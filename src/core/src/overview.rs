@@ -47,6 +47,12 @@ const OVERVIEW_STREAM_TYPES: [StreamType; 4] = [
     StreamType::EnrichmentTables,
 ];
 
+/// Stats refresh lags ingestion, so a shorter gap would flag streams that are still writing.
+const QUIET_AFTER_MICROS: i64 = 3_600 * 1_000_000;
+/// Streams silent longer than this are treated as abandoned, not newly quiet.
+const QUIET_FORGOTTEN_AFTER_MICROS: i64 = 7 * 24 * 3_600 * 1_000_000;
+const DAY_MICROS: i64 = 24 * 3_600 * 1_000_000;
+
 const ALERT_ID_CHUNK: usize = 500;
 const CACHE_MAX_ENTRIES: usize = 1024;
 const ALERT_STATE_KEYS: [&str; 9] = [
@@ -129,6 +135,7 @@ impl<T> Section<T> {
         }
     }
 
+    #[cfg(any(not(feature = "enterprise"), feature = "cloud", test))]
     fn locked(reason: &str) -> Self {
         Self {
             status: SectionStatus::Locked,
@@ -173,6 +180,21 @@ pub struct StreamsData {
     pub total_streams: u64,
     pub total_storage_size_mb: f64,
     pub by_type: Vec<StreamTypeSummary>,
+    /// User streams that stopped writing between one hour and seven days ago.
+    pub quiet_count: usize,
+    /// Oldest-silent first, capped at `top`.
+    pub quiet: Vec<QuietStream>,
+    /// Schema versions created in the last 24 hours across the visible user streams.
+    pub schema_changes_24h: u64,
+    /// Pending compaction jobs for the org; `None` when the lookup fails.
+    pub compaction_pending: Option<i64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct QuietStream {
+    pub name: String,
+    pub stream_type: String,
+    pub last_write: i64,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -203,6 +225,18 @@ pub struct AlertsData {
     pub by_level: BTreeMap<String, u64>,
     /// Same count as `by_state.error`; do not add the two together.
     pub failed_evaluation: u64,
+    /// Oldest-firing first, capped at `top`.
+    pub firing: Vec<FiringAlert>,
+    /// Same keys as `by_level`, counting only firing rules, uncapped.
+    pub firing_by_level: BTreeMap<String, u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct FiringAlert {
+    pub name: String,
+    pub stream: String,
+    pub level: Option<String>,
+    pub since: i64,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -221,10 +255,20 @@ pub struct LimitsData {
     pub ingestion_used_percent: f64,
     pub expired: bool,
     pub days_over_limit: u8,
+    pub used_today_gb: Option<f64>,
+    pub limit_today_gb: Option<f64>,
+    pub allowed_days: Option<u32>,
+    /// Next UTC midnight, when the daily ingestion counter resets.
+    pub resets_at: i64,
 }
 
 pub fn normalize_top_n(requested: Option<usize>) -> usize {
     requested.unwrap_or(DEFAULT_TOP_N).clamp(1, MAX_TOP_N)
+}
+
+/// Microsecond timestamp of the next UTC midnight after `now`.
+pub fn next_utc_midnight_micros(now: i64) -> i64 {
+    (now.div_euclid(DAY_MICROS) + 1) * DAY_MICROS
 }
 
 /// Resolves which streams and pipelines the caller may see; errors when the grant lookup fails.
@@ -248,10 +292,10 @@ pub async fn resolve_scope(org_id: &str, user_id: &str) -> Result<OverviewScope,
 }
 
 /// Overview when grants cannot be resolved; alerts still load on their own permission check.
-pub async fn scope_unavailable(org_id: &str, user_id: &str) -> Overview {
+pub async fn scope_unavailable(org_id: &str, user_id: &str, top_n: usize) -> Overview {
     Overview {
         streams: Section::error("failed to resolve permissions"),
-        alerts: Section::from_result(load_alerts(org_id, user_id).await, "alerts"),
+        alerts: Section::from_result(load_alerts(org_id, user_id, top_n).await, "alerts"),
         pipelines: Section::error("failed to resolve permissions"),
         limits: limits_section().await,
         generated_at: now_micros(),
@@ -310,7 +354,7 @@ async fn build_overview(org_id: &str, scope: &OverviewScope, top_n: usize) -> Ov
             }
             Section::from_result(load_streams(org_id, scope, top_n).await, "streams")
         },
-        async { Section::from_result(load_alerts(org_id, &scope.user_id).await, "alerts") },
+        async { Section::from_result(load_alerts(org_id, &scope.user_id, top_n).await, "alerts") },
         async {
             if scope.pipeline_grants.as_ref().is_some_and(Vec::is_empty) {
                 return Section::forbidden();
@@ -371,10 +415,73 @@ async fn load_streams(
         let grants = scope.stream_grants.get(&stream_type).cloned();
         streams.extend(try_get_streams(org_id, Some(stream_type), false, grants).await?);
     }
-    Ok(build_streams_data(streams, top_n))
+    let now = now_micros();
+    let schema_changes_24h = count_schema_changes(org_id, &streams, now - DAY_MICROS).await;
+    let mut data = build_streams_data(streams, top_n, now);
+    data.schema_changes_24h = schema_changes_24h;
+    data.compaction_pending = pending_compaction(org_id).await;
+    Ok(data)
 }
 
-fn build_streams_data(streams: Vec<Stream>, top_n: usize) -> StreamsData {
+/// Counts cached schema versions started since `since`; the cache lookup never hits the db.
+async fn count_schema_changes(org_id: &str, streams: &[Stream], since: i64) -> u64 {
+    let mut total = 0;
+    for s in streams.iter().filter(|s| is_quiet_candidate(s)) {
+        total += infra::schema::count_cached_versions_since(org_id, s.stream_type, &s.name, since)
+            .await as u64;
+    }
+    total
+}
+
+async fn pending_compaction(org_id: &str) -> Option<i64> {
+    match infra::file_list::get_pending_jobs_count().await {
+        Ok(counts) => Some(sum_pending_for_org(&counts, org_id)),
+        Err(e) => {
+            log::warn!("[overview] failed to load pending compaction jobs: {e}");
+            None
+        }
+    }
+}
+
+fn sum_pending_for_org(counts: &HashMap<String, HashMap<String, i64>>, org_id: &str) -> i64 {
+    counts
+        .get(org_id)
+        .map_or(0, |by_type| by_type.values().sum())
+}
+
+/// User data streams only; enrichment tables and protected internal streams are left out.
+fn is_quiet_candidate(stream: &Stream) -> bool {
+    matches!(
+        stream.stream_type,
+        StreamType::Logs | StreamType::Metrics | StreamType::Traces
+    ) && !is_protected_ai_chat_stream(&stream.name)
+}
+
+fn quiet_streams(streams: &[Stream], now: i64, top_n: usize) -> (usize, Vec<QuietStream>) {
+    let mut quiet: Vec<QuietStream> = streams
+        .iter()
+        .filter(|s| is_quiet_candidate(s))
+        .filter(|s| {
+            let last = s.stats.doc_time_max;
+            last < now - QUIET_AFTER_MICROS && last > now - QUIET_FORGOTTEN_AFTER_MICROS
+        })
+        .map(|s| QuietStream {
+            name: s.name.clone(),
+            stream_type: s.stream_type.to_string(),
+            last_write: s.stats.doc_time_max,
+        })
+        .collect();
+    quiet.sort_by(|a, b| {
+        a.last_write
+            .cmp(&b.last_write)
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    let count = quiet.len();
+    quiet.truncate(top_n);
+    (count, quiet)
+}
+
+fn build_streams_data(streams: Vec<Stream>, top_n: usize, now: i64) -> StreamsData {
     let mut by_type = Vec::with_capacity(OVERVIEW_STREAM_TYPES.len());
     for stream_type in OVERVIEW_STREAM_TYPES {
         let mut of_type: Vec<&Stream> = streams
@@ -408,14 +515,23 @@ fn build_streams_data(streams: Vec<Stream>, top_n: usize) -> StreamsData {
                 .collect(),
         });
     }
+    let (quiet_count, quiet) = quiet_streams(&streams, now, top_n);
     StreamsData {
         total_streams: by_type.iter().map(|t| t.count).sum(),
         total_storage_size_mb: by_type.iter().fold(0.0, |acc, t| acc + t.storage_size_mb),
         by_type,
+        quiet_count,
+        quiet,
+        schema_changes_24h: 0,
+        compaction_pending: None,
     }
 }
 
-async fn load_alerts(org_id: &str, user_id: &str) -> Result<AlertsData, anyhow::Error> {
+async fn load_alerts(
+    org_id: &str,
+    user_id: &str,
+    top_n: usize,
+) -> Result<AlertsData, anyhow::Error> {
     let conn = get_orm_client_ro().await;
     let alerts: Vec<Alert> =
         crate::alerts::alert::list_v2(conn, Some(user_id), ListAlertsParams::new(org_id))
@@ -432,20 +548,19 @@ async fn load_alerts(org_id: &str, user_id: &str) -> Result<AlertsData, anyhow::
     for chunk in ids.chunks(ALERT_ID_CHUNK) {
         states.extend(infra::table::alert_states::get_rollups(chunk).await?);
     }
-    Ok(build_alerts_data(&alerts, &states))
+    Ok(build_alerts_data(&alerts, &states, top_n))
 }
 
-fn build_alerts_data(alerts: &[Alert], states: &[AlertState]) -> AlertsData {
+fn build_alerts_data(alerts: &[Alert], states: &[AlertState], top_n: usize) -> AlertsData {
     let by_id: HashMap<String, &AlertState> =
         states.iter().map(|s| (s.alert_id.clone(), s)).collect();
     let mut by_state: BTreeMap<String, u64> = ALERT_STATE_KEYS
         .iter()
         .map(|k| (k.to_string(), 0))
         .collect();
-    let mut by_level: BTreeMap<String, u64> = ALERT_LEVEL_KEYS
-        .iter()
-        .map(|k| (k.to_string(), 0))
-        .collect();
+    let mut by_level = zeroed_levels();
+    let mut firing_by_level = zeroed_levels();
+    let mut firing = Vec::new();
     let mut enabled = 0;
     let mut failed_evaluation = 0;
     for alert in alerts.iter().filter(|a| a.enabled) {
@@ -457,11 +572,24 @@ fn build_alerts_data(alerts: &[Alert], states: &[AlertState]) -> AlertsData {
         let level_key = state
             .and_then(|s| s.level)
             .map_or("unclassified".to_string(), |l| l.to_string());
+        if let Some(state) =
+            state.filter(|s| s.last_outcome.as_ref().is_some_and(|o| o.is_firing()))
+        {
+            *firing_by_level.entry(level_key.clone()).or_insert(0) += 1;
+            firing.push(FiringAlert {
+                name: alert.name.clone(),
+                stream: alert.stream_name.clone(),
+                level: Some(level_key.clone()),
+                since: state.since.or(state.last_outcome_at).unwrap_or(0),
+            });
+        }
         *by_level.entry(level_key).or_insert(0) += 1;
         if outcome.is_some_and(|o| o.as_str() == "error") {
             failed_evaluation += 1;
         }
     }
+    firing.sort_by(|a, b| a.since.cmp(&b.since).then_with(|| a.name.cmp(&b.name)));
+    firing.truncate(top_n);
     AlertsData {
         total: alerts.len() as u64,
         enabled,
@@ -469,7 +597,16 @@ fn build_alerts_data(alerts: &[Alert], states: &[AlertState]) -> AlertsData {
         by_state,
         by_level,
         failed_evaluation,
+        firing,
+        firing_by_level,
     }
+}
+
+fn zeroed_levels() -> BTreeMap<String, u64> {
+    ALERT_LEVEL_KEYS
+        .iter()
+        .map(|k| (k.to_string(), 0))
+        .collect()
 }
 
 async fn load_pipelines(
@@ -501,14 +638,19 @@ fn build_pipelines_data(pipelines: &[Pipeline], errored: &HashSet<String>) -> Pi
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 async fn limits_section() -> Section<LimitsData> {
     use o2_enterprise::enterprise::license::{
-        ingestion_limit_exceeded_count, ingestion_used, license_expired,
+        ingestion_limit_exceeded_count, ingestion_used, license_expired, license_status,
     };
 
+    let decision = license_status().await.decision;
     Section::ok(LimitsData {
         scope: "deployment",
         ingestion_used_percent: ingestion_used() * 100.0,
         expired: license_expired().await,
         days_over_limit: ingestion_limit_exceeded_count(),
+        used_today_gb: Some(decision.used_today_gb),
+        limit_today_gb: decision.limit_today_gb,
+        allowed_days: Some(decision.allowed_days),
+        resets_at: next_utc_midnight_micros(now_micros()),
     })
 }
 
@@ -592,7 +734,7 @@ mod tests {
             stream("m1", StreamType::Metrics, 2.0, 20),
             stream("internal", StreamType::Index, 100.0, 1),
         ];
-        let data = build_streams_data(streams, 2);
+        let data = build_streams_data(streams, 2, now_micros());
         assert_eq!(data.total_streams, 4);
         assert_eq!(data.total_storage_size_mb, 17.0);
         let logs = &data.by_type[0];
@@ -617,7 +759,7 @@ mod tests {
             state(&a2, Some(RunOutcome::Error), None),
             state(&a4, Some(RunOutcome::Firing), Some(AlertLevel::Warning)),
         ];
-        let data = build_alerts_data(&[a1, a2, a3, a4], &states);
+        let data = build_alerts_data(&[a1, a2, a3, a4], &states, 5);
         assert_eq!((data.total, data.enabled, data.disabled), (4, 3, 1));
         assert_eq!(data.by_state["firing"], 1);
         assert_eq!(data.by_state["error"], 1);
@@ -774,6 +916,7 @@ mod tests {
             streams: Section::ok(build_streams_data(
                 vec![stream("only_for_admin", StreamType::Logs, 7.0, 1)],
                 5,
+                now_micros(),
             )),
             alerts: Section::locked("test"),
             pipelines: Section::locked("test"),
@@ -794,5 +937,154 @@ mod tests {
             top_n: 5,
         };
         assert!(CACHE.get(&limited_key).is_none());
+    }
+
+    fn stream_at(name: &str, stream_type: StreamType, doc_time_max: i64) -> Stream {
+        let mut s = stream(name, stream_type, 1.0, 1);
+        s.stats.doc_time_max = doc_time_max;
+        s
+    }
+
+    const MIN: i64 = 60 * 1_000_000;
+
+    #[test]
+    fn test_quiet_streams_classified_at_boundaries() {
+        let now = 100 * DAY_MICROS;
+        let streams = vec![
+            stream_at("m59", StreamType::Logs, now - 59 * MIN),
+            stream_at("m61", StreamType::Logs, now - 61 * MIN),
+            stream_at("d6", StreamType::Metrics, now - 6 * DAY_MICROS),
+            stream_at("d8", StreamType::Traces, now - 8 * DAY_MICROS),
+            stream_at("unknown", StreamType::Logs, 0),
+            stream_at("lookup", StreamType::EnrichmentTables, now - 2 * 60 * MIN),
+            stream_at("index", StreamType::Index, now - 2 * 60 * MIN),
+        ];
+        let (count, quiet) = quiet_streams(&streams, now, 1);
+        assert_eq!(count, 2);
+        assert_eq!(quiet.len(), 1);
+        assert_eq!(quiet[0].name, "d6");
+        assert_eq!(quiet[0].stream_type, "metrics");
+        let (_, all) = quiet_streams(&streams, now, 5);
+        let names: Vec<&str> = all.iter().map(|q| q.name.as_str()).collect();
+        assert_eq!(names, vec!["d6", "m61"]);
+    }
+
+    #[test]
+    fn test_streams_data_serializes_added_fields_when_empty() {
+        let data = build_streams_data(vec![], 5, now_micros());
+        let v = serde_json::to_value(&data).unwrap();
+        assert_eq!(v["quiet_count"], 0);
+        assert_eq!(v["quiet"], serde_json::json!([]));
+        assert_eq!(v["schema_changes_24h"], 0);
+        assert!(v["compaction_pending"].is_null());
+    }
+
+    #[test]
+    fn test_sum_pending_for_org_adds_stream_types() {
+        let counts = HashMap::from([
+            (
+                "o1".to_string(),
+                HashMap::from([("logs".to_string(), 3), ("metrics".to_string(), 4)]),
+            ),
+            ("o2".to_string(), HashMap::from([("logs".to_string(), 9)])),
+        ]);
+        assert_eq!(sum_pending_for_org(&counts, "o1"), 7);
+        assert_eq!(sum_pending_for_org(&counts, "none"), 0);
+    }
+
+    #[tokio::test]
+    async fn test_count_schema_changes_counts_recent_versions_of_user_streams() {
+        let org = "overview_schema_changes_org";
+        let schema = Schema::new(vec![Field::new("f", DataType::Utf8, true)]);
+        let now = now_micros();
+        {
+            let mut w = infra::schema::STREAM_SCHEMAS.write().await;
+            w.insert(
+                format!("{org}/logs/app"),
+                vec![
+                    (now - 2 * DAY_MICROS, schema.clone()),
+                    (now - 1_000_000, schema.clone()),
+                    (now - 2_000_000, schema.clone()),
+                ],
+            );
+            w.insert(
+                format!("{org}/enrichment_tables/lookup"),
+                vec![(now - 1_000_000, schema)],
+            );
+        }
+        let streams = vec![
+            stream("app", StreamType::Logs, 1.0, 1),
+            stream("lookup", StreamType::EnrichmentTables, 1.0, 1),
+            stream("absent", StreamType::Logs, 1.0, 1),
+        ];
+        assert_eq!(
+            count_schema_changes(org, &streams, now - DAY_MICROS).await,
+            2
+        );
+    }
+
+    #[test]
+    fn test_next_utc_midnight_micros() {
+        let midnight = 20_000 * DAY_MICROS;
+        assert_eq!(next_utc_midnight_micros(midnight), midnight + DAY_MICROS);
+        assert_eq!(
+            next_utc_midnight_micros(midnight + 5),
+            midnight + DAY_MICROS
+        );
+        assert_eq!(
+            next_utc_midnight_micros(midnight + DAY_MICROS - 1),
+            midnight + DAY_MICROS
+        );
+    }
+
+    #[test]
+    fn test_firing_alerts_sorted_oldest_first_capped_with_level_counts() {
+        let ids = [
+            "2Z8rVTbWbyUjb3hIibV02e0sqHA",
+            "2Z8rVTbWbyUjb3hIibV02e0sqHB",
+            "2Z8rVTbWbyUjb3hIibV02e0sqHC",
+            "2Z8rVTbWbyUjb3hIibV02e0sqHD",
+        ];
+        let alerts: Vec<Alert> = ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| {
+                serde_json::from_value(serde_json::json!({
+                    "id": id, "enabled": true, "name": format!("a{i}"), "stream_name": "s"
+                }))
+                .unwrap()
+            })
+            .collect();
+        let mut states = vec![
+            state(
+                &alerts[0],
+                Some(RunOutcome::Firing),
+                Some(AlertLevel::Critical),
+            ),
+            state(&alerts[1], Some(RunOutcome::NotifyFailed), None),
+            state(
+                &alerts[2],
+                Some(RunOutcome::Firing),
+                Some(AlertLevel::Critical),
+            ),
+            state(&alerts[3], Some(RunOutcome::Normal), Some(AlertLevel::Ok)),
+        ];
+        states[0].since = Some(300);
+        states[1].since = Some(100);
+        states[2].since = Some(200);
+        let data = build_alerts_data(&alerts, &states, 2);
+        let names: Vec<&str> = data.firing.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, vec!["a1", "a2"]);
+        assert_eq!(data.firing[0].level.as_deref(), Some("unclassified"));
+        assert_eq!(data.firing[1].level.as_deref(), Some("critical"));
+        assert_eq!(data.firing[0].since, 100);
+        assert_eq!(data.firing_by_level["critical"], 2);
+        assert_eq!(data.firing_by_level["unclassified"], 1);
+        assert_eq!(data.firing_by_level["ok"], 0);
+        assert_eq!(data.by_level["ok"], 1);
+        let empty = build_alerts_data(&[], &[], 5);
+        let v = serde_json::to_value(&empty).unwrap();
+        assert_eq!(v["firing"], serde_json::json!([]));
+        assert_eq!(v["firing_by_level"]["warning"], 0);
     }
 }

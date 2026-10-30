@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OStatStrip
     :items="items"
     :loading="pending"
+    compact
     selectable
     data-test="overview-headline-strip"
     @select="(key) => emit('select', key as OverviewTarget)"
@@ -27,11 +28,11 @@ import { computed } from "vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { formatSizeFromMB } from "@/utils/formatters";
 import type { OrgOverview, OverviewSection } from "@/ts/interfaces/overview";
-import { firingCount, sectionView } from "./overviewFormat";
+import { firingCount, firingRows, levelCount, microsToMs, sectionView } from "./overviewFormat";
+import { useOverviewTime } from "./useOverviewTime";
 
-export type OverviewTarget = "firing" | "failing" | "incidents" | "pipelines" | "streams";
+export type OverviewTarget = "firing" | "failing" | "incidents" | "pipelines" | "quiet" | "streams";
 export type IncidentsTile = "ok" | "loading" | "error" | "locked" | "unavailable";
 
 const props = defineProps<{
@@ -46,6 +47,7 @@ const props = defineProps<{
 const emit = defineEmits<{ select: [target: OverviewTarget] }>();
 
 const { t } = useI18nTyped();
+const { formatElapsed } = useOverviewTime();
 
 const DASH = raw("—");
 
@@ -76,12 +78,25 @@ const pipelinesSub = (tile: { ok: boolean; note?: I18nText }): I18nText | undefi
   return enabled > 0 ? t("overview.cards.pipelinesOf", { enabled }) : undefined;
 };
 
+// one short piece only: the tile has room for "2 critical" or "oldest 1h 0m", not both
+const firingSub = (tile: { ok: boolean; note?: I18nText }): I18nText | undefined => {
+  if (!tile.ok) return tile.note;
+  const alerts = props.overview?.alerts.data;
+  const critical = levelCount(alerts, "critical");
+  if (critical > 0) return t("overview.cards.firingCritical", { count: critical });
+  const oldest = firingRows(alerts)[0];
+  if (!oldest) return undefined;
+  const age = formatElapsed(Date.now() - microsToMs(oldest.since));
+  return t("overview.cards.firingOldest", { age });
+};
+
 const items = computed<StatItem[]>(() => {
   const o = props.overview;
   const firing = sectionTile(o?.alerts, (d) => firingCount(d));
   const failing = sectionTile(o?.alerts, (d) => d.failed_evaluation);
   const pipelines = sectionTile(o?.pipelines, (d) => d.errored);
   const streams = sectionTile(o?.streams, (d) => d.total_streams);
+  const quiet = sectionTile(o?.streams, (d) => d.quiet_count);
   const incidentNote: Record<IncidentsTile, I18nText | undefined> = {
     ok: undefined,
     loading: undefined,
@@ -95,7 +110,7 @@ const items = computed<StatItem[]>(() => {
       key: "firing",
       label: t("overview.cards.firingAlerts"),
       value: firing.value,
-      sub: firing.note,
+      sub: firingSub(firing),
       icon: "notifications",
       tone: firing.ok && Number(firing.value) > 0 ? "error" : "neutral",
       dataTest: "overview-headline-firing",
@@ -129,12 +144,19 @@ const items = computed<StatItem[]>(() => {
       dataTest: "overview-headline-pipelines",
     },
     {
+      key: "quiet",
+      label: t("overview.cards.quietStreams"),
+      value: quiet.value,
+      sub: quiet.ok ? undefined : quiet.note,
+      icon: "schedule",
+      tone: quiet.ok && Number(quiet.value) > 0 ? "warning" : "neutral",
+      dataTest: "overview-headline-quiet",
+    },
+    {
       key: "streams",
       label: t("overview.cards.streams"),
       value: streams.value,
-      sub: streams.ok
-        ? raw(formatSizeFromMB(o?.streams.data?.total_storage_size_mb ?? 0))
-        : streams.note,
+      sub: streams.ok ? undefined : streams.note,
       icon: "storage",
       // no real maximum exists, so a huge one keeps the tile bar from drawing full
       max: Number.MAX_SAFE_INTEGER,

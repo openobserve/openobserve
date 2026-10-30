@@ -42,6 +42,10 @@ export const buildOverview = (over: Partial<OrgOverview> = {}): OrgOverview => (
         top: [{ name: "cpu_usage", doc_num: 50, storage_size_mb: 512 }],
       },
     ],
+    quiet_count: 3,
+    quiet: [{ name: "old_logs", stream_type: "logs", last_write: 1_699_990_000_000_000 }],
+    schema_changes_24h: 5,
+    compaction_pending: 12,
   }),
   alerts: ok({
     total: 12,
@@ -50,6 +54,11 @@ export const buildOverview = (over: Partial<OrgOverview> = {}): OrgOverview => (
     by_state: { firing: 3, pending: 2, error: 4, normal: 1 },
     by_level: {},
     failed_evaluation: 4,
+    firing: [
+      { name: "high_cpu", stream: "cpu_usage", level: "critical", since: 1_699_996_400_000_000 },
+      { name: "slow_requests", stream: "web_logs", level: "warning", since: 1_699_999_000_000_000 },
+    ],
+    firing_by_level: { ok: 0, warning: 1, critical: 2, no_data: 0, unclassified: 0 },
   }),
   pipelines: ok({ total: 9, enabled: 8, disabled: 1, errored: 2 }),
   limits: ok({
@@ -57,6 +66,10 @@ export const buildOverview = (over: Partial<OrgOverview> = {}): OrgOverview => (
     ingestion_used_percent: 85.5,
     expired: false,
     days_over_limit: 1,
+    used_today_gb: 85.5,
+    limit_today_gb: 100,
+    allowed_days: 3,
+    resets_at: 1_700_006_400_000_000,
   }),
   generated_at: 1_700_000_000_000_000,
   cached: false,
@@ -72,6 +85,8 @@ export const buildHealthyOverview = (): OrgOverview =>
       by_state: { firing: 0, pending: 0, error: 0, normal: 10 },
       by_level: {},
       failed_evaluation: 0,
+      firing: [],
+      firing_by_level: { ok: 0, warning: 0, critical: 0, no_data: 0, unclassified: 0 },
     }),
     pipelines: ok({ total: 9, enabled: 8, disabled: 1, errored: 0 }),
   });

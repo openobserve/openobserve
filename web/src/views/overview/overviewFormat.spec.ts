@@ -15,12 +15,19 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  elapsedParts,
+  firingTotal,
+  levelCount,
   mergeTopStreams,
+  percentOf,
   percentToFraction,
   percentVariant,
   sectionView,
+  signalSplit,
+  signalVariant,
   sizeShare,
 } from "./overviewFormat";
+import { buildOverview } from "./overviewFixtures";
 import type { OverviewStreamTypeSummary } from "@/ts/interfaces/overview";
 
 const summary = (stream_type: string, top: Array<[string, number]>): OverviewStreamTypeSummary => ({
@@ -95,5 +102,80 @@ describe("top streams", () => {
     const rows = mergeTopStreams(byType);
     expect(sizeShare(450, rows)).toBe(0.5);
     expect(sizeShare(5, [])).toBe(0);
+  });
+});
+
+describe("percentOf", () => {
+  it("rounds to a whole percent", () => {
+    expect(percentOf(1, 3)).toBe(33);
+    expect(percentOf(2, 3)).toBe(67);
+    expect(percentOf(512, 2048)).toBe(25);
+  });
+
+  it("is zero, not NaN or Infinity, for a zero total", () => {
+    expect(percentOf(5, 0)).toBe(0);
+    expect(percentOf(0, 0)).toBe(0);
+  });
+});
+
+describe("signalSplit", () => {
+  const typed = (stream_type: string, storage_size_mb: number): OverviewStreamTypeSummary => ({
+    ...summary(stream_type, []),
+    storage_size_mb,
+  });
+
+  it("splits logs, metrics and traces by stored size and ignores other types", () => {
+    const rows = signalSplit([
+      typed("logs", 710),
+      typed("metrics", 190),
+      typed("traces", 100),
+      typed("enrichment_tables", 99999),
+    ]);
+    expect(rows.map((r) => [r.signal, r.percent])).toEqual([
+      ["logs", 71],
+      ["metrics", 19],
+      ["traces", 10],
+    ]);
+    expect(rows.map((r) => r.segment.pct)).toEqual([71, 19, 10]);
+  });
+
+  it("returns zero shares for a zero total and for missing signals", () => {
+    const rows = signalSplit([typed("logs", 0)]);
+    expect(rows.map((r) => r.percent)).toEqual([0, 0, 0]);
+    expect(rows.map((r) => r.segment.pct)).toEqual([0, 0, 0]);
+    expect(signalSplit([]).map((r) => r.sizeMb)).toEqual([0, 0, 0]);
+  });
+
+  it("gives each signal a distinct colour and unknown types a neutral grey", () => {
+    const variants = ["logs", "metrics", "traces"].map(signalVariant);
+    expect(new Set(variants).size).toBe(3);
+    expect(signalVariant("enrichment_tables")).toBe("muted");
+  });
+});
+
+describe("elapsedParts", () => {
+  it("splits milliseconds into days, hours and minutes", () => {
+    expect(elapsedParts((26 * 60 + 5) * 60_000)).toEqual({ days: 1, hours: 2, minutes: 5 });
+    expect(elapsedParts(59_999)).toEqual({ days: 0, hours: 0, minutes: 0 });
+    expect(elapsedParts(9 * 3_600_000 + 40 * 60_000)).toEqual({ days: 0, hours: 9, minutes: 40 });
+  });
+
+  it("never goes negative", () => {
+    expect(elapsedParts(-120_000)).toEqual({ days: 0, hours: 0, minutes: 0 });
+  });
+});
+
+describe("firing totals", () => {
+  const alerts = buildOverview().alerts.data!;
+
+  it("reads the per-level counts", () => {
+    expect(levelCount(alerts, "critical")).toBe(2);
+    expect(levelCount(undefined, "critical")).toBe(0);
+  });
+
+  it("totals every firing level, or falls back to the state counts without levels", () => {
+    expect(firingTotal(alerts)).toBe(3);
+    const noLevels = { ...alerts, firing_by_level: undefined } as never;
+    expect(firingTotal(noLevels)).toBe(3);
   });
 });

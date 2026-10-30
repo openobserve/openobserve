@@ -40,16 +40,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OEmptyState>
     </template>
-    <ul class="flex flex-col" data-test="overview-alerts-rows">
-      <li v-for="row in rows" :key="row.key">
-        <OverviewRowButton :data-test="`overview-alerts-row-${row.key}`" @click="emit('open')">
-          <span class="text-text-body text-sm">{{ row.label }}</span>
-          <OTag type="countChip" :value="row.count > 0 ? row.tone : 'neutral'">{{
-            row.count
-          }}</OTag>
-        </OverviewRowButton>
-      </li>
-    </ul>
+    <div class="flex flex-col gap-4">
+      <ul class="grid grid-cols-4 gap-3 max-md:grid-cols-2" data-test="overview-alerts-tiles">
+        <li
+          v-for="tile in tiles"
+          :key="tile.key"
+          class="flex flex-col gap-0.5"
+          :data-test="`overview-alerts-tile-${tile.key}`"
+        >
+          <span :class="['text-2xl font-semibold tabular-nums', tile.valueClass]">{{
+            tile.value
+          }}</span>
+          <span class="text-text-secondary text-xs">{{ tile.label }}</span>
+        </li>
+      </ul>
+      <div data-test="overview-alerts-firing">
+        <div class="mb-1 flex items-center justify-between gap-3 px-2">
+          <span class="text-text-label text-xs font-medium">{{
+            t("overview.alerts.firingNow")
+          }}</span>
+          <span v-if="rows.length > 0" class="text-text-label text-xs font-medium">{{
+            t("overview.alerts.firingFor")
+          }}</span>
+        </div>
+        <p
+          v-if="rows.length === 0"
+          class="text-text-secondary px-2 py-1.5 text-sm"
+          data-test="overview-alerts-all-clear"
+        >
+          {{ t("overview.alerts.allClear") }}
+        </p>
+        <ul v-else class="flex flex-col">
+          <li v-for="row in rows" :key="`${row.stream}-${row.name}`">
+            <OverviewRowButton
+              :data-test="`overview-alerts-firing-${row.name}`"
+              @click="emit('open')"
+            >
+              <span class="flex min-w-0 items-center gap-2">
+                <OTag
+                  type="countChip"
+                  :value="levelTone(row.level)"
+                  class="shrink-0"
+                  :data-test="`overview-alerts-firing-level-${row.name}`"
+                  >{{ t(`overview.level.${row.level}`) }}</OTag
+                >
+                <OTruncatedText class="text-text-body text-sm">{{ raw(row.name) }}</OTruncatedText>
+                <OTruncatedText class="text-text-secondary text-xs max-md:hidden">{{
+                  raw(row.stream)
+                }}</OTruncatedText>
+              </span>
+              <span class="text-text-secondary shrink-0 text-xs tabular-nums">{{ row.age }}</span>
+            </OverviewRowButton>
+          </li>
+        </ul>
+        <OButton
+          v-if="remaining > 0"
+          variant="ghost-primary"
+          size="sm"
+          data-test="overview-alerts-show-more"
+          @click="emit('open')"
+        >
+          {{ t("overview.alerts.showMore", { count: remaining }, remaining) }}
+        </OButton>
+      </div>
+    </div>
   </OverviewSectionCard>
 </template>
 
@@ -58,49 +112,83 @@ import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import { useI18nTyped } from "@/types/i18n";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { OverviewAlertsData, OverviewSection } from "@/ts/interfaces/overview";
+import type { IncidentsTile } from "./OverviewHeadlineStrip.vue";
 import OverviewRowButton from "./OverviewRowButton.vue";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
-import { firingCount, sectionView } from "./overviewFormat";
+import {
+  firingRows,
+  firingTotal,
+  levelCount,
+  levelTone,
+  microsToMs,
+  sectionView,
+} from "./overviewFormat";
+import { useOverviewTime } from "./useOverviewTime";
 
 const props = defineProps<{
   section?: OverviewSection<OverviewAlertsData>;
   pending: boolean;
   failed: boolean;
   forbidden?: boolean;
+  incidentsState?: IncidentsTile;
+  incidentsTotal?: number;
 }>();
 
 const emit = defineEmits<{ retry: []; open: [] }>();
 
 const { t } = useI18nTyped();
+const { formatElapsed } = useOverviewTime();
 
 const view = computed(() => {
   const base = sectionView(props.section, props);
   return base === "ok" && props.section?.data?.total === 0 ? "empty" : base;
 });
 
-const rows = computed(() => {
+// the age is read at render time so each new overview snapshot restarts it from the current clock
+const rows = computed(() =>
+  firingRows(props.section?.data).map((row) => ({
+    ...row,
+    age: formatElapsed(Date.now() - microsToMs(row.since)),
+  })),
+);
+const remaining = computed(() => Math.max(0, firingTotal(props.section?.data) - rows.value.length));
+
+const tiles = computed(() => {
   const data = props.section?.data;
-  return [
+  const critical = levelCount(data, "critical");
+  const warning = levelCount(data, "warning");
+  const failing = data?.failed_evaluation ?? 0;
+  const list = [
     {
-      key: "firing",
-      label: t("overview.alerts.firing"),
-      count: firingCount(data),
-      tone: "error",
+      key: "critical",
+      label: t("overview.alerts.criticalLevel"),
+      value: critical,
+      valueClass: critical > 0 ? "text-status-negative" : "text-text-heading",
     },
     {
-      key: "pending",
-      label: t("overview.alerts.pending"),
-      count: data?.by_state.pending ?? 0,
-      tone: "warning",
-    },
-    {
-      key: "failing",
-      label: t("overview.alerts.failing"),
-      count: data?.failed_evaluation ?? 0,
-      tone: "error",
+      key: "warning",
+      label: t("overview.alerts.warningLevel"),
+      value: warning,
+      valueClass: warning > 0 ? "text-status-warning-text" : "text-text-heading",
     },
   ];
+  if (props.incidentsState === "ok") {
+    list.push({
+      key: "incidents",
+      label: t("overview.cards.openIncidents"),
+      value: props.incidentsTotal ?? 0,
+      valueClass: "text-text-heading",
+    });
+  }
+  list.push({
+    key: "failing",
+    label: t("overview.alerts.failing"),
+    value: failing,
+    valueClass: failing > 0 ? "text-status-negative" : "text-text-heading",
+  });
+  return list;
 });
 </script>

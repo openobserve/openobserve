@@ -241,6 +241,21 @@ pub async fn get_from_db(
     })
 }
 
+/// Counts cached schema versions that started at or after `since`; never touches the db.
+pub async fn count_cached_versions_since(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    since: i64,
+) -> usize {
+    let key = mk_key(org_id, stream_type, stream_name);
+    let cache_key = key.strip_prefix(SCHEMA_KEY).unwrap_or(&key);
+    let r = STREAM_SCHEMAS.read().await;
+    r.get(cache_key).map_or(0, |versions| {
+        versions.iter().filter(|(t, _)| *t >= since).count()
+    })
+}
+
 #[tracing::instrument(name = "infra:schema:get_versions", skip_all)]
 pub async fn get_versions(
     org_id: &str,
