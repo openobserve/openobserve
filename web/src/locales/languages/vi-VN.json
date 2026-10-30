@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "Không có dữ liệu mạng cho chế độ xem này",
     "apiEmptyDescription": "Stream đã chọn không có yêu cầu tài nguyên hoặc mạng trong khoảng thời gian này. Các chỉ số mạng sẽ xuất hiện sau khi ứng dụng ghi nhận các lệnh gọi HTTP của nó.",
     "skipInactivity": "Bỏ qua không hoạt động",
+    "fullScreen": "Toàn màn hình",
+    "exitFullScreen": "Thoát toàn màn hình",
     "error": "Lỗi",
     "errorCount": "Số lỗi",
     "all": "Tất cả",

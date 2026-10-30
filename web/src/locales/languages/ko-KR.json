@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "이 보기에 대한 네트워크 데이터 없음",
     "apiEmptyDescription": "선택한 스트림에는 이 시간 범위에 리소스 또는 네트워크 요청이 없습니다. 네트워크 메트릭은 앱이 HTTP 호출을 계측하면 표시됩니다.",
     "skipInactivity": "비활성 건너뛰기",
+    "fullScreen": "전체 화면",
+    "exitFullScreen": "전체 화면 종료",
     "error": "오류",
     "errorCount": "오류 개수",
     "all": "모두",

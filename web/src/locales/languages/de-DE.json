@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "Keine Netzwerkdaten für diese Ansicht",
     "apiEmptyDescription": "Der ausgewählte Stream enthält keine Ressourcen- oder Netzwerkanfragen in diesem Zeitraum. Netzwerkmetriken erscheinen, sobald die App ihre HTTP-Aufrufe instrumentiert.",
     "skipInactivity": "Inaktivität überspringen",
+    "fullScreen": "Vollbild",
+    "exitFullScreen": "Vollbild beenden",
     "error": "Fehler",
     "errorCount": "Anzahl der Fehler",
     "all": "Alle",

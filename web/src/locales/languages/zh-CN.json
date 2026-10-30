@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "此视图没有网络数据",
     "apiEmptyDescription": "所选数据流在此时间范围内没有资源或网络请求。一旦应用对其 HTTP 调用进行埋点，网络指标就会显示。",
     "skipInactivity": "跳过不活动状态",
+    "fullScreen": "全屏",
+    "exitFullScreen": "退出全屏",
     "error": "错误",
     "errorCount": "错误数",
     "all": "全部",

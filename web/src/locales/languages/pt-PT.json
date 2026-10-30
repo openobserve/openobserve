@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "Sem dados de rede para esta visualização",
     "apiEmptyDescription": "O stream selecionado não tem pedidos de recurso ou rede neste intervalo de tempo. As métricas de rede aparecem quando a aplicação instrumenta as suas chamadas HTTP.",
     "skipInactivity": "Ignorar inatividade",
+    "fullScreen": "Ecrã inteiro",
+    "exitFullScreen": "Sair do ecrã inteiro",
     "error": "Erro",
     "errorCount": "Contagem de erros",
     "all": "Todos",

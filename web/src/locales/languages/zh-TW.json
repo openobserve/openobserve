@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "此檢視沒有網路資料",
     "apiEmptyDescription": "所選的資料流在此時間範圍內沒有資源或網路請求。一旦應用程式對其 HTTP 呼叫進行檢測，就會出現網路指標。",
     "skipInactivity": "跳過閒置時間",
+    "fullScreen": "全螢幕",
+    "exitFullScreen": "退出全螢幕",
     "error": "錯誤",
     "errorCount": "錯誤數",
     "all": "全部",

@@ -1817,6 +1817,8 @@
     "apiEmptyTitle": "Nessun dato di rete per questa vista",
     "apiEmptyDescription": "Lo stream selezionato non ha richieste di risorse o di rete in questo intervallo di tempo. Le metriche di rete compaiono quando l'app strumenta le sue chiamate HTTP.",
     "skipInactivity": "Salta l'inattività",
+    "fullScreen": "Schermo intero",
+    "exitFullScreen": "Esci da schermo intero",
     "error": "Errore",
     "errorCount": "Numero errori",
     "all": "Tutti",
