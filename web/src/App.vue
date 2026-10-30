@@ -57,7 +57,8 @@ export default {
 
     // Only real user interaction triggers a heartbeat; API polling never does.
     const idleLimitMs = 30 * 60 * 1000;
-    const heartbeatIntervalMs = 60 * 1000;
+    // Heartbeats must be substantially more frequent than the shortest supported idle timeout.
+    const heartbeatIntervalMs = 15 * 1000;
     let lastInteraction = Date.now();
     let lastHeartbeat = 0;
     let heartbeatPending = false;
