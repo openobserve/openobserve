@@ -465,10 +465,24 @@ where
             let auth_tokens: AuthTokens =
                 json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
             let access_token = auth_tokens.access_token;
-            if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
-                access_token
+            if let Some(session_id) = access_token.strip_prefix("session ") {
+                // Resolve server-side session on every browser request. Never fall
+                // back to the cookie's contents if the session has expired.
+                match db::session::get(session_id).await {
+                    Ok(token) if token.starts_with("Basic ") || token.starts_with("Bearer ") => {
+                        format!("{SESSION_AUTH_MARKER}{session_id}::{token}")
+                    }
+                    _ => String::new(),
+                }
+            } else if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
+                // Legacy cookies are supported only with idle enforcement disabled.
+                if config::get_config().common.session_idle_timeout > 0 {
+                    String::new()
+                } else {
+                    access_token
+                }
             } else {
-                format!("Bearer {access_token}")
+                String::new()
             }
         } else if let Some(auth_header) = parts.headers.get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
