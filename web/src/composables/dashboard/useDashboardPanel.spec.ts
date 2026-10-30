@@ -265,6 +265,47 @@ describe("useDashboardPanel", () => {
     expect(data.data.queries[1].query).toBe("stale");
   });
 
+  it("escapes stored identifiers, allows only ASC or DESC and caps a box plot's rows", () => {
+    const panel = useDashboardPanelData("dashboard-panel-test-boxplot-sql");
+    const data = panel.dashboardPanelData;
+    data.meta.streamFields.groupedFields = [{ name: "logs", schema: [{ name: "took" }] }];
+    data.data.type = "boxplot";
+    const fieldOf = (alias: string, column: string, extra = {}) => ({
+      alias,
+      column,
+      functionName: null,
+      args: [{ type: "field", value: { field: column } }],
+      ...extra,
+    });
+    const builderQuery = (sortBy: string, limit?: number) => ({
+      query: "stale",
+      customQuery: false,
+      fields: {
+        stream: 'lo"gs',
+        stream_type: "logs",
+        x: [fieldOf('x"; DROP', "host", { sortBy })],
+        y: [fieldOf('y"', "took")],
+        z: [],
+        breakdown: [],
+        filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
+      },
+      config: { limit },
+    });
+    data.data.queries = [builderQuery("ASC; DROP"), builderQuery("desc", 5), builderQuery("asc")];
+    data.layout.currentQueryIndex = 2;
+
+    panel.regenerateOtherBuilderQueries();
+
+    const [injected, limited] = data.data.queries;
+    expect(injected.query).toContain('FROM "lo""gs"');
+    expect(injected.query).toContain('GROUP BY "x""; DROP"');
+    expect(injected.query).toContain('as "y""_q1"');
+    expect(injected.query).not.toContain("ORDER BY");
+    expect(injected.query).toMatch(/LIMIT 10000$/);
+    expect(limited.query).toContain('ORDER BY "x""; DROP" DESC');
+    expect(limited.query).toMatch(/LIMIT 5$/);
+  });
+
   it("uses user defined schema when enabled", () => {
     const panel = useDashboardPanelData("dashboard-panel-test-4");
 

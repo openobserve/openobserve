@@ -507,6 +507,9 @@ export function buildSQLChartQuery(config: {
   return query;
 }
 
+/** Double-quotes a stored identifier; an imported dashboard's alias or stream must not reach the SQL as syntax. */
+const quoteIdentifier = (name: unknown): string => `"${String(name).replace(/"/g, '""')}"`;
+
 /** A box plot's builder query: the y field's five-number summary per x category, over every matching row. */
 function buildBoxplotStatsQuery(queryData: any, dashboardPanelData: any): string {
   const stream = queryData.fields.stream;
@@ -515,19 +518,26 @@ function buildBoxplotStatsQuery(queryData: any, dashboardPanelData: any): string
   const value = valueField ? buildSQLQueryFromInput(valueField, streamAlias) : "";
   if (!value) return "";
   const category = queryData.fields.x.find((field: any) => !field?.isDerived);
-  const categoryExpr = category ? buildFieldExpression(category, streamAlias) : "";
+  const categorySql = category ? buildSQLQueryFromInput(category, streamAlias) : "";
+  const categoryAlias = categorySql ? quoteIdentifier(category.alias) : "";
+  const categoryExpr = categorySql ? `${categorySql} as ${categoryAlias}` : "";
   const stats = BOXPLOT_STATS.map(
-    (stat) => `${stat.sql(value)} as "${boxplotStatAlias(valueField.alias, stat.column)}"`,
+    (stat) =>
+      `${stat.sql(value)} as ${quoteIdentifier(boxplotStatAlias(valueField.alias, stat.column))}`,
   );
 
   let query = `SELECT ${[categoryExpr, ...stats].filter(Boolean).join(", ")}`;
-  query += ` FROM "${stream}" ${buildSQLJoinsFromInput(queryData.joins, streamAlias)}`;
+  query += ` FROM ${quoteIdentifier(stream)} ${buildSQLJoinsFromInput(queryData.joins, streamAlias)}`;
   query += buildWhereClause(queryData.fields.filter.conditions, dashboardPanelData);
   if (categoryExpr) {
-    query += ` GROUP BY ${category.alias}`;
-    if (category.sortBy) query += ` ORDER BY ${category.alias} ${category.sortBy}`;
+    query += ` GROUP BY ${categoryAlias}`;
+    const direction = String(category.sortBy ?? "").toUpperCase();
+    if (["ASC", "DESC"].includes(direction)) query += ` ORDER BY ${categoryAlias} ${direction}`;
   }
-  if (queryData.config.limit > 0) query += ` LIMIT ${queryData.config.limit}`;
+  // A high-cardinality category must not return more boxes than a panel can draw.
+  const limit =
+    queryData.config.limit > 0 ? queryData.config.limit : categoryExpr ? DISTRIBUTION_ROW_LIMIT : 0;
+  if (limit) query += ` LIMIT ${limit}`;
   return query;
 }
 

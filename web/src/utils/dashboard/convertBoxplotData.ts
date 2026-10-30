@@ -322,3 +322,11 @@ export const boxplotDrilldownSeries = (options: any, params: any) => {
   const category = categories[params?.data?.[0]];
   return { __name: category, __value: params?.data?.[1], __axisValue: category };
 };
+
+/** The time a logs drilldown starts at: a time-bucket box's category, or null to keep the panel range, since a box's value[0] is never a time. */
+export const boxplotDrilldownTime = (panelSchema: any, options: any, params: any) => {
+  if (!TIME_BUCKET_FUNCTIONS.has(panelSchema?.queries?.[0]?.fields?.x?.[0]?.functionName)) {
+    return null;
+  }
+  return boxplotDrilldownSeries(options, params).__axisValue ?? null;
+};

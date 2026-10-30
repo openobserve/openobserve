@@ -16,7 +16,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { convertPanelData } from "./convertPanelData";
 import { buildSQLChartQuery } from "./dashboardAutoQueryBuilder";
-import { boxStats, boxplotDrilldownSeries, quantile } from "./convertBoxplotData";
+import {
+  boxStats,
+  boxplotDrilldownSeries,
+  boxplotDrilldownTime,
+  quantile,
+} from "./convertBoxplotData";
 
 vi.mock("./convertCustomChartData", () => ({
   runJavaScriptCode: vi.fn(),
@@ -103,12 +108,11 @@ describe("box plot", () => {
         'approx_percentile_cont(latency_ms, 0.5) as "y_axis_1_median", ' +
         'approx_percentile_cont(latency_ms, 0.75) as "y_axis_1_q3", ' +
         'max(latency_ms) as "y_axis_1_max", count(latency_ms) as "y_axis_1_count" ' +
-        'FROM "demo_app"  GROUP BY x_axis_1',
+        'FROM "demo_app"  GROUP BY "x_axis_1" LIMIT 10000',
     );
-    expect(build()).not.toMatch(/LIMIT/);
-    schema.queries[0].config.limit = 500;
+        schema.queries[0].config.limit = 500;
     schema.queries[0].fields.x[0] = { ...schema.queries[0].fields.x[0], sortBy: "ASC" };
-    expect(build()).toMatch(/GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 500$/);
+    expect(build()).toMatch(/GROUP BY "x_axis_1" ORDER BY "x_axis_1" ASC LIMIT 500$/);
   });
 
   it("summarises the whole stream in one row without an x field", () => {
@@ -286,5 +290,24 @@ describe("box plot", () => {
     expect((await convert(panel(), [[{ x_axis_1: "a", y_axis_1: "x" }]])).options.series).toEqual(
       [],
     );
+  });
+});
+
+describe("boxplotDrilldownTime", () => {
+  const options = {
+    xAxis: { data: ["2026-10-30 10:00:00"] },
+    series: [{ data: [[1, 2, 3, 4, 5]] }],
+  };
+  const params = { seriesType: "boxplot", dataIndex: 0, value: [0, 1, 2, 3, 4, 5] };
+  const panel = (functionName: string | null) => ({
+    queries: [{ fields: { x: [{ alias: "x_axis_1", functionName }] } }],
+  });
+
+  it("opens a time-bucket box at its bucket", () => {
+    expect(boxplotDrilldownTime(panel("histogram"), options, params)).toBe("2026-10-30 10:00:00");
+  });
+
+  it("keeps the panel range for a plain category, never the box's minimum", () => {
+    expect(boxplotDrilldownTime(panel(null), options, params)).toBeNull();
   });
 });
