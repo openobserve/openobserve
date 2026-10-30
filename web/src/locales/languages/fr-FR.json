@@ -1355,6 +1355,8 @@
     "scanSize": "Taille de scan",
     "deltaScanSize": "Taille de scan delta",
     "scannedSoFar": "{size} analysés",
+    "quickModeHiddenFields": "Le mode rapide est activé. Cette ligne affiche {shown} champs sur {total}.",
+    "turnOffQuickMode": "Désactiver le mode rapide",
     "resultsProgressLabel": "Progression de la recherche",
     "histogramTitleError": "Erreur lors de la génération du titre de l'histogramme.",
     "selectLogStream": "Sélectionnez le flux de journaux",

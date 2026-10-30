@@ -327,6 +327,15 @@ export default defineComponent({
       conditionModel.value.column = {};
     };
 
+    // `emptyLiteral` keeps a `<> ''` that came from SQL. Once the user edits the
+    // value, an empty value means "not entered yet" again.
+    watch(
+      () => props.condition.value,
+      () => {
+        if (conditionModel.value.emptyLiteral) delete conditionModel.value.emptyLiteral;
+      },
+    );
+
     watch(
       () => props.condition.column,
       (newColumn, oldColumn) => {

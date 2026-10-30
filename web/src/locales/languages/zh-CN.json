@@ -1355,6 +1355,8 @@
     "scanSize": "扫描大小",
     "deltaScanSize": "增量扫描大小",
     "scannedSoFar": "已扫描 {size}",
+    "quickModeHiddenFields": "快速模式已开启。此行显示 {total} 个字段中的 {shown} 个。",
+    "turnOffQuickMode": "关闭快速模式",
     "resultsProgressLabel": "搜索进度",
     "histogramTitleError": "生成直方图标题时出错。",
     "selectLogStream": "选择日志流",

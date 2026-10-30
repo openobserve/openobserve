@@ -1355,6 +1355,8 @@
     "scanSize": "Rozmiar skanowania",
     "deltaScanSize": "Delta rozmiaru skanowania",
     "scannedSoFar": "Przeskanowano {size}",
+    "quickModeHiddenFields": "Tryb szybki jest włączony. Ten wiersz pokazuje {shown} z {total} pól.",
+    "turnOffQuickMode": "Wyłącz tryb szybki",
     "resultsProgressLabel": "Postęp wyszukiwania",
     "histogramTitleError": "Błąd podczas generowania tytułu histogramu.",
     "selectLogStream": "Wybierz strumień logów",

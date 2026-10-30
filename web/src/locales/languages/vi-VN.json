@@ -1355,6 +1355,8 @@
     "scanSize": "Kích thước quét",
     "deltaScanSize": "Kích thước quét Delta",
     "scannedSoFar": "Đã quét {size}",
+    "quickModeHiddenFields": "Chế độ nhanh đang bật. Hàng này hiển thị {shown} trên {total} trường.",
+    "turnOffQuickMode": "Tắt chế độ nhanh",
     "resultsProgressLabel": "Tiến độ tìm kiếm",
     "histogramTitleError": "Lỗi khi tạo tiêu đề biểu đồ histogram.",
     "selectLogStream": "Chọn stream nhật ký",

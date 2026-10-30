@@ -469,6 +469,14 @@ function extractJoinConditions(onClause: any, conditions: any[]): void {
   }
 }
 
+// The builder treats an empty value as "no value yet" and skips the condition.
+// `x != ''` in SQL is a real filter, so mark it to keep it.
+const emptyLiteralFlag = (condition: any) =>
+  ["single_quote_string", "string"].includes(condition?.right?.type) &&
+  condition?.right?.value === ""
+    ? { emptyLiteral: true }
+    : {};
+
 function parseCondition(condition: any) {
   try {
     if (condition.type === "binary_expr") {
@@ -533,6 +541,7 @@ function parseCondition(condition: any) {
           column: columnObj,
           operator: condition?.operator,
           value: `${condition?.right?.value}`,
+          ...emptyLiteralFlag(condition),
           logicalOperator: "AND",
           filterType: "condition",
         };
@@ -547,6 +556,7 @@ function parseCondition(condition: any) {
           column: columnObj,
           operator: "<>",
           value: `${condition?.right?.value}`,
+          ...emptyLiteralFlag(condition),
           logicalOperator: "AND",
           filterType: "condition",
         };

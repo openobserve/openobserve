@@ -1355,6 +1355,8 @@
     "scanSize": "掃描大小",
     "deltaScanSize": "掃描大小差異",
     "scannedSoFar": "已掃描 {size}",
+    "quickModeHiddenFields": "快速模式已開啟。此列顯示 {total} 個欄位中的 {shown} 個。",
+    "turnOffQuickMode": "關閉快速模式",
     "resultsProgressLabel": "搜尋進度",
     "histogramTitleError": "產生直方圖標題時發生錯誤。",
     "selectLogStream": "選擇日誌串流",

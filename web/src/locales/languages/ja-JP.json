@@ -1355,6 +1355,8 @@
     "scanSize": "スキャンサイズ",
     "deltaScanSize": "デルタスキャンサイズ",
     "scannedSoFar": "{size} をスキャン済み",
+    "quickModeHiddenFields": "クイックモードがオンです。この行には {total} 個中 {shown} 個のフィールドが表示されています。",
+    "turnOffQuickMode": "クイックモードをオフにする",
     "resultsProgressLabel": "検索の進捗",
     "histogramTitleError": "ヒストグラムタイトルの生成中にエラーが発生しました。",
     "selectLogStream": "ログストリームを選択",

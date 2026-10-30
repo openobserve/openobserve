@@ -1355,6 +1355,8 @@
     "scanSize": "Tamaño de escaneo",
     "deltaScanSize": "Tamaño de escaneo delta",
     "scannedSoFar": "Escaneado {size}",
+    "quickModeHiddenFields": "El modo rápido está activado. Esta fila muestra {shown} de {total} campos.",
+    "turnOffQuickMode": "Desactivar modo rápido",
     "resultsProgressLabel": "Progreso de la búsqueda",
     "histogramTitleError": "Error al generar el título del histograma.",
     "selectLogStream": "Seleccione el stream de logs",

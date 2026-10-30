@@ -1355,6 +1355,8 @@
     "scanSize": "Scangrootte",
     "deltaScanSize": "Delta-scangrootte",
     "scannedSoFar": "Gescand: {size}",
+    "quickModeHiddenFields": "Snelle modus staat aan. Deze rij toont {shown} van {total} velden.",
+    "turnOffQuickMode": "Snelle modus uitzetten",
     "resultsProgressLabel": "Zoekvoortgang",
     "histogramTitleError": "Fout bij het genereren van de histogramtitel.",
     "selectLogStream": "Logstream selecteren",

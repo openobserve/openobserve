@@ -1355,6 +1355,8 @@
     "scanSize": "Dimensione scansione",
     "deltaScanSize": "Dimensione scansione delta",
     "scannedSoFar": "Scansionati {size}",
+    "quickModeHiddenFields": "La modalità rapida è attiva. Questa riga mostra {shown} campi su {total}.",
+    "turnOffQuickMode": "Disattiva modalità rapida",
     "resultsProgressLabel": "Avanzamento ricerca",
     "histogramTitleError": "Errore durante la generazione del titolo dell'istogramma.",
     "selectLogStream": "Seleziona lo stream dei log",

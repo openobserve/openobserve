@@ -1355,6 +1355,8 @@
     "scanSize": "스캔 크기",
     "deltaScanSize": "델타 스캔 크기",
     "scannedSoFar": "스캔한 크기: {size}",
+    "quickModeHiddenFields": "빠른 모드가 켜져 있습니다. 이 행에는 {total}개 중 {shown}개 필드가 표시됩니다.",
+    "turnOffQuickMode": "빠른 모드 끄기",
     "resultsProgressLabel": "검색 진행률",
     "histogramTitleError": "히스토그램 제목을 생성하는 중 오류가 발생했습니다.",
     "selectLogStream": "로그 스트림 선택",

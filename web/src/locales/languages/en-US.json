@@ -1355,6 +1355,8 @@
     "scanSize": "Scan Size",
     "deltaScanSize": "Delta Scan Size",
     "scannedSoFar": "Scanned {size}",
+    "quickModeHiddenFields": "Quick mode is on. This row shows {shown} of {total} fields.",
+    "turnOffQuickMode": "Turn off quick mode",
     "resultsProgressLabel": "Search progress",
     "histogramTitleError": "Error while generating histogram title.",
     "selectLogStream": "Select logs stream",
