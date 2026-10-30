@@ -184,8 +184,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTooltip side="bottom" :content="t('oncall.editTeam')" />
         </OButton>
+        <!-- The server refuses to delete the default team, so its row offers no Delete, as the phone menu already does. -->
         <OButton
-          v-if="canConfigure"
+          v-if="canConfigure && row.id !== defaultTeamId"
           variant="ghost"
           size="icon-sm"
           icon-left="delete-outline"
@@ -283,9 +284,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :model-value="!!teamToDelete"
       :title="t('oncall.deleteTeamTitle')"
-      message-keypath="oncall.deleteTeamMessage"
+      :message-keypath="deleteTeamKeypath"
       :message-name="teamToDelete?.name"
+      :ok-label="t('oncall.deleteTeam')"
       ok-variant="destructive"
+      focus-cancel
       @update:ok="deleteTeam"
       @update:cancel="teamToDelete = null"
     />
@@ -328,7 +331,7 @@ import {
 import { userKeys } from "@/services/users.querykeys";
 import { useMutation } from "@tanstack/vue-query";
 import type { OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { isOnCallUnavailable } from "@/utils/oncall";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
@@ -374,6 +377,11 @@ const settingDefaultTeamId = ref<string | null>(null);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const defaultTeamId = computed(() => routingConfig.value?.default_team_id ?? "");
+
+/// Where the deleted team's routed alerts land next: the default team if one is set, else the Unrouted queue.
+const deleteTeamKeypath = computed<I18nKey>(() =>
+  defaultTeamId.value ? "oncall.deleteTeamMessageToDefault" : "oncall.deleteTeamMessageToUnrouted",
+);
 
 const deleteTeamWrite = useMutation(() => deleteTeamMutation(orgId.value));
 
@@ -664,7 +672,7 @@ function openEdit(team: OnCallTeam) {
   formOpen.value = true;
 }
 
-function openTeam(team: OnCallTeam) {
+function openTeam(team: Pick<OnCallTeam, "id">) {
   router.push({
     name: "onCallTeamDetail",
     params: { teamId: team.id },
@@ -680,8 +688,14 @@ function onEmptyAction(id?: string) {
   openCreate();
 }
 
-function onSaved() {
+// A created team opens straight away: its members, schedule and ladder are set up there, not on this list.
+function onSaved(teamId: string) {
+  const created = !editingTeam.value;
   formOpen.value = false;
+  if (created && teamId) {
+    openTeam({ id: teamId });
+    return;
+  }
   fetchTeams();
 }
 

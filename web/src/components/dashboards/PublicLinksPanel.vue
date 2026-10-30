@@ -175,6 +175,7 @@
                       menu-align="start"
                       auto-apply
                       hide-range-shift
+                      hide-seconds
                       :default-open="row.id === addedRowId"
                       :default-type="row.range.type"
                       :default-relative-time="
@@ -269,7 +270,7 @@
             scope="global"
             :variablesManager="formVars"
             :variablesConfig="{ list: formVars.variablesData.global }"
-            :selectedTimeDate="timeObj"
+            :selectedTimeDate="variablesWindow"
             :showDynamicFilters="false"
             data-test="dashboards-public-links-panel-global-variables"
           />
@@ -286,7 +287,7 @@
               :panelId="group.panelId"
               :variablesManager="formVars"
               :variablesConfig="{ list: group.vars }"
-              :selectedTimeDate="timeObj"
+              :selectedTimeDate="variablesWindow"
               :showDynamicFilters="false"
             />
           </div>
@@ -299,6 +300,15 @@
       class="flex h-full min-h-0 flex-col gap-3"
       data-test="dashboards-public-links-panel-list"
     >
+      <OContent v-if="orgDisabled" class="pt-2">
+        <OBanner
+          variant="warning"
+          icon="warning-amber"
+          dense
+          :content="t('dashboard.publicLinks.orgDisabledBanner')"
+          data-test="dashboards-public-links-panel-org-disabled"
+        />
+      </OContent>
       <OTable
         class="min-h-0 flex-1"
         :data="filteredLinks"
@@ -345,6 +355,7 @@
             <OButton
               variant="primary"
               size="sm"
+              :disabled="orgDisabled"
               data-test="dashboards-public-links-panel-new-btn"
               @click="openForm(null)"
             >
@@ -383,7 +394,11 @@
         <template #cell-status="{ row }">
           <span class="inline-flex min-w-0 items-center gap-1.5">
             <span class="inline-flex" :data-test="`dashboards-public-links-panel-${row.id}-status`">
-              <OTag type="publicLinkStatus" :value="displayStatus(row, linkReports[row.id])" />
+              <OTag
+                type="publicLinkStatus"
+                :value="displayStatus(row, linkReports[row.id])"
+                :label="statusLabel(row, t)"
+              />
               <OTooltip v-if="statusHints[row.id]" side="bottom" :content="statusHints[row.id]" />
             </span>
             <OBadge
@@ -484,7 +499,7 @@
                   row.enabled ? t('dashboard.publicLinks.pause') : t('dashboard.publicLinks.resume')
                 "
                 :loading="busyRows.get(row.id) === 'inline'"
-                :disabled="!canPause(row) || busyRows.has(row.id)"
+                :disabled="!canPause(row) || busyRows.has(row.id) || orgDisabled"
                 :data-test="`dashboards-public-links-panel-${row.id}-${row.enabled ? 'pause' : 'resume'}-btn`"
                 @click="setPaused(row, row.enabled, 'inline')"
               >
@@ -541,7 +556,7 @@
                 v-if="canPause(row) && !takeOverReplacesResume(row, userId)"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                 class="md:hidden"
-                :disabled="busyRows.has(row.id)"
+                :disabled="busyRows.has(row.id) || orgDisabled"
                 :data-test="`dashboards-public-links-panel-${row.id}-${row.enabled ? 'pause' : 'resume'}-menu`"
                 @select="setPaused(row, row.enabled, 'menu')"
               >
@@ -588,6 +603,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { isEqual } from "lodash-es";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
@@ -609,6 +625,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -653,6 +670,7 @@ import {
   rangeError,
   rangeFromPicker,
   rangeKey,
+  rangesWindow,
   todayIn,
   toPublicLinkConfig,
   type PickedTime,
@@ -666,8 +684,10 @@ import {
   noDashboardAccess,
   lifecycleStatus,
   longRange,
+  orgSwitchedOff,
   publicLinkColumns,
   publicLinkSearchTerm,
+  statusLabel,
   statusReason,
   forbiddenMessage,
   pauseBlockedReason,
@@ -739,6 +759,10 @@ const open = computed({
 
 // From a dashboard, leaving the form returns to its link list; from the org-wide list it closes the drawer.
 function guardClose(): boolean {
+  if (currentView.value === "form" && isFormDirty()) {
+    void closeForm();
+    return false;
+  }
   if (currentView.value === "list" || !links.value.length || props.editLinkId) return true;
   editing.value = null;
   form.reset(publicLinkDefaults());
@@ -756,6 +780,7 @@ const linksQuery = useQuery(() =>
   }),
 );
 const links = computed(() => linksQuery.data.value ?? []);
+const orgDisabled = computed(() => orgSwitchedOff(links.value));
 const loading = linksQuery.isPending;
 const forbidden = computed(
   () =>
@@ -813,6 +838,8 @@ const formVarsReady = ref(false);
 const variablesPending = computed(
   () => !!props.variablesConfig?.list?.length && (!formVarsReady.value || formVars.isLoading.value),
 );
+// The pickers settle on loaded or auto-selected values, so only a change after that is the author's.
+let settledVariables: string | null = null;
 // Rows with a pause, resume, refresh or revoke in flight, so a second click can't send it again.
 const busyRows = reactive(new Map<string, RowActionSource>());
 
@@ -880,6 +907,13 @@ const rowErrors = computed(() =>
       Date.now() * 1000,
       t,
     ),
+  ),
+);
+// Variable values are listed for the link's own ranges, not the time range the dashboard behind the drawer is on.
+const variablesWindow = computed(() =>
+  rangesWindow(
+    rows.value.filter((_, i) => !rowErrors.value[i]).map((r) => r.range),
+    Date.now(),
   ),
 );
 
@@ -1043,6 +1077,7 @@ function withoutEmptyQuerySeeds(
 
 async function seedFormVariables() {
   formVarsReady.value = false;
+  settledVariables = null;
   const list = (props.variablesConfig?.list ?? []) as VariableConfig[];
   if (!list.length) return;
   // Dynamic filters are never part of a public link.
@@ -1050,7 +1085,9 @@ async function seedFormVariables() {
     ...props.dashboardData,
     variables: { ...props.dashboardData?.variables, showDynamicFilters: false },
   });
-  formVars.loadFromUrl({ query: withoutEmptyQuerySeeds(variableSeedParams(), list) });
+  // An edited link's empty value is its stored "not set", so it is seeded as is rather than auto-selected.
+  const seed = variableSeedParams();
+  formVars.loadFromUrl({ query: editing.value ? seed : withoutEmptyQuerySeeds(seed, list) });
   Object.keys(formVars.variablesData.tabs).forEach((id) => formVars.setTabVisibility(id, true));
   Object.keys(formVars.variablesData.panels).forEach((id) => formVars.setPanelVisibility(id, true));
   formVarsReady.value = true;
@@ -1065,10 +1102,28 @@ function openForm(link: PublicLink | null) {
 
 function goBack() {
   if (currentView.value === "created") view.value = "list";
-  else closeForm();
+  else void closeForm();
 }
 
-function closeForm() {
+function isFormDirty(): boolean {
+  if (!isEqual(form.state.values, form.options.defaultValues)) return true;
+  return settledVariables !== null && JSON.stringify(frozenVariables()) !== settledVariables;
+}
+
+async function closeForm() {
+  if (isFormDirty()) {
+    const discard = await confirm({
+      title: t("common.unsavedChanges"),
+      message: t("common.unsavedMessage"),
+      confirmLabel: t("common.discardChanges"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (!discard) return;
+  }
+  leaveForm();
+}
+
+function leaveForm() {
   editing.value = null;
   form.reset(publicLinkDefaults());
   // Opened to edit one link from the org-wide list, so leaving the form returns there.
@@ -1116,12 +1171,14 @@ async function submit(value: PublicLinkForm) {
     });
     if (editing.value) {
       showPositiveNotification(t("dashboard.publicLinks.savedToast"));
-      closeForm();
+      leaveForm();
     } else {
       createdLink.value = saved;
       view.value = "created";
     }
   } catch (e: unknown) {
+    // A refusal such as the per-dashboard link limit means the list here is behind the server's.
+    void linksQuery.refetch();
     const refused = forbiddenMessage(
       e,
       t,
@@ -1221,6 +1278,8 @@ watch(
       createdLink.value = null;
       // A dashboard with no links opens straight on the form, so errors from an earlier attempt must not carry over.
       form.reset(publicLinkDefaults());
+      // A cached list misses links made elsewhere since; without data the query is fetching already.
+      if (linksQuery.data.value) void linksQuery.refetch({ cancelRefetch: false });
     }
     pendingEditId.value = editId ?? null;
   },
@@ -1234,6 +1293,11 @@ watch(
   },
   { immediate: true },
 );
+watch(variablesPending, (pending) => {
+  if (!pending && formVarsReady.value && settledVariables === null) {
+    settledVariables = JSON.stringify(frozenVariables());
+  }
+});
 watch(defaultOptions, (options) => {
   const first = options[0];
   if (first && !options.some((o) => o.value === form.state.values.defaultKey)) {

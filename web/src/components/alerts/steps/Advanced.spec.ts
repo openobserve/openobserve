@@ -270,6 +270,21 @@ describe("Advanced — on-call team picker", () => {
     ]);
   });
 
+  // S14: an unset priority still pages, at P2, and the field says so while on-call is on.
+  it("says an unset priority pages as P2 only while on-call is on", async () => {
+    const placeholder = (host: any) =>
+      host
+        .findAllComponents({ name: "OFormSelect" })
+        .find((select: any) => select.props("name") === "priority")
+        .props("placeholder");
+
+    setOnCall(true);
+    expect(placeholder(mountDescendant())).toBe("Not set (pages as P2)");
+
+    setOnCall(false);
+    expect(placeholder(mountDescendant())).toBe("Unset");
+  });
+
   // A team list that fails to load must not block saving an alert — the field
   // is optional and ownership routing still applies.
   it("leaves the picker empty when the team lookup fails", async () => {

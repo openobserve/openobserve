@@ -236,6 +236,7 @@ mod tests {
     #[test]
     fn gate02_a_variable_from_a_lost_values_stream_is_nulled() {
         let var = |label: &str, value| PublicVariable {
+            name: label.into(),
             label: label.into(),
             value,
             tab_id: None,

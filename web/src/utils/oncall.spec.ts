@@ -77,6 +77,9 @@ import {
   routingReasonOf,
   rungProblem,
   shortReachReason,
+  channelList,
+  listInLocale,
+  stepsNamingRotation,
   toZonedInputValue,
   zonedMidnight,
   coversPresetOf,
@@ -2484,5 +2487,83 @@ describe("rotation editor: how several shift rules add up", () => {
     ])("%s", (_name, spans, expected) => {
       expect(coverageHoursSummary(spans as Array<[number, number]>, t)).toBe(expected);
     });
+  });
+});
+
+// S3/S4: one spelling and one order for a priority's channels.
+describe("channelList", () => {
+  const t = ((k: string) => k) as any;
+
+  it("says the channels in the fixed order, whatever order they are stored in", () => {
+    expect(channelList(["voice", "email", "sms"], t)).toBe(
+      "oncall.channel_email, oncall.channel_sms, oncall.channel_voice",
+    );
+  });
+
+  it("says nothing for no channels", () => {
+    expect(channelList([], t)).toBe("");
+    expect(channelList(undefined, t)).toBe("");
+  });
+});
+
+// S11: which escalation steps a rotation's removal touches.
+describe("stepsNamingRotation", () => {
+  const MIN = 60_000_000;
+  const policy = {
+    id: "p",
+    org_id: "o",
+    team_id: "t",
+    rungs: [
+      {
+        priority: 1 as const,
+        channels: [],
+        steps: [
+          { after_micros: 10 * MIN, targets: [{ kind: "rotation" as const, rotation_id: "r2" }] },
+          { after_micros: 0, targets: [{ kind: "rotation" as const, rotation_id: "r1" }] },
+          { after_micros: 20 * MIN, targets: [{ kind: "whole_team" as const }] },
+        ],
+      },
+      {
+        priority: 2 as const,
+        channels: [],
+        steps: [
+          {
+            after_micros: 0,
+            targets: [
+              { kind: "user" as const, email: "ana@o2.ai" },
+              { kind: "rotation" as const, rotation_id: "r2", mode: "all" as const },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  it("numbers steps by their delay within each priority", () => {
+    expect(stepsNamingRotation(policy, "r2")).toEqual([
+      { priority: 1, step: 2 },
+      { priority: 2, step: 1 },
+    ]);
+    expect(stepsNamingRotation(policy, "r1")).toEqual([{ priority: 1, step: 1 }]);
+  });
+
+  it("finds nothing for a rotation no step names, or with no policy", () => {
+    expect(stepsNamingRotation(policy, "r9")).toEqual([]);
+    expect(stepsNamingRotation(null, "r1")).toEqual([]);
+  });
+});
+
+// L4/F3: lists read as prose in the reader's language, via Intl.ListFormat and the app's locale code.
+describe("listInLocale", () => {
+  it.each([
+    ["en-us", [], ""],
+    ["en-us", ["Primary"], "Primary"],
+    ["en-us", ["Primary", "Secondary"], "Primary and Secondary"],
+    ["de", ["A", "B", "C"], "A, B und C"],
+    ["zh-cn", ["A", "B", "C"], "A、B和C"],
+    ["ja", ["A", "B", "C"], "A、B、C"],
+    ["tr-turk", ["A", "B"], "A ve B"],
+  ])("%s %j reads %j", (locale, items, expected) => {
+    expect(listInLocale(items as string[], locale)).toBe(expected);
   });
 });
