@@ -76,6 +76,7 @@ vi.mock("@/composables/useStreams", () => ({
           ],
         },
         traces: { list: [{ name: "svc-a" }] },
+        profiles: { list: [{ name: "cpu-prof" }, { name: "mem-prof" }] },
         index: { list: [{ name: "users" }] },
         enrichment_tables: { list: [{ name: "geo" }] },
         metadata: { list: [{ name: "meta" }] },
@@ -468,6 +469,14 @@ const SAVED_GRANTS_RESOURCE_CATALOG = [
     top_level: false,
     order: 3,
   },
+  {
+    key: "profiles",
+    display_name: "Profiles",
+    has_entities: true,
+    parent: "stream",
+    top_level: false,
+    order: 80,
+  },
   { key: "dfolder", display_name: "Dash Folders", has_entities: true, top_level: true, order: 4 },
   {
     key: "dashboard",
@@ -607,6 +616,8 @@ function useSavedGrantsFixture() {
 const mountEditRoleVm = async () => (await mountEditRole()).vm;
 
 beforeEach(() => {
+  // A draft one test leaves behind would open the restore dialog on the next mount of the same role.
+  localStorage.clear();
   // resourcesQuery is cached by TanStack, so without this the second mount
   // never re-calls getResources and the call-order pins go stale.
   queryClient.clear();
@@ -1807,6 +1818,7 @@ describe("EditRole - module navigation", () => {
       "index",
       "logs",
       "metrics",
+      "profiles",
       "traces",
     ]);
   });
@@ -1821,6 +1833,7 @@ describe("EditRole - module navigation", () => {
       "index",
       "logs",
       "metrics",
+      "profiles",
       "traces",
     ]);
   });
@@ -2387,11 +2400,17 @@ async function loadStreamType(wrapper, type) {
 }
 
 describe("EditRole - loaded rows through the tree [characterization]", () => {
-  it("getStreamsTypes builds four type rows", async () => {
+  it("getStreamsTypes builds five type rows", async () => {
     const wrapper = await mountEditRole();
     const stream = await loadResource(wrapper, "stream");
 
-    expect(stream.entities.map((e) => e.name)).toEqual(["logs", "traces", "metrics", "index"]);
+    expect(stream.entities.map((e) => e.name)).toEqual([
+      "logs",
+      "traces",
+      "metrics",
+      "profiles",
+      "index",
+    ]);
     expect(stream.entities[0]).toMatchObject({
       name: "logs",
       type: "Type",
@@ -2718,22 +2737,10 @@ describe("EditRole - tabs and dirty state [characterization]", () => {
     expect(vm.isUsersDirty).toBe(false);
   });
 
-  // The leave guard holds the navigation in a promise the dialog resolves.
-  it("resolves the held navigation with the user's answer and forgets the resolver", async () => {
+  it("opens with no leave or restore dialog", async () => {
     const vm = await mountEditRoleVm();
-    const resolve = vi.fn();
-    vm.leaveConfirm = { show: true, resolve };
-
-    vm.onLeaveConfirm(true);
-
-    expect(resolve).toHaveBeenCalledWith(true);
-    expect(vm.leaveConfirm.show).toBe(false);
-    expect(vm.leaveConfirm.resolve).toBeNull();
-  });
-
-  it("opens with no dialog and nothing to resolve", async () => {
-    const vm = await mountEditRoleVm();
-    expect(vm.leaveConfirm).toEqual({ show: false, resolve: null });
+    expect(vm.roleDraft.state.leaveOpen).toBe(false);
+    expect(vm.roleDraft.state.restoreOpen).toBe(false);
   });
 });
 
@@ -3078,6 +3085,15 @@ describe("EditRole savedGrants - updateRolePermissions expansion", () => {
     expect(app.type).toBe("Resource");
     expect(app.permission.AllowGet.value).toBe(true);
     expect(rows.find((r) => r.name === "sys").permission.AllowGet.value).toBe(false);
+  });
+
+  it("expands the stream tree and ticks a per-stream profiles row", async () => {
+    const wrapper = await mountWithSaved([{ object: "profiles:cpu-prof", permission: "AllowGet" }]);
+    const rows = wrapper.vm.heavyResourceEntities["profiles"] ?? [];
+    const cpu = rows.find((r) => r.name === "cpu-prof");
+    expect(cpu.resourceName).toBe("profiles");
+    expect(cpu.permission.AllowGet.value).toBe(true);
+    expect(rows.find((r) => r.name === "mem-prof").permission.AllowGet.value).toBe(false);
   });
 
   it("expands dfolder and its folder to tick a folder-scoped dashboard grant", async () => {
@@ -3631,6 +3647,7 @@ describe("EditRole - all modules", () => {
       "index",
       "logs",
       "metrics",
+      "profiles",
       "traces",
     ]);
     expect(wrapper.find('[data-test^="edit-role-module-pane-bulk-"]').exists()).toBe(false);

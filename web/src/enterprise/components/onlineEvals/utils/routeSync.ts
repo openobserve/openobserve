@@ -6,6 +6,7 @@
 // computeViewState() returns what the page should be showing. The component
 // is just a thin applier of that state.
 
+import type { RouteLocationNormalized } from "vue-router";
 import type { EvalJob, ScoreConfig, Scorer, ScorerType } from "@/services/online-evals.service";
 import { entityId } from "./evalEntity";
 
@@ -14,6 +15,9 @@ export type FullPageEntity = Exclude<ActiveTab, "scoreConfigs" | "quality">;
 export type AnyRow = EvalJob | Scorer | ScoreConfig;
 
 export const VALID_TABS: ActiveTab[] = ["quality", "jobs", "scorers", "scoreConfigs"];
+
+/** Query keys that pick what OnlineEvals shows; a change to any of them closes an open job or scorer form. */
+const VIEW_QUERY_KEYS = ["tab", "action", "id", "scorer_type"] as const;
 
 export function parseTabFromRoute(value: unknown): ActiveTab {
   if (typeof value === "string" && (VALID_TABS as string[]).includes(value)) {
@@ -131,4 +135,11 @@ export function buildCrossNavigationQuery(
     action: "view",
     id: targetId,
   };
+}
+
+export function leavesEvalForm(
+  to: Pick<RouteLocationNormalized, "path" | "query">,
+  from: Pick<RouteLocationNormalized, "path" | "query">,
+): boolean {
+  return to.path !== from.path || VIEW_QUERY_KEYS.some((key) => to.query[key] !== from.query[key]);
 }

@@ -417,6 +417,17 @@ describe("TraceDetailsSidebar", async () => {
     expect(spanId.text()).toContain(mockSpan.span_id);
   });
 
+  it("wraps the header chips and keeps the action group from shrinking", () => {
+    const chips = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-chips"]');
+    const actions = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-actions"]');
+    expect(chips.classes()).toEqual(expect.arrayContaining(["flex-wrap", "min-w-0"]));
+    expect(chips.classes()).not.toContain("flex-nowrap");
+    expect(actions.classes()).toContain("shrink-0");
+    expect(
+      actions.find('[data-test="trace-details-sidebar-header-toolbar-span-id"]').exists(),
+    ).toBe(true);
+  });
+
   it("should emit close when close button is clicked", async () => {
     const closeBtn = wrapper.find('[data-test="trace-details-sidebar-header-close-btn"]');
     expect(closeBtn.exists()).toBe(true);

@@ -38,6 +38,9 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
 import { DEFAULT_EXPANDED_SECTIONS, type SectionId } from "@/utils/dashboard/searchLabelsConfig";
 
+// Value the component gives its "Default" choice.
+const TOGGLE_AUTO = "__auto__";
+
 const mockDashboardPanelData = {
   data: {
     id: "panel-1",
@@ -107,6 +110,9 @@ const mockDashboardPanelData = {
     },
   },
 };
+
+// Every test mounts the full config panel; on a loaded CI runner one mount can exceed the 5s default.
+vi.setConfig({ testTimeout: 20000 });
 
 describe("ConfigPanel", () => {
   let wrapper: any;
@@ -260,7 +266,7 @@ describe("ConfigPanel", () => {
 
       const sort = wrapper.find('[data-test="dashboard-config-state-timeline-row-sort"]');
       expect(sort.exists()).toBe(true);
-      expect(sort.attributes("data-test-selected-value")).toBe("name");
+      expect(sort.attributes("data-test-selected-value")).toBe(TOGGLE_AUTO);
       expect(wrapper.vm.showStateTextModel).toBe(true);
       expect("show_state_text" in panelData.data.config).toBe(false);
 
@@ -268,9 +274,11 @@ describe("ConfigPanel", () => {
       wrapper.vm.rowSortModel = "non_ok_time";
       expect(panelData.data.config.show_state_text).toBe(false);
       expect(panelData.data.config.row_sort).toBe("non_ok_time");
+      wrapper.vm.rowSortModel = TOGGLE_AUTO;
+      expect("row_sort" in panelData.data.config).toBe(false);
     });
 
-    it("offers the tooltip mode, defaulting to this segment", async () => {
+    it("offers the tooltip mode with Default first, which stores nothing", async () => {
       const panelData = {
         ...mockDashboardPanelData,
         data: {
@@ -284,11 +292,13 @@ describe("ConfigPanel", () => {
 
       const mode = wrapper.find('[data-test="dashboard-config-state-timeline-tooltip-mode"]');
       expect(mode.exists()).toBe(true);
-      expect(mode.attributes("data-test-selected-value")).toBe("segment");
+      expect(mode.attributes("data-test-selected-value")).toBe(TOGGLE_AUTO);
       expect("tooltip_mode" in panelData.data.config).toBe(false);
 
       wrapper.vm.tooltipModeModel = "all_rows";
       expect(panelData.data.config.tooltip_mode).toBe("all_rows");
+      wrapper.vm.tooltipModeModel = TOGGLE_AUTO;
+      expect("tooltip_mode" in panelData.data.config).toBe(false);
     });
   });
 
@@ -404,6 +414,17 @@ describe("ConfigPanel", () => {
       await descriptionInput.vm.$emit("update:modelValue", "New description");
 
       expect(wrapper.vm.dashboardPanelData.data.description).toBe("New description");
+    });
+
+    it("drops decimals instead of storing an empty string when the field is cleared", async () => {
+      wrapper = createWrapper();
+      const config = wrapper.vm.dashboardPanelData.data.config;
+      config.decimals = 3;
+
+      const decimalsInput = wrapper.findComponent('[data-test="dashboard-config-decimals"]');
+      await decimalsInput.vm.$emit("update:modelValue", "");
+
+      expect("decimals" in config).toBe(false);
     });
 
     it("should handle empty description", () => {
@@ -538,6 +559,22 @@ describe("ConfigPanel", () => {
         },
       });
       expect(wrapper.find('[data-test="dashboard-config-map-roam"]').exists()).toBe(false);
+    });
+
+    it("opens a geomap saved with a null map view and base map on the default view", () => {
+      wrapper = createWrapper({
+        dashboardPanelData: {
+          ...mockDashboardPanelData,
+          data: {
+            ...mockDashboardPanelData.data,
+            type: "geomap",
+            config: { ...mockDashboardPanelData.data.config, map_view: null, base_map: null },
+          },
+        },
+      });
+      const config = wrapper.vm.dashboardPanelData.data.config;
+      expect(config.map_view).toEqual({ zoom: 1, lat: 0, lng: 0 });
+      expect(config.base_map).toEqual({ type: "osm" });
     });
   });
 
@@ -3715,16 +3752,19 @@ describe("ConfigPanel", () => {
       expect(widthInput().props("error")).toBe(false);
     });
 
-    it("shows the track for h-bar only and the width wherever a converter reads it", () => {
-      wrapper = createWrapper({ dashboardPanelData: panelOf("h-bar") });
-      expect(widthInput().exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(true);
-      wrapper = createWrapper({ dashboardPanelData: panelOf("bar") });
-      expect(widthInput().exists()).toBe(false);
-      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(false);
-      wrapper = createWrapper({ dashboardPanelData: panelOf("stacked") }, { promqlMode: true });
-      expect(widthInput().exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(false);
-    });
+    it.each([
+      ["h-bar", false, true, true],
+      ["bar", false, false, false],
+      ["stacked", true, true, false],
+    ])(
+      "shows the width and track controls for %s (promql %s) only where a converter reads them",
+      (type, promqlMode, hasWidth, hasTrack) => {
+        wrapper = createWrapper({ dashboardPanelData: panelOf(type) }, { promqlMode });
+        expect(widthInput().exists()).toBe(hasWidth);
+        expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(
+          hasTrack,
+        );
+      },
+    );
   });
 });

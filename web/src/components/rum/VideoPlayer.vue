@@ -680,7 +680,7 @@ const setupSession = async () => {
   if (!session.value.some((event: any) => event.type === 2)) return;
 
   session.value.every((segment: any) => {
-    if (segment.data.height && segment.data.width) {
+    if (segment.data?.height && segment.data?.width) {
       sessionWidth.value = segment.data.width;
       sessionHeight.value = segment.data.height;
       return false;

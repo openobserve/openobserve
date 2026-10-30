@@ -642,6 +642,48 @@ impl Response {
     pub fn is_exhausted(&self) -> bool {
         self.exhausted_at.is_some() && !self.state.is_terminal()
     }
+
+    /// The timeline line a joining alert leaves, in the run it belongs to. [pure] [no-fail]
+    pub fn new_alert_note(&self, repaged: bool, actor: &str, now: i64) -> ResponseEvent {
+        let (body, run) = if repaged {
+            (
+                "A new alert joined after nobody answered; paging again.",
+                next_ladder_run(self.ladder_run),
+            )
+        } else {
+            ("A new alert joined this page.", self.current_run())
+        };
+        ResponseEvent::new(ResponseEventKind::Sys, now, actor, body).in_run(run)
+    }
+
+    /// What a new alert joining this page's incident does to it at `now`. [pure] [no-fail]
+    pub fn on_new_alert(&self, now: i64) -> NewAlertEffect {
+        if !self.is_exhausted() {
+            return NewAlertEffect::Nothing;
+        }
+        let quiet = self.state == ResponseState::Acknowledged
+            || self.is_snoozed(now)
+            || now - self.ladder_start() < NEW_ALERT_REPAGE_COOLDOWN_MICROS;
+        if quiet {
+            NewAlertEffect::NoteOnly
+        } else {
+            NewAlertEffect::PageAgain
+        }
+    }
+}
+
+/// How long a page's current run must have been going before a joining alert may page again.
+pub const NEW_ALERT_REPAGE_COOLDOWN_MICROS: i64 = 30 * 60 * 1_000_000;
+
+/// What a new alert joining an incident does to the incident's page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NewAlertEffect {
+    /// The ladder ran out unanswered a while ago: run it again.
+    PageAgain,
+    /// Exhausted but owned, quieted or freshly re-run: say so on the timeline only.
+    NoteOnly,
+    /// The ladder is still climbing or the page is closed.
+    Nothing,
 }
 
 // G16 dampens on the re-fire, not the close, and from `closed_at`: a bug delays, never sticks.
@@ -1004,6 +1046,90 @@ mod tests {
         ResponseEventKind::SeverityPromoted,
         ResponseEventKind::Flapped,
     ];
+
+    /// The note sits in the run it belongs to: the new run when it re-paged, else the current.
+    #[test]
+    fn test_a_new_alert_note_is_tagged_with_its_run() {
+        let page = Response {
+            ladder_run: Some(3),
+            ..sample(None, None)
+        };
+        let repaged = page.new_alert_note(true, "o2-engine", 5);
+        let noted = page.new_alert_note(false, "o2-engine", 5);
+        assert_eq!(repaged.ladder_run, Some(4));
+        assert!(repaged.body.contains("paging again"));
+        assert_eq!(noted.ladder_run, Some(3));
+        assert_eq!(noted.body, "A new alert joined this page.");
+    }
+
+    /// A new alert re-pages an exhausted page only if unowned and its run is 30 minutes old.
+    #[test]
+    fn test_a_new_alert_pages_again_only_after_the_cooldown() {
+        let opened = 1_700_000_000_000_000;
+        let later = opened + NEW_ALERT_REPAGE_COOLDOWN_MICROS;
+        let open = Response {
+            opened_at: opened,
+            ..sample(None, None)
+        };
+        let exhausted = |state: ResponseState| Response {
+            state,
+            exhausted_at: Some(opened + 1),
+            ..open.clone()
+        };
+        let cases = [
+            (
+                "exhausted, quiet for 30 minutes",
+                exhausted(ResponseState::Triggered),
+                later,
+                NewAlertEffect::PageAgain,
+            ),
+            (
+                "within 30 minutes",
+                exhausted(ResponseState::Triggered),
+                later - 1,
+                NewAlertEffect::NoteOnly,
+            ),
+            (
+                "acknowledged",
+                exhausted(ResponseState::Acknowledged),
+                later,
+                NewAlertEffect::NoteOnly,
+            ),
+            (
+                "snoozed",
+                Response {
+                    snoozed_until: Some(later + 1),
+                    ..exhausted(ResponseState::Triggered)
+                },
+                later,
+                NewAlertEffect::NoteOnly,
+            ),
+            (
+                "re-run less than 30 minutes ago",
+                Response {
+                    ladder_anchor: Some(later - 1),
+                    ..exhausted(ResponseState::Triggered)
+                },
+                later,
+                NewAlertEffect::NoteOnly,
+            ),
+            (
+                "still climbing",
+                open.clone(),
+                later,
+                NewAlertEffect::Nothing,
+            ),
+            (
+                "resolved",
+                exhausted(ResponseState::Resolved),
+                later,
+                NewAlertEffect::Nothing,
+            ),
+        ];
+        for (case, record, now, want) in cases {
+            assert_eq!(record.on_new_alert(now), want, "{case}");
+        }
+    }
 
     #[test]
     fn test_responder_role_ids_are_pinned() {

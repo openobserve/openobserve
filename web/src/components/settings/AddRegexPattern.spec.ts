@@ -390,7 +390,7 @@ describe("AddRegexPattern", () => {
   describe("Button interactions", () => {
     it("should emit close event when handleClose runs", async () => {
       const wrapper = createWrapper();
-      wrapper.vm.handleClose();
+      await wrapper.vm.handleClose();
       expect(wrapper.emitted("close")).toBeTruthy();
       expect(wrapper.emitted("update:open")).toBeTruthy();
     });
@@ -399,6 +399,7 @@ describe("AddRegexPattern", () => {
       const wrapper = createWrapper();
       const drawer = wrapper.findComponent({ name: "ODrawer" });
       await drawer.vm.$emit("click:secondary");
+      await flushPromises();
       expect(wrapper.emitted("close")).toBeTruthy();
     });
 

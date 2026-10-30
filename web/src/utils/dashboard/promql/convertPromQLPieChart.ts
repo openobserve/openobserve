@@ -17,7 +17,7 @@ import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { buildTooltip } from "./shared/axisBuilder";
 import { buildPieChartConfig } from "./shared/gridBuilder";
-import { getSeriesColor } from "../colorPalette";
+import { createDistinctSeriesColor, getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { createSeriesOverrideLookup } from "../seriesOverrides";
 import { MAX_SEATS_PRECISION, pieLegendPercentDecimals } from "../legendConfiguration";
@@ -78,20 +78,29 @@ export class PieConverter implements PromQLChartConverter {
       });
     });
 
+    const distinctColor = createDistinctSeriesColor(
+      seriesDataCollection.map((s) => s.name),
+      config.color,
+      store.state.theme,
+    );
+
     // Now apply colors and build data with unit formatting
     seriesDataCollection.forEach((seriesData) => {
       // Extract numeric values for color calculation
       const numericValues = seriesData.rawValues.map(([, val]) => parseFloat(val));
 
-      const color = getSeriesColor(
-        config.color || null,
-        seriesData.name,
-        numericValues,
-        chartMin,
-        chartMax,
-        store.state.theme,
-        config.color?.colorBySeries,
-      );
+      const color =
+        distinctColor(seriesData.name) ??
+        getSeriesColor(
+          config.color || null,
+          seriesData.name,
+          numericValues,
+          chartMin,
+          chartMax,
+          store.state.theme,
+          config.color?.colorBySeries,
+          config,
+        );
 
       data.push({
         name: seriesData.name,

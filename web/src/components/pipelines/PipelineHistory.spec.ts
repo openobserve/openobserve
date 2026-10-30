@@ -195,7 +195,7 @@ const OTableStub = {
     "stickyHeader",
     "maxHeight",
   ],
-  emits: ["pagination-change", "sort-change"],
+  emits: ["pagination-change", "sort-change", "row-click"],
   template: `
     <div data-test="o2-table-stub">
       <slot name="empty" />
@@ -694,6 +694,34 @@ describe("PipelineHistory", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.detailsDialog).toBe(false);
+    });
+
+    it("clicking a history row opens the details dialog with that row", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const row = {
+        pipeline_name: "Beta Pipeline",
+        timestamp: 1700000000000000,
+        start_time: 1700000000000000,
+        end_time: 1700003600000000,
+        status: "error",
+        error: "boom",
+        retries: 0,
+      };
+
+      wrapper.findComponent(OTableStub).vm.$emit("row-click", row, new MouseEvent("click"));
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(vm.detailsDialog).toBe(true);
+      expect(vm.selectedRow).toEqual(row);
+      const dialog = wrapper
+        .findAllComponents(ODialogStub)
+        .find((d) => d.vm.$attrs["data-test"] === "pipeline-history-details-dialog");
+      expect(dialog).toBeDefined();
+      expect(dialog!.props("open")).toBe(true);
+      expect(dialog!.text()).toContain("Beta Pipeline");
+      expect(dialog!.text()).toContain("boom");
     });
   });
 

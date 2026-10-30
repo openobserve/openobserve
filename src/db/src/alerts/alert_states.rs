@@ -33,7 +33,7 @@ use config::meta::alerts::{
 };
 use infra::{
     errors::Result,
-    table::alert_states::{DeliveryOutcome, GroupPlanWrite},
+    table::alert_states::{DeliveryAdvance, DeliveryOutcome, GroupPlanWrite, PlanApply},
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
@@ -70,9 +70,14 @@ pub async fn persist(update: &StateUpdate, ledger: Option<&EvalLedgerWrite>) -> 
     Ok(())
 }
 
+/// Returns the closes and reaps that matched, so the caller emits only those.
 #[inline]
-pub async fn persist_group_plan(plan: &GroupPlan, alert_id: &str) -> Result<GroupPlanWrite> {
-    let write = infra::table::alert_states::persist_group_plan(plan, alert_id).await?;
+pub async fn persist_group_plan(
+    plan: &GroupPlan,
+    alert_id: &str,
+    mode: PlanApply,
+) -> Result<GroupPlanWrite> {
+    let write = infra::table::alert_states::persist_group_plan(plan, alert_id, mode).await?;
 
     // A plan the §5.3 opt-out gate refused wrote nothing here, and broadcasting
     // it would be worse than pointless: a region that has not yet seen the
@@ -81,9 +86,13 @@ pub async fn persist_group_plan(plan: &GroupPlan, alert_id: &str) -> Result<Grou
     // them back up.
     #[cfg(feature = "enterprise")]
     if write.written {
+        // Replicas apply by id alone: publish only the closes and reaps that matched here.
+        let mut published = plan.clone();
+        published.closed_episodes = write.closed.clone();
+        published.reaped = write.reaped.clone();
         publish(AlertStateMessage::PersistGroupPlan {
             alert_id: alert_id.to_string(),
-            plan: plan.clone(),
+            plan: published,
         })
         .await;
     }
@@ -97,25 +106,27 @@ pub async fn advance_delivery_state(
     group_key: &str,
     episode: DeliveryEpisode,
     outcome: DeliveryOutcome,
-) -> Result<bool> {
-    let applied =
-        infra::table::alert_states::advance_delivery_state(alert_id, group_key, episode, outcome)
-            .await?;
+    mint: Option<&str>,
+) -> Result<DeliveryAdvance> {
+    let advance = infra::table::alert_states::advance_delivery_state(
+        alert_id, group_key, episode, outcome, mint,
+    )
+    .await?;
 
-    // A callback whose episode had already moved on wrote nothing here, and the
-    // same guard would reject it everywhere else too.
+    // A refused delivery write is still published when it minted, so every region records the key.
     #[cfg(feature = "enterprise")]
-    if applied {
+    if advance.applied || advance.mint == infra::table::alert_states::MintOutcome::Minted {
         publish(AlertStateMessage::AdvanceDeliveryState {
             alert_id: alert_id.to_string(),
             group_key: group_key.to_string(),
             episode,
             outcome,
+            mint_episode_id: mint.map(str::to_string),
         })
         .await;
     }
 
-    Ok(applied)
+    Ok(advance)
 }
 
 #[inline]
