@@ -52,7 +52,7 @@ import {
 } from "./src/inline.mjs";
 import { changedCodeEvidence, mergeConfidence, severityCounts, unfinishedReviewers } from "./src/confidence.mjs";
 import { OpencodeServer, resolveOpencodeConfig, selfCheck, shouldRetry } from "./src/opencode.mjs";
-import { fetchDiff, pinDiff, prefixDiffPaths, reviewerDiff } from "./src/pr-diff.mjs";
+import { fetchPinnedDiff, prefixDiffPaths, reviewerDiff } from "./src/pr-diff.mjs";
 import {
   buildFallbackReview,
   failedReviewersNote,
@@ -140,6 +140,7 @@ const REVIEW_PAIR_CLEAR = process.env.REVIEW_PAIR_CLEAR === "true";
 const REVIEW_ARTIFACT_DIR = process.env.REVIEW_ARTIFACT_DIR || "";
 
 const MAX_DIFF_TOKENS = 150_000;
+const UNPARSEABLE_OUTPUT = "output held neither findings nor a no-issues marker";
 const AGENT_TIMEOUT_MS = 20 * 60 * 1000;
 const OVERALL_TIMEOUT_MS = 40 * 60 * 1000;
 // Kept free at the end of the run for rendering and posting the comment.
@@ -296,7 +297,7 @@ function execErrorText(err) {
 // The API refuses diffs over 20k lines; the workflow fetches the merge base into PR_DIR so the same three-dot diff can be built locally.
 function fetchPrDiff(prNumber) {
   const log = message => console.log(`[${isoNow()}] ${message}`);
-  const own = fetchDiff({
+  const own = fetchPinnedDiff({
     repo: process.env.GITHUB_REPOSITORY,
     prNumber,
     prDir: PR_DIR,
@@ -304,8 +305,8 @@ function fetchPrDiff(prNumber) {
     head: process.env.HEAD_SHA,
     log,
   });
-  if (!PAIRED.repo || !PAIRED.prNumber) return { diff: own, own };
-  const paired = fetchDiff({
+  if (!PAIRED.repo || !PAIRED.prNumber) return { diff: own.diff, own: own.diff, pinned: own.pinned };
+  const paired = fetchPinnedDiff({
     repo: PAIRED.repo,
     prNumber: PAIRED.prNumber,
     prDir: PR_DIR && PAIRED.dir ? resolve(PR_DIR, PAIRED.dir) : "",
@@ -314,7 +315,8 @@ function fetchPrDiff(prNumber) {
     log,
   });
   log(`Reviewing together with paired PR ${PAIRED.repo}#${PAIRED.prNumber} (paths prefixed with ${PAIRED.dir}/)`);
-  return { diff: `${own.replace(/\n?$/, "\n")}${prefixDiffPaths(paired, PAIRED.dir)}`, own };
+  // The review key names both heads, so both sides must be pinned for it to be true.
+  return { diff: `${own.diff.replace(/\n?$/, "\n")}${prefixDiffPaths(paired.diff, PAIRED.dir)}`, own: own.diff, pinned: own.pinned && paired.pinned };
 }
 
 function pairedPrContext() {
@@ -1337,19 +1339,7 @@ async function main() {
     let diffPinned = false;
     const diffSpan = TRACE.startSpan("github.pr.diff", { "github.pr.number": prNumber }, rootSpan);
     try {
-      ({ diff, own: ownDiff } = fetchPrDiff(prNumber));
-      // A paired review is never approved, so it keeps its combined diff.
-      const pin = pinDiff({
-        diff,
-        candidate: gate.active && !PAIRED.repo && !PAIRED.prNumber && sizeReasons(parseRawDiff(diff)).length === 0,
-        prDir: PR_DIR,
-        mergeBase: process.env.MERGE_BASE_SHA,
-        head: process.env.HEAD_SHA,
-        log: message => console.warn(`[${isoNow()}] Auto-approve: ${message}`),
-      });
-      diff = pin.diff;
-      diffPinned = pin.pinned;
-      if (pin.pinned) ownDiff = pin.diff;
+      ({ diff, own: ownDiff, pinned: diffPinned } = fetchPrDiff(prNumber));
       const diffStats = diff.split("\n").length;
       TRACE.endSpan(diffSpan, { "diff.raw_lines": diffStats });
       console.log(`[${isoNow()}] Raw diff: ${diffStats} lines`);
@@ -1411,6 +1401,7 @@ async function main() {
 
     // 4. PR context
     let prContext = `PR #${prNumber} in ${process.env.GITHUB_REPOSITORY}`;
+    let reviewedText = null;
     const contextSpan = TRACE.startSpan("github.pr.context", { "github.pr.number": prNumber }, rootSpan);
     try {
       const prData = ghJson(`pr view "${prNumber}" --json title,body,author,files,baseRefOid,headRefOid`);
@@ -1422,6 +1413,7 @@ async function main() {
         `Files changed: ${prData.files?.length || filtered.files.length}`,
         `Description: ${prData.body || "N/A"}`,
       ].join("\n") + pairedPrContext();
+      reviewedText = { title: prData.title, body: prData.body };
       TRACE.endSpan(contextSpan, {
         "github.pr.author": prData.author?.login || "unknown",
         "github.pr.file_count": prData.files?.length || filtered.files.length,
@@ -1480,11 +1472,12 @@ async function main() {
     // A requiresFocus agent that saw no files in its domain opted out — it is neither expected
     // nor completed, so it must not count toward coverage.
     const ranResults = results.filter(r => !r.skipped);
-    const failedAgents = ranResults.filter(r => r.error);
-    const completedAgents = ranResults.filter(r => !r.error);
+    // Free-form output is no review, so it counts as a failure everywhere a clean exit would otherwise read as finished.
+    const failedAgents = ranResults.filter(r => r.error || r.parsed !== true);
+    const completedAgents = ranResults.filter(r => !r.error && r.parsed === true);
     const failedAgentNames = failedAgents.map(r => r.agentName);
     const failureReasons = Object.fromEntries(
-      failedAgents.map(r => [r.agentName, r.error]),
+      failedAgents.map(r => [r.agentName, r.error || UNPARSEABLE_OUTPUT]),
     );
     const coverageRatio = ranResults.length > 0 ? completedAgents.length / ranResults.length : 0;
     if (failedAgents.length > 0 && failedAgents.length < ranResults.length) {
@@ -1506,7 +1499,7 @@ async function main() {
 
     // 7. Coordinator pass — unless nothing survived to coordinate.
     //
-    // If EVERY reviewer failed there are no findings to consolidate, so the coordinator can
+    // If EVERY reviewer failed or returned nothing parseable there are no findings to consolidate, so the coordinator can
     // only produce "no issues found" — which reads as an approval on a PR that was never
     // actually reviewed. That is strictly worse than posting nothing: it is a green light
     // manufactured from a total outage. Report the failure instead, skip the coordinator
@@ -1521,7 +1514,7 @@ async function main() {
       outcome = "all_agents_failed";
       exitCode = 1;
       const detail = failedAgents
-        .map(r => `- ${r.agentName}: ${r.error}`)
+        .map(r => `- ${r.agentName}: ${r.error || UNPARSEABLE_OUTPUT}`)
         .join("\n");
       console.error(`[${isoNow()}] All ${ranResults.length} reviewers failed — skipping coordinator and reporting failure.`);
       TRACE.setSpanAttributes(rootSpan, {
@@ -1574,6 +1567,7 @@ async function main() {
     const autoApprove = gate.conclude({
       diff: rawDiffFacts,
       diffPinned,
+      reviewedText,
       reviewConfig: OPENCODE_CONFIG.name,
       filteredFileCount: filtered.files.length,
       reviewedChars: prContext.length + filtered.diff.length,
@@ -1604,9 +1598,11 @@ async function main() {
     // Sanitize and validate before posting
     const sanitizeSpan = TRACE.startSpan("ai_review.sanitize", {}, rootSpan);
     finalReview = sanitizeForPosting(finalReview);
-    // A run where every reviewer failed reviewed nothing, so it does not use up a pass.
-    const passes = allAgentsFailed ? passesDone : passesDone + 1;
-    finalReview = finishReviewBody(finalReview, { key: headKey, passes, maxPasses: REVIEW_MAX_PASSES, reviewed: !allAgentsFailed, confidence, gateLine: autoApproveLine(autoApprove) });
+    // A run where no reviewer finished reviewed nothing, so it does not use up a pass.
+    const reviewed = completedAgents.length > 0;
+    const passes = reviewed ? passesDone + 1 : passesDone;
+    if (reviewed && !diffPinned) console.warn(`[${isoNow()}] The reviewed diff is not tied to ${headKey}, so the commit stays reviewable`);
+    finalReview = finishReviewBody(finalReview, { key: headKey, passes, maxPasses: REVIEW_MAX_PASSES, reviewed: reviewed && diffPinned, confidence, gateLine: autoApproveLine(autoApprove) });
     TRACE.endSpan(sanitizeSpan, { "review.final_length": finalReview.length });
     console.log(`[${isoNow()}] Final review length: ${finalReview.length} chars`);
 

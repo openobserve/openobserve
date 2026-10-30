@@ -58,7 +58,7 @@ test("the inline block is parsed and cut out of the summary, fenced or not", () 
     "",
     "```",
     "<!-- ai-review-inline",
-    '[{"file": "./src/lib.rs", "line": "11", "severity": "Critical", "category": "Code Quality", "title": "Bug <!-- x -->", "body": "Fix it"}, {"title": ""}]',
+    '[{"file": "./src/lib.rs", "line": "11", "severity": "Critical", "category": "Code Quality", "title": "Bug <!-- x -->", "body": "Fix it"}]',
     "-->",
     "```",
   ].join("\n");
@@ -84,6 +84,32 @@ test("a missing or malformed inline block leaves the summary intact and yields n
   assert.equal(bad.text, "## Review");
   assert.deepEqual(bad.findings, []);
   assert.match(bad.error, /not valid JSON/);
+});
+
+test("an entry that cannot be counted leaves the count unknown, and the readable ones still post", () => {
+  const good = { file: "src/lib.rs", line: 11, severity: "p2", title: "Bug" };
+  const block = entries => `<!-- ai-review-inline ${JSON.stringify(entries)} -->`;
+  const uncountable = [
+    { file: "src/lib.rs", line: 11, severity: "p1", description: "no title" },
+    { title: "", severity: "p1" },
+    { title: "no severity" },
+    { title: "bad grade", severity: "blocker" },
+    "p1",
+    null,
+  ];
+  for (const entry of uncountable) {
+    const out = extractInlineBlock(block([good, entry]));
+    assert.match(out.error, /cannot be counted/, JSON.stringify(entry));
+    assert.ok(out.findings.some(f => f.title === "Bug"), JSON.stringify(entry));
+  }
+  assert.equal(extractInlineBlock(block([{ ...good, severity: "Critical" }])).error, null);
+  assert.equal(extractInlineBlock(block([])).error, null);
+});
+
+test("a second inline block is never read, so it leaves the count unknown", () => {
+  const out = extractInlineBlock(`<!-- ai-review-inline [] -->\n<!-- ai-review-inline [{"title":"x","severity":"p0"}] -->`);
+  assert.match(out.error, /cannot be counted/);
+  assert.equal(out.text.includes("ai-review-inline"), false);
 });
 
 test("only p0, p1 and p2 findings on valid anchors are selected, most severe first, capped", () => {
