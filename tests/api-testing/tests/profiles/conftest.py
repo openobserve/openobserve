@@ -29,10 +29,6 @@ from .profiles_helpers import (
 log = logging.getLogger(__name__)
 
 
-def pytest_configure(config: pytest.Config) -> None:
-    config.addinivalue_line("markers", "slow: long-running profiles test (100k-stack ingest); runs in the normal suite")
-
-
 def _delete_profiles_stream(client: OpenObserveClient, name: str) -> None:
     resp = client.streams.delete(name, type_="profiles")
     if resp.status_code not in (200, 404):

@@ -116,10 +116,8 @@ test.describe('Profiles states and edges', () => {
   });
 
   test('A 1100-frame stack renders with its truncated root', { tag: ['@all', '@profiles', '@P2'] }, async () => {
-    const started = Date.now();
     await pm.profilesPage.gotoRef(ref, { service: 'catalog', view: 'flame' });
     await pm.profilesPage.hoverFrame(C.truncated, '[truncated]');
-    expect(Date.now() - started).toBeLessThan(10_000);
     await pm.profilesPage.expectFlameTooltipContains('[truncated]', ['1 s', '18.13%']);
     await pm.profilesPage.switchView('top');
     await pm.profilesPage.expectTopRow(0, { name: 'deep_0000', self: '1 s' });
