@@ -744,7 +744,7 @@ const statItems = computed<StatItem[]>(() => [
 ]);
 
 // ── visible set ────────────────────────────────────────────────────────────
-// One order for the grid and for the batch handed to the wizard, so step 2 reads as the grid did.
+// One order for the grid and for the batch handed to the wizard, so the review step reads as the grid did.
 const byGridOrder = (a: AlertLibraryEntry, b: AlertLibraryEntry) =>
   severityRank(a.severity) - severityRank(b.severity) || text(a.title).localeCompare(text(b.title));
 
@@ -940,10 +940,6 @@ const onInstall = (payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }
 
 /** The card's Add: the same single-alert hand-off the drawer makes, minus the drawer. */
 const addEntry = async (entry: AlertLibraryEntry) => {
-  if (isLocked(entry)) {
-    openUpgradeDialog();
-    return;
-  }
   try {
     const file = await loadAlertFile(entry);
     onInstall({ entry, file: fileForInstall(entry, file) });

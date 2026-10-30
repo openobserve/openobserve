@@ -87,14 +87,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OTruncatedText>
 
     <div
-      v-if="entry.stream"
+      v-if="entry.stream || !ready"
       class="flex min-w-0 items-center gap-1.5"
       data-test="alert-library-card-stream"
     >
-      <OIcon name="database" size="xs" class="text-text-secondary shrink-0" />
-      <OTruncatedText class="text-text-secondary text-2xs min-w-0 flex-1 font-mono">{{
-        entry.stream
-      }}</OTruncatedText>
+      <template v-if="entry.stream">
+        <OIcon name="database" size="xs" class="text-text-secondary shrink-0" />
+        <OTruncatedText class="text-text-secondary text-2xs min-w-0 flex-1 font-mono">{{
+          entry.stream
+        }}</OTruncatedText>
+      </template>
       <!-- The CHIP is neutral and only its icon carries the warning colour: most alerts are not ingested on a typical org. -->
       <OTag
         v-if="!ready"
