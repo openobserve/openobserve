@@ -400,6 +400,8 @@ struct RecordState<'c, 'de> {
     nested_top: bool,
     /// Whether the record has a top-level key spelled exactly `_timestamp`.
     raw_timestamp: bool,
+    /// Whether a top-level key such as `@timestamp` or `_timestamp` flattens into `_timestamp`.
+    top_timestamp: bool,
     fallback: bool,
 }
 
@@ -422,6 +424,7 @@ impl<'c, 'de> RecordState<'c, 'de> {
             serial: 0,
             nested_top: false,
             raw_timestamp: false,
+            top_timestamp: false,
             fallback: false,
         }
     }
@@ -443,6 +446,7 @@ impl<'c, 'de> RecordState<'c, 'de> {
         self.containers.clear();
         self.nested_top = false;
         self.raw_timestamp = false;
+        self.top_timestamp = false;
         self.fallback = false;
     }
 
@@ -585,8 +589,11 @@ impl<'c, 'de> RecordState<'c, 'de> {
         {
             return false;
         }
-        // `_bulk` reads a key that only flattens into `_timestamp` on its JSON path
-        if self.fallback || self.raw_timestamp != self.timestamp.is_some() {
+        // `_bulk` reads only a top-level key, and refuses a `_timestamp` that holds no value
+        if self.fallback
+            || (self.timestamp.is_some() && !self.top_timestamp)
+            || (self.timestamp.is_none() && self.raw_timestamp)
+        {
             return false;
         }
         // `{}` counts 2 bytes, yet once `_bulk` adds entries the object counts 1 plus theirs
@@ -597,9 +604,10 @@ impl<'c, 'de> RecordState<'c, 'de> {
         let Ok((timestamp, _)) = super::bulk::resolve_bulk_timestamp(parsed, min_ts, max_ts) else {
             return false;
         };
+        // `_bulk` rewrites its own `_timestamp` but adds one next to a key such as `@timestamp`
         input_bytes = match leaf {
-            Some(leaf) => input_bytes - leaf.json_bytes(),
-            None => input_bytes + estimate_json_entry_bytes(TIMESTAMP_COL_NAME, 0),
+            Some(leaf) if self.raw_timestamp => input_bytes - leaf.json_bytes(),
+            _ => input_bytes + estimate_json_entry_bytes(TIMESTAMP_COL_NAME, 0),
         } + timestamp.json_bytes();
         self.timestamp = Some(Leaf::Num(Num::I64(timestamp)));
         if let Some(id) = doc_id {
@@ -656,10 +664,12 @@ impl<'c, 'de> RecordState<'c, 'de> {
             let parent = self.path.len();
             if depth > 0 {
                 self.path.push('_');
-            } else if name == TIMESTAMP_COL_NAME {
-                self.raw_timestamp = true;
             }
             push_formatted_key(&mut self.path, &name);
+            if depth == 0 && self.path == TIMESTAMP_COL_NAME {
+                self.top_timestamp = true;
+                self.raw_timestamp |= name == TIMESTAMP_COL_NAME;
+            }
             let value_bytes = map.next_value_seed(FieldSeed {
                 state: self,
                 depth: depth + 1,
@@ -1174,7 +1184,7 @@ mod tests {
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].data_size, json_size, "json size of {line}");
         let batch = entries[0].batch.as_ref().unwrap();
-        if line.contains(TIMESTAMP_COL_NAME) {
+        if range == RANGE {
             assert_eq!(batch, &expected, "{line}");
         } else {
             // both paths stamp the current time, a few microseconds apart
@@ -1197,6 +1207,10 @@ mod tests {
                 TS / 1_000_000
             ),
             format!(r#"{{"_timestamp":{TS},"_original":"skip me","ok":true}}"#),
+            // `_bulk` reads a top-level key that flattens into `_timestamp`
+            format!(r#"{{"@timestamp":{TS},"level":"info"}}"#),
+            r#"{"level":"info","@timestamp":"2025-09-16T00:00:00Z"}"#.to_string(),
+            format!(r#"{{"_Timestamp":"{TS}","level":"a"}}"#),
         ];
         for line in &lines {
             for doc_id in [None, Some("doc-1"), Some(r#"a "quoted" \ id"#)] {
@@ -1208,6 +1222,7 @@ mod tests {
             r#"{"level":"info","bytes":7}"#,
             "{}",
             r#"{"_original":"x"}"#,
+            r#"{"@timestamp":null,"level":"info"}"#,
         ] {
             for doc_id in [None, Some("doc-2")] {
                 assert_bulk_same_as_json_path(&schema, line, doc_id, now_range());
@@ -1222,9 +1237,14 @@ mod tests {
             // the record's own `_id` would name its response item
             format!(r#"{{"_timestamp":{TS},"_id":"own"}}"#),
             format!(r#"{{"_timestamp":{TS},"_id":null,"level":"a"}}"#),
-            // `_bulk` reads a key that only flattens into `_timestamp` on its JSON path
-            format!(r#"{{"_Timestamp":{TS},"level":"a"}}"#),
+            // `_bulk` reads no nested key, and leaves a value that is not a time to the JSON path
+            format!(r#"{{"":{{"timestamp":{TS}}},"level":"a"}}"#),
+            format!(r#"{{"@timestamp":[{TS}],"level":"a"}}"#),
+            r#"{"@timestamp":true,"level":"a"}"#.to_string(),
+            format!(r#"{{"@timestamp":{TS},"_timestamp":{TS},"level":"a"}}"#),
             // `_bulk` rejects what it cannot parse
+            r#"{"@timestamp":"garbage","level":"a"}"#.to_string(),
+            format!(r#"{{"@timestamp":{},"level":"a"}}"#, TS - 7_200_000_000),
             r#"{"_timestamp":null,"level":"a"}"#.to_string(),
             r#"{"_timestamp":{},"level":"a"}"#.to_string(),
             r#"{"_timestamp":true,"level":"a"}"#.to_string(),
