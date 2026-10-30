@@ -85,6 +85,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Locked (not hidden): the family supports workflow routing, but this
          edition doesn't unlock it — kept as the discovery point since the
          dropdown's own "Workflows" header has no icon/tooltip slot to attach. -->
+    <OTooltip v-else-if="workflowsLicenseLocked" :content="workflowsLockMessage">
+      <span class="ms-2 inline-flex">
+        <OButton
+          data-test="create-workflow-btn"
+          variant="outline"
+          size="sm"
+          icon-left="lock"
+          disabled
+        >
+          {{ t("workflow.create") }}
+        </OButton>
+      </span>
+    </OTooltip>
     <template v-else-if="workflowsLocked">
       <OButton
         data-test="create-workflow-btn"
@@ -93,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="ms-2"
         @click="openUpgradeDialog"
       >
-        <template #icon-left><OIcon name="lock" size="sm" class="text-warning-600" /></template>
+        <template #icon-left><OIcon name="lock" size="sm" class="text-icon-locked" /></template>
         {{ t("workflow.create") }}
       </OButton>
     </template>
@@ -106,6 +119,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
@@ -125,6 +139,7 @@ const props = defineProps<{
   workflowsEnabled: boolean;
   /** Family supports workflows but this edition doesn't unlock them — show the group locked instead of hiding it. */
   workflowsLocked?: boolean;
+  workflowsLicenseLocked?: boolean;
   workflowsLockMessage?: I18nText;
   error?: boolean;
   placeholder?: I18nText;

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="locked"
         name="lock"
         size="xs"
-        class="text-warning-600"
+        class="text-icon-locked"
         aria-hidden="true"
         :data-test="`${dataTest}-lock`"
       />

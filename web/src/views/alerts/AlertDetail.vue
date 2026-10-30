@@ -105,7 +105,12 @@
         <span class="inline-flex">
           <OButton variant="outline" size="sm-action" disabled data-test="alerts-alertdetail-edit">
             <template #icon-left>
-              <OIcon name="lock" size="sm" data-test="alerts-alertdetail-edit-lock" />
+              <OIcon
+                name="lock"
+                class="text-icon-locked"
+                size="sm"
+                data-test="alerts-alertdetail-edit-lock"
+              />
             </template>
             {{ t("alerts.edit") }}
           </OButton>

@@ -630,6 +630,26 @@ describe("SyntheticMonitoring", () => {
       expect(mockStatusPagesList).toHaveBeenCalledTimes(1);
     });
 
+    it("flags the status pages list as license-denied on a 40001 403", async () => {
+      mockStatusPagesList.mockRejectedValueOnce({
+        response: { status: 403, data: { code: 40001, error_detail: "synthetics" } },
+      });
+      mockRoute.query.section = "status-pages";
+      wrapper = mountPage();
+      await flushPromises();
+      expect((wrapper.vm as any).statusPagesForbidden).toEqual(["synthetics"]);
+    });
+
+    it("flags the private locations list as license-denied on a 40001 403", async () => {
+      mockRoute.query.section = "private";
+      mockServiceGetLocations.mockRejectedValueOnce({
+        response: { status: 403, data: { code: 40001, error_detail: "synthetics" } },
+      });
+      wrapper = mountPage();
+      await flushPromises();
+      expect((wrapper.vm as any).locationsForbidden).toEqual(["synthetics"]);
+    });
+
     it("lazy-loads private locations when the tab is reached through the URL", async () => {
       wrapper = mountPage();
       await flushPromises();

@@ -24,11 +24,7 @@ const LICENSE_FEATURE_NOT_ENTITLED = 40001;
 
 // Icon mirrors each feature's own nav entry.
 export const LOCKED_FEATURES: Partial<Record<string, { icon: IconName }>> = {
-  workflows: { icon: "schema" },
-  oncall: { icon: "notifications-active" },
-  incidents: { icon: "notifications-active" },
   ai_assistant: { icon: "auto-awesome" },
-  ai_observability: { icon: "auto-awesome" },
 };
 
 interface RejectedResponse {

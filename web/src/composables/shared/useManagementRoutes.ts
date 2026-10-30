@@ -247,7 +247,7 @@ const useManagementRoutes = () => {
           beforeEnter: withFeatureGate("pipelineDestinations", routeGuard),
         },
         // Its API is mounted with on-call's, so the page exists only where on-call is on.
-        {
+        withLicenseFeature("oncall", {
           path: "telephony",
           name: "telephonySettings",
           meta: {
@@ -255,7 +255,7 @@ const useManagementRoutes = () => {
           },
           component: () => import("@/components/settings/TelephonySettings.vue"),
           beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
-        },
+        }),
         {
           path: "storage_settings",
           name: "storageSettings",

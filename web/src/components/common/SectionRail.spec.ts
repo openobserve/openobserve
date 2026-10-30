@@ -33,7 +33,7 @@ const stubs = {
   OTab: {
     name: "OTab",
     props: ["name", "label", "icon", "tooltip", "suffixIcon"],
-    template: "<button :data-name='name'>{{ label }}</button>",
+    template: "<button :data-name='name'>{{ label }}<slot name='icon' /></button>",
   },
   OButton: {
     emits: ["click"],
@@ -179,14 +179,20 @@ describe("SectionRail", () => {
     expect(push).toHaveBeenCalledWith({ name: "roles" });
   });
 
-  it("drops the license lock once collapsed", async () => {
+  it("swaps the lock suffix for a corner badge once collapsed", async () => {
     const wrapper = mountRail({
-      groups: lockedGroups({ licenseLocked: true }),
+      groups: lockedGroups({
+        licenseLocked: true,
+        lockedLabel: "Locked: needs RBAC",
+        icon: "lock",
+      }),
       collapsible: true,
       icon: "auto-awesome",
     });
     await wrapper.get('[data-test="section-rail-toggle"]').trigger("click");
     expect(wrapper.findComponent({ name: "OTab" }).props("suffixIcon")).toBeUndefined();
+    expect(wrapper.get(".sr-only").text()).toBe("Locked: needs RBAC");
+    expect(wrapper.find(".text-icon-locked").exists()).toBe(true);
   });
 
   const headings = (wrapper: ReturnType<typeof mountRail>) =>
