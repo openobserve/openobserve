@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
         />
         <span class="section-header-title text-compact text-text-heading font-semibold">{{
-          t("alerts.steps.compareWithPast")
+          t("alerts.plain.compareTitle")
         }}</span>
       </div>
       <div class="px-3 pb-2">
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="multi-window-text text-text-body mt-3 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
         >
-          <span>{{ t("alerts.compareWithPast.alertSetFor") }}</span>
+          <span>{{ t("alerts.plain.compareThisCheck") }}</span>
           <div class="border-line h-px flex-1"></div>
         </div>
 
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
             >
-              {{ t("alerts.compareWithPast.cycle") }}
+              {{ t("alerts.plain.compareRuns") }}
               <span class="cursor-pointer">
                 <OIcon
                   name="info"
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
             >
-              {{ t("alerts.compareWithPast.cycle") }}
+              {{ t("alerts.plain.compareRuns") }}
               <span class="cursor-pointer">
                 <OIcon
                   name="info"
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isComparisonDisabled"
             @click="addTimeShift"
           >
-            {{ t("alerts.compareWithPast.addComparisonWindow") }}
+            {{ t("alerts.plain.compareAddWindow") }}
             <OTooltip
               v-if="isComparisonDisabled"
               :content="raw(comparisonDisabledTooltip)"

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
           />
           <span class="section-header-title text-compact text-text-heading font-semibold">{{
-            t("alerts.steps.deduplication")
+            t("alerts.plain.dedupTitle")
           }}</span>
         </div>
         <div class="px-3 py-2">

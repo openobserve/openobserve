@@ -18,6 +18,7 @@ import type {
   StaleChildPolicy,
 } from "@/ts/interfaces/alert";
 import { raw, useI18nTyped } from "@/types/i18n";
+import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import {
   type CompositeChildOption,
   rawToLettered,
@@ -31,8 +32,11 @@ const props = withDefaults(
     orgIdentifier?: string;
     folderId?: string;
     availableChildren?: CompositeChildOption[];
+    /** Opt-in: the sectioned alert editor renders the expression and the preview in its own sections. */
+    sectionTargets?: AlertSectionTargets | null;
   }>(),
   {
+    sectionTargets: null,
     folderId: "default",
     orgIdentifier: undefined,
     availableChildren: () => [],
@@ -122,6 +126,8 @@ const validateDraft = async (): Promise<void> => {
     selectedChildren.value,
   );
   if (!local.valid) {
+    // Invalidate in-flight server replies so a slower one for an older valid expression can't re-enable Save.
+    validationSequence++;
     preview.value = null;
     emit("validation", { valid: false });
     return;
@@ -172,7 +178,10 @@ watch(
 
 <template>
   <section
-    class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,6.5fr)_minmax(0,3.5fr)]"
+    :class="[
+      'grid grid-cols-1 gap-4',
+      sectionTargets ? '' : 'xl:grid-cols-[minmax(0,6.5fr)_minmax(0,3.5fr)]',
+    ]"
     data-test="alerts-composite-form"
   >
     <!-- Left column: sub-alerts, expression, settings -->
@@ -194,83 +203,96 @@ watch(
         </div>
       </div>
 
-      <div class="bg-card-glass-bg rounded-default border-border-default border">
-        <div class="border-border-default flex items-center border-b px-3 py-2.5">
-          <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
-          <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
-            {{ t("alerts.composite.triggerExpression") }} <span class="text-text-body">*</span>
-          </span>
-        </div>
-        <div class="flex flex-col gap-3 px-3 py-2">
-          <OBanner variant="info" dense :content="t('alerts.composite.banner')" />
-          <CompositeExpressionBuilder
-            :model-value="draft.composite_condition.expression"
-            :selected-children="selectedChildren"
-            @update:model-value="updateCondition({ expression: $event })"
-          />
-        </div>
-      </div>
-
-      <div class="bg-card-glass-bg rounded-default border-border-default border">
-        <div class="border-border-default flex items-center border-b px-3 py-2.5">
-          <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
-          <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
-            {{ t("alerts.composite.settings") }}
-          </span>
-        </div>
-        <div class="flex flex-col gap-3 px-3 py-2">
-          <OSwitch
-            :model-value="draft.composite_condition.warning_counts_as_firing"
-            :label="t('alerts.composite.warningCountsAsFiring')"
-            data-test="alerts-composite-warning-counts-as-firing"
-            @update:model-value="updateCondition({ warning_counts_as_firing: Boolean($event) })"
-          />
-          <div class="flex flex-col gap-1">
-            <OSelect
-              :model-value="draft.composite_condition.stale_child_policy"
-              :options="stalePolicyOptions"
-              :label="t('alerts.composite.stalePolicy')"
-              :searchable="false"
-              data-test="alerts-composite-stale-policy"
-              :data-value="draft.composite_condition.stale_child_policy"
-              @update:model-value="
-                updateCondition({ stale_child_policy: $event as StaleChildPolicy })
-              "
-            />
-            <span
-              class="text-text-secondary text-xs"
-              data-test="alerts-composite-stale-policy-help"
-            >
-              {{ stalePolicyHelp }}
+      <Teleport
+        :to="sectionTargets?.compositeCondition"
+        :disabled="!sectionTargets?.compositeCondition"
+      >
+        <div class="bg-card-glass-bg rounded-default border-border-default border">
+          <div class="border-border-default flex items-center border-b px-3 py-2.5">
+            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+            <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
+              {{ t("alerts.composite.triggerExpression") }} <span class="text-text-body">*</span>
             </span>
           </div>
+          <div class="flex flex-col gap-3 px-3 py-2">
+            <OBanner variant="info" dense :content="t('alerts.composite.banner')" />
+            <CompositeExpressionBuilder
+              :model-value="draft.composite_condition.expression"
+              :selected-children="selectedChildren"
+              @update:model-value="updateCondition({ expression: $event })"
+            />
+          </div>
         </div>
-      </div>
+
+        <div class="bg-card-glass-bg rounded-default border-border-default border">
+          <div class="border-border-default flex items-center border-b px-3 py-2.5">
+            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+            <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
+              {{ t("alerts.composite.settings") }}
+            </span>
+          </div>
+          <div class="flex flex-col gap-3 px-3 py-2">
+            <OSwitch
+              :model-value="draft.composite_condition.warning_counts_as_firing"
+              :label="t('alerts.composite.warningCountsAsFiring')"
+              data-test="alerts-composite-warning-counts-as-firing"
+              @update:model-value="updateCondition({ warning_counts_as_firing: Boolean($event) })"
+            />
+            <div class="flex flex-col gap-1">
+              <OSelect
+                :model-value="draft.composite_condition.stale_child_policy"
+                :options="stalePolicyOptions"
+                :label="t('alerts.composite.stalePolicy')"
+                :searchable="false"
+                data-test="alerts-composite-stale-policy"
+                :data-value="draft.composite_condition.stale_child_policy"
+                @update:model-value="
+                  updateCondition({ stale_child_policy: $event as StaleChildPolicy })
+                "
+              />
+              <span
+                class="text-text-secondary text-xs"
+                data-test="alerts-composite-stale-policy-help"
+              >
+                {{ stalePolicyHelp }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </Teleport>
     </div>
 
     <!-- Right column: live preview + summary -->
     <div class="flex min-w-0 flex-col gap-4">
-      <div class="bg-card-glass-bg rounded-default border-border-default border">
-        <div class="border-border-default flex items-center border-b px-3 py-2.5">
-          <span class="text-text-heading text-sm font-medium">{{ t("alerts.preview") }}</span>
-        </div>
-        <div class="min-h-0 overflow-auto px-3 py-2">
-          <CompositeAlertPreview
-            v-if="preview"
-            :preview="preview"
-            :expression="draft.composite_condition.expression"
-            :selected-children="selectedChildren"
-          />
-          <div
-            v-else
-            class="text-text-secondary flex items-center justify-center gap-2 py-6 text-sm"
-          >
-            {{ t("alerts.composite.invalidExpression") }}
+      <Teleport
+        :to="sectionTargets?.compositePreview"
+        :disabled="!sectionTargets?.compositePreview"
+      >
+        <div class="bg-card-glass-bg rounded-default border-border-default border">
+          <div class="border-border-default flex items-center border-b px-3 py-2.5">
+            <span class="text-text-heading text-sm font-medium">{{ t("alerts.preview") }}</span>
+          </div>
+          <div class="min-h-0 overflow-auto px-3 py-2">
+            <CompositeAlertPreview
+              v-if="preview"
+              :preview="preview"
+              :expression="draft.composite_condition.expression"
+              :selected-children="selectedChildren"
+            />
+            <div
+              v-else
+              class="text-text-secondary flex items-center justify-center gap-2 py-6 text-sm"
+            >
+              {{ t("alerts.composite.invalidExpression") }}
+            </div>
           </div>
         </div>
-      </div>
+      </Teleport>
 
-      <div class="bg-card-glass-bg rounded-default border-border-default border">
+      <div
+        v-if="!sectionTargets"
+        class="bg-card-glass-bg rounded-default border-border-default border"
+      >
         <div class="border-border-default flex items-center border-b px-3 py-2.5">
           <span class="text-text-heading text-sm font-medium">{{ t("alerts.summary.title") }}</span>
         </div>

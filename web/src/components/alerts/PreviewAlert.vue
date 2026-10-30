@@ -97,6 +97,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Opt-in: names the limit lines on the chart.
+  labelledLimit: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 // SQL tab's Multi Alert value-column dropdown (sql_simple_multi_alert_fe_prd.md
@@ -134,7 +139,13 @@ const clearFieldLabels = (data: any) => {
  * longer drawing.
  */
 const applyThresholds = (critical: unknown, warning: unknown): void => {
-  const markLines = buildThresholdMarkLines(critical, warning);
+  const markLines = buildThresholdMarkLines(
+    critical,
+    warning,
+    props.labelledLimit
+      ? { critical: t("alerts.plain.limitLine"), warning: t("alerts.plain.warnLine") }
+      : undefined,
+  );
   const bounds = thresholdAxisBounds(markLines);
   dashboardPanelData.data.config.mark_line = markLines;
   dashboardPanelData.data.config.y_axis_min = bounds.y_axis_min;
@@ -175,6 +186,9 @@ const selectedTimeObj = ref({});
 const evaluationStatus = ref<{
   wouldTrigger: boolean;
   reason: string;
+  count?: number;
+  label?: string;
+  grouped?: boolean;
 } | null>(null);
 const { t } = useI18nTyped();
 
@@ -1052,8 +1066,15 @@ const setEvaluationStatus = (verdict: {
     ? t("alerts.previewEvaluation.reasonMatch", args)
     : t("alerts.previewEvaluation.reasonNoMatch", args);
 
+  const groupBy: string[] = props.formData.query_condition?.aggregation?.group_by ?? [];
   evaluationStatus.value = {
     wouldTrigger: verdict.wouldTrigger,
+    count: verdict.count,
+    label: args.label,
+    grouped:
+      props.selectedTab === "custom" &&
+      props.isAggregationEnabled &&
+      groupBy.some((f) => !!f && f.trim() !== ""),
     reason: verdict.level
       ? t("alerts.previewEvaluation.reasonLevel", {
           reason: sentence,

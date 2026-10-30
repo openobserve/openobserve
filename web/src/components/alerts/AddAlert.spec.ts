@@ -21,7 +21,6 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { nextTick } from "vue";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import alertsService from "@/services/alerts";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -112,6 +111,9 @@ vi.mock("@/services/alerts", async (importOriginal) => {
         }),
       ),
       listByFolderId: vi.fn(() => Promise.resolve({ data: { list: [] } })),
+      toggle_state_by_alert_id: vi.fn((_org: string, _id: string, enable: boolean) =>
+        Promise.resolve({ data: { enabled: enable } }),
+      ),
     },
   });
 });
@@ -185,13 +187,75 @@ const seedValidScheduled = (form: any) => {
   });
 };
 
+/** jsdom has no scrolling; the section jump calls one of these. */
+const stubScrolling = () => {
+  const saved = [
+    [HTMLElement.prototype, "scrollTo"],
+    [Element.prototype, "scrollIntoView"],
+  ] as const;
+  const originals = saved.map(([proto, key]) => Object.getOwnPropertyDescriptor(proto, key));
+  for (const [proto, key] of saved) {
+    Object.defineProperty(proto, key, { configurable: true, writable: true, value: vi.fn() });
+  }
+  return () =>
+    saved.forEach(([proto, key], i) => {
+      const original = originals[i];
+      if (original) Object.defineProperty(proto, key, original);
+      else delete (proto as unknown as Record<string, unknown>)[key];
+    });
+};
+
+const focusedTestId = () => document.activeElement?.getAttribute("data-test");
+
+/** A saved scheduled alert as the edit page loads it. */
+const savedAlert = (over: Record<string, any> = {}) => ({
+  id: "alert-1",
+  name: "errors_alert",
+  stream_type: "logs",
+  stream_name: "app_logs",
+  is_real_time: false,
+  pending_period_sec: 0,
+  query_condition: {
+    type: "custom",
+    conditions: null,
+    sql: "",
+    promql: "",
+    promql_condition: null,
+    aggregation: null,
+    vrl_function: "",
+    multi_time_range: [],
+  },
+  trigger_condition: {
+    period: 10,
+    operator: ">=",
+    frequency: 10,
+    threshold: 3,
+    silence: 10,
+    frequency_type: "minutes",
+    timezone: "UTC",
+  },
+  destinations: ["email"],
+  context_attributes: {},
+  description: "",
+  row_template: "",
+  row_template_type: "String",
+  enabled: true,
+  ...over,
+});
+
 describe("AddAlert (OForm owner)", () => {
   let wrapper: any;
+  let unstubScrolling: () => void;
+
+  beforeEach(() => {
+    unstubScrolling = stubScrolling();
+  });
 
   afterEach(() => {
     wrapper?.unmount();
     wrapper = null;
     vi.clearAllMocks();
+    unstubScrolling();
   });
 
   describe("owner pattern wiring", () => {
@@ -450,7 +514,7 @@ describe("AddAlert (OForm owner)", () => {
     it("blocks a cron save when the interval is below the org minimum", async () => {
       const restore = withMinInterval(300); // 5 minutes
       try {
-        wrapper = mountAlert();
+        wrapper = mountAlert({}, { attachTo: document.body });
         await flushPromises();
         const form = wrapper.vm.form;
         // Every minute = 60s < 300s.
@@ -466,14 +530,14 @@ describe("AddAlert (OForm owner)", () => {
             message: "Frequency should be greater than 299 seconds.",
           }),
         );
-        expect(wrapper.vm.activeTab).toBe("condition");
+        expect(focusedTestId()).toBe("add-alert-section-schedule-title");
       } finally {
         restore();
       }
     });
 
     it("blocks a cron save when the expression is invalid", async () => {
-      wrapper = mountAlert();
+      wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();
       const form = wrapper.vm.form;
       seedCron(form, "not-a-cron");
@@ -485,11 +549,11 @@ describe("AddAlert (OForm owner)", () => {
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ message: "Invalid cron expression" }),
       );
-      expect(wrapper.vm.activeTab).toBe("condition");
+      expect(focusedTestId()).toBe("add-alert-section-schedule-title");
     });
 
     it("blocks a cron save when the timezone is missing (inline-only, NO toast)", async () => {
-      wrapper = mountAlert();
+      wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();
       const form = wrapper.vm.form;
       seedCron(form, "0 */10 * * * *", "");
@@ -499,10 +563,11 @@ describe("AddAlert (OForm owner)", () => {
 
       // Pre-migration returned {valid:false, message:null} here and the
       // orchestrator only toasted `if (message)` — so this case blocks + moves
-      // to the condition tab WITHOUT a toast (QueryConfig renders the inline
+      // to the schedule section WITHOUT a toast (QueryConfig renders the inline
       // "Cron expression and timezone are required").
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(wrapper.vm.activeTab).toBe("condition");
+      expect(toast).not.toHaveBeenCalled();
+      expect(focusedTestId()).toBe("add-alert-section-schedule-title");
     });
 
     it("blocks a cron save when the expression is missing", async () => {
@@ -1067,15 +1132,323 @@ describe("AddAlert (OForm owner)", () => {
     });
   });
 
-  // ── Cross-tab error focus ──────────────────────────────────────────────────
-  // Regression: leave a required field blank on the Alert Rules tab, switch to
-  // Advanced, hit Save → "Please fix the highlighted fields" fired while the
-  // highlighted field sat on a v-show'd-off tab the user could not see, and
-  // nothing steered them back. focusOnFirstError skips messages with a null
-  // offsetParent (correct on its own — focusing a display:none control no-ops),
-  // so every message on the inactive pane was filtered out and it focused
-  // nothing. It must bring the tab OWNING the error forward first.
-  describe("focusOnFirstError (cross-tab)", () => {
+  describe("sections layout", () => {
+    it("renders the five sections in order beside the section list", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const ids = wrapper
+        .findAll("[data-snap-section]")
+        .map((el) => el.attributes("data-snap-section"));
+      expect(ids).toEqual(["watch", "condition", "notify", "schedule", "details"]);
+      expect(wrapper.findAll('[data-test^="o-section-nav-item-"]')).toHaveLength(5);
+      expect(wrapper.find('[data-test="add-alert-tab-condition"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="add-alert-tab-advanced"]').exists()).toBe(false);
+    });
+
+    it("names the alert types as ways of checking, keeping their ids", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-type-tab-false"]').text()).toContain(
+        "Every 10 min",
+      );
+      expect(wrapper.find('[data-test="add-alert-type-tab-true"]').text()).toContain(
+        "As it happens",
+      );
+    });
+
+    it("describes the whole alert in one line in the rail once a stream is picked", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-rail-sentence"]').exists()).toBe(false);
+      wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-rail-sentence"]').text()).toBe(
+        "Alerts nobody yet when 3+ events turn up in 10 minutes, checked every 10 min, at most once every 10 minutes.",
+      );
+      expect(wrapper.find('[data-test="add-alert-read-back"]').text()).toContain(
+        "Alerts nobody yet when 3+ events turn up in 10 minutes",
+      );
+      expect(wrapper.find('[data-test="alerts-alert-summary"]').exists()).toBe(false);
+    });
+
+    it("tucks the rare condition settings behind one link that expands in place", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const more = () => wrapper.find('[data-test="add-alert-section-condition-more"]');
+      expect(more().text()).toBe("2 more: warning, hold for");
+      expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(false);
+      expect(wrapper.vm.tiers.isVisible("warning")).toBe(false);
+
+      await more().trigger("click");
+      expect(more().text()).toBe("Show fewer");
+      expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(true);
+      expect(wrapper.vm.tiers.isVisible("warning")).toBe(true);
+
+      await more().trigger("click");
+      expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(false);
+    });
+
+    it("shows a tucked setting that holds a value and drops it from the count", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("pending_period_sec", 5);
+      await flushPromises();
+      expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(true);
+      expect(wrapper.find('[data-test="add-alert-section-condition-more"]').text()).toBe(
+        "1 more: warning",
+      );
+    });
+
+    it("keeps the message settings one click away and tucks priority and tags", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.vm.tiers.isVisible("template")).toBe(false);
+      await wrapper.find('[data-test="add-alert-add-template"]').trigger("click");
+      expect(wrapper.vm.tiers.isVisible("template")).toBe(true);
+      expect(wrapper.find('[data-test="add-alert-add-template"]').exists()).toBe(false);
+      await wrapper.find('[data-test="add-alert-add-variables"]').trigger("click");
+      expect(wrapper.vm.form.getFieldValue("context_attributes")).toHaveLength(1);
+      expect(wrapper.find('[data-test="add-alert-section-details-more"]').text()).toBe(
+        "2 more: priority, tags",
+      );
+    });
+
+    it("finds a setting by its old name and expands its tucked group when picked", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-find-setting"]').exists()).toBe(true);
+      wrapper.vm.settingFind.query.value = "dedup";
+      await flushPromises();
+      expect(wrapper.vm.settingFind.items.value[0]).toMatchObject({
+        id: "dedup",
+        label: "Skip duplicates",
+      });
+      expect(wrapper.vm.tiers.isVisible("dedup")).toBe(false);
+      // jsdom has no layout: the stubbed step renders no control, so the jump falls back to the section.
+      const scrollTo = vi.fn();
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: scrollTo,
+      });
+      await wrapper.vm.settingFind.select("dedup");
+      await flushPromises();
+      delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo;
+      expect(wrapper.vm.tiers.isVisible("dedup")).toBe(true);
+      expect(scrollTo).toHaveBeenCalled();
+      expect(wrapper.find('[data-test="add-alert-section-notify-more"]').text()).toBe("Show fewer");
+    });
+
+    it("lists only the settings the alert type has", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const found = (q: string): string[] => {
+        wrapper.vm.settingFind.query.value = q;
+        return wrapper.vm.settingFind.items.value.map((i: { id: string }) => i.id);
+      };
+      expect(found("cron")).toContain("cron");
+      wrapper.vm.form.setFieldValue("is_real_time", "true");
+      await flushPromises();
+      expect(found("cron")).not.toContain("cron");
+      expect(found("dedup")).not.toContain("dedup");
+      expect(found("cooldown")).toContain("cooldown");
+    });
+
+    it("shows the name read-only in section 5; the header keeps the one editable field", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-details-name"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-alert-details-rename-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-alert-details-name-input"]').exists()).toBe(false);
+    });
+  });
+
+  describe("edit header and tucked settings", () => {
+    it("keeps a header Disable through the next Save and does not count it as unsaved", async () => {
+      wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert() });
+      await flushPromises();
+      document.dispatchEvent(new Event("pointerdown"));
+
+      await wrapper.vm.editHeader.toggleEnabled();
+      await flushPromises();
+
+      expect(alertsService.toggle_state_by_alert_id).toHaveBeenCalledWith(
+        expect.any(String),
+        "alert-1",
+        false,
+        expect.anything(),
+      );
+      expect(wrapper.vm.editHeader.enabled.value).toBe(false);
+      expect(wrapper.vm.editHeader.state.value).toEqual({ kind: "disabled" });
+      expect(wrapper.vm.form.state.values.enabled).toBe(false);
+      expect(wrapper.vm.getAlertPayload().enabled).toBe(false);
+      expect(wrapper.vm.unsavedChanges.map((c: { path: string }) => c.path)).not.toContain(
+        "enabled",
+      );
+    });
+
+    describe("measure switched to event count", () => {
+      const measureAlert = () =>
+        savedAlert({
+          stream_type: "metrics",
+          query_condition: {
+            ...savedAlert().query_condition,
+            aggregation: {
+              function: "avg",
+              group_by: [],
+              having: { column: "field2", operator: ">=", value: 90 },
+            },
+          },
+        });
+      const mountWithQuery = async () => {
+        wrapper = mountAlert(
+          { isUpdated: true, modelValue: measureAlert() },
+          {
+            attachTo: document.body,
+            global: {
+              provide: { store },
+              plugins: [i18n, router],
+              stubs: { ...stubs, QueryConfig: false },
+            },
+          },
+        );
+        await flushPromises();
+        document.dispatchEvent(new Event("pointerdown"));
+        await flushPromises();
+      };
+      const pickEventCount = async () => {
+        wrapper
+          .findComponent({ name: "Step2QueryConfig" })
+          .findAllComponents({ name: "OSelect" })
+          .find((c: any) => c.props("modelValue") === "avg")!
+          .vm.$emit("update:modelValue", "total_events");
+        await flushPromises();
+      };
+      const savedMeasure = { function: "avg", having: { column: "field2", value: 90 } };
+
+      it("counts the switch as an unsaved change", async () => {
+        await mountWithQuery();
+        await pickEventCount();
+        expect(wrapper.vm.getAlertPayload().query_condition.aggregation).toBeNull();
+        expect(wrapper.vm.unsavedChanges).toEqual([
+          { path: "aggregation_enabled", before: true, after: false },
+        ]);
+      });
+
+      it("Discard brings the saved measure back", async () => {
+        await mountWithQuery();
+        await pickEventCount();
+        await wrapper.vm.discardChanges();
+        await flushPromises();
+        expect(wrapper.vm.isAggregationEnabled).toBe(true);
+        expect(wrapper.vm.getAlertPayload().query_condition.aggregation).toMatchObject(
+          savedMeasure,
+        );
+        expect(wrapper.vm.unsavedChanges).toEqual([]);
+      });
+
+      it("a header Disable before Discard keeps the saved measure as the baseline", async () => {
+        await mountWithQuery();
+        await pickEventCount();
+        wrapper.vm.form.setFieldValue("description", "an unsaved edit");
+        await flushPromises();
+        await wrapper.vm.editHeader.toggleEnabled();
+        await flushPromises();
+        await wrapper.vm.discardChanges();
+        await flushPromises();
+        expect(wrapper.vm.form.state.values.enabled).toBe(false);
+        expect(wrapper.vm.getAlertPayload().query_condition.aggregation).toMatchObject(
+          savedMeasure,
+        );
+      });
+    });
+
+    it.each([
+      ["holdFor", { pending_period_sec: 300 }, ["pending_period_sec", 0]],
+      ["holdFor", { pending_period_sec: 300 }, ["pending_period_sec", -5]],
+      ["recovery", { notify_on_recovery: true }, ["notify_on_recovery", false]],
+      ["tags", { tags: ["payments"] }, ["tags", []]],
+    ] as const)(
+      "keeps %s on screen once its value is cleared",
+      async (id, loaded, [field, cleared]) => {
+        wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert(loaded) });
+        await flushPromises();
+        expect(wrapper.vm.tiers.isVisible(id)).toBe(true);
+
+        wrapper.vm.form.setFieldValue(field, cleared);
+        await flushPromises();
+
+        expect(wrapper.vm.tiers.isVisible(id)).toBe(true);
+      },
+    );
+
+    it("keeps a negative hold-for and its error on screen, and flags the section", async () => {
+      wrapper = mountAlert(
+        { isUpdated: true, modelValue: savedAlert({ pending_period_sec: 300 }) },
+        {
+          global: {
+            provide: { store },
+            plugins: [i18n, router],
+            stubs: { ...stubs, AlertSettings: false },
+          },
+        },
+      );
+      await flushPromises();
+      const row = () => wrapper.find('[data-test="alert-settings-pending-period-input"]');
+      expect(row().exists()).toBe(true);
+
+      await row().find("input").setValue("-5");
+      await wrapper.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(row().exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-settings-pending-period-error"]').text()).not.toBe("");
+      expect(wrapper.find('[data-test="o-section-nav-item-condition"]').text()).toContain(
+        "Needs a fix",
+      );
+      expect(alertsService.update_by_alert_id).not.toHaveBeenCalled();
+    });
+
+    it("moves focus to the picked section's heading", async () => {
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      await wrapper.find('[data-test="o-section-nav-item-notify"]').trigger("click");
+      expect(focusedTestId()).toBe("add-alert-section-notify-title");
+    });
+
+    it("gives a real-time alert a plain note instead of a verdict", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      wrapper.vm.form.setFieldValue("is_real_time", "true");
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-rail-verdict"]').text()).toBe(
+        "Checked as each event arrives, so there is no count to judge yet. The graph shows recent matching events.",
+      );
+    });
+
+    it("describes a composite alert in one line in the rail", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      form.setFieldValue("is_real_time", "composite");
+      form.setFieldValue("destinations", ["pager"]);
+      form.setFieldValue("trigger_condition", { silence: 15 });
+      form.setFieldValue("composite_condition", { expression: "{id-a} && {id-b}" });
+      form.setFieldValue("children", [
+        { alert_id: "id-a", name: "errors_high", accessible: true },
+        { alert_id: "id-b", name: "latency_high", accessible: true },
+      ]);
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-rail-sentence"]').text()).toBe(
+        "Alerts pager when its alerts match errors_high AND latency_high, at most once every 15 minutes.",
+      );
+    });
+  });
+
+  // ── Error focus across sections ───────────────────────────────────────────
+  // focusOnFirstError skips messages with a null offsetParent, so a slice the
+  // current alert type hides is never focused into the void.
+  describe("focusOnFirstError (sections)", () => {
     let offsetParent: any;
 
     beforeEach(() => {
@@ -1100,60 +1473,55 @@ describe("AddAlert (OForm owner)", () => {
 
     /** Stand in for the error an OForm* field renders once the schema fails —
      *  the step children are stubbed here, so inject the same shape they emit
-     *  (a [role="alert"] message beside its control) into the real pane. */
-    const seedFieldError = (tab: string): HTMLInputElement => {
-      const pane = wrapper.find(`[data-tab-pane="${tab}"]`).element;
+     *  (a [role="alert"] message beside its control) into a section's body. */
+    const seedFieldError = (section: string, hidden = false): HTMLInputElement => {
+      const body = wrapper.find(`[data-test="add-alert-section-${section}"]`).element;
       const field = document.createElement("div");
+      if (hidden) field.style.display = "none";
       field.innerHTML = '<span role="alert">At least one destination is required.</span><input />';
-      pane.appendChild(field);
+      body.appendChild(field);
       return field.querySelector("input") as HTMLInputElement;
     };
 
-    it("brings the tab owning the error forward and focuses the field", async () => {
+    it("focuses an error in any section, since every section is always shown", async () => {
       // Attached: focusOnFirstError reaches for the live document (the real
       // <form> + focus()), which a detached wrapper has no place in.
       wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();
-      const input = seedFieldError("condition");
-      wrapper.vm.activeTab = "advanced";
-      await nextTick();
+      const input = seedFieldError("notify");
 
       wrapper.vm.focusOnFirstError();
       await flushPromises();
 
-      expect(wrapper.vm.activeTab).toBe("condition");
       expect(document.activeElement).toBe(input);
     });
 
-    it("stays put when the error is already on the visible tab", async () => {
+    it("focuses the earliest section's error when several sections have one", async () => {
       wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();
-      const input = seedFieldError("condition");
-      wrapper.vm.activeTab = "condition";
-      await nextTick();
+      const later = seedFieldError("details");
+      const earlier = seedFieldError("condition");
 
       wrapper.vm.focusOnFirstError();
       await flushPromises();
 
-      expect(wrapper.vm.activeTab).toBe("condition");
-      expect(document.activeElement).toBe(input);
+      expect(document.activeElement).toBe(earlier);
+      expect(document.activeElement).not.toBe(later);
     });
 
-    // Anomaly mode swaps the tab headers wholesale, but every pane stays in the
-    // DOM (v-show). Hopping onto a pane with no header would strand the user on
-    // a tab the toggle group cannot show or leave.
-    it("never hops to a tab that has no header in the current mode", async () => {
+    it("skips a stale message in a slice the current mode hides", async () => {
       wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();
       wrapper.vm.form.setFieldValue("is_real_time", "anomaly");
       await flushPromises();
-      expect(wrapper.vm.activeTab).toBe("anomaly-config");
+      const hidden = seedFieldError("condition", true);
+      const visible = seedFieldError("details");
 
-      seedFieldError("condition"); // stale message on the now-headerless pane
       wrapper.vm.focusOnFirstError();
       await flushPromises();
 
-      expect(wrapper.vm.activeTab).toBe("anomaly-config");
+      expect(document.activeElement).toBe(visible);
+      expect(document.activeElement).not.toBe(hidden);
     });
   });
 
