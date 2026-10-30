@@ -350,7 +350,6 @@ use crate::{
         openobserve_api_management::request::fleet::put_fleet_settings,
         openobserve_api_management::request::fleet::set_desired,
         openobserve_api_management::request::fleet::preview_desired,
-        openobserve_api_management::request::fleet::move_collectors,
         openobserve_api_management::request::fleet::list_tokens,
         openobserve_api_management::request::fleet::create_token,
         openobserve_api_management::request::fleet::revoke_token,
@@ -790,8 +789,6 @@ use crate::{
             config::meta::fleet::Settings,
             config::meta::fleet::CreateFleetRequest,
             config::meta::fleet::RenameFleetRequest,
-            config::meta::fleet::MoveCollectorsRequest,
-            config::meta::fleet::MoveCollectorsResponse,
             config::meta::fleet::References,
             config::meta::fleet::FleetConfig,
             config::meta::fleet::FleetConfigList,
@@ -1774,11 +1771,6 @@ mod tests {
                 "put",
                 &["200", "400", "403", "404", "409"][..],
             ),
-            (
-                "/api/{org_id}/fleet/fleets/move",
-                "post",
-                &["200", "400", "403", "404", "409"][..],
-            ),
             ("/api/{org_id}/fleet/configs", "get", &["200", "403"][..]),
             (
                 "/api/{org_id}/fleet/configs",
@@ -1846,15 +1838,11 @@ mod tests {
             ("/api/{org_id}/fleet/rollouts/{id}/pause", "post"),
             ("/api/{org_id}/fleet/rollouts/{id}/stop", "post"),
             ("/api/{org_id}/fleet/flow", "get"),
+            ("/api/{org_id}/fleet/fleets/move", "post"),
         ] {
             assert!(spec["paths"][path][method].is_null(), "{method} {path}");
         }
-        for schema in [
-            "SetDesiredRequest",
-            "FleetList",
-            "MoveCollectorsRequest",
-            "CollectorFleet",
-        ] {
+        for schema in ["SetDesiredRequest", "FleetList", "CollectorFleet"] {
             assert!(
                 spec["components"]["schemas"][schema].is_object(),
                 "{schema}"

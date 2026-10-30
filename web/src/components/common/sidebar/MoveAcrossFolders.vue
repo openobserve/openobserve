@@ -160,8 +160,6 @@ export default defineComponent({
           return "workflow_ids";
         case "downtimes":
           return "downtime_ids";
-        case "fleets":
-          return "collector_ids";
         default:
           return "alert_ids";
       }
