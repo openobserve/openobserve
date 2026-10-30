@@ -30,7 +30,11 @@ log = logging.getLogger(__name__)
 
 
 def _delete_profiles_stream(client: OpenObserveClient, name: str) -> None:
-    resp = client.streams.delete(name, type_="profiles")
+    try:
+        resp = client.streams.delete(name, type_="profiles")
+    except Exception as e:
+        log.warning("profiles stream cleanup failed for %s: %s", name, e)
+        return
     if resp.status_code not in (200, 404):
         log.warning("profiles stream cleanup failed for %s: %s %s", name, resp.status_code, resp.text[:200])
 

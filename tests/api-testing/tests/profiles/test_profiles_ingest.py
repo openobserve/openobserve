@@ -512,8 +512,8 @@ def test_ing44_negative_value_kept(client: OpenObserveClient, prof_stream: str):
     assert wait_rows(client, prof_stream, 1)[0]["value"] == -5
 
 
-# Product bug: profiles never apply ZO_COLS_PER_RECORD_LIMIT; unskip once o2-enterprise#3123 (columns-per-record item) is fixed.
-@pytest.mark.skip(reason="Known product bug o2-enterprise#3123: profiles ignore ZO_COLS_PER_RECORD_LIMIT")
+# Product bug: profiles never apply ZO_COLS_PER_RECORD_LIMIT; strict xfail turns red once o2-enterprise#3123 fixes it, then drop the marker.
+@pytest.mark.xfail(strict=True, reason="Known product bug o2-enterprise#3123: profiles ignore ZO_COLS_PER_RECORD_LIMIT")
 def test_ing45_too_many_columns_rejected(client: OpenObserveClient, prof_stream: str):
     b = ProfilesBuilder()
     attrs = {f"extra.attr_{i:04d}": f"v{i}" for i in range(1010)}

@@ -40,7 +40,6 @@ export class ProfilesPage {
     this.pageRoot = '[data-test="profiles-page"]';
     this.pageTitle = '[data-test="profiles-page-title"]';
     this.betaBadge = '[data-test="beta-badge"]';
-    this.datePicker = '[data-test="profiles-date-picker"]';
     this.datePrevBtn = '[data-test="profiles-date-picker"] [data-test="date-time-prev-btn"]';
     this.dateNextBtn = '[data-test="profiles-date-picker"] [data-test="date-time-next-btn"]';
     this.dateBtn = '[data-test="profiles-date-picker"] [data-test="date-time-btn"]';
@@ -74,19 +73,15 @@ export class ProfilesPage {
     this.seriesSkeleton = '[data-test="profiles-series-skeleton"]';
     this.noSeries = '[data-test="profiles-no-series"]';
 
-    this.viewToggle = '[data-test="profiles-view"]';
     this.searchInput = '[data-test="profiles-search-functions-field"]';
     this.searchSummary = '[data-test="profiles-search-summary"]';
     this.resultsExpandBtn = '[data-test="profiles-results-expand"]';
     this.topTable = '[data-test="profiles-top-table"]';
     this.stackTable = '[data-test="profiles-stack-table"]';
     this.flameSkeleton = '[data-test="profiles-flame-skeleton"]';
-    this.sandwich = '[data-test="profiles-sandwich"]';
     this.sandwichFunction = 'profiles-sandwich-function';
     this.sandwichCoverage = '[data-test="profiles-sandwich-coverage"]';
     this.sandwichSkeleton = '[data-test="profiles-sandwich-skeleton"]';
-    this.sandwichCallers = '[data-test="profiles-sandwich-callers"]';
-    this.sandwichCallees = '[data-test="profiles-sandwich-callees"]';
     this.loadingIndicators = [
       '[data-test="profiles-series-skeleton"]',
       '[data-test="profiles-flame-skeleton"]',
@@ -111,11 +106,9 @@ export class ProfilesPage {
     this.compareBaseline = 'profiles-compare-baseline';
     this.compareComparison = 'profiles-compare-comparison';
     this.compareSwap = '[data-test="profiles-compare-swap"]';
-    this.compareLegend = '[data-test="profiles-compare-legend"]';
     this.compareSkeleton = '[data-test="profiles-compare-skeleton"]';
     this.compareMessage = '[data-test="profiles-compare-message"]';
     this.compareFlame = '[data-test="profiles-compare-flame"]';
-    this.compareSides = '[data-test="profiles-compare-sides"]';
     this.compareTable = '[data-test="profiles-compare-table"]';
     this.compareSideBaseline = '[data-test="profiles-compare-side-baseline"]';
     this.compareSideComparison = '[data-test="profiles-compare-side-comparison"]';
@@ -147,7 +140,6 @@ export class ProfilesPage {
     this.ingestionOtelGrpcBlock = '[data-test="ingestion-profiles-otel-grpc-code-block-pre"]';
     this.traceViewProfileBtn = '[data-test="trace-details-sidebar-header-toolbar-view-profile-btn"]';
   }
-
 
   orgName() {
     return getOrgIdentifier();
@@ -327,11 +319,6 @@ export class ProfilesPage {
     await this.page.unroute(new RegExp(`/profiles/${kind}(\\?|$)`));
   }
 
-
-  selectRoot(name, scope) {
-    return (scope ?? this.page).locator(`[data-test="${name}"]`).first();
-  }
-
   selectTrigger(name, scope) {
     return (scope ?? this.page).locator(`[data-test="${name}-trigger"]`).first();
   }
@@ -385,11 +372,6 @@ export class ProfilesPage {
   async selectService(service) {
     await this.pickOption(this.serviceSelect, service);
   }
-
-  async selectProfileType(label) {
-    await this.pickOption(this.typeSelect, label);
-  }
-
 
   async clickRun() {
     await expect(this.page.locator(this.runBtn)).toBeEnabled();
@@ -460,7 +442,6 @@ export class ProfilesPage {
   async expectDateButtonText(pattern) {
     await expect(this.page.locator(this.dateBtn)).toContainText(pattern);
   }
-
 
   async openAddFilter() {
     const add = this.page.locator(this.addFilterBtn);
@@ -533,7 +514,6 @@ export class ProfilesPage {
     await this.page.keyboard.press('Escape');
   }
 
-
   async switchView(view) {
     await this.page.locator(`[data-test="profiles-view-${view}"]`).click();
     await this.expectViewActive(view);
@@ -558,7 +538,6 @@ export class ProfilesPage {
   async toggleResultsExpand() {
     await this.page.locator(this.resultsExpandBtn).click();
   }
-
 
   /** Rendered row at `position` (data-test row ids keep the unsorted data index, so position is by DOM order). */
   topRow(position) {
@@ -646,7 +625,6 @@ export class ProfilesPage {
     await expect(this.treeRow(index).locator('[data-test="o2-table-tree-toggle-name"]')).toHaveAttribute('aria-expanded', String(expanded));
   }
 
-
   async expectDetails({ name, self, total, calledBy, calls, hasPackage }) {
     const panel = this.page.locator(this.details);
     await expect(panel).toBeVisible({ timeout: 15000 });
@@ -676,7 +654,6 @@ export class ProfilesPage {
     await this.page.locator(map[action]).click();
   }
 
-
   async expectSandwichFunction(name) {
     await this.expectSelected(this.sandwichFunction, name);
   }
@@ -692,7 +669,6 @@ export class ProfilesPage {
   async expectSandwichCoverageText(text) {
     await expect(this.page.locator(this.sandwichCoverage)).toContainText(text, { timeout: 15000 });
   }
-
 
   flameGraph(scope) {
     return (scope ? this.page.locator(scope) : this.page).locator(this.flamePlot).first();
@@ -870,11 +846,6 @@ export class ProfilesPage {
     await this.page.keyboard.press('Escape');
   }
 
-  async expectFlameSkeleton() {
-    await expect(this.page.locator(this.flameSkeleton)).toBeVisible();
-  }
-
-
   pixelAt(png, fx, fy) {
     const image = PNG.sync.read(png);
     const x = Math.min(image.width - 1, Math.max(0, Math.round(fx * image.width)));
@@ -907,7 +878,6 @@ export class ProfilesPage {
     }
     return { count, centre: count ? sum / count / image.width : -1 };
   }
-
 
   async expectSeriesCardVisible(visible) {
     if (visible) await expect(this.page.locator(this.seriesCard)).toBeVisible();
@@ -971,7 +941,6 @@ export class ProfilesPage {
     await expect(this.page.locator(this.breakdownChipOthers)).toBeDisabled();
     await expect(this.page.locator(this.breakdownChipOthers)).toHaveText('Others');
   }
-
 
   async expectState(name, { title, description } = {}) {
     const map = {
@@ -1050,7 +1019,6 @@ export class ProfilesPage {
     await expect(this.page.locator(this.successToast).filter({ hasText: 'Copied to clipboard' }).first()).toBeVisible({ timeout: 15000 });
   }
 
-
   /** RGB of the frame's fill at `at` across its width (away from the label, which sits at the left). */
   async framePixel(frame, { at = 0.8, scope } = {}) {
     const point = await this.framePoint(frame, { at, scope });
@@ -1096,7 +1064,6 @@ export class ProfilesPage {
     const details = await this.page.locator(this.details).boundingBox();
     return details.y >= table.y + table.height - 1;
   }
-
 
   async expectCompareSides(label, baseline, comparison) {
     await this.expectSelected(this.compareLabel, label);
@@ -1155,7 +1122,6 @@ export class ProfilesPage {
     await expect(this.page.locator(this.compareMessage)).toContainText(text, { timeout: 15000 });
   }
 
-
   async expectMenuProfilesVisible(visible) {
     await expect(this.page.locator(this.navRail)).toBeVisible();
     await expect(this.page.locator(this.menuTraces)).toBeVisible();
@@ -1165,10 +1131,6 @@ export class ProfilesPage {
   async clickMenuProfiles() {
     await this.page.locator(this.menuProfiles).click();
     await this.waitForPageReady();
-  }
-
-  async menuLinkOrder() {
-    return this.page.locator(this.menuLinks).evaluateAll((els) => els.map((el) => el.getAttribute('data-test')));
   }
 
   async expectPageHeader() {
