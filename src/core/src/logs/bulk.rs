@@ -288,6 +288,12 @@ pub async fn ingest(
                     written_any = true;
                 }
                 for status in v.status {
+                    // the stream status keeps the items but not the write's errors flag
+                    bulk_res.errors |= status
+                        .items
+                        .iter()
+                        .flat_map(|item| item.values())
+                        .any(|item| item.error.is_some());
                     bulk_res.items.extend(status.items);
                 }
             }
@@ -621,8 +627,7 @@ mod tests {
         } else {
             assert!(rejected.is_empty());
         }
-        // not set: Fluent Bit retries a whole chunk on it, duplicating the other streams' rows
-        assert!(!resp.errors);
+        assert_eq!(resp.errors, bounded);
         assert!(
             infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_key_len_ok").await
         );
