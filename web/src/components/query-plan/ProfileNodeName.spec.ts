@@ -40,7 +40,9 @@ function mountName(r: NodeNameRow) {
 describe("ProfileNodeName", () => {
   it("shows the cluster beside a node from a super cluster", () => {
     const w = mountName(row({ cluster: "cluster-b" }));
-    expect(w.find('[data-test="query-profile-node-cluster-n1"]').text()).toBe("cluster-b");
+    expect(w.find('[data-test="query-profile-node-cluster-n1"]').text()).toBe(
+      "cluster-b · Ingester",
+    );
   });
 
   it("shows no cluster badge inside a single cluster", () => {

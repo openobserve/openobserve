@@ -15,29 +15,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex min-w-0 items-center gap-1" :data-test="`query-profile-node-${row.id}`">
-    <OTruncatedText :class="row.active ? 'text-accent font-semibold' : 'text-text-body'">{{
-      row.name
-    }}</OTruncatedText>
-    <OBadge
-      v-if="row.cluster"
-      size="xs"
-      shape="rounded"
-      variant="default-outline"
-      :data-test="`query-profile-node-cluster-${row.id}`"
-      >{{ row.cluster }}</OBadge
+  <div
+    class="flex min-w-0 gap-1"
+    :class="row.cluster ? 'flex-col items-start' : 'items-center'"
+    :data-test="`query-profile-node-${row.id}`"
+  >
+    <OTruncatedText
+      class="max-w-full"
+      :class="row.active ? 'text-accent font-semibold' : 'text-text-body'"
+      >{{ row.name }}</OTruncatedText
     >
-    <OBadge v-if="roleText" size="xs" shape="rounded" variant="default-soft">{{ roleText }}</OBadge>
-    <OBadge v-if="row.straggler" size="xs" shape="rounded" variant="error-soft">{{
-      t("search.queryProfile.straggler")
-    }}</OBadge>
-    <OBadge v-if="row.skipped" size="xs" shape="rounded" variant="default-outline">{{
-      t("search.queryProfile.skipped")
-    }}</OBadge>
-    <OBadge v-if="row.error" size="xs" shape="rounded" variant="error-outline">
-      {{ t("search.queryProfile.error") }}
-      <OTooltip :content="raw(row.error)" />
-    </OBadge>
+    <div
+      class="flex max-w-full min-w-0 flex-wrap items-center gap-1"
+      :class="row.cluster ? '' : 'contents'"
+    >
+      <OTruncatedText
+        v-if="row.cluster"
+        class="text-text-secondary text-2xs"
+        :data-test="`query-profile-node-cluster-${row.id}`"
+        >{{ clusterText }}</OTruncatedText
+      >
+      <OBadge v-else-if="roleText" size="xs" shape="rounded" variant="default-soft">{{
+        roleText
+      }}</OBadge>
+      <OBadge v-if="row.straggler" size="xs" shape="rounded" variant="error-soft">{{
+        t("search.queryProfile.straggler")
+      }}</OBadge>
+      <OBadge v-if="row.skipped" size="xs" shape="rounded" variant="default-outline">{{
+        t("search.queryProfile.skipped")
+      }}</OBadge>
+      <OBadge v-if="row.error" size="xs" shape="rounded" variant="error-outline">
+        {{ t("search.queryProfile.error") }}
+        <OTooltip :content="raw(row.error)" />
+      </OBadge>
+    </div>
   </div>
 </template>
 
@@ -55,4 +66,10 @@ const props = defineProps<{ row: NodeNameRow }>();
 const { t } = useI18nTyped();
 
 const roleText = computed(() => roleLabel(t, props.row.role));
+
+const clusterText = computed(() =>
+  roleText.value
+    ? t("search.queryProfile.nodeOnCluster", { cluster: props.row.cluster, role: roleText.value })
+    : raw(props.row.cluster),
+);
 </script>
