@@ -71,7 +71,7 @@ env:
 
 jobs:
   check_changes:
-    # Runs only on PRs carrying the 'ready-for-ci' label; the merge queue runs unit tests only (see docs/ci).
+    # Runs on PRs carrying the 'ready-for-ci' label and on this repo's nightly schedule; the merge queue runs unit tests only (see docs/ci).
     if: ${{ github.event_name != 'merge_group' && (github.event_name != 'schedule' || github.repository == 'openobserve/openobserve') && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) }}
     timeout-minutes: 5
     name: check_changes
@@ -914,7 +914,7 @@ jobs:
           # The file says "no advice" until every check below passes, so any early exit keeps the bot's old behaviour.
           jq -c '.failed_count = -1 | .failed_files = []' <<< "$COMPUTED" > "$ADVICE"
           if [ "$GITHUB_RUN_ATTEMPT" != "1" ]; then
-            # A later attempt reruns only the failed shards, so the others leave no record to check.
+            # The bot reads only attempt 1's advice, and a failed-jobs rerun leaves no record for shards that passed earlier.
             echo "Rerun advice is only written for the first attempt"; exit 0
           fi
           if [ "$LAST_RUNS_OUTCOME" != "success" ]; then

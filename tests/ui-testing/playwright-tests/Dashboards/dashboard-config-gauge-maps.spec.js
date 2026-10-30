@@ -16,9 +16,7 @@ import {
 const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
-// Kept for reference, commented rather than deleted so it can be restored easily.
-// This override beat --retries=0 locally, making a clean baseline impossible.
-// test.describe.configure({ retries: 1 });
+// No file-level `retries` override: it would add retries locally (project default 0) and hide flakes during development.
 
 test.describe("ConfigPanel — Gauge and Maps Settings", () => {
   test.beforeEach(async ({ page }) => {
