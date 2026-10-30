@@ -17,7 +17,7 @@ import type { I18nKey, I18nText } from "@/types/i18n";
  * Prebuilt destination types
  */
 export type PrebuiltTypeId =
-  "slack" | "discord" | "msteams" | "pagerduty" | "servicenow" | "email" | "opsgenie";
+  "slack" | "discord" | "msteams" | "pagerduty" | "servicenow" | "email" | "opsgenie" | "jira";
 
 /** A tile in the destination type picker: every prebuilt type, plus the Slack app. */
 export type DestinationTileId = PrebuiltTypeId | "slack_app";
@@ -27,10 +27,10 @@ export interface DestinationTile {
   id: DestinationTileId;
   name: string;
   descriptionKey: I18nKey;
+  /** One short line shown under the name; the full description is the tooltip. */
+  shortKey: I18nKey;
   icon: string;
   image?: string;
-  /** Tells the two Slack tiles apart. */
-  tag?: { label: I18nText; variant: "success-soft" | "default-soft" };
 }
 
 /**
@@ -103,6 +103,8 @@ export interface PrebuiltType {
    * this at render time instead.
    */
   descriptionKey: I18nKey;
+  /** Overrides the short line the picker maps from the type id. */
+  shortKey?: I18nKey;
   icon: string; // Icon name or component reference
   image?: string; // Image URL for logo
   popular?: boolean;
@@ -135,6 +137,8 @@ export interface TestResult {
   error?: string;
   statusCode?: number;
   responseBody?: string;
+  /** The test issue a Jira destination created. */
+  issue?: { key: string; url: string };
 }
 
 /**

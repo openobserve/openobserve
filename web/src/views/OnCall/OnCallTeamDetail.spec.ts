@@ -1235,7 +1235,11 @@ describe("OnCallTeamDetail", () => {
     const expiries = [
       { queryKey: oncallKeys.all("default"), exact: false, refetchType: "none" },
       { queryKey: userKeys.users("default"), exact: true, refetchType: "none" },
-      { queryKey: destinationKeys.list("default", "alert"), exact: true, refetchType: "none" },
+      {
+        queryKey: destinationKeys.list("default", "alert", false, ["jira"]),
+        exact: true,
+        refetchType: "none",
+      },
       { queryKey: serviceStreamKeys.all("default"), exact: false, refetchType: "none" },
     ];
     const pageReads = () => [

@@ -299,10 +299,12 @@ export default defineComponent({
           org_identifier: this.orgIdentifier,
           module: "alert",
         });
-        this.destinationOptions = (res.data ?? []).map((d: any) => ({
-          label: raw(d.name),
-          value: d.name,
-        }));
+        this.destinationOptions = (res.data ?? [])
+          .filter((d: any) => d.destination_type_name !== "jira")
+          .map((d: any) => ({
+            label: raw(d.name),
+            value: d.name,
+          }));
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.destinationsLoadError") });
       }

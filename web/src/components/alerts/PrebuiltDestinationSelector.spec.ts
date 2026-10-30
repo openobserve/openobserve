@@ -603,23 +603,85 @@ describe("PrebuiltDestinationSelector", () => {
 });
 
 describe("Approved Slack choices", () => {
-  it("renders the approved descriptions and success badge", () => {
+  const descriptionOf = (wrapper: VueWrapper, type: string) => {
+    const card = findCardByType(wrapper, type);
+    return wrapper.find(`[id="${card.attributes("aria-describedby")}"]`);
+  };
+
+  it("keeps the descriptions in the tooltip text, not in the visible tile", () => {
     const wrapper = mountComponent({ slackApp: true });
-    expect(findCardByType(wrapper, "slack_app").text()).toContain(
-      "Updates scheduled alerts in place. Acknowledge, mute and investigate from Slack. Needs a connected workspace.",
+    const app = descriptionOf(wrapper, "slack_app");
+    expect(app.attributes("data-test")).toBe("destination-type-description");
+    expect(app.classes()).toContain("sr-only");
+    expect(app.text()).toBe(
+      "Recommended for alert response. Updates scheduled alerts in place. Acknowledge, mute and investigate from Slack. Needs a connected workspace.",
     );
-    expect(findCardByType(wrapper, "slack").text()).toContain(
+    expect(descriptionOf(wrapper, "slack").text()).toBe(
       "Posts a new message with your webhook and template. Use it for on-call pages or custom Slack layouts.",
     );
-    const badge = findCardByType(wrapper, "slack_app").findComponent({ name: "OTag" });
-    expect(badge.props("label")).toBe("Recommended for alert response");
-    expect(badge.props("variant")).toBe("success-soft");
-    expect(badge.props("size")).toBe("sm");
-    expect(
-      findCardByType(wrapper, "slack_app")
-        .find('[data-test="destination-type-description"]')
-        .classes(),
-    ).not.toContain("hidden");
+    const shown = findCardByType(wrapper, "slack").find(".card-content").text();
+    expect(shown).not.toContain("Posts a new message");
+    wrapper.unmount();
+  });
+
+  it("has no tag inside the Slack tiles", () => {
+    const wrapper = mountComponent({ slackApp: true });
+    expect(wrapper.findAll('[data-test="destination-type-tag"]')).toHaveLength(0);
+    expect(findCardByType(wrapper, "slack_app").find(".card-content").text()).not.toContain(
+      "Recommended",
+    );
+    expect(wrapper.find('[data-test="destination-type-off"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("renders a short line on every tile", () => {
+    const wrapper = mountComponent({ slackApp: true });
+    const expected: Record<string, string> = {
+      slack_app: "Act on alerts",
+      slack: "Post only",
+      discord: "Chat posts",
+      msteams: "Chat posts",
+      email: "HTML email",
+      pagerduty: "Page on-call",
+      opsgenie: "Page on-call",
+      servicenow: "IT incidents",
+      jira: "Issue tickets",
+      custom: "URL or email",
+    };
+    for (const [type, text] of Object.entries(expected)) {
+      const short = findCardByType(wrapper, type).find('[data-test="destination-type-short"]');
+      expect(short.text()).toBe(text);
+      expect(short.classes()).toContain("mt-auto");
+    }
+    wrapper.unmount();
+  });
+
+  it("marks the unavailable app Off and explains it under the row, not in the tile", () => {
+    const wrapper = mountComponent({
+      slackApp: false,
+      unavailableReason: "flag",
+      canManageSlack: true,
+    });
+    const card = findCardByType(wrapper, "slack_app");
+    expect(card.find('[data-test="destination-type-off"]').text()).toBe("Off");
+    expect(card.find('[data-test="slack-app-unavailable"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="slack-app-unavailable"]').exists()).toBe(true);
+    expect(descriptionOf(wrapper, "slack_app").text()).toContain("O2_SLACK_ENABLED");
+    wrapper.unmount();
+  });
+
+  it("shows no under-row line when the app is available", () => {
+    const wrapper = mountComponent({ slackApp: true });
+    expect(wrapper.find('[data-test="slack-app-unavailable"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("applies the selected class on click", async () => {
+    const wrapper = mountComponent({ slackApp: true });
+    await findCardByType(wrapper, "discord").trigger("click");
+    expect(wrapper.emitted("update:modelValue")![0]).toEqual(["discord"]);
+    await wrapper.setProps({ modelValue: "discord" });
+    expect(findCardByType(wrapper, "discord").classes()).toContain("selected");
     wrapper.unmount();
   });
 
@@ -641,7 +703,7 @@ describe("Approved Slack choices", () => {
   });
 
   const reasonOf = (wrapper: VueWrapper) =>
-    wrapper.find(`[id="${findCardByType(wrapper, "slack_app").attributes("aria-describedby")}"]`);
+    wrapper.find('[data-test="slack-app-unavailable-reason"]');
   const contactOf = (wrapper: VueWrapper) =>
     wrapper.find('[data-test="slack-app-contact-support"]');
   const variableOf = (wrapper: VueWrapper) =>
@@ -804,8 +866,8 @@ describe("Approved Slack choices", () => {
 
   it("keeps every other destination tile whole in the wider grid", () => {
     const wrapper = mountComponent({ slackApp: true });
-    expect(wrapper.find(".selector-grid").classes()).toContain(
-      "[grid-template-columns:repeat(auto-fill,minmax(min(100%,16rem),1fr))]",
+    expect(wrapper.find(".selector-grid").classes()).toEqual(
+      expect.arrayContaining(["grid-flow-col", "@max-[54rem]/dest-picker:grid-cols-5"]),
     );
     const others = PREBUILT_DESTINATION_TYPES.filter((type) => type.id !== "slack");
     expect(others.length).toBeGreaterThan(0);
@@ -816,9 +878,7 @@ describe("Approved Slack choices", () => {
       expect(card.find('[data-test="destination-type-icon"]').exists()).toBe(true);
       expect(card.find('[data-test="destination-type-name"]').text()).toBe(type.name);
       expect(card.find(".card-content").classes()).toContain("min-w-0");
-      expect(card.find('[data-test="destination-type-description"]').classes()).toEqual(
-        expect.arrayContaining(["hidden", "min-[75rem]:block"]),
-      );
+      expect(card.find('[data-test="destination-type-short"]').exists()).toBe(true);
     }
     expect(findCardByType(wrapper, "custom").exists()).toBe(true);
     wrapper.unmount();

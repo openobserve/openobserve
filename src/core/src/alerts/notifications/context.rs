@@ -38,6 +38,8 @@ pub struct NotificationContext {
     pub stream_type: String,
     pub stream_name: String,
     pub alert_name: String,
+    /// The composite's id for a composite alert; empty when no alert stands behind the send.
+    pub alert_id: String,
     /// "realtime" | "scheduled"
     pub alert_type: String,
     pub alert_period: String,
@@ -61,6 +63,8 @@ pub struct NotificationContext {
     pub alert_tags: String,
     pub alert_threshold_crit: String,
     pub alert_threshold_warn: String,
+    /// Operator the crit/warn thresholds were compared with (family-aware).
+    pub alert_threshold_operator: String,
     /// Formatted local time; "N/A" when unknown.
     pub alert_start_time: String,
     pub alert_end_time: String,
