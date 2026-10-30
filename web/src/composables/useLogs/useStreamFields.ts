@@ -57,8 +57,12 @@ import { pickLatestStream, type StreamStatsEntry } from "@/utils/logs/estimateSc
 import { restoreLogsSelectedStreams } from "@/utils/streamPersist";
 import { sqlSources } from "@/utils/logs/sqlSources";
 
+/** How long a cold load keeps the field list loading for the semantic groups before showing it ungrouped. */
+export const FIELD_GROUPS_WAIT_MS = 1000;
+
 let correlationWatcherUsers = 0;
 let correlationWatcherScope: EffectScope | null = null;
+let fieldGroupsHoldId = 0;
 
 export interface InitialStreamInput {
   list: StreamStatsEntry[];
@@ -107,7 +111,7 @@ export function pickInitialLogsStreams(input: InitialStreamInput): InitialStream
 
 export const useStreamFields = () => {
   const { t } = useI18nTyped();
-  const { getStreams, getStream } = useStreams(t);
+  const { getStreams, getStream, prefetchStreamSchema } = useStreams(t);
   const { updateFieldKeywords } = useSqlSuggestions();
   const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 
@@ -197,6 +201,9 @@ export const useStreamFields = () => {
     const regroupPass = options.regroupWith !== undefined;
     const orgId = store.state.selectedOrganization.identifier;
     let lateSemanticGroups: { load: Promise<FieldAlias[]>; used: FieldAlias[] } | null = null;
+    // A list still held for its groups has not been shown yet.
+    const listWasEmpty =
+      !searchObj.data.stream.selectedStreamFields?.length || searchObj.loadingFieldGroups;
     if (!regroupPass) searchObj.loadingStream = true;
     await nextTick();
     try {
@@ -924,12 +931,19 @@ export const useStreamFields = () => {
       correlationFilters.restore();
 
       searchObjDebug["extractFieldsEndTime"] = performance.now();
-      if (!regroupPass) searchObj.loadingStream = false;
+      if (!regroupPass) {
+        // Without cached groups every row would move when they land, so the list stays loading for them.
+        searchObj.loadingFieldGroups = listWasEmpty && lateSemanticGroups?.used.length === 0;
+        searchObj.loadingStream = false;
+      }
       if (lateSemanticGroups) {
         regroupWhenSemanticGroupsArrive(lateSemanticGroups, capturedToken, orgId);
       }
     } catch (e: any) {
-      if (!regroupPass) searchObj.loadingStream = false;
+      if (!regroupPass) {
+        searchObj.loadingFieldGroups = false;
+        searchObj.loadingStream = false;
+      }
       console.log("Error while extracting fields.", e);
       notificationMsg.value = t("search.errorWhileExtractingStreamFields");
     }
@@ -940,16 +954,27 @@ export const useStreamFields = () => {
     token: number,
     orgId: string,
   ) => {
-    void late.load.then(() => {
-      // fetchQuery returns the raw response; the cached copy keeps its reference when nothing changed, and survives a failed refresh.
-      const aliases = getCachedSemanticGroups(orgId);
-      if (!aliases?.length || aliases === late.used) return;
-      if (token !== schemaRequestToken.value) return;
-      // A stream or org change in flight runs its own extract, which reads these groups from the cache.
-      if (searchObj.loadingStream || orgId !== store.state.selectedOrganization.identifier) return;
-      if (!selectedSchemasLoaded()) return;
-      void extractFields({ reuseLoadedSchema: true, regroupWith: aliases });
-    });
+    const holdId = ++fieldGroupsHoldId;
+    const release = () => {
+      if (holdId === fieldGroupsHoldId) searchObj.loadingFieldGroups = false;
+    };
+    const timer = searchObj.loadingFieldGroups ? setTimeout(release, FIELD_GROUPS_WAIT_MS) : null;
+    void late.load
+      .then(async () => {
+        // fetchQuery returns the raw response; the cached copy keeps its reference when nothing changed, and survives a failed refresh.
+        const aliases = getCachedSemanticGroups(orgId);
+        if (!aliases?.length || aliases === late.used) return;
+        if (token !== schemaRequestToken.value) return;
+        // A stream or org change in flight runs its own extract, which reads these groups from the cache.
+        if (searchObj.loadingStream || orgId !== store.state.selectedOrganization.identifier)
+          return;
+        if (!selectedSchemasLoaded()) return;
+        await extractFields({ reuseLoadedSchema: true, regroupWith: aliases });
+      })
+      .finally(() => {
+        if (timer) clearTimeout(timer);
+        release();
+      });
   };
 
   const selectedSchemasLoaded = () =>
@@ -970,6 +995,15 @@ export const useStreamFields = () => {
     } catch (e: any) {
       console.log("Error while loading stream fields");
     }
+  };
+
+  /** Starts the requests extractFields() would otherwise make one after another, once the URL names the streams. */
+  const prefetchSelectedStreamFields = () => {
+    const streamType = searchObj.data.stream.streamType || "logs";
+    void loadKeyFields();
+    void loadFieldGrouping();
+    if (config.isEnterprise === "true" || config.isCloud === "true") void loadSemanticGroups();
+    for (const name of searchObj.data.stream.selectedStream) prefetchStreamSchema(name, streamType);
   };
 
   const getStreamList = async (selectStream: boolean = true, options: StreamListOptions = {}) => {
@@ -1394,6 +1428,7 @@ export const useStreamFields = () => {
   return {
     updateFieldValues,
     extractFields,
+    prefetchSelectedStreamFields,
     loadStreamFields,
     getStreamList,
     loadStreamLists,

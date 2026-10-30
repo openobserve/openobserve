@@ -18896,8 +18896,7 @@
     "detailTable": {
       "noDataAvailable": "Nenhum dado disponível.",
       "addIcon": "Adicionar ícone",
-      "sendToAiChat": "Enviar para o Chat de IA",
-      "contentCopiedSuccessfully": "Conteúdo copiado com sucesso!"
+      "sendToAiChat": "Enviar para o Chat de IA"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Consulta Select * não é suportada para visualização.",
@@ -19183,7 +19182,24 @@
     "hideDetail": "Ocultar detalhes",
     "runAs": "Executar como",
     "searchTextFor": "Pesquisar o texto de \"{text}\"",
-    "searchTextDesc": "Pesquisar toda a entrada como uma única frase"
+    "searchTextDesc": "Pesquisar toda a entrada como uma única frase",
+    "explain": {
+      "missingStream": "Falta o nome do stream depois de {from}. Adicione-o, por exemplo {example}.",
+      "unexpectedEnd": "A consulta termina antes de estar completa. Conclua a última condição ou cláusula.",
+      "unexpectedEndAfter": "A consulta termina logo após {keyword}. Adicione o que deve vir a seguir ou remova {keyword}.",
+      "unclosedBracket": "Um parêntese é aberto mas nunca fechado. Adicione o {char} em falta.",
+      "notAStatement": "Uma consulta tem de começar com uma palavra-chave como {keyword}, mas esta começa com {token}. Verifique a ortografia.",
+      "unexpectedToken": "{token} não encaixa onde aparece na consulta. Verifique a ortografia e as palavras à volta.",
+      "unclosedQuote": "Um valor de texto não tem aspa de fecho. Adicione a ' em falta depois do valor.",
+      "unclosedDelimiter": "Um nome entre aspas não tem o {char} de fecho. Adicione o {char} em falta.",
+      "streamNotFound": "Não existe nenhum stream chamado {name}. Verifique o nome ou escolha um stream da lista.",
+      "unknownField": "Este stream não tem nenhum campo chamado {name}. Verifique a ortografia ou escolha um campo da lista de campos.",
+      "unknownFunction": "Não existe nenhuma função chamada {name}. Verifique a ortografia.",
+      "unknownFunctionSuggest": "Não existe nenhuma função chamada {name}. Quis dizer {suggestion}?",
+      "notANumber": "{value} é texto, mas o campo com que é comparado contém números. Use um número sem aspas.",
+      "functionArgs": "Os valores passados a {name} não correspondem ao que a função aceita. Verifique quantos valores aceita e os seus tipos.",
+      "notGrouped": "{name} está selecionado sem ser agrupado nem agregado. Adicione-o a {groupBy} ou remova-o das colunas selecionadas."
+    }
   },
   "refreshButton": {
     "justNow": "agora mesmo",

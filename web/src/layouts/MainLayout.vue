@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="store.state.printMode !== true && !store.state.kioskMode"
         class="max-md:hidden"
         :links-list="navLinks"
+        :loading="!menuReady"
         :mini-mode="miniMode"
         @menu-hover="handleMenuHover"
       />
@@ -1725,6 +1726,7 @@ export default defineComponent({
       selectedLanguage,
       linksList,
       navLinks,
+      menuReady,
       selectedOrg,
       orgOptions,
       isMobile,

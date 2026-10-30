@@ -18891,8 +18891,7 @@
     "detailTable": {
       "noDataAvailable": "無可用資料。",
       "addIcon": "新增圖示",
-      "sendToAiChat": "傳送至 AI 聊天",
-      "contentCopiedSuccessfully": "內容複製成功！"
+      "sendToAiChat": "傳送至 AI 聊天"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "不支援視覺化的 Select * 查詢。",
@@ -19178,7 +19177,24 @@
     "hideDetail": "隱藏詳細資料",
     "runAs": "執行身分",
     "searchTextFor": "搜尋文字「{text}」",
-    "searchTextDesc": "將整段輸入視為一個詞組搜尋"
+    "searchTextDesc": "將整段輸入視為一個詞組搜尋",
+    "explain": {
+      "missingStream": "{from} 後面缺少串流名稱。請新增一個，例如 {example}。",
+      "unexpectedEnd": "查詢在完成之前就結束了。請補全最後一個條件或子句。",
+      "unexpectedEndAfter": "查詢在 {keyword} 之後就結束了。請補上後續內容，或刪除 {keyword}。",
+      "unclosedBracket": "有括號未閉合。請新增缺少的 {char}。",
+      "notAStatement": "查詢必須以 {keyword} 等關鍵字開頭，但此查詢以 {token} 開頭。請檢查拼寫。",
+      "unexpectedToken": "{token} 不能出現在查詢中的這個位置。請檢查拼寫及其前後的詞。",
+      "unclosedQuote": "文字值缺少右引號。請在值後新增缺少的 '。",
+      "unclosedDelimiter": "帶引號的名稱缺少右側的 {char}。請新增缺少的 {char}。",
+      "streamNotFound": "不存在名為 {name} 的串流。請檢查名稱，或從串流清單中選擇一個串流。",
+      "unknownField": "此串流中沒有名為 {name} 的欄位。請檢查拼寫，或從欄位清單中選擇一個欄位。",
+      "unknownFunction": "不存在名為 {name} 的函式。請檢查拼寫。",
+      "unknownFunctionSuggest": "不存在名為 {name} 的函式。您是想用 {suggestion} 嗎？",
+      "notANumber": "{value} 是文字，但與之比較的欄位儲存的是數字。請使用不帶引號的數字。",
+      "functionArgs": "傳給 {name} 的值與該函式接受的參數不相符。請檢查參數的數量和類型。",
+      "notGrouped": "{name} 被選取，但既未分組也未彙總。請將其加入 {groupBy}，或從所選欄位中移除。"
+    }
   },
   "refreshButton": {
     "justNow": "剛剛",

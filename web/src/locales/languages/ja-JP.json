@@ -18896,8 +18896,7 @@
     "detailTable": {
       "noDataAvailable": "利用可能なデータがありません。",
       "addIcon": "アイコンを追加",
-      "sendToAiChat": "AIチャットに送信",
-      "contentCopiedSuccessfully": "コンテンツのコピーに成功しました！"
+      "sendToAiChat": "AIチャットに送信"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "SELECT * クエリは可視化でサポートされていません。",
@@ -19183,7 +19182,24 @@
     "hideDetail": "詳細を非表示にする",
     "runAs": "実行者",
     "searchTextFor": "「{text}」のテキストを検索",
-    "searchTextDesc": "入力全体を 1 つのフレーズとして検索"
+    "searchTextDesc": "入力全体を 1 つのフレーズとして検索",
+    "explain": {
+      "missingStream": "{from} の後にストリーム名がありません。たとえば {example} のように追加してください。",
+      "unexpectedEnd": "クエリが途中で終わっています。最後の条件または句を完成させてください。",
+      "unexpectedEndAfter": "クエリが {keyword} の直後で終わっています。続く内容を追加するか、{keyword} を削除してください。",
+      "unclosedBracket": "括弧が開いたまま閉じられていません。不足している {char} を追加してください。",
+      "notAStatement": "クエリは {keyword} などのキーワードで始める必要がありますが、{token} で始まっています。綴りを確認してください。",
+      "unexpectedToken": "{token} はクエリ内のこの位置では使えません。綴りと前後の語を確認してください。",
+      "unclosedQuote": "テキスト値の閉じ引用符がありません。値の後に ' を追加してください。",
+      "unclosedDelimiter": "引用符で囲まれた名前に閉じる {char} がありません。不足している {char} を追加してください。",
+      "streamNotFound": "{name} という名前のストリームはありません。名前を確認するか、ストリーム一覧から選択してください。",
+      "unknownField": "このストリームには {name} というフィールドがありません。綴りを確認するか、フィールド一覧から選択してください。",
+      "unknownFunction": "{name} という関数はありません。綴りを確認してください。",
+      "unknownFunctionSuggest": "{name} という関数はありません。{suggestion} のことですか？",
+      "notANumber": "{value} はテキストですが、比較対象のフィールドは数値です。引用符なしの数値を使用してください。",
+      "functionArgs": "{name} に渡された値が、この関数で使える値と一致しません。値の数と型を確認してください。",
+      "notGrouped": "{name} はグループ化も集計もされずに選択されています。{groupBy} に追加するか、選択列から削除してください。"
+    }
   },
   "refreshButton": {
     "justNow": "たった今",

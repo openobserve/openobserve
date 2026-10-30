@@ -18896,8 +18896,7 @@
     "detailTable": {
       "noDataAvailable": "无可用数据。",
       "addIcon": "添加图标",
-      "sendToAiChat": "发送到AI聊天",
-      "contentCopiedSuccessfully": "内容复制成功！"
+      "sendToAiChat": "发送到AI聊天"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "可视化不支持SELECT * 查询。",
@@ -19183,7 +19182,24 @@
     "hideDetail": "隐藏细节",
     "runAs": "运行身份",
     "searchTextFor": "搜索文本“{text}”",
-    "searchTextDesc": "将整个输入作为短语进行搜索"
+    "searchTextDesc": "将整个输入作为短语进行搜索",
+    "explain": {
+      "missingStream": "{from} 后面缺少流名称。请添加一个，例如 {example}。",
+      "unexpectedEnd": "查询在完成之前就结束了。请补全最后一个条件或子句。",
+      "unexpectedEndAfter": "查询在 {keyword} 之后就结束了。请补充后续内容，或删除 {keyword}。",
+      "unclosedBracket": "有括号未闭合。请添加缺少的 {char}。",
+      "notAStatement": "查询必须以 {keyword} 等关键字开头，但此查询以 {token} 开头。请检查拼写。",
+      "unexpectedToken": "{token} 不能出现在查询中的这个位置。请检查拼写及其前后的词。",
+      "unclosedQuote": "文本值缺少右引号。请在值后添加缺少的 '。",
+      "unclosedDelimiter": "带引号的名称缺少右侧的 {char}。请添加缺少的 {char}。",
+      "streamNotFound": "不存在名为 {name} 的流。请检查名称，或从流列表中选择一个流。",
+      "unknownField": "此流中没有名为 {name} 的字段。请检查拼写，或从字段列表中选择一个字段。",
+      "unknownFunction": "不存在名为 {name} 的函数。请检查拼写。",
+      "unknownFunctionSuggest": "不存在名为 {name} 的函数。您是想用 {suggestion} 吗？",
+      "notANumber": "{value} 是文本，但与之比较的字段存储的是数字。请使用不带引号的数字。",
+      "functionArgs": "传给 {name} 的值与该函数接受的参数不匹配。请检查参数的数量和类型。",
+      "notGrouped": "{name} 被选中，但既未分组也未聚合。请将其加入 {groupBy}，或从所选列中移除。"
+    }
   },
   "refreshButton": {
     "justNow": "刚才",

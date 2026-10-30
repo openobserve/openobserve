@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { beforeAll, describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, h, ref } from "vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
@@ -134,6 +134,11 @@ const deliverPage = async (hits: any[]) => {
 };
 
 describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => {
+  // DetailTable loads lazily and pulls in the trace views; transform it once, outside the timed waits.
+  beforeAll(async () => {
+    await import("./DetailTable.vue");
+  }, 60000);
+
   let wrapper: any;
   const { searchObj } = searchState();
 

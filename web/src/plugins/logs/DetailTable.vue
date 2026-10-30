@@ -212,6 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <JsonPreview
               :value="rowData"
               show-copy-button
+              copy-in-place
               mode="sidebar"
               hide-view-related
               hide-view-trace
@@ -219,7 +220,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hide-add-field-to-table="embedded"
               :highlight-query="highlightQuery"
               :should-wrap-values="shouldWrapValues"
-              @copy="copyContentToClipboard"
               @add-field-to-table="addFieldToTable"
               @add-search-term="toggleIncludeSearchTerm"
               @view-trace="viewTrace"
@@ -630,7 +630,6 @@ import { useTheme } from "@/composables/useTheme";
 import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { copyToClipboard } from "@/utils/clipboard";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
@@ -1224,13 +1223,6 @@ export default defineComponent({
       return newObj;
     };
 
-    const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log), t, {
-        successMessage: t("logs.detailTable.contentCopiedSuccessfully"),
-        timeout: 1000,
-      });
-    };
-
     const addFieldToTable = (value: string) => {
       emit("add:table", value);
     };
@@ -1423,7 +1415,6 @@ export default defineComponent({
       isFilterableLogField,
       shouldWrapValues,
       toggleWrapLogDetails,
-      copyContentToClipboard,
       addFieldToTable,
       getCrossLinksForField,
       openCrossLink,

@@ -148,6 +148,33 @@ describe("useResultsLoadingIndicator", () => {
     scope.stop();
   });
 
+  it("keeps the scanned size up while the given busy source outlasts loading", async () => {
+    const searchObj = reactive({
+      loading: false,
+      data: { queryResults: { scan_size: 300 } as { scan_size?: number } | null },
+    });
+    const busy = ref(false);
+    const scope = effectScope();
+    const { showLoader, scannedSize } = scope.run(() =>
+      useResultsLoadingIndicator(searchObj, () => searchObj.loading || busy.value),
+    )!;
+    searchObj.loading = true;
+    busy.value = true;
+    await nextTick();
+    searchObj.data.queryResults = { scan_size: 10 };
+    vi.advanceTimersByTime(RESULTS_LOADER_DELAY_MS);
+    expect(scannedSize.value).toBe("10.00 MB");
+    searchObj.loading = false;
+    await nextTick();
+    expect(showLoader.value).toBe(true);
+    expect(scannedSize.value).toBe("10.00 MB");
+    busy.value = false;
+    await nextTick();
+    expect(showLoader.value).toBe(false);
+    expect(scannedSize.value).toBeNull();
+    scope.stop();
+  });
+
   it("never shows the previous run's size while a page load mutates results in place", async () => {
     const { searchObj, scope, showLoader, scannedSize } = setup();
     searchObj.loading = true;
