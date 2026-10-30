@@ -94,6 +94,7 @@ import {
   formatNs,
   formatPercent,
   formatRows,
+  nodeLabel,
   scopeNodeKey,
   scopedValue,
   shareOfTotal,
@@ -181,7 +182,7 @@ const bars = computed<NodeBar[] | null>(() => {
       key: n.key,
       ratio: n.wallUs / max,
       tone: n.straggler ? "hot" : "default",
-      title: `${n.name} ${formatNs(n.wallUs * 1000)}`,
+      title: `${nodeLabel(n)} ${formatNs(n.wallUs * 1000)}`,
     }));
   }
   if (!props.op.stageId || props.op.samples.length < 2) return null;
@@ -195,7 +196,7 @@ const bars = computed<NodeBar[] | null>(() => {
       key: s.nodeKey,
       ratio: s.computeNs / max,
       tone: off ? "off" : node?.straggler ? "hot" : "default",
-      title: `${node?.name ?? s.nodeKey} ${formatNs(s.computeNs)}`,
+      title: `${node ? nodeLabel(node) : s.nodeKey} ${formatNs(s.computeNs)}`,
     };
   });
 });

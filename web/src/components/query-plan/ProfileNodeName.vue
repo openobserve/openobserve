@@ -19,6 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTruncatedText :class="row.active ? 'text-accent font-semibold' : 'text-text-body'">{{
       row.name
     }}</OTruncatedText>
+    <OBadge
+      v-if="row.cluster"
+      size="xs"
+      shape="rounded"
+      variant="default-outline"
+      :data-test="`query-profile-node-cluster-${row.id}`"
+      >{{ row.cluster }}</OBadge
+    >
     <OBadge v-if="roleText" size="xs" shape="rounded" variant="default-soft">{{ roleText }}</OBadge>
     <OBadge v-if="row.straggler" size="xs" shape="rounded" variant="error-soft">{{
       t("search.queryProfile.straggler")

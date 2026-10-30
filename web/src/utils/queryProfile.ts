@@ -162,6 +162,10 @@ export interface StageNode {
   key: string;
   name: string;
   role: string;
+  /** Set only when the profile spans several clusters and the name alone does not say which. */
+  cluster: string;
+  /** A super-cluster entry that stands for a whole cluster, not one node. */
+  clusterEntry: boolean;
   remote: RemoteNodeProfile;
   wallUs: number;
   firstBatchUs: number;
@@ -219,6 +223,7 @@ export interface ScopedValue {
 export interface NodeRow {
   nodeKey: string;
   name: string;
+  cluster: string;
   computeNs: number;
   rows: number;
   share: number;
@@ -349,6 +354,7 @@ interface BuildContext {
   stages: ProfileStage[];
   hits: PlanHit[];
   usedHits: Set<PlanHit>;
+  multiCluster: boolean;
 }
 
 interface Box {
@@ -784,11 +790,22 @@ function addOperator(
   return id;
 }
 
-function stageNodeKey(remote: RemoteNodeProfile, used: Set<string>): string {
-  const base = remote.node_name || remote.node_address || `partition-${remote.partition}`;
-  const key = used.has(base) ? `${base}#${remote.partition}` : base;
+function stageNodeKey(remote: RemoteNodeProfile, cluster: string, used: Set<string>): string {
+  const name = remote.node_name || remote.node_address || `partition-${remote.partition}`;
+  const base = cluster ? `${cluster}/${name}` : name;
+  let key = base;
+  for (let i = 1; used.has(key); i++) key = `${base}#${i}`;
   used.add(key);
   return key;
+}
+
+function collectClusters(node: ProfileNode, out: Set<string>): Set<string> {
+  for (const r of node.remote ?? []) {
+    if (r.cluster) out.add(r.cluster);
+    if (r.plan) collectClusters(r.plan, out);
+  }
+  for (const c of node.children ?? []) collectClusters(c, out);
+  return out;
 }
 
 function variantRole(nodes: StageNode[]): VariantRole {
@@ -832,10 +849,16 @@ function buildStage(
   const groups = new Map<string, { nodes: StageNode[]; parts: PlanPart[] }>();
   for (const remote of entries) {
     const plan = remote.plan ?? fallbackPlan(remote, ctx);
+    const name = remote.node_name || remote.node_address || `#${remote.partition}`;
+    // pod names repeat across clusters deployed from one chart, so the cluster tells them apart
+    const clusterEntry = ctx.multiCluster && remote.cluster === remote.node_name;
+    const cluster = ctx.multiCluster && !clusterEntry ? (remote.cluster ?? "") : "";
     const node: StageNode = {
-      key: stageNodeKey(remote, used),
-      name: remote.node_name || remote.node_address || `#${remote.partition}`,
+      key: stageNodeKey(remote, cluster, used),
+      name,
       role: remote.role ?? "",
+      cluster,
+      clusterEntry,
       remote,
       wallUs: remoteWallUs(remote),
       firstBatchUs: remote.first_batch_us > 0 ? remote.first_batch_us - remote.start_us : 0,
@@ -872,7 +895,14 @@ export function buildProfileModel(
   hits: PlanHit[] = [],
   options: BuildProfileOptions = {},
 ): ProfileModel {
-  const ctx: BuildContext = { ops: {}, order: [], stages: [], hits, usedHits: new Set() };
+  const ctx: BuildContext = {
+    ops: {},
+    order: [],
+    stages: [],
+    hits,
+    usedHits: new Set(),
+    multiCluster: collectClusters(profile.plan, new Set()).size > 1,
+  };
   const leaderKey = profile.node_name || profile.node_address || "leader";
   const rootId = addOperator(
     "op",
@@ -983,12 +1013,17 @@ export function operatorNodeRows(model: ProfileModel, op: ProfileOperator): Node
     return {
       nodeKey: s.nodeKey,
       name: node?.name ?? s.nodeKey,
+      cluster: node?.cluster ?? "",
       computeNs: s.computeNs,
       rows: s.rows,
       share: total > 0 ? s.computeNs / total : 0,
       straggler: node?.straggler ?? false,
     };
   });
+}
+
+export function nodeLabel(node: Pick<StageNode, "name" | "cluster">): string {
+  return node.cluster ? `${node.name} · ${node.cluster}` : node.name;
 }
 
 /** max / median of a set of values; 1 when there is nothing to compare. */
@@ -1004,7 +1039,8 @@ function uniqueNodes(model: ProfileModel): StageNode[] {
   return [...seen.values()];
 }
 
-function countRoles(nodes: StageNode[]): ProfileSummary["nodeCounts"] {
+function countRoles(all: StageNode[]): ProfileSummary["nodeCounts"] {
+  const nodes = all.filter((n) => !n.clusterEntry);
   const counts = { queriers: 0, ingesters: 0, other: 0, total: nodes.length };
   for (const n of nodes) {
     const querier = n.role.includes("querier");
@@ -1024,7 +1060,7 @@ function peakMemory(model: ProfileModel): ProfileSummary["peakMemory"] {
         n.remote.peak_memory || 0,
         n.remote.scan_stats?.peak_memory_usage || 0,
       );
-      if (bytes > 0 && (!best || bytes > best.bytes)) best = { bytes, node: n.name };
+      if (bytes > 0 && (!best || bytes > best.bytes)) best = { bytes, node: nodeLabel(n) };
     }
   }
   return best;
@@ -1107,7 +1143,7 @@ function timeline(model: ProfileModel): ProfileSummary["timeline"] {
       if (n.wallUs <= 0) continue;
       const row = rows.get(n.key) ?? {
         nodeKey: n.key,
-        name: n.name,
+        name: nodeLabel(n),
         role: n.role,
         segments: [],
         durationUs: 0,
@@ -1135,7 +1171,7 @@ function stragglers(model: ProfileModel): StragglerInfo[] {
       .filter((n) => n.straggler)
       .map((n) => ({
         nodeKey: n.key,
-        name: n.name,
+        name: nodeLabel(n),
         stageIndex: s.index,
         wallUs: n.wallUs,
         ratio: s.medianWallUs > 0 ? n.wallUs / s.medianWallUs : 0,
@@ -1181,8 +1217,15 @@ export function summarizePlan(model: ProfileModel): PlanSummary {
   };
 }
 
-export function clusterNodes(model: ProfileModel): { key: string; name: string; role: string }[] {
-  return uniqueNodes(model).map((n) => ({ key: n.key, name: n.name, role: n.role }));
+export function clusterNodes(
+  model: ProfileModel,
+): { key: string; name: string; cluster: string; role: string }[] {
+  return uniqueNodes(model).map((n) => ({
+    key: n.key,
+    name: n.name,
+    cluster: n.cluster,
+    role: n.role,
+  }));
 }
 
 function blocksOf(model: ProfileModel, op: ProfileOperator): string[] {

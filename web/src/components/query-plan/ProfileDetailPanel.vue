@@ -314,6 +314,7 @@ const nodeRows = computed<OpNodeRow[]>(() => {
     return {
       id: r.nodeKey,
       name: r.name,
+      cluster: r.cluster,
       role: "",
       straggler: r.straggler,
       active: activeNode.value === r.nodeKey,
@@ -341,6 +342,7 @@ const remoteRows = computed(() =>
     return {
       id: n.key,
       name: n.name,
+      cluster: n.cluster,
       role: n.role,
       straggler: n.straggler,
       active: activeNode.value === n.key,
