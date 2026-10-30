@@ -37,6 +37,7 @@ vi.mock("vue-router", () => ({
   useRoute: () => ({ query: routeQuery }),
   useRouter: () => ({ push }),
   onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 vi.mock("@/services/llm-experiments.service", () => ({

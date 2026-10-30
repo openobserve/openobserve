@@ -62,7 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
               >
               <OButton
-                v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+                v-if="
+                  !['html', 'markdown', 'custom_chart', 'alert-list'].includes(
+                    dashboardPanelData.data.type,
+                  )
+                "
                 variant="outline"
                 size="icon-sm"
                 @click="showViewPanel = true"
@@ -216,7 +220,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
               >
               <OButton
-                v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+                v-if="
+                  !['html', 'markdown', 'custom_chart', 'alert-list'].includes(
+                    dashboardPanelData.data.type,
+                  )
+                "
                 variant="outline"
                 size="sm"
                 icon-left="info-outline"
@@ -285,7 +293,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <PanelLeaveDialog
       :open="leaveDialogOpen"
       :saving="leaveSaving"
-      :can-keep-draft="draftsEnabled"
+      :can-keep-draft="draftsEnabled && !draftSigningOut"
+      :signing-out="draftSigningOut"
+      :other-draft-count="signOutOtherDrafts"
+      :can-save="!draftSignOutDiscardOnly"
       @choose="onLeaveChoice"
     />
 
@@ -397,6 +408,13 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import PanelDraftRestoreDialog from "@/components/dashboards/panelDraft/PanelDraftRestoreDialog.vue";
 import PanelLeaveDialog from "@/components/dashboards/panelDraft/PanelLeaveDialog.vue";
+import {
+  draftSigningOut,
+  draftSignOutDiscardOnly,
+  draftSignOutForced,
+  registerSignOutLeaveAsker,
+} from "@/utils/drafts/draftSession";
+import { countAllDraftsFor } from "@/utils/drafts/editorDraftStore";
 import type {
   PanelDraftRestoreChoice,
   PanelLeaveChoice,
@@ -404,6 +422,7 @@ import type {
 import {
   cleanupPanelDrafts,
   deletePanelDraft,
+  hasPanelDraft,
   isPanelDraftStorageAvailable,
   readPanelDraft,
   usePanelDraftAutosave,
@@ -867,6 +886,17 @@ export default defineComponent({
     const scheduleDraftWrite = () => {
       if (draftsEnabled) draftAutosave.schedule();
     };
+
+    // A sign-out skips its own draft count when this panel's leave dialog will tell it.
+    onBeforeUnmount(
+      registerSignOutLeaveAsker(() => !forceSkipBeforeUnloadListener && hasUnsavedChanges()),
+    );
+    // This panel's own draft goes with the dialog's answer, so only the rest is counted.
+    const signOutOtherDrafts = computed(() =>
+      draftSigningOut.value
+        ? Math.max(0, countAllDraftsFor(draftUserEmail) - (hasPanelDraft(draftScope()) ? 1 : 0))
+        : 0,
+    );
 
     // A draft kept by Escape belongs to an earlier session, so this session's save or discard leaves it.
     const discardDraft = () => {
@@ -1591,6 +1621,8 @@ export default defineComponent({
       } else {
         discardDraft();
       }
+      // A guard redirect re-runs this guard, which must not ask again.
+      panelBaseline = JSON.parse(JSON.stringify(dashboardPanelData.data));
       cleanupSessionVariables();
       return true;
     };
@@ -1598,6 +1630,13 @@ export default defineComponent({
     onBeforeRouteLeave(async (to, from, next) => {
       // check if it is a force navigation, then allow
       if (forceSkipBeforeUnloadListener) {
+        next();
+        return;
+      }
+      // The old session is already dead and its drafts stay, so the panel is kept as after an expired session.
+      if (draftSignOutForced.value) {
+        onLeaveChoice("stay");
+        draftAutosave.flush();
         next();
         return;
       }
@@ -2109,6 +2148,8 @@ export default defineComponent({
     const collectBuilderTabErrors = (): string[] => {
       const errors: string[] = [];
       const panel = dashboardPanelData.data;
+      // An alert list reads the alerts API, so its empty builder query is not a missing query.
+      if (panel.type === "alert-list") return errors;
       panel.queries.forEach((query: any, index: number) => {
         if (query?.customQuery) return;
         validateSQLPanelFields(
@@ -2457,6 +2498,9 @@ export default defineComponent({
       submitPanel,
       saveAndStay,
       draftsEnabled,
+      draftSigningOut,
+      draftSignOutDiscardOnly,
+      signOutOtherDrafts,
       restoreDraft,
       restoreDialogOpen,
       restoreChangedOnServer,

@@ -251,6 +251,28 @@ describe("OScheduleTimeline", () => {
     expect(w.find("[data-test='o2-schedule-timeline-now-label']").text()).toBe("18 Aug, 09:59");
   });
 
+  /// On a phone the lane headers span the plot, so a line over the whole plot crosses the rotation names.
+  it("draws the now line inside each lane on a phone, with the stamp kept in the top row", () => {
+    const w = mount(OScheduleTimeline, {
+      props: {
+        tracks: [track(), track({ key: "t2" })],
+        laneHeaders: true,
+        nowOffset: 0.25,
+        nowLabel: raw("18 Aug, 09:59"),
+      },
+    });
+
+    const lanes = w.findAll("[data-test='o2-schedule-timeline-now-lane']");
+    expect(lanes).toHaveLength(2);
+    for (const lane of lanes) expect(lane.classes()).toContain("md:hidden");
+    expect(w.find("[data-test='o2-schedule-timeline-now']").classes()).toContain(
+      "max-md:bg-transparent",
+    );
+    expect(w.find("[data-test='o2-schedule-timeline-now-label']").classes()).not.toContain(
+      "max-md:hidden",
+    );
+  });
+
   /// Paging forward must not pin the marker to an edge and imply the present
   /// is inside a window it is not in.
   it("drops the now line, and its stamp, when the window has moved off it", () => {

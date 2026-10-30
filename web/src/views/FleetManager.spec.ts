@@ -20,6 +20,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import FleetManager from "./FleetManager.vue";
+import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 
 vi.mock("@/aws-exports", async (importOriginal) => {
   const actual: any = await importOriginal();
@@ -87,6 +88,27 @@ describe("FleetManager", () => {
       expect(created).toHaveBeenCalledWith(target);
     },
   );
+
+  it("marks New configuration, and only it, when a new-config draft exists", async () => {
+    localStorage.clear();
+    writeEditorDraft(
+      { kind: "fleet_config", org: "default", entityId: null, userEmail: "example@gmail.com" },
+      { data: { yamlText: "x: 1\n" } },
+    );
+    wrapper = await mountAt("configurations");
+    const btn = wrapper.find('[data-test="fleet-manager-create-configurations"]');
+    expect(btn.find('[data-test="fleet-manager-create-configurations-draft-dot"]').exists()).toBe(
+      true,
+    );
+    expect(btn.attributes("aria-label")).toBe("New configuration · unsaved draft");
+    wrapper.unmount();
+
+    wrapper = await mountAt("fleets");
+    expect(
+      wrapper.find('[data-test="fleet-manager-create-configurations-draft-dot"]').exists(),
+    ).toBe(false);
+    localStorage.clear();
+  });
 
   it.each(["overview", "settings", "audit"])("offers no create action on %s", async (tab) => {
     wrapper = await mountAt(tab);

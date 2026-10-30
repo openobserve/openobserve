@@ -121,11 +121,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-name="{ row, index }">
-          <span
-            class="text-text-body truncate font-medium"
-            :data-test="`rum-analytics-named-events-row-${index}`"
-            >{{ row.name }}</span
-          >
+          <span class="flex min-w-0 items-center gap-2">
+            <span
+              class="text-text-body truncate font-medium"
+              :data-test="`rum-analytics-named-events-row-${index}`"
+              >{{ row.name }}</span
+            >
+            <EditorDraftDot
+              v-if="eventDrafts.ids.has(row.id)"
+              :saved-at="eventDrafts.savedAt(row.id)"
+              :data-test="`rum-analytics-named-events-row-${index}-draft-dot`"
+            />
+          </span>
         </template>
         <template #cell-rules="{ row, index }">
           <span
@@ -169,13 +176,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-sm"
-                icon-left="content-copy"
                 :disabled="!canCreate"
-                :aria-label="t('rum.analytics.events.duplicate')"
+                :aria-label="duplicateDraftLabel(row, t('rum.analytics.events.duplicate'))"
                 :data-test="`rum-analytics-named-events-row-${index}-duplicate-btn`"
                 @click="duplicate(row)"
-              />
-              <OTooltip :content="duplicateTip" />
+              >
+                <OIcon name="content-copy" size="sm" />
+                <EditorDraftDot
+                  v-if="hasDuplicateDraft(row)"
+                  corner
+                  :tooltip="false"
+                  :data-test="`rum-analytics-named-events-row-${index}-duplicate-draft-dot`"
+                />
+              </OButton>
+              <OTooltip :content="duplicateTip(row)" />
             </span>
             <span class="max-md:hidden">
               <OButton
@@ -196,10 +210,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-xs-sq"
                   class="md:hidden"
-                  :aria-label="t('rum.analytics.events.moreActions')"
+                  :aria-label="duplicateDraftLabel(row, t('rum.analytics.events.moreActions'))"
                   :data-test="`rum-analytics-named-events-row-${index}-more-btn`"
                   @click.stop
-                />
+                >
+                  <EditorDraftDot
+                    v-if="hasDuplicateDraft(row)"
+                    corner
+                    :saved-at="duplicateDraftSavedAt(row)"
+                    :data-test="`rum-analytics-named-events-row-${index}-more-draft-dot`"
+                  />
+                </OButton>
               </template>
               <ODropdownItem
                 icon-left="edit"
@@ -218,6 +239,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select="duplicate(row)"
               >
                 <span>{{ t("rum.analytics.events.duplicate") }}</span>
+                <EditorDraftDot
+                  v-if="hasDuplicateDraft(row)"
+                  :saved-at="duplicateDraftSavedAt(row)"
+                  :data-test="`rum-analytics-named-events-row-${index}-duplicate-menu-draft-dot`"
+                />
               </ODropdownItem>
               <ODropdownItem
                 icon-left="delete"
@@ -295,6 +321,7 @@ import { useListViewState } from "@/composables/useListViewState";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -305,9 +332,15 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import useNamedEvents, {
+  namedEventDraftVariant,
   namedEventHandoffState,
+  useNewEventDraftTimes,
   type FunnelUsage,
 } from "@/composables/rum/useNamedEvents";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import useSavedFunnels from "@/composables/rum/useSavedFunnels";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -331,6 +364,7 @@ const ne = useNamedEvents();
 const savedFunnels = useSavedFunnels();
 const { confirm } = useConfirmDialog();
 const { events, permission, invalidCount, loading } = ne;
+const eventDrafts = useEditorDraftIds("rum_named_event");
 
 const viewState = useListViewState("rumNamedEvents", {
   filter: "",
@@ -375,11 +409,17 @@ watch(
 const canWrite = computed(() => permission.value === "write");
 const canCreate = computed(() => canWrite.value && events.value.length < MAX_EVENTS_PER_APP);
 const readOnlyTip = computed(() => t("rum.analytics.events.readOnly"));
-const duplicateTip = computed<I18nText>(() => {
+const draftLabel = useDraftLabel();
+
+// Per row: a Duplicate with a kept copy says so, with the copy's date, in its own tooltip.
+const duplicateTip = (ev: NamedEvent): I18nText => {
   if (!canWrite.value) return readOnlyTip.value;
   if (!canCreate.value) return t("rum.analytics.events.capReached", { max: MAX_EVENTS_PER_APP });
-  return t("rum.analytics.events.duplicate");
-});
+  return duplicateDraftLabel(ev, t("rum.analytics.events.duplicate"));
+};
+// The corner dot is presentational, so an action that reopens a kept copy says so, dated, in its own name.
+const duplicateDraftLabel = (ev: NamedEvent, label: I18nText): I18nText =>
+  hasDuplicateDraft(ev) ? draftLabel(label, duplicateDraftSavedAt(ev)) : label;
 
 const filtered = computed(() => {
   const term = filter.value.trim().toLowerCase();
@@ -498,7 +538,24 @@ const openEdit = (ev: NamedEvent) => {
 const duplicate = (ev: NamedEvent) => {
   if (!canCreate.value) return;
   const name = t("rum.analytics.events.copyName", { name: raw(ev.name) });
-  void openNew(namedEventHandoffState({ draft: { name, rules: ev.rules } }));
+  void openNew(namedEventHandoffState({ draft: { name, rules: ev.rules }, source: ev.id }));
+};
+
+const newEventDrafts = useNewEventDraftTimes();
+const duplicateDraftSavedAt = (ev: NamedEvent) =>
+  newEventDrafts.savedAt(namedEventDraftVariant(app.value, { draft: null, source: ev.id }));
+const hasDuplicateDraft = (ev: NamedEvent) => duplicateDraftSavedAt(ev) !== null;
+
+// A duplicate's draft is keyed by its source, so every user's copy goes with the source.
+const dropDrafts = (ids: string[]) => {
+  for (const entityId of ids) {
+    deleteEditorDraftsFor({
+      kind: "rum_named_event",
+      org: org(),
+      entityId,
+      variant: namedEventDraftVariant(app.value, { draft: null, source: entityId }),
+    });
+  }
 };
 
 const funnelNames = (funnels: FunnelUsage[]) =>
@@ -532,6 +589,7 @@ const confirmRemove = async (ev: NamedEvent, funnels: FunnelUsage[]): Promise<bo
     const inUse = await ne.remove(org(), app.value, ev.id, funnels.length > 0);
     // A funnel saved with this event after the usage check: ask again, naming it.
     if (inUse) return confirmRemove(ev, inUse);
+    dropDrafts([ev.id]);
     return true;
   } catch {
     // useNamedEvents has already toasted, read-only included.
@@ -590,6 +648,7 @@ const removeSelected = async () => {
     const inUse = chosen.map((ev, i) => ({ ev, funnels: used[i] })).filter((u) => u.funnels.length);
     if (!(await confirmBulk(chosen.length, inUse))) return;
     const gone = await deleteChosen(chosen, inUse);
+    dropDrafts(gone);
     selectedIds.value = selectedIds.value.filter((id) => !gone.includes(id));
   } finally {
     bulkDeleting.value = false;

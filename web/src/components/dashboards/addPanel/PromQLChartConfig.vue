@@ -403,7 +403,16 @@ export default defineComponent({
     ];
 
     // Chart types that support aggregation
-    const chartsWithAggregation = ["pie", "donut", "geomap", "maps", "metric", "gauge", "h-bar"];
+    const chartsWithAggregation = [
+      "pie",
+      "donut",
+      "geomap",
+      "maps",
+      "metric",
+      "gauge",
+      "bar-gauge",
+      "h-bar",
+    ];
 
     // A pie or metric reduces each series to one value, which an instant query already is.
     const showAggregationConfig = computed(
