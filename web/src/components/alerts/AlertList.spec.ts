@@ -612,6 +612,25 @@ describe("AlertList - data fetching and columns", () => {
     expect(texts).toEqual(["15 Mins", "*/10 * * * *", "--"]);
   });
 
+  it("states a zero firing count in the groups cell when no group fires", async () => {
+    alertsDB = [makeAlert(1, { name: "multi-quiet" })];
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.filteredResults = wrapper.vm.filteredResults.map((row: any) => ({
+      ...row,
+      multi_alert: true,
+      groups_observed: 28,
+      groups_firing: 0,
+    }));
+    wrapper.vm.activeTab = "all";
+    await flushPromises();
+
+    const spans = wrapper
+      .findAll('[data-test="alert-list-multi-quiet-groups"] span')
+      .map((span: any) => span.text());
+    expect(spans).toEqual(["0 firing", "of 28 groups"]);
+  });
+
   // Feature 2 (PT-3/PT-6): the columns that REPLACED them.
   it("renders the priority and tags columns", async () => {
     const wrapper: any = await mountAlertList();
