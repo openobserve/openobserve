@@ -12936,7 +12936,7 @@
       "acknowledgeGroups": "Reconocer {count} grupo disparado | Reconocer {count} grupos disparados",
       "unacknowledge": "Quitar reconocimiento",
       "takeOver": "Hacerse cargo",
-      "chip": "Reconocido por {who} mediante {source} · {time}",
+      "chip": "Reconocido por {who} · {time}",
       "chipTooltip": "Reconocido por {who} a las {time} desde {source}",
       "firingAcknowledged": "Disparada · reconocida",
       "tile": "Reconocidas",

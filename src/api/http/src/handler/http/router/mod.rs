@@ -91,6 +91,10 @@ use crate::{
 
 pub mod decompression;
 pub mod middlewares;
+#[cfg(all(test, feature = "enterprise"))]
+mod one_ack_oncall_off_tests;
+#[cfg(all(test, feature = "enterprise"))]
+mod one_ack_tests;
 pub mod openapi;
 
 use common::meta::http::ERROR_HEADER;
@@ -1481,6 +1485,8 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume", post(alerts::incidents::resume_incident_rca_run))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary", get(alerts::incidents::get_incident_rca_summary))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/acknowledge", post(alerts::ack::ack_incident))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/unacknowledge", post(alerts::ack::unack_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
         .route("/v2/{org_id}/incidents/integrations", get(alerts::incident_integrations::list_integrations).post(alerts::incident_integrations::create_integration))
@@ -2390,6 +2396,10 @@ fn oncall_routes(router: Router) -> Router {
         .route(
             "/{org_id}/oncall/responses/{response_id}/acknowledge",
             post(oncall::acknowledge_response),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/unacknowledge",
+            post(oncall::unacknowledge_response),
         )
         .route(
             "/{org_id}/oncall/responses/{response_id}/snooze",
@@ -5205,8 +5215,10 @@ mod tests {
             "POST /v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/cancel",
             "POST /v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/extend",
             "POST /v2/{org_id}/alerts/{alert_id}/unack",
+            "POST /{org_id}/oncall/responses/{response_id}/acknowledge",
             "POST /{org_id}/oncall/responses/{response_id}/resolve",
             "POST /{org_id}/oncall/responses/{response_id}/snooze",
+            "POST /{org_id}/oncall/responses/{response_id}/unacknowledge",
         ];
         assert_eq!(scope_allows(in_slack_action_scope), sorted(&expected));
     }

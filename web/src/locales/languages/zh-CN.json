@@ -12936,7 +12936,7 @@
       "acknowledgeGroups": "确认 {count} 个触发中的组 | 确认 {count} 个触发中的组",
       "unacknowledge": "取消确认",
       "takeOver": "接管",
-      "chip": "由 {who} 通过 {source} 确认 · {time}",
+      "chip": "由 {who} 确认 · {time}",
       "chipTooltip": "由 {who} 于 {time} 通过 {source} 确认",
       "firingAcknowledged": "触发中 · 已确认",
       "tile": "已确认",

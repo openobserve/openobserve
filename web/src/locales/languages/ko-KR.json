@@ -12936,7 +12936,7 @@
       "acknowledgeGroups": "발생 그룹 {count}개 확인 | 발생 그룹 {count}개 확인",
       "unacknowledge": "확인 취소",
       "takeOver": "인계받기",
-      "chip": "{who}님이 {source}에서 확인 · {time}",
+      "chip": "{who}님이 확인 · {time}",
       "chipTooltip": "{who}님이 {source}에서 {time}에 확인했습니다",
       "firingAcknowledged": "발생 · 확인됨",
       "tile": "확인됨",

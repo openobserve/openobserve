@@ -16,6 +16,7 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import oncallService, { RESPONSE_PAGE_LIMIT } from "./oncall";
 import { incidentKeys } from "./incidents.querykeys";
+import { oneAckScopes } from "./alerts.querykeys";
 import { oncallKeys } from "./oncall.querykeys";
 import {
   LIVE_STALE_TIME,
@@ -683,7 +684,25 @@ export const acknowledgeResponseMutation = (org: string) =>
   mutationOptions({
     mutationFn: (responseId: string) =>
       oncallService.acknowledgeResponse({ org_identifier: org, response_id: responseId }),
-    meta: { invalidates: responseWriteScopes(org), silentError: true },
+    meta: { invalidates: oneAckScopes(org), silentError: true },
+  });
+
+export const takeOverResponseMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (responseId: string) =>
+      oncallService.acknowledgeResponse({
+        org_identifier: org,
+        response_id: responseId,
+        take_over: true,
+      }),
+    meta: { invalidates: oneAckScopes(org), silentError: true },
+  });
+
+export const unacknowledgeResponseMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (responseId: string) =>
+      oncallService.unacknowledgeResponse({ org_identifier: org, response_id: responseId }),
+    meta: { invalidates: oneAckScopes(org), silentError: true },
   });
 
 /** The ladder resumes on its own when the snooze lapses — see the live tier on the reads. */

@@ -12936,7 +12936,7 @@
       "acknowledgeGroups": "Potwierdź wyzwoloną grupę: {count} | Potwierdź wyzwolone grupy: {count}",
       "unacknowledge": "Cofnij potwierdzenie",
       "takeOver": "Przejmij",
-      "chip": "Potwierdzone przez {who} za pośrednictwem {source} · {time}",
+      "chip": "Potwierdzone przez {who} · {time}",
       "chipTooltip": "Potwierdzone przez {who} o {time} z {source}",
       "firingAcknowledged": "Wyzwolony · potwierdzony",
       "tile": "Potwierdzone",

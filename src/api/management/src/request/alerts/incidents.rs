@@ -267,6 +267,16 @@ pub async fn update_incident(
             }
         }
         UpdatePayload::Status { status } => {
+            if let Err(e) = openobserve_core::alerts::incidents::authorize_status(
+                &org_id,
+                &incident_id,
+                status.as_str(),
+                &user_id,
+            )
+            .await
+            {
+                return crate::request::alerts::ack::error_response(e);
+            }
             match openobserve_core::alerts::incidents::update_status(
                 &org_id,
                 &incident_id,

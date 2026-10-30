@@ -12931,7 +12931,7 @@
       "acknowledgeGroups": "確認 {count} 個觸發中群組 | 確認 {count} 個觸發中群組",
       "unacknowledge": "取消確認",
       "takeOver": "接手",
-      "chip": "已由 {who} 透過 {source} 確認 · {time}",
+      "chip": "已由 {who} 確認 · {time}",
       "chipTooltip": "由 {who} 於 {time} 透過 {source} 確認",
       "firingAcknowledged": "觸發中 · 已確認",
       "tile": "已確認",

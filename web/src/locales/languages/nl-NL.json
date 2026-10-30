@@ -12936,7 +12936,7 @@
       "acknowledgeGroups": "Bevestig {count} afgaande groep | Bevestig {count} afgaande groepen",
       "unacknowledge": "Bevestiging intrekken",
       "takeOver": "Overnemen",
-      "chip": "Bevestigd door {who} via {source} · {time}",
+      "chip": "Bevestigd door {who} · {time}",
       "chipTooltip": "Bevestigd door {who} op {time} via {source}",
       "firingAcknowledged": "Afgaand · bevestigd",
       "tile": "Bevestigd",

@@ -53,6 +53,11 @@ pub async fn claim_with_outbox(ack: &AlertAck) -> Result<Option<u64>, Error> {
     claim_with_outbox_with(get_orm_client_rw().await, ack).await
 }
 
+/// Moves one firing's ack only while `from` still holds it; `None` otherwise.
+pub async fn take_over_with_outbox(ack: &AlertAck, from: &str) -> Result<Option<u64>, Error> {
+    take_over_with_outbox_with(get_orm_client_rw().await, ack, from).await
+}
+
 /// Every ack row of these alerts, for list pages.
 pub async fn list_for_alerts(org_id: &str, alert_ids: &[String]) -> Result<Vec<AlertAck>, Error> {
     list_for_alerts_with(get_orm_client_ro().await, org_id, alert_ids).await
@@ -170,6 +175,44 @@ pub async fn claim_with_outbox_with<C: ConnectionTrait + TransactionTrait>(
         .exec_without_returning(&txn)
         .await?;
     if written == 0 {
+        txn.rollback().await?;
+        return Ok(None);
+    }
+    let bumped = slack_alert_messages::bump_wanted_with(
+        &txn,
+        &ack.alert_id,
+        &ack.group_key,
+        ack.firing_started_at,
+    )
+    .await?;
+    txn.commit().await?;
+    Ok(Some(bumped))
+}
+
+pub async fn take_over_with_outbox_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    ack: &AlertAck,
+    from: &str,
+) -> Result<Option<u64>, Error> {
+    let txn = conn.begin().await?;
+    let moved = Entity::update_many()
+        .col_expr(Column::AckedBy, Expr::value(ack.acked_by.clone()))
+        .col_expr(Column::AckedAt, Expr::value(ack.acked_at))
+        .col_expr(Column::AckSource, Expr::value(enum_text(&ack.ack_source)?))
+        .col_expr(
+            Column::TakenOverFrom,
+            Expr::value(ack.taken_over_from.clone()),
+        )
+        .col_expr(Column::UpdatedAt, Expr::value(ack.updated_at))
+        .filter(Column::OrgId.eq(&ack.org_id))
+        .filter(Column::AlertId.eq(&ack.alert_id))
+        .filter(Column::GroupKey.eq(&ack.group_key))
+        .filter(Column::FiringStartedAt.eq(ack.firing_started_at))
+        .filter(Column::UnackedAt.is_null())
+        .filter(Column::AckedBy.eq(from))
+        .exec(&txn)
+        .await?;
+    if moved.rows_affected == 0 {
         txn.rollback().await?;
         return Ok(None);
     }
@@ -382,6 +425,41 @@ mod tests {
             unacked_by: None,
             updated_at,
         }
+    }
+
+    #[tokio::test]
+    async fn a_take_over_moves_the_ack_only_from_the_holder_it_names() {
+        let db = db().await;
+        claim_with_outbox_with(&db, &ack("g", 100, 10))
+            .await
+            .unwrap();
+        let bob = AlertAck {
+            acked_by: "bob@acme.com".into(),
+            taken_over_from: Some("dana@acme.com".into()),
+            ..ack("g", 100, 11)
+        };
+        let stale = AlertAck {
+            taken_over_from: Some("carol@acme.com".into()),
+            ..bob.clone()
+        };
+        assert_eq!(
+            take_over_with_outbox_with(&db, &stale, "carol@acme.com")
+                .await
+                .unwrap(),
+            None,
+            "a holder that moved on keeps nothing to give"
+        );
+        assert!(
+            take_over_with_outbox_with(&db, &bob, "dana@acme.com")
+                .await
+                .unwrap()
+                .is_some()
+        );
+        let stored = get_with(&db, "acme", "a1", "g").await.unwrap().unwrap();
+        assert_eq!(
+            (stored.acked_by.as_str(), stored.taken_over_from.as_deref()),
+            ("bob@acme.com", Some("dana@acme.com"))
+        );
     }
 
     #[tokio::test]
