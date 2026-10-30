@@ -11,6 +11,7 @@
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+import { openAlertSectionForTab } from './alertSectionHelpers.js';
 
 export class AlertManagement {
     constructor(page, commonActions, locators) {
@@ -817,17 +818,11 @@ export class AlertManagement {
         testLogger.info('Opened alert edit view', { alertName });
     }
 
-    /**
-     * Activate the Advanced tab in the AddAlert v3 wizard.
-     * Deduplication lives in this tab (AddAlert.vue line ~273).
-     */
+    /** Shows the old Advanced tab's settings; deduplication is a tucked setting of "Who should hear about it?". */
     async openAdvancedTab() {
-        const advancedTab = this.page.locator(this.locators.addAlertTabAdvanced);
-        await expect(advancedTab).toBeVisible({ timeout: 10000 });
-        await advancedTab.click();
-        // Wait for the dedup fingerprint OSelect wrapper to mount in the Advanced tab.
+        await openAlertSectionForTab(this.page, 'Advanced');
         await this.page.locator(this.locators.dedupFingerprintFieldsSelect).waitFor({ state: 'visible', timeout: 10000 });
-        testLogger.info('Switched to Advanced tab — deduplication panel visible');
+        testLogger.info('Deduplication panel visible');
     }
 
     /**

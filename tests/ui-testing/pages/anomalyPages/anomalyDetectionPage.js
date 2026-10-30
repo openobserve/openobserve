@@ -7,6 +7,7 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 const { cleanupTestAnomalies: apiCleanupTestAnomalies } = require('../../playwright-tests/utils/api-helper.js');
 const { discardEditorDraftIfAsked } = require('../alertsPages/editorDraftHelpers.js');
+const { goToAlertSection, settleIntoView } = require('../alertsPages/alertSectionHelpers.js');
 
 class AnomalyDetectionPage {
     /**
@@ -45,8 +46,6 @@ class AnomalyDetectionPage {
             // Wizard chrome
             saveBtn: '[data-test="add-alert-submit-btn"]',
             cancelBtn: '[data-test="add-alert-cancel-btn"]',
-            configTab: '[data-test="add-alert-tab-anomaly-config"]',
-            alertingTab: '[data-test="add-alert-tab-anomaly-alerting"]',
 
             // Detection config step
             queryTabs: '[data-test="anomaly-query-tabs"]',
@@ -216,7 +215,7 @@ class AnomalyDetectionPage {
      */
     async selectOptionByValue(selectSelector, value) {
         const dataTest = this._dataTestOf(selectSelector);
-        await this.page.locator(`${selectSelector} [data-test$="-trigger"]`).click();
+        await this._openSelect(selectSelector);
         await this._filterOpenSelect(dataTest, value);
         const option = this.page.locator(
             `[data-test="${dataTest}-option"][data-test-value="${value}"]`,
@@ -228,7 +227,7 @@ class AnomalyDetectionPage {
     /** Pick an OSelect option by its rendered label (use when the value is opaque). */
     async selectOptionByLabel(selectSelector, label) {
         const dataTest = this._dataTestOf(selectSelector);
-        await this.page.locator(`${selectSelector} [data-test$="-trigger"]`).click();
+        await this._openSelect(selectSelector);
         await this._filterOpenSelect(dataTest, label);
         const option = this.page
             .locator(`[data-test="${dataTest}-option"]`)
@@ -236,6 +235,13 @@ class AnomalyDetectionPage {
             .first();
         await option.waitFor({ state: 'visible', timeout: 10000 });
         await option.click();
+    }
+
+    /** Opens an OSelect once its trigger has stopped scrolling; one opened in the same frame as a scroll closes again. */
+    async _openSelect(selectSelector) {
+        const trigger = this.page.locator(`${selectSelector} [data-test$="-trigger"]`).first();
+        await settleIntoView(this.page, trigger);
+        await trigger.click();
     }
 
     /** Extract the bare data-test value out of a `[data-test="x"]` selector. */
@@ -292,15 +298,15 @@ class AnomalyDetectionPage {
         await this.fillAnomalyName(name);
     }
 
-    // Wizard tabs
+    // Editor sections: detection config starts in "What should we watch?", alerting is "Who should hear about it?".
 
     async openConfigTab() {
-        await this.page.locator(this.selectors.configTab).click();
+        await goToAlertSection(this.page, 'watch');
         await this.page.locator(this.selectors.queryTabs).waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async openAlertingTab() {
-        await this.page.locator(this.selectors.alertingTab).click();
+        await goToAlertSection(this.page, 'notify');
         await this.page.locator(this.selectors.alertEnabled).waitFor({ state: 'visible', timeout: 10000 });
     }
 

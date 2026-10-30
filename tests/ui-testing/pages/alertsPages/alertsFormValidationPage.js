@@ -2,6 +2,7 @@
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { openNavFlyoutChild } = require('../commonActions.js');
+import { goToAlertSection } from './alertSectionHelpers.js';
 
 export class AlertsFormValidationPage {
   /**
@@ -100,7 +101,6 @@ export class AlertsFormValidationPage {
     // Redesigned form uses OToggleGroup tabs (no Next button). The default
     // active tab is "condition", which already renders FilterCondition,
     // QueryConfig and AlertSettings content once a stream is selected.
-    this.alertTabCondition = '[data-test="add-alert-tab-condition"]';
 
     // ── AlertSettings (step 3 of alert wizard) ───────────────────────────────
     this.alertSettingsSilenceDuration = '[data-test="alert-settings-silence-duration-input-field"]';
@@ -451,10 +451,8 @@ export class AlertsFormValidationPage {
    * the condition tab is the active tab so the downstream assertions resolve.
    */
   async clickWizardNext() {
-    testLogger.info('Ensuring condition tab is active (no wizard Next button)');
-    const conditionTab = this.page.locator(this.alertTabCondition);
-    await conditionTab.waitFor({ state: 'visible', timeout: 10000 });
-    await conditionTab.click();
+    testLogger.info('Scrolling to the first editor section (no wizard Next button)');
+    await goToAlertSection(this.page, 'watch');
   }
 
   /**
