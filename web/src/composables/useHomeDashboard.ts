@@ -37,6 +37,13 @@ const isLoading = ref(false);
 // The pin is per org but this state is shared, so loads are keyed to the org they were started for.
 const currentOrg = ref("");
 const loadedOrg = ref("");
+// Pages mount before the pin read answers, so a read older than a pin change must not undo it.
+let pinWrites = 0;
+
+function notePinWrite(org: string): void {
+  pinWrites++;
+  void queryClient.cancelQueries({ queryKey: settingKeys.one(org, SETTING_KEY), exact: true });
+}
 
 export function useHomeDashboard(t: TranslateFn) {
   const isHome = (dashboardId: string) => homeDashboard.value?.dashboardId === dashboardId;
@@ -51,8 +58,9 @@ export function useHomeDashboard(t: TranslateFn) {
       currentOrg.value = org;
       loadedOrg.value = "";
     }
+    const writesAtStart = pinWrites;
     const apply = (val: any) => {
-      if (org !== currentOrg.value) return;
+      if (org !== currentOrg.value || pinWrites !== writesAtStart) return;
       homeDashboard.value = val && val.dashboardId ? (val as HomeDashboard) : null;
       loadedOrg.value = org;
     };
@@ -88,6 +96,7 @@ export function useHomeDashboard(t: TranslateFn) {
 
   const setHomeDashboard = async (org: string, d: HomeDashboard) => {
     if (!org) return; // no org → don't hit the API with an undefined segment
+    notePinWrite(org);
     const prev = homeDashboard.value;
     homeDashboard.value = d; // optimistic
     try {
@@ -104,6 +113,7 @@ export function useHomeDashboard(t: TranslateFn) {
 
   const clearHomeDashboard = async (org: string) => {
     if (!org) return; // no org → don't hit the API with an undefined segment
+    notePinWrite(org);
     const prev = homeDashboard.value;
     homeDashboard.value = null; // optimistic
     try {
