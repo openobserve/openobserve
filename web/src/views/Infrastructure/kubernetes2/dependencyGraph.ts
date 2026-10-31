@@ -332,10 +332,10 @@ export interface Position {
 export const CARD_W = 216;
 export const CARD_H = 76;
 // A column is a card wide plus a gap with room for edges to fan out and a rate label to sit clear of the arrowheads.
-export const COLUMN_GAP = CARD_W + 176;
+export const COLUMN_GAP = CARD_W + 240;
 // A card's slot is its height plus a gap; an edge passing through a column takes a thin slot of its own.
-const NODE_SLOT = CARD_H + 36;
-const PASS_SLOT = 24;
+const NODE_SLOT = CARD_H + 68;
+const PASS_SLOT = 40;
 
 // Alternating left-to-right and right-to-left passes; a few settle a graph of this size.
 const SWEEPS = 6;
