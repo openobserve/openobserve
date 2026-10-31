@@ -772,6 +772,7 @@ const handleErrorTypeClick = async (payload: any) => {
     params: { id: payload.row.latest_error_id },
     query: {
       timestamp: payload.row.zo_sql_timestamp,
+      org_identifier: store.state.selectedOrganization.identifier,
     },
   });
 };

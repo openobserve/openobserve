@@ -50,6 +50,18 @@ describe("OStatStrip", () => {
       expect(wrapper.findAll('[data-test="o-stat-card-value-skeleton"]')).toHaveLength(2);
     });
 
+    it("holds only the tile whose own value is still loading", async () => {
+      const wrapper = mount(OStatStrip, {
+        props: { items: [items[0], { ...items[1], loading: true }], loading: false },
+      });
+      expect(wrapper.findAll('[data-test="o-stat-card-value-skeleton"]')).toHaveLength(1);
+      expect(wrapper.text()).toContain("128");
+      expect(wrapper.text()).not.toContain("93");
+      await wrapper.setProps({ items });
+      expect(wrapper.find('[data-test="o-stat-card-value-skeleton"]').exists()).toBe(false);
+      expect(wrapper.text()).toContain("93");
+    });
+
     it("keeps the last values through a refresh instead of flickering", async () => {
       const wrapper = mount(OStatStrip, { props: { items, loading: true } });
       await wrapper.setProps({ loading: false });

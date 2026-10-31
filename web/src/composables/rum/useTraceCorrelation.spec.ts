@@ -265,7 +265,8 @@ describe("useTraceCorrelation", () => {
       await fetchCorrelation();
 
       const apmCall = vi.mocked(searchService.search).mock.calls[1];
-      expect(apmCall[1]).toBe("APM");
+      // The server rejects any search_type it does not know with a 400, and "APM" is one.
+      expect(apmCall[1]).toBe("RUM");
       expect(apmCall[0].page_type).toBe("traces");
       const sql: string = apmCall[0].query.query.sql;
       expect(sql).toContain('from "default"');
@@ -350,7 +351,7 @@ describe("useTraceCorrelation", () => {
         expect.objectContaining({
           org_identifier: "test-org",
         }),
-        "APM",
+        "RUM",
       );
     });
 
@@ -392,6 +393,39 @@ describe("useTraceCorrelation", () => {
 
       expect(correlationData.value).not.toBeNull();
       expect(hasBackendTrace.value).toBe(false);
+      expect(correlationData.value?.backend_spans).toHaveLength(0);
+    });
+
+    it("warns when the backend trace search is rejected instead of hiding it", async () => {
+      const traceId = ref("test-trace-123");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const rejection = new Error("invalid SearchEventType");
+      vi.mocked(searchService.search)
+        .mockResolvedValueOnce(createMockSearchResponse([createMockRumEvent()]))
+        .mockRejectedValueOnce(rejection);
+
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
+      await fetchCorrelation();
+
+      expect(warn).toHaveBeenCalledWith("Backend trace search failed:", rejection);
+    });
+
+    it("stays quiet when the org has no traces stream", async () => {
+      const traceId = ref("test-trace-123");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.mocked(searchService.search)
+        .mockResolvedValueOnce(createMockSearchResponse([createMockRumEvent()]))
+        .mockRejectedValueOnce({
+          response: {
+            status: 400,
+            data: { code: 20002, message: "Search stream not found: default" },
+          },
+        });
+
+      const { fetchCorrelation, correlationData } = useTraceCorrelation(traceId, t);
+      await fetchCorrelation();
+
+      expect(warn).not.toHaveBeenCalled();
       expect(correlationData.value?.backend_spans).toHaveLength(0);
     });
 

@@ -60,20 +60,45 @@ vi.mock("@/composables/useQuery", () => ({
 }));
 
 // Null passes getStream through to the real composable; a test sets it to answer stream lookups itself.
+// The browser-logs stream exists unless a test clears rumLogExists, since most fixtures carry error logs.
+// A forced list refresh is counted, and adds the browser-logs stream when rumLogOnRefresh is set.
 const streamsMock = vi.hoisted(() => ({
   getStream: null as null | ((name: string, type: string, schema: boolean) => Promise<unknown>),
+  rumLogExists: true,
+  rumLogOnRefresh: false,
+  forcedRefreshes: [] as string[],
 }));
 vi.mock("@/composables/useStreams", async (importOriginal) => {
   const actual = await importOriginal<{ default: (...a: unknown[]) => Record<string, unknown> }>();
+  const { default: i18n } = await import("@/locales");
   return {
     default: (...a: unknown[]) => {
       const real = actual.default(...a);
       return {
         ...real,
-        getStream: (...b: [string, string, boolean]) =>
-          streamsMock.getStream
+        getStream: (...b: [string, string, boolean]) => {
+          if (b[0] === "_rumlog") {
+            return streamsMock.rumLogExists
+              ? Promise.resolve({ name: "_rumlog", schema: [] })
+              : Promise.reject(
+                  new Error(
+                    i18n.global.t("logStream.streamNotFoundForType", {
+                      stream: "_rumlog",
+                      type: "logs",
+                    }),
+                  ),
+                );
+          }
+          return streamsMock.getStream
             ? streamsMock.getStream(...b)
-            : (real.getStream as (...c: unknown[]) => Promise<unknown>)(...b),
+            : (real.getStream as (...c: unknown[]) => Promise<unknown>)(...b);
+        },
+        getStreams: (...b: [string, boolean, boolean?, boolean?]) => {
+          if (!b[3]) return (real.getStreams as (...c: unknown[]) => Promise<unknown>)(...b);
+          streamsMock.forcedRefreshes.push(b[0]);
+          if (streamsMock.rumLogOnRefresh) streamsMock.rumLogExists = true;
+          return Promise.resolve({ list: [] });
+        },
       };
     },
   };
@@ -1091,6 +1116,38 @@ function manyRows(n: number) {
 }
 
 const bodySqls = () => streaming.sqls.filter((sql) => sql.includes("segment"));
+
+describe("SessionViewer.vue — geo fields in the session lookup (o2-enterprise#3129 B9, openobserve#2516)", () => {
+  const lookupSql = () =>
+    vi
+      .mocked(searchService.search)
+      .mock.calls.map((call: any[]) => String(call[0]?.query?.query?.sql ?? ""))
+      .find((sql) => sql.includes("min(start)")) ?? "";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetStreaming(rowsResponder(fixtureRows));
+  });
+
+  afterEach(() => {
+    replaySchema.fields = { geo_info_country: true, geo_info_city: true };
+  });
+
+  it.each([
+    [{ geo_info_country: true }, ["min(geo_info_country) as country"], ["geo_info_city"]],
+    [{ geo_info_city: true }, ["min(geo_info_city) as city"], ["geo_info_country"]],
+    [{}, [], ["geo_info_city", "geo_info_country"]],
+  ])("asks only for the geo fields %o has", async (fields, present, absent) => {
+    replaySchema.fields = fields as Record<string, boolean>;
+    const wrapper = await mountLoaded();
+
+    const sql = lookupSql();
+    expect(sql).toContain("min(start)");
+    for (const fragment of present) expect(sql).toContain(fragment);
+    for (const field of absent) expect(sql).not.toContain(field);
+    wrapper.unmount();
+  });
+});
 
 describe("SessionViewer.vue — segment manifest and windowed fetch", () => {
   beforeEach(() => {
@@ -2188,6 +2245,72 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     vi.useRealTimers();
     vi.mocked(searchService.search).mockImplementation(originalSearch);
     setVisibility("visible");
+  });
+
+  it("never searches a missing _rumlog stream, on open or on a poll, and logs no error", async () => {
+    streamsMock.rumLogExists = false;
+    streamsMock.forcedRefreshes = [];
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const wrapper = await mountLive();
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      const sqls = vi
+        .mocked(searchService.search)
+        .mock.calls.map((call: any[]) => String(call[0]?.query?.query?.sql ?? ""));
+      expect(sqls.some((sql) => sql.includes('"_rumdata"'))).toBe(true);
+      expect(sqls.some((sql) => sql.includes('"_rumlog"'))).toBe(false);
+      expect(streamsMock.forcedRefreshes).toEqual(["logs"]);
+      expect(error).not.toHaveBeenCalled();
+      wrapper.unmount();
+    } finally {
+      streamsMock.rumLogExists = true;
+      error.mockRestore();
+    }
+  });
+
+  it("logs no error when the _rumlog search itself answers stream not found", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      serve(NOW - 60_000);
+      const served = vi.mocked(searchService.search).getMockImplementation()!;
+      let rumLogSearches = 0;
+      vi.mocked(searchService.search).mockImplementation(async (params: any) => {
+        if (!String(params?.query?.query?.sql ?? "").includes('"_rumlog"')) return served(params);
+        rumLogSearches += 1;
+        throw {
+          response: { status: 400, data: { code: 20002, message: "Search stream not found" } },
+        };
+      });
+      const wrapper = mountSessionViewer(await pushRoute());
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(rumLogSearches).toBeGreaterThan(0);
+      expect(error).not.toHaveBeenCalled();
+      wrapper.unmount();
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it("searches a _rumlog stream the cached list lacked once a forced refresh finds it", async () => {
+    streamsMock.rumLogExists = false;
+    streamsMock.rumLogOnRefresh = true;
+    streamsMock.forcedRefreshes = [];
+    try {
+      const wrapper = await mountLive();
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      const sqls = vi
+        .mocked(searchService.search)
+        .mock.calls.map((call: any[]) => String(call[0]?.query?.query?.sql ?? ""));
+      expect(streamsMock.forcedRefreshes).toEqual(["logs"]);
+      expect(sqls.some((sql) => sql.includes('"_rumlog"'))).toBe(true);
+      wrapper.unmount();
+    } finally {
+      streamsMock.rumLogExists = true;
+      streamsMock.rumLogOnRefresh = false;
+    }
   });
 
   it("detects a live session with the Sessions list's rule, inclusive at the boundary", async () => {

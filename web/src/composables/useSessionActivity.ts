@@ -125,7 +125,7 @@ const useSessionActivity = () => {
       return Promise.resolve(null);
     }
 
-    const key = `${sessionId}:${startTime}`;
+    const key = `${sessionId}:${startTime}:${endTime}`;
     const cached = cache.get(key);
     if (cached) return Promise.resolve(cached);
     const pending = inFlight.get(key);
