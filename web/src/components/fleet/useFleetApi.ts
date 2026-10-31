@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed } from "vue";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { keepPreviousData, useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import {
@@ -374,6 +375,17 @@ export function serverMessage(err: unknown): string | null {
 export function isForbidden(err: unknown): boolean {
   const e = err as { status?: number; response?: { status?: number } } | null;
   return e?.status === 403 || e?.response?.status === 403;
+}
+
+// The route check and the fleet handlers refuse with these words, which never say it is about permission.
+const BARE_REFUSALS = new Set(["Forbidden", "Unauthorized Access"]);
+
+/** A failed write's toast text; a bare refusal becomes a permission message, a stated reason is kept. */
+export function failureText(err: unknown, t: TranslateFn): I18nText {
+  const message = serverMessage(err);
+  if (isForbidden(err) && (!message || BARE_REFUSALS.has(message)))
+    return t("fleet.common.noPermission");
+  return raw(message) || t("fleet.common.requestFailed");
 }
 
 export function isNotFound(err: unknown): boolean {

@@ -121,6 +121,20 @@ pub async fn revoke_with<C: ConnectionTrait>(
     Ok(res.rows_affected)
 }
 
+/// Called once no live token is left, so it removes only revoked ones.
+pub async fn delete_for_fleet_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    fleet: &str,
+) -> Result<u64, Error> {
+    let res = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::FleetId.eq(fleet))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
+}
+
 pub async fn delete_by_org(org_id: &str) -> Result<Vec<String>, Error> {
     delete_by_org_with(get_orm_client_rw().await, org_id).await
 }
