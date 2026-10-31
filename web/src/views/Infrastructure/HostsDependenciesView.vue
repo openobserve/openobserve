@@ -313,7 +313,7 @@ function onSetUp() {
       <OSwitch
         :model-value="lowTraffic"
         size="sm"
-        :label="t('infra.k8s2.depsShowLowTraffic')"
+        :label="t('infra.hosts.depsShowLowTraffic')"
         data-test="hosts-deps-show-low-traffic"
         @update:model-value="(show: unknown) => emit('update:lowTraffic', !!show)"
       />
