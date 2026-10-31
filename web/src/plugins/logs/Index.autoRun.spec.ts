@@ -36,6 +36,7 @@ const router = createRouter({
 import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { REFRESH_QUERY_ORIGIN } from "@/composables/useLogs/logsRowNav";
+import { urlWriteMode } from "@/composables/useLogs/useLogsUrl";
 
 initializeLogsIndexDom();
 
@@ -166,6 +167,21 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
     );
   });
 
+  it("a landing that runs nothing lets the user's first search push history", async () => {
+    localStorage.setItem("oo_toggle_auto_run", "false");
+    localStorage.setItem(`oo_logs_selected_stream_logs_${org}`, '["k8s_json"]');
+    await router.replace({ name: "home" });
+    const logs = await land(
+      {},
+      { auto_query_enabled: true, query_on_stream_selection: true, auto_query_max_scan_mb: 0 },
+    );
+    expect(logs).not.toHaveBeenCalled();
+    const current = router.currentRoute.value.query;
+    expect(urlWriteMode(current, { ...current, stream: "k8s_json", query: "ZWRpdGVk" })).toBe(
+      "push",
+    );
+  });
+
   it("AQE=false: no restore and no preselect, as today", async () => {
     localStorage.setItem(`oo_logs_selected_stream_logs_${org}`, '["k8s_json"]');
     const logs = await land(
@@ -239,6 +255,22 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
         expect(wrapper.vm.searchObj.data.filterErrMsg).toBe("");
       },
     );
+
+    it("a re-applied query loaded without running lets the user's edited run push history", async () => {
+      await router.replace({ name: "home" });
+      await reApply({
+        type: "search_history_re_apply",
+        stream: "k8s_json",
+        stream_type: "logs",
+        period: "15m",
+      });
+      await vi.waitFor(() =>
+        expect(wrapper.vm.searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+      );
+      await flushPromises();
+      const current = router.currentRoute.value.query;
+      expect(urlWriteMode(current, { ...current, query: "ZWRpdGVk" })).toBe("push");
+    });
 
     it("an ai_chat_query link opened on a loaded page shows stream-not-found", async () => {
       await reApply({ stream: "k8s_json", stream_type: "logs", period: "15m" });

@@ -49,6 +49,7 @@ import { refreshFreeTextSchemas } from "@/composables/useLogs/freeTextSearch";
 import { decodeFtScan } from "@/utils/logs/freeTextScan";
 import {
   decodeColumns,
+  endLogsArrival,
   initShownSearchFromUrl,
   parseRowsParam,
   writeLogsUrl,
@@ -298,7 +299,10 @@ const useLogs = (t: TranslateFn) => {
           searchObj.data.stream.selectedStream.length > 0 && !userSearchSent
             ? autoRun.request(fromUrl ? "url" : reason, { origin: options.origin })
             : "skipped-ineligible";
-        if (result !== "scheduled" && result !== "dispatched") showNoQueryAppliedIfIdle();
+        if (result !== "scheduled" && result !== "dispatched") {
+          endLogsArrival();
+          showNoQueryAppliedIfIdle();
+        }
       } else {
         autoRun.engine.resetScope("job");
         await getJobData();
