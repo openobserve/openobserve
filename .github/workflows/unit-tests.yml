@@ -255,7 +255,7 @@ jobs:
     if: needs.check_changes.outputs.has_ui_changes == 'true'
     timeout-minutes: 45
     runs-on:
-      labels: eks-openobserve-standard-16
+      labels: ubicloud-standard-16
     permissions:
       contents: read
 
