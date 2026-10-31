@@ -134,7 +134,7 @@ const drawerStub = {
 
 const depsStub = {
   name: "HostsDependenciesView",
-  props: ["orgId", "range", "refreshNonce"],
+  props: ["orgId", "range", "refreshNonce", "knownHosts"],
   emits: ["open", "refresh"],
   template: "<div data-test='hosts-deps-stub' />",
 };
@@ -861,6 +861,7 @@ describe("HostsPage", () => {
       expect(wrapper.find('[data-test="hosts-table-stub"]').exists()).toBe(false);
       expect(deps().props("orgId")).toBe("test-org");
       expect(deps().props("range")).toMatchObject({ relative: true });
+      expect(deps().props("knownHosts")).toEqual(["web-01", "web-02", "db-01"]);
     });
 
     it("writes the chosen view into the URL and drops it for the table", async () => {

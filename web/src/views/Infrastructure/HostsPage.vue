@@ -230,6 +230,7 @@ onMounted(() => {
 const view = computed(() =>
   first(route.query.view) === "dependencies" ? "dependencies" : "table",
 );
+const knownHosts = computed(() => list.rows.value.map((r) => r.host_name));
 const onViewChange = (name: string | number) => {
   const { view: _view, ...rest } = route.query;
   router.replace({ query: name === "dependencies" ? { ...rest, view: "dependencies" } : rest });
@@ -502,6 +503,7 @@ const osToggleLabel = (slug: string) =>
       :org-id="orgId"
       :range="range"
       :refresh-nonce="refreshNonce"
+      :known-hosts="knownHosts"
       @open="openDrawer"
       @refresh="onRefreshClick"
     />

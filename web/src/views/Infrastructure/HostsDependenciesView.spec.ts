@@ -60,6 +60,7 @@ describe("HostsDependenciesView", () => {
         orgId: "org1",
         range: { start: END - 60 * MIN_US, end: END, relative: true },
         refreshNonce: 0,
+        knownHosts: [],
         ...props,
       },
       global: {
@@ -87,7 +88,8 @@ describe("HostsDependenciesView", () => {
     await mountView();
     const sent = decodeURIComponent((metricsQuery.mock.calls[0][0] as any).query);
     expect(sent).toBe(
-      "sum by (src_cidr, dst_cidr, direction, host_name) (rate(obi_network_flow_bytes[3600s]))",
+      "sum by (src_cidr, dst_cidr, direction, host_name) " +
+        '(rate(obi_network_flow_bytes{k8s_cluster=""}[3600s]))',
     );
     expect(metricsQuery.mock.calls[0][0]).toMatchObject({ org_identifier: "org1", end_time: END });
     expect(testId("hosts-deps-caption").text()).toContain("over 1h");
@@ -99,7 +101,7 @@ describe("HostsDependenciesView", () => {
     expect(testId("hosts-deps-caption").text()).toContain("over 90m");
   });
 
-  it("draws hosts and networks, hiding traffic within a name by default", async () => {
+  it("draws hosts and networks, and leaves out traffic within a name", async () => {
     await mountView();
     expect(series().links).toHaveLength(2);
     expect(series().links[0]).toMatchObject({
@@ -119,20 +121,12 @@ describe("HostsDependenciesView", () => {
     expect(chart().props("label")).toBe("Host dependency map of 2 connections");
   });
 
-  it("shows traffic within a name on its box when switched on", async () => {
-    await mountView();
-    await testId("hosts-deps-show-self-btn").trigger("click");
-    expect(series().links).toHaveLength(2);
-    // Loopback's 50 B/s, more than web to lan, must not thin the drawn edges.
-    expect(series().links[1].lineStyle.width).toBeCloseTo(1 + 7 * Math.sqrt(10 / 6144));
-    const box = series().data.find((n: any) => n.id === "loopback");
-    expect(box.tooltip.formatter).toMatch(/Within loopback: approximately 50(\.0+)?\s?B\/s/);
-    chart().vm.$emit("click", { dataType: "node", data: { id: "loopback" } });
-    await flushPromises();
-    const ways = wrapper.findAll('[data-test="hosts-deps-edge-way"]').map((w) => w.text());
-    expect(ways).toHaveLength(1);
-    expect(testId("hosts-deps-edge-target").exists()).toBe(false);
-    expect(wrapper.emitted("open")).toBeUndefined();
+  it("draws a known host that reports no flows as a host", async () => {
+    await mountView({ knownHosts: ["lan"] });
+    const lan = series().data.find((n: any) => n.id === "lan");
+    expect(lan).toMatchObject({ category: 0, symbol: "circle" });
+    chart().vm.$emit("click", { dataType: "node", data: { id: "lan" } });
+    expect(wrapper.emitted("open")).toEqual([["lan"]]);
   });
 
   it("counts traffic both agents report once, from the busier host", async () => {
@@ -198,12 +192,10 @@ describe("HostsDependenciesView", () => {
     });
   });
 
-  it("offers to show traffic within a name when that is all there is", async () => {
+  it("reads traffic only within names as no flows", async () => {
     metricsQuery.mockResolvedValue({ data: { data: { result: [FLOWS[4]] } } } as any);
     await mountView();
-    expect(testId("hosts-deps-empty").exists()).toBe(true);
-    await testId("hosts-deps-empty").find("button").trigger("click");
-    expect(series().data.map((n: any) => n.id)).toEqual(["loopback"]);
+    expect(testId("hosts-deps-no-flows").exists()).toBe(true);
   });
 
   it("shows the no-access state on a 403 and a retry on other failures", async () => {
@@ -228,9 +220,15 @@ describe("HostsDependenciesView", () => {
     });
     expect(metricsQuery).toHaveBeenCalledTimes(2);
     expect(chart().exists()).toBe(true);
+    const refresh = wrapper.findComponent({ name: "ORefreshButton" });
+    expect(refresh.props("loading")).toBe(true);
+    expect(refresh.props("lastRunAt")).toEqual(expect.any(Number));
     resolve({ data: { data: { result: [] } } });
     await flushPromises();
+    expect(refresh.props("loading")).toBe(false);
     expect(testId("hosts-deps-no-flows").exists()).toBe(true);
+    await testId("hosts-deps-refresh").trigger("click");
+    expect(wrapper.emitted("refresh")).toHaveLength(1);
   });
 
   it("drops another org's graph at once and ignores its late response", async () => {

@@ -18,7 +18,6 @@ import type { Series } from "./kubernetes2/kubernetesModel";
 import { buildGraph } from "./kubernetes2/dependencyGraph";
 import {
   hostFlowQuery,
-  isSelfEdge,
   layoutHostGraph,
   pairHostFlows,
   type HostFlowEdge,
@@ -36,6 +35,8 @@ const flow = (
 });
 
 // Recorded from four VMs on two machines, each running the agent with the same --network-flows list.
+// m1-api's 5 minute window held a 52 MB burst to m1-web that m1-web's window had just passed; over
+// the same hour the two hosts reported 189 KB/s and 181 KB/s for that direction.
 const LIVE: Series[] = [
   flow("m1-api", "m1-api", "m1-web", "response", 231576.26),
   flow("m1-web", "m1-api", "m1-web", "response", 2579.91),
@@ -66,12 +67,13 @@ const LIVE: Series[] = [
 const names = (e: HostFlowEdge) => [e.source.name, e.target.name];
 
 const edge = (edges: HostFlowEdge[], a: string, b: string) =>
-  edges.find((e) => [a, b].every((n) => names(e).includes(n)) && (a === b) === isSelfEdge(e))!;
+  edges.find((e) => [a, b].every((n) => names(e).includes(n)))!;
 
 describe("hostFlowQuery", () => {
-  it("sums per reporting host and direction, without a direction filter", () => {
+  it("sums per reporting host and direction, without a direction filter, leaving out Kubernetes rows", () => {
     expect(hostFlowQuery(3600)).toBe(
-      "sum by (src_cidr, dst_cidr, direction, host_name) (rate(obi_network_flow_bytes[3600s]))",
+      "sum by (src_cidr, dst_cidr, direction, host_name) " +
+        '(rate(obi_network_flow_bytes{k8s_cluster=""}[3600s]))',
     );
   });
 });
@@ -82,7 +84,6 @@ describe("pairHostFlows", () => {
   it("draws one edge per pair of names, client to server", () => {
     expect(edges.map(names).sort()).toEqual(
       [
-        ["loopback", "loopback"],
         ["m1-api", "mini3"],
         ["m1-web", "m1-api"],
         ["m1-web", "mini3"],
@@ -92,14 +93,18 @@ describe("pairHostFlows", () => {
         ["m3-web", "mini3"],
       ].sort(),
     );
-    expect(edges.filter((e) => !isSelfEdge(e)).every((e) => e.directed)).toBe(true);
+    expect(edges.every((e) => e.directed)).toBe(true);
   });
 
   it("marks reporting host names as hosts and every other name as a network", () => {
     const web = edge(edges, "m1-web", "mini3");
     expect(web.source).toEqual({ id: "m1-web", kind: "host", name: "m1-web" });
     expect(web.target).toEqual({ id: "mini3", kind: "network", name: "mini3" });
-    expect(edge(edges, "loopback", "loopback").source.kind).toBe("network");
+  });
+
+  it("marks a name from the hosts list as a host even when that host reports no flows", () => {
+    const web = edge(pairHostFlows(LIVE, ["mini3"]), "m1-web", "mini3");
+    expect(web.target).toEqual({ id: "mini3", kind: "host", name: "mini3" });
   });
 
   it("counts traffic between two agents once, from the host that saw the most of it", () => {
@@ -116,8 +121,8 @@ describe("pairHostFlows", () => {
     expect(pair.unknown).toBeCloseTo(2.2);
   });
 
-  it("keeps traffic within one name as a self edge", () => {
-    expect(edge(edges, "loopback", "loopback").total).toBe(4);
+  it("leaves out traffic within one name, such as loopback", () => {
+    expect(edges.some((e) => e.source.id === e.target.id)).toBe(false);
   });
 
   it("gathers addresses no entry names into one unnamed end", () => {
@@ -129,10 +134,10 @@ describe("pairHostFlows", () => {
     expect(e.total).toBe(12);
   });
 
-  it("reads a series without CIDR labels as unnamed at both ends", () => {
-    const [e] = pairHostFlows([{ metric: { host_name: "h", direction: "unknown" }, value: 1 }]);
-    expect(isSelfEdge(e)).toBe(true);
-    expect(e.source.kind).toBe("unnamed");
+  it("reads a series without CIDR labels as unnamed, which leaves nothing to pair", () => {
+    expect(pairHostFlows([{ metric: { host_name: "h", direction: "unknown" }, value: 1 }])).toEqual(
+      [],
+    );
   });
 
   it("returns nothing for no data or idle series", () => {

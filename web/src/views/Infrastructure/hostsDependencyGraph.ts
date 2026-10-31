@@ -25,7 +25,7 @@ import {
   type GraphNode,
 } from "./kubernetes2/dependencyGraph";
 
-// "host" is a name some reporting agent also uses as its host_name; "unnamed" is an address no entry contains.
+// "host" is a name equal to a host's host_name; "unnamed" is an address no entry contains.
 export type HostEndKind = "host" | "network" | "unnamed";
 
 export interface HostEnd {
@@ -40,21 +40,21 @@ export type HostFlowEdge = FlowEdge<HostEnd>;
 const UNNAMED_ID = "(unnamed)";
 
 // Per reporting host, since both hosts report traffic between two agents; pairEnds keeps one host's count.
+// Kubernetes rows share the stream; an empty match keeps the series that carry no cluster label.
 export const hostFlowQuery = (windowS: number) =>
-  `sum by (src_cidr, dst_cidr, direction, host_name) (rate(${FLOW_STREAM}[${windowS}s]))`;
+  `sum by (src_cidr, dst_cidr, direction, host_name) (rate(${FLOW_STREAM}{k8s_cluster=""}[${windowS}s]))`;
 
-// Traffic inside one name, such as loopback, stays in as an edge from the name to itself.
-export function pairHostFlows(series: Series[]): HostFlowEdge[] {
-  const hosts = new Set(series.map((s) => s.metric.host_name).filter(Boolean));
+// A name is a host when a reporting agent or the hosts list uses it as a host_name. Traffic inside one
+// name, such as loopback, is not a dependency.
+export function pairHostFlows(series: Series[], knownHosts: string[] = []): HostFlowEdge[] {
+  const hosts = new Set([...knownHosts, ...series.map((s) => s.metric.host_name)].filter(Boolean));
   const endOf = (metric: Record<string, string>, side: "src" | "dst"): HostEnd => {
     const name = metric[`${side}_cidr`] ?? "";
     const kind = !name ? "unnamed" : hosts.has(name) ? "host" : "network";
     return { id: name || UNNAMED_ID, kind, name };
   };
-  return pairEnds(series, endOf, "host_name");
+  return pairEnds(series, endOf, "host_name").filter((e) => e.source.id !== e.target.id);
 }
-
-export const isSelfEdge = (edge: HostFlowEdge) => edge.source.id === edge.target.id;
 
 const ORDER: Record<HostEndKind, number> = { host: 0, network: 1, unnamed: 2 };
 

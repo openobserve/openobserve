@@ -21,9 +21,9 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import searchService from "@/services/search";
 import { chartColor } from "@/utils/chartTheme";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
@@ -33,7 +33,6 @@ import { parseVector, type Series } from "./kubernetes2/kubernetesModel";
 import { buildGraph, flowWindowSeconds } from "./kubernetes2/dependencyGraph";
 import {
   hostFlowQuery,
-  isSelfEdge,
   layoutHostGraph,
   pairHostFlows,
   type HostEnd,
@@ -44,6 +43,8 @@ const props = defineProps<{
   orgId: string;
   range: { start: number; end: number; relative: boolean };
   refreshNonce: number;
+  // The hosts list's host names, so a host whose agent reports no flows still reads as a host.
+  knownHosts: string[];
 }>();
 
 const emit = defineEmits<{
@@ -55,10 +56,11 @@ const { t } = useI18nTyped();
 const router = useRouter();
 
 const series = shallowRef<Series[]>([]);
+const loading = ref(false);
 const loadError = ref(false);
 const forbidden = ref(false);
 const loaded = ref(false);
-const showSelf = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
 const selectedEdgeId = ref<string | null>(null);
 
 const windowS = computed(() => flowWindowSeconds(props.range.start, props.range.end));
@@ -82,6 +84,7 @@ async function load() {
     selectedEdgeId.value = null;
     loadedFor = null;
   }
+  loading.value = true;
   loadError.value = false;
   forbidden.value = false;
   try {
@@ -95,21 +98,20 @@ async function load() {
     series.value = parseVector(out);
     loaded.value = true;
     loadedFor = scopeKey;
+    lastUpdatedAt.value = Date.now();
   } catch (e: any) {
     if (gen !== generation) return;
     loadError.value = true;
     forbidden.value = (e?.response?.status ?? e?.status) === 403;
+  } finally {
+    if (gen === generation) loading.value = false;
   }
 }
 
 // The page bumps refreshNonce whenever it reloads, after it has moved the range.
 watch(() => [props.orgId, props.refreshNonce], load, { immediate: true });
 
-const allEdges = computed(() => pairHostFlows(series.value));
-
-const edges = computed(() =>
-  showSelf.value ? allEdges.value : allEdges.value.filter((e) => !isSelfEdge(e)),
-);
+const edges = computed(() => pairHostFlows(series.value, props.knownHosts));
 
 const graph = computed(() => buildGraph(edges.value));
 
@@ -136,30 +138,20 @@ function endDetail(end: HostEnd): I18nText {
 const arrowOf = (edge: HostFlowEdge) => (edge.directed ? "→" : "↔");
 
 const edgeText = (edge: HostFlowEdge) =>
-  isSelfEdge(edge)
-    ? t("infra.hosts.depsSelfEdge", { name: endLabel(edge.source) })
-    : `${endLabel(edge.source)} ${arrowOf(edge)} ${endLabel(edge.target)}`;
+  `${endLabel(edge.source)} ${arrowOf(edge)} ${endLabel(edge.target)}`;
 
-const ways = (edge: HostFlowEdge): I18nText[] =>
-  isSelfEdge(edge)
-    ? [
-        t("infra.hosts.depsEdgeWithin", {
-          name: endLabel(edge.source),
-          rate: formatRate(edge.total),
-        }),
-      ]
-    : [
-        t("infra.hosts.depsEdgeWay", {
-          from: endLabel(edge.source),
-          to: endLabel(edge.target),
-          rate: formatRate(edge.forward),
-        }),
-        t("infra.hosts.depsEdgeWay", {
-          from: endLabel(edge.target),
-          to: endLabel(edge.source),
-          rate: formatRate(edge.backward),
-        }),
-      ];
+const ways = (edge: HostFlowEdge): I18nText[] => [
+  t("infra.hosts.depsEdgeWay", {
+    from: endLabel(edge.source),
+    to: endLabel(edge.target),
+    rate: formatRate(edge.forward),
+  }),
+  t("infra.hosts.depsEdgeWay", {
+    from: endLabel(edge.target),
+    to: endLabel(edge.source),
+    rate: formatRate(edge.backward),
+  }),
+];
 
 const split = (edge: HostFlowEdge) =>
   t("infra.hosts.depsEdgeSplit", {
@@ -178,11 +170,6 @@ const SYMBOL = { host: "circle", network: "roundRect", unnamed: "diamond" } as c
 
 const KINDS = ["host", "network", "unnamed"] as const;
 
-// The chart cannot draw an edge from a box to itself, so traffic within a name rides on its box.
-const selfEdges = computed(
-  () => new Map(graph.value.edges.filter(isSelfEdge).map((e) => [e.source.id, e])),
-);
-
 const chartData = computed(() => {
   const { nodes, edges } = graph.value;
   const positions = layoutHostGraph(nodes);
@@ -196,8 +183,7 @@ const chartData = computed(() => {
     symbol: SYMBOL[kind],
     itemStyle: { color: kind === "host" ? host : neutral },
   }));
-  const links = edges.filter((e) => !isSelfEdge(e));
-  const max = Math.max(1, ...links.map((e) => e.total));
+  const max = Math.max(1, ...edges.map((e) => e.total));
   return {
     options: {
       animation: false,
@@ -226,16 +212,11 @@ const chartData = computed(() => {
             tooltip: {
               formatter:
                 `<strong>${escapeHtml(endLabel(n.end))}</strong><br/>` +
-                [
-                  endDetail(n.end),
-                  t("infra.hosts.depsEndTotal", { rate: formatRate(n.total) }),
-                  ...(selfEdges.value.has(n.end.id) ? ways(selfEdges.value.get(n.end.id)!) : []),
-                ]
-                  .map(escapeHtml)
-                  .join("<br/>"),
+                `${escapeHtml(endDetail(n.end))}<br/>` +
+                escapeHtml(t("infra.hosts.depsEndTotal", { rate: formatRate(n.total) })),
             },
           })),
-          links: links.map((e) => ({
+          links: edges.map((e) => ({
             id: e.id,
             source: e.source.id,
             target: e.target.id,
@@ -280,15 +261,12 @@ function openEnd(end: HostEnd) {
   if (end.kind === "host") emit("open", end.name);
 }
 
-// A host box opens the host; another box opens the traffic within it, if shown.
 function onChartClick(params: any) {
   const id = params?.data?.id;
   if (params?.dataType === "edge") selectedEdgeId.value = id ?? null;
   else if (params?.dataType === "node") {
     const node = graph.value.nodes.find((n) => n.end.id === id);
-    const self = node && selfEdges.value.get(node.end.id);
-    if (node?.end.kind === "host") openEnd(node.end);
-    else if (self) selectedEdgeId.value = self.id;
+    if (node) openEnd(node.end);
   }
 }
 
@@ -303,15 +281,16 @@ function onSetUp() {
     data-test="hosts-deps-view"
   >
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1" data-test="hosts-deps-controls">
-      <OSwitch
-        v-model="showSelf"
-        size="sm"
-        :label="t('infra.hosts.depsShowSelf')"
-        data-test="hosts-deps-show-self"
-      />
       <OText tag="span" class="text-text-secondary text-xs" data-test="hosts-deps-caption">
         {{ t("infra.hosts.depsCaption", { window: windowText }) }}
       </OText>
+      <ORefreshButton
+        class="ms-auto"
+        :last-run-at="lastUpdatedAt"
+        :loading="loading"
+        data-test="hosts-deps-refresh"
+        @click="emit('refresh')"
+      />
     </div>
     <OEmptyState v-if="forbidden" preset="no-access" data-test="hosts-deps-forbidden" />
     <OEmptyState
@@ -329,20 +308,13 @@ function onSetUp() {
       <OSpinner size="lg" />
     </div>
     <OEmptyState
-      v-else-if="!allEdges.length"
+      v-else-if="!edges.length"
       preset="no-data"
       :title="t('infra.hosts.depsNoFlowsTitle')"
       :description="t('infra.hosts.depsNoFlowsDescription', { window: windowText })"
       :action-label="t('infra.hosts.depsSetUp')"
       data-test="hosts-deps-no-flows"
       @action="onSetUp"
-    />
-    <OEmptyState
-      v-else-if="!graph.edges.length"
-      filtered
-      :title="t('infra.hosts.depsNoMatch')"
-      data-test="hosts-deps-empty"
-      @action="showSelf = true"
     />
     <template v-else>
       <OText
@@ -396,18 +368,16 @@ function onSetUp() {
             >
               {{ raw(endLabel(selectedEdge.source)) }}
             </OButton>
-            <template v-if="!isSelfEdge(selectedEdge)">
-              <OText tag="span" class="text-text-secondary">{{ raw(arrowOf(selectedEdge)) }}</OText>
-              <OButton
-                variant="ghost-primary"
-                size="xs"
-                :disabled="selectedEdge.target.kind !== 'host'"
-                data-test="hosts-deps-edge-target"
-                @click="openEnd(selectedEdge.target)"
-              >
-                {{ raw(endLabel(selectedEdge.target)) }}
-              </OButton>
-            </template>
+            <OText tag="span" class="text-text-secondary">{{ raw(arrowOf(selectedEdge)) }}</OText>
+            <OButton
+              variant="ghost-primary"
+              size="xs"
+              :disabled="selectedEdge.target.kind !== 'host'"
+              data-test="hosts-deps-edge-target"
+              @click="openEnd(selectedEdge.target)"
+            >
+              {{ raw(endLabel(selectedEdge.target)) }}
+            </OButton>
             <OButton
               class="ms-auto"
               variant="ghost"
@@ -431,7 +401,7 @@ function onSetUp() {
             {{ split(selectedEdge) }}
           </OText>
           <OText
-            v-if="!selectedEdge.directed && !isSelfEdge(selectedEdge)"
+            v-if="!selectedEdge.directed"
             tag="span"
             class="text-text-secondary text-xs"
             data-test="hosts-deps-edge-undirected"
