@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 
 // ---------------------------------------------------------------------------
 // Module mocks — hoisted before component import
@@ -69,7 +70,7 @@ const mockError = {
 function mountComponent(error: Record<string, any> = mockError) {
   return mount(ErrorSessionReplay, {
     props: { error },
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, store] },
   });
 }
 
@@ -203,6 +204,7 @@ describe("ErrorSessionReplay", () => {
           start_time: TIMESTAMP_US,
           end_time: TIMESTAMP_US,
           event_time: EVENT_TIME_MS,
+          org_identifier: "default",
         },
       });
     });
@@ -234,6 +236,7 @@ describe("ErrorSessionReplay", () => {
           start_time: newTs,
           end_time: newTs,
           event_time: Math.floor(newTs / 1000),
+          org_identifier: "default",
         },
       });
     });

@@ -215,7 +215,9 @@
       "rum-15190-paths-build-funnel.spec.js",
       "rum-15230-paths-drawer-user.spec.js",
       "rum-15304-overview-synthetic-counts.spec.js",
-      "rum-15269-list-view-state.spec.js"
+      "rum-15269-list-view-state.spec.js",
+      "rum-14694-replay-missing-segment.spec.js",
+      "rum-3129-sessions-and-trace-card.spec.js"
     ],
     "disabled": [],
     "ingest_allowed_upto": "1440",

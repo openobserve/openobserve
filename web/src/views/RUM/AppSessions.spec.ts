@@ -395,8 +395,25 @@ describe("AppSessions.vue", () => {
         query: {
           start_time: 1672531000000,
           end_time: 1672531300000,
+          org_identifier: "test-org-123",
         },
       });
+    });
+
+    it("opens a session without a replay at its _rumdata bounds, not NaN", () => {
+      const pushSpy = vi.spyOn(router, "push");
+
+      wrapper.vm.handleCellClick({
+        columnName: "action_play",
+        row: { session_id: "session2", rum_start_time: 1672531000, rum_end_time: 1672531300 },
+      });
+
+      expect(pushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "SessionViewer",
+          query: expect.objectContaining({ start_time: 1672531000000, end_time: 1672531300000 }),
+        }),
+      );
     });
 
     it("should handle scroll end events for pagination", () => {
@@ -446,6 +463,25 @@ describe("AppSessions.vue", () => {
       expect(names).toContain("usr_email");
       expect(names).toContain("session_id");
       expect(names).toContain("view_id");
+    });
+
+    it("keeps the o2-prefixed SDK fields in the field sidebar (o2-enterprise#2724)", async () => {
+      mockStreams.getStream.mockResolvedValueOnce({
+        schema: [
+          ...mockStreamData.schema,
+          { name: "o2source", type: "UTF8" },
+          { name: "o2_evp_origin", type: "UTF8" },
+          { name: "o2_evp_origin_version", type: "UTF8" },
+          { name: "e2e_unlisted_field", type: "UTF8" },
+        ],
+      });
+      await wrapper.vm.getStreamFields();
+      const names = wrapper.vm.streamFields.map((f: any) => f.name);
+
+      expect(names).toEqual(
+        expect.arrayContaining(["o2source", "o2_evp_origin", "o2_evp_origin_version"]),
+      );
+      expect(names).not.toContain("e2e_unlisted_field");
     });
 
     it("should include view_url and resource_url in the field filter set", async () => {
@@ -570,9 +606,38 @@ describe("AppSessions.vue", () => {
       await flushPromises();
       await flushPromises();
       const mainQuerySql = capturedSqls.find((sql) => sql.includes('FROM "_rumdata"'));
-      expect(mainQuerySql).toContain("WHERE 1 = 1");
+      expect(mainQuerySql).toContain("WHERE session_id IS NOT NULL AND session_id <> ''");
       expect(mainQuerySql).toContain("0 AS has_replay");
       expect(mainQuerySql).not.toContain("session_has_replay");
+    });
+  });
+
+  describe("geo fields the org's schema lacks (openobserve#2516)", () => {
+    it.each([
+      [["geo_info_city"], ["min(geo_info_country) as country"], ["geo_info_city"]],
+      [["geo_info_city", "geo_info_country"], [], ["geo_info_city", "geo_info_country"]],
+    ])("leaves %o out of the sessions query", async (missing, present, absent) => {
+      mockStreams.getStream.mockResolvedValueOnce({
+        schema: mockStreamData.schema.filter((f) => !missing.includes(f.name)),
+      });
+      wrapper.vm.schemaMapping = {};
+      await wrapper.vm.getStreamFields();
+      await nextTick();
+
+      vi.mocked(searchService.search).mockClear();
+      const capturedSqls: string[] = [];
+      vi.mocked(searchService.search).mockImplementation(async (params: any) => {
+        capturedSqls.push(params?.query?.query?.sql ?? "");
+        return { data: { hits: [] } };
+      });
+      wrapper.vm.getSessions();
+      await flushPromises();
+      await flushPromises();
+
+      const mainQuerySql = capturedSqls.find((sql) => sql.includes("GROUP BY session_id")) ?? "";
+      expect(mainQuerySql).toContain('FROM "_rumdata"');
+      for (const fragment of present) expect(mainQuerySql).toContain(fragment);
+      for (const field of absent) expect(mainQuerySql).not.toContain(field);
     });
   });
 
@@ -1320,6 +1385,66 @@ describe("AppSessions.vue", () => {
           ],
         },
       });
+    });
+
+    it("keeps rows without a session_id out of the list and every window aggregate", async () => {
+      mockSessionState.data.editorValue = "";
+      vi.mocked(searchService.search).mockClear();
+      const capturedSqls: string[] = [];
+      vi.mocked(searchService.search).mockImplementation(async (params: any) => {
+        const sql = params?.query?.query?.sql ?? "";
+        capturedSqls.push(sql);
+        if (sql.includes("GROUP BY session_id")) {
+          return { data: { hits: [{ session_id: "s-1", zo_sql_timestamp: 1672531200000 }] } };
+        }
+        return { data: { hits: [] } };
+      });
+
+      wrapper.vm.getSessions();
+      await flushPromises();
+      await flushPromises();
+
+      const rumdataSqls = capturedSqls.filter((sql) => sql.includes('FROM "_rumdata"'));
+      expect(rumdataSqls.some((sql) => sql.includes("COUNT(DISTINCT session_id) AS total"))).toBe(
+        true,
+      );
+      for (const sql of rumdataSqls) {
+        expect(sql).toContain("session_id IS NOT NULL AND session_id <> ''");
+      }
+    });
+
+    it("gives a session without replay its _rumdata bounds so its activity sparkline can load", async () => {
+      vi.mocked(searchService.search).mockClear();
+      vi.mocked(searchService.search).mockImplementation(async (params: any) => {
+        if (params?.query?.query?.sql?.includes("GROUP BY session_id")) {
+          return {
+            data: {
+              hits: [
+                {
+                  session_id: "no-replay-1",
+                  zo_sql_timestamp: 1672531200000500,
+                  zo_sql_end_timestamp: 1672531260000500,
+                  events: 12,
+                },
+              ],
+            },
+          };
+        }
+        return { data: { hits: [] } };
+      });
+
+      wrapper.vm.getSessions();
+      await flushPromises();
+      await flushPromises();
+
+      expect(wrapper.vm.rows).toEqual([
+        expect.objectContaining({
+          session_id: "no-replay-1",
+          rum_start_time: 1672531200000,
+          rum_end_time: 1672531260001,
+        }),
+      ]);
+      expect(wrapper.vm.rows[0].start_time).toBeUndefined();
     });
 
     it("queries _sessionreplay only for the session IDs that actually have replay", async () => {

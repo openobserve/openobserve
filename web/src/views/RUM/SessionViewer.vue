@@ -497,6 +497,7 @@ let livePolling = false;
 let lastNewIdAtMs = 0;
 let lastEventsTs = 0;
 let lastLogsTs = 0;
+let rumLogListRefreshed = false;
 // Formatted events by stream key, so a poll overlapping the last one adds nothing twice.
 const rumEvents = new Map<string, any>();
 const logEvents = new Map<string, any>();
@@ -542,7 +543,7 @@ watchDebounced(
   { debounce: 300 },
 );
 const { performanceState } = usePerformance();
-const { getStream } = useStreams(t);
+const { getStream, getStreams } = useStreams(t);
 
 const analyticsContext = computed<{ step: number | null; label: string; kind: StepKind } | null>(
   () => {
@@ -745,6 +746,9 @@ onBeforeUnmount(() => {
 
 type StreamLookup = "present" | "missing" | "failed";
 
+const searchErrorCode = (e: unknown) =>
+  (e as { response?: { data?: { code?: number } } })?.response?.data?.code;
+
 // Only a stream the org confirms it lacks means "no replay"; any other failure must surface with Retry.
 async function readStreamSchema(name: string): Promise<StreamLookup> {
   try {
@@ -808,8 +812,7 @@ async function loadEventsOnlySession(): Promise<"found" | "missing" | "failed"> 
     getSessionDetails();
     return "found";
   } catch (e) {
-    const code = (e as { response?: { data?: { code?: number } } })?.response?.data?.code;
-    return code === SEARCH_STREAM_NOT_FOUND ? "missing" : "failed";
+    return searchErrorCode(e) === SEARCH_STREAM_NOT_FOUND ? "missing" : "failed";
   } finally {
     isLoading.value.pop();
   }
@@ -1480,7 +1483,7 @@ const pollManifest = async () => {
 const pollEvents = async () => {
   const hits = await fetchEventPages(rumEventsSql(), liveWindowUs(lastEventsTs, EVENTS_TAIL_US));
   if (cancelled) return;
-  const logs = await fetchEventPages(errorLogsSql(), liveWindowUs(lastLogsTs, EVENTS_TAIL_US));
+  const logs = await fetchErrorLogPages(liveWindowUs(lastLogsTs, EVENTS_TAIL_US));
   if (cancelled) return;
   const changed = addRumEvents(hits);
   if (addErrorLogs(logs) || changed) publishEvents();
@@ -1525,6 +1528,21 @@ const fetchEventPages = async (sql: string, window: QueryWindow) => {
     if (rows.length < EVENTS_PAGE_SIZE || cancelled) break;
   }
   return hits;
+};
+
+// The stream list is cached and can predate the app's first browser log, so a miss is checked against the server once.
+const rumLogStreamMissing = async () => {
+  if ((await readStreamSchema("_rumlog")) !== "missing") return false;
+  if (rumLogListRefreshed) return true;
+  rumLogListRefreshed = true;
+  await getStreams("logs", false, false, true).catch(() => undefined);
+  return (await readStreamSchema("_rumlog")) === "missing";
+};
+
+// Apps that send no browser logs have no _rumlog stream, and searching it answers 400.
+const fetchErrorLogPages = async (window: QueryWindow) => {
+  if (await rumLogStreamMissing()) return [];
+  return fetchEventPages(errorLogsSql(), window);
 };
 
 // Re-sends of a view share its date, so the document version marks the newer one, and a later arrival when there is none.
@@ -1602,20 +1620,21 @@ const getSessionEvents = () => {
       getSessionErrorLogs();
     })
     .catch((error) => {
-      console.error("Failed to fetch sesion events:", error);
+      console.error("Failed to fetch session events:", error);
     })
     .finally(() => isLoading.value.pop());
 };
 
 const getSessionErrorLogs = () => {
   isLoading.value.push(true);
-  fetchEventPages(errorLogsSql(), serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US))
+  fetchErrorLogPages(serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US))
     .then((hits: any[]) => {
       addErrorLogs(hits);
       publishEvents();
     })
     .catch((error) => {
-      console.error("Failed to fetch sesion error logs:", error);
+      if (searchErrorCode(error) === SEARCH_STREAM_NOT_FOUND) return;
+      console.error("Failed to fetch session error logs:", error);
     })
     .finally(() => isLoading.value.pop());
 };

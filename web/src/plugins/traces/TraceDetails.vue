@@ -3203,6 +3203,7 @@ export default defineComponent({
           start_time: Math.floor(span.start_time / 1000) - 1000000,
           end_time: Math.ceil(span.end_time / 1000) + 1000000,
           event_time: span.rum_date,
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };
