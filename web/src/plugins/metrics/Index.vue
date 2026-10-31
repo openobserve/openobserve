@@ -58,8 +58,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         shortcut-id="metricsCopyUrl"
         class="h-8"
       />
-      <QueryHistoryDrawer @load="onHistoryLoad" />
+      <QueryHistoryDrawer ref="historyDrawerRef" @load="onHistoryLoad" />
+      <RecentSearchesFocusDropdown
+        ref="recentDropdownRef"
+        v-model:open="recentEditor.open.value"
+        source="metrics"
+        :anchor="recentEditor.anchor.value"
+        @run="(entry, when) => historyDrawerRef?.restore(entry, when, true)"
+        @load="(entry, when) => historyDrawerRef?.restore(entry, when, false)"
+        @view-all="(status) => historyDrawerRef?.show(status)"
+      />
       <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
+        <RecentSearchesButton
+          source="metrics"
+          data-test="metrics-history-btn"
+          @run="(entry, when) => historyDrawerRef?.restore(entry, when, true)"
+          @load="(entry, when) => historyDrawerRef?.restore(entry, when, false)"
+          @view-all="(status) => historyDrawerRef?.show(status)"
+        />
         <OButton
           v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
           variant="cancel-query"
@@ -101,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :selectedDateTime="dashboardPanelData.meta.dateTime"
       @addToDashboard="addToDashboard"
       @chartApiError="handleChartApiError"
+      @renderer-error="historyRecorder.onPanelError"
       @dataZoom="onDataZoom"
     />
 
@@ -158,6 +175,10 @@ import {
 import { useQueryHistoryRecorder } from "@/composables/metrics/useQueryHistoryRecorder";
 import { pickerSavedDate } from "@/utils/metrics/queryHistory";
 import QueryHistoryDrawer from "./QueryHistoryDrawer.vue";
+import RecentSearchesButton from "@/components/queryHistory/RecentSearchesButton.vue";
+import RecentSearchesFocusDropdown from "@/components/queryHistory/RecentSearchesFocusDropdown.vue";
+import { useRecentSearchesEditorHost } from "@/composables/queryHistory/useRecentSearchesEditorHost";
+import { metricsEditorIsEmpty, metricsEditorIsEmptyWith } from "@/utils/queryHistory/metrics";
 import analytics from "@/services/product_analytics";
 import {
   queryParamsToSelectedDate,
@@ -176,6 +197,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { takeRecentLanding } from "@/utils/queryHistory/routes";
 
 export default defineComponent({
   name: "Metrics",
@@ -193,6 +215,8 @@ export default defineComponent({
     OTooltip,
     ShareButton,
     QueryHistoryDrawer,
+    RecentSearchesButton,
+    RecentSearchesFocusDropdown,
   },
   setup() {
     provide("dashboardPanelDataPageKey", "metrics");
@@ -336,9 +360,12 @@ export default defineComponent({
     const isPanelConfigChanged = ref(false);
 
     // Reset before children mount so FieldList sees stream_type=metrics (avoids a spurious logs stream fetch).
+    // A restore from recent searches runs only on request, and records then; any other landing runs unrecorded.
+    let landing: { run: boolean } | null = null;
     onBeforeMount(() => {
       applyMetricsDefaults();
-      pendingAutoRun = hydrateFromUrl();
+      landing = takeRecentLanding("metrics");
+      pendingAutoRun = hydrateFromUrl() && (landing?.run ?? true);
     });
 
     onMounted(async () => {
@@ -355,7 +382,8 @@ export default defineComponent({
       if (pendingAutoRun) {
         pendingAutoRun = false;
         updateDateTime();
-        runQuery();
+        if (landing?.run) onUserRun();
+        else runQuery();
       }
     });
 
@@ -444,23 +472,33 @@ export default defineComponent({
       return true;
     };
 
-    const { record } = useQueryHistoryRecorder();
-
-    /** An explicit Run (button or shortcut): runs, then records a valid query. */
+    /** An explicit Run (button, shortcut or a history re-run): runs, then records a valid query. */
     const onUserRun = () => {
-      if (runQuery()) record(dashboardPanelData, selectedDate.value);
+      if (runQuery()) historyRecorder.record(dashboardPanelData, selectedDate.value);
     };
 
-    /** The editor hydrates only on mount, so an entry replaces the panel in place and reruns. */
-    const applyPanelData = (metricsData: string, timeRange: SelectedDate) => {
+    /** The editor hydrates only on mount, so an entry replaces the panel in place; a re-run is a user Run. */
+    const applyPanelData = (metricsData: string, timeRange: SelectedDate, run = true) => {
       if (!applyMetricsBlob(metricsData, dashboardPanelData)) return;
       selectedDate.value = timeRange;
       dateTimePickerRef.value?.setSavedDate?.(pickerSavedDate(timeRange));
-      runQuery();
+      if (run) onUserRun();
     };
 
-    const onHistoryLoad = (entry: { metricsData: string; timeRange: SelectedDate }) => {
-      applyPanelData(entry.metricsData, entry.timeRange);
+    const historyDrawerRef = ref<InstanceType<typeof QueryHistoryDrawer> | null>(null);
+    // One editor takes one query, so multi-query rows stay out of its clock rows.
+    const recentEditor = useRecentSearchesEditorHost("metrics", {
+      opensOnFocus: () => metricsEditorIsEmpty(dashboardPanelData),
+      emptyWith: (isBlank) => metricsEditorIsEmptyWith(dashboardPanelData, isBlank),
+      acceptsQuery: (query) => !query.includes("\n"),
+    });
+
+    const onHistoryLoad = (entry: {
+      metricsData: string;
+      timeRange: SelectedDate;
+      run?: boolean;
+    }) => {
+      applyPanelData(entry.metricsData, entry.timeRange, entry.run !== false);
       try {
         analytics.track("metrics_query_history_loaded", {
           org_id: store.state.selectedOrganization?.identifier,
@@ -588,6 +626,7 @@ export default defineComponent({
     const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
     const cancelAddPanelQuery = () => {
+      historyRecorder.cancel();
       traceIdRef.value = searchRequestTraceIds.value;
       cancelQuery();
     };
@@ -598,6 +637,8 @@ export default defineComponent({
       const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
       disable.value = panelsValues.some((item: any) => item === true);
     });
+
+    const historyRecorder = useQueryHistoryRecorder(() => disable.value);
 
     const isRunQueryPending = computed(() => {
       if (!isRunQueryArmed.value || disable.value || appliedSignature.value === null) return false;
@@ -699,6 +740,10 @@ export default defineComponent({
       onUserRun,
       applyPanelData,
       onHistoryLoad,
+      historyDrawerRef,
+      historyRecorder,
+      recentEditor,
+      recentDropdownRef: recentEditor.dropdownRef,
       dashboardPanelData,
       chartData,
       editMode,

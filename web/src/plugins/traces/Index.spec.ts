@@ -26,6 +26,10 @@ import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
 import analytics from "@/services/product_analytics";
+import queryHistory from "@/services/query_history";
+import type { QueryHistoryEntry } from "@/services/query_history";
+import { openRecentOnItsPage, takeRecentLanding } from "@/utils/queryHistory/routes";
+import { landingRouter, landWithoutRestore } from "@/test/unit/helpers/recentLanding";
 import {
   announceTracesRowNav,
   tracesRowNavAnnouncement,
@@ -1608,6 +1612,143 @@ describe("Index.vue (Main Traces Page)", () => {
       const calls = mockFetchQueryDataWithHttpStream.mock.calls;
       return calls[calls.length - 1][1];
     };
+
+    it("records a Run in recent searches once it completes, and never a page fetch", async () => {
+      const record = vi.spyOn(queryHistory, "record").mockResolvedValue({ data: {} } as never);
+      await mountPage();
+      mockSearchObj.data.resultGrid.currentPage = 0;
+      mockSearchObj.data.editorValue = "service_name = 'cart'";
+      wrapper.vm.runQueryFn();
+      await flushPromises();
+      lastCallbacks().complete({});
+      await flushPromises();
+      expect(record).toHaveBeenCalledTimes(1);
+      expect(record.mock.calls[0][1]).toMatchObject({
+        source: "traces",
+        query: "service_name = 'cart'",
+        streams: ["default"],
+        status: "ok",
+        context: { page: { stream: "default", tab: "spans" } },
+      });
+
+      record.mockClear();
+      await wrapper.vm.getMoreData();
+      lastCallbacks().complete({});
+      await flushPromises();
+      expect(record).not.toHaveBeenCalled();
+      record.mockRestore();
+    });
+
+    it("records a query error as failed and a cancel not at all", async () => {
+      const record = vi.spyOn(queryHistory, "record").mockResolvedValue({ data: {} } as never);
+      await mountPage();
+      mockSearchObj.data.editorValue = "nosuch = 1";
+      wrapper.vm.runQueryFn();
+      await flushPromises();
+      lastCallbacks().error({}, { content: { code: 20004, message: "field not found" } });
+      await flushPromises();
+      expect(record.mock.calls[0][1]).toMatchObject({
+        status: "error",
+        context: { error: "field not found" },
+      });
+
+      record.mockClear();
+      wrapper.vm.runQueryFn();
+      await flushPromises();
+      lastCallbacks().error({}, { content: { code: 20009, message: "cancelled" } });
+      await flushPromises();
+      expect(record).not.toHaveBeenCalled();
+      record.mockRestore();
+    });
+
+    describe("page landings and restores from another page", () => {
+      const restoredEntry: QueryHistoryEntry = {
+        id: "t1",
+        source: "traces",
+        query: "service_name = 'cart'",
+        query_key: "k",
+        streams: ["default"],
+        context: { page: { stream: "default", tab: "spans" } },
+        status: "ok",
+        starred: false,
+        run_count: 1,
+        created_at: 1,
+        updated_at: 2,
+      };
+      const landWith = async (run: boolean | null) => {
+        mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+        mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+        if (run !== null) {
+          await openRecentOnItsPage(landingRouter().router, restoredEntry, "now", "default", run);
+        }
+        mockSearchObj.data.editorValue = "service_name = 'cart'";
+        const before = mockFetchQueryDataWithHttpStream.mock.calls.length;
+        await wrapper.vm.loadPageData();
+        await flushPromises();
+        mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+        mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+        return mockFetchQueryDataWithHttpStream.mock.calls.length - before;
+      };
+
+      it("runs a plain landing without recording it", async () => {
+        const record = vi.spyOn(queryHistory, "record").mockResolvedValue({ data: {} } as never);
+        await mountPage();
+        record.mockClear();
+        expect(await landWith(null)).toBe(1);
+        lastCallbacks().complete({});
+        await flushPromises();
+        expect(record).not.toHaveBeenCalled();
+        record.mockRestore();
+      });
+
+      it("runs and records a restore that asked to run", async () => {
+        const record = vi.spyOn(queryHistory, "record").mockResolvedValue({ data: {} } as never);
+        await mountPage();
+        record.mockClear();
+        expect(await landWith(true)).toBe(1);
+        lastCallbacks().complete({});
+        await flushPromises();
+        expect(record).toHaveBeenCalledTimes(1);
+        record.mockRestore();
+      });
+
+      it("claims a restore that finds no stream, so a later landing is not taken for it", async () => {
+        await mountPage();
+        await openRecentOnItsPage(landingRouter().router, restoredEntry, "now", "default", true);
+        mockGetStreams.mockResolvedValueOnce({ list: [] });
+        mockSearchObj.data.stream.streamLists = [];
+        mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
+        const before = mockFetchQueryDataWithHttpStream.mock.calls.length;
+        await wrapper.vm.loadPageData();
+        await flushPromises();
+        expect(mockSearchObj.data.stream.selectedStream.value || "").toBe("");
+        expect(mockFetchQueryDataWithHttpStream.mock.calls.length).toBe(before);
+        expect(takeRecentLanding("traces")).toBeNull();
+        landWithoutRestore();
+      });
+
+      it("remembers the query each search ran with, so the Run button can tell when the editor moved on", async () => {
+        await mountPage();
+        mockSearchObj.data.editorValue = "service_name = 'cart'";
+        wrapper.vm.runQueryFn();
+        await flushPromises();
+        expect(mockSearchObj.data.appliedEditorValue).toBe("service_name = 'cart'");
+        mockSearchObj.data.editorValue = "service_name = 'checkout'";
+        await wrapper.vm.getMoreData();
+        await flushPromises();
+        expect(mockSearchObj.data.appliedEditorValue).toBe("service_name = 'cart'");
+      });
+
+      it("only loads a restore that asked not to run", async () => {
+        const record = vi.spyOn(queryHistory, "record").mockResolvedValue({ data: {} } as never);
+        await mountPage();
+        record.mockClear();
+        expect(await landWith(false)).toBe(0);
+        await flushPromises();
+        expect(record).not.toHaveBeenCalled();
+        record.mockRestore();
+      });
+    });
 
     describe("J/K page crossing signals (4a §3.4)", () => {
       const navigation = () => mockSearchObj.meta.resultGrid.navigation;

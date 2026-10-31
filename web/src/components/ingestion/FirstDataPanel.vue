@@ -31,7 +31,6 @@ import analytics from "@/services/product_analytics";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getEndPoint, getImageURL } from "@/utils/zincutils";
-import { b64EncodeStandard } from "@/utils/formatters";
 import { copyToClipboard } from "@/utils/clipboard";
 import { isPrimaryCloudWebUrl } from "@/utils/otelCollectorConfig";
 import {
@@ -39,7 +38,11 @@ import {
   userDataStreams,
   type UserDataStreamType,
 } from "@/utils/internalStreams";
-import { OPEN_TOKEN_PICKER, useCredentialSnippet } from "@/composables/useCredentialSnippet";
+import {
+  OPEN_TOKEN_PICKER,
+  basicIngestToken,
+  useCredentialSnippet,
+} from "@/composables/useCredentialSnippet";
 import { useOrgCredential } from "@/composables/useOrgCredential";
 import type { FirstEventResult, StreamSignal } from "@/composables/firstEvent/useFirstEventWatch";
 import { firstSourceOption, readFirstSource } from "@/components/login/firstSourceOptions";
@@ -186,7 +189,7 @@ const subs = computed(() => {
   return {
     url: getEndPoint(ingestionUrl.value)?.url ?? "",
     org: org.value,
-    token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
+    token: basicIngestToken(email, passcode),
     isPrimaryCloud: isPrimaryCloudWebUrl(store.state.zoConfig?.web_url),
   };
 });

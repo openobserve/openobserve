@@ -69,6 +69,25 @@ describe("useAnalyticsSearch", () => {
     });
   });
 
+  it("passes a per-run cache choice to the search service", async () => {
+    vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } } as never);
+    const runner = useAnalyticsSearch();
+    await runner.run("p", { ...spec(), useCache: false }, "k1");
+    expect(vi.mocked(searchService.search).mock.calls[0][3]).toBe(false);
+    await runner.run("q", spec(), "k2");
+    expect(vi.mocked(searchService.search).mock.calls[1][3]).toBeUndefined();
+  });
+
+  it("holds a panel as loading and keeps its rows only when asked", async () => {
+    vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [{ x: 1 }] } } as never);
+    const runner = useAnalyticsSearch();
+    await runner.run("p", spec(), "k1");
+    runner.hold("p", "loading", true);
+    expect(runner.panel("p").value).toMatchObject({ status: "loading", rows: [{ x: 1 }] });
+    runner.hold("p", "loading");
+    expect(runner.panel("p").value).toMatchObject({ status: "loading", rows: [] });
+  });
+
   it("base64-encodes the SQL when the server asks for it", async () => {
     mockStore.state.zoConfig.sql_base64_enabled = true;
     vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } } as never);

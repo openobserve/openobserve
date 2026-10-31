@@ -71,7 +71,7 @@ async fn mapped_domains(org_id: &str) -> anyhow::Result<Vec<String>> {
     if db::org_status::is_blocked(org_id) {
         return Ok(vec![]);
     }
-    let settings = db::organization::get_org_setting(config::META_ORG_ID).await?;
+    let settings = db::organization::get_org_setting(org_id).await?;
     let mappings = settings
         .domain_org_mappings
         .iter()

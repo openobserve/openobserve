@@ -141,6 +141,41 @@ describe("SearchResult Component", () => {
     vi.clearAllMocks();
   });
 
+  describe("Quick mode hint in the expanded row (issue 16022)", () => {
+    const setQuickModeState = (quickMode: boolean) => {
+      const { meta, data } = wrapper.vm.searchObj;
+      meta.quickMode = quickMode;
+      meta.sqlMode = false;
+      data.stream.selectedStream = ["app"];
+      data.stream.interestingFieldList = ["level"];
+      data.stream.selectedStreamFields = [
+        { name: "_timestamp", isSchemaField: true },
+        { name: "level", isSchemaField: true },
+        { name: "message", isSchemaField: true },
+      ];
+    };
+
+    it("reports hidden fields for a quick-mode row", () => {
+      setQuickModeState(true);
+      expect(wrapper.vm.quickModeHiddenFields({ _timestamp: 1, level: "info" })).toEqual({
+        shown: 2,
+        total: 3,
+      });
+    });
+
+    it("reports nothing when quick mode is off", () => {
+      setQuickModeState(false);
+      expect(wrapper.vm.quickModeHiddenFields({ _timestamp: 1, level: "info" })).toBeNull();
+    });
+
+    it("turns off quick mode and runs the query again", () => {
+      setQuickModeState(true);
+      wrapper.vm.turnOffQuickMode();
+      expect(wrapper.vm.searchObj.meta.quickMode).toBe(false);
+      expect(wrapper.emitted("run-query")).toHaveLength(1);
+    });
+  });
+
   describe("Table Functionality", () => {
     it("should calculate table width correctly", () => {
       window.innerWidth = 1000;

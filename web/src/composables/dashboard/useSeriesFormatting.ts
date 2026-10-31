@@ -271,7 +271,7 @@ export const getPromqlMetricSeriesNames = async (
   const [
     { alignShiftedPromQLResults, METRIC_MAX_CELLS },
     { buildPromqlSeriesNames },
-    { legendFallbackOf },
+    { legendFallbackOf, legendExprOf },
     cache,
   ] = await Promise.all([
     import("@/utils/dashboard/convertPromQLData"),
@@ -297,6 +297,7 @@ export const getPromqlMetricSeriesNames = async (
       metrics: (q?.result ?? []).map((m: any) => m?.metric).filter(Boolean),
       template: queries?.[parentQueryIndex[i]]?.config?.promql_legend,
       fallback: legendFallbackOf(queries, parentQueryIndex[i]),
+      expr: legendExprOf(queries, source.metadata, parentQueryIndex[i]),
     })),
     cache.getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );

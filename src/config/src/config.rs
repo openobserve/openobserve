@@ -126,7 +126,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 126: add held_action to slack_link_requests.
 // 127: add group_label_set to alert_states.
 // 128: widen alert_dedup_state.fingerprint to varchar(256).
-pub const DB_SCHEMA_VERSION: u64 = 128;
+// 129: add source, query_key, streams, run_count, updated_at and status to query_history.
+// 130: add suppress_repeats to alerts.
+// 131: org domain mapping migrations
+pub const DB_SCHEMA_VERSION: u64 = 131;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -526,6 +529,11 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
         "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
         SyntheticsReloadClass::Hot,
     ),
+    ("ZO_SYNTHETICS_LEASE_BATCH_SIZE", SyntheticsReloadClass::Hot),
+    (
+        "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK",
+        SyntheticsReloadClass::Hot,
+    ),
     // Were `HotViaLimits` while these lived in `o2_enterprise` and had to be
     // pushed across a seam into this crate. They are declared here now, so the
     // seam and its class are both gone and they are plainly `Hot`.
@@ -580,6 +588,8 @@ pub(crate) fn synthetics_restart_required_changes(
         devices: _,
         scheduler_jitter_enabled: _,
         orphan_detection_enabled: _,
+        lease_batch_size: _,
+        max_inflight_per_tick: _,
     } = new;
 
     let mut changed = Vec::new();
@@ -1126,14 +1136,14 @@ impl PublicAiChat {
     }
 }
 
-/// Background self CPU/memory profile ingest into `_meta.self_profiles`.
-/// Gated at runtime by `enabled`; sampling code is compile-gated on `profiling`.
+/// Background self CPU/memory profile ingest into the `default` profiles stream.
+/// Gated at runtime by `enabled`; CPU needs `cpu-profiling`, memory needs `profiling`.
 #[derive(Debug, Serialize, EnvConfig, Default)]
 pub struct SelfProfiles {
     #[env_config(
         name = "ZO_SELF_PROFILES_ENABLED",
         default = false,
-        help = "Enable background self CPU/memory profile sampling into _meta.self_profiles"
+        help = "Enable background self CPU/memory profile sampling into the default profiles stream"
     )]
     pub enabled: bool,
     #[env_config(
@@ -1493,6 +1503,23 @@ pub struct Synthetics {
         help = "Kill switch for orphan detection, which reports enabled checks no scheduler is claiming."
     )]
     pub orphan_detection_enabled: bool,
+    /// Jobs leased per pool in one dispatcher lease call. Must be > 0; a
+    /// non-positive value falls back to the default. Read per tick.
+    #[env_config(
+        name = "ZO_SYNTHETICS_LEASE_BATCH_SIZE",
+        default = 10,
+        help = "Jobs the dispatcher leases per pool per lease call. Must be greater than 0."
+    )]
+    pub lease_batch_size: i64,
+    /// Upper bound on jobs the dispatcher leases across all pools in one tick.
+    /// While a pool's batch comes back full the dispatcher keeps leasing, up to
+    /// this cap. Must be > 0; a non-positive value falls back to the default.
+    #[env_config(
+        name = "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK",
+        default = 100,
+        help = "Cap on jobs the dispatcher leases across all pools in one 2s tick. Must be greater than 0."
+    )]
+    pub max_inflight_per_tick: i64,
 }
 
 /// Feature 5 — SLO measurement (`alerts_2.md` §6b).
@@ -2911,7 +2938,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_QUERY_HISTORY_RETENTION_DAYS",
         default = 14,
-        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less keeps every entry forever; it does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
+        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less removes the age limit; each user still keeps at most 500 unstarred entries per source (logs, traces, metrics, dbm, profiles), the oldest of that source pruned first. It does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
     )]
     pub query_history_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
@@ -5270,6 +5297,21 @@ fn check_synthetics_config(cfg: &mut Config) {
         cfg.synthetics.max_net_timeout_ms = crate::meta::synthetics::DEFAULT_MAX_NET_TIMEOUT_MS;
     }
 
+    if cfg.synthetics.lease_batch_size <= 0 {
+        log::error!(
+            "ZO_SYNTHETICS_LEASE_BATCH_SIZE ({}) must be greater than 0, using 10",
+            cfg.synthetics.lease_batch_size
+        );
+        cfg.synthetics.lease_batch_size = 10;
+    }
+    if cfg.synthetics.max_inflight_per_tick <= 0 {
+        log::error!(
+            "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK ({}) must be greater than 0, using 100",
+            cfg.synthetics.max_inflight_per_tick
+        );
+        cfg.synthetics.max_inflight_per_tick = 100;
+    }
+
     // Every synthetics var now has exactly one name, in every build — which
     // means an OSS user can set a private-agent var and get silence back. One
     // line per var is the difference between "configured and ignored" and
@@ -5450,6 +5492,8 @@ mod tests {
         "ZO_SYNTHETICS_DEVICES",
         "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
         "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
+        "ZO_SYNTHETICS_LEASE_BATCH_SIZE",
+        "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK",
     ];
 
     fn synthetics_names_in_class(class: SyntheticsReloadClass) -> Vec<&'static str> {
@@ -5469,8 +5513,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            16,
-            "Synthetics has 16 keys; every one needs a reload class"
+            18,
+            "Synthetics has 18 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -5502,7 +5546,9 @@ mod tests {
                 "ZO_SYNTHETICS_JOB_LEASE_SECS",
                 "ZO_SYNTHETICS_LAMBDA_BROWSER",
                 "ZO_SYNTHETICS_LAMBDA_NET",
+                "ZO_SYNTHETICS_LEASE_BATCH_SIZE",
                 "ZO_SYNTHETICS_MAX_CHECK_BUDGET_SECS",
+                "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK",
                 "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
                 "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
                 "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
@@ -5565,6 +5611,8 @@ mod tests {
         cfg.devices = "desktop:800:600".to_string();
         cfg.scheduler_jitter_enabled = !cfg.scheduler_jitter_enabled;
         cfg.orphan_detection_enabled = !cfg.orphan_detection_enabled;
+        cfg.lease_batch_size += 1;
+        cfg.max_inflight_per_tick += 1;
     }
 
     #[test]
