@@ -434,15 +434,15 @@ const useRoutes = () => {
         routeGuard(to, from, next);
       },
     },
-    {
-      // Old editor bookmarks; the `/metrics` guard turns any editor params into a Visualize chart.
-      path: "metrics/editor",
+    ...["metrics/editor", "promql-builder"].map((path) => ({
+      // Old editor and builder bookmarks; the `/metrics` guard turns any editor params into a Visualize chart.
+      path,
       redirect: (to: any) => ({
         name: "metrics",
         query: { ...to.query, mode: "visualize" },
         hash: to.hash,
       }),
-    },
+    })),
     {
       path: "traces",
       name: "traces",

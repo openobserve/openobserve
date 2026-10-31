@@ -749,11 +749,23 @@ describe("useRoutes (router.ts)", () => {
       expect(next).toHaveBeenCalledWith();
     });
 
-    it("has no promql-builder or metricsEditor route left", () => {
+    it("has no promql-builder or metricsEditor page left, only redirects", () => {
       const { homeChildRoutes } = useRoutes();
       expect(findRoute(homeChildRoutes, "promqlBuilder")).toBeUndefined();
       expect(findRoute(homeChildRoutes, "metricsEditor")).toBeUndefined();
-      expect(homeChildRoutes.some((route: any) => route.path === "promql-builder")).toBe(false);
+      const builder = homeChildRoutes.find((route: any) => route.path === "promql-builder");
+      expect(builder.component).toBeUndefined();
+    });
+
+    it("sends a /promql-builder bookmark to Visualize with its query", () => {
+      const builder = useRoutes().homeChildRoutes.find(
+        (route: any) => route.path === "promql-builder",
+      );
+      expect(builder.redirect({ query: { org_identifier: "o", period: "1h" }, hash: "" })).toEqual({
+        name: "metrics",
+        query: { org_identifier: "o", period: "1h", mode: "visualize" },
+        hash: "",
+      });
     });
 
     describe("the retired /metrics/editor path", () => {
