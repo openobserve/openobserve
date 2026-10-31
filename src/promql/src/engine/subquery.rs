@@ -36,6 +36,12 @@ use crate::{
 impl Engine {
     /// A subquery as a range function reads it: its samples moved forward by its offset.
     pub(super) async fn exec_subquery(&mut self, sq: &SubqueryExpr) -> Result<Value> {
+        // the caller pins `sq @ T` through `pin`; reading it here would use the outer grid
+        if sq.at.is_some() {
+            return Err(DataFusionError::Internal(
+                "a pinned subquery must be evaluated through its pin".to_string(),
+            ));
+        }
         let mut series = self.eval_subquery(sq).await?;
         let offset = offset_micros(&sq.offset);
         if offset != 0 {

@@ -1224,6 +1224,64 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn test_pinned_subquery_reads_the_pinned_instant_on_every_range_step() {
+        // unpinned, `max_over_time(m[1m:20s])` reads 9, 18 and 27 on the three steps
+        let unpinned = pinned_values(false, "max_over_time(m[1m:20s])").await;
+        assert_eq!(
+            unpinned.iter().map(|s| s.1).collect::<Vec<_>>(),
+            [9.0, 18.0, 27.0]
+        );
+        let cases = [
+            ("max_over_time(m[1m:20s] @ 1100)", 15.0),
+            (
+                "max_over_time((max_over_time(m[1m:20s] @ 1100))[1m:20s])",
+                15.0,
+            ),
+            (
+                "max_over_time(max_over_time(m[1m:20s] @ 1100)[2m:20s])",
+                15.0,
+            ),
+            (
+                "max_over_time(max_over_time(m[1m:20s] @ 1040)[1m:20s] @ 1100)",
+                6.0,
+            ),
+            (
+                "quantile_over_time(scalar(vector(time())) * 0 + 0.5, m[1m:20s] @ 1100)",
+                12.0,
+            ),
+            ("topk(time(), max_over_time(m[1m:20s] @ 1100))", 15.0),
+            ("max_over_time(m[1m:20s] @ 1100) + m * 0", 15.0),
+            ("sum(max_over_time(m[1m:20s] @ 1100)) / 2", 15.0),
+            (
+                "absent_over_time(m[1m:20s] @ 1100) or max_over_time(m[1m:20s] @ 1100)",
+                15.0,
+            ),
+            (
+                "double_exponential_smoothing(m[1m:20s] @ 1100, 0.5, 0.5)",
+                15.0,
+            ),
+            (
+                "label_replace(max_over_time(m[1m:20s] @ 1100), \"x\", \"y\", \"\", \"\")",
+                15.0,
+            ),
+            ("max_over_time(rate(m[1m])[1m:20s] @ 1100) * 0 + 15", 15.0),
+            (
+                "quantile(scalar(sum(max_over_time(m[1m:20s] @ 1100))) / 60, m @ 1100)",
+                15.0,
+            ),
+        ];
+        for (query, expected) in cases {
+            for streams in [true, false] {
+                assert_eq!(
+                    pinned_values(streams, query).await,
+                    on_every_step(expected),
+                    "{query}, streams {streams}"
+                );
+            }
+        }
+    }
+
     /// `3 * k` at `1003.7 s + 15 s * k`, sample times off the whole second.
     fn provider_off_the_second(streams: bool) -> StreamingProvider {
         provider_sampled_at(streams, false, 12, |step| {
