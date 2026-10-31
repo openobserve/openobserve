@@ -403,7 +403,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </header>
       </div>
-      <TraceErrorStrip :errors="errorSpans" @select="selectErrorSpan" />
       <div class="bg-card-glass-bg flex h-full min-h-0 flex-col overflow-hidden">
         <!-- Tabs & Search Bar -->
         <div
@@ -989,7 +988,6 @@ import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceDAG from "./TraceDAG.vue";
 import TraceHeader from "./TraceHeader.vue";
-import TraceErrorStrip from "./components/TraceErrorStrip.vue";
 import TraceErrorSpansMenu from "./components/TraceErrorSpansMenu.vue";
 import { errorSpansDeepestFirst } from "./utils/traceErrorSummary";
 import { useStore } from "vuex";
@@ -1289,7 +1287,6 @@ export default defineComponent({
     TraceTree,
     TraceDAG,
     TraceHeader,
-    TraceErrorStrip,
     TraceErrorSpansMenu,
     FlameGraphView,
     OToggleGroup,

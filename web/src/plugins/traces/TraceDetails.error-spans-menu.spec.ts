@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
+import TraceErrorSpansMenu from "@/plugins/traces/components/TraceErrorSpansMenu.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -66,7 +67,7 @@ function detailsWithErrors(errorIds: string[]) {
   return { hits };
 }
 
-describe("TraceDetails - error strip and error spans menu", () => {
+describe("TraceDetails - error spans menu", () => {
   let wrapper: any;
 
   async function mountWith(details: any) {
@@ -112,20 +113,26 @@ describe("TraceDetails - error strip and error spans menu", () => {
     vi.restoreAllMocks();
   });
 
-  it("hides the strip and the error chip when the trace has no error spans", async () => {
+  it("hides the error chip when the trace has no error spans", async () => {
     await mountWith(detailsWithErrors([]));
-    expect(wrapper.find('[data-test="trace-details-error-strip"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="trace-details-error-spans-count"]').exists()).toBe(false);
   });
 
-  it("names the deepest error span and selects it on click", async () => {
+  it("shows the error count in the header without an error strip", async () => {
     await mountWith(detailsWithErrors([ROOT, LEAF]));
-    const strip = wrapper.get('[data-test="trace-details-error-strip"]');
-    expect(strip.text()).toContain(`failed in ${LEAF}`);
-    expect(strip.text()).toContain("(1 of 2 errors)");
-    expect(wrapper.find('[data-test="trace-details-error-spans-count"]').text()).toContain("2");
+    expect(wrapper.find('[data-test="trace-details-error-strip"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="trace-details-error-spans-count"]').text()).toContain(
+      "2 errors",
+    );
+  });
 
-    await strip.trigger("click");
+  it("selects the span chosen in the error spans menu", async () => {
+    await mountWith(detailsWithErrors([ROOT, LEAF]));
+    const menu = wrapper.findComponent(TraceErrorSpansMenu);
+    expect(menu.props("errors").map((e: { spanId: string }) => e.spanId)).toEqual([LEAF, ROOT]);
+
+    menu.vm.$emit("select", LEAF);
+    await flushPromises();
     expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(LEAF);
     expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(true);
   });

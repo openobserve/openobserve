@@ -14961,9 +14961,6 @@
     "spansLabel": "spans",
     "errorsLabel": "errors",
     "errorStrip": {
-      "deepest": "Deepest error: {span} — {message} {position}",
-      "deepestNoMessage": "Deepest error: {span} {position}",
-      "position": "(1 of {count} error) | (1 of {count} errors)",
       "spanLabel": "{service} · {operation}",
       "menuTitle": "Error spans, deepest first"
     },

@@ -16,7 +16,6 @@
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
-import TraceErrorStrip from "./TraceErrorStrip.vue";
 import TraceErrorSpansMenu from "./TraceErrorSpansMenu.vue";
 import type { ErrorSpanSummary } from "../utils/traceErrorSummary";
 
@@ -48,41 +47,11 @@ const dropdownStubs = {
   },
 };
 
-const mountStrip = (errors: ErrorSpanSummary[]) =>
-  mount(TraceErrorStrip, { props: { errors }, global: { plugins: [i18n] } });
-
 const mountMenu = (errors: ErrorSpanSummary[]) =>
   mount(TraceErrorSpansMenu, {
     props: { errors },
     global: { plugins: [i18n], stubs: dropdownStubs },
   });
-
-describe("TraceErrorStrip", () => {
-  it("renders nothing when there are no errors", () => {
-    expect(mountStrip([]).find('[data-test="trace-details-error-strip"]').exists()).toBe(false);
-  });
-
-  it("names the deepest error span with its message and the error count", () => {
-    const text = mountStrip(ERRORS).get('[data-test="trace-details-error-strip"]').text();
-    expect(text).toContain("Deepest error:");
-    expect(text).toContain("postgres · SELECT products");
-    expect(text).toContain("connection reset");
-    expect(text).toContain("(1 of 2 errors)");
-  });
-
-  it("leaves the message out when the span has none", () => {
-    const text = mountStrip([ERRORS[1]]).get('[data-test="trace-details-error-strip"]').text();
-    expect(text).toContain("frontend · POST /api/checkout");
-    expect(text).not.toContain("—");
-    expect(text).toContain("(1 of 1 error)");
-  });
-
-  it("emits the deepest span id when clicked", async () => {
-    const wrapper = mountStrip(ERRORS);
-    await wrapper.get('[data-test="trace-details-error-strip"]').trigger("click");
-    expect(wrapper.emitted("select")).toEqual([["deep"]]);
-  });
-});
 
 describe("TraceErrorSpansMenu", () => {
   it("renders no chip when there are no errors", () => {
