@@ -67,6 +67,49 @@ describe("outlierScores", () => {
     expect(scores.get("b")).toBe(0);
   });
 
+  it("keeps near-identical series well under the threshold", () => {
+    const level = 725.81;
+    const scores = outlierScores(
+      series({
+        "api-gateway": [level * (1 + 1e-6), level * (1 + 2e-6), level * (1 - 1e-6)],
+        "stream-ingest-service": [level * (1 - 1e-6), level * (1 - 2e-6), level * (1 + 1e-6)],
+        a: [level, level, level],
+        b: [level, level, level],
+        c: [level, level, level],
+      }),
+    );
+    for (const score of scores.values()) expect(score).toBeLessThan(0.01);
+  });
+
+  it("still ranks a real spike first and past the threshold among near-identical series", () => {
+    const level = 725.81;
+    const scores = outlierScores(
+      series({
+        a: [level, level * (1 + 1e-6), level],
+        b: [level, level, level * (1 - 1e-6)],
+        c: [level * (1 + 1e-6), level, level],
+        spike: [level, level * 3, level],
+      }),
+    );
+    expect(ranked(scores)[0]).toBe("spike");
+    expect(scores.get("spike")!).toBeGreaterThanOrEqual(OUTLIER_SCORE);
+    expect(scores.get("a")!).toBeLessThan(0.01);
+  });
+
+  it("scores finitely around a median of 0 and still ranks the departure first", () => {
+    const scores = outlierScores(
+      series({
+        a: [0, 0, 0],
+        b: [0, 0, 0],
+        c: [0.001, -0.001, 0],
+        jump: [0, 5, 0],
+      }),
+    );
+    for (const score of scores.values()) expect(Number.isFinite(score)).toBe(true);
+    expect(ranked(scores)[0]).toBe("jump");
+    expect(scores.get("jump")!).toBeGreaterThanOrEqual(OUTLIER_SCORE);
+  });
+
   it("returns an empty map for no series", () => {
     expect(outlierScores(new Map()).size).toBe(0);
   });

@@ -18,6 +18,8 @@ const MAD_SCALE = 1.4826;
 /** Scales a mean absolute deviation the same way. */
 const MEAN_AD_SCALE = 1.2533;
 const EPSILON = 1e-9;
+/** The spread never counts as less than this share of the level, so a negligible relative wobble cannot score high. */
+const RELATIVE_FLOOR = 0.01;
 
 /** A score at or above this is a robust z-score of 3: a series well apart from the rest. */
 export const OUTLIER_SCORE = 3;
@@ -49,7 +51,7 @@ export function seriesPointsByValue(
   return out;
 }
 
-/** Per series, the mean over its points of |value − median| / (1.4826·MAD + ε) at timestamps two or more series share; 0 with none. */
+/** Per series, the mean over its points of |value − median| / (max(1.4826·MAD, 1% of |median|) + ε) at timestamps two or more series share; 0 with none. */
 export function outlierScores(series: Map<string, Map<number, number>>): Map<string, number> {
   const atTime = new Map<number, number[]>();
   for (const points of series.values()) {
@@ -71,8 +73,10 @@ export function outlierScores(series: Map<string, Map<number, number>>): Map<str
     const spreadOf = mad
       ? mad * MAD_SCALE
       : (deviations.reduce((sum, d) => sum + d, 0) / deviations.length) * MEAN_AD_SCALE;
-    // Relative to the median, so values in the billions do not lose ε to rounding.
-    spread.set(ts, { median: m, scale: spreadOf + EPSILON * Math.max(1, Math.abs(m)) });
+    spread.set(ts, {
+      median: m,
+      scale: Math.max(spreadOf, RELATIVE_FLOOR * Math.abs(m)) + EPSILON,
+    });
   }
 
   const scores = new Map<string, number>();
