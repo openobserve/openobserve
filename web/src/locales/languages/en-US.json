@@ -23682,7 +23682,7 @@
       "depsShowNodeTraffic": "Node-to-node traffic",
       "depsShowLowTraffic": "Low-traffic connections",
       "depsCaption": "Approximate bytes per second, averaged over {window} to the end of the time range",
-      "depsCaptionMore": "Edge width follows the bytes per second. Arrows point from client to server where the direction is known; a thin grey line's client is unknown, or both ends act as client. A card's colour is its namespace. Connections below 1 B/s are hidden unless Low-traffic connections is on.",
+      "depsCaptionMore": "Edge width follows the bytes per second. Arrows point from client to server where the direction is known; a grey line's client is unknown, or both ends act as client. A card's colour is its namespace. Connections below 1 B/s are hidden unless Low-traffic connections is on.",
       "depsCapped": "Showing the {shown} busiest of {total} connections. Filter by namespace to see the rest.",
       "depsNoStreamTitle": "No network flow data",
       "depsNoStreamDescription": "The dependency map is drawn from eBPF network flow metrics ({stream}). They come from the openobserve-collector Helm chart 0.8.0 or later with ebpf.enabled=true and ebpf.network.enabled=true.",

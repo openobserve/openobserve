@@ -225,10 +225,13 @@ const flowNodes = computed<Node<MapNode>[]>(() =>
 
 // From the data alone: hovering never rebuilds them, which would make Vue Flow reparse every edge.
 // Where each edge leaves and enters a card side, as offsets from its middle: the edges at one side spread out in
-// the order their other ends lie, so they fan out instead of converging on one point or crossing at the card.
+// the order their other ends lie, so they fan out instead of converging on one point or crossing at the card. A bow
+// to a card in the same column leaves past the straight edges, toward its other end, and the deeper bow to a farther
+// card leaves nearer the middle, outside the shallower one.
 const PORT_SPACING = 10;
+type Port = { id: string; end: "from" | "to"; tier: number; toward: number };
 const ports = computed(() => {
-  const sides = new Map<string, { id: string; end: "from" | "to"; toward: number }[]>();
+  const sides = new Map<string, Port[]>();
   const middle = (id: string) => byId.value.get(id)!.position.y + CARD_H / 2;
   for (const e of drawn.value) {
     const [a, b] = [byId.value.get(e.source)!.position, byId.value.get(e.target)!.position];
@@ -237,22 +240,26 @@ const ports = computed(() => {
     const slots = [...e.waypoints].sort((p, q) => (forward ? p.x - q.x : q.x - p.x));
     const sourceSide = loop || forward ? "right" : "left";
     const targetSide = loop || !forward ? "right" : "left";
-    const add = (key: string, entry: { id: string; end: "from" | "to"; toward: number }) =>
-      sides.set(key, [...(sides.get(key) ?? []), entry]);
+    const add = (key: string, entry: Port) => sides.set(key, [...(sides.get(key) ?? []), entry]);
+    // Below or above the straight edges by the bow's direction, the nearer card the further out.
+    const bow = (self: string, other: string) => {
+      const dy = middle(other) - middle(self);
+      return { tier: Math.sign(dy), toward: -dy };
+    };
     add(`${e.source}|${sourceSide}`, {
       id: e.id,
       end: "from",
-      toward: slots[0]?.y ?? middle(e.target),
+      ...(loop ? bow(e.source, e.target) : { tier: 0, toward: slots[0]?.y ?? middle(e.target) }),
     });
     add(`${e.target}|${targetSide}`, {
       id: e.id,
       end: "to",
-      toward: slots.at(-1)?.y ?? middle(e.source),
+      ...(loop ? bow(e.target, e.source) : { tier: 0, toward: slots.at(-1)?.y ?? middle(e.source) }),
     });
   }
   const out = new Map<string, { from?: number; to?: number }>();
   for (const entries of sides.values()) {
-    entries.sort((p, q) => p.toward - q.toward || p.id.localeCompare(q.id));
+    entries.sort((p, q) => p.tier - q.tier || p.toward - q.toward || p.id.localeCompare(q.id));
     const step = Math.min(PORT_SPACING, (CARD_H - 24) / Math.max(1, entries.length - 1));
     entries.forEach((entry, i) => {
       const offset = (i - (entries.length - 1) / 2) * step;
@@ -270,8 +277,8 @@ const flowEdges = computed<Edge[]>(() => {
     const dx = to.position.x - from.position.x;
     const [sourceHandle, targetHandle] =
       dx > 0 ? ["sr", "tl"] : dx < 0 ? ["sl", "tr"] : ["sr", "tr"];
-    // Width by rate for a known direction; one with no known client is a thin neutral line.
-    const width = e.directed ? 1.5 + 5 * Math.sqrt(e.total / max) : 1.25;
+    // Width by rate; one with no known client is drawn in a neutral grey, without an arrow.
+    const width = 1.5 + 5 * Math.sqrt(e.total / max);
     // Rounded, so edges share a handful of marker definitions.
     const arrow = 20 + 4 * Math.round(width);
     return {

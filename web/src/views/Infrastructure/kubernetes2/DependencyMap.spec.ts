@@ -144,10 +144,23 @@ describe("DependencyMap", () => {
       [edge("a", "b", 10), { ...edge("a", "c", 10), waypoints: [{ x: 288, y: 300 }] }],
     );
     expect(baseEdge("a-b").props("path")).toBe(
-      routeEdge({ x: 0, y: 0 }, { x: 0, y: 200 }, [], { from: -5, to: 0 }).path,
+      routeEdge({ x: 0, y: 0 }, { x: 0, y: 200 }, [], { from: 5, to: 0 }).path,
     );
     expect(baseEdge("a-c").props("path")).toBe(
-      routeEdge({ x: 0, y: 0 }, { x: 576, y: 0 }, [{ x: 288, y: 300 }], { from: 5, to: 0 }).path,
+      routeEdge({ x: 0, y: 0 }, { x: 576, y: 0 }, [{ x: 288, y: 300 }], { from: -5, to: 0 }).path,
+    );
+  });
+
+  it("nests two bows from one card, the farther card's outside the nearer's", async () => {
+    await mountMap(
+      [node("a", 0), node("b", 0, true, 200), node("c", 0, true, 400)],
+      [edge("a", "b", 10), edge("a", "c", 10)],
+    );
+    expect(baseEdge("a-c").props("path")).toBe(
+      routeEdge({ x: 0, y: 0 }, { x: 0, y: 400 }, [], { from: -5, to: 0 }).path,
+    );
+    expect(baseEdge("a-b").props("path")).toBe(
+      routeEdge({ x: 0, y: 0 }, { x: 0, y: 200 }, [], { from: 5, to: 0 }).path,
     );
   });
 
@@ -213,13 +226,17 @@ describe("DependencyMap", () => {
     expect(card("c").classes()).not.toContain("opacity-30");
   });
 
-  it("draws an edge with no known client as a thin neutral line", async () => {
-    await mountMap([node("a", 0), node("b", 340)], [edge("a", "b", 100_000, false)]);
+  it("draws an edge with no known client as a grey line, still as wide as its rate", async () => {
+    await mountMap(
+      [node("a", 0), node("b", 340), node("c", 680)],
+      [edge("a", "b", 100_000, false), edge("b", "c", 1_000)],
+    );
     expect(baseEdge("a-b").props("style")).toMatchObject({
       stroke: "var(--color-grey-500)",
-      strokeWidth: 1.25,
+      strokeWidth: 6.5,
     });
     expect(baseEdge("a-b").props("style").strokeDasharray).toBeUndefined();
+    expect(baseEdge("b-c").props("style").strokeWidth).toBe(2);
   });
 
   it("labels only a hovered hub's busiest edges", async () => {
