@@ -1058,6 +1058,60 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-linked-domains": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noLinkedDomains.title",
+    descriptionKey: "emptyState.noLinkedDomains.description",
+    actions: [
+      {
+        id: "dns",
+        icon: "dns",
+        titleKey: "emptyState.noLinkedDomains.dns",
+        descriptionKey: "emptyState.noLinkedDomains.dnsDesc",
+      },
+      {
+        id: "request",
+        icon: "send",
+        titleKey: "emptyState.noLinkedDomains.request",
+        descriptionKey: "emptyState.noLinkedDomains.requestDesc",
+      },
+    ],
+  },
+  "no-domain-mappings": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noDomainMappings.title",
+    descriptionKey: "emptyState.noDomainMappings.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noDomainMappings.action",
+        descriptionKey: "emptyState.noDomainMappings.actionDesc",
+      },
+    ],
+  },
+  "no-blocked-users": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noBlockedUsers.title",
+    descriptionKey: "emptyState.noBlockedUsers.description",
+    actions: [
+      {
+        id: "create",
+        icon: "block",
+        titleKey: "emptyState.noBlockedUsers.action",
+        descriptionKey: "emptyState.noBlockedUsers.actionDesc",
+      },
+    ],
+  },
+  "no-domain-requests": {
+    illustration: "check",
+    variant: "neutral",
+    titleKey: "emptyState.noDomainRequests.title",
+    descriptionKey: "emptyState.noDomainRequests.description",
+  },
 } satisfies Record<string, EmptyStatePreset>;
 
 export type EmptyStatePresetName = keyof typeof emptyStatePresets;
@@ -1117,4 +1171,8 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-synthetic-monitors": "emptyState.nouns.monitors",
   "no-model-pricing": "emptyState.nouns.modelPricing",
   "no-saved-funnels": "emptyState.nouns.savedFunnels",
+  "no-linked-domains": "emptyState.nouns.linkedDomains",
+  "no-domain-mappings": "emptyState.nouns.domainMappings",
+  "no-domain-requests": "emptyState.nouns.domainRequests",
+  "no-blocked-users": "emptyState.nouns.blockedUsers",
 };

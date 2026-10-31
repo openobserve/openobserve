@@ -423,7 +423,7 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
       await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
 
       // Navigate through wizard steps and submit
-      await pm.alertsPage.navigateThroughWizardSteps(5);
+      await pm.alertsPage.navigateThroughWizardSteps(4);
 
       const submitted = await pm.alertsPage.clickSubmitButton();
       expect(submitted).toBe(true);

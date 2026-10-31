@@ -67,7 +67,7 @@ pub mod public_dashboards;
 pub mod ratelimit;
 pub mod rum_pa;
 use search_service as search;
-#[cfg(feature = "profiling")]
+#[cfg(feature = "cpu-profiling")]
 pub mod self_profiles;
 pub mod self_reporting;
 pub mod service;
@@ -88,6 +88,10 @@ pub mod users;
 #[cfg(feature = "enterprise")]
 pub mod workflows;
 
+#[cfg(feature = "cloud")]
+pub mod org_domain_ownership;
+#[cfg(feature = "cloud")]
+pub mod org_domain_requests;
 /// One authorized AI operation, or `()` in builds without the quota module, so
 /// the RCA signature keeps one shape instead of being cfg-gated at every caller.
 #[cfg(feature = "cloud")]

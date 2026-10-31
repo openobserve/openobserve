@@ -366,6 +366,8 @@ pub enum DeliveryDecision {
     SuppressedByDowntime(String),
     /// The current firing is acknowledged by this user; repeats are withheld.
     SuppressedByAck(String),
+    /// `suppress_repeats` is on and nothing changed since the last delivered notification.
+    SuppressedAsRepeat,
 }
 
 impl DeliveryDecision {
@@ -383,6 +385,14 @@ impl DeliveryDecision {
             Self::SuppressedByDowntime(id) => Some(id),
             _ => None,
         }
+    }
+
+    /// Withheld by a downtime, an ack or as a repeat, rather than by the level decision.
+    pub fn withheld(&self) -> bool {
+        matches!(
+            self,
+            Self::SuppressedByDowntime(_) | Self::SuppressedByAck(_) | Self::SuppressedAsRepeat
+        )
     }
 
     pub fn acked_by(&self) -> Option<&str> {

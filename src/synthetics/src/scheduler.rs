@@ -279,11 +279,14 @@ pub fn trial_gate_decision(
     }
 }
 
-pub async fn run() {
+pub async fn run(stop: crate::StopToken) {
     tracing::info!("[synthetics scheduler] started");
 
     loop {
-        tokio::time::sleep(TICK).await;
+        if stop.sleep(TICK).await {
+            tracing::info!("[synthetics scheduler] stopped");
+            return;
+        }
 
         let db = get_orm_client_rw().await;
 

@@ -629,6 +629,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Expanded row → JSON preview -->
                   <template #expansion="{ row }">
+                    <div
+                      v-if="quickModeHiddenFields(row)"
+                      class="text-text-secondary flex items-center gap-2 px-2 pt-1.5 text-xs"
+                      data-test="logs-expanded-quick-mode-hint"
+                    >
+                      <span>
+                        {{
+                          t("search.quickModeHiddenFields", {
+                            shown: quickModeHiddenFields(row)!.shown,
+                            total: quickModeHiddenFields(row)!.total,
+                          })
+                        }}
+                      </span>
+                      <OButton
+                        variant="ghost"
+                        size="sm"
+                        data-test="logs-expanded-quick-mode-off"
+                        @click="turnOffQuickMode"
+                      >
+                        {{ t("search.turnOffQuickMode") }}
+                      </OButton>
+                    </div>
                     <JsonPreview
                       :value="row"
                       :index="logsRowIndex(row)"
@@ -954,6 +976,7 @@ import { extractSeverity } from "@/utils/sourceEventSeverity";
 import config from "@/aws-exports";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { quickModeHiddenFieldCount } from "@/utils/query/quickModeFieldList";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -2890,6 +2913,21 @@ export default defineComponent({
     // the value off a single click. The parent already tracks `expandedLogs` as
     // hit indices, so use those directly.
     const logsRowKey = (row: any): string => String(logsRowIndex(row));
+
+    // Quick mode fetches only the interesting fields; say so in the expanded row.
+    const quickModeHiddenFields = (row: any) =>
+      quickModeHiddenFieldCount(row, {
+        quickMode: !!searchObj.meta.quickMode,
+        sqlMode: !!searchObj.meta.sqlMode,
+        streamCount: searchObj.data.stream.selectedStream.length,
+        interestingFields: searchObj.data.stream.interestingFieldList,
+        streamFields: searchObj.data.stream.selectedStreamFields,
+        allFieldsName: store.state.zoConfig?.all_fields_name,
+      });
+    const turnOffQuickMode = () => {
+      searchObj.meta.quickMode = false;
+      emit("run-query");
+    };
     const expandedLogIds = computed<string[]>(() =>
       ((props.expandedLogs as number[]) || []).map(String),
     );
@@ -2976,6 +3014,8 @@ export default defineComponent({
       severityFieldTextClass,
       expandedLogIds,
       onExpandedLogIdsChange,
+      quickModeHiddenFields,
+      turnOffQuickMode,
       openLogDetailsByRow,
       isFunctionErrorOpen,
       contextCell,
