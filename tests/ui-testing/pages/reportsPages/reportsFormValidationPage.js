@@ -1,5 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { expect } from '@playwright/test';
 import { openNavFlyoutChild } from '../commonActions.js';
 
 export class ReportsFormValidationPage {
@@ -197,6 +198,31 @@ export class ReportsFormValidationPage {
         await this.page.locator(this.dashboardTabPopover).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
+    /** Picks `value` from a step-1 OSelect, typing `search` first so a long virtualised list still renders it. */
+    async #pickOption(selectDataTest, value, search) {
+        await this.page.locator(`[data-test="${selectDataTest}-trigger"]`).click();
+        await expect(this.page.locator(`[data-test="${selectDataTest}-popover"]`)).toBeVisible();
+        if (search) await this.page.locator(`[data-test="${selectDataTest}-search"]`).fill(search);
+        const option = this.page.locator(`[data-test="${selectDataTest}-option"][data-test-value="${value}"]`);
+        await expect(option).toBeVisible({ timeout: 15000 });
+        await option.click();
+        await expect(this.page.locator(`[data-test="${selectDataTest}-trigger"]`))
+            .toHaveAttribute('data-test-selected-value', value);
+    }
+
+    /** The folder options render in the same task that seeds the form, so any field filled after this survives. */
+    async selectDashboardFolder(folderId) {
+        await this.#pickOption('add-report-dashboard-folder-select', folderId);
+    }
+
+    async selectDashboard(dashboardId, title) {
+        await this.#pickOption('add-report-dashboard-name-select', dashboardId, title);
+    }
+
+    async selectDashboardTab(tabId) {
+        await this.#pickOption('add-report-dashboard-tab-select', tabId);
+    }
+
     async openTimerangeDropdown() {
         const el = this.page.locator(this.timerangeDropdown);
         await el.waitFor({ state: 'visible', timeout: 8000 });
@@ -258,6 +284,15 @@ export class ReportsFormValidationPage {
         const btn = this.page.locator(this.saveBtn);
         await btn.scrollIntoViewIfNeeded();
         await btn.click();
+    }
+
+    /** Saves and resolves with the create-report API response. */
+    async saveAndWaitForCreate() {
+        const org = process.env.ORGNAME || 'default';
+        const created = this.page.waitForResponse((res) =>
+            res.request().method() === 'POST' && new URL(res.url()).pathname === `/api/v2/${org}/reports`);
+        await this.clickSave();
+        return created;
     }
 
     // ── Locator getters for assertions ────────────────────────────────────────

@@ -6,13 +6,14 @@
 //   2. Absolute timerange with no range set → save blocked (no from/to validation)
 //   3. Valid full config → report created successfully
 //
-// Cleanup notes:
-//   Reports created in the happy-path test follow the test_fv_reports_001 name.
-//   Clean up via UI or API after the suite run if the test org is shared.
+// Cleanup: the happy-path test deletes the report and dashboard it created.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { createDashboardViaApi } = require('../../pages/dashboardPages/dashCreation.js');
+
+const uniqueSuffix = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 // ── Test 1 & 2: Validation error paths ────────────────────────────────────────
 
@@ -156,25 +157,31 @@ test.describe("Reports form validation — absolute timerange with no range bloc
 test.describe("Reports form validation — valid config creates report", () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
-
-    test.beforeAll(async ({ request }) => {
-        // Delete the test report if it exists from a previous run so the happy-path test can create it fresh.
-        const org  = process.env.ORGNAME || 'default';
-        const base = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/+$/, '');
-        const creds = Buffer.from(`${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`).toString('base64');
-        await request.delete(
-            `${base}/api/${org}/reports/test_fv_reports_001`,
-            { headers: { Authorization: `Basic ${creds}` } }
-        ).catch(() => {}); // ignore 404 if report doesn't exist
-    });
+    let reportName = null;
+    let dashboard = null;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
+        const res = await createDashboardViaApi(pm.apiCleanup, `test_fv_reports_dash_${uniqueSuffix()}`);
+        expect(res.success, res.error).toBe(true);
+        dashboard = res.dashboard;
         await pm.reportsFormValidation.navigateToReports();
         await pm.reportsFormValidation.openCreateReportForm();
         testLogger.info('Navigated to Create Report form for happy path test');
+    });
+
+    test.afterEach(async () => {
+        if (reportName) {
+            const report = (await pm.apiCleanup.fetchReports()).find((r) => r.name === reportName);
+            if (report) await pm.apiCleanup.deleteReportById(report.report_id, reportName);
+            reportName = null;
+        }
+        if (dashboard) {
+            await pm.apiCleanup.deleteDashboard(dashboard.dashboard_id, 'default');
+            dashboard = null;
+        }
     });
 
     test("should create report successfully when all required fields are filled correctly", {
@@ -182,37 +189,25 @@ test.describe("Reports form validation — valid config creates report", () => {
     }, async ({ page }) => {
         testLogger.info('Testing valid report creation — happy path');
 
-        const reportName = 'test_fv_reports_001';
-
-        // Step 1: Fill report name
+        // Step 1: the folder pick waits out the form's async reset, which would otherwise wipe an earlier-typed name.
+        await pm.reportsFormValidation.selectDashboardFolder('default');
+        await pm.reportsFormValidation.selectDashboard(dashboard.dashboard_id, dashboard.title);
+        await pm.reportsFormValidation.selectDashboardTab(dashboard.tabs[0].tab_id);
+        reportName = `test_fv_reports_${uniqueSuffix()}`;
         await pm.reportsFormValidation.fillReportName(reportName);
-
-        // Step 1: Select dashboard folder (default), dashboard, and tab
-        await pm.reportsFormValidation.selectFirstDashboardFolder();
-        await pm.reportsFormValidation.selectFirstDashboard();
-        await pm.reportsFormValidation.selectFirstDashboardTab();
-
-        // Step 1: Continue to step 2
         await pm.reportsFormValidation.clickContinueStep1();
 
-        // Step 2: frequency defaults to "once" + scheduleNow — timezone is
-        // auto-filled by saveReport() from the browser timezone. The timezone
-        // OSelect is only rendered for cron frequency or scheduleLater tab, so
-        // there is nothing to interact with here.
-
-        // Step 2: Continue to step 3
+        // Step 2: frequency defaults to "once" + scheduleNow; saveReport() fills the timezone.
         await pm.reportsFormValidation.clickContinueStep2();
 
-        // Step 3: Fill share title and a valid recipient email
+        // Step 3: share title and a valid recipient
         await pm.reportsFormValidation.fillShareTitle('E2E Form Validation Report');
         await pm.reportsFormValidation.fillShareRecipients(
             process.env['ZO_ROOT_USER_EMAIL'] || process.env['ZO_USER_EMAIL'] || 'test@example.com'
         );
 
-        // Save the report
-        await pm.reportsFormValidation.clickSave();
-
-        // Success toast must appear
+        const response = await pm.reportsFormValidation.saveAndWaitForCreate();
+        expect(response.status(), await response.text()).toBe(200);
         await expect(pm.reportsFormValidation.getToastSuccessLocator()).toBeVisible({ timeout: 15000 });
 
         testLogger.info('Report created successfully with valid config');
