@@ -2322,6 +2322,70 @@ describe("SearchBar", () => {
         expect((wrapper.vm as any).appliedSavedViewId).toBeNull();
       });
 
+      describe("applied check follows the live search", () => {
+        const applyView = async () => {
+          mockGetViewDetail.mockResolvedValueOnce({
+            data: { ...tracesView, data: expectedData() },
+          });
+          wrapper = mountSearchBar();
+          await flushPromises();
+          dialog().vm.$emit("apply", tracesView);
+          await flushPromises();
+          expect((wrapper.vm as any).appliedSavedViewId).toBe("t1");
+        };
+
+        it("clears when the query text is edited", async () => {
+          await applyView();
+          searchObjInstance.data.editorValue = "span_status = 'OK'";
+          await flushPromises();
+          expect((wrapper.vm as any).appliedSavedViewId).toBeNull();
+        });
+
+        it("clears when the stream changes", async () => {
+          await applyView();
+          searchObjInstance.data.stream.selectedStream = { label: "other", value: "other" };
+          await flushPromises();
+          expect((wrapper.vm as any).appliedSavedViewId).toBeNull();
+          searchObjInstance.data.stream.selectedStream = { label: "default", value: "default" };
+        });
+
+        it("clears on Reset", async () => {
+          await applyView();
+          (wrapper.vm as any).resetFilters();
+          await flushPromises();
+          expect((wrapper.vm as any).appliedSavedViewId).toBeNull();
+        });
+      });
+
+      it("overwrite asks for confirmation naming the view and keeps focus on Cancel", async () => {
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        dialog().vm.$emit("update", tracesView);
+        await flushPromises();
+
+        expect(mockConfirm).toHaveBeenCalledWith(
+          expect.objectContaining({
+            messageKeypath: "search.overwriteSavedViewConfirm",
+            messageName: "checkout errors",
+            focusCancel: true,
+          }),
+        );
+        expect(mockSavedViewsPut).toHaveBeenCalledTimes(1);
+      });
+
+      it("a cancelled overwrite leaves the view untouched", async () => {
+        mockConfirm.mockResolvedValue(false);
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        dialog().vm.$emit("update", tracesView);
+        await flushPromises();
+
+        expect(mockSavedViewsPut).not.toHaveBeenCalled();
+        expect((wrapper.vm as any).appliedSavedViewId).toBeNull();
+      });
+
       it("delete from the submenu does nothing when not confirmed", async () => {
         mockConfirm.mockResolvedValue(false);
         localStorage.setItem("savedViews", JSON.stringify({ t1: tracesView }));

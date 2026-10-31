@@ -192,7 +192,7 @@ describe("SearchBar — pinned saved views", () => {
     useLogsAutoRun().invalidateExecuted("search-around");
     await flushPromises();
     const apply = vi.spyOn(wrapper.vm, "applySavedView").mockImplementation(() => {});
-    const update = vi.spyOn(wrapper.vm, "quickUpdateSavedView").mockImplementation(() => {});
+    const update = vi.spyOn(wrapper.vm, "requestUpdateSavedView").mockImplementation(() => {});
     await group().get('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').trigger("click");
     await flushPromises();
     const button = document.querySelector(
@@ -214,7 +214,7 @@ describe("SearchBar — pinned saved views", () => {
     wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
     await flushPromises();
     const apply = vi.spyOn(wrapper.vm, "applySavedView").mockImplementation(() => {});
-    const update = vi.spyOn(wrapper.vm, "quickUpdateSavedView").mockImplementation(() => {});
+    const update = vi.spyOn(wrapper.vm, "requestUpdateSavedView").mockImplementation(() => {});
     await group().get('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').trigger("click");
     await flushPromises();
     const button = document.querySelector(

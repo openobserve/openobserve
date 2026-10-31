@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="savedViewsLoading"
                 data-test-prefix="traces-saved-view"
                 @apply="applySavedView"
-                @update="quickUpdateSavedView"
+                @update="requestUpdateSavedView"
                 @toggle-favorite="toggleFavorite"
                 @create="openSaveViewDialog"
                 @delete="deleteTracesSavedView"
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               create-test-id="traces-search-bar-menu-create-saved-view-btn"
               @open="refreshSavedViews"
               @apply="applySavedView"
-              @update="quickUpdateSavedView"
+              @update="requestUpdateSavedView"
               @toggle-favorite="toggleFavorite"
               @create="openSaveViewDialog"
               @delete="deleteTracesSavedView"
@@ -1106,6 +1106,7 @@ export default defineComponent({
     };
 
     const resetFilters = () => {
+      appliedSavedView.value = null;
       searchObj.data.editorValue = "";
       searchObj.data.advanceFiltersQuery = "";
       Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
@@ -1208,7 +1209,25 @@ export default defineComponent({
       },
       { immediate: true },
     );
-    const appliedSavedViewId = ref<string | null>(null);
+    const appliedSavedView = ref<{ id: string; editorValue: string; streamValue: string } | null>(
+      null,
+    );
+    // Derived from the live state so any later edit, stream switch or reset drops the check.
+    const appliedSavedViewId = computed(() => {
+      const applied = appliedSavedView.value;
+      if (!applied) return null;
+      const matches =
+        searchObj.data.editorValue === applied.editorValue &&
+        searchObj.data.stream.selectedStream?.value === applied.streamValue;
+      return matches ? applied.id : null;
+    });
+    const markSavedViewApplied = (id: string, data: any) => {
+      appliedSavedView.value = {
+        id,
+        editorValue: data?.editorValue ?? "",
+        streamValue: data?.stream?.value ?? "",
+      };
+    };
     const createSavedView = useMutation(() => createSavedViewMutation(orgId.value));
     const updateSavedView = useMutation(() => updateSavedViewMutation(orgId.value));
     const deleteSavedView = useMutation(() => deleteSavedViewMutation(orgId.value));
@@ -1250,12 +1269,13 @@ export default defineComponent({
         return;
       }
       try {
+        const viewData = buildSavedViewData();
         const res = await createSavedView.mutateAsync({
           view_name: viewName,
           view_type: "traces",
-          data: buildSavedViewData(),
+          data: viewData,
         });
-        if (res?.data?.view_id) appliedSavedViewId.value = res.data.view_id;
+        if (res?.data?.view_id) markSavedViewApplied(res.data.view_id, viewData);
         saveViewDialogOpen.value = false;
         toast({ message: t("search.viewCreatedSuccessfully"), variant: "success" });
       } catch (err) {
@@ -1268,11 +1288,12 @@ export default defineComponent({
 
     const updateSavedViewFromCurrent = async (view) => {
       try {
+        const viewData = buildSavedViewData();
         await updateSavedView.mutateAsync({
           viewId: view.view_id,
-          view: { view_name: view.view_name, data: buildSavedViewData() },
+          view: { view_name: view.view_name, data: viewData },
         });
-        appliedSavedViewId.value = view.view_id;
+        markSavedViewApplied(view.view_id, viewData);
         toast({ message: t("search.viewUpdatedSuccessfully"), variant: "success" });
       } catch (err) {
         toast({
@@ -1289,10 +1310,18 @@ export default defineComponent({
       savedViewsDropdownOpen.value = open;
       if (open) refreshSavedViews();
     };
-    const quickUpdateSavedView = (view) => {
+    const requestUpdateSavedView = async (view) => {
       savedViewsDropdownOpen.value = false;
       moreMenuOpen.value = false;
-      return updateSavedViewFromCurrent(view);
+      const confirmed = await confirm({
+        title: t("search.overwriteSavedView"),
+        messageKeypath: "search.overwriteSavedViewConfirm",
+        messageName: view.view_name,
+        confirmLabel: t("search.overwriteSavedViewOk"),
+        focusCancel: true,
+      });
+      if (!confirmed) return;
+      await updateSavedViewFromCurrent(view);
     };
 
     const deleteTracesSavedView = async (view) => {
@@ -1308,7 +1337,7 @@ export default defineComponent({
       try {
         await deleteSavedView.mutateAsync(view.view_id);
         removeFavorite(view.view_id);
-        if (appliedSavedViewId.value === view.view_id) appliedSavedViewId.value = null;
+        if (appliedSavedView.value?.id === view.view_id) appliedSavedView.value = null;
         toast({ message: t("search.viewDeletedSuccessfully"), variant: "success" });
       } catch (err) {
         toast({
@@ -1325,7 +1354,7 @@ export default defineComponent({
         // Uncached on purpose, as in logs: applying must use the server's current copy.
         const res = await savedViewsService.getViewDetail(orgId.value, view.view_id);
         if (seq !== applySavedViewSeq) return;
-        appliedSavedViewId.value = view.view_id;
+        markSavedViewApplied(view.view_id, res.data.data);
         emit("apply-saved-view", res.data.data);
       } catch (err) {
         if (seq !== applySavedViewSeq) return;
@@ -1484,7 +1513,7 @@ export default defineComponent({
       onSavedViewsDropdownOpenChange,
       refreshSavedViews,
       moreMenuOpen,
-      quickUpdateSavedView,
+      requestUpdateSavedView,
       serviceGraphAccess,
       onSearchModeChange,
     };

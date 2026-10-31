@@ -30,6 +30,7 @@ const views = [
 
 let wrapper: ReturnType<typeof mount> | undefined;
 afterEach(() => {
+  document.documentElement.dir = "ltr";
   wrapper?.unmount();
   wrapper = undefined;
 });
@@ -380,5 +381,71 @@ describe("SavedViewsSubmenu", () => {
       new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }),
     );
     expect(document.activeElement).toBe(el("sv-trigger"));
+  });
+
+  it("lets Escape from the pin reach the menu while other keys stay contained", async () => {
+    await mountSubmenu({}, { actions: () => h("button", { "data-test": "sv-pin" }, "pin") });
+    const seen: string[] = [];
+    const listener = (e: KeyboardEvent) => seen.push(e.key);
+    document.addEventListener("keydown", listener);
+    for (const key of ["Escape", "a"]) {
+      el("sv-pin")!.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+      );
+    }
+    document.removeEventListener("keydown", listener);
+    expect(seen).toEqual(["Escape"]);
+  });
+
+  it("swaps the arrow keys between the trigger and the pin under rtl", async () => {
+    document.documentElement.dir = "rtl";
+    await mountSubmenu({}, { actions: () => h("button", { "data-test": "sv-pin" }, "pin") });
+    el("sv-trigger")!.focus();
+    el("sv-trigger")!.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }),
+    );
+    expect(document.activeElement).toBe(el("sv-trigger"));
+    el("sv-trigger")!.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }),
+    );
+    expect(document.activeElement).toBe(el("sv-pin"));
+    el("sv-pin")!.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }),
+    );
+    expect(document.activeElement).toBe(el("sv-trigger"));
+  });
+});
+
+describe("SavedViewsMenuRow arrow keys", () => {
+  const press = (key: string) =>
+    document.activeElement!.dispatchEvent(
+      new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+    );
+
+  it("walks star, edit and delete with ArrowRight and back with ArrowLeft", async () => {
+    await mountMenu();
+    el("sv-favorite-a")!.focus();
+    press("ArrowRight");
+    expect(document.activeElement).toBe(el("sv-update-a"));
+    press("ArrowRight");
+    expect(document.activeElement).toBe(el("sv-delete-a"));
+    press("ArrowLeft");
+    expect(document.activeElement).toBe(el("sv-update-a"));
+  });
+
+  it("walks the actions with the swapped keys under rtl", async () => {
+    document.documentElement.dir = "rtl";
+    await mountMenu();
+    el("sv-favorite-a")!.focus();
+    press("ArrowLeft");
+    expect(document.activeElement).toBe(el("sv-update-a"));
+    press("ArrowLeft");
+    expect(document.activeElement).toBe(el("sv-delete-a"));
+    press("ArrowRight");
+    expect(document.activeElement).toBe(el("sv-update-a"));
+    press("ArrowRight");
+    expect(document.activeElement).toBe(el("sv-favorite-a"));
+    press("ArrowRight");
+    expect(document.activeElement).toBe(el("sv-apply-a"));
   });
 });

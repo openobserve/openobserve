@@ -181,7 +181,7 @@ describe("SearchBar — saved views submenu", () => {
     expect(wrapper.vm.appliedSavedViewId).toBe("new1");
   }, 20000);
 
-  it("quick update closes both menus and marks the view applied once it saves", async () => {
+  it("overwrite closes both menus, confirms, then marks the view applied once it saves", async () => {
     mockSavedViewsPut.mockResolvedValue({ status: 200, data: {} });
     wrapper = mountSearchBar();
     await flushPromises();
@@ -189,14 +189,91 @@ describe("SearchBar — saved views submenu", () => {
     wrapper.vm.utilitiesMenuOpen = true;
     wrapper.vm.savedViewsDropdownOpen = true;
 
-    wrapper.vm.quickUpdateSavedView(logsView2);
+    wrapper.vm.requestUpdateSavedView(logsView2);
+    await flushPromises();
     expect(wrapper.vm.utilitiesMenuOpen).toBe(false);
     expect(wrapper.vm.savedViewsDropdownOpen).toBe(false);
+    expect(mockSavedViewsPut).not.toHaveBeenCalled();
+
+    const confirm = wrapper
+      .findAllComponents(ConfirmDialog)
+      .find((c) => c.props("modelValue") === true)!;
+    expect(confirm.props("title")).toBe(i18n.global.t("search.overwriteSavedView"));
+    expect(confirm.props()).toMatchObject({
+      messageKeypath: "search.overwriteSavedViewConfirm",
+      messageName: "slow requests",
+      focusCancel: true,
+    });
+
+    confirm.vm.$emit("update:ok");
     await flushPromises();
 
     expect(mockSavedViewsPut).toHaveBeenCalled();
     expect(wrapper.vm.appliedSavedViewId).toBe("l2");
   }, 20000);
+
+  it("a cancelled overwrite leaves the view untouched", async () => {
+    wrapper = mountSearchBar();
+    await flushPromises();
+    wrapper.vm.searchObj.data.stream.selectedStream = ["default"];
+
+    wrapper.vm.requestUpdateSavedView(logsView2);
+    await flushPromises();
+    const confirm = wrapper
+      .findAllComponents(ConfirmDialog)
+      .find((c) => c.props("modelValue") === true)!;
+    confirm.vm.$emit("update:cancel");
+    await flushPromises();
+
+    expect(mockSavedViewsPut).not.toHaveBeenCalled();
+    expect(wrapper.vm.confirmOverwrite).toBe(false);
+    expect(wrapper.vm.appliedSavedViewId).toBeNull();
+  }, 20000);
+
+  describe("applied check follows the live search", () => {
+    const applyView = async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      wrapper.vm.searchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      wrapper.vm.searchObj.data.stream.streamType = "logs";
+      wrapper.vm.dateTimeRef = { setSavedDate: vi.fn() };
+      mockGetViewDetail.mockResolvedValueOnce(detail());
+      await wrapper.vm.applySavedView(logsView);
+      await flushPromises();
+      expect(wrapper.vm.appliedSavedViewId).toBe("l1");
+      wrapper.vm.searchObj.shouldIgnoreWatcher = false;
+    };
+
+    it("keeps the check through the changes the apply itself makes", async () => {
+      await applyView();
+      wrapper.vm.searchObj.shouldIgnoreWatcher = true;
+      wrapper.vm.searchObj.data.query = "select * from restored";
+      await flushPromises();
+      wrapper.vm.searchObj.shouldIgnoreWatcher = false;
+      expect(wrapper.vm.appliedSavedViewId).toBe("l1");
+    });
+
+    it("clears when the query text is edited", async () => {
+      await applyView();
+      wrapper.vm.searchObj.data.query = "level = 'error'";
+      await flushPromises();
+      expect(wrapper.vm.appliedSavedViewId).toBeNull();
+    });
+
+    it("clears when the stream changes", async () => {
+      await applyView();
+      wrapper.vm.searchObj.data.stream.selectedStream = ["other"];
+      await flushPromises();
+      expect(wrapper.vm.appliedSavedViewId).toBeNull();
+    });
+
+    it("clears on Reset", async () => {
+      await applyView();
+      wrapper.vm.resetFilters();
+      await flushPromises();
+      expect(wrapper.vm.appliedSavedViewId).toBeNull();
+    });
+  });
 
   it("toggles a favourite from the submenu", async () => {
     wrapper = mountSearchBar();

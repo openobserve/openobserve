@@ -21,6 +21,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { horizontalStep } from "./savedViewsKeys";
 import type { SavedViewRow } from "./savedViews.types";
 
 const props = defineProps<{
@@ -44,15 +45,16 @@ const viewId = props.view.view_id;
 
 // Arrow keys walk the row's inline actions, so star, edit and delete stay reachable without a mouse.
 const onRowKeydown = (event: KeyboardEvent) => {
-  if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+  const step = horizontalStep(event.key);
+  if (!step) return;
   const row = event.currentTarget as HTMLElement;
   const buttons = Array.from(row.querySelectorAll<HTMLElement>("button:not([disabled])"));
   const index = buttons.indexOf(document.activeElement as HTMLElement);
-  if (event.key === "ArrowLeft" && index < 0) return;
+  if (step === "back" && index < 0) return;
   event.preventDefault();
   event.stopPropagation();
-  if (event.key === "ArrowLeft" && index === 0) row.focus();
-  else buttons[index + (event.key === "ArrowRight" ? 1 : -1)]?.focus();
+  if (step === "back" && index === 0) row.focus();
+  else buttons[index + (step === "forward" ? 1 : -1)]?.focus();
 };
 </script>
 

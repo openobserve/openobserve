@@ -20,6 +20,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import SavedViewsMenu from "./SavedViewsMenu.vue";
+import { horizontalStep } from "./savedViewsKeys";
 import type { SavedViewRow } from "./savedViews.types";
 
 defineOptions({ inheritAttrs: false });
@@ -43,16 +44,14 @@ const actions = ref<HTMLElement | null>(null);
 // The pin sits beside the trigger (a <button>) so no button nests in another; arrows hop between them.
 const onRootKeydown = (event: KeyboardEvent) => {
   const target = event.target as HTMLElement;
+  const step = horizontalStep(event.key);
   if (actions.value?.contains(target)) {
-    event.stopPropagation();
-    if (event.key !== "ArrowRight") return;
+    // Escape must still reach the menu, or focus on the pin traps the keyboard.
+    if (event.key !== "Escape") event.stopPropagation();
+    if (step !== "forward") return;
     event.preventDefault();
     root.value?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-  } else if (
-    event.key === "ArrowLeft" &&
-    slots.actions &&
-    target.getAttribute("role") === "menuitem"
-  ) {
+  } else if (step === "back" && slots.actions && target.getAttribute("role") === "menuitem") {
     event.preventDefault();
     event.stopPropagation();
     actions.value?.querySelector<HTMLElement>("button")?.focus();

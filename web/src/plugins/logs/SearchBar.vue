@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 create-shortcut-id="logsSaveView"
                 data-test-prefix="logs-search-bar-saved-views-menu"
                 @apply="applySavedView"
-                @update="quickUpdateSavedView"
+                @update="requestUpdateSavedView"
                 @toggle-favorite="handleFavoriteSavedView"
                 @create="fnSavedView"
                 @delete="handleDeleteSavedView"
@@ -519,7 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             trigger-test-id="logs-search-bar-menu-list-saved-views-btn"
             create-test-id="logs-search-bar-menu-create-saved-view-btn"
             @apply="applySavedView"
-            @update="quickUpdateSavedView"
+            @update="requestUpdateSavedView"
             @toggle-favorite="handleFavoriteSavedView"
             @create="fnSavedView"
             @delete="handleDeleteSavedView"
@@ -1645,6 +1645,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
+    <ConfirmDialog
+      :title="t('search.overwriteSavedView')"
+      message-keypath="search.overwriteSavedViewConfirm"
+      :message-name="overwriteViewName"
+      :ok-label="t('search.overwriteSavedViewOk')"
+      focus-cancel
+      @update:ok="confirmOverwriteSavedView"
+      @update:cancel="cancelOverwriteSavedView"
+      v-model="confirmOverwrite"
+    />
     <!-- Query Plan Dialog -->
     <QueryPlanDialog v-model="showExplainDialog" :searchObj="searchObj" />
   </div>
@@ -2353,6 +2363,9 @@ export default defineComponent({
     }));
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
+    const confirmOverwrite = ref(false);
+    const overwriteViewId = ref("");
+    const overwriteViewName = ref("");
     const deleteViewID = ref("");
     const deleteViewName = ref("");
     const savedViewDropdownModel = ref(false);
@@ -3439,6 +3452,19 @@ export default defineComponent({
     };
 
     const appliedSavedViewId = ref<string | null>(null);
+    const savedViewSignature = () =>
+      JSON.stringify([searchObj.data.query, searchObj.data.stream.selectedStream]);
+    let appliedSignature = "";
+    const markSavedViewApplied = (viewId: string) => {
+      appliedSignature = savedViewSignature();
+      appliedSavedViewId.value = viewId;
+    };
+    // While a view is being applied the search state is rewritten on purpose, so it re-baselines instead of clearing.
+    watch(savedViewSignature, (signature) => {
+      if (!appliedSavedViewId.value) return;
+      if (searchObj.shouldIgnoreWatcher) appliedSignature = signature;
+      else if (signature !== appliedSignature) appliedSavedViewId.value = null;
+    });
 
     const utilitiesMenuOpen = ref(false);
     const onUtilitiesMenuOpenChange = (open: boolean) => {
@@ -3446,8 +3472,8 @@ export default defineComponent({
       if (open) loadSavedView();
     };
 
-    // One-click overwrite of a view with the current search state, no confirm dialog.
-    const quickUpdateSavedView = (item: any) => {
+    // Overwriting destroys the stored query, so it is confirmed first.
+    const requestUpdateSavedView = (item: any) => {
       if (searchObj.data.stream.selectedStream.length == 0) {
         toast({
           variant: "error",
@@ -3458,7 +3484,18 @@ export default defineComponent({
       if (blockWithReason(saveViewReason.value)) return;
       savedViewsDropdownOpen.value = false;
       utilitiesMenuOpen.value = false;
-      updateSavedViews(item.view_id, item.view_name);
+      overwriteViewId.value = item.view_id;
+      overwriteViewName.value = item.view_name;
+      confirmOverwrite.value = true;
+    };
+
+    const cancelOverwriteSavedView = () => {
+      confirmOverwrite.value = false;
+    };
+
+    const confirmOverwriteSavedView = () => {
+      confirmOverwrite.value = false;
+      updateSavedViews(overwriteViewId.value, overwriteViewName.value);
     };
 
     // Common function to restore visualization data and sync to URL
@@ -3871,7 +3908,7 @@ export default defineComponent({
               message: t("logs.searchBar.viewAppliedSuccess", { name: item.view_name }),
               variant: "success",
             });
-            appliedSavedViewId.value = item.view_id;
+            markSavedViewApplied(item.view_id);
             setTimeout(async () => {
               try {
                 searchObj.loadingHistogram = false;
@@ -4078,7 +4115,7 @@ export default defineComponent({
                 message: t("search.viewCreatedSuccessfully"),
                 variant: "success",
               });
-              if (res.data.view_id) appliedSavedViewId.value = res.data.view_id;
+              if (res.data.view_id) markSavedViewApplied(res.data.view_id);
               refreshSavedViews();
               isSavedViewAction.value = "create";
             } else {
@@ -4137,7 +4174,7 @@ export default defineComponent({
                 },
               );
 
-              appliedSavedViewId.value = viewID;
+              markSavedViewApplied(viewID);
               toast({
                 message: t("search.viewUpdatedSuccessfully"),
                 variant: "success",
@@ -4219,6 +4256,7 @@ export default defineComponent({
     }
 
     const resetFilters = () => {
+      appliedSavedViewId.value = null;
       flushEditorValue();
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL = fnParsedSQL();
@@ -5075,7 +5113,6 @@ export default defineComponent({
       applySavedView,
       savedViewsDropdownOpen,
       onSavedViewsDropdownOpenChange,
-      quickUpdateSavedView,
       isSavedViewAction,
       // Saved-view OForm (schema returned from setup() so the Options-API
       // template resolves :schema; a bare import would be out of scope).
@@ -5087,6 +5124,11 @@ export default defineComponent({
       deleteViewID,
       deleteViewName,
       confirmDelete,
+      confirmOverwrite,
+      overwriteViewName,
+      requestUpdateSavedView,
+      confirmOverwriteSavedView,
+      cancelOverwriteSavedView,
       savedViewDropdownModel,
       moreOptionsDropdownModel,
       fnSavedFunctionDialog,
