@@ -259,6 +259,7 @@ jobs:
     permissions:
       contents: read
     strategy:
+      fail-fast: false
       matrix:
         shardIndex: [1, 2, 3, 4, 5, 6, 7, 8]
         shardTotal: [8]
@@ -321,10 +322,11 @@ jobs:
       - name: Download Vitest results from GitHub Actions Artifacts
         uses: actions/download-artifact@v4
         with:
-          path: .vitest
+          path: web/.vitest
           merge-multiple: true
 
       - name: Merge reports
+        working-directory: web
         run: npx vitest --merge-reports
       - name: check coverage
         working-directory: web
