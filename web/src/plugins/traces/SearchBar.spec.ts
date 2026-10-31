@@ -190,6 +190,8 @@ const makeSearchObj = () =>
       searchApplied: false,
       serviceGraphVisualizationType: "tree" as "tree" | "graph",
       serviceGraphLayoutType: "horizontal" as string,
+      liveMode: false,
+      lastRunSignature: null as string | null,
     },
     data: {
       query: "",
@@ -306,6 +308,7 @@ import analytics from "@/services/product_analytics";
 import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import { placeCaret } from "@/test/unit/helpers/monacoCaret";
+import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
 
 // ---------------------------------------------------------------------------
 // DOM anchor node required by attachTo
@@ -495,10 +498,13 @@ function csvToRows(csv: string): string[][] {
 // ---------------------------------------------------------------------------
 describe("SearchBar", () => {
   let wrapper: VueWrapper;
+  let desktopWidthSpy: ReturnType<typeof mockToolbarWidth>;
 
   beforeEach(() => {
     // Fresh searchObj per test — mutations cannot bleed across tests.
     searchObjInstance = makeSearchObj();
+    // A desktop-wide bar by default; jsdom's zero width is the narrowest collapse stage.
+    desktopWidthSpy = mockToolbarWidth(1600);
 
     // Spy on router so updateDateTime's route guard does not early-return.
     vi.spyOn(router, "currentRoute", "get").mockReturnValue({
@@ -511,6 +517,7 @@ describe("SearchBar", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+    desktopWidthSpy.mockRestore();
     vi.clearAllMocks();
   });
 
@@ -965,7 +972,7 @@ describe("SearchBar", () => {
     it("shrinks the toggle labels for the pinned RED Metrics width", async () => {
       togglePin("savedViews");
       togglePin("histogram");
-      useWidth(800);
+      useWidth(660);
       wrapper = mountSearchBar();
       await flushPromises();
 
@@ -1001,7 +1008,7 @@ describe("SearchBar", () => {
         const btn = wrapper.find('[data-test="insights-button"]');
         expect(btn.exists()).toBe(true);
         expect(btn.text().includes("traces.drillDown")).toBe(
-          !(wrapper.vm as any).shouldHideToggleText,
+          !(wrapper.vm as any).shouldHideToolbarButtonText,
         );
         const toggleGroup = wrapper.find(".o-toggle-group-stub").element;
         expect(toggleGroup.nextElementSibling).toBe(btn.element);
@@ -1241,6 +1248,203 @@ describe("SearchBar", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.emitted("searchdata")).toBeTruthy();
+    });
+  });
+
+  describe("run query pending state", () => {
+    const runBtn = () => wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
+    const markRun = () => {
+      searchObjInstance.meta.lastRunSignature = tracesSearchRunSignature(searchObjInstance);
+    };
+    const setAutoRun = (on: boolean) => {
+      store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: true };
+      searchObjInstance.meta.liveMode = on;
+    };
+
+    afterEach(() => {
+      store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: false };
+    });
+
+    it("shows pending with auto-run off once a staged edit differs from the last run", async () => {
+      setAutoRun(false);
+      markRun();
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(runBtn().attributes("data-run-pending")).toBeUndefined();
+
+      searchObjInstance.data.editorValue = "service_name = 'checkout'";
+      await flushPromises();
+
+      expect(runBtn().attributes("data-run-pending")).toBe("true");
+      expect(runBtn().attributes("aria-label")).toBe("search.runQueryPendingLabel");
+      expect(runBtn().findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "search.autoRunPendingDot",
+      );
+    });
+
+    it.each([
+      ["time range", () => (searchObjInstance.data.datetime.relativeTimePeriod = "1h")],
+      ["stream", () => (searchObjInstance.data.stream.selectedStream.value = "other")],
+    ])("shows pending with auto-run off after a %s change", async (_label, edit) => {
+      setAutoRun(false);
+      markRun();
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      edit();
+      await flushPromises();
+
+      expect(runBtn().attributes("data-run-pending")).toBe("true");
+    });
+
+    it("stages a click-to-filter from the field panel as pending, without searching", async () => {
+      setAutoRun(false);
+      markRun();
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      searchObjInstance.data.stream.addToFilter = "service_name='checkout'";
+      await flushPromises();
+
+      expect(searchObjInstance.data.editorValue).toContain("service_name='checkout'");
+      expect(runBtn().attributes("data-run-pending")).toBe("true");
+      expect(wrapper.emitted("searchdata")).toBeUndefined();
+    });
+
+    it("clears pending once the staged state runs", async () => {
+      setAutoRun(false);
+      markRun();
+      searchObjInstance.data.editorValue = "service_name = 'checkout'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(runBtn().attributes("data-run-pending")).toBe("true");
+
+      markRun();
+      await flushPromises();
+
+      expect(runBtn().attributes("data-run-pending")).toBeUndefined();
+    });
+
+    it("never shows pending with auto-run on", async () => {
+      setAutoRun(true);
+      markRun();
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      searchObjInstance.data.editorValue = "service_name = 'checkout'";
+      await flushPromises();
+
+      expect(runBtn().attributes("data-run-pending")).toBeUndefined();
+    });
+
+    it.each([true, false])(
+      "shows pending for a staged edit when the server turns auto-run off (live mode %s)",
+      async (liveMode) => {
+        store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: false };
+        searchObjInstance.meta.liveMode = liveMode;
+        markRun();
+        wrapper = mountSearchBar();
+        await flushPromises();
+        expect(runBtn().attributes("data-run-pending")).toBeUndefined();
+
+        searchObjInstance.data.editorValue = "service_name = 'checkout'";
+        await flushPromises();
+
+        expect(runBtn().attributes("data-run-pending")).toBe("true");
+      },
+    );
+
+    it("clears pending with auto-run off on the server once the staged state runs", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: false };
+      markRun();
+      searchObjInstance.data.editorValue = "service_name = 'checkout'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(runBtn().attributes("data-run-pending")).toBe("true");
+
+      markRun();
+      await flushPromises();
+
+      expect(runBtn().attributes("data-run-pending")).toBeUndefined();
+    });
+
+    it("shows no pending before the first run", async () => {
+      setAutoRun(false);
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      searchObjInstance.data.editorValue = "service_name = 'checkout'";
+      await flushPromises();
+
+      expect(runBtn().attributes("data-run-pending")).toBeUndefined();
+    });
+  });
+
+  describe("toolbar collapse stages", () => {
+    let widthSpy: ReturnType<typeof mockToolbarWidth>;
+    const { isPinned, togglePin } = useToolbarPins("traces");
+    const spansBtn = () => wrapper.find('[data-test="traces-search-mode-spans-btn"]');
+    const resetBtn = () => wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]');
+    const menuReset = () => wrapper.find('[data-test="traces-search-bar-menu-reset-filters-btn"]');
+    const drillDown = () => wrapper.find('[data-test="insights-button"]');
+    // The bar reports `width`; the left section gets width minus the 14px bar padding.
+    const mountAt = async (width: number) => {
+      widthSpy = mockToolbarWidth(width + 14);
+      wrapper = mountSearchBar();
+      await flushPromises();
+    };
+
+    beforeEach(() => {
+      mockSavedViewsGet.mockResolvedValue({ data: { views: [] } });
+      if (isPinned("histogram")) togglePin("histogram");
+      if (isPinned("savedViews")) togglePin("savedViews");
+      searchObjInstance.searchApplied = true;
+      searchObjInstance.data.stream.streamLists = [{ label: "default", value: "default" }] as any;
+    });
+
+    afterEach(() => {
+      widthSpy?.mockRestore();
+      if (!isPinned("savedViews")) togglePin("savedViews");
+      breakpointState.lgUp = true;
+    });
+
+    it("keeps every label at full width", async () => {
+      await mountAt(1200);
+      expect(spansBtn().text()).toContain("traces.spansTab");
+      expect(drillDown().text()).toContain("traces.drillDown");
+      expect(resetBtn().text()).toContain("common.reset");
+      expect(menuReset().exists()).toBe(false);
+    });
+
+    it("drops the button labels first and keeps the view toggle labels", async () => {
+      await mountAt(700);
+      expect(spansBtn().text()).toContain("traces.spansTab");
+      expect(drillDown().text()).not.toContain("traces.drillDown");
+      expect(resetBtn().text()).not.toContain("common.reset");
+    });
+
+    it("then shows the view toggle as icons", async () => {
+      await mountAt(500);
+      expect(spansBtn().text()).not.toContain("traces.spansTab");
+      expect(resetBtn().exists()).toBe(true);
+    });
+
+    it("finally moves Reset into More, where it still resets", async () => {
+      searchObjInstance.data.editorValue = "service_name = 'a'";
+      await mountAt(300);
+      expect(resetBtn().exists()).toBe(false);
+
+      await menuReset().trigger("click");
+
+      expect(searchObjInstance.data.editorValue).toBe("");
+      expect(wrapper.emitted("filters-reset")).toHaveLength(1);
+    });
+
+    it("keeps Reset on the bar below lg, where the bar wraps", async () => {
+      breakpointState.lgUp = false;
+      await mountAt(0);
+      expect(resetBtn().exists()).toBe(true);
+      expect(menuReset().exists()).toBe(false);
     });
   });
 
@@ -2476,7 +2680,7 @@ describe("SearchBar", () => {
 
       it("shrinks the toggle labels before the pinned group falls back", async () => {
         widthSpy.mockRestore();
-        widthSpy = mockToolbarWidth(800);
+        widthSpy = mockToolbarWidth(660);
         wrapper = mountSearchBar();
         await flushPromises();
 

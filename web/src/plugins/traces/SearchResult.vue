@@ -65,7 +65,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           value="neutral"
           class="me-[0.6rem]"
           >{{
-            `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === "spans" ? t("traces.spansFound") : t("traces.tracesFound")}`
+            searchObj.meta.searchMode === "spans"
+              ? `${formatLargeNumber(resultTotal)} ${t("traces.spansFound")}`
+              : t(
+                  "traces.results.tracesWithMatchingSpan",
+                  { count: formatLargeNumber(resultTotal) },
+                  resultTotal,
+                )
           }}</OTag
         >
         <OTag
@@ -317,7 +323,7 @@ export default defineComponent({
     const router = useRouter();
     const { isMobile } = useBreakpoint();
 
-    const { searchObj, updatedLocalLogFilterField } = useTraces();
+    const { searchObj, updatedLocalLogFilterField, patchUrlViewState } = useTraces();
 
     const metricsDashboardRef: any = ref(null);
 
@@ -341,7 +347,7 @@ export default defineComponent({
       },
     );
 
-    const expandRowDetail = (props: any) => {
+    const expandRowDetail = async (props: any) => {
       let from: number;
       let to: number;
       searchObj.meta.resultGrid.navigation.lastOpenedId =
@@ -358,6 +364,8 @@ export default defineComponent({
         to = props.trace_end_time;
       }
 
+      // The URL write is debounced; Back restores what this entry holds, so it must land before leaving.
+      await patchUrlViewState();
       router.push({
         name: "traceDetails",
         query: {
@@ -396,6 +404,10 @@ export default defineComponent({
     // Pagination
     // -----------------------------------------------------------------------
     const hits = computed<any[]>(() => searchObj.data.queryResults?.hits ?? []);
+
+    const resultTotal = computed<number>(() =>
+      Number(searchObj.data.queryResults?.total ?? hits.value.length),
+    );
 
     const searchPerformed = computed(() =>
       Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "total"),
@@ -466,6 +478,7 @@ export default defineComponent({
     return {
       t,
       store,
+      resultTotal,
       isMobile,
       searchObj,
       updatedLocalLogFilterField,

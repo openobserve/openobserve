@@ -36,21 +36,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-search-mode-spans-btn"
               value="spans"
               size="sm"
-              :tooltip="shouldHideToggleText ? t('traces.spansTab') : undefined"
+              :tooltip="toolbarToggleIconOnly ? t('traces.spansTab') : undefined"
             >
               <template #icon-left><OIcon name="layers" size="sm" class="shrink-0" /></template>
-              <span v-if="!shouldHideToggleText">{{ t("traces.spansTab") }}</span>
+              <span v-if="!toolbarToggleIconOnly">{{ t("traces.spansTab") }}</span>
             </OToggleGroupItem>
             <OToggleGroupItem
               data-test="traces-search-mode-traces-btn"
               value="traces"
               size="sm"
-              :tooltip="shouldHideToggleText ? t('traces.tracesTab') : undefined"
+              :tooltip="toolbarToggleIconOnly ? t('traces.tracesTab') : undefined"
             >
               <template #icon-left
                 ><OIcon name="account-tree" size="sm" class="shrink-0"
               /></template>
-              <span v-if="!shouldHideToggleText">{{ t("traces.tracesTab") }}</span>
+              <span v-if="!toolbarToggleIconOnly">{{ t("traces.tracesTab") }}</span>
             </OToggleGroupItem>
             <OToggleGroupItem
               v-if="serviceGraphAccess.visible"
@@ -59,22 +59,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               :icon-right="!serviceGraphAccess.allowed ? 'lock' : undefined"
               :tooltip="
-                serviceGraphAccess.allowed && shouldHideToggleText
+                serviceGraphAccess.allowed && toolbarToggleIconOnly
                   ? t('traces.serviceGraphTab')
                   : undefined
               "
             >
               <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
-              <span v-if="!shouldHideToggleText">{{ t("traces.serviceGraphTab") }}</span>
+              <span v-if="!toolbarToggleIconOnly">{{ t("traces.serviceGraphTab") }}</span>
             </OToggleGroupItem>
             <OToggleGroupItem
               data-test="traces-search-mode-services-catalog-btn"
               value="services-catalog"
               size="sm"
-              :tooltip="shouldHideToggleText ? t('traces.servicesCatalog.tabLabel') : undefined"
+              :tooltip="toolbarToggleIconOnly ? t('traces.servicesCatalog.tabLabel') : undefined"
             >
               <template #icon-left><OIcon name="menu-book" size="sm" class="shrink-0" /></template>
-              <span v-if="!shouldHideToggleText">{{ t("traces.servicesCatalog.tabLabel") }}</span>
+              <span v-if="!toolbarToggleIconOnly">{{ t("traces.servicesCatalog.tabLabel") }}</span>
             </OToggleGroupItem>
           </OToggleGroup>
 
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon-left>
               <OIcon name="timeline" size="sm" class="shrink-0" />
             </template>
-            <span v-if="!shouldHideToggleText">{{ t("traces.drillDown") }}</span>
+            <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
             <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
           </OButton>
 
@@ -99,8 +99,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.meta.searchMode !== 'services-catalog'
             "
           >
-            <!-- Reset: icon+text at wide widths, icon-only when narrow -->
             <OButton
+              v-if="!toolbarMoveResetToMenu"
               data-test="traces-search-bar-reset-filters-btn"
               variant="outline"
               size="xs"
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left>
                 <OIcon name="restart-alt" size="sm" class="shrink-0" />
               </template>
-              <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
+              <span v-if="!shouldHideToolbarButtonText">{{ t("common.reset") }}</span>
             </OButton>
           </template>
 
@@ -191,6 +191,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.menuMore") }}
             </OButton>
           </template>
+
+          <ODropdownItem
+            v-if="isSearchMode && toolbarMoveResetToMenu"
+            data-test="traces-search-bar-menu-reset-filters-btn"
+            @select="resetFilters"
+          >
+            <template #icon-left>
+              <span
+                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+              >
+                <OIcon name="restart-alt" size="sm" />
+              </span>
+            </template>
+            {{ t("search.resetFilters") }}
+          </ODropdownItem>
 
           <ODropdownItem
             v-if="isSearchMode"
@@ -356,18 +371,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 {{ t("search.runQuery") }}
               </OButton>
-              <OSeparator class="h-[1.875rem]! w-px" vertical />
+              <OSeparator v-if="!showRunQueryPending" class="h-[1.875rem]! w-px" vertical />
               <ODropdown v-if="store.state.zoConfig.auto_query_enabled" side="bottom" align="end">
                 <template #trigger>
                   <OButton
                     :aria-label="t('common.moreOptions')"
-                    variant="ghost"
+                    :variant="showRunQueryPending && !isLoading ? 'pending' : 'ghost'"
                     size="icon-xs"
                     :disabled="isLoading"
                     :class="[
                       config.isEnterprise == 'true' && isLoading
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                        : 'bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 hover:opacity-90 hover:ring-2',
+                        : showRunQueryPending
+                          ? 'border-s-0'
+                          : 'bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 hover:opacity-90 hover:ring-2',
                       '![border-radius:0_0.375rem_0.375rem_0]',
                     ]"
                   >
@@ -632,7 +649,12 @@ import {
   replaceExistingFieldCondition,
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
-import { isDatetimeChanged } from "./tracesSearchBar.utils";
+import {
+  isDatetimeChanged,
+  tracesRunIsStaged,
+  tracesToolbarLayout,
+  TRACES_TOOLBAR_WIDTHS,
+} from "./tracesSearchBar.utils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { downloadFile } from "@/utils/dom";
 import { toCsv } from "@/utils/csv";
@@ -749,8 +771,9 @@ export default defineComponent({
     const recentFocusRef = ref<InstanceType<typeof RecentSearchesFocusDropdown> | null>(null);
     const recentDrawerRef = ref<InstanceType<typeof RecentSearchesDrawer> | null>(null);
     const recentFocusOpen = ref(false);
-    // A typed edit and a recent search loaded without running both leave the shown results stale until the next run.
+    // Pending when auto-run is off and the state differs from the last Run, or the editor differs from the last applied query.
     const showRunQueryPending = computed(() => {
+      if (tracesRunIsStaged(searchObj, store.state.zoConfig?.auto_query_enabled)) return true;
       const applied: unknown = searchObj.data.appliedEditorValue;
       if (typeof applied !== "string") return false;
       return String(searchObj.data.editorValue ?? "").trim() !== applied.trim();
@@ -1373,29 +1396,12 @@ export default defineComponent({
         searchObj.meta.searchMode !== "services-catalog",
     );
 
-    // Approximate rendered widths of the Traces left-section items, used only to decide whether the pinned group fits.
-    const TOOLBAR_ITEM_GAP = 6;
-    const METRICS_PINNED_WIDTH = 72 + TOOLBAR_ITEM_GAP;
-    const SAVED_VIEWS_GROUP_WIDTH = 87 + TOOLBAR_ITEM_GAP;
-    const TOGGLE_WIDTH = { enterprise: { text: 422, icon: 150 }, oss: { text: 298, icon: 114 } };
-    const DRILL_DOWN_WIDTH = { text: 97, icon: 36 };
-    const RESET_WIDTH = { text: 72, icon: 36 };
-    const MORE_WIDTH = 70;
-
     const metricsPinned = computed(() => isSearchMode.value && isPinned("histogram"));
     const savedViewsPinned = computed(() => isSearchMode.value && isPinned("savedViews"));
     const pinnedGroupWidth = computed(
       () =>
-        (metricsPinned.value ? METRICS_PINNED_WIDTH : 0) +
-        (savedViewsPinned.value ? SAVED_VIEWS_GROUP_WIDTH : 0),
-    );
-
-    // Traces-specific breakpoints, raised by the pinned group so labels shrink before it falls back into More.
-    const shouldHideToggleText = computed(
-      () => availableLeftWidth.value < 750 + pinnedGroupWidth.value,
-    );
-    const shouldHideResetText = computed(
-      () => availableLeftWidth.value < 540 + pinnedGroupWidth.value,
+        (metricsPinned.value ? TRACES_TOOLBAR_WIDTHS.metricsPinned : 0) +
+        (savedViewsPinned.value ? TRACES_TOOLBAR_WIDTHS.savedViewsPinned : 0),
     );
 
     // Only while Index renders SearchResult with its header, since the click is routed to it.
@@ -1421,22 +1427,32 @@ export default defineComponent({
       emit("update:searchMode", value);
     };
 
-    const leftBaseWidth = computed(() => {
-      const textKey = shouldHideToggleText.value ? "icon" : "text";
-      const toggle = serviceGraphAccess.value.visible ? TOGGLE_WIDTH.enterprise : TOGGLE_WIDTH.oss;
-      const widths = [toggle[textKey], MORE_WIDTH];
-      if (showDrillDown.value) widths.push(DRILL_DOWN_WIDTH[textKey]);
-      if (isSearchMode.value) widths.push(RESET_WIDTH[shouldHideResetText.value ? "icon" : "text"]);
-      return widths.reduce((sum, w) => sum + w, 0) + (widths.length - 1) * TOOLBAR_ITEM_GAP;
-    });
+    const toolbarLayout = computed(() =>
+      tracesToolbarLayout({
+        available: availableLeftWidth.value,
+        serviceGraph: serviceGraphAccess.value.visible,
+        drillDown: showDrillDown.value,
+        reset: isSearchMode.value,
+        pinnedWidth: pinnedGroupWidth.value,
+      }),
+    );
+    // Below lg the bar wraps and availableLeftWidth reads ~0, so the stage and pinned items need no budget there.
+    const toolbarStage = computed(() => (lgUp.value ? toolbarLayout.value.stage : "iconToggle"));
+    const shouldHideToolbarButtonText = computed(() => toolbarStage.value !== "full");
+    const toolbarToggleIconOnly = computed(
+      () => toolbarStage.value === "iconToggle" || toolbarStage.value === "resetInMenu",
+    );
+    const toolbarMoveResetToMenu = computed(() => toolbarStage.value === "resetInMenu");
 
-    // Below lg the bar wraps and availableLeftWidth reads ~0, so pinned items need no budget there.
     const pinnedFit = computed(() => {
       if (!lgUp.value) return { metrics: metricsPinned.value, savedViews: savedViewsPinned.value };
-      let budget = availableLeftWidth.value - leftBaseWidth.value;
-      const metrics = metricsPinned.value && budget >= METRICS_PINNED_WIDTH;
-      if (metrics) budget -= METRICS_PINNED_WIDTH;
-      return { metrics, savedViews: savedViewsPinned.value && budget >= SAVED_VIEWS_GROUP_WIDTH };
+      let budget = toolbarLayout.value.pinnedBudget;
+      const metrics = metricsPinned.value && budget >= TRACES_TOOLBAR_WIDTHS.metricsPinned;
+      if (metrics) budget -= TRACES_TOOLBAR_WIDTHS.metricsPinned;
+      return {
+        metrics,
+        savedViews: savedViewsPinned.value && budget >= TRACES_TOOLBAR_WIDTHS.savedViewsPinned,
+      };
     });
     const showPinnedMetrics = computed(() => pinnedFit.value.metrics);
     const showPinnedSavedViews = computed(() => pinnedFit.value.savedViews);
@@ -1488,8 +1504,9 @@ export default defineComponent({
       traceEditorPlaceholder,
       toolbarLeftRef,
       toolbarRightRef,
-      shouldHideToggleText,
-      shouldHideResetText,
+      shouldHideToolbarButtonText,
+      toolbarToggleIconOnly,
+      toolbarMoveResetToMenu,
       showDrillDown,
       isSearchMode,
       isPinned,

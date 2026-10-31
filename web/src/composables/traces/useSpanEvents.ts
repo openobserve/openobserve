@@ -48,6 +48,7 @@ const WINDOW_TOLERANCE_US = 1;
 const EXCEPTION_EVENT_NAME = "exception";
 const EXCEPTION_ATTR_PREFIX = "exception.";
 const EXCEPTION_TYPE_ATTR = "exception.type";
+const EXCEPTION_MESSAGE_ATTR = "exception.message";
 
 /**
  * Severity-bearing fields, in the order they are consulted.
@@ -134,6 +135,9 @@ export interface NormalizedSpanEvent {
   severity: SpanEventSeverity;
   /** `exception.type` when present, else the event name. */
   exceptionType: string;
+  isException: boolean;
+  /** `exception.message` when present. */
+  exceptionMessage?: string;
 }
 
 export interface SpanEventMarker extends NormalizedSpanEvent {
@@ -232,6 +236,7 @@ export const normalizeSpanEvents = (
     if (timestampNs === null) return [];
 
     const name = String(event.name ?? "");
+    const exceptionMessage = event[EXCEPTION_MESSAGE_ATTR];
 
     return [
       {
@@ -240,6 +245,8 @@ export const normalizeSpanEvents = (
         tsUs: timestampNs / NS_PER_US,
         severity: resolveSeverity(event),
         exceptionType: String(event[EXCEPTION_TYPE_ATTR] ?? name),
+        isException: isExceptionEvent(event),
+        ...(typeof exceptionMessage === "string" ? { exceptionMessage } : {}),
       },
     ];
   });

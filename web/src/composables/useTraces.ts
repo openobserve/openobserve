@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, computed, nextTick, shallowRef } from "vue";
+import { reactive, computed, nextTick, shallowRef, watch } from "vue";
+import { debounce } from "lodash-es";
 import { b64EncodeStandard, b64EncodeUnicode, useLocalTraceFilterField } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, type LocationQueryRaw } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { TranslateFn } from "@/types/i18n";
 import { getOrSetServiceColor as registryGetOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
@@ -34,6 +35,11 @@ import useNotifications from "@/composables/useNotifications";
 import { gt } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { PageLoad, PageRequest, PendingPageSelection } from "@/utils/pageCrossing";
+import {
+  decodeTracesListState,
+  encodeTracesListState,
+  TRACES_LIST_URL_KEYS,
+} from "@/plugins/traces/tracesUrlState";
 
 // Mirrors the backend's is_internal_stream(); other `_`-prefixed streams are user data.
 const INTERNAL_LOG_STREAMS = new Set([
@@ -110,6 +116,7 @@ const defaultObject = {
     redirectedFromLogs: false,
     searchApplied: false,
     lastRunAt: undefined as number | undefined,
+    lastRunSignature: null as string | null,
     metricsRangeFilters: new Map<string, MetricsRangeFilter>(),
     queryEditorPlaceholderFlag: true,
     liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
@@ -207,6 +214,9 @@ const defaultObject = {
 
 const searchObj = reactive(Object.assign({}, defaultObject));
 
+// A link's columns win over the local ones until the user changes columns or stream; never persisted for them.
+let urlColumns: { mode: string; stream: string; fields: string[] } | null = null;
+
 /** Default ordered column ID lists used when no localStorage entry exists. */
 export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
   spans: ["service_name", "operation_name", "duration", "span_status"],
@@ -263,6 +273,8 @@ const useTraces = () => {
     searchObj.data.query = "";
     searchObj.data.editorValue = "";
     searchObj.meta.sqlMode = false;
+    searchObj.meta.lastRunSignature = null;
+    urlColumns = null;
     searchObj.runQuery = false;
     searchObj.data.traceDetails.isLoadingTraceDetails = false;
     searchObj.data.traceDetails.isLoadingTraceMeta = false;
@@ -273,6 +285,7 @@ const useTraces = () => {
    * Stored as traceFilterField[orgId_stream][mode] = string[].
    */
   const updatedLocalLogFilterField = (searchMode: "traces" | "spans" = "traces"): void => {
+    urlColumns = null;
     const identifier: string = searchObj.organizationIdentifier || "default";
     const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
     const all: any = useLocalTraceFilterField()?.value ?? {};
@@ -288,6 +301,13 @@ const useTraces = () => {
    * Falls back to the default ordered column list when no saved value exists.
    */
   const loadLocalLogFilterField = (searchMode: "traces" | "spans" = "traces"): void => {
+    if (urlColumns && urlColumns.stream !== searchObj.data.stream.selectedStream.value) {
+      urlColumns = null;
+    }
+    if (urlColumns?.mode === searchMode) {
+      searchObj.data.stream.selectedFields = [...urlColumns.fields];
+      return;
+    }
     const identifier: string = searchObj.organizationIdentifier || "default";
     const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
     // storage ref .value is typed {} at this boundary; narrow to the stored map shape
@@ -326,8 +346,79 @@ const useTraces = () => {
     if (router.currentRoute.value.query.span_id)
       query["span_id"] = router.currentRoute.value.query.span_id;
 
+    Object.assign(query, listUrlState());
+
     return query;
   }
+
+  function listUrlState() {
+    const mode = searchObj.meta.searchMode;
+    const isList = mode === "traces" || mode === "spans";
+    return encodeTracesListState({
+      columns: isList ? searchObj.data.stream.selectedFields : [],
+      defaultColumns: isList ? DEFAULT_TRACE_COLUMNS[mode] : [],
+      rowsPerPage: Number(searchObj.meta.resultGrid.rowsPerPage),
+      currentPage: searchObj.data.resultGrid.currentPage,
+      showHistogram: searchObj.meta.showHistogram,
+    });
+  }
+
+  /** Applies a link's list-view keys; the page is returned for the first search to use. */
+  const applyUrlListState = (query: Record<string, unknown>) => {
+    const decoded = decodeTracesListState(query);
+    if (decoded.rowsPerPage !== null) searchObj.meta.resultGrid.rowsPerPage = decoded.rowsPerPage;
+    if (decoded.showHistogram !== null) searchObj.meta.showHistogram = decoded.showHistogram;
+    urlColumns = decoded.columns
+      ? {
+          mode: searchObj.meta.searchMode,
+          stream: searchObj.data.stream.selectedStream.value,
+          fields: decoded.columns,
+        }
+      : null;
+    if (decoded.columns) searchObj.data.stream.selectedFields = [...decoded.columns];
+    return { currentPage: decoded.currentPage };
+  };
+
+  /** Keeps the list view and the staged editor text in the URL without adding a history entry. */
+  const patchUrlViewState = () => {
+    const route = router.currentRoute.value;
+    if (route.name !== "traces") return;
+    const query: Record<string, unknown> = { ...route.query };
+    // run-query is one-shot; kept in the entry, Back to it would run whatever edit was staged there.
+    delete query["run-query"];
+    for (const key of TRACES_LIST_URL_KEYS) delete query[key];
+    Object.assign(query, listUrlState(), { query: b64EncodeUnicode(searchObj.data.editorValue) });
+    // Columns belong to the URL's stream, which only a run moves to the selected one.
+    if (route.query.stream !== searchObj.data.stream.selectedStream.value) {
+      if (route.query.columns === undefined) delete query.columns;
+      else query.columns = route.query.columns;
+    }
+    const current = route.query as Record<string, unknown>;
+    const keys = new Set([...Object.keys(current), ...Object.keys(query)]);
+    if ([...keys].every((key) => String(current[key] ?? "") === String(query[key] ?? ""))) return;
+    return router.replace({ query: query as LocationQueryRaw });
+  };
+
+  /** Starts mirroring list-view changes into the URL; call the returned function to stop. */
+  const syncUrlViewState = () => {
+    // Debounced so typing does not hit the browser's history-update rate limit.
+    const write = debounce(() => void patchUrlViewState(), 300);
+    const stop = watch(
+      () => [
+        searchObj.data.editorValue,
+        searchObj.meta.resultGrid.rowsPerPage,
+        searchObj.data.resultGrid.currentPage,
+        searchObj.meta.showHistogram,
+        searchObj.meta.searchMode,
+        searchObj.data.stream.selectedFields.join("\u0000"),
+      ],
+      write,
+    );
+    return () => {
+      stop();
+      write.flush();
+    };
+  };
 
   const copyTracesUrl = (
     t: TranslateFn,
@@ -641,6 +732,9 @@ const useTraces = () => {
     updatedLocalLogFilterField,
     loadLocalLogFilterField,
     getUrlQueryParams,
+    applyUrlListState,
+    patchUrlViewState,
+    syncUrlViewState,
     copyTracesUrl,
     buildQueryDetails,
     navigateToLogs,
