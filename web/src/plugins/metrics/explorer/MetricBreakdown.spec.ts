@@ -1955,4 +1955,75 @@ describe("MetricBreakdown", () => {
       expect(button(wrapper).exists()).toBe(false);
     });
   });
+
+  describe("the Outlying sort", () => {
+    const steady = (v: string): [number, string][] => [
+      [1, v],
+      [2, v],
+      [3, v],
+      [4, v],
+    ];
+    const rankedValues = () =>
+      wrapper
+        .findAll('[data-test^="metrics-breakdown-value-method-"]')
+        .map((c) => c.attributes("data-test")!.replace("metrics-breakdown-value-method-", ""));
+    const outliers = () =>
+      wrapper
+        .findAll('[data-test^="metrics-breakdown-outlier-method-"]')
+        .map((c) => c.attributes("data-test")!.replace("metrics-breakdown-outlier-method-", ""));
+
+    beforeEach(() => {
+      fieldValues.mockResolvedValue({
+        data: { hits: [{ field: "method", values: values("m", 4) }] },
+      });
+      // m0 has the lowest average, from a single dip the others never share.
+      runQuery.mockResolvedValue(
+        byMethod(
+          [
+            "m0",
+            [
+              [1, "39"],
+              [2, "39"],
+              [3, "0"],
+              [4, "39"],
+            ],
+          ],
+          ["m1", steady("39")],
+          ["m2", steady("38")],
+          ["m3", steady("40")],
+        ),
+      );
+    });
+
+    it("re-ranks the values by how far their series strays, and tags the standout", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      expect(rankedValues()).toEqual(["m3", "m1", "m2", "m0"]);
+      expect(outliers()).toEqual([]);
+
+      await wrapper.find('[data-test="metrics-breakdown-sort-outlying"]').trigger("click");
+      await flushPromises();
+      expect(rankedValues()[0]).toBe("m0");
+      expect(outliers()).toEqual(["m0"]);
+
+      await wrapper.find('[data-test="metrics-breakdown-sort-avg"]').trigger("click");
+      await flushPromises();
+      expect(outliers()).toEqual([]);
+    });
+
+    it("tags nothing when every series moves together", async () => {
+      runQuery.mockResolvedValue(byMethod(["m0", steady("5")], ["m1", steady("5")]));
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      await wrapper.find('[data-test="metrics-breakdown-sort-outlying"]').trigger("click");
+      await flushPromises();
+      expect(outliers()).toEqual([]);
+    });
+
+    it("is not offered on the label grid", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-breakdown-sort"]').exists()).toBe(false);
+    });
+  });
 });
