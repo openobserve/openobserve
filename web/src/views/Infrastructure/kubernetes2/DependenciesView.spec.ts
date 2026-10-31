@@ -206,7 +206,7 @@ describe("DependenciesView", () => {
     await mountView();
     expect(series().data).toHaveLength(80);
     expect(testId("k8s2-list-count").text()).toContain("79 connections");
-    expect(testId("k8s2-deps-capped").text()).toContain("Showing the 80 busiest of 91 endpoints");
+    expect(testId("k8s2-deps-capped").text()).toContain("Showing the 79 busiest of 90 connections");
   });
 
   it("explains and links to the Kubernetes data source when there is no flow stream", async () => {
@@ -225,7 +225,9 @@ describe("DependenciesView", () => {
   it("says so when the range has no flows", async () => {
     metricsQuery.mockResolvedValue({ data: { data: { result: [] } } } as any);
     await mountView();
-    expect(testId("k8s2-deps-no-flows").exists()).toBe(true);
+    expect(testId("k8s2-deps-no-flows").text()).toContain(
+      "in the last 1h of the selected time range",
+    );
   });
 
   it("offers a retry when the query fails", async () => {
@@ -252,6 +254,29 @@ describe("DependenciesView", () => {
     resolve({ data: { data: { result: FLOWS } } });
     await flushPromises();
     expect(chart().exists()).toBe(true);
+  });
+
+  it("drops the old window's graph on a range change but keeps it through a refresh", async () => {
+    await mountView();
+    let resolve!: (value: unknown) => void;
+    metricsQuery.mockReturnValue(new Promise((r) => (resolve = r)) as any);
+    await wrapper.setProps({
+      range: { start: END - 59 * MIN_US, end: END + MIN_US, relative: true },
+    });
+    await flushPromises();
+    expect(chart().exists()).toBe(true);
+    await wrapper.setProps({ range: { start: END - 15 * MIN_US, end: END, relative: true } });
+    await flushPromises();
+    expect(testId("k8s2-deps-loading").exists()).toBe(true);
+    resolve({ data: { data: { result: FLOWS } } });
+    await flushPromises();
+    expect(chart().exists()).toBe(true);
+  });
+
+  it("names workloads with their namespace in the keyboard list, and keeps the legend informational", async () => {
+    await mountView();
+    expect(testId("k8s2-deps-link").text()).toBe("frontend/web → backend/api");
+    expect(chart().props("data").options.legend.selectedMode).toBe(false);
   });
 
   it("lists every drawn edge for keyboard users", async () => {

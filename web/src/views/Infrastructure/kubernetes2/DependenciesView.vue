@@ -83,12 +83,18 @@ const hasFlows = computed(() => props.hasStream(FLOW_STREAM));
 const windowS = computed(() => flowWindowSeconds(props.range.start, props.range.end));
 
 let generation = 0;
-// The org and cluster the drawn graph belongs to; another one's graph must not stay clickable.
+// The org, cluster and window the drawn graph belongs to; another one's graph must not stay clickable.
+// A relative range moves its end on every refresh, so only an absolute range is keyed by its end.
 let loadedFor: string | null = null;
 
 async function load() {
   const gen = ++generation;
-  const scopeKey = JSON.stringify([props.orgId, props.cluster]);
+  const scopeKey = JSON.stringify([
+    props.orgId,
+    props.cluster,
+    windowS.value,
+    props.range.relative ? null : props.range.end,
+  ]);
   if (scopeKey !== loadedFor) {
     series.value = [];
     loaded.value = false;
@@ -158,7 +164,7 @@ const switchesHide = computed(
 
 const graph = computed(() => buildGraph(edges.value));
 
-const capped = computed(() => graph.value.nodes.length < graph.value.totalNodes);
+const capped = computed(() => graph.value.edges.length < edges.value.length);
 
 const selectedEdge = computed(
   () => graph.value.edges.find((e) => e.id === selectedEdgeId.value) ?? null,
@@ -191,8 +197,12 @@ function endDetail(end: FlowEnd): I18nText {
 
 const arrowOf = (edge: FlowEdge) => (edge.directed ? "→" : "↔");
 
+// Workloads by namespace too, so two namespaces' web → api read apart.
+const fullLabel = (end: FlowEnd) =>
+  end.kind === "workload" ? `${end.namespace}/${end.name}` : endLabel(end);
+
 const edgeText = (edge: FlowEdge) =>
-  `${endLabel(edge.source)} ${arrowOf(edge)} ${endLabel(edge.target)}`;
+  `${fullLabel(edge.source)} ${arrowOf(edge)} ${fullLabel(edge.target)}`;
 
 const ways = (edge: FlowEdge): I18nText[] => [
   t("infra.k8s2.depsEdgeWay", {
@@ -248,7 +258,8 @@ const chartData = computed(() => {
     options: {
       animation: false,
       tooltip: { trigger: "item", confine: true },
-      legend: { type: "scroll", bottom: 0 },
+      // Informational only: hiding a namespace here would not reach the counts or the edge list.
+      legend: { type: "scroll", bottom: 0, selectedMode: false },
       series: [
         {
           type: "graph",
@@ -433,7 +444,7 @@ function showEverything() {
       v-else-if="!allEdges.length"
       preset="no-data"
       :title="t('infra.k8s2.depsNoFlowsTitle')"
-      :description="t('infra.k8s2.depsNoFlowsDescription')"
+      :description="t('infra.k8s2.depsNoFlowsDescription', { window: windowText })"
       :action-label="t('infra.k8s2.depsSetUp')"
       data-test="k8s2-deps-no-flows"
       @action="onSetUp"
@@ -452,7 +463,7 @@ function showEverything() {
         class="text-text-secondary text-xs"
         data-test="k8s2-deps-capped"
       >
-        {{ t("infra.k8s2.depsCapped", { shown: graph.nodes.length, total: graph.totalNodes }) }}
+        {{ t("infra.k8s2.depsCapped", { shown: graph.edges.length, total: edges.length }) }}
       </OText>
       <div class="relative flex min-h-0 flex-1 max-md:min-h-96" data-test="k8s2-deps-area">
         <ChartRenderer

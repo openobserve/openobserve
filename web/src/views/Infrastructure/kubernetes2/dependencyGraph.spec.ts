@@ -141,7 +141,25 @@ describe("pairFlows", () => {
       flow(WEB, API, "request", 70, "n2"),
       flow(WEB, API, "unknown", 30, "n2"),
     ]);
-    expect(edge).toMatchObject({ forward: 100, request: 70, unknown: 30 });
+    expect(edge).toMatchObject({ forward: 100, unknown: 0 });
+    expect(edge.request).toBeCloseTo(100);
+  });
+
+  it("orients from the node that saw the direction, even when another node counted more", () => {
+    const [edge] = pairFlows([
+      flow(WEB, API, "unknown", 100, "n1"),
+      flow(WEB, API, "request", 98, "n2"),
+    ]);
+    expect(edge).toMatchObject({ total: 100, directed: true });
+    expect(names(edge)).toEqual(["web", "api"]);
+  });
+
+  it("stays undirected when no node saw the direction", () => {
+    const [edge] = pairFlows([
+      flow(WEB, API, "unknown", 100, "n1"),
+      flow(WEB, API, "unknown", 98, "n2"),
+    ]);
+    expect(edge).toMatchObject({ total: 100, directed: false, unknown: 100 });
   });
 
   it("adds a pair's request and unknown rows together", () => {
@@ -223,7 +241,6 @@ describe("buildGraph", () => {
 
   it("keeps the busiest ends and only the edges between them", () => {
     const graph = buildGraph(chain, 3);
-    expect(graph.totalNodes).toBe(5);
     expect(graph.nodes.map((n) => n.end.name).sort()).toEqual(["api", "loadgen", "web"]);
     expect(graph.edges.map((e) => names(e).join(">"))).toEqual(["loadgen>web", "web>api"]);
   });
@@ -237,7 +254,6 @@ describe("buildGraph", () => {
     const graph = buildGraph(disjoint, 80);
     expect(graph.edges).toHaveLength(40);
     expect(graph.nodes).toHaveLength(80);
-    expect(graph.totalNodes).toBe(160);
   });
 
   it("survives a cycle", () => {

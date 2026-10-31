@@ -78,8 +78,6 @@ export interface GraphNode {
 export interface FlowGraph {
   nodes: GraphNode[];
   edges: FlowEdge[];
-  // Ends before the cap, so the view can say how many were left out.
-  totalNodes: number;
 }
 
 const END = (side: "src" | "dst") =>
@@ -139,8 +137,9 @@ interface Flow {
 
 const known = (f: Flow) => f.request + f.response;
 
-// One flow per direction of travel, from the node that saw the most of it, with that node's direction
-// split: mixing nodes could add one node's request bytes to the other's unknown ones.
+// One flow per direction of travel: the bytes from the node that saw the most of them, split by direction
+// as the node that saw the most request and response bytes did, since a node whose eBPF pod restarted
+// reports the same bytes as unknown. Adding nodes' rows together would count cross-node bytes twice.
 function busiestNode(series: Series[]): Flow[] {
   const perNode = new Map<string, Flow>();
   for (const { metric, value } of series) {
@@ -158,16 +157,26 @@ function busiestNode(series: Series[]): Flow[] {
     else f.unknown += value;
     f.total += value;
   }
-  const best = new Map<string, Flow>();
+  const best = new Map<string, { busiest: Flow; informed: Flow }>();
   for (const f of perNode.values()) {
     const key = `${f.src.id}\n${f.dst.id}`;
     const kept = best.get(key);
-    // On a tie the node that saw the connection open says more about its direction.
-    if (!kept || f.total > kept.total || (f.total === kept.total && known(f) > known(kept))) {
-      best.set(key, f);
+    if (!kept) {
+      best.set(key, { busiest: f, informed: f });
+      continue;
     }
+    if (f.total > kept.busiest.total) kept.busiest = f;
+    if (known(f) > known(kept.informed)) kept.informed = f;
   }
-  return [...best.values()];
+  return [...best.values()].map(({ busiest, informed }) => {
+    const scale = busiest.total / informed.total;
+    return {
+      ...busiest,
+      request: informed.request * scale,
+      response: informed.response * scale,
+      unknown: informed.unknown * scale,
+    };
+  });
 }
 
 interface Pair {
@@ -274,7 +283,7 @@ export function buildGraph(edges: FlowEdge[], limit = MAX_GRAPH_NODES): FlowGrap
   const nodes = [...totals.values()]
     .filter((n) => kept.has(n.end.id))
     .map((n) => ({ ...n, rank: ranks.get(n.end.id) ?? 0 }));
-  return { nodes, edges: keptEdges, totalNodes: totals.size };
+  return { nodes, edges: keptEdges };
 }
 
 // Longest chain of callers above each end; an edge back into the current chain is a cycle and ignored.
