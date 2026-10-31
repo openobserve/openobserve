@@ -99,6 +99,7 @@ export const hostsPage: CuratedPageManifest = {
           ],
         },
         {
+          // Each state over all CPU time, for the same reason as CPU busy.
           id: "hd_cpu_by_state",
           titleKey: "infra.hosts.panel.cpuByState",
           type: "line",
@@ -111,7 +112,7 @@ export const hostsPage: CuratedPageManifest = {
               queryType: "promql",
               queries: [
                 {
-                  query: `avg by (state)(irate(system_cpu_time{\${scope:host},state!="idle",${GUARD}}[5m]))`,
+                  query: `sum by (state)(irate(system_cpu_time{\${scope:host},state!="idle",${GUARD}}[5m])) / scalar(sum(irate(system_cpu_time{\${scope:host},${GUARD}}[5m])))`,
                   legend: "{state}",
                 },
               ],
@@ -120,7 +121,7 @@ export const hostsPage: CuratedPageManifest = {
           drilldown: [
             explorerDrilldown(
               "system_cpu_time",
-              `avg by (state)(irate(system_cpu_time{\${scope:host},state!="idle",${GUARD}}[5m]))`,
+              `sum by (state)(irate(system_cpu_time{\${scope:host},state!="idle",${GUARD}}[5m])) / scalar(sum(irate(system_cpu_time{\${scope:host},${GUARD}}[5m])))`,
             ),
           ],
         },
