@@ -210,6 +210,19 @@ describe("useHomeDashboard", () => {
       expect(isLoadedFor("switch-b")).toBe(true);
     });
 
+    it("a pin saved while the boot read is pending survives that read's late answer", async () => {
+      const { load, setHomeDashboard, homeDashboard } = useHomeDashboard(gt);
+      const read = deferred();
+      (settings.getSetting as any).mockReturnValueOnce(read.promise);
+      const loading = load("pin-race");
+      (settings.setOrgSetting as any).mockResolvedValueOnce({});
+      await setHomeDashboard("pin-race", D);
+      read.resolve({ data: null });
+      await loading;
+      expect(homeDashboard.value).toEqual(D);
+      expect(queryClient.getQueryData(settingKeys.one("pin-race", "home_dashboard"))).toEqual(D);
+    });
+
     it("a late answer for an earlier org never lands on the current one", async () => {
       const { load, homeDashboard, isLoadedFor } = useHomeDashboard(gt);
       const a = deferred();
