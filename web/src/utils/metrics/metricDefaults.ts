@@ -32,12 +32,15 @@ import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 
 import { PromqlStepId } from "@/components/promql/types";
 import type { PromqlBuilderQuery, PromqlLabelMatcher, PromqlStep } from "@/components/promql/types";
+import { compileLabelFilters } from "@/components/promql/labelBoolean";
 
-/** A filter as callers pass it in: label/value plus an optional operator. */
+/** A filter as callers pass it in: label/value plus an optional operator and OR group. */
 interface FilterInput {
   label: I18nText;
   value: string;
   operator?: string;
+  group?: number;
+  negate?: boolean;
 }
 
 /** Filters accepted by the selector builders: a list, or a label->value map. */
@@ -48,6 +51,8 @@ interface NormalizedMatcher {
   label: I18nText;
   operator: PromqlOperator;
   value: string;
+  group?: number;
+  negate?: boolean;
 }
 
 /** Extra context resolving a stream to a card kind. */
@@ -524,13 +529,60 @@ export function buildSelector(
 ): string {
   if (!metricName) throw new Error("buildSelector: metricName is required");
 
-  const matchers = normalizeMatchers(filters, extraMatchers).map(
-    (f) => `${f.label}${f.operator}"${escapePromqlString(f.value)}"`,
+  const selectors = selectorBranches(normalizeMatchers(filters, extraMatchers)).map(
+    (branch) =>
+      `{__name__="${escapePromqlString(metricName)}"${branch
+        .map((f) => `,${f.label}${f.operator}"${escapePromqlString(f.value)}"`)
+        .join("")}}`,
   );
+  return selectors.length === 1 ? selectors[0] : `(${selectors.join(" or ")})`;
+}
 
-  return `{__name__="${escapePromqlString(metricName)}"${
-    matchers.length ? `,${matchers.join(",")}` : ""
-  }}`;
+/** The OR branches of a normalized filter list, in the order the builder renders them; throws past the branch cap. */
+function selectorBranches(matchers: NormalizedMatcher[]): NormalizedMatcher[][] {
+  const compiled = compileLabelFilters(
+    matchers.map((m) => ({ ...m, label: String(m.label), op: m.operator })),
+  );
+  if (!compiled.ok) {
+    throw new Error(`buildSelector: filters expand to ${compiled.branchCount} selectors`);
+  }
+  return compiled.branches.map((branch) =>
+    branch.map((m) => ({ label: raw(m.label), operator: m.op, value: m.value })),
+  );
+}
+
+const compareMatchers = (a: NormalizedMatcher, b: NormalizedMatcher) =>
+  a.label === b.label ? a.value.localeCompare(b.value) : a.label.localeCompare(b.label);
+
+const UNION_SELECTOR = String.raw`\{(?:[^{}"]|"(?:[^"\\]|\\.)*")*\}`;
+const UNION = String.raw`\(${UNION_SELECTOR}(?: or ${UNION_SELECTOR})+\)`;
+const UNION_RANGE_CALL = new RegExp(
+  String.raw`(\w+)\(([^(),"]*,\s*)?(${UNION})(\[[^\]]+\](?:\s*@\s*end\(\))?)\)`,
+  "g",
+);
+const BARE_UNION = new RegExp(UNION, "g");
+
+/** Parenthesised unless it already fills a whole argument, where `or` cannot bind wrongly. */
+const unionIn = (expr: string, at: number, length: number, parts: string[]): string => {
+  const before = expr.slice(0, at).trimEnd().at(-1);
+  const after = expr.slice(at + length).trimStart()[0];
+  const whole = [undefined, "(", ","].includes(before) && [undefined, ")", ","].includes(after);
+  return whole ? parts.join(" or ") : `(${parts.join(" or ")})`;
+};
+
+/** Moves range calls inside `buildSelector` unions (`rate((a or b)[w])` does not parse) and drops redundant union parens. */
+export function distributeUnionRanges(expr: string): string {
+  const distributed = expr.replace(
+    UNION_RANGE_CALL,
+    (match, fn: string, lead: string | undefined, union: string, range: string, at: number) => {
+      const branches = union.match(new RegExp(UNION_SELECTOR, "g")) ?? [];
+      const calls = branches.map((sel) => `${fn}(${lead ?? ""}${sel}${range})`);
+      return unionIn(expr, at, match.length, calls);
+    },
+  );
+  return distributed.replace(BARE_UNION, (match, at: number) =>
+    unionIn(distributed, at, match.length, match.match(new RegExp(UNION_SELECTOR, "g")) ?? []),
+  );
 }
 
 /**
@@ -577,11 +629,16 @@ function normalizeMatchers(
       if (!isPromqlOperator(operator)) {
         throw new Error(`buildSelector: invalid operator "${operator}"`);
       }
-      return { label: raw(label), operator, value: String(f.value ?? "") };
+      const matcher: NormalizedMatcher = {
+        label: raw(label),
+        operator,
+        value: String(f.value ?? ""),
+      };
+      if ((f.group ?? 0) > 0) matcher.group = f.group;
+      if (f.negate) matcher.negate = true;
+      return matcher;
     })
-    .sort((a, b) =>
-      a.label === b.label ? a.value.localeCompare(b.value) : a.label.localeCompare(b.label),
-    );
+    .sort(compareMatchers);
 }
 
 /**
@@ -594,11 +651,12 @@ function normalizeMatchers(
  * @returns {Array<{label: I18nText, op: string, value: string}>}
  */
 export function builderLabelsOf(filters?: FiltersArg): PromqlLabelMatcher[] {
-  return normalizeMatchers(filters).map(({ label, operator, value }) => ({
-    label,
-    op: operator,
-    value,
-  }));
+  return normalizeMatchers(filters).map(({ label, operator, value, group, negate }) => {
+    const matcher: PromqlLabelMatcher = { label, op: operator, value };
+    if (group) matcher.group = group;
+    if (negate) matcher.negate = true;
+    return matcher;
+  });
 }
 
 /**
@@ -1029,7 +1087,7 @@ function resolveUnit(
  * through the real query modeller and diffs it against `expr`.
  */
 const q = (expr: string, legendTemplate?: string, builder?: PromqlBuilderQuery): VariantQuery => {
-  const out: VariantQuery = { expr };
+  const out: VariantQuery = { expr: distributeUnionRanges(expr) };
   if (legendTemplate !== undefined) out.legendTemplate = legendTemplate;
   if (builder !== undefined) out.builder = builder;
   return out;
@@ -1567,7 +1625,10 @@ export function buildBreakdownQuery(
     default:
       return null;
   }
-  return cap ? keepRanked(expr, label, buildBreakdownRank(cardKind, ctx, label, cap)) : expr;
+  const distributed = distributeUnionRanges(expr);
+  return cap
+    ? keepRanked(distributed, label, buildBreakdownRank(cardKind, ctx, label, cap))
+    : distributed;
 }
 
 /** The `cap.topk` values of `label` busiest over the whole window, ranked once at its end by the kind's measure. */
@@ -1615,7 +1676,7 @@ export function buildBreakdownRank(
     default:
       return null;
   }
-  return `topk(${cap.topk}, ${measure})`;
+  return distributeUnionRanges(`topk(${cap.topk}, ${measure})`);
 }
 
 interface HeatmapQueryContext {
@@ -1653,7 +1714,9 @@ export function buildHeatmapBreakdownQuery(
 ): string | null {
   if (!LABEL_NAME_RE.test(label)) return null;
   const w = ctx.rateWindow || DEFAULT_RATE_WINDOW;
-  const expr = `sum by (le, ${label}) (rate(${buildSelector(ctx.metricName, ctx.filters)}[${w}]))`;
+  const expr = distributeUnionRanges(
+    `sum by (le, ${label}) (rate(${buildSelector(ctx.metricName, ctx.filters)}[${w}]))`,
+  );
   if (!cap) return expr;
   // A character class, not `\+`: PromQL strings reject the escape. OTLP writes the bound as "inf".
   const total = buildSelector(ctx.metricName, [
@@ -1666,7 +1729,7 @@ export function buildHeatmapBreakdownQuery(
   // Never shorter than the rate window: a range holding one sample has no increase, and `and` would drop every value.
   const window = formatPromDuration(Math.max(cap.windowSeconds, promDurationSeconds(w)));
   const ranked = `topk(${cap.topk}, sum by (${label}) (increase(${total}[${window}] @ end())))`;
-  return `${expr} and on (${label}) ${ranked}`;
+  return distributeUnionRanges(`${expr} and on (${label}) ${ranked}`);
 }
 
 /** The heatmap of one value of `label`: the card's own heatmap, narrowed to that value. */
@@ -1678,7 +1741,7 @@ export function buildHeatmapValueQuery(
   if (!LABEL_NAME_RE.test(label)) return null;
   const w = ctx.rateWindow || DEFAULT_RATE_WINDOW;
   const sel = buildSelector(ctx.metricName, ctx.filters, { [label]: value });
-  return `sum by (le) (rate(${sel}[${w}]))`;
+  return distributeUnionRanges(`sum by (le) (rate(${sel}[${w}]))`);
 }
 
 const AGGREGATION_RE = /\b(sum|avg|min|max|count|stddev)\s*(?:by\s*\(([^)]*)\)\s*)?\(/g;

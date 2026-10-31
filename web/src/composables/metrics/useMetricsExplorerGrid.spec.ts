@@ -1616,6 +1616,55 @@ describe("useMetricsExplorerGrid", () => {
     });
   });
 
+  describe("OR groups narrow by any group a card can apply", () => {
+    it("keeps a card one group fits, and leaves the other group out of its query", async () => {
+      const grid = await setup();
+      (StreamService.nameList as any).mockResolvedValueOnce({
+        data: {
+          list: STREAMS.map((stream) =>
+            stream.name === "lat_seconds_bucket"
+              ? { ...stream, schema: [{ name: "le", type: "Utf8" }] }
+              : { ...stream, schema: [{ name: "pod", type: "Utf8" }] },
+          ),
+        },
+      });
+      const le = { label: "le", value: "0.5", operator: "=", group: 1 } as any;
+      const pod = { label: "pod", value: "a", operator: "=", group: 2 } as any;
+      await grid.addLabelFilter(le);
+      await grid.addLabelFilter(pod);
+
+      const card = cardNamed(grid, "lat_seconds_bucket");
+      expect(grid.isLabelEligible(card)).toBe(true);
+      expect(grid.inapplicableLabelFilters(card)).toEqual([pod]);
+      const expr = grid.effectiveVariant(card).resolved.queries[0].expr;
+      expect(expr).toContain('le="0.5"');
+      expect(expr).not.toContain("pod");
+
+      grid.removeLabelFilter(le);
+      expect(grid.isLabelEligible(card)).toBe(false);
+    });
+
+    it("drops a card that lacks a base filter even when a group fits", async () => {
+      const grid = await setup();
+      (StreamService.nameList as any).mockResolvedValueOnce({
+        data: {
+          list: STREAMS.map((stream) =>
+            stream.name === "lat_seconds_bucket"
+              ? { ...stream, schema: [{ name: "le", type: "Utf8" }] }
+              : { ...stream, schema: [{ name: "pod", type: "Utf8" }] },
+          ),
+        },
+      });
+      const pod = { label: "pod", value: "a", operator: "=" } as any;
+      await grid.addLabelFilter(pod);
+      await grid.addLabelFilter({ label: "le", value: "0.5", operator: "=", group: 1 } as any);
+
+      const card = cardNamed(grid, "lat_seconds_bucket");
+      expect(grid.isLabelEligible(card)).toBe(false);
+      expect(grid.inapplicableLabelFilters(card)).toEqual([pod]);
+    });
+  });
+
   describe("an org switch must not deadlock the deferred loads", () => {
     it("does not strand schemaLoading at true forever", async () => {
       // `ensureSchemas` early-returns while `schemaLoading` is true, and its

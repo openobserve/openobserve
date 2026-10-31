@@ -770,4 +770,136 @@ describe("QueryModeller", () => {
       ).toBe("(x{} + 1) * 2");
     });
   });
+
+  describe("boolean label filters", () => {
+    const render = (labels: any[], operations: { id: string; params: any[] }[] = []) =>
+      promqlRenderer.renderQuery({ metric: "x", labels, operations });
+    const orLabels = [
+      { label: "job", op: "=", value: "api" },
+      { label: "a", op: "=", value: "1", group: 1 },
+      { label: "b", op: "=", value: "2", group: 2 },
+    ];
+
+    it("unions the branches of OR groups with the or operator", () => {
+      expect(render(orLabels)).toBe('x{job="api",a="1"} or x{job="api",b="2"}');
+    });
+
+    it("applies the leading range step inside each branch", () => {
+      expect(render(orLabels, [{ id: PromqlStepId.Rate, params: ["5m"] }])).toBe(
+        'rate(x{job="api",a="1"}[5m]) or rate(x{job="api",b="2"}[5m])',
+      );
+      expect(render(orLabels, [{ id: PromqlStepId.QuantileOverTime, params: [0.9, "5m"] }])).toBe(
+        'quantile_over_time(0.9, x{job="api",a="1"}[5m]) or quantile_over_time(0.9, x{job="api",b="2"}[5m])',
+      );
+    });
+
+    it("aggregates over the whole union", () => {
+      expect(
+        render(orLabels, [
+          { id: PromqlStepId.Rate, params: ["5m"] },
+          { id: PromqlStepId.Sum, params: [["job"]] },
+        ]),
+      ).toBe('sum by (job) (rate(x{job="api",a="1"}[5m]) or rate(x{job="api",b="2"}[5m]))');
+    });
+
+    it("parenthesises the union under arithmetic, which binds tighter than or", () => {
+      expect(render(orLabels, [{ id: PromqlStepId.MultiplyBy, params: [2] }])).toBe(
+        '(x{job="api",a="1"} or x{job="api",b="2"}) * 2',
+      );
+    });
+
+    it("renders a negated group by De Morgan and merged values as one selector", () => {
+      expect(
+        render([
+          { label: "env", op: "=", value: "prod", group: 1, negate: true },
+          { label: "zone", op: "=~", value: "us-.*", group: 1, negate: true },
+        ]),
+      ).toBe('x{env!="prod"} or x{zone!~"us-.*"}');
+      expect(
+        render([
+          { label: "code", op: "=", value: "500", group: 1 },
+          { label: "code", op: "=", value: "a.b", group: 2 },
+        ]),
+      ).toBe('x{code=~"(?:500|a\\\\.b)"}');
+    });
+
+    it("renders nothing past the branch cap, so the query does not run", () => {
+      const labels = Array.from({ length: 17 }, (_, i) => ({
+        label: `l${i}`,
+        op: "=",
+        value: "v",
+        group: 1,
+        negate: true,
+      }));
+      expect(render(labels, [{ id: PromqlStepId.Rate, params: ["5m"] }])).toBe("");
+    });
+  });
+
+  describe("offset", () => {
+    const render = (operations: { id: string; params: any[] }[], labels: any[] = []) =>
+      promqlRenderer.renderQuery({ metric: "x", labels, operations });
+
+    it("attaches to the selector, inside a range step's brackets", () => {
+      expect(render([{ id: PromqlStepId.Offset, params: ["1h"] }])).toBe("x{} offset 1h");
+      expect(
+        render([
+          { id: PromqlStepId.Rate, params: ["5m"] },
+          { id: PromqlStepId.Sum, params: [[]] },
+          { id: PromqlStepId.Offset, params: ["1d"] },
+        ]),
+      ).toBe("sum(rate(x{}[5m] offset 1d))");
+    });
+
+    it("offsets every branch of a union", () => {
+      expect(
+        render(
+          [
+            { id: PromqlStepId.Offset, params: ["1h"] },
+            { id: PromqlStepId.Rate, params: ["5m"] },
+          ],
+          [
+            { label: "a", op: "=", value: "1", group: 1 },
+            { label: "b", op: "=", value: "2", group: 2 },
+          ],
+        ),
+      ).toBe('rate(x{a="1"}[5m] offset 1h) or rate(x{b="2"}[5m] offset 1h)');
+    });
+
+    it("renders no modifier for an empty duration", () => {
+      expect(render([{ id: PromqlStepId.Offset, params: [""] }])).toBe("x{}");
+    });
+  });
+
+  describe("without", () => {
+    const render = (operations: { id: string; params: any[] }[]) =>
+      promqlRenderer.renderQuery({ metric: "x", labels: [], operations });
+
+    it("renders the without form when the trailing flag is set", () => {
+      expect(render([{ id: PromqlStepId.Sum, params: [["instance"], true] }])).toBe(
+        "sum without (instance) (x{})",
+      );
+      expect(render([{ id: PromqlStepId.TopK, params: [5, ["a", "b"], true] }])).toBe(
+        "topk without (a, b) (5, x{})",
+      );
+      expect(render([{ id: PromqlStepId.Quantile, params: [0.9, [], true] }])).toBe(
+        "quantile without () (0.9, x{})",
+      );
+    });
+
+    it("keeps by for a false flag and for panels saved without one", () => {
+      expect(render([{ id: PromqlStepId.Avg, params: [["job"], false] }])).toBe(
+        "avg by (job) (x{})",
+      );
+      expect(render([{ id: PromqlStepId.TopK, params: [5, ["job"]] }])).toBe(
+        "topk by (job) (5, x{})",
+      );
+    });
+
+    it("is offered on every aggregation", () => {
+      for (const step of promqlRenderer.getStepsForGroup(PromqlStepGroup.Aggregation)) {
+        expect(step.params.at(-1)?.type).toBe("boolean");
+        expect(step.params.at(-2)?.type).toBe("select");
+      }
+    });
+  });
 });

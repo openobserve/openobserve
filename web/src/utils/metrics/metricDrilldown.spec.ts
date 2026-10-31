@@ -54,6 +54,16 @@ describe("contextToDimensions", () => {
     expect(out.labelByGroupId).toEqual({ service: "service_name", "k8s-namespace": "namespace" });
   });
 
+  it("drops filters inside an OR group, which hold for only some series", () => {
+    const out = contextToDimensions(
+      [{ ...filter("service_name", "checkout"), group: 1 }],
+      [],
+      GROUPS,
+      IDENTITY,
+    );
+    expect(out.dimensions).toEqual({});
+  });
+
   it("drops matchers other than equality", () => {
     const out = contextToDimensions(
       [filter("service_name", "check.*", "=~"), filter("namespace", "shop", "!=")],

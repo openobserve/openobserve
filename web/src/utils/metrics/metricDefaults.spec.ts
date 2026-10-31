@@ -26,6 +26,7 @@ import {
   buildHeatmapValueQuery,
   breakdownQueryOf,
   buildSelector,
+  distributeUnionRanges,
   supportsBreakdown,
   computeAlignedStepSeconds,
   computePercentileWindow,
@@ -58,6 +59,87 @@ const unitOf = (name: string, type?: string, ctx?: Record<string, any>) =>
   getMetricDefaults(name, type, undefined, { rateWindow: W, ...ctx }).unit;
 
 const streamNames = (...names: string[]) => new Set(names);
+
+describe("OR-grouped filters", () => {
+  const GROUPED = [
+    { label: "job", value: "api" },
+    { label: "a", value: "1", group: 1 },
+    { label: "b", value: "2", group: 2 },
+  ] as any[];
+
+  it("buildSelector unions one selector per branch", () => {
+    expect(buildSelector("m", GROUPED)).toBe(
+      '({__name__="m",job="api",a="1"} or {__name__="m",job="api",b="2"})',
+    );
+    expect(buildSelector("m", GROUPED, { quantile: "0.5" })).toBe(
+      '({__name__="m",job="api",quantile="0.5",a="1"} or {__name__="m",job="api",quantile="0.5",b="2"})',
+    );
+  });
+
+  it("buildSelector merges equality branches into one regex selector", () => {
+    expect(
+      buildSelector("m", [
+        { label: "code", value: "500", group: 1 },
+        { label: "code", value: "5.3", group: 2 },
+      ] as any[]),
+    ).toBe('{__name__="m",code=~"(?:500|5\\\\.3)"}');
+  });
+
+  it("buildSelector refuses filters past the branch cap", () => {
+    const many = Array.from({ length: 17 }, (_, i) => ({
+      label: `l${i}`,
+      value: "x",
+      group: 1,
+      negate: true,
+    })) as any[];
+    expect(() => buildSelector("m", many)).toThrow(/17 selectors/);
+  });
+
+  it("distributes range calls over a union and drops parens a whole argument does not need", () => {
+    const u = '({__name__="m",a="1"} or {__name__="m",b="}"})';
+    expect(distributeUnionRanges(`sum(rate(${u}[5m]))`)).toBe(
+      'sum(rate({__name__="m",a="1"}[5m]) or rate({__name__="m",b="}"}[5m]))',
+    );
+    expect(distributeUnionRanges(`quantile_over_time(0.5, ${u}[5m])`)).toBe(
+      'quantile_over_time(0.5, {__name__="m",a="1"}[5m]) or quantile_over_time(0.5, {__name__="m",b="}"}[5m])',
+    );
+    expect(distributeUnionRanges(`rate(${u}[5m]) * 2`)).toBe(
+      '(rate({__name__="m",a="1"}[5m]) or rate({__name__="m",b="}"}[5m])) * 2',
+    );
+    expect(distributeUnionRanges(`increase(${u}[1h] @ end())`)).toBe(
+      'increase({__name__="m",a="1"}[1h] @ end()) or increase({__name__="m",b="}"}[1h] @ end())',
+    );
+    expect(distributeUnionRanges(`avg(${u})`)).toBe(
+      'avg({__name__="m",a="1"} or {__name__="m",b="}"})',
+    );
+    expect(distributeUnionRanges(`(${u} and ${u} > -Inf)`)).toBe(`(${u} and ${u} > -Inf)`);
+    expect(distributeUnionRanges('sum(rate({__name__="m"}[5m]))')).toBe(
+      'sum(rate({__name__="m"}[5m]))',
+    );
+  });
+
+  it("every card query and breakdown runs with the union distributed", () => {
+    const counter = getMetricDefaults("http_requests_total", "Counter", undefined, {
+      filters: GROUPED,
+      rateWindow: W,
+    });
+    expect(counter.defaultQuery).toBe(
+      'sum(rate({__name__="http_requests_total",job="api",a="1"}[4m]) or rate({__name__="http_requests_total",job="api",b="2"}[4m]))',
+    );
+    expect(
+      buildBreakdownQuery(CARD_KIND.COUNTER_RATE, { metricName: "x", filters: GROUPED }, "pod"),
+    ).not.toContain(")[");
+    expect(
+      buildHeatmapBreakdownQuery({ metricName: "x", filters: GROUPED }, "pod", {
+        topk: 3,
+        windowSeconds: 3600,
+      }),
+    ).not.toContain(")[");
+    expect(buildHeatmapValueQuery({ metricName: "x", filters: GROUPED }, "pod", "a")).not.toContain(
+      ")[",
+    );
+  });
+});
 
 describe("buildSelector", () => {
   it("always emits the __name__ form, never a bare identifier", () => {
@@ -1042,6 +1124,27 @@ describe("buildBreakdownQuery", () => {
 
 describe("buildBreakdownRank", () => {
   const ctx = { metricName: "m", rateWindow: W };
+
+  it("distributes an OR-group union into each branch, @ end() on every range selector", () => {
+    const filters = [
+      { label: "job", value: "api" },
+      { label: "a", value: "1", group: 1 },
+      { label: "b", value: "2", group: 2 },
+    ] as any[];
+    const branch = (m: string) => `{__name__="m",az!="",job="api",${m}}[6h] @ end()`;
+    const rank = `topk(10, sum by (az) (increase(${branch('a="1"')}) or increase(${branch('b="2"')})))`;
+    expect(buildBreakdownRank(CARD_KIND.COUNTER_RATE, { ...ctx, filters }, "az", cap)).toBe(rank);
+    expect(
+      buildBreakdownQuery(CARD_KIND.COUNTER_RATE, { ...ctx, filters }, "az", cap),
+    ).toBe(
+      `(sum by (az) (rate({__name__="m",job="api",a="1"}[4m]) or rate({__name__="m",job="api",b="2"}[4m]))) and on (az) ${rank}`,
+    );
+    const gauge = buildBreakdownQuery(CARD_KIND.GAUGE, { ...ctx, filters }, "az", cap)!;
+    expect(gauge).toContain(
+      `avg_over_time(${branch('a="1"')}) or avg_over_time(${branch('b="2"')})`,
+    );
+    expect(gauge).not.toMatch(/\)\[/);
+  });
   const cap = { topk: 10, window: "6h" };
   const SEL = '{__name__="m",az!=""}[6h] @ end()';
 

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
+import { compileLabelFilters, type LabelMatchOp } from "@/components/promql/labelBoolean";
 
 /** PromQL matcher operator -> SQL predicate over a label column. */
 const PREDICATE: Record<string, (column: string, literal: string) => string> = {
@@ -24,17 +25,26 @@ const PREDICATE: Record<string, (column: string, literal: string) => string> = {
   "!~": (column, literal) => `re_not_match(${column}, ${literal})`,
 };
 
+const predicateOf = (filter: { label: string; operator: string; value: string }): string => {
+  const predicate = PREDICATE[filter.operator] ?? PREDICATE["="];
+  let value = String(filter.value ?? "");
+  // PromQL regex matchers are fully anchored; re_match is a find, so anchor it.
+  if (filter.operator === "=~" || filter.operator === "!~") value = `^(?:${value})$`;
+  const literal = `'${value.replace(/'/g, "''")}'`;
+  return predicate(`"${filter.label}"`, literal);
+};
+
 /** A full SELECT, not a bare clause: the field-values endpoint picks the WHERE out of a statement. */
 export function labelFiltersToSql(stream: string, filters: LabelFilter[]): string {
-  const where = filters.map((filter) => {
-    const operator = filter.operator ?? "=";
-    const predicate = PREDICATE[operator] ?? PREDICATE["="];
-    let value = String(filter.value ?? "");
-    // PromQL regex matchers are fully anchored; re_match is a find, so anchor it.
-    if (operator === "=~" || operator === "!~") value = `^(?:${value})$`;
-    const literal = `'${value.replace(/'/g, "''")}'`;
-    return predicate(`"${filter.label}"`, literal);
-  });
   const base = `SELECT * FROM "${stream}"`;
-  return where.length ? `${base} WHERE ${where.join(" AND ")}` : base;
+  const compiled = compileLabelFilters(
+    filters.map((f) => ({ ...f, label: String(f.label), op: (f.operator ?? "=") as LabelMatchOp })),
+  );
+  // Past the branch cap the PromQL side does not run either, so the values go unfiltered.
+  if (!compiled.ok || compiled.branches.some((branch) => !branch.length)) return base;
+  const branches = compiled.branches.map((branch) =>
+    branch.map((m) => predicateOf({ label: m.label, operator: m.op, value: m.value })),
+  );
+  if (branches.length === 1) return `${base} WHERE ${branches[0].join(" AND ")}`;
+  return `${base} WHERE ${branches.map((b) => `(${b.join(" AND ")})`).join(" OR ")}`;
 }

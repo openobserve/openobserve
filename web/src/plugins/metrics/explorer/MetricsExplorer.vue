@@ -240,6 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @focus-picker="grid.loadLabelNames"
         @add="onAddLabelFilter"
         @remove="onRemoveLabelFilter"
+        @negate-group="onNegateLabelGroup"
         @clear-all="onClearLabelFilters"
       />
     </div>
@@ -689,7 +690,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :ensure-schemas="grid.ensureSchemas"
       :prefix-of="grid.prefixOf"
       :family-of="grid.familyOf"
-      :filters="grid.labelFilters.value"
+      :filters="detailCard ? grid.labelFiltersFor(detailCard) : grid.labelFilters.value"
       :inapplicable-filters="detailCard ? grid.inapplicableLabelFilters(detailCard) : []"
       :is-label-eligible="grid.isLabelEligible"
       :time-range="grid.timeRange.value"
@@ -1358,6 +1359,11 @@ export default defineComponent({
 
     const onRemoveLabelFilter = async (filter: LabelFilter) => {
       grid.removeLabelFilter(filter);
+      await requestOnScreen({ skipCache: true });
+    };
+
+    const onNegateLabelGroup = async (group: number, negate: boolean) => {
+      grid.setLabelGroupNegated(group, negate);
       await requestOnScreen({ skipCache: true });
     };
 
@@ -2368,6 +2374,7 @@ export default defineComponent({
       onSuffixChange,
       onAddLabelFilter,
       onRemoveLabelFilter,
+      onNegateLabelGroup,
       onClearLabelFilters,
       sortOptions,
       usageFilterOptions,
