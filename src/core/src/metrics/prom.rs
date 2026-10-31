@@ -744,7 +744,8 @@ fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
     super::get_prom_metadata_from_schema(schema).map(Into::into)
 }
 
-/// Default lookback window for `/api/v1/series` when `start` is omitted.
+/// Default lookback window for `/api/v1/series` and `/api/v1/label/{name}/values` when `start`
+/// is omitted.
 ///
 /// The Prometheus spec makes `start`/`end` optional (defaulting to the full
 /// TSDB range), but an unbounded range is rejected by the file_list layer and
@@ -767,13 +768,36 @@ fn normalize_series_time_range(start: i64, end: i64) -> (i64, i64) {
     (start, end)
 }
 
+fn metadata_search_request(sql: String, start: i64, end: i64) -> config::meta::search::Request {
+    let (start, end) = normalize_series_time_range(start, end);
+    config::meta::search::Request {
+        query: config::meta::search::Query {
+            sql,
+            from: 0,
+            size: 1000,
+            start_time: start,
+            end_time: end,
+            ..Default::default()
+        },
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
+        clusters: vec![],
+        timeout: 0,
+        search_type: None,
+        search_event_context: None,
+        use_cache: default_use_cache(),
+        clear_cache: false,
+        local_mode: None,
+        agent_options: None,
+    }
+}
+
 pub async fn get_series(
     org_id: &str,
     selector: Option<parser::VectorSelector>,
     start: i64,
     end: i64,
 ) -> Result<Vec<serde_json::Value>> {
-    let (start, end) = normalize_series_time_range(start, end);
     let metric_name = match selector.as_ref().and_then(try_into_metric_name) {
         Some(name) => name,
         None => {
@@ -794,26 +818,7 @@ pub async fn get_series(
         return Ok(vec![]);
     };
 
-    let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql,
-            from: 0,
-            size: 1000,
-            start_time: start,
-            end_time: end,
-            ..Default::default()
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
-        use_cache: default_use_cache(),
-        clear_cache: false,
-        local_mode: None,
-        agent_options: None,
-    };
+    let req = metadata_search_request(sql, start, end);
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
             log::error!("search series error: org_id: {org_id}, error: {err}");
@@ -974,26 +979,7 @@ pub async fn get_label_values(
 
     let sql = metadata_sql(&metric_name, &[&label_name], &schema, selector.as_ref());
 
-    let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql,
-            from: 0,
-            size: 1000,
-            start_time: start,
-            end_time: end,
-            ..Default::default()
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
-        use_cache: default_use_cache(),
-        clear_cache: false,
-        local_mode: None,
-        agent_options: None,
-    };
+    let req = metadata_search_request(sql, start, end);
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
         Ok(resp) => resp
             .hits
@@ -1106,7 +1092,11 @@ fn metadata_sql(
         })
         .map(|mat| {
             let name = quote_identifier(&mat.name);
-            let value = quote_sql_string(&mat.value);
+            // the parser's regex is anchored as `^(?:...)$`; `re_match` searches anywhere
+            let value = match &mat.op {
+                MatchOp::Re(regex) | MatchOp::NotRe(regex) => quote_sql_string(regex.as_str()),
+                MatchOp::Equal | MatchOp::NotEqual => quote_sql_string(&mat.value),
+            };
             let predicate = match &mat.op {
                 MatchOp::Equal => format!("{name} = {value}"),
                 MatchOp::NotEqual => format!("{name} != {value}"),
@@ -1491,7 +1481,12 @@ mod tests {
                 let parser::Expr::VectorSelector(selector) = parser::parse(&promql).unwrap() else {
                     panic!("expected a vector selector");
                 };
-                assert_eq!(selector.matchers.matchers[0].value, value);
+                let matcher = &selector.matchers.matchers[0];
+                assert_eq!(matcher.value, value);
+                let literal_value = match &matcher.op {
+                    MatchOp::Re(regex) | MatchOp::NotRe(regex) => regex.as_str(),
+                    _ => value,
+                };
                 for (sql, projection) in [
                     (
                         metadata_sql("up", &["job"], &schema, Some(&selector)),
@@ -1508,7 +1503,10 @@ mod tests {
                         let mut literals = 0;
                         let _ = visit_expressions_mut(&mut statements, |expr| {
                             if let Expr::Value(literal) = expr {
-                                assert_eq!(literal.value, Value::SingleQuotedString(value.into()));
+                                assert_eq!(
+                                    literal.value,
+                                    Value::SingleQuotedString(literal_value.into())
+                                );
                                 literal.value = Value::SingleQuotedString(String::new());
                                 literals += 1;
                             }
@@ -1658,6 +1656,84 @@ mod tests {
                 .collect::<Vec<_>>();
             hashes.sort();
             assert_eq!(hashes, expected, "{query}");
+        }
+    }
+
+    #[tokio::test]
+    async fn metadata_sql_anchors_regex_matchers_to_the_whole_value() {
+        use std::sync::Arc;
+
+        use datafusion::{
+            arrow::{array::StringArray, record_batch::RecordBatch},
+            prelude::SessionContext,
+        };
+        use search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
+
+        let values = [
+            "api", "work", "apix", "xwork", "xapix", "apiwork", "apix-x", "workx",
+        ];
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEX_MATCH_UDF.clone());
+        ctx.register_udf(REGEX_NOT_MATCH_UDF.clone());
+        let batch = RecordBatch::try_from_iter(vec![
+            (
+                HASH_LABEL,
+                Arc::new(StringArray::from(values.to_vec())) as _,
+            ),
+            ("job", Arc::new(StringArray::from(values.to_vec())) as _),
+        ])
+        .unwrap();
+        let schema = batch.schema();
+        ctx.register_batch("up", batch).unwrap();
+        for (query, expected) in [
+            (r#"up{job=~"api|work"}"#, vec!["api", "work"]),
+            (
+                r#"up{job!~"api|work"}"#,
+                vec!["apiwork", "apix", "apix-x", "workx", "xapix", "xwork"],
+            ),
+            (r#"up{job=~"^api$|work"}"#, vec!["api", "work"]),
+            (r#"up{job=~"(?:api|work)x"}"#, vec!["apix", "workx"]),
+            (
+                r#"up{job!~"(api|work)x"}"#,
+                vec!["api", "apiwork", "apix-x", "work", "xapix", "xwork"],
+            ),
+            (
+                r#"up{job=~"api.*"}"#,
+                vec!["api", "apiwork", "apix", "apix-x"],
+            ),
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected a vector selector");
+            };
+            let matcher = &selector.matchers.matchers[0];
+            let mut matching = values
+                .into_iter()
+                .filter(|value| matcher.is_match(value))
+                .collect::<Vec<_>>();
+            matching.sort_unstable();
+            assert_eq!(matching, expected, "{query}: the parser's own matching");
+            for sql in [
+                metadata_sql("up", &["job"], &schema, Some(&selector)),
+                series_sql("up", &schema, Some(&selector)).unwrap(),
+            ] {
+                let batches = ctx.sql(&sql).await.unwrap().collect().await.unwrap();
+                let mut actual = batches
+                    .iter()
+                    .flat_map(|batch| {
+                        batch
+                            .column_by_name("job")
+                            .unwrap()
+                            .as_any()
+                            .downcast_ref::<StringArray>()
+                            .unwrap()
+                            .iter()
+                            .map(|value| value.unwrap().to_string())
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                actual.sort_unstable();
+                assert_eq!(actual, expected, "{query}: {sql}");
+            }
         }
     }
 
@@ -2008,6 +2084,22 @@ mod tests {
         let (start, end) = normalize_series_time_range(0, 0);
         assert!(end >= before);
         assert_eq!(start, end - DEFAULT_SERIES_LOOKBACK_MICROS);
+    }
+
+    #[test]
+    fn metadata_search_request_bounds_a_missing_start() {
+        let end = now_micros();
+        let req = metadata_search_request("SELECT 1".to_string(), 0, end);
+        assert_eq!(req.query.start_time, end - DEFAULT_SERIES_LOOKBACK_MICROS);
+        assert_eq!(req.query.end_time, end);
+        let req = metadata_search_request("SELECT 1".to_string(), 0, 0);
+        assert!(req.query.start_time > 0);
+        assert_eq!(
+            req.query.end_time - req.query.start_time,
+            DEFAULT_SERIES_LOOKBACK_MICROS
+        );
+        let req = metadata_search_request("SELECT 1".to_string(), 1_000, 2_000);
+        assert_eq!((req.query.start_time, req.query.end_time), (1_000, 2_000));
     }
 
     #[test]
