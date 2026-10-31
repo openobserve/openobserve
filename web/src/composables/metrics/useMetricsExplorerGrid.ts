@@ -1447,21 +1447,26 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     }
   };
 
+  const probeWindow = (): QueryWindow => ({
+    start: timeRange.value.end_time,
+    end: timeRange.value.end_time,
+  });
+  const probeKey = (expr: string) => previewCacheKey(expr, MIN_STEP_SECONDS, probeWindow(), true);
+  const probeKeysOf = (card: MetricCard) =>
+    EXPORT_INTERVAL_PROBE_WINDOWS.map((s) =>
+      probeKey(buildExportIntervalQuery(operandStreamsOf(card)[0] ?? card.name, s)),
+    );
+
   /** The stream's export interval, from the most samples one series holds at the window's end. */
-  const measureExportInterval = async (
-    stream: string,
-    owner: string,
-    priority: number,
-  ): Promise<number | null> => {
-    const end = timeRange.value.end_time;
-    const window = { start: end, end };
+  const measureExportInterval = async (stream: string, owner: string): Promise<number | null> => {
     for (const windowSeconds of EXPORT_INTERVAL_PROBE_WINDOWS) {
       const expr = buildExportIntervalQuery(stream, windowSeconds);
+      const window = probeWindow();
       let response: any;
       try {
         response = await queue.run(
-          previewCacheKey(expr, MIN_STEP_SECONDS, window, true),
-          priority,
+          probeKey(expr),
+          PRIORITY.BACKGROUND,
           (signal) => streamQuery(expr, MIN_STEP_SECONDS, signal, 1, window, "instant"),
           { owner, cache: false },
         );
@@ -1491,15 +1496,17 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     void requestPreview(card, { realign: true });
   };
 
-  /** Measures the card's export interval in the background; never awaited, so the first render keeps its step. */
+  /** Measures an on-screen card's export interval once its chart has landed, behind every preview in the queue. */
   const ensureExportInterval = (card: MetricCard, priority: number) => {
+    // A prefetched card is not on screen, and one still loading must chart before it is measured.
+    if (priority === PRIORITY.PREFETCH || previews.value[card.name]?.status !== "done") return;
     // A never-written metric has no cadence to find, and the long tail of them would each cost two probes.
     if (!card.hasData) return;
     const key = exportIntervalKey(card);
     const stream = operandStreamsOf(card)[0] ?? card.name;
     const epoch = previewsEpoch;
     exportIntervalCache
-      .detect(key, () => measureExportInterval(stream, card.name, priority))
+      .detect(key, () => measureExportInterval(stream, card.name))
       .then((interval) => {
         if (epoch !== previewsEpoch) return;
         measuredIntervals.set(key, interval ?? 0);
@@ -1706,7 +1713,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     }
 
     const step = stepFor(card, points);
-    ensureExportInterval(card, opts?.priority ?? PRIORITY.VISIBLE);
+    const priority = opts?.priority ?? PRIORITY.VISIBLE;
+    ensureExportInterval(card, priority);
 
     // Already resolved — reuse it, fire NO query. A card that already has a
     // SETTLED preview (done/no-data/unavailable) is just being re-triggered
@@ -1755,7 +1763,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // A realign may paint from the persisted aligned result over the chart it replaces.
     if (!opts?.skipCache && (opts?.realign || !previews.value[card.name])) {
       const restored = await restoreFromCache(card, resolved, defaults, step, epoch);
-      if (restored === "painted") return realignIfStale(card);
+      if (restored === "painted") return ensureExportInterval(card, priority);
       if (restored === "recheck") forcedRecheck = true;
     }
 
@@ -1914,7 +1922,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       markEmptiness(card.name, !results.some(hasSamples) && !sparse);
       rememberPreview(card.name);
       persistToCache(card, previews.value[card.name], resolved.queries, step);
-      realignIfStale(card);
+      ensureExportInterval(card, priority);
     } catch (error: any) {
       // A cancelled request belongs to a state the user has already left; it is
       // not an error the card should show. Restore whatever was on screen before
@@ -2039,7 +2047,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   };
 
   const cancelPreview = (card: MetricCard) => {
-    for (const key of previewKeysOf(card)) queue.cancel(key, card.name);
+    for (const key of [...previewKeysOf(card), ...probeKeysOf(card)]) queue.cancel(key, card.name);
   };
 
   /** Time or filters changed: every in-flight preview is now for the wrong state. */

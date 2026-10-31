@@ -638,10 +638,30 @@ describe("useMetricsExplorerGrid", () => {
       intervalProbes.measure = true;
     });
 
-    it("charts at the range step first, then re-queries aligned once the interval lands", async () => {
+    /** Requests the card's preview and lands it, leaving the probe that follows in flight. */
+    const charted = async (grid: any, card: any, opts?: any) => {
+      const preview = grid.requestPreview(card, opts);
+      await flush();
+      land(ranges()[0], SERIES);
+      await preview;
+      await flush();
+    };
+
+    it("charts at the range step first, probing only once that chart has landed", async () => {
       const grid = await setup();
       const card = cardNamed(grid, COUNTER);
       const preview = grid.requestPreview(card);
+      await flush();
+
+      // Nothing measures while the first chart is still loading.
+      expect(probes()).toEqual([]);
+      // 1h over 50 points: a 72s step and a [1m27s] window at the org's 15s scrape.
+      expect(ranges().map((q) => [q.query, q.step])).toEqual([
+        [`sum(rate({__name__="${COUNTER}"}[1m27s]))`, "72s"],
+      ]);
+      land(ranges()[0], SERIES);
+      await preview;
+      expect(grid.previews.value[COUNTER].status).toBe("done");
       await flush();
 
       expect(probes().map((q) => q.query)).toEqual([
@@ -649,15 +669,6 @@ describe("useMetricsExplorerGrid", () => {
       ]);
       expect(probes()[0].start).toBe(NOW_US);
       expect(probes()[0].end).toBe(NOW_US);
-      // 1h over 50 points: a 72s step and a [1m27s] window at the org's 15s scrape.
-      expect(ranges().map((q) => [q.query, q.step])).toEqual([
-        [`sum(rate({__name__="${COUNTER}"}[1m27s]))`, "72s"],
-      ]);
-
-      // The first render lands while the probe is still out: detection never blocks it.
-      land(ranges()[0], SERIES);
-      await preview;
-      expect(grid.previews.value[COUNTER].status).toBe("done");
 
       // 10 samples in 10m: a 60s exporter, so a 120s step and a [4m] window.
       land(probes()[0], counted(10));
@@ -678,12 +689,57 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.rateWindowFor(card)).toBe("4m");
     });
 
+    it("never runs a probe ahead of a preview: it queues below every preview priority", async () => {
+      const grid = await setup();
+      const run = vi.spyOn(createdQueues.at(-1), "run");
+      await charted(grid, cardNamed(grid, COUNTER));
+
+      const calls = run.mock.calls.map(([key, priority]) => ({ key: String(key), priority }));
+      const probe = calls.findIndex((c) => c.key.includes("count_over_time"));
+      const chart = calls.findIndex((c) => c.key.includes("sum(rate("));
+      expect(chart).toBeGreaterThanOrEqual(0);
+      expect(probe).toBeGreaterThan(chart);
+      expect(calls[probe].priority).toBe(PRIORITY.BACKGROUND);
+      expect(PRIORITY.BACKGROUND).toBeGreaterThan(
+        Math.max(PRIORITY.DIALOG, PRIORITY.VISIBLE, PRIORITY.PREFETCH),
+      );
+    });
+
+    it("does not probe for a prefetched card", async () => {
+      const grid = await setup();
+      await charted(grid, cardNamed(grid, COUNTER), { priority: PRIORITY.PREFETCH });
+      expect(probes()).toEqual([]);
+    });
+
+    it("probes a prefetched card once it comes on screen", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, COUNTER);
+      await charted(grid, card, { priority: PRIORITY.PREFETCH });
+      await grid.requestPreview(card);
+      await flush();
+      expect(probes()).toHaveLength(1);
+    });
+
+    it("drops a hidden card's probe, and measures again when it is next seen", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, COUNTER);
+      await charted(grid, card);
+      const stranded = probes()[0];
+      grid.cancelPreview(card);
+      await flush();
+      land(stranded, counted(10));
+      await flush();
+      expect(ranges()).toEqual([]);
+      expect(grid.detailStepFor(card)).toBe(72);
+
+      await grid.requestPreview(card);
+      await flush();
+      expect(probes()).toHaveLength(1);
+    });
+
     it("re-queries nothing when the aligned step and window already match", async () => {
       const grid = await setup();
-      const preview = grid.requestPreview(cardNamed(grid, COUNTER));
-      await flush();
-      land(ranges()[0], SERIES);
-      await preview;
+      await charted(grid, cardNamed(grid, COUNTER));
 
       // One sample a second: 72s is already a multiple, and the 15s scrape still sizes the window.
       land(probes()[0], counted(600));
@@ -694,10 +750,7 @@ describe("useMetricsExplorerGrid", () => {
 
     it("re-counts over an hour for a sparse metric, and does not align when it still cannot tell", async () => {
       const grid = await setup();
-      const preview = grid.requestPreview(cardNamed(grid, COUNTER));
-      await flush();
-      land(ranges()[0], SERIES);
-      await preview;
+      await charted(grid, cardNamed(grid, COUNTER));
 
       land(probes()[0], counted(1));
       await flush();
@@ -713,12 +766,11 @@ describe("useMetricsExplorerGrid", () => {
 
     it("aligns from the first query once the interval is cached", async () => {
       const grid = await setup();
-      const preview = grid.requestPreview(cardNamed(grid, COUNTER));
-      await flush();
+      await charted(grid, cardNamed(grid, COUNTER));
       land(probes()[0], counted(10));
       await flush();
       inFlight.splice(0).forEach((q) => q.complete(SERIES));
-      await preview;
+      await flush();
       await flush();
 
       // A new window clears every preview; the cached interval aligns the very next query.
@@ -726,24 +778,21 @@ describe("useMetricsExplorerGrid", () => {
       inFlight.length = 0;
       const again = grid.requestPreview(cardNamed(grid, COUNTER));
       await flush();
-      expect(probes()).toEqual([]);
       // 2h over 50 points is 144s, aligned to 180s.
       expect(ranges().map((q) => q.step)).toEqual(["180s"]);
       land(ranges()[0], SERIES);
       await again;
+      await flush();
+      expect(probes()).toEqual([]);
     });
 
-    it("measures a stream once for cards asked about together", async () => {
+    it("measures a stream once however often its card asks", async () => {
       const grid = await setup();
       const card = cardNamed(grid, COUNTER);
-      const first = grid.requestPreview(card);
-      const second = grid.requestPreview(card, { skipCache: true });
+      await charted(grid, card);
+      await grid.requestPreview(card);
       await flush();
       expect(probes()).toHaveLength(1);
-      inFlight
-        .splice(0)
-        .forEach((q) => q.complete(q.queryType === "instant" ? counted(600) : SERIES));
-      await Promise.allSettled([first, second]);
     });
   });
 
