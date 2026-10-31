@@ -827,8 +827,7 @@ const buildFormValues = (overrides: Partial<CreateReportForm> = {}): CreateRepor
   ...overrides,
 });
 
-// Seed the form's values (create-query / edit prefill). Async-arriving data is
-// applied with `form.reset(values)`, not a per-field setFieldValue loop.
+// Replaces every value at once, for the edit prefill and a restored draft.
 const seedForm = async (values: CreateReportForm) => {
   await nextTick();
   form.reset(values);
