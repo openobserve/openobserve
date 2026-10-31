@@ -158,7 +158,7 @@ const globalOptions = {
     },
     TracesMetricsDashboard: {
       template: '<div data-test="traces-metrics-dashboard"></div>',
-      props: ["streamName", "timeRange", "filter", "show"],
+      props: ["streamName", "timeRange", "filter", "show", "aiEnabled"],
       methods: {
         loadDashboard: vi.fn(),
       },
@@ -274,6 +274,22 @@ describe("SearchResult", () => {
       expect(wrapper.emitted("metrics:editor-filter-set")).toEqual([
         ["(a = '1') and duration < '1ms'"],
       ]);
+    });
+  });
+
+  describe("heatmap Ask AI relay", () => {
+    it("hands the AI gate to the metrics dashboard", async () => {
+      const dashboard = () => wrapper.findComponent('[data-test="traces-metrics-dashboard"]');
+      expect(dashboard().props("aiEnabled")).toBe(false);
+      await wrapper.setProps({ aiEnabled: true });
+      expect(dashboard().props("aiEnabled")).toBe(true);
+    });
+
+    it("relays the dashboard's send-to-ai-chat payload unchanged", async () => {
+      const payload = { query: "q", chipName: "c", newChat: true, autoSend: false, context: {} };
+      const dashboard = wrapper.findComponent('[data-test="traces-metrics-dashboard"]');
+      await dashboard.vm.$emit("send-to-ai-chat", payload);
+      expect(wrapper.emitted("send-to-ai-chat")).toEqual([[payload]]);
     });
   });
 

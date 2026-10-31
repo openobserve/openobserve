@@ -35,8 +35,8 @@ vi.mock("./TracesLatencyHeatmap.vue", () => ({
   default: {
     name: "TracesLatencyHeatmap",
     template: '<div data-test="traces-latency-heatmap"></div>',
-    props: ["request", "selection"],
-    emits: ["select", "filter", "drill-down", "clear"],
+    props: ["request", "selection", "aiEnabled"],
+    emits: ["select", "filter", "drill-down", "clear", "ask-ai"],
   },
 }));
 
@@ -1369,6 +1369,66 @@ describe("TracesMetricsDashboard", () => {
       await flushPromises();
       expect(heatmap().props("selection")).toBeNull();
       expect(wrapper.emitted("editor-filter-run")).toEqual([[`(${raw}) and a = '1'`]]);
+    });
+
+    it("hands the heatmap the AI gate", async () => {
+      expect(heatmap().props("aiEnabled")).toBe(false);
+      await wrapper.setProps({ aiEnabled: true });
+      expect(heatmap().props("aiEnabled")).toBe(true);
+    });
+
+    it("asks AI about the box with the filter the charts ran, not an unrun edit", async () => {
+      await flushPromises();
+      await draw();
+      mockSearchObj.data.editorValue = "unrun = 1";
+      heatmap().vm.$emit("ask-ai", {
+        selection: BOX,
+        count: 40,
+        band: "100ms–500ms",
+        window: "10:02:00–10:02:40",
+      });
+      await flushPromises();
+      const from = new Date(T / 1000).toISOString();
+      const to = new Date((T + 40 * S) / 1000).toISOString();
+      expect(wrapper.emitted("send-to-ai-chat")).toEqual([
+        [
+          {
+            query: `I selected a box on the traces latency heatmap. Spans in the box: 40. Duration: 100ms–500ms. Time: ${from} to ${to} (shown as 10:02:00–10:02:40). I am searching traces. Stream: default. The filter expression is: ${raw}. This is a WHERE-clause filter — not a full SQL query. What do these spans have in common, and what explains their duration?`,
+            chipName: "Heatmap selection · 40 spans",
+            newChat: true,
+            autoSend: false,
+            context: {
+              currentPage: "traces",
+              selectedStreams: ["default"],
+              streamType: "traces",
+              currentQuery: raw,
+              searchMode: "traces",
+              timeRange: { type: "absolute", startTime: T, endTime: T + 40 * S },
+              durationRange: { startUs: 100_000, endUs: 500_000 },
+              organization_identifier: "test-org",
+            },
+          },
+        ],
+      ]);
+      expect(wrapper.emitted("editor-filter-set")).toBeUndefined();
+    });
+
+    it("names the charted stream and mode when they changed after the charts loaded", async () => {
+      await flushPromises();
+      await draw();
+      mockSearchObj.data.stream.selectedStream.value = "other_stream";
+      mockSearchObj.meta.searchMode = "spans";
+      heatmap().vm.$emit("ask-ai", {
+        selection: BOX,
+        count: 40,
+        band: "100ms–500ms",
+        window: "10:02:00–10:02:40",
+      });
+      await flushPromises();
+      const payload: any = wrapper.emitted("send-to-ai-chat")![0][0];
+      expect(payload.query).toContain("I am searching traces. Stream: default.");
+      expect(payload.context.selectedStreams).toEqual(["default"]);
+      expect(payload.context.searchMode).toBe("traces");
     });
   });
 
