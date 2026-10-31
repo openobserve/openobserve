@@ -1876,12 +1876,7 @@ mod tests {
     }
 
     async fn create_query_history_table() {
-        use sea_orm::{ConnectionTrait, Schema};
-        let conn = get_orm_client_rw().await;
-        let backend = conn.get_database_backend();
-        let mut stmt = Schema::new(backend)
-            .create_table_from_entity(infra_table::entity::query_history::Entity);
-        conn.execute(backend.build(stmt.if_not_exists()))
+        infra_table::query_history::create_table_for_tests(get_orm_client_rw().await)
             .await
             .unwrap();
     }
@@ -1906,14 +1901,24 @@ mod tests {
         };
         create_new_user(user).await.unwrap();
         for org in ["dummy", "other"] {
-            infra_table::query_history::record(org, email, "up", serde_json::json!({}), 1)
-                .await
-                .unwrap();
+            infra_table::query_history::record(infra_table::query_history::NewRun {
+                org_id: org,
+                user_email: email,
+                source: "logs",
+                query: "up",
+                query_key: None,
+                streams: &[],
+                status: "ok",
+                context: serde_json::json!({}),
+                now_us: 1,
+            })
+            .await
+            .unwrap();
         }
     }
 
     async fn history_count(org: &str, email: &str) -> usize {
-        infra_table::query_history::list(org, email, None, None, 10, 0)
+        infra_table::query_history::list(org, email, &Default::default(), 10, 0)
             .await
             .unwrap()
             .len()

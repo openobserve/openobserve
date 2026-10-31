@@ -46,12 +46,6 @@ impl MigrationTrait for Migration {
     }
 }
 
-/// Adds the column to a freshly created table (test setups that skip the migrator).
-pub(crate) async fn add_column<C: sea_orm::ConnectionTrait>(db: &C) -> Result<(), DbErr> {
-    let stmt = db.get_database_backend().build(&add_column_statement());
-    db.execute(stmt).await.map(|_| ())
-}
-
 fn add_column_statement() -> TableAlterStatement {
     Table::alter()
         .table(SlackLinkRequests::Table)

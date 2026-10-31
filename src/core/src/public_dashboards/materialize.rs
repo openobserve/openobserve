@@ -1457,6 +1457,7 @@ pub(super) mod tests {
             Run {
                 panels,
                 variables: vec![PublicVariable {
+                    name: "svc".into(),
                     label: "svc".into(),
                     value: json!("checkout"),
                     tab_id: None,

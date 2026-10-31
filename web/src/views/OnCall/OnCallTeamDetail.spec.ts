@@ -58,6 +58,7 @@ vi.mock("@/services/oncall", () => ({
     // Deleting a rotation is a whole-schedule save with one layer removed —
     // there is no per-rotation endpoint.
     setSchedule: vi.fn(),
+    testPage: vi.fn(),
   },
 }));
 
@@ -196,6 +197,127 @@ describe("OnCallTeamDetail", () => {
     second.findComponent({ name: "OnCallTeamAttention" }).vm.$emit("recheck");
     await flushPromises();
     expect(service.teamOverview).toHaveBeenCalledTimes(2);
+  });
+
+  // A policy written while its channel failed leaves the drawer open, and the page re-reads the ladder behind it.
+  it("re-reads the policy when the editor wrote it but stayed open", async () => {
+    const wrapper = render();
+    await flushPromises();
+    wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "policy");
+    await flushPromises();
+    const before = service.getPolicy.mock.calls.length;
+    await queryClient.invalidateQueries();
+
+    wrapper.findComponent({ name: "OnCallPolicyEditor" }).vm.$emit("policy-written");
+    await flushPromises();
+
+    expect(service.getPolicy.mock.calls.length).toBeGreaterThan(before);
+  });
+
+  // S7: the attention banner carries the findings; the header does not repeat them.
+  it("keeps the config-risk count out of the header", async () => {
+    service.teamConfigRisks.mockResolvedValue({
+      data: { team_id: "team_1", horizon_days: 14, total: 3, risks: [] },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-team-config-risks"]').exists()).toBe(false);
+  });
+
+  // S6: the strip is told who cannot be reached, from the reachability the page already read.
+  it("hands the coverage strip the people a page would not reach", async () => {
+    service.teamReachability.mockResolvedValue({
+      data: {
+        members: [
+          { user_email: "ana@corp.com", would_a_page_land: false },
+          { user_email: "bob@corp.com", would_a_page_land: true },
+        ],
+      },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+    wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "overview");
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "OnCallCoverageStrip" }).props("unreachable")).toEqual([
+      "ana@corp.com",
+    ]);
+  });
+
+  // S4: a test page is confirmed against who it would reach, then reported by count.
+  describe("sending a test page from the ladder", () => {
+    beforeEach(() => {
+      service.escalationPreview.mockResolvedValue({
+        data: {
+          priority: "P1",
+          pages_anyone: true,
+          channels: ["sms", "email", "voice"],
+          // Out of delay order on purpose: the server sends to the earliest step, not the first listed.
+          rungs: [
+            {
+              after_micros: 300_000_000,
+              targets: [],
+              recipients: [{ user_email: "cara@corp.com", deliverable_channels: ["voice"] }],
+              resolves_to_nobody: false,
+            },
+            {
+              after_micros: 0,
+              targets: [],
+              recipients: [
+                { user_email: "ana@corp.com", deliverable_channels: ["email", "sms"] },
+                { user_email: "bob@corp.com", deliverable_channels: ["email"] },
+              ],
+              resolves_to_nobody: false,
+            },
+          ],
+        },
+      } as any);
+    });
+
+    async function ask() {
+      const wrapper = render();
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "policy");
+      await flushPromises();
+      wrapper.findComponent({ name: "OnCallEscalationLadder" }).vm.$emit("send-test");
+      await flushPromises();
+      return wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c: any) => c.props("title") === "Send a test page?")!;
+    }
+
+    // The first step by delay, and only the channels its people can receive, which is what the server sends.
+    it("names the recipients and channels before sending anything", async () => {
+      const confirm = await ask();
+
+      expect(confirm.props("modelValue")).toBe(true);
+      expect(confirm.props("message")).toBe(
+        "Send a test page for P1 to ana@corp.com, bob@corp.com? Email, SMS. It does not escalate.",
+      );
+      expect(service.testPage).not.toHaveBeenCalled();
+    });
+
+    it("sends the selected priority on confirm and reports how many went out", async () => {
+      service.testPage.mockResolvedValue({
+        data: {
+          reached_anyone: true,
+          channels: ["email"],
+          attempts: [
+            { channel: "email", recipient: "ana@corp.com", reason: "", delivered: true },
+            { channel: "sms", recipient: "ana@corp.com", reason: "", delivered: false },
+          ],
+        },
+      } as any);
+      const confirm = await ask();
+      confirm.vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(service.testPage).toHaveBeenCalledWith(expect.objectContaining({ priority: 1 }));
+      expect(toasted).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "warning", message: "Sent 1 of 2 messages" }),
+      );
+    });
   });
 
   describe("the coverage chip", () => {
@@ -684,9 +806,7 @@ describe("OnCallTeamDetail", () => {
   describe("the schedule tab", () => {
     /// The delete confirm, told apart from the presets dialog's own by title.
     function deleteConfirm(wrapper: any) {
-      return wrapper
-        .findAllComponents({ name: "ConfirmDialog" })
-        .find((c: any) => c.props("title") === "Delete this rotation?");
+      return wrapper.findComponent({ name: "OnCallRemoveRotationDialog" });
     }
 
     async function openSchedule() {
@@ -757,7 +877,7 @@ describe("OnCallTeamDetail", () => {
 
       wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_primary");
       await flushPromises();
-      deleteConfirm(wrapper)!.vm.$emit("update:ok");
+      deleteConfirm(wrapper)!.vm.$emit("confirm");
       await flushPromises();
 
       const sent = service.setSchedule.mock.calls[0][0];
@@ -781,27 +901,65 @@ describe("OnCallTeamDetail", () => {
       wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_primary");
       await flushPromises();
 
-      // BY TITLE, not `findComponent`: the presets dialog mounts a ConfirmDialog
-      // of its own and sits earlier in the tree, so the first match is its
-      // "Replace the current schedule?" — which is always closed, and would
-      // make this assertion pass for the wrong reason if it ever inverted.
       const confirm = deleteConfirm(wrapper);
       // Named in the prompt: two rotations in one team routinely differ by one
       // word, and deleting the wrong one silently stops paging.
-      expect(confirm!.props("modelValue")).toBe(true);
-      expect(confirm!.props("messageKeypath")).toBe("oncall.laneDeleteMessage");
-      expect(confirm!.props("messageName")).toBe("Primary");
-      expect(confirm!.props("okVariant")).toBe("destructive");
-      const name = document.body.querySelector('[data-test="confirm-dialog-name"]');
-      expect(name?.textContent).toBe("Primary");
-      expect(name?.className).toContain("font-semibold");
+      expect(confirm!.props("open")).toBe(true);
+      // The title names the rotation; the body says who holds it now, by name.
+      expect(document.body.textContent).toContain("Delete the Primary rotation?");
+      expect(
+        document.body.querySelector('[data-test="oncall-remove-rotation-body"]')?.textContent,
+      ).toBe("Nobody is on call in Primary now. Once it's deleted, nobody takes over its shifts.");
+      // S11: the dialog reads the policy to say which escalation steps go with it.
+      expect(confirm!.props("rotationId")).toBe("rot_primary");
+      expect(confirm!.props("policy")).toEqual({ rungs: [] });
       expect(service.setSchedule).not.toHaveBeenCalled();
 
-      confirm!.vm.$emit("update:ok");
+      confirm!.vm.$emit("confirm");
       await flushPromises();
 
       const sent = service.setSchedule.mock.calls[0][0];
       expect(sent.data.rotations.map((r: any) => r.name)).not.toContain("Primary");
+    });
+
+    // S11: a hand-edited ladder that pages the rotation is edited first, from the dialog's link.
+    it("opens the policy editor when the dialog asks for the policy first", async () => {
+      service.getSchedule.mockResolvedValue({
+        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
+      } as any);
+      const wrapper = await openSchedule();
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_primary");
+      await flushPromises();
+
+      deleteConfirm(wrapper)!.vm.$emit("open-policy");
+      await flushPromises();
+
+      expect(deleteConfirm(wrapper)!.props("open")).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).props("open")).toBe(true);
+      expect(service.setSchedule).not.toHaveBeenCalled();
+    });
+
+    // The lane menu's delete is a human save too, so what is kept loses the default marker.
+    it("clears the default-staffing marker from the rotations a lane delete keeps", async () => {
+      service.setSchedule.mockResolvedValue({ data: {} });
+      service.getSchedule.mockResolvedValue({
+        data: {
+          timezone: "UTC",
+          rotations: [
+            { ...rotation("rot_primary", "Primary"), source: "default" },
+            { ...rotation("rot_second", "Secondary"), source: "default" },
+          ],
+        },
+      } as any);
+      const wrapper = await openSchedule();
+
+      wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_second");
+      await flushPromises();
+      deleteConfirm(wrapper)!.vm.$emit("confirm");
+      await flushPromises();
+
+      const sent = service.setSchedule.mock.calls[0][0].data.rotations;
+      expect(sent.map((r: any) => [r.name, r.source])).toEqual([["Primary", undefined]]);
     });
 
     it("drops the deleted rotation's draft and keeps another rotation's", async () => {
@@ -832,7 +990,7 @@ describe("OnCallTeamDetail", () => {
 
       wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_primary");
       await flushPromises();
-      deleteConfirm(wrapper)!.vm.$emit("update:ok");
+      deleteConfirm(wrapper)!.vm.$emit("confirm");
       await flushPromises();
 
       expect(readEditorDraft(scopeFor("rot_primary"))).toBeNull();
@@ -898,11 +1056,11 @@ describe("OnCallTeamDetail", () => {
 
       wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "Primary");
       await flushPromises();
-      deleteConfirm(wrapper)!.vm.$emit("update:cancel");
+      deleteConfirm(wrapper)!.vm.$emit("update:open", false);
       await flushPromises();
 
       expect(service.setSchedule).not.toHaveBeenCalled();
-      expect(deleteConfirm(wrapper)!.props("modelValue")).toBe(false);
+      expect(deleteConfirm(wrapper)!.props("open")).toBe(false);
     });
 
     /// The point of saving is to see what the engine now says. The editor's own

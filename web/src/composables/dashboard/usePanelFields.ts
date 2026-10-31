@@ -84,6 +84,7 @@ export const usePanelFields = ({
       case "bar-gauge":
       case "state-timeline":
       case "funnel":
+      case "boxplot":
       case "hostmap":
       case "area":
       case "bar":
@@ -104,6 +105,7 @@ export const usePanelFields = ({
       case "node-graph":
       case "alert-list":
       case "flame-graph":
+      case "logs":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 0
@@ -150,6 +152,8 @@ export const usePanelFields = ({
       case "node-graph":
       case "alert-list":
       case "flame-graph":
+      case "boxplot":
+      case "logs":
         return true;
       case "hostmap":
         return (
@@ -176,6 +180,7 @@ export const usePanelFields = ({
       case "treemap":
       case "sunburst":
       case "funnel":
+      case "boxplot":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1
@@ -183,6 +188,7 @@ export const usePanelFields = ({
       case "node-graph":
       case "alert-list":
       case "flame-graph":
+      case "logs":
         return true;
       case "metric":
         return (
@@ -400,6 +406,7 @@ export const usePanelFields = ({
       type: "build",
       functionName:
         dashboardPanelData.data.type == "heatmap" ||
+        dashboardPanelData.data.type == "boxplot" ||
         isRawValueChart(dashboardPanelData.data.type) ||
         isDerived
           ? null

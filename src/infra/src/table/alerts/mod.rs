@@ -220,6 +220,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
         alert.notify_on_recovery = value.notify_on_recovery.unwrap_or(false);
         alert.recovery_destinations = recovery_destinations;
         alert.keep_firing_for = value.keep_firing_for_seconds.unwrap_or(0);
+        alert.suppress_repeats = value.suppress_repeats.unwrap_or(false);
 
         Ok(alert)
     }
@@ -958,6 +959,7 @@ fn update_mutable_fields(
         Some(serde_json::to_string(&alert.recovery_destinations)?)
     };
     let keep_firing_for_seconds = alert.keep_firing_for;
+    let suppress_repeats = alert.suppress_repeats;
 
     alert_am.name = Set(name);
     alert_am.is_real_time = Set(is_real_time);
@@ -1016,6 +1018,7 @@ fn update_mutable_fields(
     alert_am.notify_on_recovery = Set(Some(notify_on_recovery));
     alert_am.recovery_destinations = Set(recovery_destinations);
     alert_am.keep_firing_for_seconds = Set(Some(keep_firing_for_seconds));
+    alert_am.suppress_repeats = Set(Some(suppress_repeats));
     Ok(())
 }
 
@@ -1096,6 +1099,7 @@ pub(super) mod tests {
             notify_on_recovery: None,
             recovery_destinations: None,
             keep_firing_for_seconds: None,
+            suppress_repeats: None,
         }
     }
 

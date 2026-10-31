@@ -60,7 +60,7 @@ const retries = computed({
   },
 });
 
-const retryDelayMs = computed({
+const retryDelaySecs = computed({
   get: () => props.check.waitBeforeRetrySecs ?? 0,
   set: (v: string | number) =>
     emit("update:check", { ...props.check, waitBeforeRetrySecs: Number(v) }),
@@ -111,7 +111,7 @@ const retryDelayMs = computed({
           t("synthetics.scheduleAlert.retryDelay")
         }}</label>
         <OInput
-          v-model="retryDelayMs"
+          v-model="retryDelaySecs"
           type="number"
           class="w-25!"
           :placeholder="raw('0')"

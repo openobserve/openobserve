@@ -354,6 +354,9 @@ pub struct TriggerData {
     /// Whether a firing tried a destination, workflow or incident notification; None on old rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivery_attempted: Option<bool>,
+    /// Set when `suppress_repeats` withheld a notification that repeated the last delivered state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repeat_suppressed: Option<bool>,
     /// "scheduled" or "manual"; None on older rows, which read as scheduled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trigger_source: Option<String>,
@@ -413,6 +416,7 @@ impl Default for TriggerData {
             ack_source: None,
             taken_over_from: None,
             delivery_attempted: None,
+            repeat_suppressed: None,
             trigger_source: None,
             triggered_by: None,
             recipient_count: None,
@@ -473,6 +477,7 @@ impl TriggerData {
             ack_source: Some(AckSource::Api),
             taken_over_from: Some(String::new()),
             delivery_attempted: Some(true),
+            repeat_suppressed: None,
             trigger_source: Some(String::new()),
             triggered_by: Some(String::new()),
             recipient_count: Some(0),
@@ -1915,6 +1920,7 @@ mod tests {
             ack_source: None,
             taken_over_from: None,
             delivery_attempted: None,
+            repeat_suppressed: None,
             trigger_source: None,
             triggered_by: None,
             recipient_count: None,

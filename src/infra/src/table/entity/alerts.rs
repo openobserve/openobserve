@@ -92,6 +92,8 @@ pub struct Model {
     /// How long the condition must stay clear before the episode recovers.
     /// NULL or 0 recovers on the first clear evaluation.
     pub keep_firing_for_seconds: Option<i64>,
+    /// NULL predates the feature, which is the same as `false`.
+    pub suppress_repeats: Option<bool>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -178,6 +180,7 @@ mod tests {
             notify_on_recovery: None,
             recovery_destinations: None,
             keep_firing_for_seconds: None,
+            suppress_repeats: None,
         };
         assert_eq!(m.id, "alert-1");
         assert_eq!(m.name, "High Error Rate");

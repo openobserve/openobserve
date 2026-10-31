@@ -20,11 +20,13 @@ import {
   displayStatus,
   lifecycleStatus,
   longRange,
+  orgSwitchedOff,
   printedWindow,
   publicLinkColumns,
   publicLinkSearchTerm,
   publicLinkUrl,
   shortRange,
+  statusLabel,
   statusReason,
   takeOverError,
 } from "@/components/dashboards/publicLinkDisplay";
@@ -143,6 +145,14 @@ describe("public link status", () => {
     );
     expect(statusReason(row({}), failing, gt)).toBe(attentionReason(failing, gt));
     expect(statusReason(row({}), undefined, gt)).toBeNull();
+  });
+
+  it("reads the org switch from the links, and keeps a disabled link's paused state in its label", () => {
+    expect(orgSwitchedOff([row({}), row({ status: "disabled" })])).toBe(true);
+    expect(orgSwitchedOff([row({}), row({ status: "paused" })])).toBe(false);
+    expect(statusLabel(row({ status: "disabled", enabled: false }), gt)).toBe("Disabled · Paused");
+    expect(statusLabel(row({ status: "disabled", enabled: true }), gt)).toBeUndefined();
+    expect(statusLabel(row({ status: "paused", enabled: false }), gt)).toBeUndefined();
   });
 
   it("shows Last viewed from the access time, not an update time", () => {
