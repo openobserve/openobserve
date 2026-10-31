@@ -190,7 +190,6 @@ export class TracesPage {
 
     this.moreMenuButton = '[data-test="traces-search-bar-more-menu-btn"]';
     this.openDropdownMenu = page.getByRole('menu');
-    this.menuSavedViewsGroup = '[data-test="traces-search-bar-menu-saved-views-group"]';
     this.menuPinSavedViewsButton = '[data-test="traces-search-bar-menu-pin-saved-views-btn"]';
     this.menuListSavedViewsButton = '[data-test="traces-search-bar-menu-list-saved-views-btn"]';
     this.menuCreateSavedViewButton = '[data-test="traces-search-bar-menu-create-saved-view-btn"]';
@@ -198,8 +197,6 @@ export class TracesPage {
     this.pinnedSavedViewsTrigger = '[data-test="traces-search-bar-saved-views-btn"]';
     this.pinnedSavedViewItemPrefix = '[data-test^="traces-saved-view-apply-"]';
     this.savedViewNameInput = '[data-test="traces-saved-view-name-input"]';
-    this.savedViewsListDialog = '[data-test="traces-saved-views-dialog"]';
-    this.savedViewsDialogApplyPrefix = '[data-test^="traces-saved-views-dialog-apply-"]';
 
     this.waterfallAxisLastLabels = '[data-test="trace-header-tic-label-3"]';
     this.spanBar = '[data-test="span-marker"]';
@@ -3086,10 +3083,7 @@ export class TracesPage {
   }
 
   async applySavedView(viewName) {
-    await this.page.locator('[data-test="traces-search-bar-saved-views-btn"]').click();
-    const view = this.page.locator('[data-test^="traces-saved-view-apply-"]').filter({ hasText: viewName }).first();
-    await view.waitFor({ state: 'visible', timeout: 10000 });
-    await view.click();
+    await this.applySavedViewFromMoreMenu(viewName);
   }
 
   // enterTraceQuery appends to existing text, so clear first and confirm the editor holds only `query`.
@@ -3154,22 +3148,25 @@ export class TracesPage {
   }
 
   async closeMoreMenu() {
-    await this.page.keyboard.press('Escape');
-    await expect(this.openDropdownMenu).toBeHidden({ timeout: 10000 });
+    // A nested submenu consumes the first Escape, so repeat until no menu is left.
+    await expect(async () => {
+      if (await this.openDropdownMenu.count()) await this.page.keyboard.press('Escape');
+      await expect(this.openDropdownMenu).toHaveCount(0, { timeout: 1000 });
+    }).toPass({ timeout: 10000 });
   }
 
   async expectMoreMenuSavedViewsEntriesVisible() {
-    const group = this.page.locator(this.menuSavedViewsGroup);
-    await expect(group).toBeVisible({ timeout: 10000 });
-    await expect(group.locator(this.menuPinSavedViewsButton)).toBeVisible();
-    await expect(group.locator(this.menuListSavedViewsButton)).toContainText(/list saved views/i);
-    await expect(group.locator(this.menuCreateSavedViewButton)).toContainText(/create saved view/i);
+    const trigger = this.page.locator(this.menuListSavedViewsButton);
+    await expect(trigger).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.menuPinSavedViewsButton)).toBeVisible();
+    await expect(trigger).toContainText(/saved views/i);
+    await trigger.click();
+    await expect(this.page.locator(this.menuCreateSavedViewButton)).toContainText(/create saved view/i);
   }
 
   /** Asserts on an open menu, so an unopened menu cannot pass for a missing group. */
   async expectMoreMenuSavedViewsEntriesHidden() {
     await expect(this.openDropdownMenu).toBeVisible({ timeout: 10000 });
-    await expect(this.page.locator(this.menuSavedViewsGroup)).toHaveCount(0);
     await expect(this.page.locator(this.menuListSavedViewsButton)).toHaveCount(0);
     await expect(this.page.locator(this.menuCreateSavedViewButton)).toHaveCount(0);
   }
@@ -3196,6 +3193,7 @@ export class TracesPage {
 
   async openCreateSavedViewFromMoreMenu() {
     await this.openMoreMenu();
+    await this.page.locator(this.menuListSavedViewsButton).click();
     await this.page.locator(this.menuCreateSavedViewButton).click();
     await expect(this.page.locator(this.savedViewNameInput)).toBeVisible({ timeout: 10000 });
   }
@@ -3207,21 +3205,14 @@ export class TracesPage {
     await view.click();
   }
 
-  async openSavedViewsListFromMoreMenu() {
+  async applySavedViewFromMoreMenu(viewName) {
     await this.openMoreMenu();
     await this.page.locator(this.menuListSavedViewsButton).click();
-    await expect(this.page.locator(this.savedViewsListDialog)).toBeVisible({ timeout: 10000 });
-  }
-
-  savedViewsDialogApplyCell(viewName) {
-    return this.page.locator(`${this.savedViewsListDialog} ${this.savedViewsDialogApplyPrefix}[data-test-view-name="${viewName}"]`);
-  }
-
-  async applySavedViewFromListDialog(viewName) {
-    const cell = this.savedViewsDialogApplyCell(viewName);
-    await expect(cell).toBeVisible({ timeout: 15000 });
-    await cell.click();
-    await expect(this.page.locator(this.savedViewsListDialog)).toBeHidden({ timeout: 10000 });
+    const view = this.page
+      .locator('[data-test^="traces-search-bar-menu-saved-views-apply-"]')
+      .filter({ has: this.page.getByText(viewName, { exact: true }) });
+    await expect(view).toBeVisible({ timeout: 15000 });
+    await view.click();
   }
 
   async expectQueryEditorEventuallyContains(text) {
