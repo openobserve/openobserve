@@ -518,7 +518,7 @@ function escapePromqlString(value: unknown): string {
  * cache key stable.
  *
  * @param {string} metricName
- * @param {Array<{label: I18nText, value: string, operator?: string}>|Record<string,string>} [filters]
+ * @param {Array<{label: I18nText, value: string, operator?: string, group?: number, negate?: boolean}>|Record<string,string>} [filters]
  * @param {Record<string,string>} [extraMatchers] appended verbatim as `=` matchers
  * @returns {string} e.g. `{__name__="http_requests_total",job="api"}`; OR groups give `(sel1 or sel2)`
  */
@@ -594,9 +594,9 @@ export function distributeUnionRanges(expr: string): string {
  * panel editor's PromQL builder stores. Sharing this step is what keeps the two
  * from drifting apart.
  *
- * @param {Array<{label: I18nText, value: string, operator?: string}>|Record<string,string>} [filters]
+ * @param {Array<{label: I18nText, value: string, operator?: string, group?: number, negate?: boolean}>|Record<string,string>} [filters]
  * @param {Record<string,string>} [extraMatchers] appended as `=` matchers
- * @returns {Array<{label: I18nText, operator: string, value: string}>}
+ * @returns {Array<{label: I18nText, operator: string, value: string, group?: number, negate?: boolean}>}
  */
 function normalizeMatchers(
   filters?: FiltersArg,
@@ -648,7 +648,7 @@ function normalizeMatchers(
  * Values are handed over RAW: the query modeller escapes them itself when it
  * renders, so escaping here would double it.
  *
- * @returns {Array<{label: I18nText, op: string, value: string}>}
+ * @returns {Array<{label: I18nText, op: string, value: string, group?: number, negate?: boolean}>}
  */
 export function builderLabelsOf(filters?: FiltersArg): PromqlLabelMatcher[] {
   return normalizeMatchers(filters).map(({ label, operator, value, group, negate }) => {
@@ -703,7 +703,7 @@ export function isRateBasedKind(cardKind: string): boolean {
  * empty only when the window truly holds nothing.
  *
  * @param {string} streamName
- * @param {Array<{label: I18nText, value: string, operator?: string}>} [filters]
+ * @param {Array<{label: I18nText, value: string, operator?: string, group?: number, negate?: boolean}>} [filters]
  * @returns {string} PromQL
  */
 export function buildPresenceQuery(streamName: string, filters?: FiltersArg): string {
