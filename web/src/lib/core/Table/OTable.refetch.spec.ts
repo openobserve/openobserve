@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
-import { mount, VueWrapper, config } from "@vue/test-utils";
+import { mount, VueWrapper, config, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import { nextTick, reactive } from "vue";
 import OTable from "./OTable.vue";
@@ -224,5 +224,43 @@ describe("OTable refetch keeps settled rows", () => {
     await wrapper.setProps({ data: makeRows(1, "Fresh"), loading: false });
     expect(wrapper.find(TABLE).attributes("data-test-loading")).toBe("false");
     expect(bodyText()).toContain("Fresh 1");
+  });
+});
+
+describe("OTable kept rows keep the table's own state", () => {
+  afterEach(() => wrapper?.unmount());
+
+  it("stays on the current page while a refetch keeps the rows and after it settles", async () => {
+    const rows = makeRows(30);
+    mountTable({ data: rows, pageSize: 10 });
+    wrapper.vm.table.setPageIndex(1);
+    await flushPromises();
+    expect(bodyText()).toContain("User 11");
+
+    await wrapper.setProps({ loading: true });
+    await flushPromises();
+    expect(wrapper.vm.table.getState().pagination.pageIndex).toBe(1);
+    expect(bodyText()).toContain("User 11");
+
+    await wrapper.setProps({ loading: false });
+    await flushPromises();
+    expect(wrapper.vm.table.getState().pagination.pageIndex).toBe(1);
+    expect(bodyText()).toContain("User 11");
+  });
+
+  it("keeps the tree's chevrons and indentation on kept rows", async () => {
+    const treeRows = [{ id: 1, name: "Parent", children: [{ id: 2, name: "Child" }] }];
+    mountTable({ data: treeRows, tree: true, expandedIds: ["1"] });
+    const toggle = '[data-test="o2-table-tree-toggle-id"]';
+    const childIndent = () =>
+      (wrapper.findAll(`${BODY} tr`)[1].find("td div").element as HTMLElement).style.paddingLeft;
+    expect(wrapper.find(toggle).exists()).toBe(true);
+    const indent = childIndent();
+    expect(indent).not.toBe("0px");
+
+    await wrapper.setProps({ loading: true });
+    expect(wrapper.find(BODY).attributes("data-test-stale")).toBe("true");
+    expect(wrapper.find(toggle).exists()).toBe(true);
+    expect(childIndent()).toBe(indent);
   });
 });
