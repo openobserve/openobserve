@@ -57,6 +57,9 @@ export const pagerdutyTemplate = {
   isDefault: false,
 };
 
+export const PAGERDUTY_US_EVENTS_URL = "https://events.pagerduty.com/v2/enqueue";
+export const PAGERDUTY_EU_EVENTS_URL = "https://events.eu.pagerduty.com/v2/enqueue";
+
 export const pagerdutyConfig: PrebuiltConfig = {
   templateName: "prebuilt_pagerduty",
   templateBody: pagerdutyTemplate.body,
@@ -75,6 +78,14 @@ export const pagerdutyConfig: PrebuiltConfig = {
         key.length === 32 || {
           key: "alerts.prebuiltDestinations.pagerdutyIntegrationKeyLength",
         },
+    },
+    {
+      // Not persisted in metadata: an edit reads the region back from the saved URL.
+      key: "euRegion",
+      labelKey: "alerts.prebuiltDestinations.pagerdutyEuRegion",
+      type: "toggle",
+      required: false,
+      hintKey: "alerts.prebuiltDestinations.pagerdutyEuRegionHelp",
     },
     {
       key: "severity",

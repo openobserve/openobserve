@@ -828,9 +828,12 @@ export default defineComponent({
     };
 
     const navGateContext = useNavGateContext();
-    // Same gate and route check the nav flyout applies to the On-Call entries.
+    // Waits for an explicit `true`: the gate is open before the full config loads, and unmounting the first menu item then drops keyboard focus.
     const showMyOncall = computed(
-      () => isGateOpen(navGateContext.value, "oncall") && props.router.hasRoute("onCallMine"),
+      () =>
+        props.store.state.zoConfig?.oncall_enabled === true &&
+        isGateOpen(navGateContext.value, "oncall") &&
+        props.router.hasRoute("onCallMine"),
     );
 
     const goToMyOncall = () => {

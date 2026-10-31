@@ -439,6 +439,7 @@ const subTabs = computed(() => [
   { value: "overview", label: t("rum.analytics.subtabs.overview") },
   { value: "funnels", label: t("rum.analytics.subtabs.funnels") },
   { value: "paths", label: t("rum.analytics.subtabs.paths") },
+  { value: "heatmaps", label: t("rum.analytics.subtabs.heatmaps") },
   { value: "retention", label: t("rum.analytics.subtabs.retention") },
   { value: "events", label: t("rum.analytics.subtabs.events") },
 ]);

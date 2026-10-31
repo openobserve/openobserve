@@ -849,6 +849,27 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
     expect(credentials.severity).toBe("critical");
   });
 
+  it.each([
+    ["https://events.eu.pagerduty.com/v2/enqueue", true],
+    ["https://events.pagerduty.com/v2/enqueue", false],
+  ])("restores the PagerDuty EU region toggle from the saved URL %s", async (url, euRegion) => {
+    const existingPagerDuty = {
+      name: "pagerduty-alerts",
+      url,
+      type: "http",
+      method: "post",
+      destination_type_name: "pagerduty",
+      template: "prebuilt_pagerduty",
+      skip_tls_verify: false,
+      headers: {},
+      metadata: { prebuilt_type: "pagerduty", routing_key: "x".repeat(32), severity: "critical" },
+    };
+    wrapper = mountComp({ isAlerts: true, destination: existingPagerDuty });
+    await flushPromises();
+
+    expect(getForm(wrapper).state.values.credentials.euRegion).toBe(euRegion);
+  });
+
   // The DOM wiring that makes Enter-in-any-field AND the footer Save submit the
   // ONE form: the single credential-bearing <form> carries the OForm id, the Save
   // button is type=submit associated to that same id, and there is no second form

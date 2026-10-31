@@ -98,6 +98,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-if="!sessionNotFound" #actions>
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="grid-on"
+        :disabled="heatmapOpening"
+        data-test="session-viewer-view-heatmap-btn"
+        @click="openSessionHeatmap(String(getSessionId), viewerStartUs)"
+      >
+        {{ t("rum.heatmap.viewHeatmap") }}
+        <OTooltip :content="t('rum.heatmap.viewHeatmapTip')" side="bottom" />
+      </OButton>
       <ShareButton
         data-test="session-viewer-share-link-btn"
         :url="shareUrl"
@@ -302,11 +313,13 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useStreams from "@/composables/useStreams";
 import { sessionEventsProbeSql, type StepKind } from "@/utils/rum/productAnalyticsQueries";
 import { MAX_KEY_LENGTH } from "@/utils/rum/productAnalyticsModel";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
+import useSessionHeatmap from "@/composables/rum/useSessionHeatmap";
 import analytics from "@/services/product_analytics";
 
 import { formatDate } from "@/utils/date";
@@ -550,6 +563,7 @@ const markedTimestamps = computed<number[]>(() => {
 });
 
 const getSessionId = computed(() => router.currentRoute.value.params.id);
+const { openSessionHeatmap, opening: heatmapOpening } = useSessionHeatmap();
 
 // Read event_time query parameter
 const eventTime = computed(() => {
@@ -589,6 +603,9 @@ const sessionDetails = ref({
 const sessionStartMs = computed(
   () =>
     Number(sessionState.data.selectedSession?.start_time) || Number(manifest.value[0]?.start) || 0,
+);
+const viewerStartUs = computed(
+  () => Number(router.currentRoute.value.query.start_time) || sessionStartMs.value * 1000,
 );
 
 // Session ms of the first full snapshot; nothing before it can be drawn, so seeks there land on it.
