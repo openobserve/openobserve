@@ -158,7 +158,7 @@ describe("pairHostFlows", () => {
 });
 
 describe("layoutHostGraph", () => {
-  it("lists hosts before networks before unnamed addresses in a column", () => {
+  it("puts networks and unnamed addresses past the hosts, networks first", () => {
     const graph = buildGraph(
       pairHostFlows([
         flow("web", "", "lan", "unknown", 1),
@@ -166,8 +166,11 @@ describe("layoutHostGraph", () => {
         flow("web", "web", "", "unknown", 1),
       ]),
     );
-    const positions = layoutHostGraph(graph.nodes);
-    const ys = ["web", "lan", "(unnamed)"].map((id) => positions.get(id)!.y);
-    expect(ys).toEqual([...ys].sort((a, b) => a - b));
+    const positions = layoutHostGraph(graph);
+    const at = (id: string) => positions.get(id)!;
+    // Networks and unnamed addresses in a column past the hosts, networks first.
+    expect(at("lan").x).toBe(at("(unnamed)").x);
+    expect(at("lan").x).toBeGreaterThan(at("web").x);
+    expect(at("lan").y).toBeLessThan(at("(unnamed)").y);
   });
 });

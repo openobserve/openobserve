@@ -22,7 +22,7 @@ import {
   layoutColumns,
   pairEnds,
   type FlowEdge,
-  type GraphNode,
+  type FlowGraph,
 } from "./kubernetes2/dependencyGraph";
 
 // "host" is a name equal to a host's host_name; "unnamed" is an address no entry contains.
@@ -59,6 +59,11 @@ export function pairHostFlows(series: Series[], knownHosts: string[] = []): Host
 
 const ORDER: Record<HostEndKind, number> = { host: 0, network: 1, unnamed: 2 };
 
-// Hosts first, then networks, then unnamed addresses, by name in every column.
-export const layoutHostGraph = (nodes: GraphNode<HostEnd>[]) =>
-  layoutColumns(nodes, (x, y) => ORDER[x.kind] - ORDER[y.kind] || x.name.localeCompare(y.name));
+// Hosts by name; networks and unnamed addresses, which many hosts talk to, in a column of their own past them.
+export const layoutHostGraph = ({ nodes, edges }: FlowGraph<HostEnd>) =>
+  layoutColumns(
+    nodes,
+    (x, y) => ORDER[x.kind] - ORDER[y.kind] || x.name.localeCompare(y.name),
+    edges,
+    (end) => end.kind !== "host",
+  );

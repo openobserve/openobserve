@@ -26,12 +26,12 @@ vi.mock("@/services/search", () => ({ default: { metrics_query: vi.fn() } }));
 const metricsQuery = vi.mocked(searchService.metrics_query);
 const push = vi.fn();
 
-const ChartStub = defineComponent({
-  name: "ChartRenderer",
-  props: ["data", "label"],
-  emits: ["click"],
+const MapStub = defineComponent({
+  name: "DependencyMap",
+  props: ["nodes", "edges", "selectedEdgeId", "label", "legend"],
+  emits: ["open", "select"],
   setup() {
-    return () => h("div", { "data-test": "chart-stub" });
+    return () => h("div", { "data-test": "map-stub" });
   },
 });
 
@@ -66,15 +66,19 @@ describe("HostsDependenciesView", () => {
       global: {
         plugins: [i18n],
         provide: { [routerKey as symbol]: { push } },
-        stubs: { ChartRenderer: ChartStub },
+        stubs: { DependencyMap: MapStub },
       },
     });
     await flushPromises();
     return wrapper;
   };
 
-  const chart = () => wrapper.findComponent(ChartStub);
-  const series = () => chart().props("data").options.series[0];
+  const chart = () => wrapper.findComponent(MapStub);
+  const edges = () => chart().props("edges");
+  const node = (id: string) =>
+    chart()
+      .props("nodes")
+      .find((n: any) => n.id === id);
   const testId = (id: string) => wrapper.find(`[data-test="${id}"]`);
 
   beforeEach(() => {
@@ -93,7 +97,7 @@ describe("HostsDependenciesView", () => {
     );
     expect(metricsQuery.mock.calls[0][0]).toMatchObject({ org_identifier: "org1", end_time: END });
     expect(testId("hosts-deps-caption").text()).toContain("over 1h");
-    const caption = testId("hosts-deps-caption").text();
+    const caption = testId("hosts-deps-caption-more").attributes("aria-label");
     expect(caption).toContain("same --network-flows list on every host");
     expect(caption).toContain("a /32 entry named after each host's host name");
     expect(caption).toContain("busiest host's traffic");
@@ -106,48 +110,40 @@ describe("HostsDependenciesView", () => {
 
   it("draws hosts and networks, and leaves out traffic within a name", async () => {
     await mountView();
-    expect(series().links).toHaveLength(2);
-    expect(series().links[0]).toMatchObject({
-      source: "web",
-      target: "api",
-      symbol: ["none", "arrow"],
-    });
-    expect(series().categories).toMatchObject([
-      { name: "Hosts", symbol: "circle" },
-      { name: "Networks", symbol: "roundRect" },
-    ]);
-    const node = (id: string) => series().data.find((n: any) => n.id === id);
-    expect(node("api")).toMatchObject({ category: 0, symbol: "circle" });
-    expect(node("lan")).toMatchObject({ category: 1, symbol: "roundRect" });
-    expect(series().data.some((n: any) => n.id === "loopback")).toBe(false);
-    expect(chart().props("data").options.legend.selectedMode).toBe(false);
+    expect(edges()).toHaveLength(2);
+    expect(edges()[0]).toMatchObject({ source: "web", target: "api", directed: true });
+    expect(node("api")).toMatchObject({ detail: "Host", icon: "computer", clickable: true });
+    expect(node("lan")).toMatchObject({ detail: "Network", icon: "lan", clickable: false });
+    // A network many hosts talk to sits in a column past the hosts, not among the callers.
+    expect(node("lan").position.x).toBeGreaterThan(node("api").position.x);
+    expect(node("loopback")).toBeUndefined();
+    expect(chart().props("legend")).toBeUndefined();
     expect(chart().props("label")).toBe("Host dependency map of 2 connections");
   });
 
   it("draws a known host that reports no flows as a host", async () => {
     await mountView({ knownHosts: ["lan"] });
-    const lan = series().data.find((n: any) => n.id === "lan");
-    expect(lan).toMatchObject({ category: 0, symbol: "circle" });
-    chart().vm.$emit("click", { dataType: "node", data: { id: "lan" } });
+    expect(node("lan")).toMatchObject({ detail: "Host", clickable: true });
+    chart().vm.$emit("open", "lan");
     expect(wrapper.emitted("open")).toEqual([["lan"]]);
   });
 
   it("counts traffic both agents report once, from the busier host", async () => {
     await mountView();
-    const link = series().links.find((l: any) => l.source === "web" && l.target === "api");
-    expect(link.value).toBe(2048 + 4096);
+    const link = edges().find((l: any) => l.source === "web" && l.target === "api");
+    expect(link.total).toBe(2048 + 4096);
   });
 
   it("opens a host's drawer from its box and ignores a network box", async () => {
     await mountView();
-    chart().vm.$emit("click", { dataType: "node", data: { id: "lan" } });
-    chart().vm.$emit("click", { dataType: "node", data: { id: "api" } });
+    chart().vm.$emit("open", "lan");
+    chart().vm.$emit("open", "api");
     expect(wrapper.emitted("open")).toEqual([["api"]]);
   });
 
   it("shows an edge's bytes each way and its direction split", async () => {
     await mountView();
-    chart().vm.$emit("click", { dataType: "edge", data: { id: "api\nweb" } });
+    chart().vm.$emit("select", "api\nweb");
     await flushPromises();
     const ways = wrapper.findAll('[data-test="hosts-deps-edge-way"]').map((w) => w.text());
     expect(ways[0]).toMatch(/^web to api: approximately 2(\.0+)?\s?KB\/s$/);
@@ -177,7 +173,7 @@ describe("HostsDependenciesView", () => {
     );
     metricsQuery.mockResolvedValue({ data: { data: { result: many } } } as any);
     await mountView();
-    expect(series().links).toHaveLength(200);
+    expect(edges()).toHaveLength(200);
     expect(wrapper.findAll('[data-test="hosts-deps-link"]')).toHaveLength(200);
     expect(testId("hosts-deps-capped").text()).toBe("Showing the 200 busiest of 210 connections.");
   });

@@ -18,19 +18,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import searchService from "@/services/search";
-import { chartColor } from "@/utils/chartTheme";
-import { getColorPalette } from "@/utils/dashboard/colorPalette";
-import { escapeHtml } from "@/utils/html";
-import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
+import DependencyMap, { type MapEdge, type MapNode } from "./kubernetes2/DependencyMap.vue";
 import { parseVector, type Series } from "./kubernetes2/kubernetesModel";
-import { buildGraph, flowWindowSeconds } from "./kubernetes2/dependencyGraph";
+import { buildGraph, flowWindowSeconds, formatRate } from "./kubernetes2/dependencyGraph";
 import {
   hostFlowQuery,
   layoutHostGraph,
@@ -123,8 +121,6 @@ const selectedEdge = computed(
 
 const navEdges = computed(() => [...graph.value.edges].sort((a, b) => b.total - a.total));
 
-const formatRate = (value: number) => formatUnitValue(getUnitValue(value, "bps", "", 1));
-
 const pct = (part: number, total: number) => `${total > 0 ? Math.round((part / total) * 100) : 0}%`;
 
 const endLabel = (end: HostEnd) => (end.name ? end.name : t("infra.hosts.depsUnnamed"));
@@ -160,84 +156,45 @@ const split = (edge: HostFlowEdge) =>
     unknown: pct(edge.unknown, edge.total),
   });
 
-const CATEGORY = {
-  host: "infra.hosts.depsHosts",
-  network: "infra.hosts.depsNetworks",
-  unnamed: "infra.hosts.depsUnnamed",
-} as const;
+// Hosts are clickable and coloured; networks and unnamed addresses are neutral and told apart by their icons.
+const KIND = {
+  host: {
+    icon: "computer",
+    detail: "infra.hosts.depsKindHost",
+    color: "var(--color-chart-series-1)",
+  },
+  network: { icon: "lan", detail: "infra.hosts.depsKindNetwork", color: "var(--color-grey-500)" },
+  unnamed: {
+    icon: "public",
+    detail: "infra.hosts.depsKindUnnamed",
+    color: "var(--color-grey-500)",
+  },
+} as const satisfies Record<HostEnd["kind"], { icon: IconName; detail: string; color: string }>;
 
-const SYMBOL = { host: "circle", network: "roundRect", unnamed: "diamond" } as const;
-
-const KINDS = ["host", "network", "unnamed"] as const;
-
-const chartData = computed(() => {
-  const { nodes, edges } = graph.value;
-  const positions = layoutHostGraph(nodes);
-  const neutral = chartColor("--color-grey-500");
-  const line = chartColor("--color-grey-400");
-  const host = getColorPalette()[0];
-  const kinds = KINDS.filter((kind) => nodes.some((n) => n.end.kind === kind));
-  // The symbol too, so the legend tells networks from unnamed addresses, which share a colour.
-  const categories = kinds.map((kind) => ({
-    name: t(CATEGORY[kind]),
-    symbol: SYMBOL[kind],
-    itemStyle: { color: kind === "host" ? host : neutral },
+const mapNodes = computed<MapNode[]>(() => {
+  const positions = layoutHostGraph(graph.value);
+  return graph.value.nodes.map(({ end, total }) => ({
+    id: end.id,
+    position: positions.get(end.id)!,
+    label: endLabel(end),
+    detail: t(KIND[end.kind].detail),
+    title: `${endLabel(end)}\n${endDetail(end)}`,
+    icon: KIND[end.kind].icon,
+    color: KIND[end.kind].color,
+    clickable: end.kind === "host",
+    total,
   }));
-  const max = Math.max(1, ...edges.map((e) => e.total));
-  return {
-    options: {
-      animation: false,
-      tooltip: { trigger: "item", confine: true },
-      // Informational only: hiding a kind here would not reach the edge list.
-      legend: { type: "scroll", bottom: 0, selectedMode: false },
-      series: [
-        {
-          type: "graph",
-          layout: "none",
-          roam: true,
-          top: 24,
-          bottom: 48,
-          left: 80,
-          right: 160,
-          categories,
-          emphasis: { focus: "adjacency" },
-          data: nodes.map((n) => ({
-            id: n.end.id,
-            name: endLabel(n.end),
-            ...positions.get(n.end.id),
-            category: kinds.indexOf(n.end.kind),
-            symbol: SYMBOL[n.end.kind],
-            symbolSize: 16,
-            label: { show: true, position: "right" },
-            tooltip: {
-              formatter:
-                `<strong>${escapeHtml(endLabel(n.end))}</strong><br/>` +
-                `${escapeHtml(endDetail(n.end))}<br/>` +
-                escapeHtml(t("infra.hosts.depsEndTotal", { rate: formatRate(n.total) })),
-            },
-          })),
-          links: edges.map((e) => ({
-            id: e.id,
-            source: e.source.id,
-            target: e.target.id,
-            value: e.total,
-            symbol: ["none", e.directed ? "arrow" : "none"],
-            symbolSize: [0, 8],
-            lineStyle: {
-              color: line,
-              opacity: 0.7,
-              curveness: 0.15,
-              width: 1 + 7 * Math.sqrt(e.total / max),
-            },
-            tooltip: {
-              formatter: [edgeText(e), ...ways(e)].map(escapeHtml).join("<br/>"),
-            },
-          })),
-        },
-      ],
-    },
-  };
 });
+
+const mapEdges = computed<MapEdge[]>(() =>
+  graph.value.edges.map((e) => ({
+    id: e.id,
+    source: e.source.id,
+    target: e.target.id,
+    directed: e.directed,
+    total: e.total,
+  })),
+);
 
 const ariaLabel = computed(() =>
   t("infra.hosts.depsAria", { count: graph.value.edges.length }, graph.value.edges.length),
@@ -261,13 +218,9 @@ function openEnd(end: HostEnd) {
   if (end.kind === "host") emit("open", end.name);
 }
 
-function onChartClick(params: any) {
-  const id = params?.data?.id;
-  if (params?.dataType === "edge") selectedEdgeId.value = id ?? null;
-  else if (params?.dataType === "node") {
-    const node = graph.value.nodes.find((n) => n.end.id === id);
-    if (node) openEnd(node.end);
-  }
+function openNode(id: string) {
+  const node = graph.value.nodes.find((n) => n.end.id === id);
+  if (node) openEnd(node.end);
 }
 
 function onSetUp() {
@@ -281,9 +234,20 @@ function onSetUp() {
     data-test="hosts-deps-view"
   >
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1" data-test="hosts-deps-controls">
-      <OText tag="span" class="text-text-secondary text-xs" data-test="hosts-deps-caption">
-        {{ t("infra.hosts.depsCaption", { window: windowText }) }}
-      </OText>
+      <div class="flex items-center gap-1">
+        <OText tag="span" class="text-text-secondary text-xs" data-test="hosts-deps-caption">
+          {{ t("infra.hosts.depsCaption", { window: windowText }) }}
+        </OText>
+        <OButton
+          variant="ghost"
+          size="icon-xs"
+          icon-left="info"
+          :aria-label="t('infra.hosts.depsCaptionMore')"
+          data-test="hosts-deps-caption-more"
+        >
+          <OTooltip :content="t('infra.hosts.depsCaptionMore')" max-width="24rem" />
+        </OButton>
+      </div>
       <ORefreshButton
         class="ms-auto"
         :last-run-at="lastUpdatedAt"
@@ -326,11 +290,14 @@ function onSetUp() {
         {{ t("infra.hosts.depsCapped", { shown: graph.edges.length, total: edges.length }) }}
       </OText>
       <div class="relative flex min-h-0 flex-1 max-md:min-h-96" data-test="hosts-deps-area">
-        <ChartRenderer
-          :data="chartData"
+        <DependencyMap
+          :nodes="mapNodes"
+          :edges="mapEdges"
+          :selected-edge-id="selectedEdgeId"
           :label="ariaLabel"
           data-test="hosts-deps-chart"
-          @click="onChartClick"
+          @open="openNode"
+          @select="(id: string) => (selectedEdgeId = id)"
         />
         <!-- not-sr-only resets position to static, so this wrapper does the overlay positioning. -->
         <div class="pointer-events-none absolute start-3 top-3 bottom-3 flex flex-col items-start">
