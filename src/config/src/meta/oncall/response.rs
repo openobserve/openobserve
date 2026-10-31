@@ -515,8 +515,7 @@ pub struct Response {
     /// it expires — which is what makes it safe to offer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snoozed_until: Option<i64>,
-    /// What the ladder measures its step delays from; `opened_at` until a
-    /// snooze pushes it forward.
+    /// Where step delays count from: `opened_at`, moved by a snooze or a triage-held first page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ladder_anchor: Option<i64>,
     /// Which run of the ladder the record is on.
