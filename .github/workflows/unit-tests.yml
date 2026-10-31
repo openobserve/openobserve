@@ -37,7 +37,7 @@ jobs:
         run: sleep 60
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       # One shared classification for every suite (see .github/actions/classify-changes); a change to
       # this workflow file re-tests itself on top of it.
@@ -71,7 +71,7 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -127,7 +127,7 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -191,7 +191,7 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -263,7 +263,7 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: ./.github/actions/github-auth
       - name: Setup Node.js
