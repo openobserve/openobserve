@@ -136,10 +136,8 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
         testLogger.warn(`Query may have produced an error: ${await inlineError.textContent().catch(() => '')}`);
       }
       expect(hasInlineError).toBe(false);
-      await expect(page.locator('[data-test="chart-renderer"] canvas').first()).toBeVisible({ timeout: 15000 });
-      await expect(
-        page.locator('[data-test="no-data"], [data-test="panel-editor-container"] [data-test="o2-empty-state"]')
-      ).toHaveCount(0);
+      await pm.metricsPage.expectChartRendered();
+      await pm.metricsPage.expectNoDataHidden();
     }
     testLogger.info('TopK and BottomK queries tested successfully');
   });

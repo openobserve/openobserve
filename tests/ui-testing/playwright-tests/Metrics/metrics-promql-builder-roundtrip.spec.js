@@ -59,7 +59,7 @@ test.describe('Metrics PromQL builder round-trip', () => {
       await expect(page.locator(builder.confirmDialogOk)).toHaveCount(0);
       await expect(builder.operationChips.first()).toBeVisible({ timeout: 15000 });
       if (query.includes('without')) {
-        await expect(page.locator('[data-test="promql-operation-0"]')).toContainText('without instance');
+        await expect(builder.operationChips.first()).toContainText('without instance');
       }
 
       await builder.customModeBtn.click();

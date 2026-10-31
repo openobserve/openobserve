@@ -89,13 +89,14 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
     testLogger.info('Testing the back-compat branch of the guard');
 
     // Links shared before the explorer existed carry metrics_data with NO mode.
-    const blob = pm.metricsExplorerPage.buildPromqlBlob(SEEDED_METRIC);
+    const blob = pm.metricsExplorerPage.buildPromqlBlob(TYPED_QUERY);
     const url = pm.metricsExplorerPage.buildExplorerUrl({ metrics_data: blob });
 
     await pm.metricsExplorerPage.navigateToUrl(url);
 
     await pm.metricsExplorerPage.expectRedirectedToVisualize();
-    await pm.metricsExplorerPage.expectVisualizeQueryToContain(SEEDED_METRIC);
+    await pm.metricsExplorerPage.waitForBlobQuery(TYPED_QUERY);
+    await pm.metricsExplorerPage.expectVisualizeQueryToContain(TYPED_QUERY);
 
     testLogger.info('Legacy deep-link redirected into Visualize with its query');
   });

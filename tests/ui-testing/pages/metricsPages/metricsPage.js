@@ -1851,6 +1851,14 @@ export class MetricsPage {
         return this.page.locator('.not-exists'); // Return non-existent locator
     }
 
+    async expectChartRendered(timeout = 15000) {
+        await expect(this.chartRenderer.locator('canvas').first()).toBeVisible({ timeout });
+    }
+
+    async expectNoDataHidden() {
+        await expect(this.noDataMessage).toHaveCount(0);
+    }
+
     async getNoDataMessage() {
         // Returns the no-data placeholder locator (data-test only; see constructor).
         return this.noDataMessage.first();

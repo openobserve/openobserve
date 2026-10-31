@@ -168,8 +168,9 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     const pm = await setupTest(page, testInfo);
     testLogger.info('Testing URL sync after manual query change');
 
-    // Enter a query and click Apply
-    await pm.metricsPage.enterMetricsQuery('cpu_usage');
+    // An expression the mount-time auto-seed never writes, so only this edit can put it in the blob.
+    const typed = 'max by (job)(cpu_usage) * 2';
+    await pm.metricsPage.enterMetricsQuery(typed);
     await pm.metricsPage.clickApplyButton();
 
     // Wait for results to render
@@ -183,7 +184,9 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     const blob = await pm.metricsPage.decodeMetricsBlob();
     expect(blob).not.toBeNull();
     expect(blob.v).toBe(1);
-    expect(await pm.metricsPage.verifyQueryInUrl('cpu_usage')).toBe(true);
+    await expect
+      .poll(async () => (await pm.metricsPage.decodeMetricsBlob())?.data?.queries?.[0]?.query)
+      .toBe(typed);
 
     testLogger.info('URL sync after manual query verified');
   });
