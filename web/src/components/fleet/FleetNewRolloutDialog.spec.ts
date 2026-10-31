@@ -278,6 +278,37 @@ describe("FleetNewRolloutDialog", () => {
     expect(fleet.setDesired).not.toHaveBeenCalled();
   });
 
+  it("leaves the fleet unpicked when opened without one, and refuses to deploy", async () => {
+    wrapper = mountDialog({ config: "edge", toVersion: 2 });
+    await settlePreview();
+    expect(form(wrapper).state.values.fleet).toBe("");
+    expect(wrapper.find('[data-test="fleet-new-rollout-dialog-plan"]').text()).not.toContain(
+      "no collectors",
+    );
+    await submit(wrapper);
+    expect(fleet.setDesired).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain("Pick a fleet");
+  });
+
+  it("fills the picked fleet's desired configuration when none was given", async () => {
+    wrapper = mountDialog({});
+    await settlePreview();
+    expect(form(wrapper).state.values.config).toBe("");
+    form(wrapper).setFieldValue("fleet", "default");
+    wrapper.findComponent({ name: "OFormSelect" }).vm.$emit("update:modelValue", "default");
+    await flushPromises();
+    expect(form(wrapper).state.values).toMatchObject({ config: "other", version: 0 });
+  });
+
+  it("picks the only fleet the user can read when opened without one", async () => {
+    vi.mocked(fleet.listFleets).mockResolvedValue({
+      data: { items: [fleetOf("one", 1)] },
+    } as any);
+    wrapper = mountDialog({ config: "edge", toVersion: 2 });
+    await settlePreview();
+    expect(form(wrapper).state.values.fleet).toBe("one");
+  });
+
   it("says an empty fleet gets the version at once", async () => {
     wrapper = mountDialog({ fleetId: "void", config: "edge", toVersion: 2 });
     await settlePreview();

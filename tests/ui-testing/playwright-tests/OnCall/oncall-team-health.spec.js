@@ -341,11 +341,11 @@ test.describe('On-call team health', {
     );
 
     const team = await createTeam(page, { name, timezone: 'UTC' });
+    await addTeamMembers(page, team.id, [me]);
     await setTeamSchedule(page, team.id, {
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: [me] })],
     });
-    await addTeamMembers(page, team.id, [me]);
 
     // Half one: nothing is sent. Counted across the call rather than assumed.
     const before = await mailSince(0);
@@ -399,11 +399,11 @@ test.describe('On-call team health', {
     const name = uniqueName(`${workerPrefix(testInfo)}_ovw`);
     const users = await createOrgUsers(page, name, 3);
     const team = await createTeam(page, { name, timezone: 'UTC' });
+    await addTeamMembers(page, team.id, users);
     await setTeamSchedule(page, team.id, {
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: users })],
     });
-    await addTeamMembers(page, team.id, users);
 
     const overview = await getTeamOverview(page, team.id);
     expect(overview, 'the overview endpoint must answer').toBeTruthy();

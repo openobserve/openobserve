@@ -182,3 +182,13 @@ export interface StreamPageParams {
   sort?: string;
   asc?: boolean;
 }
+
+/** One stream row of the `GET /api/{org}/streams` list response. */
+export interface StreamListItem {
+  name: string;
+  stream_type?: string;
+  storage_type?: string;
+  /** System-written stream; the server omits the field when false. */
+  is_internal?: boolean;
+  [key: string]: unknown;
+}

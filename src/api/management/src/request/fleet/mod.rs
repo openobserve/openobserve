@@ -251,6 +251,7 @@ pub async fn delete_collector(
         (status = 202, description = "Queued", content_type = "application/json", body = config::meta::fleet::RestartQueued),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "The collector does not accept restart commands", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn restart_collector(
@@ -383,7 +384,7 @@ pub async fn list_fleets(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "CreateFleet",
-    summary = "Create a fleet; the creator receives full rights on it",
+    summary = "Create a fleet; roles grant access to it, as for dashboard folders",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = CreateFleetRequest, content_type = "application/json"),
