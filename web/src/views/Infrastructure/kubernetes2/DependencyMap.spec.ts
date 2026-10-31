@@ -52,16 +52,16 @@ vi.mock("@vue-flow/core", () => ({
   },
   BaseEdge: {
     name: "BaseEdge",
-    props: ["id", "path", "style", "label", "labelX", "labelY"],
+    props: ["id", "path", "style", "markerEnd"],
     template: "<i />",
   },
   Handle: { name: "Handle", template: "<i />" },
-  EdgeLabelRenderer: { name: "EdgeLabelRenderer", template: "<div><slot /></div>" },
   MarkerType: { ArrowClosed: "arrowclosed" },
   Position: { Left: "left", Right: "right" },
   useVueFlow: () => ({
     setViewport,
     dimensions: { value: { width: 1000, height: 600 } },
+    viewport: { value: { x: 0, y: 0, zoom: 1 } },
     zoomIn: vi.fn(),
     zoomOut: vi.fn(),
     areNodesInitialized: { value: true },
@@ -109,6 +109,11 @@ describe("DependencyMap", () => {
   const baseEdge = (id: string) =>
     wrapper.findAllComponents({ name: "BaseEdge" }).find((e) => e.props("id") === id)!;
   const hoveredLabel = () => wrapper.find('[data-test="dependency-map-hovered-label"]');
+  // A resting rate pill, by its edge.
+  const pill = (id: string) =>
+    wrapper.find(`[data-test="dependency-map-label"][data-edge="${id}"]`);
+  const pills = () =>
+    wrapper.findAll('[data-test="dependency-map-label"]').map((p) => p.attributes("data-edge"));
   const card = (id: string) => wrapper.find(`[data-id="${id}"] [data-test="dependency-map-node"]`);
 
   afterEach(() => wrapper?.unmount());
@@ -126,6 +131,8 @@ describe("DependencyMap", () => {
       ["b-a", "sl", "tr", "arrowclosed"],
       ["b-c", "sr", "tr", undefined],
     ]);
+    // Vue Flow hands every edge a marker reference; an undirected one draws none.
+    expect(baseEdge("b-c").props("markerEnd")).toBeUndefined();
   });
 
   it("draws each edge along its route from the layout", () => {
@@ -181,9 +188,10 @@ describe("DependencyMap", () => {
       [...ends, node("api", 340)],
       ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))),
     );
-    expect(baseEdge("w0-api").props("label")).toBeUndefined();
-    expect(baseEdge("w1-api").props("label")).toBeUndefined();
-    expect(baseEdge("w9-api").props("label")).toMatch(/KB\/s/);
+    expect(pill("w0-api").exists()).toBe(false);
+    expect(pill("w1-api").exists()).toBe(false);
+    expect(pill("w9-api").text()).toMatch(/KB\/s/);
+    expect(pills()).toHaveLength(8);
     expect(card("api").text()).toContain("10 connections");
   });
 
@@ -196,8 +204,8 @@ describe("DependencyMap", () => {
     expect(card("c").classes()).toContain("opacity-30");
     expect(card("b").classes()).not.toContain("opacity-30");
     expect(baseEdge("b-c").props("style").opacity).toBeLessThan(0.2);
-    expect(baseEdge("b-c").props("label")).toBeUndefined();
-    expect(baseEdge("a-b").props("label")).toBeDefined();
+    expect(pill("b-c").exists()).toBe(false);
+    expect(pill("a-b").exists()).toBe(true);
     await flow().vm.$emit("node-mouse-leave");
     expect(card("c").classes()).not.toContain("opacity-30");
   });
@@ -209,10 +217,7 @@ describe("DependencyMap", () => {
       [...ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))), edge("api", "db", 50_000)],
     );
     await flow().vm.$emit("node-mouse-enter", { node: { id: "api" } });
-    const shown = wrapper
-      .findAllComponents({ name: "BaseEdge" })
-      .filter((e) => e.props("label") !== undefined)
-      .map((e) => e.props("id"));
+    const shown = pills();
     expect(shown).toHaveLength(8);
     expect(shown).toContain("api-db");
     expect(shown).not.toContain("w0-api");
@@ -231,7 +236,7 @@ describe("DependencyMap", () => {
     expect(baseEdge("w1-api").props("style").opacity).toBe(1);
     await flow().vm.$emit("edge-mouse-leave");
     expect(hoveredLabel().exists()).toBe(false);
-    expect(baseEdge("w1-api").props("label")).toBeUndefined();
+    expect(pill("w1-api").exists()).toBe(false);
   });
 
   it("keeps the other labels where they are while an edge is hovered", async () => {
@@ -241,19 +246,46 @@ describe("DependencyMap", () => {
       ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))),
     );
     const at = () =>
-      wrapper
-        .findAllComponents({ name: "BaseEdge" })
-        .filter((e) => e.props("id") !== "w0-api")
-        .map((e) => [e.props("id"), e.props("label"), e.props("labelX"), e.props("labelY")]);
+      Object.fromEntries(
+        wrapper
+          .findAll('[data-test="dependency-map-label"]')
+          .map((p) => [p.attributes("data-edge"), p.attributes("style")]),
+      );
     const before = at();
     const edges = flow().props("edges");
     await flow().vm.$emit("edge-mouse-enter", { edge: { id: "w0-api" } });
-    expect(at()).toEqual(before);
+    // Each pill still shown is where it was; one the hovered pill would cover is hidden, not moved.
+    for (const [id, style] of Object.entries(at())) expect(style).toBe(before[id]);
     // Hovering leaves Vue Flow's edges alone; the hovered label is drawn in the label layer instead.
     expect(flow().props("edges")).toBe(edges);
     expect(hoveredLabel().exists()).toBe(true);
     await flow().vm.$emit("edge-mouse-leave");
     expect(flow().props("edges")).toBe(edges);
+  });
+
+  it("hides a resting pill the hovered edge's pill would cover", async () => {
+    // Two edges into one gap a few pixels apart, so their pills would sit on each other.
+    mountMap(
+      [node("a", 0), node("b", 0, true, 12), node("c", 340), node("d", 340, true, 12)],
+      [edge("a", "c", 2000), edge("b", "d", 10)],
+    );
+    expect(pills()).toEqual(["a-c"]);
+    await flow().vm.$emit("edge-mouse-enter", { edge: { id: "b-d" } });
+    expect(hoveredLabel().exists()).toBe(true);
+    expect(pills()).toEqual([]);
+  });
+
+  it("starts a map too big to read whole at a readable zoom, from its top-left", async () => {
+    mountMap(
+      Array.from({ length: 12 }, (_, i) => node(`c${i}`, i * 312)),
+      [],
+    );
+    setViewport.mockClear();
+    await flow().vm.$emit("nodes-initialized");
+    const [view] = setViewport.mock.calls[0];
+    expect(view.zoom).toBe(0.75);
+    // The left-most card's left edge, plus the margin, at the pane's left.
+    expect(view.x).toBeCloseTo(32 * 0.75);
   });
 
   it("makes a clickable card a named button, and leaves the others plain", () => {

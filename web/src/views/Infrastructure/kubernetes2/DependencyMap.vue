@@ -56,10 +56,9 @@ export interface MapLegendItem {
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   BaseEdge,
-  EdgeLabelRenderer,
   Handle,
   MarkerType,
   Position,
@@ -78,7 +77,16 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { CARD_H, CARD_W, formatRate } from "./dependencyGraph";
-import { fitTransform, placeLabels, routeEdge } from "./dependencyMapGeometry";
+import {
+  LABEL_H,
+  arrowBox,
+  fitTransform,
+  labelBox,
+  labelWidth,
+  overlaps,
+  placeLabels,
+  routeEdge,
+} from "./dependencyMapGeometry";
 
 const props = defineProps<{
   nodes: MapNode[];
@@ -95,17 +103,20 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const { setViewport, dimensions, zoomIn, zoomOut, areNodesInitialized } = useVueFlow();
+const { setViewport, dimensions, viewport, zoomIn, zoomOut, areNodesInitialized } = useVueFlow();
 
 // Rate labels only on the busiest edges, so the rest of the map stays readable.
 const LABELLED = 8;
 
-// Also the fit's floor, so a fitted map never sits below where zooming out stops.
+// How far zooming out goes, and how far the fit button goes to show a big map whole.
 const MIN_ZOOM = 0.1;
+// On load and on a resize the map is never fitted below this, so card text and rates stay readable; a bigger map
+// starts at its top-left, the callers, and is panned or fitted whole with the fit button.
+const READABLE_ZOOM = 0.75;
 
-// The whole map, cards and the edges routed past them, never zoomed in past its natural size. fitView only
-// knows the cards, and stops zooming out at 0.5.
-function fit(duration = 0) {
+// The map, cards and the edges routed past them, never zoomed in past its natural size. fitView only knows the
+// cards, and stops zooming out at 0.5.
+function fit(duration = 0, floor = READABLE_ZOOM) {
   const points = [
     ...props.nodes.flatMap((n) => [
       n.position,
@@ -116,7 +127,22 @@ function fit(duration = 0) {
     ...flowEdges.value.flatMap((e) => e.data.route.spots),
   ];
   const { width, height } = dimensions.value;
-  setViewport(fitTransform(points, width, height, MIN_ZOOM), { duration });
+  setViewport(fitTransform(points, width, height, floor), { duration });
+  userMoved = false;
+}
+
+// Set once the user pans or zooms, so a resize no longer refits over what they chose.
+let userMoved = false;
+
+function zoomBy(inward: boolean) {
+  userMoved = true;
+  if (inward) zoomIn({ duration: 150 });
+  else zoomOut({ duration: 150 });
+}
+
+// Only a pan or zoom from the pointer or wheel carries an event; the fit's own moves do not.
+function onMoveEnd({ event }: { event?: unknown }) {
+  if (event) userMoved = true;
 }
 
 // Exactly the size the layout routes edges around, whatever the root font size.
@@ -129,18 +155,6 @@ const HANDLES = [
   { id: "tr", type: "target", position: Position.Right },
   { id: "sr", type: "source", position: Position.Right },
 ] as const;
-
-const LABEL_STYLE = {
-  fill: "var(--color-text-secondary)",
-  fontSize: "0.625rem",
-  fontWeight: 500,
-};
-// A pill, so a label reads over the edges it sits on.
-const LABEL_BG_STYLE = {
-  fill: "var(--color-surface-base)",
-  stroke: "var(--color-border-default)",
-  strokeWidth: 1,
-};
 
 const hovered = ref<string | null>(null);
 const hoveredEdge = ref<string | null>(null);
@@ -186,7 +200,10 @@ const openLabel = (node: MapNode) =>
 
 function summaryOf(node: MapNode) {
   const count = neighbours.value.get(node.id)?.size ?? 0;
-  return t("infra.k8s2.depsEndSummary", { count, rate: formatRate(node.total) }, count);
+  const rate = formatRate(node.total);
+  // "<0.1B/s" is already a bound, not an estimate.
+  const approx = rate.startsWith("<") ? rate : t("infra.k8s2.depsApprox", { rate });
+  return t("infra.k8s2.depsEndSummary", { count, rate: approx }, count);
 }
 
 // In reading order, column by column, so Tab moves through the cards as they are laid out.
@@ -279,10 +296,34 @@ const placed = computed(() => {
       text: routes.value.get(e.id)!.rate,
       spots: routes.value.get(e.id)!.route.spots,
     }));
+  // Clear of every arrowhead, so a rate never covers where an edge lands.
+  const arrows = flowEdges.value.filter((e) => e.data.directed).map((e) => arrowBox(e.data.route));
   return placeLabels(
     wanted,
     props.nodes.map((n) => n.position),
+    arrows,
   );
+});
+
+// Where each pill is drawn and how big, in the label layer above every edge. A resting pill the hovered edge's
+// pill would cover is left out while it is hovered.
+const pills = computed(() => {
+  const out = new Map<string, { text: string; x: number; y: number }>();
+  const hover = hoveredLabel.value;
+  const hoverBox = hover ? labelBox(hover.text, hover.at) : null;
+  for (const [id, at] of placed.value) {
+    const text = routes.value.get(id)!.rate;
+    if (hover && id !== hover.id && overlaps(labelBox(text, at), hoverBox!)) continue;
+    out.set(id, { text, ...at });
+  }
+  if (hover) out.set(hover.id, { text: hover.text, ...hover.at });
+  return out;
+});
+
+const pillStyle = (pill: { text: string; x: number; y: number }) => ({
+  width: `${labelWidth(pill.text)}px`,
+  height: `${LABEL_H}px`,
+  "--dep-label": `translate(-50%, -50%) translate(${pill.x}px, ${pill.y}px)`,
 });
 
 // The hovered edge's label, where it was placed or else on its route, drawn in the HTML label layer above every edge
@@ -296,6 +337,25 @@ const hoveredLabel = computed(() => {
 });
 
 // Fit when the drawn ends or their places change, not on a refresh that redraws the same map.
+// A resize refits, a moment after it settles, unless the user has moved the map since the last fit.
+const pane = ref<HTMLElement | null>(null);
+let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+let observer: ResizeObserver | undefined;
+onMounted(() => {
+  if (typeof ResizeObserver === "undefined" || !pane.value) return;
+  observer = new ResizeObserver(() => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (!userMoved && areNodesInitialized.value) fit();
+    }, 150);
+  });
+  observer.observe(pane.value);
+});
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  clearTimeout(resizeTimer);
+});
+
 let fitPending = true;
 function fitIfPending() {
   if (!fitPending) return;
@@ -329,6 +389,7 @@ function onKeydown(event: KeyboardEvent) {
 <template>
   <div class="flex h-full w-full min-w-0 flex-col gap-2">
     <div
+      ref="pane"
       class="dependency-map bg-surface-panel border-border-default rounded-default relative min-h-0 w-full flex-1 overflow-hidden border"
       role="group"
       :aria-label="label"
@@ -351,6 +412,7 @@ function onKeydown(event: KeyboardEvent) {
         @node-click="({ node }) => node.data.clickable && emit('open', node.id)"
         @edge-click="({ edge }) => emit('select', edge.id)"
         @pane-click="emit('select', null)"
+        @move-end="onMoveEnd"
         @node-mouse-enter="({ node }) => (hovered = node.id)"
         @node-mouse-leave="hovered = null"
         @edge-mouse-enter="({ edge }) => (hoveredEdge = edge.id)"
@@ -407,32 +469,34 @@ function onKeydown(event: KeyboardEvent) {
           <BaseEdge
             :id="edge.id"
             :path="edge.data.route.path"
-            :marker-end="edge.markerEnd"
+            :marker-end="edge.data.directed ? edge.markerEnd : undefined"
             :style="strokeOf(edge)"
-            :label="
-              placed.has(edge.id) && edge.id !== hoveredLabel?.id ? edge.data.rate : undefined
-            "
-            :label-x="placed.get(edge.id)?.x"
-            :label-y="placed.get(edge.id)?.y"
-            :label-style="LABEL_STYLE"
-            :label-show-bg="true"
-            :label-bg-style="LABEL_BG_STYLE"
-            :label-bg-padding="[5, 3]"
-            :label-bg-border-radius="8"
           />
-          <EdgeLabelRenderer v-if="edge.id === hoveredLabel?.id">
-            <div
-              class="bg-surface-base border-border-default text-text-secondary text-3xs pointer-events-none absolute top-0 left-0 [transform:var(--dep-label,none)] rounded-full border px-1.5 py-px font-medium tabular-nums"
-              :style="{
-                '--dep-label': `translate(-50%, -50%) translate(${hoveredLabel.at.x}px, ${hoveredLabel.at.y}px)`,
-              }"
-              data-test="dependency-map-hovered-label"
-            >
-              {{ raw(hoveredLabel.text) }}
-            </div>
-          </EdgeLabelRenderer>
         </template>
       </VueFlow>
+      <!-- Every rate pill in one layer over the canvas, moved with it, so no edge or arrowhead is drawn over one.
+           The rates are in the edge panel and the connection list too, so this layer is hidden from screen readers. -->
+      <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div
+          class="absolute top-0 left-0 origin-top-left [transform:var(--dep-viewport,none)]"
+          :style="{
+            '--dep-viewport': `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+          }"
+        >
+          <div
+            v-for="[id, pill] in pills"
+            :key="id"
+            class="bg-surface-base border-border-default text-text-secondary text-2xs absolute top-0 left-0 flex [transform:var(--dep-label,none)] items-center justify-center rounded-full border font-medium whitespace-nowrap tabular-nums"
+            :style="pillStyle(pill)"
+            :data-edge="id"
+            :data-test="
+              id === hoveredLabel?.id ? 'dependency-map-hovered-label' : 'dependency-map-label'
+            "
+          >
+            {{ raw(pill.text) }}
+          </div>
+        </div>
+      </div>
       <div
         class="rounded-default border-border-default bg-surface-panel absolute end-3 bottom-3 z-10 flex flex-col overflow-hidden border"
         data-test="dependency-map-zoom"
@@ -444,7 +508,7 @@ function onKeydown(event: KeyboardEvent) {
           class="rounded-none"
           :aria-label="t('fleet.flow.zoomIn')"
           data-test="dependency-map-zoom-in"
-          @click="zoomIn({ duration: 150 })"
+          @click="zoomBy(true)"
         >
           <OTooltip side="left" :content="t('fleet.flow.zoomIn')" />
         </OButton>
@@ -456,7 +520,7 @@ function onKeydown(event: KeyboardEvent) {
           class="rounded-none"
           :aria-label="t('fleet.flow.zoomOut')"
           data-test="dependency-map-zoom-out"
-          @click="zoomOut({ duration: 150 })"
+          @click="zoomBy(false)"
         >
           <OTooltip side="left" :content="t('fleet.flow.zoomOut')" />
         </OButton>
@@ -468,7 +532,7 @@ function onKeydown(event: KeyboardEvent) {
           class="rounded-none"
           :aria-label="t('fleet.flow.fitView')"
           data-test="dependency-map-fit"
-          @click="fit(150)"
+          @click="fit(150, MIN_ZOOM)"
         >
           <OTooltip side="left" :content="t('fleet.flow.fitView')" />
         </OButton>

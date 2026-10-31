@@ -20,6 +20,7 @@ import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -30,6 +31,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { k8sInstantQuery } from "@/services/kubernetes.queries";
 import DependencyMap, { type MapEdge, type MapNode } from "./DependencyMap.vue";
 import K8sListHeader from "./K8sListHeader.vue";
+import { useEscapeToClose } from "./useEscapeToClose";
 import { detailKindOf } from "./kubernetesEvents";
 import type { Series } from "./kubernetesModel";
 import { VIEW_ICON } from "./k8sTree";
@@ -226,11 +228,9 @@ const split = (edge: FlowEdge) =>
 // A chart colour per namespace; nodes and the outside world are neutral and told apart by their icons.
 const NEUTRAL = "var(--color-grey-500)";
 
-const colors = computed(() =>
-  namespaceColors(
-    graph.value.nodes.filter((n) => n.end.kind === "workload").map((n) => n.end.namespace),
-  ),
-);
+// Over every namespace the view knows, not only those drawn, so the namespace filter, search and switches never
+// recolour one.
+const colors = computed(() => namespaceColors(namespaceChoices.value));
 
 const colorOf = (end: FlowEnd) =>
   end.kind === "workload" ? (colors.value.get(end.namespace) ?? NEUTRAL) : NEUTRAL;
@@ -270,7 +270,15 @@ const mapEdges = computed<MapEdge[]>(() =>
   })),
 );
 
-const legend = computed(() => [...colors.value].map(([label, color]) => ({ label, color })));
+const legend = computed(() =>
+  [
+    ...new Set(
+      graph.value.nodes.filter((n) => n.end.kind === "workload").map((n) => n.end.namespace),
+    ),
+  ]
+    .sort((a, b) => a.localeCompare(b))
+    .map((label) => ({ label, color: colors.value.get(label) ?? NEUTRAL })),
+);
 
 const ariaLabel = computed(() =>
   t("infra.k8s2.depsAria", { count: graph.value.edges.length }, graph.value.edges.length),
@@ -344,6 +352,16 @@ function onSetUp() {
   router.push({ name: "ingestFromKubernetes", query: { org_identifier: props.orgId } });
 }
 
+// Clear filters here resets only the namespace filter and search, so it says so.
+const CLEAR_ACTION: EmptyStateAction[] = [
+  {
+    id: "clear-filters",
+    icon: "filter-list",
+    titleKey: "emptyState.filtered.action",
+    descriptionKey: "infra.k8s2.depsClearDescription",
+  },
+];
+
 const filtersSet = computed(() => props.state.namespaces.length > 0 || !!props.state.search);
 
 // Whether the switches, not only the namespace filter and search, keep flows off the map.
@@ -351,6 +369,21 @@ const switchesHide = computed(
   () =>
     filterFlows(allEdges.value, { ...scope.value, showSystem: true, showNodeTraffic: true })
       .length > edges.value.length,
+);
+
+useEscapeToClose(
+  computed(() => !!selectedEdge.value),
+  () => closeEdge(),
+);
+
+// What the switches leave, before the namespace filter and search: the header's total.
+const switchedEdges = computed(() =>
+  filterFlows(allEdges.value, {
+    namespaces: [],
+    search: "",
+    showSystem: props.state.system,
+    showNodeTraffic: props.state.nodeTraffic,
+  }),
 );
 
 // Only the namespace filter and search; the switches keep what they show.
@@ -363,12 +396,11 @@ function clearFilters() {
   <div
     class="flex h-full min-h-0 flex-col gap-2 p-3 max-md:overflow-y-auto"
     data-test="k8s2-deps-view"
-    @keydown.esc="selectedEdge && closeEdge()"
   >
     <K8sListHeader
       :title="t('infra.k8s2.depsTitle')"
       :count="graph.edges.length"
-      :total="allEdges.length"
+      :total="switchedEdges.length"
       :count-label="t('infra.k8s2.depsCount', { count: graph.edges.length }, graph.edges.length)"
       namespaced
       :namespace-options="namespaceChoices"
@@ -467,8 +499,9 @@ function clearFilters() {
     />
     <OEmptyState
       v-else-if="!graph.edges.length"
-      filtered
+      variant="no-results"
       :title="t('infra.k8s2.depsNoMatch')"
+      :actions="CLEAR_ACTION"
       data-test="k8s2-deps-empty"
       @action="clearFilters"
     />

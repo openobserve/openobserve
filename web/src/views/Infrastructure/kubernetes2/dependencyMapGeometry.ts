@@ -21,8 +21,11 @@ import { CARD_H, CARD_W, type Position } from "./dependencyGraph";
 
 export interface Route {
   path: string;
-  // Points along the route, for a label to sit on.
+  // Where a label may sit along the route, best first: the gaps furthest from the target first, several places in each.
   spots: Position[];
+  // The point the route ends at, and whether it enters the target from the left.
+  end: Position;
+  fromLeft: boolean;
 }
 
 export interface Box {
@@ -38,7 +41,16 @@ const curve = (a: Position, b: Position) => {
   return `C${mid},${a.y} ${mid},${b.y} ${b.x},${b.y}`;
 };
 
-const middle = (a: Position, b: Position) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+// The point at t along that curve.
+const along = (a: Position, b: Position, t: number) => {
+  const mid = (a.x + b.x) / 2;
+  const u = 1 - t;
+  const [k0, k1, k2, k3] = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+  return { x: k0 * a.x + (k1 + k2) * mid + k3 * b.x, y: (k0 + k1) * a.y + (k2 + k3) * b.y };
+};
+
+// Places tried in each gap, the middle first.
+const STEPS = [0.5, 0.38, 0.62, 0.26, 0.74];
 
 // Room left for a bow between a card and the next column.
 const BOW_MAX = 48;
@@ -52,9 +64,12 @@ export function routeEdge(from: Position, to: Position, through: Position[]): Ro
     // Both ends in one column: a bow out of the right-hand sides, into the gap, deeper the further apart they are.
     const x = from.x + CARD_W;
     const bow = Math.min(BOW_MAX, 16 + 0.15 * Math.abs(ty - sy)) / 0.75;
+    const tip = { x: x + 0.75 * bow, y: (sy + ty) / 2 };
     return {
       path: `M${x},${sy} C${x + bow},${sy} ${x + bow},${ty} ${x},${ty}`,
-      spots: [{ x: x + 0.75 * bow, y: (sy + ty) / 2 }],
+      spots: [tip, { ...tip, y: (3 * sy + ty) / 4 }, { ...tip, y: (sy + 3 * ty) / 4 }],
+      end: { x, y: ty },
+      fromLeft: false,
     };
   }
   const forward = from.x < to.x;
@@ -65,54 +80,72 @@ export function routeEdge(from: Position, to: Position, through: Position[]): Ro
     const [enter, leave] = forward ? [slot.x, slot.x + CARD_W] : [slot.x + CARD_W, slot.x];
     points.push({ x: enter, y: slot.y }, { x: leave, y: slot.y });
   }
-  points.push({ x: forward ? to.x : to.x + CARD_W, y: ty });
+  const end = { x: forward ? to.x : to.x + CARD_W, y: ty };
+  points.push(end);
   let path = `M${points[0].x},${points[0].y}`;
-  const spots: Position[] = [];
+  const gaps: [Position, Position][] = [];
   for (let i = 1; i < points.length; i++) {
     // Curves cross the gaps; lines cross the columns.
     if (i % 2 === 1) {
       path += ` ${curve(points[i - 1], points[i])}`;
-      spots.push(middle(points[i - 1], points[i]));
+      gaps.push([points[i - 1], points[i]]);
     } else {
       path += ` L${points[i].x},${points[i].y}`;
     }
   }
-  // The first gap is furthest from the arrowhead at the target.
-  return { path, spots };
+  return {
+    path,
+    spots: gaps.flatMap(([a, b]) => STEPS.map((t) => along(a, b, t))),
+    end,
+    fromLeft: forward,
+  };
 }
 
-// The pill a rate label is drawn in, at 0.625rem text; narrow enough to sit in a gap clear of both cards.
+// A rate label's pill, at 0.6875rem text. DependencyMap.vue draws it at exactly this size, so the overlap checks
+// here hold for what is on screen.
+export const LABEL_H = 18;
+export const labelWidth = (text: string) => Math.ceil(text.length * 6.2 + 14);
 export const labelBox = (text: string, at: Position): Box => {
-  const w = text.length * 5.6 + 10;
-  return { x: at.x - w / 2, y: at.y - 8, w, h: 16 };
+  const w = labelWidth(text);
+  return { x: at.x - w / 2, y: at.y - LABEL_H / 2, w, h: LABEL_H };
 };
 
-const overlaps = (a: Box, b: Box) =>
+// The stretch before a target an arrowhead takes, kept clear of labels.
+const ARROW_CLEARANCE = 24;
+export const arrowBox = (route: Route): Box => ({
+  x: route.fromLeft ? route.end.x - ARROW_CLEARANCE : route.end.x,
+  y: route.end.y - 10,
+  w: ARROW_CLEARANCE,
+  h: 20,
+});
+
+export const overlaps = (a: Box, b: Box) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-// Busiest first, each label at the first spot on its route where it clears every card and every label placed so far;
-// one that fits nowhere is left out.
+// Busiest first, each label at the first spot on its route where it clears every card, every obstacle such as an
+// arrowhead, and every label placed so far; one that fits nowhere is left out.
 export function placeLabels(
   wanted: { id: string; text: string; spots: Position[] }[],
   cards: Position[],
+  obstacles: Box[] = [],
 ): Map<string, Position> {
-  const cardBoxes = cards.map((c) => ({ x: c.x, y: c.y, w: CARD_W, h: CARD_H }));
-  const placed: Box[] = [];
+  const blocked: Box[] = [
+    ...cards.map((c) => ({ x: c.x, y: c.y, w: CARD_W, h: CARD_H })),
+    ...obstacles,
+  ];
   const out = new Map<string, Position>();
   for (const { id, text, spots } of wanted) {
-    const spot = spots.find((at) => {
-      const box = labelBox(text, at);
-      return ![...cardBoxes, ...placed].some((other) => overlaps(box, other));
-    });
+    const spot = spots.find((at) => !blocked.some((other) => overlaps(labelBox(text, at), other)));
     if (!spot) continue;
-    placed.push(labelBox(text, spot));
+    blocked.push(labelBox(text, spot));
     out.set(id, spot);
   }
   return out;
 }
 
-// Zoom and offset that show every point with a margin, never past natural size nor below `minZoom`, centred in a
-// width x height pane.
+// Zoom and offset that show every point with a margin, never past natural size nor below `minZoom`, in a width x height
+// pane. A map that fits is centred; one that does not, at the floor, starts at its top-left, where the callers are,
+// and is centred only along a side that fits.
 export function fitTransform(points: Position[], width: number, height: number, minZoom = 0) {
   if (!points.length || !width || !height) return { x: 0, y: 0, zoom: 1 };
   const xs = points.map((p) => p.x);
@@ -121,10 +154,9 @@ export function fitTransform(points: Position[], width: number, height: number, 
   const [w, h] = [Math.max(...xs) - left, Math.max(...ys) - top];
   // Room for a bow out of the right-most column, and a little air on every side.
   const margin = 32;
-  const zoom = Math.max(minZoom, Math.min(1, width / (w + 2 * margin), height / (h + 2 * margin)));
-  return {
-    x: width / 2 - (left + w / 2) * zoom,
-    y: height / 2 - (top + h / 2) * zoom,
-    zoom,
-  };
+  const [outerW, outerH] = [w + 2 * margin, h + 2 * margin];
+  const zoom = Math.max(minZoom, Math.min(1, width / outerW, height / outerH));
+  const place = (pane: number, outer: number, start: number, size: number) =>
+    outer * zoom <= pane ? pane / 2 - (start + size / 2) * zoom : (margin - start) * zoom;
+  return { x: place(width, outerW, left, w), y: place(height, outerH, top, h), zoom };
 }

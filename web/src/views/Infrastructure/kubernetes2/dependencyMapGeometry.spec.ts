@@ -24,7 +24,7 @@ import {
   pairFlows,
   type Position,
 } from "./dependencyGraph";
-import { fitTransform, labelBox, placeLabels, routeEdge } from "./dependencyMapGeometry";
+import { arrowBox, fitTransform, labelBox, placeLabels, routeEdge } from "./dependencyMapGeometry";
 
 type End = [namespace: string, type: string, name: string];
 
@@ -153,10 +153,39 @@ describe("placeLabels", () => {
     expect(placed.get("moved")).toEqual({ x: 252, y: 200 });
   });
 
+  it("keeps a label off the stretch an arrowhead takes before its target", () => {
+    const route = routeEdge({ x: 0, y: 0 }, { x: 312, y: 0 }, []);
+    const placed = placeLabels(
+      [{ id: "e", text: "174KB/s", spots: route.spots }],
+      [
+        { x: 0, y: 0 },
+        { x: 312, y: 0 },
+      ],
+      [arrowBox(route)],
+    );
+    const box = labelBox("174KB/s", placed.get("e")!);
+    expect(box.x + box.w).toBeLessThanOrEqual(312 - 24);
+    expect(box.x).toBeGreaterThanOrEqual(CARD_W);
+  });
+
+  it("tries further spots along the route before leaving a label out", () => {
+    const route = routeEdge({ x: 0, y: 0 }, { x: 312, y: 200 }, []);
+    // A label already on the gap's middle; the next one moves along the curve.
+    const placed = placeLabels(
+      [
+        { id: "first", text: "1.0KB/s", spots: [route.spots[0]] },
+        { id: "second", text: "1.0KB/s", spots: route.spots },
+      ],
+      [],
+    );
+    expect(placed.get("second")).toBeDefined();
+    expect(placed.get("second")).not.toEqual(placed.get("first"));
+  });
+
   it("fits a typical rate label in the gap between two columns", () => {
-    const box = labelBox("174.4KB/s", { x: CARD_W + 36, y: 0 });
+    const box = labelBox("174.4KB/s", { x: CARD_W + 48, y: 0 });
     expect(box.x).toBeGreaterThan(CARD_W);
-    expect(box.x + box.w).toBeLessThan(288);
+    expect(box.x + box.w).toBeLessThan(312);
   });
 });
 
@@ -178,6 +207,19 @@ describe("formatRate", () => {
 });
 
 describe("fitTransform", () => {
+  it("starts a map too big for the floor at its top-left", () => {
+    const view = fitTransform(
+      [
+        { x: 0, y: 0 },
+        { x: 4000, y: 2000 },
+      ],
+      1000,
+      600,
+      0.8,
+    );
+    expect(view).toEqual({ x: 32 * 0.8, y: 32 * 0.8, zoom: 0.8 });
+  });
+
   it("never fits below the zoom it is given as a floor", () => {
     expect(
       fitTransform(

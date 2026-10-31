@@ -220,7 +220,9 @@ describe("DependenciesView", () => {
     await mountView();
     chart().vm.$emit("select", edges()[0].id);
     await flushPromises();
-    await testId("k8s2-deps-view").trigger("keydown", { key: "Escape" });
+    // From anywhere on the page, as after a mouse click on an edge, which leaves focus on the body.
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flushPromises();
     expect(testId("k8s2-deps-edge").exists()).toBe(false);
     chart().vm.$emit("select", edges()[0].id);
     await flushPromises();
@@ -258,11 +260,27 @@ describe("DependenciesView", () => {
     expect(wrapper.emitted("update")).toEqual([[{ namespaces: [], search: "" }]]);
   });
 
-  it("leaves Escape alone while no edge panel is open", async () => {
+  it("leaves Escape alone while no edge panel is open, or to a dialog open over the page", async () => {
     await mountView();
-    const esc = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
-    testId("k8s2-deps-view").element.dispatchEvent(esc);
-    expect(esc.defaultPrevented).toBe(false);
+    const esc = () => {
+      const event = new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      });
+      document.body.dispatchEvent(event);
+      return event;
+    };
+    expect(esc().defaultPrevented).toBe(false);
+    chart().vm.$emit("select", edges()[0].id);
+    await flushPromises();
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    document.body.appendChild(dialog);
+    expect(esc().defaultPrevented).toBe(false);
+    await flushPromises();
+    expect(testId("k8s2-deps-edge").exists()).toBe(true);
+    dialog.remove();
   });
 
   it("returns focus to the list when the map dismisses a panel that holds it", async () => {
@@ -287,13 +305,31 @@ describe("DependenciesView", () => {
     expect(document.activeElement).toBe(document.body);
   });
 
-  it("colours a namespace the same whatever else is drawn", async () => {
-    await mountView();
-    const before = nodes().find((n: any) => n.label === "api").color;
+  it("colours a namespace the same across the namespace filter, search and both switches", async () => {
+    await mountView({ namespaceOptions: ["aaa", "backend", "frontend"] });
+    const colour = (name: string) => nodes().find((n: any) => n.label === name)?.color;
+    const before = { api: colour("api"), web: colour("web") };
+    for (const query of [
+      { system: "true", nodeTraffic: "true" },
+      { namespace: "backend" },
+      { search: "api" },
+      { namespace: "frontend", system: "true" },
+    ]) {
+      await wrapper.setProps({ state: parseUrlState({ view: "dependencies", ...query }) });
+      if (colour("api")) expect(colour("api")).toBe(before.api);
+      if (colour("web")) expect(colour("web")).toBe(before.web);
+    }
+  });
+
+  it("totals the connections the switches leave in the header", async () => {
+    await mountView({ state: parseUrlState({ view: "dependencies", namespace: "backend" }) });
+    const header = wrapper.findComponent({ name: "K8sListHeader" });
+    // Only web -> api: the switches hide api -> coredns and node-to-node traffic, whatever the namespace filter.
+    expect(header.props("total")).toBe(1);
     await wrapper.setProps({
-      state: parseUrlState({ view: "dependencies", system: "true" }),
+      state: parseUrlState({ view: "dependencies", namespace: "backend", nodeTraffic: "true" }),
     });
-    expect(nodes().find((n: any) => n.label === "api").color).toBe(before);
+    expect(header.props("total")).toBe(2);
   });
 
   it("counts what it draws when there are too many endpoints", async () => {
