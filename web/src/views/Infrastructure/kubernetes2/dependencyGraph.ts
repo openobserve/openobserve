@@ -49,11 +49,12 @@ export interface FlowEnd {
   ownerType: string;
 }
 
-export interface FlowEdge {
+// Hosts draw the same edges between their own ends.
+export interface FlowEdge<E extends { id: string } = FlowEnd> {
   id: string;
   // Client to server when directed; otherwise in id order.
-  source: FlowEnd;
-  target: FlowEnd;
+  source: E;
+  target: E;
   directed: boolean;
   // Bytes/s source to target, and back.
   forward: number;
@@ -71,16 +72,16 @@ export interface FlowFilter {
   showNodeTraffic: boolean;
 }
 
-export interface GraphNode {
-  end: FlowEnd;
+export interface GraphNode<E extends { id: string } = FlowEnd> {
+  end: E;
   total: number;
   // Column in the layered layout: callers to the left of what they call.
   rank: number;
 }
 
-export interface FlowGraph {
-  nodes: GraphNode[];
-  edges: FlowEdge[];
+export interface FlowGraph<E extends { id: string } = FlowEnd> {
+  nodes: GraphNode<E>[];
+  edges: FlowEdge<E>[];
 }
 
 const END = (side: "src" | "dst") =>
@@ -129,27 +130,33 @@ export function endOf(metric: Record<string, string>, side: "src" | "dst"): Flow
   };
 }
 
-interface Flow {
-  src: FlowEnd;
-  dst: FlowEnd;
+export type EndOf<E> = (metric: Record<string, string>, side: "src" | "dst") => E;
+
+interface Flow<E> {
+  src: E;
+  dst: E;
   request: number;
   response: number;
   unknown: number;
   total: number;
 }
 
-const known = (f: Flow) => f.request + f.response;
+const known = (f: Flow<unknown>) => f.request + f.response;
 
 // One flow per direction of travel: the bytes from the node that saw the most of them, split by direction
 // as the node that saw the most request and response bytes did, since a node whose eBPF pod restarted
 // reports the same bytes as unknown. Adding nodes' rows together would count cross-node bytes twice.
-function busiestNode(series: Series[]): Flow[] {
-  const perNode = new Map<string, Flow>();
+function busiestNode<E extends { id: string }>(
+  series: Series[],
+  endOf: EndOf<E>,
+  reporter: string,
+): Flow<E>[] {
+  const perNode = new Map<string, Flow<E>>();
   for (const { metric, value } of series) {
     if (!(value > 0)) continue;
     const src = endOf(metric, "src");
     const dst = endOf(metric, "dst");
-    const key = `${src.id}\n${dst.id}\n${metric.host_id ?? ""}`;
+    const key = `${src.id}\n${dst.id}\n${metric[reporter] ?? ""}`;
     let f = perNode.get(key);
     if (!f) {
       f = { src, dst, request: 0, response: 0, unknown: 0, total: 0 };
@@ -160,7 +167,7 @@ function busiestNode(series: Series[]): Flow[] {
     else f.unknown += value;
     f.total += value;
   }
-  const best = new Map<string, { busiest: Flow; informed: Flow }>();
+  const best = new Map<string, { busiest: Flow<E>; informed: Flow<E> }>();
   for (const f of perNode.values()) {
     const key = `${f.src.id}\n${f.dst.id}`;
     const kept = best.get(key);
@@ -182,9 +189,9 @@ function busiestNode(series: Series[]): Flow[] {
   });
 }
 
-interface Pair {
-  a: FlowEnd;
-  b: FlowEnd;
+interface Pair<E> {
+  a: E;
+  b: E;
   ab: number;
   ba: number;
   aClient: number;
@@ -194,13 +201,21 @@ interface Pair {
   unknown: number;
 }
 
+// Traffic inside one workload, one node or the outside world is not a dependency.
+export const pairFlows = (series: Series[]): FlowEdge[] =>
+  pairEnds(series, endOf, "host_id").filter((e) => e.source.id !== e.target.id);
+
 // One edge per unordered pair. A request leaves the client and a response leaves the server, so both
 // count toward the same orientation; an edge is directed only when that evidence is most of its bytes.
-export function pairFlows(series: Series[]): FlowEdge[] {
-  const pairs = new Map<string, Pair>();
-  for (const { src, dst, request, response, unknown, total } of busiestNode(series)) {
-    // Traffic inside one workload, one node or the outside world is not a dependency.
-    if (src.id === dst.id) continue;
+// `reporter` is the label naming the node or host that reported a row.
+export function pairEnds<E extends { id: string }>(
+  series: Series[],
+  endOf: EndOf<E>,
+  reporter: string,
+): FlowEdge<E>[] {
+  const pairs = new Map<string, Pair<E>>();
+  const flows = busiestNode(series, endOf, reporter);
+  for (const { src, dst, request, response, unknown, total } of flows) {
     const [a, b] = src.id < dst.id ? [src, dst] : [dst, src];
     const key = `${a.id}\n${b.id}`;
     let p = pairs.get(key);
@@ -262,14 +277,14 @@ export function filterFlows(edges: FlowEdge[], filter: FlowFilter): FlowEdge[] {
 }
 
 // Takes the busiest edges while they and their ends fit under the limits, ranked so each caller sits left of what it calls.
-export function buildGraph(
-  edges: FlowEdge[],
+export function buildGraph<E extends { id: string }>(
+  edges: FlowEdge<E>[],
   limit = MAX_GRAPH_NODES,
   edgeLimit = MAX_GRAPH_EDGES,
-): FlowGraph {
+): FlowGraph<E> {
   // Picking ends first could keep every client of disjoint pairs and none of their servers.
   const kept = new Set<string>();
-  const keptEdges: FlowEdge[] = [];
+  const keptEdges: FlowEdge<E>[] = [];
   const busiest = [...edges].sort((x, y) => y.total - x.total || x.id.localeCompare(y.id));
   for (const e of busiest) {
     if (keptEdges.length >= edgeLimit) break;
@@ -280,7 +295,7 @@ export function buildGraph(
     keptEdges.push(e);
   }
   // Each card's rate from its drawn edges alone, matching the connections it counts.
-  const totals = new Map<string, { end: FlowEnd; total: number }>();
+  const totals = new Map<string, { end: E; total: number }>();
   for (const e of keptEdges) {
     for (const end of [e.source, e.target]) {
       const entry = totals.get(end.id) ?? { end, total: 0 };
