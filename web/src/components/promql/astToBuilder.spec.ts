@@ -322,6 +322,30 @@ describe("promqlToBuilder", () => {
     expect(parsePromqlQuery.mock.calls[1][0].query).toBe(text);
   });
 
+  it("accepts a union the renderer merges into one regex selector", async () => {
+    const eq = (value: string) => ({ label: "code", op: "=", value });
+    const union = bin("or", sel("x", [eq("500")]), sel("x", [eq("503")]));
+    const merged = sel("x", [{ label: "code", op: "=~", value: "(?:500|503)" }]);
+    parsePromqlQuery
+      .mockResolvedValueOnce({ data: { data: union } })
+      .mockResolvedValueOnce({ data: { data: merged } });
+    const result = await promqlToBuilder("org", 'x{code="500"} or x{code="503"}');
+    expect(result.ok).toBe(true);
+    expect(parsePromqlQuery.mock.calls[1][0].query).toBe('x{code=~"(?:500|503)"}');
+  });
+
+  it("still refuses a merged rendering that means something else", async () => {
+    const eq = (value: string) => ({ label: "code", op: "=", value });
+    parsePromqlQuery
+      .mockResolvedValueOnce({
+        data: { data: bin("or", sel("x", [eq("500")]), sel("x", [eq("503")])) },
+      })
+      .mockResolvedValueOnce({
+        data: { data: sel("x", [{ label: "code", op: "=~", value: "(?:500)" }]) },
+      });
+    expect((await promqlToBuilder("org", "q")).ok).toBe(false);
+  });
+
   it("returns the parser's message for a query that does not parse", async () => {
     parsePromqlQuery.mockRejectedValue({
       response: { data: { status: "error", error: "unclosed left parenthesis" } },

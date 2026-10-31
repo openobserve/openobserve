@@ -17,6 +17,7 @@ import { isEqual } from "lodash-es";
 import metricsService from "@/services/metrics";
 import { gt, type I18nKey } from "@/types/i18n";
 import { promqlRenderer } from "./operations/queryModeller";
+import { compileLabelFilters } from "./labelBoolean";
 import {
   PromqlStepGroup,
   PromqlStepId,
@@ -314,6 +315,51 @@ export const treeToBuilder = (tree: PromqlTree): BuilderMapping => {
   }
 };
 
+/** The OR-of-AND branches a filter list means, in a fixed order, so equal filters compare equal. */
+const canonicalBranches = (labels: PromqlLabelMatcher[]): string[][] => {
+  const compiled = compileLabelFilters(labels);
+  const branches = compiled.ok ? compiled.branches : [labels];
+  return branches
+    .map((branch) => branch.map((m) => matcherKey(m as PromqlLabelMatcher)).sort())
+    .sort((a, b) => a.join("\u0001").localeCompare(b.join("\u0001")));
+};
+
+const filterLayer = (node: PromqlTree): Layer | null => {
+  if (node.type === "binary" && node.op === "or") return unionLayer(node);
+  if (node.type === "selector") return { selector: node as unknown as TreeSelector };
+  if (
+    node.type === "call" &&
+    promqlRenderer.getStepSpec(node.func)?.group === PromqlStepGroup.RateAndRange
+  ) {
+    return rangeLayer(node.func, node.args);
+  }
+  return null;
+};
+
+/** A tree with each selector or union of selectors replaced by the filter branches it means, so a merged rendering matches the union it came from. */
+export const canonicalTree = (node: PromqlTree): PromqlTree => {
+  const layer = filterLayer(node);
+  if (layer && "selector" in layer) {
+    return {
+      type: "filters",
+      step: layer.step ?? null,
+      name: layer.selector.name,
+      offset: layer.selector.offset ?? null,
+      branches: canonicalBranches(layer.selector.matchers),
+    };
+  }
+  const out: PromqlTree = { type: node.type };
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "type") continue;
+    out[key] = Array.isArray(value)
+      ? value.map((v) => (isTree(v) ? canonicalTree(v) : v))
+      : isTree(value)
+        ? canonicalTree(value)
+        : value;
+  }
+  return out;
+};
+
 const parse = async (org: string, query: string): Promise<PromqlTree> =>
   (await metricsService.parsePromqlQuery({ org_identifier: org, query })).data.data;
 
@@ -333,7 +379,8 @@ export const promqlToBuilder = async (org: string, text: string): Promise<Builde
   const mismatch = { ok: false as const, reason: gt("metrics.builderSwitch.mismatch") as string };
   try {
     const again = await parse(org, promqlRenderer.renderQuery(mapped.query));
-    return isEqual(stripParens(tree), stripParens(again)) ? mapped : mismatch;
+    const same = isEqual(canonicalTree(stripParens(tree)), canonicalTree(stripParens(again)));
+    return same ? mapped : mismatch;
   } catch {
     return mismatch;
   }
