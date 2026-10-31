@@ -27,6 +27,7 @@ import useNamedEvents, { type NamedEventsStatus } from "@/composables/rum/useNam
 import { getConsumableRelativeTime } from "@/utils/date";
 import api from "@/services/rumProductAnalytics";
 import { rumPaError } from "@/utils/rum/rumPaApiError";
+import { isDeviceClass, type DeviceClass } from "@/utils/rum/clickHeatmapQueries";
 import {
   appProbeSql,
   entryExitSql,
@@ -171,6 +172,10 @@ const funnelPair = ref<FunnelPair | null>(null);
 const funnelInterval = ref<Granularity>("auto");
 const paths = ref<PathsDef>(defaultPaths());
 const retention = ref<RetentionDef>(defaultRetention());
+const heatmap = reactive<{ pageUrl: string; device: DeviceClass }>({
+  pageUrl: "",
+  device: "all",
+});
 const trendSeries = ref<StepRef[]>([]);
 const refreshTick = ref(0);
 const syncedSignature = ref("");
@@ -257,6 +262,7 @@ export function resetProductAnalytics(): void {
   funnelInterval.value = "auto";
   paths.value = defaultPaths();
   retention.value = defaultRetention();
+  Object.assign(heatmap, { pageUrl: "", device: "all" });
   trendSeries.value = [];
   refreshTick.value = 0;
   syncedSignature.value = "";
@@ -432,6 +438,11 @@ export default function useProductAnalytics() {
     range.value = null;
     paths.value = defaultPaths();
     retention.value = defaultRetention();
+    const device = firstString(q.device);
+    Object.assign(heatmap, {
+      pageUrl: firstString(q.page_url) ?? "",
+      device: isDeviceClass(device) ? device : "all",
+    });
     if (!keepFunnel) {
       funnel.value = defaultFunnel();
       const fc = firstString(q.fc);
@@ -506,6 +517,10 @@ export default function useProductAnalytics() {
     if (r.ret) q.rr = encodeDef(stepRefParam(r.ret));
     if (r.per !== "auto") q.per = r.per;
     if (r.mode !== "on") q.rmode = r.mode;
+    if (routeName === PA_ROUTES.heatmaps) {
+      if (heatmap.pageUrl) q.page_url = heatmap.pageUrl;
+      if (heatmap.device !== "all") q.device = heatmap.device;
+    }
     return q;
   };
 
@@ -1125,6 +1140,7 @@ export default function useProductAnalytics() {
     funnelInterval,
     paths,
     retention,
+    heatmap,
     trendSeries,
     initFromRoute,
     toQuery,

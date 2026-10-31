@@ -1088,6 +1088,72 @@ describe("AppSessions.vue", () => {
       await nextTick();
     };
 
+    it("offers a View heatmap action on each session row that opens the heatmap, not the viewer", async () => {
+      wrapper.unmount();
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      wrapper = mount(AppSessions, {
+        props: { isSessionReplayEnabled: true },
+        global: {
+          plugins: [store, router, i18n],
+          stubs: {
+            ...buildPlatformStubs(),
+            // Passes the click event on, as OButton does, so .stop keeps the row from opening the viewer.
+            OButton: {
+              template:
+                '<button v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></button>',
+              emits: ["click"],
+            },
+            OTable: {
+              template:
+                '<div data-test="rum-sessions-table" @click="$emit(\'row-click\', data[0])"><div v-for="row in data" :key="row.session_id"><slot name="cell-session" :row="row" /></div></div>',
+              props: [
+                "data",
+                "columns",
+                "loading",
+                "rowKey",
+                "columnVisibility",
+                "getRowStatusColor",
+              ],
+              emits: ["row-click"],
+            },
+          },
+        },
+      });
+      await flushPromises();
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: { hits: [{ app: "web", url: "/home" }] },
+      } as any);
+      wrapper.vm.rows = [
+        {
+          session_id: "session-1",
+          start_time: 1000,
+          events: 2,
+          time_spent: 5000,
+          has_replay: true,
+        },
+      ];
+      await nextTick();
+
+      const button = wrapper.find('[data-test="rum-app-sessions-view-heatmap-btn"]');
+      expect(button.exists()).toBe(true);
+      expect(button.attributes("aria-label")).toBe("View heatmap");
+
+      await button.trigger("click");
+      await flushPromises();
+
+      expect(push).toHaveBeenCalledTimes(1);
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "productAnalyticsHeatmaps",
+          query: expect.objectContaining({ app: "web", page_url: "/home" }),
+        }),
+      );
+
+      wrapper.vm.rows = [{ session_id: "session-1", start_time: 1000, has_replay: false }];
+      await nextTick();
+      expect(wrapper.find('[data-test="rum-app-sessions-view-heatmap-btn"]').exists()).toBe(false);
+    });
+
     it("renders React Native as the platform label when source is react-native", async () => {
       // Act
       await setSessionRow("react-native");
