@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 import { LogsQueryPage } from './logsQueryPage.js';
 import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
@@ -2732,6 +2733,7 @@ export class LogsPage {
         await this.page.locator('[data-test="header-my-account-profile-icon"]').click();
         // Header.vue data-test="menu-link-logout-item" on the Sign Out menu item
         await this.page.locator('[data-test="menu-link-logout-item"]').click();
+        await confirmDraftSignOut(this.page);
     }
 
     // LogsQueryPage methods - delegate to LogsQueryPage
@@ -8306,8 +8308,7 @@ export class LogsPage {
         const relativeBtn = this.page.locator(`[data-test="date-time-relative-${suffix}-btn"]`);
         await relativeBtn.waitFor({ state: 'visible', timeout: 5000 });
         await relativeBtn.click();
-        // Wait for the date-time button to remain visible (popup closed); selection complete
-        await this.page.locator(this.dateTimeButton).waitFor({ state: 'visible' });
+        await this.closeDateTimePickerIfOpen();
         testLogger.info(`Relative time range set: ${suffix}`);
     }
 

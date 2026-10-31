@@ -26,7 +26,9 @@ use axum::{
 use config::get_config;
 use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
-#[cfg(feature = "profiling")]
+#[cfg(feature = "cloud")]
+use openobserve_api_management::request::org_domains;
+#[cfg(feature = "cpu-profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
@@ -63,8 +65,8 @@ use {
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
         discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys, license, oncall,
-        playground, prompts, providers, remote_tasks, score_configs, scorers, service_streams,
-        workflows,
+        playground, prompts, providers, quality, remote_tasks, score_configs, scorers,
+        service_streams, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -952,12 +954,14 @@ pub fn basic_routes() -> Router {
     router = router.nest("/node", node_routes);
 
     // Debug/profiling routes with auth
-    #[cfg(feature = "profiling")]
+    #[cfg(feature = "cpu-profiling")]
     {
-        let debug_routes = Router::new()
+        let debug_routes = Router::new().route("/profile/cpu", get(profiling::cpu_profile));
+        #[cfg(feature = "profiling")]
+        let debug_routes = debug_routes
             .route("/profile/memory", get(profiling::memory_profile))
-            .route("/profile/stats", get(profiling::jemalloc_stats))
-            .route("/profile/cpu", get(profiling::cpu_profile))
+            .route("/profile/stats", get(profiling::jemalloc_stats));
+        let debug_routes = debug_routes
             .layer(middleware::from_fn(password_policy_middleware))
             .layer(middleware::from_fn(auth_middleware));
 
@@ -1376,7 +1380,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/savedviews", get(search::saved_view::get_views).post(search::saved_view::create_view))
         .route("/{org_id}/savedviews/{view_id}", get(search::saved_view::get_view).put(search::saved_view::update_view).delete(search::saved_view::delete_view))
 
-        .route("/{org_id}/query_history", get(query_history::list).post(query_history::record).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
+        .route("/{org_id}/query_history", get(query_history::list).post(query_history::record).delete(query_history::clear).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
         .route("/{org_id}/query_history/{id}", patch(query_history::star).delete(query_history::delete).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
 
         // Functions
@@ -1439,6 +1443,18 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/{alert_id}/export", post(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/enable", patch(alerts::enable_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/ack", post(alerts::ack::ack_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/unack", post(alerts::ack::unack_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/acks", get(alerts::ack::list_alert_acks))
+        .route("/v2/{org_id}/alerts/{alert_id}/mute", post(alerts::mute::mute_alert))
+        .route(
+            "/v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/extend",
+            post(alerts::mute::extend_alert_mute),
+        )
+        .route(
+            "/v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/cancel",
+            post(alerts::mute::cancel_alert_mute),
+        )
         .route("/v2/{org_id}/alerts/bulk/enable", post(alerts::enable_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/retrain", patch(alerts::retrain_alert))
@@ -1447,7 +1463,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
         .route("/v2/{org_id}/alerts/tags", get(alerts::list_alert_tags))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
-        .route("/v2/{org_id}/alerts/dedup/summary", get(alerts::dedup_stats::get_dedup_summary))
+        .route("/v2/{org_id}/alerts/auto_investigate/decisions", get(alerts::auto_investigate::list_auto_investigate_decisions))
 
         // Alerts - incidents must be before alerts to avoid route conflicts
         .route("/v2/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents))
@@ -1490,8 +1506,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/alerts/destinations/{destination_name}/test_send", post(alerts::destinations::test_send))
         .route("/{org_id}/alerts/destinations/bulk", delete(alerts::destinations::delete_destination_bulk))
 
-        // Deduplication
-        .route("/{org_id}/alerts/deduplication/config", get(alerts::deduplication::get_config).post(alerts::deduplication::set_config).delete(alerts::deduplication::delete_config))
+        // Semantic field groups, under their historical path
         .route("/{org_id}/alerts/deduplication/semantic-groups", get(alerts::deduplication::get_semantic_groups).put(alerts::deduplication::save_semantic_groups))
         .route("/{org_id}/alerts/deduplication/semantic-groups/preview-diff", post(alerts::deduplication::preview_semantic_groups_diff));
 
@@ -1763,6 +1778,9 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/tasks/{entity_id}", get(remote_tasks::get_remote_task).put(remote_tasks::save_remote_task_draft).delete(remote_tasks::delete_remote_task))
                 .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config).put(score_configs::ensure_score_config))
                 .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
+                .route("/{org_id}/score_configs/quality", get(quality::list_quality_summaries))
+                .route("/{org_id}/score_configs/{entity_id}/quality", get(quality::list_quality_scores))
+                .route("/{org_id}/score_configs/{entity_id}/quality/timeline", get(quality::get_quality_timeline))
                 .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
 
                 // Scorers (Online Eval Phase 2)
@@ -2158,6 +2176,18 @@ pub fn service_routes() -> Router {
             )
             .route("/{org_id}/billing_group/members", get(billing_group::check_members))
             .route(
+                "/{org_id}/settings/domains",
+                get(org_domains::get_linked_domain).post(org_domains::link_domain)
+            )
+            .route("/{org_id}/settings/domains/requests",post(org_domains::raise_request).get(org_domains::list_requests))
+            .route("/{org_id}/settings/domain/request/{id}/approve",post(org_domains::approve_request))
+            .route("/{org_id}/settings/domain/request/{id}/reject",post(org_domains::reject_request))
+            .route("/{org_id}/settings/domains/{domain}",delete(org_domains::delete_linked_domain))
+            .route(
+                "/{org_id}/settings/domains/verify/{domain}",
+                post(org_domains::verify_domain),
+            )
+            .route(
                 "/{org_id}/billing_group/members/{member_org_id}",
                 delete(billing_group::remove_member),
             );
@@ -2447,6 +2477,10 @@ fn oncall_routes(router: Router) -> Router {
                 .put(oncall::put_telephony)
                 .delete(oncall::delete_telephony),
         )
+        .route(
+            "/{org_id}/telephony/status",
+            get(oncall::get_telephony_status),
+        )
 }
 
 // Private and before the next `pub fn`, so the ROUTE_PERMISSIONS router scrape still reads it.
@@ -2479,7 +2513,6 @@ fn fleet_router() -> Router {
             "/{org_id}/fleet/fleets",
             get(fleet::list_fleets).post(fleet::create_fleet),
         )
-        .route("/{org_id}/fleet/fleets/move", post(fleet::move_collectors))
         .route(
             "/{org_id}/fleet/fleets/{fleet_id}",
             get(fleet::get_fleet)
@@ -2615,6 +2648,8 @@ pub fn slack_routes() -> Router {
         .route("/{org_id}/slack/installations/{installation_id}/channel-defaults", get(set::channel_defaults))
         .route("/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}", get(set::get_channel_default).put(set::put_channel_default).delete(set::delete_channel_default))
         .route("/{org_id}/slack/installations/{installation_id}/help-contact", get(set::get_help_contact).put(set::put_help_contact))
+        .route("/{org_id}/slack/installations/{installation_id}/oncall-unlinked", get(set::oncall_unlinked))
+        .route("/{org_id}/slack/installations/{installation_id}/oncall-unlinked/remind", post(set::remind_oncall_unlinked))
         .route("/{org_id}/slack/installations/{installation_id}/org-access", get(inst::get_org_access).put(inst::put_org_access))
 }
 
@@ -2727,14 +2762,7 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
             .merge(crate::router::http::create_splunk_collector_proxy_routes())
             .merge(router_routes)
     } else {
-        // Non-router node: use direct service routes
-        Router::new()
-            .merge(basic_routes())
-            .merge(splunk_collector_routes())
-            .nest("/config", config_routes())
-            .nest("/api", service_routes())
-            .merge(other_service_routes())
-            .merge(proxy_routes(true))
+        local_routes()
     };
 
     // Ensure redirect takes into account base_uri
@@ -2786,6 +2814,17 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
         ));
     }
     outer
+}
+
+/// Every route a non-router node serves itself, without the UI.
+fn local_routes() -> Router {
+    Router::new()
+        .merge(basic_routes())
+        .merge(splunk_collector_routes())
+        .nest("/config", config_routes())
+        .nest("/api", service_routes())
+        .merge(other_service_routes())
+        .merge(proxy_routes(true))
 }
 
 /// Root-only node management routes, before the authentication layers `basic_routes` adds.
@@ -3791,7 +3830,6 @@ mod tests {
                 "custom_logo_text",
                 "editor_suggest_mode",
                 "native_login_enabled",
-                "rum",
                 "sso_enabled",
                 "telemetry_enabled",
             ],
@@ -3871,6 +3909,10 @@ mod tests {
             "authenticated config carries the version"
         );
         assert!(
+            payload.get("rum").is_some_and(Value::is_object),
+            "the RUM SDK settings are served only to signed-in callers"
+        );
+        assert!(
             payload.get("instance").is_none(),
             "the instance id is a fingerprinting handle no UI consumer reads; it must not be served"
         );
@@ -3886,6 +3928,34 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(wrong_method.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[tokio::test]
+    async fn settings_v2_refuses_an_invalid_auto_investigate_gate() {
+        let app = Router::new().route(
+            "/api/{org_id}/settings/v2",
+            post(organization::system_settings::set_org_setting),
+        );
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/api/default/settings/v2")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                r#"{"setting_key":"auto_investigate_gate","setting_value":{"flapping_onsets_7d":1},"setting_category":"alerts"}"#,
+            ))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let text = String::from_utf8_lossy(&body);
+        assert!(
+            text.contains(
+                "invalid auto_investigate_gate: flapping_onsets_7d must be between 2 and 100"
+            ),
+            "{text}"
+        );
     }
 
     // NOTE ON WHAT IS TESTABLE HERE.
@@ -4299,6 +4369,29 @@ mod tests {
         assert!(
             json.contains("/{org_id}/query_functions"),
             "query_functions is missing from the OpenAPI surface"
+        );
+    }
+
+    #[test]
+    fn query_history_list_publishes_both_response_shapes() {
+        let spec = serde_json::to_value(super::openapi::ApiDoc::openapi()).unwrap();
+        let ok = &spec["paths"]["/api/{org_id}/query_history"]["get"]["responses"]["200"];
+        assert_eq!(
+            ok["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/QueryHistoryListResponse"
+        );
+        let shapes = spec["components"]["schemas"]["QueryHistoryListResponse"]["oneOf"]
+            .as_array()
+            .expect("the list response is a oneOf");
+        let shapes = serde_json::to_string(shapes).unwrap();
+        assert!(
+            shapes.contains("#/components/schemas/QueryHistoryEntry"),
+            "{shapes}"
+        );
+        assert!(shapes.contains("\"type\":\"array\""), "{shapes}");
+        assert!(
+            shapes.contains("#/components/schemas/QueryHistoryCountResponse"),
+            "{shapes}"
         );
     }
 
@@ -4940,19 +5033,70 @@ mod tests {
         })
     }
 
-    #[test]
-    fn assistant_scope_is_exactly_these_router_routes() {
-        use openobserve_api_common::auth::delegation::in_assistant_scope;
-
+    /// Every `METHOD template` of the router that `in_scope` admits, sorted.
+    fn scope_allows(in_scope: fn(&Method, &str) -> bool) -> Vec<String> {
         let mut allowed = Vec::new();
         for (template, methods) in api_routes() {
             for method in methods {
                 let m = Method::from_bytes(method.as_bytes()).unwrap();
-                if in_assistant_scope(&m, &neutral_path(&template)) {
+                if in_scope(&m, &neutral_path(&template)) {
                     allowed.push(format!("{method} {template}"));
                 }
             }
         }
+        allowed.sort();
+        allowed
+    }
+
+    fn sorted(expected: &[&str]) -> Vec<String> {
+        let mut expected: Vec<String> = expected.iter().map(|s| s.to_string()).collect();
+        expected.sort();
+        expected
+    }
+
+    /// Paths where `in_scope` admits a request that axum hands to a route it refuses, or back.
+    fn dispatch_disagreements(in_scope: fn(&Method, &str) -> bool) -> Vec<String> {
+        let routes = api_routes();
+        let templates: Vec<&str> = routes.keys().map(String::as_str).collect();
+        let mut wrong = Vec::new();
+        for r in &templates {
+            for a in &templates {
+                let (rs, as_) = (template_segments(r), template_segments(a));
+                if rs.len() != as_.len() {
+                    continue;
+                }
+                let merged: Option<Vec<&str>> = rs
+                    .iter()
+                    .zip(&as_)
+                    .map(|(x, y)| match (is_param(x), is_param(y)) {
+                        (false, false) => (x == y).then_some(*x),
+                        (false, true) => Some(*x),
+                        (true, false) => Some(*y),
+                        (true, true) => Some("zz"),
+                    })
+                    .collect();
+                let Some(path) = merged else { continue };
+                let Some(owner) = owner(&templates, &path) else {
+                    continue;
+                };
+                for method in &routes[owner] {
+                    let m = Method::from_bytes(method.as_bytes()).unwrap();
+                    let joined = path.join("/");
+                    if in_scope(&m, &joined) != in_scope(&m, &neutral_path(owner)) {
+                        wrong.push(format!("{method} {joined} dispatches to {owner}"));
+                    }
+                }
+            }
+        }
+        wrong.sort();
+        wrong.dedup();
+        wrong
+    }
+
+    #[test]
+    fn assistant_scope_is_exactly_these_router_routes() {
+        use openobserve_api_common::auth::delegation::in_assistant_scope;
+
         let expected = [
             "GET /v2/{org_id}/alerts",
             "GET /v2/{org_id}/alerts/history",
@@ -5018,10 +5162,27 @@ mod tests {
             "POST /{org_id}/prometheus/api/v1/query_range",
             "POST /{org_id}/{stream_name}/_around",
         ];
-        allowed.sort();
-        let mut expected: Vec<String> = expected.iter().map(|s| s.to_string()).collect();
-        expected.sort();
-        assert_eq!(allowed, expected);
+        assert_eq!(scope_allows(in_assistant_scope), sorted(&expected));
+    }
+
+    #[test]
+    fn slack_action_scope_routes_are_exactly() {
+        use openobserve_api_common::auth::delegation::in_slack_action_scope;
+
+        let expected = [
+            "GET /v2/{org_id}/alerts/{alert_id}",
+            "GET /v2/{org_id}/alerts/{alert_id}/acks",
+            "GET /v2/{org_id}/alerts/{alert_id}/groups",
+            "PATCH /v2/{org_id}/alerts/incidents/{incident_id}/update",
+            "POST /v2/{org_id}/alerts/{alert_id}/ack",
+            "POST /v2/{org_id}/alerts/{alert_id}/mute",
+            "POST /v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/cancel",
+            "POST /v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/extend",
+            "POST /v2/{org_id}/alerts/{alert_id}/unack",
+            "POST /{org_id}/oncall/responses/{response_id}/resolve",
+            "POST /{org_id}/oncall/responses/{response_id}/snooze",
+        ];
+        assert_eq!(scope_allows(in_slack_action_scope), sorted(&expected));
     }
 
     /// A pattern parameter must not admit a path that axum hands to a more specific route.
@@ -5029,45 +5190,21 @@ mod tests {
     fn assistant_scope_agrees_with_axum_dispatch() {
         use openobserve_api_common::auth::delegation::in_assistant_scope;
 
-        let routes = api_routes();
-        let templates: Vec<&str> = routes.keys().map(String::as_str).collect();
-        let mut wrong = Vec::new();
-        for r in &templates {
-            for a in &templates {
-                let (rs, as_) = (template_segments(r), template_segments(a));
-                if rs.len() != as_.len() {
-                    continue;
-                }
-                let merged: Option<Vec<&str>> = rs
-                    .iter()
-                    .zip(&as_)
-                    .map(|(x, y)| match (is_param(x), is_param(y)) {
-                        (false, false) => (x == y).then_some(*x),
-                        (false, true) => Some(*x),
-                        (true, false) => Some(*y),
-                        (true, true) => Some("zz"),
-                    })
-                    .collect();
-                let Some(path) = merged else { continue };
-                let Some(owner) = owner(&templates, &path) else {
-                    continue;
-                };
-                for method in &routes[owner] {
-                    let m = Method::from_bytes(method.as_bytes()).unwrap();
-                    let joined = path.join("/");
-                    if in_assistant_scope(&m, &joined)
-                        != in_assistant_scope(&m, &neutral_path(owner))
-                    {
-                        wrong.push(format!("{method} {joined} dispatches to {owner}"));
-                    }
-                }
-            }
-        }
-        wrong.sort();
-        wrong.dedup();
+        let wrong = dispatch_disagreements(in_assistant_scope);
         assert!(
             wrong.is_empty(),
             "add the literal to RESERVED_STREAM_SLOTS in api/common auth/delegation.rs: {wrong:#?}"
+        );
+    }
+
+    #[test]
+    fn slack_action_scope_agrees_with_axum_dispatch() {
+        use openobserve_api_common::auth::delegation::in_slack_action_scope;
+
+        let wrong = dispatch_disagreements(in_slack_action_scope);
+        assert!(
+            wrong.is_empty(),
+            "add the literal to ALERT_ID_LITERALS in api/common auth/delegation.rs: {wrong:#?}"
         );
     }
 
@@ -5146,6 +5283,87 @@ mod tests {
         assert_eq!(
             status(request("POST", "take_overs")).await,
             StatusCode::NOT_FOUND
+        );
+    }
+
+    // OSS documents enterprise-only operations without routing them, so this holds only there.
+    #[cfg(feature = "enterprise")]
+    /// `METHOD /path` OpenAPI operations a non-router node does not route.
+    const UNROUTED_OPENAPI_OPERATIONS: &[&str] = &[
+        // The deprecated v1 folder API is still documented; only `/v2/{org_id}/folders` is routed.
+        "DELETE /api/{org_id}/folders/{folder_id}",
+        "GET /api/{org_id}/folders",
+        "GET /api/{org_id}/folders/name/{folder_name}",
+        "GET /api/{org_id}/folders/{folder_id}",
+        "POST /api/{org_id}/folders",
+        "PUT /api/{org_id}/folders/{folder_id}",
+        // o2-enterprise rbac_known_gaps.txt keys this path; fixing it needs a paired change there.
+        "POST /{org_id}/service_streams/_correlate",
+    ];
+
+    #[cfg(feature = "enterprise")]
+    fn any_param(template: &str) -> String {
+        template
+            .split('/')
+            .map(|s| if is_param(s) { "{}" } else { s })
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+
+    #[cfg(feature = "enterprise")]
+    /// An unrouted documented path meets the auth layer's 401, failing its MCP tool.
+    #[tokio::test]
+    async fn every_openapi_operation_reaches_the_route_it_documents() {
+        let app = local_routes().route_layer(middleware::from_fn(
+            |req: Request<Body>, _next: Next| async move {
+                let matched = req
+                    .extensions()
+                    .get::<axum::extract::MatchedPath>()
+                    .map(|p| p.as_str().to_string())
+                    .unwrap_or_default();
+                (StatusCode::IM_A_TEAPOT, matched).into_response()
+            },
+        ));
+        let spec = super::openapi::ApiDoc::openapi();
+        let mut unrouted = Vec::new();
+        for (template, item) in &spec.paths.paths {
+            let operations = [
+                (Method::GET, item.get.is_some()),
+                (Method::PUT, item.put.is_some()),
+                (Method::POST, item.post.is_some()),
+                (Method::DELETE, item.delete.is_some()),
+                (Method::PATCH, item.patch.is_some()),
+                (Method::HEAD, item.head.is_some()),
+            ];
+            let uri = template
+                .split('/')
+                .map(|s| if is_param(s) { "zz" } else { s })
+                .collect::<Vec<_>>()
+                .join("/");
+            for (method, _) in operations.into_iter().filter(|(_, documented)| *documented) {
+                let req = Request::builder()
+                    .method(method.clone())
+                    .uri(&uri)
+                    .body(Body::empty())
+                    .unwrap();
+                let resp = app.clone().oneshot(req).await.unwrap();
+                let status = resp.status();
+                let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                let matched = String::from_utf8_lossy(&bytes);
+                if status != StatusCode::IM_A_TEAPOT || any_param(&matched) != any_param(template) {
+                    unrouted.push(format!("{method} {template}"));
+                }
+            }
+        }
+        unrouted.sort();
+        let mut allowed = UNROUTED_OPENAPI_OPERATIONS.to_vec();
+        allowed.sort_unstable();
+        assert_eq!(
+            unrouted, allowed,
+            "each documented operation must resolve to the route of the same template; fix the \
+             utoipa `path`, or list a path no local route serves in UNROUTED_OPENAPI_OPERATIONS"
         );
     }
 }

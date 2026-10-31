@@ -155,7 +155,7 @@ describe("LabelFilterEditor", () => {
     it("should display layout name", () => {
       wrapper = createWrapper();
       expect(wrapper.find('[data-test="promql-labelfilter-editor-label"]').text()).toBe(
-        "Label Filters",
+        "Label filters",
       );
     });
 

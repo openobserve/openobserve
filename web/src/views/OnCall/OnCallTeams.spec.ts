@@ -24,6 +24,11 @@ import oncallService from "@/services/oncall";
 import { userKeys } from "@/services/users.querykeys";
 import store from "@/test/unit/helpers/store";
 import OnCallTeams from "@/views/OnCall/OnCallTeams.vue";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -104,9 +109,10 @@ const stubs = {
   OnCallTeamForm: { name: "OnCallTeamForm", props: ["open", "team"], template: "<div />" },
   ConfirmDialog: {
     name: "ConfirmDialog",
-    props: ["modelValue", "message"],
+    props: ["modelValue", "message", "messageKeypath", "messageName", "okLabel", "okVariant"],
     emits: ["update:ok", "update:cancel"],
-    template: "<div v-if='modelValue' data-test='confirm'>{{ message }}</div>",
+    template:
+      "<div v-if='modelValue' data-test='confirm'>{{ messageKeypath ? $t(messageKeypath, { name: messageName }) : message }}</div>",
   },
   // Mirrors the real OButton: emits declared (otherwise the listener also
   // falls through and handlers run twice) and the event passed on.
@@ -343,6 +349,20 @@ describe("OnCallTeams", () => {
     expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallTeamDetail" }));
   });
 
+  // S1: a team just created is the one the reader wants to set up next.
+  it("opens the new team after create", async () => {
+    service.listTeams.mockResolvedValue({ data: [] } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    wrapper.findComponent({ name: "OnCallTeamForm" }).vm.$emit("saved", "team_new");
+    await flushPromises();
+
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "onCallTeamDetail", params: { teamId: "team_new" } }),
+    );
+  });
+
   /// Named in review: every mistake was permanent, because the delete endpoint
   /// and its service method both existed and nothing called them.
   describe("deleting a team", () => {
@@ -362,9 +382,39 @@ describe("OnCallTeams", () => {
       const confirm = wrapper.find('[data-test="confirm"]');
 
       expect(confirm.exists()).toBe(true);
-      expect(confirm.text()).toContain("Platform");
-      expect(confirm.text()).toContain("page nobody");
+      const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
+      expect(dialog.props("messageKeypath")).toBe("oncall.deleteTeamMessageToUnrouted");
+      expect(dialog.props("messageName")).toBe("Platform");
+      expect(dialog.props("okVariant")).toBe("destructive");
       expect(service.deleteTeam).not.toHaveBeenCalled();
+    });
+
+    // S14: the button says what it does, and the message says where routed alerts go next.
+    it("names the button and sends routed alerts to Unrouted when there is no default team", async () => {
+      const wrapper = await open();
+      const confirm = wrapper.findComponent({ name: "ConfirmDialog" });
+
+      expect(confirm.props("okLabel")).toBe("Delete team");
+      expect(confirm.props("okVariant")).toBe("destructive");
+      expect(confirm.props("messageKeypath")).toBe("oncall.deleteTeamMessageToUnrouted");
+      expect(confirm.props("messageName")).toBe("Platform");
+    });
+
+    it("sends routed alerts to the default team when one is set", async () => {
+      service.getRoutingConfig.mockResolvedValue({
+        data: { default_team_id: "team_2", default_team_name: "Payments" },
+      } as any);
+      service.listTeams.mockResolvedValue({
+        data: [team("team_1", "Platform"), team("team_2", "Payments")],
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-team-delete-team_1"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("messageKeypath")).toBe(
+        "oncall.deleteTeamMessageToDefault",
+      );
     });
 
     it("deletes on confirm and reloads", async () => {
@@ -459,6 +509,20 @@ describe("OnCallTeams", () => {
 
       expect(wrapper.find('[data-test="oncall-team-default-badge-team_2"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="oncall-team-default-badge-team_1"]').exists()).toBe(false);
+    });
+
+    // The server refuses to delete the default team, so its row offers no Delete, as the phone menu already does.
+    it("offers no Delete on the default team's row", async () => {
+      service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_2" } } as any);
+      service.listTeams.mockResolvedValue({
+        data: [team("team_1", "Platform"), team("team_2", "Payments")],
+      } as any);
+
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-team-delete-team_2"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-team-delete-team_1"]').exists()).toBe(true);
     });
 
     it("offers to set as default on every team but the current one", async () => {
@@ -616,5 +680,113 @@ describe("OnCallTeams", () => {
 
       expect(wrapper.find('[data-test="confirm"]').text()).toContain("Platform");
     });
+  });
+});
+
+describe("OnCallTeams - editor drafts", () => {
+  const scopeOf = (
+    kind: "oncall_schedule" | "oncall_policy",
+    entityId: string,
+  ): EditorDraftScope => ({
+    kind,
+    org: store.state.selectedOrganization.identifier,
+    entityId,
+    userEmail: store.state.userInfo.email,
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    __resetOnCallRoutingConfig();
+    resetListViewState();
+    vi.clearAllMocks();
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as never);
+    service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: null } } as never);
+    service.listTeams.mockResolvedValue({
+      data: [team("team_1", "Platform"), team("team_2", "Payments")],
+    } as never);
+  });
+
+  it("dots a team whose rotation or escalation policy has an unsaved draft", async () => {
+    writeEditorDraft(scopeOf("oncall_schedule", "team_1/rot_a"), { data: {} });
+    writeEditorDraft(scopeOf("oncall_policy", "team_2"), { data: {} });
+    // The dot sits inside its tooltip's trigger, which the list stub swallows.
+    const wrapper = mount(OnCallTeams, {
+      global: {
+        plugins: [i18n, store],
+        stubs: { ...stubs, OTooltip: { name: "OTooltip", template: "<span><slot /></span>" } },
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-teams-team_1-draft-dot"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-teams-team_2-draft-dot"]').exists()).toBe(true);
+  });
+
+  it("dots a team by its own rotation drafts, new and duplicated ones included, never by a team whose id it prefixes", async () => {
+    service.listTeams.mockResolvedValue({
+      data: [team("team_1", "Platform"), team("team_10", "Search"), team("team_2", "Payments")],
+    } as never);
+    writeEditorDraft(scopeOf("oncall_schedule", "team_10/rot_a"), { data: {} });
+    writeEditorDraft(
+      { ...scopeOf("oncall_schedule", "team_2"), entityId: null, variant: "team_2/clone:rot_b" },
+      { data: {} },
+    );
+    const wrapper = mount(OnCallTeams, {
+      global: {
+        plugins: [i18n, store],
+        stubs: { ...stubs, OTooltip: { name: "OTooltip", template: "<span><slot /></span>" } },
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-teams-team_1-draft-dot"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-teams-team_10-draft-dot"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-teams-team_2-draft-dot"]').exists()).toBe(true);
+
+    writeEditorDraft(scopeOf("oncall_policy", "team_1"), { data: {} });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-teams-team_1-draft-dot"]').exists()).toBe(true);
+  });
+
+  it("drops a deleted team's policy and rotation drafts, and keeps another team's", async () => {
+    const newRotation: EditorDraftScope = {
+      ...scopeOf("oncall_schedule", "team_1"),
+      entityId: null,
+      variant: "team_1/new",
+    };
+    writeEditorDraft(scopeOf("oncall_schedule", "team_1/rot_a"), { data: {} });
+    writeEditorDraft(newRotation, { data: {} });
+    const othersNewRotation = { ...newRotation, userEmail: "teammate@x.io" };
+    writeEditorDraft(othersNewRotation, { data: {} });
+    writeEditorDraft(scopeOf("oncall_schedule", "team_10/rot_a"), { data: {} });
+    writeEditorDraft(scopeOf("oncall_policy", "team_1"), { data: {} });
+    writeEditorDraft(scopeOf("oncall_policy", "team_2"), { data: {} });
+    service.deleteTeam.mockResolvedValue({ data: {} } as never);
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-team-delete-team_1"]').trigger("click");
+    await flushPromises();
+    wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+    await flushPromises();
+
+    expect(readEditorDraft(scopeOf("oncall_schedule", "team_1/rot_a"))).toBeNull();
+    expect(readEditorDraft(newRotation)).toBeNull();
+    expect(readEditorDraft(othersNewRotation)).toBeNull();
+    expect(readEditorDraft(scopeOf("oncall_schedule", "team_10/rot_a"))).not.toBeNull();
+    expect(readEditorDraft(scopeOf("oncall_policy", "team_1"))).toBeNull();
+    expect(readEditorDraft(scopeOf("oncall_policy", "team_2"))).not.toBeNull();
+  });
+
+  it("keeps the drafts when the delete fails", async () => {
+    writeEditorDraft(scopeOf("oncall_schedule", "team_1/rot_a"), { data: {} });
+    service.deleteTeam.mockRejectedValue({ response: { status: 500 } });
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-team-delete-team_1"]').trigger("click");
+    await flushPromises();
+    wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+    await flushPromises();
+
+    expect(readEditorDraft(scopeOf("oncall_schedule", "team_1/rot_a"))).not.toBeNull();
   });
 });

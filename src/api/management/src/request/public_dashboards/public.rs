@@ -19,7 +19,7 @@ use std::{sync::LazyLock, time::Duration};
 
 use axum::{
     Json,
-    extract::{Extension, Path, Query},
+    extract::{Extension, Path, Query, rejection::QueryRejection},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
@@ -182,7 +182,7 @@ pub async fn config(ip: Option<Extension<RealIp>>, Path(slug): Path<String>) -> 
 pub async fn data(
     ip: Option<Extension<RealIp>>,
     Path(slug): Path<String>,
-    Query(params): Query<DataParams>,
+    query: Result<Query<DataParams>, QueryRejection>,
     headers: HeaderMap,
 ) -> Response {
     let if_none_match = headers
@@ -191,6 +191,9 @@ pub async fn data(
     if rate_limited(ip.map(|e| e.0)) || shed_early(&slug, if_none_match) {
         return with_headers(too_many_requests(READ_WINDOW));
     }
+    let Ok(Query(params)) = query else {
+        return with_headers(invalid_range());
+    };
     with_headers(serve_data(&slug, params.range.as_deref(), if_none_match).await)
 }
 
@@ -428,6 +431,11 @@ pub fn with_headers(mut resp: Response) -> Response {
 
 fn expired() -> Response {
     (StatusCode::GONE, "expired").into_response()
+}
+
+// The extractor's own text names serde internals, e.g. a repeated `range`.
+fn invalid_range() -> Response {
+    (StatusCode::BAD_REQUEST, "invalid range").into_response()
 }
 
 // A failed read is temporary, so the viewer retries instead of treating the link as gone.
@@ -833,6 +841,7 @@ mod tests {
             StatusCode::OK.into_response(),
             StatusCode::NOT_FOUND.into_response(),
             expired(),
+            invalid_range(),
             unavailable(),
             too_many_requests(READ_WINDOW),
             server_error(),
@@ -844,6 +853,22 @@ mod tests {
             assert_eq!(h[header::REFERRER_POLICY], "no-referrer");
             assert_eq!(h[header::CACHE_CONTROL], "no-store", "{}", resp.status());
         }
+    }
+
+    #[tokio::test]
+    async fn a_query_the_extractor_refuses_is_a_plain_invalid_range() {
+        let uri: axum::http::Uri = "/data?range=r3600&range=r60".parse().unwrap();
+        let resp = data(
+            None,
+            Path("Qz8Zt2mR7aB3cD4eF5gH6Q".into()),
+            Query::try_from_uri(&uri),
+            HeaderMap::new(),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(resp.headers()[header::CACHE_CONTROL], "no-store");
+        let body = axum::body::to_bytes(resp.into_body(), 1024).await.unwrap();
+        assert_eq!(&body[..], b"invalid range");
     }
 
     #[test]

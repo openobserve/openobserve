@@ -21,6 +21,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 import organizationsService from "@/services/organizations";
 import awsMarketplace from "@/services/awsMarketplace";
+import { ensureBrowserRum } from "@/utils/rum/ensureBrowserRum";
 
 // Mock the services the two card-forms drive on submit.
 vi.mock("@/services/organizations", async (importOriginal) => {
@@ -32,6 +33,7 @@ vi.mock("@/services/organizations", async (importOriginal) => {
     },
   });
 });
+vi.mock("@/utils/rum/ensureBrowserRum", () => ({ ensureBrowserRum: vi.fn() }));
 vi.mock("@/services/awsMarketplace", () => ({
   default: {
     linkSubscription: vi.fn(),
@@ -272,6 +274,12 @@ describe("AwsMarketplaceSetup", () => {
       await flushPromises();
       return wrapper;
     };
+
+    it("starts RUM from the first org the caller belongs to", async () => {
+      await mountSelectOrg([{ identifier: "org1", name: "Org 1" }]);
+
+      expect(ensureBrowserRum).toHaveBeenLastCalledWith("org1");
+    });
 
     it("create form: blocks submit + does NOT create an org when newOrgName is empty", async () => {
       const wrapper = await mountSelectOrg();

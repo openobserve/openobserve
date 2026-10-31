@@ -85,6 +85,43 @@ pub(super) struct WriteTimings {
     pub report_stats_micros: u128,
 }
 
+/// Per-request memo of the streams whose file_list key is too long to store.
+#[derive(Default)]
+pub(super) struct StreamKeyChecks(HashMap<String, Option<String>>);
+
+impl StreamKeyChecks {
+    /// Why `stream_name` cannot be stored; counted as an ingest error the first time it is seen.
+    pub(super) fn violation(&mut self, org_id: &str, stream_name: &str) -> Option<&str> {
+        if !self.0.contains_key(stream_name) {
+            let violation =
+                schema::check_stream_key_len(org_id, StreamType::Metrics, stream_name).err();
+            if let Some(e) = &violation {
+                log::warn!("[METRICS] rejecting stream {org_id}/{stream_name}: {e}");
+            }
+            self.0
+                .insert(stream_name.to_string(), violation.map(|e| e.to_string()));
+        }
+        self.0[stream_name].as_deref()
+    }
+
+    /// Removes the records bound for streams that cannot be stored, as (stream, reason, records).
+    pub(super) fn drop_unstorable<R>(
+        &mut self,
+        org_id: &str,
+        records_by_stream: &mut HashMap<String, Vec<R>>,
+    ) -> Vec<(String, String, usize)> {
+        let mut dropped = Vec::new();
+        records_by_stream.retain(|stream_name, records| {
+            let Some(violation) = self.violation(org_id, stream_name) else {
+                return true;
+            };
+            dropped.push((stream_name.clone(), violation.to_string(), records.len()));
+            false
+        });
+        dropped
+    }
+}
+
 /// Runs each stream's pipelines over its buffered records, grouping the output by destination.
 pub(super) async fn run_pipelines<T: Clone>(
     org_id: &str,
@@ -594,6 +631,35 @@ mod tests {
             fields.push(Field::new(VALUE_LABEL, value_type, true));
         }
         SchemaCache::new(Schema::new(fields))
+    }
+
+    #[test]
+    fn test_stream_key_checks_drop_only_unstorable_streams() {
+        let long_name = "m".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let bounded =
+            infra::file_list::stream_key_violation("org", StreamType::Metrics, &long_name)
+                .is_some();
+        let mut checks = StreamKeyChecks::default();
+        assert!(checks.violation("org", "short").is_none());
+        assert_eq!(checks.violation("org", &long_name).is_some(), bounded);
+
+        let mut records: RecordsByStream<()> = HashMap::new();
+        records.insert("short".to_string(), vec![(record_with(1), ())]);
+        records.insert(
+            long_name.clone(),
+            vec![(record_with(1), ()), (record_with(1), ())],
+        );
+        let dropped = checks.drop_unstorable("org", &mut records);
+        assert!(records.contains_key("short"));
+        assert_eq!(records.contains_key(&long_name), !bounded);
+        if bounded {
+            assert_eq!(dropped.len(), 1);
+            assert_eq!(dropped[0].0, long_name);
+            assert!(dropped[0].1.starts_with("Stream name too long"));
+            assert_eq!(dropped[0].2, 2);
+        } else {
+            assert!(dropped.is_empty());
+        }
     }
 
     #[test]

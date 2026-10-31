@@ -22,6 +22,8 @@ import store from "@/test/unit/helpers/store";
 vi.mock("vue-router", () => ({
   useRouter: () => ({ currentRoute: { value: { query: {} } }, push: vi.fn() }),
   useRoute: () => ({ params: {}, query: {} }),
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 vi.mock("@/services/alert_templates", async (importOriginal) => {

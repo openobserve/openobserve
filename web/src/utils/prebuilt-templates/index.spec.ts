@@ -18,15 +18,39 @@ import {
   PREBUILT_CONFIGS,
   getPrebuiltConfig,
   isPrebuiltType,
-  detectPrebuiltTypeFromUrl,
   generateDestinationUrl,
   generateDestinationHeaders,
   generatePrebuiltMetadata,
   getPopularPrebuiltTypes,
   getPrebuiltTypesByCategory,
+  destinationTypeTiles,
 } from "@/utils/prebuilt-templates";
 
 describe("Prebuilt Templates Index", () => {
+  describe("destinationTypeTiles (MK-7)", () => {
+    it("puts the Slack app tile first, tagged for alert response, then the relabelled webhook tile", () => {
+      const tiles = destinationTypeTiles(true);
+      expect(tiles.map((tile) => tile.id).slice(0, 3)).toEqual(["slack_app", "slack", "discord"]);
+      expect(tiles[0].name).toBe("Slack app");
+      expect(tiles[0].tag).toEqual({
+        label: "Recommended for alert response",
+        variant: "success-soft",
+      });
+      expect(tiles[1].name).toBe("Slack webhook");
+      expect(tiles[1].tag).toEqual({ label: "Post only", variant: "default-soft" });
+    });
+
+    it("keeps the unavailable Slack app disabled and the webhook selectable", () => {
+      const tiles = destinationTypeTiles(false);
+      expect(tiles.map((tile) => tile.id)).toEqual([
+        "slack_app",
+        ...PREBUILT_DESTINATION_TYPES.map((p) => p.id),
+      ]);
+      expect(tiles[0].disabled).toBe(true);
+      expect(tiles[1].disabled).not.toBe(true);
+    });
+  });
+
   describe("PREBUILT_DESTINATION_TYPES", () => {
     it("should contain all expected destination types", () => {
       const expectedTypes = [
@@ -78,14 +102,12 @@ describe("Prebuilt Templates Index", () => {
         expect(config).toHaveProperty("templateBody");
         expect(config).toHaveProperty("headers");
         expect(config).toHaveProperty("method");
-        expect(config).toHaveProperty("urlValidator");
         expect(config).toHaveProperty("credentialFields");
 
         expect(typeof config.templateName).toBe("string");
         expect(typeof config.templateBody).toBe("string");
         expect(typeof config.headers).toBe("object");
         expect(["get", "post", "put"]).toContain(config.method);
-        expect(typeof config.urlValidator).toBe("function");
         expect(Array.isArray(config.credentialFields)).toBe(true);
       });
     });
@@ -123,58 +145,6 @@ describe("Prebuilt Templates Index", () => {
       expect(isPrebuiltType("custom")).toBe(false);
       expect(isPrebuiltType("invalid")).toBe(false);
       expect(isPrebuiltType("")).toBe(false);
-    });
-  });
-
-  describe("detectPrebuiltTypeFromUrl", () => {
-    it("should detect Slack URLs", () => {
-      const slackUrl = "https://hooks.slack.com/services/T1234/B5678/xyz";
-      expect(detectPrebuiltTypeFromUrl(slackUrl)).toBe("slack");
-    });
-
-    it("should detect Microsoft Teams URLs", () => {
-      const teamsUrl = "https://outlook.office.com/webhook/abc/IncomingWebhook/def";
-      expect(detectPrebuiltTypeFromUrl(teamsUrl)).toBe("msteams");
-
-      const teamsUrl2 = "https://webhook.office.com/webhookb2/abc";
-      expect(detectPrebuiltTypeFromUrl(teamsUrl2)).toBe("msteams");
-
-      const teamsWorkflowUrl =
-        "https://prod-10.westus.logic.azure.com/workflows/abc/triggerS/manual/paths/invoke?api-version=2016-06-01&sig=xyz";
-      expect(detectPrebuiltTypeFromUrl(teamsWorkflowUrl)).toBe("msteams");
-    });
-
-    it("should detect PagerDuty URLs", () => {
-      const pagerdutyUrl = "https://events.pagerduty.com/v2/enqueue";
-      expect(detectPrebuiltTypeFromUrl(pagerdutyUrl)).toBe("pagerduty");
-    });
-
-    it("should detect ServiceNow URLs", () => {
-      const servicenowUrl = "https://dev123.service-now.com/api/now/table/incident";
-      expect(detectPrebuiltTypeFromUrl(servicenowUrl)).toBe("servicenow");
-    });
-
-    it("should detect Opsgenie URLs", () => {
-      const opsgenieUrl = "https://api.opsgenie.com/v2/alerts";
-      expect(detectPrebuiltTypeFromUrl(opsgenieUrl)).toBe("opsgenie");
-
-      const opsgenieEuUrl = "https://api.eu.opsgenie.com/v2/alerts";
-      expect(detectPrebuiltTypeFromUrl(opsgenieEuUrl)).toBe("opsgenie");
-    });
-
-    it("should detect Discord URLs", () => {
-      const discordUrl = "https://discord.com/api/webhooks/123456789/abcdef";
-      expect(detectPrebuiltTypeFromUrl(discordUrl)).toBe("discord");
-    });
-
-    it("should return null for custom URLs", () => {
-      const customUrl = "https://custom-webhook.example.com/webhook";
-      expect(detectPrebuiltTypeFromUrl(customUrl)).toBeNull();
-    });
-
-    it("should return null for invalid URLs", () => {
-      expect(detectPrebuiltTypeFromUrl("not-a-url")).toBeNull();
-      expect(detectPrebuiltTypeFromUrl("")).toBeNull();
     });
   });
 

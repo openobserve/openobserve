@@ -258,6 +258,18 @@ describe("LLMInsightsDashboard — version compare entry", () => {
     const btn = wrapper.find('[data-test="llm-insights-compare-entry"]');
     expect(btn.exists()).toBe(false);
   });
+
+  it("passes the page start to the compare version list so it is never narrower than the page", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    await wrapper.find('[data-test="llm-insights-compare-entry"]').trigger("click");
+    await flushPromises();
+    expect(mockListVersionsForCompare).toHaveBeenCalledTimes(1);
+    expect(mockListVersionsForCompare.mock.calls[0][4]).toBe(1_700_000_000_000_000);
+  });
 });
 
 describe("LLMInsightsDashboard — compare mode surfaces", () => {

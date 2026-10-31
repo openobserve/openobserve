@@ -18,10 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex min-w-0 flex-wrap items-center gap-2" data-test="profiles-label-filters">
     <span class="flex items-center text-sm whitespace-nowrap">
-      <span
-        class="rounded-default bg-badge-orange-ol-text me-1.5 h-2 w-2 shrink-0"
-        aria-hidden="true"
-      ></span>
       {{ t("panel.labelFilters") }}
     </span>
 
@@ -32,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-bind="item.filter ? { radius: 'sm', divided: true } : {}"
       :class="
         item.filter
-          ? 'border-border-default bg-surface-panel overflow-hidden border [&>*:not(:first-child)]:!border-s'
+          ? 'border-border-default bg-surface-panel overflow-hidden border [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s'
           : 'flex'
       "
       :data-test="item.filter ? `profiles-filter-chip-${item.filter.key}` : undefined"

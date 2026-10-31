@@ -230,6 +230,33 @@ import { VARIABLES_SPLITTER_LIMITS } from "@/composables/synthetics/useCheckWiza
 import destinationService from "@/services/alert_destination";
 import { queryClient } from "@/composables/query/queryClient";
 import { syntheticsKeys } from "@/services/synthetics.querykeys";
+import { onBeforeRouteLeave } from "vue-router";
+import {
+  hashDraftValue,
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
+
+/** A browser check with every required field, as a stored draft holds it. */
+const defaultDraftCheck = () => ({
+  name: "",
+  url: "",
+  enabled: true,
+  folder: "default",
+  tags: [],
+  journey: [] as BrowserStep[],
+  schedule: { type: "interval", intervalValue: 5, intervalUnit: "minutes" },
+  locations: [],
+  retries: 1,
+  waitBeforeRetrySecs: 5,
+  alertIfFails: 1,
+  cooldownMins: 5,
+  notifications: { destinations: [] },
+  rum: { collect: true, sessionReplay: false },
+  capture: { screenshot: "on-fail", trace: "on-fail" },
+  variables: [],
+});
 
 // Exposed by the real BrowserJourney; the host calls it after a refused save.
 const mockRevealCapNotice = vi.fn();
@@ -491,6 +518,7 @@ async function mountValidEdit() {
   });
   const w = mountPage({ editId: "check-123" });
   await flushPromises();
+  firstInput();
   return w;
 }
 
@@ -574,20 +602,35 @@ const typeStep = (id: string, value: string): BrowserStep => ({
 const toWire = (steps: BrowserStep[]) =>
   steps.map((s) => ({ id: s.id, action: s.action, value: s.value }));
 
-/** Whether leaving this editor for another test would stop and ask to discard. */
-function leaveAsks() {
-  const guard = mockOnBeforeRouteUpdate.mock.calls[0][0] as (
-    to: unknown,
-    from: unknown,
-    next: (arg?: unknown) => void,
-  ) => void;
-  const next = vi.fn();
-  guard(
+type UpdateGuard = (to: unknown, from: unknown) => boolean | Promise<boolean>;
+
+interface DraftVm {
+  browserDraft: {
+    state: { leaveOpen: boolean };
+    chooseLeave: (choice: "stay") => void;
+  };
+}
+
+/** The draft guard, registered before the guard that stops the recorder. */
+const draftUpdateGuard = () => mockOnBeforeRouteUpdate.mock.calls[0][0] as UpdateGuard;
+
+/** The draft baseline is the editor as it was at the author's first input, as in the browser. */
+function firstInput() {
+  window.dispatchEvent(new Event("pointerdown"));
+}
+
+/** Whether leaving this editor for another test would stop and ask; answers Stay when it does. */
+async function leaveAsks(w: VueWrapper) {
+  const pending = draftUpdateGuard()(
     { fullPath: "/web/synthetics/edit/other", params: { id: "other" }, query: {} },
     { fullPath: "/web/synthetics/edit/check-123", params: { id: "check-123" }, query: {} },
-    next,
   );
-  return next.mock.calls[0]?.[0] === false;
+  await flushPromises();
+  const draft = (w.vm as unknown as DraftVm).browserDraft;
+  const asked = draft.state.leaveOpen;
+  if (asked) draft.chooseLeave("stay");
+  expect(await pending).toBe(!asked);
+  return asked;
 }
 
 describe("CreateBrowserTest", () => {
@@ -595,6 +638,7 @@ describe("CreateBrowserTest", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     mockServiceGetLocations.mockResolvedValue({
       data: { locations: [], browsers: [], devices: [] },
     });
@@ -1102,12 +1146,7 @@ describe("CreateBrowserTest", () => {
 
     it("asks before leaving a dirty parent when the route only changes its id", async () => {
       wrapper = await mountValidEdit();
-      expect(mockOnBeforeRouteUpdate).toHaveBeenCalledTimes(1);
-      const guard = mockOnBeforeRouteUpdate.mock.calls[0][0] as (
-        to: unknown,
-        from: unknown,
-        next: (arg?: unknown) => void,
-      ) => void;
+      const guard = draftUpdateGuard();
       const from = { fullPath: "/web/synthetics/edit/parent", params: { id: "parent" }, query: {} };
       const toChild = {
         fullPath: "/web/synthetics/edit/child",
@@ -1119,14 +1158,10 @@ describe("CreateBrowserTest", () => {
         params: { id: "parent" },
         query: { ...from.query, setup: "1" },
       };
-      const dialog = () => wrapper.find('[data-test="synthetics-create-unsaved-dialog"]');
+      const dialog = () => wrapper.find('[data-test="editor-draft-leave-dialog"]');
 
       // Clean: nothing to lose, so the navigation goes straight through.
-      const nextClean = vi.fn();
-      guard(toChild, from, nextClean);
-      await nextTick();
-      expect(nextClean).toHaveBeenCalledTimes(1);
-      expect(nextClean).toHaveBeenCalledWith();
+      expect(await guard(toChild, from)).toBe(true);
       expect(dialog().exists()).toBe(false);
 
       (wrapper.vm as any).check.journey = [
@@ -1135,20 +1170,15 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
 
       // Dirty but the id is unchanged (query-only, e.g. the setup mirror): still the same editor.
-      const nextSameId = vi.fn();
-      guard(toSameId, from, nextSameId);
-      await nextTick();
-      expect(nextSameId).toHaveBeenCalledTimes(1);
-      expect(nextSameId).toHaveBeenCalledWith();
+      expect(await guard(toSameId, from)).toBe(true);
       expect(dialog().exists()).toBe(false);
 
-      // Dirty and a different id: same guard as onBeforeRouteLeave — cancel and ask.
-      const nextDirty = vi.fn();
-      guard(toChild, from, nextDirty);
-      await nextTick();
-      expect(nextDirty).toHaveBeenCalledTimes(1);
-      expect(nextDirty).toHaveBeenCalledWith(false);
+      // Dirty and a different id: the leave dialog holds the navigation until it is answered.
+      const pending = guard(toChild, from);
+      await flushPromises();
       expect(dialog().exists()).toBe(true);
+      (wrapper.vm as unknown as DraftVm).browserDraft.chooseLeave("stay");
+      expect(await pending).toBe(false);
     });
 
     it("records a 403'd child in refusedChildIds and passes the set to the journey", async () => {
@@ -1657,6 +1687,7 @@ describe("CreateBrowserTest", () => {
       });
       const w = mountPage({ editId: "check-123" });
       await flushPromises();
+      firstInput();
       return w;
     }
 
@@ -1671,7 +1702,7 @@ describe("CreateBrowserTest", () => {
       wrapper = await mountSaved();
 
       expect(wrapper.find(DOT).exists()).toBe(false);
-      expect(leaveAsks()).toBe(false);
+      expect(await leaveAsks(wrapper)).toBe(false);
     });
 
     it("no unsaved dot after the folder fallback", async () => {
@@ -1689,7 +1720,7 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
 
       expect(wrapper.find(DOT).exists()).toBe(false);
-      expect(leaveAsks()).toBe(false);
+      expect(await leaveAsks(wrapper)).toBe(false);
     });
 
     it("the unsaved dot shows after renaming a step", async () => {
@@ -1745,18 +1776,16 @@ describe("CreateBrowserTest", () => {
 
       expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
       expect(wrapper.find(DOT).exists()).toBe(false);
-      expect(leaveAsks()).toBe(false);
+      expect(await leaveAsks(wrapper)).toBe(false);
     });
 
     it("leaving after only a step rename asks to discard", async () => {
       wrapper = await mountSaved();
-      expect(leaveAsks()).toBe(false);
+      expect(await leaveAsks(wrapper)).toBe(false);
 
       await setJourney(wrapper, renamed());
 
-      expect(leaveAsks()).toBe(true);
-      await nextTick();
-      expect(wrapper.find('[data-test="synthetics-create-unsaved-dialog"]').exists()).toBe(true);
+      expect(await leaveAsks(wrapper)).toBe(true);
     });
   });
 
@@ -2320,6 +2349,7 @@ describe("CreateBrowserTest", () => {
       });
       const w = mountPage({ editId: "check-123" });
       await flushPromises();
+      firstInput();
       return w;
     }
 
@@ -2382,7 +2412,7 @@ describe("CreateBrowserTest", () => {
 
       await chooseReplayEnvironment(wrapper, "stg");
 
-      expect(leaveAsks()).toBe(false);
+      expect(await leaveAsks(wrapper)).toBe(false);
       await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
       await flushPromises();
       expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
@@ -3410,6 +3440,7 @@ describe("CreateBrowserTest", () => {
       });
       const w = mountPage({ editId: "check-123" });
       await flushPromises();
+      firstInput();
       return w;
     }
 
@@ -3490,13 +3521,13 @@ describe("CreateBrowserTest", () => {
 
     it("an edit in the Starting URL popover updates the check's URL and marks it unsaved", async () => {
       wrapper = await mountEditWith({});
-      expect(leaveAsks()).toBe(false);
+      expect(await leaveAsks(wrapper)).toBe(false);
 
       pill(wrapper).vm.$emit("update:url", "{{BASE_URL}}/x");
       await flushPromises();
 
       expect(pill(wrapper).props("url")).toBe("{{BASE_URL}}/x");
-      expect(leaveAsks()).toBe(true);
+      expect(await leaveAsks(wrapper)).toBe(true);
       await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
       await flushPromises();
       expect(mockServiceUpdate).toHaveBeenCalledWith(
@@ -3572,6 +3603,156 @@ describe("CreateBrowserTest", () => {
 
       expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
       expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("drafts", () => {
+    const editScope: EditorDraftScope = {
+      kind: "synthetic_browser",
+      org: "default",
+      entityId: "check-123",
+      userEmail: "example@gmail.com",
+    };
+    const newScope: EditorDraftScope = { ...editScope, entityId: null };
+    const steps = [typeStep("s1", "hello")];
+
+    interface RestoreVm {
+      browserDraft: {
+        state: { restoreOpen: boolean; credentialsNotSaved: boolean };
+        chooseRestore: (choice: "continue") => void;
+        chooseLeave: (choice: "save") => void;
+      };
+      check: { name: string; journey: BrowserStep[]; cookies?: { value: string }[] };
+      currentStep: number;
+      autoRecord: boolean;
+      phase: string;
+    }
+    const vmOf = (w: VueWrapper) => w.vm as unknown as RestoreVm;
+
+    it("writes the journey, the step and blanked cookie values on pagehide", async () => {
+      wrapper = await mountValidEdit();
+      const vm = vmOf(wrapper);
+      vm.check = {
+        ...vm.check,
+        journey: steps,
+        cookies: [{ id: "c1", name: "sid", value: "abc", domain: "shop.test" }],
+      } as RestoreVm["check"];
+      vm.currentStep = 2;
+      await flushPromises();
+      window.dispatchEvent(new Event("pagehide"));
+
+      const draft = readEditorDraft<{ check: RestoreVm["check"]; currentStep: number }>(editScope);
+      expect(draft?.data.currentStep).toBe(2);
+      expect(draft?.data.check.journey).toEqual(steps);
+      expect(draft?.data.check.cookies?.[0].value).toBe("");
+      expect(draft?.redactedPaths).toContain("/check/cookies/0/value");
+    });
+
+    it("continues a draft on the step it was left on, without recording or replaying", async () => {
+      writeEditorDraft(newScope, {
+        data: {
+          check: {
+            ...defaultDraftCheck(),
+            name: "Checkout",
+            url: "https://shop.test",
+            journey: steps,
+          },
+          currentStep: 2,
+          journeyStepDone: true,
+        },
+      });
+      wrapper = mountPage();
+      await flushPromises();
+      const vm = vmOf(wrapper);
+      expect(wrapper.find('[data-test="editor-draft-restore-dialog"]').exists()).toBe(true);
+
+      vm.browserDraft.chooseRestore("continue");
+      await flushPromises();
+
+      expect(vm.phase).toBe("editor");
+      expect(vm.currentStep).toBe(2);
+      expect(vm.check.journey).toEqual(steps);
+      expect(vm.autoRecord).toBe(false);
+      expect(mockRecorderReplay).not.toHaveBeenCalled();
+    });
+
+    it("drops a draft holding only the gate fields the setup reload carries in the query", async () => {
+      writeEditorDraft(newScope, {
+        data: {
+          check: { ...defaultDraftCheck(), name: "Shop", url: "https://shop.test", journey: [] },
+          currentStep: 1,
+          journeyStepDone: false,
+        },
+      });
+      mockRoute.query = { url: "https://shop.test", name: "Shop", setup: "1" };
+      wrapper = mountPage();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="editor-draft-restore-dialog"]').exists()).toBe(false);
+      expect(readEditorDraft(newScope)).toBeNull();
+    });
+
+    it("save from the leave dialog persists without navigating", async () => {
+      wrapper = await mountValidEdit();
+      const vm = vmOf(wrapper);
+      vm.check = { ...vm.check, journey: steps };
+      await flushPromises();
+
+      const pending = draftUpdateGuard()(
+        { fullPath: "/web/synthetics/edit/other", params: { id: "other" }, query: {} },
+        { fullPath: "/web/synthetics/edit/check-123", params: { id: "check-123" }, query: {} },
+      );
+      await flushPromises();
+      vm.browserDraft.chooseLeave("save");
+
+      expect(await pending).toBe(true);
+      expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    });
+
+    it("save and continue moves the draft base to the saved check", async () => {
+      wrapper = await mountValidEdit();
+      const vm = vmOf(wrapper);
+      vm.check = { ...vm.check, journey: steps };
+      await flushPromises();
+      const saved = {
+        name: "Test Check",
+        url: "https://example.com",
+        folder: "folder-1",
+        journey: steps,
+      };
+      mockServiceGet.mockResolvedValue({ data: saved });
+
+      await (
+        wrapper.vm as unknown as { onSaveAndContinue: () => Promise<void> }
+      ).onSaveAndContinue();
+      await flushPromises();
+      expect(mockServiceGet).toHaveBeenLastCalledWith("default", "check-123", "folder-1");
+      vm.check = { ...vm.check, name: "After save" };
+      await flushPromises();
+      window.dispatchEvent(new Event("pagehide"));
+
+      expect(readEditorDraft(editScope)?.baseHash).toBe(hashDraftValue(saved));
+    });
+
+    it("stops a running replay only from the guard after the draft guard", async () => {
+      wrapper = await mountValidEdit();
+      const vm = wrapper.vm as unknown as {
+        currentStep: number;
+        recorder: { stopReplayAndForget: ReturnType<typeof vi.fn> };
+      };
+      vm.currentStep = 2;
+      await flushPromises();
+      mockRecorderReplayPhase.value = "running";
+      const [draftGuard, stopGuard] = vi
+        .mocked(onBeforeRouteLeave)
+        .mock.calls.map(([guard]) => guard as () => boolean | Promise<boolean>);
+
+      expect(await draftGuard()).toBe(true);
+      expect(vm.recorder.stopReplayAndForget).not.toHaveBeenCalled();
+      expect(stopGuard()).toBe(true);
+      expect(vm.recorder.stopReplayAndForget).toHaveBeenCalledTimes(1);
+      mockRecorderReplayPhase.value = "idle";
     });
   });
 });

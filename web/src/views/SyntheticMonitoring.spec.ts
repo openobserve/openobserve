@@ -17,6 +17,7 @@
 //
 // Render tests for SyntheticMonitoring.vue — the main synthetics list page.
 
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
@@ -37,6 +38,7 @@ const {
   mockServiceGetLocations,
   mockServiceGetAgentSetup,
   mockStatusPagesList,
+  mockStatusPagesDelete,
   mockRouterPush,
   mockRouterReplace,
   mockRoute,
@@ -56,6 +58,7 @@ const {
   mockRouterPush: vi.fn().mockResolvedValue(undefined),
   mockRouterReplace: vi.fn().mockResolvedValue(undefined),
   mockStatusPagesList: vi.fn().mockResolvedValue({ data: { pages: [] } }),
+  mockStatusPagesDelete: vi.fn().mockResolvedValue({}),
   // `query` is swapped for a reactive proxy by the vue-router mock, so a test can drive `?section=` the way Back/Forward would.
   mockRoute: { query: {} as Record<string, string> },
 }));
@@ -101,15 +104,16 @@ vi.mock("@/services/synthetics", async (importOriginal) => {
 vi.mock("@/services/status_pages", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
-    default: { list: mockStatusPagesList },
+    default: { list: mockStatusPagesList, delete: mockStatusPagesDelete },
   });
 });
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 import analytics from "@/services/product_analytics";
 
+const { confirmMock } = vi.hoisted(() => ({ confirmMock: vi.fn() }));
 vi.mock("@/composables/useConfirmDialog", () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+  useConfirmDialog: () => ({ confirm: confirmMock }),
 }));
 
 vi.mock("@/utils/commons", () => ({
@@ -128,6 +132,12 @@ vi.mock("@/utils/synthetics/buildPayload", () => ({
 }));
 
 import SyntheticMonitoring from "./SyntheticMonitoring.vue";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftKind,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   buildCreateBrowserTestPayload,
@@ -159,6 +169,7 @@ const baseStubs = {
       "currentPage",
       "sortBy",
       "sortOrder",
+      "draftSavedAt",
     ],
     emits: ["update:currentPage", "update:pageSize", "update:sortBy", "update:sortOrder"],
   },
@@ -276,6 +287,7 @@ describe("SyntheticMonitoring", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    confirmMock.mockResolvedValue(true);
     resetListViewState();
     mockServiceList.mockResolvedValue({ data: { monitors: [] } });
     // Both are process-global and mutated by individual tests, so they are
@@ -1176,6 +1188,94 @@ describe("SyntheticMonitoring", () => {
       expect(analytics.track).toHaveBeenCalledWith("synthetic_test_deleted", { count: 2 });
     });
 
+    const draftScope = (kind: EditorDraftKind, entityId: string | null): EditorDraftScope => ({
+      kind,
+      org: "default",
+      entityId,
+      userEmail: "example@gmail.com",
+    });
+
+    it("passes each check's newest draft to the table and marks New check for a new draft", async () => {
+      localStorage.clear();
+      writeEditorDraft(draftScope("synthetic_check", "m1"), { data: {} });
+      writeEditorDraft(draftScope("synthetic_browser", null), { data: {} });
+      wrapper = mountPage();
+      await flushPromises();
+
+      expect(Object.keys(table().props("draftSavedAt") as Record<string, number>)).toEqual(["m1"]);
+      const button = wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]');
+      expect(button.find('[data-test="synthetic-monitoring-new-check-draft-dot"]').exists()).toBe(
+        true,
+      );
+      // This suite's i18n returns keys, so the label is checked by key.
+      expect(button.attributes("aria-label")).toBe("common.editorDraft.newDot");
+      localStorage.clear();
+    });
+
+    it("marks New check for a new protocol check draft kept under its type", async () => {
+      localStorage.clear();
+      writeEditorDraft({ ...draftScope("synthetic_check", null), variant: "tcp" }, { data: {} });
+      wrapper = mountPage();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="synthetic-monitoring-new-check-draft-dot"]').exists()).toBe(
+        true,
+      );
+      // The dot's tooltip dates the variant's draft.
+      const dot = wrapper
+        .findAllComponents(EditorDraftDot)
+        .find((c) => c.props("dataTest") === "synthetic-monitoring-new-check-draft-dot");
+      expect(dot?.props("savedAt")).toBe(
+        readEditorDraft({ ...draftScope("synthetic_check", null), variant: "tcp" })?.savedAt,
+      );
+      localStorage.clear();
+    });
+
+    interface DeleteVm {
+      bulkDeleteMonitors: () => Promise<void>;
+      confirmDeleteStatusPage: (page: { id: string; name: string }) => Promise<void>;
+    }
+    const deleteVm = () => wrapper.vm as unknown as DeleteVm;
+
+    it("drops the drafts of checks that were deleted, singly or in bulk", async () => {
+      localStorage.clear();
+      for (const id of ["m1", "a", "b"]) {
+        writeEditorDraft(draftScope("synthetic_check", id), { data: {} });
+        writeEditorDraft(draftScope("synthetic_browser", id), { data: {} });
+      }
+      wrapper = mountPage();
+      await flushPromises();
+
+      table().vm.$emit("delete", { id: "m1", name: "n" });
+      await flushPromises();
+      table().vm.$emit("update:selected-ids", ["a"]);
+      await deleteVm().bulkDeleteMonitors();
+
+      expect(readEditorDraft(draftScope("synthetic_check", "m1"))).toBeNull();
+      expect(readEditorDraft(draftScope("synthetic_browser", "m1"))).toBeNull();
+      expect(readEditorDraft(draftScope("synthetic_browser", "a"))).toBeNull();
+      expect(readEditorDraft(draftScope("synthetic_check", "b"))).not.toBeNull();
+      localStorage.clear();
+    });
+
+    it("drops a deleted status page's drafts, and keeps them when the delete fails", async () => {
+      localStorage.clear();
+      writeEditorDraft(draftScope("status_page", "sp1"), { data: {} });
+      writeEditorDraft(draftScope("status_page", "sp2"), { data: {} });
+      wrapper = mountPage();
+      await flushPromises();
+
+      confirmMock.mockResolvedValueOnce(true);
+      await deleteVm().confirmDeleteStatusPage({ id: "sp1", name: "Public" });
+      mockStatusPagesDelete.mockRejectedValueOnce(new Error("boom"));
+      confirmMock.mockResolvedValueOnce(true);
+      await deleteVm().confirmDeleteStatusPage({ id: "sp2", name: "Internal" });
+
+      expect(readEditorDraft(draftScope("status_page", "sp1"))).toBeNull();
+      expect(readEditorDraft(draftScope("status_page", "sp2"))).not.toBeNull();
+      localStorage.clear();
+    });
+
     it("does not track synthetic_test_deleted when the bulk delete fails", async () => {
       mockServiceBulkDelete.mockRejectedValueOnce(new Error("boom"));
       wrapper = mountPage();
@@ -1185,6 +1285,73 @@ describe("SyntheticMonitoring", () => {
       await (wrapper.vm as any).bulkDeleteMonitors();
 
       expect(analytics.track).not.toHaveBeenCalledWith("synthetic_test_deleted", expect.anything());
+    });
+
+    it("keeps the bulk count after the selection clears on delete", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      table().vm.$emit("update:selected-ids", ["a", "b"]);
+      table().vm.$emit("delete-selected");
+      const vm = wrapper.vm as any;
+      expect(vm.showBulkDeleteConfirm).toBe(true);
+
+      await vm.bulkDeleteMonitors();
+
+      expect(vm.selectedMonitorIds).toEqual([]);
+      expect(vm.showBulkDeleteConfirm).toBe(false);
+      expect(vm.bulkDeleteCount).toBe(2);
+    });
+  });
+
+  describe("delete dialogs name the item", () => {
+    it("asks to delete a check by name with a destructive confirm", async () => {
+      confirmMock.mockResolvedValueOnce(false);
+      wrapper = mountPage();
+      await flushPromises();
+      wrapper
+        .findComponent('[data-test="synthetic-monitoring-monitors-table"]')
+        .vm.$emit("delete", { id: "m1", name: "checkout-flow" });
+      await flushPromises();
+
+      expect(confirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageKeypath: "synthetics.dialog.deleteSingleBody",
+          messageName: "checkout-flow",
+          confirmVariant: "destructive",
+        }),
+      );
+      expect(mockServiceDelete).not.toHaveBeenCalled();
+    });
+
+    it("asks to delete a status page by name with a destructive confirm", async () => {
+      confirmMock.mockResolvedValueOnce(false);
+      wrapper = mountPage();
+      await flushPromises();
+      await (wrapper.vm as any).confirmDeleteStatusPage({ id: "sp1", name: "Public status" });
+
+      expect(confirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageKeypath: "statusPages.dialog.deleteBody",
+          messageName: "Public status",
+          confirmVariant: "destructive",
+        }),
+      );
+    });
+
+    it("names the private location in bold in its delete dialog", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      (wrapper.vm as any).confirmDeleteLocation({ id: "loc1", label: "eu-west-agents" });
+      await flushPromises();
+
+      const dialog = wrapper.find('[data-test="synthetic-monitoring-delete-location-dialog"]');
+      const name = dialog.find('[data-test="synthetic-monitoring-delete-location-name"]');
+      expect(name.text()).toBe("eu-west-agents");
+      expect(name.classes()).toContain("font-semibold");
+      const stub = wrapper
+        .findAllComponents(baseStubs.ODialog)
+        .find((d) => d.attributes("data-test") === "synthetic-monitoring-delete-location-dialog");
+      expect(stub?.props("primaryButtonVariant")).toBe("destructive");
     });
   });
 });

@@ -405,6 +405,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
+
+          <div v-if="repeatSuppressionAvailable" class="mb-4! flex items-start max-md:gap-3">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+              {{ t("alerts.alertSettings.suppressRepeats") }}
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
+              <OTooltip :content="t('alerts.alertSettings.suppressRepeatsTooltip')" side="right" />
+            </div>
+            <OFormSwitch
+              name="suppress_repeats"
+              :aria-label="t('alerts.alertSettings.suppressRepeats')"
+              data-test="alert-suppress-repeats-toggle"
+            />
+          </div>
         </template>
       </div>
     </div>
@@ -506,6 +519,8 @@ export default defineComponent({
         (config.isEnterprise === "true" || config.isCloud === "true") &&
         store.state.zoConfig?.incidents_enabled === true,
     );
+    // The backend honours the switch only in enterprise builds.
+    const repeatSuppressionAvailable = config.isEnterprise === "true" || config.isCloud === "true";
 
     // Field refs consumed by the parent's AlertFocusManager (registered off the
     // step ref). Scheduled-only.
@@ -698,13 +713,7 @@ export default defineComponent({
       servicenow: "alerts.alertSettings.recoveryResolvesIncident",
     };
 
-    // `destination_type_name` first, because that is the field the server reads
-    // (`derive_channel_format`) when it decides to send a protocol resolve. A
-    // destination pointed at PagerDuty without going through the prebuilt
-    // wizard has no `prebuilt_type`, and saying "new Resolved message" for one
-    // would promise something the server does not do.
-    const platformOf = (destination: any): string =>
-      destination?.destination_type_name || detectPrebuiltType(destination) || "";
+    const platformOf = (destination: any): string => detectPrebuiltType(destination) ?? "";
 
     const platformKeyFor = (name: any): string | undefined => {
       const destination = props.destinationObjects.find((d: any) => d?.name === name);
@@ -742,6 +751,7 @@ export default defineComponent({
       t,
       store,
       incidentsEnabled,
+      repeatSuppressionAvailable,
       handlePeriodChange,
       // Field refs for the parent focus manager
       periodFieldRef,

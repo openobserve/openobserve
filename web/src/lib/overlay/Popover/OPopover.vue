@@ -9,8 +9,9 @@
   Shares ODropdown's overlay coordination so descendant overlays (OSelect /
   OCombobox / nested dropdowns) opening INSIDE the popover never dismiss it.
 
-  Props: open (v-model) | side | align | sideOffset | hideWhenDetached | modal | ariaLabel | contentClass
+  Props: open (v-model) | side | align | sideOffset | hideWhenDetached | modal | ariaLabel | contentClass | collisionPadding
   Slots: trigger | default
+  Emits: update:open | open-auto-focus
 -->
 <script lang="ts">
 import type { I18nText } from "@/types/i18n";
@@ -66,6 +67,8 @@ const props = withDefaults(
     zIndex?: number;
     /** Extra classes merged onto the content surface. */
     contentClass?: string;
+    /** Overrides the default (0 desktop / 8 tablet-down) collision inset, e.g. to clear a fixed header on a flipped side. */
+    collisionPadding?: number | Partial<Record<"top" | "right" | "bottom" | "left", number>>;
   }>(),
   {
     modal: false,
@@ -77,7 +80,15 @@ const props = withDefaults(
   },
 );
 
-const emit = defineEmits<{ "update:open": [boolean] }>();
+const emit = defineEmits<{
+  "update:open": [boolean];
+  /** Forwards reka's initial-focus event so a consumer can redirect it (call `preventDefault()` to opt out of the default first-tabbable focus). */
+  "open-auto-focus": [Event];
+  /** Forwards reka's outside pointerdown; `preventDefault()` keeps the popover open, e.g. for a panel it owns outside its content. */
+  "pointer-down-outside": [Event];
+  /** Forwards reka's outside focus; `preventDefault()` keeps the popover open. */
+  "focus-outside": [Event];
+}>();
 
 // Vue boolean-casts an absent `open` prop to `false`, which would lock
 // PopoverRoot into controlled-closed mode. Manage state ourselves so it stays
@@ -168,11 +179,13 @@ function handlePointerDownOutside(event: Event) {
   if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
     event.preventDefault();
   }
+  emit("pointer-down-outside", event);
 }
 function handleFocusOutside(event: Event) {
   if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
     event.preventDefault();
   }
+  emit("focus-outside", event);
 }
 
 // Close on ancestor scroll so the portal never floats detached from its trigger.
@@ -226,16 +239,17 @@ onBeforeUnmount(() => {
         :align="align"
         :side-offset="sideOffset"
         :hide-when-detached="hideWhenDetached"
-        :collision-padding="lgUp ? 0 : 8"
+        :collision-padding="collisionPadding ?? (lgUp ? 0 : 8)"
         :aria-label="ariaLabel"
         :style="{ zIndex }"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
+        @open-auto-focus="(e) => emit('open-auto-focus', e)"
         :class="[
           'outline-none max-lg:max-w-[calc(100vw-1rem)]',
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           // Surface
-          'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
+          'bg-dropdown-bg rounded-default shadow-overlay border border-transparent',
           // Open/close reveal animation (matches ODropdown)
           'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
           'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',

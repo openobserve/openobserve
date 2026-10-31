@@ -36,9 +36,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="regex-pattern-list-add-pattern-btn"
             variant="primary"
             size="sm"
+            :aria-label="
+              regexDrafts.hasNew
+                ? t('common.editorDraft.newDot', { label: t('regex_patterns.create_pattern') })
+                : undefined
+            "
             @click="createRegexPattern"
-            >{{ t("regex_patterns.create_pattern") }}</OButton
-          >
+            >{{ t("regex_patterns.create_pattern") }}
+            <EditorDraftDot
+              v-if="regexDrafts.hasNew"
+              :saved-at="regexDrafts.savedAt(null)"
+              corner
+              data-test="regex-pattern-list-add-draft-dot"
+          /></OButton>
         </template>
         <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
           <OTable
@@ -105,6 +115,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : createRegexPattern()
                 "
               />
+            </template>
+            <template #cell-name="{ row }">
+              <div class="flex min-w-0 items-center gap-2">
+                <OTruncatedText>{{ row.name }}</OTruncatedText>
+                <EditorDraftDot
+                  v-if="regexDrafts.ids.has(row.id)"
+                  :saved-at="regexDrafts.savedAt(row.id)"
+                  :data-test="`regex-pattern-list-${row.id}-draft-dot`"
+                />
+              </div>
             </template>
             <template #cell-pattern="{ row }">
               <OCodeCell :value="row.pattern" />
@@ -211,8 +231,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ConfirmDialog
       v-model="deleteDialog.show"
-      :title="deleteDialog.title"
-      :message="deleteDialog.message"
+      :title="t('settings.regexPatternList.deleteTitle')"
+      message-keypath="settings.regexPatternList.deleteMessage"
+      :message-name="deleteDialog.name"
+      ok-variant="destructive"
       @update:ok="deleteRegexPattern"
       @update:cancel="deleteDialog.show = false"
     />
@@ -220,6 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('settings.regexPatternList.bulkDeleteTitle')"
       :message="t('settings.regexPatternList.bulkDeleteMessage', { n: selectedPatterns.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteRegexPatterns"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -268,6 +291,10 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { useListViewState } from "@/composables/useListViewState";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 
 export default defineComponent({
   name: "RegexPatternList",
@@ -285,6 +312,8 @@ export default defineComponent({
     OTable,
     OCodeCell,
     OTimeCell,
+    OTruncatedText,
+    EditorDraftDot,
   },
   setup() {
     const viewState = useListViewState("regex-patterns", {
@@ -366,9 +395,8 @@ export default defineComponent({
 
     const deleteDialog = ref({
       show: false,
-      title: t("settings.regexPatternList.deleteTitle"),
-      message: t("settings.regexPatternList.deleteMessage"),
       data: "" as any,
+      name: "",
     });
 
     const orgIdForList = useOrgId();
@@ -411,6 +439,13 @@ export default defineComponent({
     const lastUpdatedAt = regexPatternsList.dataUpdatedAt;
 
     const showImportRegexPatternDialog = ref(false);
+
+    const regexDrafts = useEditorDraftIds("regex_pattern");
+    const dropRegexDrafts = (ids: string[]) => {
+      const org = store.state.selectedOrganization.identifier;
+      for (const id of ids)
+        deleteEditorDraftsFor({ kind: "regex_pattern", org, entityId: String(id) });
+    };
 
     const showAddRegexPatternDialog = ref({
       show: false,
@@ -495,6 +530,7 @@ export default defineComponent({
     const confirmDeleteRegexPattern = (row: any) => {
       deleteDialog.value.show = true;
       deleteDialog.value.data = row.id;
+      deleteDialog.value.name = row.name;
     };
 
     const deleteRegexPattern = async () => {
@@ -506,6 +542,7 @@ export default defineComponent({
         // Drop the row from the cache first so it disappears now, not when the
         // refetch lands; the forced reload re-persists the corrected list.
         const deletedId = deleteDialog.value.data;
+        dropRegexDrafts([deletedId]);
         queryClient.setQueriesData(
           { queryKey: regexPatternKeys.all(store.state.selectedOrganization.identifier) },
           (list: any) =>
@@ -604,6 +641,7 @@ export default defineComponent({
           { ids: patternIds },
         );
         const { successful, unsuccessful } = res.data;
+        dropRegexDrafts(successful);
 
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
@@ -654,6 +692,7 @@ export default defineComponent({
     ]);
 
     return {
+      regexDrafts,
       refreshRegexPatterns,
       t,
       store,

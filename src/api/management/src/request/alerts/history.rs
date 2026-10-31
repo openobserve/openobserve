@@ -41,7 +41,17 @@ use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
 
-/// Every column the data query reads but `downtime_id`, which [history_columns] adds.
+/// Columns a stream gains only once a row carried them, so [history_columns] adds each one present.
+const OPTIONAL_HISTORY_COLUMNS: [&str; 6] = [
+    "downtime_id",
+    "acked_by",
+    "ack_action",
+    "ack_source",
+    "taken_over_from",
+    "repeat_suppressed",
+];
+
+/// Every column the data query reads but [OPTIONAL_HISTORY_COLUMNS].
 const HISTORY_COLUMNS: &str = "_timestamp, org, key, status, level, actual_value, \
      threshold_value, threshold_operator, group_label, value_is_lower_bound, is_realtime, \
      is_silenced, start_time, end_time, retries, delay_in_secs, evaluation_took_in_secs, \
@@ -92,13 +102,6 @@ pub struct AlertHistoryEntry {
     pub evaluation_took_in_secs: Option<f64>,
     pub source_node: Option<String>,
     pub query_took: Option<i64>,
-    // Deduplication information
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dedup_enabled: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dedup_suppressed: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dedup_count: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grouped: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -132,6 +135,19 @@ pub struct AlertHistoryEntry {
     /// The downtime that suppressed this run.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub downtime_id: Option<String>,
+    /// Whose ack withheld this run's send, or who acted on an `ack_event` row.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acked_by: Option<String>,
+    /// `ack`, `unack` or `take_over`, on `ack_event` rows.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ack_action: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ack_source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taken_over_from: Option<String>,
+    /// `suppress_repeats` withheld this run because it repeated the last delivered state.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repeat_suppressed: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -152,7 +168,7 @@ pub struct AlertHistoryResponse {
 /// authentication.
 #[utoipa::path(
     get,
-    path = "/{org_id}/alerts/history",
+    path = "/v2/{org_id}/alerts/history",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetAlertHistory",
@@ -409,9 +425,6 @@ pub async fn get_alert_history(
                         .and_then(|v| v.as_f64()),
                     source_node: None,
                     query_took: None,
-                    dedup_enabled: None,
-                    dedup_suppressed: None,
-                    dedup_count: None,
                     grouped: None,
                     group_size: None,
                     anomaly_count: Some(anomaly_count as i32),
@@ -424,6 +437,11 @@ pub async fn get_alert_history(
                     group_label: None,
                     value_is_lower_bound: None,
                     downtime_id: None,
+                    acked_by: None,
+                    ack_action: None,
+                    ack_source: None,
+                    taken_over_from: None,
+                    repeat_suppressed: None,
                 }
             })
             .collect();
@@ -802,13 +820,6 @@ pub async fn get_alert_history(
                 .and_then(|v| v.as_str())
                 .map(String::from),
             query_took: hit.get("query_took").and_then(|v| v.as_i64()),
-            // Deduplication fields - populated from trigger data if available
-            dedup_enabled: hit.get("dedup_enabled").and_then(|v| v.as_bool()),
-            dedup_suppressed: hit.get("dedup_suppressed").and_then(|v| v.as_bool()),
-            dedup_count: hit
-                .get("dedup_count")
-                .and_then(|v| v.as_i64())
-                .map(|v| v as i32),
             grouped: hit.get("grouped").and_then(|v| v.as_bool()),
             group_size: hit
                 .get("group_size")
@@ -834,11 +845,12 @@ pub async fn get_alert_history(
                 .filter(|s| !s.is_empty())
                 .map(String::from),
             value_is_lower_bound: hit.get("value_is_lower_bound").and_then(|v| v.as_bool()),
-            downtime_id: hit
-                .get("downtime_id")
-                .and_then(|v| v.as_str())
-                .filter(|s| !s.is_empty())
-                .map(String::from),
+            downtime_id: hit_text(&hit, "downtime_id"),
+            acked_by: hit_text(&hit, "acked_by"),
+            ack_action: hit_text(&hit, "ack_action"),
+            ack_source: hit_text(&hit, "ack_source"),
+            taken_over_from: hit_text(&hit, "taken_over_from"),
+            repeat_suppressed: hit.get("repeat_suppressed").and_then(|v| v.as_bool()),
         });
     }
 
@@ -935,13 +947,24 @@ fn triggers_schema(read: infra::errors::Result<Schema>) -> Result<Schema, Respon
     })
 }
 
-/// [HISTORY_COLUMNS], with `downtime_id` once the stream has it: an upgraded stream learns it late.
+/// [HISTORY_COLUMNS] plus each optional column the stream has; an upgraded stream learns them late.
 fn history_columns(schema: &Schema) -> String {
-    if schema.field_with_name("downtime_id").is_ok() {
-        format!("{HISTORY_COLUMNS}, downtime_id")
-    } else {
-        HISTORY_COLUMNS.to_string()
+    let mut columns = HISTORY_COLUMNS.to_string();
+    for column in OPTIONAL_HISTORY_COLUMNS {
+        if schema.field_with_name(column).is_ok() {
+            columns.push_str(", ");
+            columns.push_str(column);
+        }
     }
+    columns
+}
+
+/// A non-empty text column of a history hit.
+fn hit_text(hit: &serde_json::Value, column: &str) -> Option<String> {
+    hit.get(column)
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from)
 }
 
 /// The downtime filters of the history read, quoted with the same single-quote escaping.
@@ -1225,9 +1248,6 @@ mod tests {
             evaluation_took_in_secs: Some(1.5),
             source_node: Some("node1".to_string()),
             query_took: Some(100),
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             anomaly_count: None,
@@ -1238,6 +1258,11 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
+            repeat_suppressed: None,
         };
 
         assert_eq!(entry.alert_name, "test_alert");
@@ -1283,9 +1308,6 @@ mod tests {
             evaluation_took_in_secs: None,
             source_node: None,
             query_took: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             anomaly_count: None,
@@ -1296,6 +1318,11 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
+            repeat_suppressed: None,
         };
 
         let response = AlertHistoryResponse {
@@ -1330,9 +1357,6 @@ mod tests {
             evaluation_took_in_secs: Some(5.5),
             source_node: Some("node2".to_string()),
             query_took: Some(500),
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             anomaly_count: None,
@@ -1343,6 +1367,11 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
+            repeat_suppressed: None,
         };
 
         assert_eq!(entry.status, "error");
@@ -1559,9 +1588,6 @@ mod tests {
             evaluation_took_in_secs: Some(1.5),
             source_node: Some("node1".to_string()),
             query_took: Some(500),
-            dedup_enabled: Some(true),
-            dedup_suppressed: Some(false),
-            dedup_count: Some(1),
             grouped: Some(false),
             group_size: None,
             anomaly_count: None,
@@ -1572,6 +1598,11 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
+            repeat_suppressed: None,
         };
 
         let json = serde_json::to_string(&entry).unwrap();
@@ -1581,7 +1612,6 @@ mod tests {
         assert_eq!(deserialized.alert_name, entry.alert_name);
         assert_eq!(deserialized.org, entry.org);
         assert_eq!(deserialized.status, entry.status);
-        assert_eq!(deserialized.dedup_enabled, entry.dedup_enabled);
     }
 
     #[test]
@@ -1603,9 +1633,6 @@ mod tests {
             evaluation_took_in_secs: None,
             source_node: None,
             query_took: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             anomaly_count: None,
@@ -1616,6 +1643,11 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
+            repeat_suppressed: None,
         };
 
         let response = AlertHistoryResponse {
@@ -1635,7 +1667,7 @@ mod tests {
     }
 
     #[test]
-    fn test_alert_history_entry_dedup_fields_absent_when_none() {
+    fn test_alert_history_entry_optional_fields_absent_when_none() {
         let entry = AlertHistoryEntry {
             timestamp: 0,
             alert_name: "a".to_string(),
@@ -1653,9 +1685,6 @@ mod tests {
             evaluation_took_in_secs: None,
             source_node: None,
             query_took: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
             grouped: None,
             group_size: None,
             anomaly_count: None,
@@ -1666,19 +1695,21 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
+            repeat_suppressed: None,
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();
-        assert!(!obj.contains_key("dedup_enabled"));
-        assert!(!obj.contains_key("dedup_suppressed"));
-        assert!(!obj.contains_key("dedup_count"));
         assert!(!obj.contains_key("grouped"));
         assert!(!obj.contains_key("group_size"));
         assert!(!obj.contains_key("anomaly_count"));
     }
 
     #[test]
-    fn test_alert_history_entry_dedup_fields_present_when_some() {
+    fn test_alert_history_entry_optional_fields_present_when_some() {
         let entry = AlertHistoryEntry {
             timestamp: 0,
             alert_name: "a".to_string(),
@@ -1696,9 +1727,6 @@ mod tests {
             evaluation_took_in_secs: None,
             source_node: None,
             query_took: None,
-            dedup_enabled: Some(true),
-            dedup_suppressed: Some(false),
-            dedup_count: Some(5),
             grouped: Some(true),
             group_size: Some(3),
             anomaly_count: Some(2),
@@ -1709,12 +1737,14 @@ mod tests {
             group_label: None,
             value_is_lower_bound: None,
             downtime_id: None,
+            acked_by: None,
+            ack_action: None,
+            ack_source: None,
+            taken_over_from: None,
+            repeat_suppressed: None,
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();
-        assert!(obj.contains_key("dedup_enabled"));
-        assert!(obj.contains_key("dedup_suppressed"));
-        assert!(obj.contains_key("dedup_count"));
         assert!(obj.contains_key("grouped"));
         assert!(obj.contains_key("group_size"));
         assert!(obj.contains_key("anomaly_count"));
@@ -1786,5 +1816,40 @@ mod tests {
         let mut current = upgraded;
         current.push(field("downtime_id"));
         assert!(history_columns(&Schema::new(current)).ends_with(", downtime_id"));
+    }
+
+    #[test]
+    fn ack_columns_are_read_once_the_stream_has_them() {
+        use arrow_schema::{DataType, Field};
+
+        let field = |name: &str| Field::new(name, DataType::Utf8, true);
+        let mut fields: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        fields.push(field("acked_by"));
+        let columns = history_columns(&Schema::new(fields.clone()));
+        assert!(columns.ends_with(", acked_by"), "{columns}");
+        assert!(!columns.contains("ack_action"), "{columns}");
+        for name in ["ack_action", "ack_source", "taken_over_from"] {
+            fields.push(field(name));
+        }
+        assert!(
+            history_columns(&Schema::new(fields))
+                .ends_with(", acked_by, ack_action, ack_source, taken_over_from")
+        );
+        let hit = serde_json::json!({"acked_by": "dana@acme.com", "ack_action": ""});
+        assert_eq!(hit_text(&hit, "acked_by").as_deref(), Some("dana@acme.com"));
+        assert_eq!(hit_text(&hit, "ack_action"), None);
+    }
+
+    #[test]
+    fn the_repeat_suppressed_column_is_read_once_the_stream_has_it() {
+        use arrow_schema::{DataType, Field};
+
+        let mut fields: Vec<Field> = HISTORY_COLUMNS
+            .split(", ")
+            .map(|name| Field::new(name, DataType::Utf8, true))
+            .collect();
+        assert!(!history_columns(&Schema::new(fields.clone())).contains("repeat_suppressed"));
+        fields.push(Field::new("repeat_suppressed", DataType::Boolean, true));
+        assert!(history_columns(&Schema::new(fields)).ends_with(", repeat_suppressed"));
     }
 }

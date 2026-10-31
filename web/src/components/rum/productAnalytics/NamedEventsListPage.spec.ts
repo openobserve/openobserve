@@ -43,6 +43,11 @@ import { resetSavedFunnels } from "@/composables/rum/useSavedFunnels";
 import { MAX_EVENTS_PER_APP } from "@/utils/rum/productAnalyticsModel";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import { rumPaApiMock as api } from "@/utils/rum/__fixtures__/namedEventsApiMock";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 import NamedEventsListPage from "./NamedEventsListPage.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 
@@ -96,6 +101,12 @@ describe("NamedEventsListPage (AC-44)", () => {
     [...document.querySelectorAll('[data-test^="rum-analytics-named-events-row-"]')]
       .filter((el) => /row-\d+$/.test(el.getAttribute("data-test") ?? ""))
       .map((el) => el.textContent?.trim());
+  const deleteName = () => q("rum-analytics-named-events-delete-name");
+  const deleteText = () => deleteName()?.closest("p")?.textContent;
+  const answerDelete = async (ok: boolean) => {
+    q(ok ? "o-dialog-primary-btn" : "o-dialog-secondary-btn")!.click();
+    await settle();
+  };
   const selectRow = async (i: number) => {
     q(`o2-table-row-${i}`)!
       .querySelector<HTMLElement>('[data-test="o2-table-select-cell"]')!
@@ -103,7 +114,16 @@ describe("NamedEventsListPage (AC-44)", () => {
     await flushPromises();
   };
 
+  const draftScope = (entityId: string | null, variant?: string): EditorDraftScope => ({
+    kind: "rum_named_event",
+    org: "org1",
+    entityId,
+    userEmail: "me@x.com",
+    variant,
+  });
+
   beforeEach(() => {
+    localStorage.clear();
     api.reset();
     confirmMock.mockReset().mockResolvedValue(true);
     toastMock.mockReset();
@@ -177,7 +197,7 @@ describe("NamedEventsListPage (AC-44)", () => {
   });
 
   it("Duplicate opens a new event pre-filled as a copy, and the row stays put", async () => {
-    seed(1);
+    const [ev] = seed(1);
     await mountList();
     q("rum-analytics-named-events-row-0-duplicate-btn")!.click();
     await settle();
@@ -187,8 +207,70 @@ describe("NamedEventsListPage (AC-44)", () => {
       draft: { name: "Copy of Event 0", rules: [{ t: "view", op: "eq", value: "/web/logs" }] },
       pageHints: [],
       from: null,
+      source: ev.id,
     });
     expect(api.service.createEvent).not.toHaveBeenCalled();
+  });
+
+  it("marks rows with a draft and the Duplicate of an event whose copy has one", async () => {
+    const [a, b] = seed(2);
+    writeEditorDraft(draftScope(a.id), { data: {} });
+    writeEditorDraft(draftScope(null, `web~clone:${b.id}`), { data: {} });
+    await mountList();
+
+    expect(q("rum-analytics-named-events-row-0-draft-dot")).not.toBeNull();
+    expect(q("rum-analytics-named-events-row-1-draft-dot")).toBeNull();
+    expect(q("rum-analytics-named-events-row-0-duplicate-draft-dot")).toBeNull();
+    expect(q("rum-analytics-named-events-row-1-duplicate-draft-dot")).not.toBeNull();
+    expect(q("rum-analytics-named-events-row-1-duplicate-btn")?.getAttribute("aria-label")).toMatch(
+      /^Duplicate · unsaved draft · .*\d/,
+    );
+    // The phone row menu is the only way to Duplicate below md, so it carries the dot too.
+    const more = q("rum-analytics-named-events-row-1-more-btn");
+    expect(
+      more?.querySelector('[data-test="rum-analytics-named-events-row-1-more-draft-dot"]'),
+    ).not.toBeNull();
+    expect(more?.getAttribute("aria-label")).toMatch(/^More actions · unsaved draft · .*\d/);
+    expect(q("rum-analytics-named-events-row-0-more-draft-dot")).toBeNull();
+    expect(q("rum-analytics-named-events-row-0-more-btn")?.getAttribute("aria-label")).toBe(
+      "More actions",
+    );
+    // What the user sees on hover: the button's own tooltip names the kept copy and its date.
+    vi.useFakeTimers();
+    try {
+      q("rum-analytics-named-events-row-1-duplicate-btn")!.dispatchEvent(
+        new MouseEvent("mouseenter"),
+      );
+      vi.advanceTimersByTime(800);
+      await flushPromises();
+      const tip = document.body.querySelector('[data-test="o-tooltip-content"]')?.textContent;
+      expect(tip).toMatch(/Duplicate · unsaved draft · .*\d/);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(document.body.querySelectorAll('[data-test="o-tooltip-content"]')).toHaveLength(1);
+  });
+
+  it("drops the drafts of events deleted singly or in bulk, and keeps a failed one's", async () => {
+    const [a, b, c] = seed(3);
+    for (const ev of [a, b, c]) writeEditorDraft(draftScope(ev.id), { data: {} });
+    writeEditorDraft(draftScope(null, `web~clone:${a.id}`), { data: {} });
+    writeEditorDraft(draftScope(null, `web~clone:${b.id}`), { data: {} });
+    await mountList();
+    q("rum-analytics-named-events-row-0-delete-btn")!.click();
+    await settle();
+    await answerDelete(true);
+    expect(readEditorDraft(draftScope(a.id))).toBeNull();
+    expect(readEditorDraft(draftScope(null, `web~clone:${a.id}`))).toBeNull();
+    expect(readEditorDraft(draftScope(null, `web~clone:${b.id}`))).not.toBeNull();
+
+    await selectRow(0);
+    await selectRow(1);
+    api.failNext("deleteEvent", 503);
+    q("rum-analytics-named-events-bulk-delete-btn")!.click();
+    await settle();
+    expect(readEditorDraft(draftScope(b.id))).not.toBeNull();
+    expect(readEditorDraft(draftScope(c.id))).toBeNull();
   });
 
   it("deletes an unused event after the plain confirmation, without force", async () => {
@@ -196,9 +278,15 @@ describe("NamedEventsListPage (AC-44)", () => {
     await mountList();
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
-    expect(confirmMock.mock.calls[0][0].message).toBe(
-      'Delete "Event 0"? Funnels that use it will show a deleted-step tag.',
+    expect(deleteName()?.textContent).toBe("Event 0");
+    expect(deleteName()?.classList.contains("font-semibold")).toBe(true);
+    expect(deleteText()).toBe(
+      "Delete the Event 0 named event? Funnels that use it will show a deleted-step tag.",
     );
+    expect(q("o-dialog-primary-btn")?.textContent?.trim()).toBe("Delete");
+    expect(q("o-dialog-primary-btn")?.getAttribute("data-o2-variant")).toBe("destructive");
+    expect(api.service.deleteEvent).not.toHaveBeenCalled();
+    await answerDelete(true);
     expect(api.service.deleteEvent.mock.calls).toEqual([["org1", "web", ev.id, false]]);
     expect(rowText()).toEqual([]);
   });
@@ -216,10 +304,11 @@ describe("NamedEventsListPage (AC-44)", () => {
     await mountList();
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
-    expect(confirmMock).toHaveBeenCalledTimes(1);
-    expect(confirmMock.mock.calls[0][0].message).toBe(
-      'Delete "Event 0"? It is used by 1 saved funnel: Signup. That funnel will show a Deleted event step.',
+    expect(deleteText()).toBe(
+      "Delete the Event 0 named event? It is used by 1 saved funnel: Signup. That funnel will show a Deleted event step.",
     );
+    await answerDelete(true);
+    expect(deleteName()).toBeNull();
     expect(api.service.deleteEvent.mock.calls).toEqual([["org1", "web", ev.id, true]]);
     expect(api.events.has(ev.id)).toBe(false);
   });
@@ -238,11 +327,11 @@ describe("NamedEventsListPage (AC-44)", () => {
       });
       return { data: { list: [] } };
     });
-    confirmMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
-    expect(confirmMock).toHaveBeenCalledTimes(2);
-    expect(confirmMock.mock.calls[1][0].message).toContain("1 saved funnel: Late");
+    await answerDelete(true);
+    expect(deleteText()).toContain("1 saved funnel: Late");
+    await answerDelete(false);
     expect(api.service.deleteEvent.mock.calls).toEqual([["org1", "web", ev.id, false]]);
     expect(api.events.has(ev.id)).toBe(true);
     expect(toastMock).not.toHaveBeenCalled();
@@ -254,16 +343,18 @@ describe("NamedEventsListPage (AC-44)", () => {
     await selectRow(0);
     const bulk = () => q("rum-analytics-named-events-bulk-delete-btn");
     expect(bulk()).not.toBeNull();
-    confirmMock.mockResolvedValueOnce(false);
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
+    await answerDelete(false);
     expect(bulk()).not.toBeNull();
     api.failNext("deleteEvent", 503);
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
+    await answerDelete(true);
     expect(bulk()).not.toBeNull();
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
+    await answerDelete(true);
     expect(bulk()).toBeNull();
   });
 
@@ -286,6 +377,7 @@ describe("NamedEventsListPage (AC-44)", () => {
     expect(confirmMock.mock.calls[0][0].message).toBe(
       "Delete 2 named events? Saved funnels will show a Deleted event step for: Event 1 (Signup).",
     );
+    expect(confirmMock.mock.calls[0][0].confirmVariant).toBe("destructive");
     expect(api.service.deleteEvent.mock.calls).toEqual([
       ["org1", "web", a.id, false],
       ["org1", "web", b.id, true],
@@ -419,6 +511,7 @@ describe("NamedEventsListPage (AC-44)", () => {
     await mountList();
     q("rum-analytics-named-events-row-0-delete-btn")!.click();
     await settle();
+    await answerDelete(true);
     expect(useNamedEvents().permission.value).toBe("read");
     expect(q("rum-analytics-named-events-read-only")?.textContent).toContain(
       "can view but not change",

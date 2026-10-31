@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 import { resolveBadge, normalizeKey, BADGE_GROUPS } from "./badgeGroups";
+import enUS from "@/locales/languages/en-US.json";
 
 describe("badgeGroups", () => {
   it("normalizes separators and case", () => {
@@ -17,6 +18,12 @@ describe("badgeGroups", () => {
     expect(r.icon).toBe("bolt");
     expect(r.dot).toBe(false);
     expect(r.labelKey).toBe("components.badge.alertType.realtime");
+  });
+
+  it("resolves oncallResponseState exhausted to Nobody answered", () => {
+    const r = resolveBadge("oncallResponseState", "exhausted");
+    expect(r.variant).toBe("error-soft");
+    expect(r.labelKey).toBe("oncall.state_exhausted");
   });
 
   it("resolves alertStatus to dot mode (no icon)", () => {
@@ -233,6 +240,20 @@ describe("badgeGroups", () => {
     expect(r.labelKey).toBe("components.badge.alertState.notifyfailed");
   });
 
+  it("alert 'acknowledged' is blue with a person, apart from firing red and muted amber", () => {
+    const r = resolveBadge("alertState", "acknowledged");
+    expect(r.variant).toBe("blue-soft");
+    expect(r.icon).toBe("person");
+    expect(r.labelKey).toBe("components.badge.alertState.acknowledged");
+  });
+
+  it("an ack event history row is a quiet person badge", () => {
+    const r = resolveBadge("alertState", "ack_event");
+    expect(r.variant).toBe("default-soft");
+    expect(r.icon).toBe("person");
+    expect(r.labelKey).toBe("components.badge.alertState.ackevent");
+  });
+
   it("alert 'firing' and 'normal' resolve to opposite tones", () => {
     expect(resolveBadge("alertState", "firing").variant).toBe("error-soft");
     expect(resolveBadge("alertState", "normal").variant).toBe("success-soft");
@@ -259,6 +280,14 @@ describe("badgeGroups", () => {
     for (const value of ["skipped", "warning"]) {
       expect(resolveBadge("pipelineRunOutcome", value).variant, value).toBe("warning-soft");
     }
+  });
+
+  it("pipeline run outcome firing is labelled Succeeded", () => {
+    const firing = resolveBadge("pipelineRunOutcome", "firing");
+    expect(firing.labelKey).toBe("components.badge.pipelineRunOutcome.succeeded");
+    expect(enUS.components.badge.pipelineRunOutcome.succeeded).toBe("Succeeded");
+    expect(resolveBadge("pipelineRunOutcome", "succeeded").labelKey).toBe(firing.labelKey);
+    expect(resolveBadge("alertState", "firing").labelKey).not.toBe(firing.labelKey);
   });
 
   it("resolves the groups added in the OTag type/value sweep", () => {

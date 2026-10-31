@@ -139,7 +139,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts">
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { getColorPalette } from "@/utils/dashboard/colorPalette";
+import {
+  CATEGORY10_PALETTE,
+  TABLEAU10_PALETTE,
+  getColorPalette,
+} from "@/utils/dashboard/colorPalette";
 import { computed, inject, onBeforeMount, defineComponent } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -150,6 +154,7 @@ import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import OSelectGroup from "@/lib/forms/Select/OSelectGroup.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+import { HOSTMAP_DEFAULT_COLOR } from "@/utils/dashboard/convertHostmapData";
 
 interface ColorOption {
   label: I18nText;
@@ -178,7 +183,12 @@ export default defineComponent({
     const { dashboardPanelData, promqlMode } = useDashboardPanelData(dashboardPanelDataPageKey, t);
     onBeforeMount(() => {
       // on before mount need to check whether color object is there or not else use palette-classic-by-series as a default
-      if (!dashboardPanelData?.data?.config?.color) {
+      if (!dashboardPanelData?.data?.config?.color && dashboardPanelData.data.type === "hostmap") {
+        dashboardPanelData.data.config.color = {
+          ...HOSTMAP_DEFAULT_COLOR,
+          fixedColor: [...HOSTMAP_DEFAULT_COLOR.fixedColor],
+        };
+      } else if (!dashboardPanelData?.data?.config?.color) {
         dashboardPanelData.data.config.color = {
           mode: "palette-classic-by-series",
           fixedColor: [],
@@ -191,6 +201,8 @@ export default defineComponent({
 
     // Sankey nodes have no series value, so only the categorical palettes apply.
     const categoricalOnly = computed(() => dashboardPanelData.data.type === "sankey");
+    // The sankey converter reads only these two modes; a named palette would fall back silently.
+    const SANKEY_MODES = ["palette-classic-by-series", "palette-classic"];
 
     const colorOptions: ColorOption[] = [
       {
@@ -221,6 +233,16 @@ export default defineComponent({
           "#facc15",
         ],
         value: "palette-classic",
+      },
+      {
+        label: t("dashboard.colorPaletteCategory10"),
+        colorPalette: CATEGORY10_PALETTE,
+        value: "palette-category10",
+      },
+      {
+        label: t("dashboard.colorPaletteTableau10"),
+        colorPalette: TABLEAU10_PALETTE,
+        value: "palette-tableau10",
       },
       {
         label: t("dashboard.colorSingleColor"),
@@ -266,7 +288,23 @@ export default defineComponent({
         colorPalette: ["#B8CCE0", "#96AFCD", "#7392BA", "#5175A7", "#2E5894"],
         value: "continuous-light-to-dark-blue",
       },
+      {
+        label: t("dashboard.colorFromThresholds"),
+        value: "palette-from-thresholds",
+      },
     ];
+
+    // Modes whose colours live in code, so none are stored in fixedColor.
+    const PALETTE_IN_CODE = [
+      "palette-classic-by-series",
+      "palette-classic",
+      "palette-category10",
+      "palette-tableau10",
+      "palette-from-thresholds",
+    ];
+
+    const isByValueMode = (mode: string) =>
+      mode.startsWith("continuous") || mode === "palette-from-thresholds";
 
     // A mode carried over from another chart type renders as the by-series palette on a sankey.
     const shownMode = computed(() => {
@@ -282,16 +320,19 @@ export default defineComponent({
     });
 
     const colorOptionsByGroup = computed(() => ({
+      // A host map has one value per cell and no series to colour by.
       bySeries: colorOptions.filter(
         (o): o is SelectableColorOption =>
+          dashboardPanelData.data.type !== "hostmap" &&
           !o.header &&
           !!o.value &&
-          !o.value.startsWith("continuous") &&
+          !isByValueMode(o.value) &&
           o.value !== "fixed" &&
-          o.value !== "shades",
+          o.value !== "shades" &&
+          (!categoricalOnly.value || SANKEY_MODES.includes(o.value)),
       ),
       byValue: colorOptions.filter(
-        (o): o is SelectableColorOption => !!o.value && o.value.startsWith("continuous"),
+        (o): o is SelectableColorOption => !!o.value && isByValueMode(o.value),
       ),
     }));
 
@@ -308,7 +349,7 @@ export default defineComponent({
     // A PromQL h-bar is coloured by the reduced value it shows, so last/min/max does not apply.
     const showSeriesBy = computed(
       () =>
-        shownMode.value.startsWith("continuous") &&
+        isByValueMode(shownMode.value) &&
         !(promqlMode.value && dashboardPanelData.data.type === "h-bar"),
     );
 
@@ -320,8 +361,7 @@ export default defineComponent({
       if (["fixed", "shades"].includes(value)) {
         dashboardPanelData.data.config.color.fixedColor = ["#53ca53"];
         dashboardPanelData.data.config.color.seriesBy = "last";
-      } else if (["palette-classic-by-series", "palette-classic"].includes(value)) {
-        // do not store fixedcolor in config for palette-classic-by-series and palette-classic
+      } else if (PALETTE_IN_CODE.includes(value)) {
         dashboardPanelData.data.config.color.fixedColor = [];
       } else {
         // else assign sublabel to fixedcolor
@@ -340,6 +380,7 @@ export default defineComponent({
       onColorModeChange,
       selectedOptionLabel,
       selectedOptionPalette,
+      isByValueMode,
       showSeriesBy,
     };
   },

@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :config="panelSchema.config"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
+          :empty-text="customNoDataText ? noDataTitle : null"
           @row-click="onPanelClick"
         />
         <TableRenderer
@@ -47,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
+          :density="panelSchema.config?.table_density"
           :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
@@ -64,7 +66,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             allowDrilldown &&
             drilldownAllColumns
           "
-        />
+        >
+          <template v-if="customNoDataText" #empty>
+            <OEmptyState
+              size="inline"
+              icon="bar-chart"
+              :title="noDataTitle"
+              :backdrop="false"
+              data-test="no-data"
+            />
+          </template>
+        </TableRenderer>
         <div
           v-else-if="panelSchema.type == 'html'"
           class="column flex h-full w-full flex-1 flex-col"
@@ -90,6 +102,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
+        <AlertListPanelRenderer
+          v-else-if="panelSchema.type == 'alert-list'"
+          :config="panelSchema.config"
+          :refresh-signal="selectedTimeObj"
+        />
+        <FlameGraphPanelRenderer
+          v-else-if="panelSchema.type == 'flame-graph'"
+          :data="panelData.chartType == 'flame-graph' ? panelData : null"
+          :config="panelSchema.config"
+        />
+        <LogsPanelRenderer
+          v-else-if="panelSchema.type == 'logs'"
+          :data="panelData.chartType == 'logs' ? panelData : null"
+          :config="panelSchema.config"
+        />
         <CustomChartRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
@@ -101,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="chartRendererRef"
           :data="chartRendererData"
           :height="chartPanelHeight"
-          :label="raw(panelSchema?.title)"
+          :label="raw(panelTitle)"
           :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
           @updated:data-zoom="(event) => !store.state.kioskMode && onDataZoom(event)"
           @error="errorDetail = $event"
@@ -187,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         size="inline"
         icon="bar-chart"
-        :title="t('panel.noData')"
+        :title="noDataTitle"
         :backdrop="false"
         data-test="no-data"
         class="noData [container-type:size] absolute! inset-0 h-full !min-h-0 w-full !p-2"
@@ -226,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-sm dark:shadow-sm"
+        class="rounded-default bg-dropdown-bg shadow-overlay absolute top-0 left-0 z-9999999 hidden min-w-50 border border-transparent px-0 py-1 whitespace-nowrap"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
@@ -325,6 +352,7 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { chartColor } from "@/utils/chartTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import {
@@ -334,6 +362,7 @@ import {
 } from "@/utils/dashboard/convertCustomChartData";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
+import { showsMissingValue } from "@/utils/dashboard/tableConfigUtils";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useRoute, useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
@@ -418,6 +447,14 @@ const MarkdownRenderer = defineAsyncComponent(() => {
   return import("./panels/MarkdownRenderer.vue");
 });
 
+const AlertListPanelRenderer = defineAsyncComponent(
+  () => import("./panels/AlertListPanelRenderer.vue"),
+);
+const FlameGraphPanelRenderer = defineAsyncComponent(
+  () => import("./panels/FlameGraphPanelRenderer.vue"),
+);
+const LogsPanelRenderer = defineAsyncComponent(() => import("./panels/LogsPanelRenderer.vue"));
+
 const AddAnnotation = defineAsyncComponent(() => {
   return import("./addPanel/AddAnnotation.vue");
 });
@@ -441,6 +478,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
+import { resolveNoDataText } from "@/utils/dashboard/noDataText";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
@@ -456,6 +494,9 @@ export default defineComponent({
     MapsRenderer,
     HTMLRenderer,
     MarkdownRenderer,
+    AlertListPanelRenderer,
+    FlameGraphPanelRenderer,
+    LogsPanelRenderer,
     AddAnnotation,
     CustomChartRenderer,
     LoadingProgress,
@@ -645,6 +686,11 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const route = useRoute();
     const router = useRouter();
+    const panelTitle = usePanelTitle({
+      title: () => props.panelSchema?.title,
+      variablesData: () => props.variablesData,
+      context: () => ({ tabId: props.tabId, panelId: props.panelSchema?.id }),
+    });
 
     // ============================================================================
     // Hidden Queries Feature Setup
@@ -877,11 +923,11 @@ export default defineComponent({
       injectedPromqlData,
     );
 
-    // Html and markdown render without a query, so they never wait on one.
+    // Html, markdown and the alert list render without a query, so they never wait on one.
     const isAwaitingFirstLoad = computed(
       () =>
         isFirstLoadSettled?.value === false &&
-        !["html", "markdown"].includes(panelSchema.value?.type),
+        !["html", "markdown", "alert-list"].includes(panelSchema.value?.type),
     );
 
     // Dashboard-level annotation sources are queried once by the dashboard and merged after the panel's own.
@@ -1963,7 +2009,7 @@ export default defineComponent({
       emit("series-data-update", panelData.value);
     });
 
-    // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
+    // Immediate, so a renderer remounted for a new chart type clears the previous type's series warning.
     watch(
       limitNumberOfSeriesWarningMessage,
       () => {
@@ -1972,12 +2018,17 @@ export default defineComponent({
           limitNumberOfSeriesWarningMessage.value,
         );
       },
-      { deep: true },
+      { immediate: true },
     );
 
-    watch(seriesLimit, (value) => {
-      emit("series-limit-update", value);
-    });
+    // Immediate, so a renderer remounted for a new chart type clears the previous type's series chip.
+    watch(
+      seriesLimit,
+      (value) => {
+        emit("series-limit-update", value);
+      },
+      { immediate: true },
+    );
 
     // Immediate, so a renderer remounted for a new chart type clears the previous type's chips.
     watch(
@@ -2039,12 +2090,26 @@ export default defineComponent({
     // Multi-SQL note: panelData is built from filteredData (visible queries only)
     // by convertSQLData and friends, so the type-specific checks below
     // already reflect the multi-query aggregate.
+    // A metric or SQL gauge that names its missing value draws that text instead of the No Data state.
+    const drawsMissingValue = computed(() => {
+      const { type, queryType, config } = panelSchema.value ?? {};
+      if (!panelData.value?.chartType) return false;
+      if (type === "metric") return showsMissingValue(config);
+      return (
+        type === "gauge" &&
+        queryType !== "promql" &&
+        String(config?.no_value_replacement ?? "") !== ""
+      );
+    });
+
     const noData = computed(() => {
       const type = panelSchema.value.type;
 
-      if (type === "html" || type === "markdown") {
+      if (type === "html" || type === "markdown" || type === "alert-list") {
         return "";
       }
+
+      if (drawsMissingValue.value) return "";
 
       if (panelSchema.value?.queryType === "promql") {
         const hasResults =
@@ -2081,6 +2146,14 @@ export default defineComponent({
         return "";
       }
 
+      if (type === "flame-graph") {
+        return panelData.value?.root ? "" : "No Data";
+      }
+
+      if (type === "logs") {
+        return panelData.value?.rows?.length > 0 ? "" : "No Data";
+      }
+
       // Table renders raw rows; the conversion returns { rows, columns }.
       if (type === "table") {
         return panelData.value?.rows?.length > 0 ? "" : "No Data";
@@ -2114,6 +2187,17 @@ export default defineComponent({
       // whose data is entirely null. Just check what survived.
       return panelData.value?.options?.series?.length > 0 ? "" : "No Data";
     });
+
+    const customNoDataText = computed(() =>
+      resolveNoDataText(
+        panelSchema.value?.config,
+        props.currentVariablesData || variablesData.value,
+        { tabId: tabId.value, panelId: panelSchema.value?.id },
+      ),
+    );
+    const noDataTitle = computed(() =>
+      customNoDataText.value ? raw(customNoDataText.value) : t("panel.noData"),
+    );
 
     // Determines what data to pass to ChartRenderer.
     // noData check is evaluated first so promql panels with no results
@@ -2246,6 +2330,7 @@ export default defineComponent({
       showErrorNotification,
       t,
       onExemplarClick: exemplarInteraction.onExemplarClick,
+      hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction?.({ type: "hideTip" }),
     });
 
     // A chart or table click opens the drilldown menu, so it does nothing where drilldowns are off.
@@ -2538,6 +2623,7 @@ export default defineComponent({
       onChartMouseOut,
       failedAnnotationSources,
       truncatedAnnotationSources,
+      panelTitle,
       t,
       raw,
       store,
@@ -2550,6 +2636,8 @@ export default defineComponent({
       errorDetail,
       panelData,
       noData,
+      noDataTitle,
+      customNoDataText,
       geoMapRendererData,
       isAwaitingFirstLoad,
       chartRendererData,
@@ -2595,12 +2683,12 @@ export default defineComponent({
         const csv = getPanelCsvString();
         if (!csv) return null;
         return {
-          title: title ?? panelSchema.value?.title ?? "panel",
+          title: title ?? panelTitle.value ?? "panel",
           csv,
         };
       },
       logDataAsJSON: (title: string) => {
-        console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
+        console.group(`[oo] ${title ?? panelTitle.value ?? "panel"}`);
         console.groupEnd();
       },
       loadingProgressPercentage,

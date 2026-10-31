@@ -19,6 +19,7 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 import { queryClient } from "@/composables/query/queryClient";
 import slack from "@/services/slack";
+import destinationService from "@/services/alert_destination";
 import SlackChannelDefaults from "./SlackChannelDefaults.vue";
 import {
   ConfirmDialogStub,
@@ -32,6 +33,8 @@ import {
   orgAccessView,
 } from "@/test/unit/helpers/slack";
 import type { InstallationView, SlackChannelDefaultRow } from "@/types/slack";
+
+vi.mock("@/services/alert_destination", () => ({ default: { list: vi.fn() } }));
 
 vi.mock("@/services/slack", () => ({
   default: {
@@ -118,8 +121,17 @@ const mountWith = async (realTable = false) => {
   return w;
 };
 
+const appDestination = (name: string, channel: string, installation = "inst-1") => ({
+  name,
+  type: "slack_app",
+  installation_id: installation,
+  channel_id: channel,
+  channel_name: channel,
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(destinationService.list).mockReturnValue(ok([]) as any);
   vi.mocked(slack.listInstallations).mockReturnValue(
     ok({ installations: [installationView()] }) as any,
   );
@@ -140,7 +152,7 @@ afterEach(() => {
 });
 
 describe("SlackChannelDefaults (rows 21-22)", () => {
-  it("lists each channel with its answer mode, who set it and a dash for Phase 2 alert routes", async () => {
+  it("lists each channel with its answer mode, who set it and a dash when no alert routes", async () => {
     const w = await mountDefaults();
     expect(slack.listChannelDefaults).toHaveBeenCalledWith("acme", "inst-1");
     const [mine, theirs] = w.findAll('[data-test-stub="otable-row"]');
@@ -151,6 +163,22 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     expect(mine.find('[data-col="alert_routes"]').text()).toBe("—");
     expect(theirs.text()).toContain("Private only");
     expect(theirs.text()).toContain("Another org");
+  });
+
+  it("fills Alert routes with this workspace's Slack app destinations per channel (MK-6b)", async () => {
+    vi.mocked(destinationService.list).mockReturnValue(
+      ok([
+        appDestination("a", "C1"),
+        appDestination("b", "C1"),
+        appDestination("c", "C1", "inst-2"),
+        appDestination("d", "C2"),
+      ]) as any,
+    );
+    const w = await mountDefaults();
+    const [mine, theirs] = w.findAll('[data-test-stub="otable-row"]');
+    expect(mine.find('[data-col="alert_routes"]').text()).toBe("2 destinations");
+    expect(theirs.find('[data-col="alert_routes"]').text()).toBe("1 destination");
+    expect(w.text()).not.toMatch(/failing/i);
   });
 
   it("AC-5.5 offers Edit and Remove only on rows this org set", async () => {
@@ -165,6 +193,12 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     const w = await mountDefaults();
     await w.find('[data-test="slack-channel-remove-C1"]').trigger("click");
     expect(w.find('[data-test-stub="confirm-title"]').text()).toContain("#sre-prod");
+    const confirmDialog = w.find('[data-test-stub="confirm-dialog"]');
+    expect(confirmDialog.attributes("message-keypath")).toBe("slackApp.channels.removeMessage");
+    expect(confirmDialog.attributes("message-name")).toBe("#sre-prod");
+    expect(i18n.global.t("slackApp.channels.removeMessage", { name: "#sre-prod" })).toBe(
+      "Questions in #sre-prod then go to each person's default org (they can change it with /o2 org).",
+    );
     await w.find('[data-test-stub="confirm-ok"]').trigger("click");
     await flushPromises();
     expect(slack.deleteChannelDefault).toHaveBeenCalledWith("acme", "inst-1", "C1");
@@ -288,6 +322,7 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     await w.find('[data-test="slack-channel-set-default"]').trigger("click");
     await flushPromises();
     expect(slack.listChannels).toHaveBeenCalledWith("acme", "inst-1", { q: "", cursor: "" });
+    expect(body().text()).toContain("can take up to 10 minutes");
     await body().find("form").trigger("submit");
     await vi.waitFor(() => expect(body().text()).toContain("Pick a channel"));
     expect(slack.putChannelDefault).not.toHaveBeenCalled();
@@ -296,6 +331,7 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
   it("explains an empty list", async () => {
     const w = await mountDefaults([]);
     expect(w.text()).toContain("No channel has a default org yet");
+    expect(w.text()).toContain("go to each person's default org");
   });
 
   it("W-S7 shows no empty state while the defaults load", async () => {

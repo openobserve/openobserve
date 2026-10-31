@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+  addUsage,
   cleanAttributeValue,
   genAiRequestAttributes,
   genAiResponseAttributes,
@@ -36,7 +37,7 @@ test("response content and provider-reported usage use standard attributes", () 
     {
       info: {
         id: "msg-123",
-        modelID: "deepseek-v4-pro",
+        modelID: "deepseek-flash",
         finish: "stop",
         cost: 0.42,
         tokens: {
@@ -58,17 +59,30 @@ test("response content and provider-reported usage use standard attributes", () 
     },
   ]);
   assert.deepEqual(attributes["gen_ai.response.finish_reasons"], ["stop"]);
-  assert.equal(attributes["gen_ai.usage.input_tokens"], 1234);
-  assert.equal(attributes["gen_ai.usage.output_tokens"], 56);
-  assert.equal(attributes["gen_ai.usage.total_tokens"], 1290);
-  assert.equal(attributes["gen_ai.usage.cache_read_tokens"], 78);
-  assert.equal(attributes["gen_ai.usage.cache_write_tokens"], 9);
+  assert.equal(attributes["gen_ai.usage.input_tokens"], 1234 + 78 + 9);
+  assert.equal(attributes["gen_ai.usage.output_tokens"], 56 + 12);
+  assert.equal(attributes["gen_ai.usage.total_tokens"], 1234 + 78 + 9 + 56 + 12);
+  assert.equal(attributes["gen_ai.usage.cache_read.input_tokens"], 78);
+  assert.equal(attributes["gen_ai.usage.cache_creation.input_tokens"], 9);
+  assert.equal(attributes["gen_ai.usage.cache_read_tokens"], undefined);
   assert.equal(attributes["gen_ai.usage.cost"], 0.42);
-  assert.equal(attributes["ai.review.usage.reasoning_tokens"], 12);
+  assert.equal(attributes["ai.usage.reasoning_tokens"], 12);
   assert.equal(
     Object.keys(attributes).some(key => key.startsWith("gen_ai.completion.")),
     false,
   );
+});
+
+test("usage without cache or reasoning breakdown passes through unchanged", () => {
+  const attributes = genAiResponseAttributes(
+    { info: { tokens: { input: 100, output: 20 } } },
+    "ok",
+    "deepseek-flash",
+  );
+
+  assert.equal(attributes["gen_ai.usage.input_tokens"], 100);
+  assert.equal(attributes["gen_ai.usage.output_tokens"], 20);
+  assert.equal(attributes["gen_ai.usage.cache_read.input_tokens"], undefined);
 });
 
 test("missing provider usage is omitted instead of replaced with synthetic counts", () => {
@@ -97,4 +111,14 @@ test("review instrumentation does not emit legacy TraceLoop content attributes",
 
   assert.doesNotMatch(reviewSource, /["']gen_ai\.prompt\./);
   assert.doesNotMatch(reviewSource, /["']gen_ai\.completion\./);
+});
+
+test("usage of retried attempts is summed, and a missing side is skipped", () => {
+  const a = { cost: 0.1, tokens: { input: 10, output: 2, reasoning: 5, cache: { read: 100, write: 0 } } };
+  const b = { cost: 0.2, tokens: { input: 20, output: 3, reasoning: 7, cache: { read: 50, write: 1 } } };
+  const sum = addUsage(a, b);
+  assert.equal(sum.cost.toFixed(2), "0.30");
+  assert.deepEqual(sum.tokens, { input: 30, output: 5, reasoning: 12, cache: { read: 150, write: 1 } });
+  assert.equal(addUsage(null, b), b);
+  assert.equal(addUsage(a, undefined), a);
 });

@@ -1154,7 +1154,9 @@ export default defineComponent({
     const confirmRevokeContract = async (row: any) => {
       const ok = await confirm({
         title: t("settings.organizationManagementPage.revokeConfirmTitle"),
-        message: t("settings.organizationManagementPage.revokeConfirmMessage", { name: row.name }),
+        messageKeypath: "settings.organizationManagementPage.revokeConfirmMessage",
+        messageName: row.name,
+        confirmVariant: "destructive",
       });
       if (ok) {
         const metaOrg = store.state.selectedOrganization.identifier;

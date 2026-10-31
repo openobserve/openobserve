@@ -355,6 +355,9 @@ export interface PanelEditorEmits {
    */
   (e: "chartApiError", error: any): void;
 
+  /** Every change of the renderer's error; `{ message: "" }` means the last run succeeded. */
+  (e: "renderer-error", error: { message?: unknown; code?: unknown } | string | null): void;
+
   /**
    * Emitted when user zooms on chart (for datetime update).
    * Parent should update its DateTimePicker with new time range.
@@ -655,13 +658,24 @@ export const ALL_CHART_TYPES = [
   "donut",
   "metric",
   "gauge",
+  "bar-gauge",
   "table",
   "heatmap",
   "state-timeline",
+  "boxplot",
+  "distribution",
+  "treemap",
+  "sunburst",
+  "funnel",
+  "hostmap",
   "geomap",
   "sankey",
+  "node-graph",
   "html",
   "markdown",
+  "alert-list",
+  "flame-graph",
+  "logs",
   "custom_chart",
 ] as const;
 
@@ -689,8 +703,14 @@ export const AGGREGATION_REQUIRED_CHART_TYPES: ChartType[] = [
   "donut",
   "metric",
   "gauge",
+  "bar-gauge",
   "heatmap",
   "state-timeline",
+  "treemap",
+  "sunburst",
+  "funnel",
+  "hostmap",
   "geomap",
   "sankey",
+  "node-graph",
 ];

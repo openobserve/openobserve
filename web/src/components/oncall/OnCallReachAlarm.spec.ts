@@ -49,6 +49,7 @@ function render(
     deliveriesTotal?: number | null;
     progress?: Partial<EscalationProgress> | null;
     smtpConfigured?: boolean | null;
+    noTeam?: boolean;
   } = {},
 ) {
   const deliveries = options.deliveries ?? [delivery()];
@@ -68,12 +69,40 @@ function render(
               ...options.progress,
             },
       smtpConfigured: options.smtpConfigured ?? null,
+      noTeam: options.noTeam ?? false,
     },
     global: { plugins: [i18n], stubs },
   });
 }
 
 describe("OnCallReachAlarm", () => {
+  /// The server refuses Escalate on an unrouted page, so the alarm offers none.
+  it("drops Escalate when the page cannot be escalated", () => {
+    const deliveries = [delivery(), delivery({ recipient: "bo@o2.ai" })];
+    expect(render({ deliveries }).find('[data-test="oncall-reach-alarm-escalate"]').exists()).toBe(
+      true,
+    );
+
+    const wrapper = mount(OnCallReachAlarm, {
+      props: { state: "triggered", deliveries, deliveriesTotal: 2, escalatable: false },
+      global: { plugins: [i18n], stubs },
+    });
+    expect(wrapper.find('[data-test="oncall-reach-alarm"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-reach-alarm-escalate"]').exists()).toBe(false);
+  });
+
+  /// The reachability check lives on the team, and a deleted or missing team has no screen to open.
+  it("drops the reachability link when there is no team screen", () => {
+    const deliveries = [delivery(), delivery({ recipient: "bo@o2.ai" })];
+    expect(
+      render({ deliveries }).find('[data-test="oncall-reach-alarm-reachability"]').exists(),
+    ).toBe(true);
+
+    const wrapper = render({ deliveries, noTeam: true });
+    expect(wrapper.find('[data-test="oncall-reach-alarm"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-reach-alarm-reachability"]').exists()).toBe(false);
+  });
+
   it("says nobody has seen the page when every send failed", () => {
     const wrapper = render({ deliveries: [delivery(), delivery({ recipient: "bo@o2.ai" })] });
 

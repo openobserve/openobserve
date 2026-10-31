@@ -15,11 +15,11 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent } from "vue";
 import i18n from "@/locales";
 import slack from "@/services/slack";
 import SlackWorkspaceCard from "./SlackWorkspaceCard.vue";
 import {
-  ConfirmDialogStub,
   OTableStub,
   axiosError,
   fakePopup,
@@ -62,6 +62,27 @@ const CredentialsStub = {
 
 const errorHandler = vi.fn();
 
+// Adds the named-message props the shared stub does not declare.
+const NamedConfirmDialogStub = defineComponent({
+  name: "ConfirmDialog",
+  props: {
+    modelValue: { type: Boolean, default: false },
+    title: { type: String, default: "" },
+    message: { type: String, default: "" },
+    messageKeypath: { type: String, default: "" },
+    messageName: { type: String, default: "" },
+    okLabel: { type: String, default: "" },
+    okVariant: { type: String, default: "primary" },
+  },
+  emits: ["update:ok", "update:cancel", "update:modelValue"],
+  template: `
+    <div v-if="modelValue" data-test-stub="confirm-dialog">
+      <span data-test-stub="confirm-message">{{ message }}</span>
+      <span data-test-stub="confirm-name">{{ messageName }}</span>
+      <button data-test-stub="confirm-ok" @click="$emit('update:modelValue', false); $emit('update:ok')">{{ okLabel }}</button>
+    </div>`,
+});
+
 const mountCard = (installation: InstallationView = installationView(), isCloud = false) =>
   mount(SlackWorkspaceCard, {
     props: { installation, isCloud },
@@ -71,7 +92,7 @@ const mountCard = (installation: InstallationView = installationView(), isCloud 
       config: { errorHandler },
       stubs: {
         OTable: OTableStub,
-        ConfirmDialog: ConfirmDialogStub,
+        ConfirmDialog: NamedConfirmDialogStub,
         SlackCredentialsDialog: CredentialsStub,
       },
     },
@@ -122,6 +143,35 @@ describe("SlackWorkspaceCard (A3)", () => {
         .find('[data-test="slack-workspace-sockets"]')
         .exists(),
     ).toBe(false);
+  });
+
+  it("shows the outbound queue line once the server reports it, and no last-send line (MK-6b)", () => {
+    const health = installationView().health;
+    const w = mountCard(
+      installationView({ health: { ...health, outbound_depth: 3, outbound_oldest_age_secs: 4 } }),
+    );
+    expect(w.find('[data-test="slack-workspace-outbound"]').text()).toBe(
+      "Alert messages: 3 queued, oldest 4 s",
+    );
+    expect(w.text()).not.toMatch(/last send/i);
+    expect(mountCard().find('[data-test="slack-workspace-outbound"]').exists()).toBe(false);
+    const empty = mountCard(
+      installationView({ health: { ...health, outbound_depth: 0, outbound_oldest_age_secs: 0 } }),
+    ).find('[data-test="slack-workspace-outbound"]');
+    expect(empty.text()).toBe("No alert messages queued");
+    expect(empty.attributes("data-state")).toBe("ok");
+  });
+
+  it("flags the queue once its oldest message waits past 10 minutes", () => {
+    const health = installationView().health;
+    const w = mountCard(
+      installationView({
+        health: { ...health, outbound_depth: 40, outbound_oldest_age_secs: 900 },
+      }),
+    );
+    const line = w.find('[data-test="slack-workspace-outbound"]');
+    expect(line.text()).toBe("Alert messages: 40 queued, oldest 15 min");
+    expect(line.attributes("data-state")).toBe("warning");
   });
 
   it("AC-12.1 credentials unreadable: says so and opens Update credentials", async () => {
@@ -217,9 +267,10 @@ describe("SlackWorkspaceCard (A3)", () => {
       "Configuration refresh token kept",
     );
     await w.find('[data-test="slack-forget-token"]').trigger("click");
-    expect(w.find('[data-test-stub="confirm-message"]').text()).toContain(
-      "Slack does not revoke the token",
-    );
+    expect(w.find('[data-test-stub="confirm-name"]').text()).toBe("Acme Corp");
+    const dialog = w.findComponent(NamedConfirmDialogStub);
+    expect(dialog.props("messageKeypath")).toBe("slackApp.card.forgetMessage");
+    expect(dialog.props("okVariant")).toBe("destructive");
     await w.find('[data-test-stub="confirm-ok"]').trigger("click");
     await flushPromises();
     expect(slack.updateCredentials).toHaveBeenCalledWith("acme", "inst-1", {

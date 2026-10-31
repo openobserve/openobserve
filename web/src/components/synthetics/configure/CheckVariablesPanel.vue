@@ -251,6 +251,15 @@ const pendingRemove = computed(() =>
 const pendingRemoveUsage = computed(() =>
   pendingRemoveIndex.value === null ? 0 : (usageCounts.value[pendingRemoveIndex.value] ?? 0),
 );
+const pendingRemoveWarning = computed(() =>
+  pendingRemoveUsage.value
+    ? t(
+        "synthetics.variablesPanel.removeWarning",
+        { count: pendingRemoveUsage.value },
+        pendingRemoveUsage.value,
+      )
+    : undefined,
+);
 const removeDialogOpen = computed({
   get: () => pendingRemoveIndex.value !== null,
   set: (open: boolean) => {
@@ -635,22 +644,23 @@ function onPromoted(name: string) {
       size="sm"
       :title="t('synthetics.variablesPanel.removeTitle')"
       :primary-button-label="t('common.ok')"
+      primary-button-variant="destructive"
       :secondary-button-label="t('common.cancel')"
       data-test="synthetics-check-variables-panel-remove-dialog"
       @click:primary="confirmRemove"
       @click:secondary="pendingRemoveIndex = null"
     >
       <p class="py-2">
-        {{ t("synthetics.variablesPanel.removeBody", { name: pendingRemove?.name ?? "" }) }}
-        <template v-if="pendingRemoveUsage">
-          {{
-            t(
-              "synthetics.variablesPanel.removeWarning",
-              { count: pendingRemoveUsage },
-              pendingRemoveUsage,
-            )
-          }}
-        </template>
+        <i18n-t keypath="synthetics.variablesPanel.removeBody">
+          <template #name>
+            <span
+              data-test="synthetics-check-variables-panel-remove-name"
+              class="text-text-heading font-semibold break-all"
+              >{{ pendingRemove?.name }}</span
+            >
+          </template>
+        </i18n-t>
+        {{ pendingRemoveWarning }}
       </p>
       <p v-if="pendingRemoveFallbackScope" class="pb-2">
         {{

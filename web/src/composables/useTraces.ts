@@ -170,6 +170,7 @@ const defaultObject = {
     streamResults: <any>[],
     histogram: <any>{},
     editorValue: "",
+    appliedEditorValue: null as string | null,
     datetime: {
       startTime: 0,
       endTime: 0,

@@ -73,6 +73,9 @@ export interface SlackInstallationHealth {
   nodes: number;
   last_event_at: number | null;
   as_of: number | null;
+  /** Alert messages waiting on the outbound queue; absent before the server sends it. */
+  outbound_depth?: number;
+  outbound_oldest_age_secs?: number | null;
 }
 
 export interface InstallationView {
@@ -146,6 +149,8 @@ export interface SlackCreatedDestination {
 
 export interface SlackInstallStartRequest {
   source: SlackInstallSource;
+  /** The Slack app form only: the exchange creates the destination; the webhook tile saves its own. */
+  create_destination?: boolean;
 }
 
 export interface SlackInstallStartResponse {
@@ -162,15 +167,29 @@ export interface SlackLinkAllResult {
   complete: boolean;
 }
 
+/** The workspace is connected but the channel needs a confirm (MK-7, MK-20) the form asks for. */
+export interface SlackDestinationRefusal {
+  code: string;
+  message: string;
+  team?: string;
+  destination?: string;
+  channel: string;
+  channel_id: string;
+}
+
 /** `source: destination_form`: today's camelCase webhook fields, so `applyConnection` keeps working. */
 export interface SlackFormExchangeResponse extends SlackOAuthConnection {
   installation: InstallationSummary;
+  destination: SlackCreatedDestination | null;
+  channel_default_set: boolean;
+  destination_refusal?: SlackDestinationRefusal;
 }
 
 /** `source: settings` or `upgrade_banner`; `destination` is null on self-hosted, whose app has no incoming webhook. */
 export interface SlackSettingsExchangeResponse {
   installation: InstallationView;
   destination: SlackCreatedDestination | null;
+  destination_refusal?: SlackDestinationRefusal;
   channel_default_set: boolean;
   linking: LinkingView;
   link_all: SlackLinkAllResult | null;
@@ -421,6 +440,7 @@ export interface SlackConnectRequest {
 export interface SlackConnectResponse {
   connected: true;
   destination: SlackCreatedDestination | null;
+  destination_refusal?: SlackDestinationRefusal;
   channel_default_set: boolean;
 }
 
@@ -455,6 +475,8 @@ export interface SlackChannel {
   is_private: boolean;
   is_member: boolean;
   is_shared: boolean;
+  /** Slack Connect: people outside the workspace are in it (conversations.info). */
+  is_ext_shared?: boolean;
 }
 
 export interface SlackChannelsResponse {
@@ -471,6 +493,23 @@ export interface SlackChannelDefaultRow {
   /** Only a `_meta` viewer of an instance workspace learns the owning org. */
   org_id?: string;
   org_name?: string;
+}
+
+/** An on-call schedule member with no Slack link, and the pre-shift DM sent to them. */
+export interface SlackOncallUnlinkedMember {
+  email: string;
+  team_id: string;
+  team_name: string;
+  next_shift_at: number | null;
+  reminded_at: number | null;
+}
+
+export interface SlackOncallUnlinkedResponse {
+  members: SlackOncallUnlinkedMember[];
+}
+
+export interface SlackOncallRemindResponse {
+  sent: number;
 }
 
 export interface SlackChannelDefaultsResponse {

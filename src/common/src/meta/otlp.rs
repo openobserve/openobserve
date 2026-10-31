@@ -19,7 +19,8 @@ use axum::{
 };
 use config::{meta::otlp::OtlpRequestType, utils::json};
 use opentelemetry_proto::tonic::collector::{
-    logs::v1::ExportLogsServiceResponse, profiles::v1development::ExportProfilesServiceResponse,
+    logs::v1::ExportLogsServiceResponse, metrics::v1::ExportMetricsServiceResponse,
+    profiles::v1development::ExportProfilesServiceResponse, trace::v1::ExportTraceServiceResponse,
 };
 use prost::Message;
 
@@ -53,6 +54,26 @@ impl OtlpExportResponse for ExportProfilesServiceResponse {
         self.partial_success
             .as_ref()
             .map(|ps| (ps.rejected_profiles, ps.error_message.as_str()))
+    }
+}
+
+impl OtlpExportResponse for ExportTraceServiceResponse {
+    const REJECTED_FIELD: &'static str = "rejectedSpans";
+
+    fn partial_success(&self) -> Option<(i64, &str)> {
+        self.partial_success
+            .as_ref()
+            .map(|ps| (ps.rejected_spans, ps.error_message.as_str()))
+    }
+}
+
+impl OtlpExportResponse for ExportMetricsServiceResponse {
+    const REJECTED_FIELD: &'static str = "rejectedDataPoints";
+
+    fn partial_success(&self) -> Option<(i64, &str)> {
+        self.partial_success
+            .as_ref()
+            .map(|ps| (ps.rejected_data_points, ps.error_message.as_str()))
     }
 }
 

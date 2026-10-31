@@ -343,6 +343,17 @@ describe("User Component", () => {
       expect(dialog!.props("open")).toBe(true);
     });
 
+    it("names the user in bold and uses a destructive OK button", async () => {
+      wrapper.vm.confirmDeleteAction({ email: "to-delete@example.com" });
+      await flushPromises();
+      const dialog = wrapper
+        .findAllComponents(ODialogStub)
+        .find((d: any) => d.props("title") === "Delete User")!;
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      const name = dialog.find('[data-test="user-delete-dialog-message"] span.font-semibold');
+      expect(name.text()).toBe("to-delete@example.com");
+    });
+
     it("closes the dialog when secondary button is clicked", async () => {
       wrapper.vm.confirmDelete = true;
       await flushPromises();
@@ -393,6 +404,17 @@ describe("User Component", () => {
       expect(dialog!.props("open")).toBe(true);
     });
 
+    it("names the invited email in bold and uses a destructive OK button", async () => {
+      wrapper.vm.confirmRevokeAction({ email: "pending@example.com", token: "tok-123" });
+      await flushPromises();
+      const dialog = wrapper
+        .findAllComponents(ODialogStub)
+        .find((d: any) => d.props("title") === "Revoke Invitation")!;
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      const name = dialog.find('[data-test="user-revoke-dialog-message"] span.font-semibold');
+      expect(name.text()).toBe("pending@example.com");
+    });
+
     it("closes when secondary button is clicked", async () => {
       wrapper.vm.confirmRevoke = true;
       await flushPromises();
@@ -438,6 +460,7 @@ describe("User Component", () => {
       expect(dialog).toBeTruthy();
       expect(dialog!.props("size")).toBe("sm");
       expect(dialog!.props("primaryButtonLabel")).toBe("OK");
+      expect(dialog!.props("primaryButtonVariant")).toBe("destructive");
       expect(dialog!.props("secondaryButtonLabel")).toBe("Cancel");
       expect(dialog!.props("open")).toBe(true);
     });
@@ -472,6 +495,26 @@ describe("User Component", () => {
         { ids: ["a@example.com", "b@example.com"] },
       );
       expect(wrapper.vm.confirmBulkDelete).toBe(false);
+    });
+
+    it("keeps the opened count while the dialog closes after the delete", async () => {
+      wrapper.vm.selectedUsers = [
+        { email: "a@example.com", enableDelete: true },
+        { email: "b@example.com", enableDelete: true },
+      ];
+      mockUsersService.bulkDelete.mockResolvedValue({
+        data: { successful: ["a@example.com", "b@example.com"], unsuccessful: [] },
+      } as any);
+      wrapper.vm.openBulkDeleteDialog();
+      await flushPromises();
+      const dialog = wrapper
+        .findAllComponents(ODialogStub)
+        .find((d: any) => d.props("title") === "Delete Users")!;
+      await dialog.vm.$emit("click:primary");
+      await flushPromises();
+      expect(wrapper.vm.selectedUsers).toEqual([]);
+      expect(dialog.props("open")).toBe(false);
+      expect(dialog.text()).toContain("delete 2 users?");
     });
   });
 
@@ -1051,6 +1094,62 @@ describe("User Component", () => {
     });
   });
 
+  describe("AddUser dialog dismissal (#15546)", () => {
+    it("clears action/email from the URL when the dialog is cancelled", async () => {
+      const replaceSpy = vi.spyOn(router, "replace").mockImplementation(() => Promise.resolve());
+      wrapper.vm.showAddUserDialog = true;
+      await flushPromises();
+
+      wrapper.findComponent(AddUserStub).vm.$emit("update:open", false);
+      await flushPromises();
+
+      expect(wrapper.vm.showAddUserDialog).toBe(false);
+      expect(replaceSpy).toHaveBeenCalledWith({
+        name: "users",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+      replaceSpy.mockRestore();
+    });
+
+    it("drops a pending open timer when the form is hidden", async () => {
+      const replaceSpy = vi.spyOn(router, "replace").mockImplementation(() => Promise.resolve());
+      wrapper.vm.addUser({ row: { email: "test@example.com" } }, true);
+      wrapper.vm.hideForm();
+      await new Promise((r) => setTimeout(r, 150));
+
+      expect(wrapper.vm.showAddUserDialog).toBe(false);
+      replaceSpy.mockRestore();
+    });
+
+    it("does not reopen the edit dialog when it was cancelled while the page was still loading", async () => {
+      sharedUsersState.users = [];
+      queryClient.clear();
+      let resolveRoles: (v: any) => void = () => {};
+      mockUsersService.getRoles.mockReturnValue(new Promise((r) => (resolveRoles = r)) as any);
+      await router.push({
+        name: "users",
+        query: {
+          action: "update",
+          email: "test@example.com",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      const late = mountUser();
+      await flushPromises();
+
+      late.findComponent(AddUserStub).vm.$emit("update:open", false);
+      await flushPromises();
+      expect(router.currentRoute.value.query.action).toBeUndefined();
+
+      resolveRoles({ data: [{ label: "admin", value: "admin" }] });
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 150));
+
+      expect((late.vm as any).showAddUserDialog).toBe(false);
+      late.unmount();
+    });
+  });
+
   describe("hideForm", () => {
     it("should hide add user dialog and navigate", () => {
       const replaceSpy = vi.spyOn(router, "replace").mockImplementation(() => Promise.resolve());
@@ -1217,6 +1316,46 @@ describe("User Component", () => {
       await wrapper.vm.bulkDeleteUsers();
 
       expect(mockUsersService.bulkDelete).toHaveBeenCalled();
+    });
+
+    it("deletes regular users and blocks domain-mapped users in separate calls", async () => {
+      wrapper.vm.selectedUsers = [
+        { email: "a@example.com", enableDelete: true },
+        { email: "b@acme.com", enableDelete: true, isDomainMapped: true },
+      ];
+      mockOrganizationsService.get_organization_settings.mockResolvedValue({
+        data: { data: { domain_management_config: { domains: [], blocked_emails: [] } } },
+      } as any);
+      mockOrganizationsService.post_organization_settings.mockResolvedValue({ data: {} } as any);
+      mockUsersService.bulkDelete.mockImplementation(
+        async (_org: string, { ids }: { ids: string[] }) =>
+          ({ data: { successful: ids, unsuccessful: [] } }) as any,
+      );
+
+      await wrapper.vm.bulkDeleteUsers();
+
+      const org = store.state.selectedOrganization.identifier;
+      expect(mockUsersService.bulkDelete).toHaveBeenCalledWith(org, { ids: ["a@example.com"] });
+      expect(mockUsersService.bulkDelete).toHaveBeenCalledWith(org, { ids: ["b@acme.com"] });
+      expect(mockOrganizationsService.post_organization_settings).toHaveBeenCalledWith(
+        org,
+        expect.objectContaining({
+          domain_management_config: expect.objectContaining({ blocked_emails: ["b@acme.com"] }),
+        }),
+      );
+    });
+
+    it("does not remove domain-mapped users when the block write fails", async () => {
+      wrapper.vm.selectedUsers = [
+        { email: "b@acme.com", enableDelete: true, isDomainMapped: true },
+      ];
+      mockOrganizationsService.get_organization_settings.mockRejectedValue(
+        new Error("settings down"),
+      );
+
+      await wrapper.vm.bulkDeleteUsers();
+
+      expect(mockUsersService.bulkDelete).not.toHaveBeenCalled();
     });
 
     it("should suppress 403 errors", async () => {

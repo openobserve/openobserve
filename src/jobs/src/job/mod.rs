@@ -35,8 +35,6 @@ mod agent_signals;
 mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
-#[cfg(feature = "enterprise")]
-pub mod alert_grouping;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
@@ -598,7 +596,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     .await?;
 
     #[cfg(feature = "cloud")]
-    tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
+    {
+        openobserve_core::org_domain_ownership::init().await;
+        tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
+        tokio::task::spawn(openobserve_core::org_domain_ownership::watch());
+    }
 
     // check version
     db::metas::version::set()
@@ -692,7 +694,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    #[cfg(feature = "profiling")]
+    #[cfg(feature = "cpu-profiling")]
     tokio::task::spawn(openobserve_core::self_profiles::run());
 
     // telemetry run
@@ -1245,30 +1247,22 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
         o2_enterprise::enterprise::llm_evaluations::providers::register_provider_cost_calculator(
             |org_id, model, input_tokens, output_tokens, timestamp| {
-                use openobserve_core::traces::otel::pricing::{ResolvedPricing, resolve_pricing};
-
                 let entries = db::model_pricing::get_org_pricing_entries(org_id);
-                let resolved = resolve_pricing(&entries, model, Some(timestamp))?;
-                match resolved.pricing {
-                    ResolvedPricing::Definition(definition) => {
-                        let usage = std::collections::HashMap::from([
-                            ("input".to_string(), input_tokens),
-                            ("output".to_string(), output_tokens),
-                        ]);
-                        db::model_pricing::calculate_cost_from_definition(
-                            &definition,
-                            &usage,
-                            Some(timestamp),
-                            &config::meta::model_pricing::PricingContext::default(),
-                        )
-                        .cost
-                        .get("total")
-                        .copied()
-                    }
-                    ResolvedPricing::Compiled(pricing) => {
-                        Some(pricing.cost(input_tokens, output_tokens, Some(timestamp)).2)
-                    }
-                }
+                let resolved =
+                    db::model_pricing::find_pricing_sync_at(&entries, model, Some(timestamp))?;
+                let usage = std::collections::HashMap::from([
+                    ("input".to_string(), input_tokens),
+                    ("output".to_string(), output_tokens),
+                ]);
+                db::model_pricing::calculate_cost_from_definition(
+                    &resolved.definition,
+                    &usage,
+                    Some(timestamp),
+                    &config::meta::model_pricing::PricingContext::default(),
+                )
+                .cost
+                .get("total")
+                .copied()
             },
         );
 
@@ -1413,8 +1407,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(metrics::run());
     let _ = promql::run();
     tokio::task::spawn(scheduler::run());
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(alert_grouping::process_expired_batches());
     tokio::task::spawn(infra::cache::file_downloader::run());
     // Note: Service discovery extraction runs automatically during parquet file processing
     // See src/jobs/src/job/files/parquet.rs:queue_services_from_data_file for

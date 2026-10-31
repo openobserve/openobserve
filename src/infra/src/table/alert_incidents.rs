@@ -17,7 +17,12 @@
 //!
 //! Provides CRUD operations for incidents and incident-alert associations.
 
-use config::meta::alerts::rca_runs::{V1_PREVIOUS_REPORTS_KEY, V1_REPORT_KEY};
+use std::collections::HashMap;
+
+use config::meta::alerts::{
+    incidents::IncidentAlertGroup,
+    rca_runs::{V1_PREVIOUS_REPORTS_KEY, V1_REPORT_KEY},
+};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, RelationTrait, Set, TransactionTrait,
@@ -37,6 +42,15 @@ pub struct AutoResolved {
     pub org_id: String,
     pub incident_id: String,
     pub muted_by_downtime_id: Option<String>,
+}
+
+/// The junction-table truth about one incident's firings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IncidentAlertCounts {
+    /// Every firing; heals the denormalized `alert_count`.
+    pub total: i32,
+    /// Every alert that fired into the incident, most-fired first.
+    pub groups: Vec<IncidentAlertGroup>,
 }
 
 /// The row a new incident starts as. One construction site, so the plain create
@@ -313,7 +327,7 @@ pub async fn update_status(
     update_status_with(get_orm_client_rw().await, org_id, id, status).await
 }
 
-/// [`update_status`] on a given connection; a resolve ends the downtime mute.
+/// [`update_status`] on a given connection; resolve ends the mute, reopen clears resolve and ack.
 pub async fn update_status_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -329,6 +343,10 @@ pub async fn update_status_with<C: ConnectionTrait>(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
 
+    // Like `acknowledge()`, an ack only takes an open incident, so a replica cannot undo a resolve.
+    if status == "acknowledged" && incident.status != "open" {
+        return Ok(incident);
+    }
     let mut active: alert_incidents::ActiveModel = incident.into();
     active.status = Set(status.to_string());
     active.updated_at = Set(now);
@@ -337,6 +355,10 @@ pub async fn update_status_with<C: ConnectionTrait>(
         active.resolved_at = Set(Some(now));
         // A manual reopen must run as a live incident, not stay muted forever.
         active.muted_by_downtime_id = Set(None);
+    } else if status == "open" {
+        active.resolved_at = Set(None);
+        active.acknowledged_by = Set(None);
+        active.acknowledged_at = Set(None);
     }
 
     active
@@ -715,44 +737,66 @@ pub async fn resolved_incidents_for_alert_with<C: ConnectionTrait>(
     Ok(ids.into_iter().filter(|id| resolved.contains(id)).collect())
 }
 
-/// Get actual alert counts for multiple incidents (source of truth)
-///
-/// Returns a HashMap of incident_id -> actual_count from junction table.
-/// Use this to fix denormalized alert_count fields that may be out of sync.
+/// Firing total plus groups ranked by count desc, then name, then id, stable across pages.
+pub fn rank_alert_groups(mut groups: Vec<IncidentAlertGroup>) -> IncidentAlertCounts {
+    let total = groups.iter().map(|g| g.count).sum();
+    groups.sort_by(|a, b| {
+        b.count
+            .cmp(&a.count)
+            .then_with(|| a.alert_name.cmp(&b.alert_name))
+            .then_with(|| a.alert_id.cmp(&b.alert_id))
+    });
+    IncidentAlertCounts { total, groups }
+}
+
+/// Per-incident firing totals and alert groups; incidents with no links are absent.
 pub async fn get_alert_counts(
     incident_ids: &[String],
-) -> Result<std::collections::HashMap<String, i32>, errors::Error> {
-    use sea_orm::FromQueryResult;
-
-    if incident_ids.is_empty() {
-        return Ok(std::collections::HashMap::new());
-    }
-
+) -> Result<HashMap<String, IncidentAlertCounts>, errors::Error> {
     let client = get_orm_client_ro().await;
+    get_alert_counts_with(client, incident_ids).await
+}
 
-    #[derive(Debug, FromQueryResult)]
-    struct CountResult {
-        incident_id: String,
-        count: i64,
+pub async fn get_alert_counts_with<C: ConnectionTrait>(
+    conn: &C,
+    incident_ids: &[String],
+) -> Result<HashMap<String, IncidentAlertCounts>, errors::Error> {
+    if incident_ids.is_empty() {
+        return Ok(HashMap::new());
     }
 
-    let results = alert_incident_alerts::Entity::find()
+    // One grouped scan the PK serves; ranking happens in Rust to stay backend-neutral.
+    let rows: Vec<(String, String, Option<String>, i64)> = alert_incident_alerts::Entity::find()
         .filter(
             alert_incident_alerts::Column::IncidentId
                 .is_in(incident_ids.iter().map(|s| s.as_str())),
         )
         .select_only()
         .column(alert_incident_alerts::Column::IncidentId)
-        .column_as(alert_incident_alerts::Column::IncidentId.count(), "count")
+        .column(alert_incident_alerts::Column::AlertId)
+        .column_as(alert_incident_alerts::Column::AlertName.max(), "alert_name")
+        .column_as(alert_incident_alerts::Column::AlertId.count(), "count")
         .group_by(alert_incident_alerts::Column::IncidentId)
-        .into_model::<CountResult>()
-        .all(client)
+        .group_by(alert_incident_alerts::Column::AlertId)
+        .into_tuple()
+        .all(conn)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    Ok(results
+    let mut by_incident: HashMap<String, Vec<IncidentAlertGroup>> = HashMap::new();
+    for (incident_id, alert_id, alert_name, count) in rows {
+        by_incident
+            .entry(incident_id)
+            .or_default()
+            .push(IncidentAlertGroup {
+                alert_name: alert_name.unwrap_or_else(|| alert_id.clone()),
+                alert_id,
+                count: count as i32,
+            });
+    }
+    Ok(by_incident
         .into_iter()
-        .map(|r| (r.incident_id, r.count as i32))
+        .map(|(id, groups)| (id, rank_alert_groups(groups)))
         .collect())
 }
 
@@ -1209,6 +1253,115 @@ mod tests {
         );
     }
 
+    fn group(name: &str, count: i32) -> IncidentAlertGroup {
+        IncidentAlertGroup {
+            alert_id: format!("id-{name}"),
+            alert_name: name.to_string(),
+            count,
+        }
+    }
+
+    #[test]
+    fn alert_groups_rank_by_count_then_name_and_keep_every_alert() {
+        let ranked = rank_alert_groups(vec![
+            group("c", 1),
+            group("b", 2),
+            group("a", 1),
+            group("z", 9),
+            group("y", 2),
+            group("d", 1),
+            group("e", 1),
+        ]);
+        assert_eq!(ranked.total, 17);
+        assert_eq!(
+            ranked.groups,
+            [
+                group("z", 9),
+                group("b", 2),
+                group("y", 2),
+                group("a", 1),
+                group("c", 1),
+                group("d", 1),
+                group("e", 1)
+            ]
+        );
+    }
+
+    /// An incident with `firings` (alert name, fired_at) links.
+    async fn incident_with_firings(db: &DatabaseConnection, firings: &[(&str, i64)]) -> String {
+        let incident = new_incident(
+            "acme",
+            "P2",
+            serde_json::json!({"service": "payments"}),
+            "service",
+            1,
+            None,
+            None,
+        )
+        .insert(db)
+        .await
+        .unwrap();
+        for &(name, fired_at) in firings {
+            alert_incident_alerts::ActiveModel {
+                incident_id: Set(incident.id.clone()),
+                alert_id: Set(format!("id-{name}")),
+                alert_fired_at: Set(fired_at),
+                alert_name: Set(name.to_string()),
+                alert_kind: Set("alert".to_string()),
+                correlation_reason: Set(None),
+                created_at: Set(fired_at),
+                resolved_at: Set(None),
+            }
+            .insert(db)
+            .await
+            .unwrap();
+        }
+        incident.id
+    }
+
+    #[tokio::test]
+    async fn alert_counts_fold_repeat_firings_into_ranked_groups() {
+        let db = incidents_db().await;
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        let repeat =
+            incident_with_firings(&db, &[("b", 1), ("a", 2), ("b", 3), ("c", 4), ("b", 5)]).await;
+        let seven: Vec<(String, i64)> = ["g", "f", "e", "d", "c", "b", "a"]
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (n.to_string(), i as i64))
+            .chain([("f".to_string(), 10), ("g".to_string(), 11)])
+            .collect();
+        let seven_refs: Vec<(&str, i64)> = seven.iter().map(|(n, t)| (n.as_str(), *t)).collect();
+        let wide = incident_with_firings(&db, &seven_refs).await;
+        let unlinked = incident_with_firings(&db, &[]).await;
+
+        let counts = get_alert_counts_with(&db, &[repeat.clone(), wide.clone(), unlinked.clone()])
+            .await
+            .unwrap();
+
+        let repeat = &counts[&repeat];
+        assert_eq!(repeat.total, 5);
+        assert_eq!(repeat.groups, [group("b", 3), group("a", 1), group("c", 1)]);
+        let wide = &counts[&wide];
+        assert_eq!(wide.total, 9);
+        assert_eq!(
+            wide.groups,
+            [
+                group("f", 2),
+                group("g", 2),
+                group("a", 1),
+                group("b", 1),
+                group("c", 1),
+                group("d", 1),
+                group("e", 1)
+            ]
+        );
+        assert!(!counts.contains_key(&unlinked));
+        assert!(get_alert_counts_with(&db, &[]).await.unwrap().is_empty());
+    }
+
     async fn muted_incident(db: &DatabaseConnection, downtime_id: &str) -> alert_incidents::Model {
         new_incident(
             "acme",
@@ -1312,6 +1465,45 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn a_reopen_clears_the_resolve_and_the_acknowledgement() {
+        let db = incidents_db().await;
+        let mut incident = new_incident(
+            "acme",
+            "P2",
+            serde_json::json!({"service": "payments"}),
+            "service",
+            1,
+            None,
+            None,
+        );
+        incident.status = Set("acknowledged".to_string());
+        incident.acknowledged_by = Set(Some("ana@example.com".to_string()));
+        incident.acknowledged_at = Set(Some(2));
+        let incident = incident.insert(&db).await.unwrap();
+
+        let resolved = update_status_with(&db, "acme", &incident.id, "resolved")
+            .await
+            .unwrap();
+        assert!(resolved.resolved_at.is_some());
+        assert_eq!(resolved.acknowledged_by.as_deref(), Some("ana@example.com"));
+
+        // A replicated ack never clears the resolve; only a reopen does.
+        let acked = update_status_with(&db, "acme", &incident.id, "acknowledged")
+            .await
+            .unwrap();
+        assert_eq!(acked.status, "resolved");
+        assert_eq!(acked.resolved_at, resolved.resolved_at);
+
+        let reopened = update_status_with(&db, "acme", &incident.id, "open")
+            .await
+            .unwrap();
+        assert_eq!(reopened.status, "open");
+        assert_eq!(reopened.resolved_at, None);
+        assert_eq!(reopened.acknowledged_by, None);
+        assert_eq!(reopened.acknowledged_at, None);
     }
 
     #[tokio::test]

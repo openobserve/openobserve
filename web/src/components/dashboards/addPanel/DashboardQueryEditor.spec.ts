@@ -435,6 +435,22 @@ describe("DashboardQueryEditor", () => {
       expect(wrapper.vm.dashboardPanelData.data.queries.length).toBe(2);
     });
 
+    it("warns that a box plot draws only query 1 once a second query exists", async () => {
+      wrapper = createWrapper();
+      const panelData = wrapper.vm.dashboardPanelData.data;
+      const previousType = panelData.type;
+      panelData.type = "boxplot";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.multiQueryWarning).toBeNull();
+
+      // The mocked addQuery pushes onto the raw object, which computed values never see.
+      panelData.queries.push({ query: "", queryType: "sql", customQuery: true });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.multiQueryWarning).toContain("Box plot");
+      panelData.queries.pop();
+      panelData.type = previousType;
+    });
+
     it("should handle query index changes", async () => {
       wrapper = createWrapper();
 

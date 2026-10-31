@@ -19,6 +19,7 @@ const SECTION_DEFS = [
   { id: "legend", icon: "format-list-bulleted" },
   { id: "data", icon: "data-object" },
   { id: "stateTimeline", icon: "timeline" },
+  { id: "hostmap", icon: "grid-on" },
   { id: "axis", icon: "analytics" },
   { id: "labels", icon: "label" },
   { id: "lineStyle", icon: "show-chart" },
@@ -29,14 +30,19 @@ const SECTION_DEFS = [
   { id: "seriesOverrides", icon: "tune" },
   { id: "map", icon: "location-on" },
   { id: "gauge", icon: "speed" },
+  { id: "pie", icon: "data-usage" },
   { id: "layout", icon: "dashboard" },
   { id: "colors", icon: "palette" },
   { id: "drilldown", icon: "ads-click" },
   { id: "comparison", icon: "compare-arrows" },
   { id: "markLines", icon: "timeline" },
   { id: "thresholds", icon: "rule" },
+  { id: "metric", icon: "trending-up" },
   { id: "background", icon: "color-lens" },
   { id: "sparkline", icon: "show-chart" },
+  { id: "alertList", icon: "notifications" },
+  { id: "flameGraph", icon: "local-fire-department" },
+  { id: "logs", icon: "article" },
 ] as const satisfies ReadonlyArray<SectionDef>;
 
 export type SectionId = (typeof SECTION_DEFS)[number]["id"];

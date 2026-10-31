@@ -1,6 +1,6 @@
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -41,12 +41,14 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 import AppRoles from "@/components/iam/roles/AppRoles.vue";
 import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers, updateRole } from "@/services/iam";
 import users from "@/services/users";
+import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
+import { clickIn } from "@/test/unit/helpers/draftDom";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app-roles-test");
 document.body.appendChild(node);
 
-async function mountAppRoles() {
+async function mountAppRoles({ realConfirm = false } = {}) {
   const wrapper = mount(AppRoles, {
     attachTo: node,
     global: {
@@ -58,11 +60,21 @@ async function mountAppRoles() {
           template: `<div data-test="iam-roles-table-section"><slot name="actions" v-bind="{column:{row:rows&&rows[0]?rows[0]:{role_name:'Admin'}}}"/><slot name="bottom-actions"/></div>`,
         },
         AddRole: { template: '<div data-test="add-role-stub" />' },
-        ConfirmDialog: {
-          props: ["modelValue", "title", "message"],
-          emits: ["update:ok", "update:cancel", "update:modelValue"],
-          template: '<div data-test="confirm-dialog-stub"></div>',
-        },
+        ConfirmDialog: realConfirm
+          ? false
+          : {
+              name: "ConfirmDialog",
+              props: [
+                "modelValue",
+                "title",
+                "message",
+                "messageKeypath",
+                "messageName",
+                "okVariant",
+              ],
+              emits: ["update:ok", "update:cancel", "update:modelValue"],
+              template: '<div data-test="confirm-dialog-stub"></div>',
+            },
       },
     },
   });
@@ -298,6 +310,16 @@ describe("AppRoles - showConfirmDialog", () => {
     expect((wrapper.vm as any).deleteConformDialog.data).toEqual(row);
   });
 
+  it("names the role and uses a destructive OK button", async () => {
+    const wrapper = await mountAppRoles();
+    (wrapper.vm as any).showConfirmDialog({ role_name: "Viewer" });
+    await flushPromises();
+    const dialog = wrapper.findAllComponents({ name: "ConfirmDialog" })[0];
+    expect(dialog.props("messageKeypath")).toBe("iam.appRoles.deleteConfirm");
+    expect(dialog.props("messageName")).toBe("Viewer");
+    expect(dialog.props("okVariant")).toBe("destructive");
+  });
+
   it("builds a blast-radius warning with the live user count", async () => {
     const wrapper = await mountAppRoles();
     await (wrapper.vm as any).showConfirmDialog({ role_name: "Admin" });
@@ -373,6 +395,10 @@ describe("AppRoles - openBulkDeleteDialog", () => {
     const wrapper = await mountAppRoles();
     (wrapper.vm as any).openBulkDeleteDialog();
     expect((wrapper.vm as any).confirmBulkDelete).toBe(true);
+    const dialog = wrapper
+      .findAllComponents({ name: "ConfirmDialog" })
+      .find((c: any) => c.props("title") === i18n.global.t("iam.appRoles.bulkDeleteRoles"));
+    expect(dialog!.props("okVariant")).toBe("destructive");
   });
 });
 
@@ -685,5 +711,68 @@ describe("list view state", () => {
       sortBy: "role_name",
       sortOrder: "desc",
     });
+  });
+});
+
+describe("AppRoles - editor drafts", () => {
+  const draftOf = (entityId: string) => ({
+    kind: "iam_role" as const,
+    org: store.state.selectedOrganization.identifier,
+    entityId,
+    userEmail: store.state.userInfo.email,
+  });
+
+  beforeEach(() => localStorage.clear());
+
+  it("dots the row of a role with an unsaved draft, and only that row", async () => {
+    writeEditorDraft(draftOf("Viewer"), { data: { added: [] } });
+    const wrapper = await mountAppRoles();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="iam-roles-Viewer-draft-dot"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="iam-roles-Admin-draft-dot"]').exists()).toBe(false);
+  });
+
+  const deleteFromRow = async (wrapper: VueWrapper, role: string) => {
+    await wrapper.get(`[data-test="iam-roles-delete-${role}-role-icon"]`).trigger("click");
+    await flushPromises();
+    clickIn("confirm-dialog", "o-dialog-primary-btn");
+    await flushPromises();
+  };
+
+  it("drops a deleted role's draft", async () => {
+    writeEditorDraft(draftOf("Admin"), { data: { added: [] } });
+    const wrapper = await mountAppRoles({ realConfirm: true });
+    await deleteFromRow(wrapper, "Admin");
+
+    expect(deleteRole).toHaveBeenCalledTimes(1);
+    expect(readEditorDraft(draftOf("Admin"))).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("drops the drafts of the roles a bulk delete removed, and keeps the rest", async () => {
+    writeEditorDraft(draftOf("Admin"), { data: { added: [] } });
+    writeEditorDraft(draftOf("Editor"), { data: { added: [] } });
+    const wrapper = await mountAppRoles();
+    const vm = wrapper.vm as unknown as {
+      selectedRoleNames: string[];
+      bulkDeleteUserRoles: () => Promise<void>;
+    };
+    vm.selectedRoleNames = ["Admin", "Viewer"];
+    await vm.bulkDeleteUserRoles();
+
+    expect(readEditorDraft(draftOf("Admin"))).toBeNull();
+    expect(readEditorDraft(draftOf("Editor"))).not.toBeNull();
+  });
+
+  it("keeps the draft when the delete fails", async () => {
+    writeEditorDraft(draftOf("Admin"), { data: { added: [] } });
+    vi.mocked(deleteRole).mockRejectedValueOnce({ response: { status: 500 } });
+    const wrapper = await mountAppRoles({ realConfirm: true });
+    await deleteFromRow(wrapper, "Admin");
+
+    expect(deleteRole).toHaveBeenCalledTimes(1);
+    expect(readEditorDraft(draftOf("Admin"))).not.toBeNull();
+    wrapper.unmount();
   });
 });

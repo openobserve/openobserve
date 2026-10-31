@@ -39,6 +39,7 @@ import CreateAlertFromSourceDialogPage from "./alertsPages/createAlertFromSource
 import { AlertLibraryPage } from "./alertsPages/alertLibraryPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
+import { AlertAckPage } from "./alertsPages/alertAckPage.js";
 import { AlertSaveQueryModePage } from "./alertsPages/alertSaveQueryModePage.js";
 import { AlertNoDestinationPage } from "./alertsPages/alertNoDestinationPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
@@ -86,6 +87,7 @@ import { MetricsExplorerPage } from "./metricsPages/metricsExplorerPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
+import { ProfilesPage } from "./profilesPages/profilesPage.js";
 import { DatabaseMonitoringPage } from "./dbmPages/databaseMonitoringPage.js";
 import { RumPage } from "./rumPages/rumPage.js";
 import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
@@ -223,6 +225,7 @@ class PageManager {
     this.alertLibraryPage = new AlertLibraryPage(page);
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
+    this.alertAckPage = new AlertAckPage(page);
     this.alertSaveQueryModePage = new AlertSaveQueryModePage(page);
     this.alertNoDestinationPage = new AlertNoDestinationPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
@@ -283,6 +286,7 @@ class PageManager {
     this.tracesPage = new TracesPage(page);
     this.serviceGraphPage = new ServiceGraphPage(page);
     this.servicesCatalogPage = new ServicesCatalogPage(page);
+    this.profilesPage = new ProfilesPage(page);
     this.databaseMonitoringPage = new DatabaseMonitoringPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);

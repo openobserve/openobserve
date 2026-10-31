@@ -278,6 +278,32 @@ describe("usePanelDrilldown", () => {
     expect(deps.drilldownPopUpRef.value.style.left).toContain("px");
   });
 
+  it("hides the chart tooltip when the drilldown menu opens, and only then", async () => {
+    const hideChartTooltip = vi.fn();
+    const deps: any = { ...makeDeps(), hideChartTooltip };
+    const api = usePanelDrilldown(deps);
+    await api.onChartClick({
+      componentType: "series",
+      seriesType: "funnel",
+      event: { offsetX: 40, offsetY: 50 },
+      dataIndex: 0,
+      name: "visit",
+      value: 200,
+    });
+    expect(deps.drilldownPopUpRef.value.style.display).toBe("block");
+    expect(hideChartTooltip).toHaveBeenCalledTimes(1);
+
+    const plain: any = { ...makeDeps(), hideChartTooltip: vi.fn() };
+    plain.panelSchema.value.config.drilldown = [];
+    plain.store.state.zoConfig.enable_cross_linking = false;
+    await usePanelDrilldown(plain).onChartClick({
+      componentType: "series",
+      event: { offsetX: 1, offsetY: 1 },
+      name: "visit",
+    });
+    expect(plain.hideChartTooltip).not.toHaveBeenCalled();
+  });
+
   it("resolves variables sharing a name prefix in a custom Logs drilldown query", async () => {
     const deps = makeDeps();
     deps.panelSchema.value.config.drilldown = [
@@ -688,6 +714,88 @@ describe("usePanelDrilldown", () => {
               from: "1000000",
               to: "61000000",
               query: expect.stringContaining("gpu = 'gpu0'"),
+            }),
+          }),
+        ),
+      );
+    });
+  });
+
+  describe("host map cell", () => {
+    const cellClick = {
+      componentType: "series",
+      seriesIndex: 0,
+      dataIndex: 3,
+      event: { offsetX: 40, offsetY: 50 },
+      value: [3],
+      data: {
+        name: "gpu3",
+        groups: ["rack-1", "host-7"],
+        cellValue: 91.5,
+        labels: { gpu: "gpu3", rack: "rack-1", host: "host-7" },
+      },
+    };
+    const hostmapDeps = () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "hostmap";
+      deps.panelSchema.value.queries[0].fields.x = [{ alias: "x_axis_1", column: "gpu" }] as any;
+      deps.panelSchema.value.queries[0].fields.breakdown = [
+        { alias: "breakdown_1", column: "rack" },
+        { alias: "breakdown_2", column: "host" },
+      ] as any;
+      return deps;
+    };
+
+    it("passes the cell's name, value, group and labels to a URL drilldown", async () => {
+      const deps = hostmapDeps();
+      deps.panelSchema.value.config.drilldown = [
+        {
+          name: "Open",
+          type: "byUrl",
+          targetBlank: true,
+          data: {
+            url: "https://example.com/?e=${series.__name}&v=${series.__value}&g=${series.__group}&host=${series.labels.host}",
+          },
+        },
+      ] as any;
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(cellClick);
+      expect(deps.drilldownPopUpRef.value.style.display).toBe("block");
+      await api.openDrilldown(0);
+
+      expect(open).toHaveBeenCalledWith(
+        "https://example.com/?e=gpu3&v=91.5&g=rack-1/host-7&host=host-7",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      open.mockRestore();
+    });
+
+    it("opens nothing for a click on a group header", async () => {
+      const deps = hostmapDeps();
+      const api = usePanelDrilldown(deps as any);
+      await api.onChartClick({ ...cellClick, seriesIndex: 1, data: { value: [0] } });
+      expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
+    });
+
+    it("scopes an auto Logs drilldown to the entity over the whole panel range", async () => {
+      const deps = hostmapDeps();
+      deps.panelSchema.value.config.drilldown = [
+        { name: "Logs", type: "logs", targetBlank: false, data: { logsMode: "auto" } },
+      ] as any;
+      const api = usePanelDrilldown(deps as any);
+
+      await api.onChartClick(cellClick);
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() =>
+        expect(deps.router.push).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({
+              from: String(new Date("2026-03-18T00:00:00Z").getTime()),
+              query: expect.stringContaining("gpu = 'gpu3'"),
             }),
           }),
         ),

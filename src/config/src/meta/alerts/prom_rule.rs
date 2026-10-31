@@ -18,7 +18,7 @@ use std::collections::{HashMap, HashSet};
 use super::{
     grouping::{
         GroupClassification, GroupPageCompleteness, GroupPlan, group_key, render_labels,
-        resolve_group_update,
+        resolve_group_update, step_group_episode,
     },
     level::AlertLevel,
     state::{AlertState, ROLLUP_GROUP_KEY, StateUpdate, apply_outcome},
@@ -32,17 +32,16 @@ pub fn plan_rule_updates(
     previous: &HashMap<String, AlertState>,
     at: i64,
     pending_sec: i64,
+    keep_firing_for_secs: i64,
 ) -> GroupPlan {
     if classification.page.completeness() != GroupPageCompleteness::Complete {
-        return GroupPlan {
-            updates: vec![],
-            evicted: vec![],
-        };
+        return GroupPlan::default();
     }
     let interrupted = previous
         .get(ROLLUP_GROUP_KEY)
         .is_some_and(|s| matches!(s.last_outcome, Some(RunOutcome::Error)));
     let mut updates = Vec::new();
+    let mut closed_episodes = Vec::new();
     let mut retained = HashSet::new();
     let mut firing = 0usize;
     for group in &classification.groups {
@@ -71,6 +70,9 @@ pub fn plan_rule_updates(
         );
         if let Some(s) = update.state.as_mut() {
             s.group_labels = Some(render_labels(&group.labels));
+            s.group_label_set = Some(group.labels.clone());
+            // A returned series ends any hold, so a later absence starts a fresh one.
+            step_group_episode(s, prev, true, keep_firing_for_secs, at, None);
         }
         if let Some(t) = update.transition.as_mut() {
             t.group_labels = Some(render_labels(&group.labels));
@@ -78,10 +80,29 @@ pub fn plan_rule_updates(
         }
         updates.push(update);
     }
-    for (key, prev) in previous {
-        if key != ROLLUP_GROUP_KEY && !retained.contains(key) {
-            updates.push(resolve_group_update(alert_id, key, prev, at));
+    let mut absent: Vec<_> = previous
+        .iter()
+        .filter(|(key, _)| key.as_str() != ROLLUP_GROUP_KEY && !retained.contains(*key))
+        .collect();
+    absent.sort_by_key(|(key, _)| *key);
+    for (key, prev) in absent {
+        let mut update = resolve_group_update(alert_id, key, prev, at);
+        // A resolved row is never resolved again, so its hold is re-checked on every evaluation.
+        if prev.episode_id.is_some() {
+            let mut state = update.state.clone().unwrap_or_else(|| prev.clone());
+            closed_episodes.extend(step_group_episode(
+                &mut state,
+                Some(prev),
+                false,
+                keep_firing_for_secs,
+                at,
+                None,
+            ));
+            if update.state.is_some() || state != *prev {
+                update.state = Some(state);
+            }
         }
+        updates.push(update);
     }
     let outcome = if classification.groups.is_empty() {
         RunOutcome::Normal
@@ -104,6 +125,7 @@ pub fn plan_rule_updates(
         at,
     );
     if let Some(s) = rollup.state.as_mut() {
+        close_cycle_on_pending(s);
         s.groups_observed = Some(classification.groups.len());
         s.groups_firing = Some(firing);
         s.groups_observed_is_lower_bound = Some(false);
@@ -112,7 +134,8 @@ pub fn plan_rule_updates(
     updates.push(rollup);
     GroupPlan {
         updates,
-        evicted: vec![],
+        closed_episodes,
+        ..Default::default()
     }
 }
 
@@ -126,10 +149,20 @@ pub fn apply_rule_rollup_outcome(
     value: Option<&str>,
 ) -> StateUpdate {
     let mut update = apply_outcome(alert_id, ROLLUP_GROUP_KEY, previous, outcome, level, at);
+    if let Some(state) = update.state.as_mut() {
+        close_cycle_on_pending(state);
+    }
     if let Some(transition) = update.transition.as_mut() {
         transition.rule_value = value.map(str::to_string);
     }
     update
+}
+
+/// Firing → Pending without passing Normal still ends the firing cycle (R-116).
+fn close_cycle_on_pending(rollup: &mut AlertState) {
+    if rollup.last_outcome == Some(RunOutcome::Pending) {
+        rollup.firing_started_at = None;
+    }
 }
 
 fn rule_outcome(previous: Option<&AlertState>, at: i64, pending_sec: i64) -> RunOutcome {
@@ -193,6 +226,7 @@ mod tests {
             previous,
             sec * 1_000_000,
             pending,
+            0,
         );
         for u in &plan.updates {
             if let Some(s) = &u.state {
@@ -272,7 +306,7 @@ mod tests {
             filled: true,
             reached_healthy: false,
         };
-        let plan = plan_rule_updates("rule", &incomplete, &previous, 600_000_000, 0);
+        let plan = plan_rule_updates("rule", &incomplete, &previous, 600_000_000, 0, 0);
         assert!(plan.updates.is_empty());
         assert_eq!(state(&previous, "a").last_outcome, Some(RunOutcome::Firing));
     }
@@ -290,5 +324,128 @@ mod tests {
             .unwrap();
         assert_eq!(t.rule_value.as_deref(), Some("+Inf"));
         assert_eq!(t.value, None);
+    }
+
+    /// AC-P2.1.4
+    #[test]
+    fn a_rollup_that_falls_back_to_pending_closes_its_firing_cycle() {
+        let mut previous = HashMap::new();
+        run(&mut previous, &["a"], 0, 240);
+        run(&mut previous, &["a"], 240, 240);
+        let fired = Some(240_000_000);
+        assert_eq!(previous[ROLLUP_GROUP_KEY].firing_started_at, fired);
+        assert_eq!(state(&previous, "a").firing_started_at, fired);
+
+        // "a" vanished and "b" is still pending: groups exist, none fires.
+        run(&mut previous, &["b"], 300, 240);
+        assert_eq!(
+            previous[ROLLUP_GROUP_KEY].last_outcome,
+            Some(RunOutcome::Pending)
+        );
+        assert_eq!(previous[ROLLUP_GROUP_KEY].firing_started_at, None);
+        assert_eq!(state(&previous, "a").firing_started_at, None);
+        assert_eq!(state(&previous, "b").firing_started_at, None);
+    }
+
+    #[test]
+    fn the_single_row_rule_rollup_also_closes_on_pending() {
+        let fired = apply_rule_rollup_outcome(
+            "rule",
+            None,
+            RunOutcome::Firing,
+            Some(AlertLevel::Critical),
+            100,
+            None,
+        )
+        .state
+        .unwrap();
+        assert_eq!(fired.firing_started_at, Some(100));
+        let pending = apply_rule_rollup_outcome(
+            "rule",
+            Some(&fired),
+            RunOutcome::Pending,
+            Some(AlertLevel::Critical),
+            200,
+            None,
+        )
+        .state
+        .unwrap();
+        assert_eq!(pending.firing_started_at, None);
+    }
+
+    fn run_held(previous: &mut HashMap<String, AlertState>, hosts: &[&str], sec: i64) -> GroupPlan {
+        let plan = plan_rule_updates(
+            "rule",
+            &classification(hosts),
+            previous,
+            sec * 1_000_000,
+            0,
+            60,
+        );
+        for close in &plan.closed_episodes {
+            let row = previous.get_mut(&close.group_key).unwrap();
+            row.episode_id = None;
+            row.recovering_since = None;
+        }
+        for u in &plan.updates {
+            if let Some(s) = &u.state {
+                let episode = previous
+                    .get(&s.group_key)
+                    .and_then(|p| p.episode_id.clone());
+                let mut next = s.clone();
+                if s.group_key != ROLLUP_GROUP_KEY {
+                    next.episode_id = episode;
+                }
+                previous.insert(s.group_key.clone(), next);
+            }
+        }
+        plan
+    }
+
+    #[test]
+    fn a_returned_series_ends_the_hold_and_the_next_absence_starts_a_fresh_one() {
+        let mut previous = HashMap::new();
+        run_held(&mut previous, &["a"], 0);
+        let k = group_key(&std::collections::BTreeMap::from([(
+            "host".into(),
+            "a".into(),
+        )]));
+        previous.get_mut(&k).unwrap().episode_id = Some("ep".into());
+
+        assert!(run_held(&mut previous, &[], 10).closed_episodes.is_empty());
+        assert_eq!(state(&previous, "a").recovering_since, Some(10_000_000));
+        run_held(&mut previous, &["a"], 40);
+        assert!(state(&previous, "a").recovering_since.is_none());
+        assert_eq!(state(&previous, "a").episode_id.as_deref(), Some("ep"));
+
+        for sec in [80, 100, 139] {
+            assert!(run_held(&mut previous, &[], sec).closed_episodes.is_empty());
+        }
+        let plan = run_held(&mut previous, &[], 140);
+        assert_eq!(plan.closed_episodes.len(), 1);
+        let close = &plan.closed_episodes[0];
+        assert_eq!(close.recovered_at, 80_000_000);
+        assert_eq!(
+            close.reason,
+            crate::meta::alerts::recovery::RecoveryReason::Cleared
+        );
+        assert_eq!(close.labels.get("host").map(String::as_str), Some("a"));
+        assert!(run_held(&mut previous, &[], 200).closed_episodes.is_empty());
+    }
+
+    #[test]
+    fn a_truncated_page_closes_nothing() {
+        let mut previous = HashMap::new();
+        run(&mut previous, &["a"], 0, 0);
+        for s in previous.values_mut() {
+            s.episode_id = Some("ep".into());
+        }
+        let mut incomplete = classification(&[]);
+        incomplete.page = FetchPage {
+            filled: true,
+            reached_healthy: false,
+        };
+        let plan = plan_rule_updates("rule", &incomplete, &previous, 600_000_000, 0, 0);
+        assert!(plan.closed_episodes.is_empty());
     }
 }

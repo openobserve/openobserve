@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       show-report-column
       show-cached-tile
       :running="running"
+      :report-folders="reportFolders"
       @run-now="openRunNow"
     >
       <template #toolbar-start>
@@ -47,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="runNowOpen"
       :report-id="runNowTarget.id"
       :report-name="runNowTarget.name"
+      :folder-id="reportFolders[runNowTarget.id]"
       @update:running="running = $event"
       @ran="historyRef?.afterManualRun()"
     />
@@ -82,6 +84,15 @@ const reportList = useQuery(() =>
 
 const reportOptions = computed(() =>
   (reportList.data.value ?? []).map((r: any) => ({ label: raw(r.name), value: r.report_id })),
+);
+
+const reportFolders = computed<Record<string, string>>(() =>
+  Object.fromEntries(
+    (reportList.data.value ?? []).map((r: { report_id: string; folder_id?: string }) => [
+      r.report_id,
+      r.folder_id ?? "",
+    ]),
+  ),
 );
 
 /** The report filter lives in the URL so the org-wide view can be shared filtered. */

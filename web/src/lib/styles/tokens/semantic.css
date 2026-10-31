@@ -17,11 +17,10 @@
   --color-text-secondary: var(--color-grey-500); /* supporting text, descriptions, captions */
   --color-text-label: var(--color-grey-400); /* form labels, metadata, badges */
   --color-text-muted: var(--color-grey-300); /* disabled, placeholder, de-emphasized */
-  /* label / disabled / placeholder (+ border-strong, scrollbar-thumb-hover) are
-     intentionally equal for now: all route through the grey-400 primitive so any one
-     can diverge later. Distinct intents kept as distinct tokens on purpose, NOT aliases. */
+  /* label, disabled, border-strong and scrollbar-thumb-hover share grey-400 but stay separate tokens so each can diverge. */
   --color-text-disabled: var(--color-grey-400);
-  --color-text-placeholder: var(--color-grey-400);
+  /* grey-500, not grey-400: placeholder text must clear 4.5:1 on white. */
+  --color-text-placeholder: var(--color-grey-500);
   --color-text-soft: rgba(0, 0, 0, 0.75); /* black at 75% — readable but not harsh */
   --color-text-link: var(--color-primary-600); /* clickable links */
   --color-text-link-hover: var(--color-primary-700); /* link hover state */
@@ -188,6 +187,19 @@
   --color-focus-ring-danger: var(--color-error-500);
   --color-focus-ring-success: var(--color-success-600);
   --color-focus-ring-warning: var(--color-warning-700);
+
+  /* Motion: hover tints land instantly and fade out, so a moving pointer never trails a lagging highlight. */
+  --duration-hover-in: 0ms;
+  --duration-hover-out: 150ms;
+  --duration-overlay-in: 140ms;
+  --duration-overlay-out: 100ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Floating menus and popovers: the 1px ring lives in the shadow; dark values in dark.css. */
+  /* eslint-disable local/no-hardcoded-px -- optical shadow geometry, not layout */
+  --shadow-overlay:
+    0 0 0 1px #00000014, 0 1px 1px #00000005, 0 4px 8px -4px #0000000a, 0 16px 24px -8px #0000000f;
+  /* eslint-enable local/no-hardcoded-px */
 }
 
 /* ── Register ALL semantic tokens for Tailwind utilities ── */
@@ -405,6 +417,7 @@
   --shadow-scroll-both:
     inset 0 8px 6px -6px var(--shadow-scroll-c), inset 0 -8px 6px -6px var(--shadow-scroll-c);
   --shadow-glow: 0 0 4px var(--shadow-glow-c);
+  --shadow-overlay: var(--shadow-overlay);
   /* Directional / inset roles — not points on the elevation scale, so they
      cannot be expressed as one. */
   --shadow-sticky-left-geom: 2px 0 4px -2px;
@@ -503,8 +516,8 @@
   --color-status-error-text: #cc3645;
   --color-status-error-bg: #fff7f7;
   /* Nudged from #208a3c (4.41:1) to clear 4.5:1 for its several genuine
-     plain-text uses (QualityRunsTable.vue, AppSessions.vue, MonitorRuns.vue
-     KPI values) — imperceptibly darker. */
+     plain-text uses (AppSessions.vue, MonitorRuns.vue KPI values) — imperceptibly
+     darker. */
   --color-status-success-text: #20883b;
   --color-status-success-bg: #f2fcf3;
 }

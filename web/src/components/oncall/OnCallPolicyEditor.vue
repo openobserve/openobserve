@@ -10,6 +10,7 @@
     :sub-title="t('oncall.policyHint')"
     bleed
     data-test="oncall-policy-editor"
+    :close-guard="guardClose"
     @update:open="(v: boolean) => emit('update:open', v)"
   >
     <!-- `bleed` because the chip bar spans the full width and supplies its own
@@ -497,35 +498,24 @@
                 </span>
                 <OTag
                   v-if="teamChannel"
-                  :variant="teamChannel.source === 'team' ? 'primary-soft' : 'default-soft'"
+                  :variant="channelFromTeam ? 'primary-soft' : 'default-soft'"
                   size="xs"
                   data-test="oncall-team-channel-source"
                 >
                   {{
-                    teamChannel.source === "team"
+                    channelFromTeam
                       ? t("oncall.teamChannelFromTeam")
                       : t("oncall.teamChannelFromPolicy")
                   }}
                 </OTag>
-                <OButton
-                  variant="outline"
-                  size="sm-action"
-                  :loading="savingChannel"
-                  :disabled="!teamChannelDirty"
-                  data-test="oncall-team-channel-save"
-                  @click="saveTeamChannel(teamChannelDraft)"
-                >
-                  {{ t("oncall.teamChannelSave") }}
-                </OButton>
                 <!-- Clearing is its own verb because null and [] are different
                        facts on the wire: back-to-policy versus silence-on-purpose. -->
                 <OButton
-                  v-if="teamChannel?.source === 'team'"
+                  v-if="channelFromTeam"
                   variant="ghost"
                   size="sm-action"
-                  :loading="savingChannel"
                   data-test="oncall-team-channel-clear"
-                  @click="saveTeamChannel(null)"
+                  @click="usePolicyChannel"
                 >
                   {{ t("oncall.teamChannelUsePolicy") }}
                 </OButton>
@@ -533,8 +523,9 @@
                        HTTP destination, which cannot edit what it already sent. Said
                        here so nobody designs an expectation the engine cannot meet. -->
                 <OText variant="meta">{{ t("oncall.teamChannelHint") }}</OText>
+                <!-- Only the team's own empty list is a choice; an empty list inherited from the policy is the policy's. -->
                 <span
-                  v-if="teamChannel && !teamChannel.destinations.length"
+                  v-if="channelFromTeam && !teamChannelDraft.length"
                   class="text-status-warning-text text-xs"
                   data-test="oncall-team-channel-silent"
                 >
@@ -552,7 +543,7 @@
               <OText variant="meta">{{ t("oncall.l0Hint") }}</OText>
 
               <OnCallL0Editor
-                :l0="props.policy?.l0 ?? null"
+                :l0="l0Draft ?? props.policy?.l0 ?? null"
                 @update:l0="onL0Update"
                 @update:valid="(v: boolean) => (l0Valid = v)"
               />
@@ -586,6 +577,7 @@
         </span>
       </div>
     </template>
+    <EditorDraftDialogs :draft="policyDraft" />
   </ODrawer>
 </template>
 
@@ -595,6 +587,9 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallL0Editor from "@/components/oncall/OnCallL0Editor.vue";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import { stableStringify } from "@/utils/drafts/editorDraftStore";
 import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -610,6 +605,7 @@ import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { destinationsQuery } from "@/services/alert_destination.queries";
+import { isSlackAppDestination } from "@/utils/slackAppDestination";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import { queryClient } from "@/composables/query/queryClient";
@@ -667,9 +663,19 @@ const props = withDefaults(
 );
 const emit = defineEmits<{
   saved: [];
+  /** The policy was written but the drawer stays open, so the page behind it should re-read the ladder. */
+  "policy-written": [];
   "update:open": [boolean];
   "open-members": [];
 }>();
+
+interface PolicyDraftData {
+  rungs: PriorityRung[];
+  destinations: string[];
+  repeatCount: number;
+  finalAction: PolicyFinalAction;
+  l0: L0Policy | null;
+}
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -751,13 +757,30 @@ const saveChannelWrite = useMutation(() => setTeamChannelMutation(orgId.value, p
 /// The team's room, read whole with its provenance.
 const teamChannel = ref<TeamChannel | null>(null);
 const teamChannelDraft = ref<string[]>([]);
-const savingChannel = ref(false);
+/// "Use the policy's list" pressed: Save sends `null`, which is a different fact from an empty list.
+const channelBackToPolicy = ref(false);
 
-const teamChannelDirty = computed(
-  () =>
-    JSON.stringify([...teamChannelDraft.value].sort()) !==
-    JSON.stringify([...(teamChannel.value?.destinations ?? [])].sort()),
+/// Whether the draft is the team's own list, as Save would leave it.
+const channelFromTeam = computed(
+  () => teamChannel.value?.source === "team" && !channelBackToPolicy.value,
 );
+
+const teamChannelDirty = computed(() =>
+  channelBackToPolicy.value
+    ? teamChannel.value?.source === "team"
+    : JSON.stringify([...teamChannelDraft.value].sort()) !==
+      JSON.stringify([...(teamChannel.value?.destinations ?? [])].sort()),
+);
+
+// Picking a destination after "Use the policy's list" makes the list the team's own again.
+watch(teamChannelDraft, (draft) => {
+  if (draft.length) channelBackToPolicy.value = false;
+});
+
+function usePolicyChannel() {
+  teamChannelDraft.value = [];
+  channelBackToPolicy.value = true;
+}
 
 // Uncached read-modify-write: a stale entry would seed the draft and be saved back.
 async function fetchTeamChannel() {
@@ -768,27 +791,27 @@ async function fetchTeamChannel() {
     });
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
+    channelBackToPolicy.value = false;
   } catch {
     teamChannel.value = null;
   }
 }
 
-/// `null` clears the override; an array (even empty) is the team's own list.
-async function saveTeamChannel(destinations: string[] | null) {
-  savingChannel.value = true;
+/// The channel after the policy, only if it changed; false keeps the drawer open so Save retries it.
+async function saveChannelAfterPolicy(): Promise<boolean> {
+  if (!teamChannelDirty.value) return true;
   try {
-    const res = await saveChannelWrite.mutateAsync(destinations);
-    // The drawer stays open on this answer, and an invalidation cannot repaint a ref.
+    const res = await saveChannelWrite.mutateAsync(
+      channelBackToPolicy.value ? null : teamChannelDraft.value,
+    );
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
-    toast({ variant: "success", message: t("oncall.teamChannelSaved") });
+    channelBackToPolicy.value = false;
+    return true;
   } catch (err: any) {
-    toast({
-      variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.teamChannelSaveFailed"),
-    });
-  } finally {
-    savingChannel.value = false;
+    noteConfigurationDenied(err);
+    toast({ variant: "error", message: t("oncall.teamChannelNotSavedAfterPolicy") });
+    return false;
   }
 }
 
@@ -1064,7 +1087,66 @@ function reset() {
   l0Touched.value = false;
 }
 
-watch(() => props.policy, reset, { immediate: true });
+/// The team's room is its own resource with its own Save, so it stays out of the draft.
+const policyContent = (): PolicyDraftData => ({
+  rungs: draft.value,
+  destinations: destinations.value,
+  repeatCount: repeatCount.value,
+  finalAction: finalAction.value,
+  l0: l0Touched.value ? l0Draft.value : null,
+});
+
+/// What the drawer opened on, so switching priority or tab is never an unsaved change.
+let contentAtOpen = "";
+const markOpened = () => {
+  contentAtOpen = stableStringify(policyContent());
+};
+
+function applyPolicyDraft(data: PolicyDraftData) {
+  draft.value = data.rungs;
+  destinations.value = data.destinations;
+  repeatCount.value = data.repeatCount;
+  finalAction.value = data.finalAction;
+  l0Draft.value = data.l0;
+  l0Touched.value = data.l0 !== null;
+  pendingUserStep.value = null;
+  pendingRotation.value = null;
+  if (!draft.value.some((rung) => rung.priority === selected.value)) {
+    selected.value = draft.value[0]?.priority ?? selected.value;
+  }
+}
+
+const policyDraft = useEditorDraft<PolicyDraftData>({
+  kind: "oncall_policy",
+  entityLabel: () => t("common.editorDraft.entities.oncall_policy"),
+  // One policy per team, and a team with no policy yet has no policy id to key on.
+  entityId: () => props.teamId,
+  snapshot: policyContent,
+  apply: applyPolicyDraft,
+  base: () => ({
+    rungs: props.policy?.rungs ?? [],
+    destinations: props.policy?.destinations ?? [],
+    repeat_count: props.policy?.repeat_count ?? 1,
+    final_action: props.policy?.final_action ?? "stop",
+    l0: props.policy?.l0 ?? null,
+  }),
+  hasChanges: () => !!props.open && stableStringify(policyContent()) !== contentAtOpen,
+  save: () => save(),
+});
+
+function startPolicyDraft() {
+  markOpened();
+  void policyDraft.start();
+}
+
+watch(
+  () => props.policy,
+  () => {
+    reset();
+    markOpened();
+  },
+  { immediate: true },
+);
 
 /// The drawer keeps this component mounted between visits, so a discarded edit
 /// would still be sitting in `draft` the next time it opens — and nothing the
@@ -1089,18 +1171,28 @@ watch(
     fetchTeamChannel();
     fetchMembers();
     fetchOnCallNow();
+    startPolicyDraft();
   },
   { immediate: true },
 );
 
-function cancel() {
+async function cancel() {
+  if (!(await policyDraft.confirmLeave())) return;
   reset();
   emit("update:open", false);
 }
 
+/// ✕, Escape and the backdrop ask through the leave dialog instead of closing over unsaved edits.
+function guardClose(): boolean {
+  if (!policyDraft.hasUnsavedChanges()) return true;
+  void cancel();
+  return false;
+}
+
 /// Steps into the Members tab. The drawer closes first — left open, it would
 /// float over a tab it no longer explains.
-function openMembers() {
+async function openMembers() {
+  if (!(await policyDraft.confirmLeave())) return;
   emit("update:open", false);
   emit("open-members");
 }
@@ -1110,7 +1202,11 @@ function openMembers() {
 async function fetchDestinations() {
   try {
     const list = await queryClient.fetchQuery(destinationsQuery(orgId.value, "alert"));
-    availableDestinations.value = list.map((d: { name: string }) => d.name).filter(Boolean);
+    // A Slack app destination cannot carry a page; the team's room is a webhook (7.1).
+    availableDestinations.value = list
+      .filter((d: { type?: string }) => !isSlackAppDestination(d))
+      .map((d: { name: string }) => d.name)
+      .filter(Boolean);
   } catch {
     availableDestinations.value = [];
   }
@@ -1176,7 +1272,16 @@ function onL0Update(value: L0Policy) {
   l0Touched.value = true;
 }
 
-async function save() {
+async function save(): Promise<boolean> {
+  // The leave dialog's Save reaches here past the disabled footer button, so the reason has to be said.
+  if (!canConfigure.value || !l0Valid.value) {
+    toast({
+      variant: "error",
+      title: t("oncall.savePolicyFailed"),
+      message: canConfigure.value ? t("oncall.l0BudgetInvalidNotSaved") : t("oncall.configDenied"),
+    });
+    return false;
+  }
   saving.value = true;
   try {
     await savePolicyWrite.mutateAsync({
@@ -1186,14 +1291,21 @@ async function save() {
       final_action: finalAction.value,
       ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
     });
+    if (!(await saveChannelAfterPolicy())) {
+      emit("policy-written");
+      return false;
+    }
     toast({ variant: "success", message: t("oncall.policySaved") });
+    policyDraft.markSaved();
     emit("saved");
+    return true;
   } catch (err: any) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.savePolicyFailed"),
     });
+    return false;
   } finally {
     saving.value = false;
   }

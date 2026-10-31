@@ -34,11 +34,14 @@ const router = createRouter({
   ],
 });
 import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { REFRESH_QUERY_ORIGIN } from "@/composables/useLogs/logsRowNav";
 
 initializeLogsIndexDom();
 
 const loaderCalls = vi.hoisted(() => [] as string[]);
 const loadRuns = vi.hoisted(() => [] as Promise<unknown>[]);
+const gridSearches = vi.hoisted(() => ({ stub: false, calls: [] as unknown[][] }));
 vi.mock("@/composables/useLogs", async () => {
   const actual =
     await vi.importActual<typeof import("@/composables/useLogs")>("@/composables/useLogs");
@@ -58,6 +61,11 @@ vi.mock("@/composables/useLogs", async () => {
         loadVisualizeData: () => {
           loaderCalls.push("visualize");
           return api.loadVisualizeData();
+        },
+        runGridSearch: (...gridArgs: Parameters<typeof api.runGridSearch>) => {
+          if (!gridSearches.stub) return api.runGridSearch(...gridArgs);
+          gridSearches.calls.push(gridArgs);
+          return Promise.resolve();
         },
       };
     },
@@ -191,6 +199,91 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
     expect(logs.mock.calls[0][0]).toMatchObject({ reason: "url", kind: "entry" });
   });
 
+  describe("re-applied query links (AI chat, search history)", () => {
+    const reApply = async (query: Record<string, string>) => {
+      store.state.zoConfig = { ...originalZoConfig, auto_query_enabled: true };
+      (store.state as any).logs = { isInitialized: false, logs: {} };
+      vi.spyOn(store, "dispatch").mockResolvedValue(undefined as any);
+      (getFieldsFromQuery as Mock).mockResolvedValue({ fields: [], filters: [], streamName: "" });
+      await router.replace({ name: "logs", query: { org_identifier: org, ...query } });
+      wrapper = mount(Index, {
+        attachTo: "#app",
+        global: { provide: { store }, plugins: [i18n, router] },
+      });
+      await vi.waitFor(
+        () => expect(wrapper.vm.searchObj.data.stream.streamLists.length).toBeGreaterThan(0),
+        { timeout: 10000 },
+      );
+      await flushPromises();
+    };
+
+    it.each(["ai_chat_query", "search_history_re_apply"])(
+      "%s naming a missing stream shows stream-not-found",
+      async (type) => {
+        await reApply({ type, stream: "app_query_metrics", stream_type: "logs", period: "15m" });
+        expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual([]);
+        expect(wrapper.vm.searchObj.data.filterErrMsg).toContain("app_query_metrics");
+        await vi.waitFor(() =>
+          expect(wrapper.find('[data-test="logs-search-filter-error-message"]').exists()).toBe(
+            true,
+          ),
+        );
+      },
+    );
+
+    it.each(["ai_chat_query", "search_history_re_apply"])(
+      "%s naming an existing stream selects it with no error",
+      async (type) => {
+        await reApply({ type, stream: "k8s_json", stream_type: "logs", period: "15m" });
+        expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(["k8s_json"]);
+        expect(wrapper.vm.searchObj.data.filterErrMsg).toBe("");
+      },
+    );
+
+    it("an ai_chat_query link opened on a loaded page shows stream-not-found", async () => {
+      await reApply({ stream: "k8s_json", stream_type: "logs", period: "15m" });
+      await router.replace({
+        name: "logs",
+        query: {
+          org_identifier: org,
+          type: "ai_chat_query",
+          stream: "app_query_metrics",
+          stream_type: "logs",
+          period: "15m",
+        },
+      });
+      await vi.waitFor(() =>
+        expect(wrapper.vm.searchObj.data.filterErrMsg).toContain("app_query_metrics"),
+      );
+      expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual([]);
+    });
+
+    it("re-applying an existing stream after a missing one clears the not-found error", async () => {
+      await reApply({
+        type: "ai_chat_query",
+        stream: "app_query_metrics",
+        stream_type: "logs",
+        period: "15m",
+      });
+      expect(wrapper.vm.searchObj.data.filterErrMsg).toContain("app_query_metrics");
+      await router.replace({
+        name: "logs",
+        query: {
+          org_identifier: org,
+          type: "search_history_re_apply",
+          stream: "k8s_json",
+          stream_type: "logs",
+          period: "15m",
+        },
+      });
+      await vi.waitFor(() =>
+        expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(["k8s_json"]),
+      );
+      await flushPromises();
+      expect(wrapper.vm.searchObj.data.filterErrMsg).toBe("");
+    });
+  });
+
   describe("entry points and explicit runs after landing", () => {
     const ready = async (zoConfig: Record<string, unknown> = {}) => {
       const logs = await land(
@@ -238,6 +331,38 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
         wrapper.vm.searchObj.meta.refreshInterval = 0;
         wrapper.vm.refreshData();
         vi.useRealTimers();
+      }
+    });
+
+    it("only a refresh tick tags its grid query with the refresh origin", async () => {
+      const setExecutors = vi.spyOn(useLogsAutoRun(), "setExecutors");
+      await ready();
+      const executeGridRun = setExecutors.mock.calls.find((c) => c[0].logs && c[0].visualize)?.[0]
+        .logs;
+      expect(executeGridRun).toBeTypeOf("function");
+      const generation = wrapper.vm.autoRun.engine.currentGeneration("grid");
+      const run = (reason: string) =>
+        executeGridRun!({
+          generation,
+          reason,
+          reasons: [reason],
+          kind: "refinement",
+          op: "full",
+          signature: wrapper.vm.autoRun.readSignature(),
+          target: "live",
+        } as any);
+      gridSearches.stub = true;
+      gridSearches.calls.length = 0;
+      try {
+        await run("refresh");
+        await run("explicit");
+        expect(gridSearches.calls.map((args) => args[2])).toEqual([
+          REFRESH_QUERY_ORIGIN,
+          undefined,
+        ]);
+      } finally {
+        gridSearches.stub = false;
+        setExecutors.mockRestore();
       }
     });
 

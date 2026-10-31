@@ -5,13 +5,13 @@
  * - Real-time alerts with conditions
  * - Scheduled alerts with SQL/PromQL queries
  * - Multi-condition alerts with AND/OR logic
- * - Alerts with deduplication configuration
  */
 
 import { expect } from '@playwright/test';
 import testLogger from '../../playwright-tests/utils/test-logger.js';
 import MonacoEditorHelper from '../../playwright-tests/utils/MonacoEditorHelper.js';
 import { openOSelectDropdown } from './oselectHelpers.js';
+import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
 
 export class AlertCreationWizard {
     constructor(page, commonActions, locators) {
@@ -74,6 +74,7 @@ export class AlertCreationWizard {
         const maxRetries = 2;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             await this.page.locator(this.locators.addAlertBackButton || '[data-test="add-alert-back-btn"]').first().click();
+            await discardEditorDraftIfAsked(this.page);
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(1500);
 
@@ -178,7 +179,7 @@ export class AlertCreationWizard {
 
     /**
      * Create a real-time alert using Alerts 2.0 wizard UI
-     * Wizard steps for real-time: Step 1 (Setup) -> Step 2 (Conditions) -> Step 4 (Settings) -> Step 6 (Advanced) -> Submit
+     * Wizard steps for real-time: Step 1 (Setup) -> Step 2 (Conditions) -> Step 4 (Settings) -> Step 5 (Advanced) -> Submit
      * @param {string} streamName - Name of the stream
      * @param {string} column - Column name for condition
      * @param {string} value - Value for condition
@@ -412,7 +413,7 @@ export class AlertCreationWizard {
 
     /**
      * Create a scheduled alert with SQL query using Alerts 2.0 wizard UI
-     * Wizard steps for scheduled: Step 1 (Setup) -> Step 2 (Conditions/SQL) -> Step 3 (Compare) -> Step 4 (Settings) -> Step 5 (Dedup) -> Step 6 (Advanced) -> Submit
+     * Wizard steps for scheduled: Step 1 (Setup) -> Step 2 (Conditions/SQL) -> Step 3 (Compare) -> Step 4 (Settings) -> Step 5 (Advanced) -> Submit
      * @param {string} streamName - Name of the stream
      * @param {string} destinationName - Name of the destination
      * @param {string} randomValue - Random string for unique naming
@@ -774,208 +775,6 @@ export class AlertCreationWizard {
     }
 
     /**
-     * Create a scheduled alert with deduplication configuration
-     * @param {string} streamName - Name of the stream
-     * @param {string} destinationName - Name of the destination
-     * @param {string} randomValue - Random string for unique naming
-     * @param {Object} dedupConfig - Deduplication configuration
-     * @param {number} [dedupConfig.timeWindowMinutes] - Time window in minutes
-     * @param {string[]} [dedupConfig.fingerprintFields] - Fields for fingerprinting
-     */
-    async createScheduledAlertWithDeduplication(streamName, destinationName, randomValue, dedupConfig = {}) {
-        const randomAlertName = 'auto_dedup_alert_' + randomValue;
-        this.currentAlertName = randomAlertName;
-
-        testLogger.info('Creating scheduled alert with deduplication', {
-            streamName,
-            destinationName,
-            alertName: randomAlertName,
-            dedupConfig
-        });
-
-        // ==================== ALERT SETUP ====================
-        await this.page.locator(this.locators.addAlertButton).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        testLogger.info('Add alert dialog opened');
-
-        await this.fillAlertNameField(randomAlertName);
-        testLogger.info('Filled alert name', { alertName: randomAlertName });
-
-        // Select stream type (logs) via OSelect popover pattern (§4)
-        await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
-        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
-        testLogger.info('Selected stream type: logs');
-
-        // Select stream name
-        await this.selectStreamByName(streamName);
-        testLogger.info('Selected stream name', { streamName });
-
-        // Select Scheduled alert type via dropdown (v3 UI)
-        await this._selectAlertType('Scheduled');
-        testLogger.info('Selected scheduled alert type');
-
-        // ==================== CONDITIONS (SQL) ====================
-        const sqlTab = this.page.locator('[data-test="step2-query-tabs"] button:has-text("SQL")');
-        await sqlTab.waitFor({ state: 'visible', timeout: 10000 });
-        await sqlTab.click();
-        await this.page.waitForTimeout(1000);
-        testLogger.info('Switched to SQL tab');
-
-        const viewEditorBtn = this.page.locator(this.locators.viewEditorButton);
-        await viewEditorBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await viewEditorBtn.click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(1000);
-        testLogger.info('Opened SQL Editor dialog');
-
-        await this._replaceSqlEditorQuery(`SELECT kubernetes_labels_name FROM "${streamName}" where kubernetes_labels_name = 'ziox-querier'`);
-
-        await this.page.locator(this.locators.runQueryButton).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(2000);
-        testLogger.info('Ran SQL query');
-
-        // Close the query-editor drawer via ITS back button — scope to the
-        // query-editor-dialog container, since an unscoped add-alert-back-btn matches
-        // the wizard's own back arrow and leaves the drawer open to intercept clicks
-        // on the threshold row below. Assert the drawer detaches before proceeding.
-        const editorDialog = this.page.locator('[data-test="query-editor-dialog"]').first();
-        const dialogBackBtn = editorDialog.locator('[data-test="add-alert-back-btn"]').first();
-        await dialogBackBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await dialogBackBtn.click();
-        await expect(editorDialog).not.toBeAttached({ timeout: 10000 });
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(500);
-
-        testLogger.info('Closed SQL Editor dialog — portal cleaned up');
-
-        // ==================== ALERT SETTINGS ====================
-        // Threshold row via stable data-test hooks (same as createScheduledAlertWithSQL) —
-        // the old `.alert-condition-row`/`.alert-v3-select` class chain no longer exists
-        // on current builds (removed with the alert wizard revamp).
-        // OSelect forwards data-test to an inner -trigger button; the wrapper div itself
-        // is not clickable. Target the trigger so the popover actually opens.
-        const thresholdOperatorSelect = this.page.locator('[data-test="alert-trigger-operator-select"]').first();
-        await thresholdOperatorSelect.waitFor({ state: 'visible', timeout: 10000 });
-        testLogger.info('Threshold section visible');
-
-        // Open via the OSelect helper (clicks the inner -trigger until aria-expanded),
-        // not a raw click — the reka-ui trigger can open-then-close on a single click.
-        await openOSelectDropdown(this.page, thresholdOperatorSelect);
-        await this.page.locator('[data-test="alert-trigger-operator-select-option"][data-test-value=">="]').first().click();
-        testLogger.info('Set threshold operator: >=');
-
-        const thresholdInput = this.page.locator('[data-test="alert-trigger-threshold-input-field"]').first();
-        await thresholdInput.waitFor({ state: 'visible', timeout: 5000 });
-        await thresholdInput.fill('1');
-        testLogger.info('Set threshold value: 1');
-
-        const periodInput = this.page.locator('[data-test="alert-settings-period-input-field"]').first();
-        await this.page.waitForTimeout(500);
-        if (await periodInput.isVisible({ timeout: 3000 })) {
-            await periodInput.fill('15');
-            testLogger.info('Set period: 15 minutes');
-        }
-
-        const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
-        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await openOSelectDropdown(this.page, destinationDropdown);
-        await this.page.waitForTimeout(1000);
-
-        // Use popover selector for destination
-        const visibleDestMenuDedupItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(visibleDestMenuDedupItems.first()).toBeVisible({ timeout: 5000 });
-
-        let destFoundDedup = false;
-        const destOptionDedup = visibleDestMenuDedupItems.filter({ hasText: destinationName }).first();
-        if (await destOptionDedup.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await destOptionDedup.click();
-            destFoundDedup = true;
-            testLogger.info('Selected destination via popover', { destinationName });
-        }
-
-        if (!destFoundDedup) {
-            // Fallback: select first available destination
-            await visibleDestMenuDedupItems.first().click();
-            testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
-        }
-        await this.page.waitForTimeout(500);
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-        testLogger.info('Selected destination', { destinationName });
-
-        // ==================== DEDUPLICATION (Advanced tab) ====================
-        await this._switchToAdvancedTab();
-
-        const dedupContainer = this.page.locator(this.locators.stepDeduplication);
-        await expect(dedupContainer).toBeVisible({ timeout: 5000 });
-        testLogger.info('Deduplication container visible in Advanced tab');
-
-        // Configure fingerprint fields if provided
-        if (dedupConfig.fingerprintFields && dedupConfig.fingerprintFields.length > 0) {
-            const fingerprintSelect = this.page.locator(this.locators.stepDeduplicationFingerprintSelect);
-            await fingerprintSelect.waitFor({ state: 'visible', timeout: 5000 });
-
-            for (const field of dedupConfig.fingerprintFields) {
-                await fingerprintSelect.click();
-                await this.page.waitForTimeout(500);
-                await fingerprintSelect.locator('input').fill(field);
-                await this.page.waitForTimeout(500);
-
-                const fieldOption = this.page.getByRole('option', { name: field }).first();
-                if (await fieldOption.isVisible({ timeout: 2000 })) {
-                    await fieldOption.click();
-                } else {
-                    await this.page.keyboard.press('Enter');
-                }
-                await this.page.waitForTimeout(300);
-            }
-            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-            testLogger.info('Configured fingerprint fields', { fields: dedupConfig.fingerprintFields });
-        } else {
-            testLogger.info('Skipping fingerprint fields (auto-detect)');
-        }
-
-        // Configure time window if provided
-        if (dedupConfig.timeWindowMinutes !== undefined) {
-            const timeWindowInput = this.page.locator(this.locators.stepDeduplicationTimeWindowInput);
-            await timeWindowInput.waitFor({ state: 'visible', timeout: 5000 });
-            await timeWindowInput.clear();
-            await timeWindowInput.fill(String(dedupConfig.timeWindowMinutes));
-            testLogger.info('Set time window', { minutes: dedupConfig.timeWindowMinutes });
-        } else {
-            testLogger.info('Skipping time window (auto-detect)');
-        }
-
-        // ==================== SUBMIT ALERT ====================
-        // The submit button sits inside a scroll container that clips it from the viewport
-        // — worse here because the Advanced/deduplication tab lengthens the form. Playwright's
-        // .click() (even force:true) doesn't bypass scroll-container clipping, so the click
-        // silently misses, the alert never saves, and the success toast never appears (the
-        // exact alpha1 failure). Use a native DOM click via evaluate() — the same reliable
-        // submit the non-dedup scheduled-alert path (createScheduledAlertWithSQL) uses.
-        await this.page.locator(this.locators.alertSubmitButton).waitFor({ state: 'attached', timeout: 10000 });
-        await this.page.evaluate((selector) => {
-            const btn = document.querySelector(selector);
-            if (btn) btn.click();
-        }, this.locators.alertSubmitButton);
-        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
-        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
-        // strict-mode violation per AGENT_RULES §2.
-        await expect(
-            this.page
-                .locator('[data-test="o-toast-message"]')
-                .filter({ hasText: this.locators.alertSuccessMessage })
-                .first()
-        ).toBeVisible({ timeout: 30000 });
-        testLogger.info('Successfully created scheduled alert with deduplication', { alertName: randomAlertName });
-
-        return randomAlertName;
-    }
-
-    /**
      * Test condition operator toggle (AND to OR) during alert creation
      * @param {string} streamName - Name of the stream
      * @param {string} randomValue - Random string for unique naming
@@ -1117,6 +916,7 @@ export class AlertCreationWizard {
 
         // Cancel alert creation
         await this.page.locator(this.locators.alertBackButton).click();
+        await discardEditorDraftIfAsked(this.page);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         return { toggleSuccessful, message };
@@ -1154,39 +954,6 @@ export class AlertCreationWizard {
         await deleteBtn.click();
         await this.page.waitForTimeout(500);
         testLogger.info('Deleted condition', { index });
-    }
-
-    /**
-     * Verify deduplication step is visible (only for scheduled alerts)
-     */
-    async verifyDeduplicationStepVisible() {
-        const dedupContainer = this.page.locator(this.locators.stepDeduplication);
-        await expect(dedupContainer).toBeVisible({ timeout: 5000 });
-
-        const fingerprintSelect = this.page.locator(this.locators.stepDeduplicationFingerprintSelect);
-        await expect(fingerprintSelect).toBeVisible({ timeout: 3000 });
-
-        const timeWindowInput = this.page.locator(this.locators.stepDeduplicationTimeWindowInput);
-        await expect(timeWindowInput).toBeVisible({ timeout: 3000 });
-
-        testLogger.info('Deduplication step verified - all elements visible');
-        return true;
-    }
-
-    /**
-     * Get current deduplication configuration from the UI
-     */
-    async getDeduplicationConfig() {
-        const timeWindowInput = this.page.locator(this.locators.stepDeduplicationTimeWindowInput);
-        const timeWindowValue = await timeWindowInput.inputValue();
-
-        const fingerprintSelect = this.page.locator(this.locators.stepDeduplicationFingerprintSelect);
-        const chips = await fingerprintSelect.locator('[data-test*="chip"], [data-test*="badge"]').allTextContents();
-
-        return {
-            timeWindowMinutes: timeWindowValue ? parseInt(timeWindowValue, 10) : null,
-            fingerprintFields: chips
-        };
     }
 
     getCurrentAlertName() {
@@ -1262,257 +1029,10 @@ export class AlertCreationWizard {
     }
 
     /**
-     * Create a scheduled alert with deduplication for validation testing
-     * Uses custom columns (city) and configures for quick evaluation cycles
-     * @param {string} streamName - Name of the stream (with custom columns)
-     * @param {string} column - Column name for condition (e.g., 'city')
-     * @param {string} value - Value for condition (e.g., 'bangalore')
-     * @param {string} destinationName - Name of the destination (validation destination)
-     * @param {string} randomValue - Random string for unique naming
-     * @param {Object} dedupConfig - Deduplication configuration
-     * @param {number} [dedupConfig.timeWindowMinutes] - Time window in minutes (default: 5)
-     * @param {string[]} [dedupConfig.fingerprintFields] - Fields for fingerprinting (default: [column])
-     */
-    async createScheduledAlertWithDedupForValidation(streamName, column, value, destinationName, randomValue, dedupConfig = {}) {
-        const randomAlertName = 'auto_dedup_val_' + randomValue;
-        this.currentAlertName = randomAlertName;
-
-        // Default dedup config for validation testing
-        const timeWindowMinutes = dedupConfig.timeWindowMinutes || 5;
-        const fingerprintFields = dedupConfig.fingerprintFields || [column];
-
-        testLogger.info('Creating scheduled alert with deduplication for validation', {
-            streamName,
-            column,
-            value,
-            destinationName,
-            alertName: randomAlertName,
-            dedupConfig: { timeWindowMinutes, fingerprintFields }
-        });
-
-        // ==================== ALERT SETUP ====================
-        await this.page.locator(this.locators.addAlertButton).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        testLogger.info('Add alert dialog opened');
-
-        await this.fillAlertNameField(randomAlertName);
-        testLogger.info('Filled alert name', { alertName: randomAlertName });
-
-        // Select stream type (logs) via OSelect popover pattern (§4)
-        await this.page.locator(this.locators.streamTypeDropdown).click();
-        await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-        await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
-        // Deterministic wait: stream-name dropdown becomes enabled once `formData.stream_type` is set (§10)
-        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
-        testLogger.info('Selected stream type: logs');
-
-        // Select stream name
-        await this.selectStreamByName(streamName);
-        testLogger.info('Selected stream name', { streamName });
-
-        // Select Scheduled alert type via dropdown (v3 UI)
-        await this._selectAlertType('Scheduled');
-        testLogger.info('Selected scheduled alert type');
-
-        // ==================== CONDITIONS (SQL) ====================
-        const sqlTab = this.page.locator('[data-test="step2-query-tabs"] button:has-text("SQL")');
-        await sqlTab.waitFor({ state: 'visible', timeout: 10000 });
-        await sqlTab.click();
-        await this.page.waitForTimeout(1000);
-        testLogger.info('Switched to SQL tab');
-
-        const viewEditorBtn = this.page.locator(this.locators.viewEditorButton);
-        await viewEditorBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await viewEditorBtn.click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(1000);
-        testLogger.info('Opened SQL Editor dialog');
-
-        // Use SQL query that selects data matching our condition
-        const sqlQuery = `SELECT ${column} FROM "${streamName}" WHERE ${column} = '${value}'`;
-        await this._replaceSqlEditorQuery(sqlQuery);
-
-        await this.page.locator(this.locators.runQueryButton).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(2000);
-        testLogger.info('Ran SQL query');
-
-        // Close dialog — try back button, then close button
-        try {
-            const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            await closeButton.click({ force: true, timeout: 10000 });
-        } catch (error) {
-            testLogger.warn('Close button force-click failed, trying dialog close button', { error: error.message });
-            const dialogCloseBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
-            if (await dialogCloseBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await dialogCloseBtn.click();
-            }
-            await this.page.waitForTimeout(500);
-        }
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(1000);
-
-        // Verify SQL editor dialog is closed by waiting for it to be hidden
-        const sqlEditorDialog = this.page.locator(this.locators.sqlEditorDialog);
-        const dialogHidden = await sqlEditorDialog.isHidden({ timeout: 5000 }).catch(() => true);
-        if (!dialogHidden) {
-            testLogger.warn('SQL Editor dialog still visible, clicking close button');
-            await this.page.locator('[data-test="o-dialog-close-btn"]').first().click().catch(() => {});
-            await this.page.waitForTimeout(1000);
-        }
-        testLogger.info('Closed SQL Editor dialog');
-
-        // ==================== COMPARE WITH PAST (Advanced tab) ====================
-        await this._switchToAdvancedTab();
-
-        // Add time range comparison
-        const addTimeRangeBtn = this.page.locator(this.locators.multiTimeRangeAddButton);
-        if (await addTimeRangeBtn.isVisible({ timeout: 3000 })) {
-            await addTimeRangeBtn.click();
-            await this.page.waitForTimeout(1000);
-            await this.page.locator('[data-test="date-time-btn"]').click();
-            await this.page.locator('[data-test="date-time-relative-30-m-btn"]').click();
-            testLogger.info('Added 30-minute time range comparison');
-        } else {
-            testLogger.info('Time range button not visible, skipping');
-        }
-
-        // ==================== ALERT SETTINGS (back in Alert Rules tab) ====================
-        await this._switchToAlertRulesTab();
-
-        // The SQL query-editor drawer often doesn't close via its close button, and while it stays
-        // open reka disables pointer events on the rest of the page — so the threshold-operator
-        // click below is intercepted (by the drawer, its overlay, or ultimately <html>). Dismiss it
-        // with Escape until it is no longer open, which lets reka restore page interaction.
-        for (let i = 0; i < 5; i++) {
-            if ((await this.page.locator('[data-test="query-editor-dialog"][data-state="open"]').count()) === 0) break;
-            await this.page.keyboard.press('Escape').catch(() => {});
-            await this.page.waitForTimeout(400);
-        }
-        // Fallback: if it still won't close, re-enable page pointer events and hide any residue so
-        // the operator is reachable anyway.
-        await this.page.evaluate(() => {
-            document.body.style.pointerEvents = 'auto';
-            document.querySelectorAll(
-                '[data-test="query-editor-dialog"], [data-test="o-drawer-overlay"], div[data-reka-dialog-overlay], div[data-reka-portalled]'
-            ).forEach((el) => { el.style.display = 'none'; });
-        }).catch(() => {});
-        await this.page.waitForTimeout(300);
-
-        // Threshold row via stable data-test hooks — the old `.alert-condition-row`/
-        // `.alert-v3-select` class chain no longer exists on current builds.
-        // OSelect forwards data-test to an inner -trigger button; the wrapper div itself
-        // is not clickable. Target the trigger so the popover actually opens.
-        const thresholdOperatorSelect = this.page.locator('[data-test="alert-trigger-operator-select"]').first();
-        await thresholdOperatorSelect.waitFor({ state: 'visible', timeout: 10000 });
-        // Open via the OSelect helper (clicks the inner -trigger until aria-expanded),
-        // not a raw click — the reka-ui trigger can open-then-close on a single click.
-        await openOSelectDropdown(this.page, thresholdOperatorSelect);
-        await this.page.locator('[data-test="alert-trigger-operator-select-option"][data-test-value=">="]').first().click();
-        testLogger.info('Set threshold operator: >=');
-
-        const thresholdInput = this.page.locator('[data-test="alert-trigger-threshold-input-field"]').first();
-        await thresholdInput.waitFor({ state: 'visible', timeout: 10000 });
-        await thresholdInput.fill('1');
-        testLogger.info('Set threshold value: 1');
-
-        // Set shortest period (1 minute) for faster testing
-        const periodInput = this.page.locator('[data-test="alert-settings-period-input-field"]').first();
-        await this.page.waitForTimeout(500);
-        if (await periodInput.isVisible({ timeout: 5000 })) {
-            await periodInput.fill('1');
-            testLogger.info('Set period: 1 minute (shortest)');
-        }
-
-        const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
-        await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await openOSelectDropdown(this.page, destinationDropdown);
-        await this.page.waitForTimeout(1000);
-
-        // Use popover selector for destination
-        const visibleDestMenuItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(visibleDestMenuItems.first()).toBeVisible({ timeout: 5000 });
-
-        let destFound = false;
-        const destOption = visibleDestMenuItems.filter({ hasText: destinationName }).first();
-        if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await destOption.click();
-            destFound = true;
-            testLogger.info('Selected destination via popover', { destinationName });
-        }
-
-        if (!destFound) {
-            // Try scrolling to find the destination
-            try {
-                await this.commonActions.scrollAndFindOption(destinationName, 'template');
-                testLogger.info('Found destination by scrolling', { destinationName });
-            } catch (scrollError) {
-                await visibleDestMenuItems.first().click();
-                testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
-            }
-        }
-        await this.page.waitForTimeout(500);
-        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-        testLogger.info('Selected destination', { destinationName });
-
-        // ==================== DEDUPLICATION (Advanced tab) ====================
-        await this._switchToAdvancedTab();
-
-        const dedupContainer = this.page.locator(this.locators.stepDeduplication);
-        await expect(dedupContainer).toBeVisible({ timeout: 5000 });
-        testLogger.info('Deduplication container visible in Advanced tab');
-
-        // Configure fingerprint fields
-        if (fingerprintFields && fingerprintFields.length > 0) {
-            const fingerprintSelect = this.page.locator(this.locators.stepDeduplicationFingerprintSelect);
-            await fingerprintSelect.waitFor({ state: 'visible', timeout: 5000 });
-
-            for (const field of fingerprintFields) {
-                await fingerprintSelect.click();
-                await this.page.waitForTimeout(500);
-                await fingerprintSelect.locator('input').fill(field);
-                await this.page.waitForTimeout(500);
-
-                const fieldOption = this.page.getByRole('option', { name: field }).first();
-                if (await fieldOption.isVisible({ timeout: 2000 })) {
-                    await fieldOption.click();
-                } else {
-                    await this.page.keyboard.press('Enter');
-                }
-                await this.page.waitForTimeout(300);
-            }
-            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
-            testLogger.info('Configured fingerprint fields', { fields: fingerprintFields });
-        }
-
-        // Configure time window
-        const timeWindowInput = this.page.locator(this.locators.stepDeduplicationTimeWindowInput);
-        await timeWindowInput.waitFor({ state: 'visible', timeout: 5000 });
-        await timeWindowInput.clear();
-        await timeWindowInput.fill(String(timeWindowMinutes));
-        testLogger.info('Set dedup time window', { minutes: timeWindowMinutes });
-
-        // ==================== SUBMIT ALERT ====================
-        await this.page.locator(this.locators.alertSubmitButton).click();
-        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
-        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
-        // strict-mode violation per AGENT_RULES §2.
-        await expect(
-            this.page
-                .locator('[data-test="o-toast-message"]')
-                .filter({ hasText: this.locators.alertSuccessMessage })
-                .first()
-        ).toBeVisible({ timeout: 30000 });
-        testLogger.info('Successfully created scheduled alert with deduplication for validation', { alertName: randomAlertName });
-
-        return randomAlertName;
-    }
-
-    /**
      * Create a scheduled alert with aggregation enabled in Builder mode
      * PR #10470 moved aggregation from Step 4 (AlertSettings) to Step 2 (QueryConfig)
      *
-     * Wizard flow: Step 1 (Setup) -> Step 2 (Conditions + Aggregation) -> Step 3 (Compare) -> Step 4 (Settings) -> Step 5 (Dedup) -> Step 6 (Advanced) -> Submit
+     * Wizard flow: Step 1 (Setup) -> Step 2 (Conditions + Aggregation) -> Step 3 (Compare) -> Step 4 (Settings) -> Step 5 (Advanced) -> Submit
      *
      * @param {string} streamName - Name of the log stream
      * @param {string} destinationName - Name of the destination
@@ -1696,7 +1216,7 @@ export class AlertCreationWizard {
         await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         testLogger.info('Configured alert settings');
 
-        // Remaining advanced features (CompareWithPast, Dedup) are in Advanced tab
+        // Remaining advanced features (CompareWithPast) are in Advanced tab
         // but we skip them for this test
 
         // ==================== SUBMIT ====================
@@ -1916,7 +1436,7 @@ export class AlertCreationWizard {
         await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         testLogger.info('Selected destination', { destinationName });
 
-        // Remaining advanced features (CompareWithPast, Dedup) are in Advanced tab
+        // Remaining advanced features (CompareWithPast) are in Advanced tab
         // but we skip them for this test
 
         // ==================== SUBMIT ALERT ====================

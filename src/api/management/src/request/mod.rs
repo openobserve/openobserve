@@ -58,7 +58,7 @@ pub mod organization;
 pub mod password_policy;
 #[cfg(feature = "enterprise")]
 pub mod playground;
-#[cfg(feature = "profiling")]
+#[cfg(feature = "cpu-profiling")]
 pub mod profiling;
 #[cfg(feature = "enterprise")]
 pub mod prompts;
@@ -66,6 +66,8 @@ pub mod prompts;
 pub mod providers;
 pub mod public_dashboards;
 pub mod public_rate_limit;
+#[cfg(feature = "enterprise")]
+pub mod quality;
 pub mod query_history;
 #[cfg(feature = "enterprise")]
 pub mod remote_tasks;
@@ -87,5 +89,8 @@ pub mod synthetics;
 pub mod users;
 #[cfg(feature = "enterprise")]
 pub mod workflows;
+
+#[cfg(feature = "cloud")]
+pub mod org_domains;
 
 use openobserve_api_common::request::{BulkDeleteRequest, BulkDeleteResponse};

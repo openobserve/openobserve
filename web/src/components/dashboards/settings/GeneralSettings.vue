@@ -19,9 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
     <OForm
       ref="formRef"
-      :schema="generalSettingsSchema"
-      :default-values="generalSettingsDefaults()"
-      @submit="onSubmit"
+      :form="form"
       v-slot="{ isSubmitting }"
       class="flex min-h-0 flex-1 flex-col"
     >
@@ -50,13 +48,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <DateTimePickerDashboard
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
+            :key="dateTimePickerKey"
             class="h-7.5"
             size="sm"
             :initialTimezone="initialTimezone"
             v-model="dateTimeValue"
             :auto-apply-dashboard="true"
+            calendar-presets
             menu-align="start"
           />
+        </div>
+
+        <div class="flex flex-col items-start gap-1">
+          <label class="text-compact text-input-label-text leading-tight font-medium">{{
+            t("dashboard.generalSettingsPage.defaultAutoRefresh")
+          }}</label>
+          <AutoRefreshInterval
+            :model-value="selectedRefresh"
+            :min-refresh-interval="minRefreshSeconds"
+            class="h-7.5"
+            data-test="dashboard-general-setting-default-refresh"
+            @update:model-value="
+              (value: number) => form.setFieldValue('defaultRefreshInterval', value)
+            "
+          />
+          <span
+            class="text-input-help-text text-xs leading-none"
+            data-test="dashboard-general-setting-default-refresh-help"
+          >
+            {{ refreshHelpText }}
+          </span>
+          <p
+            v-if="showAbsoluteRangeHint"
+            class="text-text-secondary text-xs"
+            data-test="dashboard-general-setting-default-refresh-absolute-hint"
+          >
+            {{ t("dashboard.generalSettingsPage.defaultAutoRefreshAbsoluteHint") }}
+          </p>
         </div>
 
         <div class="flex flex-col gap-1">
@@ -104,7 +132,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref, nextTick, type Ref } from "vue";
+import {
+  computed,
+  defineComponent,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  nextTick,
+  watch,
+  type Ref,
+} from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getDashboard, updateDashboard } from "@/utils/commons";
@@ -118,11 +155,24 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import {
+  autoRefreshLabel,
+  effectiveDefaultRefresh,
+  minAutoRefreshSeconds,
+} from "@/utils/dashboard/autoRefresh";
 import {
   makeGeneralSettingsSchema,
   generalSettingsDefaults,
   type GeneralSettingsForm,
 } from "./GeneralSettings.schema";
+import {
+  comparableDateTime,
+  useDashboardSettingsDraft,
+  type GeneralSettingsDraft,
+} from "./dashboardSettingsDraft";
+import { stableStringify } from "@/utils/drafts/editorDraftStore";
 
 export default defineComponent({
   name: "GeneralSettings",
@@ -134,6 +184,7 @@ export default defineComponent({
     OFormInput,
     OFormTextarea,
     OFormSwitch,
+    AutoRefreshInterval,
   },
   emits: ["save", "close"],
   setup(props, { emit }) {
@@ -145,12 +196,88 @@ export default defineComponent({
     const saveConflict = useDashboardSaveConflict();
 
     const formRef = ref<any>(null);
+    const dateTimeValue: any = ref(null);
+    const form = useOForm<GeneralSettingsForm>({
+      defaultValues: generalSettingsDefaults(),
+      schema: generalSettingsSchema,
+      onSubmit: (value) => onSubmit(value),
+    });
+
+    const minRefreshSeconds = computed(() =>
+      minAutoRefreshSeconds(store.state?.zoConfig?.min_auto_refresh_interval),
+    );
+    // What the dashboard has stored, kept apart from the form so a below-minimum value can be explained.
+    const savedRefresh = ref(0);
+    const effectiveRefresh = computed(() =>
+      effectiveDefaultRefresh(savedRefresh.value, minRefreshSeconds.value),
+    );
+    const selectedRefresh = form.useStore((s: any) => s.values.defaultRefreshInterval as number);
+    const refreshHelpText = computed(() =>
+      savedRefresh.value > 0 && savedRefresh.value < minRefreshSeconds.value
+        ? t("dashboard.generalSettingsPage.defaultAutoRefreshRaised", {
+            saved: autoRefreshLabel(savedRefresh.value, t),
+            effective: autoRefreshLabel(effectiveRefresh.value, t),
+          })
+        : t("dashboard.generalSettingsPage.defaultAutoRefreshHelp"),
+    );
+    const showAbsoluteRangeHint = computed(
+      () => selectedRefresh.value > 0 && dateTimeValue.value?.valueType === "absolute",
+    );
     const closeBtn: Ref<any> = ref(null);
     // initial timezone, which will come from the route query
     const initialTimezone: any = ref(store.state.timezone ?? null);
 
-    let dateTimeValue: any = ref(null);
+    const draftContext = useDashboardSettingsDraft();
+    // The picker reads its v-model only on mount, so a restored range remounts it.
+    const dateTimePickerKey = ref(0);
+    // What the server holds; null until loaded.
+    let loadedSection: GeneralSettingsDraft | null = null;
+    // The picker re-emits the range it is given, normalised, so until the user's first input its emits are the loaded range.
+    let rangeFollowsPicker = false;
+    const stopFollowingPicker = () => {
+      rangeFollowsPicker = false;
+    };
+    // Off from a load until its pending edits are back, so the picker's mount emit cannot clear them first.
+    let draftSyncOn = false;
+    let lastSaveSucceeded = false;
+    let unregisterDraftSection: (() => void) | null = null;
+
+    const formValues = form.useStore((s) => s.values);
+    const generalSnapshot = (): GeneralSettingsDraft =>
+      JSON.parse(
+        JSON.stringify({ values: formValues.value, dateTime: dateTimeValue.value ?? null }),
+      );
+    const sectionKey = (draft: GeneralSettingsDraft) =>
+      stableStringify({ values: draft.values, dateTime: comparableDateTime(draft.dateTime) });
+
+    const syncDraftSection = () => {
+      if (!draftContext || loadedSection === null) return;
+      const current = generalSnapshot();
+      if (rangeFollowsPicker) loadedSection = { ...loadedSection, dateTime: current.dateTime };
+      if (!draftSyncOn) return;
+      draftContext.pending.general =
+        sectionKey(current) === sectionKey(loadedSection) ? null : current;
+    };
+
+    const applyPendingDraft = async () => {
+      const pending = draftContext?.pending.general;
+      if (!pending) return;
+      stopFollowingPicker();
+      form.reset(pending.values);
+      dateTimeValue.value = pending.dateTime;
+      dateTimePickerKey.value++;
+      await nextTick();
+    };
+
+    const saveForDraft = async (): Promise<boolean> => {
+      lastSaveSucceeded = false;
+      await form.handleSubmit();
+      return lastSaveSucceeded;
+    };
+
     const getDashboardData = async () => {
+      draftSyncOn = false;
+      loadedSection = null;
       const data = await getDashboard(
         store,
         route.query.dashboard,
@@ -163,10 +290,12 @@ export default defineComponent({
       // The form owns `name`, `description`, and `showDynamicFilters`; there is
       // no local mirror of any of them.
       await nextTick();
-      formRef.value?.form.reset({
+      savedRefresh.value = Number(data?.defaultRefreshInterval) || 0;
+      form.reset({
         name: data.title,
         description: data.description ?? "",
         showDynamicFilters: data.variables?.showDynamicFilters ?? false,
+        defaultRefreshInterval: effectiveRefresh.value,
       });
 
       dateTimeValue.value = {
@@ -175,9 +304,45 @@ export default defineComponent({
         relativeTimePeriod: data?.defaultDatetimeDuration?.relativeTimePeriod,
         valueType: data?.defaultDatetimeDuration?.type,
       };
+      if (draftContext) {
+        loadedSection = generalSnapshot();
+        rangeFollowsPicker = true;
+      }
     };
-    onMounted(async () => {
+    const reloadAfterConflict = async () => {
       await getDashboardData();
+      draftSyncOn = true;
+      syncDraftSection();
+    };
+
+    onMounted(async () => {
+      if (draftContext) {
+        window.addEventListener("pointerdown", stopFollowingPicker, true);
+        window.addEventListener("keydown", stopFollowingPicker, true);
+      }
+      await getDashboardData();
+      if (!draftContext) return;
+      await applyPendingDraft();
+      draftSyncOn = true;
+      syncDraftSection();
+      unregisterDraftSection = draftContext.register("general", saveForDraft);
+    });
+
+    watch([formValues, dateTimeValue], syncDraftSection, { deep: true });
+    watch(
+      () => draftContext?.restoreRevision,
+      async () => {
+        if (!draftSyncOn) return;
+        draftSyncOn = false;
+        await applyPendingDraft();
+        draftSyncOn = true;
+        syncDraftSection();
+      },
+    );
+    onBeforeUnmount(() => {
+      unregisterDraftSection?.();
+      window.removeEventListener("pointerdown", stopFollowingPicker, true);
+      window.removeEventListener("keydown", stopFollowingPicker, true);
     });
 
     const saveDashboard = async (value: GeneralSettingsForm) => {
@@ -204,6 +369,12 @@ export default defineComponent({
           data.variables.showDynamicFilters = value.showDynamicFilters;
         }
 
+        if (value.defaultRefreshInterval > 0) {
+          data.defaultRefreshInterval = value.defaultRefreshInterval;
+        } else {
+          delete data.defaultRefreshInterval;
+        }
+
         data.defaultDatetimeDuration = {
           startTime: dateTimeValue?.value?.startTime,
           endTime: dateTimeValue?.value?.endTime,
@@ -222,6 +393,11 @@ export default defineComponent({
 
         showPositiveNotification(t("dashboard.generalSettingsPage.updatedSuccessfully"));
 
+        lastSaveSucceeded = true;
+        if (loadedSection !== null) {
+          loadedSection = generalSnapshot();
+          syncDraftSection();
+        }
         emit("save");
       } catch (error: any) {
         if (saveConflict.isConflict(error)) {
@@ -230,7 +406,7 @@ export default defineComponent({
             folderId: (route?.query?.folder as string) ?? "default",
             mine: data,
             change: t("dashboard.saveConflict.change.changedSettings"),
-            onResolved: getDashboardData,
+            onResolved: reloadAfterConflict,
           });
         } else {
           showErrorNotification(
@@ -253,13 +429,17 @@ export default defineComponent({
 
     return {
       t,
-      generalSettingsSchema,
-      generalSettingsDefaults,
+      form,
+      selectedRefresh,
+      minRefreshSeconds,
+      refreshHelpText,
+      showAbsoluteRangeHint,
       store,
       onSubmit,
       closeBtn,
       initialTimezone,
       dateTimeValue,
+      dateTimePickerKey,
       formRef,
     };
   },

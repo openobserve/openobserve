@@ -14,7 +14,13 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ref, computed, nextTick } from "vue";
-import { useConfigPanel, filterOption, filterSection } from "./useConfigPanel";
+import {
+  useConfigPanel,
+  filterOption,
+  filterSection,
+  shouldShowThresholds,
+  shouldShowSeriesOverrides,
+} from "./useConfigPanel";
 import type { ConfigOption } from "./useConfigPanel";
 import {
   DEFAULT_EXPANDED_SECTIONS,
@@ -40,9 +46,16 @@ vi.mock("@/utils/dashboard/configUtils", () => ({
   shouldShowTopResultsConfig: vi.fn(() => false),
   shouldShowAreaLineStyleConfig: vi.fn(() => false),
   shouldShowNoValueReplacement: vi.fn(() => false),
+  shouldShowNoDataText: vi.fn(() => false),
   shouldShowAxisConfig: vi.fn(() => false),
   shouldShowAxisBorderConfig: vi.fn(() => false),
   shouldShowCartesianAxisConfig: vi.fn(() => false),
+  shouldShowCartesianSeriesConfig: vi.fn(() => false),
+  shouldShowStackMode: vi.fn(() => false),
+  shouldShowSortOrder: vi.fn(() => false),
+  shouldShowBarRadius: vi.fn(() => false),
+  shouldShowScatterEncoding: vi.fn(() => false),
+  shouldShowConnectNullsThreshold: vi.fn(() => false),
   shouldShowGridlines: vi.fn(() => false),
   shouldShowAxisLabelConfig: vi.fn(() => false),
   shouldShowAreaFillConfig: vi.fn(() => false),
@@ -188,6 +201,7 @@ describe("ORDERED_SECTION_IDS", () => {
     "legend",
     "data",
     "stateTimeline",
+    "hostmap",
     "axis",
     "labels",
     "lineStyle",
@@ -198,18 +212,22 @@ describe("ORDERED_SECTION_IDS", () => {
     "seriesOverrides",
     "map",
     "gauge",
+    "pie",
     "layout",
     "colors",
     "drilldown",
     "comparison",
     "markLines",
     "thresholds",
+    "metric",
     "background",
     "sparkline",
+    "alertList",
+    "flameGraph",
   ];
 
-  it("contains all 24 sections", () => {
-    expect(ORDERED_SECTION_IDS).toHaveLength(24);
+  it("lists each section once", () => {
+    expect(new Set(ORDERED_SECTION_IDS).size).toBe(ORDERED_SECTION_IDS.length);
   });
 
   it("contains every expected section id", () => {
@@ -634,6 +652,31 @@ describe("useConfigPanel – data section", () => {
   });
 });
 
+describe("useConfigPanel – host map section", () => {
+  const shared = ["reduction", "group-sort", "cell-sort", "cell-shape", "cell-label"];
+
+  it("shows the cell options for SQL and keeps unit, decimals and thresholds", () => {
+    const c = makeComposable(makePanelData("hostmap"));
+    for (const option of shared) expect(c.isConfigOptionVisible("hostmap", option)).toBe(true);
+    expect(c.isConfigOptionVisible("hostmap", "entity-label")).toBe(false);
+    expect(c.isConfigOptionVisible("data", "unit")).toBe(true);
+    expect(c.isConfigOptionVisible("data", "decimals")).toBe(true);
+    expect(c.isSectionVisible("thresholds")).toBe(true);
+  });
+
+  it("shows the label inputs only for PromQL", () => {
+    const c = makeComposable(makePanelData("hostmap"), ref(true));
+    expect(c.isConfigOptionVisible("hostmap", "entity-label")).toBe(true);
+    expect(c.isConfigOptionVisible("hostmap", "group-by")).toBe(true);
+    // The host map's own cell cap bounds its PromQL series, so the panel series limit stays hidden.
+    expect(c.isConfigOptionVisible("general", "promql-series-limit")).toBe(false);
+  });
+
+  it("hides the host map options for other types", () => {
+    expect(makeComposable(makePanelData("line")).isSectionVisible("hostmap")).toBe(false);
+  });
+});
+
 describe("useConfigPanel – state timeline section", () => {
   const options = ["merge-gaps", "row-size", "show-state-text", "row-sort", "tooltip-mode"];
 
@@ -1004,6 +1047,75 @@ describe("useConfigPanel – gauge section", () => {
     expect(c.isConfigOptionVisible("gauge", "gauge-min")).toBe(false);
     expect(c.isConfigOptionVisible("gauge", "gauge-max")).toBe(false);
     expect(c.isConfigOptionVisible("gauge", "gauge-range-mode")).toBe(true);
+  });
+});
+
+describe("useConfigPanel – alert list section", () => {
+  it("shows the alert list only its own section and general", () => {
+    const c = makeComposable(makePanelData("alert-list"));
+    expect(ORDERED_SECTION_IDS.filter((id) => c.isSectionVisible(id))).toEqual([
+      "general",
+      "alertList",
+    ]);
+  });
+
+  it("hides the panel time option for the alert list, which reads no time range", () => {
+    expect(
+      makeComposable(makePanelData("alert-list")).isConfigOptionVisible(
+        "general",
+        "panel-default-time",
+      ),
+    ).toBe(false);
+    expect(
+      makeComposable(makePanelData("bar")).isConfigOptionVisible("general", "panel-default-time"),
+    ).toBe(true);
+  });
+
+  it("leaves other charts' sections as they were", () => {
+    const c = makeComposable(makePanelData("bar"));
+    expect(c.isSectionVisible("data")).toBe(true);
+    expect(c.isSectionVisible("general")).toBe(true);
+    expect(c.isSectionVisible("alertList")).toBe(false);
+  });
+});
+describe("useConfigPanel – flame graph sections", () => {
+  it("shows the flame graph only its own section, general and data", () => {
+    const c = makeComposable(makePanelData("flame-graph"));
+    expect(ORDERED_SECTION_IDS.filter((id) => c.isSectionVisible(id))).toEqual([
+      "general",
+      "data",
+      "flameGraph",
+    ]);
+  });
+
+  it("leaves other charts' sections as they were", () => {
+    const c = makeComposable(makePanelData("bar"));
+    expect(c.isSectionVisible("data")).toBe(true);
+    expect(c.isSectionVisible("general")).toBe(true);
+    expect(c.isSectionVisible("flameGraph")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useConfigPanel — logs section
+// ---------------------------------------------------------------------------
+describe("useConfigPanel – logs section", () => {
+  it("shows a logs panel only its own section and general", () => {
+    const c = makeComposable(makePanelData("logs"));
+    expect(ORDERED_SECTION_IDS.filter((id) => c.isSectionVisible(id))).toEqual(["general", "logs"]);
+  });
+
+  it("keeps the panel time option for logs, which reads the dashboard time range", () => {
+    expect(
+      makeComposable(makePanelData("logs")).isConfigOptionVisible("general", "panel-default-time"),
+    ).toBe(true);
+  });
+
+  it("leaves other charts' sections as they were", () => {
+    const c = makeComposable(makePanelData("bar"));
+    expect(c.isSectionVisible("data")).toBe(true);
+    expect(c.isSectionVisible("general")).toBe(true);
+    expect(c.isSectionVisible("logs")).toBe(false);
   });
 });
 
@@ -1449,6 +1561,180 @@ describe("useConfigPanel – heatmap y axis", () => {
   });
 });
 
+describe("cartesian series options", () => {
+  it.each([
+    ["shouldShowCartesianSeriesConfig", "legend", "chart-tooltip-mode"],
+    ["shouldShowCartesianSeriesConfig", "legend", "tooltip-sort"],
+    ["shouldShowCartesianSeriesConfig", "axis", "y-axis-scale"],
+    ["shouldShowCartesianSeriesConfig", "axis", "y-axis-label"],
+    ["shouldShowCartesianSeriesConfig", "axis", "y-axis-hard-range"],
+    ["shouldShowCartesianSeriesConfig", "markLines", "mark-areas"],
+    ["shouldShowStackMode", "axis", "stack-mode"],
+    ["shouldShowSortOrder", "axis", "sort-order"],
+    ["shouldShowBarRadius", "lineStyle", "bar-radius"],
+    ["shouldShowAreaLineStyleConfig", "lineStyle", "line-style"],
+    ["shouldShowScatterEncoding", "data", "scatter-encoding"],
+    ["shouldShowConnectNullsThreshold", "data", "connect-nulls-threshold"],
+  ] as const)("%s drives %s/%s", async (helper, section, option) => {
+    const utils: any = await import("@/utils/dashboard/configUtils");
+    expect(makeComposable().isConfigOptionVisible(section, option)).toBe(false);
+    vi.mocked(utils[helper]).mockReturnValue(true);
+    expect(makeComposable().isConfigOptionVisible(section, option)).toBe(true);
+    vi.mocked(utils[helper]).mockReturnValue(false);
+  });
+});
+
+describe("useConfigPanel – metric, gauge, pie, table, heatmap, state timeline and geomap options", () => {
+  const visible = (type: string, section: any, option: string, config = {}, promql = false) =>
+    makeComposable(makePanelData(type, config), ref(promql)).isConfigOptionVisible(section, option);
+
+  it("shows each option on its own chart type only", () => {
+    expect(visible("metric", "metric", "stat-text-mode")).toBe(true);
+    expect(visible("bar", "metric", "stat-text-mode")).toBe(false);
+    expect(visible("gauge", "gauge", "gauge-style")).toBe(true);
+    expect(visible("pie", "pie", "pie-other-threshold")).toBe(true);
+    expect(visible("pie", "pie", "donut-inner-radius")).toBe(false);
+    expect(visible("donut", "pie", "donut-inner-radius")).toBe(true);
+    expect(visible("heatmap", "data", "heatmap-cells")).toBe(true);
+    expect(visible("state-timeline", "stateTimeline", "state-value-align")).toBe(true);
+    expect(visible("geomap", "map", "map-cluster")).toBe(true);
+    expect(visible("maps", "map", "map-cluster")).toBe(false);
+  });
+
+  it("keeps footer calculations to SQL tables", () => {
+    expect(visible("table", "table", "table-footer-calcs")).toBe(true);
+    expect(visible("table", "table", "table-footer-calcs", {}, true)).toBe(false);
+    expect(visible("table", "table", "table-density", {}, true)).toBe(true);
+  });
+
+  it("shows thresholds on a SQL table once a column is a bar gauge", () => {
+    const table = (overrides: any[], queryType = "sql") => ({
+      data: { type: "table", queryType, config: { override_config: overrides } },
+    });
+    const barGauge = {
+      field: { matchBy: "name", value: "latency" },
+      config: [{ type: "field_type", value: "bar_gauge" }],
+    };
+    expect(shouldShowThresholds(table([]))).toBe(false);
+    expect(shouldShowThresholds(table([barGauge]))).toBe(true);
+    expect(shouldShowThresholds(table([barGauge], "promql"))).toBe(false);
+  });
+});
+
+describe("useConfigPanel – bar gauge options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows the bar gauge options on the bar gauge only", () => {
+    expect(visible("bar-gauge", "gauge", "bar-gauge-range-mode")).toBe(true);
+    expect(visible("gauge", "gauge", "bar-gauge-range-mode")).toBe(false);
+    expect(visible("bar-gauge", "gauge", "gauge-min")).toBe(false);
+    const fixed = makePanelData("bar-gauge", {}, { config: { range_mode: "fixed" } });
+    expect(makeComposable(fixed, ref(false)).isConfigOptionVisible("gauge", "gauge-min")).toBe(
+      true,
+    );
+    expect(visible("bar-gauge", "gauge", "bar-gauge-mode")).toBe(true);
+    expect(visible("bar-gauge", "gauge", "gauge-style")).toBe(false);
+    expect(visible("gauge", "gauge", "bar-gauge-orientation")).toBe(false);
+  });
+
+  it("shows thresholds and series overrides on the bar gauge", () => {
+    expect(shouldShowThresholds({ data: { type: "bar-gauge", config: {} } })).toBe(true);
+    expect(shouldShowSeriesOverrides({ data: { type: "bar-gauge" } })).toBe(true);
+  });
+});
+describe("useConfigPanel – distribution options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows the bucket settings on distribution only", () => {
+    expect(visible("distribution", "data", "distribution-buckets")).toBe(true);
+    expect(visible("heatmap", "data", "distribution-buckets")).toBe(false);
+  });
+});
+describe("useConfigPanel – state timeline display", () => {
+  const visible = (config: any, option: string) =>
+    makeComposable(makePanelData("state-timeline", config), ref(false)).isConfigOptionVisible(
+      "stateTimeline",
+      option,
+    );
+
+  it("offers the display choice on state timeline only", () => {
+    expect(visible({}, "display")).toBe(true);
+    expect(
+      makeComposable(makePanelData("line", {}), ref(false)).isConfigOptionVisible(
+        "stateTimeline",
+        "display",
+      ),
+    ).toBe(false);
+  });
+
+  it("hides merge gaps in cells mode, where every bucket is its own cell", () => {
+    expect(visible({}, "merge-gaps")).toBe(true);
+    expect(visible({ state_timeline_display: "cells" }, "merge-gaps")).toBe(false);
+  });
+});
+describe("useConfigPanel – sunburst options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows the label switch on sunburst only", () => {
+    expect(visible("sunburst", "data", "sunburst-labels")).toBe(true);
+    expect(visible("pie", "data", "sunburst-labels")).toBe(false);
+  });
+
+  it("shows no thresholds or series overrides on sunburst", () => {
+    expect(shouldShowThresholds({ data: { type: "sunburst", config: {} } })).toBe(false);
+    expect(shouldShowSeriesOverrides({ data: { type: "sunburst" } })).toBe(false);
+  });
+});
+describe("useConfigPanel – funnel options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows each option on its own chart type only", () => {
+    for (const option of ["funnel-sort", "funnel-orient", "funnel-show-percent"]) {
+      expect(visible("funnel", "data", option), option).toBe(true);
+      expect(visible("pie", "data", option), option).toBe(false);
+    }
+  });
+
+  it("shows no thresholds or series overrides on a funnel", () => {
+    expect(shouldShowThresholds({ data: { type: "funnel", config: {} } })).toBe(false);
+    expect(shouldShowSeriesOverrides({ data: { type: "funnel" } })).toBe(false);
+  });
+});
+describe("useConfigPanel – node graph options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows each option on its own chart type only", () => {
+    expect(visible("node-graph", "data", "node-graph-layout")).toBe(true);
+    expect(visible("node-graph", "data", "node-graph-edge-labels")).toBe(true);
+    expect(visible("sankey", "data", "node-graph-layout")).toBe(false);
+  });
+
+  it("shows no thresholds or series overrides on a node graph", () => {
+    expect(shouldShowThresholds({ data: { type: "node-graph", config: {} } })).toBe(false);
+    expect(shouldShowSeriesOverrides({ data: { type: "node-graph" } })).toBe(false);
+  });
+});
+
+describe("useConfigPanel – box plot options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows the whisker option on a box plot only", () => {
+    expect(visible("boxplot", "data", "boxplot-whisker")).toBe(true);
+    expect(visible("bar", "data", "boxplot-whisker")).toBe(false);
+  });
+
+  it("shows no thresholds or series overrides on a box plot", () => {
+    expect(shouldShowThresholds({ data: { type: "boxplot", config: {} } })).toBe(false);
+    expect(shouldShowSeriesOverrides({ data: { type: "boxplot" } })).toBe(false);
+  });
+});
+
 describe("useConfigPanel – sparkline search visibility", () => {
   it("drops the sparkline option for an all-instant PromQL metric only", async () => {
     const { allVisibleQueriesInstant } = await import("@/utils/dashboard/configUtils");
@@ -1467,5 +1753,16 @@ describe("useConfigPanel – sparkline search visibility", () => {
     expect(makeComposable(metric("promql")).isConfigOptionVisible("sparkline", "sparkline")).toBe(
       true,
     );
+  });
+});
+
+describe("useConfigPanel – treemap options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows the breadcrumb option on a treemap only, and no thresholds", () => {
+    expect(visible("treemap", "data", "treemap-breadcrumb")).toBe(true);
+    expect(visible("pie", "data", "treemap-breadcrumb")).toBe(false);
+    expect(shouldShowThresholds({ data: { type: "treemap", config: {} } })).toBe(false);
   });
 });

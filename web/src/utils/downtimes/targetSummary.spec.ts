@@ -3,7 +3,7 @@
 import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
 import type { DimensionCondition, DowntimeTarget } from "@/services/downtimes";
-import { conditionSummary, sortedTargets, targetSummary } from "./targetSummary";
+import { alertGroupChips, conditionSummary, sortedTargets, targetSummary } from "./targetSummary";
 
 const eq = (key: string, value: string): DimensionCondition => ({
   type: "pair",
@@ -112,5 +112,35 @@ describe("targetSummary", () => {
       { module: "synthetics", folders: { kind: "all" } },
     ]);
     expect(sorted.map((s) => s.module)).toEqual(["alerts", "synthetics", "slos"]);
+  });
+});
+
+describe("alertGroupChips", () => {
+  it("names each muted group by its labels map", () => {
+    const chips = alertGroupChips(
+      [
+        {
+          alert_id: "a1",
+          group_key: "k1",
+          group_labels: { cluster: "prod-eu", region: "eu-west-1" },
+        },
+        { alert_id: "a1", group_key: "k2", group_labels: { cluster: "prod-us" } },
+      ],
+      gt,
+    );
+    expect(chips.map((c) => [c.key, String(c.label)])).toEqual([
+      ["k1", "Group: cluster=prod-eu, region=eu-west-1"],
+      ["k2", "Group: cluster=prod-us"],
+    ]);
+  });
+
+  it("shows the start of the group key when an older node recorded no labels", () => {
+    const chips = alertGroupChips([{ alert_id: "a1", group_key: "3f9a1c2e77d0" }], gt);
+    expect(String(chips[0].label)).toBe("Group: 3f9a1c2e");
+  });
+
+  it("has nothing to show for a whole-alert downtime", () => {
+    expect(alertGroupChips(null, gt)).toEqual([]);
+    expect(alertGroupChips(undefined, gt)).toEqual([]);
   });
 });

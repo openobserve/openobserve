@@ -94,6 +94,7 @@ const OTableStub = {
           <slot name="cell-severity" :row="row" />
           <slot name="cell-title" :row="row" />
           <slot name="cell-dimensions" :row="row" />
+          <div data-test="cell-alert_count"><slot name="cell-alert_count" :row="row" /></div>
           <slot name="cell-actions" :row="row" />
         </div>
       </template>
@@ -140,7 +141,7 @@ function createWrapper() {
           template:
             '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
         },
-        OTooltip: { template: "<span />" },
+        OTooltip: { template: '<span data-test="o-tooltip"><slot name="content" /></span>' },
       },
     },
   });
@@ -457,6 +458,22 @@ describe("IncidentList.vue", () => {
       await (wrapper.vm as any).reopenIncident(incident);
       await flushPromises();
       expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", incident.id, "open");
+    });
+
+    it.each([
+      ["resolveIncident", "Resolve incident?"],
+      ["reopenIncident", "Reopen incident?"],
+    ] as const)("%s asks first and changes nothing when cancelled", async (action, title) => {
+      // The instance exposes setup() bindings that the mounted type does not declare.
+      const vm = wrapper.vm as unknown as Record<
+        typeof action,
+        (incident: Incident) => Promise<void>
+      > & { allIncidents: Incident[] };
+      mockConfirm.mockResolvedValueOnce(false);
+      await vm[action](vm.allIncidents[0]);
+      await flushPromises();
+      expect(mockConfirm).toHaveBeenLastCalledWith(expect.objectContaining({ title }));
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
     });
 
     it("reloads incidents after successful status update", async () => {
@@ -951,6 +968,78 @@ describe("IncidentList.vue", () => {
       await flushPromises();
 
       expect(wrapper.vm.currentPage).toBe(1);
+    });
+  });
+
+  describe("Alerts cell", () => {
+    const mountWith = async (incident: Incident) => {
+      (incidentsService.list as any).mockResolvedValue({
+        data: { incidents: [incident], total: 1 },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+      return wrapper.find('[data-test="cell-alert_count"]');
+    };
+
+    it("renders one name ×count chip per alert group, in API order", async () => {
+      const cell = await mountWith(
+        createIncident({
+          alert_groups: [
+            { alert_id: "a", alert_name: "demo-alert-a", count: 3 },
+            { alert_id: "b", alert_name: "demo-alert-b", count: 1 },
+          ],
+        }),
+      );
+      const chips = cell.findAll('[data-test="incident-alert-group-chip"]');
+      expect(chips.map((c) => c.text().replace(/\s+/g, " "))).toEqual([
+        "demo-alert-a ×3",
+        "demo-alert-b ×1",
+      ]);
+      expect(cell.find('[data-test="incident-alert-group-more"]').exists()).toBe(false);
+    });
+
+    it("shows the top two alerts as chips and the rest in the +N more tooltip", async () => {
+      const cell = await mountWith(
+        createIncident({
+          alert_groups: ["a", "b", "c", "d", "e", "f", "g"].map((id, i) => ({
+            alert_id: id,
+            alert_name: `alert-${id}`,
+            count: 7 - i,
+          })),
+        }),
+      );
+      const chips = cell.findAll('[data-test="incident-alert-group-chip"]');
+      expect(chips.map((c) => c.text().replace(/\s+/g, " "))).toEqual(["alert-a ×7", "alert-b ×6"]);
+      const more = cell.find('[data-test="incident-alert-group-more"]');
+      expect(more.text()).toMatch(/^\+5 more/);
+      const rows = more
+        .find('[data-test="incident-alert-group-list"]')
+        .findAll("span")
+        .map((s) => s.text());
+      expect(rows).toEqual([
+        "alert-c",
+        "×5",
+        "alert-d",
+        "×4",
+        "alert-e",
+        "×3",
+        "alert-f",
+        "×2",
+        "alert-g",
+        "×1",
+      ]);
+    });
+
+    it("falls back to the alert count chip without alert groups", async () => {
+      const cell = await mountWith(createIncident({ alert_count: 7 }));
+      expect(cell.find('[data-test="incident-alert-group-chip"]').exists()).toBe(false);
+      expect(cell.text()).toBe("7");
+    });
+
+    it("shows the count chip for an incident with no linked alerts", async () => {
+      const cell = await mountWith(createIncident({ alert_groups: [], alert_count: 0 }));
+      expect(cell.find('[data-test="incident-alert-group-chip"]').exists()).toBe(false);
+      expect(cell.text()).toBe("0");
     });
   });
 });

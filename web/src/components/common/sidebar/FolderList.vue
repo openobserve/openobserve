@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ODropdownItem
                       variant="destructive"
                       data-test="dashboard-delete-folder-icon"
-                      @select="showDeleteFolderDialogFn(tab.folderId)"
+                      @select="showDeleteFolderDialogFn(tab.folderId, tab.name)"
                     >
                       <template #icon-left>
                         <OIcon name="delete" size="xs" />
@@ -174,10 +174,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="t(folderKey(type, 'dashboard.deleteFolder'))"
     data-test="dashboard-confirm-delete-folder-dialog"
-    :message="t(folderKey(type, 'dashboard.deleteFolderMessage'))"
+    :message="type === 'fleets' ? t(folderKey(type, 'dashboard.deleteFolderMessage')) : undefined"
+    :message-keypath="type === 'fleets' ? undefined : 'dashboard.deleteFolderMessage'"
+    :message-name="selectedFolderDeleteName"
     :confirm-text="deleteConfirmText"
     :ok-label="type === 'fleets' ? t('common.delete') : undefined"
-    :ok-variant="type === 'fleets' ? 'destructive' : undefined"
+    ok-variant="destructive"
     :focus-cancel="type === 'fleets'"
     @update:ok="deleteFolder"
     @update:cancel="confirmDeleteFolderDialog = false"
@@ -275,6 +277,7 @@ export default defineComponent({
     const isFolderEditMode = ref(false);
     const selectedFolderToEdit = ref(null);
     const selectedFolderDelete = ref(null);
+    const selectedFolderDeleteName = ref("");
     const confirmDeleteFolderDialog = ref(false);
     // A fleet holds collectors and their desired version, so deleting one asks for its name.
     const deleteConfirmText = computed(() => {
@@ -323,8 +326,9 @@ export default defineComponent({
       isFolderEditMode.value = false;
       emit("update:folders", folders);
     };
-    const showDeleteFolderDialogFn = (folderId: any) => {
+    const showDeleteFolderDialogFn = (folderId: any, folderName = "") => {
       selectedFolderDelete.value = folderId;
+      selectedFolderDeleteName.value = folderName;
       confirmDeleteFolderDialog.value = true;
     };
 
@@ -416,6 +420,7 @@ export default defineComponent({
       store,
       deleteFolder,
       selectedFolderDelete,
+      selectedFolderDeleteName,
       confirmDeleteFolderDialog,
       deleteConfirmText,
       showDeleteFolderDialogFn,

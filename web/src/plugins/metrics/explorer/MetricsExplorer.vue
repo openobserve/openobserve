@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimePickerRef"
           v-model="selectedDate"
           :auto-apply-dashboard="mode === 'visualize'"
+          calendar-presets
           @on:date-change="onDateChange"
         />
         <AutoRefreshInterval
@@ -114,7 +115,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <!-- Only an explicit Run writes query history; Refresh does not. -->
         <template v-if="mode === 'visualize'">
-          <QueryHistoryDrawer @load="onHistoryLoad" />
+          <QueryHistoryDrawer ref="historyDrawerRef" @load="onHistoryLoad" />
+          <RecentSearchesFocusDropdown
+            ref="recentDropdownRef"
+            v-model:open="recentEditor.open.value"
+            source="metrics"
+            :anchor="recentEditor.anchor.value"
+            @run="(entry, when) => historyDrawerRef?.restore(entry, when, true)"
+            @load="(entry, when) => historyDrawerRef?.restore(entry, when, false)"
+            @view-all="(status) => historyDrawerRef?.show(status)"
+          />
+          <RecentSearchesButton
+            source="metrics"
+            data-test="metrics-history-btn"
+            @run="(entry, when) => historyDrawerRef?.restore(entry, when, true)"
+            @load="(entry, when) => historyDrawerRef?.restore(entry, when, false)"
+            @view-all="(status) => historyDrawerRef?.show(status)"
+          />
           <OButtonGroup>
             <OButton
               :variant="isVisualizePending ? 'pending' : 'primary'"
@@ -746,6 +763,10 @@ import FunctionConfigDialog from "./FunctionConfigDialog.vue";
 import MetricDetailView from "./MetricDetailView.vue";
 import ExplorerSavedViews from "./ExplorerSavedViews.vue";
 import QueryHistoryDrawer from "../QueryHistoryDrawer.vue";
+import RecentSearchesButton from "@/components/queryHistory/RecentSearchesButton.vue";
+import RecentSearchesFocusDropdown from "@/components/queryHistory/RecentSearchesFocusDropdown.vue";
+import { useRecentSearchesEditorHost } from "@/composables/queryHistory/useRecentSearchesEditorHost";
+import { metricsEditorIsEmpty, metricsEditorIsEmptyWith } from "@/utils/queryHistory/metrics";
 
 import useMetricsExplorerGrid, {
   PAGE_SIZE_INCREMENT,
@@ -834,6 +855,8 @@ export default defineComponent({
     MetricDetailView,
     ExplorerSavedViews,
     QueryHistoryDrawer,
+    RecentSearchesButton,
+    RecentSearchesFocusDropdown,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -2092,8 +2115,21 @@ export default defineComponent({
     const onVisualizeRunWithoutCache = () =>
       visualizeRef.value?.onUserRun?.(selectedDate.value, true);
 
-    const onHistoryLoad = (entry: { metricsData: string; timeRange: SelectedDate }) => {
-      visualizeRef.value?.applyPanelData?.(entry.metricsData, entry.timeRange);
+    const historyDrawerRef = ref<InstanceType<typeof QueryHistoryDrawer> | null>(null);
+    // One editor takes one query, so multi-query rows stay out of its clock rows.
+    const recentEditor = useRecentSearchesEditorHost("metrics", {
+      opensOnFocus: () => metricsEditorIsEmpty(visualizeRef.value?.dashboardPanelData),
+      emptyWith: (isBlank) =>
+        metricsEditorIsEmptyWith(visualizeRef.value?.dashboardPanelData, isBlank),
+      acceptsQuery: (query) => !query.includes("\n"),
+    });
+
+    const onHistoryLoad = (entry: {
+      metricsData: string;
+      timeRange: SelectedDate;
+      run?: boolean;
+    }) => {
+      visualizeRef.value?.applyPanelData?.(entry.metricsData, entry.timeRange, entry.run !== false);
       track("metrics_explorer_history_loaded");
     };
 
@@ -2362,6 +2398,9 @@ export default defineComponent({
       onVisualizeRun,
       onVisualizeRunWithoutCache,
       onHistoryLoad,
+      historyDrawerRef,
+      recentEditor,
+      recentDropdownRef: recentEditor.dropdownRef,
       onVisualizeTimeRange,
     };
   },

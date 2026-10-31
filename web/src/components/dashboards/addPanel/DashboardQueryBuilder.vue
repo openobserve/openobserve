@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       !promqlBuilderMode &&
       dashboardPanelData.data.type != 'geomap' &&
       dashboardPanelData.data.type != 'maps' &&
-      dashboardPanelData.data.type != 'sankey'
+      !isFlowChart(dashboardPanelData.data.type)
     "
   >
     <!-- x axis container -->
@@ -29,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex w-full flex-row ps-3 max-md:flex-col"
       v-if="dashboardPanelData.data.type != 'metric'"
     >
-      <div class="flex-1">
+      <!-- A distribution buckets the y values, so it has no x field. -->
+      <div class="flex-1" v-if="dashboardPanelData.data.type != 'distribution'">
         <div class="flex flex-row">
           <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
             <span
@@ -81,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+                class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
                 radius="sm"
                 :divided="true"
                 :draggable="isDragArmed('x-' + index)"
@@ -177,23 +178,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'scatter' ||
           dashboardPanelData.data.type == 'area-stacked' ||
           dashboardPanelData.data.type == 'stacked' ||
-          dashboardPanelData.data.type == 'state-timeline'
+          dashboardPanelData.data.type == 'state-timeline' ||
+          dashboardPanelData.data.type == 'distribution' ||
+          dashboardPanelData.data.type == 'treemap' ||
+          dashboardPanelData.data.type == 'sunburst' ||
+          dashboardPanelData.data.type == 'hostmap'
         "
       >
         <div
           class="max-md:border-border-default flex h-full flex-row ps-3 max-md:border-t max-md:ps-0"
         >
           <!-- Separator between X and Breakdown/Pivot -->
-          <OSeparator vertical class="me-4 max-md:hidden" />
+          <OSeparator
+            v-if="dashboardPanelData.data.type != 'distribution'"
+            vertical
+            class="me-4 max-md:hidden"
+          />
           <!-- shrink-0, not min-w-0: the nowrap label would overflow onto the drop-zone hint if it shrank. -->
           <div class="layout-name flex min-w-0 items-center whitespace-nowrap max-lg:shrink-0">
             <span
               class="rounded-default bg-badge-orange-ol-text me-1.5 h-2 w-2 shrink-0"
               aria-hidden="true"
             ></span>
-            {{
-              dashboardPanelData.data.type == "table" ? t("panel.pivotField") : t("panel.breakdown")
-            }}
+            {{ currentBreakdownLabel }}
             <OIcon name="info-outline" size="sm" class="ms-1" />
             <OTooltip side="top" align="center">
               <template #content>
@@ -209,6 +216,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 <span v-else-if="dashboardPanelData.data.type == 'state-timeline'">{{
                   t("panel.breakdownTooltipStateTimeline")
+                }}</span>
+                <span v-else-if="dashboardPanelData.data.type == 'distribution'">{{
+                  t("panel.breakdownTooltipDistribution")
+                }}</span>
+                <span v-else-if="dashboardPanelData.data.type == 'treemap'">{{
+                  t("panel.breakdownTooltipTreemap")
+                }}</span>
+                <span v-else-if="dashboardPanelData.data.type == 'sunburst'">{{
+                  t("panel.breakdownTooltipSunburst")
+                }}</span>
+                <span v-else-if="dashboardPanelData.data.type == 'hostmap'">{{
+                  t("panel.breakdownTooltipHostmap")
                 }}</span>
                 <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
               </template>
@@ -255,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+                class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
                 radius="sm"
                 :divided="true"
                 :draggable="isDragArmed('breakdown-' + index)"
@@ -392,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             &nbsp;
           </div>
           <OButtonGroup
-            class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+            class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
             radius="sm"
             :divided="true"
             :draggable="isDragArmed('y-' + index)"
@@ -442,7 +461,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .fields.y[index]
                   "
-                  :allowAggregation="dashboardPanelData.data.type == 'heatmap' ? false : true"
+                  :allowAggregation="
+                    !['heatmap', 'distribution', 'boxplot'].includes(dashboardPanelData.data.type)
+                  "
                   :customQuery="
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .customQuery
@@ -528,7 +549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               &nbsp;
             </div>
             <OButtonGroup
-              class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+              class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
               radius="sm"
               :divided="true"
               :draggable="isDragArmed('z-' + index)"
@@ -667,6 +688,7 @@ import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOpti
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
+import { isFlowChart } from "@/utils/dashboard/chartTypeGroups";
 import { useStore } from "vuex";
 import { FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
@@ -690,6 +712,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { HOSTMAP_MAX_GROUP_LEVELS } from "@/utils/dashboard/convertHostmapData";
+import { TREEMAP_MAX_LEVELS } from "@/utils/dashboard/convertTreemapData";
+import { SUNBURST_MAX_LEVELS } from "@/utils/dashboard/convertSunburstData";
 
 // Minimal shape of a dashboard panel query slot as read by the PromQL builder.
 interface DashboardQuerySlot {
@@ -763,7 +788,28 @@ export default defineComponent({
     // Translated axis labels. The composable's currentXLabel/currentYLabel return
     // hardcoded English; recompute them here through t() so they respect the
     // active locale (mirrors the composable's type/pivot branching).
+    // Hierarchy, row and category charts name each well by its job, as the sankey builder does.
+    const roleLabels = computed((): { x: string; y: string; b: string | null } | null => {
+      switch (dashboardPanelData.data.type) {
+        case "treemap":
+        case "sunburst":
+          return { x: t("panel.wellGroup"), y: t("panel.wellSize"), b: t("panel.wellSubgroup") };
+        case "boxplot":
+          return { x: t("panel.wellCategory"), y: t("panel.value"), b: null };
+        default:
+          return null;
+      }
+    });
+
+    const currentBreakdownLabel = computed(() => {
+      if (dashboardPanelData.data.type == "table") return t("panel.pivotField");
+      if (dashboardPanelData.data.type == "hostmap") return t("panel.hostmapGroupBy");
+      return roleLabels.value?.b ?? t("panel.breakdown");
+    });
+
     const currentXLabel = computed(() => {
+      if (dashboardPanelData.data.type == "hostmap") return t("panel.hostmapEntity");
+      if (roleLabels.value) return roleLabels.value.x;
       if (dashboardPanelData.data.type == "table") {
         return isPivotMode.value ? t("panel.rowFields") : t("panel.firstColumn");
       }
@@ -773,6 +819,8 @@ export default defineComponent({
     });
 
     const currentYLabel = computed(() => {
+      if (dashboardPanelData.data.type == "hostmap") return t("panel.hostmapValue");
+      if (roleLabels.value) return roleLabels.value.y;
       if (dashboardPanelData.data.type == "table") {
         return isPivotMode.value ? t("panel.valueFields") : t("panel.otherColumn");
       }
@@ -1002,6 +1050,9 @@ export default defineComponent({
                 case "metric":
                   maxAllowedAxisFields = targetAxis === "x" ? 0 : 1;
                   break;
+                case "hostmap":
+                  maxAllowedAxisFields = targetAxis === "breakdown" ? HOSTMAP_MAX_GROUP_LEVELS : 1;
+                  break;
                 case "table":
                   maxAllowedAxisFields = 0;
                   break;
@@ -1139,8 +1190,14 @@ export default defineComponent({
       switch (dashboardPanelData.data.type) {
         case "pie":
         case "donut":
+        case "funnel":
           return t("dashboard.oneLabelFieldMessage");
+        case "treemap":
+          return t("dashboard.treemapLevelsHint", { count: TREEMAP_MAX_LEVELS });
+        case "sunburst":
+          return t("panel.sunburstLevelsHint", { count: SUNBURST_MAX_LEVELS });
         case "metric":
+        case "distribution":
           return t("dashboard.xaxisFieldNAMessage");
         case "table":
           return t("dashboard.oneOrMoreFieldsMessage");
@@ -1155,8 +1212,11 @@ export default defineComponent({
           return t("dashboard.twoFieldsMessage");
         case "heatmap":
         case "state-timeline":
+        case "hostmap":
           return t("dashboard.oneFieldMessage");
         case "gauge":
+        case "bar-gauge":
+        case "boxplot":
           return t("dashboard.dashboardQueryBuilder.addZeroOrOneLabelField");
         default:
           return t("dashboard.maxtwofieldMessage");
@@ -1169,6 +1229,8 @@ export default defineComponent({
         case "area-stacked":
         case "h-stacked":
           return t("dashboard.twoFieldsMessage");
+        case "hostmap":
+          return t("dashboard.hostmapGroupByHint");
         default:
           return t("dashboard.zeroOrOneFieldMessage");
       }
@@ -1179,11 +1241,17 @@ export default defineComponent({
         case "pie":
         case "donut":
         case "gauge":
+        case "bar-gauge":
+        case "treemap":
+        case "sunburst":
+        case "funnel":
           return t("dashboard.oneValueFieldMessage");
         case "metric":
           return t("dashboard.oneValueFieldMessage");
         case "heatmap":
         case "state-timeline":
+        case "boxplot":
+        case "hostmap":
           return t("dashboard.oneFieldMessage");
         default:
           return t("dashboard.oneOrMoreFieldsMessage");
@@ -1534,6 +1602,7 @@ export default defineComponent({
     return {
       shouldShowPromQLQueryType,
       showXAxis,
+      isFlowChart,
       t,
       FIELD_FUNCTION_MENU_WIDTH,
       panelName,
@@ -1573,6 +1642,7 @@ export default defineComponent({
       isDragArmed,
       currentXLabel,
       currentYLabel,
+      currentBreakdownLabel,
       labelWidthClass,
       isPivotMode,
       reorderItems,

@@ -43,9 +43,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm"
           data-test="function-list-add-function-btn"
+          :aria-label="
+            functionDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('function.add') })
+              : undefined
+          "
           @click="showAddUpdateFn({})"
         >
           {{ t(`function.add`) }}
+          <EditorDraftDot
+            v-if="functionDrafts.hasNew"
+            :saved-at="functionDrafts.savedAt(null)"
+            corner
+            data-test="function-list-add-function-draft-dot"
+          />
         </OButton>
       </template>
       <div class="min-h-0 w-full flex-1 overflow-hidden">
@@ -109,11 +120,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-name="{ row, value }">
-              <span
-                class="text-text-body"
-                :data-test="`function-list-name-cell-${row?.name ?? value}`"
-                >{{ value }}</span
-              >
+              <span class="inline-flex items-center gap-2">
+                <span
+                  class="text-text-body"
+                  :data-test="`function-list-name-cell-${row?.name ?? value}`"
+                  >{{ value }}</span
+                >
+                <EditorDraftDot
+                  v-if="functionDrafts.ids.has(row?.name)"
+                  :saved-at="functionDrafts.savedAt(row?.name)"
+                  :data-test="`function-list-${row?.name}-draft-dot`"
+                />
+              </span>
             </template>
 
             <!-- Language of the transform. Its own column (sortable + hideable)
@@ -256,7 +274,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <ConfirmDialog
       :title="t('function.deleteTransformDialogTitle')"
-      :message="t('function.deleteTransformConfirmMessage')"
+      message-keypath="function.deleteTransformConfirmMessage"
+      :message-name="selectedDelete?.name"
+      ok-variant="destructive"
       @update:ok="deleteFn"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -265,6 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('function.deleteFunctionsDialogTitle')"
       :message="t('functions.confirmDeleteFunctions', { count: selectedFunctions.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteFunctions"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -335,6 +356,9 @@ import {
   functionsQuery,
 } from "@/services/jstransform.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 
 export default defineComponent({
   name: "functionList",
@@ -352,6 +376,7 @@ export default defineComponent({
     ODropdownItem,
     OSearchInput,
     ORefreshButton,
+    EditorDraftDot,
   },
   emits: [
     "updated:fields",
@@ -383,6 +408,11 @@ export default defineComponent({
     });
     const filterQuery = ref(viewState.filterQuery);
     const { track } = useReo();
+    const functionDrafts = useEditorDraftIds("function");
+    const dropFunctionDrafts = (names: string[]) => {
+      const org = store.state.selectedOrganization.identifier;
+      names.forEach((name) => deleteEditorDraftsFor({ kind: "function", org, entityId: name }));
+    };
     const columns: OTableColumnDef[] = [
       {
         id: "name",
@@ -624,10 +654,12 @@ export default defineComponent({
     const deleteFunction = useMutation(() => deleteFunctionMutation(orgId.value));
 
     const deleteFn = () => {
+      const name = selectedDelete.value.name;
       deleteFunction
-        .mutateAsync(selectedDelete.value.name)
+        .mutateAsync(name)
         .then((res: any) => {
           if (res.data.code == 200) {
+            dropFunctionDrafts([name]);
             toast({
               variant: "success",
               message: res.data.message,
@@ -856,6 +888,7 @@ export default defineComponent({
         // Handle response based on successful/unsuccessful arrays
         if (response.data) {
           const { successful = [], unsuccessful = [] } = response.data;
+          dropFunctionDrafts(successful.map(String));
           const successCount = successful.length;
           const failCount = unsuccessful.length;
 
@@ -885,6 +918,7 @@ export default defineComponent({
             });
           }
         } else {
+          dropFunctionDrafts(payload.ids);
           // Fallback success message
           toast({
             variant: "success",
@@ -949,6 +983,7 @@ export default defineComponent({
       raw,
       store,
       router,
+      functionDrafts,
       jsTransforms,
       columns,
       formData,

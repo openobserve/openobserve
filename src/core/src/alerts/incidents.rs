@@ -630,7 +630,7 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
 /// Correlate an alert to an incident, and send a notification if appropriate.
 ///
 /// This is the main entry point for incident correlation in the alert execution flow.
-/// Called after deduplication, instead of direct notification for `creates_incident=true` alerts.
+/// Called instead of direct notification for `creates_incident=true` alerts.
 ///
 /// Notification behaviour:
 /// - `NewIncidentCreated` → sends incident notification to merged destinations of all correlated
@@ -863,6 +863,15 @@ pub async fn correlate_alert_to_incident(
         }
     }
 
+    // A new alert is new evidence, so a page whose ladder ran out may page again.
+    #[cfg(feature = "enterprise")]
+    if let Some(incident_id) = outcome.joined_by_new_alert()
+        && downtime.is_none()
+        && o2_enterprise::enterprise::oncall::is_enabled()
+    {
+        page_again_after_new_alert(&alert.org_id, incident_id).await;
+    }
+
     // Starts after routing decides L0; an un-mute keeps an already stored off decision.
     #[cfg(feature = "enterprise")]
     if let IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. } = &outcome
@@ -1010,6 +1019,14 @@ pub async fn correlate_external_event(
         None,
     )
     .await?;
+
+    // A new external alert is new evidence too, so an unanswered page may page again.
+    #[cfg(feature = "enterprise")]
+    if let Some(incident_id) = outcome.joined_by_new_alert()
+        && o2_enterprise::enterprise::oncall::is_enabled()
+    {
+        page_again_after_new_alert(org_id, incident_id).await;
+    }
 
     // No on-call routing on this path, so nothing decides L0 and the run starts.
     #[cfg(feature = "enterprise")]
@@ -2216,25 +2233,29 @@ pub async fn list_incidents(
 
     // Get actual alert counts from junction table (source of truth)
     let incident_ids: Vec<String> = incidents.iter().map(|i| i.id.clone()).collect();
-    let actual_counts = infra::table::alert_incidents::get_alert_counts(&incident_ids).await?;
+    let mut actual_counts = infra::table::alert_incidents::get_alert_counts(&incident_ids).await?;
 
     let incidents_list: Vec<Incident> = incidents
         .into_iter()
         .map(|i| {
-            let mut incident = model_to_incident_with_topology(i.clone(), None);
+            let counts = actual_counts.remove(&i.id);
+            let mut incident = model_to_incident_with_topology(i, None);
+            let Some(counts) = counts else {
+                incident.alert_groups = Some(Vec::new());
+                return incident;
+            };
 
             // Fix alert_count from actual triggers (self-healing for corrupted data)
-            if let Some(&actual_count) = actual_counts.get(&i.id)
-                && incident.alert_count != actual_count
-            {
+            if incident.alert_count != counts.total {
                 log::debug!(
                     "[incidents] List: Incident {} alert_count mismatch: stored={}, actual={}",
-                    i.id,
+                    incident.id,
                     incident.alert_count,
-                    actual_count
+                    counts.total
                 );
-                incident.alert_count = actual_count;
+                incident.alert_count = counts.total;
             }
+            incident.alert_groups = Some(counts.groups);
 
             incident
         })
@@ -2585,6 +2606,71 @@ async fn start_unmuted_incident_rca(
         )
         .await;
     }
+}
+
+/// Tells each of the incident's pages that a new alert joined, re-running a ladder that ran out.
+#[cfg(feature = "enterprise")]
+async fn page_again_after_new_alert(org_id: &str, incident_id: &str) {
+    use config::meta::oncall::NewAlertEffect;
+    use o2_enterprise::enterprise::oncall::{escalation::ENGINE_ACTOR, replicate};
+
+    let now = config::utils::time::now_micros();
+    let pages = match infra::table::oncall_responses::list_for_incident(org_id, incident_id).await {
+        Ok(pages) => pages,
+        Err(e) => {
+            log::error!("[incidents] on-call pages of {org_id}/{incident_id}: {e}");
+            return;
+        }
+    };
+    for page in pages {
+        let repaged = match page.on_new_alert(now) {
+            NewAlertEffect::Nothing => continue,
+            NewAlertEffect::NoteOnly => false,
+            // Ok(false): acked, snoozed or re-run since the read, so this alert only gets the note.
+            NewAlertEffect::PageAgain => match restart_exhausted_ladder(org_id, &page, now).await {
+                Ok(repaged) => repaged,
+                Err(e) => {
+                    log::error!("[incidents] could not page {org_id}/{} again: {e}", page.id);
+                    continue;
+                }
+            },
+        };
+        let event = page.new_alert_note(repaged, ENGINE_ACTOR, now);
+        if let Err(e) = replicate::add_event(org_id, &page.id, &event).await {
+            log::error!("[incidents] timeline of {org_id}/{}: {e}", page.id);
+        }
+    }
+}
+
+/// Re-runs an exhausted page's ladder if nobody touched it since `seen`, then re-arms its timer.
+#[cfg(feature = "enterprise")]
+async fn restart_exhausted_ladder(
+    org_id: &str,
+    seen: &config::meta::oncall::Response,
+    now: i64,
+) -> Result<bool, anyhow::Error> {
+    use config::meta::triggers::{Trigger, TriggerModule};
+    use o2_enterprise::enterprise::oncall::replicate;
+
+    let Some(updated) =
+        infra::table::oncall_responses::restart_exhausted(org_id, seen, now).await?
+    else {
+        return Ok(false);
+    };
+    // Upsert keeps the row's data; a racing tick may delete it, and the reconcile sweep re-arms it.
+    infra::scheduler::arm_with(
+        infra::db::get_orm_client_rw().await,
+        &Trigger {
+            org: org_id.to_string(),
+            module: TriggerModule::OncallEscalation,
+            module_key: updated.id.clone(),
+            next_run_at: now,
+            ..Default::default()
+        },
+    )
+    .await?;
+    replicate::response(&updated).await;
+    Ok(true)
 }
 
 /// A manual run does not decide L0, so only a stored off reason skips the un-mute decision.
@@ -3014,6 +3100,7 @@ fn model_to_incident_with_topology(
         muted_by_downtime_id: db_model.muted_by_downtime_id,
         rca,
         rca_off_reason: db_model.rca_off_reason,
+        alert_groups: None,
     }
 }
 
@@ -3041,6 +3128,32 @@ async fn record_muted_auto_resolve<C: sea_orm::ConnectionTrait + sea_orm::Transa
     let comment = IncidentEvent::comment("system", format!("Resolved while muted by {name}"));
     infra::table::incident_events::append_with(conn, org_id, incident_id, comment).await?;
     Ok(())
+}
+
+/// An incident ack made anywhere but an alert's own ack acks every firing row of its alerts (§5.6).
+async fn ack_incident_alerts(org_id: &str, incident_id: &str, user_id: &str) {
+    if crate::alerts::ack::propagating() {
+        return;
+    }
+    let alerts = match infra::table::alert_incidents::get_incident_alerts(incident_id).await {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::warn!("[incidents] could not list the alerts of {incident_id} to ack them: {e}");
+            return;
+        }
+    };
+    let mut ids: Vec<String> = alerts.into_iter().map(|a| a.alert_id).collect();
+    ids.sort();
+    ids.dedup();
+    for alert_id in ids {
+        crate::alerts::ack::ack_from_elsewhere(
+            org_id,
+            &alert_id,
+            user_id,
+            config::meta::alerts::ack::AckSource::Incident,
+        )
+        .await;
+    }
 }
 
 /// Update incident status
@@ -3081,6 +3194,13 @@ pub async fn update_status_as(
     } else {
         infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
     };
+    // The ack guard left a resolved row alone: record and replicate nothing.
+    if status == "acknowledged" && updated.status != "acknowledged" {
+        return model_to_incident(updated).await;
+    }
+    if status == "acknowledged" && updated.acknowledged_by.as_deref() == Some(user_id) {
+        ack_incident_alerts(org_id, incident_id, user_id).await;
+    }
 
     let muted = status_change_is_muted(
         quiet || muted_before,
@@ -4128,18 +4248,36 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn the_list_carries_each_incidents_run_summary() {
-        use config::meta::alerts::rca_runs::{RunState, RunTrigger};
+        use config::meta::alerts::rca_runs::{ReportFormat, RunState, RunTrigger};
 
-        use crate::alerts::rca_runs::tests::{add_incident, db, new_incident, start};
+        use crate::alerts::rca_runs::{
+            rca_detail,
+            tests::{
+                add_incident, completed_at, db, incident_row, new_incident, pre_run_topology, start,
+            },
+        };
 
         let _db = db().await;
         let (org, analyzed) = new_incident(None).await;
         let run_id = start(&org, &analyzed, RunTrigger::AutoNewIncident).await;
         let never = add_incident(&org, None).await;
+        // Reports from before runs existed: dated by the archive, else by the Complete event.
+        let archived = add_incident(&org, Some(pre_run_topology())).await;
+        let single = add_incident(
+            &org,
+            Some(serde_json::json!({"nodes": [], "edges": [], "suggested_root_cause": "r"})),
+        )
+        .await;
+        completed_at(&org, &single, 150).await;
+        let rerun = add_incident(&org, Some(pre_run_topology())).await;
+        let rerun_id = start(&org, &rerun, RunTrigger::Manual).await;
+        infra::table::rca_runs::backfill_v1_pointers_for_tests()
+            .await
+            .unwrap();
 
         let (incidents, total) = list_incidents(&org, None, 50, 0).await.unwrap();
 
-        assert_eq!(total, 2);
+        assert_eq!(total, 5);
         let by_id = |id: &str| incidents.iter().find(|i| i.id == id).unwrap();
         let rca = by_id(&analyzed).rca.as_ref().unwrap();
         assert_eq!(rca.run_id, run_id);
@@ -4147,6 +4285,35 @@ mod tests {
         assert!(!rca.stale);
         assert!(rca.detail.is_none(), "the list adds no join");
         assert!(by_id(&never).rca.is_none());
+        let v1 = |id: &str| {
+            let rca = by_id(id).rca.as_ref().expect("a pre-run report shows");
+            (
+                rca.run_id.as_str(),
+                rca.report_format,
+                rca.state,
+                rca.outcome.as_deref(),
+                rca.updated_at,
+            )
+        };
+        let (format, state) = (ReportFormat::V1, RunState::Completed);
+        assert_eq!(v1(&archived), ("v1-0", format, state, None, 200));
+        assert_eq!(v1(&single), ("v1-0", format, state, None, 150));
+        let rca = by_id(&rerun).rca.as_ref().unwrap();
+        assert_eq!(
+            (rca.run_id.as_str(), rca.report_format),
+            (rerun_id.as_str(), ReportFormat::V2),
+            "a run replaces the pre-run report"
+        );
+        for id in [&archived, &single] {
+            let listed = by_id(id).rca.as_ref().unwrap();
+            let mut detail = rca_detail(&org, &incident_row(&org, id).await)
+                .await
+                .unwrap()
+                .unwrap();
+            let fields = detail.detail.take().unwrap();
+            assert_eq!(&detail, listed, "the detail summary is the list summary");
+            assert_eq!(fields.history[0].started_at, listed.updated_at);
+        }
 
         let json = serde_json::to_value(&incidents).unwrap();
         let json_of = |id: &str| {
@@ -4161,6 +4328,55 @@ mod tests {
         assert!(json_of(&analyzed)["rca"].get("current_run").is_none());
         assert!(json_of(&never)["rca"].is_null());
         assert!(json_of(&never).as_object().unwrap().contains_key("rca"));
+        assert_eq!(json_of(&archived)["rca"]["report_format"], "v1");
+    }
+
+    /// Each listed incident names the alerts that fired into it and how often; an incident
+    /// with no links lists none, and `alert_count` heals to the junction's firing total.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_list_carries_each_incidents_alert_groups() {
+        use config::meta::alerts::incidents::IncidentAlertGroup;
+        use infra::table::alert_incidents::add_alert_to_incident;
+
+        use crate::alerts::rca_runs::tests::{add_incident, db, new_incident};
+
+        let _db = db().await;
+        let (org, repeat) = new_incident(None).await;
+        let unlinked = add_incident(&org, None).await;
+        for (alert, fired_at) in [("a", 1), ("b", 2), ("a", 3), ("a", 4)] {
+            add_alert_to_incident(
+                &repeat,
+                alert,
+                &format!("{alert}-name"),
+                "alert",
+                fired_at,
+                "manual",
+            )
+            .await
+            .unwrap();
+        }
+
+        let (incidents, _) = list_incidents(&org, None, 50, 0).await.unwrap();
+
+        let by_id = |id: &str| incidents.iter().find(|i| i.id == id).unwrap();
+        let group = |id: &str, count| IncidentAlertGroup {
+            alert_id: id.to_string(),
+            alert_name: format!("{id}-name"),
+            count,
+        };
+        let listed = by_id(&repeat);
+        assert_eq!(
+            listed.alert_groups.as_deref(),
+            Some(&[group("a", 3), group("b", 1)][..])
+        );
+        // Seeded at 1 and incremented per link, so stored is 5: the list heals it to 4.
+        assert_eq!(listed.alert_count, 4);
+        let none = by_id(&unlinked);
+        assert_eq!(none.alert_groups.as_deref(), Some(&[][..]));
+
+        let json = serde_json::to_value(listed).unwrap();
+        assert_eq!(json["alert_groups"][0]["count"], 3);
     }
 
     /// A turn that could not start fails its run with the turn's code and an actionable reason.

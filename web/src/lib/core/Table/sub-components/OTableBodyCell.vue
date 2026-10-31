@@ -95,10 +95,11 @@ const slotAlignClass = computed(() => {
   return "flex items-center w-full min-w-0";
 });
 
-// Slotted content truncates to one line unless `wrap` is on, mirroring the
-// default (non-slot) behaviour.
+// Truncates like `truncate`, but clip with a margin lets a focused control's outline in the slot still paint.
 const slotContentClass = computed(() =>
-  props.wrap ? "min-w-0 flex-1 wrap-anywhere whitespace-normal" : "truncate min-w-0 flex-1",
+  props.wrap
+    ? "min-w-0 flex-1 wrap-anywhere whitespace-normal"
+    : "min-w-0 flex-1 overflow-clip text-ellipsis whitespace-nowrap [overflow-clip-margin:0.25rem]",
 );
 
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
@@ -459,8 +460,8 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
       isAction ? 'w-0 whitespace-nowrap' : '',
       isPinned
         ? rowSelected
-          ? 'bg-table-row-selected-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
-          : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
+          ? 'bg-table-row-selected-bg transition-colors duration-(--duration-hover-out)'
+          : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-(--duration-hover-out) group-hover/row:duration-(--duration-hover-in)'
         : '',
       wrap
         ? 'wrap-anywhere whitespace-normal'
@@ -469,7 +470,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
             ? 'overflow-hidden text-ellipsis whitespace-nowrap'
             : 'whitespace-nowrap'
           : isAction
-            ? 'overflow-hidden whitespace-nowrap'
+            ? 'overflow-clip whitespace-nowrap [overflow-clip-margin:0.25rem] has-[:focus-visible]:z-2!'
             : 'overflow-hidden text-ellipsis whitespace-nowrap',
       meta?.cellClass ?? '',
       isTreeColumn ? 'relative' : '',
@@ -571,7 +572,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
           size="icon-xs-sq"
           :data-test="`o2-table-cell-copy-${cell.column.id}`"
           :data-copied="copied ? 'true' : undefined"
-          class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100 max-md:opacity-100"
+          class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
           :class="align === 'right' ? 'order-first me-1' : 'ms-1'"
           :title="copied ? t('common.copiedExclaim') : t('common.copy')"
           @click="handleCopy"
@@ -619,7 +620,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
           <!-- empty:hidden covers what the vnode walk can't see: slot content that IS a
                component but renders nothing, e.g. the AI button on a non-AI build. -->
           <div
-            class="peer bg-surface-overlay border-border-default rounded-default flex items-center gap-1 border border-solid px-1 py-0.5 shadow-lg empty:hidden"
+            class="peer bg-surface-overlay rounded-default shadow-overlay flex items-center gap-1 border border-solid border-transparent px-1 py-0.5 empty:hidden"
           >
             <slot
               name="cell-hover-actions"

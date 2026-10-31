@@ -439,6 +439,9 @@ mod tests {
 
     fn versioned(version: i64, updated_at: i64) -> Downtime {
         Downtime {
+            alert_groups: None,
+            end_on_clear: None,
+            source: None,
             id: "d1".to_string(),
             org: "acme".to_string(),
             folder_id: "default".to_string(),

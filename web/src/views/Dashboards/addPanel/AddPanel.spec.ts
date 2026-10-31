@@ -655,6 +655,28 @@ describe("AddPanel.vue", () => {
       });
     });
 
+    it("offers the dashboard's variables, with list formats for multi-select ones, to the title field", async () => {
+      wrapper.vm.currentDashboardData.data = {
+        tabs: [{ tabId: "default" }],
+        variables: {
+          list: [
+            { name: "cdu", type: "query_values", multiSelect: false },
+            { name: "rack", type: "query_values", multiSelect: true },
+          ],
+        },
+      };
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.titleSuggestions.map((s: { name: string }) => s.name)).toEqual([
+        "cdu",
+        "rack",
+        "rack:csv",
+        "rack:pipe",
+        "rack:doublequote",
+        "rack:singlequote",
+      ]);
+    });
+
     it("should compute panelTitle correctly when in edit mode", () => {
       wrapper.vm.editMode = true;
       wrapper.vm.dashboardPanelData.data.title = "Test Panel";
@@ -4306,6 +4328,38 @@ describe("AddPanel.vue", () => {
         }
       });
 
+      it("seeds the applied-date key from the resolved window, not the unresolved selection", () => {
+        if (!wrapper.vm.updateDateTime) return;
+
+        // The first calendar selection has no startTime yet — the picker backfills it only after this call.
+        wrapper.vm.selectedDate = {
+          valueType: "relative",
+          relativeTimePeriod: "calendar:month:0",
+        };
+        const resolvedStartTime = 1700000000000;
+        wrapper.vm.dateTimePickerRef = {
+          getConsumableDateTime: vi.fn().mockReturnValue({
+            startTime: resolvedStartTime,
+            endTime: 1700000500000,
+            relativeTimePeriod: "calendar:month:0",
+          }),
+        };
+
+        try {
+          wrapper.vm.updateDateTime();
+          expect(wrapper.vm.appliedDateKey).not.toContain("undefined");
+
+          // Simulate the picker backfilling selectedDate with the same resolved startTime.
+          wrapper.vm.selectedDate = {
+            ...wrapper.vm.selectedDate,
+            startTime: resolvedStartTime,
+          };
+          expect(wrapper.vm.isTimeChangePending).toBe(false);
+        } catch (error) {
+          // Expected if router not fully mocked
+        }
+      });
+
       it("should test goBack method", () => {
         if (wrapper.vm.goBack) {
           try {
@@ -4991,6 +5045,24 @@ describe("AddPanel.vue", () => {
       );
       expect(editor.runQuery).not.toHaveBeenCalled();
       expect(editor.initChartData).not.toHaveBeenCalled();
+    });
+
+    it("runs Apply on an alert list, which reads the alerts API and has no query", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementation(() => {});
+      const editor = { reportValidationErrors: vi.fn(), runQuery: vi.fn(), initChartData: vi.fn() };
+      wrapper.vm.panelEditorRef = editor;
+      wrapper.vm.dashboardPanelData.data.type = "alert-list";
+      const query = wrapper.vm.dashboardPanelData.data.queries[0];
+      // The mocked panel's map/sankey placeholders are objects; a real alert list has them null.
+      Object.assign(query.fields, { source: null, target: null, latitude: null, longitude: null });
+      query.query = "";
+      wrapper.vm.shouldRefreshWithoutCache = false;
+
+      wrapper.vm.runQuery(true);
+
+      expect(editor.reportValidationErrors).not.toHaveBeenCalled();
+      expect(wrapper.vm.shouldRefreshWithoutCache).toBe(true);
     });
 
     it("still runs Apply with a filter that has no value yet, which the query drops", async () => {

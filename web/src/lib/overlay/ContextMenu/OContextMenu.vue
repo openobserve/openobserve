@@ -92,7 +92,7 @@ onBeforeUnmount(() => {
           // Surface — a context menu is visually the same object as a dropdown
           // menu, so it deliberately shares the dropdown token set rather than
           // duplicating one that would have to be kept in sync.
-          'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
+          'bg-dropdown-bg rounded-default shadow-overlay border border-transparent',
           // Typography
           'text-dropdown-item-text text-sm',
           // Animation — same clip-path reveal as ODropdown, wiping away from

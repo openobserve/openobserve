@@ -55,9 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              unaffected — the spacer just absorbs 1.25rem less. -->
         <!-- Curated tiles sit six to a row: they wrap at every width and keep two lines so a row's values stay level. -->
         <!-- One line; next to notice chips it holds ~40% of the bar so the chip squeezes nothing but the spacer. -->
+        <!-- shrink-[1000]: at factor 1 a long title still hands a fraction of a pixel of its cut to the freshness label, which ellipsises it to "no…". -->
         <OTruncatedText
           as="div"
-          class="text-compact text-text-heading me-5 font-medium tracking-[0.02em] @max-[22rem]/panelbar:me-1"
+          class="text-compact text-text-heading me-5 shrink-[1000] font-medium tracking-[0.02em] @max-[22rem]/panelbar:me-1"
           :class="[
             curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined,
             hasNoticeChips
@@ -66,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ]"
           data-test="dashboard-panel-header"
         >
-          {{ props.data.title }}
+          {{ panelTitle }}
         </OTruncatedText>
         <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
@@ -140,6 +141,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'heatmap',
               'metric',
               'gauge',
+              'bar-gauge',
+              'treemap',
+              'sunburst',
+              'funnel',
+              'node-graph',
+              'alert-list',
+              'flame-graph',
+              'boxplot',
+              'logs',
             ].includes(props.data.type)
           "
           variant="ghost"
@@ -411,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               data-test="dashboard-panel-download-as-csv-btn"
-              @select="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
+              @select="PanleSchemaRendererRef?.downloadDataAsCSV(panelFileName)"
             >
               <template #icon-left><OIcon name="file-download" size="sm" /></template>
               {{ t("panel.downloadAsCSV") }}
@@ -419,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               data-test="dashboard-panel-download-as-json-btn"
-              @select="PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)"
+              @select="PanleSchemaRendererRef?.downloadDataAsJSON(panelFileName)"
             >
               <template #icon-left><OIcon name="data-object" size="sm" /></template>
               {{ t("panel.downloadAsJSON") }}
@@ -453,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  panel's state through a pure adapter and the action owns the rest
                  (label, confirm dialog, transport). See CreateAlertAction.vue. -->
             <CreateAlertAction
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              v-if="!simplifiedPanelView && canCreateAlert"
               variant="menu-item"
               source="panel"
               :build="buildPanelAlertPrefill"
@@ -598,7 +608,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('panel.deletePanelTitle')"
-      :message="t('panel.deletePanelMessage')"
+      message-keypath="panel.deletePanelMessage"
+      :message-name="data.title"
+      ok-variant="destructive"
       @update:ok="deletePanelDialog"
       @update:cancel="confirmDeletePanelDialog = false"
       v-model="confirmDeletePanelDialog"
@@ -652,7 +664,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
 import shortURL from "@/services/short_url";
+import { isEnrichmentTablePanel } from "@/utils/dashboard/streamLifetime";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
+import { toPanelFileName } from "@/utils/dashboard/panelTitle";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
@@ -759,6 +774,12 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { t } = useI18nTyped();
+    const panelTitle = usePanelTitle({
+      title: () => props.data?.title,
+      variablesData: () => props.variablesData,
+      context: () => ({ tabId: props.tabId, panelId: props.data?.id }),
+    });
+    const panelFileName = computed(() => toPanelFileName(panelTitle.value));
     // Curated pages stamp this; stored dashboards never carry it, so the badge
     // and the body dimming are both invisible outside them (§6.3).
     const curatedBadge = computed(
@@ -1356,11 +1377,11 @@ export default defineComponent({
       const panelId = props.data?.id;
       if (panelId) {
         panelDownloadRegistry.set(panelId, () =>
-          PanleSchemaRendererRef.value?.logDataAsJSON(props.data?.title),
+          PanleSchemaRendererRef.value?.logDataAsJSON(panelTitle.value),
         );
         panelCsvRegistry.set(
           panelId,
-          () => PanleSchemaRendererRef.value?.getPanelCsvData(props.data?.title) ?? null,
+          () => PanleSchemaRendererRef.value?.getPanelCsvData(panelTitle.value) ?? null,
         );
       }
     });
@@ -1428,12 +1449,19 @@ export default defineComponent({
     onMounted(() => window.addEventListener("keydown", handlePanelKeydown));
     onBeforeUnmount(() => window.removeEventListener("keydown", handlePanelKeydown));
 
+    // An alert list reads the alerts API, so it has no query to build an alert from.
+    const canCreateAlert = computed(
+      () => props.data?.type !== "alert-list" && (metaData.value?.queries?.length ?? 0) > 0,
+    );
+
     // Guards that used to fire as toasts AFTER the user clicked "Create alert".
     // Stated up front as a disabled reason instead — a dead-end click is worse
     // than a control that explains itself.
     const alertDisabledReason = computed(() => {
       const visible = (props.data?.queries ?? []).filter((query: any) => !query?.config?.hide);
       if (!visible.length) return t("panel.noQueriesToCreateAlert");
+      // The alert form offers no enrichment-table stream type, so the prefill would be rejected.
+      if (isEnrichmentTablePanel(props.data)) return t("panel.enrichmentTableAlertUnsupported");
       // A formula's stream comes from its inputs' text; any other query needs its own.
       if (!visible.some((query: any) => isFormulaQuery(query) || query?.fields?.stream)) {
         return t("panel.panelQueryMustHaveStream");
@@ -1461,7 +1489,10 @@ export default defineComponent({
       curatedTile,
       curatedTableOwnsEmpty,
       onCuratedSeriesData,
+      panelTitle,
+      panelFileName,
       alertDisabledReason,
+      canCreateAlert,
       onEditPanel,
       onNoticeEditPanel,
       showDraftDot,

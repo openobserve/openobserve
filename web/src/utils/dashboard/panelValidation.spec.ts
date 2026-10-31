@@ -337,6 +337,53 @@ describe("panelValidation", () => {
   });
 });
 
+describe("validateSQLPanelFields — host map field rules", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: `max(${alias})`,
+  });
+  const errorsFor = (fields: any) => {
+    const errors: string[] = [];
+    validateSQLPanelFields(
+      gt,
+      { type: "hostmap", queryType: "sql", queries: [{ customQuery: false, fields }] },
+      0,
+      "Entity",
+      "Value",
+      errors,
+      true,
+    );
+    return errors;
+  };
+
+  it("accepts one entity, one value and up to two group fields", () => {
+    expect(
+      errorsFor({
+        x: [field("gpu")],
+        y: [field("temp")],
+        breakdown: [field("rack"), field("host")],
+      }),
+    ).toEqual([]);
+  });
+
+  it("needs exactly one entity and one value", () => {
+    expect(errorsFor({ x: [], y: [field("temp")], breakdown: [] })).toHaveLength(1);
+    expect(errorsFor({ x: [field("gpu")], y: [], breakdown: [] })).toHaveLength(1);
+  });
+
+  it("rejects a third group level", () => {
+    const errors = errorsFor({
+      x: [field("gpu")],
+      y: [field("temp")],
+      breakdown: [field("dc"), field("rack"), field("host")],
+    });
+    expect(errors).toEqual(["Host map can group by at most 2 fields"]);
+  });
+});
+
 describe("validatePanel on a PromQL formula", () => {
   const run = (queries: any[]) => {
     const errors: string[] = [];
@@ -459,6 +506,546 @@ describe("validateConditions", () => {
       errors,
     );
     expect(errors).toHaveLength(0);
+  });
+});
+
+describe("validatePanel on cartesian settings", () => {
+  const run = (config: any, { type = "line", queryType = "sql" } = {}) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: true,
+              query: "SELECT 1",
+              fields: { x: [], y: [{ alias: "y_axis_1" }, { alias: "y_axis_2" }] },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      false,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts every supported value and an empty config", () => {
+    expect(run({})).toEqual([]);
+    expect(
+      run({
+        tooltip_mode: "single",
+        tooltip_sort: "asc",
+        y_axis_scale: "log",
+        y_axis_log_base: 2,
+        line_style: "dotted",
+        y_axis_hard_min: 1,
+        y_axis_hard_max: 5,
+        connect_nulls_threshold: 60,
+        bar_radius: 4,
+        mark_area: [{ axis: "y", from: "1", to: "2" }],
+      }),
+    ).toEqual([]);
+    expect(run({ stack_mode: "percent" }, { type: "stacked" })).toEqual([]);
+    expect(run({ sort_order: "desc" }, { type: "h-bar" })).toEqual([]);
+    // A panel switched from a state timeline keeps its tooltip mode.
+    expect(run({ tooltip_mode: "all_rows" })).toEqual([]);
+  });
+
+  it("rejects unsupported choices", () => {
+    expect(run({ y_axis_scale: "sqrt", y_axis_log_base: 3 })).toEqual([
+      gt("dashboard.utils.unsupportedConfigValue", { setting: "y_axis_scale", value: "sqrt" }),
+      gt("dashboard.utils.unsupportedConfigValue", { setting: "y_axis_log_base", value: "3" }),
+    ]);
+    expect(run({ stack_mode: "fill" }, { type: "stacked" })).toHaveLength(1);
+  });
+
+  it("rejects negative sizes, inverted soft ranges and a log axis from zero", () => {
+    expect(run({ bar_radius: -1 })).toEqual([
+      gt("dashboard.utils.configValueNotNegative", { setting: "bar_radius" }),
+    ]);
+    expect(run({ y_axis_hard_min: 5, y_axis_hard_max: 1 })).toEqual([
+      gt("dashboard.utils.yAxisHardRangeInverted"),
+    ]);
+    expect(run({ y_axis_scale: "log", y_axis_min: 0 })).toEqual([
+      gt("dashboard.utils.yAxisLogMinInvalid"),
+    ]);
+  });
+
+  it("checks mark areas", () => {
+    expect(run({ mark_area: [{ axis: "y", from: "1" }] })).toEqual([
+      gt("dashboard.utils.markAreaIncomplete", { index: 1 }),
+    ]);
+    expect(run({ mark_area: [{ axis: "y", from: "low", to: "2" }] })).toEqual([
+      gt("dashboard.utils.markAreaNotNumeric", { index: 1 }),
+    ]);
+    // The x axis of an h-bar is its value axis; its y axis holds category names.
+    expect(run({ mark_area: [{ axis: "y", from: "a", to: "b" }] }, { type: "h-bar" })).toEqual([]);
+  });
+
+  it("checks scatter fields against the y fields", () => {
+    expect(run({ scatter_size_field: "y_axis_2" }, { type: "scatter" })).toEqual([]);
+    expect(run({ scatter_color_field: "nope" }, { type: "scatter" })).toEqual([
+      gt("dashboard.utils.scatterFieldUnknown", { setting: "scatter_color_field" }),
+    ]);
+    expect(run({ scatter_size_min: 9, scatter_size_max: 2 }, { type: "scatter" })).toEqual([
+      gt("dashboard.utils.scatterSizeRangeInverted"),
+    ]);
+  });
+
+  it("skips charts that do not use the settings", () => {
+    expect(run({ y_axis_scale: "sqrt" }, { type: "pie" })).toEqual([]);
+  });
+});
+
+describe("validatePanel on metric, gauge, pie, table, heatmap, state timeline and geomap settings", () => {
+  const run = (type: string, config: any) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType: "sql",
+          config,
+          queries: [
+            { customQuery: true, query: "SELECT 1", fields: { x: [], y: [{ alias: "y" }] } },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      false,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts every supported value", () => {
+    expect(
+      run("metric", {
+        stat_text_mode: "value_and_name",
+        value_font_size: 32,
+      }),
+    ).toEqual([]);
+    expect(run("gauge", { gauge_style: "circle", gauge_segments: 10, gauge_neutral: -5 })).toEqual(
+      [],
+    );
+    expect(
+      run("donut", {
+        pie_label_content: ["name", "percent"],
+        pie_other_threshold: 5,
+        donut_inner_radius: 60,
+        sort_order: "asc",
+      }),
+    ).toEqual([]);
+    expect(
+      run("table", { table_density: "comfortable", table_footer_calcs: ["sum", "last"] }),
+    ).toEqual([]);
+    expect(run("heatmap", { heatmap_cell_gap: 0, heatmap_hide_below: -1 })).toEqual([]);
+    expect(run("state-timeline", { state_value_align: "center" })).toEqual([]);
+    expect(run("geomap", { map_cluster: true, map_cluster_radius: 60 })).toEqual([]);
+  });
+
+  it("accepts special value mappings with a known match and rejects any other", () => {
+    const mappings = (match: unknown) => [
+      { type: "value", value: "1", text: "One" },
+      { type: "special", match, text: "x" },
+    ];
+    for (const match of ["null", "nan", "empty", "true", "false"]) {
+      expect(run("table", { mappings: mappings(match) })).toEqual([]);
+    }
+    expect(run("metric", { mappings: mappings("zero") })).toEqual([
+      gt("dashboard.utils.valueMappingSpecialInvalid", { index: 2 }),
+    ]);
+    expect(run("table", { mappings: mappings(undefined) })).toEqual([
+      gt("dashboard.utils.valueMappingSpecialInvalid", { index: 2 }),
+    ]);
+  });
+
+  it("rejects unsupported choices and list entries", () => {
+    expect(run("metric", { stat_text_mode: "ratio" })).toEqual([
+      gt("dashboard.utils.unsupportedConfigValue", { setting: "stat_text_mode", value: "ratio" }),
+    ]);
+    expect(run("table", { table_footer_calcs: ["sum", "median"] })).toEqual([
+      gt("dashboard.utils.unsupportedConfigValue", {
+        setting: "table_footer_calcs",
+        value: "median",
+      }),
+    ]);
+    expect(run("gauge", { gauge_style: "dial" })).toHaveLength(1);
+    expect(run("state-timeline", { state_value_align: "justify" })).toHaveLength(1);
+    expect(run("state-timeline", { state_timeline_display: "cells" })).toEqual([]);
+    expect(run("state-timeline", { state_timeline_display: "grid" })).toHaveLength(1);
+  });
+
+  it("rejects out-of-range numbers", () => {
+    expect(run("gauge", { gauge_segments: 1 })).toEqual([
+      gt("dashboard.utils.configValueOutOfRange", {
+        setting: gt("dashboard.gaugeSegments"),
+        min: "2",
+        max: "100",
+      }),
+    ]);
+    expect(run("donut", { donut_inner_radius: 99 })).toEqual([
+      gt("dashboard.utils.configValueOutOfRange", {
+        setting: gt("dashboard.donutInnerRadius"),
+        min: "0",
+        max: "95",
+      }),
+    ]);
+    expect(run("pie", { pie_other_threshold: -1 })).toHaveLength(1);
+    expect(run("metric", { value_font_size: 0 })).toHaveLength(1);
+    expect(run("geomap", { map_cluster_radius: 0 })).toHaveLength(1);
+    expect(run("heatmap", { heatmap_cell_gap: -2 })).toHaveLength(1);
+    expect(run("heatmap", { heatmap_hide_below: "low" })).toEqual([
+      gt("dashboard.utils.configValueNotNumeric", { setting: "heatmap_hide_below" }),
+    ]);
+  });
+
+  it("ignores settings of another chart type", () => {
+    expect(
+      run("line", { stat_text_mode: "ratio", gauge_segments: 1, table_density: "huge" }),
+    ).toEqual([]);
+  });
+});
+
+describe("validatePanel on distribution", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (type: string, fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts y fields and a breakdown", () => {
+    expect(run("distribution", { y: [field("a"), field("b")], breakdown: [field("s")] })).toEqual(
+      [],
+    );
+  });
+
+  it("rejects a missing y and any x field", () => {
+    expect(run("distribution", { y: [] })).toHaveLength(1);
+    expect(run("distribution", { x: [field("ts")], y: [field("v")] })[0]).toMatch(
+      /not allowed for the distribution chart/,
+    );
+  });
+
+  it("is not allowed on PromQL", () => {
+    const unsupported = gt("dashboard.utils.promqlChartTypeUnsupported");
+    expect(run("distribution", {}, {}, "promql")).toContain(unsupported);
+  });
+
+  it("checks the allowed values and ranges of the bucket keys", () => {
+    const y = { y: [field("v")] };
+    expect(
+      run("distribution", y, {
+        distribution_bucket_count: 20,
+        distribution_bucket_size: 0.5,
+        distribution_bucket_offset: -1,
+      }),
+    ).toEqual([]);
+    expect(run("distribution", y, { distribution_bucket_count: 0 })).toHaveLength(1);
+    expect(run("distribution", y, { distribution_bucket_count: 5000 })).toHaveLength(1);
+    expect(run("distribution", y, { distribution_bucket_size: 0 })).toHaveLength(1);
+    expect(run("distribution", y, { distribution_bucket_offset: "x" })).toHaveLength(1);
+  });
+
+  it("lists distribution as an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [
+            { type: "distribution", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } },
+          ],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
+describe("validatePanel on sunburst", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (type: string, fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts one group, one size and a sub-group", () => {
+    expect(
+      run("sunburst", { x: [field("region")], y: [field("count")], breakdown: [field("s")] }),
+    ).toEqual([]);
+  });
+
+  it("rejects a missing group", () => {
+    expect(run("sunburst", { x: [], y: [field("c")] })).toHaveLength(1);
+  });
+
+  it("accepts several group rings plus a sub-group up to five levels", () => {
+    const x = ["region", "service", "host", "pod"].map(field);
+    expect(run("sunburst", { x, y: [field("c")], breakdown: [field("s")] })).toEqual([]);
+  });
+
+  it("rejects more than five levels across the group and sub-group fields", () => {
+    const x = ["a", "b", "c", "d", "e"].map(field);
+    const errors = run("sunburst", { x, y: [field("c")], breakdown: [field("s")] });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("at most 5 levels");
+  });
+
+  it("accepts a count or a sum as the size and rejects an aggregation the rings cannot add up", () => {
+    const sizeError = gt("dashboard.utils.sizeMustBeCountOrSum");
+    // The function list is mocked empty here, so only the size rule's own error is checked.
+    const errorsWith = (functionName: string) =>
+      run("sunburst", {
+        x: [field("region")],
+        y: [{ alias: "y_axis_1", type: "build", functionName, args: [] }],
+      });
+    expect(errorsWith("count")).not.toContain(sizeError);
+    expect(errorsWith("sum")).not.toContain(sizeError);
+    for (const fn of ["avg", "max", "count-distinct", "p95"]) {
+      expect(errorsWith(fn), fn).toContain(sizeError);
+    }
+  });
+
+  it("is not allowed on PromQL", () => {
+    expect(run("sunburst", {}, {}, "promql")).toContain(
+      gt("dashboard.utils.promqlChartTypeUnsupported"),
+    );
+  });
+
+  it("is an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [{ type: "sunburst", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
+describe("validatePanel on the alert list", () => {
+  const run = (config: any = {}, queryType = "") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "alert-list",
+          queryType,
+          config,
+          queries: [
+            {
+              query: "",
+              customQuery: false,
+              fields: { x: [], y: [], breakdown: [], z: [] },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("asks nothing of an alert list, which has no query", () => {
+    expect(run()).toEqual([]);
+  });
+
+  it("checks the allowed values and types of the new keys", () => {
+    expect(
+      run({ alert_list_sort: "time", alert_list_state: ["firing", "paused"], alert_list_max: 5 }),
+    ).toEqual([]);
+    expect(run({ alert_list_sort: "owner" })).toHaveLength(1);
+    expect(run({ alert_list_state: ["firing", "muted"] })).toHaveLength(1);
+    expect(run({ alert_list_max: 0 })).toHaveLength(1);
+    expect(run({ alert_list_max: 5000 })).toHaveLength(1);
+  });
+
+  it("does not allow the alert list on PromQL", () => {
+    expect(run({}, "promql")).toContain(gt("dashboard.utils.promqlChartTypeUnsupported"));
+  });
+
+  it("lists the alert list as an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [
+            {
+              type: "alert-list",
+              id: "p-alert-list",
+              title: "t",
+              layout: { x: 0, y: 0, w: 1, h: 1, i: "alert-list" },
+              queries: [{ query: "SELECT 1", customQuery: true, fields: {} }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
+describe("validatePanel on the flame graph", () => {
+  const run = (
+    type: string,
+    query: Partial<{ query: string; customQuery: boolean }>,
+    config: any = {},
+    queryType = "sql",
+  ) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config,
+          queries: [
+            {
+              query: "",
+              customQuery: false,
+              fields: { x: [], y: [], breakdown: [], z: [] },
+              ...query,
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+  const sql = { customQuery: true, query: 'SELECT * FROM "demo_app"' };
+
+  it("needs a query but asks for no builder fields", () => {
+    expect(run("flame-graph", sql)).toEqual([]);
+    const empty = gt("dashboard.utils.queryIsEmpty", { index: 1 });
+    expect(run("flame-graph", { customQuery: true, query: "" })).toEqual([empty]);
+  });
+
+  it("is not allowed on PromQL", () => {
+    const unsupported = gt("dashboard.utils.promqlChartTypeUnsupported");
+    expect(run("flame-graph", { customQuery: true, query: "up" }, {}, "promql")).toContain(
+      unsupported,
+    );
+  });
+
+  it("is an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [
+            {
+              type: "flame-graph",
+              id: "p-flame-graph",
+              title: "t",
+              layout: { x: 0, y: 0, w: 1, h: 1, i: "flame-graph" },
+              queries: [{ query: "SELECT 1", customQuery: true, fields: {} }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
   });
 });
 
@@ -608,5 +1195,462 @@ describe("validatePanel bar width", () => {
     expect(run("h-bar", "sql", null)).toEqual([]);
     expect(run("h-bar", "sql", 13)).toEqual([]);
     expect(run("stacked", "sql", -3)).toEqual([]);
+  });
+});
+
+describe("validatePanel on bar gauge", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "bar-gauge",
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts one value with or without a label field, and rejects no value", () => {
+    expect(run({ y: [field("count")] })).toEqual([]);
+    expect(run({ x: [field("service")], y: [field("count")] })).toEqual([]);
+    expect(run({ y: [] })).toHaveLength(1);
+  });
+
+  it("allows PromQL", () => {
+    expect(run({}, {}, "promql")).not.toContain(gt("dashboard.utils.promqlChartTypeUnsupported"));
+  });
+
+  it("checks the allowed mode and orientation values", () => {
+    const y = { y: [field("v")] };
+    expect(run(y, { bar_gauge_mode: "lcd", bar_gauge_orientation: "vertical" })).toEqual([]);
+    expect(run(y, { bar_gauge_mode: "neon" })).toHaveLength(1);
+    expect(run(y, { bar_gauge_orientation: "diagonal" })).toHaveLength(1);
+  });
+
+  it("is an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [{ type: "bar-gauge", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
+describe("validatePanel on a treemap", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (fields: any, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "treemap",
+          queryType,
+          config: {},
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts one x, one y and one breakdown", () => {
+    expect(run({ x: [field("service")], y: [field("count")], breakdown: [field("r")] })).toEqual(
+      [],
+    );
+  });
+
+  it("rejects a missing x and a second y", () => {
+    expect(run({ x: [], y: [field("c"), field("d")] })).toHaveLength(2);
+  });
+
+  it("accepts several group fields as nested levels", () => {
+    expect(
+      run({ x: [field("region"), field("service"), field("host")], y: [field("count")] }),
+    ).toEqual([]);
+  });
+
+  it("rejects more than five levels across the group fields and the sub-group", () => {
+    const x = ["a", "b", "c", "d", "e"].map(field);
+    expect(run({ x, y: [field("count")], breakdown: [field("f")] })).toEqual([
+      gt("dashboard.utils.treemapTooManyLevels", { count: 5 }),
+    ]);
+  });
+
+  it("accepts a count or sum size and rejects a size a parent tile cannot add up", () => {
+    const size = (functionName: string) => ({
+      ...field("y_axis_1"),
+      type: "build",
+      functionName,
+      args: [{ type: "field", value: { field: "latency" } }],
+    });
+    const x = [field("region"), field("service")];
+    const sizeError = gt("dashboard.utils.sizeMustBeCountOrSum");
+    expect(run({ x, y: [size("count")] })).not.toContain(sizeError);
+    expect(run({ x, y: [size("sum")] })).not.toContain(sizeError);
+    expect(run({ x, y: [size("avg")] })).toContain(sizeError);
+    expect(run({ x, y: [size("count-distinct")] })).toContain(sizeError);
+  });
+
+  it("is not supported on PromQL", () => {
+    expect(run({}, "promql")).toContain(gt("dashboard.utils.promqlChartTypeUnsupported"));
+  });
+
+  it("is an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [{ type: "treemap", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
+describe("validatePanel on funnel", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (type: string, fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type,
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts one stage field and one value field", () => {
+    expect(run("funnel", { x: [field("stage")], y: [field("count")] })).toEqual([]);
+  });
+
+  it("rejects a funnel without a value field", () => {
+    expect(run("funnel", { x: [field("stage")], y: [] })).toHaveLength(1);
+  });
+
+  it("does not allow a funnel on PromQL", () => {
+    expect(run("funnel", {}, {}, "promql")).toContain(
+      gt("dashboard.utils.promqlChartTypeUnsupported"),
+    );
+  });
+
+  it("checks the allowed values of the funnel keys", () => {
+    const funnel = { x: [field("stage")], y: [field("v")] };
+    expect(run("funnel", funnel, { funnel_sort: "none", funnel_orient: "horizontal" })).toEqual([]);
+    expect(run("funnel", funnel, { funnel_sort: "random" })).toHaveLength(1);
+    expect(run("funnel", funnel, { funnel_orient: "diagonal" })).toHaveLength(1);
+  });
+
+  it("lists funnel as an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [{ type: "funnel", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
+describe("validatePanel on node graph", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "node-graph",
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+  const edges = { source: field("source"), target: field("target"), value: field("value") };
+
+  it("accepts source, target and value fields", () => {
+    expect(run(edges)).toEqual([]);
+  });
+
+  it("asks for the target and value when only the source is set", () => {
+    expect(run({ source: field("source") })).toHaveLength(2);
+  });
+
+  it("is not allowed on PromQL", () => {
+    expect(run({}, {}, "promql")).toContain(gt("dashboard.utils.promqlChartTypeUnsupported"));
+  });
+
+  it("checks the layout value", () => {
+    expect(run(edges, { node_graph_layout: "circular" })).toEqual([]);
+    expect(run(edges, { node_graph_layout: "tree" })).toHaveLength(1);
+  });
+
+  it("is an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [{ type: "node-graph", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
+
+describe("validatePanel on box plot", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const run = (fields: any, config: any = {}, queryType = "sql") => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "boxplot",
+          queryType,
+          config,
+          queries: [
+            {
+              customQuery: queryType === "promql",
+              query: "SELECT 1",
+              fields: { x: [], y: [], breakdown: [], z: [], ...fields },
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+
+  it("accepts one y field with at most one x category", () => {
+    expect(run({ y: [field("latency")] })).toEqual([]);
+    expect(run({ x: [field("service")], y: [field("latency")] })).toEqual([]);
+  });
+
+  it("rejects a second x field or a missing y field", () => {
+    expect(run({ x: [field("a"), field("b")], y: [field("v")] })[0]).toMatch(/at most one field/);
+    expect(run({ y: [] })).toHaveLength(1);
+  });
+
+  it("does not allow box plot on PromQL", () => {
+    expect(run({}, {}, "promql")).toContain(gt("dashboard.utils.promqlChartTypeUnsupported"));
+  });
+
+  it("checks the allowed whisker values", () => {
+    expect(run({ y: [field("v")] }, { boxplot_whisker: "iqr" })).toEqual([]);
+    expect(run({ y: [field("v")] }, { boxplot_whisker: "p99" })).toHaveLength(1);
+  });
+
+  it("lists box plot as an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [{ type: "boxplot", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
+
+describe("validatePanel on logs", () => {
+  const run = (
+    query: Partial<{ query: string; customQuery: boolean }>,
+    config: any = {},
+    queryType = "sql",
+  ) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "logs",
+          queryType,
+          config,
+          queries: [
+            {
+              query: "",
+              customQuery: false,
+              fields: { x: [], y: [], breakdown: [], z: [] },
+              ...query,
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+  const sql = { customQuery: true, query: 'SELECT * FROM "demo_app"' };
+
+  it("needs a query but asks for no builder fields", () => {
+    expect(run(sql)).toEqual([]);
+    expect(run({ customQuery: true, query: "" })).toEqual([
+      gt("dashboard.utils.queryIsEmpty", { index: 1 }),
+    ]);
+  });
+
+  it("checks the allowed values of the order key", () => {
+    expect(run(sql, { logs_order: "oldest" })).toEqual([]);
+    expect(run(sql, { logs_order: "random" })).toHaveLength(1);
+  });
+
+  it("is not allowed on PromQL", () => {
+    expect(run({ customQuery: true, query: "up" }, {}, "promql")).toContain(
+      gt("dashboard.utils.promqlChartTypeUnsupported"),
+    );
+  });
+
+  it("is an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [
+            {
+              type: "logs",
+              id: "p-logs",
+              title: "t",
+              layout: { x: 0, y: 0, w: 1, h: 1, i: "logs" },
+              queries: [{ query: "SELECT 1", customQuery: true, fields: {} }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
   });
 });
