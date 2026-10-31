@@ -227,16 +227,26 @@ describe("HostsDependenciesView", () => {
     expect(wrapper.emitted("loading")).toEqual([[false], [true], [false]]);
   });
 
-  it("keeps focus put when the map closes an edge panel the list opened", async () => {
+  it("returns focus to the list when the map dismisses a panel that holds it", async () => {
     await mountView({}, document.body);
-    await wrapper.findAll('[data-test="hosts-deps-link"]')[0].trigger("click");
+    const link = () => wrapper.findAll('[data-test="hosts-deps-link"]')[0];
+    await link().trigger("click");
     await flushPromises();
     chart().vm.$emit("select", null);
     await flushPromises();
     expect(testId("hosts-deps-edge").exists()).toBe(false);
-    expect(document.activeElement).not.toBe(
-      wrapper.findAll('[data-test="hosts-deps-link"]')[0].element,
-    );
+    expect(document.activeElement).toBe(link().element);
+  });
+
+  it("leaves focus alone when the map dismisses a panel that does not hold it", async () => {
+    await mountView({}, document.body);
+    await wrapper.findAll('[data-test="hosts-deps-link"]')[0].trigger("click");
+    await flushPromises();
+    (document.activeElement as HTMLElement).blur();
+    chart().vm.$emit("select", null);
+    await flushPromises();
+    expect(testId("hosts-deps-edge").exists()).toBe(false);
+    expect(document.activeElement).toBe(document.body);
   });
 
   it("does not draw a pair whose rate is nothing", async () => {

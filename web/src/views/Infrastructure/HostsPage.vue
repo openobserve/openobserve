@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   MainLayout's bare router-view, so the page must survive remounts.
 -->
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -198,6 +198,34 @@ watch(
       return;
     }
     syncQuery();
+  },
+);
+
+// Back and Forward between the tabs move the URL without remounting, so the table's state follows it. Every field
+// is set, absent ones to their defaults, and only where it differs, so the page's own URL writes change nothing.
+const ownRoute = route.name;
+const sameList = (a: string[], b: string[]) => a.join("\n") === b.join("\n");
+watch(
+  () => route.query,
+  async (q) => {
+    if (route.name !== ownRoute) return;
+    const status = q.status ? [q.status].flat().map(String) : [];
+    const os = q.os ? [q.os].flat().map(String) : [];
+    const pageParam = Number(first(q.page));
+    const sort = first(q.sort);
+    suppressQuerySync = true;
+    if (nameFilter.value !== (first(q.name) ?? "")) nameFilter.value = first(q.name) ?? "";
+    if (!sameList(statusFilter.value, status)) statusFilter.value = status;
+    if (!sameList(osFilter.value, os)) osFilter.value = os;
+    const nextPage = Number.isFinite(pageParam) && pageParam > 1 ? pageParam : 1;
+    if (page.value !== nextPage) page.value = nextPage;
+    const nextSort = sort ? (LEGACY_SORT_FIELD[sort] ?? sort) : "cpu";
+    if (sortBy.value !== nextSort) sortBy.value = nextSort;
+    const nextDesc = first(q.desc) ? first(q.desc) !== "false" : true;
+    if (sortDesc.value !== nextDesc) sortDesc.value = nextDesc;
+    // The state watchers run before this resumes, so they see the restore as their own and write nothing back.
+    await nextTick();
+    suppressQuerySync = false;
   },
 );
 

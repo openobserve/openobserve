@@ -856,6 +856,28 @@ describe("HostsPage", () => {
   describe("Dependencies view", () => {
     const deps = () => wrapper.findComponent({ name: "HostsDependenciesView" });
 
+    it("puts the table's filter back with the URL on Back across the tabs", async () => {
+      wrapper = await mountPage({ name: "a" });
+      expect(hostsListState.nameFilter.value).toBe("a");
+      const tabs = wrapper.findComponent({ name: "OTabs" });
+      tabs.vm.$emit("change", "dependencies");
+      await flushPromises();
+      tabs.vm.$emit("change", "table");
+      await flushPromises();
+      hostsListState.nameFilter.value = "b";
+      await flushPromises();
+      expect(router.currentRoute.value.query.name).toBe("b");
+      for (let i = 0; i < 2; i++) {
+        router.back();
+        await flushPromises();
+        await new Promise((r) => setTimeout(r, 0));
+        await flushPromises();
+      }
+      expect(router.currentRoute.value.query).toMatchObject({ name: "a" });
+      expect(router.currentRoute.value.query.view).toBeUndefined();
+      expect(hostsListState.nameFilter.value).toBe("a");
+    });
+
     it("spins the page's Refresh while the map reloads", async () => {
       wrapper = await mountPage({ view: "dependencies" });
       const refresh = () =>
