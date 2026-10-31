@@ -23106,6 +23106,7 @@
       "depsCaptionMore": "Thicker lines carry more bytes per second. An arrow points from the side that opened the connection to the side that answered; a thin grey line means that is unknown, or both sides do. Connections below 1 B/s are hidden unless Low-traffic connections is on. For every host to show up, install the agent everywhere with the same --network-flows list, and give each host's own address (/32) an entry named after its host name. A name that covers several hosts shows only the traffic of the busiest of them.",
       "depsCapped": "Showing the {shown} busiest of {total} connections.",
       "depsAllQuiet": "Every connection here is below 1 B/s",
+      "depsShowQuiet": "Show low-traffic connections",
       "depsNoFlowsTitle": "No network flows in this time range",
       "depsNoFlowsDescription": "No network flows between named addresses were recorded in the last {window} of the selected time range. The map needs hosts running the Linux agent installed with --network-flows and a list of CIDR=NAME entries. If they already are, try a longer range.",
       "depsNoFlowsDescriptionRange": "No network flows between named addresses were recorded in the selected time range. The map needs hosts running the Linux agent installed with --network-flows and a list of CIDR=NAME entries. If they already are, try a longer range.",

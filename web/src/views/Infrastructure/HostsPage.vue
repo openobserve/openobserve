@@ -271,7 +271,8 @@ watch(view, (next) => {
   if (next === "table" && listStale && hostsState.value === "detected") refreshList();
 });
 const onViewChange = (name: string | number) => {
-  const { view: _view, ...rest } = route.query;
+  // The map's low-traffic switch goes with the map, as on Kubernetes.
+  const { view: _view, lowTraffic: _lowTraffic, ...rest } = route.query;
   // A history entry per tab, so Back returns to the other one.
   router.push({ query: name === "dependencies" ? { ...rest, view: "dependencies" } : rest });
 };

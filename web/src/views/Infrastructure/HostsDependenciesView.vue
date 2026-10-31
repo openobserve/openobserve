@@ -348,7 +348,7 @@ function onSetUp() {
       variant="no-results"
       illustration="no-results"
       :title="t('infra.hosts.depsAllQuiet')"
-      :action-label="t('infra.k8s2.depsShowLowTraffic')"
+      :action-label="t('infra.hosts.depsShowQuiet')"
       data-test="hosts-deps-all-quiet"
       @action="emit('update:lowTraffic', true)"
     />

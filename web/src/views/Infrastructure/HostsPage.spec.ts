@@ -893,6 +893,13 @@ describe("HostsPage", () => {
       expect(router.currentRoute.value.query.lowTraffic).toBeUndefined();
     });
 
+    it("drops the low-traffic switch on leaving the map", async () => {
+      wrapper = await mountPage({ view: "dependencies", lowTraffic: "true" });
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", "table");
+      await flushPromises();
+      expect(router.currentRoute.value.query.lowTraffic).toBeUndefined();
+    });
+
     it("spins the page's Refresh while the map reloads", async () => {
       wrapper = await mountPage({ view: "dependencies" });
       const refresh = () =>
