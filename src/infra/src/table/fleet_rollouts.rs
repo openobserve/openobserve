@@ -253,6 +253,35 @@ pub async fn members_with_delivery_with<C: ConnectionTrait>(
         .await?)
 }
 
+/// A deleted fleet's rollout history, members first; returns how many rollouts went.
+pub async fn delete_for_fleet_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    fleet: &str,
+) -> Result<u64, Error> {
+    let ids: Vec<String> = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::FleetId.eq(fleet))
+        .into_tuple()
+        .all(conn)
+        .await?;
+    for chunk in ids.chunks(ID_CHUNK) {
+        MemberEntity::delete_many()
+            .filter(MemberColumn::OrgId.eq(org_id))
+            .filter(MemberColumn::RolloutId.is_in(chunk))
+            .exec(conn)
+            .await?;
+    }
+    let res = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::FleetId.eq(fleet))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
+}
+
 pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
     delete_by_org_with(get_orm_client_rw().await, org_id).await
 }

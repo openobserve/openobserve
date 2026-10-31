@@ -108,7 +108,7 @@ const detail = (over: Parameters<typeof apiDetail>[0] = {}) =>
     },
     history: [
       { at: 1, event: "enrolled", detail: null },
-      { at: 3, event: "moved_by_token", detail: "from staging" },
+      { at: 3, event: "assigned", detail: "edge v2" },
     ],
     ...over,
   });
@@ -281,12 +281,12 @@ describe("FleetCollectorDrawer", () => {
     expect(wrapper.find(sel("no-yaml")).exists()).toBe(true);
   });
 
-  it("lists the history newest first, with moves by token named", async () => {
+  it("lists the history newest first, with each step's detail", async () => {
     wrapper = mountDrawer("history");
     await flushPromises();
     const text = wrapper.find(sel("history")).text();
-    expect(text.indexOf("Moved by its enrollment token")).toBeLessThan(text.indexOf("Enrolled"));
-    expect(text).toContain("from staging");
+    expect(text.indexOf("Configuration assigned")).toBeLessThan(text.indexOf("Enrolled"));
+    expect(text).toContain("edge v2");
   });
 
   it("labels the running event as the last confirmation, not a start time", async () => {

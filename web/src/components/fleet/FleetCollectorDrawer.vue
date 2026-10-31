@@ -419,9 +419,6 @@ const HISTORY_VARIANT: Record<string, TimelineItemVariant> = {
   accepted: "info",
   running: "success",
   rejected: "destructive",
-  moved_by_token: "primary",
-  restarted: "info",
-  redelivered: "primary",
 };
 
 const { t } = useI18nTyped();
@@ -485,9 +482,6 @@ function historyTitle(event: string): I18nText {
     accepted: t("fleet.delivery.accepted"),
     running: t("fleet.collectors.eventRunning"),
     rejected: t("fleet.delivery.rejected"),
-    moved_by_token: t("fleet.collectors.eventMovedByToken"),
-    restarted: t("fleet.collectors.eventRestarted"),
-    redelivered: t("fleet.collectors.eventRedelivered"),
   };
   return known[event] ?? raw(event);
 }

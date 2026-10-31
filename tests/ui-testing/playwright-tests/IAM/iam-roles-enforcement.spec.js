@@ -419,7 +419,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
     // ---------------- All Modules column select-all ----------------
 
     test('E-07 · a role granted ONLY from the All Modules headers really opens every module', {
-        tag: ['@iam', '@iamRolesEnforcement', '@P0', '@all']
+        tag: ['@iam', '@iamRolesEnforcement', '@bug-15217', '@regression', '@P0', '@all']
     }, async ({ page, browser }) => {
         test.setTimeout(240000);
 

@@ -246,6 +246,30 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "SC 1.4.11 decorative: a container hairline, not information required to identify a component or its state",
   },
   {
+    fg: "--color-select-header-count-text",
+    bg: "--color-select-header-bg",
+    category: "text",
+    why: "an OSelect action header's count is painted on the header's accent tint",
+  },
+  {
+    fg: "--color-select-header-action-text",
+    bg: "--color-select-header-bg",
+    category: "text",
+    why: "an OSelect header action's label is painted on the header's accent tint",
+  },
+  {
+    fg: "--color-select-header-count-text",
+    bg: "--color-select-item-hover-bg",
+    category: "text",
+    why: "an OSelect action header's count stays on screen while the arrow keys highlight its row",
+  },
+  {
+    fg: "--color-select-header-action-text",
+    bg: "--color-select-header-action-hover-bg",
+    category: "text",
+    why: "an OSelect header action's label sits on its hover fill under the pointer or the arrow-key highlight",
+  },
+  {
     fg: "--color-slider-thumb-border",
     bg: "--color-slider-track-fill",
     category: "non-text",

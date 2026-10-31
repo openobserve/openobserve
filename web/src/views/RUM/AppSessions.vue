@@ -357,25 +357,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <template #cell-session="{ row }">
-                  <div class="flex min-w-0 flex-col justify-center gap-0.5">
-                    <OUserCell
-                      :value="row.user_email || unknownUserLabel"
-                      class="truncate font-medium"
-                    />
-                    <div class="text-text-secondary flex items-center gap-1.5 text-xs">
-                      <span
-                        class="font-mono"
-                        :title="row.session_id"
-                        data-test="rum-app-sessions-session-id-text"
-                        >{{ shortSessionId(row.session_id) }}</span
-                      >
-                      <span aria-hidden="true">·</span>
-                      <OTimeCell
-                        :value="row.zo_sql_timestamp"
-                        unit="us"
-                        :timezone="store.state.timezone"
+                  <div class="flex min-w-0 items-center gap-2">
+                    <div class="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+                      <OUserCell
+                        :value="row.user_email || unknownUserLabel"
+                        class="truncate font-medium"
                       />
+                      <div class="text-text-secondary flex items-center gap-1.5 text-xs">
+                        <span
+                          class="font-mono"
+                          :title="row.session_id"
+                          data-test="rum-app-sessions-session-id-text"
+                          >{{ shortSessionId(row.session_id) }}</span
+                        >
+                        <span aria-hidden="true">·</span>
+                        <OTimeCell
+                          :value="row.zo_sql_timestamp"
+                          unit="us"
+                          :timezone="store.state.timezone"
+                        />
+                      </div>
                     </div>
+                    <OButton
+                      v-if="row.has_replay"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      :aria-label="t('rum.heatmap.viewHeatmap')"
+                      :disabled="heatmapOpening === row.session_id"
+                      data-test="rum-app-sessions-view-heatmap-btn"
+                      @click.stop="openSessionHeatmap(row.session_id, row.start_time * 1000)"
+                    >
+                      <OIcon name="grid-on" size="sm" />
+                      <OTooltip :content="t('rum.heatmap.viewHeatmapTip')" side="bottom" />
+                    </OButton>
                   </div>
                 </template>
                 <template #cell-platform="{ row }">
@@ -520,6 +534,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import useSessionHeatmap from "@/composables/rum/useSessionHeatmap";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
@@ -1698,6 +1713,7 @@ const getSessionStatusColor = (row: any) => {
 };
 
 const router = useRouter();
+const { openSessionHeatmap, openingSessionId: heatmapOpening } = useSessionHeatmap();
 
 // A RUM tab switch pushes Performance's range, so only a Product Analytics handoff may replace the list's own.
 let enteredFromAnalytics = false;

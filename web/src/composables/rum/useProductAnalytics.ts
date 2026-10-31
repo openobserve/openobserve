@@ -27,6 +27,7 @@ import useNamedEvents, { type NamedEventsStatus } from "@/composables/rum/useNam
 import { getConsumableRelativeTime } from "@/utils/date";
 import api from "@/services/rumProductAnalytics";
 import { rumPaError } from "@/utils/rum/rumPaApiError";
+import { isDeviceClass, type DeviceClass } from "@/utils/rum/clickHeatmapQueries";
 import {
   appProbeSql,
   entryExitSql,
@@ -40,6 +41,8 @@ import {
   IDENTITY_FIELDS,
   type AnalyticsScope,
   type FunnelDef,
+  type FunnelPair,
+  type Granularity,
   type IdentitySql,
   type PathsDef,
   type RetentionDef,
@@ -60,6 +63,7 @@ import {
   parsePathsDef,
   parseRetentionDef,
   parseScope,
+  pinnedAfter,
   resolveIdentity,
   samplingRatio,
   stepRefParam,
@@ -75,6 +79,12 @@ import {
   type UaSuggestionRow,
 } from "@/utils/rum/productAnalyticsModel";
 import { PA_ROUTES, type AnalyticsSubTab } from "@/utils/rum/productAnalyticsRoutes";
+import {
+  FUNNEL_COMPARE_MODES,
+  previousWindow,
+  type FunnelCompareMode,
+} from "@/utils/rum/funnelCompare";
+import { pairParam, parseInterval, parsePair, type FunnelView } from "@/utils/rum/funnelTrend";
 
 export type { AnalyticsScopeState } from "@/utils/rum/productAnalyticsModel";
 export type { AnalyticsSubTab } from "@/utils/rum/productAnalyticsRoutes";
@@ -154,8 +164,18 @@ const scopeError = ref<string | null>(null);
 const invalidParams = ref<string[]>([]);
 const lastSubTab = ref<AnalyticsSubTab>("overview");
 const funnel = ref<FunnelDef>(defaultFunnel());
+// Compare to the previous period lives in the link only, never in a saved funnel.
+const funnelCompare = ref<FunnelCompareMode | null>(null);
+// The trend view, its step pair and its interval are link state too; a null pair is step 1 → the last step.
+const funnelView = ref<FunnelView>("steps");
+const funnelPair = ref<FunnelPair | null>(null);
+const funnelInterval = ref<Granularity>("auto");
 const paths = ref<PathsDef>(defaultPaths());
 const retention = ref<RetentionDef>(defaultRetention());
+const heatmap = reactive<{ pageUrl: string; device: DeviceClass }>({
+  pageUrl: "",
+  device: "all",
+});
 const trendSeries = ref<StepRef[]>([]);
 const refreshTick = ref(0);
 const syncedSignature = ref("");
@@ -236,8 +256,13 @@ export function resetProductAnalytics(): void {
   invalidParams.value = [];
   lastSubTab.value = "overview";
   funnel.value = defaultFunnel();
+  funnelCompare.value = null;
+  funnelView.value = "steps";
+  funnelPair.value = null;
+  funnelInterval.value = "auto";
   paths.value = defaultPaths();
   retention.value = defaultRetention();
+  Object.assign(heatmap, { pageUrl: "", device: "all" });
   trendSeries.value = [];
   refreshTick.value = 0;
   syncedSignature.value = "";
@@ -413,8 +438,18 @@ export default function useProductAnalytics() {
     range.value = null;
     paths.value = defaultPaths();
     retention.value = defaultRetention();
+    const device = firstString(q.device);
+    Object.assign(heatmap, {
+      pageUrl: firstString(q.page_url) ?? "",
+      device: isDeviceClass(device) ? device : "all",
+    });
     if (!keepFunnel) {
       funnel.value = defaultFunnel();
+      const fc = firstString(q.fc);
+      funnelCompare.value = FUNNEL_COMPARE_MODES.find((m) => m === fc) ?? null;
+      funnelView.value = firstString(q.fv) === "trend" ? "trend" : "steps";
+      funnelPair.value = parsePair(firstString(q.fp));
+      funnelInterval.value = parseInterval(firstString(q.fi));
       if (q.funnel !== undefined) {
         const def = parseFunnelDef(decodeDef(firstString(q.funnel)));
         if (def) funnel.value = def;
@@ -465,6 +500,10 @@ export default function useProductAnalytics() {
     const sf = openedFunnel.value?.id ?? pendingSavedId.value;
     if (routeName !== PA_ROUTES.funnels) {
       if (funnel.value.steps.length) q.funnel = encodeDef(funnelParam(funnel.value));
+      if (funnelCompare.value) q.fc = funnelCompare.value;
+      if (funnelView.value === "trend") q.fv = "trend";
+      if (funnelPair.value) q.fp = pairParam(funnelPair.value);
+      if (funnelInterval.value !== "auto") q.fi = funnelInterval.value;
       if (sf) q.sf = sf;
     }
     const p = paths.value;
@@ -478,6 +517,10 @@ export default function useProductAnalytics() {
     if (r.ret) q.rr = encodeDef(stepRefParam(r.ret));
     if (r.per !== "auto") q.per = r.per;
     if (r.mode !== "on") q.rmode = r.mode;
+    if (routeName === PA_ROUTES.heatmaps) {
+      if (heatmap.pageUrl) q.page_url = heatmap.pageUrl;
+      if (heatmap.device !== "all") q.device = heatmap.device;
+    }
     return q;
   };
 
@@ -639,7 +682,7 @@ export default function useProductAnalytics() {
   };
 
   const runSummary = async (cur: UsRange, key: string, stale: () => boolean) => {
-    const prev = { startUs: cur.startUs - (cur.endUs - cur.startUs), endUs: cur.endUs };
+    const prev = { startUs: previousWindow(cur).startUs, endUs: cur.endUs };
     const [sum, tops] = await Promise.all([
       search.run<Record<string, number>>(
         "scope-summary",
@@ -784,7 +827,13 @@ export default function useProductAnalytics() {
     // A saved funnel keeps a deleted event's step, tagged, so it stays editable.
     const saved = !!openedFunnel.value || !!pendingSavedId.value;
     if (!saved && f.steps.some(missing)) {
-      funnel.value = { ...f, steps: f.steps.filter((s) => !missing(s)) };
+      const pos = (k: number) =>
+        missing(f.steps[k - 1]) ? null : f.steps.slice(0, k).filter((s) => !missing(s)).length;
+      funnel.value = {
+        ...f,
+        steps: f.steps.filter((s) => !missing(s)),
+        breakdown: pinnedAfter(f.breakdown, pos),
+      };
       dropped = true;
     }
     const p = dropCohortSteps(paths.value, missing);
@@ -967,7 +1016,7 @@ export default function useProductAnalytics() {
 
   const readEntryExit = async (key: string): Promise<Record<string, unknown>[]> => {
     const cur = resolveRange();
-    const prev = { startUs: cur.startUs - (cur.endUs - cur.startUs), endUs: cur.endUs };
+    const prev = { startUs: previousWindow(cur).startUs, endUs: cur.endUs };
     const res = await search.run<Record<string, unknown>>(
       "scope-entry-exit",
       {
@@ -1085,8 +1134,13 @@ export default function useProductAnalytics() {
     invalidParams,
     lastSubTab,
     funnel,
+    funnelCompare,
+    funnelView,
+    funnelPair,
+    funnelInterval,
     paths,
     retention,
+    heatmap,
     trendSeries,
     initFromRoute,
     toQuery,

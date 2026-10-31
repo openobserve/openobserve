@@ -52,7 +52,8 @@ export default class DashboardactionPage {
     this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
-    this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
+    this.chartRendererSelector = '[data-test="chart-renderer"]';
+    this.chartRendererCanvas = page.locator(this.chartRendererSelector);
     this.chartRendererCanvasEl = page.locator('[data-test="chart-renderer"] canvas');
     this.noDataElement = page.locator('[data-test="no-data"]');
     this.dashboardSearchInput = page.locator('[data-test="dashboard-search"]');
@@ -898,12 +899,25 @@ export default class DashboardactionPage {
             try {
               const option = chart.getOption() ?? {};
               charts.push({
+                width: chart.getWidth(),
+                height: chart.getHeight(),
+                hostWidth: host.clientWidth,
+                hostHeight: host.clientHeight,
                 xAxis: axesOf(option.xAxis),
                 yAxis: axesOf(option.yAxis),
                 series: (option.series ?? []).map((s) => ({
                   name: s?.name ? String(s.name) : "",
+                  type: s?.type ?? null,
+                  silent: s?.silent === true,
                   stack: s?.stack === undefined || s?.stack === null ? null : String(s.stack),
+                  radius: s?.radius ?? null,
+                  center: Array.isArray(s?.center) ? s.center.map(String) : null,
+                  min: numberOrNull(s?.min),
+                  max: numberOrNull(s?.max),
                   points: (s?.data ?? []).map(pointOf),
+                  pointNames: (s?.data ?? []).map((point) =>
+                    point !== null && typeof point === "object" && !Array.isArray(point) ? String(point.name ?? "") : "",
+                  ),
                 })),
                 legendEntries: legendEntriesOf(option),
               });
@@ -919,6 +933,73 @@ export default class DashboardactionPage {
       walk(document.querySelector("#app")?._vnode, 0);
       return charts;
     }, scopeSelector);
+  }
+
+  async getGaugeLayoutProblems(expected = {}, scopeSelector = this.chartRendererSelector) {
+    const charts = await this.getChartOptionSnapshots(scopeSelector);
+    if (charts.length !== 1) return [`expected one rendered chart, found ${charts.length}`];
+    const [chart] = charts;
+    const problems = [];
+    const { width, height } = chart;
+    if (!(width > 0 && height > 0)) problems.push(`canvas has no size: ${width}x${height}`);
+    // A dial sized against a stale container overflows the canvas, which is the distortion itself.
+    if (Math.abs(width - chart.hostWidth) > 1 || Math.abs(height - chart.hostHeight) > 1) {
+      problems.push(`canvas ${width}x${height} does not match its container ${chart.hostWidth}x${chart.hostHeight}`);
+    }
+    // A display-name override adds a silent title-only gauge on top of its dial; it is not a dial.
+    const dials = chart.series.filter((s) => !s.silent);
+    if (expected.count !== undefined && dials.length !== expected.count) {
+      problems.push(`expected ${expected.count} dials, found ${dials.length}`);
+    }
+    if (dials.length === 0) problems.push("no gauge series");
+    const placed = [];
+    dials.forEach((dial, i) => {
+      const label = `dial ${i} (${dial.name || "unnamed"})`;
+      if (dial.type !== "gauge") problems.push(`${label}: type is ${dial.type}`);
+      const radius = parseFloat(dial.radius);
+      if (!/px$/.test(String(dial.radius)) || !Number.isFinite(radius) || radius <= 0) {
+        problems.push(`${label}: bad radius ${dial.radius}`);
+        return;
+      }
+      const [cxPct, cyPct] = (dial.center ?? []).map((c) => parseFloat(c));
+      if (!Number.isFinite(cxPct) || !Number.isFinite(cyPct) || cxPct < 0 || cxPct > 100 || cyPct < 0 || cyPct > 100) {
+        problems.push(`${label}: bad center ${JSON.stringify(dial.center)}`);
+        return;
+      }
+      const cx = (cxPct * width) / 100;
+      const cy = (cyPct * height) / 100;
+      if (cx - radius < -2 || cx + radius > width + 2 || cy - radius < -2 || cy + radius > height + 2) {
+        problems.push(`${label}: radius ${radius}px at (${cx.toFixed(0)},${cy.toFixed(0)}) overflows ${width}x${height}`);
+      }
+      for (const other of placed) {
+        if (Math.hypot(cx - other.cx, cy - other.cy) < radius + other.radius - 2) {
+          problems.push(`${label}: overlaps dial ${other.i}`);
+        }
+      }
+      placed.push({ i, cx, cy, radius });
+      if (dial.min === null || dial.max === null || !(dial.min < dial.max)) {
+        problems.push(`${label}: bad range ${dial.min}..${dial.max}`);
+      }
+      if (expected.min !== undefined && dial.min !== expected.min) problems.push(`${label}: min ${dial.min}, expected ${expected.min}`);
+      if (expected.max !== undefined && dial.max !== expected.max) problems.push(`${label}: max ${dial.max}, expected ${expected.max}`);
+      const value = dial.points[0];
+      if (typeof value !== "number" || !Number.isFinite(value)) problems.push(`${label}: value is ${value}`);
+    });
+    return problems;
+  }
+
+  async expectGaugeWellFormed(expect, expected = {}, scopeSelector = this.chartRendererSelector) {
+    await expect
+      .poll(() => this.getGaugeLayoutProblems(expected, scopeSelector), {
+        timeout: 20000,
+        intervals: [500, 1000, 1000, 2000],
+      })
+      .toEqual([]);
+  }
+
+  async getGaugeDialNames(scopeSelector = this.chartRendererSelector) {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    return chart ? chart.series.filter((s) => s.type === "gauge" && !s.silent).map((s) => s.pointNames[0] ?? "") : [];
   }
 
   /**

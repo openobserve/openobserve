@@ -18,11 +18,7 @@ export interface SavedViewLike {
   view_name: string;
 }
 
-/**
- * Ordering for the saved-views quick dropdown: favorited views first, then
- * case-insensitive alphabetical. The dropdown has no search box, so ordering
- * is what makes a long list scannable. Returns a new array.
- */
+/** Favorites first, then case-insensitive alphabetical; returns a new array. */
 export function sortSavedViews<T extends SavedViewLike>(
   views: T[] | null | undefined,
   favoriteIds: string[],

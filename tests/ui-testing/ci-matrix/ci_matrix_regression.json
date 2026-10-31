@@ -11,7 +11,8 @@
       "logs-stream-type-scope.spec.js",
       "logs-14376-int64-precision.spec.js",
       "logs-stream-selector.spec.js",
-      "logs-table-stream-switch.spec.js"
+      "logs-table-stream-switch.spec.js",
+      "logs-internal-streams.spec.js"
     ],
     "disabled": []
   },
@@ -58,6 +59,7 @@
     "browser": "chrome",
     "run_files": [
       "dashboard-regression.spec.js",
+      "dashboard-2188-gauge-edit-layout.spec.js",
       "dashboard-cache-browser-refresh.spec.js",
       "dashboard-save-validation-message-11283.spec.js",
       "dashboard-14479-variable-name-prefix.spec.js"
@@ -92,6 +94,7 @@
     "browser": "chrome",
     "run_files": [
       "traces-regression.spec.js",
+      "traces-12603-refresh-and-placeholder.spec.js",
       "traces-bugs.spec.js",
       "traces-filter-reset.spec.js",
       "traces-share-url.spec.js",

@@ -554,6 +554,7 @@ import {
 } from "@/composables/usePrebuiltDestinations";
 import { detectPrebuiltType, getPrebuiltConfig } from "@/utils/prebuilt-templates";
 import { isValidSlackWebhookUrl } from "@/utils/prebuilt-templates/slack";
+import { PAGERDUTY_EU_EVENTS_URL } from "@/utils/prebuilt-templates/pagerduty";
 import { DEFAULT_SLACK_APP_NAME } from "@/utils/slackManifest";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
 import { prebuiltDestinationDefaults } from "./PrebuiltDestinationForm.schema";
@@ -1173,6 +1174,9 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
     props.destination.headers?.["X-Routing-Key"]
   ) {
     credentials.integrationKey = props.destination.headers["X-Routing-Key"];
+  }
+  if (typeId === "pagerduty") {
+    credentials.euRegion = props.destination.url === PAGERDUTY_EU_EVENTS_URL;
   }
   // Opsgenie: apiKey is in the Authorization header.
   if (typeId === "opsgenie" && props.destination.headers?.["Authorization"]) {

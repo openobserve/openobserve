@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :open="savedViewsDropdownOpen"
               side="bottom"
               align="start"
-              @update:open="savedViewsDropdownOpen = $event"
+              @update:open="onSavedViewsDropdownOpenChange"
             >
               <template #trigger>
                 <OButton
@@ -148,30 +148,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
                 </OButton>
               </template>
-              <ODropdownGroup :label="t('search.savedViewsLabel')">
-                <TracesSavedViewsMenuItems
-                  :views="sortedTracesSavedViews"
-                  :favorite-ids="favoriteIds"
-                  :loading="savedViewsLoading"
-                  @apply="applySavedView"
-                  @update="quickUpdateSavedView"
-                />
-              </ODropdownGroup>
-              <ODropdownSeparator />
-              <ODropdownItem
-                icon-left="save"
-                data-test="traces-saved-view-create"
-                @select="openSaveViewDialog"
-              >
-                {{ t("search.createSavedView") }}
-              </ODropdownItem>
-              <ODropdownItem
-                icon-left="settings"
-                data-test="traces-saved-view-manage"
-                @select="openSavedViewsDialog"
-              >
-                {{ t("search.manageSavedViews") }}
-              </ODropdownItem>
+              <SavedViewsMenu
+                :views="tracesSavedViews"
+                :favorite-ids="favoriteIds"
+                :applied-view-id="appliedSavedViewId"
+                :loading="savedViewsLoading"
+                data-test-prefix="traces-saved-view"
+                @apply="applySavedView"
+                @update="requestUpdateSavedView"
+                @toggle-favorite="toggleFavorite"
+                @create="openSaveViewDialog"
+                @delete="deleteTracesSavedView"
+              />
             </ODropdown>
             <OSeparator vertical />
             <OButton
@@ -186,7 +174,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButtonGroup>
         </div>
 
-        <ODropdown side="bottom" align="start">
+        <ODropdown
+          :open="moreMenuOpen"
+          side="bottom"
+          align="start"
+          @update:open="moreMenuOpen = $event"
+        >
           <template #trigger>
             <OButton
               data-test="traces-search-bar-more-menu-btn"
@@ -237,11 +230,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-if="isSearchMode">
             <ODropdownSeparator />
-            <ODropdownGroup
-              :label="t('search.menuGroupSavedViews')"
-              data-test="traces-search-bar-menu-saved-views-group"
+            <SavedViewsSubmenu
+              :views="tracesSavedViews"
+              :favorite-ids="favoriteIds"
+              :applied-view-id="appliedSavedViewId"
+              :loading="savedViewsLoading"
+              data-test-prefix="traces-search-bar-menu-saved-views"
+              trigger-test-id="traces-search-bar-menu-list-saved-views-btn"
+              create-test-id="traces-search-bar-menu-create-saved-view-btn"
+              @open="refreshSavedViews"
+              @apply="applySavedView"
+              @update="requestUpdateSavedView"
+              @toggle-favorite="toggleFavorite"
+              @create="openSaveViewDialog"
+              @delete="deleteTracesSavedView"
             >
-              <template #label-action>
+              <template #actions>
                 <OButton
                   data-test="traces-search-bar-menu-pin-saved-views-btn"
                   variant="ghost-neutral"
@@ -254,33 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
                 </OButton>
               </template>
-              <ODropdownItem
-                data-test="traces-search-bar-menu-list-saved-views-btn"
-                @select="openSavedViewsDialog"
-              >
-                <template #icon-left>
-                  <span
-                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                  >
-                    <OIcon name="format-list-bulleted" size="sm" />
-                  </span>
-                </template>
-                {{ t("search.listSavedViews") }}
-              </ODropdownItem>
-              <ODropdownItem
-                data-test="traces-search-bar-menu-create-saved-view-btn"
-                @select="openSaveViewDialog"
-              >
-                <template #icon-left>
-                  <span
-                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                  >
-                    <OIcon name="add" size="sm" />
-                  </span>
-                </template>
-                {{ t("search.createSavedView") }}
-              </ODropdownItem>
-            </ODropdownGroup>
+            </SavedViewsSubmenu>
             <ODropdownSeparator />
           </template>
 
@@ -596,18 +574,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-saved-view-name-input"
       />
     </ODialog>
-    <SavedViewsListDialog
-      v-model:open="savedViewsDialogOpen"
-      data-test-prefix="traces-saved-views-dialog"
-      :views="tracesSavedViews"
-      :favorite-ids="favoriteIds"
-      :favorite-views="favoriteViews"
-      :loading="savedViewsLoading"
-      @apply="applySavedView"
-      @update="confirmUpdateSavedView"
-      @delete="deleteTracesSavedView"
-      @toggle-favorite="toggleFavorite"
-    />
   </div>
 </template>
 
@@ -637,7 +603,6 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -650,9 +615,8 @@ import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import useTraces from "@/composables/useTraces";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import SyntaxGuide from "./SyntaxGuide.vue";
-import TracesSavedViewsMenuItems from "./TracesSavedViewsMenuItems.vue";
-import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
-import { sortSavedViews } from "@/components/savedViews/savedViewsSort";
+import SavedViewsMenu from "@/components/savedViews/SavedViewsMenu.vue";
+import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useFavoriteSavedViews } from "@/composables/useFavoriteSavedViews";
 
 import { debounce } from "lodash-es";
@@ -710,7 +674,6 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
-    ODropdownGroup,
     ODropdownSeparator,
     ODialog,
     OInput,
@@ -719,11 +682,11 @@ export default defineComponent({
     OTooltip,
     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     SyntaxGuide,
-    TracesSavedViewsMenuItems,
-    SavedViewsListDialog,
     RecentSearchesButton,
     RecentSearchesDrawer,
     RecentSearchesFocusDropdown,
+    SavedViewsMenu,
+    SavedViewsSubmenu,
   },
   emits: [
     "searchdata",
@@ -1143,6 +1106,7 @@ export default defineComponent({
     };
 
     const resetFilters = () => {
+      appliedSavedView.value = null;
       searchObj.data.editorValue = "";
       searchObj.data.advanceFiltersQuery = "";
       Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
@@ -1233,7 +1197,7 @@ export default defineComponent({
       (savedViewsList.data.value ?? []).filter((view) => view.view_type === "traces"),
     );
     const savedViewsLoading = computed(() => savedViewsList.isLoading.value);
-    const { favoriteIds, favoriteViews, toggleFavorite, removeFavorite, pruneFavorites } =
+    const { favoriteIds, toggleFavorite, removeFavorite, pruneFavorites } =
       useFavoriteSavedViews("traces");
     // Only a successful fetch is the complete list; pruning on error would drop every favourite.
     watch(
@@ -1245,9 +1209,25 @@ export default defineComponent({
       },
       { immediate: true },
     );
-    const sortedTracesSavedViews = computed(() =>
-      sortSavedViews(tracesSavedViews.value, favoriteIds.value),
+    const appliedSavedView = ref<{ id: string; editorValue: string; streamValue: string } | null>(
+      null,
     );
+    // Derived from the live state so any later edit, stream switch or reset drops the check.
+    const appliedSavedViewId = computed(() => {
+      const applied = appliedSavedView.value;
+      if (!applied) return null;
+      const matches =
+        searchObj.data.editorValue === applied.editorValue &&
+        searchObj.data.stream.selectedStream?.value === applied.streamValue;
+      return matches ? applied.id : null;
+    });
+    const markSavedViewApplied = (id: string, data: any) => {
+      appliedSavedView.value = {
+        id,
+        editorValue: data?.editorValue ?? "",
+        streamValue: data?.stream?.value ?? "",
+      };
+    };
     const createSavedView = useMutation(() => createSavedViewMutation(orgId.value));
     const updateSavedView = useMutation(() => updateSavedViewMutation(orgId.value));
     const deleteSavedView = useMutation(() => deleteSavedViewMutation(orgId.value));
@@ -1282,12 +1262,6 @@ export default defineComponent({
       saveViewDialogOpen.value = true;
     };
 
-    const savedViewsDialogOpen = ref(false);
-    const openSavedViewsDialog = () => {
-      savedViewsList.refetch();
-      savedViewsDialogOpen.value = true;
-    };
-
     const saveAsNewView = async () => {
       const viewName = newViewName.value.trim();
       if (!viewName) {
@@ -1295,11 +1269,13 @@ export default defineComponent({
         return;
       }
       try {
-        await createSavedView.mutateAsync({
+        const viewData = buildSavedViewData();
+        const res = await createSavedView.mutateAsync({
           view_name: viewName,
           view_type: "traces",
-          data: buildSavedViewData(),
+          data: viewData,
         });
+        if (res?.data?.view_id) markSavedViewApplied(res.data.view_id, viewData);
         saveViewDialogOpen.value = false;
         toast({ message: t("search.viewCreatedSuccessfully"), variant: "success" });
       } catch (err) {
@@ -1312,10 +1288,12 @@ export default defineComponent({
 
     const updateSavedViewFromCurrent = async (view) => {
       try {
+        const viewData = buildSavedViewData();
         await updateSavedView.mutateAsync({
           viewId: view.view_id,
-          view: { view_name: view.view_name, data: buildSavedViewData() },
+          view: { view_name: view.view_name, data: viewData },
         });
+        markSavedViewApplied(view.view_id, viewData);
         toast({ message: t("search.viewUpdatedSuccessfully"), variant: "success" });
       } catch (err) {
         toast({
@@ -1326,22 +1304,29 @@ export default defineComponent({
     };
 
     const savedViewsDropdownOpen = ref(false);
-    const quickUpdateSavedView = (view) => {
-      savedViewsDropdownOpen.value = false;
-      return updateSavedViewFromCurrent(view);
+    const moreMenuOpen = ref(false);
+    const refreshSavedViews = () => savedViewsList.refetch();
+    const onSavedViewsDropdownOpenChange = (open: boolean) => {
+      savedViewsDropdownOpen.value = open;
+      if (open) refreshSavedViews();
     };
-
-    const confirmUpdateSavedView = async (view) => {
-      savedViewsDialogOpen.value = false;
+    const requestUpdateSavedView = async (view) => {
+      savedViewsDropdownOpen.value = false;
+      moreMenuOpen.value = false;
       const confirmed = await confirm({
-        title: t("search.updateSavedView"),
-        message: t("search.updateSavedViewConfirm"),
+        title: t("search.overwriteSavedView"),
+        messageKeypath: "search.overwriteSavedViewConfirm",
+        messageName: view.view_name,
+        confirmLabel: t("search.overwriteSavedViewOk"),
+        focusCancel: true,
       });
-      if (confirmed) await updateSavedViewFromCurrent(view);
+      if (!confirmed) return;
+      await updateSavedViewFromCurrent(view);
     };
 
     const deleteTracesSavedView = async (view) => {
-      savedViewsDialogOpen.value = false;
+      savedViewsDropdownOpen.value = false;
+      moreMenuOpen.value = false;
       const confirmed = await confirm({
         title: t("search.deleteSavedView"),
         messageKeypath: "search.deleteSavedViewConfirm",
@@ -1352,6 +1337,7 @@ export default defineComponent({
       try {
         await deleteSavedView.mutateAsync(view.view_id);
         removeFavorite(view.view_id);
+        if (appliedSavedView.value?.id === view.view_id) appliedSavedView.value = null;
         toast({ message: t("search.viewDeletedSuccessfully"), variant: "success" });
       } catch (err) {
         toast({
@@ -1368,6 +1354,7 @@ export default defineComponent({
         // Uncached on purpose, as in logs: applying must use the server's current copy.
         const res = await savedViewsService.getViewDetail(orgId.value, view.view_id);
         if (seq !== applySavedViewSeq) return;
+        markSavedViewApplied(view.view_id, res.data.data);
         emit("apply-saved-view", res.data.data);
       } catch (err) {
         if (seq !== applySavedViewSeq) return;
@@ -1514,20 +1501,19 @@ export default defineComponent({
       saveViewDialogOpen,
       newViewName,
       openSaveViewDialog,
-      savedViewsDialogOpen,
-      openSavedViewsDialog,
       saveAsNewView,
       updateSavedViewFromCurrent,
       deleteTracesSavedView,
       applySavedView,
       savedViewsLoading,
       favoriteIds,
-      favoriteViews,
       toggleFavorite,
-      sortedTracesSavedViews,
+      appliedSavedViewId,
       savedViewsDropdownOpen,
-      quickUpdateSavedView,
-      confirmUpdateSavedView,
+      onSavedViewsDropdownOpenChange,
+      refreshSavedViews,
+      moreMenuOpen,
+      requestUpdateSavedView,
       serviceGraphAccess,
       onSearchModeChange,
     };
