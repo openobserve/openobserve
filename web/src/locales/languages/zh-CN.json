@@ -662,7 +662,8 @@
       "groups": "组",
       "serviceAccounts": "服务账号",
       "cipherKeys": "加密密钥",
-      "regexPatterns": "正则表达式模式"
+      "regexPatterns": "正则表达式模式",
+      "unnamed": "此资源"
     },
     "denied": {
       "view": "您无法查看{resource}",

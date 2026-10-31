@@ -662,7 +662,8 @@
       "groups": "группы",
       "serviceAccounts": "сервисные аккаунты",
       "cipherKeys": "ключи шифрования",
-      "regexPatterns": "регулярные выражения"
+      "regexPatterns": "регулярные выражения",
+      "unnamed": "этот ресурс"
     },
     "denied": {
       "view": "Вы не можете просматривать {resource}",

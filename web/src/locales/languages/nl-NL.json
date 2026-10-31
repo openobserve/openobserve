@@ -662,7 +662,8 @@
       "groups": "groepen",
       "serviceAccounts": "serviceaccounts",
       "cipherKeys": "cipher keys",
-      "regexPatterns": "regex-patronen"
+      "regexPatterns": "regex-patronen",
+      "unnamed": "deze resource"
     },
     "denied": {
       "view": "U kunt {resource} niet bekijken",

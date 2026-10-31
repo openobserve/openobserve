@@ -662,7 +662,8 @@
       "groups": "gruplar",
       "serviceAccounts": "hizmet hesapları",
       "cipherKeys": "şifreleme anahtarları",
-      "regexPatterns": "regex desenleri"
+      "regexPatterns": "regex desenleri",
+      "unnamed": "bu kaynak"
     },
     "denied": {
       "view": "{resource} görüntüleyemezsiniz",

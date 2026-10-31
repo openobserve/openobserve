@@ -662,7 +662,8 @@
       "groups": "gruppi",
       "serviceAccounts": "account di servizio",
       "cipherKeys": "chiavi di cifratura",
-      "regexPatterns": "pattern regex"
+      "regexPatterns": "pattern regex",
+      "unnamed": "questa risorsa"
     },
     "denied": {
       "view": "Non puoi visualizzare {resource}",

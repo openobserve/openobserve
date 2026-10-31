@@ -137,4 +137,37 @@ describe("access store classification", () => {
     noteAccessSuccess({ method: "get", url: "/api/acme/roles", routeKey: currentAccessRouteKey() });
     expect(access.pageDenied.value).toBe(false);
   });
+  it("keeps a readable page when only a sub-read of its resource is denied", async () => {
+    await boot("/roles");
+    forbidden("GET", "/api/acme/users/roles/all");
+    expect(access.pageDenied.value).toBe(false);
+    expect(access.sectionEntries.value.map((e) => e.resource.key)).toEqual(["roles"]);
+  });
+
+  it("reports a denied write on a resource with no friendly name", async () => {
+    await boot("/settings");
+    forbidden("POST", "/api/acme/storage");
+    expect(access.sectionEntries.value.map((e) => [e.permission, e.requests])).toEqual([
+      ["create", ["POST /api/acme/storage"]],
+    ]);
+    forbidden("GET", "/api/acme/storage");
+    expect(access.sectionEntries.value).toHaveLength(1);
+  });
+
+  it("keeps one object's denial when a different object of the same resource succeeds", async () => {
+    await boot("/settings");
+    forbidden("GET", "/api/acme/functions/secret");
+    noteAccessSuccess({
+      method: "get",
+      url: "/api/acme/functions/readable",
+      routeKey: currentAccessRouteKey(),
+    });
+    expect(access.sectionEntries.value).toHaveLength(1);
+    noteAccessSuccess({
+      method: "get",
+      url: "/api/acme/functions/secret",
+      routeKey: currentAccessRouteKey(),
+    });
+    expect(access.sectionEntries.value).toHaveLength(0);
+  });
 });

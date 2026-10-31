@@ -662,7 +662,8 @@
       "groups": "群組",
       "serviceAccounts": "服務帳戶",
       "cipherKeys": "加密金鑰",
-      "regexPatterns": "正規表示式模式"
+      "regexPatterns": "正規表示式模式",
+      "unnamed": "此資源"
     },
     "denied": {
       "view": "您無法檢視{resource}",

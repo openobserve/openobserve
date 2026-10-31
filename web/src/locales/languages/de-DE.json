@@ -662,7 +662,8 @@
       "groups": "Gruppen",
       "serviceAccounts": "Dienstkonten",
       "cipherKeys": "Verschlüsselungsschlüssel",
-      "regexPatterns": "Regex-Muster"
+      "regexPatterns": "Regex-Muster",
+      "unnamed": "diese Ressource"
     },
     "denied": {
       "view": "Sie können {resource} nicht anzeigen",

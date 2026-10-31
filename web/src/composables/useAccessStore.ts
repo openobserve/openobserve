@@ -233,6 +233,7 @@ const PERMISSION_ORDER: AccessPermission[] = ["list", "get", "create", "update",
 export const ACCESS_LIST_LIMIT = 4;
 
 const MEMORY_PREFIX = "o2.access.memory.";
+const UNNAMED_RESOURCE = "_unnamed";
 const ACTIVATION_WINDOW_MS = 5000;
 const ACTIVATION_HISTORY = 5;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -299,15 +300,15 @@ export function recordForbidden({ url, method, routeKey: startedOn }: AccessRequ
   // A response from a page the user has already left says nothing about the page now on screen.
   if (startedOn !== undefined && startedOn !== accessStamp(key)) return;
   const verb = (method ?? "get").toUpperCase();
-  const resource = extractResourceInfo(url);
-  // A resource without a friendly name would surface a raw URL word, so it stays silent like a background read.
+  const permission = accessPermission(verb, url);
+  const isRead = permission === "list" || permission === "get";
+  // An unnamed read is mostly a side fetch the user never asked for; an unnamed write is their own action and must not vanish.
+  const resource = extractResourceInfo(url) ?? (isRead ? null : unnamedResource(url));
   if (!resource) {
     if (import.meta.env.DEV) console.debug("[access] 403 on an unnamed resource:", verb, url);
     return;
   }
-  const permission = accessPermission(verb, url);
   const denied: DeniedRequest = { permission, request: `${verb} ${resource.path}` };
-  const isRead = permission === "list" || permission === "get";
   if (!isRead) {
     const [el, ...fallbacks] = anchorCandidates();
     if (el) {
@@ -316,7 +317,7 @@ export function recordForbidden({ url, method, routeKey: startedOn }: AccessRequ
     }
   }
   const pageResource = routeResource(route);
-  if (pageResource && resource.key === pageResource && isRead) {
+  if (pageResource && resource.key === pageResource && isPageList(permission, url)) {
     markPageDenied(deniedEntry(route, pageResource), denied);
     return;
   }
@@ -333,9 +334,12 @@ export function noteAccessSuccess({
   if (!url || (!pageDenied.value && sectionEntries.value.length === 0)) return;
   const route = currentRoute.value;
   if (!route || (startedOn !== undefined && startedOn !== accessStamp(routeKey(route)))) return;
-  const info = extractResourceInfo(url);
+  const verb = (method ?? "get").toUpperCase();
+  const permission = accessPermission(verb, url);
+  const info =
+    extractResourceInfo(url) ??
+    (permission === "list" || permission === "get" ? null : unnamedResource(url));
   if (!info) return;
-  const permission = accessPermission(method ?? "get", url);
   const entry = currentEntry.value;
   const org = currentOrg();
   if (entry && deniedPermission.value === permission && info.key === currentResource.value) {
@@ -344,8 +348,17 @@ export function noteAccessSuccess({
   }
   const key = routeKey(route);
   const entries = sectionEntries.value;
-  const kept = entries.filter((e) => entryId(e) !== info.key || e.permission !== permission);
-  if (kept.length !== entries.length) writeSections(org, key, kept);
+  // Only the request that succeeded is cleared, so a readable dashboard does not erase another one's denial.
+  const request = `${verb} ${info.path}`;
+  let changed = false;
+  const kept = entries.flatMap((e) => {
+    if (entryId(e) !== info.key || e.permission !== permission || !e.requests.includes(request))
+      return [e];
+    changed = true;
+    const requests = e.requests.filter((r) => r !== request);
+    return requests.length ? [{ ...e, requests }] : [];
+  });
+  if (changed) writeSections(org, key, kept);
 }
 
 /** Forgets every denial, for an org switch or a sign-out. */
@@ -733,6 +746,28 @@ function locateResource(segments: string[]): { matched: string; after: string[] 
     if (isKnownResource(matched)) return { matched, after: rest.slice(i) };
   }
   return null;
+}
+
+// The page's own list is the bare collection; a failing sub-read such as `users/roles/all` leaves the page readable.
+function isPageList(permission: AccessPermission, url: string): boolean {
+  if (permission !== "list") return false;
+  try {
+    return (
+      locateResource(apiSegments(new URL(url, "http://localhost").pathname))?.after.length === 0
+    );
+  } catch {
+    return false;
+  }
+}
+
+function unnamedResource(url: string): AccessResource {
+  let path = "";
+  try {
+    path = new URL(url, "http://localhost").pathname;
+  } catch {
+    // The request line in Copy details then omits the path.
+  }
+  return { key: UNNAMED_RESOURCE, labelKey: "accessBoundary.resourcesInline.unnamed", path };
 }
 
 function isKnownResource(path: string): boolean {

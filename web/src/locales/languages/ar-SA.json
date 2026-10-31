@@ -662,7 +662,8 @@
       "groups": "المجموعات",
       "serviceAccounts": "حسابات الخدمة",
       "cipherKeys": "مفاتيح التشفير",
-      "regexPatterns": "أنماط Regex"
+      "regexPatterns": "أنماط Regex",
+      "unnamed": "هذا المورد"
     },
     "denied": {
       "view": "لا يمكنك عرض {resource}",

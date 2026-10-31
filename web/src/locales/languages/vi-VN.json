@@ -662,7 +662,8 @@
       "groups": "nhóm",
       "serviceAccounts": "tài khoản dịch vụ",
       "cipherKeys": "khóa mã hóa",
-      "regexPatterns": "mẫu regex"
+      "regexPatterns": "mẫu regex",
+      "unnamed": "tài nguyên này"
     },
     "denied": {
       "view": "Bạn không thể xem {resource}",

@@ -662,7 +662,8 @@
       "groups": "그룹",
       "serviceAccounts": "서비스 계정",
       "cipherKeys": "암호 키",
-      "regexPatterns": "정규식 패턴"
+      "regexPatterns": "정규식 패턴",
+      "unnamed": "이 리소스"
     },
     "denied": {
       "view": "{resource}을(를) 볼 수 없습니다",

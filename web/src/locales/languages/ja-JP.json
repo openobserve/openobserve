@@ -662,7 +662,8 @@
       "groups": "グループ",
       "serviceAccounts": "サービスアカウント",
       "cipherKeys": "暗号化キー",
-      "regexPatterns": "正規表現パターン"
+      "regexPatterns": "正規表現パターン",
+      "unnamed": "このリソース"
     },
     "denied": {
       "view": "{resource} を表示できません",
