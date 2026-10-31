@@ -316,9 +316,9 @@ describe("DependencyMap", () => {
     setViewport.mockClear();
     await flow().vm.$emit("nodes-initialized");
     const [view] = setViewport.mock.calls[0];
-    expect(view.zoom).toBe(0.75);
+    expect(view.zoom).toBe(0.7);
     // The left-most card's left edge, plus the margin, at the pane's left.
-    expect(view.x).toBeCloseTo(32 * 0.75);
+    expect(view.x).toBeCloseTo(32 * 0.7);
   });
 
   it("treats a pill as part of its edge: hovering it lights the edge, clicking it selects the edge", async () => {
@@ -353,7 +353,7 @@ describe("DependencyMap", () => {
       );
       await wrapper.find('[data-test="dependency-map-fit"]').trigger("click");
       const whole = setViewport.mock.calls.at(-1)![0].zoom;
-      expect(whole).toBeLessThan(0.75);
+      expect(whole).toBeLessThan(0.7);
       setViewport.mockClear();
       vi.useFakeTimers();
       resized();

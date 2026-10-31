@@ -114,7 +114,7 @@ const LABELLED = 8;
 const MIN_ZOOM = 0.1;
 // On load and on a resize the map is never fitted below this, so card text and rates stay readable; a bigger map
 // starts at its top-left, the callers, and is panned or fitted whole with the fit button.
-const READABLE_ZOOM = 0.75;
+const READABLE_ZOOM = 0.7;
 
 // The map, cards and the edges routed past them, never zoomed in past its natural size. fitView only knows the
 // cards, and stops zooming out at 0.5.
