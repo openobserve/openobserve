@@ -299,6 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :facets="grid.prefixFacets.value"
           :selected="grid.selectedPrefixes.value"
           :has-selection="railHasSelection"
+          :loading="firstLoadPending"
           @update:selected="onPrefixChange"
           @clear="clearActiveRail"
         />
@@ -309,6 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :facets="grid.suffixFacets.value"
           :selected="grid.selectedSuffixes.value"
           :has-selection="railHasSelection"
+          :loading="firstLoadPending"
           @update:selected="onSuffixChange"
           @clear="clearActiveRail"
         />
@@ -373,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OCheckboxGroup>
           <OEmptyState
-            v-else
+            v-else-if="!firstLoadPending"
             size="inline"
             icon="search-off"
             :title="t('metrics.explorer.facets.noTypeMatch')"
@@ -1493,10 +1495,9 @@ export default defineComponent({
       },
       { immediate: true },
     );
+    const firstLoadPending = computed(() => grid.loading.value && !grid.cards.value.length);
     // Only the first load: a manual refresh must not remount the open view behind a spinner.
-    const detailLoading = computed(
-      () => (grid.loading.value && !grid.cards.value.length) || detailSchemasPending.value,
-    );
+    const detailLoading = computed(() => firstLoadPending.value || detailSchemasPending.value);
 
     /** A card's current query, its ⚙ override and any NaN-guard / widening included. */
     const chartOf = (card: MetricCardModel) => {
@@ -2359,6 +2360,7 @@ export default defineComponent({
       detailOpen,
       detailCard,
       detailLoading,
+      firstLoadPending,
       detailOverview,
       detailPanelQueries,
       chartOf,
