@@ -88,11 +88,7 @@ export class HomePage {
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
-    /**
-     * Clicks the sidebar's Metrics item, then switches to the explorer's
-     * Visualize mode, whose controls `validateMetricsPageElements` asserts on.
-     * Both hops are kept so the sidebar link stays covered.
-     */
+    /** Clicks the sidebar Metrics item, then switches to Visualize mode. */
     async navigateToMetrics() {
         await this.metricsMenu.waitFor({ state: 'visible', timeout: 10000 });
         await this.metricsMenu.click();

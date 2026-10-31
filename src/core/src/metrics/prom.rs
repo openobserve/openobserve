@@ -744,8 +744,7 @@ fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
     super::get_prom_metadata_from_schema(schema).map(Into::into)
 }
 
-/// Default lookback window for `/api/v1/series` and `/api/v1/label/{name}/values` when `start`
-/// is omitted.
+/// Default lookback for the series and label-values endpoints when `start` is omitted.
 ///
 /// The Prometheus spec makes `start`/`end` optional (defaulting to the full
 /// TSDB range), but an unbounded range is rejected by the file_list layer and

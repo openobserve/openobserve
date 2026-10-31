@@ -235,10 +235,7 @@ export class MetricsPage {
             // Caller branches on the current visibility (warn vs assert).
         }
     }
-    /**
-     * Opens the Metrics Explorer's Visualize mode — the panel editor every caller
-     * of this method drives (PromQL input, Run, visualizations, Add to Dashboard).
-     */
+    /** Opens the Metrics Explorer in Visualize mode. */
     async gotoMetricsPage() {
         await gotoMetricsVisualize(this.page);
 

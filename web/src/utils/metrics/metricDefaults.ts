@@ -1645,7 +1645,6 @@ export function buildBreakdownRank(
   // Series without the label would otherwise take one of the slots as a group of their own.
   const labelled: FilterInput[] = [...filters, { label: raw(label), operator: "!=", value: "" }];
   const window = rankWindowOf(cap.window, ctx.rateWindow || DEFAULT_RATE_WINDOW);
-  // On each range selector, not the expression: the engine pins selectors and rejects `@` on a subquery.
   const ranged = (selector: string) => `${selector}[${window}] @ end()`;
   const own = ranged(buildSelector(ctx.metricName, labelled));
   const count = ranged(buildSelector(`${baseNameOf(ctx.metricName)}_count`, labelled));

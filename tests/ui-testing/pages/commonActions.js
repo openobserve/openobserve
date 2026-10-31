@@ -130,15 +130,7 @@ export async function selectLogsViewMode(page, mode, timeout = 20000) {
     await page.locator(`[data-test="logs-view-mode-${mode}-item"]`).click();
 }
 
-/**
- * Navigate straight to the Metrics Explorer's Visualize mode.
- *
- * `/metrics` opens the explorer's browse grid by default; the panel editor —
- * PromQL input, Run, date picker, Add to Dashboard — is its Visualize mode at
- * `/metrics?mode=visualize`. Tests that drive the editor address it directly so
- * one navigation is the only thing that can fail; sidebar navigation itself is
- * covered by landingPage.spec.
- */
+/** Opens the Metrics Explorer in Visualize mode, where the panel editor lives. */
 export async function gotoMetricsVisualize(page) {
     // Carry the org the page is CURRENTLY on, rather than pinning the default.
     // The sidebar click this replaced preserved the selected org, and the

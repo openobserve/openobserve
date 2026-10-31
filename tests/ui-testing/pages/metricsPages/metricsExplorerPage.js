@@ -1,9 +1,7 @@
 // metricsExplorerPage.js
 //
 // Page object for the Metrics EXPLORER (`/web/metrics`) — the zero-query browse
-// grid and its in-page Visualize workspace. metricsPage.js drives the same
-// Visualize pane's panel editor in depth; this file owns the explorer shell,
-// modes, cards and URL state.
+// grid and its in-page Visualize workspace.
 //
 // Selectors verified against:
 //   web/src/plugins/metrics/explorer/MetricsExplorer.vue

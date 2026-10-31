@@ -56,10 +56,7 @@ export class SharedComponentsFormValidationPage {
 
     // ── AddToDashboard helpers ────────────────────────────────────────────────
 
-    /**
-     * The AddToDashboard dialog under test is reached from the Metrics Explorer's
-     * Visualize mode (run a query, then "Add to Dashboard"), so go there directly.
-     */
+    /** The Add to Dashboard dialog is reached from Visualize mode, so this goes there directly. */
     async navigateToMetrics() {
         await gotoMetricsVisualize(this.page);
     }
