@@ -291,12 +291,11 @@ export default defineComponent({
   --categories "${cats}"`;
     });
 
-    // Copy block, not prose: the two labels name the fields exactly as the Azure
-    // portal spells them, so they stay English in every locale (raw() at render).
+    // Copy block, not prose: the labels name the fields as the Azure template spells them, so they stay English in every locale.
     const manualContent = computed(() => {
       const orgId = store.state?.selectedOrganization?.identifier || "";
       const url = endpoint?.url || "";
-      return `Event Hub → OpenObserve Endpoint: ${url}/azure/${orgId}/default/_event_hub\nAccess Key: [BASIC_PASSCODE]`;
+      return `Event Hub → OpenObserve Endpoint: ${url}/api/${orgId}/azure-activity-logs/_json\nOpenObserve username: [EMAIL]\nOpenObserve password: [PASSCODE]`;
     });
 
     const handleDeploy = () => {
@@ -320,10 +319,9 @@ export default defineComponent({
         return;
       }
 
-      const accessKey = btoa(`${email}:${passcode}`);
-      const endpointUrl = `${endpoint.url}/azure/${organizationId}/default/_event_hub`;
+      const endpointUrl = `${endpoint.url}/api/${organizationId}/azure-activity-logs/_json`;
 
-      const url = generateARMTemplateURL(activityLogsIntegration, endpointUrl, accessKey);
+      const url = generateARMTemplateURL(activityLogsIntegration, endpointUrl, email, passcode);
       window.open(url, "_blank", "noopener,noreferrer");
 
       analytics.track("Azure Activity Logs Deploy Started", {

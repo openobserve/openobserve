@@ -4,6 +4,7 @@
  * Bug fixes for Data Sources page functionality:
  * - #11682: On clicking on AI integration the credentials disappear
  * - #11534: AI Frameworks & Agent datasources
+ * - #16021: Azure manual configuration ingest URL
  */
 
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
@@ -99,6 +100,15 @@ test.describe("Data Sources Regression Bug Fixes", () => {
     testLogger.info(`Framework doc pane rendered ${docs.length} chars`);
 
     testLogger.info('✓ PASSED: AI datasource categories browsable with docs (#11534)');
+  });
+
+  test("Azure manual configuration should show the real activity-logs ingest URL", {
+    tag: ['@bug-16021', '@P1', '@regression', '@datasourcesRegression']
+  }, async ({ page }) => {
+    const org = process.env.ORGNAME || 'default';
+    await page.goto(`${process.env.ZO_BASE_URL}/web/ingestion/recommended/azure?org_identifier=${org}`, { timeout: 15000 });
+
+    await pm.dataPage.expectAzureManualIngestUrl(org);
   });
 
   test.afterEach(async () => {
