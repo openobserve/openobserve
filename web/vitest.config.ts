@@ -108,12 +108,12 @@ export default mergeConfig(
           "src/test/**",
           "test{,s}/**",
           "test{,-*}.{js,cjs,mjs,ts,tsx,jsx}",
-          // "**/*{.,-}test.{js,cjs,mjs,ts,tsx,jsx}",
-          // "**/*{.,-}spec.{js,cjs,mjs,ts,tsx,jsx}",
-          // "**/__tests__/**",
-          // "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*",
-          // "**/.{eslint,mocha,prettier}rc.{js,cjs,yml}",
-          // "**/*.config.js",
+          "**/*{.,-}test.{js,cjs,mjs,ts,tsx,jsx}",
+          "**/*{.,-}spec.{js,cjs,mjs,ts,tsx,jsx}",
+          "**/__tests__/**",
+          "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*",
+          "**/.{eslint,mocha,prettier}rc.{js,cjs,yml}",
+          "**/*.config.js",
           "env.d.ts",
           "src/assets/dashboard/**",
           // Language/translation files - no tests needed
@@ -125,7 +125,7 @@ export default mergeConfig(
           "src/components/dashboards/addPanel/customChartExamples/index.ts",
           "src/components/dashboards/addPanel/customChartExamples/exampleTypes.ts",
           // Type definition files
-          // "**/*.d.ts",
+          "**/*.d.ts",
           "src/contextProviders/types.ts",
           // Index files that only re-export
           "src/components/alerts/index.ts",
