@@ -344,15 +344,44 @@ describe("DependenciesView", () => {
     expect(nodes().map((n: any) => n.color)).toEqual(before);
   });
 
+  it("counts a picked system namespace's edges in the header total with the switch off", async () => {
+    await mountView({ state: parseUrlState({ view: "dependencies", namespace: "kube-system" }) });
+    const header = wrapper.findComponent({ name: "K8sListHeader" });
+    // api -> coredns is drawn because kube-system is picked, so it is in the total too.
+    expect(edges()).toHaveLength(1);
+    expect(header.props("count")).toBeLessThanOrEqual(header.props("total"));
+    expect(header.props("total")).toBe(2);
+  });
+
+  it("keeps an Escape it handles from reaching page-wide shortcuts, and only that one", async () => {
+    await mountView();
+    const shortcut = vi.fn();
+    window.addEventListener("keydown", shortcut);
+    try {
+      const esc = () =>
+        document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      esc();
+      expect(shortcut).toHaveBeenCalledTimes(1);
+      chart().vm.$emit("select", edges()[0].id);
+      await flushPromises();
+      esc();
+      await flushPromises();
+      expect(testId("k8s2-deps-edge").exists()).toBe(false);
+      expect(shortcut).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener("keydown", shortcut);
+    }
+  });
+
   it("totals the connections the switches leave in the header", async () => {
     await mountView({ state: parseUrlState({ view: "dependencies", namespace: "backend" }) });
     const header = wrapper.findComponent({ name: "K8sListHeader" });
-    // Only web -> api: the switches hide api -> coredns and node-to-node traffic, whatever the namespace filter.
-    expect(header.props("total")).toBe(1);
+    // web -> api, and api -> coredns, drawn because it touches the picked backend; node-to-node traffic stays off.
+    expect(header.props("total")).toBe(2);
     await wrapper.setProps({
       state: parseUrlState({ view: "dependencies", namespace: "backend", nodeTraffic: "true" }),
     });
-    expect(header.props("total")).toBe(2);
+    expect(header.props("total")).toBe(3);
   });
 
   it("counts what it draws when there are too many endpoints", async () => {

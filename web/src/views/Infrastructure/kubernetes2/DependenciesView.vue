@@ -380,15 +380,19 @@ useEscapeToClose(
   () => closeEdge(),
 );
 
-// What the switches leave, before the namespace filter and search: the header's total.
-const switchedEdges = computed(() =>
-  filterFlows(allEdges.value, {
-    namespaces: [],
+// What the switches leave, before the namespace filter and search: the header's total. A namespace picked in the
+// filter shows its edges even with system namespaces hidden, so those count too.
+const switchedEdges = computed(() => {
+  const switches = {
     search: "",
     showSystem: props.state.system,
     showNodeTraffic: props.state.nodeTraffic,
-  }),
-);
+  };
+  const shown = filterFlows(allEdges.value, { ...switches, namespaces: [] });
+  if (!props.state.namespaces.length) return shown;
+  const picked = filterFlows(allEdges.value, { ...switches, namespaces: props.state.namespaces });
+  return [...new Map([...shown, ...picked].map((e) => [e.id, e])).values()];
+});
 
 // Only the namespace filter and search; the switches keep what they show.
 function clearFilters() {

@@ -32,7 +32,10 @@ export function useEscapeToClose(open: Ref<boolean>, close: () => void) {
   const onKey = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.defaultPrevented) return;
     if (document.querySelector(OVERLAY) || typing(document.activeElement)) return;
+    // Handled here, so a page-wide Escape shortcut on the window, which may not check defaultPrevented, does not
+    // also act on it.
     event.preventDefault();
+    event.stopPropagation();
     close();
   };
   const stop = () => document.removeEventListener("keydown", onKey);
