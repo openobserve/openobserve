@@ -647,7 +647,22 @@ afterEach(() => {
   mockToast.mockClear();
 });
 
-src/components/iam/roles/EditRole4.spec.jsdescribe("EditRole - presets panel wiring", () => {
+const mountWithSaved = async (perms) => {
+  ctl.rolePermissions = perms;
+  return mountEditRole();
+};
+
+const mountWithPreset = async (preset) => {
+  router.currentRoute.value.query = { preset };
+  const wrapper = await mountEditRole();
+  await flushPromises();
+  router.currentRoute.value.query = {};
+  return wrapper;
+};
+
+const stagedObjects = (wrapper) => Object.values(wrapper.vm.addedPermissions).map((p) => p.object);
+
+describe("EditRole - presets panel wiring", () => {
   it("announces a preset added from the panel", async () => {
     const wrapper = await mountEditRole();
     mockToast.mockClear();

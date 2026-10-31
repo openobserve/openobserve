@@ -647,6 +647,21 @@ afterEach(() => {
   mockToast.mockClear();
 });
 
+const mountWithSaved = async (perms) => {
+  ctl.rolePermissions = perms;
+  return mountEditRole();
+};
+
+const mountWithPreset = async (preset) => {
+  router.currentRoute.value.query = { preset };
+  const wrapper = await mountEditRole();
+  await flushPromises();
+  router.currentRoute.value.query = {};
+  return wrapper;
+};
+
+const stagedObjects = (wrapper) => Object.values(wrapper.vm.addedPermissions).map((p) => p.object);
+
 describe("EditRole - all modules", () => {
   const openAllModules = async (wrapper) => {
     wrapper.vm.activeModule = "__all__";
