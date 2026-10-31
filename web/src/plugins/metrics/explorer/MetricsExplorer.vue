@@ -690,7 +690,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :ensure-schemas="grid.ensureSchemas"
       :prefix-of="grid.prefixOf"
       :family-of="grid.familyOf"
-      :filters="detailCard ? grid.labelFiltersFor(detailCard) : grid.labelFilters.value"
+      :filters="grid.labelFilters.value"
       :inapplicable-filters="detailCard ? grid.inapplicableLabelFilters(detailCard) : []"
       :is-label-eligible="grid.isLabelEligible"
       :time-range="grid.timeRange.value"

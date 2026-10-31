@@ -596,7 +596,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    */
   const isLabelEligible = (card: MetricCard): boolean => labelFit(card).eligible;
 
-  /** The active filters this card cannot apply: missing labels, or the OR groups dropped from its query. */
+  /** The base filters this card's streams lack a label of; OR groups run as written, so never listed. */
   const inapplicableLabelFilters = (card: MetricCard): LabelFilter[] => labelFit(card).inapplicable;
 
   /** A stream with no known schema cannot be proven to carry the label. */
@@ -605,14 +605,6 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       const labels = labelsByStream.value[stream];
       return !!labels && labels.includes(filter.label);
     });
-
-  /** OR groups some stream lacks a label of: the engine would ignore that matcher and match unfiltered. */
-  const unappliedGroups = (streams: string[]): Set<number> =>
-    new Set(
-      filterGroupsOf(labelFilters.value)
-        .filter(({ members }) => !members.every((f) => carriedBy(streams, f)))
-        .map(({ group }) => group),
-    );
 
   const labelFit = (card: MetricCard): { eligible: boolean; inapplicable: LabelFilter[] } => {
     if (labelFilters.value.length === 0 || !membershipKnown.value) {
@@ -631,30 +623,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     if (!hasFilterGroups(labelFilters.value)) {
       return { eligible: missing.length === 0, inapplicable: missing };
     }
-    const dropped = unappliedGroups(operands);
-    const someGroupApplies = filterGroupsOf(labelFilters.value).some(
-      ({ group }) => !dropped.has(group),
+    // Grid narrowing only: the query keeps every group, since a negated or empty-matching one still matches here.
+    const baseMissing = missing.filter((f) => (f.group ?? 0) <= 0);
+    const someGroupFits = filterGroupsOf(labelFilters.value).some(({ members }) =>
+      members.every((f) => carriedBy(operands, f)),
     );
-    if (someGroupApplies && missing.every((f) => (f.group ?? 0) > 0)) {
-      return {
-        eligible: true,
-        inapplicable: labelFilters.value.filter((f) => dropped.has(f.group ?? 0)),
-      };
-    }
-    return { eligible: false, inapplicable: missing };
+    return { eligible: !baseMissing.length && someGroupFits, inapplicable: baseMissing };
   };
-
-  /** The filters a query over `streams` runs with: OR groups those streams cannot apply are left out. */
-  const filtersFor = (streams: string[]): LabelFilter[] => {
-    if (!membershipKnown.value || !hasFilterGroups(labelFilters.value)) return labelFilters.value;
-    const dropped = unappliedGroups(streams);
-    const kept = labelFilters.value.filter((f) => !dropped.has(f.group ?? 0));
-    return hasFilterGroups(kept) ? kept : labelFilters.value;
-  };
-
-  /** The filters this card's queries run with, for views that build their own queries over it. */
-  const labelFiltersFor = (card: MetricCard): LabelFilter[] =>
-    filtersFor(operandStreamsOfVariant(card));
 
   /**
    * Every stream the card's EFFECTIVE variant actually queries.
@@ -1233,8 +1208,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       {
         streamNames: streamNameSet.value,
         familyType: card.familyType,
-        // The default operands, not the effective ones: those are read off this very variant.
-        filters: filtersFor(operandStreamsOf(card)),
+        filters: labelFilters.value,
         // A concrete window by default — the explorer executes its own previews
         // and nothing substitutes variables for them. The handoff asks for
         // `$__rate_interval` instead, because a PANEL resolves that itself.
@@ -1453,7 +1427,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     opts?: { skipCache?: boolean; priority?: number },
   ): Promise<boolean> => {
     const probes = operandStreamsOfVariant(card).map((stream) => ({
-      expr: buildPresenceQuery(stream, filtersFor([stream])),
+      expr: buildPresenceQuery(stream, labelFilters.value),
     }));
     if (!probes.length) return false;
 
@@ -2661,7 +2635,6 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     ensureSchemas,
     isLabelEligible,
     inapplicableLabelFilters,
-    labelFiltersFor,
 
     // local state
     overrides,

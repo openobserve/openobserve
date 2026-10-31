@@ -102,7 +102,6 @@ const grid = vi.hoisted(() => {
     loadStreams: vi.fn(async () => {}),
     isLabelEligible: vi.fn(() => true),
     inapplicableLabelFilters: vi.fn(() => []),
-    labelFiltersFor: vi.fn((): any[] => g.labelFilters.value),
     setLabelGroupNegated: vi.fn(),
     setTimeRange: vi.fn(),
     setRefreshInterval: vi.fn(),

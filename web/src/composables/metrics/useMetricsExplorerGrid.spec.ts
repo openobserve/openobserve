@@ -1617,7 +1617,7 @@ describe("useMetricsExplorerGrid", () => {
   });
 
   describe("OR groups narrow by any group a card can apply", () => {
-    it("keeps a card one group fits, and leaves the other group out of its query", async () => {
+    it("keeps a card one group fits, and queries every group as written", async () => {
       const grid = await setup();
       (StreamService.nameList as any).mockResolvedValueOnce({
         data: {
@@ -1635,10 +1635,11 @@ describe("useMetricsExplorerGrid", () => {
 
       const card = cardNamed(grid, "lat_seconds_bucket");
       expect(grid.isLabelEligible(card)).toBe(true);
-      expect(grid.inapplicableLabelFilters(card)).toEqual([pod]);
+      expect(grid.inapplicableLabelFilters(card)).toEqual([]);
+      // A group the stream cannot satisfy changes nothing, but a negated one would match every series.
       const expr = grid.effectiveVariant(card).resolved.queries[0].expr;
       expect(expr).toContain('le="0.5"');
-      expect(expr).not.toContain("pod");
+      expect(expr).toContain('pod="a"');
 
       grid.removeLabelFilter(le);
       expect(grid.isLabelEligible(card)).toBe(false);
