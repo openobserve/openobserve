@@ -18896,8 +18896,7 @@
     "detailTable": {
       "noDataAvailable": "Aucune donnée disponible.",
       "addIcon": "Ajouter une icône",
-      "sendToAiChat": "Envoyer au chat IA",
-      "contentCopiedSuccessfully": "Contenu copié avec succès !"
+      "sendToAiChat": "Envoyer au chat IA"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "La requête SELECT * n'est pas prise en charge pour la visualisation.",
@@ -19183,7 +19182,24 @@
     "hideDetail": "Masquer les détails",
     "runAs": "Exécuter en tant que",
     "searchTextFor": "Rechercher le texte « {text} »",
-    "searchTextDesc": "Rechercher l'intégralité de la saisie comme une seule phrase"
+    "searchTextDesc": "Rechercher l'intégralité de la saisie comme une seule phrase",
+    "explain": {
+      "missingStream": "Il manque le nom du stream après {from}. Ajoutez-le, par exemple {example}.",
+      "unexpectedEnd": "La requête se termine avant d'être complète. Terminez la dernière condition ou clause.",
+      "unexpectedEndAfter": "La requête se termine juste après {keyword}. Ajoutez ce qui doit suivre, ou supprimez {keyword}.",
+      "unclosedBracket": "Une parenthèse est ouverte mais jamais fermée. Ajoutez le {char} manquant.",
+      "notAStatement": "Une requête doit commencer par un mot-clé comme {keyword}, mais celle-ci commence par {token}. Vérifiez l'orthographe.",
+      "unexpectedToken": "{token} n'a pas sa place à cet endroit de la requête. Vérifiez son orthographe et les mots qui l'entourent.",
+      "unclosedQuote": "Une valeur texte n'a pas de guillemet fermant. Ajoutez le ' manquant après la valeur.",
+      "unclosedDelimiter": "Un nom entre guillemets n'a pas de {char} fermant. Ajoutez le {char} manquant.",
+      "streamNotFound": "Aucun stream ne s'appelle {name}. Vérifiez le nom ou choisissez un stream dans la liste.",
+      "unknownField": "Ce stream n'a aucun champ nommé {name}. Vérifiez l'orthographe ou choisissez un champ dans la liste des champs.",
+      "unknownFunction": "Aucune fonction ne s'appelle {name}. Vérifiez l'orthographe.",
+      "unknownFunctionSuggest": "Aucune fonction ne s'appelle {name}. Vouliez-vous dire {suggestion} ?",
+      "notANumber": "{value} est du texte, mais le champ comparé contient des nombres. Utilisez un nombre sans guillemets.",
+      "functionArgs": "Les valeurs passées à {name} ne correspondent pas à ce que la fonction accepte. Vérifiez le nombre de valeurs et leurs types.",
+      "notGrouped": "{name} est sélectionné sans être groupé ni agrégé. Ajoutez-le à {groupBy} ou retirez-le des colonnes sélectionnées."
+    }
   },
   "refreshButton": {
     "justNow": "tout à l'heure",

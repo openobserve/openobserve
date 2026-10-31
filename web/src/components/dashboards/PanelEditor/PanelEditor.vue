@@ -116,10 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-if="pageType === 'build' || resolvedConfig.showAddToDashboardButton"
                     class="border-border-default flex items-center justify-between border-b px-2 py-2"
+                    :class="{ 'min-h-12.5': pageType === 'build' }"
                   >
                     <QueryTypeSelector v-if="pageType === 'build'" :showQueryType="false" />
                     <div v-else />
-                    <div class="flex items-center gap-2">
+                    <div class="ms-auto flex items-center gap-2">
                       <OButton
                         v-if="resolvedConfig.showAddToDashboardButton"
                         data-test="panel-editor-add-to-dashboard-btn"
@@ -196,10 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Warning icons and last refreshed time -->
                   <div class="me-2 flex items-center justify-end gap-2">
-                    <!-- Show Legends button (hidden when the chart has no data) -->
                     <OButton
                       v-if="
-                        !panelSchemaRendererRef?.noData &&
                         ![
                           'table',
                           'heatmap',
@@ -217,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'maps',
                         ].includes(dashboardPanelData.data.type)
                       "
+                      :class="{ invisible: panelSchemaRendererRef?.noData }"
                       variant="ghost"
                       size="icon"
                       @click="showLegendsDialog = true"

@@ -18896,8 +18896,7 @@
     "detailTable": {
       "noDataAvailable": "Kullanılabilir veri yok.",
       "addIcon": "Simge ekle",
-      "sendToAiChat": "AI Sohbetine Gönder",
-      "contentCopiedSuccessfully": "İçerik Başarıyla Kopyalandı!"
+      "sendToAiChat": "AI Sohbetine Gönder"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "SELECT * sorgusu görselleştirme için desteklenmiyor.",
@@ -19183,7 +19182,24 @@
     "hideDetail": "Ayrıntıları gizle",
     "runAs": "Şu olarak çalıştır",
     "searchTextFor": "\"{text}\" için metin ara",
-    "searchTextDesc": "Tüm girdiyi tek bir ifade olarak ara"
+    "searchTextDesc": "Tüm girdiyi tek bir ifade olarak ara",
+    "explain": {
+      "missingStream": "{from} sonrasında akış adı yok. Bir ad ekleyin, örneğin {example}.",
+      "unexpectedEnd": "Sorgu tamamlanmadan bitiyor. Son koşulu veya ifadeyi tamamlayın.",
+      "unexpectedEndAfter": "Sorgu {keyword} sonrasında hemen bitiyor. Ardından gelmesi gerekeni ekleyin veya {keyword} ifadesini kaldırın.",
+      "unclosedBracket": "Bir parantez açılmış ama kapatılmamış. Eksik {char} karakterini ekleyin.",
+      "notAStatement": "Sorgu {keyword} gibi bir anahtar kelimeyle başlamalı, ancak bu sorgu {token} ile başlıyor. Yazımı kontrol edin.",
+      "unexpectedToken": "{token} sorguda bulunduğu yere uymuyor. Yazımını ve çevresindeki kelimeleri kontrol edin.",
+      "unclosedQuote": "Bir metin değerinin kapanış tırnağı yok. Değerin sonuna eksik ' karakterini ekleyin.",
+      "unclosedDelimiter": "Tırnak içindeki bir adın kapanış {char} karakteri yok. Eksik {char} karakterini ekleyin.",
+      "streamNotFound": "{name} adında bir akış yok. Adı kontrol edin veya akış listesinden bir akış seçin.",
+      "unknownField": "Bu akışta {name} adında bir alan yok. Yazımı kontrol edin veya alan listesinden bir alan seçin.",
+      "unknownFunction": "{name} adında bir fonksiyon yok. Yazımı kontrol edin.",
+      "unknownFunctionSuggest": "{name} adında bir fonksiyon yok. {suggestion} mı demek istediniz?",
+      "notANumber": "{value} bir metin, ancak karşılaştırıldığı alan sayı içeriyor. Tırnaksız bir sayı kullanın.",
+      "functionArgs": "{name} fonksiyonuna verilen değerler fonksiyonun kabul ettikleriyle uyuşmuyor. Değer sayısını ve türlerini kontrol edin.",
+      "notGrouped": "{name} gruplanmadan veya toplanmadan seçilmiş. {groupBy} ifadesine ekleyin veya seçili sütunlardan kaldırın."
+    }
   },
   "refreshButton": {
     "justNow": "Hemen şimdi",

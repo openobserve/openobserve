@@ -171,6 +171,8 @@ export interface NavbarProps {
    * column permanently there would eat a quarter of a 390px viewport.
    */
   overlay?: boolean;
+  /** Draws placeholder tiles in place of the menu while its entries are not known yet. */
+  loading?: boolean;
 }
 
 export interface NavbarEmits {

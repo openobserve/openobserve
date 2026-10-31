@@ -91,6 +91,7 @@ export const DEFAULT_LOGS_CONFIG = {
   loadingHistogram: false,
   loadingCounter: false,
   loadingStream: false,
+  loadingFieldGroups: false,
   loadingSavedView: false,
   loadingProgressPercentage: 0,
   loadingHistogramProgressPercentage: 0,

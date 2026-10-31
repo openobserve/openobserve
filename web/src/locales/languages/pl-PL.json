@@ -18896,8 +18896,7 @@
     "detailTable": {
       "noDataAvailable": "Brak dostępnych danych.",
       "addIcon": "Dodaj ikonę",
-      "sendToAiChat": "Wyślij do czatu AI",
-      "contentCopiedSuccessfully": "Treść skopiowana pomyślnie!"
+      "sendToAiChat": "Wyślij do czatu AI"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Zapytanie SELECT * nie jest obsługiwane dla wizualizacji.",
@@ -19183,7 +19182,24 @@
     "hideDetail": "Ukryj szczegóły",
     "runAs": "Uruchom jako",
     "searchTextFor": "Szukaj tekstu dla \"{text}\"",
-    "searchTextDesc": "Przeszukaj całe dane wejściowe jako jedną frazę"
+    "searchTextDesc": "Przeszukaj całe dane wejściowe jako jedną frazę",
+    "explain": {
+      "missingStream": "Po {from} brakuje nazwy strumienia. Dodaj ją, na przykład {example}.",
+      "unexpectedEnd": "Zapytanie kończy się, zanim jest kompletne. Dokończ ostatni warunek lub klauzulę.",
+      "unexpectedEndAfter": "Zapytanie kończy się zaraz po {keyword}. Dodaj to, co powinno nastąpić, albo usuń {keyword}.",
+      "unclosedBracket": "Nawias jest otwarty, ale nie został zamknięty. Dodaj brakujący {char}.",
+      "notAStatement": "Zapytanie musi zaczynać się od słowa kluczowego, takiego jak {keyword}, a to zaczyna się od {token}. Sprawdź pisownię.",
+      "unexpectedToken": "{token} nie pasuje w tym miejscu zapytania. Sprawdź pisownię i sąsiednie słowa.",
+      "unclosedQuote": "Wartość tekstowa nie ma cudzysłowu zamykającego. Dodaj brakujący ' po wartości.",
+      "unclosedDelimiter": "Nazwa w cudzysłowie nie ma zamykającego {char}. Dodaj brakujący {char}.",
+      "streamNotFound": "Nie ma strumienia o nazwie {name}. Sprawdź nazwę lub wybierz strumień z listy.",
+      "unknownField": "Ten strumień nie ma pola o nazwie {name}. Sprawdź pisownię lub wybierz pole z listy pól.",
+      "unknownFunction": "Nie ma funkcji o nazwie {name}. Sprawdź pisownię.",
+      "unknownFunctionSuggest": "Nie ma funkcji o nazwie {name}. Czy chodziło o {suggestion}?",
+      "notANumber": "{value} to tekst, ale porównywane pole zawiera liczby. Użyj liczby bez cudzysłowów.",
+      "functionArgs": "Wartości przekazane do {name} nie pasują do tego, co funkcja przyjmuje. Sprawdź liczbę wartości i ich typy.",
+      "notGrouped": "{name} jest wybrane bez grupowania ani agregacji. Dodaj je do {groupBy} lub usuń z wybranych kolumn."
+    }
   },
   "refreshButton": {
     "justNow": "przed chwilą",

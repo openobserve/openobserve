@@ -442,6 +442,34 @@ describe("Header Component", () => {
   });
 
   describe("AI Chat Button", () => {
+    it("holds the AI button's place until the config says whether it shows", async () => {
+      const aiWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: { state: { zoConfig: { version: "" } } },
+        configOverrides: { isEnterprise: "true" },
+        stubsOverrides: {},
+      });
+      await aiWrapper.vm.$nextTick();
+
+      expect(aiWrapper.find('[data-test="header-ai-slot-placeholder"]').exists()).toBe(true);
+      expect(aiWrapper.find('[data-test="menu-link-ai-item"]').exists()).toBe(false);
+      aiWrapper.unmount();
+    });
+
+    it("drops the held place once the config has loaded", async () => {
+      const aiWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: { state: { zoConfig: { version: "v1", ai_enabled: true } } },
+        configOverrides: { isEnterprise: "true" },
+        stubsOverrides: {},
+      });
+      await aiWrapper.vm.$nextTick();
+
+      expect(aiWrapper.find('[data-test="header-ai-slot-placeholder"]').exists()).toBe(false);
+      expect(aiWrapper.find('[data-test="menu-link-ai-item"]').exists()).toBe(true);
+      aiWrapper.unmount();
+    });
+
     it("should display AI chat button in enterprise mode with ai_enabled", async () => {
       const aiWrapper = createWrapper({
         mountType: "mount",

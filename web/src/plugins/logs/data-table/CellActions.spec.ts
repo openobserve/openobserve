@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { mount, config } from "@vue/test-utils";
+import { mount, config, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import i18n from "@/locales";
 import CellActions from "./CellActions.vue";
+
+const { clipboardMock } = vi.hoisted(() => ({ clipboardMock: vi.fn() }));
+vi.mock("@/utils/clipboard", () => ({ copyToClipboard: clipboardMock }));
 
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
@@ -308,5 +311,46 @@ describe("CellActions", () => {
       const btn = wrapper.findComponent({ name: "O2AIContextAddBtn" });
       expect(btn.exists()).toBe(true);
     });
+  });
+});
+
+describe("CellActions in-place copy", () => {
+  const COPY_BTN = '[data-test="logs-cell-actions-copy-btn"]';
+  const copiedLabel = () => i18n.global.t("common.copied");
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("copies the value itself and relabels the button Copied instead of emitting", async () => {
+    clipboardMock.mockResolvedValue(true);
+    const wrapper = mountComponent({ copyInPlace: true });
+
+    await wrapper.find(COPY_BTN).trigger("click");
+    await flushPromises();
+
+    expect(clipboardMock).toHaveBeenCalledWith('"200"', expect.any(Function), { silent: true });
+    expect(wrapper.emitted("copy")).toBeUndefined();
+    expect(wrapper.find(COPY_BTN).attributes("aria-label")).toBe(copiedLabel());
+  });
+
+  it("keeps the copy label when the clipboard refuses", async () => {
+    clipboardMock.mockResolvedValue(false);
+    const wrapper = mountComponent({ copyInPlace: true });
+
+    await wrapper.find(COPY_BTN).trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find(COPY_BTN).attributes("aria-label")).toBe(
+      i18n.global.t("logs.cellActions.copy"),
+    );
+  });
+
+  it("still hands the value to the parent when not asked to copy in place", async () => {
+    const wrapper = mountComponent();
+    await wrapper.find(COPY_BTN).trigger("click");
+
+    expect(clipboardMock).not.toHaveBeenCalled();
+    expect(wrapper.emitted("copy")?.[0]).toEqual(["200"]);
   });
 });
