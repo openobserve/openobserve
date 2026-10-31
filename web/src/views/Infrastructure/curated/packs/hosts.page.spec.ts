@@ -244,4 +244,10 @@ describe("queries carry tokens, not literals", () => {
     expect(panel("hd_cpu_by_state").variants[0].queries[0].query).toContain('state!="idle"');
     expect(panel("hd_fs_used_pct").variants[0].queries[0].query).toContain('state="used"');
   });
+
+  it("takes CPU busy as idle over all CPU time, so a collector summing idle across cores stays in 0-100", () => {
+    const query = panel("hd_cpu_busy").variants[0].queries[0].query;
+    expect(query).toMatch(/^100 \* \(1 - sum\(irate\(system_cpu_time\{state="idle",.*\/ sum\(irate\(system_cpu_time\{\$\{scope:host\}/);
+    expect(query).not.toContain("avg(");
+  });
 });

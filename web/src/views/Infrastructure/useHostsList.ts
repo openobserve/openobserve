@@ -20,17 +20,18 @@
 import { computed, onScopeDispose, ref, watch } from "vue";
 import { useStore } from "vuex";
 import searchService from "@/services/search";
+import streamService from "@/services/stream";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import {
   HOSTS_CORES_QUERY,
   HOSTS_CPU_QUERY,
   HOSTS_DISK_QUERY,
-  HOSTS_LAST_SEEN_SQL,
   HOSTS_LIVENESS_QUERY,
   HOSTS_LOAD_QUERY,
   HOSTS_MEMORY_STATES,
   HOSTS_MEMORY_USAGE_QUERY,
   HOSTS_MEMORY_UTILIZATION_QUERY,
+  hostsLastSeenSql,
 } from "./hostsQueries";
 
 export type HostStatus = "ACTIVE" | "INACTIVE" | "UNKNOWN";
@@ -184,6 +185,14 @@ export function useHostsList() {
         query: encodeURIComponent(query),
         end_time: end,
       });
+    // Grouped by node only where the stream has the column; unknown, it is left out rather than fail the query.
+    const lastSeenSql = streamService
+      .schema(orgId, "system_cpu_load_average_15m", "metrics")
+      .then((res: any) =>
+        ((res?.data?.schema ?? []) as Array<{ name: string }>).some((f) => f.name === "k8s_node_name"),
+      )
+      .catch(() => false)
+      .then(hostsLastSeenSql);
     const results = await Promise.allSettled([
       instant(HOSTS_LIVENESS_QUERY),
       instant(HOSTS_CPU_QUERY),
@@ -192,22 +201,24 @@ export function useHostsList() {
       instant(HOSTS_DISK_QUERY),
       instant(HOSTS_LOAD_QUERY),
       instant(HOSTS_CORES_QUERY),
-      searchService.search(
-        {
-          org_identifier: orgId,
-          query: {
+      lastSeenSql.then((sql) =>
+        searchService.search(
+          {
+            org_identifier: orgId,
             query: {
-              sql: HOSTS_LAST_SEEN_SQL,
-              start_time: start,
-              end_time: end,
-              from: 0,
-              // Silent ceiling: hosts beyond 10k rows drop from last-seen with no error surfaced.
-              size: 10000,
+              query: {
+                sql,
+                start_time: start,
+                end_time: end,
+                from: 0,
+                // Silent ceiling: hosts beyond 10k rows drop from last-seen with no error surfaced.
+                size: 10000,
+              },
             },
+            page_type: "metrics",
           },
-          page_type: "metrics",
-        },
-        "ui",
+          "ui",
+        ),
       ),
     ]);
     if (gen !== generation) return;

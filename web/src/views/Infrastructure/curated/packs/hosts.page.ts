@@ -71,6 +71,8 @@ export const hostsPage: CuratedPageManifest = {
       scopedBy: ["host"],
       panels: [
         {
+          // A ratio, as on the hosts table: collectors >= 0.157 drop the cpu label and sum idle across cores, so
+          // 1 - avg(idle) goes negative on a multi-core host.
           id: "hd_cpu_busy",
           titleKey: "infra.hosts.panel.cpuBusy",
           type: "line",
@@ -83,7 +85,7 @@ export const hostsPage: CuratedPageManifest = {
               queryType: "promql",
               queries: [
                 {
-                  query: `100 * (1 - avg(irate(system_cpu_time{state="idle",\${scope:host},${GUARD}}[5m])))`,
+                  query: `100 * (1 - sum(irate(system_cpu_time{state="idle",\${scope:host},${GUARD}}[5m])) / sum(irate(system_cpu_time{\${scope:host},${GUARD}}[5m])))`,
                   legend: "busy",
                 },
               ],
@@ -92,7 +94,7 @@ export const hostsPage: CuratedPageManifest = {
           drilldown: [
             explorerDrilldown(
               "system_cpu_time",
-              `100 * (1 - avg(irate(system_cpu_time{state="idle",\${scope:host},${GUARD}}[5m])))`,
+              `100 * (1 - sum(irate(system_cpu_time{state="idle",\${scope:host},${GUARD}}[5m])) / sum(irate(system_cpu_time{\${scope:host},${GUARD}}[5m])))`,
             ),
           ],
         },

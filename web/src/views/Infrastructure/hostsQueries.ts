@@ -40,8 +40,12 @@ export const HOSTS_DEFAULT_WINDOW_US = 3 * 60 * 60 * 1000 * 1000;
 export const HOSTS_LIVENESS_QUERY = `count by (host_name, os_type, k8s_node_name) (last_over_time(system_cpu_load_average_15m{${HOSTS_PRODUCER_GUARD}}[10m]))`;
 
 // SQL because timestamp(last_over_time(...)) re-stamps at eval time in this engine.
-// k8s_node_name is grouped too because liveness carries it only for ACTIVE hosts, leaving dead ones pod-named.
-export const HOSTS_LAST_SEEN_SQL = `SELECT host_name, k8s_node_name, max(_timestamp) AS last_seen FROM "system_cpu_load_average_15m" WHERE ${HOSTS_PRODUCER_GUARD_SQL} GROUP BY host_name, k8s_node_name`;
+// k8s_node_name is grouped too because liveness carries it only for ACTIVE hosts, leaving dead ones pod-named. Only
+// `withNode`: a stream from Linux hosts alone has no such column, and naming it fails the whole query.
+export const hostsLastSeenSql = (withNode: boolean) => {
+  const keys = withNode ? "host_name, k8s_node_name" : "host_name";
+  return `SELECT ${keys}, max(_timestamp) AS last_seen FROM "system_cpu_load_average_15m" WHERE ${HOSTS_PRODUCER_GUARD_SQL} GROUP BY ${keys}`;
+};
 
 // A ratio, not 1 - avg(idle): collectors >= 0.157 drop the cpu label and sum idle across cores.
 export const HOSTS_CPU_QUERY = `100 * (1 - sum by (host_name)(irate(system_cpu_time{state="idle",${HOSTS_PRODUCER_GUARD}}[5m])) / sum by (host_name)(irate(system_cpu_time{${HOSTS_PRODUCER_GUARD}}[5m])))`;
