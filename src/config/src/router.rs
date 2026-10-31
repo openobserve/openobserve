@@ -14,10 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 38] = [
+const QUERIER_ROUTES: [(&str, usize); 39] = [
     ("config", 0),               // /config (unauthenticated bootstrap)
     ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
+    ("overview", 2),             // /api/{org_id}/overview
     ("organizations", 1),        // /api/organizations
     ("settings", 2),             // /api/{org_id}/settings/...
     ("schema", 3),               // /api/{org_id}/streams/{stream_name}/schema
@@ -57,6 +58,8 @@ const QUERIER_ROUTES: [(&str, usize); 38] = [
     ("service_streams", 2),   // /api/{org_id}/service_streams/...
     ("node/list", 2),         // /api/_meta/node/list
 ];
+/// Entries that match their whole remaining path, so `overview_x/...` stays unrouted.
+const EXACT_QUERIER_ROUTES: [&str; 1] = ["overview"];
 const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/_search",
     "/_search_partition",
@@ -107,7 +110,12 @@ pub fn is_querier_route(path: &str) -> bool {
             }
             // Join remaining segments without collecting into a Vec
             let route_part = segments.collect::<Vec<_>>().join("/");
-            route_part.starts_with(route)
+            let matched = if EXACT_QUERIER_ROUTES.contains(route) {
+                extract_path_without_query(&route_part) == *route
+            } else {
+                route_part.starts_with(route)
+            };
+            matched
                 && INGESTER_ROUTES
                     .iter()
                     .all(|ingest_route| !route_part.ends_with(ingest_route))
@@ -149,7 +157,16 @@ pub fn is_public_dashboard_slug(slug: &str) -> bool {
 #[inline]
 pub fn is_fixed_querier_route(path: &str) -> bool {
     let path = remove_base_uri(path);
-    FIXED_QUERIER_ROUTES.iter().any(|x| path.contains(x))
+    FIXED_QUERIER_ROUTES.iter().any(|x| path.contains(x)) || is_org_overview_route(path)
+}
+
+/// Only `/api/{org}/overview` itself; a substring match would pin streams named `overview_*`.
+fn is_org_overview_route(path: &str) -> bool {
+    let segments: Vec<&str> = extract_path_without_query(path)
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect();
+    matches!(segments.as_slice(), ["api", _, "overview"])
 }
 
 /// The public routes, and the status calls that answer from the querier owning a link's files.
@@ -194,6 +211,14 @@ mod tests {
         // Test summary route
         assert!(is_querier_route("/api/org1/summary"));
         assert!(!is_querier_route("/summary")); // Should fail as it needs org_id
+
+        assert!(is_querier_route("/api/org1/overview"));
+        assert!(!is_querier_route("/overview"));
+        assert!(is_querier_route("/api/org1/overview?top=5"));
+        assert!(is_querier_route("/api/org1/overview/"));
+        assert!(!is_querier_route("/api/default/overview_x/profiles/meta"));
+        assert!(!is_querier_route("/api/default/overview_events/_search"));
+        assert!(!is_querier_route("/api/default/overview/extra"));
 
         // Test streams route
         assert!(is_querier_route("/api/org1/streams"));
@@ -261,11 +286,31 @@ mod tests {
     #[test]
     fn test_is_fixed_querier_route() {
         assert!(is_fixed_querier_route("/summary"));
+        assert!(is_fixed_querier_route("/api/org1/overview"));
         assert!(is_fixed_querier_route("/schema"));
         assert!(is_fixed_querier_route("/streams"));
 
         assert!(!is_fixed_querier_route("/other_route"));
         assert!(is_fixed_querier_route("/summary_other"));
+    }
+
+    #[test]
+    fn test_overview_pin_matches_only_the_org_route() {
+        assert!(is_fixed_querier_route("/api/default/overview"));
+        assert!(is_fixed_querier_route("/api/default/overview/"));
+        assert!(is_fixed_querier_route("/api/default/overview?top=5"));
+        assert!(!is_fixed_querier_route(
+            "/api/default/overview_events/_search"
+        ));
+        for path in [
+            "/api/default/streams/overview/schema",
+            "/api/default/streams/overview_x/_around",
+            "/api/default/overview_events/_search",
+            "/api/default/overview/extra",
+            "/overview",
+        ] {
+            assert!(!is_org_overview_route(path), "{path}");
+        }
     }
 
     #[test]
