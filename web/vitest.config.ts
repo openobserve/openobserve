@@ -91,10 +91,10 @@ export default mergeConfig(
         return false;
       },
       coverage: {
-        provider: 'istanbul',
+        provider: 'v8',
         reporter: ["text", "json", "html", "json-summary"],
         include: ['src/**/*.{js,ts,vue}'],
-        processingConcurrency: 256,
+        processingConcurrency: 512,
         thresholds: {
           lines: 33,
           functions: 33,
