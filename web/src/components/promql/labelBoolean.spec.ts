@@ -20,6 +20,7 @@ import {
   filterGroupsOf,
   hasFilterGroups,
   MAX_FILTER_BRANCHES,
+  MAX_GROUPED_MATCHERS,
   type BooleanLabelMatch,
 } from "./labelBoolean";
 
@@ -129,6 +130,20 @@ describe("compileLabelFilters", () => {
     );
     expect(compileLabelFilters(negated)).toEqual({ ok: false, branchCount: 17 });
     expect(branches(negated.slice(0, MAX_FILTER_BRANCHES))).toHaveLength(MAX_FILTER_BRANCHES);
+  });
+
+  it("refuses more grouped matchers than it will compile, before merging them", () => {
+    const many = Array.from({ length: MAX_GROUPED_MATCHERS + 1 }, (_, i) =>
+      m("code", "=", String(i), i + 1),
+    );
+    expect(compileLabelFilters(many)).toEqual({ ok: false, branchCount: MAX_GROUPED_MATCHERS + 1 });
+    expect(branches(many.slice(0, MAX_GROUPED_MATCHERS))).toHaveLength(1);
+  });
+
+  it("dedupes a repeated value once in the merged alternation", () => {
+    expect(branches([m("a", "=", "1", 1), m("a", "=", "2", 2), m("a", "=", "1", 3)])).toEqual([
+      [{ label: "a", op: "=~", value: "(?:1|2)" }],
+    ]);
   });
 
   it("counts branches after merging, so many values of one label stay runnable", () => {

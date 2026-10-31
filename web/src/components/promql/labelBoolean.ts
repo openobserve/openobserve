@@ -33,6 +33,9 @@ export type CompiledLabelFilters =
 
 export const MAX_FILTER_BRANCHES = 16;
 
+/** Grouped matchers compiled at all; merging can fold many into few, but every card pays for the work. */
+export const MAX_GROUPED_MATCHERS = MAX_FILTER_BRANCHES * 16;
+
 const INVERSE: Record<LabelMatchOp, LabelMatchOp> = {
   "=": "!=",
   "!=": "=",
@@ -96,8 +99,8 @@ const mergeable = (m: LabelMatch | undefined): m is LabelMatch =>
 
 /** Folds branches that differ only in one label's `=` value into one `=~` alternation. */
 const mergeOnLabel = (branches: LabelMatch[][], label: string): LabelMatch[][] => {
-  const buckets = new Map<string, { branch: LabelMatch[]; values: string[] }>();
-  const out: Array<LabelMatch[] | { branch: LabelMatch[]; values: string[] }> = [];
+  const buckets = new Map<string, { branch: LabelMatch[]; values: Set<string> }>();
+  const out: Array<LabelMatch[] | { branch: LabelMatch[]; values: Set<string> }> = [];
   for (const branch of branches) {
     const on = branch.filter((m) => m.label === label);
     if (on.length !== 1 || !mergeable(on[0])) {
@@ -107,17 +110,17 @@ const mergeOnLabel = (branches: LabelMatch[][], label: string): LabelMatch[][] =
     const sig = branchKey(branch.filter((m) => m !== on[0]));
     const bucket = buckets.get(sig);
     if (bucket) {
-      if (!bucket.values.includes(on[0].value)) bucket.values.push(on[0].value);
+      bucket.values.add(on[0].value);
       continue;
     }
-    const created = { branch, values: [on[0].value] };
+    const created = { branch, values: new Set([on[0].value]) };
     buckets.set(sig, created);
     out.push(created);
   }
   return out.map((entry) => {
     if (Array.isArray(entry)) return entry;
-    if (entry.values.length === 1) return entry.branch;
-    const alternation = `(?:${entry.values.map(escapeRegexLiteral).join("|")})`;
+    if (entry.values.size === 1) return entry.branch;
+    const alternation = `(?:${[...entry.values].map(escapeRegexLiteral).join("|")})`;
     return entry.branch.map((m) =>
       m.label === label ? { label, op: "=~" as const, value: alternation } : m,
     );
@@ -135,8 +138,15 @@ export function compileLabelFilters(matchers: BooleanLabelMatch[]): CompiledLabe
   const base = matchers.filter((m) => (m.group ?? 0) <= 0).map(plain);
   if (!hasFilterGroups(matchers)) return { ok: true, branches: [base] };
 
+  const groups = filterGroupsOf(matchers);
+  const grouped = groups.reduce((n, { members }) => n + members.length, 0);
+  if (grouped > MAX_GROUPED_MATCHERS) {
+    const expanded = groups.reduce((n, g) => n + (g.negate ? g.members.length : 1), 0);
+    return { ok: false, branchCount: expanded };
+  }
+
   const disjuncts: LabelMatch[][] = [];
-  for (const { negate, members } of filterGroupsOf(matchers)) {
+  for (const { negate, members } of groups) {
     if (negate) {
       members.forEach((m) => disjuncts.push([{ ...plain(m), op: INVERSE[m.op] }]));
     } else {
