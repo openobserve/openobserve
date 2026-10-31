@@ -8126,6 +8126,7 @@
       "aggRangeDesc": "Maksimum ve minimum arasındaki fark",
       "aggDiffLabel": "Fark:",
       "aggDiffDesc": "Son ve ilk arasındaki fark",
+      "aggInstantNote": "Pasta veya halka grafikte bu, Range sorguları gibi birden çok örnek döndüren sorgulara uygulanır. Tek örnek döndüren bir Instant sorgusu bu örneği korur; dolayısıyla ikisini karıştırmak, indirgenmiş değerleri ham değerlerin yanında gösterir.",
       "geoLatTooltip": "Enlem değerlerini içeren metrik etiketinin adı. Varsayılan: \"latitude\" veya \"lat\"",
       "geoLonTooltip": "Boylam değerlerini içeren metrik etiketinin adı. Varsayılan: \"longitude\" veya \"lon\"",
       "geoWeightTooltip": "Ağırlık değerlerini içeren metrik etiketinin adı. Varsayılan: \"weight\"",
@@ -21411,6 +21412,17 @@
       "moreInfoAbout": "{field} hakkında daha fazla bilgi",
       "moreInfo": "Daha fazla bilgi"
     },
+    "streamPicker": {
+      "internalStreams": "Dahili akışlar",
+      "hiddenCount": "{count} gizli",
+      "matchCount": "{count} gizli eşleşme | {count} gizli eşleşme",
+      "hide": "Gizle",
+      "show": "Göster",
+      "hideInternal": "Dahili akışları gizle",
+      "showInternal": "Dahili akışları göster",
+      "announceHidden": "Dahili akışlar gizlendi",
+      "announceShown": "Dahili akışlar gösterildi"
+    },
     "templateInput": {
       "suggestions": "Değişken önerileri"
     },
@@ -28501,11 +28513,6 @@
       "target": "Hedef",
       "auditDisabled": "Denetim izi için sunucuda O2_AUDIT_ENABLED=true gerekir",
       "auditDelayHint": "Henüz kayıt yok. Sunucu denetim kayıtlarını toplu olarak yayımlar; varsayılan olarak her 10 dakikada bir (O2_AUDIT_PUBLISH_INTERVAL).",
-      "alertAutoRolledBack": "Bir dağıtım otomatik olarak geri alındı",
-      "alertOfflineRatio": "Bir filonun çevrimdışı payı eşiğini aştı",
-      "alertRolloutHalted": "Bir dağıtım durduruldu",
-      "alerts": "Filolar için uyarılar",
-      "alertsDesc": "Filo yönetimi kendisi bildirim göndermez. Olayları kaydeder; uyarı kitaplığında bunlara yönelik hazır uyarılar vardır.",
       "fleetDefaults": "Filo varsayılanları",
       "fleetDefaultsDesc": "Her filo, kendi ayarlarında belirlemediği sürece bu değerleri kullanır",
       "gateObserve": "Kapı gözlemi (saniye)",
@@ -28523,7 +28530,6 @@
       "offlineHeartbeatsHelp": "Bir toplayıcı, bu kadar kalp atışı aralığı boyunca mesaj göndermezse çevrimdışı sayılır",
       "offlineRatio": "Çevrimdışı oranı olayı (%)",
       "offlineRatioHelp": "Toplayıcıların bu orandan fazlası çevrimdışı olduğunda bir filo olayı kaydeder",
-      "openAlertLibrary": "Uyarı kitaplığını aç",
       "outOfRange": "{min} ile {max} arasında bir sayı girin",
       "phaseTimeout": "Aşama zaman aşımı (saniye)",
       "phaseTimeoutHelp": "Bu süre içinde ne onaylanan ne de reddedilen bir dağıtım aşaması durdurulur",

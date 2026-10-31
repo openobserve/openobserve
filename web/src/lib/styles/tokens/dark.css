@@ -417,6 +417,14 @@
   --color-select-item-selected-bg: var(--color-surface-accent-active);
   --color-select-item-selected-text: var(--color-primary-200);
   --color-select-item-disabled: var(--color-text-disabled);
+  --color-select-header-bg: color-mix(
+    in srgb,
+    var(--color-accent) 15%,
+    var(--color-select-content-bg)
+  );
+  --color-select-header-count-text: var(--color-grey-400);
+  --color-select-header-action-text: var(--color-primary-300);
+  --color-select-header-action-hover-bg: var(--color-surface-accent-hover);
 
   /* Switch (OSwitch) — same off-vs-on-vs-disabled differentiation as light
        mode. OFF uses primary outline + primary thumb (interactive signal).

@@ -8121,6 +8121,7 @@
       "aggRangeDesc": "最大值與最小值的差異",
       "aggDiffLabel": "差異：",
       "aggDiffDesc": "最後一個與第一個的差異",
+      "aggInstantNote": "在圓餅圖或環圈圖上，這適用於會傳回多個樣本的查詢，例如範圍查詢。只有單一瞬時查詢的樣本會保留該樣本，因此混用兩者時，縮減值會與原始值並列顯示。",
       "geoLatTooltip": "包含緯度值的度量標籤名稱。預設：\"latitude\" 或 \"lat\"",
       "geoLonTooltip": "包含經度值的度量標籤名稱。預設：\"longitude\" 或 \"lon\"",
       "geoWeightTooltip": "包含權重值的度量標籤名稱。預設：\"weight\"",
@@ -21406,6 +21407,17 @@
       "moreInfoAbout": "關於{field}的更多資訊",
       "moreInfo": "更多資訊"
     },
+    "streamPicker": {
+      "internalStreams": "內部串流",
+      "hiddenCount": "已隱藏 {count} 個",
+      "matchCount": "隱藏 {count} 個符合項目 | 隱藏 {count} 個符合項目",
+      "hide": "隱藏",
+      "show": "顯示",
+      "hideInternal": "隱藏內部串流",
+      "showInternal": "顯示內部串流",
+      "announceHidden": "內部串流已隱藏",
+      "announceShown": "內部串流已顯示"
+    },
     "templateInput": {
       "suggestions": "變數建議"
     },
@@ -28496,11 +28508,6 @@
       "target": "目標",
       "auditDisabled": "稽核軌跡需要在伺服器上設定 O2_AUDIT_ENABLED=true",
       "auditDelayHint": "尚無記錄。伺服器按批次發布稽核記錄,預設每 10 分鐘一次(O2_AUDIT_PUBLISH_INTERVAL)。",
-      "alertAutoRolledBack": "推出已自動回復",
-      "alertOfflineRatio": "機群的離線比例超過其門檻",
-      "alertRolloutHalted": "推出已中止",
-      "alerts": "機群警示",
-      "alertsDesc": "Fleet 管理本身不會傳送通知。它會記錄事件，而警示庫中有針對這些事件的現成警示。",
       "fleetDefaults": "機群預設值",
       "fleetDefaultsDesc": "除非機群在其設定中自行設定，否則每個機群都使用這些值",
       "gateObserve": "關卡觀察時間（秒）",
@@ -28518,7 +28525,6 @@
       "offlineHeartbeatsHelp": "收集器在這麼多個心跳間隔內未傳送任何訊息即視為離線",
       "offlineRatio": "離線比例事件（%）",
       "offlineRatioHelp": "當離線的收集器比例超過此值時，記錄一則機群事件",
-      "openAlertLibrary": "開啟警示庫",
       "outOfRange": "請輸入 {min} 到 {max} 之間的數字",
       "phaseTimeout": "階段逾時（秒）",
       "phaseTimeoutHelp": "推出階段在此時間內既未確認也未拒絕即中止",

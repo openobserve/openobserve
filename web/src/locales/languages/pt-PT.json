@@ -8126,6 +8126,7 @@
       "aggRangeDesc": "Diferença entre máximo e mínimo",
       "aggDiffLabel": "Diferença:",
       "aggDiffDesc": "Diferença entre último e primeiro",
+      "aggInstantNote": "Num gráfico circular ou em anel, isto aplica-se a consultas que devolvem várias amostras, como as consultas Range. Uma consulta Instant com uma única amostra mantém essa amostra, pelo que misturar ambas mostra valores reduzidos ao lado dos valores em bruto.",
       "geoLatTooltip": "Nome do rótulo da métrica que contém valores de latitude. Predefinição: \"latitude\" ou \"lat\"",
       "geoLonTooltip": "Nome do rótulo da métrica que contém valores de longitude. Predefinição: \"longitude\" ou \"lon\"",
       "geoWeightTooltip": "Nome do rótulo da métrica que contém valores de peso. Predefinição: \"weight\"",
@@ -21411,6 +21412,17 @@
       "moreInfoAbout": "Mais informações sobre {field}",
       "moreInfo": "Mais informações"
     },
+    "streamPicker": {
+      "internalStreams": "Streams internos",
+      "hiddenCount": "{count} ocultos",
+      "matchCount": "{count} correspondência oculta | {count} correspondências ocultas",
+      "hide": "Ocultar",
+      "show": "Mostrar",
+      "hideInternal": "Ocultar streams internos",
+      "showInternal": "Mostrar streams internos",
+      "announceHidden": "Streams internos ocultados",
+      "announceShown": "Streams internos apresentados"
+    },
     "templateInput": {
       "suggestions": "Sugestões de variáveis"
     },
@@ -28501,11 +28513,6 @@
       "target": "Alvo",
       "auditDisabled": "O registo de auditoria requer O2_AUDIT_ENABLED=true no servidor",
       "auditDelayHint": "Ainda sem registos. O servidor publica os registos de auditoria em lotes, a cada 10 minutos por predefinição (O2_AUDIT_PUBLISH_INTERVAL).",
-      "alertAutoRolledBack": "Uma implementação foi revertida automaticamente",
-      "alertOfflineRatio": "A proporção offline de uma frota excedeu o limite",
-      "alertRolloutHalted": "Uma implementação foi interrompida",
-      "alerts": "Alertas para frotas",
-      "alertsDesc": "A gestão de frota não envia notificações por si própria. Regista eventos, e a biblioteca de alertas tem alertas prontos a usar sobre eles.",
       "fleetDefaults": "Predefinições das frotas",
       "fleetDefaultsDesc": "Todas as frotas usam estes valores, salvo se definirem os seus próprios nas respetivas definições",
       "gateObserve": "Observação da verificação (segundos)",
@@ -28523,7 +28530,6 @@
       "offlineHeartbeatsHelp": "Um coletor fica offline após este número de intervalos de heartbeat sem mensagem",
       "offlineRatio": "Evento de proporção offline (%)",
       "offlineRatioHelp": "Regista um evento da frota quando mais do que esta proporção de coletores está offline",
-      "openAlertLibrary": "Abrir a biblioteca de alertas",
       "outOfRange": "Introduza um número de {min} a {max}",
       "phaseTimeout": "Tempo limite da fase (segundos)",
       "phaseTimeoutHelp": "Uma fase da implementação que não confirma nem rejeita neste tempo é interrompida",

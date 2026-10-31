@@ -8126,6 +8126,7 @@
       "aggRangeDesc": "Diferencia entre máximo y mínimo",
       "aggDiffLabel": "Diferencia:",
       "aggDiffDesc": "Diferencia entre último y primero",
+      "aggInstantNote": "En un gráfico circular o de anillo, esto se aplica a las consultas que devuelven varias muestras, como las consultas de rango. Una consulta instantánea con una sola muestra conserva esa muestra, por lo que mezclar ambas muestra valores reducidos junto a los valores sin procesar.",
       "geoLatTooltip": "Nombre de la etiqueta de métrica que contiene valores de latitud. Predeterminado: \"latitude\" o \"lat\"",
       "geoLonTooltip": "Nombre de la etiqueta de métrica que contiene valores de longitud. Predeterminado: \"longitude\" o \"lon\"",
       "geoWeightTooltip": "Nombre de la etiqueta de métrica que contiene valores de peso. Predeterminado: \"weight\"",
@@ -21411,6 +21412,17 @@
       "moreInfoAbout": "Más información sobre {field}",
       "moreInfo": "Más información"
     },
+    "streamPicker": {
+      "internalStreams": "Streams internos",
+      "hiddenCount": "{count} ocultos",
+      "matchCount": "{count} coincidencia oculta | {count} coincidencias ocultas",
+      "hide": "Ocultar",
+      "show": "Mostrar",
+      "hideInternal": "Ocultar streams internos",
+      "showInternal": "Mostrar streams internos",
+      "announceHidden": "Streams internos ocultos",
+      "announceShown": "Streams internos mostrados"
+    },
     "templateInput": {
       "suggestions": "Sugerencias de variables"
     },
@@ -28501,11 +28513,6 @@
       "target": "Destino",
       "auditDisabled": "El registro de auditoría requiere O2_AUDIT_ENABLED=true en el servidor",
       "auditDelayHint": "Aún no hay entradas. El servidor publica los registros de auditoría por lotes, cada 10 minutos de forma predeterminada (O2_AUDIT_PUBLISH_INTERVAL).",
-      "alertAutoRolledBack": "Un despliegue se revirtió automáticamente",
-      "alertOfflineRatio": "La proporción sin conexión de una flota superó su umbral",
-      "alertRolloutHalted": "Un despliegue se detuvo",
-      "alerts": "Alertas para flotas",
-      "alertsDesc": "La gestión de flota no envía notificaciones por sí misma. Registra eventos, y la biblioteca de alertas tiene alertas predefinidas sobre ellos.",
       "fleetDefaults": "Valores predeterminados de las flotas",
       "fleetDefaultsDesc": "Todas las flotas usan estos valores, a menos que definan los suyos en sus ajustes",
       "gateObserve": "Observación del control (segundos)",
@@ -28523,7 +28530,6 @@
       "offlineHeartbeatsHelp": "Un colector está sin conexión tras este número de intervalos de latido sin mensaje",
       "offlineRatio": "Evento de proporción sin conexión (%)",
       "offlineRatioHelp": "Registra un evento de flota cuando más de esta proporción de colectores está sin conexión",
-      "openAlertLibrary": "Abrir la biblioteca de alertas",
       "outOfRange": "Introduce un número de {min} a {max}",
       "phaseTimeout": "Tiempo de espera de la fase (segundos)",
       "phaseTimeoutHelp": "Una fase del despliegue que no confirma ni rechaza en este tiempo se detiene",
