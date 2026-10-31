@@ -1,5 +1,6 @@
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 const testLogger = require("../utils/test-logger.js");
+const { NavRailPage } = require("../../pages/generalPages/navRailPage.js");
 
 const SIZES = [
   { width: 1440, height: 900 },
@@ -25,18 +26,6 @@ async function setLanguageCookie(page, code) {
 
 const isFocused = (locator) => locator.evaluate((el) => el === document.activeElement);
 
-// ODropdownItem animates its colours over 150 ms; read once its transitions have finished.
-async function settledBackground(locator) {
-  await expect.poll(() => locator.evaluate((el) => el.getAnimations().length)).toBe(0);
-  return locator.evaluate((el) => getComputedStyle(el).backgroundColor);
-}
-
-const focusedMenuRow = (page) =>
-  page.evaluate(() => {
-    const el = document.activeElement;
-    return el && el.closest('[role="menu"]') ? el.getAttribute("data-test") || el.textContent.trim() : null;
-  });
-
 async function openProfileMenuByKeyboard(page) {
   await page.locator(PROFILE).focus();
   await page.keyboard.press("Enter");
@@ -61,6 +50,7 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
         page,
       }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
+        const navRail = new NavRailPage(page);
         await page.setViewportSize(size);
         await setLanguageCookie(page, dir === "rtl" ? "ar" : "en-us");
         await navigateToBase(page);
@@ -74,11 +64,11 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
         await expect(row).toHaveAttribute("aria-expanded", "false");
 
         testLogger.step("Focus style matches the sibling items");
-        const rowBg = await settledBackground(row);
+        const rowBg = await navRail.settledBackground(row);
         await page.keyboard.press("ArrowDown");
         const themeRow = page.locator(THEME_ROW);
         expect(await isFocused(themeRow)).toBe(true);
-        const siblingBg = await settledBackground(themeRow);
+        const siblingBg = await navRail.settledBackground(themeRow);
         expect(rowBg).toBe(siblingBg);
         await page.keyboard.press("ArrowUp");
         expect(await isFocused(row)).toBe(true);
@@ -165,18 +155,9 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
     page,
   }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
-    const fullConfigPath = `/api/${process.env.ORGNAME}/config`;
-    let release;
-    const released = new Promise((resolve) => (release = resolve));
-    await page.route(
-      (url) => url.pathname.endsWith(fullConfigPath),
-      async (route) => {
-        await released;
-        const response = await route.fetch();
-        const json = { ...(await response.json()), oncall_enabled: false };
-        await route.fulfill({ response, json });
-      },
-    );
+    const navRail = new NavRailPage(page);
+    const oncallOff = { oncall_enabled: false };
+    const { release } = await navRail.holdOrgConfig(oncallOff);
     await page.addInitScript((selector) => {
       window.__oncallRowSeen = false;
       new MutationObserver(() => {
@@ -192,17 +173,16 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
     await expect(page.locator(ONCALL_ROW)).toHaveCount(0);
 
     testLogger.step("Release the full config with on-call off");
-    const fulfilled = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith(fullConfigPath));
     release();
-    await fulfilled;
+    await navRail.waitForStoreConfig(oncallOff);
     await expect(page.locator(ROW)).toBeVisible();
 
     testLogger.step("Arrow keys still move between menu rows");
     await page.keyboard.press("ArrowDown");
-    const first = await focusedMenuRow(page);
+    const first = await navRail.focusedMenuRow();
     expect(first, "focus is inside the menu").not.toBeNull();
     await page.keyboard.press("ArrowDown");
-    const second = await focusedMenuRow(page);
+    const second = await navRail.focusedMenuRow();
     expect(second, "focus is inside the menu").not.toBeNull();
     expect(second).not.toBe(first);
     expect(await page.evaluate(() => window.__oncallRowSeen), "My on-call never rendered").toBe(false);
