@@ -726,7 +726,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <MetricsVisualize
       v-else-if="mode === 'visualize'"
       ref="visualizeRef"
-      key="metrics-visualize"
+      :key="`metrics-visualize-${visualizeMount}`"
       class="min-h-0 flex-1"
       :selected-date-time="visualizeDateTime"
       :seed="visualizeSeed"
@@ -1443,6 +1443,7 @@ export default defineComponent({
     // on the card's own query.
     // Consumed once by MetricsVisualize, then cleared.
     const visualizeSeed = ref<Record<string, any> | null>(null);
+    const visualizeMount = ref(0);
     const seedVisualizeFromUrl = (q: Record<string, any>) => {
       if (!q.metrics_data) return;
       const blob = decodeMetricsConfig(q.metrics_data);
@@ -1479,11 +1480,19 @@ export default defineComponent({
 
     const shareUrl = computed(() => {
       void route.fullPath; // reactive dep on the URL
+      void selectedDate.value;
       if (mode.value !== "visualize") return window.location.href;
       const url = new URL(window.location.href);
       const blob = visualizeBlob.value;
       if (blob) url.searchParams.set("metrics_data", blob);
       else url.searchParams.delete("metrics_data");
+      // A shared chart shows the window it was shared with, so a relative range is frozen (µs -> ms).
+      const ct = dateTimePickerRef.value?.getConsumableDateTime?.();
+      if (ct?.startTime && ct?.endTime) {
+        url.searchParams.delete("period");
+        url.searchParams.set("from", String(Math.floor(ct.startTime / 1000)));
+        url.searchParams.set("to", String(Math.floor(ct.endTime / 1000)));
+      }
       return url.href;
     });
 
@@ -1889,10 +1898,13 @@ export default defineComponent({
       syncUrlState,
     );
 
+    // The blob this page last wrote, so its own replace is never read back as a new chart.
+    let writtenBlob = "";
     const syncVisualizeUrl = () => {
       if (route.name !== "metrics") return;
       const blob = mode.value === "visualize" ? visualizeBlob.value : "";
       if (String(blob) === String(route.query.metrics_data ?? "")) return;
+      writtenBlob = blob;
 
       const query: Record<string, any> = { ...route.query };
       if (blob) query.metrics_data = blob;
@@ -1930,6 +1942,19 @@ export default defineComponent({
     const onRouteQueryChange = () => {
       // Leaving the page fires this once with the next route's query.
       if (route.name !== "metrics") return;
+
+      // Visualize seeds only on mount, so another link's chart (or Back/Forward) remounts it.
+      const blobIn = String(route.query.metrics_data ?? "");
+      if (
+        mode.value === "visualize" &&
+        route.query.mode === "visualize" &&
+        blobIn &&
+        blobIn !== writtenBlob &&
+        blobIn !== visualizeBlob.value
+      ) {
+        seedVisualizeFromUrl(route.query as Record<string, any>);
+        visualizeMount.value += 1;
+      }
 
       const incoming: Record<string, string> = {};
       for (const key of MANAGED_PARAM_KEYS) {
@@ -2438,6 +2463,7 @@ export default defineComponent({
       onDetailOpenVisualize,
       onRouteQueryChange,
       visualizeSeed,
+      visualizeMount,
       visualizeRef,
       isVisualizePending,
       visualizeRunTooltip,

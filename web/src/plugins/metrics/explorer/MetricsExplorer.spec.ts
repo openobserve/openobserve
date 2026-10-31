@@ -902,6 +902,29 @@ describe("MetricsExplorer wiring", () => {
         expect(blob?.data?.type).toBe("line");
       });
 
+      it("freezes a relative window into the picker's absolute from/to, in ms", async () => {
+        routerState.query = { period: "15m" };
+        window.history.replaceState({}, "", "/metrics?period=15m");
+        const wrapper = mountExplorer({
+          DateTimePickerDashboard: {
+            setup: () => ({
+              getConsumableDateTime: () => ({
+                startTime: 1_700_000_000_000_000,
+                endTime: 1_700_000_900_000_000,
+              }),
+            }),
+            template: "<div />",
+          },
+        });
+        await enterVisualizeWith(wrapper, "up");
+
+        const params = new URL((wrapper.vm as any).shareUrl).searchParams;
+        expect(params.get("period")).toBeNull();
+        expect(params.get("from")).toBe("1700000000000");
+        expect(params.get("to")).toBe("1700000900000");
+        window.history.replaceState({}, "", "/");
+      });
+
       it("omits metrics_data on a blank Visualize (no query yet)", async () => {
         const wrapper = mountExplorer();
         visualizePanel = reactive({
@@ -1043,6 +1066,51 @@ describe("MetricsExplorer wiring", () => {
 
         expect(routerState.replace).toHaveBeenCalled();
         expect(routerState.push).not.toHaveBeenCalled();
+      });
+
+      it("remounts Visualize on the URL's chart when Back/Forward moves between two blobs", async () => {
+        const first = encodeMetricsConfig(
+          getMetricsConfig({ data: { type: "line", queries: [{ query: "up", fields: {} }] } }),
+        );
+        const second = encodeMetricsConfig(
+          getMetricsConfig({
+            data: { type: "bar", queries: [{ query: "node_load1", fields: {} }] },
+          }),
+        );
+        visualizePanel = null;
+        routerState.query = { mode: "visualize", metrics_data: first };
+        const wrapper = mountExplorer();
+        const vm = wrapper.vm as any;
+        const mounted = vm.visualizeMount;
+
+        routerState.query = { mode: "visualize", metrics_data: second };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeSeed?.queries?.[0]?.query).toBe("node_load1");
+        expect(vm.visualizeMount).toBe(mounted + 1);
+
+        routerState.query = { mode: "visualize", metrics_data: first };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeSeed?.queries?.[0]?.query).toBe("up");
+        expect(vm.visualizeMount).toBe(mounted + 2);
+      });
+
+      it("does not remount on the blob the page itself wrote", async () => {
+        const wrapper = mountExplorer();
+        const vm = wrapper.vm as any;
+        await enterVisualizeWith(wrapper, "node_load1");
+        vi.advanceTimersByTime(300);
+        const wrote = blobWrites().at(-1);
+        expect(wrote).toBeTruthy();
+        const mounted = vm.visualizeMount;
+        vm.visualizeSeed = null;
+        // An edit inside the debounce means the chart has moved on from what was written.
+        visualizePanel.data.queries[0].query = "node_load5";
+        await wrapper.vm.$nextTick();
+
+        routerState.query = { mode: "visualize", metrics_data: wrote };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeMount).toBe(mounted);
+        expect(vm.visualizeSeed).toBeNull();
       });
 
       it("does not touch metrics_data while in a grid mode", async () => {
