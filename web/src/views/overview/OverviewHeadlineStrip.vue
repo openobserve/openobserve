@@ -29,11 +29,17 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { OrgOverview, OverviewSection } from "@/ts/interfaces/overview";
-import { firingCount, firingRows, levelCount, microsToMs, sectionView } from "./overviewFormat";
+import {
+  firingCount,
+  levelCount,
+  microsToMs,
+  oldestKnownFiring,
+  sectionView,
+} from "./overviewFormat";
 import { useOverviewTime } from "./useOverviewTime";
 
 export type OverviewTarget = "firing" | "failing" | "incidents" | "pipelines" | "quiet" | "streams";
-export type IncidentsTile = "ok" | "loading" | "error" | "locked" | "unavailable";
+export type IncidentsTile = "ok" | "loading" | "error" | "locked" | "unavailable" | "forbidden";
 
 const props = defineProps<{
   overview: OrgOverview | null;
@@ -61,15 +67,15 @@ const unavailableNote = (view: ReturnType<typeof sectionView>): I18nText | undef
 const sectionTile = <T,>(
   section: OverviewSection<T> | undefined,
   pick: (data: T) => number,
-): { value: string | number; note?: I18nText; ok: boolean } => {
+): { value: string | number; note?: I18nText; ok: boolean; loading: boolean } => {
   const view = sectionView(section, {
-    pending: false,
+    pending: props.pending,
     failed: props.failed,
     forbidden: props.forbidden,
   });
   if (view !== "ok" || !section?.data)
-    return { value: DASH, note: unavailableNote(view), ok: false };
-  return { value: pick(section.data), ok: true };
+    return { value: DASH, note: unavailableNote(view), ok: false, loading: view === "loading" };
+  return { value: pick(section.data), ok: true, loading: false };
 };
 
 const pipelinesSub = (tile: { ok: boolean; note?: I18nText }): I18nText | undefined => {
@@ -78,13 +84,17 @@ const pipelinesSub = (tile: { ok: boolean; note?: I18nText }): I18nText | undefi
   return enabled > 0 ? t("overview.cards.pipelinesOf", { enabled }) : undefined;
 };
 
+// a zero with no rules behind it would read as reassurance, so say nothing is monitored
+const notSetUp = () => t("overview.dataHealth.status.notSetUp");
+
 // one short piece only: the tile has room for "2 critical" or "oldest 1h 0m", not both
 const firingSub = (tile: { ok: boolean; note?: I18nText }): I18nText | undefined => {
   if (!tile.ok) return tile.note;
   const alerts = props.overview?.alerts.data;
+  if (alerts?.total === 0) return notSetUp();
   const critical = levelCount(alerts, "critical");
   if (critical > 0) return t("overview.cards.firingCritical", { count: critical });
-  const oldest = firingRows(alerts)[0];
+  const oldest = oldestKnownFiring(alerts);
   if (!oldest) return undefined;
   const age = formatElapsed(Date.now() - microsToMs(oldest.since));
   return t("overview.cards.firingOldest", { age });
@@ -94,22 +104,25 @@ const items = computed<StatItem[]>(() => {
   const o = props.overview;
   const firing = sectionTile(o?.alerts, (d) => firingCount(d));
   const failing = sectionTile(o?.alerts, (d) => d.failed_evaluation);
+  const noRules = firing.ok && o?.alerts.data?.total === 0;
   const pipelines = sectionTile(o?.pipelines, (d) => d.errored);
   const streams = sectionTile(o?.streams, (d) => d.total_streams);
   const quiet = sectionTile(o?.streams, (d) => d.quiet_count);
   const incidentNote: Record<IncidentsTile, I18nText | undefined> = {
     ok: undefined,
     loading: undefined,
-    unavailable: undefined,
+    unavailable: t("overview.state.tileUnavailable"),
     error: t("overview.state.tileError"),
     locked: t("overview.state.tileLocked"),
+    forbidden: t("overview.state.tileForbidden"),
   };
   const incidentsOk = props.incidentsState === "ok";
   return [
     {
       key: "firing",
+      loading: firing.loading,
       label: t("overview.cards.firingAlerts"),
-      value: firing.value,
+      value: noRules ? DASH : firing.value,
       sub: firingSub(firing),
       icon: "notifications",
       tone: firing.ok && Number(firing.value) > 0 ? "error" : "neutral",
@@ -117,9 +130,10 @@ const items = computed<StatItem[]>(() => {
     },
     {
       key: "failing",
+      loading: firing.loading,
       label: t("overview.cards.failingRules"),
-      value: failing.value,
-      sub: failing.note,
+      value: noRules ? DASH : failing.value,
+      sub: noRules ? notSetUp() : failing.note,
       icon: "error",
       tone: failing.ok && Number(failing.value) > 0 ? "error" : "neutral",
       dataTest: "overview-headline-failing",
@@ -132,10 +146,12 @@ const items = computed<StatItem[]>(() => {
       loading: props.incidentsState === "loading",
       icon: "warning",
       tone: incidentsOk && props.incidentsTotal > 0 ? "warning" : "neutral",
+      selectable: props.incidentsState !== "unavailable" && props.incidentsState !== "forbidden",
       dataTest: "overview-headline-incidents",
     },
     {
       key: "pipelines",
+      loading: pipelines.loading,
       label: t("overview.cards.pipelineErrors"),
       value: pipelines.value,
       sub: pipelinesSub(pipelines),
@@ -145,6 +161,7 @@ const items = computed<StatItem[]>(() => {
     },
     {
       key: "quiet",
+      loading: quiet.loading,
       label: t("overview.cards.quietStreams"),
       value: quiet.value,
       sub: quiet.ok ? undefined : quiet.note,
@@ -154,6 +171,7 @@ const items = computed<StatItem[]>(() => {
     },
     {
       key: "streams",
+      loading: streams.loading,
       label: t("overview.cards.streams"),
       value: streams.value,
       sub: streams.ok ? undefined : streams.note,

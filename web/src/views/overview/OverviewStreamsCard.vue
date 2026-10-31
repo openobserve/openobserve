@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('overview.sections.streams')"
     :link-label="t('overview.streams.viewStreams')"
     :view="view"
+    :summary-forbidden="forbidden"
     @retry="emit('retry')"
     @view-all="emit('open')"
   >
@@ -67,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`overview-streams-top-${row.stream_type}-${row.name}`"
               @click="emit('open')"
             >
-              <span class="flex w-full flex-col gap-1 text-left">
+              <span class="flex w-full flex-col gap-1 text-start">
                 <span class="flex items-center justify-between gap-3">
                   <span class="flex min-w-0 items-center gap-2">
                     <span
@@ -89,14 +90,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >{{ raw(formatSizeFromMB(row.storage_size_mb)) }}
                     {{ raw("·") }}
                     {{
-                      t("overview.streams.shareOfTotal", {
-                        percent: percentOf(row.storage_size_mb, totalMb),
-                      })
+                      isUnderOnePercent(row.storage_size_mb, totalMb)
+                        ? t("overview.streams.shareUnderOne", { percent: 1 })
+                        : t("overview.streams.shareOfTotal", {
+                            percent: percentOf(row.storage_size_mb, totalMb),
+                          })
                     }}</span
                   >
                 </span>
                 <OProgressBar
-                  :value="sizeShare(row.storage_size_mb, topRows)"
+                  :value="sizeShare(row.storage_size_mb, totalMb)"
                   size="xs"
                   :aria-label="row.name"
                 />
@@ -131,6 +134,7 @@ import OverviewSectionCard from "./OverviewSectionCard.vue";
 import { SEGMENT_SWATCH } from "@/lib/data/SegmentedBar/OSegmentedBar.types";
 import {
   mergeTopStreams,
+  isUnderOnePercent,
   percentOf,
   sectionView,
   signalVariant,

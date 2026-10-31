@@ -15,10 +15,13 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
+import config from "@/aws-exports";
 import i18n from "@/locales";
+import { raw } from "@/types/i18n";
 import OverviewAlertsCard from "./OverviewAlertsCard.vue";
 import OverviewDataHealthCard from "./OverviewDataHealthCard.vue";
 import OverviewLimitCard from "./OverviewLimitCard.vue";
+import OverviewSectionCard from "./OverviewSectionCard.vue";
 import OverviewSignalCards from "./OverviewSignalCards.vue";
 import OverviewStorageCard from "./OverviewStorageCard.vue";
 import OverviewStreamsCard from "./OverviewStreamsCard.vue";
@@ -56,6 +59,32 @@ const stateSections: Array<[string, OverviewSection<never>, string]> = [
   ["locked", { status: "locked", reason: "secret internal reason" }, "locked"],
 ];
 
+describe("OverviewSectionCard", () => {
+  it("falls back to a generic locked message when none is passed", async () => {
+    const w = mount(OverviewSectionCard, {
+      props: { section: "x", title: raw("X"), view: "locked" },
+      global,
+    });
+    const locked = w.get('[data-test="overview-x-locked"]');
+    expect(locked.text()).toBe("Available with an enterprise license");
+    await locked.trigger("click");
+    expect(w.emitted("unlock")).toHaveLength(1);
+  });
+
+  it("renders a plain notice, not a button, when unlock is not available", async () => {
+    const w = mount(OverviewSectionCard, {
+      props: { section: "x", title: raw("X"), view: "locked", canUnlock: false },
+      global,
+    });
+    const locked = w.get('[data-test="overview-x-locked"]');
+    expect(locked.element.tagName).not.toBe("BUTTON");
+    expect(w.find("button").exists()).toBe(false);
+    expect(locked.text()).toBe("Available with an enterprise license");
+    await locked.trigger("click");
+    expect(w.emitted("unlock")).toBeUndefined();
+  });
+});
+
 describe("OverviewAlertsCard", () => {
   const mountAlerts = (props: Record<string, unknown> = {}) =>
     mount(OverviewAlertsCard, { props: { ...base, section: o.alerts, ...props }, global });
@@ -65,7 +94,9 @@ describe("OverviewAlertsCard", () => {
     expect(w.get('[data-test="overview-alerts-tile-critical"]').text()).toContain("2");
     expect(w.get('[data-test="overview-alerts-tile-warning"]').text()).toContain("1");
     expect(w.get('[data-test="overview-alerts-tile-failing"]').text()).toContain("4");
-    expect(w.get('[data-test="overview-alerts-tile-critical"]').text()).toContain("Critical level");
+    expect(w.get('[data-test="overview-alerts-tile-critical"]').text()).toContain(
+      "Firing at critical",
+    );
   });
 
   it("omits the incidents tile unless incidents data exists", () => {
@@ -89,6 +120,37 @@ describe("OverviewAlertsCard", () => {
     expect(rows[0].text()).toContain("1h 0m");
     expect(rows[1].text()).toContain("Warning");
     expect(rows[1].text()).toContain("16m");
+  });
+
+  it("shows a neutral Firing tag for a firing rule whose level is ok", () => {
+    const [first] = o.alerts.data!.firing;
+    const w = mountAlerts({ section: alertsWith({ firing: [{ ...first, level: "ok" }] }) });
+    const tag = w.get(`[data-test="overview-alerts-firing-level-${first.name}"]`);
+    expect(tag.text()).toBe("Firing");
+    expect(tag.text()).not.toContain("Normal");
+  });
+
+  it("renders two same-named rules on one stream as separate rows", () => {
+    const [first] = o.alerts.data!.firing;
+    const w = mountAlerts({
+      section: alertsWith({ firing: [first, { ...first, since: first.since + 1 }] }),
+    });
+    expect(w.findAll(`[data-test="overview-alerts-firing-${first.name}"]`)).toHaveLength(2);
+  });
+
+  it("shows no age for a firing rule whose since is unknown", () => {
+    const [first, second] = o.alerts.data!.firing;
+    const w = mountAlerts({ section: alertsWith({ firing: [{ ...first, since: 0 }, second] }) });
+    const rows = w.findAll('[data-test^="overview-alerts-firing-"]:not([data-test*="level"])');
+    expect(rows[0].text()).not.toMatch(/\d+[dhm]/);
+    expect(rows[1].text()).toContain("16m");
+  });
+
+  it("gives the view-all link a distinct accessible name", () => {
+    const w = mountAlerts();
+    const link = w.get('[data-test="overview-alerts-view-all"]');
+    expect(link.attributes("aria-label")).toBe("View all alerts");
+    expect(link.text()).toBe("View all");
   });
 
   it("offers the remaining count when more rules fire than are listed", async () => {
@@ -133,8 +195,23 @@ describe("OverviewAlertsCard", () => {
     const w = mountAlerts({ section: alertsWith({ total: 0, enabled: 0, failed_evaluation: 0 }) });
     expect(w.get('[data-test="overview-alerts-empty"]').text()).toContain("No alert rules yet");
     expect(w.find('[data-test="overview-alerts-tiles"]').exists()).toBe(false);
-    await w.get('[data-test="overview-alerts-open-btn"]').trigger("click");
-    expect(w.emitted("open")).toHaveLength(1);
+    const action = w.get('[data-test="overview-alerts-open-btn"]');
+    expect(action.text()).toBe("Create an alert");
+    await action.trigger("click");
+    expect(w.emitted("create")).toHaveLength(1);
+    expect(w.emitted("open")).toBeUndefined();
+  });
+
+  it("shows a firing-at-other-levels tile only when rules fire at unlisted levels", () => {
+    expect(mountAlerts().find('[data-test="overview-alerts-tile-other"]').exists()).toBe(false);
+    const w = mountAlerts({
+      section: alertsWith({
+        firing_by_level: { ok: 1, warning: 1, critical: 2, no_data: 2, unclassified: 1 },
+      }),
+    });
+    const tile = w.get('[data-test="overview-alerts-tile-other"]');
+    expect(tile.text()).toContain("4");
+    expect(tile.text()).toContain("Firing at other levels");
   });
 
   it("opens the alert list from a firing row", async () => {
@@ -166,6 +243,26 @@ describe("OverviewAlertsCard", () => {
   });
 });
 
+describe("forbidden copy", () => {
+  it("asks for Summary access when the whole request was refused", () => {
+    const w = mount(OverviewAlertsCard, {
+      props: { pending: false, failed: false, forbidden: true },
+      global,
+    });
+    expect(w.get('[data-test="overview-alerts-forbidden"]').text()).toContain("Summary access");
+  });
+
+  it("asks for plain access when only one section was refused", () => {
+    const w = mount(OverviewStreamsCard, {
+      props: { ...base, section: { status: "forbidden" } as never },
+      global,
+    });
+    const text = w.get('[data-test="overview-streams-forbidden"]').text();
+    expect(text).toContain("Ask an org admin for access.");
+    expect(text).not.toContain("Summary");
+  });
+});
+
 describe("forbidden request", () => {
   it.each([
     ["alerts", OverviewAlertsCard],
@@ -191,14 +288,14 @@ describe("OverviewDataHealthCard", () => {
 
   it("shows every row with its real value and a text status", () => {
     const w = mountHealth();
-    expect(row(w, "quiet").text()).toContain("Streams gone quiet");
+    expect(row(w, "quiet").text()).toContain("Quiet streams");
     expect(row(w, "quiet").text()).toContain("Warning");
     expect(w.get('[data-test="overview-data-health-value-quiet"]').text()).toBe("3");
     expect(row(w, "failing").text()).toContain("Needs action");
     expect(w.get('[data-test="overview-data-health-value-failing"]').text()).toBe("4");
     expect(row(w, "pipelines").text()).toContain("of 8 enabled");
     expect(w.get('[data-test="overview-data-health-value-pipelines"]').text()).toBe("2");
-    expect(row(w, "schema").text()).toContain("For information");
+    expect(row(w, "schema").text()).toContain("Info");
     expect(w.get('[data-test="overview-data-health-value-schema"]').text()).toBe("5");
   });
 
@@ -224,6 +321,27 @@ describe("OverviewDataHealthCard", () => {
     }
   });
 
+  it("shows not set up, not healthy, for things that do not exist", () => {
+    const overview = buildOverview({
+      alerts: alertsWith({ total: 0, enabled: 0, disabled: 0, failed_evaluation: 0, by_state: {} }),
+      pipelines: okSection({ total: 0, enabled: 0, disabled: 0, errored: 0 }),
+    });
+    const w = mountHealth(overview);
+    for (const key of ["failing", "delivery", "pipelines"]) {
+      expect(row(w, key).text()).toContain("Not set up");
+      expect(row(w, key).text()).not.toContain("Healthy");
+      expect(w.get(`[data-test="overview-data-health-value-${key}"]`).text()).toBe("—");
+    }
+  });
+
+  it("shows quiet streams and schema changes as not set up when there are no streams", () => {
+    const w = mountHealth(buildOverview({ streams: streamsWith({ total_streams: 0 }) }));
+    for (const key of ["quiet", "schema"]) {
+      expect(row(w, key).text()).toContain("Not set up");
+      expect(row(w, key).text()).not.toContain("Healthy");
+    }
+  });
+
   it("notes when there are no pipelines", () => {
     const overview = buildOverview({
       pipelines: okSection({ total: 0, enabled: 0, disabled: 0, errored: 0 }),
@@ -238,8 +356,8 @@ describe("OverviewDataHealthCard", () => {
       alerts: { status: "locked", reason: "secret internal reason" },
     });
     const w = mountHealth(overview);
-    expect(row(w, "quiet").text()).toContain("Unavailable");
-    expect(row(w, "schema").text()).toContain("Unavailable");
+    expect(row(w, "quiet").text()).toContain("Could not load");
+    expect(row(w, "schema").text()).toContain("Could not load");
     expect(row(w, "pipelines").text()).toContain("No access");
     expect(row(w, "failing").text()).toContain("Locked");
     expect(row(w, "delivery").text()).toContain("Locked");
@@ -319,6 +437,16 @@ describe("OverviewStreamsCard", () => {
     expect(w.text()).not.toContain("NaN");
   });
 
+  it("shows under 1 percent, not 0, for a tiny share of the total", () => {
+    const w = mount(OverviewStreamsCard, {
+      props: { ...base, section: streamsWith({ total_storage_size_mb: 100000 }) },
+      global,
+    });
+    const size = w.get('[data-test="overview-streams-top-size-logs-web_logs"]').text();
+    expect(size).toContain("<1% of total");
+    expect(size).not.toContain("0% of total");
+  });
+
   it("gives each signal its own colour swatch", () => {
     const w = mount(OverviewStreamsCard, { props: { ...base, section: o.streams }, global });
     const cls = (id: string) =>
@@ -332,6 +460,25 @@ describe("OverviewStreamsCard", () => {
     const w = mount(OverviewStreamsCard, { props: { ...base, section: o.streams }, global });
     const bar = w.get('[data-test="overview-streams-top-logs-app_logs"] [role="progressbar"]');
     expect(bar.attributes("aria-label")).toBe("app_logs");
+  });
+
+  it("sizes each top stream bar by its share of total storage", () => {
+    const w = mount(OverviewStreamsCard, { props: { ...base, section: o.streams }, global });
+    const bar = (id: string) =>
+      w.get(`[data-test="overview-streams-top-${id}"] [role="progressbar"]`);
+    expect(bar("logs-app_logs").attributes("aria-valuenow")).toBe("50");
+    expect(w.get('[data-test="overview-streams-top-size-logs-app_logs"]').text()).toContain(
+      "50% of total",
+    );
+    const empty = mount(OverviewStreamsCard, {
+      props: { ...base, section: streamsWith({ total_storage_size_mb: 0 }) },
+      global,
+    });
+    expect(
+      empty
+        .get('[data-test="overview-streams-top-logs-app_logs"] [role="progressbar"]')
+        .attributes("aria-valuenow"),
+    ).toBe("0");
   });
 
   it("emits open from a top stream row", async () => {
@@ -419,6 +566,16 @@ describe("OverviewSignalCards", () => {
     expect(w.get('[data-test="overview-signal-logs-events"]').text()).toBe("2.9B");
   });
 
+  it("gives each Open link a distinct accessible name that keeps the visible text", () => {
+    const w = mountSignals();
+    const names = ["logs", "metrics"].map((s) => {
+      const link = w.get(`[data-test="overview-signal-${s}-view-all"]`);
+      expect(link.text()).toBe("Open");
+      return link.attributes("aria-label");
+    });
+    expect(names).toEqual(["Open logs", "Open metrics"]);
+  });
+
   it("emits the signal from its Open link", async () => {
     const w = mountSignals();
     await w.get('[data-test="overview-signal-metrics-view-all"]').trigger("click");
@@ -471,7 +628,7 @@ describe("OverviewStorageCard", () => {
 
   it("shows the empty state, not zero percentages, with nothing stored", () => {
     const w = mountStorage({ section: streamsWith({ total_storage_size_mb: 0, by_type: [] }) });
-    expect(w.get('[data-test="overview-storage-empty"]').text()).toContain("No stored data yet");
+    expect(w.get('[data-test="overview-storage-empty"]').text()).toContain("No data yet");
     expect(w.find('[data-test="overview-storage-bar"]').exists()).toBe(false);
   });
 
@@ -551,6 +708,16 @@ describe("OverviewLimitCard", () => {
     expect(w.get('[data-test="overview-limit-block-note"]').text()).toContain("Search is blocked");
   });
 
+  it.each([
+    [0, 3, "neutral"],
+    [3, 3, "warning"],
+    [4, 3, "error"],
+  ])("tones %s days over of %s allowed as %s", (days, allowed, tone) => {
+    const w = mountLimit(limitsWith({ days_over_limit: days, allowed_days: allowed }));
+    const chip = w.get('[data-test="overview-limit-days-over"]');
+    expect(chip.classes()).toContain(`bg-badge-${tone === "neutral" ? "default" : tone}-soft-bg`);
+  });
+
   it("flags an expired license", () => {
     const w = mountLimit(
       limitsWith({ ingestion_used_percent: 120, expired: true, days_over_limit: 5 }),
@@ -573,6 +740,24 @@ describe("OverviewLimitCard", () => {
     expect(w.text()).not.toContain("secret internal");
     await locked.trigger("click");
     expect(w.emitted("unlock")).toHaveLength(1);
+  });
+
+  it("says the limit is not available on cloud and never emits unlock", async () => {
+    const original = config.isCloud;
+    config.isCloud = "true";
+    try {
+      const w = mount(OverviewLimitCard, {
+        props: { ...base, section: { status: "locked", reason: "not available in this edition" } },
+        global,
+      });
+      const locked = w.get('[data-test="overview-limit-locked"]');
+      expect(locked.element.tagName).not.toBe("BUTTON");
+      expect(locked.text()).toBe("Not available on this edition");
+      await locked.trigger("click");
+      expect(w.emitted("unlock")).toBeUndefined();
+    } finally {
+      config.isCloud = original;
+    }
   });
 
   it.each(stateSections.filter(([n]) => n !== "locked"))(

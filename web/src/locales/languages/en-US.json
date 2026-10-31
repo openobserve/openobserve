@@ -9211,7 +9211,11 @@
     "state": {
       "tileForbidden": "No access",
       "tileLocked": "Locked",
-      "tileError": "Unavailable"
+      "tileError": "Could not load",
+      "tileUnavailable": "Not available",
+      "sectionLocked": "Available with an enterprise license",
+      "summaryForbidden": "Your role cannot see this. Ask an org admin for Summary access.",
+      "sectionForbidden": "Your role cannot see this data. Ask an org admin for access."
     },
     "time": {
       "minutes": "{minutes}m",
@@ -9222,6 +9226,7 @@
       "critical": "Critical",
       "warning": "Warning",
       "ok": "Normal",
+      "okFiring": "Firing",
       "no_data": "No data",
       "unclassified": "Unclassified"
     },
@@ -9229,29 +9234,31 @@
       "alerts": "Alerts",
       "dataHealth": "Data health",
       "streams": "Streams",
-      "topStreams": "Largest streams by ingested data",
+      "topStreams": "Largest streams by data size",
       "ingestLimit": "Ingest limit",
-      "storage": "Storage"
+      "storage": "Data size"
     },
     "alerts": {
-      "criticalLevel": "Critical level",
-      "warningLevel": "Warning level",
+      "criticalLevel": "Firing at critical",
+      "warningLevel": "Firing at warning",
+      "otherLevel": "Firing at other levels",
       "failing": "Failing rules",
       "firingNow": "Firing now, oldest first",
       "firingFor": "Firing for",
       "showMore": "Show {count} more firing alert | Show {count} more firing alerts",
       "allClear": "No alerts are firing right now.",
       "emptyTitle": "No alert rules yet",
-      "emptyAction": "Open alerts"
+      "emptyAction": "Create an alert",
+      "viewAllAria": "View all alerts"
     },
     "dataHealth": {
       "viewPipelines": "View pipelines",
       "noPipelines": "No pipelines yet.",
-      "pipelinesErrored": "Pipelines with errors",
+      "pipelinesErrored": "Pipeline errors",
       "pipelinesNote": "Enabled pipelines with an error",
-      "quiet": "Streams gone quiet",
+      "quiet": "Quiet streams",
       "quietNote": "Stopped writing between an hour and 7 days ago",
-      "failing": "Alert rules failing to evaluate",
+      "failing": "Failing rules",
       "failingNote": "Rules whose last evaluation errored",
       "delivery": "Alert delivery failures",
       "deliveryNote": "Alerts that fired but could not notify",
@@ -9261,7 +9268,8 @@
         "needsAction": "Needs action",
         "warning": "Warning",
         "healthy": "Healthy",
-        "info": "For information"
+        "notSetUp": "Not set up",
+        "info": "Info"
       }
     },
     "streams": {
@@ -9271,11 +9279,17 @@
       "startIngesting": "Start ingesting",
       "typeSummary": "{count} stream | {count} streams",
       "shareOfTotal": "{percent}% of total",
+      "shareUnderOne": "<{percent}% of total",
       "compactionPending": "{count} compaction job pending | {count} compaction jobs pending",
       "compactionNone": "No compaction jobs pending"
     },
     "signals": {
       "open": "Open",
+      "openAria": {
+        "logs": "Open logs",
+        "metrics": "Open metrics",
+        "traces": "Open traces"
+      },
       "logs": "Logs",
       "metrics": "Metrics",
       "traces": "Traces",
@@ -9283,13 +9297,13 @@
       "events": "Events",
       "samples": "Samples",
       "spans": "Spans",
-      "stored": "Stored"
+      "stored": "Data size"
     },
     "storage": {
-      "used": "Storage used",
-      "bySignal": "Storage by signal",
+      "used": "Data size",
+      "bySignal": "Data size by signal",
       "splitNote": "The split covers logs, metrics and traces only.",
-      "emptyTitle": "No stored data yet"
+      "emptyTitle": "No data yet"
     },
     "limit": {
       "used": "Ingested today (UTC)",
@@ -9306,19 +9320,21 @@
       "nearLimit": "Near limit",
       "blockNote": "Search is blocked once the days over the limit pass the number your license allows.",
       "overLimit": "Over limit",
+      "unavailableMessage": "Not available on this edition",
       "lockedMessage": "Track ingestion against your license limit with an enterprise license."
     },
     "empty": {
-      "incidents": "No open incidents in the selected time range",
+      "incidents": "No open incidents",
       "anomalies": "No anomalies detected in the selected time range",
-      "services": "No service data yet. Services appear once traces arrive",
-      "recentEvents": "No alert or pipeline events in the selected time range"
+      "anomalyNoChecks": "No anomaly checks are set up",
+      "services": "No service data in the selected time range",
+      "recentEvents": "No alert events in the selected time range"
     },
     "stale": {
       "message": "Showing data from {time}. Refresh failed.",
       "retry": "Retry"
     },
-    "freshness": "Alerts, pipelines, streams and limits show the current state, not the selected time range. Updated {time}. Incidents and recent events follow their own scope."
+    "freshness": "Cards show the current state, not the selected time range. Updated {time}."
   },
   "chatHistory": {
     "title": "Chats",

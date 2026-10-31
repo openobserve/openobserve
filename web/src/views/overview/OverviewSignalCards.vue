@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :section="`signal-${card.signal}`"
         :title="t(`overview.signals.${card.signal}`)"
         :link-label="t('overview.signals.open')"
+        :link-aria-label="t(`overview.signals.openAria.${card.signal}`)"
         view="ok"
         @view-all="emit('open', card.signal)"
       >

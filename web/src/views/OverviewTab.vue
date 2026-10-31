@@ -38,8 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Sections rendered top-to-bottom; each collapses when empty -->
-
     <p
       v-if="showOverviewCards && overview"
       class="text-text-secondary mb-2 text-xs"
@@ -80,32 +78,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :incidents-total="incidentsTotal"
       @select="onHeadlineSelect"
     />
-
-    <div
-      v-if="showOverviewCards"
-      class="mb-5 grid grid-cols-2 gap-3 max-lg:grid-cols-1"
-      data-test="overview-alerts-health-grid"
-    >
-      <OverviewAlertsCard
-        :section="overview?.alerts"
-        :pending="overviewPending"
-        :failed="overviewFailed"
-        :forbidden="overviewForbidden"
-        :incidents-state="incidentsTile"
-        :incidents-total="incidentsTotal"
-        @retry="() => loadOverview(true)"
-        @open="goToAlertList"
-      />
-      <OverviewDataHealthCard
-        class="self-start"
-        :overview="overview"
-        :pending="overviewPending"
-        :failed="overviewFailed"
-        :forbidden="overviewForbidden"
-        @retry="() => loadOverview(true)"
-        @open="onHealthOpen"
-      />
-    </div>
 
     <!-- ACTIVE INCIDENTS (enterprise / cloud only) -->
     <section
@@ -200,13 +172,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.activeIncidents')"
     />
 
-    <!-- Locked: no license to unlock Incidents, shown instead of omitted so
-         the capability is discoverable from a build that can't enable it. -->
-    <section
-      v-else-if="!incidentsAccess.allowed"
-      class="mb-5"
-      data-test="overview-incidents-locked"
+    <OverviewSectionEmpty
+      v-else-if="showSectionEmpty('incidents')"
+      section="incidents"
+      kind="empty"
+      :title="t('overview.activeIncidents')"
+    />
+
+    <div
+      v-if="showOverviewCards"
+      class="mb-5 grid grid-cols-2 gap-3 max-lg:grid-cols-1"
+      data-test="overview-alerts-health-grid"
     >
+      <OverviewAlertsCard
+        :section="overview?.alerts"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        :forbidden="overviewForbidden"
+        :incidents-state="incidentsTile"
+        :incidents-total="incidentsTotal"
+        @retry="() => loadOverview(true)"
+        @open="goToAlertList"
+        @create="goToAddAlert"
+      />
+      <OverviewDataHealthCard
+        class="self-start"
+        :overview="overview"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        :forbidden="overviewForbidden"
+        @retry="() => loadOverview(true)"
+        @open="onHealthOpen"
+      />
+    </div>
+
+    <!-- the upsell sits below the alerts grid so it never outranks live alert state -->
+    <section v-if="!incidentsAccess.allowed" class="mb-5" data-test="overview-incidents-locked">
       <div class="mb-2 flex items-center justify-between ps-1">
         <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
           {{ t("overview.activeIncidents") }}
@@ -220,13 +221,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
       </div>
     </section>
-
-    <OverviewSectionEmpty
-      v-else-if="showSectionEmpty('incidents')"
-      section="incidents"
-      kind="empty"
-      :title="t('overview.activeIncidents')"
-    />
 
     <!-- SERVICES (enterprise only — needs service graph data) -->
     <section
@@ -504,6 +498,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="showSectionEmpty('anomalies')"
       section="anomalies"
       kind="empty"
+      :no-checks="anomalyConfigCount === 0"
       :title="t('overview.activeAnomalies')"
     />
 
@@ -594,6 +589,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div class="flex flex-col gap-3 self-start">
         <OverviewLimitCard
+          v-if="!isCloud"
           :section="overview?.limits"
           :pending="overviewPending"
           :failed="overviewFailed"
@@ -612,7 +608,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <OEmptyState
-      v-if="pageState === 'forbidden'"
+      v-if="pageState === 'forbidden' || errorIsForbidden"
       preset="no-access"
       size="block"
       data-test="overview-no-access-empty-state"
@@ -722,6 +718,7 @@ import OverviewHeadlineStrip, {
 import OverviewAlertsCard from "./overview/OverviewAlertsCard.vue";
 import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
 import OverviewStreamsCard from "./overview/OverviewStreamsCard.vue";
+import config from "@/aws-exports";
 import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
 import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
 import OverviewStorageCard from "./overview/OverviewStorageCard.vue";
@@ -853,6 +850,14 @@ const sectionState = reactive<Record<SectionKey, { loading: boolean; loaded: boo
   recentEvents: { loading: false, loaded: false },
 });
 
+let alertCountSeq = 0;
+const sectionSeq: Record<SectionKey, number> = {
+  incidents: 0,
+  services: 0,
+  anomalies: 0,
+  recentEvents: 0,
+};
+
 const isSectionPending = (key: SectionKey) =>
   sectionState[key].loading && !sectionState[key].loaded;
 
@@ -863,6 +868,7 @@ const sectionFailure = reactive<Record<SectionKey, unknown>>({
   anomalies: null,
   recentEvents: null,
 });
+const isCloud = config.isCloud === "true";
 const overview = ref<OrgOverview | null>(null);
 const overviewFailed = ref(false);
 const overviewState = reactive({ loading: false });
@@ -884,7 +890,6 @@ const overviewPending = computed(
   () => overviewState.loading && (!overview.value || overviewFailed.value),
 );
 const alertCount = ref<number | null>(null);
-const summaryFailed = ref(false);
 const anomalyConfigCount = ref<number | null>(null);
 // null keeps all clear: only answered lists prove an org empty, and only the flag-off page asks
 const noUserStreams = ref<boolean | null>(null);
@@ -912,18 +917,27 @@ const pageState = computed<PageState>(() => {
   if (isLoading.value || hasAnyData.value) return "content";
   if (allFailed.value) {
     const allForbidden = attemptedSections.value.every((k) => isForbidden(sectionFailure[k]));
-    return flagOn.value && allForbidden ? "forbidden" : "error";
+    if (flagOn.value && allForbidden) return "forbidden";
+    // the cards loaded, so the failed sections keep their own inline Retry
+    return overview.value && !overviewFailed.value && !overviewForbidden.value
+      ? "partial"
+      : "error";
   }
   if (attemptedSections.value.some(isFailed)) return "partial";
-  if (!flagOn.value && streamProbeFailed.value) return "error";
   if (!flagOn.value && noUserStreams.value === true) return "no-data";
-  // without the summary the page cannot tell all clear from nothing watched, so neither may show
-  if (flagOn.value && summaryFailed.value) return "error";
+  // a failed summary leaves alertCount null, so the page never claims nothing is watched
   if (flagOn.value && alertCount.value === 0 && (anomalyConfigCount.value ?? 0) === 0) {
     return "not-monitored";
   }
   return "all-clear";
 });
+// every attempted call was refused, so "could not load" would contradict the No access cards
+const errorIsForbidden = computed(
+  () =>
+    pageState.value === "error" &&
+    overviewForbidden.value &&
+    attemptedSections.value.every((k) => !isFailed(k) || isDenied(k)),
+);
 const pageShowsSections = computed(
   () => pageState.value !== "error" && pageState.value !== "forbidden",
 );
@@ -950,13 +964,38 @@ const showSectionEmpty = (key: SectionKey) =>
 /* Wraps a loader with its section's state. The loaders swallow their own errors,
    and `finally` also covers the early `return` in the enterprise-gated ones, so
    a section can never be left stuck pending. */
-const runSection = async (key: SectionKey, load: () => Promise<void>) => {
+const runSection = async (key: SectionKey, load: (current: () => boolean) => Promise<void>) => {
+  const seq = ++sectionSeq[key];
+  const current = () => seq === sectionSeq[key];
   sectionState[key].loading = true;
   try {
-    await load();
+    await load(current);
   } finally {
+    // a superseded call must not mark the newer call's section as settled
+    if (current()) {
+      sectionState[key].loading = false;
+      sectionState[key].loaded = true;
+    }
+  }
+};
+
+// bumping every sequence makes responses still in flight for the previous org discard themselves
+const resetLegacySections = () => {
+  anomalies.value = [];
+  incidents.value = [];
+  incidentsTotal.value = 0;
+  services.value = [];
+  recentEvents.value = [];
+  alertCount.value = null;
+  alertCountSeq++;
+  graphData.value = { nodes: [], edges: [] };
+  selectedService.value = null;
+  servicePanelVisible.value = false;
+  for (const key of Object.keys(sectionState) as SectionKey[]) {
+    sectionSeq[key]++;
     sectionState[key].loading = false;
-    sectionState[key].loaded = true;
+    sectionState[key].loaded = false;
+    sectionFailure[key] = null;
   }
 };
 
@@ -1000,10 +1039,10 @@ const loadAll = async (force = false) => {
   // outside allSettled: a slow or failed /overview must never hold the page states
   void loadOverview(force);
   await Promise.allSettled([
-    runSection("recentEvents", () => loadHistoryAndSplit(force)),
-    runSection("anomalies", () => loadAnomalies(force)),
-    runSection("incidents", () => loadIncidents(force)),
-    runSection("services", () => loadServiceGraph(force)),
+    runSection("recentEvents", (current) => loadHistoryAndSplit(force, current)),
+    runSection("anomalies", (current) => loadAnomalies(force, current)),
+    runSection("incidents", (current) => loadIncidents(force, current)),
+    runSection("services", (current) => loadServiceGraph(force, current)),
     loadAlertCount(force),
   ]);
   await loadUserStreams(force);
@@ -1022,6 +1061,7 @@ const loadOverview = async (force = false) => {
     overviewFailed.value = false;
     overviewForbidden.value = false;
     overviewRefreshFailed.value = false;
+    resetLegacySections();
   }
   overviewState.loading = true;
   try {
@@ -1058,6 +1098,7 @@ const incidentsTile = computed<IncidentsTile>(() => {
   if (!incidentsAccess.value.allowed) return "locked";
   if (!isIncidentsEnabled.value) return "unavailable";
   if (isSectionPending("incidents")) return "loading";
+  if (isDenied("incidents") && isFailed("incidents")) return "forbidden";
   if (isFailed("incidents")) return "error";
   return "ok";
 });
@@ -1065,7 +1106,8 @@ const incidentsTile = computed<IncidentsTile>(() => {
 // only the flag-on page tells "nothing is watched" apart from "all clear"
 const loadAlertCount = async (force = false) => {
   if (!flagOn.value) return;
-  summaryFailed.value = false;
+  const org = orgId.value;
+  const seq = ++alertCountSeq;
   try {
     const options = orgSummaryQuery(orgId.value);
     if (force) {
@@ -1076,10 +1118,11 @@ const loadAlertCount = async (force = false) => {
       });
     }
     const summary: any = await queryClient.fetchQuery(options);
+    if (seq !== alertCountSeq || org !== orgId.value) return;
     alertCount.value = (summary?.alerts?.num_realtime ?? 0) + (summary?.alerts?.num_scheduled ?? 0);
   } catch {
+    if (seq !== alertCountSeq || org !== orgId.value) return;
     alertCount.value = null;
-    summaryFailed.value = true;
   }
 };
 
@@ -1132,7 +1175,7 @@ const loadUserStreams = async (force = false) => {
 };
 
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
-const loadAnomalies = async (force = false) => {
+const loadAnomalies = async (force = false, current: () => boolean = () => true) => {
   sectionFailure.anomalies = null;
   try {
     const org = orgId.value;
@@ -1157,6 +1200,7 @@ const loadAnomalies = async (force = false) => {
     // Fire list first; only fetch history if configs exist
     try {
       const configs: any[] = await readConfigs(org);
+      if (!current()) return;
       anomalyConfigCount.value = configs.length;
       if (!configs.length) {
         anomalies.value = [];
@@ -1164,6 +1208,7 @@ const loadAnomalies = async (force = false) => {
       }
       const configById = new Map(configs.map((c: any) => [c.id ?? c.anomaly_id, c]));
       const bulkRes = await readHistory(org, 20);
+      if (!current()) return;
       const bulkConfigs: any[] = bulkRes?.configs ?? [];
       // Merge bulk history hits with config metadata
       rawHits = bulkConfigs.map((entry: any) => ({
@@ -1173,6 +1218,7 @@ const loadAnomalies = async (force = false) => {
     } catch {
       // Bulk endpoint not available — fall back to per-config requests
       const configs: any[] = await readConfigs(org);
+      if (!current()) return;
       anomalyConfigCount.value = configs.length;
       if (!configs.length) {
         anomalies.value = [];
@@ -1182,6 +1228,7 @@ const loadAnomalies = async (force = false) => {
       const results = await Promise.allSettled(
         configs.map((c) => anomalyService.getHistory(org, c.id ?? c.anomaly_id, limitPerConfig)),
       );
+      if (!current()) return;
       rawHits = configs.map((cfg, idx) => ({
         cfg,
         hits:
@@ -1230,6 +1277,7 @@ const loadAnomalies = async (force = false) => {
 
     anomalies.value = result;
   } catch (err) {
+    if (!current()) return;
     anomalies.value = [];
     anomalyConfigCount.value = null;
     sectionFailure.anomalies = err;
@@ -1237,7 +1285,7 @@ const loadAnomalies = async (force = false) => {
 };
 
 // Alert trigger history feeds recentEvents only
-const loadHistoryAndSplit = async (force = false) => {
+const loadHistoryAndSplit = async (force = false, current: () => boolean = () => true) => {
   sectionFailure.recentEvents = null;
   try {
     // Exact bounds: `alertHistoryQuery` rounds only its key, so the newest minutes still reach the server.
@@ -1257,6 +1305,7 @@ const loadHistoryAndSplit = async (force = false) => {
       });
     }
     const res: any = await queryClient.fetchQuery(historyOptions);
+    if (!current()) return;
     const hits: any[] = res?.hits ?? [];
 
     // Recent events: firing shown per-occurrence; failed deduped by alert_name with count.
@@ -1306,12 +1355,13 @@ const loadHistoryAndSplit = async (force = false) => {
       .sort((a, b) => (b.rawTs ?? 0) - (a.rawTs ?? 0))
       .slice(0, 5);
   } catch (err) {
+    if (!current()) return;
     recentEvents.value = [];
     sectionFailure.recentEvents = err;
   }
 };
 
-const loadIncidents = async (force = false) => {
+const loadIncidents = async (force = false, current: () => boolean = () => true) => {
   if (!isIncidentsEnabled.value) return;
   sectionFailure.incidents = null;
   try {
@@ -1324,16 +1374,18 @@ const loadIncidents = async (force = false) => {
       });
     }
     const res: any = await queryClient.fetchQuery(incidentOptions);
+    if (!current()) return;
     incidents.value = res?.incidents ?? [];
     incidentsTotal.value = res?.total ?? incidents.value.length;
   } catch (err) {
+    if (!current()) return;
     incidents.value = [];
     incidentsTotal.value = 0;
     sectionFailure.incidents = err;
   }
 };
 
-const loadServiceGraph = async (force = false) => {
+const loadServiceGraph = async (force = false, current: () => boolean = () => true) => {
   if (!incidentsAccess.value.allowed) return;
   sectionFailure.services = null;
   try {
@@ -1351,6 +1403,7 @@ const loadServiceGraph = async (force = false) => {
       });
     }
     const res: any = await queryClient.fetchQuery(topologyOptions);
+    if (!current()) return;
     const nodes: any[] = res?.nodes ?? [];
     const edges: any[] = res?.edges ?? [];
     graphData.value = { nodes, edges };
@@ -1397,6 +1450,7 @@ const loadServiceGraph = async (force = false) => {
     await nextTick();
     onSvcScroll();
   } catch (err) {
+    if (!current()) return;
     services.value = [];
     sectionFailure.services = err;
   }
@@ -1563,7 +1617,9 @@ const onHeadlineSelect = (target: OverviewTarget) => {
   else if (target === "pipelines") goToPipelines();
   else if (target === "streams" || target === "quiet") goToStreams();
   else if (incidentsTile.value === "locked") openUpgradeDialog();
-  else goToIncidentList();
+  else if (incidentsTile.value !== "unavailable" && incidentsTile.value !== "forbidden") {
+    goToIncidentList();
+  }
 };
 
 const goToIncidentList = () => {
@@ -1610,6 +1666,9 @@ watch(
 
 // zoConfig loads asynchronously after mount — retry incidents when it becomes available
 watch(isIncidentsEnabled, (enabled) => {
-  if (enabled && incidents.value.length === 0) loadIncidents();
+  if (!enabled || incidents.value.length > 0) return;
+  // the earlier pass returned early and marked the section loaded, so re-arm its skeleton
+  sectionState.incidents.loaded = false;
+  void runSection("incidents", (current) => loadIncidents(false, current));
 });
 </script>

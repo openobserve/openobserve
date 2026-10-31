@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('overview.sections.dataHealth')"
     :link-label="t('overview.dataHealth.viewPipelines')"
     :view="view"
+    summary-forbidden
     @retry="emit('retry')"
     @view-all="emit('open', 'pipelines')"
   >
@@ -108,7 +109,12 @@ const statusWord = (tone: HealthTone): I18nText => {
 const healthRow = <T,>(
   base: Pick<HealthRow, "key" | "label" | "note" | "destination">,
   section: OverviewSection<T> | undefined,
-  pick: (data: T) => { count: number; tone: (count: number) => HealthTone; note?: I18nText },
+  pick: (data: T) => {
+    count: number;
+    tone: (count: number) => HealthTone;
+    note?: I18nText;
+    notSetUp?: boolean;
+  },
 ): HealthRow => {
   const state = sectionView(section, {
     pending: false,
@@ -118,7 +124,16 @@ const healthRow = <T,>(
   if (state !== "ok" || !section?.data) {
     return { ...base, tone: "neutral", word: stateWord(state), value: raw("—") };
   }
-  const { count, tone, note } = pick(section.data);
+  const { count, tone, note, notSetUp } = pick(section.data);
+  if (notSetUp) {
+    return {
+      ...base,
+      note: note ?? base.note,
+      tone: "neutral",
+      word: t("overview.dataHealth.status.notSetUp"),
+      value: raw("—"),
+    };
+  }
   const level = tone(count);
   return {
     ...base,
@@ -141,7 +156,11 @@ const rows = computed<HealthRow[]>(() => {
         destination: "streams",
       },
       o?.streams,
-      (d) => ({ count: d.quiet_count, tone: byCount("warning") }),
+      (d) => ({
+        count: d.quiet_count,
+        tone: byCount("warning"),
+        notSetUp: d.total_streams === 0,
+      }),
     ),
     healthRow(
       {
@@ -151,7 +170,7 @@ const rows = computed<HealthRow[]>(() => {
         destination: "alerts",
       },
       o?.alerts,
-      (d) => ({ count: d.failed_evaluation, tone: byCount("error") }),
+      (d) => ({ count: d.failed_evaluation, tone: byCount("error"), notSetUp: d.total === 0 }),
     ),
     healthRow(
       {
@@ -164,6 +183,7 @@ const rows = computed<HealthRow[]>(() => {
       (d) => ({
         count: d.errored,
         tone: byCount("error"),
+        notSetUp: d.total === 0,
         note:
           d.total === 0
             ? t("overview.dataHealth.noPipelines")
@@ -178,7 +198,11 @@ const rows = computed<HealthRow[]>(() => {
         destination: "alerts",
       },
       o?.alerts,
-      (d) => ({ count: d.by_state.notify_failed ?? 0, tone: byCount("error") }),
+      (d) => ({
+        count: d.by_state.notify_failed ?? 0,
+        tone: byCount("error"),
+        notSetUp: d.total === 0,
+      }),
     ),
     healthRow(
       {
@@ -188,7 +212,11 @@ const rows = computed<HealthRow[]>(() => {
         destination: "streams",
       },
       o?.streams,
-      (d) => ({ count: d.schema_changes_24h, tone: () => "info" }),
+      (d) => ({
+        count: d.schema_changes_24h,
+        tone: () => "info",
+        notSetUp: d.total_streams === 0,
+      }),
     ),
   ];
 });

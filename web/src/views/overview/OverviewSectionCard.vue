@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="linkLabel && view === 'ok'"
           variant="ghost-primary"
           size="sm"
+          :aria-label="linkAriaLabel"
           :data-test="`overview-${section}-view-all`"
           @click="emit('viewAll')"
         >
@@ -58,18 +59,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="view === 'forbidden'"
         size="inline"
         preset="no-access"
+        :description="
+          t(
+            summaryForbidden
+              ? 'overview.state.summaryForbidden'
+              : 'overview.state.sectionForbidden',
+          )
+        "
         :data-test="`overview-${section}-forbidden`"
+      />
+      <OEmptyState
+        v-else-if="view === 'locked' && !canUnlock"
+        size="inline"
+        icon="lock"
+        :title="lockedMessage ?? t('overview.state.sectionLocked')"
+        :data-test="`overview-${section}-locked`"
       />
       <OButton
         v-else-if="view === 'locked'"
-        variant="outline"
+        variant="locked-body"
         block
         icon-left="lock"
-        class="h-auto! justify-start! px-3! py-3! text-start whitespace-normal!"
         :data-test="`overview-${section}-locked`"
         @click="emit('unlock')"
       >
-        {{ lockedMessage }}
+        {{ lockedMessage ?? t("overview.state.sectionLocked") }}
       </OButton>
       <slot v-else-if="view === 'empty'" name="empty" />
       <slot v-else />
@@ -86,13 +100,21 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type { OverviewView } from "./overviewFormat";
 
-defineProps<{
-  section: string;
-  title: I18nText;
-  view: OverviewView;
-  linkLabel?: I18nText;
-  lockedMessage?: I18nText;
-}>();
+withDefaults(
+  defineProps<{
+    section: string;
+    title: I18nText;
+    view: OverviewView;
+    linkLabel?: I18nText;
+    linkAriaLabel?: I18nText;
+    lockedMessage?: I18nText;
+    // clicking the locked row only does something when the parent handles unlock
+    canUnlock?: boolean;
+    // the whole overview request was refused, so the fix is Summary access rather than the section's own
+    summaryForbidden?: boolean;
+  }>(),
+  { canUnlock: true, summaryForbidden: false },
+);
 
 const emit = defineEmits<{ retry: []; viewAll: []; unlock: [] }>();
 

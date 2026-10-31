@@ -396,7 +396,7 @@ pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("top" = Option<u32>, Query, description = "Top streams per stream type by size. Default 5, max 20."),
+        ("top" = Option<u32>, Query, description = "Rows per list (top streams per type, firing alerts). Default 5, clamped to 1..20."),
         ("refresh" = Option<bool>, Query, description = "Set true (or 1) to skip the short-lived cache and rebuild now."),
       ),
     responses(
@@ -414,19 +414,12 @@ pub async fn org_overview(
     Headers(user_email): Headers<UserEmail>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
-    let top = match query.get("top").map(|v| v.parse::<usize>()) {
-        Some(Err(_)) => {
-            return MetaHttpResponse::bad_request(
-                "'top' must be a non-negative integer; it is clamped to 1..20",
-            );
-        }
-        Some(Ok(n)) => Some(n),
-        None => None,
+    let top = match parse_top(&query) {
+        Ok(top) => top,
+        Err(message) => return MetaHttpResponse::bad_request(message),
     };
     let top_n = overview::normalize_top_n(top);
-    let refresh = query
-        .get("refresh")
-        .is_some_and(|v| v.eq_ignore_ascii_case("true") || v == "1");
+    let refresh = parse_refresh(&query);
     if !refresh && let Some(hit) = overview::cached_overview(&org_id, &user_email.user_id, top_n) {
         return Json(hit).into_response();
     }
@@ -438,6 +431,9 @@ pub async fn org_overview(
                 .into_response();
         }
     };
+    if scope.denies_everything() {
+        return MetaHttpResponse::forbidden("Forbidden");
+    }
     let result = overview::get_overview(&org_id, &scope, top_n).await;
     Json(result).into_response()
 }
@@ -1915,13 +1911,57 @@ fn unknown_quota_pool_message(pool: &str) -> String {
     format!("unknown quota pool '{pool}' (expected one of: {expected})")
 }
 
+fn parse_top(query: &HashMap<String, String>) -> Result<Option<usize>, &'static str> {
+    match query.get("top").map(|v| v.parse::<usize>()) {
+        Some(Err(_)) => Err("'top' must be a non-negative integer; values are clamped to 1..20"),
+        Some(Ok(n)) => Ok(Some(n)),
+        None => Ok(None),
+    }
+}
+
+fn parse_refresh(query: &HashMap<String, String>) -> bool {
+    query
+        .get("refresh")
+        .is_some_and(|v| v.eq_ignore_ascii_case("true") || v == "1")
+}
+
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use openobserve_core::overview;
     #[cfg(feature = "cloud")]
     use openobserve_core::trial_quota::TrialQuotaPool;
 
     #[cfg(feature = "cloud")]
     use super::*;
+
+    fn q(key: &str, value: &str) -> HashMap<String, String> {
+        HashMap::from([(key.to_string(), value.to_string())])
+    }
+
+    #[test]
+    fn parse_top_handles_absent_invalid_and_numeric_values() {
+        assert_eq!(super::parse_top(&HashMap::new()), Ok(None));
+        assert!(super::parse_top(&q("top", "abc")).is_err());
+        assert!(super::parse_top(&q("top", "-1")).is_err());
+        let top_n = |v: &str| overview::normalize_top_n(super::parse_top(&q("top", v)).unwrap());
+        assert_eq!(top_n("0"), 1);
+        assert_eq!(top_n("7"), 7);
+        assert_eq!(top_n("500"), 20);
+        assert_eq!(overview::normalize_top_n(None), 5);
+    }
+
+    #[test]
+    fn parse_refresh_accepts_only_true_or_one() {
+        for v in ["true", "1", "TRUE"] {
+            assert!(super::parse_refresh(&q("refresh", v)), "{v}");
+        }
+        for v in ["false", "0", "yes", ""] {
+            assert!(!super::parse_refresh(&q("refresh", v)), "{v}");
+        }
+        assert!(!super::parse_refresh(&HashMap::new()));
+    }
 
     /// The route accepts every key in `ALL_POOLS`, so a hand-written list leaves an admin who
     /// typos the pool they want reading a 400 that never names it.

@@ -83,9 +83,9 @@ export function mergeTopStreams(
     .slice(0, limit);
 }
 
-export function sizeShare(sizeMb: number, rows: TopStreamRow[]): number {
-  const max = Math.max(0, ...rows.map((r) => r.storage_size_mb));
-  return max > 0 ? sizeMb / max : 0;
+// the bar shows the same share of total storage as the "% of total" text beside it
+export function sizeShare(sizeMb: number, totalMb: number): number {
+  return totalMb > 0 ? sizeMb / totalMb : 0;
 }
 
 export type OverviewSignal = "logs" | "metrics" | "traces";
@@ -107,9 +107,13 @@ export function signalVariant(streamType: string): SegmentedBarVariant {
   return isSignal(streamType) ? SIGNAL_VARIANT[streamType] : "muted";
 }
 
-// whole percent, 0 when there is nothing to divide by
 export function percentOf(part: number, total: number): number {
   return total > 0 ? Math.round((part / total) * 100) : 0;
+}
+
+// a non-empty share that rounds to 0% would read as no storage at all
+export function isUnderOnePercent(part: number, total: number): boolean {
+  return total > 0 && part > 0 && (part / total) * 100 < 1;
 }
 
 export interface SignalSplitRow {
@@ -160,6 +164,11 @@ export function microsToMs(micros: number): number {
   return Math.floor(micros / 1000);
 }
 
+// the server sends 0 when it does not know when a rule started firing
+export function hasKnownSince(since: number): boolean {
+  return since > 0;
+}
+
 export const ALERT_LEVELS: OverviewAlertLevel[] = [
   "critical",
   "warning",
@@ -177,6 +186,12 @@ export function levelCount(
 
 export function firingRows(alerts: OverviewAlertsData | undefined): OverviewFiringAlert[] {
   return alerts?.firing ?? [];
+}
+
+export function oldestKnownFiring(
+  alerts: OverviewAlertsData | undefined,
+): OverviewFiringAlert | undefined {
+  return firingRows(alerts).find((row) => hasKnownSince(row.since));
 }
 
 // firing_by_level counts every firing rule, so it is the total the capped list is cut from
