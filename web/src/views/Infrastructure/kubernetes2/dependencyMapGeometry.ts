@@ -58,8 +58,8 @@ const along = (a: Position, b: Position, t: number) => {
 const STEPS = [0.5, 0.38, 0.62, 0.26, 0.74];
 
 // How far a bow between two cards in one column reaches into the gap: deeper the further apart they are, never past
-// the gap's middle.
-const bowDepth = (dy: number) => Math.min(GAP * 0.5, 40 + 0.25 * Math.abs(dy));
+// the gap's middle, and never as deep as a bow to a farther card, so bows from one card nest without crossing.
+const bowDepth = (dy: number) => 40 + (GAP * 0.5 - 40) * (1 - Math.exp(-Math.abs(dy) / 400));
 
 // From the side of the source facing the target to the side of the target facing the source, through each slot.
 // `from` and `to` are the cards' top-left corners; `through` is layoutColumns' waypoints for the edge. `ports` moves
@@ -78,6 +78,7 @@ export function routeEdge(
     const bow = bowDepth(ty - sy) / 0.75;
     const a = { x, y: sy };
     const b = { x, y: ty };
+    const n = Math.max(32, Math.ceil((Math.abs(ty - sy) + 2 * bow) / 6));
     const onBow = (t: number) => {
       const u = 1 - t;
       const [k0, k1, k2, k3] = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
@@ -88,7 +89,7 @@ export function routeEdge(
       spots: [0.5, 0.42, 0.58].map(onBow),
       end: b,
       fromLeft: false,
-      trace: Array.from({ length: 33 }, (_, i) => onBow(i / 32)),
+      trace: Array.from({ length: n + 1 }, (_, i) => onBow(i / n)),
     };
   }
   const forward = from.x < to.x;
@@ -115,7 +116,8 @@ export function routeEdge(
   const trace: Position[] = [];
   for (let i = 1; i < points.length; i++) {
     const [p, q] = [points[i - 1], points[i]];
-    const n = Math.max(2, Math.ceil(Math.abs(q.x - p.x) / 6));
+    // A few pixels apart however steep the curve, so none passes between two points unseen.
+    const n = Math.max(2, Math.ceil((Math.abs(q.x - p.x) + Math.abs(q.y - p.y)) / 6));
     for (let k = 0; k <= n; k++) {
       trace.push(i % 2 === 1 ? along(p, q, k / n) : { x: p.x + ((q.x - p.x) * k) / n, y: p.y });
     }

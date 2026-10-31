@@ -135,6 +135,22 @@ describe("routeEdge", () => {
     expect(furthest).toBeLessThan(392);
     expect(route.spots[0].x).toBeCloseTo(furthest, 0);
   });
+
+  it("bows deeper to a farther card however far, so bows from one card nest", () => {
+    const depth = (y: number) =>
+      Math.max(...sample(routeEdge({ x: 0, y: 0 }, { x: 0, y }, []).path).map((p) => p.x));
+    expect(depth(432)).toBeLessThan(depth(864));
+    expect(depth(864)).toBeLessThan(depth(4000));
+  });
+
+  it("traces a steep edge a few pixels apart, so a label between two points still sees it", () => {
+    const { trace } = routeEdge({ x: 0, y: 0 }, { x: 0, y: 2000 }, []);
+    const steep = routeEdge({ x: 0, y: 0 }, { x: 784, y: 2000 }, [{ x: 392, y: 1000 }]).trace;
+    for (const points of [trace, steep]) {
+      const gaps = points.slice(1).map((p, i) => Math.hypot(p.x - points[i].x, p.y - points[i].y));
+      expect(Math.max(...gaps)).toBeLessThan(12);
+    }
+  });
 });
 
 describe("routeEdge ports", () => {
