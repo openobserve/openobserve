@@ -54,8 +54,9 @@ const FLOWS = [
 describe("HostsDependenciesView", () => {
   let wrapper: VueWrapper<any>;
 
-  const mountView = async (props: Record<string, any> = {}) => {
+  const mountView = async (props: Record<string, any> = {}, attachTo?: HTMLElement) => {
     wrapper = mount(HostsDependenciesView, {
+      attachTo,
       props: {
         orgId: "org1",
         range: { start: END - 60 * MIN_US, end: END, relative: true },
@@ -156,10 +157,12 @@ describe("HostsDependenciesView", () => {
   });
 
   it("lists the edges as buttons for keyboard users, busiest first", async () => {
-    await mountView();
+    await mountView({}, document.body);
     const links = wrapper.findAll('[data-test="hosts-deps-link"]');
     expect(links.map((l) => l.text())).toEqual(["web → api", "lan ↔ web"]);
     await links[1].trigger("click");
+    await flushPromises();
+    expect(document.activeElement).toBe(testId("hosts-deps-edge").element);
     expect(testId("hosts-deps-edge-source").attributes("disabled")).toBeDefined();
     expect(testId("hosts-deps-edge-target").attributes("disabled")).toBeUndefined();
     expect(testId("hosts-deps-edge-undirected").text()).toContain("without seeing");

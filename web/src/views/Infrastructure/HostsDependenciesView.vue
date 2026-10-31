@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -218,6 +218,14 @@ function openEnd(end: HostEnd) {
   if (end.kind === "host") emit("open", end.name);
 }
 
+const edgePanel = ref<HTMLElement | null>(null);
+
+// From the keyboard list, focus follows to the panel, which comes after the map.
+function showEdge(id: string) {
+  selectedEdgeId.value = id;
+  nextTick(() => edgePanel.value?.focus());
+}
+
 function openNode(id: string) {
   const node = graph.value.nodes.find((n) => n.end.id === id);
   if (node) openEnd(node.end);
@@ -306,7 +314,7 @@ function onSetUp() {
               variant="ghost-primary"
               size="xs"
               data-test="hosts-deps-link"
-              @click="selectedEdgeId = edge.id"
+              @click="showEdge(edge.id)"
             >
               {{ raw(edgeText(edge)) }}
             </OButton>
@@ -326,6 +334,8 @@ function onSetUp() {
           class="bg-surface-overlay rounded-surface border-border-default absolute end-3 top-3 flex w-80 max-w-[calc(100%-1.5rem)] flex-col gap-1 border p-3 shadow-md"
           role="region"
           :aria-label="raw(edgeText(selectedEdge))"
+          ref="edgePanel"
+          tabindex="-1"
           data-test="hosts-deps-edge"
         >
           <div class="flex items-center gap-1">
