@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -195,6 +195,13 @@ function endDetail(end: FlowEnd): I18nText {
   return t("infra.k8s2.depsTypeIn", { type: end.ownerType, namespace: end.namespace });
 }
 
+// The card's short second line; endDetail's longer text goes in its hover text.
+function kindText(end: FlowEnd): I18nText {
+  if (end.kind === "external") return t("infra.k8s2.depsKindExternal");
+  if (end.kind === "node") return t("infra.k8s2.depsKindNode");
+  return endDetail(end);
+}
+
 const arrowOf = (edge: FlowEdge) => (edge.directed ? "→" : "↔");
 
 // Workloads by namespace too, so two namespaces' web → api read apart.
@@ -252,7 +259,7 @@ const mapNodes = computed<MapNode[]>(() => {
     id: end.id,
     position: positions.get(end.id)!,
     label: endLabel(end),
-    detail: endDetail(end),
+    detail: kindText(end),
     title: `${fullLabel(end)}\n${endDetail(end)}`,
     icon: iconOf(end),
     color: colorOf(end),
@@ -306,6 +313,14 @@ function openEnd(end: FlowEnd) {
     namespace: end.kind === "node" ? "" : end.namespace,
     name: end.name,
   });
+}
+
+const edgePanel = ref<HTMLElement | null>(null);
+
+// From the keyboard list, focus follows to the panel, which comes after the map.
+function showEdge(id: string) {
+  selectedEdgeId.value = id;
+  nextTick(() => edgePanel.value?.focus());
 }
 
 function openNode(id: string) {
@@ -448,7 +463,7 @@ function showEverything() {
               variant="ghost-primary"
               size="xs"
               data-test="k8s2-deps-link"
-              @click="selectedEdgeId = edge.id"
+              @click="showEdge(edge.id)"
             >
               {{ raw(edgeText(edge)) }}
             </OButton>
@@ -469,6 +484,8 @@ function showEverything() {
           class="bg-surface-overlay rounded-surface border-border-default absolute end-3 top-3 flex w-80 max-w-[calc(100%-1.5rem)] flex-col gap-1 border p-3 shadow-md"
           role="region"
           :aria-label="raw(edgeText(selectedEdge))"
+          ref="edgePanel"
+          tabindex="-1"
           data-test="k8s2-deps-edge"
         >
           <div class="flex items-center gap-1">

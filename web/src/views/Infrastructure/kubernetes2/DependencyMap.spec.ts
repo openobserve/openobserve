@@ -30,12 +30,14 @@ vi.mock("@vue-flow/core", () => ({
       "edge-click",
       "node-mouse-enter",
       "node-mouse-leave",
+      "edge-mouse-enter",
+      "edge-mouse-leave",
       "nodes-initialized",
     ],
     template: `
       <div class="mock-vue-flow">
         <slot />
-        <div v-for="n in nodes" :key="n.id" class="vue-flow__node" :data-id="n.id" tabindex="0">
+        <div v-for="n in nodes" :key="n.id" class="vue-flow__node" :data-id="n.id">
           <slot name="node-end" :id="n.id" :data="n.data" />
         </div>
         <template v-for="e in edges" :key="e.id">
@@ -49,10 +51,14 @@ vi.mock("@vue-flow/core", () => ({
   MarkerType: { ArrowClosed: "arrowclosed" },
   Position: { Left: "left", Right: "right" },
   getBezierPath: () => ["M0 0", 0, 0],
-  useVueFlow: () => ({ fitView: vi.fn(), areNodesInitialized: { value: true } }),
+  useVueFlow: () => ({
+    fitView: vi.fn(),
+    zoomIn: vi.fn(),
+    zoomOut: vi.fn(),
+    areNodesInitialized: { value: true },
+  }),
 }));
 vi.mock("@vue-flow/background", () => ({ Background: { template: "<i />" } }));
-vi.mock("@vue-flow/controls", () => ({ Controls: { template: "<i />" } }));
 
 const node = (id: string, x: number, clickable = true): MapNode => ({
   id,
@@ -134,11 +140,48 @@ describe("DependencyMap", () => {
     expect(card("c").classes()).not.toContain("opacity-30");
   });
 
+  it("shows a hovered edge's rate even when it is not among the busiest", async () => {
+    const ends = Array.from({ length: 10 }, (_, i) => node(`w${i}`, 0));
+    mountMap(
+      [...ends, node("api", 340)],
+      ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))),
+    );
+    await flow().vm.$emit("edge-mouse-enter", { edge: { id: "w1-api" } });
+    expect(baseEdge("w1-api").props("label")).toMatch(/KB\/s/);
+    expect(baseEdge("w1-api").props("style").opacity).toBe(1);
+    await flow().vm.$emit("edge-mouse-leave");
+    expect(baseEdge("w1-api").props("label")).toBeUndefined();
+  });
+
+  it("makes a clickable card a named button, and leaves the others plain", () => {
+    mountMap([node("a", 0), node("net", 340, false)], [edge("a", "net", 10)]);
+    expect(card("a").attributes("role")).toBe("button");
+    expect(card("a").attributes("tabindex")).toBe("0");
+    expect(card("a").attributes("aria-label")).toMatch(
+      /^Open details for a: Deployment in shop, 1 connection/,
+    );
+    expect(card("net").attributes("role")).toBeUndefined();
+    expect(card("net").attributes("tabindex")).toBeUndefined();
+    expect(
+      flow()
+        .props("nodes")
+        .every((n: any) => n.focusable === false),
+    ).toBe(true);
+  });
+
+  it("names its zoom buttons", () => {
+    mountMap([node("a", 0)], []);
+    const names = ["zoom-in", "zoom-out", "fit"].map((id) =>
+      wrapper.find(`[data-test="dependency-map-${id}"]`).attributes("aria-label"),
+    );
+    expect(names).toEqual(["Zoom in", "Zoom out", "Fit to view"]);
+  });
+
   it("opens a clickable card from Enter or Space, and not one that is not", async () => {
     mountMap([node("a", 0), node("net", 340, false)], [edge("a", "net", 10)]);
-    await wrapper.find('[data-id="a"]').trigger("keydown", { key: "Enter" });
-    await wrapper.find('[data-id="a"]').trigger("keydown", { key: " " });
-    await wrapper.find('[data-id="net"]').trigger("keydown", { key: "Enter" });
+    await card("a").trigger("keydown", { key: "Enter" });
+    await card("a").trigger("keydown", { key: " " });
+    await card("net").trigger("keydown", { key: "Enter" });
     expect(wrapper.emitted("open")).toEqual([["a"], ["a"]]);
   });
 

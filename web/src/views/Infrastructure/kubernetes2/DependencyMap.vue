@@ -68,12 +68,13 @@ import {
   type Node,
 } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
-import { Controls } from "@vue-flow/controls";
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
-import "@vue-flow/controls/dist/style.css";
 import { raw, useI18nTyped } from "@/types/i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { formatRate } from "./dependencyGraph";
 
 const props = defineProps<{
@@ -90,13 +91,13 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const { fitView, areNodesInitialized } = useVueFlow();
+const { fitView, zoomIn, zoomOut, areNodesInitialized } = useVueFlow();
 
 // Rate labels only on the busiest edges, so the rest of the map stays readable.
 const LABELLED = 8;
 
 // Never below a zoom where the cards stay readable; a wider map is then panned.
-const FIT = { padding: 0.06, minZoom: 0.8, maxZoom: 1 };
+const FIT = { padding: 0.04, minZoom: 0.65, maxZoom: 1 };
 
 // Both sides take edges either way: an edge leaves the side facing its target, and one within a
 // column loops out to the right.
@@ -115,6 +116,7 @@ const LABEL_STYLE = {
 const LABEL_BG_STYLE = { fill: "var(--color-surface-base)" };
 
 const hovered = ref<string | null>(null);
+const hoveredEdge = ref<string | null>(null);
 
 const byId = computed(() => new Map(props.nodes.map((n) => [n.id, n])));
 
@@ -148,6 +150,9 @@ const busiest = computed(
     ),
 );
 
+const openLabel = (node: MapNode) =>
+  t("infra.k8s2.depsOpenEnd", { name: node.label, detail: node.detail, summary: summaryOf(node) });
+
 function summaryOf(node: MapNode) {
   const count = neighbours.value.get(node.id)?.size ?? 0;
   return t("infra.k8s2.depsEndSummary", { count, rate: formatRate(node.total) }, count);
@@ -159,8 +164,8 @@ const flowNodes = computed<Node<MapNode>[]>(() =>
     type: "end",
     position: n.position,
     data: n,
-    focusable: n.clickable,
-    ariaLabel: `${n.label}, ${n.detail}, ${summaryOf(n)}`,
+    // The card itself takes focus, as a button where it opens something.
+    focusable: false,
   })),
 );
 
@@ -202,7 +207,10 @@ const dimmed = (id: string) =>
   hovered.value != null && hovered.value !== id && !neighbours.value.get(hovered.value)?.has(id);
 
 function strokeOf(edge: EdgeProps) {
-  const lit = edge.id === props.selectedEdgeId || (hovered.value && touches(edge, hovered.value));
+  const lit =
+    edge.id === props.selectedEdgeId ||
+    edge.id === hoveredEdge.value ||
+    (hovered.value && touches(edge, hovered.value));
   const faded = hovered.value && !touches(edge, hovered.value);
   return {
     stroke: edge.data.color,
@@ -213,8 +221,9 @@ function strokeOf(edge: EdgeProps) {
   };
 }
 
-// The busiest edges' rates, or while a card is hovered only its own edges' rates.
+// The busiest edges' rates, or while a card is hovered only its own edges' rates; a hovered edge always shows its own.
 const labelOf = (edge: EdgeProps) =>
+  edge.id === hoveredEdge.value ||
   (hovered.value ? touches(edge, hovered.value) : busiest.value.has(edge.id))
     ? edge.data.rate
     : undefined;
@@ -269,6 +278,7 @@ function onKeydown(event: KeyboardEvent) {
       :nodes-connectable="false"
       :elements-selectable="false"
       :edges-focusable="false"
+      :disable-keyboard-a11y="true"
       :min-zoom="0.1"
       :max-zoom="2"
       @nodes-initialized="fitIfPending"
@@ -276,18 +286,24 @@ function onKeydown(event: KeyboardEvent) {
       @edge-click="({ edge }) => emit('select', edge.id)"
       @node-mouse-enter="({ node }) => (hovered = node.id)"
       @node-mouse-leave="hovered = null"
+      @edge-mouse-enter="({ edge }) => (hoveredEdge = edge.id)"
+      @edge-mouse-leave="hoveredEdge = null"
     >
       <Background :size="2" :gap="22" />
-      <Controls :show-interactive="false" :fit-view-params="FIT" position="top-left" />
 
       <template #node-end="{ id, data }">
         <div
-          class="bg-surface-base border-border-default rounded-default relative flex w-56 items-center gap-2.5 overflow-hidden border py-2 ps-3.5 pe-3 shadow-sm transition-[opacity,box-shadow,border-color] duration-150"
+          class="bg-surface-base border-border-default rounded-default focus-visible:ring-accent/40 relative flex w-56 items-center gap-2.5 overflow-hidden border py-2 ps-3.5 pe-3 shadow-sm transition-[opacity,box-shadow,border-color] duration-150"
           :class="[
-            data.clickable ? 'hover:border-border-strong cursor-pointer hover:shadow-md' : '',
+            data.clickable
+              ? 'hover:border-border-strong cursor-pointer hover:shadow-md focus-visible:ring-2 focus-visible:outline-none'
+              : '',
             dimmed(id) ? 'opacity-30' : '',
           ]"
           :title="data.title"
+          :role="data.clickable ? 'button' : undefined"
+          :tabindex="data.clickable ? 0 : undefined"
+          :aria-label="data.clickable ? openLabel(data) : undefined"
           data-test="dependency-map-node"
         >
           <span
@@ -334,6 +350,46 @@ function onKeydown(event: KeyboardEvent) {
         />
       </template>
     </VueFlow>
+    <div
+      class="rounded-default border-border-default bg-surface-panel absolute end-3 bottom-3 z-10 flex flex-col overflow-hidden border"
+      data-test="dependency-map-zoom"
+    >
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        icon-left="add"
+        class="rounded-none"
+        :aria-label="t('fleet.flow.zoomIn')"
+        data-test="dependency-map-zoom-in"
+        @click="zoomIn({ duration: 150 })"
+      >
+        <OTooltip side="left" :content="t('fleet.flow.zoomIn')" />
+      </OButton>
+      <OSeparator />
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        icon-left="remove"
+        class="rounded-none"
+        :aria-label="t('fleet.flow.zoomOut')"
+        data-test="dependency-map-zoom-out"
+        @click="zoomOut({ duration: 150 })"
+      >
+        <OTooltip side="left" :content="t('fleet.flow.zoomOut')" />
+      </OButton>
+      <OSeparator />
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        icon-left="fullscreen"
+        class="rounded-none"
+        :aria-label="t('fleet.flow.fitView')"
+        data-test="dependency-map-fit"
+        @click="fitView({ ...FIT, duration: 150 })"
+      >
+        <OTooltip side="left" :content="t('fleet.flow.fitView')" />
+      </OButton>
+    </div>
     <!-- Informational only: it names the stripe colours and filters nothing. -->
     <ul
       v-if="legend?.length"
@@ -357,8 +413,8 @@ function onKeydown(event: KeyboardEvent) {
 </template>
 
 <style scoped>
-/* keep: lib-override:vue-flow — the library paints its own background, controls and node cursor,
-   which have to follow the theme tokens and the non-draggable cards here. */
+/* keep: lib-override:vue-flow — the library paints its own background and node cursor, which have to
+   follow the theme tokens and the non-draggable cards here. */
 .dependency-map :deep(.vue-flow__background) {
   background-color: var(--color-surface-panel);
 }
@@ -371,23 +427,7 @@ function onKeydown(event: KeyboardEvent) {
   cursor: default;
 }
 
-.dependency-map :deep(.vue-flow__node:focus-visible) {
-  outline: 0.125rem solid var(--color-primary-600);
-  outline-offset: 0.125rem;
-  border-radius: 0.5rem;
-}
-
 .dependency-map :deep(.vue-flow__edge) {
   cursor: pointer;
-}
-
-.dependency-map :deep(.vue-flow__controls-button) {
-  background: var(--color-surface-base);
-  border-bottom-color: var(--color-border-default);
-  fill: var(--color-text-secondary);
-}
-
-.dependency-map :deep(.vue-flow__controls-button:hover) {
-  background: var(--color-surface-panel);
 }
 </style>

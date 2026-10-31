@@ -329,8 +329,8 @@ export interface Position {
   y: number;
 }
 
-// Sized to the map's cards: a card's width plus room for the edges to curve, and a card's height plus a gap.
-const COLUMN_GAP = 340;
+// Sized to the map's cards: a card's width plus room for an edge's rate label, and a card's height plus a gap.
+const COLUMN_GAP = 290;
 const ROW_GAP = 84;
 
 // Alternating left-to-right and right-to-left passes; a few settle a graph of this size.

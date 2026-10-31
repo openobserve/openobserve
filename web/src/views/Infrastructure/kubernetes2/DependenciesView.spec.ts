@@ -70,8 +70,9 @@ const FLOWS = [
 describe("DependenciesView", () => {
   let wrapper: VueWrapper<any>;
 
-  const mountView = async (props: Record<string, any> = {}) => {
+  const mountView = async (props: Record<string, any> = {}, attachTo?: HTMLElement) => {
     wrapper = mount(DependenciesView, {
+      attachTo,
       props: {
         state: parseUrlState({ view: "dependencies" }),
         cluster: "prod",
@@ -152,7 +153,8 @@ describe("DependenciesView", () => {
     await testId("k8s2-deps-show-node-traffic-btn").trigger("click");
     expect(edges()).toHaveLength(3);
     const node = nodes().find((n: any) => n.id === "prod/node/n1");
-    expect(node).toMatchObject({ label: "n1", icon: "dns", clickable: true });
+    expect(node).toMatchObject({ label: "n1", detail: "Node", icon: "dns", clickable: true });
+    expect(node.title).toContain("Host processes and host-network pods");
     expect(node.position.x).toBeGreaterThan(
       nodes().find((n: any) => n.label === "coredns").position.x,
     );
@@ -286,9 +288,12 @@ describe("DependenciesView", () => {
     expect(chart().exists()).toBe(true);
   });
 
-  it("names workloads with their namespace in the keyboard list", async () => {
-    await mountView();
+  it("names workloads with their namespace in the keyboard list, and focuses the edge it opens", async () => {
+    await mountView({}, document.body);
     expect(testId("k8s2-deps-link").text()).toBe("frontend/web → backend/api");
+    await testId("k8s2-deps-link").trigger("click");
+    await flushPromises();
+    expect(document.activeElement).toBe(testId("k8s2-deps-edge").element);
   });
 
   it("lists every drawn edge for keyboard users", async () => {
