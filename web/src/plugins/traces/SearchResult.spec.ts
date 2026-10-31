@@ -128,10 +128,15 @@ const mockSearchObj = reactive({
   organizationIdentifier: "test-org",
 });
 
+const { mockPatchUrlViewState } = vi.hoisted(() => ({
+  mockPatchUrlViewState: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
     searchObj: mockSearchObj,
     updatedLocalLogFilterField: vi.fn(),
+    patchUrlViewState: mockPatchUrlViewState,
   }),
 }));
 
@@ -196,6 +201,31 @@ describe("SearchResult", () => {
       wrapper.unmount();
     }
     vi.clearAllMocks();
+  });
+
+  describe("result count header", () => {
+    const countText = () => wrapper.find('[data-test="traces-count-badge"]').text();
+
+    afterEach(() => {
+      mockSearchObj.data.queryResults.total = 2;
+      (mockSearchObj.meta as any).searchMode = undefined;
+    });
+
+    it("names the unit as traces with a matching span", () => {
+      expect(countText()).toBe("2 traces with a matching span");
+    });
+
+    it("uses the singular for one trace", async () => {
+      mockSearchObj.data.queryResults.total = 1;
+      await flushPromises();
+      expect(countText()).toBe("1 trace with a matching span");
+    });
+
+    it("keeps the spans wording in the Spans view", async () => {
+      (mockSearchObj.meta as any).searchMode = "spans";
+      await flushPromises();
+      expect(countText()).toContain("Spans Found");
+    });
   });
 
   it("should mount SearchResult component", () => {
@@ -307,11 +337,28 @@ describe("SearchResult", () => {
       expect(typeof wrapper.vm.expandRowDetail).toBe("function");
     });
 
+    it("writes the list's pending URL state before opening a trace, so Back returns to it", async () => {
+      const order: string[] = [];
+      mockPatchUrlViewState.mockImplementationOnce(() => {
+        order.push("patch");
+        return Promise.resolve();
+      });
+      const push = vi.spyOn(router, "push").mockImplementation(async () => {
+        order.push("push");
+        return undefined as any;
+      });
+
+      await wrapper.vm.expandRowDetail(mockSearchObj.data.queryResults.hits[0]);
+
+      expect(order).toEqual(["patch", "push"]);
+      push.mockRestore();
+    });
+
     it("uses the exact aggregated trace range without padding", async () => {
       const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
       const trace = mockSearchObj.data.queryResults.hits[0];
 
-      wrapper.vm.expandRowDetail(trace);
+      await wrapper.vm.expandRowDetail(trace);
 
       expect(push).toHaveBeenCalledWith(
         expect.objectContaining({

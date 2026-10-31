@@ -228,7 +228,7 @@ function mountIndexList(props: Record<string, unknown> = {}) {
           ],
         },
         FieldExpansion: {
-          template: '<div data-test="field-expansion">Field Expansion</div>',
+          template: '<div data-test="field-expansion">Field Expansion<slot name="caption" /></div>',
           props: [
             "field",
             "fieldValues",
@@ -366,6 +366,45 @@ describe("IndexList Component", () => {
     it("should show FieldExpansion for fields with showValues=true", () => {
       const basicFilters = wrapper.findAll('[data-test="field-expansion"]');
       expect(basicFilters.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Field value count caption", () => {
+    const captions = () => wrapper.findAll('[data-test="traces-field-values-count-caption"]');
+
+    const valueFields = [
+      { name: "service_name", label: "Service Name", showValues: true, ftsKey: false },
+      { name: "duration", label: "Duration", showValues: true, ftsKey: false },
+    ];
+
+    it("says the value counts are spans in the Traces view", () => {
+      expect(captions().length).toBeGreaterThan(0);
+      expect(captions()[0].text()).toBe("Counts are spans with this value, in the current range");
+    });
+
+    it("says the value counts are spans in the Spans view", async () => {
+      wrapper.unmount();
+      mockSearchObj.meta.searchMode = "spans";
+      try {
+        wrapper = mountIndexList();
+        await flushPromises();
+        expect(captions().length).toBeGreaterThan(0);
+        expect(captions()[0].text()).toBe("Counts are spans with this value, in the current range");
+      } finally {
+        mockSearchObj.meta.searchMode = "traces";
+      }
+    });
+
+    it.each(["traces", "spans"])("is not shown for duration in the %s view", async (mode) => {
+      wrapper.unmount();
+      mockSearchObj.meta.searchMode = mode;
+      try {
+        wrapper = mountIndexList({ fieldList: valueFields });
+        await flushPromises();
+        expect(captions()).toHaveLength(1);
+      } finally {
+        mockSearchObj.meta.searchMode = "traces";
+      }
     });
   });
 

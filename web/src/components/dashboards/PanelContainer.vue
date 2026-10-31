@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-compact text-text-heading me-5 shrink-[1000] font-medium tracking-[0.02em] @max-[22rem]/panelbar:me-1"
           :class="[
             curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined,
+            titleMeta ? 'me-2!' : undefined,
             hasNoticeChips
               ? 'min-w-[min(10rem,40%)]! @max-[12rem]/panelbar:min-w-[35%]!'
               : undefined,
@@ -69,6 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ panelTitle }}
         </OTruncatedText>
+        <span
+          v-if="titleMeta"
+          class="text-2xs text-text-secondary me-5 shrink-0 font-normal whitespace-nowrap"
+          data-test="dashboard-panel-header-meta"
+          >{{ titleMeta }}</span
+        >
         <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
@@ -780,6 +787,8 @@ export default defineComponent({
       context: () => ({ tabId: props.tabId, panelId: props.data?.id }),
     });
     const panelFileName = computed(() => toPanelFileName(panelTitle.value));
+    // A runtime stamp from embedding pages (the traces Rate unit); stored dashboards never carry it.
+    const titleMeta = computed(() => props.data?.config?.title_meta as string | undefined);
     // Curated pages stamp this; stored dashboards never carry it, so the badge
     // and the body dimming are both invisible outside them (§6.3).
     const curatedBadge = computed(
@@ -1490,6 +1499,7 @@ export default defineComponent({
       curatedTableOwnsEmpty,
       onCuratedSeriesData,
       panelTitle,
+      titleMeta,
       panelFileName,
       alertDisabledReason,
       canCreateAlert,

@@ -14960,6 +14960,10 @@
     "reviewAndApplyFilters": "Review and apply filters to Traces",
     "spansLabel": "spans",
     "errorsLabel": "errors",
+    "errorStrip": {
+      "spanLabel": "{service} · {operation}",
+      "menuTitle": "Error spans, deepest first"
+    },
     "previousMatch": "Previous match",
     "nextMatch": "Next match",
     "searchInSpans": "Search in spans",
@@ -15209,6 +15213,22 @@
       "roleAssistant": "Assistant",
       "roleSystem": "System",
       "roleTool": "Tool"
+    },
+    "results": {
+      "tracesWithMatchingSpan": "{count} trace with a matching span | {count} traces with a matching span",
+      "spansColumnTooltip": "Total spans in trace",
+      "fieldValueCountsCaption": "Counts are spans with this value, in the current range",
+      "errorColumn": "Error",
+      "eventsColumn": "Events",
+      "eventExceptions": "{count} exception | {count} exceptions",
+      "eventLogs": "{count} log | {count} logs",
+      "eventCounts": "{exceptions} · {logs}",
+      "eventsHoverTitle": "Events on {operation}",
+      "eventsHoverOrder": "{count}, in time order",
+      "eventKindException": "exception",
+      "eventKindLog": "log",
+      "eventOffset": "+{offset}",
+      "moreEvents": "+{count} more"
     },
     "tableColumns": {
       "service": "Service",
