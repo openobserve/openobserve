@@ -84,11 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('metrics.labelGroups.notTooltip')" :delay="200" />
         </OButton>
         <template v-for="(filter, i) in section.filters" :key="labelFilterKey(filter)">
-          <!-- Said, not inferred. Matchers in a PromQL selector are ALWAYS AND, but
-               two adjacent chips look equally like "either of these" — and the one
-               thing a second chip cannot mean is OR, so the ambiguity always resolves
-               the wrong way. The title carries the fix (`=~` with a regex) for anyone
-               who wanted OR and now knows they did not get it. -->
+          <!-- Said, not inferred: two adjacent chips read as either one, but they are always AND. -->
           <span
             v-if="i > 0"
             class="text-3xs text-text-secondary shrink-0 tracking-wide uppercase select-none"

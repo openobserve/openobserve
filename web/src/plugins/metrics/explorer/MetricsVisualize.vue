@@ -128,7 +128,6 @@ export default defineComponent({
       values: [],
     };
 
-    // A line chart driven by a promql query, with the query bar shown so the user can type PromQL.
     const applyMetricsDefaults = () => {
       resetDashboardPanelData();
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";

@@ -689,21 +689,24 @@ describe("useRoutes (router.ts)", () => {
       [{ chart_type: "bar" }, "chart_type"],
       [{ metrics_data: "abc", query: "dXA=" }, "metrics_data,query"],
       [{ mode: "visualize", query: "dXA=" }, "mode,query"],
-    ])("folds the editor params of %o into a Visualize blob", async (query, translated) => {
-      const { homeChildRoutes } = useRoutes();
-      const metricsRoute = findRoute(homeChildRoutes, "metrics");
+    ])(
+      "hands the editor params of %o to the translator and redirects to its query",
+      async (query, translated) => {
+        const { homeChildRoutes } = useRoutes();
+        const metricsRoute = findRoute(homeChildRoutes, "metrics");
 
-      const next = vi.fn();
-      await metricsRoute.beforeEnter({ query, hash: "" }, {}, next);
+        const next = vi.fn();
+        await metricsRoute.beforeEnter({ query, hash: "" }, {}, next);
 
-      expect(next).toHaveBeenCalledTimes(1);
-      expect(next).toHaveBeenCalledWith({
-        name: "metrics",
-        query: { translated },
-        hash: "",
-        replace: true,
-      });
-    });
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(next).toHaveBeenCalledWith({
+          name: "metrics",
+          query: { translated },
+          hash: "",
+          replace: true,
+        });
+      },
+    );
 
     it("keeps a mode=visualize link in the explorer — no redirect", () => {
       // The explorer's in-page Visualize owns metrics_data and rehydrates it

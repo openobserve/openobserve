@@ -46,7 +46,6 @@
               {{ t("metrics.labelGroups.not") }}
               <OTooltip :content="t('metrics.labelGroups.notTooltip')" side="top" />
             </OButton>
-            <!-- Label Filter Items -->
             <div
               v-for="{ label, index } in section.items"
               :key="index"
@@ -70,7 +69,6 @@
                         <template v-if="!label.label">
                           <span class="text-text-secondary">{{ computedLabel(label) }}</span>
                         </template>
-                        <!-- PromQL editor colours: maroon labels, string/number values -->
                         <template v-else>
                           <span class="text-promql-label">{{ label.label }}</span>
                           <template v-if="label.value">
@@ -91,7 +89,6 @@
                   </template>
                   <div class="p-3" :data-test="`promql-label-filter-${index}-menu`">
                     <div class="w-86 [&_.o-input-label]:text-xs [&_.o-input-label]:font-normal">
-                      <!-- Label Selection -->
                       <OSelect
                         v-model="label.label"
                         :options="labelOptionsFor(section.group)"
@@ -110,7 +107,6 @@
                         </template>
                       </OSelect>
 
-                      <!-- Operator Selection -->
                       <OSelect
                         v-model="label.op"
                         :options="operatorOptions"
@@ -119,7 +115,6 @@
                         data-test="promql-operator-select"
                       />
 
-                      <!-- Value Selection -->
                       <OSelect
                         v-model="label.value"
                         :options="getLabelValueOptions(label.label)"
