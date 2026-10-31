@@ -487,22 +487,33 @@ describe("useHostsList — join & window anchoring", () => {
     schemaMock.mockResolvedValueOnce({ data: { schema: [{ name: "host_name" }] } } as any);
     const h = withHostsList();
     wrapper = h.wrapper;
-    await h.list.refresh(refreshArgs);
+    const args = { ...refreshArgs, orgId: "linux-only" };
+    await h.list.refresh(args);
     await flushPromises();
-    expect(schemaMock).toHaveBeenCalledWith("test-org", "system_cpu_load_average_15m", "metrics");
+    expect(schemaMock).toHaveBeenCalledWith("linux-only", "system_cpu_load_average_15m", "metrics");
     const sql: string = (searchMock.mock.calls[0][0] as any).query.query.sql;
     expect(sql).not.toContain("k8s_node_name");
     expect(rowByName(h.list, "web-01")).toBeTruthy();
+    // The answer is kept for the org, so the next refresh asks only the queries.
+    await h.list.refresh(args);
+    await flushPromises();
+    expect(schemaMock).toHaveBeenCalledTimes(1);
   });
 
   it("leaves k8s_node_name out of last-seen when the schema cannot be read", async () => {
     schemaMock.mockRejectedValueOnce(new Error("schema down"));
     const h = withHostsList();
     wrapper = h.wrapper;
-    await h.list.refresh(refreshArgs);
+    const args = { ...refreshArgs, orgId: "schema-down" };
+    await h.list.refresh(args);
     await flushPromises();
     const sql: string = (searchMock.mock.calls[0][0] as any).query.query.sql;
     expect(sql).not.toContain("k8s_node_name");
+    // A failed check is not kept: the next refresh asks again, and groups by node once it can.
+    await h.list.refresh(args);
+    await flushPromises();
+    expect(schemaMock).toHaveBeenCalledTimes(2);
+    expect((searchMock.mock.calls[1][0] as any).query.query.sql).toContain("k8s_node_name");
   });
 
   it("reduces duplicate liveness entries to one row per host with the first non-empty os_type", async () => {

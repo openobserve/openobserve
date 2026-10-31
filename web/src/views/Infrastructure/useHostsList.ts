@@ -122,6 +122,28 @@ export function utilizationTint(value: number | null): "" | "warn" | "critical" 
   return "";
 }
 
+// Whether the load stream has k8s_node_name, per org: last-seen groups by node only where it does. Checked again after
+// a few minutes, so a cluster that starts sending is picked up; a failed check is not kept, and leaves the column out
+// rather than fail the query.
+const NODE_COLUMN_TTL_MS = 5 * 60 * 1000;
+const nodeColumn = new Map<string, { at: number; has: Promise<boolean> }>();
+
+function hasNodeColumn(orgId: string): Promise<boolean> {
+  const cached = nodeColumn.get(orgId);
+  if (cached && Date.now() - cached.at < NODE_COLUMN_TTL_MS) return cached.has;
+  const has = streamService
+    .schema(orgId, "system_cpu_load_average_15m", "metrics")
+    .then((res: any) =>
+      ((res?.data?.schema ?? []) as Array<{ name: string }>).some((f) => f.name === "k8s_node_name"),
+    )
+    .catch(() => {
+      nodeColumn.delete(orgId);
+      return false;
+    });
+  nodeColumn.set(orgId, { at: Date.now(), has });
+  return has;
+}
+
 export function useHostsList() {
   const store = useStore();
 
@@ -185,14 +207,7 @@ export function useHostsList() {
         query: encodeURIComponent(query),
         end_time: end,
       });
-    // Grouped by node only where the stream has the column; unknown, it is left out rather than fail the query.
-    const lastSeenSql = streamService
-      .schema(orgId, "system_cpu_load_average_15m", "metrics")
-      .then((res: any) =>
-        ((res?.data?.schema ?? []) as Array<{ name: string }>).some((f) => f.name === "k8s_node_name"),
-      )
-      .catch(() => false)
-      .then(hostsLastSeenSql);
+    const lastSeenSql = hasNodeColumn(orgId).then(hostsLastSeenSql);
     const results = await Promise.allSettled([
       instant(HOSTS_LIVENESS_QUERY),
       instant(HOSTS_CPU_QUERY),
