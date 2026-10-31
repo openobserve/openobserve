@@ -138,16 +138,16 @@ describe("DependencyMap", () => {
     expect(baseEdge("b-c").props("markerEnd")).toBeUndefined();
   });
 
-  it("draws each edge along its route from the layout", async () => {
+  it("draws each edge along its route from the layout, fanning the two out of a's side", async () => {
     await mountMap(
       [node("a", 0), node("b", 0, true, 200), node("c", 576)],
       [edge("a", "b", 10), { ...edge("a", "c", 10), waypoints: [{ x: 288, y: 300 }] }],
     );
     expect(baseEdge("a-b").props("path")).toBe(
-      routeEdge({ x: 0, y: 0 }, { x: 0, y: 200 }, []).path,
+      routeEdge({ x: 0, y: 0 }, { x: 0, y: 200 }, [], { from: -5, to: 0 }).path,
     );
     expect(baseEdge("a-c").props("path")).toBe(
-      routeEdge({ x: 0, y: 0 }, { x: 576, y: 0 }, [{ x: 288, y: 300 }]).path,
+      routeEdge({ x: 0, y: 0 }, { x: 576, y: 0 }, [{ x: 288, y: 300 }], { from: 5, to: 0 }).path,
     );
   });
 
@@ -185,17 +185,17 @@ describe("DependencyMap", () => {
     expect(wrapper.emitted("select")).toEqual([[null]]);
   });
 
-  it("labels only the busiest edges with their rate", async () => {
+  it("shows no rates at rest, only the selected edge's", async () => {
     const ends = stack(10);
     await mountMap(
       [...ends, node("api", 340)],
       ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))),
     );
-    expect(pill("w0-api").exists()).toBe(false);
-    expect(pill("w1-api").exists()).toBe(false);
-    expect(pill("w9-api").text()).toMatch(/KB\/s/);
-    expect(pills()).toHaveLength(8);
+    // Width shows volume and the cards their totals.
+    expect(pills()).toEqual([]);
     expect(card("api").text()).toContain("10 connections");
+    await wrapper.setProps({ selectedEdgeId: "w3-api" });
+    expect(pills()).toEqual(["w3-api"]);
   });
 
   it("dims what a hovered card does not talk to, and its labels follow the hover", async () => {
@@ -211,6 +211,15 @@ describe("DependencyMap", () => {
     expect(pill("a-b").exists()).toBe(true);
     await flow().vm.$emit("node-mouse-leave");
     expect(card("c").classes()).not.toContain("opacity-30");
+  });
+
+  it("draws an edge with no known client as a thin neutral line", async () => {
+    await mountMap([node("a", 0), node("b", 340)], [edge("a", "b", 100_000, false)]);
+    expect(baseEdge("a-b").props("style")).toMatchObject({
+      stroke: "var(--color-grey-500)",
+      strokeWidth: 1.25,
+    });
+    expect(baseEdge("a-b").props("style").strokeDasharray).toBeUndefined();
   });
 
   it("labels only a hovered hub's busiest edges", async () => {
@@ -254,7 +263,10 @@ describe("DependencyMap", () => {
           .findAll('[data-test="dependency-map-label"]')
           .map((p) => [p.attributes("data-edge"), p.attributes("style")]),
       );
+    // The api card's own labels, then an edge hovered.
+    await flow().vm.$emit("node-mouse-enter", { node: { id: "api" } });
     const before = at();
+    expect(Object.keys(before).length).toBeGreaterThan(0);
     const edges = flow().props("edges");
     await flow().vm.$emit("edge-mouse-enter", { edge: { id: "w0-api" } });
     // Each pill still shown is where it was; one the hovered pill would cover is hidden, not moved.
@@ -272,6 +284,7 @@ describe("DependencyMap", () => {
       [node("a", 0), node("b", 0, true, 12), node("c", 340), node("d", 340, true, 12)],
       [edge("a", "c", 2000), edge("b", "d", 10)],
     );
+    await wrapper.setProps({ selectedEdgeId: "a-c" });
     expect(pills()).toEqual(["a-c"]);
     await flow().vm.$emit("edge-mouse-enter", { edge: { id: "b-d" } });
     expect(hoveredLabel().exists()).toBe(true);
@@ -293,6 +306,7 @@ describe("DependencyMap", () => {
 
   it("treats a pill as part of its edge: hovering it lights the edge, clicking it selects the edge", async () => {
     await mountMap([node("a", 0), node("b", 340)], [edge("a", "b", 2000)]);
+    await wrapper.setProps({ selectedEdgeId: "a-b" });
     await pill("a-b").trigger("mouseenter");
     expect(hoveredLabel().exists()).toBe(true);
     expect(baseEdge("a-b").props("style").opacity).toBe(1);
@@ -300,6 +314,7 @@ describe("DependencyMap", () => {
     expect(wrapper.emitted("select")).toEqual([["a-b"]]);
     await hoveredLabel().trigger("mouseleave");
     expect(hoveredLabel().exists()).toBe(false);
+    expect(pill("a-b").exists()).toBe(true);
   });
 
   it("refits on a resize with the floor the last fit used", async () => {

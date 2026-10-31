@@ -43,6 +43,7 @@ import {
   filterFlows,
   flowQuery,
   flowWindowSeconds,
+  dropQuiet,
   formatRate,
   layoutGraph,
   namespaceColors,
@@ -151,11 +152,14 @@ const scope = computed(() => ({
 }));
 
 const edges = computed(() =>
-  filterFlows(allEdges.value, {
-    ...scope.value,
-    showSystem: props.state.system,
-    showNodeTraffic: props.state.nodeTraffic,
-  }),
+  dropQuiet(
+    filterFlows(allEdges.value, {
+      ...scope.value,
+      showSystem: props.state.system,
+      showNodeTraffic: props.state.nodeTraffic,
+    }),
+    props.state.lowTraffic,
+  ),
 );
 
 const graph = computed(() => buildGraph(edges.value));
@@ -388,9 +392,15 @@ const switchedEdges = computed(() => {
     showSystem: props.state.system,
     showNodeTraffic: props.state.nodeTraffic,
   };
-  const shown = filterFlows(allEdges.value, { ...switches, namespaces: [] });
+  const shown = dropQuiet(
+    filterFlows(allEdges.value, { ...switches, namespaces: [] }),
+    props.state.lowTraffic,
+  );
   if (!props.state.namespaces.length) return shown;
-  const picked = filterFlows(allEdges.value, { ...switches, namespaces: props.state.namespaces });
+  const picked = dropQuiet(
+    filterFlows(allEdges.value, { ...switches, namespaces: props.state.namespaces }),
+    props.state.lowTraffic,
+  );
   return [...new Map([...shown, ...picked].map((e) => [e.id, e])).values()];
 });
 
@@ -444,6 +454,13 @@ function clearFilters() {
         @update:model-value="
           (nodeTraffic: unknown) => emit('update', { nodeTraffic: !!nodeTraffic })
         "
+      />
+      <OSwitch
+        :model-value="state.lowTraffic"
+        size="sm"
+        :label="t('infra.k8s2.depsShowLowTraffic')"
+        data-test="k8s2-deps-show-low-traffic"
+        @update:model-value="(lowTraffic: unknown) => emit('update', { lowTraffic: !!lowTraffic })"
       />
       <div class="flex items-center gap-1">
         <OText tag="span" class="text-text-secondary text-xs" data-test="k8s2-deps-caption">
@@ -503,7 +520,7 @@ function clearFilters() {
       :action-label="t('infra.k8s2.depsShowAll')"
       :secondary-action-label="filtersSet ? t('emptyState.filtered.action') : undefined"
       data-test="k8s2-deps-empty"
-      @action="emit('update', { system: true, nodeTraffic: true })"
+      @action="emit('update', { system: true, nodeTraffic: true, lowTraffic: true })"
       @secondary-action="clearFilters"
     />
     <OEmptyState

@@ -331,11 +331,11 @@ export interface Position {
 // The map's card size; DependencyMap.vue draws its cards at exactly this size, so edges can be routed around them.
 export const CARD_W = 216;
 export const CARD_H = 76;
-// A column is a card wide plus a gap that fits an edge's rate label clear of the arrowhead.
-export const COLUMN_GAP = 312;
+// A column is a card wide plus a gap with room for edges to fan out and a rate label to sit clear of the arrowheads.
+export const COLUMN_GAP = CARD_W + 176;
 // A card's slot is its height plus a gap; an edge passing through a column takes a thin slot of its own.
-const NODE_SLOT = CARD_H + 16;
-const PASS_SLOT = 20;
+const NODE_SLOT = CARD_H + 36;
+const PASS_SLOT = 24;
 
 // Alternating left-to-right and right-to-left passes; a few settle a graph of this size.
 const SWEEPS = 6;
@@ -535,6 +535,14 @@ export const layoutGraph = ({ nodes, edges }: FlowGraph) =>
 
 // Nodes before the outside world aside, until the sweeps reorder them by their neighbours.
 const orderOf = (end: FlowEnd) => (end.kind === "workload" ? 0 : end.kind === "node" ? 1 : 2);
+
+// Below this a connection is background chatter, such as DNS retries or health probes trickling a few bytes; its
+// line would cross the whole map to say almost nothing. The low-traffic switch shows it.
+export const QUIET_RATE = 1;
+
+// Without the low-traffic connections unless `show`.
+export const dropQuiet = <T extends { total: number }>(edges: T[], show: boolean): T[] =>
+  show ? edges : edges.filter((e) => e.total >= QUIET_RATE);
 
 const RATE_UNITS = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s"];
 

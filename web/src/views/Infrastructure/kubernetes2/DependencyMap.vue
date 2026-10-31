@@ -106,7 +106,8 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const { setViewport, dimensions, zoomIn, zoomOut, areNodesInitialized } = useVueFlow();
 
-// Rate labels only on the busiest edges, so the rest of the map stays readable.
+// No rate at rest: edge width already shows volume, and a card's summary its total. Hovering a card labels up to
+// this many of its own edges; the hovered and the selected edge are labelled too.
 const LABELLED = 8;
 
 // How far zooming out goes, and how far the fit button goes to show a big map whole.
@@ -144,6 +145,8 @@ function zoomBy(inward: boolean) {
   if (inward) zoomIn({ duration: 150 });
   else zoomOut({ duration: 150 });
 }
+
+const UNDIRECTED = "var(--color-grey-500)";
 
 // Exactly the size the layout routes edges around, whatever the root font size.
 const CARD_SIZE = { width: `${CARD_W}px`, height: `${CARD_H}px` };
@@ -189,11 +192,11 @@ const busiestOf = (edges: MapEdge[]) =>
       .map((e) => e.id),
   );
 
-// The map's busiest edges, or while a card is hovered its own busiest: a hub can have dozens of edges, and each
-// new label is measured as it appears.
-const labelled = computed(() =>
-  busiestOf(hovered.value ? drawn.value.filter((e) => touches(e, hovered.value!)) : drawn.value),
-);
+// While a card is hovered its own busiest edges, a hub can have dozens; otherwise only the selected edge.
+const labelled = computed(() => {
+  if (hovered.value) return busiestOf(drawn.value.filter((e) => touches(e, hovered.value!)));
+  return new Set(props.selectedEdgeId ? [props.selectedEdgeId] : []);
+});
 
 const openLabel = (node: MapNode) =>
   t("infra.k8s2.depsOpenEnd", { name: node.label, detail: node.detail, summary: summaryOf(node) });
@@ -221,6 +224,44 @@ const flowNodes = computed<Node<MapNode>[]>(() =>
 );
 
 // From the data alone: hovering never rebuilds them, which would make Vue Flow reparse every edge.
+// Where each edge leaves and enters a card side, as offsets from its middle: the edges at one side spread out in
+// the order their other ends lie, so they fan out instead of converging on one point or crossing at the card.
+const PORT_SPACING = 10;
+const ports = computed(() => {
+  const sides = new Map<string, { id: string; end: "from" | "to"; toward: number }[]>();
+  const middle = (id: string) => byId.value.get(id)!.position.y + CARD_H / 2;
+  for (const e of drawn.value) {
+    const [a, b] = [byId.value.get(e.source)!.position, byId.value.get(e.target)!.position];
+    const forward = a.x < b.x;
+    const loop = a.x === b.x;
+    const slots = [...e.waypoints].sort((p, q) => (forward ? p.x - q.x : q.x - p.x));
+    const sourceSide = loop || forward ? "right" : "left";
+    const targetSide = loop || !forward ? "right" : "left";
+    const add = (key: string, entry: { id: string; end: "from" | "to"; toward: number }) =>
+      sides.set(key, [...(sides.get(key) ?? []), entry]);
+    add(`${e.source}|${sourceSide}`, {
+      id: e.id,
+      end: "from",
+      toward: slots[0]?.y ?? middle(e.target),
+    });
+    add(`${e.target}|${targetSide}`, {
+      id: e.id,
+      end: "to",
+      toward: slots.at(-1)?.y ?? middle(e.source),
+    });
+  }
+  const out = new Map<string, { from?: number; to?: number }>();
+  for (const entries of sides.values()) {
+    entries.sort((p, q) => p.toward - q.toward || p.id.localeCompare(q.id));
+    const step = Math.min(PORT_SPACING, (CARD_H - 24) / Math.max(1, entries.length - 1));
+    entries.forEach((entry, i) => {
+      const offset = (i - (entries.length - 1) / 2) * step;
+      out.set(entry.id, { ...out.get(entry.id), [entry.end]: offset });
+    });
+  }
+  return out;
+});
+
 const flowEdges = computed<Edge[]>(() => {
   const max = Math.max(1, ...drawn.value.map((e) => e.total));
   return drawn.value.map((e) => {
@@ -229,7 +270,8 @@ const flowEdges = computed<Edge[]>(() => {
     const dx = to.position.x - from.position.x;
     const [sourceHandle, targetHandle] =
       dx > 0 ? ["sr", "tl"] : dx < 0 ? ["sl", "tr"] : ["sr", "tr"];
-    const width = 1.5 + 6 * Math.sqrt(e.total / max);
+    // Width by rate for a known direction; one with no known client is a thin neutral line.
+    const width = e.directed ? 1.5 + 5 * Math.sqrt(e.total / max) : 1.25;
     // Rounded, so edges share a handful of marker definitions.
     const arrow = 20 + 4 * Math.round(width);
     return {
@@ -249,11 +291,11 @@ const flowEdges = computed<Edge[]>(() => {
           }
         : undefined,
       data: {
-        color: from.color,
+        color: e.directed ? from.color : UNDIRECTED,
         width,
         directed: e.directed,
         rate: formatRate(e.total),
-        route: routeEdge(from.position, to.position, e.waypoints),
+        route: routeEdge(from.position, to.position, e.waypoints, ports.value.get(e.id)),
       },
     };
   });
@@ -276,8 +318,8 @@ function strokeOf(edge: EdgeProps) {
   return {
     stroke: edge.data.color,
     strokeWidth: edge.data.width + (selected ? 1.5 : 0),
-    strokeDasharray: edge.data.directed ? undefined : "6 4",
-    opacity: faded ? (hovered.value ? 0.08 : 0.2) : lit ? 1 : 0.6,
+    // An undirected edge is a quiet line, lit like the rest when its card or itself is hovered.
+    opacity: faded ? (hovered.value ? 0.08 : 0.2) : lit ? 1 : edge.data.directed ? 0.65 : 0.4,
     filter: selected ? `drop-shadow(0 0 0.25rem ${edge.data.color})` : undefined,
     transition: "opacity 0.15s ease",
   };
@@ -298,10 +340,13 @@ const placed = computed(() => {
     }));
   // Clear of every arrowhead, so a rate never covers where an edge lands.
   const arrows = flowEdges.value.filter((e) => e.data.directed).map((e) => arrowBox(e.data.route));
+  // Clear of every other edge's line too, so none runs under a pill.
+  const traces = new Map(flowEdges.value.map((e) => [e.id, e.data.route.trace]));
   return placeLabels(
     wanted,
     props.nodes.map((n) => n.position),
     arrows,
+    traces,
   );
 });
 
@@ -448,7 +493,7 @@ function onKeydown(event: KeyboardEvent) {
             data-test="dependency-map-node"
           >
             <span
-              class="absolute inset-y-0 start-0 w-1"
+              class="absolute inset-y-0 start-0 w-1.5"
               :style="{ backgroundColor: data.color }"
               aria-hidden="true"
             />
@@ -494,7 +539,7 @@ function onKeydown(event: KeyboardEvent) {
           <div
             v-for="[id, pill] in pills"
             :key="id"
-            class="bg-surface-base border-border-default text-text-secondary pointer-events-auto absolute top-0 left-0 flex [transform:var(--dep-label,none)] cursor-pointer items-center justify-center rounded-full border font-medium whitespace-nowrap tabular-nums"
+            class="bg-surface-base border-border-strong text-text-body pointer-events-auto absolute top-0 left-0 flex [transform:var(--dep-label,none)] cursor-pointer items-center justify-center rounded-full border font-medium whitespace-nowrap tabular-nums"
             :style="pillStyle(pill)"
             :data-edge="id"
             :data-test="

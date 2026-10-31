@@ -237,7 +237,9 @@ describe("DependenciesView", () => {
     const empty = testId("k8s2-deps-empty");
     expect(empty.text()).toContain("which the switches above hide");
     await empty.find("button").trigger("click");
-    expect(wrapper.emitted("update")).toEqual([[{ system: true, nodeTraffic: true }]]);
+    expect(wrapper.emitted("update")).toEqual([
+      [{ system: true, nodeTraffic: true, lowTraffic: true }],
+    ]);
   });
 
   it("offers both to show what the switches hide and to clear a search they also hide", async () => {
@@ -249,7 +251,7 @@ describe("DependenciesView", () => {
     await show.trigger("click");
     await clear.trigger("click");
     expect(wrapper.emitted("update")).toEqual([
-      [{ system: true, nodeTraffic: true }],
+      [{ system: true, nodeTraffic: true, lowTraffic: true }],
       [{ namespaces: [], search: "" }],
     ]);
   });
@@ -371,6 +373,23 @@ describe("DependenciesView", () => {
     } finally {
       window.removeEventListener("keydown", shortcut);
     }
+  });
+
+  it("hides connections below 1 B/s until the low-traffic switch shows them", async () => {
+    metricsQuery.mockResolvedValue({
+      data: {
+        data: { result: [...FLOWS, row(WEB, ["backend", "Deployment", "cache"], "request", 0.4)] },
+      },
+    } as any);
+    await mountView();
+    const header = wrapper.findComponent({ name: "K8sListHeader" });
+    expect(edges().some((e: any) => e.target.endsWith("/cache"))).toBe(false);
+    expect(header.props("total")).toBe(1);
+    await testId("k8s2-deps-show-low-traffic-btn").trigger("click");
+    expect(wrapper.emitted("update")).toEqual([[{ lowTraffic: true }]]);
+    await wrapper.setProps({ state: parseUrlState({ view: "dependencies", lowTraffic: "true" }) });
+    expect(edges().some((e: any) => e.target.endsWith("/cache"))).toBe(true);
+    expect(header.props("total")).toBe(2);
   });
 
   it("totals the connections the switches leave in the header", async () => {

@@ -92,6 +92,7 @@ const state = (over: Partial<K8sUrlState> = {}): K8sUrlState => ({
   filter: [],
   system: false,
   nodeTraffic: false,
+  lowTraffic: false,
   details: null,
   ...over,
 });

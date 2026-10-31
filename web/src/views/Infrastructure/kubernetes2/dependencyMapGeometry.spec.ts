@@ -132,8 +132,33 @@ describe("routeEdge", () => {
     const route = routeEdge({ x: 0, y: 0 }, { x: 0, y: 900 }, []);
     const furthest = Math.max(...sample(route.path).map((p) => p.x));
     expect(furthest).toBeGreaterThan(CARD_W);
-    expect(furthest).toBeLessThan(288);
+    expect(furthest).toBeLessThan(392);
     expect(route.spots[0].x).toBeCloseTo(furthest, 0);
+  });
+});
+
+describe("routeEdge ports", () => {
+  it("leaves and enters at the given offsets along the card sides", () => {
+    const route = routeEdge({ x: 0, y: 0 }, { x: 392, y: 0 }, [], { from: -10, to: 10 });
+    expect(route.path.startsWith(`M${CARD_W},${CARD_H / 2 - 10}`)).toBe(true);
+    expect(route.end).toEqual({ x: 392, y: CARD_H / 2 + 10 });
+  });
+
+  it("offers the middle of a straight run through a slot as a label spot", () => {
+    const route = routeEdge({ x: 0, y: 0 }, { x: 784, y: 0 }, [{ x: 392, y: 300 }]);
+    expect(route.spots.at(-1)).toEqual({ x: 392 + CARD_W / 2, y: 300 });
+  });
+
+  it("puts a label over another line only when no clear spot is left", () => {
+    const route = routeEdge({ x: 0, y: 0 }, { x: 392, y: 0 }, []);
+    const across = route.spots.map((p) => ({ x: p.x, y: p.y }));
+    const placed = placeLabels(
+      [{ id: "e", text: "1.0KB/s", spots: route.spots }],
+      [],
+      [],
+      new Map([["other", across]]),
+    );
+    expect(placed.get("e")).toEqual(route.spots[0]);
   });
 });
 
@@ -147,7 +172,7 @@ describe("placeLabels on a shallow bow", () => {
     const placed = placeLabels([{ id: "e", text: "10.0KB/s", spots: route.spots }], [top, below]);
     const box = labelBox("10.0KB/s", placed.get("e")!);
     expect(box.x).toBeGreaterThanOrEqual(CARD_W);
-    expect(box.x + box.w).toBeLessThanOrEqual(312);
+    expect(box.x + box.w).toBeLessThanOrEqual(392);
   });
 });
 

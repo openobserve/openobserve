@@ -20,6 +20,7 @@ import {
   MAX_GRAPH_EDGES,
   buildGraph,
   crossings,
+  dropQuiet,
   endOf,
   filterFlows,
   flowQuery,
@@ -521,5 +522,13 @@ describe("crossings", () => {
     );
     expect(positions.size).toBe(80);
     expect(performance.now() - started).toBeLessThan(200);
+  });
+});
+
+describe("dropQuiet", () => {
+  it("leaves out connections below 1 B/s unless asked to keep them", () => {
+    const edges = [{ total: 0.3 }, { total: 1 }, { total: 500 }];
+    expect(dropQuiet(edges, false)).toEqual([{ total: 1 }, { total: 500 }]);
+    expect(dropQuiet(edges, true)).toEqual(edges);
   });
 });

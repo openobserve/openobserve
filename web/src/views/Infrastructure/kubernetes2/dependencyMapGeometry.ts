@@ -29,6 +29,8 @@ export interface Route {
   // The point the route ends at, and whether it enters the target from the left.
   end: Position;
   fromLeft: boolean;
+  // Points along the whole route a few pixels apart, so a label can keep off other edges.
+  trace: Position[];
 }
 
 export interface Box {
@@ -55,31 +57,42 @@ const along = (a: Position, b: Position, t: number) => {
 // Places tried in each gap, the middle first.
 const STEPS = [0.5, 0.38, 0.62, 0.26, 0.74];
 
-// Room left for a bow between a card and the next column.
-const BOW_MAX = 48;
+// How far a bow between two cards in one column reaches into the gap: deeper the further apart they are, never past
+// the gap's middle.
+const bowDepth = (dy: number) => Math.min(GAP * 0.5, 40 + 0.25 * Math.abs(dy));
 
 // From the side of the source facing the target to the side of the target facing the source, through each slot.
-// `from` and `to` are the cards' top-left corners; `through` is layoutColumns' waypoints for the edge.
-export function routeEdge(from: Position, to: Position, through: Position[]): Route {
-  const sy = from.y + CARD_H / 2;
-  const ty = to.y + CARD_H / 2;
+// `from` and `to` are the cards' top-left corners; `through` is layoutColumns' waypoints for the edge. `ports` moves
+// where it leaves and enters along those sides, so the edges at one side fan out instead of meeting at one point.
+export function routeEdge(
+  from: Position,
+  to: Position,
+  through: Position[],
+  ports: { from?: number; to?: number } = {},
+): Route {
+  const sy = from.y + CARD_H / 2 + (ports.from ?? 0);
+  const ty = to.y + CARD_H / 2 + (ports.to ?? 0);
   if (from.x === to.x) {
-    // Both ends in one column: a bow out of the right-hand sides, into the gap, deeper the further apart they are.
+    // Both ends in one column: a bow out of the right-hand sides into the gap.
     const x = from.x + CARD_W;
-    const bow = Math.min(BOW_MAX, 16 + 0.15 * Math.abs(ty - sy)) / 0.75;
-    const tip = { x: x + 0.75 * bow, y: (sy + ty) / 2 };
-    // A shallow bow's tip is close to the cards, so the gap's middle is tried too, at the same heights.
-    const out = { x: x + GAP / 2, y: tip.y };
-    const heights = [tip.y, (3 * sy + ty) / 4, (sy + 3 * ty) / 4];
+    const bow = bowDepth(ty - sy) / 0.75;
+    const a = { x, y: sy };
+    const b = { x, y: ty };
+    const onBow = (t: number) => {
+      const u = 1 - t;
+      const [k0, k1, k2, k3] = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+      return { x: (k0 + k3) * x + (k1 + k2) * (x + bow), y: (k0 + k1) * a.y + (k2 + k3) * b.y };
+    };
     return {
       path: `M${x},${sy} C${x + bow},${sy} ${x + bow},${ty} ${x},${ty}`,
-      spots: [...heights.map((y) => ({ ...tip, y })), ...heights.map((y) => ({ ...out, y }))],
-      end: { x, y: ty },
+      spots: [0.5, 0.42, 0.58].map(onBow),
+      end: b,
       fromLeft: false,
+      trace: Array.from({ length: 33 }, (_, i) => onBow(i / 32)),
     };
   }
   const forward = from.x < to.x;
-  const slots = [...through].sort((a, b) => (forward ? a.x - b.x : b.x - a.x));
+  const slots = [...through].sort((p, q) => (forward ? p.x - q.x : q.x - p.x));
   // Points in order of travel: each card side, and each slot's two sides.
   const points: Position[] = [{ x: forward ? from.x + CARD_W : from.x, y: sy }];
   for (const slot of slots) {
@@ -99,11 +112,26 @@ export function routeEdge(from: Position, to: Position, through: Position[]): Ro
       path += ` L${points[i].x},${points[i].y}`;
     }
   }
+  const trace: Position[] = [];
+  for (let i = 1; i < points.length; i++) {
+    const [p, q] = [points[i - 1], points[i]];
+    const n = Math.max(2, Math.ceil(Math.abs(q.x - p.x) / 6));
+    for (let k = 0; k <= n; k++) {
+      trace.push(i % 2 === 1 ? along(p, q, k / n) : { x: p.x + ((q.x - p.x) * k) / n, y: p.y });
+    }
+  }
+  // Each straight run through a slot is kept clear of cards and other edges by the layout, so its middle is a spot
+  // too, after the gaps.
+  const runs: Position[] = [];
+  for (let i = 2; i < points.length; i += 2) {
+    runs.push({ x: (points[i - 1].x + points[i].x) / 2, y: points[i].y });
+  }
   return {
     path,
-    spots: gaps.flatMap(([a, b]) => STEPS.map((t) => along(a, b, t))),
+    spots: [...gaps.flatMap(([p, q]) => STEPS.map((t) => along(p, q, t))), ...runs],
     end,
     fromLeft: forward,
+    trace,
   };
 }
 
@@ -131,10 +159,12 @@ export const overlaps = (a: Box, b: Box) =>
 
 // Busiest first, each label at the first spot on its route where it clears every card, every obstacle such as an
 // arrowhead, and every label placed so far; one that fits nowhere is left out.
+// A label also keeps off every other edge in `traces`, so no line runs under it.
 export function placeLabels(
   wanted: { id: string; text: string; spots: Position[] }[],
   cards: Position[],
   obstacles: Box[] = [],
+  traces: Map<string, Position[]> = new Map(),
 ): Map<string, Position> {
   const blocked: Box[] = [
     ...cards.map((c) => ({ x: c.x, y: c.y, w: CARD_W, h: CARD_H })),
@@ -142,7 +172,22 @@ export function placeLabels(
   ];
   const out = new Map<string, Position>();
   for (const { id, text, spots } of wanted) {
-    const spot = spots.find((at) => !blocked.some((other) => overlaps(labelBox(text, at), other)));
+    const crossed = (box: Box) =>
+      [...traces].some(
+        ([other, points]) =>
+          other !== id &&
+          points.some(
+            (p) =>
+              p.x > box.x - 2 &&
+              p.x < box.x + box.w + 2 &&
+              p.y > box.y - 2 &&
+              p.y < box.y + box.h + 2,
+          ),
+      );
+    const clear = (at: Position) => !blocked.some((other) => overlaps(labelBox(text, at), other));
+    // Best clear of every other line; failing that, over another line, which the opaque pill hides, rather than
+    // leaving a busy edge without its rate.
+    const spot = spots.find((at) => clear(at) && !crossed(labelBox(text, at))) ?? spots.find(clear);
     if (!spot) continue;
     blocked.push(labelBox(text, spot));
     out.set(id, spot);

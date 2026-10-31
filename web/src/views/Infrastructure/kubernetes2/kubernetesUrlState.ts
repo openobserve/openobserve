@@ -47,9 +47,10 @@ export interface K8sUrlState {
   fill: MapFill;
   group: MapGroup;
   filter: string[];
-  // Dependencies: draw system namespaces, and node-to-node traffic.
+  // Dependencies: draw system namespaces, node-to-node traffic, and connections below the low-traffic threshold.
   system: boolean;
   nodeTraffic: boolean;
+  lowTraffic: boolean;
   details: DetailsRef | null;
 }
 
@@ -70,6 +71,7 @@ const PAGE_PARAMS = [
   "filter",
   "system",
   "nodeTraffic",
+  "lowTraffic",
   "details",
   "kind",
   "name",
@@ -172,6 +174,7 @@ export const parseUrlState = (query: Query): K8sUrlState => {
     filter: parseFilter(first(query.filter)),
     system: view === "dependencies" && first(query.system) === "true",
     nodeTraffic: view === "dependencies" && first(query.nodeTraffic) === "true",
+    lowTraffic: view === "dependencies" && first(query.lowTraffic) === "true",
     details,
   };
 };
@@ -202,6 +205,7 @@ export const toQuery = (state: K8sUrlState, base: Query): LocationQueryRaw => {
   if (state.view === "dependencies") {
     if (state.system) out.system = "true";
     if (state.nodeTraffic) out.nodeTraffic = "true";
+    if (state.lowTraffic) out.lowTraffic = "true";
   }
   if (state.details) out.details = encodeDetails(state.details);
   return out;
@@ -226,6 +230,7 @@ export const withView = (state: K8sUrlState, view: View): K8sUrlState => ({
   filter: [],
   system: false,
   nodeTraffic: false,
+  lowTraffic: false,
   details: null,
 });
 
