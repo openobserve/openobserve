@@ -581,16 +581,22 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
       testLogger.warn('Share success toast not detected');
     });
 
-    // Read clipboard URL
     const clipboardUrl = await pm.metricsPage.getCopiedShortUrl(15000);
-    if (clipboardUrl && clipboardUrl.includes('/short/')) {
-      testLogger.info(`Clipboard URL: ${clipboardUrl}`);
+    testLogger.info(`Clipboard URL: ${clipboardUrl}`);
+    expect(clipboardUrl).toContain('/short/');
 
-      // Parse the URL — the short URL redirects to the long URL with params.
-      // The clipboard contains the short URL itself, not the expanded URL.
-      // We can at least verify it's a valid short URL.
-      expect(clipboardUrl).toContain('/short/');
-    }
+    // The short link redirects to the long one, which must carry the frozen window; opened on this
+    // session's origin, since web_url may name another host the browser holds no session for.
+    const short = new URL(clipboardUrl);
+    await page.goto(new URL(short.pathname + short.search, process.env.ZO_BASE_URL).href);
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('from'), { timeout: 15000 })
+      .toMatch(/^\d+$/);
+    testLogger.info(`Short URL resolved to ${page.url()}`);
+    const params = new URL(page.url()).searchParams;
+    expect(params.get('to')).toMatch(/^\d+$/);
+    expect(params.get('period')).toBeNull();
+    expect(Number(params.get('to'))).toBeGreaterThan(Number(params.get('from')));
 
     testLogger.info('Share time-freeze test completed');
   });
