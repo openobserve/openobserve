@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { Series } from "./kubernetesModel";
-import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { escapeLabel } from "./kubernetesQueries";
 
 // The eBPF network flow counter: bytes one end sent the other, per reporting node.
@@ -511,15 +510,42 @@ export const layoutGraph = ({ nodes, edges }: FlowGraph) =>
 // Nodes before the outside world aside, until the sweeps reorder them by their neighbours.
 const orderOf = (end: FlowEnd) => (end.kind === "workload" ? 0 : end.kind === "node" ? 1 : 2);
 
-// Below 0.1 B/s the unit formatter rounds to 0, which reads as no traffic at all.
-export const formatRate = (value: number) =>
-  value > 0 && value < 0.1 ? "<0.1 B/s" : formatUnitValue(getUnitValue(value, "bps", "", 1));
+const RATE_UNITS = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s"];
 
-// Chart colours told apart at a glance, so near-identical neighbours of the palette are left out.
-const NAMESPACE_COLORS = [1, 2, 3, 5, 8, 9, 6, 7].map((i) => `var(--color-chart-series-${i})`);
+// Bytes/s in binary units to at most 3 significant digits, so a rate fits a card line: 1.0KB/s, 17.4KB/s, 168KB/s.
+// Below 0.1 B/s it says so, rather than rounding to no traffic at all.
+export function formatRate(value: number): string {
+  if (!(value > 0)) return "0B/s";
+  if (value < 0.1) return "<0.1B/s";
+  let v = value;
+  let unit = 0;
+  while (v >= 999.5 && unit < RATE_UNITS.length - 1) {
+    v /= 1024;
+    unit++;
+  }
+  return `${v < 99.95 ? v.toFixed(1) : Math.round(v)}${RATE_UNITS[unit]}`;
+}
 
-// From the name alone, so a namespace keeps its colour whatever else is drawn or filtered.
-export function namespaceColor(namespace: string): string {
+// Every chart colour, ordered so neighbours differ, with the hue family each belongs to: red, pink and fuchsia, or blue
+// and sky, read alike at a glance.
+const NAMESPACE_COLORS = (
+  [
+    [1, "blue"],
+    [3, "orange"],
+    [2, "green"],
+    [5, "purple"],
+    [6, "orange"],
+    [8, "red"],
+    [9, "green"],
+    [4, "red"],
+    [7, "blue"],
+    [12, "orange"],
+    [10, "green"],
+    [11, "red"],
+  ] as const
+).map(([i, family]) => ({ color: `var(--color-chart-series-${i})`, family }));
+
+const slotOf = (namespace: string) => {
   let hash = 0x811c9dc5;
   for (let i = 0; i < namespace.length; i++) {
     hash = Math.imul(hash ^ namespace.charCodeAt(i), 0x01000193);
@@ -528,5 +554,30 @@ export function namespaceColor(namespace: string): string {
   hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b);
   hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2ae35);
   hash ^= hash >>> 16;
-  return NAMESPACE_COLORS[(hash >>> 0) % NAMESPACE_COLORS.length];
+  return (hash >>> 0) % NAMESPACE_COLORS.length;
+};
+
+// A colour per namespace from its name, taken in name order: each starts at its own slot and moves on past colours
+// an earlier namespace holds, and past a hue family one holds while another family is still free. So the same
+// namespaces always get the same colours, up to twelve never share one, up to five get different families, and
+// adding a namespace that sorts after another never changes the other's colour.
+export function namespaceColors(namespaces: Iterable<string>): Map<string, string> {
+  const out = new Map<string, string>();
+  const taken = new Set<number>();
+  const families = new Set<string>();
+  const allFamilies = new Set(NAMESPACE_COLORS.map((c) => c.family)).size;
+  const n = NAMESPACE_COLORS.length;
+  for (const name of [...new Set(namespaces)].sort((a, b) => a.localeCompare(b))) {
+    const start = slotOf(name);
+    const free = (slot: number) => !taken.has(slot);
+    const fresh = (slot: number) => free(slot) && !families.has(NAMESPACE_COLORS[slot].family);
+    const want = families.size < allFamilies ? fresh : free;
+    let slot = start;
+    for (let tries = 0; tries < n && !want(slot); tries++) slot = (slot + 1) % n;
+    if (!free(slot)) slot = start;
+    taken.add(slot);
+    families.add(NAMESPACE_COLORS[slot].family);
+    out.set(name, NAMESPACE_COLORS[slot].color);
+  }
+  return out;
 }

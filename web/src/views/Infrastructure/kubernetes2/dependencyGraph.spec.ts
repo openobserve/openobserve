@@ -24,7 +24,7 @@ import {
   flowQuery,
   flowWindowSeconds,
   layoutGraph,
-  namespaceColor,
+  namespaceColors,
   pairFlows,
   type FlowEdge,
   type FlowFilter,
@@ -421,11 +421,43 @@ describe("layoutGraph", () => {
   });
 });
 
-describe("namespaceColor", () => {
-  it("gives a namespace one colour from its name alone", () => {
-    expect(namespaceColor("backend")).toBe(namespaceColor("backend"));
-    expect(namespaceColor("backend")).toMatch(/^var\(--color-chart-series-\d+\)$/);
-    const many = ["backend", "frontend", "data", "batch", "bulk"].map(namespaceColor);
-    expect(new Set(many).size).toBe(5);
+describe("namespaceColors", () => {
+  const DEFAULT = ["backend", "frontend", "data", "batch", "bulk"];
+
+  it("gives the same namespaces the same colours, whatever order they come in", () => {
+    expect(namespaceColors(DEFAULT)).toEqual(namespaceColors([...DEFAULT].reverse()));
+    expect(namespaceColors(DEFAULT).get("backend")).toMatch(/^var\(--color-chart-series-\d+\)$/);
+  });
+
+  it("never gives two of up to twelve namespaces one colour", () => {
+    const twelve = Array.from({ length: 12 }, (_, i) => `ns-${i}`);
+    expect(new Set(namespaceColors(twelve).values()).size).toBe(12);
+  });
+
+  it("gives up to five namespaces colours of different hue families", () => {
+    const families: Record<string, string> = {
+      1: "blue",
+      7: "blue",
+      2: "green",
+      9: "green",
+      10: "green",
+      3: "orange",
+      6: "orange",
+      12: "orange",
+      4: "red",
+      8: "red",
+      11: "red",
+      5: "purple",
+    };
+    const used = [...namespaceColors(DEFAULT).values()].map(
+      (c) => families[c.match(/series-(\d+)/)![1]],
+    );
+    expect(new Set(used).size).toBe(5);
+  });
+
+  it("keeps a namespace's colour when namespaces that sort after it are added", () => {
+    const before = namespaceColors(DEFAULT);
+    const after = namespaceColors([...DEFAULT, "kube-system", "openobserve-collector", "zz"]);
+    for (const name of DEFAULT) expect(after.get(name)).toBe(before.get(name));
   });
 });

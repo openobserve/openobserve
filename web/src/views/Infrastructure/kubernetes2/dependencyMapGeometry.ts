@@ -114,8 +114,9 @@ export function placeLabels(
   return out;
 }
 
-// Zoom and offset that show every point with a margin, never past natural size, centred in a width x height pane.
-export function fitTransform(points: Position[], width: number, height: number) {
+// Zoom and offset that show every point with a margin, never past natural size nor below `minZoom`, centred in a
+// width x height pane.
+export function fitTransform(points: Position[], width: number, height: number, minZoom = 0) {
   if (!points.length || !width || !height) return { x: 0, y: 0, zoom: 1 };
   const xs = points.map((p) => p.x);
   const ys = points.map((p) => p.y);
@@ -123,7 +124,7 @@ export function fitTransform(points: Position[], width: number, height: number) 
   const [w, h] = [Math.max(...xs) - left, Math.max(...ys) - top];
   // Room for a bow out of the right-most column, and a little air on every side.
   const margin = 32;
-  const zoom = Math.min(1, width / (w + 2 * margin), height / (h + 2 * margin));
+  const zoom = Math.max(minZoom, Math.min(1, width / (w + 2 * margin), height / (h + 2 * margin)));
   return {
     x: width / 2 - (left + w / 2) * zoom,
     y: height / 2 - (top + h / 2) * zoom,

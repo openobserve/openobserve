@@ -50,7 +50,11 @@ vi.mock("@vue-flow/core", () => ({
       </div>
     `,
   },
-  BaseEdge: { name: "BaseEdge", props: ["id", "path", "style", "label"], template: "<i />" },
+  BaseEdge: {
+    name: "BaseEdge",
+    props: ["id", "path", "style", "label", "labelX", "labelY"],
+    template: "<i />",
+  },
   Handle: { name: "Handle", template: "<i />" },
   MarkerType: { ArrowClosed: "arrowclosed" },
   Position: { Left: "left", Right: "right" },
@@ -225,6 +229,27 @@ describe("DependencyMap", () => {
     expect(baseEdge("w1-api").props("style").opacity).toBe(1);
     await flow().vm.$emit("edge-mouse-leave");
     expect(baseEdge("w1-api").props("label")).toBeUndefined();
+  });
+
+  it("keeps the other labels where they are while an edge is hovered", async () => {
+    const ends = stack(10);
+    mountMap(
+      [...ends, node("api", 340)],
+      ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))),
+    );
+    const at = () =>
+      wrapper
+        .findAllComponents({ name: "BaseEdge" })
+        .filter((e) => e.props("id") !== "w0-api")
+        .map((e) => [e.props("id"), e.props("label"), e.props("labelX"), e.props("labelY")]);
+    const before = at();
+    await flow().vm.$emit("edge-mouse-enter", { edge: { id: "w0-api" } });
+    expect(at()).toEqual(before);
+    expect(
+      flow()
+        .props("edges")
+        .find((e: any) => e.id === "w0-api").zIndex,
+    ).toBe(1);
   });
 
   it("makes a clickable card a named button, and leaves the others plain", () => {

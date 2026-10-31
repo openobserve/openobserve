@@ -229,6 +229,34 @@ describe("DependenciesView", () => {
     expect(testId("k8s2-deps-edge").exists()).toBe(false);
   });
 
+  it("offers to show what the switches hide when they alone hide every edge", async () => {
+    metricsQuery.mockResolvedValue({ data: { data: { result: [FLOWS[2], FLOWS[3]] } } } as any);
+    await mountView();
+    const empty = testId("k8s2-deps-empty");
+    expect(empty.text()).toContain("which the switches above hide");
+    await empty.find("button").trigger("click");
+    expect(wrapper.emitted("update")).toEqual([[{ system: true, nodeTraffic: true }]]);
+  });
+
+  it("offers to clear the filters when the namespace filter or search hides every edge", async () => {
+    await mountView({ state: parseUrlState({ view: "dependencies", search: "nothing" }) });
+    await testId("k8s2-deps-empty").find("button").trigger("click");
+    expect(wrapper.emitted("update")).toEqual([[{ namespaces: [], search: "" }]]);
+  });
+
+  it("leaves Escape alone while no edge panel is open, and keeps focus put when the map closes one", async () => {
+    await mountView({}, document.body);
+    const esc = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    testId("k8s2-deps-view").element.dispatchEvent(esc);
+    expect(esc.defaultPrevented).toBe(false);
+    await testId("k8s2-deps-link").trigger("click");
+    await flushPromises();
+    chart().vm.$emit("select", null);
+    await flushPromises();
+    expect(testId("k8s2-deps-edge").exists()).toBe(false);
+    expect(document.activeElement).not.toBe(testId("k8s2-deps-link").element);
+  });
+
   it("colours a namespace the same whatever else is drawn", async () => {
     await mountView();
     const before = nodes().find((n: any) => n.label === "api").color;

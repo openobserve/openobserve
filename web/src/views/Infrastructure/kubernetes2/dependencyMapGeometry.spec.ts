@@ -173,12 +173,36 @@ describe("placeLabels", () => {
 
 describe("formatRate", () => {
   it("says a rate too small to round is under 0.1 B/s", () => {
-    expect(formatRate(0.01)).toBe("<0.1 B/s");
-    expect(formatRate(2048)).toMatch(/^2(\.0+)?\s?KB\/s$/);
+    expect(formatRate(0.01)).toBe("<0.1B/s");
+    expect(formatRate(2048)).toBe("2.0KB/s");
+  });
+
+  it.each([
+    [354, "354B/s"],
+    [1000, "1.0KB/s"],
+    [17_818, "17.4KB/s"],
+    [171_930, "168KB/s"],
+    [1_048_000, "1.0MB/s"],
+  ])("writes %s bytes/s in at most 3 significant digits as %s", (value, text) => {
+    expect(formatRate(value)).toBe(text);
   });
 });
 
 describe("fitTransform", () => {
+  it("never fits below the zoom it is given as a floor", () => {
+    expect(
+      fitTransform(
+        [
+          { x: 0, y: 0 },
+          { x: 1e6, y: 0 },
+        ],
+        1000,
+        600,
+        0.1,
+      ).zoom,
+    ).toBe(0.1);
+  });
+
   it("centres every point, never zoomed in past natural size", () => {
     expect(
       fitTransform(

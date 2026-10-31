@@ -43,7 +43,7 @@ import {
   flowWindowSeconds,
   formatRate,
   layoutGraph,
-  namespaceColor,
+  namespaceColors,
   pairFlows,
   type FlowEdge,
   type FlowEnd,
@@ -226,8 +226,14 @@ const split = (edge: FlowEdge) =>
 // A chart colour per namespace; nodes and the outside world are neutral and told apart by their icons.
 const NEUTRAL = "var(--color-grey-500)";
 
+const colors = computed(() =>
+  namespaceColors(
+    graph.value.nodes.filter((n) => n.end.kind === "workload").map((n) => n.end.namespace),
+  ),
+);
+
 const colorOf = (end: FlowEnd) =>
-  end.kind === "workload" ? namespaceColor(end.namespace) : NEUTRAL;
+  end.kind === "workload" ? (colors.value.get(end.namespace) ?? NEUTRAL) : NEUTRAL;
 
 // A workload by its owner's kind, as the resource tree shows it.
 function iconOf(end: FlowEnd): IconName {
@@ -264,15 +270,7 @@ const mapEdges = computed<MapEdge[]>(() =>
   })),
 );
 
-const legend = computed(() =>
-  [
-    ...new Set(
-      graph.value.nodes.filter((n) => n.end.kind === "workload").map((n) => n.end.namespace),
-    ),
-  ]
-    .sort((a, b) => a.localeCompare(b))
-    .map((label) => ({ label, color: namespaceColor(label) })),
-);
+const legend = computed(() => [...colors.value].map(([label, color]) => ({ label, color })));
 
 const ariaLabel = computed(() =>
   t("infra.k8s2.depsAria", { count: graph.value.edges.length }, graph.value.edges.length),
@@ -321,8 +319,8 @@ function showEdge(id: string, event: Event) {
 
 // Picked on the map, so a later close has no list button to return to; empty map space dismisses it.
 function selectEdge(id: string | null) {
-  if (id == null) return closeEdge();
   openedFrom = null;
+  if (id == null) return closeEdge();
   selectedEdgeId.value = id;
 }
 
@@ -342,6 +340,8 @@ function onSetUp() {
   router.push({ name: "ingestFromKubernetes", query: { org_identifier: props.orgId } });
 }
 
+const filtersSet = computed(() => props.state.namespaces.length > 0 || !!props.state.search);
+
 // Only the namespace filter and search; the switches keep what they show.
 function clearFilters() {
   emit("update", { namespaces: [], search: "" });
@@ -352,7 +352,7 @@ function clearFilters() {
   <div
     class="flex h-full min-h-0 flex-col gap-2 p-3 max-md:overflow-y-auto"
     data-test="k8s2-deps-view"
-    @keydown.esc="closeEdge"
+    @keydown.esc="selectedEdge && closeEdge()"
   >
     <K8sListHeader
       :title="t('infra.k8s2.depsTitle')"
@@ -442,12 +442,22 @@ function clearFilters() {
       data-test="k8s2-deps-no-flows"
       @action="onSetUp"
     />
+    <!-- With no namespace filter or search set, only the switches can be hiding every edge. -->
     <OEmptyState
-      v-else-if="!graph.edges.length"
+      v-else-if="!graph.edges.length && filtersSet"
       filtered
       :title="t('infra.k8s2.depsNoMatch')"
       data-test="k8s2-deps-empty"
       @action="clearFilters"
+    />
+    <OEmptyState
+      v-else-if="!graph.edges.length"
+      variant="no-results"
+      :title="t('infra.k8s2.depsNoMatch')"
+      :description="t('infra.k8s2.depsHiddenBySwitches')"
+      :action-label="t('infra.k8s2.depsShowAll')"
+      data-test="k8s2-deps-empty"
+      @action="emit('update', { system: true, nodeTraffic: true })"
     />
     <template v-else>
       <OText

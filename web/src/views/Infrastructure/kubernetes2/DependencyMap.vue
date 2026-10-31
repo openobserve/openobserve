@@ -99,6 +99,9 @@ const { setViewport, dimensions, zoomIn, zoomOut, areNodesInitialized } = useVue
 // Rate labels only on the busiest edges, so the rest of the map stays readable.
 const LABELLED = 8;
 
+// Also the fit's floor, so a fitted map never sits below where zooming out stops.
+const MIN_ZOOM = 0.1;
+
 // The whole map, cards and the edges routed past them, never zoomed in past its natural size. fitView only
 // knows the cards, and stops zooming out at 0.5.
 function fit(duration = 0) {
@@ -109,11 +112,14 @@ function fit(duration = 0) {
     ]),
     ...props.edges.flatMap((e) => e.waypoints),
     // A bow's tip, where its label sits, can reach past the right-most column.
-    ...flowEdges.value.flatMap((e) => e.data.route.spots),
+    ...edgesAtRest.value.flatMap((e) => e.data.route.spots),
   ];
   const { width, height } = dimensions.value;
-  setViewport(fitTransform(points, width, height), { duration });
+  setViewport(fitTransform(points, width, height, MIN_ZOOM), { duration });
 }
+
+// Exactly the size the layout routes edges around, whatever the root font size.
+const CARD_SIZE = { width: `${CARD_W}px`, height: `${CARD_H}px` };
 
 // Vue Flow places an edge only between handles, though each edge draws its own route from the layout.
 const HANDLES = [
@@ -196,7 +202,7 @@ const flowNodes = computed<Node<MapNode>[]>(() =>
     })),
 );
 
-const flowEdges = computed<Edge[]>(() => {
+const edgesAtRest = computed<Edge[]>(() => {
   const max = Math.max(1, ...drawn.value.map((e) => e.total));
   return drawn.value.map((e) => {
     const from = byId.value.get(e.source)!;
@@ -259,21 +265,36 @@ function strokeOf(edge: EdgeProps) {
 }
 
 // Busiest first, each label where it clears the cards and the labels already placed; a hovered edge's always shows.
-const labelAt = computed(() => {
-  const routes = new Map(flowEdges.value.map((e) => [e.id, e.data]));
+// A hovered edge is drawn over the rest, so its label is never hidden under another edge.
+const flowEdges = computed<Edge[]>(() =>
+  hoveredEdge.value
+    ? edgesAtRest.value.map((e) => (e.id === hoveredEdge.value ? { ...e, zIndex: 1 } : e))
+    : edgesAtRest.value,
+);
+
+const routes = computed(() => new Map(edgesAtRest.value.map((e) => [e.id, e.data])));
+
+// Placed without the hovered edge, so hovering one does not move the others.
+const placed = computed(() => {
   const wanted = drawn.value
-    .filter((e) => labelled.value.has(e.id) || e.id === hoveredEdge.value)
+    .filter((e) => labelled.value.has(e.id))
     .sort((a, b) => b.total - a.total)
     .map((e) => ({
       id: e.id,
-      text: routes.get(e.id)!.rate,
-      spots: routes.get(e.id)!.route.spots,
-      forced: e.id === hoveredEdge.value,
+      text: routes.value.get(e.id)!.rate,
+      spots: routes.value.get(e.id)!.route.spots,
     }));
   return placeLabels(
     wanted,
     props.nodes.map((n) => n.position),
   );
+});
+
+// The hovered edge's label goes on top wherever it falls, overlapping or not.
+const labelAt = computed(() => {
+  const id = hoveredEdge.value;
+  if (!id || placed.value.has(id) || !routes.value.has(id)) return placed.value;
+  return new Map([...placed.value, [id, routes.value.get(id)!.route.spots[0]]]);
 });
 
 // Fit when the drawn ends or their places change, not on a refresh that redraws the same map.
@@ -326,7 +347,7 @@ function onKeydown(event: KeyboardEvent) {
         :elements-selectable="false"
         :edges-focusable="false"
         :disable-keyboard-a11y="true"
-        :min-zoom="0.1"
+        :min-zoom="MIN_ZOOM"
         :max-zoom="2"
         @nodes-initialized="fitIfPending"
         @node-click="({ node }) => node.data.clickable && emit('open', node.id)"
@@ -341,13 +362,14 @@ function onKeydown(event: KeyboardEvent) {
 
         <template #node-end="{ id, data }">
           <div
-            class="bg-surface-base border-border-default rounded-default focus-visible:ring-accent/40 relative flex h-19 w-54 items-center gap-2 overflow-hidden border py-2 ps-3 pe-2 shadow-sm transition-[opacity,box-shadow,border-color] duration-150"
+            class="bg-surface-base border-border-default rounded-default focus-visible:ring-accent/40 relative flex items-center gap-2 overflow-hidden border py-2 ps-3 pe-2 shadow-sm transition-[opacity,box-shadow,border-color] duration-150"
             :class="[
               data.clickable
                 ? 'hover:border-border-strong cursor-pointer hover:shadow-md focus-visible:ring-2 focus-visible:outline-none'
                 : '',
               dimmed(id) ? 'opacity-30' : '',
             ]"
+            :style="CARD_SIZE"
             :title="data.title"
             :role="data.clickable ? 'button' : undefined"
             :tabindex="data.clickable ? 0 : undefined"
@@ -361,11 +383,13 @@ function onKeydown(event: KeyboardEvent) {
             />
             <OIcon :name="data.icon" size="sm" class="text-text-secondary shrink-0" />
             <div class="min-w-0 flex-1 leading-tight">
-              <div class="text-text-heading truncate text-base font-semibold">
+              <div class="text-text-heading truncate text-base leading-tight font-semibold">
                 {{ raw(data.label) }}
               </div>
-              <div class="text-text-secondary truncate text-[0.9375rem]">{{ data.detail }}</div>
-              <div class="text-text-secondary truncate text-[0.9375rem] tabular-nums">
+              <div class="text-text-secondary truncate text-sm leading-tight">
+                {{ data.detail }}
+              </div>
+              <div class="text-text-secondary text-compact truncate leading-tight tabular-nums">
                 {{ summaryOf(data) }}
               </div>
             </div>

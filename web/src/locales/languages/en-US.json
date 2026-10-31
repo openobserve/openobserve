@@ -23690,6 +23690,8 @@
       "depsSetUp": "Set up network flows",
       "depsLoadError": "Network flows could not be loaded",
       "depsNoMatch": "No connections match the filters",
+      "depsHiddenBySwitches": "The connections here are in system namespaces or between nodes, which the switches above hide.",
+      "depsShowAll": "Show system namespaces and node traffic",
       "depsExternal": "External or node-local",
       "depsOutsideCluster": "Addresses outside the cluster, or traffic inside a node such as kubelet probes",
       "depsHostTraffic": "Host processes and host-network pods on this node",
