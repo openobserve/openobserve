@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { Series } from "./kubernetesModel";
+import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { escapeLabel } from "./kubernetesQueries";
 
 // The eBPF network flow counter: bytes one end sent the other, per reporting node.
@@ -328,27 +329,136 @@ export interface Position {
   y: number;
 }
 
-const COLUMN_GAP = 260;
-const ROW_GAP = 70;
+// Sized to the map's cards: a card's width plus room for the edges to curve, and a card's height plus a gap.
+const COLUMN_GAP = 340;
+const ROW_GAP = 84;
 
-// Columns by rank, each sorted by namespace then name so a namespace's workloads sit together.
-export function layoutGraph(nodes: GraphNode[]): Map<string, Position> {
-  const columns = new Map<number, GraphNode[]>();
-  for (const n of nodes) columns.set(n.rank, [...(columns.get(n.rank) ?? []), n]);
-  const out = new Map<string, Position>();
-  for (const [rank, column] of columns) {
-    column.sort(
-      (x, y) =>
-        orderOf(x.end) - orderOf(y.end) ||
-        x.end.namespace.localeCompare(y.end.namespace) ||
-        x.end.name.localeCompare(y.end.name),
-    );
-    column.forEach((n, i) => {
-      out.set(n.end.id, { x: rank * COLUMN_GAP, y: (i - (column.length - 1) / 2) * ROW_GAP });
-    });
+// Alternating left-to-right and right-to-left passes; a few settle a graph of this size.
+const SWEEPS = 6;
+
+interface Link {
+  source: { id: string };
+  target: { id: string };
+  directed: boolean;
+}
+
+// Columns by rank, each starting in `compare` order. An end that only calls sits just left of the nearest end it
+// calls, so its edges do not run behind the columns in between. The `aside` ends get a column of their own past the
+// rest, so catch-all ends many workloads talk to do not land among the callers. Each column is then reordered a few
+// times by the mean position of its neighbours in the columns already placed, keeping the order with the fewest
+// crossings.
+export function layoutColumns<E extends { id: string }>(
+  nodes: { end: E; rank: number }[],
+  compare: (x: E, y: E) => number,
+  edges: Link[] = [],
+  aside: (end: E) => boolean = () => false,
+): Map<string, Position> {
+  const rank = new Map(nodes.map((n) => [n.end.id, n.rank]));
+  const isAside = new Set(nodes.filter((n) => aside(n.end)).map((n) => n.end.id));
+  const called = new Set(edges.filter((e) => e.directed).map((e) => e.target.id));
+  const nearest = new Map<string, number>();
+  for (const { source, target, directed } of edges) {
+    if (!directed || called.has(source.id) || isAside.has(target.id) || !rank.has(target.id))
+      continue;
+    nearest.set(source.id, Math.min(nearest.get(source.id) ?? Infinity, rank.get(target.id)! - 1));
   }
+  const last = Math.max(-1, ...nodes.filter((n) => !isAside.has(n.end.id)).map((n) => n.rank)) + 1;
+  const rankOfNode = (n: { end: E; rank: number }) =>
+    isAside.has(n.end.id) ? last : (nearest.get(n.end.id) ?? n.rank);
+  // Renumbered, so a rank emptied by moving its ends aside leaves no gap.
+  const used = [...new Set(nodes.map(rankOfNode))].sort((a, b) => a - b);
+  let order: E[][] = used.map(() => []);
+  for (const n of nodes) order[used.indexOf(rankOfNode(n))].push(n.end);
+  for (const column of order) column.sort(compare);
+
+  const columnOf = new Map<string, number>();
+  order.forEach((column, i) => column.forEach((end) => columnOf.set(end.id, i)));
+  const neighbours = new Map<string, string[]>();
+  const links = edges.filter((e) => columnOf.has(e.source.id) && columnOf.has(e.target.id));
+  for (const { source, target } of links) {
+    neighbours.set(source.id, [...(neighbours.get(source.id) ?? []), target.id]);
+    neighbours.set(target.id, [...(neighbours.get(target.id) ?? []), source.id]);
+  }
+
+  // Centred row of each end, so columns of different heights line up on their middles.
+  const rows = new Map<string, number>();
+  const place = (column: E[]) =>
+    column.forEach((end, i) => rows.set(end.id, i - (column.length - 1) / 2));
+  order.forEach(place);
+
+  let best = order;
+  let fewest = crossings(links, columnOf, rows);
+  for (let sweep = 0; sweep < SWEEPS; sweep++) {
+    const forward = sweep % 2 === 0;
+    const next = [...order];
+    for (let k = 0; k < next.length; k++) {
+      const i = forward ? k : next.length - 1 - k;
+      const placed = (id: string) => (forward ? columnOf.get(id)! < i : columnOf.get(id)! > i);
+      const weight = new Map<string, number>();
+      for (const end of next[i]) {
+        const ys = (neighbours.get(end.id) ?? []).filter(placed).map((id) => rows.get(id)!);
+        weight.set(
+          end.id,
+          ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : rows.get(end.id)!,
+        );
+      }
+      // A stable sort, so ends without placed neighbours and ties keep their order.
+      next[i] = [...next[i]].sort((x, y) => weight.get(x.id)! - weight.get(y.id)!);
+      place(next[i]);
+    }
+    order = next;
+    const count = crossings(links, columnOf, rows);
+    if (count < fewest) {
+      fewest = count;
+      best = order;
+    }
+  }
+
+  const out = new Map<string, Position>();
+  best.forEach((column, i) =>
+    column.forEach((end, j) =>
+      out.set(end.id, { x: i * COLUMN_GAP, y: (j - (column.length - 1) / 2) * ROW_GAP }),
+    ),
+  );
   return out;
 }
 
-// Workloads first, then nodes, then the outside world, in every column.
+// Pairs of edges between the same two columns whose ends are in opposite orders.
+function crossings(
+  edges: Link[],
+  columnOf: Map<string, number>,
+  rows: Map<string, number>,
+): number {
+  const spans = edges
+    .map(({ source, target }) => {
+      const [a, b] = [source.id, target.id].sort((x, y) => columnOf.get(x)! - columnOf.get(y)!);
+      return { from: columnOf.get(a)!, to: columnOf.get(b)!, ya: rows.get(a)!, yb: rows.get(b)! };
+    })
+    .filter((s) => s.from !== s.to);
+  let count = 0;
+  for (let i = 0; i < spans.length; i++) {
+    for (let j = i + 1; j < spans.length; j++) {
+      const [p, q] = [spans[i], spans[j]];
+      if (p.from !== q.from || p.to !== q.to) continue;
+      if ((p.ya - q.ya) * (p.yb - q.yb) < 0) count++;
+    }
+  }
+  return count;
+}
+
+// Workloads by namespace then name, so a namespace's workloads start together; nodes and the outside world go aside.
+export const layoutGraph = ({ nodes, edges }: FlowGraph) =>
+  layoutColumns(
+    nodes,
+    (x, y) =>
+      orderOf(x) - orderOf(y) ||
+      x.namespace.localeCompare(y.namespace) ||
+      x.name.localeCompare(y.name),
+    edges,
+    (end) => end.kind !== "workload",
+  );
+
+// Nodes, then the outside world, in the column aside.
 const orderOf = (end: FlowEnd) => (end.kind === "workload" ? 0 : end.kind === "node" ? 1 : 2);
+
+export const formatRate = (value: number) => formatUnitValue(getUnitValue(value, "bps", "", 1));

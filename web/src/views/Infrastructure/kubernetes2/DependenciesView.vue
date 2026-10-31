@@ -18,23 +18,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, shallowRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { k8sInstantQuery } from "@/services/kubernetes.queries";
-import { chartColor } from "@/utils/chartTheme";
-import { getColorPalette } from "@/utils/dashboard/colorPalette";
-import { escapeHtml } from "@/utils/html";
-import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
+import DependencyMap, { type MapEdge, type MapNode } from "./DependencyMap.vue";
 import K8sListHeader from "./K8sListHeader.vue";
 import { detailKindOf } from "./kubernetesEvents";
 import type { Series } from "./kubernetesModel";
-import { SHORT_KIND } from "./mapFill";
+import { VIEW_ICON } from "./k8sTree";
 import type { DetailsRef, K8sUrlState } from "./kubernetesUrlState";
 import type { K8sTime } from "./useKubernetesInventory";
 import {
@@ -43,6 +41,7 @@ import {
   filterFlows,
   flowQuery,
   flowWindowSeconds,
+  formatRate,
   layoutGraph,
   pairFlows,
   type FlowEdge,
@@ -184,8 +183,6 @@ const namespaceChoices = computed(() => {
   return [...names].sort((a, b) => a.localeCompare(b));
 });
 
-const formatRate = (value: number) => formatUnitValue(getUnitValue(value, "bps", "", 1));
-
 const pct = (part: number, total: number) => `${total > 0 ? Math.round((part / total) * 100) : 0}%`;
 
 function endLabel(end: FlowEnd): string {
@@ -227,97 +224,56 @@ const split = (edge: FlowEdge) =>
     unknown: pct(edge.unknown, edge.total),
   });
 
-const categoryOf = (end: FlowEnd) =>
-  end.kind === "workload"
-    ? end.namespace
-    : end.kind === "node"
-      ? t("infra.k8s2.depsNodes")
-      : t("infra.k8s2.depsExternal");
+// One chart colour per namespace; nodes and the outside world are neutral and told apart by their icons.
+const NEUTRAL = "var(--color-grey-500)";
 
-const SYMBOL = { workload: "circle", node: "roundRect", external: "diamond" } as const;
-
-const chartData = computed(() => {
-  const { nodes, edges } = graph.value;
-  const positions = layoutGraph(nodes);
-  const neutral = chartColor("--color-grey-500");
-  const line = chartColor("--color-grey-400");
-  const palette = getColorPalette();
-  const namespaces = [
-    ...new Set(nodes.filter((n) => n.end.kind === "workload").map((n) => n.end.namespace)),
-  ];
-  namespaces.sort((a, b) => a.localeCompare(b));
-  const has = (kind: FlowEnd["kind"]) => nodes.some((n) => n.end.kind === kind);
-  const special = [
-    ...(has("node") ? [t("infra.k8s2.depsNodes")] : []),
-    ...(has("external") ? [t("infra.k8s2.depsExternal")] : []),
-  ];
-  const categories = [
-    ...namespaces.map((name, i) => ({ name, itemStyle: { color: palette[i % palette.length] } })),
-    ...special.map((name) => ({ name, itemStyle: { color: neutral } })),
-  ];
-  const index = new Map(categories.map((c, i) => [c.name, i]));
-  const max = Math.max(1, ...edges.map((e) => e.total));
-  return {
-    options: {
-      animation: false,
-      tooltip: { trigger: "item", confine: true },
-      // Informational only: hiding a namespace here would not reach the counts or the edge list.
-      legend: { type: "scroll", bottom: 0, selectedMode: false },
-      series: [
-        {
-          type: "graph",
-          layout: "none",
-          roam: true,
-          top: 24,
-          bottom: 48,
-          left: 80,
-          right: 160,
-          categories,
-          emphasis: { focus: "adjacency" },
-          data: nodes.map((n) => {
-            const kind = SHORT_KIND[n.end.ownerType] ?? n.end.ownerType.toLowerCase();
-            return {
-              id: n.end.id,
-              name: endLabel(n.end),
-              ...positions.get(n.end.id),
-              category: index.get(categoryOf(n.end)),
-              symbol: SYMBOL[n.end.kind],
-              symbolSize: 16,
-              label: {
-                show: true,
-                position: "right",
-                formatter: n.end.kind === "workload" ? `{b}  ${kind}` : "{b}",
-              },
-              tooltip: {
-                formatter:
-                  `<strong>${escapeHtml(endLabel(n.end))}</strong><br/>` +
-                  `${escapeHtml(endDetail(n.end))}<br/>` +
-                  escapeHtml(t("infra.k8s2.depsEndTotal", { rate: formatRate(n.total) })),
-              },
-            };
-          }),
-          links: edges.map((e) => ({
-            id: e.id,
-            source: e.source.id,
-            target: e.target.id,
-            value: e.total,
-            symbol: ["none", e.directed ? "arrow" : "none"],
-            symbolSize: [0, 8],
-            lineStyle: {
-              color: line,
-              opacity: 0.7,
-              curveness: 0.15,
-              width: 1 + 7 * Math.sqrt(e.total / max),
-            },
-            tooltip: {
-              formatter: [edgeText(e), ...ways(e)].map(escapeHtml).join("<br/>"),
-            },
-          })),
-        },
-      ],
-    },
-  };
+const namespaceColors = computed(() => {
+  const names = [
+    ...new Set(
+      graph.value.nodes.filter((n) => n.end.kind === "workload").map((n) => n.end.namespace),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
+  return new Map(names.map((name, i) => [name, `var(--color-chart-series-${(i % 12) + 1})`]));
 });
+
+const colorOf = (end: FlowEnd) =>
+  end.kind === "workload" ? (namespaceColors.value.get(end.namespace) ?? NEUTRAL) : NEUTRAL;
+
+// A workload by its owner's kind, as the resource tree shows it.
+function iconOf(end: FlowEnd): IconName {
+  if (end.kind === "external") return "public";
+  if (end.kind === "node") return VIEW_ICON.nodes;
+  return (VIEW_ICON as Record<string, IconName>)[`${end.ownerType.toLowerCase()}s`] ?? "widgets";
+}
+
+const mapNodes = computed<MapNode[]>(() => {
+  const positions = layoutGraph(graph.value);
+  return graph.value.nodes.map(({ end, total }) => ({
+    id: end.id,
+    position: positions.get(end.id)!,
+    label: endLabel(end),
+    detail: endDetail(end),
+    title: `${fullLabel(end)}\n${endDetail(end)}`,
+    icon: iconOf(end),
+    color: colorOf(end),
+    clickable: canOpen(end),
+    total,
+  }));
+});
+
+const mapEdges = computed<MapEdge[]>(() =>
+  graph.value.edges.map((e) => ({
+    id: e.id,
+    source: e.source.id,
+    target: e.target.id,
+    directed: e.directed,
+    total: e.total,
+  })),
+);
+
+const legend = computed(() =>
+  [...namespaceColors.value].map(([label, color]) => ({ label, color })),
+);
 
 const ariaLabel = computed(() =>
   t("infra.k8s2.depsAria", { count: graph.value.edges.length }, graph.value.edges.length),
@@ -352,13 +308,9 @@ function openEnd(end: FlowEnd) {
   });
 }
 
-function onChartClick(params: any) {
-  const id = params?.data?.id;
-  if (params?.dataType === "edge") selectedEdgeId.value = id ?? null;
-  else if (params?.dataType === "node") {
-    const node = graph.value.nodes.find((n) => n.end.id === id);
-    if (node) openEnd(node.end);
-  }
+function openNode(id: string) {
+  const node = graph.value.nodes.find((n) => n.end.id === id);
+  if (node) openEnd(node.end);
 }
 
 function onSetUp() {
@@ -415,9 +367,20 @@ function showEverything() {
         :label="t('infra.k8s2.depsShowNodeTraffic')"
         data-test="k8s2-deps-show-node-traffic"
       />
-      <OText tag="span" class="text-text-secondary text-xs" data-test="k8s2-deps-caption">
-        {{ t("infra.k8s2.depsCaption", { window: windowText }) }}
-      </OText>
+      <div class="flex items-center gap-1">
+        <OText tag="span" class="text-text-secondary text-xs" data-test="k8s2-deps-caption">
+          {{ t("infra.k8s2.depsCaption", { window: windowText }) }}
+        </OText>
+        <OButton
+          variant="ghost"
+          size="icon-xs"
+          icon-left="info"
+          :aria-label="t('infra.k8s2.depsCaptionMore')"
+          data-test="k8s2-deps-caption-more"
+        >
+          <OTooltip :content="t('infra.k8s2.depsCaptionMore')" max-width="20rem" />
+        </OButton>
+      </div>
     </div>
     <OEmptyState
       v-if="!hasFlows"
@@ -469,11 +432,15 @@ function showEverything() {
         {{ t("infra.k8s2.depsCapped", { shown: graph.edges.length, total: edges.length }) }}
       </OText>
       <div class="relative flex min-h-0 flex-1 max-md:min-h-96" data-test="k8s2-deps-area">
-        <ChartRenderer
-          :data="chartData"
+        <DependencyMap
+          :nodes="mapNodes"
+          :edges="mapEdges"
+          :selected-edge-id="selectedEdgeId"
           :label="ariaLabel"
+          :legend="legend"
           data-test="k8s2-deps-chart"
-          @click="onChartClick"
+          @open="openNode"
+          @select="(id: string) => (selectedEdgeId = id)"
         />
         <!-- not-sr-only resets position to static, so this wrapper does the overlay positioning. -->
         <div class="pointer-events-none absolute start-3 top-3 bottom-3 flex flex-col items-start">

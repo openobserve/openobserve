@@ -288,17 +288,78 @@ describe("buildGraph", () => {
 });
 
 describe("layoutGraph", () => {
+  const ids = (e: End) => `prod/${e[0]}/${e[1]}/${e[2]}`;
+
   it("places ranks in columns and centres each column", () => {
     const graph = buildGraph(
       pairFlows([flow(WEB, API, "request", 10), flow(WEB, DB, "request", 10)]),
     );
-    const at = layoutGraph(graph.nodes);
-    expect(at.get("prod/frontend/Deployment/web")).toEqual({ x: 0, y: 0 });
-    const api = at.get("prod/backend/Deployment/api")!;
-    const db = at.get("prod/data/StatefulSet/postgres")!;
+    const at = layoutGraph(graph);
+    expect(at.get(ids(WEB))).toEqual({ x: 0, y: 0 });
+    const api = at.get(ids(API))!;
+    const db = at.get(ids(DB))!;
     expect(api.x).toBe(db.x);
     expect(api.x).toBeGreaterThan(0);
     expect(api.y + db.y).toBe(0);
     expect(api.y).toBeLessThan(db.y);
+  });
+
+  it("puts nodes and the outside world in a column of their own past the workloads", () => {
+    const graph = buildGraph(
+      pairFlows([
+        flow(EXTERNAL, WEB, "request", 10),
+        flow(WEB, API, "request", 10),
+        flow(API, NODE("n1"), "request", 10),
+      ]),
+    );
+    const at = layoutGraph(graph);
+    // The outside world calls web, yet it does not take the first column: web does.
+    expect(at.get(ids(WEB))!.x).toBe(0);
+    const aside = [at.get("prod/external")!, at.get("prod/node/n1")!];
+    expect(aside[0].x).toBe(aside[1].x);
+    expect(aside[0].x).toBeGreaterThan(at.get(ids(API))!.x);
+    // Nodes before the outside world in that column.
+    expect(aside[1].y).toBeLessThan(aside[0].y);
+  });
+
+  it("puts an end that only calls just left of what it calls", () => {
+    const graph = buildGraph(
+      pairFlows([
+        flow(W("shop", "loadgen"), WEB, "request", 10),
+        flow(WEB, API, "request", 10),
+        flow(W("batch", "pinger"), API, "request", 10),
+      ]),
+    );
+    const at = layoutGraph(graph);
+    expect(at.get(ids(W("batch", "pinger")))!.x).toBe(at.get(ids(WEB))!.x);
+    expect(at.get(ids(W("shop", "loadgen")))!.x).toBe(0);
+  });
+
+  // Callers a, b, c call z, y, x: by name both columns read a-c and x-z, and every edge crosses the others.
+  const crossed = () =>
+    buildGraph(
+      pairFlows(
+        [
+          ["a", "z"],
+          ["b", "y"],
+          ["c", "x"],
+          ["a", "y"],
+        ].map(([from, to]) => flow(W("shop", from), W("shop", to), "request", 10)),
+      ),
+    );
+
+  it("orders a column by its neighbours so edges do not cross", () => {
+    const at = layoutGraph(crossed());
+    const y = (name: string) => at.get(`prod/shop/Deployment/${name}`)!.y;
+    expect(y("a")).toBeLessThan(y("b"));
+    expect(y("b")).toBeLessThan(y("c"));
+    expect(y("z")).toBeLessThan(y("y"));
+    expect(y("y")).toBeLessThan(y("x"));
+  });
+
+  it("lays out the same graph the same way every time", () => {
+    const first = layoutGraph(crossed());
+    expect(layoutGraph(crossed())).toEqual(first);
+    expect(new Set([...first.values()].map((p) => `${p.x},${p.y}`)).size).toBe(first.size);
   });
 });

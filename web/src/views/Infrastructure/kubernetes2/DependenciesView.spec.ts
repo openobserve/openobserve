@@ -28,12 +28,12 @@ vi.mock("@/services/search", () => ({ default: { metrics_query: vi.fn() } }));
 const metricsQuery = vi.mocked(searchService.metrics_query);
 const push = vi.fn();
 
-const ChartStub = defineComponent({
-  name: "ChartRenderer",
-  props: ["data", "label"],
-  emits: ["click"],
+const MapStub = defineComponent({
+  name: "DependencyMap",
+  props: ["nodes", "edges", "selectedEdgeId", "label", "legend"],
+  emits: ["open", "select"],
   setup() {
-    return () => h("div", { "data-test": "chart-stub" });
+    return () => h("div", { "data-test": "map-stub" });
   },
 });
 
@@ -85,15 +85,16 @@ describe("DependenciesView", () => {
       global: {
         plugins: [i18n],
         provide: { [routerKey as symbol]: { push } },
-        stubs: { ChartRenderer: ChartStub },
+        stubs: { DependencyMap: MapStub },
       },
     });
     await flushPromises();
     return wrapper;
   };
 
-  const chart = () => wrapper.findComponent(ChartStub);
-  const series = () => chart().props("data").options.series[0];
+  const chart = () => wrapper.findComponent(MapStub);
+  const edges = () => chart().props("edges");
+  const nodes = () => chart().props("nodes");
   const testId = (id: string) => wrapper.find(`[data-test="${id}"]`);
 
   beforeEach(() => {
@@ -127,15 +128,21 @@ describe("DependenciesView", () => {
 
   it("draws one edge per pair and hides system namespaces and node-to-node traffic by default", async () => {
     await mountView();
-    expect(series().links).toHaveLength(1);
-    expect(series().links[0]).toMatchObject({
+    expect(edges()).toHaveLength(1);
+    expect(edges()[0]).toMatchObject({
       source: "prod/frontend/Deployment/web",
       target: "prod/backend/Deployment/api",
-      symbol: ["none", "arrow"],
+      directed: true,
     });
-    expect(series().data.map((n: any) => n.name)).toEqual(["web", "api"]);
-    expect(series().categories.map((c: any) => c.name)).toEqual(["backend", "frontend"]);
-    expect(series().data.map((n: any) => n.category)).toEqual([1, 0]);
+    expect(nodes().map((n: any) => n.label)).toEqual(["web", "api"]);
+    expect(nodes().map((n: any) => n.detail)).toEqual([
+      "Deployment in frontend",
+      "Deployment in backend",
+    ]);
+    const legend = chart().props("legend");
+    expect(legend.map((l: any) => l.label)).toEqual(["backend", "frontend"]);
+    expect(nodes().map((n: any) => n.color)).toEqual([legend[1].color, legend[0].color]);
+    expect(nodes()[0].position.x).toBeLessThan(nodes()[1].position.x);
     expect(chart().props("label")).toBe("Dependency map of 1 connection");
   });
 
@@ -143,12 +150,17 @@ describe("DependenciesView", () => {
     await mountView();
     await testId("k8s2-deps-show-system-btn").trigger("click");
     await testId("k8s2-deps-show-node-traffic-btn").trigger("click");
-    expect(series().links).toHaveLength(3);
+    expect(edges()).toHaveLength(3);
+    const node = nodes().find((n: any) => n.id === "prod/node/n1");
+    expect(node).toMatchObject({ label: "n1", icon: "dns", clickable: true });
+    expect(node.position.x).toBeGreaterThan(
+      nodes().find((n: any) => n.label === "coredns").position.x,
+    );
   });
 
   it("opens the workload drawer from a node click", async () => {
     await mountView();
-    chart().vm.$emit("click", { dataType: "node", data: { id: "prod/backend/Deployment/api" } });
+    chart().vm.$emit("open", "prod/backend/Deployment/api");
     expect(wrapper.emitted("open")).toEqual([
       [{ kind: "deployment", cluster: "prod", namespace: "backend", name: "api" }],
     ]);
@@ -156,9 +168,10 @@ describe("DependenciesView", () => {
 
   it("opens a details panel with the bytes each way from an edge click", async () => {
     await mountView();
-    const id = series().links[0].id;
-    chart().vm.$emit("click", { dataType: "edge", data: { id } });
+    const id = edges()[0].id;
+    chart().vm.$emit("select", id);
     await flushPromises();
+    expect(chart().props("selectedEdgeId")).toBe(id);
     const ways = wrapper.findAll('[data-test="k8s2-deps-edge-way"]').map((w) => w.text());
     expect(ways[0]).toMatch(/^web to api: approximately 2(\.0+)?\s?KB\/s$/);
     expect(ways[1]).toMatch(/^api to web: approximately 4(\.0+)?\s?KB\/s$/);
@@ -182,7 +195,7 @@ describe("DependenciesView", () => {
     metricsQuery.mockResolvedValue({ data: { data: { result } } } as any);
     await mountView({ state: parseUrlState({ view: "dependencies", namespace: "backend" }) });
     await testId("k8s2-deps-show-system-btn").trigger("click");
-    chart().vm.$emit("click", { dataType: "edge", data: { id: series().links[0].id } });
+    chart().vm.$emit("select", edges()[0].id);
     await flushPromises();
     expect(testId("k8s2-deps-edge-undirected").text()).toContain(text);
   });
@@ -194,7 +207,7 @@ describe("DependenciesView", () => {
     header.vm.$emit("clear");
     await flushPromises();
     expect(header.props("filtered")).toBe(false);
-    expect(series().links).toHaveLength(3);
+    expect(edges()).toHaveLength(3);
     expect(wrapper.emitted("update")).toEqual([[{ namespaces: [], search: "" }]]);
   });
 
@@ -204,7 +217,7 @@ describe("DependenciesView", () => {
     );
     metricsQuery.mockResolvedValue({ data: { data: { result: many } } } as any);
     await mountView();
-    expect(series().data).toHaveLength(80);
+    expect(nodes()).toHaveLength(80);
     expect(testId("k8s2-list-count").text()).toContain("79 connections");
     expect(testId("k8s2-deps-capped").text()).toContain("Showing the 79 busiest of 90 connections");
   });
@@ -273,10 +286,9 @@ describe("DependenciesView", () => {
     expect(chart().exists()).toBe(true);
   });
 
-  it("names workloads with their namespace in the keyboard list, and keeps the legend informational", async () => {
+  it("names workloads with their namespace in the keyboard list", async () => {
     await mountView();
     expect(testId("k8s2-deps-link").text()).toBe("frontend/web → backend/api");
-    expect(chart().props("data").options.legend.selectedMode).toBe(false);
   });
 
   it("lists every drawn edge for keyboard users", async () => {
