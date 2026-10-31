@@ -446,6 +446,7 @@ mod tests {
                 &TriggerCondition::default(),
                 600,
                 0,
+                false,
                 |_, _, _| false,
             );
             assert!(dispatch.inconsistent.is_empty());

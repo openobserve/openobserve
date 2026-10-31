@@ -587,6 +587,29 @@ describe("AddCondition.vue", () => {
 
       expect(wrapper.vm.$props.condition.values).toEqual(["value1", "value2"]);
     });
+
+    it("should clear emptyLiteral when the user types a value", async () => {
+      const condition = {
+        ...defaultProps.condition,
+        operator: "<>",
+        value: "",
+        emptyLiteral: true,
+      };
+
+      wrapper = createWrapper({ condition });
+      wrapper.vm.onValueInput("api");
+
+      expect(wrapper.vm.$props.condition.value).toBe("api");
+      expect(wrapper.vm.$props.condition.emptyLiteral).toBeUndefined();
+    });
+
+    it("should keep emptyLiteral when a different condition is passed in", async () => {
+      wrapper = createWrapper({ condition: { ...defaultProps.condition, value: "x" } });
+      const next = { ...defaultProps.condition, operator: "<>", value: "", emptyLiteral: true };
+      await wrapper.setProps({ condition: next });
+
+      expect(next.emptyLiteral).toBe(true);
+    });
   });
 
   describe("Edge cases", () => {

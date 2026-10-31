@@ -1097,6 +1097,29 @@ describe("useConfigPanel – flame graph sections", () => {
 });
 
 // ---------------------------------------------------------------------------
+// useConfigPanel — logs section
+// ---------------------------------------------------------------------------
+describe("useConfigPanel – logs section", () => {
+  it("shows a logs panel only its own section and general", () => {
+    const c = makeComposable(makePanelData("logs"));
+    expect(ORDERED_SECTION_IDS.filter((id) => c.isSectionVisible(id))).toEqual(["general", "logs"]);
+  });
+
+  it("keeps the panel time option for logs, which reads the dashboard time range", () => {
+    expect(
+      makeComposable(makePanelData("logs")).isConfigOptionVisible("general", "panel-default-time"),
+    ).toBe(true);
+  });
+
+  it("leaves other charts' sections as they were", () => {
+    const c = makeComposable(makePanelData("bar"));
+    expect(c.isSectionVisible("data")).toBe(true);
+    expect(c.isSectionVisible("general")).toBe(true);
+    expect(c.isSectionVisible("logs")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // useConfigPanel — layout section
 // ---------------------------------------------------------------------------
 
@@ -1694,6 +1717,21 @@ describe("useConfigPanel – node graph options", () => {
   it("shows no thresholds or series overrides on a node graph", () => {
     expect(shouldShowThresholds({ data: { type: "node-graph", config: {} } })).toBe(false);
     expect(shouldShowSeriesOverrides({ data: { type: "node-graph" } })).toBe(false);
+  });
+});
+
+describe("useConfigPanel – box plot options", () => {
+  const visible = (type: string, section: any, option: string) =>
+    makeComposable(makePanelData(type, {}), ref(false)).isConfigOptionVisible(section, option);
+
+  it("shows the whisker option on a box plot only", () => {
+    expect(visible("boxplot", "data", "boxplot-whisker")).toBe(true);
+    expect(visible("bar", "data", "boxplot-whisker")).toBe(false);
+  });
+
+  it("shows no thresholds or series overrides on a box plot", () => {
+    expect(shouldShowThresholds({ data: { type: "boxplot", config: {} } })).toBe(false);
+    expect(shouldShowSeriesOverrides({ data: { type: "boxplot" } })).toBe(false);
   });
 });
 

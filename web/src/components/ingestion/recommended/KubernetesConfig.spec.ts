@@ -84,7 +84,7 @@ describe("kubernetesCard builder", () => {
     const card = await buildCard();
     expect(card.provider.name).toBe("Kubernetes");
     expect(card.provider.metaBadges).toEqual(["Logs", "Metrics", "Events", "Traces"]);
-    expect(card.steps.map((s) => s.id)).toEqual(["install", "instrument", "verify"]);
+    expect(card.steps.map((s) => s.id)).toEqual(["install", "instrument", "network", "verify"]);
     expect(card.detect).toMatchObject({
       streamType: "logs",
       streamName: "default",
@@ -220,6 +220,21 @@ describe("kubernetesCard builder", () => {
     expect(ebpf.inputs?.every((i) => i.default === "")).toBe(true);
   });
 
+  it("offers eBPF network flows as an optional upgrade that keeps trace selectors", async () => {
+    const step = (await buildCard()).steps.find((s) => s.id === "network")!;
+    expect(step.required).toBeUndefined();
+    expect(step.code?.raw).toBe(
+      [
+        "helm repo update openobserve",
+        "helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\",
+        "  --version '>=0.8.0' --reset-then-reuse-values \\",
+        "  --set ebpf.enabled=true \\",
+        "  --set ebpf.network.enabled=true",
+      ].join("\n"),
+    );
+    expect(step.note).toContain("`127.0.0.1:8888`");
+  });
+
   it("drops the deprecated Go operator sidecar", async () => {
     const step = (await buildCard()).steps.find((s) => s.id === "instrument")!;
     const json = JSON.stringify(step);
@@ -246,6 +261,9 @@ describe("kubernetesCard builder", () => {
     expect(urls).toContain("https://github.com/open-telemetry/opentelemetry-operator");
     expect(urls).toContain(
       "https://github.com/openobserve/openobserve-helm-chart/blob/main/charts/openobserve-collector/docs/traces.md#ebpf-tracing",
+    );
+    expect(urls).toContain(
+      "https://github.com/openobserve/openobserve-helm-chart/blob/main/charts/openobserve-collector/docs/metrics.md#13-ebpf-network-flows",
     );
   });
 

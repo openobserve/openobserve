@@ -777,6 +777,44 @@ describe("CodeQueryEditor", () => {
         expect(wrapper.emitted("update:query")).toBeFalsy();
       });
 
+      it("passes whether the text is blank and was blank, counting a programmatic restore", async () => {
+        const lines = (...text: string[]) => {
+          mockModel.getLineCount.mockReturnValue(text.length);
+          mockModel.getLineContent.mockImplementation((line: number) => text[line - 1]);
+        };
+        const wrapper = await mountAndSetup();
+        mockEditorObj.setValue.mockImplementation(() => changeHandler()({ isFlush: false }));
+        lines("level='error'");
+        const editorApi = wrapper.vm as unknown as { setValue: (value: string) => void };
+        editorApi.setValue("level='error'");
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+
+        lines("  ", "");
+        changeHandler()({ isFlush: false });
+        lines("", "u");
+        changeHandler()({ isFlush: false });
+        expect(wrapper.emitted("user-edit")).toEqual([
+          [true, false],
+          [false, true],
+        ]);
+        lines("");
+      });
+
+      it("reads only up to the first non-blank line on an edit, never the whole document", async () => {
+        await mountAndSetup();
+        mockModel.getLineCount.mockReturnValue(10_000);
+        mockModel.getLineContent.mockImplementation((line: number) => (line === 1 ? "up" : "x"));
+        mockModel.getLineContent.mockClear();
+        mockModel.getValue.mockClear();
+        mockEditorObj.getValue.mockClear();
+        changeHandler()({ isFlush: false });
+        expect(mockModel.getLineContent).toHaveBeenCalledTimes(1);
+        expect(mockModel.getValue).not.toHaveBeenCalled();
+        expect(mockEditorObj.getValue).not.toHaveBeenCalled();
+        mockModel.getLineCount.mockReturnValue(1);
+        mockModel.getLineContent.mockImplementation(() => "");
+      });
+
       it("ignores a flush (a whole-model replace)", async () => {
         const wrapper = await mountAndSetup();
         changeHandler()({ isFlush: true });

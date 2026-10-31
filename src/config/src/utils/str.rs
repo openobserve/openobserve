@@ -34,9 +34,17 @@ pub static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
+pub static DOMAIN_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^([a-zA-Z0-9]+([\-\.][a-zA-Z0-9]+)*\.[a-zA-Z]{2,63})$").unwrap());
+
 /// Returns true if `email` is syntactically valid per [`EMAIL_REGEX`].
 pub fn is_valid_email(email: &str) -> bool {
     EMAIL_REGEX.is_match(email)
+}
+
+/// Returns true if `domain` is syntactically valid per [`DOMAIN_REGEX`].
+pub fn is_valid_domain(domain: &str) -> bool {
+    DOMAIN_REGEX.is_match(domain)
 }
 
 /// Characters an OpenFGA object id cannot represent. Detection

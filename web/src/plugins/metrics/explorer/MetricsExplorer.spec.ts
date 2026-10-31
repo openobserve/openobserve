@@ -1974,12 +1974,24 @@ describe("MetricsExplorer wiring", () => {
       const timeRange = { valueType: "relative", relativeTimePeriod: "6h" };
       wrapper
         .findComponent('[data-test="metrics-history"]')
-        .vm.$emit("load", { metricsData: "blob", timeRange });
-      expect(visualizeApplyPanelData).toHaveBeenCalledWith("blob", timeRange);
+        .vm.$emit("load", { metricsData: "blob", timeRange, run: true });
+      expect(visualizeApplyPanelData).toHaveBeenCalledWith("blob", timeRange, true);
       expect(analytics.track).toHaveBeenCalledWith(
         "metrics_explorer_history_loaded",
         expect.any(Object),
       );
+    });
+
+    it("passes a load-only pick through without running", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as unknown as { setMode: (mode: string) => void }).setMode("visualize");
+      await wrapper.vm.$nextTick();
+
+      const timeRange = { valueType: "relative", relativeTimePeriod: "6h" };
+      wrapper
+        .findComponent('[data-test="metrics-history"]')
+        .vm.$emit("load", { metricsData: "blob", timeRange, run: false });
+      expect(visualizeApplyPanelData).toHaveBeenCalledWith("blob", timeRange, false);
     });
 
     it("the pane's range change sets the toolbar picker", async () => {
