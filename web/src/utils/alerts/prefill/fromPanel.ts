@@ -31,7 +31,7 @@ import {
   type AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
 import { sanitizeAlertNamePart, periodMinutesFromRange, warn } from "../alertPrefill";
-import { formulaRefs, isFormulaQuery, queryRefs } from "@/utils/dashboard/promql/formula";
+import { formulaLeafRefs, isFormulaQuery, queryRefs } from "@/utils/dashboard/promql/formula";
 import { selectorMetricNames } from "@/utils/dashboard/exemplars/exemplarPlacement";
 
 /** Panel types whose shape has no meaningful row count to alert on. */
@@ -210,7 +210,7 @@ const formulaInputStreams = (
   formula: string,
   metadataQueries: any[] | undefined,
 ): AlertPrefillStreamCandidate[] => {
-  const referenced = new Set(formulaRefs(formula));
+  const referenced = formulaLeafRefs(queries, formula);
   const letters = queryRefs(queries);
   // A code-mode query's `fields.stream` is the editor's inherited pick, not what its text reads.
   const metricsOf = (query: any, i: number): string[] =>

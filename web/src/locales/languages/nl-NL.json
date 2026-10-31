@@ -1247,7 +1247,6 @@
       "moreExamples": "Voor meer voorbeelden,",
       "clickHere": "klik hier"
     },
-    "legendLabel": "Legenda",
     "switchToLogs": "Schakel terug naar Logs",
     "savedViewsLabel": "Opgeslagen weergaven",
     "savedViewsNotFound": "Opgeslagen weergave niet gevonden!",
@@ -6806,7 +6805,9 @@
     "formulaNumber": "Formule {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} is geen query in dit paneel",
-    "formulaReferencesFormula": "{letter} is een formule, en een formule mag niet naar een andere formule verwijzen",
+    "formulaCycle": "Formules verwijzen in een lus naar elkaar: {cycle}",
+    "formulaTooLong": "De formule wordt uitgebreid tot meer dan {limit} tekens",
+    "formulaTooDeep": "Formules zijn meer dan {limit} niveaus diep genest",
     "formulaInputNote": "Gebruikt in een formule: daar gelden de instelling voor instant/bereik, de legenda, de stap en de tijdsverschuiving van deze query niet.",
     "multiSqlQueryLabel": "Query-label",
     "multiSqlQueryLabelHint": "Aangepaste naam voor deze zoekopdracht in legenda's (bijvoorbeeld 'Productie')",
@@ -9019,7 +9020,6 @@
     "hostmapValue": "Waarde",
     "hostmapGroupBy": "Groeperen op",
     "otherColumn": "Andere kolommen",
-    "metric": "Metriek",
     "filters": "Filters",
     "labelFilters": "Filters voor etiketten",
     "operations": "Operaties",
@@ -13297,21 +13297,6 @@
     "awsStsSelfHostedInfo": "Dit maakt gebruik van AWS sts om de rol op zich te nemen en operaties uit te voeren. Zorg ervoor dat u aws-inloggegevens hebt geconfigureerd in de installatie-env die toegang hebben tot deze rol."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "Voor instant vector selectors, gebruik",
-      "rangeVector": "Voor range vector selectors, gebruik",
-      "aggregate": "Om gegevens te aggregeren, gebruik",
-      "or": "of",
-      "rate": "Voor snelheidsberekeningen over een range vector, gebruik",
-      "sqlTitle": "Syntaxisgids: SQL-modus",
-      "sqlFullText": "Voor volledige tekstzoekopdracht van waarde 'error' gebruik",
-      "sqlColumn": "Voor kolomzoekopdracht van waarde 'error' gebruik",
-      "sqlCode": "Om waarde 200 te zoeken voor codekolom gebruik",
-      "sqlStream": "Om waarde 'stderr' te zoeken voor streamkolom gebruik",
-      "sqlFunction": "Om te zoeken en queryfunctie {fn} te gebruiken op kolom log, gebruik",
-      "sqlMoreExamples": "Voor extra voorbeelden,",
-      "sqlClickHere": "klik hier"
-    },
     "add": "Toevoegen",
     "runQuery": "Query uitvoeren",
     "runQueryOptions": "Opties voor query uitvoeren",
@@ -13596,10 +13581,6 @@
         "clear": "Weergave wissen"
       }
     },
-    "index": {
-      "namePanelRequired": "Naam van paneel is vereist",
-      "errorsFixTryAgain": "Er zijn fouten, los ze op en probeer opnieuw"
-    },
     "metricCard": {
       "lastRefreshed": "Laatst vernieuwd:",
       "traceId": "Trace-ID: {id}",
@@ -13610,25 +13591,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Diagram weergeven mislukt"
-    },
-    "queryBuilder": {
-      "title": "PromQL Query Bouwer",
-      "subtitle": "Bouw en test PromQL queries visueel",
-      "generatedQuery": "Gegenereerde PromQL Query:",
-      "noQueryBuilt": "Nog geen query gebouwd",
-      "copyQuery": "Query kopiëren",
-      "clearAll": "Alles wissen",
-      "testQuery": "Test query",
-      "queryResultPreview": "Query resultaat voorbeeld:",
-      "queryCopied": "Query gekopieerd naar klembord!",
-      "queryCleared": "Query gewist",
-      "testingSoon": "Query testen wordt binnenkort geïmplementeerd",
-      "executionSoon": "Query uitvoering wordt in de volgende fase geïmplementeerd"
-    },
-    "metricSelector": {
-      "metricName": "Metriek naam",
-      "loadingMetrics": "Metrieken laden...",
-      "noMetricsFound": "Geen metrieken gevonden"
     },
     "labelFilterEditor": {
       "label": "Label",

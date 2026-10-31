@@ -1247,7 +1247,6 @@
       "moreExamples": "Để xem thêm các ví dụ,",
       "clickHere": "bấm vào đây"
     },
-    "legendLabel": "Chú thích",
     "switchToLogs": "Quay lại Nhật ký",
     "savedViewsLabel": "Chế độ xem đã lưu",
     "savedViewsNotFound": "Không tìm thấy chế độ xem đã lưu!",
@@ -6806,7 +6805,9 @@
     "formulaNumber": "Công thức {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} không phải là một truy vấn trong panel này",
-    "formulaReferencesFormula": "{letter} là một công thức, và công thức không được tham chiếu đến công thức khác",
+    "formulaCycle": "Các công thức tham chiếu lẫn nhau thành vòng lặp: {cycle}",
+    "formulaTooLong": "Công thức sau khi mở rộng dài hơn {limit} ký tự",
+    "formulaTooDeep": "Các công thức lồng nhau sâu hơn {limit} cấp",
     "formulaInputNote": "Được dùng trong công thức: ở đó, cài đặt tức thời/khoảng, chú giải, bước và dịch chuyển thời gian của truy vấn này không được áp dụng.",
     "multiSqlQueryLabel": "Nhãn truy vấn",
     "multiSqlQueryLabelHint": "Tên tùy chỉnh cho truy vấn này trong chú thích (ví dụ: 'Production')",
@@ -9019,7 +9020,6 @@
     "hostmapValue": "Giá trị",
     "hostmapGroupBy": "Nhóm theo",
     "otherColumn": "Các cột khác",
-    "metric": "Chỉ số",
     "filters": "Bộ lọc",
     "labelFilters": "Bộ lọc nhãn",
     "operations": "Thao tác",
@@ -13297,21 +13297,6 @@
     "awsStsSelfHostedInfo": "Tính năng này sử dụng AWS sts để đảm nhận vai trò và thực hiện các thao tác. Đảm bảo bạn đã cấu hình thông tin xác thực aws trong môi trường cài đặt có quyền truy cập vào vai trò này."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "Đối với bộ chọn vector tức thời, sử dụng",
-      "rangeVector": "Đối với bộ chọn vector phạm vi, sử dụng",
-      "aggregate": "Để tổng hợp dữ liệu, sử dụng",
-      "or": "hoặc",
-      "rate": "Để tính toán tỷ lệ trên một vector phạm vi, sử dụng",
-      "sqlTitle": "Hướng dẫn Cú pháp: Chế độ SQL",
-      "sqlFullText": "Để tìm kiếm toàn văn giá trị 'error', sử dụng",
-      "sqlColumn": "Để tìm kiếm theo cột giá trị 'error', sử dụng",
-      "sqlCode": "Để tìm kiếm giá trị 200 cho cột code, sử dụng",
-      "sqlStream": "Để tìm kiếm giá trị 'stderr' cho cột stream, sử dụng",
-      "sqlFunction": "Để tìm kiếm và sử dụng hàm truy vấn {fn} trên cột log, sử dụng",
-      "sqlMoreExamples": "Để biết thêm ví dụ,",
-      "sqlClickHere": "bấm vào đây"
-    },
     "add": "Thêm",
     "runQuery": "Chạy truy vấn",
     "runQueryOptions": "Tùy chọn chạy truy vấn",
@@ -13596,10 +13581,6 @@
         "clear": "Bỏ chế độ xem"
       }
     },
-    "index": {
-      "namePanelRequired": "Tên panel là bắt buộc",
-      "errorsFixTryAgain": "Có một số lỗi, vui lòng sửa chúng và thử lại"
-    },
     "metricCard": {
       "lastRefreshed": "Làm mới lần cuối:",
       "traceId": "Trace ID: {id}",
@@ -13610,25 +13591,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Không thể hiển thị biểu đồ"
-    },
-    "queryBuilder": {
-      "title": "Trình xây dựng truy vấn PromQL",
-      "subtitle": "Xây dựng và kiểm tra truy vấn PromQL trực quan",
-      "generatedQuery": "Truy vấn PromQL đã tạo:",
-      "noQueryBuilt": "Chưa có truy vấn nào được xây dựng",
-      "copyQuery": "Sao chép truy vấn",
-      "clearAll": "Xóa tất cả",
-      "testQuery": "Kiểm tra truy vấn",
-      "queryResultPreview": "Xem trước kết quả truy vấn:",
-      "queryCopied": "Đã sao chép truy vấn vào bảng tạm!",
-      "queryCleared": "Đã xóa truy vấn",
-      "testingSoon": "Tính năng kiểm tra truy vấn sẽ sớm được triển khai",
-      "executionSoon": "Việc thực thi truy vấn sẽ được triển khai trong giai đoạn tiếp theo"
-    },
-    "metricSelector": {
-      "metricName": "Tên chỉ số",
-      "loadingMetrics": "Đang tải chỉ số...",
-      "noMetricsFound": "Không tìm thấy chỉ số"
     },
     "labelFilterEditor": {
       "label": "Nhãn",

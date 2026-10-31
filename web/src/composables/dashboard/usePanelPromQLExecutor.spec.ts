@@ -407,7 +407,7 @@ describe("the heatmap column cap", () => {
    * The start/end `usePanelDataLoader` passes here are MICROSECONDS, not ms. They
    * come from `meta.dateTime`, whose Dates are built straight off
    * `getConsumableDateTime()` — which is in µs — with no conversion
-   * (`plugins/metrics/Index.vue:419-428`, `views/Dashboards/ViewDashboard.vue`).
+   * (`plugins/metrics/explorer/MetricsVisualize.vue`, `views/Dashboards/ViewDashboard.vue`).
    * `usePanelVariableSubstitution` reads the same pair and divides by 1e6.
    *
    * A previous revision of the cap divided by 1000, so every range looked 1000x
@@ -919,6 +919,30 @@ describe("formulas and hidden queries", () => {
     ]);
 
     expect(payloads.map((p: any) => p.queryReq.query)).toEqual(["(b) * 2"]);
+  });
+
+  it("inlines a hidden formula into the formula that references it", async () => {
+    const { payloads } = await run([
+      { query: "x", config: { ref: "A", hide: true, query_type: "instant", step_value: "1m" } },
+      { query: "", config: { formula: "A * 2", hide: true, time_shift: [{ offSet: "1d" }] } },
+      { query: "", config: { formula: "F1 + A" } },
+    ]);
+
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0].queryReq.query).toBe("((x) * 2) + (x)");
+    expect(payloads[0].queryReq.query_type).toBe("range");
+    expect(payloads[0].queryReq.step).toBe("0");
+  });
+
+  it("sends neither formula of a cycle and reports it", async () => {
+    const { payloads, state } = await run([
+      { query: "x", config: { ref: "A" } },
+      { query: "", config: { formula: "F2 + A" } },
+      { query: "", config: { formula: "F1" } },
+    ]);
+
+    expect(payloads.map((p: any) => p.queryReq.query)).toEqual(["x"]);
+    expect(state.errorDetail.message).toBe("Formulas refer to each other in a loop: F1 → F2 → F1");
   });
 
   it("does not time-shift a hidden query", async () => {
