@@ -751,6 +751,7 @@ import {
   type ResolveContext,
 } from "@/composables/useLogs/permalinkResolve";
 import {
+  endLogsArrival,
   parseSharedPage,
   resetShownSearch,
   sharedPage,
@@ -1596,6 +1597,7 @@ export default defineComponent({
             if (RE_APPLY_QUERY_TYPES.includes(arrivalType)) {
               await applyReAppliedQuery();
               if (landing?.run) runQueryFn();
+              else endLogsArrival();
             } else {
               searchObj.loading = true;
               loadLogsData("landing", { origin: currentInitOrigin() ?? undefined });

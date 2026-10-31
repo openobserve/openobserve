@@ -264,6 +264,11 @@ export function urlWriteMode(
     : "push";
 }
 
+/** Called when the Logs landing runs no search, so the user's first deliberate search keeps its own history entry. */
+export function endLogsArrival(): void {
+  arrivalPending = false;
+}
+
 export function writeLogsUrl(mode: LogsUrlMode, query: LocationQueryRaw): Promise<unknown> {
   const router = boundRouter;
   if (!router) return Promise.resolve();
