@@ -535,10 +535,15 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     // Page should load without crash
     await pm.metricsPage.expectMetricsPageVisible();
 
-    // Page should be functional
     await pm.metricsPage.expectApplyButtonVisible();
 
-    testLogger.info('Deep-link without stream validated — no crash');
+    // The link names no stream, so the translator takes it from the metric the query selects.
+    await expect
+      .poll(async () => (await pm.metricsPage.decodeMetricsBlob())?.data?.queries?.[0]?.fields?.stream)
+      .toBe(promqlQuery);
+    expect((await pm.metricsPage.decodeMetricsBlob())?.data?.queries?.[0]?.query).toBe(promqlQuery);
+
+    testLogger.info('Deep-link without stream validated — stream inferred from the query');
   });
 
   // ─── P2: Share URL Freezes Time to Absolute from/to ────────────────────────

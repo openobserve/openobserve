@@ -259,11 +259,11 @@ export class MetricsExplorerPage {
         );
     }
 
-    /** Visualize writes a blob for its default query on mount, so wait for the one whose query carries `text`. */
-    async waitForBlobQueryToContain(text, timeout = 20000) {
+    /** Visualize writes a blob for its default query on mount, so wait for the one whose query is exactly `query`. */
+    async waitForBlobQuery(query, timeout = 20000) {
         await expect
             .poll(() => this.decodeMetricsBlob()?.data?.queries?.[0]?.query ?? '', { timeout })
-            .toContain(text);
+            .toBe(query);
     }
 
     /**

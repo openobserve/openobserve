@@ -34,6 +34,8 @@ const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
 /** A metric the ingestion helper always seeds — safe to query and to drill into. */
 const SEEDED_METRIC = 'cpu_usage';
+// Typed, never generated: the mount-time auto-seed can select SEEDED_METRIC too, but never this expression.
+const TYPED_QUERY = `sum by (job)(rate(${SEEDED_METRIC}[5m]))`;
 
 test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -149,13 +151,13 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
     await pm.metricsExplorerPage.gotoExplorer({ mode: 'visualize' });
     await pm.metricsExplorerPage.waitForVisualizeReady();
 
-    await pm.metricsExplorerPage.enterVisualizeQuery(SEEDED_METRIC);
-    await pm.metricsExplorerPage.waitForBlobQueryToContain(SEEDED_METRIC);
+    await pm.metricsExplorerPage.enterVisualizeQuery(TYPED_QUERY);
+    await pm.metricsExplorerPage.waitForBlobQuery(TYPED_QUERY);
 
     const blob = pm.metricsExplorerPage.decodeMetricsBlob();
     expect(blob).not.toBeNull();
     expect(blob.v).toBe(1);
-    expect(JSON.stringify(blob.data)).toContain(SEEDED_METRIC);
+    expect(blob.data.queries[0].query).toBe(TYPED_QUERY);
 
     testLogger.info('metrics_data blob written to the URL with the built query');
   });
@@ -242,8 +244,8 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
     // one. This is the whole bug: what the app writes must be what it can read.
     await pm.metricsExplorerPage.gotoExplorer({ mode: 'visualize' });
     await pm.metricsExplorerPage.waitForVisualizeReady();
-    await pm.metricsExplorerPage.enterVisualizeQuery(SEEDED_METRIC);
-    await pm.metricsExplorerPage.waitForBlobQueryToContain(SEEDED_METRIC);
+    await pm.metricsExplorerPage.enterVisualizeQuery(TYPED_QUERY);
+    await pm.metricsExplorerPage.waitForBlobQuery(TYPED_QUERY);
 
     const sharedUrl = page.url();
     testLogger.info(`Captured shared URL of length ${sharedUrl.length}`);
@@ -254,7 +256,7 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
     await pm.metricsExplorerPage.expectOnExplorerRoute();
     await pm.metricsExplorerPage.expectModeActive('visualize');
     await pm.metricsExplorerPage.waitForVisualizeReady();
-    await pm.metricsExplorerPage.expectVisualizeQueryToContain(SEEDED_METRIC);
+    await pm.metricsExplorerPage.expectVisualizeQueryToContain(TYPED_QUERY);
 
     testLogger.info('Shared URL rehydrated the chart with its original query');
   });

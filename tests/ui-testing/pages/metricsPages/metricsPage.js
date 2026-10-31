@@ -243,11 +243,9 @@ export class MetricsPage {
         await this.page.locator(this.applyButton).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     }
 
+    /** Any explorer mode: switching org drops `mode=visualize` and lands on the grid. */
     async metricsPageValidation() {
-
-        await expect(this.metricsPageIndicator).toBeVisible();
-
-
+        await expect(this.page.locator('[data-test="metrics-explorer"]')).toBeVisible();
     }
 
 
@@ -690,6 +688,36 @@ export class MetricsPage {
         const hasSqlMode = await this.isInSQLMode();
         // If not in SQL mode, assume PromQL mode (default)
         return !hasSqlMode || await promqlIndicator.isVisible().catch(() => false);
+    }
+
+    /** Runs `query` and reads its own range response, so a stale chart cannot answer: series seen, and the most at any one step. */
+    async executeQueryAndCountSeries(query) {
+        const response = this.page.waitForResponse(
+            (r) => r.url().includes('/prometheus/api/v1/query_range') && new URL(r.url()).searchParams.get('query') === query,
+            { timeout: 30000 }
+        );
+        await this.enterMetricsQuery(query);
+        await this.clickApplyButton();
+        const body = await (await response).text();
+        const series = new Set();
+        const points = new Set();
+        for (const line of body.split('\n')) {
+            if (!line.startsWith('data: {')) continue;
+            const result = JSON.parse(line.slice(6))?.data?.result;
+            if (!Array.isArray(result)) continue;
+            for (const s of result) {
+                const key = JSON.stringify(s.metric);
+                series.add(key);
+                for (const [ts] of s.values ?? []) points.add(`${ts}|${key}`);
+            }
+        }
+        const perStep = new Map();
+        for (const point of points) {
+            const ts = point.split('|')[0];
+            perStep.set(ts, (perStep.get(ts) ?? 0) + 1);
+        }
+        await this.waitForMetricsResults({ strict: true });
+        return { series: series.size, maxPerStep: Math.max(0, ...perStep.values()) };
     }
 
     async executeQuery(query) {
