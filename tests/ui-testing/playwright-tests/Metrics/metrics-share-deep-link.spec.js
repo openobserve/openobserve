@@ -516,7 +516,7 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
 
   // ─── P2: Deep-Link Without Stream ──────────────────────────────────────────
 
-  test("Deep-link without stream — query populated, no stream selected", {
+  test("Deep-link without stream — query populated, stream taken from the query", {
     tag: ['@metrics-share-deep-link', '@P2', '@deeplink', '@edge-case', '@all']
   }, async ({ page }, testInfo) => {
     const pm = await setupTest(page, testInfo);
