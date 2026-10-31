@@ -417,21 +417,25 @@ const useRoutes = () => {
         titleKey: "menu.metrics",
         allowOnEmptyData: true,
       },
-      async beforeEnter(to: any, from: any, next: any) {
+      beforeEnter(to: any, from: any, next: any) {
         const overrides = hasMetricsOverrideParams(to.query);
-        if (overrides || (hasMetricsEditorParams(to.query) && to.query.mode !== "visualize")) {
-          // Loaded on demand: the translation needs the panel defaults, which pull in the store.
-          const query = overrides
-            ? (await import("@/composables/metrics/metricsUrlState")).legacyLinkToVisualizeQuery(
-                to.query,
-              )
-            : { ...to.query, mode: "visualize" };
-          routeGuard(to, from, () =>
-            next({ name: "metrics", query, hash: to.hash, replace: true }),
-          );
-          return;
+        if (!overrides && !(hasMetricsEditorParams(to.query) && to.query.mode !== "visualize")) {
+          return routeGuard(to, from, next);
         }
-        routeGuard(to, from, next);
+        let translated: Promise<void> | undefined;
+        // routeGuard reads the store through inject(), which only works before the guard's first await.
+        routeGuard(to, from, (redirect?: any) => {
+          if (redirect !== undefined) return next(redirect);
+          // Loaded on demand: the translation needs the panel defaults, which pull in the store.
+          translated = (
+            overrides
+              ? import("@/composables/metrics/metricsUrlState").then((m) =>
+                  m.legacyLinkToVisualizeQuery(to.query),
+                )
+              : Promise.resolve({ ...to.query, mode: "visualize" })
+          ).then((query) => next({ name: "metrics", query, hash: to.hash, replace: true }));
+        });
+        return translated;
       },
     },
     ...["metrics/editor", "promql-builder"].map((path) => ({

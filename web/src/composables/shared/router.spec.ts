@@ -708,6 +708,44 @@ describe("useRoutes (router.ts)", () => {
       },
     );
 
+    // routeGuard's useStore() is inject(), which returns undefined once the guard has awaited.
+    it.each([
+      [{ org_identifier: "o", query: "dXA=", query_type: "promql" }],
+      [{ metrics_data: "abc" }],
+    ])("runs routeGuard before any await for a legacy link %o", async (query) => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      let injectable = true;
+      vi.mocked(routeGuard).mockImplementationOnce((_to: any, _from: any, next: any) => {
+        if (!injectable)
+          throw new TypeError("Cannot read properties of undefined (reading 'state')");
+        next();
+      });
+      const metricsRoute = findRoute(useRoutes().homeChildRoutes, "metrics");
+      const next = vi.fn();
+
+      const done = metricsRoute.beforeEnter({ query, hash: "" }, {}, next);
+      injectable = false;
+      await done;
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "metrics", replace: true }),
+      );
+    });
+
+    it("passes routeGuard's own redirect through instead of the Visualize link", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      vi.mocked(routeGuard).mockImplementationOnce((_to: any, _from: any, next: any) =>
+        next({ name: "plans" }),
+      );
+      const metricsRoute = findRoute(useRoutes().homeChildRoutes, "metrics");
+      const next = vi.fn();
+
+      await metricsRoute.beforeEnter({ query: { query: "dXA=" }, hash: "" }, {}, next);
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(next).toHaveBeenCalledWith({ name: "plans" });
+    });
+
     it("keeps a mode=visualize link in the explorer — no redirect", () => {
       // The explorer's in-page Visualize owns metrics_data and rehydrates it
       // itself; redirecting would kick the user out on every refresh.
