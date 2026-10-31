@@ -234,7 +234,7 @@
 
   /* ToggleGroup */
   --color-toggle-item-hover-bg: var(--color-primary-950);
-  --color-toggle-item-active-bg: var(--color-primary-900);
+  --color-toggle-item-active-bg: var(--color-grey-600);
   --color-toggle-item-active-text: var(--color-white);
   /* Accent lightens on dark so the insertion line stays visible on the track */
   --color-toggle-drop-indicator: var(--color-primary-400);

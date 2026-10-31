@@ -141,9 +141,9 @@
   /* ToggleGroup */
   --color-toggle-track-bg: var(--color-surface-subtle);
   --color-toggle-item-bg: transparent;
-  --color-toggle-item-text: var(--color-text-heading);
+  --color-toggle-item-text: var(--color-text-secondary);
   --color-toggle-item-hover-bg: var(--color-primary-50);
-  --color-toggle-item-active-bg: var(--color-surface-accent-active);
+  --color-toggle-item-active-bg: var(--color-surface-base);
   --color-toggle-item-active-text: var(--color-primary-700);
   --color-toggle-item-disabled: var(--color-text-disabled);
   --color-toggle-border: var(--color-border-default);

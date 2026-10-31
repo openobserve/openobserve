@@ -151,7 +151,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
         // Active fill: normally painted per-item. When the group animates the
         // selection (opt-in), a single sliding indicator paints the fill instead,
         // so suppress the per-item background and just keep the active text colour.
-        !isAnimated && 'data-[state=on]:bg-toggle-item-active-bg',
+        !isAnimated && 'data-[state=on]:bg-toggle-item-active-bg data-[state=on]:shadow-xs',
         'data-[state=on]:text-toggle-item-active-text',
         // Sit above the sliding indicator so the icon/label stay readable.
         isAnimated && 'relative z-10',
