@@ -65,14 +65,13 @@ const emit = defineEmits<{
   refresh: [];
 }>();
 
-const MAX_EDGE_LINKS = 50;
-
 const { t } = useI18nTyped();
 const router = useRouter();
 
 const series = shallowRef<Series[]>([]);
 const loading = ref(false);
 const loadError = ref(false);
+const forbidden = ref(false);
 const loaded = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
 const showSystem = ref(false);
@@ -84,16 +83,25 @@ const hasFlows = computed(() => props.hasStream(FLOW_STREAM));
 const windowS = computed(() => flowWindowSeconds(props.range.start, props.range.end));
 
 let generation = 0;
+// The org and cluster the drawn graph belongs to; another one's graph must not stay clickable.
+let loadedFor: string | null = null;
 
 async function load() {
   const gen = ++generation;
-  if (!hasFlows.value) {
+  const scopeKey = JSON.stringify([props.orgId, props.cluster]);
+  if (scopeKey !== loadedFor) {
     series.value = [];
+    loaded.value = false;
+    selectedEdgeId.value = null;
+    loadedFor = null;
+  }
+  if (!hasFlows.value) {
     loading.value = false;
     return;
   }
   loading.value = true;
   loadError.value = false;
+  forbidden.value = false;
   try {
     const text = flowQuery(props.cluster, windowS.value);
     const out = await queryClient.fetchQuery(
@@ -102,9 +110,12 @@ async function load() {
     if (gen !== generation) return;
     series.value = out;
     loaded.value = true;
+    loadedFor = scopeKey;
     lastUpdatedAt.value = Date.now();
-  } catch {
-    if (gen === generation) loadError.value = true;
+  } catch (e: any) {
+    if (gen !== generation) return;
+    loadError.value = true;
+    forbidden.value = (e?.response?.status ?? e?.status) === 403;
   } finally {
     if (gen === generation) loading.value = false;
   }
@@ -153,9 +164,16 @@ const selectedEdge = computed(
   () => graph.value.edges.find((e) => e.id === selectedEdgeId.value) ?? null,
 );
 
-const navEdges = computed(() =>
-  [...graph.value.edges].sort((a, b) => b.total - a.total).slice(0, MAX_EDGE_LINKS),
-);
+const navEdges = computed(() => [...graph.value.edges].sort((a, b) => b.total - a.total));
+
+// Flows can name namespaces the inventory has not seen, so the filter offers both.
+const namespaceChoices = computed(() => {
+  const names = new Set(props.namespaceOptions);
+  for (const e of allEdges.value) {
+    for (const end of [e.source, e.target]) if (end.namespace) names.add(end.namespace);
+  }
+  return [...names].sort((a, b) => a.localeCompare(b));
+});
 
 const formatRate = (value: number) => formatUnitValue(getUnitValue(value, "bps", "", 1));
 
@@ -353,7 +371,7 @@ function showEverything() {
       :count-label="t('infra.k8s2.depsCount', { count: graph.edges.length }, graph.edges.length)"
       :filtered="switchesHide"
       namespaced
-      :namespace-options="namespaceOptions"
+      :namespace-options="namespaceChoices"
       :namespaces="state.namespaces"
       :search="state.search"
       :search-placeholder="t('infra.k8s2.depsSearch')"
@@ -396,6 +414,7 @@ function showEverything() {
       data-test="k8s2-deps-no-stream"
       @action="onSetUp"
     />
+    <OEmptyState v-else-if="forbidden" preset="no-access" data-test="k8s2-deps-forbidden" />
     <OEmptyState
       v-else-if="loadError"
       preset="load-error"

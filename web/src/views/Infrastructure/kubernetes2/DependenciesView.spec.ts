@@ -112,6 +112,14 @@ describe("DependenciesView", () => {
     expect(testId("k8s2-deps-caption").text()).toContain("1h");
   });
 
+  it.each([
+    [1, "over 5m"],
+    [7 * 24 * 60, "over 1d"],
+  ])("states the rate window actually used for a %s minute range", async (minutes, text) => {
+    await mountView({ range: { start: END - minutes * MIN_US, end: END, relative: true } });
+    expect(testId("k8s2-deps-caption").text()).toContain(text);
+  });
+
   it("names a window that is not a whole number of hours in minutes", async () => {
     await mountView({ range: { start: END - 90 * MIN_US, end: END, relative: true } });
     expect(testId("k8s2-deps-caption").text()).toContain("over 90m");
@@ -224,6 +232,46 @@ describe("DependenciesView", () => {
     metricsQuery.mockRejectedValue(new Error("boom"));
     await mountView();
     expect(testId("k8s2-deps-error").exists()).toBe(true);
+  });
+
+  it("shows no access on a 403, as the map does", async () => {
+    metricsQuery.mockRejectedValue(Object.assign(new Error("no"), { response: { status: 403 } }));
+    await mountView();
+    expect(testId("k8s2-deps-forbidden").exists()).toBe(true);
+    expect(testId("k8s2-deps-error").exists()).toBe(false);
+  });
+
+  it("drops the old cluster's graph while the new cluster's flows load", async () => {
+    await mountView();
+    let resolve!: (value: unknown) => void;
+    metricsQuery.mockReturnValue(new Promise((r) => (resolve = r)) as any);
+    await wrapper.setProps({ cluster: "stage" });
+    await flushPromises();
+    expect(testId("k8s2-deps-loading").exists()).toBe(true);
+    expect(chart().exists()).toBe(false);
+    resolve({ data: { data: { result: FLOWS } } });
+    await flushPromises();
+    expect(chart().exists()).toBe(true);
+  });
+
+  it("lists every drawn edge for keyboard users", async () => {
+    const many = Array.from({ length: 60 }, (_, i) =>
+      row(["shop", "Deployment", `w${i}`], API, "request", 100),
+    );
+    metricsQuery.mockResolvedValue({ data: { data: { result: many } } } as any);
+    await mountView();
+    expect(wrapper.findAll('[data-test="k8s2-deps-link"]')).toHaveLength(60);
+  });
+
+  it("offers the namespaces seen in flows beside the inventory's", async () => {
+    await mountView({ namespaceOptions: ["shop"] });
+    const header = wrapper.findComponent({ name: "K8sListHeader" });
+    expect(header.props("namespaceOptions")).toEqual([
+      "backend",
+      "frontend",
+      "kube-system",
+      "shop",
+    ]);
   });
 
   it("refetches on a refresh", async () => {

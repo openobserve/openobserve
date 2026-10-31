@@ -177,6 +177,7 @@ describe("filterFlows", () => {
     flow(NODE("n1"), NODE("n2"), "unknown", 10),
     flow(NODE("n1"), API, "request", 10),
     flow(API, EXTERNAL, "request", 10),
+    flow(W("kube-system", "coredns"), W("openobserve-collector", "gateway"), "request", 10),
   ]);
   const pairs = (filter: Partial<FlowFilter>) =>
     filterFlows(edges, { ...ALL, ...filter }).map((e) => names(e).join(">"));
@@ -190,8 +191,11 @@ describe("filterFlows", () => {
     ]);
   });
 
-  it("keeps a system namespace that the namespace filter picks", () => {
-    expect(pairs({ showSystem: false, namespaces: ["kube-system"] })).toEqual(["api>coredns"]);
+  it("keeps the edges of a system namespace that the namespace filter picks", () => {
+    expect(pairs({ showSystem: false, namespaces: ["kube-system"] })).toEqual([
+      "api>coredns",
+      "coredns>gateway",
+    ]);
   });
 
   it("keeps the edges that touch a picked namespace, with their other ends", () => {
@@ -222,6 +226,18 @@ describe("buildGraph", () => {
     expect(graph.totalNodes).toBe(5);
     expect(graph.nodes.map((n) => n.end.name).sort()).toEqual(["api", "loadgen", "web"]);
     expect(graph.edges.map((e) => names(e).join(">"))).toEqual(["loadgen>web", "web>api"]);
+  });
+
+  it("draws the busiest edges whole rather than one end of many", () => {
+    const disjoint = pairFlows(
+      Array.from({ length: 80 }, (_, i) =>
+        flow(W("a", `client-${i}`), W("b", `server-${i}`), "request", 10),
+      ),
+    );
+    const graph = buildGraph(disjoint, 80);
+    expect(graph.edges).toHaveLength(40);
+    expect(graph.nodes).toHaveLength(80);
+    expect(graph.totalNodes).toBe(160);
   });
 
   it("survives a cycle", () => {

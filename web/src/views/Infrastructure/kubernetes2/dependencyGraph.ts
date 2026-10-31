@@ -229,28 +229,27 @@ export function pairFlows(series: Series[]): FlowEdge[] {
   });
 }
 
-// A system namespace picked in the namespace filter is shown even with system namespaces hidden.
+// An edge touching a namespace picked in the namespace filter is shown even with system namespaces hidden.
 export function filterFlows(edges: FlowEdge[], filter: FlowFilter): FlowEdge[] {
   const selected = new Set(filter.namespaces);
   const needle = filter.search.trim().toLowerCase();
-  const hidden = (end: FlowEnd) =>
-    !filter.showSystem && SYSTEM_NAMESPACES.has(end.namespace) && !selected.has(end.namespace);
+  const picked = (e: FlowEdge) =>
+    selected.has(e.source.namespace) || selected.has(e.target.namespace);
+  const system = (end: FlowEnd) => SYSTEM_NAMESPACES.has(end.namespace);
   const matches = (end: FlowEnd) =>
     end.name.toLowerCase().includes(needle) || end.namespace.toLowerCase().includes(needle);
   return edges.filter((e) => {
-    if (hidden(e.source) || hidden(e.target)) return false;
+    if (!filter.showSystem && (system(e.source) || system(e.target)) && !picked(e)) return false;
     // Node to node bytes are mostly pod traffic between nodes, already drawn between the pods' workloads.
     if (!filter.showNodeTraffic && e.source.kind === "node" && e.target.kind === "node") {
       return false;
     }
-    if (selected.size && !selected.has(e.source.namespace) && !selected.has(e.target.namespace)) {
-      return false;
-    }
+    if (selected.size && !picked(e)) return false;
     return !needle || matches(e.source) || matches(e.target);
   });
 }
 
-// Keeps the busiest ends and the edges between them, ranked so each caller sits left of what it calls.
+// Takes the busiest edges while their ends fit under the limit, ranked so each caller sits left of what it calls.
 export function buildGraph(edges: FlowEdge[], limit = MAX_GRAPH_NODES): FlowGraph {
   const totals = new Map<string, { end: FlowEnd; total: number }>();
   for (const e of edges) {
@@ -260,17 +259,20 @@ export function buildGraph(edges: FlowEdge[], limit = MAX_GRAPH_NODES): FlowGrap
       totals.set(end.id, entry);
     }
   }
-  const kept = new Set(
-    [...totals.values()]
-      .sort((x, y) => y.total - x.total || x.end.id.localeCompare(y.end.id))
-      .slice(0, limit)
-      .map((n) => n.end.id),
-  );
-  const keptEdges = edges.filter((e) => kept.has(e.source.id) && kept.has(e.target.id));
-  const linked = new Set(keptEdges.flatMap((e) => [e.source.id, e.target.id]));
+  // Picking ends first could keep every client of disjoint pairs and none of their servers.
+  const kept = new Set<string>();
+  const keptEdges: FlowEdge[] = [];
+  const busiest = [...edges].sort((x, y) => y.total - x.total || x.id.localeCompare(y.id));
+  for (const e of busiest) {
+    const added = [e.source.id, e.target.id].filter((id) => !kept.has(id)).length;
+    if (kept.size + added > limit) continue;
+    kept.add(e.source.id);
+    kept.add(e.target.id);
+    keptEdges.push(e);
+  }
   const ranks = rankOf(keptEdges);
   const nodes = [...totals.values()]
-    .filter((n) => linked.has(n.end.id))
+    .filter((n) => kept.has(n.end.id))
     .map((n) => ({ ...n, rank: ranks.get(n.end.id) ?? 0 }));
   return { nodes, edges: keptEdges, totalNodes: totals.size };
 }
