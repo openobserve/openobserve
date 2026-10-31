@@ -193,12 +193,12 @@ test.describe('Traces triage loop', () => {
       expect(applied).toContain(top.name);
       if (!live) {
         expect(queries.slice(beforeApply).filter(isTableSearch), 'Manual mode stages the value until Run').toHaveLength(0);
-        await expect(page.locator(pm.tracesPage.drillDownPanel), 'The panel stays open until Run').toBeVisible();
+        await expect(page.locator(pm.tracesPage.drillDownPage), 'The page stays open until Run').toBeVisible();
         await pm.tracesPage.runTraceSearch();
         await pm.tracesPage.waitForTraceSearchResults();
       }
-      // A search started from the applied value closes the panel.
-      await expect(page.locator(pm.tracesPage.drillDownPanel)).toBeHidden({ timeout: 15000 });
+      // A search started from the applied value closes the page.
+      await expect(page.locator(pm.tracesPage.drillDownPage)).toBeHidden({ timeout: 15000 });
       const tableAfter = queries.slice(beforeApply).filter(isTableSearch);
       expect(tableAfter.length, 'Applying a value must search').toBeGreaterThan(0);
       const restored = tableAfter.at(-1);

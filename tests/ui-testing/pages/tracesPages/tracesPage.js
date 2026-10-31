@@ -139,9 +139,8 @@ export class TracesPage {
     this.comparisonBaselineBefore = '[data-test="traces-comparison-baseline-toggle-before"]';
     this.comparisonBaselineOutside = '[data-test="traces-comparison-baseline-toggle-outside"]';
     this.comparisonFieldCards = '[data-test^="traces-comparison-field-"]';
-    // The comparison opens in a side drawer (ODrawer) that closes from its × button.
-    this.drillDownPanel = '[data-test="traces-drill-down-panel"]';
-    this.drillDownCloseButton = '[data-test="traces-drill-down-panel"] [data-test="o-drawer-close-btn"]';
+    this.drillDownPage = '[data-test="traces-drill-down-page"]';
+    this.drillDownBackButton = '[data-test="traces-drill-down-back-btn"]';
 
     // Index List / Field List
     this.streamSelect = '[data-test="log-search-index-list-select-stream"]';
@@ -2074,10 +2073,10 @@ export class TracesPage {
     return '';
   }
 
-  /** Close the Drill down drawer with its × button and wait for it to leave. */
+  /** Leave the Drill down page with its back button and wait for it to close. */
   async closeComparison() {
-    await this.page.locator(this.drillDownCloseButton).click();
-    await this.page.locator(this.drillDownPanel).waitFor({ state: 'hidden', timeout: 15000 });
+    await this.page.locator(this.drillDownBackButton).click();
+    await this.page.locator(this.drillDownPage).waitFor({ state: 'hidden', timeout: 15000 });
   }
 
   /** @returns {Promise<{ name: string, score: number }[]>} the comparison cards in render order */

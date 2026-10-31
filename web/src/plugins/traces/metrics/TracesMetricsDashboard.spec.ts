@@ -1109,11 +1109,11 @@ describe("TracesMetricsDashboard", () => {
       expect(stub().props("selection")).toBeNull();
     });
 
-    it("mounts the side panel itself, with no full-pane page to teleport into", async () => {
+    it("teleports the page into the traces drill-down target", async () => {
       wrapper.vm.openComparison();
       await flushPromises();
       expect(stub().exists()).toBe(true);
-      expect(wrapper.find("teleport-stub").exists()).toBe(false);
+      expect(wrapper.find("teleport-stub").attributes("to")).toBe("#traces-drill-down-page");
     });
 
     it("gives the presets the charts' range and the decoded editor filter", async () => {

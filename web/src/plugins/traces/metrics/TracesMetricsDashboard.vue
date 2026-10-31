@@ -50,14 +50,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </transition>
 
-    <TracesComparison
-      v-if="showComparison"
-      :selection="comparisonSelection"
-      :streamName="streamName"
-      :preset-context="presetContext"
-      @close="showComparison = false"
-      @apply-filter="onComparisonApply"
-    />
+    <Teleport v-if="showComparison" defer to="#traces-drill-down-page">
+      <TracesComparison
+        :selection="comparisonSelection"
+        :streamName="streamName"
+        :preset-context="presetContext"
+        @close="showComparison = false"
+        @apply-filter="onComparisonApply"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -563,7 +564,7 @@ const openComparison = () => {
 
 const onComparisonApply = async (term: string) => {
   const entry = comparisonEntry;
-  // Without a stored selection the panel compared the editor's own filter, so the term joins it.
+  // Without a stored selection Drill down compared the editor's own filter, so the term joins it.
   const base = entry?.baselineFilter ?? searchObj.data.editorValue ?? "";
   const range =
     comparisonRange ?? originalTimeRangeBeforeSelection.value ?? effectiveTimeRange.value;

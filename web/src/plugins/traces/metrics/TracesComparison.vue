@@ -15,20 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Non-modal and scrim-free: the list beside it stays readable and usable while terms are picked. -->
-  <ODrawer
+  <TracesDrillDownPage
     :open="true"
-    side="right"
-    size="lg"
-    :modal="false"
-    seamless
-    portal-target="#tracesThirdLevel"
     :title="t('traces.drillDown')"
-    :return-focus-to="drillDownButton"
-    data-test="traces-drill-down-panel"
     @update:open="(open: boolean) => !open && emit('close')"
   >
-    <div class="flex min-h-0 flex-1 flex-col gap-3">
+    <OContent y class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto">
       <div v-if="countsLine" class="text-text-body text-sm" data-test="traces-drill-down-counts">
         {{ countsLine }}
       </div>
@@ -64,38 +56,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
       </div>
 
-      <template v-if="status === 'noSelection'">
-        <OEmptyState
-          icon="filter-list"
-          :title="t('traces.comparison.noSelectionTitle')"
-          :description="t('traces.comparison.noSelectionBody')"
-          data-test="traces-comparison-no-selection"
-        />
-        <div class="flex flex-col items-center gap-2" data-test="traces-drill-down-presets">
-          <span class="text-text-secondary text-sm">{{
-            t("traces.drillDownPanel.presetsTitle")
-          }}</span>
-          <div class="flex flex-wrap justify-center gap-2">
-            <OButton
-              v-for="preset in presets"
-              :key="preset.id"
-              variant="outline"
-              size="sm"
-              :data-test="`traces-drill-down-preset-${preset.id}`"
-              @click="pickPreset(preset.id)"
-            >
-              {{ preset.label }}
-            </OButton>
-          </div>
+      <OEmptyState
+        v-if="status === 'noSelection'"
+        size="compact"
+        :title="t('traces.comparison.noSelectionTitle')"
+        :description="t('traces.comparison.noSelectionBody')"
+        class="my-auto shrink-0"
+        data-test="traces-comparison-no-selection"
+      >
+        <template #illustration>
           <span
-            v-if="presetNote"
-            class="text-text-secondary text-xs"
-            data-test="traces-drill-down-preset-empty"
+            class="bg-tabs-active-bg text-tabs-active-text inline-flex size-12 items-center justify-center rounded-full"
           >
+            <OIcon name="filter-list" size="lg" />
+          </span>
+        </template>
+        <template #actions>
+          <div
+            class="flex w-full flex-col items-center gap-2 pt-3"
+            data-test="traces-drill-down-presets"
+          >
+            <span class="text-text-secondary text-xs">{{
+              t("traces.drillDownPanel.presetsTitle")
+            }}</span>
+            <div class="flex w-full flex-wrap justify-center gap-3">
+              <EmptyStateActionCard
+                v-for="preset in presets"
+                :key="preset.id"
+                :icon="preset.icon"
+                :label="preset.label"
+                :sublabel="preset.description"
+                :data-test="`traces-drill-down-preset-${preset.id}`"
+                @click="pickPreset(preset.id)"
+              />
+            </div>
+          </div>
+        </template>
+        <template v-if="presetNote" #extra>
+          <span class="text-text-secondary text-xs" data-test="traces-drill-down-preset-empty">
             {{ presetNote }}
           </span>
-        </div>
-      </template>
+        </template>
+      </OEmptyState>
       <div
         v-else-if="status === 'loading'"
         class="flex flex-1 flex-col items-center justify-center gap-2 py-12"
@@ -158,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             t("traces.comparison.noiseNote", { pts: Math.round(result.noiseFloorPts) })
           }}</span>
         </div>
-        <div class="grid grid-cols-1 gap-3">
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           <TracesComparisonField
             v-for="field in shownFields"
             :key="field.name"
@@ -182,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('traces.comparison.mostlyEmpty', { count: result.mostlyEmpty.length })"
           data-test="traces-comparison-mostly-empty"
         >
-          <div class="grid grid-cols-1 gap-3 pt-2">
+          <div class="grid grid-cols-1 gap-3 pt-2 md:grid-cols-2 xl:grid-cols-3">
             <TracesComparisonField
               v-for="field in result.mostlyEmpty"
               :key="field.name"
@@ -233,8 +235,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("traces.comparison.excludedFields", { fields: excluded.join(", ") }) }}
         </div>
       </div>
-    </div>
-  </ODrawer>
+    </OContent>
+  </TracesDrillDownPage>
 </template>
 
 <script lang="ts" setup>
@@ -249,10 +251,14 @@ import { timestampToTimezoneDate } from "@/utils/timezone";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
+import TracesDrillDownPage from "./TracesDrillDownPage.vue";
 import TracesComparisonField from "./TracesComparisonField.vue";
 import { formatTimeWithSuffix } from "@/utils/formatters";
 import { formatDurationBound } from "./latencyHeatmap";
@@ -297,12 +303,28 @@ const org = computed<string>(() => store.state.selectedOrganization?.identifier 
 const picked = shallowRef<ComparisonSelection | null>(null);
 const active = computed<ComparisonSelection | null>(() => props.selection ?? picked.value);
 const presetNote = ref<I18nText | null>(null);
-const presets = computed<{ id: ComparisonPreset; label: I18nText }[]>(() => [
-  { id: "errors", label: t("traces.drillDownPanel.presetErrors") },
-  { id: "slowest", label: t("traces.drillDownPanel.presetSlowest") },
-  { id: "recent", label: t("traces.drillDownPanel.presetRecent") },
+const presets = computed<
+  { id: ComparisonPreset; icon: IconName; label: I18nText; description: I18nText }[]
+>(() => [
+  {
+    id: "errors",
+    icon: "error-outline",
+    label: t("traces.drillDownPanel.presetErrors"),
+    description: t("traces.drillDownPanel.presetErrorsDesc"),
+  },
+  {
+    id: "slowest",
+    icon: "hourglass-empty",
+    label: t("traces.drillDownPanel.presetSlowest"),
+    description: t("traces.drillDownPanel.presetSlowestDesc"),
+  },
+  {
+    id: "recent",
+    icon: "history-toggle-off",
+    label: t("traces.drillDownPanel.presetRecent"),
+    description: t("traces.drillDownPanel.presetRecentDesc"),
+  },
 ]);
-const drillDownButton = () => document.querySelector<HTMLElement>('[data-test="insights-button"]');
 const schemaQuery = useQuery(() =>
   Object.assign(streamSchemaQuery(org.value, props.streamName, "traces"), {
     enabled: active.value !== null,

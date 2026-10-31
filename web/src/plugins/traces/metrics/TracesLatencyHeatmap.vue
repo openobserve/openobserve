@@ -510,7 +510,7 @@ const filterSelection = () => {
   emit("filter");
 };
 
-// The Drill down panel keeps its own copy of the selection, so only the drawn box goes.
+// The Drill down page keeps its own copy of the selection, so only the drawn box goes.
 const drillDown = () => {
   popoverOpen.value = false;
   if (!filtered.value) drawn.value = null;

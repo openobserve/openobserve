@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { reactive } from "vue";
 import { createStore } from "vuex";
@@ -90,6 +90,12 @@ beforeAll(async () => {
   await import("./TracesComparison.vue");
 });
 
+beforeEach(() => {
+  const target = document.createElement("div");
+  target.id = "traces-drill-down-page";
+  document.body.appendChild(target);
+});
+
 afterEach(() => {
   wrapper?.unmount();
   wrapper = null;
@@ -148,7 +154,7 @@ describe("TracesMetricsDashboard with the real latency heatmap", () => {
     expect(wrapper.emitted("editor-filter-set")!.at(-1)).toEqual(["service_name = 'a'"]);
   });
 
-  it("erases the drawn box on Drill down while the panel still opens on that selection", async () => {
+  it("erases the drawn box on Drill down while the page still opens on that selection", async () => {
     vi.mocked(searchService.search).mockResolvedValue({
       data: {
         hits: [
@@ -188,5 +194,28 @@ describe("TracesMetricsDashboard with the real latency heatmap", () => {
       durationHiUs: 500_000,
       filter: "service_name = 'a'",
     });
+  });
+
+  it("renders Drill down inside the page target, not in place", async () => {
+    vi.mocked(searchService.search).mockResolvedValue(HEATMAP_DATA as any);
+    wrapper = mount(TracesMetricsDashboard, {
+      props: { streamName: "default", show: true },
+      attachTo: document.body,
+      global: { plugins: [store, i18n] },
+    });
+    await settle();
+    wrapper
+      .findComponent({ name: "ChartRenderer" })
+      .vm.$emit("updated:dataZoom", { start: 1, end: 2, start1: 0, end1: 1 });
+    await settle();
+
+    item("drill-down")!.click();
+    await settle();
+
+    // TracesComparison is stubbed here; it is the root that holds TracesDrillDownPage.
+    const page = document.body.querySelector('[data-test="traces-comparison-stub"]');
+    expect(page).not.toBeNull();
+    expect(page!.closest("#traces-drill-down-page")).not.toBeNull();
+    expect(wrapper.element.contains(page)).toBe(false);
   });
 });

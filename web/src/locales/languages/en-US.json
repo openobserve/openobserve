@@ -15109,7 +15109,7 @@
       "presetRangeTooLong": "The time range is longer than this stream's {hours}-hour query limit",
       "retry": "Retry",
       "noSelectionTitle": "Select spans to compare",
-      "noSelectionBody": "Draw a box on the Duration heatmap, or brush the Errors or Rate chart, then open Drill down.",
+      "noSelectionBody": "Go back and box an area on the Duration heatmap, or brush the Errors or Rate chart.",
       "emptySelection": "No spans in the selection",
       "emptyBaseline": "No baseline spans",
       "emptyBaselineHint": "Nothing matched this baseline. Try {mode} instead.",
@@ -15133,6 +15133,7 @@
       "summaryErrors": "Errors · {window}",
       "summaryBand": "{window} · {band}"
     },
+    "drillDownBackTarget": "results",
     "drillDownPanel": {
       "counts": "{selected} vs {baseline}",
       "selectedTraces": "{count} selected trace | {count} selected traces",
@@ -15144,6 +15145,9 @@
       "presetErrors": "Errors vs rest",
       "presetSlowest": "Slowest 10% vs rest",
       "presetRecent": "Recent vs earlier",
+      "presetErrorsDesc": "Spans with an error against all other spans",
+      "presetSlowestDesc": "Spans at or above p90 against faster spans",
+      "presetRecentDesc": "Second half of the time range against the first half",
       "presetEmpty": "No span durations in this range to rank",
       "presetNoMatch": "That preset found no spans to compare in this range"
     },

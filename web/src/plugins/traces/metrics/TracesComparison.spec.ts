@@ -40,20 +40,6 @@ const { schemaFields, schemaError, searchObj, viewport } = vi.hoisted(() => ({
 
 vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
 
-// A pass-through portal keeps the drawer's body inside the wrapper, where the helpers look.
-vi.mock("reka-ui", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("reka-ui")>();
-  const { defineComponent } = await import("vue");
-  return {
-    ...actual,
-    DialogPortal: defineComponent(
-      (_, { slots }) =>
-        () =>
-          slots.default?.(),
-    ),
-  };
-});
-
 vi.mock("@/services/stream", () => ({
   default: {
     schema: vi.fn(() =>
@@ -85,8 +71,9 @@ vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
   default: { name: "ChartRenderer", props: ["data"], template: "<div />" },
 }));
 
-import { DialogContent } from "reka-ui";
 import TracesComparison from "./TracesComparison.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const search = vi.mocked(searchService.search);
 const store = createStore({
@@ -526,52 +513,30 @@ describe("TracesComparison", () => {
     expect(wrapper.find('[data-test="traces-comparison-error"] p div').exists()).toBe(false);
   });
 
-  describe("side panel", () => {
-    const drawer = () => wrapper.findComponent({ name: "ODrawer" });
-    const panel = () =>
-      wrapper
-        .findAllComponents(DialogContent)
-        .find((c: any) => c.attributes("data-o2-drawer") !== undefined)!;
+  describe("page", () => {
+    const back = () => wrapper.find('[data-test="traces-drill-down-back-btn"]');
 
-    it("opens as a non-modal Drill down panel over the right of the results", async () => {
+    it("opens as the full-pane Drill down page with a back button", async () => {
       await mountPanel(null);
-      expect(drawer().props()).toMatchObject({
-        open: true,
-        modal: false,
-        seamless: true,
-        side: "right",
-        portalTarget: "#tracesThirdLevel",
-        title: i18n.global.t("traces.drillDown"),
-      });
+      const page = wrapper.findComponent({ name: "TracesDrillDownPage" });
+      expect(page.props()).toMatchObject({ open: true, title: i18n.global.t("traces.drillDown") });
+      expect(back().attributes("aria-label")).toBe("Back to results");
       expect(wrapper.text()).not.toMatch(/comparison|compare selection/i);
-      expect(document.body.style.pointerEvents).not.toBe("none");
     });
 
-    it("leaves the list behind it interactive, never inert", async () => {
-      const list = document.createElement("div");
-      list.setAttribute("data-test", "traces-search-result-list");
-      document.body.appendChild(list);
+    it("closes from the back button", async () => {
       await mountPanel();
-      expect(document.querySelectorAll("[inert]")).toHaveLength(0);
-    });
-
-    it("closes from the × button", async () => {
-      await mountPanel();
-      await wrapper.find('[data-test="o-drawer-close-btn"]').trigger("click");
+      await back().trigger("click");
       expect(wrapper.emitted("close")).toHaveLength(1);
     });
 
     it("closes on Escape", async () => {
       await mountPanel();
-      const target = document.createElement("div");
-      document.body.appendChild(target);
-      const ev = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
-      target.dispatchEvent(ev);
-      await panel().vm.$emit("escapeKeyDown", ev);
+      back().element.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       expect(wrapper.emitted("close")).toHaveLength(1);
     });
 
-    it("heads the panel with the selected and baseline trace counts in the Traces view", async () => {
+    it("heads the page with the selected and baseline trace counts in the Traces view", async () => {
       await mountPanel();
       expect(text("traces-drill-down-counts")).toBe(
         "3,120 selected traces vs 98,012 baseline traces",
@@ -625,9 +590,56 @@ describe("TracesComparison", () => {
         ["slowest", "Slowest 10% vs rest"],
         ["recent", "Recent vs earlier"],
       ]) {
-        expect(text(`traces-drill-down-preset-${id}`)).toBe(label);
+        expect(text(`traces-drill-down-preset-${id}`)).toContain(label);
       }
       expect(search).not.toHaveBeenCalled();
+    });
+
+    it("tells the user how to make a selection", async () => {
+      await mountPanel(null);
+      expect(text("traces-comparison-no-selection")).toContain(
+        "Go back and box an area on the Duration heatmap, or brush the Errors or Rate chart.",
+      );
+    });
+
+    it("renders each preset as a card with its name and what it compares", async () => {
+      await mountPanel(null);
+      expect(wrapper.findAllComponents(OEmptyState)).toHaveLength(1);
+      for (const [id, label, description, icon] of [
+        [
+          "errors",
+          "Errors vs rest",
+          "Spans with an error against all other spans",
+          "error-outline",
+        ],
+        [
+          "slowest",
+          "Slowest 10% vs rest",
+          "Spans at or above p90 against faster spans",
+          "hourglass-empty",
+        ],
+        [
+          "recent",
+          "Recent vs earlier",
+          "Second half of the time range against the first half",
+          "history-toggle-off",
+        ],
+      ]) {
+        const card = wrapper.find(`[data-test="traces-drill-down-preset-${id}"]`);
+        expect(card.element.tagName).toBe("BUTTON");
+        expect(card.text()).toContain(label);
+        expect(card.text()).toContain(description);
+        expect(card.findComponent(OIcon).props("name")).toBe(icon);
+      }
+    });
+
+    it("puts the preset cards inside the no-selection message, under the preset label", async () => {
+      await mountPanel(null);
+      const presets = wrapper.find(
+        '[data-test="traces-comparison-no-selection"] [data-test="traces-drill-down-presets"]',
+      );
+      expect(presets.exists()).toBe(true);
+      expect(presets.text().indexOf("Or start from a preset")).toBe(0);
     });
 
     it("compares the errors in the whole range with the rest of it", async () => {
