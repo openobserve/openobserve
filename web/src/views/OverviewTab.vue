@@ -891,9 +891,9 @@ const overviewPending = computed(
 );
 const alertCount = ref<number | null>(null);
 const anomalyConfigCount = ref<number | null>(null);
-// null keeps all clear: only answered lists prove an org empty, and only the flag-off page asks
+// null leaves no-data undecided: only answered lists prove an org empty, and only the flag-off page asks
 const noUserStreams = ref<boolean | null>(null);
-// a probe that failed for any reason but 403 leaves "no streams" unproven, so all clear may not show
+// a probe that failed for any reason but 403 leaves "no streams" unproven, so the first-data hero may not show
 const streamProbeFailed = ref(false);
 
 const isForbidden = (err: unknown) => {
@@ -917,11 +917,10 @@ const pageState = computed<PageState>(() => {
   if (isLoading.value || hasAnyData.value) return "content";
   if (allFailed.value) {
     const allForbidden = attemptedSections.value.every((k) => isForbidden(sectionFailure[k]));
-    if (flagOn.value && allForbidden) return "forbidden";
+    const cardsLoaded = !!overview.value && !overviewFailed.value && !overviewForbidden.value;
+    if (flagOn.value && allForbidden && !cardsLoaded) return "forbidden";
     // the cards loaded, so the failed sections keep their own inline Retry
-    return overview.value && !overviewFailed.value && !overviewForbidden.value
-      ? "partial"
-      : "error";
+    return cardsLoaded ? "partial" : "error";
   }
   if (attemptedSections.value.some(isFailed)) return "partial";
   if (!flagOn.value && noUserStreams.value === true) return "no-data";
@@ -988,6 +987,7 @@ const resetLegacySections = () => {
   recentEvents.value = [];
   alertCount.value = null;
   alertCountSeq++;
+  lastFetched.value = null;
   graphData.value = { nodes: [], edges: [] };
   selectedService.value = null;
   servicePanelVisible.value = false;
@@ -1103,7 +1103,7 @@ const incidentsTile = computed<IncidentsTile>(() => {
   return "ok";
 });
 
-// only the flag-on page tells "nothing is watched" apart from "all clear"
+// only the flag-on page can tell that nothing is watched
 const loadAlertCount = async (force = false) => {
   if (!flagOn.value) return;
   const org = orgId.value;
@@ -1146,7 +1146,7 @@ const typeHasUserStream = async (org: string, type: string, reread: boolean) => 
   return page.list.length >= head.total ? false : null;
 };
 
-// Refresh and Retry re-read only while the hero waits or a probe failed; an org the notice saw data in asks nothing
+// Refresh and Retry re-read only while the first-data hero waits or a probe failed; an org the notice saw data in asks nothing
 const loadUserStreams = async (force = false) => {
   const org = orgId.value;
   const reread = force && (noUserStreams.value === true || streamProbeFailed.value);

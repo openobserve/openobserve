@@ -899,6 +899,7 @@ describe("OverviewTab", () => {
     it("should show the no-access state without the toolbar when every section answers 403 with the flag on", async () => {
       givenEnterprise(true);
       givenEverySectionFails(forbidden);
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(forbidden());
 
       wrapper = mountOverviewTab();
       await flushPromises();
@@ -906,6 +907,36 @@ describe("OverviewTab", () => {
       expect(wrapper.find(NO_ACCESS).exists()).toBe(true);
       expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
       expect(wrapper.find(REFRESH_BTN).exists()).toBe(false);
+    });
+
+    it("should keep the page and show partial when only the legacy sections answer 403 but the overview loaded", async () => {
+      givenEnterprise(true);
+      givenEverySectionFails(forbidden);
+      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
+        data: buildHealthyOverview(),
+      } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(NO_ACCESS).exists()).toBe(false);
+      expect(wrapper.find(REFRESH_BTN).exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-alerts-card"]').exists()).toBe(true);
+    });
+
+    it("should clear the refresh button's last-run time on an org switch", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const refresh = () => wrapper.findComponent({ name: "ORefreshButton" });
+      expect(refresh().props("lastRunAt")).not.toBeNull();
+
+      vi.mocked(alertsService.getHistory).mockReturnValue(new Promise(() => {}) as never);
+      store.commit("setSelectedOrganization", {
+        ...store.state.selectedOrganization,
+        identifier: `overview-org-switched-${++orgSeq}`,
+      });
+      await flushPromises();
+      expect(refresh().props("lastRunAt")).toBeNull();
     });
 
     it("should show load-error, not no-access, when 403s mix with other failures and the flag is on", async () => {

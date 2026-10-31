@@ -9214,7 +9214,6 @@
       "tileError": "Could not load",
       "tileUnavailable": "Not available",
       "sectionLocked": "Available with an enterprise license",
-      "summaryForbidden": "Your role cannot see this. Ask an org admin for Summary access.",
       "sectionForbidden": "Your role cannot see this data. Ask an org admin for access."
     },
     "time": {

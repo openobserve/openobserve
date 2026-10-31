@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OverviewSectionCard
     section="data-health"
     :title="t('overview.sections.dataHealth')"
-    :link-label="t('overview.dataHealth.viewPipelines')"
+    :link-label="pipelinesOk ? t('overview.dataHealth.viewPipelines') : undefined"
     :view="view"
-    summary-forbidden
     @retry="emit('retry')"
     @view-all="emit('open', 'pipelines')"
   >
@@ -26,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <li v-for="row in rows" :key="row.key">
         <OverviewRowButton
           :data-test="`overview-data-health-row-${row.key}`"
+          :disabled="!row.ok"
           @click="emit('open', row.destination)"
         >
           <span
@@ -74,6 +74,7 @@ interface HealthRow {
   tone: HealthTone;
   word: I18nText;
   value: I18nText;
+  ok: boolean;
 }
 
 const props = defineProps<{
@@ -92,6 +93,15 @@ const view = computed<OverviewView>(() => {
   if (props.overview) return "ok";
   return props.forbidden ? "forbidden" : "error";
 });
+
+const pipelinesOk = computed(
+  () =>
+    sectionView(props.overview?.pipelines, {
+      pending: false,
+      failed: props.failed,
+      forbidden: props.forbidden,
+    }) === "ok",
+);
 
 const stateWord = (state: OverviewView): I18nText => {
   if (state === "forbidden") return t("overview.state.tileForbidden");
@@ -122,7 +132,7 @@ const healthRow = <T,>(
     forbidden: props.forbidden,
   });
   if (state !== "ok" || !section?.data) {
-    return { ...base, tone: "neutral", word: stateWord(state), value: raw("—") };
+    return { ...base, tone: "neutral", word: stateWord(state), value: raw("—"), ok: false };
   }
   const { count, tone, note, notSetUp } = pick(section.data);
   if (notSetUp) {
@@ -132,6 +142,7 @@ const healthRow = <T,>(
       tone: "neutral",
       word: t("overview.dataHealth.status.notSetUp"),
       value: raw("—"),
+      ok: true,
     };
   }
   const level = tone(count);
@@ -141,6 +152,7 @@ const healthRow = <T,>(
     tone: level,
     word: statusWord(level),
     value: raw(count),
+    ok: true,
   };
 };
 
@@ -170,7 +182,7 @@ const rows = computed<HealthRow[]>(() => {
         destination: "alerts",
       },
       o?.alerts,
-      (d) => ({ count: d.failed_evaluation, tone: byCount("error"), notSetUp: d.total === 0 }),
+      (d) => ({ count: d.failed_evaluation, tone: byCount("error"), notSetUp: d.enabled === 0 }),
     ),
     healthRow(
       {
@@ -201,7 +213,7 @@ const rows = computed<HealthRow[]>(() => {
       (d) => ({
         count: d.by_state.notify_failed ?? 0,
         tone: byCount("error"),
-        notSetUp: d.total === 0,
+        notSetUp: d.enabled === 0,
       }),
     ),
     healthRow(

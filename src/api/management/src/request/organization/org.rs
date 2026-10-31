@@ -427,8 +427,10 @@ pub async fn org_overview(
         Ok(scope) => scope,
         Err(e) => {
             log::error!("[overview] failed to resolve permissions for {org_id}: {e}");
-            return Json(overview::scope_unavailable(&org_id, &user_email.user_id, top_n).await)
-                .into_response();
+            return match overview::scope_unavailable(&org_id, &user_email.user_id, top_n).await {
+                Some(degraded) => Json(degraded).into_response(),
+                None => MetaHttpResponse::forbidden("Forbidden"),
+            };
         }
     };
     if scope.denies_everything() {

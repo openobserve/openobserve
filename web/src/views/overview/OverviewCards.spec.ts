@@ -244,12 +244,14 @@ describe("OverviewAlertsCard", () => {
 });
 
 describe("forbidden copy", () => {
-  it("asks for Summary access when the whole request was refused", () => {
+  it("asks for plain access when the whole request was refused", () => {
     const w = mount(OverviewAlertsCard, {
       props: { pending: false, failed: false, forbidden: true },
       global,
     });
-    expect(w.get('[data-test="overview-alerts-forbidden"]').text()).toContain("Summary access");
+    expect(w.get('[data-test="overview-alerts-forbidden"]').text()).toContain(
+      "Ask an org admin for access.",
+    );
   });
 
   it("asks for plain access when only one section was refused", () => {
@@ -260,6 +262,32 @@ describe("forbidden copy", () => {
     const text = w.get('[data-test="overview-streams-forbidden"]').text();
     expect(text).toContain("Ask an org admin for access.");
     expect(text).not.toContain("Summary");
+  });
+
+  it("does not link to pipelines or open rows whose section is unavailable", async () => {
+    const overview = buildOverview({ pipelines: { status: "forbidden" } });
+    const w = mount(OverviewDataHealthCard, { props: { ...base, overview }, global });
+    expect(w.find('[data-test="overview-data-health-view-all"]').exists()).toBe(false);
+    const blocked = w.get('[data-test="overview-data-health-row-pipelines"]');
+    expect(blocked.attributes("aria-disabled")).toBe("true");
+    await blocked.trigger("click");
+    expect(w.emitted("open")).toBeUndefined();
+    const live = w.get('[data-test="overview-data-health-row-quiet"]');
+    await live.trigger("click");
+    expect(w.emitted("open")).toEqual([["streams"]]);
+  });
+
+  it("treats rules that are all disabled as not set up", () => {
+    const overview = buildOverview({
+      alerts: okSection({ ...o.alerts.data!, total: 3, enabled: 0, disabled: 3 }),
+    });
+    const w = mount(OverviewDataHealthCard, { props: { ...base, overview }, global });
+    expect(w.get('[data-test="overview-data-health-row-failing"]').text()).toContain("Not set up");
+    const alerts = mount(OverviewAlertsCard, {
+      props: { ...base, section: overview.alerts },
+      global,
+    });
+    expect(alerts.find('[data-test="overview-alerts-empty"]').exists()).toBe(false);
   });
 });
 

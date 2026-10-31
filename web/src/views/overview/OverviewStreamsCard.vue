@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('overview.sections.streams')"
     :link-label="t('overview.streams.viewStreams')"
     :view="view"
-    :summary-forbidden="forbidden"
     @retry="emit('retry')"
     @view-all="emit('open')"
   >

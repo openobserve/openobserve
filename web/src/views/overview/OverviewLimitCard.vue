@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     section="limit"
     :title="t('overview.sections.ingestLimit')"
     :view="view"
-    :summary-forbidden="forbidden"
     :locked-message="
       isCloud ? t('overview.limit.unavailableMessage') : t('overview.limit.lockedMessage')
     "

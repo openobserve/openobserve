@@ -91,7 +91,7 @@ const notSetUp = () => t("overview.dataHealth.status.notSetUp");
 const firingSub = (tile: { ok: boolean; note?: I18nText }): I18nText | undefined => {
   if (!tile.ok) return tile.note;
   const alerts = props.overview?.alerts.data;
-  if (alerts?.total === 0) return notSetUp();
+  if (alerts?.enabled === 0) return notSetUp();
   const critical = levelCount(alerts, "critical");
   if (critical > 0) return t("overview.cards.firingCritical", { count: critical });
   const oldest = oldestKnownFiring(alerts);
@@ -104,7 +104,7 @@ const items = computed<StatItem[]>(() => {
   const o = props.overview;
   const firing = sectionTile(o?.alerts, (d) => firingCount(d));
   const failing = sectionTile(o?.alerts, (d) => d.failed_evaluation);
-  const noRules = firing.ok && o?.alerts.data?.total === 0;
+  const noRules = firing.ok && o?.alerts.data?.enabled === 0;
   const pipelines = sectionTile(o?.pipelines, (d) => d.errored);
   const streams = sectionTile(o?.streams, (d) => d.total_streams);
   const quiet = sectionTile(o?.streams, (d) => d.quiet_count);
@@ -126,6 +126,7 @@ const items = computed<StatItem[]>(() => {
       sub: firingSub(firing),
       icon: "notifications",
       tone: firing.ok && Number(firing.value) > 0 ? "error" : "neutral",
+      selectable: firing.ok,
       dataTest: "overview-headline-firing",
     },
     {
@@ -136,6 +137,7 @@ const items = computed<StatItem[]>(() => {
       sub: noRules ? notSetUp() : failing.note,
       icon: "error",
       tone: failing.ok && Number(failing.value) > 0 ? "error" : "neutral",
+      selectable: failing.ok,
       dataTest: "overview-headline-failing",
     },
     {
@@ -157,6 +159,7 @@ const items = computed<StatItem[]>(() => {
       sub: pipelinesSub(pipelines),
       icon: "database",
       tone: pipelines.ok && Number(pipelines.value) > 0 ? "error" : "neutral",
+      selectable: pipelines.ok,
       dataTest: "overview-headline-pipelines",
     },
     {
@@ -167,6 +170,7 @@ const items = computed<StatItem[]>(() => {
       sub: quiet.ok ? undefined : quiet.note,
       icon: "schedule",
       tone: quiet.ok && Number(quiet.value) > 0 ? "warning" : "neutral",
+      selectable: quiet.ok,
       dataTest: "overview-headline-quiet",
     },
     {
@@ -179,6 +183,7 @@ const items = computed<StatItem[]>(() => {
       // no real maximum exists, so a huge one keeps the tile bar from drawing full
       max: Number.MAX_SAFE_INTEGER,
       tone: "neutral",
+      selectable: streams.ok,
       dataTest: "overview-headline-streams",
     },
   ];

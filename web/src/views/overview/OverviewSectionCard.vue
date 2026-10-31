@@ -59,13 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="view === 'forbidden'"
         size="inline"
         preset="no-access"
-        :description="
-          t(
-            summaryForbidden
-              ? 'overview.state.summaryForbidden'
-              : 'overview.state.sectionForbidden',
-          )
-        "
+        :description="t('overview.state.sectionForbidden')"
         :data-test="`overview-${section}-forbidden`"
       />
       <OEmptyState
@@ -110,10 +104,8 @@ withDefaults(
     lockedMessage?: I18nText;
     // clicking the locked row only does something when the parent handles unlock
     canUnlock?: boolean;
-    // the whole overview request was refused, so the fix is Summary access rather than the section's own
-    summaryForbidden?: boolean;
   }>(),
-  { canUnlock: true, summaryForbidden: false },
+  { canUnlock: true },
 );
 
 const emit = defineEmits<{ retry: []; viewAll: []; unlock: [] }>();
