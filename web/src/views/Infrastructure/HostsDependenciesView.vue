@@ -290,17 +290,11 @@ function onSetUp() {
         {{ t("infra.hosts.depsCapped", { shown: graph.edges.length, total: edges.length }) }}
       </OText>
       <div class="relative flex min-h-0 flex-1 max-md:min-h-96" data-test="hosts-deps-area">
-        <DependencyMap
-          :nodes="mapNodes"
-          :edges="mapEdges"
-          :selected-edge-id="selectedEdgeId"
-          :label="ariaLabel"
-          data-test="hosts-deps-chart"
-          @open="openNode"
-          @select="(id: string) => (selectedEdgeId = id)"
-        />
-        <!-- not-sr-only resets position to static, so this wrapper does the overlay positioning. -->
-        <div class="pointer-events-none absolute start-3 top-3 bottom-3 flex flex-col items-start">
+        <!-- Before the map, so keyboard users reach the edge list without tabbing through every card. not-sr-only
+             resets position to static, so this wrapper does the overlay positioning. -->
+        <div
+          class="pointer-events-none absolute start-3 top-3 bottom-3 z-10 flex flex-col items-start"
+        >
           <nav
             class="bg-surface-overlay rounded-surface pointer-events-auto sr-only flex max-h-full flex-col items-start gap-1 overflow-y-auto p-2 focus-within:not-sr-only"
             :aria-label="t('infra.hosts.depsConnections')"
@@ -318,6 +312,15 @@ function onSetUp() {
             </OButton>
           </nav>
         </div>
+        <DependencyMap
+          :nodes="mapNodes"
+          :edges="mapEdges"
+          :selected-edge-id="selectedEdgeId"
+          :label="ariaLabel"
+          data-test="hosts-deps-chart"
+          @open="openNode"
+          @select="(id: string) => (selectedEdgeId = id)"
+        />
         <div
           v-if="selectedEdge"
           class="bg-surface-overlay rounded-surface border-border-default absolute end-3 top-3 flex w-80 max-w-[calc(100%-1.5rem)] flex-col gap-1 border p-3 shadow-md"
