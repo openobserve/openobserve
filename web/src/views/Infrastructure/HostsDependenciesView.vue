@@ -22,13 +22,19 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OText from "@/lib/core/Typography/OText.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import searchService from "@/services/search";
 import DependencyMap, { type MapEdge, type MapNode } from "./kubernetes2/DependencyMap.vue";
 import { parseVector, type Series } from "./kubernetes2/kubernetesModel";
 import { useEscapeToClose } from "./kubernetes2/useEscapeToClose";
-import { buildGraph, flowWindowSeconds, formatRate } from "./kubernetes2/dependencyGraph";
+import {
+  buildGraph,
+  dropQuiet,
+  flowWindowSeconds,
+  formatRate,
+} from "./kubernetes2/dependencyGraph";
 import {
   hostFlowQuery,
   layoutHostGraph,
@@ -43,6 +49,8 @@ const props = defineProps<{
   refreshNonce: number;
   // The hosts list's host names, so a host whose agent reports no flows still reads as a host.
   knownHosts: string[];
+  // Draw connections below the low-traffic threshold; kept in the page's URL.
+  lowTraffic: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -50,6 +58,7 @@ const emit = defineEmits<{
   refresh: [];
   // While the map reloads, so the page's Refresh can show it.
   loading: [loading: boolean];
+  "update:lowTraffic": [show: boolean];
 }>();
 
 const { t } = useI18nTyped();
@@ -113,7 +122,9 @@ watch(loading, (now) => emit("loading", now), { immediate: true });
 // The page bumps refreshNonce whenever it reloads, after it has moved the range.
 watch(() => [props.orgId, props.refreshNonce], load, { immediate: true });
 
-const edges = computed(() => pairHostFlows(series.value, props.knownHosts));
+const allEdges = computed(() => pairHostFlows(series.value, props.knownHosts));
+
+const edges = computed(() => dropQuiet(allEdges.value, props.lowTraffic));
 
 const graph = computed(() => buildGraph(edges.value));
 
@@ -299,6 +310,13 @@ function onSetUp() {
           <OTooltip :content="t('infra.hosts.depsCaptionMore')" max-width="24rem" />
         </OButton>
       </div>
+      <OSwitch
+        :model-value="lowTraffic"
+        size="sm"
+        :label="t('infra.k8s2.depsShowLowTraffic')"
+        data-test="hosts-deps-show-low-traffic"
+        @update:model-value="(show: unknown) => emit('update:lowTraffic', !!show)"
+      />
       <!-- The page's Refresh reloads the map; this only says how fresh it is. -->
       <OText
         v-if="updatedAt"
@@ -325,6 +343,15 @@ function onSetUp() {
     >
       <OSpinner size="lg" />
     </div>
+    <OEmptyState
+      v-else-if="!edges.length && allEdges.length"
+      variant="no-results"
+      illustration="no-results"
+      :title="t('infra.hosts.depsAllQuiet')"
+      :action-label="t('infra.k8s2.depsShowLowTraffic')"
+      data-test="hosts-deps-all-quiet"
+      @action="emit('update:lowTraffic', true)"
+    />
     <OEmptyState
       v-else-if="!edges.length"
       preset="no-data"

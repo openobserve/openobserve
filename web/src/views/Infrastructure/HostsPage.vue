@@ -276,6 +276,12 @@ const onViewChange = (name: string | number) => {
   router.push({ query: name === "dependencies" ? { ...rest, view: "dependencies" } : rest });
 };
 
+// The map's low-traffic switch, kept in the URL like the view.
+const onLowTraffic = (show: boolean) => {
+  const { lowTraffic: _lowTraffic, ...rest } = route.query;
+  router.replace({ query: show ? { ...rest, lowTraffic: "true" } : rest });
+};
+
 // ── Drawer — deep-linked via ?host= so it survives reload ───────────────────
 const drawerHost = computed(() => first(route.query.host) ?? "");
 const drawerStatus = computed(
@@ -548,7 +554,9 @@ const osToggleLabel = (slug: string) =>
       :range="range"
       :refresh-nonce="refreshNonce"
       :known-hosts="knownHosts"
+      :low-traffic="first(route.query.lowTraffic) === 'true'"
       @open="openDrawer"
+      @update:low-traffic="onLowTraffic"
       @refresh="onRefreshClick"
       @loading="(now: boolean) => (mapLoading = now)"
     />

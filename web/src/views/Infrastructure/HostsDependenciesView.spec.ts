@@ -62,6 +62,7 @@ describe("HostsDependenciesView", () => {
         range: { start: END - 60 * MIN_US, end: END, relative: true },
         refreshNonce: 0,
         knownHosts: [],
+        lowTraffic: false,
         ...props,
       },
       global: {
@@ -256,6 +257,27 @@ describe("HostsDependenciesView", () => {
     } as any);
     await mountView();
     expect(edges().map((e: any) => e.target)).toEqual(["api"]);
+  });
+
+  it("hides connections below 1 B/s until the low-traffic switch shows them", async () => {
+    metricsQuery.mockResolvedValue({
+      data: { data: { result: [FLOWS[0], row("web", "web", "dns", "unknown", 0.4)] } },
+    } as any);
+    await mountView();
+    expect(edges().map((e: any) => e.target)).toEqual(["api"]);
+    await testId("hosts-deps-show-low-traffic-btn").trigger("click");
+    expect(wrapper.emitted("update:lowTraffic")).toEqual([[true]]);
+    await wrapper.setProps({ lowTraffic: true });
+    expect(edges()).toHaveLength(2);
+  });
+
+  it("offers the low-traffic switch when every connection is below 1 B/s", async () => {
+    metricsQuery.mockResolvedValue({
+      data: { data: { result: [row("web", "web", "dns", "unknown", 0.4)] } },
+    } as any);
+    await mountView();
+    await testId("hosts-deps-all-quiet").find("button").trigger("click");
+    expect(wrapper.emitted("update:lowTraffic")).toEqual([[true]]);
   });
 
   it("reads traffic only within names as no flows", async () => {

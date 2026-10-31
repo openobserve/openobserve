@@ -134,8 +134,8 @@ const drawerStub = {
 
 const depsStub = {
   name: "HostsDependenciesView",
-  props: ["orgId", "range", "refreshNonce", "knownHosts"],
-  emits: ["open", "refresh", "loading"],
+  props: ["orgId", "range", "refreshNonce", "knownHosts", "lowTraffic"],
+  emits: ["open", "refresh", "loading", "update:lowTraffic"],
   template: "<div data-test='hosts-deps-stub' />",
 };
 
@@ -876,6 +876,21 @@ describe("HostsPage", () => {
       expect(router.currentRoute.value.query).toMatchObject({ name: "a" });
       expect(router.currentRoute.value.query.view).toBeUndefined();
       expect(hostsListState.nameFilter.value).toBe("a");
+    });
+
+    it("keeps the map's low-traffic switch in the URL", async () => {
+      wrapper = await mountPage({ view: "dependencies" });
+      expect(deps().props("lowTraffic")).toBe(false);
+      deps().vm.$emit("update:lowTraffic", true);
+      await flushPromises();
+      expect(router.currentRoute.value.query).toMatchObject({
+        view: "dependencies",
+        lowTraffic: "true",
+      });
+      expect(deps().props("lowTraffic")).toBe(true);
+      deps().vm.$emit("update:lowTraffic", false);
+      await flushPromises();
+      expect(router.currentRoute.value.query.lowTraffic).toBeUndefined();
     });
 
     it("spins the page's Refresh while the map reloads", async () => {
