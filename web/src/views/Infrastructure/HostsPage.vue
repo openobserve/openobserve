@@ -95,6 +95,8 @@ const refreshList = async () => {
 // The Dependencies view loads on its own when shown and on an org switch. On its tab a reload refreshes
 // only the map, which keeps the host names the list already loaded.
 const refreshNonce = ref(0);
+// The Dependencies view reports its own reloads, which the header's Refresh shows on that tab.
+const mapLoading = ref(false);
 const reload = () => {
   refreshNonce.value++;
   if (view.value === "dependencies") listStale = true;
@@ -470,7 +472,7 @@ const osToggleLabel = (slug: string) =>
           icon-left="refresh"
           class="max-md:min-w-0 max-md:ps-2 max-md:pe-2"
           data-test="hosts-refresh"
-          :loading="loading"
+          :loading="view === 'dependencies' ? mapLoading : loading"
           @click="onRefreshClick"
         >
           <span class="max-md:sr-only">{{ t("infra.hosts.refresh") }}</span>
@@ -520,6 +522,7 @@ const osToggleLabel = (slug: string) =>
       :known-hosts="knownHosts"
       @open="openDrawer"
       @refresh="onRefreshClick"
+      @loading="(now: boolean) => (mapLoading = now)"
     />
 
     <!-- Total failure: ONE page-level surface, never stacked column warnings. -->

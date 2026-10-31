@@ -135,7 +135,7 @@ const drawerStub = {
 const depsStub = {
   name: "HostsDependenciesView",
   props: ["orgId", "range", "refreshNonce", "knownHosts"],
-  emits: ["open", "refresh"],
+  emits: ["open", "refresh", "loading"],
   template: "<div data-test='hosts-deps-stub' />",
 };
 
@@ -855,6 +855,20 @@ describe("HostsPage", () => {
 
   describe("Dependencies view", () => {
     const deps = () => wrapper.findComponent({ name: "HostsDependenciesView" });
+
+    it("spins the page's Refresh while the map reloads", async () => {
+      wrapper = await mountPage({ view: "dependencies" });
+      const refresh = () =>
+        wrapper
+          .findAllComponents({ name: "OButton" })
+          .find((b) => b.attributes("data-test") === "hosts-refresh")!;
+      deps().vm.$emit("loading", true);
+      await flushPromises();
+      expect(refresh().props("loading")).toBe(true);
+      deps().vm.$emit("loading", false);
+      await flushPromises();
+      expect(refresh().props("loading")).toBe(false);
+    });
 
     it("swaps the table for the dependency map from ?view=dependencies", async () => {
       wrapper = await mountPage({ view: "dependencies" });

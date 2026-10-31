@@ -219,6 +219,26 @@ describe("HostsDependenciesView", () => {
     expect(testId("hosts-deps-edge").exists()).toBe(false);
   });
 
+  it("leaves Escape alone while no edge panel is open, and tells the page when it reloads", async () => {
+    await mountView();
+    const esc = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    testId("hosts-deps-view").element.dispatchEvent(esc);
+    expect(esc.defaultPrevented).toBe(false);
+    expect(wrapper.emitted("loading")).toEqual([[false], [true], [false]]);
+  });
+
+  it("keeps focus put when the map closes an edge panel the list opened", async () => {
+    await mountView({}, document.body);
+    await wrapper.findAll('[data-test="hosts-deps-link"]')[0].trigger("click");
+    await flushPromises();
+    chart().vm.$emit("select", null);
+    await flushPromises();
+    expect(testId("hosts-deps-edge").exists()).toBe(false);
+    expect(document.activeElement).not.toBe(
+      wrapper.findAll('[data-test="hosts-deps-link"]')[0].element,
+    );
+  });
+
   it("does not draw a pair whose rate is nothing", async () => {
     metricsQuery.mockResolvedValue({
       data: { data: { result: [FLOWS[0], row("web", "web", "idle", "unknown", 0)] } },

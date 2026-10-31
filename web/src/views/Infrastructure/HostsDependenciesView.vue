@@ -47,6 +47,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   open: [host: string];
   refresh: [];
+  // While the map reloads, so the page's Refresh can show it.
+  loading: [loading: boolean];
 }>();
 
 const { t } = useI18nTyped();
@@ -104,6 +106,8 @@ async function load() {
     if (gen === generation) loading.value = false;
   }
 }
+
+watch(loading, (now) => emit("loading", now), { immediate: true });
 
 // The page bumps refreshNonce whenever it reloads, after it has moved the range.
 watch(() => [props.orgId, props.refreshNonce], load, { immediate: true });
@@ -243,8 +247,8 @@ function showEdge(id: string, event: Event) {
 
 // Picked on the map, so a later close has no list button to return to; empty map space dismisses it.
 function selectEdge(id: string | null) {
-  if (id == null) return closeEdge();
   openedFrom = null;
+  if (id == null) return closeEdge();
   selectedEdgeId.value = id;
 }
 
@@ -269,7 +273,7 @@ function onSetUp() {
   <div
     class="px-page-edge flex h-full min-h-0 flex-col gap-2 py-3 max-md:overflow-y-auto"
     data-test="hosts-deps-view"
-    @keydown.esc="closeEdge"
+    @keydown.esc="selectedEdge && closeEdge()"
   >
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1" data-test="hosts-deps-controls">
       <div class="flex items-center gap-1">
