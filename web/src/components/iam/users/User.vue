@@ -407,7 +407,8 @@ import {
 import { blockEmailsInConfig } from "@/components/settings/orgDomainRestrictions";
 import { queryClient } from "@/composables/query/queryClient";
 import { useMutation } from "@tanstack/vue-query";
-import { defineComponent, ref, onActivated, onBeforeMount, watch, computed } from "vue";
+import { defineComponent, ref, toRef, onActivated, onBeforeMount, watch, computed } from "vue";
+import { useListViewState } from "@/composables/useListViewState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -485,7 +486,7 @@ export default defineComponent({
     const { usersState } = usePermissions();
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
-    const filterQuery = ref("");
+    const filterQuery = toRef(useListViewState("iam-users", { filterQuery: "" }), "filterQuery");
 
     const toCamelCase = (str: string) => {
       return str.charAt(0).toUpperCase() + str.slice(1);
