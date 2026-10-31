@@ -1134,9 +1134,7 @@ describe("buildBreakdownRank", () => {
     const branch = (m: string) => `{__name__="m",az!="",job="api",${m}}[6h] @ end()`;
     const rank = `topk(10, sum by (az) (increase(${branch('a="1"')}) or increase(${branch('b="2"')})))`;
     expect(buildBreakdownRank(CARD_KIND.COUNTER_RATE, { ...ctx, filters }, "az", cap)).toBe(rank);
-    expect(
-      buildBreakdownQuery(CARD_KIND.COUNTER_RATE, { ...ctx, filters }, "az", cap),
-    ).toBe(
+    expect(buildBreakdownQuery(CARD_KIND.COUNTER_RATE, { ...ctx, filters }, "az", cap)).toBe(
       `(sum by (az) (rate({__name__="m",job="api",a="1"}[4m]) or rate({__name__="m",job="api",b="2"}[4m]))) and on (az) ${rank}`,
     );
     const gauge = buildBreakdownQuery(CARD_KIND.GAUGE, { ...ctx, filters }, "az", cap)!;
