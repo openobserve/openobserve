@@ -402,6 +402,22 @@ describe("useStreamFields Composable", () => {
       await wrapper.vm.loadStreamLists(true);
       expect(searchObj.data.stream.selectedStream).toEqual(["newest"]);
     });
+
+    it("carries the is_internal flag onto each picker option", async () => {
+      searchObj.data.streamResults = {
+        list: [
+          { name: "app", stats: { doc_time_max: 5 } },
+          { name: "_rumdata", is_internal: true, stats: { doc_time_max: 9 } },
+          { name: "audit", is_internal: false, stats: { doc_time_max: 1 } },
+        ],
+      } as any;
+      await wrapper.vm.loadStreamLists(false);
+      expect(searchObj.data.stream.streamLists).toEqual([
+        { label: "app", value: "app", internal: false },
+        { label: "_rumdata", value: "_rumdata", internal: true },
+        { label: "audit", value: "audit", internal: false },
+      ]);
+    });
   });
 
   describe("per-type Logs selection keys (P1 step 2)", () => {

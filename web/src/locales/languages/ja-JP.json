@@ -7939,6 +7939,7 @@
       "aggRangeDesc": "最大値と最小値の差",
       "aggDiffLabel": "差分：",
       "aggDiffDesc": "最終値と最初の値の差",
+      "aggInstantNote": "円グラフまたはドーナツグラフでは、Range クエリなど複数のサンプルを返すクエリに適用されます。単一のサンプルを返す Instant クエリではそのサンプルが保持されるため、両方を混在させると集計値と生の値が並んで表示されます。",
       "geoLatTooltip": "緯度値を含むメトリックラベルの名前。デフォルト：\"latitude\" または \"lat\"",
       "geoLonTooltip": "経度値を含むメトリックラベルの名前。デフォルト：\"longitude\" または \"lon\"",
       "geoWeightTooltip": "重み値を含むメトリックラベルの名前。デフォルト：\"weight\"",
@@ -21224,6 +21225,17 @@
       "moreInfoAbout": "{field}の詳細情報",
       "moreInfo": "詳細情報"
     },
+    "streamPicker": {
+      "internalStreams": "内部ストリーム",
+      "hiddenCount": "{count} 件非表示",
+      "matchCount": "{count} 件の非表示の一致 | {count} 件の非表示の一致",
+      "hide": "非表示",
+      "show": "表示",
+      "hideInternal": "内部ストリームを非表示",
+      "showInternal": "内部ストリームを表示",
+      "announceHidden": "内部ストリームを非表示にしました",
+      "announceShown": "内部ストリームを表示しました"
+    },
     "templateInput": {
       "suggestions": "変数の候補"
     },
@@ -28314,11 +28326,6 @@
       "target": "対象",
       "auditDisabled": "監査証跡を利用するには、サーバーで O2_AUDIT_ENABLED=true を設定する必要があります",
       "auditDelayHint": "まだ記録はありません。サーバーは監査記録をまとめて発行します。既定では 10 分ごとです(O2_AUDIT_PUBLISH_INTERVAL)。",
-      "alertAutoRolledBack": "ロールアウトが自動でロールバックされました",
-      "alertOfflineRatio": "フリートのオフライン率がしきい値を超えました",
-      "alertRolloutHalted": "ロールアウトが停止しました",
-      "alerts": "フリートのアラート",
-      "alertsDesc": "フリート管理自体は通知を送信しません。イベントを記録し、アラートライブラリにはそれらに対する既製のアラートが用意されています。",
       "fleetDefaults": "フリートのデフォルト",
       "fleetDefaultsDesc": "各フリートの設定で個別に指定しない限り、すべてのフリートがこれらの値を使用します",
       "gateObserve": "ゲート観察時間（秒）",
@@ -28336,7 +28343,6 @@
       "offlineHeartbeatsHelp": "メッセージがないままこの回数のハートビート間隔が経過すると、コレクターはオフラインとみなされます",
       "offlineRatio": "オフライン率イベント（%）",
       "offlineRatioHelp": "オフラインのコレクターの割合がこの値を超えると、フリートイベントを記録します",
-      "openAlertLibrary": "アラートライブラリを開く",
       "outOfRange": "{min} から {max} までの数値を入力してください",
       "phaseTimeout": "フェーズのタイムアウト（秒）",
       "phaseTimeoutHelp": "この時間内に承認も拒否もされないロールアウトフェーズがあると、停止します",
