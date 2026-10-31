@@ -804,6 +804,30 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.detailStepFor(card)).toBe(step);
     });
 
+    it("queues a refresh's chart query before the probe of an expired interval", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, COUNTER);
+      await charted(grid, card);
+      land(probes()[0], counted(40));
+      await flush();
+      await flush();
+      // The interval's TTL ran out.
+      intervalProbes.cache.clear();
+      const run = vi.spyOn(createdQueues.at(-1), "run");
+
+      const refresh = grid.requestPreview(card, { skipCache: true });
+      await flush();
+      expect(probes()).toEqual([]);
+      expect(ranges()).toHaveLength(1);
+      const keys = run.mock.calls.map(([key]) => String(key));
+      expect(keys.findIndex((k) => k.includes("count_over_time"))).toBe(-1);
+
+      land(ranges()[0], SERIES);
+      await refresh;
+      await flush();
+      expect(probes()).toHaveLength(1);
+    });
+
     it("measures a stream once however often its card asks", async () => {
       const grid = await setup();
       const card = cardNamed(grid, COUNTER);

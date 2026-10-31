@@ -606,6 +606,11 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       return !!labels && labels.includes(filter.label);
     });
 
+  /** Built once per filter change; `labelFit` runs for every card on every grid pass. */
+  const labelGroups = computed(() =>
+    hasFilterGroups(labelFilters.value) ? filterGroupsOf(labelFilters.value) : null,
+  );
+
   const labelFit = (card: MetricCard): { eligible: boolean; inapplicable: LabelFilter[] } => {
     if (labelFilters.value.length === 0 || !membershipKnown.value) {
       return { eligible: true, inapplicable: [] };
@@ -620,12 +625,11 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // the exact lie this whole eligibility rule exists to prevent.
     const operands = operandStreamsOfVariant(card);
     const missing = labelFilters.value.filter((filter) => !carriedBy(operands, filter));
-    if (!hasFilterGroups(labelFilters.value)) {
-      return { eligible: missing.length === 0, inapplicable: missing };
-    }
+    const groups = labelGroups.value;
+    if (!groups) return { eligible: missing.length === 0, inapplicable: missing };
     // Grid narrowing only: the query keeps every group, since a negated or empty-matching one still matches here.
     const baseMissing = missing.filter((f) => (f.group ?? 0) <= 0);
-    const someGroupFits = filterGroupsOf(labelFilters.value).some(({ members }) =>
+    const someGroupFits = groups.some(({ members }) =>
       members.every((f) => carriedBy(operands, f)),
     );
     return { eligible: !baseMissing.length && someGroupFits, inapplicable: baseMissing };
@@ -1721,7 +1725,6 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
     const step = stepFor(card, points);
     const priority = opts?.priority ?? PRIORITY.VISIBLE;
-    ensureExportInterval(card, priority);
 
     // Already resolved — reuse it, fire NO query. A card that already has a
     // SETTLED preview (done/no-data/unavailable) is just being re-triggered
@@ -1739,6 +1742,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     const settled = previews.value[card.name];
     const pendingRefresh = !!settled?.pendingRefresh;
     let forcedRecheck = false;
+    // A refresh re-queries, and its probe follows the chart; queued first it would take the chart's slot.
+    if (!opts?.skipCache && !pendingRefresh) ensureExportInterval(card, priority);
 
     if (
       !opts?.skipCache &&
