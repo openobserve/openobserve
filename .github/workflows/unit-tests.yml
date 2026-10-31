@@ -322,7 +322,7 @@ jobs:
       - name: Download Vitest results from GitHub Actions Artifacts
         uses: actions/download-artifact@v4
         with:
-          path: web/.vitest
+          path: web/.vitest-reports
           merge-multiple: true
 
       - name: Merge reports
