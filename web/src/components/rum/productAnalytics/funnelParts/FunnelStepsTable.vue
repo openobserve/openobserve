@@ -15,27 +15,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col" data-test="rum-analytics-funnel-steps-table">
+  <div
+    class="flex flex-col"
+    :class="compare ? (hideTime ? 'md:min-w-[60rem]' : 'md:min-w-[69rem]') : ''"
+    data-test="rum-analytics-funnel-steps-table"
+  >
+    <!-- Two rows in both states, so turning compare on or off never moves the table. -->
     <div
-      class="text-text-secondary bg-surface-subtle grid items-center gap-x-3 px-2 py-2 text-xs max-md:hidden"
-      :class="gridClass"
+      class="text-text-secondary bg-surface-subtle flex flex-col gap-1 px-2 py-2 text-xs max-md:hidden"
       data-test="rum-analytics-funnel-steps-header"
     >
-      <span />
-      <span
-        v-for="col in headerCols"
-        :key="col.id"
-        class="flex items-center gap-1"
-        :class="col.id === 'step' ? '' : 'justify-end'"
-        :data-test="`rum-analytics-funnel-col-${col.id}`"
-        >{{ col.label }}
-        <span tabindex="0" role="img" :aria-label="col.tip" class="flex items-center">
-          <OIcon name="info-outline" size="xs" />
-          <OTooltip :content="col.tip" />
+      <div class="grid h-5 items-end gap-x-3" :class="gridClass">
+        <span
+          v-if="compare"
+          class="border-border-default col-span-3 col-start-4 flex items-center justify-center gap-1 border-b pb-0.5"
+          data-test="rum-analytics-funnel-col-of-previous"
+          >{{ t("rum.analytics.funnel.ofPrevious") }}
+          <span
+            tabindex="0"
+            role="img"
+            :aria-label="t('rum.analytics.funnel.ofPreviousTooltip')"
+            class="flex items-center"
+          >
+            <OIcon name="info-outline" size="xs" />
+            <OTooltip :content="t('rum.analytics.funnel.ofPreviousTooltip')" />
+          </span>
         </span>
-      </span>
-      <span />
-      <span />
+      </div>
+      <div class="grid min-h-8 items-end gap-x-3" :class="gridClass">
+        <span />
+        <span
+          v-for="col in headerCols"
+          :key="col.id"
+          class="flex items-center gap-1"
+          :class="col.id === 'step' ? '' : 'justify-end text-end'"
+          :data-test="`rum-analytics-funnel-col-${col.id}`"
+          >{{ col.label }}
+          <span tabindex="0" role="img" :aria-label="col.tip" class="flex items-center">
+            <OIcon name="info-outline" size="xs" />
+            <OTooltip :content="col.tip" />
+          </span>
+        </span>
+        <span />
+        <span class="bg-surface-subtle self-stretch md:sticky md:end-0" />
+      </div>
     </div>
     <VueDraggableNext
       :model-value="def.steps"
@@ -104,7 +127,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </span>
           <template v-if="numbersReady && result && result.steps[i]">
+            <span v-if="compare" class="flex flex-col items-end tabular-nums">
+              <span
+                class="text-text-heading font-semibold"
+                :data-test="`rum-analytics-funnel-step-${i}-count`"
+                >{{ formatCount(result.steps[i].units, sampled) }}</span
+              >
+              <span
+                v-if="stepCompare(i)?.prevUnits != null"
+                class="text-text-secondary text-xs"
+                :data-test="`rum-analytics-funnel-step-${i}-prev-count`"
+                >{{
+                  t("rum.analytics.funnel.previousCount", {
+                    count: formatCount(stepCompare(i)?.prevUnits ?? 0, sampled),
+                  })
+                }}</span
+              >
+            </span>
             <span
+              v-else
               class="text-text-heading text-end font-semibold tabular-nums"
               :data-test="`rum-analytics-funnel-step-${i}-count`"
               >{{ formatCount(result.steps[i].units, sampled) }}</span
@@ -112,6 +153,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-end tabular-nums">{{
               i === 0 ? dash : pct(result.steps[i].ofPrevious)
             }}</span>
+            <template v-if="compare">
+              <span
+                class="text-end tabular-nums"
+                :class="prevRate(i) === null ? 'text-text-secondary' : 'text-text-body'"
+                :data-test="`rum-analytics-funnel-step-${i}-prev-rate`"
+                >{{ prevRate(i) === null ? dash : pct(prevRate(i) ?? 0)
+                }}<OTooltip
+                  v-if="compareFailed && i > 0"
+                  :content="t('rum.analytics.funnel.previousFailed')"
+              /></span>
+              <span class="flex justify-end" :data-test="`rum-analytics-funnel-step-${i}-change`">
+                <FunnelChangeCell
+                  :change="stepCompare(i)?.change ?? null"
+                  :unit-noun="unitNoun"
+                  :failed="compareFailed && i > 0"
+                  end
+                />
+              </span>
+            </template>
             <span
               v-if="!hideTime"
               class="flex flex-col items-end tabular-nums"
@@ -127,18 +187,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <span v-else>{{ dash }}</span>
             </span>
-            <span class="text-end tabular-nums">{{ pct(result.steps[i].ofFirst) }}</span>
+            <span v-if="prevBars" class="flex flex-col items-end tabular-nums">
+              <span>{{ pct(result.steps[i].ofFirst) }}</span>
+              <span
+                class="text-text-secondary text-xs"
+                :data-test="`rum-analytics-funnel-step-${i}-prev-of-first`"
+                >{{
+                  stepCompare(i)?.prevOfFirst == null ? dash : pct(stepCompare(i)?.prevOfFirst ?? 0)
+                }}</span
+              >
+            </span>
+            <span v-else class="text-end tabular-nums">{{ pct(result.steps[i].ofFirst) }}</span>
             <span class="min-w-24">
               <FunnelStepBar
                 :value="result.steps[i].ofFirst"
                 :removed="removedShare(i)"
+                :compare="prevBars"
+                :previous="stepCompare(i)?.prevOfFirst ?? null"
                 :data-test="`rum-analytics-funnel-bar-${i}`"
               />
             </span>
           </template>
           <template v-else-if="numbersHeld">
             <span
-              v-for="n in hideTime ? 4 : 5"
+              v-for="n in numberCols"
               :key="n"
               class="text-text-secondary text-end"
               :data-test="n === 1 ? `rum-analytics-funnel-step-${i}-held` : undefined"
@@ -146,15 +218,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </template>
           <template v-else>
-            <OSkeleton v-for="n in hideTime ? 4 : 5" :key="n" type="text" class="h-5 w-full" />
+            <OSkeleton v-for="n in numberCols" :key="n" type="text" class="h-5 w-full" />
           </template>
-          <span class="flex items-center justify-end gap-0.5">
+          <span class="md:bg-surface-base flex items-center justify-end gap-0.5 md:sticky md:end-0">
             <StepConditionPopover
-              v-if="step.kind === 'p'"
               :step="step"
               :index="i"
+              :fields="stepFields(i).map((f) => f.field)"
+              :fields-state="fieldSampleState"
+              :values="filterValues"
               @update="(s) => replaceStep(i, s)"
+              @filter-values="(f) => emit('filter-values', f)"
+              @load-fields="emit('load-fields')"
             />
+            <ODropdown align="end" @update:open="(o) => o && emit('load-fields')">
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="more-vert"
+                  :aria-label="t('rum.analytics.funnel.stepMenu')"
+                  :data-test="`rum-analytics-funnel-step-${i}-menu`"
+                  ><OTooltip :content="t('rum.analytics.funnel.stepMenu')"
+                /></OButton>
+              </template>
+              <ODropdownItem
+                icon-left="alt-route"
+                :data-test="`rum-analytics-funnel-step-${i}-break-down`"
+                @select="emit('break-down-step', i + 1)"
+                >{{ t("rum.analytics.funnel.breakDownByStep") }}</ODropdownItem
+              >
+              <ODropdownItem
+                v-if="i < def.steps.length - 1"
+                icon-left="show-chart"
+                :data-test="`rum-analytics-funnel-step-${i}-trend-from`"
+                @select="emit('trend-from-step', i + 1)"
+                >{{ t("rum.analytics.funnel.trendFromHere") }}</ODropdownItem
+              >
+            </ODropdown>
             <OButton
               variant="ghost"
               size="icon-sm"
@@ -171,7 +272,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="ps-12 pb-1"
         >
           <OButton
-            v-if="result.steps[i].dropoff > 0"
+            v-if="result.steps[i].dropoff > 0 && dropCompare(i)"
+            :variant="dropVariant(i)"
+            size="xs"
+            icon-left="arrow-downward"
+            icon-right="chevron-right"
+            aria-haspopup="dialog"
+            :aria-label="
+              t('rum.analytics.funnel.droppedCompareAria', { ...dropParams(i), step: i + 1 })
+            "
+            :data-test="`rum-analytics-funnel-dropoff-${i}`"
+            @click="emit('dropoff', i + 1)"
+            >{{ t("rum.analytics.funnel.droppedCompare", dropParams(i))
+            }}<OTooltip
+              :content="
+                t('rum.analytics.funnel.droppedCompareTooltip', {
+                  ...dropParams(i),
+                  outOf: formatCount(result.steps[i].units, sampled),
+                  prevOutOf: formatCount(dropCompare(i)?.prevOutOf ?? 0, sampled),
+                  unit: unitNoun,
+                  range: raw(compare?.rangeExact ?? ''),
+                  prevRange: raw(compare?.prevRangeExact ?? ''),
+                })
+              "
+          /></OButton>
+          <OButton
+            v-else-if="result.steps[i].dropoff > 0"
             variant="ghost-primary"
             size="xs"
             icon-left="arrow-downward"
@@ -215,7 +341,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import FunnelStepBar from "@/components/rum/productAnalytics/funnelParts/FunnelStepBar.vue";
+import FunnelChangeCell from "@/components/rum/productAnalytics/funnelParts/FunnelChangeCell.vue";
 import StepConditionPopover from "@/components/rum/productAnalytics/funnelParts/StepConditionPopover.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import useStepLabels from "@/components/rum/productAnalytics/funnelParts/useStepLabels";
 import {
   removeStep,
@@ -223,7 +352,10 @@ import {
   stepOrder,
   type FunnelEdit,
 } from "@/components/rum/productAnalytics/funnelParts/funnelEdits";
+import type { FilterValuesState } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
 import type { PanelState } from "@/composables/rum/useAnalyticsSearch";
+import type { FieldSampleState } from "@/composables/rum/useFunnelFieldSample";
+import { fieldsOnStep, type FieldSample, type SeenField } from "@/utils/rum/funnelFields";
 import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
@@ -233,6 +365,7 @@ import {
   type NamedEvent,
 } from "@/utils/rum/productAnalyticsModel";
 import type { FunnelDef, SampleRatio, StepRef } from "@/utils/rum/productAnalyticsQueries";
+import type { DropCompare, FunnelCompareView, StepCompare } from "@/utils/rum/funnelCompare";
 
 const props = defineProps<{
   def: FunnelDef;
@@ -246,10 +379,18 @@ const props = defineProps<{
   unitLabel: I18nText;
   unitNoun: I18nText;
   hideTime: boolean;
+  compare?: FunnelCompareView | null;
+  fieldSample?: FieldSample | null;
+  fieldSampleState?: FieldSampleState;
+  filterValues?: FilterValuesState;
 }>();
 const emit = defineEmits<{
   "update:def": [FunnelDef];
   dropoff: [number];
+  "filter-values": [string];
+  "load-fields": [];
+  "break-down-step": [number];
+  "trend-from-step": [number];
 }>();
 const { t } = useI18nTyped();
 const { labelOf, kindLabel, kindVariant, filterChips } = useStepLabels(
@@ -259,11 +400,20 @@ const { labelOf, kindLabel, kindVariant, filterChips } = useStepLabels(
 );
 const dash = raw("—");
 
-const gridClass = computed(() =>
-  props.hideTime
-    ? "grid-cols-[3rem_minmax(0,3fr)_5.5rem_7rem_5.5rem_minmax(6rem,2fr)_4rem]"
-    : "grid-cols-[3rem_minmax(0,3fr)_5.5rem_7rem_8rem_5.5rem_minmax(6rem,2fr)_4rem]",
-);
+const GRID = {
+  plain: "grid-cols-[3rem_minmax(0,3fr)_5.5rem_7rem_7rem_minmax(6rem,2fr)_6rem]",
+  plainTime: "grid-cols-[3rem_minmax(0,3fr)_5.5rem_7rem_8rem_7rem_minmax(6rem,2fr)_6rem]",
+  compare: "grid-cols-[3rem_minmax(0,3fr)_5.5rem_6rem_6rem_6.5rem_7rem_minmax(6rem,2fr)_6rem]",
+  compareTime:
+    "grid-cols-[3rem_minmax(0,3fr)_5.5rem_6rem_6rem_6.5rem_8rem_7rem_minmax(6rem,2fr)_6rem]",
+} as const;
+
+const gridClass = computed(() => {
+  if (props.compare) return props.hideTime ? GRID.compare : GRID.compareTime;
+  return props.hideTime ? GRID.plain : GRID.plainTime;
+});
+
+const numberCols = computed(() => (props.hideTime ? 4 : 5) + (props.compare ? 2 : 0));
 
 const headerCols = computed(() => [
   { id: "step", label: t("rum.analytics.funnel.step"), tip: t("rum.analytics.funnel.orderLabel") },
@@ -272,11 +422,31 @@ const headerCols = computed(() => [
     label: props.unitLabel,
     tip: t("rum.analytics.funnel.unitTooltip", { unit: props.unitLabel }),
   },
-  {
-    id: "of-previous",
-    label: t("rum.analytics.funnel.ofPrevious"),
-    tip: t("rum.analytics.funnel.ofPreviousTooltip"),
-  },
+  ...(props.compare
+    ? [
+        {
+          id: "this-period",
+          label: t("rum.analytics.funnel.thisPeriod"),
+          tip: raw(props.compare.rangeExact),
+        },
+        {
+          id: "previous-period",
+          label: props.compare.label,
+          tip: raw(props.compare.prevRangeExact),
+        },
+        {
+          id: "change",
+          label: t("rum.analytics.funnel.changeHeader"),
+          tip: t("rum.analytics.funnel.changeHeaderTooltip"),
+        },
+      ]
+    : [
+        {
+          id: "of-previous",
+          label: t("rum.analytics.funnel.ofPrevious"),
+          tip: t("rum.analytics.funnel.ofPreviousTooltip"),
+        },
+      ]),
   ...(props.hideTime
     ? []
     : [
@@ -289,7 +459,9 @@ const headerCols = computed(() => [
   {
     id: "of-first",
     label: t("rum.analytics.funnel.ofFirst"),
-    tip: t("rum.analytics.funnel.ofFirstTooltip"),
+    tip: props.compare
+      ? t("rum.analytics.funnel.ofFirstCompareTooltip")
+      : t("rum.analytics.funnel.ofFirstTooltip"),
   },
 ]);
 
@@ -302,6 +474,39 @@ const numbersHeld = computed(
 );
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+
+const compareData = computed(() =>
+  props.compare?.status === "ok" ? (props.compare.data ?? null) : null,
+);
+const compareFailed = computed(() => props.compare?.status === "failed");
+// An empty previous period has no bar to draw, so the rows keep their compare-off bar.
+const prevBars = computed(() => !!compareData.value && !compareData.value.empty);
+
+const stepCompare = (i: number): StepCompare | null => compareData.value?.steps[i] ?? null;
+
+const prevRate = (i: number): number | null =>
+  i === 0 ? null : (stepCompare(i)?.prevOfPrevious ?? null);
+
+const dropCompare = (i: number): DropCompare | null =>
+  prevBars.value ? (compareData.value?.drops[i] ?? null) : null;
+
+const dropParams = (i: number) => {
+  const d = dropCompare(i);
+  const r = props.result?.steps;
+  return {
+    pct: pct(r?.[i + 1] ? 1 - r[i + 1].ofPrevious : 0),
+    count: formatCount(r?.[i]?.dropoff ?? 0, props.sampled),
+    prevPct: pct(d?.prevRate ?? 0),
+    prevCount: formatCount(d?.prevCount ?? 0, props.sampled),
+  };
+};
+
+// Red is the same event as a red change on the next row; grey wins under the low-volume rule.
+const dropVariant = (i: number) => {
+  const d = dropCompare(i);
+  if (d?.lowVolume) return "ghost-muted";
+  return d?.rose ? "ghost-destructive" : "ghost-primary";
+};
 
 const isDeleted = (s: StepRef) => s.kind === "e" && !props.events.some((e) => e.id === s.key);
 
@@ -321,6 +526,8 @@ const apply = (edit: FunnelEdit | null) => {
   }
   emit("update:def", edit.def);
 };
+
+const stepFields = (i: number): SeenField[] => fieldsOnStep(props.fieldSample ?? null, i + 1);
 
 const replaceStep = (i: number, step: StepRef) =>
   emit("update:def", { ...props.def, steps: props.def.steps.map((s, j) => (j === i ? step : s)) });
