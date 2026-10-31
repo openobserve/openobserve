@@ -7939,6 +7939,7 @@
       "aggRangeDesc": "Differenza tra max e min",
       "aggDiffLabel": "Diff:",
       "aggDiffDesc": "Differenza tra ultimo e primo",
+      "aggInstantNote": "Su un grafico a torta o a ciambella questo si applica alle query che restituiscono più campioni, come le query Range. Una Instant query con un solo campione mantiene quel campione, quindi combinarle mostra valori ridotti accanto a quelli grezzi.",
       "geoLatTooltip": "Nome dell'etichetta metrica contenente i valori di latitudine. Predefinito: \"latitude\" o \"lat\"",
       "geoLonTooltip": "Nome dell'etichetta metrica contenente i valori di longitudine. Predefinito: \"longitude\" o \"lon\"",
       "geoWeightTooltip": "Nome dell'etichetta metrica contenente i valori di peso. Predefinito: \"weight\"",
@@ -21224,6 +21225,17 @@
       "moreInfoAbout": "Maggiori informazioni su {field}",
       "moreInfo": "Maggiori informazioni"
     },
+    "streamPicker": {
+      "internalStreams": "Stream interni",
+      "hiddenCount": "{count} nascosti",
+      "matchCount": "{count} corrispondenza nascosta | {count} corrispondenze nascoste",
+      "hide": "Nascondi",
+      "show": "Mostra",
+      "hideInternal": "Nascondi stream interni",
+      "showInternal": "Mostra stream interni",
+      "announceHidden": "Stream interni nascosti",
+      "announceShown": "Stream interni mostrati"
+    },
     "templateInput": {
       "suggestions": "Suggerimenti variabili"
     },
@@ -28314,11 +28326,6 @@
       "target": "Destinazione",
       "auditDisabled": "Il registro di audit richiede O2_AUDIT_ENABLED=true sul server",
       "auditDelayHint": "Ancora nessuna voce. Il server pubblica i record di audit a lotti, ogni 10 minuti per impostazione predefinita (O2_AUDIT_PUBLISH_INTERVAL).",
-      "alertAutoRolledBack": "Un rollout è stato ripristinato automaticamente",
-      "alertOfflineRatio": "La quota offline di un fleet ha superato la sua soglia",
-      "alertRolloutHalted": "Un rollout è stato interrotto",
-      "alerts": "Avvisi per i fleet",
-      "alertsDesc": "La gestione dei fleet non invia notifiche da sola. Registra eventi e la libreria degli avvisi ne offre di già pronti.",
       "fleetDefaults": "Valori predefiniti dei fleet",
       "fleetDefaultsDesc": "Ogni fleet usa questi valori a meno che non imposti i propri nelle sue impostazioni",
       "gateObserve": "Osservazione della soglia (secondi)",
@@ -28336,7 +28343,6 @@
       "offlineHeartbeatsHelp": "Un collector è offline dopo questo numero di intervalli di heartbeat senza alcun messaggio",
       "offlineRatio": "Evento di quota offline (%)",
       "offlineRatioHelp": "Registra un evento del fleet quando più di questa quota di collector è offline",
-      "openAlertLibrary": "Apri la libreria degli avvisi",
       "outOfRange": "Inserisci un numero da {min} a {max}",
       "phaseTimeout": "Timeout della fase (secondi)",
       "phaseTimeoutHelp": "Una fase del rollout che non conferma né rifiuta entro questo tempo viene interrotta",
