@@ -30,6 +30,7 @@ import DateTime from "@/components/DateTime.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import K8sListView from "./K8sListView.vue";
 import MapView from "./MapView.vue";
+import DependenciesView from "./DependenciesView.vue";
 import ClusterOverview from "./ClusterOverview.vue";
 import WorkloadsOverview from "./WorkloadsOverview.vue";
 import K8sDetailsDrawer from "./K8sDetailsDrawer.vue";
@@ -85,7 +86,7 @@ import {
   type K8sUrlState,
 } from "./kubernetesUrlState";
 
-type ListView = Exclude<View, "cluster" | "map" | "workloads">;
+type ListView = Exclude<View, "cluster" | "map" | "dependencies" | "workloads">;
 
 const DEFAULT_RELATIVE_PERIOD = "1h";
 const DEFAULT_WINDOW_US = 60 * 60 * 1000 * 1000;
@@ -242,7 +243,9 @@ const listRows = computed(() => {
   return kind ? scopedRows(k8s.inventory.value[INVENTORY_KEY[kind]] as AnyRow[]) : [];
 });
 
-const isList = computed(() => !["cluster", "map", "workloads"].includes(state.value.view));
+const isList = computed(
+  () => !["cluster", "map", "dependencies", "workloads"].includes(state.value.view),
+);
 
 const drawerRow = computed(() => {
   const d = state.value.details;
@@ -637,6 +640,19 @@ k8s.loadStreams();
             @update="onUpdate"
             @open="onOpen"
             @navigate="onNavigate"
+            @refresh="onRefresh"
+          />
+          <DependenciesView
+            v-else-if="state.view === 'dependencies'"
+            :state="state"
+            :cluster="k8s.effectiveCluster.value"
+            :namespace-options="k8s.namespaceOptions.value"
+            :range="range"
+            :org-id="orgId"
+            :refresh-nonce="k8s.refreshNonce.value"
+            :has-stream="k8s.has"
+            @update="onUpdate"
+            @open="onOpen"
             @refresh="onRefresh"
           />
           <K8sListView

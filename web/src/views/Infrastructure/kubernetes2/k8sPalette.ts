@@ -36,6 +36,7 @@ const GROUP_ORDER: PaletteGroup[] = ["goTo", "attention", "workloads", "pods", "
 const VIEW_ENTRIES: { view: View; label: I18nKey }[] = [
   { view: "cluster", label: "infra.k8s2.paletteClusterOverview" },
   { view: "map", label: "infra.k8s2.viewMap" },
+  { view: "dependencies", label: "infra.k8s2.viewDependencies" },
   { view: "nodes", label: "infra.k8s2.viewNodes" },
   { view: "namespaces", label: "infra.k8s2.viewNamespaces" },
   { view: "events", label: "infra.k8s2.viewEvents" },

@@ -55,6 +55,7 @@ describe("buildTree", () => {
     expect(groups[0].items.map((i) => i.view)).toEqual([
       "cluster",
       "map",
+      "dependencies",
       "nodes",
       "namespaces",
       "events",
