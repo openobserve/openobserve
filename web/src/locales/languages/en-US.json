@@ -8072,6 +8072,7 @@
       "aggRangeDesc": "Difference between max and min",
       "aggDiffLabel": "Diff:",
       "aggDiffDesc": "Difference between last and first",
+      "aggInstantNote": "On a pie or donut this applies to queries that return several samples, such as Range queries. An Instant query with a single sample keeps that sample, so mixing both shows reduced values beside raw ones.",
       "geoLatTooltip": "Name of the metric label containing latitude values. Default: \"latitude\" or \"lat\"",
       "geoLonTooltip": "Name of the metric label containing longitude values. Default: \"longitude\" or \"lon\"",
       "geoWeightTooltip": "Name of the metric label containing weight values. Default: \"weight\"",
@@ -21357,6 +21358,17 @@
       "moreInfoAbout": "More information about {field}",
       "moreInfo": "More information"
     },
+    "streamPicker": {
+      "internalStreams": "Internal streams",
+      "hiddenCount": "{count} hidden",
+      "matchCount": "{count} hidden match | {count} hidden matches",
+      "hide": "Hide",
+      "show": "Show",
+      "hideInternal": "Hide internal streams",
+      "showInternal": "Show internal streams",
+      "announceHidden": "Internal streams hidden",
+      "announceShown": "Internal streams shown"
+    },
     "templateInput": {
       "suggestions": "Variable suggestions"
     },
@@ -28447,11 +28459,6 @@
       "target": "Target",
       "auditDisabled": "The audit trail needs O2_AUDIT_ENABLED=true on the server",
       "auditDelayHint": "No entries yet. The server publishes audit records in batches, every 10 minutes by default (O2_AUDIT_PUBLISH_INTERVAL).",
-      "alertAutoRolledBack": "A rollout was rolled back automatically",
-      "alertOfflineRatio": "A fleet's offline share exceeded its threshold",
-      "alertRolloutHalted": "A rollout halted",
-      "alerts": "Alerts for fleets",
-      "alertsDesc": "Fleet management sends no notifications itself. It records events, and the alert library has ready-made alerts on them.",
       "fleetDefaults": "Fleet defaults",
       "fleetDefaultsDesc": "Every fleet uses these values unless it sets its own in its settings",
       "gateObserve": "Gate observation (seconds)",
@@ -28469,7 +28476,6 @@
       "offlineHeartbeatsHelp": "A collector is offline after this many heartbeat intervals without a message",
       "offlineRatio": "Offline-ratio event (%)",
       "offlineRatioHelp": "Records a fleet event when more than this share of collectors is offline",
-      "openAlertLibrary": "Open the alert library",
       "outOfRange": "Enter a number from {min} to {max}",
       "phaseTimeout": "Phase timeout (seconds)",
       "phaseTimeoutHelp": "A rollout phase that neither confirms nor rejects in this time halts",

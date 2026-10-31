@@ -1021,6 +1021,7 @@ export const useStreamFields = () => {
         searchObj.data.stream.streamLists = searchObj.data.streamResults.list.map((item: any) => ({
           label: item.name,
           value: item.name,
+          internal: item.is_internal === true,
         }));
 
         if (!selectStream) return;

@@ -8074,6 +8074,7 @@
       "aggRangeDesc": "Différence entre max et min",
       "aggDiffLabel": "Diff. :",
       "aggDiffDesc": "Différence entre la dernière et la première",
+      "aggInstantNote": "Sur un graphique en secteurs ou en anneau, cela s'applique aux requêtes qui renvoient plusieurs échantillons, comme les requêtes Range. Une requête Instant avec un seul échantillon conserve cet échantillon ; mélanger les deux affiche donc des valeurs réduites à côté de valeurs brutes.",
       "geoLatTooltip": "Nom de l'étiquette métrique contenant les valeurs de latitude. Par défaut : \"latitude\" ou \"lat\"",
       "geoLonTooltip": "Nom de l'étiquette métrique contenant les valeurs de longitude. Par défaut : \"longitude\" ou \"lon\"",
       "geoWeightTooltip": "Nom de l'étiquette métrique contenant les valeurs de poids. Par défaut : \"weight\"",
@@ -21359,6 +21360,17 @@
       "moreInfoAbout": "Plus d'informations sur {field}",
       "moreInfo": "Plus d'informations"
     },
+    "streamPicker": {
+      "internalStreams": "Flux internes",
+      "hiddenCount": "{count} masqués",
+      "matchCount": "{count} correspondance masquée | {count} correspondances masquées",
+      "hide": "Masquer",
+      "show": "Afficher",
+      "hideInternal": "Masquer les flux internes",
+      "showInternal": "Afficher les flux internes",
+      "announceHidden": "Flux internes masqués",
+      "announceShown": "Flux internes affichés"
+    },
     "templateInput": {
       "suggestions": "Suggestions de variables"
     },
@@ -28449,11 +28461,6 @@
       "target": "Cible",
       "auditDisabled": "Le journal d'audit nécessite O2_AUDIT_ENABLED=true sur le serveur",
       "auditDelayHint": "Aucune entrée pour l'instant. Le serveur publie les enregistrements d'audit par lots, toutes les 10 minutes par défaut (O2_AUDIT_PUBLISH_INTERVAL).",
-      "alertAutoRolledBack": "Un déploiement a été annulé automatiquement",
-      "alertOfflineRatio": "La part de collecteurs hors ligne d'une flotte a dépassé son seuil",
-      "alertRolloutHalted": "Un déploiement a été interrompu",
-      "alerts": "Alertes pour les flottes",
-      "alertsDesc": "La gestion de la flotte n'envoie aucune notification elle-même. Elle enregistre des événements, et la bibliothèque d'alertes propose des alertes prêtes à l'emploi sur ceux-ci.",
       "fleetDefaults": "Valeurs par défaut des flottes",
       "fleetDefaultsDesc": "Chaque flotte utilise ces valeurs, sauf si elle définit les siennes dans ses paramètres",
       "gateObserve": "Observation du contrôle (secondes)",
@@ -28471,7 +28478,6 @@
       "offlineHeartbeatsHelp": "Un collecteur est hors ligne après ce nombre d'intervalles de heartbeat sans message",
       "offlineRatio": "Événement de ratio hors ligne (%)",
       "offlineRatioHelp": "Enregistre un événement de flotte lorsque plus de cette part de collecteurs est hors ligne",
-      "openAlertLibrary": "Ouvrir la bibliothèque d'alertes",
       "outOfRange": "Saisissez un nombre de {min} à {max}",
       "phaseTimeout": "Délai d'une phase (secondes)",
       "phaseTimeoutHelp": "Une phase de déploiement qui ne confirme ni ne rejette dans ce délai est interrompue",

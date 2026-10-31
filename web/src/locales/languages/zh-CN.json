@@ -8074,6 +8074,7 @@
       "aggRangeDesc": "最大值与最小值之差",
       "aggDiffLabel": "差值：",
       "aggDiffDesc": "最后一个与第一个之差",
+      "aggInstantNote": "在饼图或环形图中，这会应用于返回多个样本的查询，例如 Range 查询。仅返回单个样本的 Instant 查询会保留该样本，因此混用两者时，会在原始值旁显示聚合后的值。",
       "geoLatTooltip": "包含纬度值的度量标签名称。默认值：\"latitude\" 或 \"lat\"",
       "geoLonTooltip": "包含经度值的度量标签名称。默认值：\"longitude\" 或 \"lon\"",
       "geoWeightTooltip": "包含权重值的度量标签名称。默认值：\"weight\"",
@@ -21359,6 +21360,17 @@
       "moreInfoAbout": "关于{field}的更多信息",
       "moreInfo": "更多信息"
     },
+    "streamPicker": {
+      "internalStreams": "内部数据流",
+      "hiddenCount": "已隐藏 {count} 个",
+      "matchCount": "{count} 个隐藏匹配 | {count} 个隐藏匹配",
+      "hide": "隐藏",
+      "show": "显示",
+      "hideInternal": "隐藏内部数据流",
+      "showInternal": "显示内部数据流",
+      "announceHidden": "已隐藏内部数据流",
+      "announceShown": "已显示内部数据流"
+    },
     "templateInput": {
       "suggestions": "变量建议"
     },
@@ -28449,11 +28461,6 @@
       "target": "对象",
       "auditDisabled": "审计跟踪需要在服务器上设置 O2_AUDIT_ENABLED=true",
       "auditDelayHint": "暂无记录。服务器按批发布审计记录,默认每 10 分钟一次(O2_AUDIT_PUBLISH_INTERVAL)。",
-      "alertAutoRolledBack": "上线已自动回滚",
-      "alertOfflineRatio": "机群的离线占比超过其阈值",
-      "alertRolloutHalted": "上线已暂停",
-      "alerts": "机群告警",
-      "alertsDesc": "机群管理本身不发送通知。它只记录事件，告警库中有基于这些事件的现成告警。",
       "fleetDefaults": "机群默认值",
       "fleetDefaultsDesc": "除非在自身设置中另行指定，否则每个机群都使用这些值",
       "gateObserve": "关卡观察时间（秒）",
@@ -28471,7 +28478,6 @@
       "offlineHeartbeatsHelp": "Collector 在这么多个心跳间隔内没有消息即视为离线",
       "offlineRatio": "离线占比事件（%）",
       "offlineRatioHelp": "当离线 Collector 的占比超过此值时记录机群事件",
-      "openAlertLibrary": "打开告警库",
       "outOfRange": "请输入 {min} 到 {max} 之间的数字",
       "phaseTimeout": "阶段超时（秒）",
       "phaseTimeoutHelp": "上线阶段在此时间内既未确认也未拒绝则暂停",
