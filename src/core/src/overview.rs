@@ -855,6 +855,7 @@ mod tests {
             total_fields: 0,
             pattern_associations: vec![],
             is_derived: None,
+            is_internal: false,
         }
     }
 
