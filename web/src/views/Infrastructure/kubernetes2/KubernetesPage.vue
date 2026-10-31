@@ -646,6 +646,7 @@ k8s.loadStreams();
             v-else-if="state.view === 'dependencies'"
             :state="state"
             :cluster="k8s.effectiveCluster.value"
+            :cluster-pending="k8s.effectiveCluster.value == null && !k8s.loaded.value"
             :namespace-options="k8s.namespaceOptions.value"
             :range="range"
             :org-id="orgId"

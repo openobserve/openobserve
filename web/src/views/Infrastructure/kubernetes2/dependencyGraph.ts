@@ -30,6 +30,9 @@ export const SYSTEM_NAMESPACES: ReadonlySet<string> = new Set([
 // Past this a layered graph stops being readable, so only the busiest ends are drawn.
 export const MAX_GRAPH_NODES = 80;
 
+// Endpoints alone do not bound the edges between them, and every edge is also a button in the edge list.
+export const MAX_GRAPH_EDGES = 200;
+
 const MIN_WINDOW_S = 300;
 // One day of samples keeps the instant query cheap on a long range.
 const MAX_WINDOW_S = 86_400;
@@ -258,8 +261,12 @@ export function filterFlows(edges: FlowEdge[], filter: FlowFilter): FlowEdge[] {
   });
 }
 
-// Takes the busiest edges while their ends fit under the limit, ranked so each caller sits left of what it calls.
-export function buildGraph(edges: FlowEdge[], limit = MAX_GRAPH_NODES): FlowGraph {
+// Takes the busiest edges while they and their ends fit under the limits, ranked so each caller sits left of what it calls.
+export function buildGraph(
+  edges: FlowEdge[],
+  limit = MAX_GRAPH_NODES,
+  edgeLimit = MAX_GRAPH_EDGES,
+): FlowGraph {
   const totals = new Map<string, { end: FlowEnd; total: number }>();
   for (const e of edges) {
     for (const end of [e.source, e.target]) {
@@ -273,6 +280,7 @@ export function buildGraph(edges: FlowEdge[], limit = MAX_GRAPH_NODES): FlowGrap
   const keptEdges: FlowEdge[] = [];
   const busiest = [...edges].sort((x, y) => y.total - x.total || x.id.localeCompare(y.id));
   for (const e of busiest) {
+    if (keptEdges.length >= edgeLimit) break;
     const added = [e.source.id, e.target.id].filter((id) => !kept.has(id)).length;
     if (kept.size + added > limit) continue;
     kept.add(e.source.id);

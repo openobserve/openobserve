@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 import type { Series } from "./kubernetesModel";
 import {
+  MAX_GRAPH_EDGES,
   buildGraph,
   endOf,
   filterFlows,
@@ -254,6 +255,21 @@ describe("buildGraph", () => {
     const graph = buildGraph(disjoint, 80);
     expect(graph.edges).toHaveLength(40);
     expect(graph.nodes).toHaveLength(80);
+  });
+
+  it("caps a dense graph's edges, busiest first", () => {
+    const ends = Array.from({ length: 25 }, (_, i) => W("mesh", `svc-${i}`));
+    const rows: Series[] = [];
+    ends.forEach((a, i) =>
+      ends.slice(i + 1).forEach((b, j) => rows.push(flow(a, b, "request", 1000 - i - j))),
+    );
+    const dense = pairFlows(rows);
+    expect(dense).toHaveLength(300);
+    const graph = buildGraph(dense);
+    expect(graph.edges).toHaveLength(MAX_GRAPH_EDGES);
+    const weakestKept = Math.min(...graph.edges.map((e) => e.total));
+    const left = dense.filter((e) => !graph.edges.includes(e));
+    expect(Math.max(...left.map((e) => e.total))).toBeLessThanOrEqual(weakestKept);
   });
 
   it("survives a cycle", () => {

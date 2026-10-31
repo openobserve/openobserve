@@ -299,6 +299,19 @@ describe("DependenciesView", () => {
     ]);
   });
 
+  it("waits for the page to learn the cluster before querying", async () => {
+    await mountView({ cluster: null, clusterPending: true });
+    expect(metricsQuery).not.toHaveBeenCalled();
+    expect(testId("k8s2-deps-loading").exists()).toBe(true);
+    await wrapper.setProps({ cluster: "prod", clusterPending: false });
+    await flushPromises();
+    expect(metricsQuery).toHaveBeenCalledTimes(1);
+    expect(decodeURIComponent((metricsQuery.mock.calls[0][0] as any).query)).toContain(
+      'k8s_cluster="prod"',
+    );
+    expect(chart().exists()).toBe(true);
+  });
+
   it("refetches on a refresh", async () => {
     await mountView();
     await queryClient.invalidateQueries();

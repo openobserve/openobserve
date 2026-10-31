@@ -52,6 +52,8 @@ import {
 const props = defineProps<{
   state: K8sUrlState;
   cluster: string | null;
+  // The page has not yet learnt which cluster to show; an unscoped query now would be thrown away.
+  clusterPending?: boolean;
   namespaceOptions: string[];
   range: K8sTime;
   orgId: string;
@@ -101,7 +103,7 @@ async function load() {
     selectedEdgeId.value = null;
     loadedFor = null;
   }
-  if (!hasFlows.value) {
+  if (!hasFlows.value || props.clusterPending) {
     loading.value = false;
     return;
   }
@@ -135,6 +137,7 @@ watch(
     props.range.end,
     props.refreshNonce,
     hasFlows.value,
+    props.clusterPending,
   ],
   load,
   { immediate: true },
