@@ -432,6 +432,30 @@ describe("metricsUrlState · legacyLinkToVisualizeQuery", () => {
     expect(data.queries[0].query).toBe("rate(cpu[5m])");
   });
 
+  // An empty stream is auto-filled after the first run, which flags the landed chart as not up to date.
+  it.each([
+    ["up", "up"],
+    ["sum(rate(http_requests_total[5m]))", "http_requests_total"],
+    [
+      'sum by (job) (rate({__name__="node_cpu_seconds_total",mode="idle"}[5m]))',
+      "node_cpu_seconds_total",
+    ],
+  ])("names the stream after the first metric %s selects", (promql, stream) => {
+    const fields = blobOf({ query: b64EncodeUnicode(promql) }).queries[0].fields;
+    expect(fields.stream).toBe(stream);
+    expect(fields.stream_type).toBe("metrics");
+  });
+
+  it("leaves the stream empty for a query that selects no metric", () => {
+    const data = blobOf({ query: b64EncodeUnicode("vector(1) + scalar(time()) * 2") });
+    expect(data.queries[0].fields.stream).toBe("");
+  });
+
+  it("keeps a stream the link already carries", () => {
+    const data = blobOf({ stream: "cpu", query: b64EncodeUnicode("rate(other_metric[5m])") });
+    expect(data.queries[0].fields.stream).toBe("cpu");
+  });
+
   it("keeps a stream-only link in builder mode", () => {
     const data = blobOf({ stream_name: "cpu" });
     expect(data.queries[0].fields.stream).toBe("cpu");

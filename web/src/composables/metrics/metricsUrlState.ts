@@ -22,6 +22,7 @@ import { METRICS_PARAMS, defaultMetricsQuery } from "@/utils/metrics/metricsPara
 import { METRICS_EDITOR_PARAM_KEYS } from "@/utils/metrics/metricsEditorParams";
 import { getDefaultDashboardPanelData } from "@/composables/dashboard/useDashboardPanelDefaults";
 import store from "@/stores";
+import { selectorMetricNames } from "@/utils/dashboard/exemplars/exemplarPlacement";
 
 // bump when the blob payload shape changes; older blobs decode to null
 export const METRICS_BLOB_VERSION = 1;
@@ -132,6 +133,12 @@ export const legacyLinkToVisualizeQuery = (query: Record<string, any>): Record<s
   const panel = legacyEditorPanel();
   if (query.metrics_data) applyMetricsBlob(query.metrics_data, panel);
   applyDeepLinkOverrides(query, panel);
+  // An empty stream is auto-filled after the first run, which marks the chart stale; the query names the right one.
+  for (const slot of panel.data.queries ?? []) {
+    if (!slot?.customQuery || !slot.query || slot.fields?.stream) continue;
+    const metric = selectorMetricNames(slot.query)[0];
+    if (metric) slot.fields = { ...slot.fields, stream: metric, stream_type: "metrics" };
+  }
   const rest = Object.fromEntries(
     Object.entries(query).filter(
       ([key]) => !(METRICS_EDITOR_PARAM_KEYS as readonly string[]).includes(key.split(".")[0]),
