@@ -294,4 +294,25 @@ describe("CodeQueryEditor Monaco loading", () => {
     expect(wrapper.find('[data-test="query-editor-preview"]').exists()).toBe(false);
     wrapper.unmount();
   });
+
+  it("does not build an editor for an instance unmounted before its setup finished", async () => {
+    const monacoApi: any = await import("monaco-editor/esm/vs/editor/editor.api");
+    load.release();
+    monacoApi.editor.create.mockClear();
+    attachHost("editor-remounted");
+    const mountWith = (query: string) =>
+      mount(CodeQueryEditor, {
+        props: { editorId: "editor-remounted", query, language: "sql" },
+        global: { plugins: [createStore({ state: { theme: "light" } })] },
+      });
+
+    mountWith("old payload").unmount();
+    await settle();
+    expect(monacoApi.editor.create).not.toHaveBeenCalled();
+
+    const fresh = mountWith("new payload");
+    await vi.waitFor(() => expect(monacoApi.editor.create).toHaveBeenCalledTimes(1));
+    expect(monacoApi.editor.create.mock.calls[0][1].value).toBe("new payload");
+    fresh.unmount();
+  });
 });

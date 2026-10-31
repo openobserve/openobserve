@@ -1080,6 +1080,12 @@ if (sidebarScrollTick) {
   });
 }
 
+// Scroll events arrive a frame late, so a scroll from before the open is only real if the trigger moved since.
+let openTriggerTop: number | null = null;
+let openTriggerLeft: number | null = null;
+// One layout read per frame: a sticky trigger never moves, so per-event reads would force layout throughout a long scroll.
+let triggerMoveFrame: number | null = null;
+
 // Generic close-on-scroll: while the dropdown is open, scrolling any ancestor
 // scroll container (page, query-builder area, joins popup, etc.) would leave
 // the portaled list floating detached from the trigger — close it instead.
@@ -1101,10 +1107,23 @@ function handleViewportScroll(event: Event) {
   // menu detached. Scrolls in unrelated sections (e.g. the field list while a
   // config-panel dropdown is open) are ignored.
   const triggerEl = triggerWrapperRef.value ?? selectTriggerWrapperRef.value;
-  if (triggerEl && target.contains(triggerEl)) {
-    popoverOpen.value = false;
-    selectOpen.value = false;
-  }
+  if (!triggerEl || !target.contains(triggerEl) || triggerMoveFrame !== null) return;
+  triggerMoveFrame = requestAnimationFrame(closeIfTriggerMoved);
+}
+
+function closeIfTriggerMoved() {
+  triggerMoveFrame = null;
+  if (!isOpen.value) return;
+  const rect = (triggerWrapperRef.value ?? selectTriggerWrapperRef.value)?.getBoundingClientRect();
+  if (rect && rect.top === openTriggerTop && rect.left === openTriggerLeft) return;
+  popoverOpen.value = false;
+  selectOpen.value = false;
+}
+
+function cancelTriggerMoveCheck() {
+  if (triggerMoveFrame === null) return;
+  cancelAnimationFrame(triggerMoveFrame);
+  triggerMoveFrame = null;
 }
 
 // Type-ahead, label clicks, focus(), Escape and picks set popoverOpen directly and Reka never reports them.
@@ -1116,18 +1135,25 @@ watch(popoverOpen, (open, wasOpen) => {
 watch(isOpen, (open) => {
   if (typeof window === "undefined") return;
   if (open) {
+    const rect = (
+      triggerWrapperRef.value ?? selectTriggerWrapperRef.value
+    )?.getBoundingClientRect();
+    openTriggerTop = rect?.top ?? null;
+    openTriggerLeft = rect?.left ?? null;
     window.addEventListener("scroll", handleViewportScroll, {
       capture: true,
       passive: true,
     });
   } else {
     window.removeEventListener("scroll", handleViewportScroll, true);
+    cancelTriggerMoveCheck();
   }
 });
 
 onBeforeUnmount(() => {
   if (typeof window !== "undefined") {
     window.removeEventListener("scroll", handleViewportScroll, true);
+    cancelTriggerMoveCheck();
   }
 });
 

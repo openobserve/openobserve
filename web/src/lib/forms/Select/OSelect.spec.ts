@@ -232,6 +232,85 @@ describe("OSelect", () => {
     expect(wrapper.emitted("create")).toBeFalsy();
   });
 
+  describe("close on scroll", () => {
+    const frames = new Map<number, FrameRequestCallback>();
+    let nextFrame = 0;
+    let frameSpies: { mockRestore: () => void }[] = [];
+
+    // The trigger check runs in a frame callback, so the tests drive frames by hand.
+    function stubFrames() {
+      frameSpies = [
+        vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+          frames.set(++nextFrame, cb);
+          return nextFrame;
+        }),
+        vi.spyOn(window, "cancelAnimationFrame").mockImplementation((id) => {
+          frames.delete(id);
+        }),
+      ];
+    }
+
+    function runFrames() {
+      const pending = [...frames.values()];
+      frames.clear();
+      pending.forEach((cb) => cb(0));
+    }
+
+    afterEach(() => {
+      frames.clear();
+      frameSpies.forEach((spy) => spy.mockRestore());
+      frameSpies = [];
+    });
+
+    async function openSelect() {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: { multiple: true, options: [{ label: "A", value: "a" }] },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+      expect(wrapper.emitted("open")).toHaveLength(1);
+      stubFrames();
+    }
+
+    // Scroll events are dispatched a frame late, so one queued before the open arrives after it.
+    it("stays open on a scroll that did not move the trigger", async () => {
+      await openSelect();
+      document.dispatchEvent(new Event("scroll"));
+      runFrames();
+      await flushPromises();
+      expect(wrapper.emitted("close")).toBeUndefined();
+    });
+
+    it("closes on a scroll that moved the trigger", async () => {
+      await openSelect();
+      const rect = vi
+        .spyOn(Element.prototype, "getBoundingClientRect")
+        .mockReturnValue(new DOMRect(0, 40, 10, 10));
+      try {
+        document.dispatchEvent(new Event("scroll"));
+        runFrames();
+      } finally {
+        rect.mockRestore();
+      }
+      await flushPromises();
+      expect(wrapper.emitted("close")).toHaveLength(1);
+    });
+
+    it("measures the trigger at most once per frame", async () => {
+      await openSelect();
+      const rect = vi.spyOn(Element.prototype, "getBoundingClientRect");
+      try {
+        for (let i = 0; i < 3; i++) document.dispatchEvent(new Event("scroll"));
+        expect(rect).not.toHaveBeenCalled();
+        runFrames();
+        expect(rect).toHaveBeenCalledTimes(1);
+      } finally {
+        rect.mockRestore();
+      }
+    });
+  });
+
   describe("opening a large single-select scrolls to the current value", () => {
     // Regression for a virtualised 48-option time-of-day picker always opening
     // scrolled to its first entry: single-select now seeds highlightedIndex
