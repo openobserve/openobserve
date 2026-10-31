@@ -339,6 +339,9 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 
 - **Display / layout**
   - `loading` (default false), `streaming` (default false — pulsing incremental indicator), `error` (`string|null`), `emptyMessage`
+    - A refetch (`loading` true again after a settled, non-empty answer) keeps the last rows on screen; if it runs past 150 ms they dim, go inert and the bottom bar pulses. A first load, or the load after an error or an empty answer, shows the skeleton.
+    - `loadingResetKey` — bind the folder, tab or entity the rows belong to; changing it drops the kept rows, so a switch shows the skeleton instead of the previous context's rows.
+    - `skeletonOnRefetch` — skeleton on every load, for tables whose old rows mislead once the query changes (log search results).
   - `dense` (default `true`), `bordered` (default `true`), `frame` (default `false` — outer frame border), `striped` (default false)
   - `stickyHeader` (default `true`), `showHeader` (default `true`), `wrap` (default false), `horizontalScroll` (natural-width cells + horizontal scroll; pair with `wrap=false`)
   - `cellOverflowTooltip` (default `true`) — the shared full-text tooltip on cut body cells; pass `false` for a table whose reveal is Wrap / row expansion (logs, correlated logs). See [Cut cell text](#cut-cell-text--the-shared-tooltip)

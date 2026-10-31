@@ -10,6 +10,7 @@ import {
   provide,
   ref,
   shallowRef,
+  toRaw,
   watch,
   watchEffect,
 } from "vue";
@@ -190,9 +191,35 @@ const skeletonRowCount = computed(() => {
 // flash-and-disappear on fast responses. If the server is slow, the
 // skeleton stays visible until data actually arrives.
 const MIN_SKELETON_MS = 50;
+// Kept rows stay live until dimmed, so a fast refetch neither flickers nor swallows a click.
+const STALE_DIM_DELAY_MS = 150;
 const heldLoading = ref(false);
 let loadingStartedAt = 0;
 let releaseTimer: ReturnType<typeof setTimeout> | null = null;
+
+const staleRows = shallowRef<readonly TData[] | null>(null);
+const staleDimmed = ref(false);
+let settledRows: TData[] | null = null;
+let staleDimTimer: ReturnType<typeof setTimeout> | null = null;
+
+function keepSettledRows(): void {
+  if (props.skeletonOnRefetch || !settledRows?.length) return;
+  // Row copies: a consumer that mutates its row objects mid-load cannot repaint the kept rows.
+  staleRows.value = Object.freeze(settledRows.map((row) => ({ ...toRaw(row) }) as TData));
+  staleDimTimer = setTimeout(() => {
+    staleDimmed.value = true;
+    staleDimTimer = null;
+  }, STALE_DIM_DELAY_MS);
+}
+
+function dropStaleRows(): void {
+  if (staleDimTimer) {
+    clearTimeout(staleDimTimer);
+    staleDimTimer = null;
+  }
+  staleDimmed.value = false;
+  staleRows.value = null;
+}
 
 watch(
   () => props.loading,
@@ -203,7 +230,11 @@ watch(
         releaseTimer = null;
       }
       loadingStartedAt = Date.now();
+      if (!heldLoading.value) keepSettledRows();
       heldLoading.value = true;
+    } else if (staleRows.value) {
+      dropStaleRows();
+      heldLoading.value = false;
     } else if (heldLoading.value) {
       const elapsed = Date.now() - loadingStartedAt;
       const remaining = MIN_SKELETON_MS - elapsed;
@@ -225,6 +256,7 @@ onBeforeUnmount(() => {
     clearTimeout(releaseTimer);
     releaseTimer = null;
   }
+  if (staleDimTimer) clearTimeout(staleDimTimer);
 });
 
 // ── Internal global filter state (uncontrolled when no parent binds :global-filter) ──
@@ -425,6 +457,21 @@ const tableData = computed<TData[]>(() => {
   return source ? source.slice() : [];
 });
 
+watch(
+  [tableData, () => props.loading, () => props.error, () => props.loadingResetKey],
+  ([rows, loading, error, resetKey], previous) => {
+    if (previous && resetKey !== previous[3]) {
+      if (staleRows.value) dropStaleRows();
+      settledRows = null;
+      // The rows still on screen belong to the old context; only rows that arrive with the new key may be kept.
+      if (rows === previous[0]) return;
+    }
+    if (error) settledRows = null;
+    else if (!loading) settledRows = rows;
+  },
+  { immediate: true },
+);
+
 // ── Windowed row model ──────────────────────────────────────────
 // TanStack builds a Row object per data row independent of virtual scroll,
 // which only bounds DOM nodes — 100k+ rows freeze the tab and ~1M rows OOM it.
@@ -453,7 +500,7 @@ const rowModelWindowed = computed(
 // identity; a fresh slice per read would re-trigger TanStack's reactive
 // options merge on every access.
 const windowedTableData = computed<TData[]>(() => {
-  const data = tableData.value;
+  const data = (staleRows.value as TData[] | null) ?? tableData.value;
   if (rowModelWindowed.value) {
     return data.slice(rowWindowStart.value, rowWindowEnd.value);
   }
@@ -1241,11 +1288,6 @@ useTableKeyboard(table, scrollContainerRef, {
 useTableRowShortcuts(scrollContainerRef);
 
 // ── Table-level empty/loading/error state ──────────────────────
-// Use `heldLoading` (props.loading + min-2s hold) so skeleton doesn't flash.
-// While loading, the full skeleton always wins — never show partial rows
-// with a "Loading…" banner over them (that pattern lets consumers'
-// progressive data mutations leak through visually). Consumers that want
-// refetch-without-replacing-content should use the `streaming` prop.
 // Sectioned tables render `bodyRows`, not `displayRows` — a `rowSection` that
 // filters every loaded row to null (every row belongs to a hidden section)
 // left the body blank with neither a row nor the empty state, since the page
@@ -1266,7 +1308,7 @@ const showEmpty = computed(
     (sectionsEnabled.value ? bodyRows.value.length === 0 : displayRows.value.length === 0),
 );
 const showError = computed(() => !heldLoading.value && !!props.error);
-const showLoadingOverlay = computed(() => heldLoading.value);
+const showSkeleton = computed(() => heldLoading.value && !staleRows.value);
 /** Streaming: data is arriving incrementally. Show pulsing indicator while stream is active and data exists. */
 const showStreaming = computed(() => props.streaming && displayRows.value.length > 0);
 
@@ -1434,9 +1476,6 @@ defineExpose({
         />
       </div>
 
-      <!-- ── Loading banner (shown when streaming with existing data) ──
-         Only used for the streaming pattern now — when `loading=true`,
-         the table body switches to the full skeleton instead. -->
       <slot
         v-if="props.streaming && displayRows.length > 0 && slots['loading-banner']"
         name="loading-banner"
@@ -1532,7 +1571,8 @@ defineExpose({
                     : 'var(--table-row-height-normal, 2.75rem)',
           }"
           data-test="o2-table"
-          :data-test-loading="props.loading ? 'true' : 'false'"
+          :data-test-loading="heldLoading ? 'true' : 'false'"
+          :aria-busy="showSkeleton || staleDimmed ? 'true' : undefined"
         >
           <!-- ── Header ───────────────────────────────────────── -->
           <OTableHeader
@@ -1567,7 +1607,7 @@ defineExpose({
             :pivot-header-levels="props.pivotHeaderLevels"
             :pivot-row-columns="props.pivotRowColumns"
             :sticky-col-totals="props.stickyColTotals"
-            @toggle-all-rows="selection.toggleAllRows"
+            @toggle-all-rows="!staleDimmed && selection.toggleAllRows()"
             @sort="sorting.handleSort"
             @update:column-order="
               (order: string[]) => {
@@ -1585,7 +1625,7 @@ defineExpose({
 
           <!-- ── Skeleton Body (loading with no existing data) ───── -->
           <OTableLoading
-            v-if="showLoadingOverlay"
+            v-if="showSkeleton"
             :rows="skeletonRowCount"
             :table-columns="table.getVisibleLeafColumns()"
             :selection-enabled="selection.isEnabled.value"
@@ -1597,6 +1637,9 @@ defineExpose({
           <!-- ── Body ─────────────────────────────────────────── -->
           <OTableBody
             v-else-if="!showEmpty && !showError"
+            :class="['transition-opacity', staleDimmed ? 'opacity-60 dark:opacity-40' : '']"
+            :inert="staleDimmed ? true : undefined"
+            :data-test-stale="staleRows ? 'true' : undefined"
             :rows="bodyRows"
             :sections="sectionsEnabled ? rowSections : undefined"
             :table="table"
@@ -1637,10 +1680,11 @@ defineExpose({
             :measure-element="isVirtual ? measureElement : undefined"
             :measure-row-element="isVirtual && useDynamicRowHeight ? measureRowElement : undefined"
             :dynamic-row-height="isVirtual && useDynamicRowHeight"
-            @toggle-selection="selection.toggleRow"
-            @toggle-expansion="expansion.toggleRow"
+            @toggle-selection="(row: TData) => !staleDimmed && selection.toggleRow(row)"
+            @toggle-expansion="(row: TData) => !staleDimmed && expansion.toggleRow(row)"
             @row-click="
               (row: TData, evt: MouseEvent) => {
+                if (staleDimmed) return;
                 const canExpand =
                   typeof props.expandOnRowClick === 'function'
                     ? props.expandOnRowClick(row)
@@ -1649,12 +1693,14 @@ defineExpose({
                 emit('row-click', row, evt);
               }
             "
-            @row-reorder="(data: TData[]) => emit('row-reorder', data)"
-            @row-dblclick="(row: TData, evt: MouseEvent) => emit('row-dblclick', row, evt)"
+            @row-reorder="(data: TData[]) => !staleDimmed && emit('row-reorder', data)"
+            @row-dblclick="
+              (row: TData, evt: MouseEvent) => !staleDimmed && emit('row-dblclick', row, evt)
+            "
             @row-mouseenter="(row: TData, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
             @row-mouseleave="(row: TData) => emit('row-mouseleave', row)"
-            @cell-click="(params: any) => emit('cell-click', params)"
-            @cell-contextmenu="(params: any) => emit('cell-contextmenu', params)"
+            @cell-click="(params: any) => !staleDimmed && emit('cell-click', params)"
+            @cell-contextmenu="(params: any) => !staleDimmed && emit('cell-contextmenu', params)"
           >
             <!-- Pass through named cell slots from parent (only for columns where parent provides a slot) -->
             <template
@@ -1812,7 +1858,7 @@ defineExpose({
 
         <!-- ── Custom loading slot (overlay) ───────────────────── -->
         <div
-          v-if="showLoadingOverlay && slots.loading"
+          v-if="showSkeleton && slots.loading"
           class="bg-surface-base/70 absolute inset-0 z-10 flex items-center justify-center"
           data-test="o2-table-loading-slot"
         >
@@ -1837,10 +1883,10 @@ defineExpose({
 
         <!-- ── Streaming Indicator ─────────────────────────────── -->
         <div
-          v-if="showStreaming"
+          v-if="showStreaming || staleDimmed"
           data-test="o2-table-streaming-bar"
           class="bg-table-streaming-bar sticky bottom-0 z-10 h-1 w-full animate-pulse"
-          :aria-label="t('common.dataStreamingInProgress')"
+          :aria-label="staleDimmed ? t('common.loading') : t('common.dataStreamingInProgress')"
         />
       </div>
 

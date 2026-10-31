@@ -539,6 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :row-key="logsRowKey"
                   :row-height="20"
                   virtual-scroll
+                  skeleton-on-refetch
                   :fill-height="false"
                   :scroll-el="scrollContainerRef"
                   :horizontal-scroll="true"

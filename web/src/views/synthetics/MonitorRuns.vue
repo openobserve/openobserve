@@ -727,6 +727,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :columns="runColumns"
                   :data="visibleRuns"
                   :loading="runsLoading"
+                  :loading-reset-key="monitorId"
                   pagination="client"
                   :page-size="pageSize"
                   :page-size-options="[10, 20, 25, 50]"

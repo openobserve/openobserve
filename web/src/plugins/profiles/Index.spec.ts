@@ -1549,7 +1549,7 @@ describe("Profiles page", () => {
       );
     });
 
-    it("shows skeletons for the chart and the table while a query runs", async () => {
+    it("shows skeletons for the chart and keeps the last table rows, marked stale, while a query runs", async () => {
       mocks.merge.mockResolvedValue(mergeResponse);
       const wrapper = mountPage();
       await settle();
@@ -1560,9 +1560,35 @@ describe("Profiles page", () => {
       await nextTick();
 
       expect(wrapper.find('[data-test="profiles-series-skeleton"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table"]').attributes("data-test-loading")).toBe("true");
+      expect(wrapper.find('[data-test="o2-table-body"]').attributes("data-test-stale")).toBe(
+        "true",
+      );
       await wrapper.find('[data-test="profiles-view-flame"]').trigger("click");
       expect(wrapper.find('[data-test="profiles-flame-skeleton"]').exists()).toBe(true);
+    });
+
+    it("shows the table skeleton, not the last type's rows in the new unit, when the profile type changes", async () => {
+      mocks.meta.mockResolvedValue({
+        data: {
+          ...profileMetaResponse.data,
+          profile_types: [
+            { type: "cpu", unit: "nanoseconds" },
+            { type: "heap", unit: "bytes" },
+          ],
+        },
+      });
+      mocks.merge.mockResolvedValue(mergeResponse);
+      const wrapper = mountPage();
+      await settle();
+      expect(wrapper.find('[data-test="o2-table-body"]').exists()).toBe(true);
+
+      mocks.merge.mockImplementationOnce(() => new Promise(() => {}));
+      await wrapper.find('[data-test="profiles-type-select"] select').setValue("heap\u0000bytes");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test-stale="true"]').exists()).toBe(false);
     });
 
     it("cancels a running query, keeps the last results and marks the run pending", async () => {
