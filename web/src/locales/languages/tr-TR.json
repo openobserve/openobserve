@@ -7939,6 +7939,7 @@
       "aggRangeDesc": "Maksimum ve minimum arasındaki fark",
       "aggDiffLabel": "Fark:",
       "aggDiffDesc": "Son ve ilk arasındaki fark",
+      "aggInstantNote": "Pasta veya halka grafikte bu, Range sorguları gibi birden çok örnek döndüren sorgulara uygulanır. Tek örnek döndüren bir Instant sorgusu bu örneği korur; dolayısıyla ikisini karıştırmak, indirgenmiş değerleri ham değerlerin yanında gösterir.",
       "geoLatTooltip": "Enlem değerlerini içeren metrik etiketinin adı. Varsayılan: \"latitude\" veya \"lat\"",
       "geoLonTooltip": "Boylam değerlerini içeren metrik etiketinin adı. Varsayılan: \"longitude\" veya \"lon\"",
       "geoWeightTooltip": "Ağırlık değerlerini içeren metrik etiketinin adı. Varsayılan: \"weight\"",

@@ -7939,6 +7939,7 @@
       "aggRangeDesc": "Differenz zwischen Maximum und Minimum",
       "aggDiffLabel": "Diff:",
       "aggDiffDesc": "Differenz zwischen letztem und erstem",
+      "aggInstantNote": "Bei einem Kreis- oder Ringdiagramm gilt dies für Abfragen, die mehrere Samples zurückgeben, etwa Range-Abfragen. Eine Instant-Abfrage mit einem einzelnen Sample behält dieses Sample bei, sodass beim Mischen beider reduzierte Werte neben Rohwerten erscheinen.",
       "geoLatTooltip": "Name des Metrik-Labels, das Breitengradwerte enthält. Standard: \"latitude\" oder \"lat\"",
       "geoLonTooltip": "Name des Metrik-Labels, das Längengradwerte enthält. Standard: \"longitude\" oder \"lon\"",
       "geoWeightTooltip": "Name des Metrik-Labels, das Gewichtswerte enthält. Standard: \"weight\"",

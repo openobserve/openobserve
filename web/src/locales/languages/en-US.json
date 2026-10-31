@@ -7937,6 +7937,7 @@
       "aggRangeDesc": "Difference between max and min",
       "aggDiffLabel": "Diff:",
       "aggDiffDesc": "Difference between last and first",
+      "aggInstantNote": "On a pie or donut this applies to queries that return several samples, such as Range queries. An Instant query with a single sample keeps that sample, so mixing both shows reduced values beside raw ones.",
       "geoLatTooltip": "Name of the metric label containing latitude values. Default: \"latitude\" or \"lat\"",
       "geoLonTooltip": "Name of the metric label containing longitude values. Default: \"longitude\" or \"lon\"",
       "geoWeightTooltip": "Name of the metric label containing weight values. Default: \"weight\"",

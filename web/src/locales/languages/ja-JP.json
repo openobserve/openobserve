@@ -7939,6 +7939,7 @@
       "aggRangeDesc": "最大値と最小値の差",
       "aggDiffLabel": "差分：",
       "aggDiffDesc": "最終値と最初の値の差",
+      "aggInstantNote": "円グラフまたはドーナツグラフでは、Range クエリなど複数のサンプルを返すクエリに適用されます。単一のサンプルを返す Instant クエリではそのサンプルが保持されるため、両方を混在させると集計値と生の値が並んで表示されます。",
       "geoLatTooltip": "緯度値を含むメトリックラベルの名前。デフォルト：\"latitude\" または \"lat\"",
       "geoLonTooltip": "経度値を含むメトリックラベルの名前。デフォルト：\"longitude\" または \"lon\"",
       "geoWeightTooltip": "重み値を含むメトリックラベルの名前。デフォルト：\"weight\"",

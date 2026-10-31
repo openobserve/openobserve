@@ -7939,6 +7939,7 @@
       "aggRangeDesc": "Diferença entre máximo e mínimo",
       "aggDiffLabel": "Diferença:",
       "aggDiffDesc": "Diferença entre último e primeiro",
+      "aggInstantNote": "Num gráfico circular ou em anel, isto aplica-se a consultas que devolvem várias amostras, como as consultas Range. Uma consulta Instant com uma única amostra mantém essa amostra, pelo que misturar ambas mostra valores reduzidos ao lado dos valores em bruto.",
       "geoLatTooltip": "Nome do rótulo da métrica que contém valores de latitude. Predefinição: \"latitude\" ou \"lat\"",
       "geoLonTooltip": "Nome do rótulo da métrica que contém valores de longitude. Predefinição: \"longitude\" ou \"lon\"",
       "geoWeightTooltip": "Nome do rótulo da métrica que contém valores de peso. Predefinição: \"weight\"",

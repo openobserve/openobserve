@@ -7939,6 +7939,7 @@
       "aggRangeDesc": "Differenza tra max e min",
       "aggDiffLabel": "Diff:",
       "aggDiffDesc": "Differenza tra ultimo e primo",
+      "aggInstantNote": "Su un grafico a torta o a ciambella questo si applica alle query che restituiscono più campioni, come le query Range. Una Instant query con un solo campione mantiene quel campione, quindi combinarle mostra valori ridotti accanto a quelli grezzi.",
       "geoLatTooltip": "Nome dell'etichetta metrica contenente i valori di latitudine. Predefinito: \"latitude\" o \"lat\"",
       "geoLonTooltip": "Nome dell'etichetta metrica contenente i valori di longitudine. Predefinito: \"longitude\" o \"lon\"",
       "geoWeightTooltip": "Nome dell'etichetta metrica contenente i valori di peso. Predefinito: \"weight\"",

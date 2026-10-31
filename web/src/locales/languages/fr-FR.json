@@ -7939,6 +7939,7 @@
       "aggRangeDesc": "Différence entre max et min",
       "aggDiffLabel": "Diff. :",
       "aggDiffDesc": "Différence entre la dernière et la première",
+      "aggInstantNote": "Sur un graphique en secteurs ou en anneau, cela s'applique aux requêtes qui renvoient plusieurs échantillons, comme les requêtes Range. Une requête Instant avec un seul échantillon conserve cet échantillon ; mélanger les deux affiche donc des valeurs réduites à côté de valeurs brutes.",
       "geoLatTooltip": "Nom de l'étiquette métrique contenant les valeurs de latitude. Par défaut : \"latitude\" ou \"lat\"",
       "geoLonTooltip": "Nom de l'étiquette métrique contenant les valeurs de longitude. Par défaut : \"longitude\" ou \"lon\"",
       "geoWeightTooltip": "Nom de l'étiquette métrique contenant les valeurs de poids. Par défaut : \"weight\"",

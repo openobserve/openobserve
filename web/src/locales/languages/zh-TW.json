@@ -7934,6 +7934,7 @@
       "aggRangeDesc": "最大值與最小值的差異",
       "aggDiffLabel": "差異：",
       "aggDiffDesc": "最後一個與第一個的差異",
+      "aggInstantNote": "在圓餅圖或環圈圖上，這適用於會傳回多個樣本的查詢，例如範圍查詢。只有單一瞬時查詢的樣本會保留該樣本，因此混用兩者時，縮減值會與原始值並列顯示。",
       "geoLatTooltip": "包含緯度值的度量標籤名稱。預設：\"latitude\" 或 \"lat\"",
       "geoLonTooltip": "包含經度值的度量標籤名稱。預設：\"longitude\" 或 \"lon\"",
       "geoWeightTooltip": "包含權重值的度量標籤名稱。預設：\"weight\"",
