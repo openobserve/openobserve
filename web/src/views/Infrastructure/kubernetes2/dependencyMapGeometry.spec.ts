@@ -137,6 +137,20 @@ describe("routeEdge", () => {
   });
 });
 
+describe("placeLabels on a shallow bow", () => {
+  it("places a label between two cards close together in one column, out in the gap", () => {
+    const [top, below] = [
+      { x: 0, y: 0 },
+      { x: 0, y: 92 },
+    ];
+    const route = routeEdge(top, below, []);
+    const placed = placeLabels([{ id: "e", text: "10.0KB/s", spots: route.spots }], [top, below]);
+    const box = labelBox("10.0KB/s", placed.get("e")!);
+    expect(box.x).toBeGreaterThanOrEqual(CARD_W);
+    expect(box.x + box.w).toBeLessThanOrEqual(312);
+  });
+});
+
 describe("placeLabels", () => {
   it("places the busiest first and skips a label that would overlap a placed one or a card", () => {
     const at = { x: 252, y: 38 };

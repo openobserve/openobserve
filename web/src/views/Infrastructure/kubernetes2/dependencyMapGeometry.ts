@@ -17,7 +17,10 @@
 // columns and runs straight through the slot layoutColumns kept for it in each column it passes, so it never goes
 // behind a card.
 
-import { CARD_H, CARD_W, type Position } from "./dependencyGraph";
+import { CARD_H, CARD_W, COLUMN_GAP, type Position } from "./dependencyGraph";
+
+// The room between a card and the next column.
+const GAP = COLUMN_GAP - CARD_W;
 
 export interface Route {
   path: string;
@@ -65,9 +68,12 @@ export function routeEdge(from: Position, to: Position, through: Position[]): Ro
     const x = from.x + CARD_W;
     const bow = Math.min(BOW_MAX, 16 + 0.15 * Math.abs(ty - sy)) / 0.75;
     const tip = { x: x + 0.75 * bow, y: (sy + ty) / 2 };
+    // A shallow bow's tip is close to the cards, so the gap's middle is tried too, at the same heights.
+    const out = { x: x + GAP / 2, y: tip.y };
+    const heights = [tip.y, (3 * sy + ty) / 4, (sy + 3 * ty) / 4];
     return {
       path: `M${x},${sy} C${x + bow},${sy} ${x + bow},${ty} ${x},${ty}`,
-      spots: [tip, { ...tip, y: (3 * sy + ty) / 4 }, { ...tip, y: (sy + 3 * ty) / 4 }],
+      spots: [...heights.map((y) => ({ ...tip, y })), ...heights.map((y) => ({ ...out, y }))],
       end: { x, y: ty },
       fromLeft: false,
     };
@@ -101,9 +107,10 @@ export function routeEdge(from: Position, to: Position, through: Position[]): Ro
   };
 }
 
-// A rate label's pill, at 0.6875rem text. DependencyMap.vue draws it at exactly this size, so the overlap checks
+// A rate label's pill. DependencyMap.vue draws it at exactly this size and text size, in pixels, so the overlap checks
 // here hold for what is on screen.
 export const LABEL_H = 18;
+export const LABEL_FONT = 11;
 export const labelWidth = (text: string) => Math.ceil(text.length * 6.2 + 14);
 export const labelBox = (text: string, at: Position): Box => {
   const w = labelWidth(text);

@@ -332,7 +332,7 @@ export interface Position {
 export const CARD_W = 216;
 export const CARD_H = 76;
 // A column is a card wide plus a gap that fits an edge's rate label clear of the arrowhead.
-const COLUMN_GAP = 312;
+export const COLUMN_GAP = 312;
 // A card's slot is its height plus a gap; an edge passing through a column takes a thin slot of its own.
 const NODE_SLOT = CARD_H + 16;
 const PASS_SLOT = 20;

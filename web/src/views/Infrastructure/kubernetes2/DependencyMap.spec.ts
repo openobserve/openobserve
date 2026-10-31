@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mount, type VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import DependencyMap, { type MapEdge, type MapNode } from "./DependencyMap.vue";
@@ -44,6 +44,7 @@ vi.mock("@vue-flow/core", () => ({
         <div v-for="n in nodes" :key="n.id" class="vue-flow__node" :data-id="n.id">
           <slot name="node-end" :id="n.id" :data="n.data" />
         </div>
+        <div class="vue-flow__edge-labels" />
         <template v-for="e in edges" :key="e.id">
           <slot name="edge-flow" v-bind="{ ...e, sourceX: 100, sourceY: 0, targetX: 100, targetY: 80 }" />
         </template>
@@ -97,11 +98,13 @@ const stack = (count: number) =>
 describe("DependencyMap", () => {
   let wrapper: VueWrapper<any>;
 
-  const mountMap = (nodes: MapNode[], edges: MapEdge[]) => {
+  // A tick for the pills to reach the label layer once the map has drawn it.
+  const mountMap = async (nodes: MapNode[], edges: MapEdge[]) => {
     wrapper = mount(DependencyMap, {
       props: { nodes, edges, selectedEdgeId: null, label: raw("Map") },
       global: { plugins: [i18n] },
     });
+    await flushPromises();
     return wrapper;
   };
 
@@ -118,8 +121,8 @@ describe("DependencyMap", () => {
 
   afterEach(() => wrapper?.unmount());
 
-  it("leaves each edge from the side that faces its target, and loops one within a column", () => {
-    mountMap(
+  it("leaves each edge from the side that faces its target, and loops one within a column", async () => {
+    await mountMap(
       [node("a", 0), node("b", 340), node("c", 340)],
       [edge("a", "b", 10), edge("b", "a", 10), edge("b", "c", 10, false)],
     );
@@ -135,8 +138,8 @@ describe("DependencyMap", () => {
     expect(baseEdge("b-c").props("markerEnd")).toBeUndefined();
   });
 
-  it("draws each edge along its route from the layout", () => {
-    mountMap(
+  it("draws each edge along its route from the layout", async () => {
+    await mountMap(
       [node("a", 0), node("b", 0, true, 200), node("c", 576)],
       [edge("a", "b", 10), { ...edge("a", "c", 10), waypoints: [{ x: 288, y: 300 }] }],
     );
@@ -149,7 +152,7 @@ describe("DependencyMap", () => {
   });
 
   it("fits the whole map, and the edges routed past it, from the fit button", async () => {
-    mountMap(
+    await mountMap(
       [node("a", 0), node("b", 2000)],
       [{ ...edge("a", "b", 10), waypoints: [{ x: 1000, y: 3000 }] }],
     );
@@ -160,8 +163,8 @@ describe("DependencyMap", () => {
     expect(view.zoom).toBeLessThan(600 / 3000);
   });
 
-  it("lists the cards for Tab in reading order, column by column", () => {
-    mountMap([node("c", 340), node("b", 0, true, 92), node("a", 0)], []);
+  it("lists the cards for Tab in reading order, column by column", async () => {
+    await mountMap([node("c", 340), node("b", 0, true, 92), node("a", 0)], []);
     expect(
       flow()
         .props("nodes")
@@ -170,7 +173,7 @@ describe("DependencyMap", () => {
   });
 
   it("dismisses the selection from empty map space, and lights the selected edge", async () => {
-    mountMap(
+    await mountMap(
       [node("a", 0), node("b", 340, true, 92), node("c", 340)],
       [edge("a", "b", 10), edge("a", "c", 10)],
     );
@@ -182,9 +185,9 @@ describe("DependencyMap", () => {
     expect(wrapper.emitted("select")).toEqual([[null]]);
   });
 
-  it("labels only the busiest edges with their rate", () => {
+  it("labels only the busiest edges with their rate", async () => {
     const ends = stack(10);
-    mountMap(
+    await mountMap(
       [...ends, node("api", 340)],
       ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))),
     );
@@ -196,7 +199,7 @@ describe("DependencyMap", () => {
   });
 
   it("dims what a hovered card does not talk to, and its labels follow the hover", async () => {
-    mountMap(
+    await mountMap(
       [node("a", 0), node("b", 340), node("c", 680)],
       [edge("a", "b", 10), edge("b", "c", 10)],
     );
@@ -212,7 +215,7 @@ describe("DependencyMap", () => {
 
   it("labels only a hovered hub's busiest edges", async () => {
     const ends = stack(12);
-    mountMap(
+    await mountMap(
       [...ends, node("api", 340), node("db", 680)],
       [...ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))), edge("api", "db", 50_000)],
     );
@@ -227,7 +230,7 @@ describe("DependencyMap", () => {
 
   it("shows a hovered edge's rate even when it is not among the busiest", async () => {
     const ends = stack(10);
-    mountMap(
+    await mountMap(
       [...ends, node("api", 340)],
       ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))),
     );
@@ -241,7 +244,7 @@ describe("DependencyMap", () => {
 
   it("keeps the other labels where they are while an edge is hovered", async () => {
     const ends = stack(10);
-    mountMap(
+    await mountMap(
       [...ends, node("api", 340)],
       ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))),
     );
@@ -265,7 +268,7 @@ describe("DependencyMap", () => {
 
   it("hides a resting pill the hovered edge's pill would cover", async () => {
     // Two edges into one gap a few pixels apart, so their pills would sit on each other.
-    mountMap(
+    await mountMap(
       [node("a", 0), node("b", 0, true, 12), node("c", 340), node("d", 340, true, 12)],
       [edge("a", "c", 2000), edge("b", "d", 10)],
     );
@@ -276,7 +279,7 @@ describe("DependencyMap", () => {
   });
 
   it("starts a map too big to read whole at a readable zoom, from its top-left", async () => {
-    mountMap(
+    await mountMap(
       Array.from({ length: 12 }, (_, i) => node(`c${i}`, i * 312)),
       [],
     );
@@ -289,7 +292,7 @@ describe("DependencyMap", () => {
   });
 
   it("treats a pill as part of its edge: hovering it lights the edge, clicking it selects the edge", async () => {
-    mountMap([node("a", 0), node("b", 340)], [edge("a", "b", 2000)]);
+    await mountMap([node("a", 0), node("b", 340)], [edge("a", "b", 2000)]);
     await pill("a-b").trigger("mouseenter");
     expect(hoveredLabel().exists()).toBe(true);
     expect(baseEdge("a-b").props("style").opacity).toBe(1);
@@ -300,7 +303,6 @@ describe("DependencyMap", () => {
   });
 
   it("refits on a resize with the floor the last fit used", async () => {
-    vi.useFakeTimers();
     let resized = () => {};
     vi.stubGlobal(
       "ResizeObserver",
@@ -313,7 +315,7 @@ describe("DependencyMap", () => {
       },
     );
     try {
-      mountMap(
+      await mountMap(
         Array.from({ length: 12 }, (_, i) => node(`c${i}`, i * 312)),
         [],
       );
@@ -321,6 +323,7 @@ describe("DependencyMap", () => {
       const whole = setViewport.mock.calls.at(-1)![0].zoom;
       expect(whole).toBeLessThan(0.75);
       setViewport.mockClear();
+      vi.useFakeTimers();
       resized();
       vi.advanceTimersByTime(200);
       expect(setViewport.mock.calls.at(-1)![0].zoom).toBe(whole);
@@ -330,8 +333,8 @@ describe("DependencyMap", () => {
     }
   });
 
-  it("makes a clickable card a named button, and leaves the others plain", () => {
-    mountMap([node("a", 0), node("net", 340, false)], [edge("a", "net", 10)]);
+  it("makes a clickable card a named button, and leaves the others plain", async () => {
+    await mountMap([node("a", 0), node("net", 340, false)], [edge("a", "net", 10)]);
     expect(card("a").attributes("role")).toBe("button");
     expect(card("a").attributes("tabindex")).toBe("0");
     expect(card("a").attributes("aria-label")).toMatch(
@@ -346,8 +349,8 @@ describe("DependencyMap", () => {
     ).toBe(true);
   });
 
-  it("names its zoom buttons", () => {
-    mountMap([node("a", 0)], []);
+  it("names its zoom buttons", async () => {
+    await mountMap([node("a", 0)], []);
     const names = ["zoom-in", "zoom-out", "fit"].map((id) =>
       wrapper.find(`[data-test="dependency-map-${id}"]`).attributes("aria-label"),
     );
@@ -355,7 +358,7 @@ describe("DependencyMap", () => {
   });
 
   it("opens a clickable card from Enter or Space, and not one that is not", async () => {
-    mountMap([node("a", 0), node("net", 340, false)], [edge("a", "net", 10)]);
+    await mountMap([node("a", 0), node("net", 340, false)], [edge("a", "net", 10)]);
     await card("a").trigger("keydown", { key: "Enter" });
     await card("a").trigger("keydown", { key: " " });
     await card("net").trigger("keydown", { key: "Enter" });
@@ -363,7 +366,7 @@ describe("DependencyMap", () => {
   });
 
   it("opens a clickable card and selects an edge on click", async () => {
-    mountMap([node("a", 0), node("net", 340, false)], [edge("a", "net", 10)]);
+    await mountMap([node("a", 0), node("net", 340, false)], [edge("a", "net", 10)]);
     await flow().vm.$emit("node-click", { node: { id: "net", data: { clickable: false } } });
     await flow().vm.$emit("node-click", { node: { id: "a", data: { clickable: true } } });
     await flow().vm.$emit("edge-click", { edge: { id: "a-net" } });

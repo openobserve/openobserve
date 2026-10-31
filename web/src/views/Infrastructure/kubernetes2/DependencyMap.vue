@@ -78,6 +78,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { CARD_H, CARD_W, formatRate } from "./dependencyGraph";
 import {
+  LABEL_FONT,
   LABEL_H,
   arrowBox,
   fitTransform,
@@ -103,7 +104,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const { setViewport, dimensions, viewport, zoomIn, zoomOut, areNodesInitialized } = useVueFlow();
+const { setViewport, dimensions, zoomIn, zoomOut, areNodesInitialized } = useVueFlow();
 
 // Rate labels only on the busiest edges, so the rest of the map stays readable.
 const LABELLED = 8;
@@ -319,9 +320,12 @@ const pills = computed(() => {
   return out;
 });
 
+// In pixels throughout, like the cards, so the pill is the size the overlap checks assume whatever the root font size.
 const pillStyle = (pill: { text: string; x: number; y: number }) => ({
   width: `${labelWidth(pill.text)}px`,
   height: `${LABEL_H}px`,
+  fontSize: `${LABEL_FONT}px`,
+  lineHeight: `${LABEL_H}px`,
   "--dep-label": `translate(-50%, -50%) translate(${pill.x}px, ${pill.y}px)`,
 });
 
@@ -337,6 +341,13 @@ const hoveredLabel = computed(() => {
 
 // A resize refits, a moment after it settles, unless the user has moved the map since the last fit.
 const pane = ref<HTMLElement | null>(null);
+
+// Vue Flow's label layer, once its viewport is drawn: the pills are teleported into it.
+const labelLayer = ref<HTMLElement | null>(null);
+const findLabelLayer = () => {
+  labelLayer.value ??= pane.value?.querySelector<HTMLElement>(".vue-flow__edge-labels") ?? null;
+};
+onMounted(() => nextTick(findLabelLayer));
 let resizeTimer: ReturnType<typeof setTimeout> | undefined;
 let observer: ResizeObserver | undefined;
 onMounted(() => {
@@ -407,6 +418,7 @@ function onKeydown(event: KeyboardEvent) {
         :disable-keyboard-a11y="true"
         :min-zoom="MIN_ZOOM"
         :max-zoom="2"
+        @pane-ready="findLabelLayer"
         @nodes-initialized="fitIfPending"
         @node-click="({ node }) => node.data.clickable && emit('open', node.id)"
         @edge-click="({ edge }) => emit('select', edge.id)"
@@ -473,20 +485,16 @@ function onKeydown(event: KeyboardEvent) {
           />
         </template>
       </VueFlow>
-      <!-- Every rate pill in one layer over the canvas, moved with it, so no edge or arrowhead is drawn over one.
-           The rates are in the edge panel and the connection list too, so this layer is hidden from screen readers.
-           A pill is part of its edge: hovering or clicking it does what the edge does, not what the pane does. -->
-      <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div
-          class="absolute top-0 left-0 origin-top-left [transform:var(--dep-viewport,none)]"
-          :style="{
-            '--dep-viewport': `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
-          }"
-        >
+      <!-- Every rate pill in one layer, in Vue Flow's label layer inside the viewport: it moves with the map, sits
+           above every edge and arrowhead, and the wheel and drags over a pill reach the map's pan and zoom. The
+           rates are in the edge panel and the connection list too, so the layer is hidden from screen readers. A pill
+           is part of its edge: hovering or clicking it does what the edge does, not what the pane does. -->
+      <Teleport v-if="labelLayer" :to="labelLayer">
+        <div class="absolute top-0 left-0" aria-hidden="true">
           <div
             v-for="[id, pill] in pills"
             :key="id"
-            class="bg-surface-base border-border-default text-text-secondary text-2xs pointer-events-auto absolute top-0 left-0 flex [transform:var(--dep-label,none)] cursor-pointer items-center justify-center rounded-full border font-medium whitespace-nowrap tabular-nums"
+            class="bg-surface-base border-border-default text-text-secondary pointer-events-auto absolute top-0 left-0 flex [transform:var(--dep-label,none)] cursor-pointer items-center justify-center rounded-full border font-medium whitespace-nowrap tabular-nums"
             :style="pillStyle(pill)"
             :data-edge="id"
             :data-test="
@@ -499,7 +507,7 @@ function onKeydown(event: KeyboardEvent) {
             {{ raw(pill.text) }}
           </div>
         </div>
-      </div>
+      </Teleport>
       <div
         class="rounded-default border-border-default bg-surface-panel absolute end-3 bottom-3 z-10 flex flex-col overflow-hidden border"
         data-test="dependency-map-zoom"
