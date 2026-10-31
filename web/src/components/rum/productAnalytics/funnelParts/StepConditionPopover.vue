@@ -28,7 +28,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         /></OButton>
       </slot>
     </template>
-    <StepConditionEditor :step="step" :index="index" @update="(s) => emit('update', s)" />
+    <StepConditionEditor
+      :step="step"
+      :index="index"
+      :fields="fields"
+      :fields-state="fieldsState"
+      :values="values"
+      @update="(s) => emit('update', s)"
+      @filter-values="(f) => emit('filter-values', f)"
+      @load-fields="emit('load-fields')"
+    />
   </OPopover>
 </template>
 
@@ -37,10 +46,22 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import StepConditionEditor from "@/components/rum/productAnalytics/funnelParts/StepConditionEditor.vue";
+import type { FilterValuesState } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
+import type { FieldSampleState } from "@/composables/rum/useFunnelFieldSample";
 import { useI18nTyped } from "@/types/i18n";
 import type { StepRef } from "@/utils/rum/productAnalyticsQueries";
 
-defineProps<{ step: StepRef; index: number }>();
-const emit = defineEmits<{ update: [StepRef] }>();
+defineProps<{
+  step: StepRef;
+  index: number;
+  fields?: readonly string[];
+  fieldsState?: FieldSampleState;
+  values?: FilterValuesState;
+}>();
+const emit = defineEmits<{
+  update: [StepRef];
+  "filter-values": [string];
+  "load-fields": [];
+}>();
 const { t } = useI18nTyped();
 </script>

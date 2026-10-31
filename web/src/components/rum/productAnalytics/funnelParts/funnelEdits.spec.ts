@@ -163,4 +163,36 @@ describe("funnelEdits", () => {
     expect(removedByStep(def, [4, 2, 1])).toEqual([null, 2, 5]);
     expect(removedByStep(def, [])).toEqual([null, null, null]);
   });
+
+  describe("a pinned attribute breakdown follows its step", () => {
+    const pinned = (s: number): FunnelDef => ({
+      ...defOf([A, B, C, D]),
+      breakdown: { f: "context_payment_method", s },
+    });
+    it("removing an earlier step shifts the pin down", () => {
+      expect(removeStep(pinned(3), 0).def.breakdown).toEqual({ f: "context_payment_method", s: 2 });
+    });
+    it("removing the pinned step falls back to automatic", () => {
+      expect(removeStep(pinned(3), 2).def.breakdown).toEqual({ f: "context_payment_method" });
+    });
+    it("removing a later step keeps the pin", () => {
+      expect(removeStep(pinned(3), 3).def.breakdown).toEqual({ f: "context_payment_method", s: 3 });
+    });
+    it("a swap carries the pin with its step", () => {
+      expect(moveStep(pinned(3), 2, -1)!.def.breakdown).toEqual({
+        f: "context_payment_method",
+        s: 2,
+      });
+      expect(moveStep(pinned(3), 0, 1)!.def.breakdown).toEqual({
+        f: "context_payment_method",
+        s: 3,
+      });
+    });
+    it("leaves automatic and built-in breakdowns alone", () => {
+      const auto = { ...defOf([A, B, C]), breakdown: { f: "context_payment_method" } };
+      expect(removeStep(auto, 0).def.breakdown).toEqual({ f: "context_payment_method" });
+      const builtin = { ...defOf([A, B, C]), breakdown: "browser" as const };
+      expect(removeStep(builtin, 0).def.breakdown).toBe("browser");
+    });
+  });
 });
