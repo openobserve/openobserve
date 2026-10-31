@@ -131,9 +131,9 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
         testLogger.warn(`Query may have produced an error: ${await inlineError.textContent().catch(() => '')}`);
       }
       expect(hasInlineError).toBe(false);
-      const legendCount = await pm.metricsPage.getLegendItemCount();
-      testLogger.info(`Query returned ${legendCount} series`);
-      expect(legendCount).toBeGreaterThan(0);
+      // Visualize draws series on a canvas, so a drawn chart with no no-data state is the evidence.
+      await expect(page.locator('[data-test="chart-renderer"] canvas').first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('[data-test="no-data"]')).toHaveCount(0);
     }
     testLogger.info('TopK and BottomK queries tested successfully');
   });

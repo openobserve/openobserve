@@ -45,6 +45,7 @@ test.describe('Metrics PromQL builder round-trip', () => {
   for (const query of [
     'sum by (job)(rate(http_requests_total{code=~"5.."}[5m]))',
     'avg by (instance)(node_load1{job="node"}) * 100',
+    'max without (instance)(node_load1)',
   ]) {
     test(`switches ${query} to the builder and back unchanged`, {
       tag: ['@metrics', '@builder', '@P1', '@all'],
@@ -69,12 +70,12 @@ test.describe('Metrics PromQL builder round-trip', () => {
   }, async ({ page }, testInfo) => {
     const pm = await openEditor(page, testInfo);
     const builder = pm.metricsBuilderPage;
-    const query = 'max without (instance)(node_load1)';
+    const query = 'max_over_time(rate(node_load1[5m])[1h:])';
     await setCodeQuery(builder, page, query);
 
     await builder.builderModeBtn.click();
     const refusal = page.locator('[data-test="dashboard-panel-query-errors"]');
-    await expect(refusal).toContainText('The builder cannot show a without (…) grouping', { timeout: 15000 });
+    await expect(refusal).toContainText('The builder cannot show a subquery', { timeout: 15000 });
     await expect(refusal).toBeInViewport();
     await expect(builder.customModeBtn).toHaveAttribute('data-state', 'on');
     expect(await editorText(page)).toBe(query);
