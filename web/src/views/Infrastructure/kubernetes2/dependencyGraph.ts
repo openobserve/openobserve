@@ -85,19 +85,19 @@ export interface FlowGraph {
 const END = (side: "src" | "dst") =>
   `k8s_${side}_namespace, k8s_${side}_owner_name, k8s_${side}_owner_type`;
 
-const PAIR = `k8s_cluster, ${END("src")}, ${END("dst")}, direction`;
+const PAIR = `k8s_cluster, ${END("src")}, ${END("dst")}, direction, host_id`;
 
 // The rate covers the selected range, bounded so a short range still has samples and a long one stays cheap.
 export const flowWindowSeconds = (startUs: number, endUs: number) =>
   Math.min(MAX_WINDOW_S, Math.max(MIN_WINDOW_S, Math.round((endUs - startUs) / 1_000_000)));
 
-// Both nodes report cross-node traffic, so it is summed per node, then the larger node's count is kept.
+// Per reporting node, since both nodes report cross-node traffic; pairFlows keeps one node's count.
 // Service rows repeat the workload rows on the client's node, so they are left out.
 export function flowQuery(cluster: string | null, windowS: number): string {
   const matchers = ['k8s_src_owner_type!="Service"', 'k8s_dst_owner_type!="Service"'];
   if (cluster) matchers.unshift(`k8s_cluster="${escapeLabel(cluster)}"`);
   const rate = `rate(${FLOW_STREAM}{${matchers.join(", ")}}[${windowS}s])`;
-  return `max by (${PAIR}) (sum by (${PAIR}, host_id) (${rate}))`;
+  return `sum by (${PAIR}) (${rate})`;
 }
 
 export function endOf(metric: Record<string, string>, side: "src" | "dst"): FlowEnd {
@@ -128,6 +128,48 @@ export function endOf(metric: Record<string, string>, side: "src" | "dst"): Flow
   };
 }
 
+interface Flow {
+  src: FlowEnd;
+  dst: FlowEnd;
+  request: number;
+  response: number;
+  unknown: number;
+  total: number;
+}
+
+const known = (f: Flow) => f.request + f.response;
+
+// One flow per direction of travel, from the node that saw the most of it, with that node's direction
+// split: mixing nodes could add one node's request bytes to the other's unknown ones.
+function busiestNode(series: Series[]): Flow[] {
+  const perNode = new Map<string, Flow>();
+  for (const { metric, value } of series) {
+    if (!(value > 0)) continue;
+    const src = endOf(metric, "src");
+    const dst = endOf(metric, "dst");
+    const key = `${src.id}\n${dst.id}\n${metric.host_id ?? ""}`;
+    let f = perNode.get(key);
+    if (!f) {
+      f = { src, dst, request: 0, response: 0, unknown: 0, total: 0 };
+      perNode.set(key, f);
+    }
+    if (metric.direction === "request") f.request += value;
+    else if (metric.direction === "response") f.response += value;
+    else f.unknown += value;
+    f.total += value;
+  }
+  const best = new Map<string, Flow>();
+  for (const f of perNode.values()) {
+    const key = `${f.src.id}\n${f.dst.id}`;
+    const kept = best.get(key);
+    // On a tie the node that saw the connection open says more about its direction.
+    if (!kept || f.total > kept.total || (f.total === kept.total && known(f) > known(kept))) {
+      best.set(key, f);
+    }
+  }
+  return [...best.values()];
+}
+
 interface Pair {
   a: FlowEnd;
   b: FlowEnd;
@@ -144,10 +186,7 @@ interface Pair {
 // count toward the same orientation; an edge is directed only when that evidence is most of its bytes.
 export function pairFlows(series: Series[]): FlowEdge[] {
   const pairs = new Map<string, Pair>();
-  for (const { metric, value } of series) {
-    if (!(value > 0)) continue;
-    const src = endOf(metric, "src");
-    const dst = endOf(metric, "dst");
+  for (const { src, dst, request, response, unknown, total } of busiestNode(series)) {
     // Traffic inside one workload, one node or the outside world is not a dependency.
     if (src.id === dst.id) continue;
     const [a, b] = src.id < dst.id ? [src, dst] : [dst, src];
@@ -158,17 +197,18 @@ export function pairFlows(series: Series[]): FlowEdge[] {
       pairs.set(key, p);
     }
     const fromA = src.id === a.id;
-    if (fromA) p.ab += value;
-    else p.ba += value;
-    if (metric.direction === "request") {
-      p.request += value;
-      if (fromA) p.aClient += value;
-      else p.bClient += value;
-    } else if (metric.direction === "response") {
-      p.response += value;
-      if (fromA) p.bClient += value;
-      else p.aClient += value;
-    } else p.unknown += value;
+    if (fromA) p.ab += total;
+    else p.ba += total;
+    p.request += request;
+    p.response += response;
+    p.unknown += unknown;
+    if (fromA) {
+      p.aClient += request;
+      p.bClient += response;
+    } else {
+      p.bClient += request;
+      p.aClient += response;
+    }
   }
   return [...pairs.entries()].map(([key, p]) => {
     const total = p.ab + p.ba;

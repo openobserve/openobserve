@@ -159,11 +159,54 @@ describe("DependenciesView", () => {
     expect(testId("k8s2-deps-edge").exists()).toBe(false);
   });
 
+  it.each([
+    [
+      "mostly unknown",
+      [row(API, DNS, "unknown", 90), row(DNS, API, "unknown", 90)],
+      "without seeing",
+    ],
+    [
+      "called both ways",
+      [row(WEB, API, "request", 50), row(API, WEB, "request", 50)],
+      "both act as client",
+    ],
+  ])("explains an undirected edge that is %s", async (_case, result, text) => {
+    metricsQuery.mockResolvedValue({ data: { data: { result } } } as any);
+    await mountView({ state: parseUrlState({ view: "dependencies", namespace: "backend" }) });
+    await testId("k8s2-deps-show-system-btn").trigger("click");
+    chart().vm.$emit("click", { dataType: "edge", data: { id: series().links[0].id } });
+    await flushPromises();
+    expect(testId("k8s2-deps-edge-undirected").text()).toContain(text);
+  });
+
+  it("reads as filtered while the switches hide edges, and clearing turns them on", async () => {
+    await mountView();
+    const header = wrapper.findComponent({ name: "K8sListHeader" });
+    expect(header.props("filtered")).toBe(true);
+    header.vm.$emit("clear");
+    await flushPromises();
+    expect(header.props("filtered")).toBe(false);
+    expect(series().links).toHaveLength(3);
+    expect(wrapper.emitted("update")).toEqual([[{ namespaces: [], search: "" }]]);
+  });
+
+  it("counts what it draws when there are too many endpoints", async () => {
+    const many = Array.from({ length: 90 }, (_, i) =>
+      row(["shop", "Deployment", `w${i}`], API, "request", 1000 - i),
+    );
+    metricsQuery.mockResolvedValue({ data: { data: { result: many } } } as any);
+    await mountView();
+    expect(series().data).toHaveLength(80);
+    expect(testId("k8s2-list-count").text()).toContain("79 connections");
+    expect(testId("k8s2-deps-capped").text()).toContain("Showing the 80 busiest of 91 endpoints");
+  });
+
   it("explains and links to the Kubernetes data source when there is no flow stream", async () => {
     await mountView({ hasStream: () => false });
     expect(metricsQuery).not.toHaveBeenCalled();
     const empty = testId("k8s2-deps-no-stream");
     expect(empty.text()).toContain("obi_network_flow_bytes");
+    expect(empty.text()).toContain("ebpf.network.enabled=true");
     await empty.find("button").trigger("click");
     expect(push).toHaveBeenCalledWith({
       name: "ingestFromKubernetes",

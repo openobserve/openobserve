@@ -36,11 +36,12 @@ const GROUP_ORDER: PaletteGroup[] = ["goTo", "attention", "workloads", "pods", "
 const VIEW_ENTRIES: { view: View; label: I18nKey }[] = [
   { view: "cluster", label: "infra.k8s2.paletteClusterOverview" },
   { view: "map", label: "infra.k8s2.viewMap" },
-  { view: "dependencies", label: "infra.k8s2.viewDependencies" },
   { view: "nodes", label: "infra.k8s2.viewNodes" },
   { view: "namespaces", label: "infra.k8s2.viewNamespaces" },
   { view: "events", label: "infra.k8s2.viewEvents" },
   { view: "workloads", label: "infra.k8s2.paletteWorkloadsOverview" },
+  // After the first six, which an empty query shows.
+  { view: "dependencies", label: "infra.k8s2.viewDependencies" },
   { view: "pods", label: "infra.k8s2.viewPods" },
   { view: "deployments", label: "infra.k8s2.viewDeployments" },
   { view: "daemonsets", label: "infra.k8s2.viewDaemonSets" },

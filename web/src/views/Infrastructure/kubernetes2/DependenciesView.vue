@@ -39,7 +39,6 @@ import type { DetailsRef, K8sUrlState } from "./kubernetesUrlState";
 import type { K8sTime } from "./useKubernetesInventory";
 import {
   FLOW_STREAM,
-  MAX_GRAPH_NODES,
   buildGraph,
   filterFlows,
   flowQuery,
@@ -126,18 +125,29 @@ watch(
 
 const allEdges = computed(() => pairFlows(series.value));
 
+const scope = computed(() => ({
+  namespaces: props.state.namespaces,
+  search: props.state.search,
+}));
+
 const edges = computed(() =>
   filterFlows(allEdges.value, {
-    namespaces: props.state.namespaces,
-    search: props.state.search,
+    ...scope.value,
     showSystem: showSystem.value,
     showNodeTraffic: showNodeTraffic.value,
   }),
 );
 
+// The header reads as filtered when the switches, not only the namespace filter or search, hide edges.
+const switchesHide = computed(
+  () =>
+    filterFlows(allEdges.value, { ...scope.value, showSystem: true, showNodeTraffic: true })
+      .length > edges.value.length,
+);
+
 const graph = computed(() => buildGraph(edges.value));
 
-const capped = computed(() => graph.value.totalNodes > MAX_GRAPH_NODES);
+const capped = computed(() => graph.value.nodes.length < graph.value.totalNodes);
 
 const selectedEdge = computed(
   () => graph.value.edges.find((e) => e.id === selectedEdgeId.value) ?? null,
@@ -323,15 +333,11 @@ function onSetUp() {
   router.push({ name: "ingestFromKubernetes", query: { org_identifier: props.orgId } });
 }
 
-function clearFilters() {
-  emit("update", { namespaces: [], search: "" });
-}
-
-// Nothing left to draw can be down to the toggles alone, so this clears them too.
+// The switches filter too, so clearing filters turns them on.
 function showEverything() {
   showSystem.value = true;
   showNodeTraffic.value = true;
-  clearFilters();
+  emit("update", { namespaces: [], search: "" });
 }
 </script>
 
@@ -342,9 +348,10 @@ function showEverything() {
   >
     <K8sListHeader
       :title="t('infra.k8s2.depsTitle')"
-      :count="edges.length"
+      :count="graph.edges.length"
       :total="allEdges.length"
-      :count-label="t('infra.k8s2.depsCount', { count: edges.length }, edges.length)"
+      :count-label="t('infra.k8s2.depsCount', { count: graph.edges.length }, graph.edges.length)"
+      :filtered="switchesHide"
       namespaced
       :namespace-options="namespaceOptions"
       :namespaces="state.namespaces"
@@ -352,7 +359,7 @@ function showEverything() {
       :search-placeholder="t('infra.k8s2.depsSearch')"
       @update:namespaces="(namespaces: string[]) => emit('update', { namespaces })"
       @update:search="(search: string) => emit('update', { search })"
-      @clear="clearFilters"
+      @clear="showEverything"
     >
       <template #trailing>
         <ORefreshButton
@@ -426,7 +433,7 @@ function showEverything() {
         class="text-text-secondary text-xs"
         data-test="k8s2-deps-capped"
       >
-        {{ t("infra.k8s2.depsCapped", { shown: MAX_GRAPH_NODES, total: graph.totalNodes }) }}
+        {{ t("infra.k8s2.depsCapped", { shown: graph.nodes.length, total: graph.totalNodes }) }}
       </OText>
       <div class="relative flex min-h-0 flex-1 max-md:min-h-96" data-test="k8s2-deps-area">
         <ChartRenderer
@@ -509,7 +516,11 @@ function showEverything() {
             class="text-text-secondary text-xs"
             data-test="k8s2-deps-edge-undirected"
           >
-            {{ t("infra.k8s2.depsEdgeUndirected") }}
+            {{
+              selectedEdge.unknown > selectedEdge.total / 2
+                ? t("infra.k8s2.depsEdgeUndirected")
+                : t("infra.k8s2.depsEdgeBothClients")
+            }}
           </OText>
         </div>
       </div>
