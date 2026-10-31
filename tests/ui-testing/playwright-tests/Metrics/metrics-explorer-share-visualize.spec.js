@@ -254,7 +254,12 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
     await pm.metricsExplorerPage.gotoExplorer({ mode: 'visualize' });
     await pm.metricsExplorerPage.waitForVisualizeReady();
     await pm.metricsExplorerPage.enterVisualizeQuery(SEEDED_METRIC);
-    await pm.metricsExplorerPage.waitForMetricsDataParam();
+    // Visualize writes a blob for its default query on mount, so wait for the one carrying the edit.
+    await expect
+      .poll(() => pm.metricsExplorerPage.decodeMetricsBlob()?.data?.queries?.[0]?.query ?? '', {
+        timeout: 20000,
+      })
+      .toContain(SEEDED_METRIC);
 
     const sharedUrl = page.url();
     testLogger.info(`Captured shared URL of length ${sharedUrl.length}`);

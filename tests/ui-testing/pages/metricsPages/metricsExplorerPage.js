@@ -245,13 +245,15 @@ export class MetricsExplorerPage {
         return Buffer.from(JSON.stringify({ v: version, data }), 'utf8').toString('base64');
     }
 
-    /** A minimal, valid Visualize payload carrying one PromQL query. */
+    /** A minimal, valid Visualize payload carrying one PromQL query, in code mode so the builder never regenerates it. */
     buildPromqlBlob(query, version = METRICS_BLOB_VERSION) {
         return this.buildMetricsBlob(
             {
                 type: 'line',
                 queryType: 'promql',
-                queries: [{ query, queryType: 'promql', fields: { stream_type: 'metrics' } }],
+                queries: [
+                    { query, queryType: 'promql', customQuery: true, fields: { stream_type: 'metrics' } },
+                ],
             },
             version
         );
