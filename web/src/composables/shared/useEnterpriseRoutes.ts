@@ -126,6 +126,7 @@ const useEnterpriseRoutes = () => {
           name: "users",
           meta: {
             titleKey: "iam.basicUsers",
+            accessResource: "users",
           },
           component: Users,
           beforeEnter(to: any, from: any, next: any) {
@@ -481,6 +482,7 @@ const useEnterpriseRoutes = () => {
         name: "roles",
         meta: {
           titleKey: "iam.roles",
+          accessResource: "roles",
         },
         component: AppRoles,
         beforeEnter: withFeatureGate("rbac", routeGuard),
