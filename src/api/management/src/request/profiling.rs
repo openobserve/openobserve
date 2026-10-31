@@ -15,11 +15,14 @@
 
 //! HTTP handlers for profiling endpoints
 
-use axum::{Json, extract::Query};
+#[cfg(feature = "profiling")]
+use axum::Json;
+use axum::extract::Query;
 use config::get_config;
+use openobserve_core::self_profiles::dump_cpu_profile;
+#[cfg(feature = "profiling")]
 use openobserve_core::self_profiles::{
-    dump_cpu_profile, dump_memory_flamegraph, dump_memory_pprof,
-    jemalloc_stats as read_jemalloc_stats,
+    dump_memory_flamegraph, dump_memory_pprof, jemalloc_stats as read_jemalloc_stats,
 };
 use serde::Deserialize;
 
@@ -29,6 +32,7 @@ use serde::Deserialize;
 /// The profile can be analyzed with jeprof or converted to flamegraph.
 ///
 /// Returns: Binary profile data
+#[cfg(feature = "profiling")]
 pub async fn memory_profile() -> Result<String, String> {
     let pprof_data = dump_memory_pprof().await?;
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
@@ -58,6 +62,7 @@ pub async fn memory_profile() -> Result<String, String> {
 /// - allocated: Current allocated memory (bytes)
 /// - resident: Current resident memory (bytes)
 /// - metadata: Metadata overhead (bytes)
+#[cfg(feature = "profiling")]
 pub async fn jemalloc_stats() -> Result<Json<serde_json::Value>, String> {
     Ok(Json(read_jemalloc_stats()?))
 }

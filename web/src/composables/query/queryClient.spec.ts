@@ -37,3 +37,31 @@ describe("purgeOrgQueries on a stale deploy", () => {
     expect(unhandled).not.toHaveBeenCalled();
   });
 });
+
+describe("a mutation's stales meta", () => {
+  it("marks the scope stale without refetching a query that is in use", async () => {
+    const { queryClient } = await import("./queryClient");
+    const { QueryObserver } = await import("@tanstack/query-core");
+    const fetches = vi.fn().mockResolvedValue(["row"]);
+    const observer = new QueryObserver(queryClient, {
+      queryKey: ["stales-test", "list"],
+      queryFn: fetches,
+      staleTime: Infinity,
+    });
+    const unsubscribe = observer.subscribe(() => {});
+    await vi.waitFor(() => expect(fetches).toHaveBeenCalledTimes(1));
+
+    await queryClient
+      .getMutationCache()
+      .build(queryClient, {
+        mutationFn: async () => "ok",
+        meta: { stales: [["stales-test"]] },
+      })
+      .execute(undefined);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(fetches).toHaveBeenCalledTimes(1);
+    expect(queryClient.getQueryState(["stales-test", "list"])?.isInvalidated).toBe(true);
+    unsubscribe();
+  });
+});

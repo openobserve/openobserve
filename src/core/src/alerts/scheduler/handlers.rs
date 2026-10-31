@@ -515,6 +515,8 @@ struct GroupDispatchOutcome {
     downtime_id: Option<String>,
     /// Who acked the first group an ack kept silent.
     acked_by: Option<String>,
+    /// Some group was withheld because it repeated its last delivery.
+    repeated: bool,
 }
 
 impl GroupDispatchOutcome {
@@ -629,6 +631,7 @@ async fn dispatch_per_group(
             state_failed: true,
             downtime_id: None,
             acked_by: None,
+            repeated: false,
         });
     };
 
@@ -647,6 +650,7 @@ async fn dispatch_per_group(
                 state_failed: true,
                 downtime_id: None,
                 acked_by: None,
+                repeated: false,
             });
         }
     };
@@ -684,6 +688,7 @@ async fn dispatch_per_group(
         &alert.trigger_condition,
         now_micros(),
         cfg.limit.alert_max_group_notifications_per_eval,
+        alert.suppresses_repeats(),
         |key, decision, last_notified| {
             muted_groups.contains_key(key)
                 || (acked_groups.contains_key(key) && decision.ack_withholds(last_notified))
@@ -749,7 +754,7 @@ async fn dispatch_per_group(
             continue;
         }
         // Chosen before the send: a resolve only closes a ticket opened under the key it quotes.
-        let episode_key = alert.notify_on_recovery.then(|| {
+        let episode_key = (alert.notify_on_recovery || alert.suppresses_repeats()).then(|| {
             states
                 .get(&item.group_key)
                 .and_then(|state| state.episode_id.clone())
@@ -771,7 +776,7 @@ async fn dispatch_per_group(
                 // last so a label value containing `{...}` cannot expand.
                 Some(&item.labels),
                 &[],
-                episode_key.clone(),
+                episode_key.clone().filter(|_| alert.notify_on_recovery),
             )
             .await;
 
@@ -835,9 +840,11 @@ async fn dispatch_per_group(
 
     log::info!(
         "[SCHEDULER trace_id {trace_id}] alert {alert_id}: per-group dispatch delivered={delivered} \
-         pending={} failed={failed} suppressed={} downtime={downtime_suppressed} candidates={}",
+         pending={} failed={failed} suppressed={} repeats={} downtime={downtime_suppressed} \
+         candidates={}",
         plan.pending,
         plan.suppressed,
+        plan.repeats,
         plan.items.len()
     );
     Some(GroupDispatchOutcome {
@@ -849,6 +856,7 @@ async fn dispatch_per_group(
         state_failed: false,
         downtime_id,
         acked_by,
+        repeated: plan.repeats > 0,
     })
 }
 
@@ -3053,6 +3061,45 @@ pub(crate) async fn correlate_muted_incident(
     }
 }
 
+/// A repeat still correlates, or a continuous firing lets its incident go stale and auto-resolve.
+#[cfg(feature = "enterprise")]
+async fn correlate_repeated_incident(
+    trace_id: &str,
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+    triggered_at: i64,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    actual_value: Option<f64>,
+) {
+    let Some(first_row) = rows.first() else {
+        return;
+    };
+    let incidents_enabled = o2_enterprise::enterprise::common::config::get_config()
+        .incidents
+        .enabled;
+    if !correlates_repeated_firing(alert.creates_incident, incidents_enabled) {
+        return;
+    }
+    // Correlation itself stays silent on a repeat and only notifies a new or escalated incident.
+    if let Err(e) = crate::alerts::incidents::correlate_alert_to_incident(
+        alert,
+        first_row,
+        rows,
+        triggered_at,
+        eval_level,
+        actual_value,
+        None,
+    )
+    .await
+    {
+        log::error!(
+            "[SCHEDULER trace_id {trace_id}] repeat incident correlation failed for {}/{}: {e}",
+            alert.org_id,
+            alert.name
+        );
+    }
+}
+
 /// Whether a matched single-series run is still inside its pending period.
 fn holds_pending(
     alert: &config::meta::alerts::alert::Alert,
@@ -3134,6 +3181,12 @@ fn correlates_muted_firing(
     creates_incident && incidents_enabled && downtime.incident_mode.is_muted()
 }
 
+/// Whether a firing withheld as a repeat still feeds its incident.
+#[cfg(feature = "enterprise")]
+fn correlates_repeated_firing(creates_incident: bool, incidents_enabled: bool) -> bool {
+    creates_incident && incidents_enabled
+}
+
 /// Who acked a single-row alert's current firing, when that ack withholds this run's send.
 async fn single_row_ack(
     alert: &config::meta::alerts::alert::Alert,
@@ -3189,6 +3242,32 @@ fn pending_stores_end_time(
 /// Whether this run moves `last_notified_level` and the delivery silence window.
 fn records_delivery_state(alert_level_delivery: bool, delivery: &DeliveryDecision) -> bool {
     alert_level_delivery && delivery.resets_silence()
+}
+
+/// Whether a single-row firing at `level` repeats what its open recovery episode already sent.
+fn single_row_repeats(
+    alert: &config::meta::alerts::alert::Alert,
+    level: Option<config::meta::alerts::level::AlertLevel>,
+    rollup: Option<&config::meta::alerts::state::AlertState>,
+    recorded_level: Option<i32>,
+    alert_level_delivery: bool,
+) -> bool {
+    let (Some(level), Some(rollup)) = (level.filter(|l| l.is_firing()), rollup) else {
+        return false;
+    };
+    // Only the multi-level path records the delivered level; a single-level alert fires at one.
+    let last_notified = if alert_level_delivery {
+        recorded_level.and_then(config::meta::alerts::level::AlertLevel::from_i32)
+    } else {
+        Some(level)
+    };
+    alert.suppresses_repeats()
+        && !alert.query_condition.multi_alert_enabled()
+        && config::meta::alerts::dispatch::repeats_last_notification(
+            level,
+            rollup.episode_id.is_some(),
+            last_notified,
+        )
 }
 
 /// A delivered firing ends the Muted chip; a pending run persists before the downtime decision.
@@ -3594,7 +3673,7 @@ async fn handle_alert_triggers(
                 .unwrap();
 
     let last_states = if !alert.query_condition.multi_alert_enabled()
-        && alert.pending_period_sec > 0
+        && (alert.pending_period_sec > 0 || alert.suppresses_repeats())
     {
         load_tracked_group_states(&alert.get_unique_key()).await.inspect_err(|e|{
             log::error!("[SCHEDULER trace_id {scheduler_trace_id}] alert {}/{} error in getting alert state: {e}",trigger.org,trigger.module_key);
@@ -3927,10 +4006,27 @@ async fn handle_alert_triggers(
     } else {
         None
     };
+    let delivery = match (downtime.as_ref(), acked_by) {
+        (Some(downtime), _) => DeliveryDecision::SuppressedByDowntime(downtime.id.clone()),
+        (None, Some(by)) => DeliveryDecision::SuppressedByAck(by),
+        (None, None)
+            if level_delivery.should_deliver()
+                && single_row_repeats(
+                    &alert,
+                    eval_level,
+                    last_states.get(config::meta::alerts::state::ROLLUP_GROUP_KEY),
+                    trigger_data.last_notified_level,
+                    alert_level_delivery,
+                ) =>
+        {
+            DeliveryDecision::SuppressedAsRepeat
+        }
+        (None, None) => level_delivery,
+    };
     // D6: a suppressed run starts no silence window, so the first run after the window delivers.
     if starts_silence_window(
         trigger_results.data.is_some(),
-        downtime.is_some() || acked_by.is_some(),
+        delivery.withheld(),
         alert.trigger_condition.silence,
         evaluates_through_silence,
     ) {
@@ -3952,14 +4048,7 @@ async fn handle_alert_triggers(
     // send notification
     // Nowhere to send means no delivery to record: no silence window or episode.
     let has_target = has_delivery_target(&alert);
-    let delivery = match (downtime.as_ref(), acked_by) {
-        (Some(downtime), _) => DeliveryDecision::SuppressedByDowntime(downtime.id.clone()),
-        (None, Some(by)) => DeliveryDecision::SuppressedByAck(by),
-        (None, None) => level_delivery,
-    };
-    if !delivery.should_deliver()
-        && (alert_level_delivery || downtime.is_some() || delivery.acked_by().is_some())
-    {
+    if !delivery.should_deliver() && (alert_level_delivery || delivery.withheld()) {
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] delivery suppressed ({delivery:?}) for {}/{}",
             new_trigger.org,
@@ -4013,6 +4102,20 @@ async fn handle_alert_triggers(
             triggered_at,
             eval_level,
             &downtime,
+        )
+        .await;
+    }
+    #[cfg(feature = "enterprise")]
+    if delivery == DeliveryDecision::SuppressedAsRepeat
+        && let Some(rows) = trigger_results.data.as_deref()
+    {
+        correlate_repeated_incident(
+            &scheduler_trace_id,
+            &alert,
+            rows,
+            triggered_at,
+            eval_level,
+            trigger_results.actual_value,
         )
         .await;
     }
@@ -4213,6 +4316,9 @@ async fn handle_alert_triggers(
             }
 
             dispatch.record_downtime(&mut trigger_data_stream);
+            if dispatch.repeated {
+                trigger_data_stream.repeat_suppressed = Some(true);
+            }
             // The rollup row was committed before anything was sent.
             if let Some(outcome) = dispatch.rollup_rewrite()
                 && let Some(alert_id) = alert.id.as_ref()
@@ -4486,6 +4592,8 @@ async fn handle_alert_triggers(
                     "alerts",
                     by.to_string(),
                 );
+            } else if delivery == DeliveryDecision::SuppressedAsRepeat {
+                trigger_data_stream.repeat_suppressed = Some(true);
             }
         } else if trigger_results.frozen {
             // Frozen is not Normal: nothing was measured (§7.6). `Skipped` is
@@ -7384,6 +7492,7 @@ mod tests {
             state_failed: false,
             downtime_id: None,
             acked_by: None,
+            repeated: false,
         }
     }
 
@@ -8942,6 +9051,14 @@ mod tests {
             IncidentMode::Muted,
             "an Alerts target without the field keeps today's muted incident"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_repeat_still_feeds_its_incident_only_when_incidents_apply() {
+        assert!(correlates_repeated_firing(true, true));
+        assert!(!correlates_repeated_firing(false, true));
+        assert!(!correlates_repeated_firing(true, false));
     }
 
     #[cfg(feature = "enterprise")]

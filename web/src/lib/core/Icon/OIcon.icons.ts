@@ -194,6 +194,8 @@ import PhotoCamera from "~icons/material-symbols/photo-camera-outline";
 import AddCircleIcon from "~icons/material-symbols/add-circle-outline";
 import AdsClickIcon from "~icons/material-symbols/ads-click";
 import AnalyticsIcon from "~icons/material-symbols/analytics-outline";
+import DoNotDisturbOnIcon from "~icons/material-symbols/do-not-disturb-on-outline";
+import LibraryAddIcon from "~icons/material-symbols/library-add-outline";
 import ArrowBackIosIcon from "~icons/material-symbols/arrow-back-ios";
 import ArrowForwardIosIcon from "~icons/material-symbols/arrow-forward-ios";
 import ArrowRightIcon from "~icons/material-symbols/arrow-right";
@@ -577,6 +579,8 @@ export const iconRegistry = {
   "add-circle": AddCircleIcon,
   "add-circle-outline": AddCircleIcon,
   "ads-click": AdsClickIcon,
+  "do-not-disturb-on": DoNotDisturbOnIcon,
+  "library-add": LibraryAddIcon,
   analytics: AnalyticsIcon,
   "arrow-back-ios": ArrowBackIosIcon,
   "arrow-forward-ios": ArrowForwardIosIcon,

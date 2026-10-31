@@ -60,11 +60,30 @@ const toMicros = (value: Date | number | null | undefined): number => {
   return typeof value === "number" && Number.isFinite(value) ? value * 1000 : 0;
 };
 
+// The page wraps picker microseconds in Dates, so its __global getTime() is already microseconds.
+export const rangeFromPage = (dateTime: unknown): RumTabDateTime | undefined => {
+  const dt = dateTime as { __global?: RumTabDateTime } & RumTabDateTime;
+  const wrapped = dt?.__global;
+  if (!wrapped) return dt?.start_time && dt?.end_time ? dt : undefined;
+  const fromUs = (v: Date | number | null | undefined) =>
+    v instanceof Date
+      ? new Date(v.getTime() / 1000)
+      : typeof v === "number"
+        ? new Date(v / 1000)
+        : null;
+  const start_time = fromUs(wrapped.start_time);
+  const end_time = fromUs(wrapped.end_time);
+  return start_time && end_time ? { start_time, end_time } : undefined;
+};
+
 export interface RumPerformanceTab {
   /** The schema-migrated, capability-filtered dashboard to hand to RenderDashboardCharts. */
   dashboardData: ComputedRef<RumDashboard>;
   /** True once the `_rumdata` schema has been read (or a fetch was attempted). */
   schemaResolved: Ref<boolean>;
+  schemaError: Ref<boolean>;
+  schemaForbidden: Ref<boolean>;
+  presentFields: ComputedRef<Set<string> | null>;
   /** True only when the schema is known and every panel was filtered out. */
   showEmptyState: ComputedRef<boolean>;
   /** True when at least one panel was dropped — e.g. to hide browser-oriented section labels. */
@@ -94,6 +113,8 @@ const useRumPerformanceTab = (
   const baseDashboard = convertDashboardSchemaVersion(rawDashboard) as RumDashboard;
 
   const schemaResolved = ref(false);
+  const schemaError = ref(false);
+  const schemaForbidden = ref(false);
 
   const rumSchemaMap = computed(() => performanceState.data.streams?.[RUM_STREAM]?.schema ?? null);
   const presentFields = computed(() => presentFieldsFromSchemaMap(rumSchemaMap.value));
@@ -144,6 +165,8 @@ const useRumPerformanceTab = (
   );
 
   const ensureRumSchema = async (): Promise<void> => {
+    schemaError.value = false;
+    schemaForbidden.value = false;
     try {
       if (presentFields.value) return;
 
@@ -153,9 +176,11 @@ const useRumPerformanceTab = (
         schemaMap[field.name] = field;
       });
       performanceState.data.streams[RUM_STREAM] = { schema: schemaMap, name: RUM_STREAM };
-    } catch {
-      // Inconclusive schema — leave presentFields null so the full dashboard renders
-      // rather than hiding panels from a browser user on a transient error.
+    } catch (e) {
+      const err = e as { response?: { status?: number }; status?: number };
+      // A retry cannot fix a missing permission, so a 403 gets its own state.
+      if ((err?.response?.status ?? err?.status) === 403) schemaForbidden.value = true;
+      else schemaError.value = true;
     } finally {
       schemaResolved.value = true;
     }
@@ -164,6 +189,9 @@ const useRumPerformanceTab = (
   return {
     dashboardData,
     schemaResolved,
+    schemaError,
+    schemaForbidden,
+    presentFields,
     showEmptyState,
     wasFiltered,
     platforms,

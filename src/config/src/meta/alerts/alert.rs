@@ -165,6 +165,10 @@ pub struct Alert {
     /// today. Named after Prometheus' `keep_firing_for`, with the same meaning.
     #[serde(default)]
     pub keep_firing_for: i64,
+
+    /// Notify once per state change; enterprise only, other builds ignore it.
+    #[serde(default)]
+    pub suppress_repeats: bool,
 }
 
 /// Accept a runbook link, or say why not.
@@ -266,11 +270,17 @@ impl Default for Alert {
             notify_on_recovery: false,
             recovery_destinations: vec![],
             keep_firing_for: 0,
+            suppress_repeats: false,
         }
     }
 }
 
 impl Alert {
+    /// Whether repeat notifications are withheld; other builds than enterprise ignore the switch.
+    pub fn suppresses_repeats(&self) -> bool {
+        cfg!(feature = "enterprise") && self.suppress_repeats
+    }
+
     /// Pending rule mode needs per-series state; the default count gate means any series.
     pub fn normalize_promql_rule_mode(&mut self) {
         if self.query_condition.query_type != super::QueryType::PromQL
@@ -1232,5 +1242,23 @@ mod tests {
         assert_eq!(alert.runbook_url, None);
         let json = serde_json::to_value(&alert).unwrap();
         assert!(json.get("runbook_url").is_none());
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn repeat_suppression_is_ignored_outside_enterprise() {
+        let alert = Alert {
+            suppress_repeats: true,
+            ..Default::default()
+        };
+        assert!(!alert.suppresses_repeats());
+    }
+
+    #[test]
+    fn an_alert_saved_before_repeat_suppression_reads_with_it_off() {
+        let mut stored = serde_json::to_value(Alert::default()).unwrap();
+        stored.as_object_mut().unwrap().remove("suppress_repeats");
+        let alert: Alert = serde_json::from_value(stored).unwrap();
+        assert!(!alert.suppress_repeats);
     }
 }

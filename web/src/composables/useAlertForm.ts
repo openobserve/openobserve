@@ -205,6 +205,8 @@ export const defaultAlertValue: any = () => {
     recovery_destinations: [],
     // Seconds the condition must stay clear before recovering. 0 = immediately.
     keep_firing_for: 0,
+    // Off by default: on, a still-firing alert sends nothing until its state changes.
+    suppress_repeats: false,
     // Feature 2 (PT-1/PT-6). `null` (not 0) is unset — 0 is not a valid
     // priority id, and the payload layer drops null so pre-Feature-2 alerts
     // serialize unchanged.
@@ -787,7 +789,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     condition: false,
     rules: false,
     compare: false,
-    dedup: false,
     advanced: false,
   });
   const chartCollapsed = ref(false);
@@ -857,8 +858,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       2: t("alerts.stepCaptions.conditions"),
       3: t("alerts.stepCaptions.compareWithPast"),
       4: t("alerts.stepCaptions.alertSettings"),
-      5: t("alerts.stepCaptions.deduplication"),
-      6: t("alerts.stepCaptions.advanced"),
+      5: t("alerts.stepCaptions.advanced"),
     };
     return captions[wizardStep.value] || "";
   });
@@ -867,7 +867,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (formData.value.is_real_time === "anomaly") {
       return wizardStep.value === 3;
     }
-    return wizardStep.value === 6;
+    return wizardStep.value === 5;
   });
 
   const getFormattedDestinations = computed(() => {
@@ -1553,7 +1553,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       condition: false,
       rules: false,
       compare: false,
-      dedup: false,
       advanced: false,
     };
 
@@ -1685,7 +1684,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // scalars directly by nested `name=`, so their update:* emits no-op in
   // descendant mode; these handlers still route the out-of-form widget values
   // (SQL/PromQL/VRL editors) and the bare wizard steps B (Advanced /
-  // CompareWithPast / Deduplication) into the form via setFieldValue.
+  // CompareWithPast) into the form via setFieldValue.
   const updateSqlQuery = (value: any) => setF("query_condition.sql", value);
   const updatePromqlQuery = (value: any) => setF("query_condition.promql", value);
   const updateVrlFunction = (value: any) => setF("query_condition.vrl_function", value);
@@ -1698,7 +1697,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const updateDescription = (value: any) => setF("description", value);
   const updateRowTemplate = (value: any) => setF("row_template", value);
   const updateRowTemplateType = (value: any) => setF("row_template_type", value);
-  const updateDeduplication = (value: any) => setF("deduplication", value);
 
   const handleGoToSqlEditor = () => {
     setF("query_condition.type", "sql");
@@ -1962,8 +1960,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (formData.value.is_real_time === "true") {
       if (wizardStep.value === 2) {
         wizardStep.value = 4;
-      } else if (wizardStep.value === 4) {
-        wizardStep.value = 6;
       } else {
         wizardStep.value = wizardStep.value + 1;
       }
@@ -1982,9 +1978,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return;
     }
     if (formData.value.is_real_time === "true") {
-      if (wizardStep.value === 6) {
-        wizardStep.value = 4;
-      } else if (wizardStep.value === 4) {
+      if (wizardStep.value === 4) {
         wizardStep.value = 2;
       } else {
         wizardStep.value = wizardStep.value - 1;
@@ -2625,7 +2619,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         }
       }
 
-      lastValidStep.value = 6;
+      lastValidStep.value = 5;
 
       if (data.is_real_time !== "composite" && !data.trigger_condition?.timezone) {
         if (data.tz_offset === 0) {
@@ -3117,7 +3111,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         setF("stream_type", data.stream_type);
         if (data.folder_id) activeFolderId.value = data.folder_id;
         anomalyEditMode.value = true;
-        lastValidStep.value = 6;
+        lastValidStep.value = 5;
 
         // The stream is only known NOW. initializeFormData already ran its
         // updateStreams, but at that point stream_type was empty, so it
@@ -3340,7 +3334,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     updateDescription,
     updateRowTemplate,
     updateRowTemplateType,
-    updateDeduplication,
     validateInputs,
     validateSqlQuery,
     validateConditionsAgainstUDS,

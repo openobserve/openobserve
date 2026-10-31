@@ -34,6 +34,8 @@ const install = `curl -O ${AGENTS_REPO}/linux/install.sh \\
   && sudo ./install.sh {url}/api/{org}/ {token}`;
 
 const TRACING_DOC_URL = "https://github.com/openobserve/agents/blob/main/obi.md";
+const NETWORK_FLOWS_DOC_URL =
+  "https://github.com/openobserve/agents/blob/main/obi.md#network-flows";
 
 export default function linuxCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
@@ -109,6 +111,37 @@ export default function linuxCard(subs: CardSubstitutions, t: TranslateFn): Rich
         note: t("ingestion.setupCard.anyLinuxHostNote"),
       },
       {
+        id: "network",
+        titleKey: "ingestion.setupCard.linuxNetworkFlowsTitle",
+        descriptionKey: "ingestion.setupCard.linuxNetworkFlowsDesc",
+        chip: { kind: "editor", labelKey: "ingestion.setupCard.optionalLabel" },
+        completeOn: "copy",
+        // One untoggled variant: only variants get {flags} and requireOneOf.
+        variantToggle: false,
+        variants: [
+          {
+            id: "network-flows",
+            code: agentCode(`${install}{flags}`, subs, "bash"),
+            inputs: [
+              {
+                id: "networkFlows",
+                flag: "--network-flows",
+                labelKey: "ingestion.setupCard.networkFlowsLabel",
+                default: "",
+                placeholder: raw("10.0.1.5/32=web1,10.0.2.0/24=db,0.0.0.0/0=other"),
+                helpKey: "ingestion.setupCard.networkFlowsHelp",
+              },
+            ],
+            // The installer requires a value: the CIDRs are what give flows an identity.
+            requireOneOf: {
+              ids: ["networkFlows"],
+              messageKey: "ingestion.setupCard.networkFlowsRequired",
+            },
+            note: t("ingestion.setupCard.linuxNetworkFlowsNote"),
+          },
+        ],
+      },
+      {
         id: "verify",
         titleKey: "ingestion.setupCard.verifyDataTitle",
         descriptionKey: "ingestion.setupCard.verifyLinuxAgentDesc",
@@ -139,7 +172,10 @@ sudo journalctl -u openobserve-agent -n 50 --no-pager`,
       uninstall: agentUninstall("linux"),
     },
     docUrl: "https://github.com/openobserve/agents",
-    // Step notes can't link externally, so the tracing guide is a footer link.
-    docLinks: [{ label: t("ingestion.setupCard.ebpfTracingGuideLink"), url: TRACING_DOC_URL }],
+    // Step notes can't link externally, so the eBPF guides are footer links.
+    docLinks: [
+      { label: t("ingestion.setupCard.ebpfTracingGuideLink"), url: TRACING_DOC_URL },
+      { label: t("ingestion.setupCard.ebpfNetworkFlowsGuideLink"), url: NETWORK_FLOWS_DOC_URL },
+    ],
   };
 }

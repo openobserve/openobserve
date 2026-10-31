@@ -15,8 +15,12 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { inject, reactive } from "vue";
+import { inject, nextTick, reactive, type SetupContext } from "vue";
 import { encodeMetricsConfig, getMetricsConfig } from "@/composables/metrics/metricsUrlState";
+import { metricsRestore } from "@/utils/queryHistory/metrics";
+import { openRecentOnItsPage, recentSearchRoute } from "@/utils/queryHistory/routes";
+import type { QueryHistoryEntry } from "@/services/query_history";
+import { landingRouter } from "@/test/unit/helpers/recentLanding";
 
 // Only an explicit Run writes history; auto-refresh, deep links and refresh share runQuery.
 
@@ -43,7 +47,7 @@ const mockStore = vi.hoisted(() => ({
   state: {
     theme: "light",
     selectedOrganization: { identifier: "org1" },
-    zoConfig: { min_auto_refresh_interval: 5 },
+    zoConfig: { min_auto_refresh_interval: 5, query_history_enabled: true },
   },
 }));
 vi.mock("vuex", async (importOriginal) => ({
@@ -81,7 +85,20 @@ vi.mock("@/composables/dashboard/useDefaultPanelFields", () => ({
 
 import MetricsIndex from "./Index.vue";
 
-const editorRunQuery = vi.fn();
+interface PanelRun {
+  state: { panels: Record<string, boolean> } | null;
+  emitError: ((e: unknown) => void) | null;
+}
+const panelRun: PanelRun = { state: null, emitError: null };
+const editorRunQuery = vi.fn(() => {
+  if (panelRun.state) panelRun.state.panels.p1 = true;
+});
+const finishRun = async (error?: { message: string; code: string | number }) => {
+  if (error) panelRun.emitError?.(error);
+  if (panelRun.state) panelRun.state.panels.p1 = false;
+  await flushPromises();
+  await nextTick();
+};
 type RunQuery = (withoutCache?: boolean) => void;
 const injected = { runQuery: null as RunQuery | null };
 const picker = {
@@ -119,8 +136,11 @@ const mountIndex = () =>
           template: '<div data-test="metrics-history" />',
         },
         PanelEditor: {
-          setup: (_: any, { expose }: any) => {
+          emits: ["chartApiError", "renderer-error"],
+          setup: (_: unknown, { expose, emit }: SetupContext) => {
             injected.runQuery = inject<RunQuery | null>("runQuery", null);
+            panelRun.state = inject<PanelRun["state"]>("variablesAndPanelsDataLoadingState", null);
+            panelRun.emitError = (e: unknown) => emit("renderer-error", e);
             expose({ runQuery: editorRunQuery });
             return {};
           },
@@ -162,8 +182,10 @@ describe("Metrics editor — query history", () => {
 
     await wrapper.find('[data-test="metrics-apply"]').trigger("click");
     await flushPromises();
-
     expect(editorRunQuery).toHaveBeenCalled();
+    expect(api.record).not.toHaveBeenCalled();
+
+    await finishRun();
     expect(api.record).toHaveBeenCalledTimes(1);
     const [org, body] = api.record.mock.calls[0];
     expect(org).toBe("org1");
@@ -178,6 +200,7 @@ describe("Metrics editor — query history", () => {
 
     shortcuts.handlers.metricsRunQuery();
     await flushPromises();
+    await finishRun();
     expect(api.record).toHaveBeenCalledTimes(1);
   });
 
@@ -187,6 +210,7 @@ describe("Metrics editor — query history", () => {
 
     injected.runQuery?.(false);
     await flushPromises();
+    await finishRun();
 
     expect(editorRunQuery).toHaveBeenCalledTimes(1);
     expect(api.record).toHaveBeenCalledTimes(1);
@@ -199,6 +223,7 @@ describe("Metrics editor — query history", () => {
     shortcuts.handlers.metricsRefresh();
     await wrapper.find('[data-test="metrics-auto-refresh"]').trigger("click");
     await flushPromises();
+    await finishRun();
 
     expect(editorRunQuery).toHaveBeenCalledTimes(2);
     expect(api.record).not.toHaveBeenCalled();
@@ -208,9 +233,59 @@ describe("Metrics editor — query history", () => {
     route.query = { metrics_data: encodeMetricsConfig(getMetricsConfig(makePanel())) };
     mountIndex();
     await flushPromises();
+    await finishRun();
 
     expect(editorRunQuery).toHaveBeenCalled();
     expect(api.record).not.toHaveBeenCalled();
+  });
+
+  describe("a recent search restored from another page", () => {
+    const entry = (): QueryHistoryEntry => ({
+      id: "m",
+      source: "metrics",
+      query: "up",
+      query_key: "k",
+      streams: ["up"],
+      context: {
+        metrics_data: encodeMetricsConfig(getMetricsConfig(makePanel())),
+        time_range: { period: "15m" },
+      },
+      status: "ok",
+      starred: false,
+      run_count: 1,
+      created_at: 1,
+      updated_at: 2,
+    });
+    const land = async (run: boolean) => {
+      await openRecentOnItsPage(landingRouter().router, entry(), "now", "org1", run);
+      route.query = recentSearchRoute(entry(), "now", "org1", run ? "run" : "load")!.query;
+      const wrapper = mountIndex();
+      await flushPromises();
+      await finishRun();
+      return wrapper;
+    };
+
+    it("runs and records it when it was restored with Run", async () => {
+      await land(true);
+      expect(editorRunQuery).toHaveBeenCalledTimes(1);
+      expect(api.record).toHaveBeenCalledTimes(1);
+    });
+
+    it("loads it without running or recording when it was restored with Load without running", async () => {
+      await land(false);
+      expect(editorRunQuery).not.toHaveBeenCalled();
+      expect(api.record).not.toHaveBeenCalled();
+    });
+
+    it("uses the restore once: reopening the same URL afterwards runs without recording", async () => {
+      const first = await land(true);
+      first.unmount();
+      mountIndex();
+      await flushPromises();
+      await finishRun();
+      expect(editorRunQuery).toHaveBeenCalledTimes(2);
+      expect(api.record).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("records nothing when the query fails validation", async () => {
@@ -230,10 +305,97 @@ describe("Metrics editor — query history", () => {
 
     await wrapper.find('[data-test="metrics-apply"]').trigger("click");
     await flushPromises();
+    await finishRun();
 
     expect(editorRunQuery).toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalled();
     expect(showErrorNotification).not.toHaveBeenCalled();
+  });
+
+  it("records the run's window in microseconds and reopens it at that window", async () => {
+    const startUs = 1_761_500_000_000_000;
+    const endUs = startUs + 3_600_000_000;
+    picker.getConsumableDateTime.mockReturnValue({ startTime: startUs, endTime: endUs });
+    const wrapper = mountIndex();
+    await flushPromises();
+    await wrapper.find('[data-test="metrics-apply"]').trigger("click");
+    await flushPromises();
+    await finishRun();
+    const body = api.record.mock.calls[0][1];
+    expect(body.context.time).toMatchObject({ start_time: startUs, end_time: endUs });
+
+    const reopened = metricsRestore(
+      {
+        ...body,
+        id: "r",
+        query_key: "k",
+        starred: false,
+        run_count: 1,
+        created_at: 1,
+        updated_at: 2,
+      },
+      "original",
+    );
+    wrapper
+      .findComponent('[data-test="metrics-history"]')
+      .vm.$emit("load", { ...reopened, run: false });
+    await flushPromises();
+    const saved = picker.setSavedDate.mock.calls.at(-1)?.[0];
+    expect(saved).toEqual({ type: "absolute", startTime: startUs, endTime: endUs });
+    // DateTime.setSavedDate reads these as microseconds and divides by 1000 for its labels.
+    expect(new Date(saved.startTime / 1000).getUTCFullYear()).toBe(2025);
+    picker.getConsumableDateTime.mockReturnValue({ startTime: 1_000_000, endTime: 2_000_000 });
+  });
+
+  it("names the metric the custom query selects, not the stream picker's last choice", async () => {
+    panel.current.data.queries = [
+      {
+        query: "sum(rate(http_requests_total[5m])) by (service)",
+        customQuery: true,
+        fields: { stream_type: "metrics", stream: "node_memory_MemAvailable_bytes" },
+      },
+    ];
+    const wrapper = mountIndex();
+    await flushPromises();
+    await wrapper.find('[data-test="metrics-apply"]').trigger("click");
+    await flushPromises();
+    await finishRun();
+    expect(api.record.mock.calls[0][1].streams).toEqual(["http_requests_total"]);
+  });
+
+  it("records a query error as failed, with its message", async () => {
+    const wrapper = mountIndex();
+    await flushPromises();
+    await wrapper.find('[data-test="metrics-apply"]').trigger("click");
+    await flushPromises();
+    await finishRun({ message: "parse error: unexpected <EOF>", code: 400 });
+
+    expect(api.record).toHaveBeenCalledTimes(1);
+    expect(api.record.mock.calls[0][1]).toMatchObject({
+      status: "error",
+      context: { error: "parse error: unexpected <EOF>" },
+    });
+  });
+
+  it("records a timeout as ok with a warning", async () => {
+    const wrapper = mountIndex();
+    await flushPromises();
+    await wrapper.find('[data-test="metrics-apply"]').trigger("click");
+    await flushPromises();
+    await finishRun({ message: "timed out", code: 20010 });
+    expect(api.record.mock.calls[0][1]).toMatchObject({
+      status: "ok",
+      context: { warning: "timed out" },
+    });
+  });
+
+  it("records nothing for a cancelled run", async () => {
+    const wrapper = mountIndex();
+    await flushPromises();
+    await wrapper.find('[data-test="metrics-apply"]').trigger("click");
+    await flushPromises();
+    await finishRun({ message: "query cancelled", code: 20009 });
+    expect(api.record).not.toHaveBeenCalled();
   });
 
   describe("loading an entry applies it live", () => {
@@ -280,7 +442,35 @@ describe("Metrics editor — query history", () => {
         endTime: 9000,
       });
       expect(editorRunQuery).toHaveBeenCalledTimes(2);
-      // Loading an entry is not a new run of it.
+    });
+
+    it("records a re-run from history once it settles, like a Run", async () => {
+      const wrapper = mountIndex();
+      await flushPromises();
+      wrapper.findComponent('[data-test="metrics-history"]').vm.$emit("load", {
+        metricsData: blobFor("bar", "sum(a)"),
+        timeRange: { valueType: "relative", relativeTimePeriod: "6h" },
+        run: true,
+      });
+      await flushPromises();
+      await finishRun();
+      expect(editorRunQuery).toHaveBeenCalledTimes(1);
+      expect(api.record).toHaveBeenCalledTimes(1);
+      expect(api.record.mock.calls[0][1]).toMatchObject({ source: "metrics", query: "sum(a)" });
+    });
+
+    it("loads without running or recording when asked to load only", async () => {
+      const wrapper = mountIndex();
+      await flushPromises();
+      const data = panel.current.data;
+      wrapper.findComponent('[data-test="metrics-history"]').vm.$emit("load", {
+        metricsData: blobFor("bar", "sum(a)"),
+        timeRange: { valueType: "relative", relativeTimePeriod: "6h" },
+        run: false,
+      });
+      await flushPromises();
+      expect(data.queries.map((q: { query: string }) => q.query)).toEqual(["sum(a)"]);
+      expect(editorRunQuery).not.toHaveBeenCalled();
       expect(api.record).not.toHaveBeenCalled();
     });
   });
