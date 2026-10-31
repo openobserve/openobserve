@@ -28314,7 +28314,7 @@
       "targetVersionDesc": "Ältere Collector gelten als veraltet. Leer lassen, um die neueste von OpenObserve unterstützte Version zu verwenden.",
       "targetVersionPlaceholder": "Neueste unterstützte (z. B. 0.163.1)",
       "save": "Speichern",
-      "saved": "Einstellungen der Fleet-Verwaltung gespeichert",
+      "saved": "Fleet-Verwaltungseinstellungen gespeichert",
       "noAccess": "Sie haben keinen Zugriff auf die Einstellungen der Fleet-Verwaltung",
       "loadFailed": "Die Einstellungen der Fleet-Verwaltung konnten nicht geladen werden",
       "auditTrail": "Audit-Protokoll",

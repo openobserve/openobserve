@@ -28315,7 +28315,7 @@
       "targetVersionPlaceholder": "受支持的最新版本（例如 0.163.1）",
       "save": "保存",
       "saved": "Fleet 管理设置已保存",
-      "noAccess": "你无权访问 Fleet 管理设置",
+      "noAccess": "您无权访问 Fleet 管理设置",
       "loadFailed": "无法加载 Fleet 管理设置",
       "auditTrail": "审计跟踪",
       "when": "时间",
