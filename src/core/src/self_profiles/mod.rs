@@ -27,3 +27,15 @@ pub use sample::{dump_memory_flamegraph, dump_memory_pprof, jemalloc_stats};
 
 pub(crate) const SERVICE_NAME: &str = "openobserve";
 pub(crate) const CPU_FREQUENCY_HZ: i32 = 100;
+
+#[cfg(test)]
+mod tests {
+    use config::{META_ORG_ID, meta::self_reporting::usage::is_system_stream};
+
+    use super::*;
+
+    #[test]
+    fn test_stream_name_is_a_meta_system_stream() {
+        assert!(is_system_stream(META_ORG_ID, STREAM_NAME));
+    }
+}

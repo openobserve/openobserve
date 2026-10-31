@@ -21225,6 +21225,17 @@
       "moreInfoAbout": "Meer informatie over {field}",
       "moreInfo": "Meer informatie"
     },
+    "streamPicker": {
+      "internalStreams": "Interne streams",
+      "hiddenCount": "{count} verborgen",
+      "matchCount": "{count} verborgen overeenkomst | {count} verborgen overeenkomsten",
+      "hide": "Verbergen",
+      "show": "Tonen",
+      "hideInternal": "Interne streams verbergen",
+      "showInternal": "Interne streams tonen",
+      "announceHidden": "Interne streams verborgen",
+      "announceShown": "Interne streams getoond"
+    },
     "templateInput": {
       "suggestions": "Suggesties voor variabelen"
     },

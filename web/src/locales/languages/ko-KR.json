@@ -21225,6 +21225,17 @@
       "moreInfoAbout": "{field}에 대한 자세한 정보",
       "moreInfo": "자세한 정보"
     },
+    "streamPicker": {
+      "internalStreams": "내부 스트림",
+      "hiddenCount": "{count}개 숨김",
+      "matchCount": "{count}개 숨김 일치 | {count}개 숨김 일치",
+      "hide": "숨기기",
+      "show": "표시",
+      "hideInternal": "내부 스트림 숨기기",
+      "showInternal": "내부 스트림 표시",
+      "announceHidden": "내부 스트림이 숨겨졌습니다",
+      "announceShown": "내부 스트림이 표시되었습니다"
+    },
     "templateInput": {
       "suggestions": "변수 제안"
     },

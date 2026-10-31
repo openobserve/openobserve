@@ -8390,6 +8390,17 @@
       "steps": "1de3df70ddf4faab",
       "swipeHint": "a03359b1b43e43a5"
     },
+    "streamPicker": {
+      "announceHidden": "527d528a87a39ef2",
+      "announceShown": "e5b3c3460544c197",
+      "hiddenCount": "1fa9e2b74eb1f0c8",
+      "hide": "ac20a57bfde0bbc4",
+      "hideInternal": "b3ad3fc97506f5fe",
+      "internalStreams": "c75e058845ac131e",
+      "matchCount": "b396fe0d689fdd8f",
+      "show": "0df6f1cad36c49da",
+      "showInternal": "788b0c20599de122"
+    },
     "table": {
       "columnToggle": {
         "columns": "53aade77cd69a77b",

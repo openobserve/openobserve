@@ -21225,6 +21225,17 @@
       "moreInfoAbout": "关于{field}的更多信息",
       "moreInfo": "更多信息"
     },
+    "streamPicker": {
+      "internalStreams": "内部数据流",
+      "hiddenCount": "已隐藏 {count} 个",
+      "matchCount": "{count} 个隐藏匹配 | {count} 个隐藏匹配",
+      "hide": "隐藏",
+      "show": "显示",
+      "hideInternal": "隐藏内部数据流",
+      "showInternal": "显示内部数据流",
+      "announceHidden": "已隐藏内部数据流",
+      "announceShown": "已显示内部数据流"
+    },
     "templateInput": {
       "suggestions": "变量建议"
     },

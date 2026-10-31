@@ -21225,6 +21225,17 @@
       "moreInfoAbout": "Więcej informacji o polu {field}",
       "moreInfo": "Więcej informacji"
     },
+    "streamPicker": {
+      "internalStreams": "Strumienie wewnętrzne",
+      "hiddenCount": "Ukryte: {count}",
+      "matchCount": "Ukryte dopasowanie: {count} | Ukryte dopasowania: {count}",
+      "hide": "Ukryj",
+      "show": "Pokaż",
+      "hideInternal": "Ukryj strumienie wewnętrzne",
+      "showInternal": "Pokaż strumienie wewnętrzne",
+      "announceHidden": "Strumienie wewnętrzne ukryte",
+      "announceShown": "Strumienie wewnętrzne pokazane"
+    },
     "templateInput": {
       "suggestions": "Sugestie zmiennych"
     },

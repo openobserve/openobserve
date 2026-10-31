@@ -413,4 +413,29 @@ describe("shared tie comparator", () => {
     expect(pickLatestStream([s("a", 0), s("b", 0)])).toBeNull();
     expect(pickLatestStream([])).toBeNull();
   });
+
+  describe("internal streams", () => {
+    const internal = (name: string, max: number): StreamStatsEntry => ({
+      ...s(name, max),
+      is_internal: true,
+    });
+
+    it("prefers a user stream even when an internal one has newer data", () => {
+      expect(pickLatestStream([internal("_rumdata", 99), s("app", 5), s("web", 3)])).toBe("app");
+    });
+
+    it("ignores a user stream that has no data when picking the user stream", () => {
+      expect(pickLatestStream([internal("_rumdata", 99), s("empty", 0), s("app", 5)])).toBe("app");
+    });
+
+    it("falls back to the newest internal stream when no user stream has data", () => {
+      expect(pickLatestStream([internal("_rumlog", 4), internal("_rumdata", 9), s("app", 0)])).toBe(
+        "_rumdata",
+      );
+    });
+
+    it("keeps the previous order when no stream is flagged internal", () => {
+      expect(pickLatestStream([s("old", 2), s("new", 8)])).toBe("new");
+    });
+  });
 });

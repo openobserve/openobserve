@@ -21225,6 +21225,17 @@
       "moreInfoAbout": "{field}の詳細情報",
       "moreInfo": "詳細情報"
     },
+    "streamPicker": {
+      "internalStreams": "内部ストリーム",
+      "hiddenCount": "{count} 件非表示",
+      "matchCount": "{count} 件の非表示の一致 | {count} 件の非表示の一致",
+      "hide": "非表示",
+      "show": "表示",
+      "hideInternal": "内部ストリームを非表示",
+      "showInternal": "内部ストリームを表示",
+      "announceHidden": "内部ストリームを非表示にしました",
+      "announceShown": "内部ストリームを表示しました"
+    },
     "templateInput": {
       "suggestions": "変数の候補"
     },

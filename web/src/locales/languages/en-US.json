@@ -21223,6 +21223,17 @@
       "moreInfoAbout": "More information about {field}",
       "moreInfo": "More information"
     },
+    "streamPicker": {
+      "internalStreams": "Internal streams",
+      "hiddenCount": "{count} hidden",
+      "matchCount": "{count} hidden match | {count} hidden matches",
+      "hide": "Hide",
+      "show": "Show",
+      "hideInternal": "Hide internal streams",
+      "showInternal": "Show internal streams",
+      "announceHidden": "Internal streams hidden",
+      "announceShown": "Internal streams shown"
+    },
     "templateInput": {
       "suggestions": "Variable suggestions"
     },
