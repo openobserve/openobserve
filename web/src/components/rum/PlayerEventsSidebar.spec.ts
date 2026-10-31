@@ -394,6 +394,30 @@ describe("PlayerEventsSidebar", () => {
     it("should render event rows when breadcrumbs tab is active with 3 events", () => {
       expect(wrapper.findAll('[data-test^="player-event-row"]').length).toBe(3);
     });
+
+    it("shows loading rows, not the empty message, while the events load", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ events: [], loading: true });
+      await flushPromises();
+      expect(wrapper.find('[data-test="player-events-loading"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="player-events-empty"]').exists()).toBe(false);
+    });
+
+    it("shows the empty message once the events settle with none", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ events: [], loading: false });
+      await flushPromises();
+      expect(wrapper.find('[data-test="player-events-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="player-events-empty"]').text()).toContain("No events found");
+    });
+
+    it("keeps showing loaded events while a later load is in flight", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ loading: true });
+      await flushPromises();
+      expect(wrapper.findAll('[data-test^="player-event-row"]').length).toBe(3);
+      expect(wrapper.find('[data-test="player-events-loading"]').exists()).toBe(false);
+    });
   });
 
   // ==========================================================================

@@ -170,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :end-time="sessionState.data.selectedSession?.end_time || 0"
         :rum-window-us="eventsOnlyRumWindowUs"
         :marked-timestamps="markedTimestamps"
+        :loading="eventsLoading"
         @event-emitted="handleSidebarEvent"
         class="min-h-0 flex-1"
       />
@@ -267,6 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :start-time="sessionState.data.selectedSession?.start_time || 0"
             :end-time="sessionState.data.selectedSession?.end_time || 0"
             :marked-timestamps="markedTimestamps"
+            :loading="eventsLoading"
             @event-emitted="handleSidebarEvent"
             class="h-full"
           />
@@ -454,6 +456,7 @@ const segmentEvents = shallowRef<any[]>([]);
 // starting, which is exactly the moment the mobile player mounts — that dip is what let
 // the "No session replay available" empty state flash before the segments arrived.
 const segmentsLoading = ref(true);
+const eventsLoading = ref(true);
 const manifest = shallowRef<ManifestEntry[]>([]);
 const manifestSummary = ref<ManifestSummary | null>(null);
 const run = shallowRef<ReplayRun>({ runId: 0, anchorIndex: 0, appendedThroughIndex: -1 });
@@ -819,6 +822,7 @@ const failSessionLoad = () => {
   sessionNotFound.value = false;
   sessionLoadFailed.value = true;
   segmentsLoading.value = false;
+  eventsLoading.value = false;
   loadState.value = "error";
 };
 
@@ -961,6 +965,7 @@ const getSession = async () => {
     console.error("Failed to fetch session:", error);
     sessionLoadFailed.value = true;
     segmentsLoading.value = false;
+    eventsLoading.value = false;
     loadState.value = "error";
   } finally {
     isLoading.value.pop();
@@ -1589,6 +1594,7 @@ const publishEvents = () => {
 // Paged in full, because the live cursor is the largest arrival time seen and a cut-off first page would skip the rest.
 const getSessionEvents = () => {
   isLoading.value.push(true);
+  eventsLoading.value = true;
   fetchEventPages(rumEventsSql(), serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US))
     .then((hits: any[]) => {
       // Test the SOURCE field, not the rendered value: user_email is filled with
@@ -1604,7 +1610,10 @@ const getSessionEvents = () => {
     .catch((error) => {
       console.error("Failed to fetch sesion events:", error);
     })
-    .finally(() => isLoading.value.pop());
+    .finally(() => {
+      isLoading.value.pop();
+      eventsLoading.value = false;
+    });
 };
 
 const getSessionErrorLogs = () => {
