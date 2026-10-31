@@ -520,7 +520,7 @@ function escapePromqlString(value: unknown): string {
  * @param {string} metricName
  * @param {Array<{label: I18nText, value: string, operator?: string}>|Record<string,string>} [filters]
  * @param {Record<string,string>} [extraMatchers] appended verbatim as `=` matchers
- * @returns {string} e.g. `{__name__="http_requests_total",job="api"}`
+ * @returns {string} e.g. `{__name__="http_requests_total",job="api"}`; OR groups give `(sel1 or sel2)`
  */
 export function buildSelector(
   metricName: string,

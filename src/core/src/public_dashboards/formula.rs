@@ -205,7 +205,7 @@ pub fn viewer_legend_fallbacks(configs: &[Value]) -> Vec<Option<String>> {
         .collect()
 }
 
-/// `substituteFormula`: references become their inputs in parentheses, formulas recursively.
+/// `substituteFormula`: inlines references in parentheses; `self_ref` is the formula's own name.
 pub fn substitute(
     formula: &str,
     inputs: &BTreeMap<String, FormulaInput>,
