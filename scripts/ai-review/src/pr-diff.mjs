@@ -37,6 +37,39 @@ export function fetchDiff({ repo, prNumber, prDir, mergeBase, head, env = proces
   }
 }
 
+// The API serves the branch as it is now, so only a local diff of the two SHAs can be tied to the commit a review or an approval names.
+export function pinDiff({ diff, prDir, mergeBase, head, run = runFile, log = () => {} }) {
+  if (!prDir || !mergeBase || !head) {
+    log("no merge base or checkout to diff locally; the API diff is not pinned");
+    return { diff, pinned: false };
+  }
+  try {
+    const local = localDiff(prDir, mergeBase, head, run);
+    return local ? { diff: local, pinned: true } : { diff, pinned: false };
+  } catch (err) {
+    log(`could not diff ${mergeBase}..${head} locally; the API diff is not pinned: ${String(err?.message).slice(0, 200)}`);
+    return { diff, pinned: false };
+  }
+}
+
+export function fetchPinnedDiff(params) {
+  return pinDiff({ ...params, diff: fetchDiff(params) });
+}
+
+// `unfocused` keeps the whole diff for a gate candidate, whose approval must rest on reviewers that saw every file; requiresFocus agents still opt out.
+export function reviewerDiff(diff, { fileFocus, requiresFocus }, { unfocused = false, pathOf = path => path } = {}) {
+  if (!fileFocus) return { diff, skipped: false, fullDiff: true };
+  const sections = diff.split(/^diff --git /gm).filter(Boolean);
+  const relevant = sections.filter(s => {
+    const m = s.match(/^a\/(.*?) b\/(.*?)\n/);
+    return m && fileFocus(pathOf(m[2]));
+  });
+  if (relevant.length === 0) return { diff, skipped: Boolean(requiresFocus), fullDiff: !requiresFocus };
+  if (unfocused) return { diff, skipped: false, fullDiff: true };
+  const narrowed = relevant.map(s => `diff --git ${s}`).join("");
+  return { diff: narrowed, skipped: false, fullDiff: narrowed === diff };
+}
+
 // Rewrites only header lines (before the first hunk of each file), so a removed line like "-- a/b" is never touched.
 export function prefixDiffPaths(diff, prefix) {
   if (!prefix) return diff;
