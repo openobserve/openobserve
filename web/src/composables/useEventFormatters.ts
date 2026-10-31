@@ -64,6 +64,7 @@ export function useEventFormatters() {
       action: "bg-blue-100 text-blue-700 border border-solid border-blue-300",
       view: "bg-success-100 text-success-700 border border-solid border-success-400",
       resource: "bg-purple-100 text-purple-700 border border-solid border-purple-400",
+      failed_request: "bg-error-100 text-error-700 border border-solid border-error-300",
     };
     return classes[type] || "bg-grey-100 text-grey-700";
   };
