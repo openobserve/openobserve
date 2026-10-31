@@ -19122,8 +19122,7 @@
     "detailTable": {
       "noDataAvailable": "No data available.",
       "addIcon": "Add icon",
-      "sendToAiChat": "Send to AI Chat",
-      "contentCopiedSuccessfully": "Content Copied Successfully!"
+      "sendToAiChat": "Send to AI Chat"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select * query is not supported for visualization.",
@@ -19409,7 +19408,24 @@
     "hideDetail": "Hide details",
     "runAs": "Run as",
     "searchTextFor": "Search text for \"{text}\"",
-    "searchTextDesc": "Search the whole input as one phrase"
+    "searchTextDesc": "Search the whole input as one phrase",
+    "explain": {
+      "missingStream": "The query has no stream name after {from}. Add one, for example {example}.",
+      "unexpectedEnd": "The query ends before it is complete. Finish the last condition or clause.",
+      "unexpectedEndAfter": "The query ends right after {keyword}. Add what should follow it, or remove {keyword}.",
+      "unclosedBracket": "A bracket is opened but never closed. Add the missing {char}.",
+      "notAStatement": "A query has to start with a keyword such as {keyword}, but this one starts with {token}. Check the spelling.",
+      "unexpectedToken": "{token} doesn't fit where it appears in the query. Check its spelling and the words around it.",
+      "unclosedQuote": "A text value has no closing quote. Add the missing ' after the value.",
+      "unclosedDelimiter": "A quoted name has no closing {char}. Add the missing {char}.",
+      "streamNotFound": "There is no stream named {name}. Check the name, or pick a stream from the stream list.",
+      "unknownField": "This stream has no field named {name}. Check the spelling, or pick a field from the fields list.",
+      "unknownFunction": "There is no function named {name}. Check the spelling.",
+      "unknownFunctionSuggest": "There is no function named {name}. Did you mean {suggestion}?",
+      "notANumber": "{value} is text, but the field it is compared with holds numbers. Use a number without quotes.",
+      "functionArgs": "The values passed to {name} don't match what the function accepts. Check how many values it takes and their types.",
+      "notGrouped": "{name} is selected without being grouped or aggregated. Add it to {groupBy}, or remove it from the selected columns."
+    }
   },
   "refreshButton": {
     "justNow": "just now",

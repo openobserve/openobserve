@@ -19124,8 +19124,7 @@
     "detailTable": {
       "noDataAvailable": "Geen gegevens beschikbaar.",
       "addIcon": "Pictogram toevoegen",
-      "sendToAiChat": "Verzenden naar AI-chat",
-      "contentCopiedSuccessfully": "Inhoud succesvol gekopieerd!"
+      "sendToAiChat": "Verzenden naar AI-chat"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select *-query wordt niet ondersteund voor visualisatie.",
@@ -19411,7 +19410,24 @@
     "hideDetail": "Details verbergen",
     "runAs": "Uitvoeren als",
     "searchTextFor": "Zoek naar tekst \"{text}\"",
-    "searchTextDesc": "Doorzoek de hele invoer als één frase"
+    "searchTextDesc": "Doorzoek de hele invoer als één frase",
+    "explain": {
+      "missingStream": "Na {from} ontbreekt de streamnaam. Voeg er een toe, bijvoorbeeld {example}.",
+      "unexpectedEnd": "De query eindigt voordat hij compleet is. Maak de laatste voorwaarde of clausule af.",
+      "unexpectedEndAfter": "De query eindigt direct na {keyword}. Voeg toe wat erna moet komen, of verwijder {keyword}.",
+      "unclosedBracket": "Een haakje wordt geopend maar niet gesloten. Voeg het ontbrekende {char} toe.",
+      "notAStatement": "Een query moet beginnen met een sleutelwoord zoals {keyword}, maar deze begint met {token}. Controleer de spelling.",
+      "unexpectedToken": "{token} past niet op deze plek in de query. Controleer de spelling en de woorden eromheen.",
+      "unclosedQuote": "Een tekstwaarde heeft geen afsluitend aanhalingsteken. Voeg de ontbrekende ' toe na de waarde.",
+      "unclosedDelimiter": "Een naam tussen aanhalingstekens heeft geen afsluitende {char}. Voeg de ontbrekende {char} toe.",
+      "streamNotFound": "Er is geen stream met de naam {name}. Controleer de naam of kies een stream uit de lijst.",
+      "unknownField": "Deze stream heeft geen veld met de naam {name}. Controleer de spelling of kies een veld uit de veldenlijst.",
+      "unknownFunction": "Er is geen functie met de naam {name}. Controleer de spelling.",
+      "unknownFunctionSuggest": "Er is geen functie met de naam {name}. Bedoelde u {suggestion}?",
+      "notANumber": "{value} is tekst, maar het veld waarmee het wordt vergeleken bevat getallen. Gebruik een getal zonder aanhalingstekens.",
+      "functionArgs": "De waarden die aan {name} worden doorgegeven passen niet bij wat de functie accepteert. Controleer het aantal waarden en hun typen.",
+      "notGrouped": "{name} wordt geselecteerd zonder te worden gegroepeerd of geaggregeerd. Voeg het toe aan {groupBy} of verwijder het uit de geselecteerde kolommen."
+    }
   },
   "refreshButton": {
     "justNow": "net nu",

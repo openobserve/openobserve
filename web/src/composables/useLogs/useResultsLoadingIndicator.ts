@@ -74,12 +74,15 @@ export function useDelayedFlag(
   return readonly(shown);
 }
 
-/** The delayed results loader, plus the size scanned so far by a fresh run (null while paging). */
-export function useResultsLoadingIndicator(searchObj: ResultsLoadingState): {
+/** The delayed results loader for `busy`, plus the size scanned so far by a fresh run (null while paging). */
+export function useResultsLoadingIndicator(
+  searchObj: ResultsLoadingState,
+  busy: WatchSource<boolean> = () => !!searchObj.loading,
+): {
   showLoader: Readonly<Ref<boolean>>;
   scannedSize: ComputedRef<string | null>;
 } {
-  const showLoader = useDelayedFlag(() => !!searchObj.loading);
+  const showLoader = useDelayedFlag(busy);
   const runStartResults = shallowRef<unknown>(undefined);
   watch(
     () => searchObj.loading,

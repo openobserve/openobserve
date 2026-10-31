@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { beforeAll, describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, h, ref } from "vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
@@ -130,6 +130,11 @@ const resolveWith = (hits: unknown[]) =>
     );
 
 describe("line link open (mounted, 4c C5)", { timeout: 30000 }, () => {
+  // DetailTable loads lazily and pulls in the trace views; transform it once, outside the timed waits.
+  beforeAll(async () => {
+    await import("./DetailTable.vue");
+  }, 60000);
+
   let wrapper: any;
   const { searchObj } = searchState();
 
@@ -318,7 +323,7 @@ describe("line link open (mounted, 4c C5)", { timeout: 30000 }, () => {
     expect(q('[data-test="logs-error-state-stub"]')).not.toBeNull();
     await resolveActivePermalink();
     await vi.waitFor(() => expect(pageDrawer()).not.toBeNull());
-    expect(drawerText()).toContain("payment declined id=7f3");
+    await vi.waitFor(() => expect(drawerText()).toContain("payment declined id=7f3"));
     expect(
       q('[data-test="log-detail-next-detail-btn"]')?.getAttribute("aria-disabled") === "true",
     ).toBe(true);

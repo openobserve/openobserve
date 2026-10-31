@@ -375,6 +375,44 @@ describe("Index List", async () => {
     expect(mockGetFilterExpressionByFieldType).toHaveBeenCalledWith("field", "value", "include");
   });
 
+  it("keeps the loaded fields up while the same streams reload, and shows another stream's only once loaded", async () => {
+    const stream = wrapper.vm.searchObj.data.stream;
+    stream.selectedStream = ["default"];
+    stream.selectedStreamFields = [{ name: "level" }];
+    await flushPromises();
+    wrapper.vm.searchObj.loadingStream = true;
+    await flushPromises();
+    expect(wrapper.vm.showFieldListSkeleton).toBe(false);
+
+    stream.selectedStream = ["other"];
+    await flushPromises();
+    expect(wrapper.vm.showFieldListSkeleton).toBe(true);
+
+    stream.selectedStreamFields = [{ name: "msg" }];
+    await flushPromises();
+    expect(wrapper.vm.showFieldListSkeleton).toBe(true);
+
+    wrapper.vm.searchObj.loadingStream = false;
+    await flushPromises();
+    expect(wrapper.vm.showFieldListSkeleton).toBe(false);
+  });
+
+  it("keeps the skeleton while the fields wait for their groups", async () => {
+    const stream = wrapper.vm.searchObj.data.stream;
+    stream.selectedStream = ["cold"];
+    wrapper.vm.searchObj.loadingStream = true;
+    await flushPromises();
+    stream.selectedStreamFields = [{ name: "msg" }];
+    wrapper.vm.searchObj.loadingFieldGroups = true;
+    wrapper.vm.searchObj.loadingStream = false;
+    await flushPromises();
+    expect(wrapper.vm.showFieldListSkeleton).toBe(true);
+
+    wrapper.vm.searchObj.loadingFieldGroups = false;
+    await flushPromises();
+    expect(wrapper.vm.showFieldListSkeleton).toBe(false);
+  });
+
   it("toggleSchema sets loadingStream and calls extractFields", async () => {
     wrapper.vm.searchObj.loadingStream = false;
     await wrapper.vm.toggleSchema();

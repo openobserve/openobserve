@@ -19124,8 +19124,7 @@
     "detailTable": {
       "noDataAvailable": "Không có dữ liệu.",
       "addIcon": "Thêm biểu tượng",
-      "sendToAiChat": "Gửi đến AI Chat",
-      "contentCopiedSuccessfully": "Đã sao chép nội dung thành công!"
+      "sendToAiChat": "Gửi đến AI Chat"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Truy vấn Select * không được hỗ trợ cho trực quan hóa.",
@@ -19411,7 +19410,24 @@
     "hideDetail": "Ẩn chi tiết",
     "runAs": "Chạy với tư cách",
     "searchTextFor": "Tìm văn bản cho \"{text}\"",
-    "searchTextDesc": "Tìm toàn bộ nội dung nhập như một cụm từ"
+    "searchTextDesc": "Tìm toàn bộ nội dung nhập như một cụm từ",
+    "explain": {
+      "missingStream": "Thiếu tên stream sau {from}. Hãy thêm tên, ví dụ {example}.",
+      "unexpectedEnd": "Truy vấn kết thúc trước khi hoàn chỉnh. Hãy hoàn thành điều kiện hoặc mệnh đề cuối cùng.",
+      "unexpectedEndAfter": "Truy vấn kết thúc ngay sau {keyword}. Hãy thêm phần tiếp theo hoặc xóa {keyword}.",
+      "unclosedBracket": "Có dấu ngoặc được mở nhưng chưa đóng. Hãy thêm {char} còn thiếu.",
+      "notAStatement": "Truy vấn phải bắt đầu bằng một từ khóa như {keyword}, nhưng truy vấn này bắt đầu bằng {token}. Hãy kiểm tra chính tả.",
+      "unexpectedToken": "{token} không phù hợp ở vị trí đó trong truy vấn. Hãy kiểm tra chính tả và các từ xung quanh.",
+      "unclosedQuote": "Một giá trị văn bản thiếu dấu nháy đóng. Hãy thêm ' còn thiếu sau giá trị.",
+      "unclosedDelimiter": "Một tên trong dấu nháy thiếu {char} đóng. Hãy thêm {char} còn thiếu.",
+      "streamNotFound": "Không có stream nào tên {name}. Hãy kiểm tra tên hoặc chọn một stream trong danh sách.",
+      "unknownField": "Stream này không có trường nào tên {name}. Hãy kiểm tra chính tả hoặc chọn một trường trong danh sách trường.",
+      "unknownFunction": "Không có hàm nào tên {name}. Hãy kiểm tra chính tả.",
+      "unknownFunctionSuggest": "Không có hàm nào tên {name}. Có phải bạn muốn dùng {suggestion}?",
+      "notANumber": "{value} là văn bản, nhưng trường được so sánh chứa số. Hãy dùng số không có dấu nháy.",
+      "functionArgs": "Các giá trị truyền vào {name} không khớp với những gì hàm chấp nhận. Hãy kiểm tra số lượng và kiểu của giá trị.",
+      "notGrouped": "{name} được chọn nhưng không được nhóm hay tổng hợp. Hãy thêm vào {groupBy} hoặc bỏ khỏi các cột đã chọn."
+    }
   },
   "refreshButton": {
     "justNow": "vừa xong",

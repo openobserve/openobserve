@@ -262,6 +262,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OButton>
           </template>
+          <span
+            v-else-if="aiSlotPending"
+            aria-hidden="true"
+            class="size-[1.875rem] shrink-0"
+            data-test="header-ai-slot-placeholder"
+          />
 
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
           <ThemeSwitcher class="max-md:hidden"></ThemeSwitcher>
@@ -725,6 +731,9 @@ export default defineComponent({
     const aiButtonVisible = computed(
       () => !aiAccess.value.allowed || Boolean(props.store.state.zoConfig.ai_enabled),
     );
+    const aiSlotPending = computed(
+      () => aiAccess.value.allowed && !props.store.state.zoConfig?.version,
+    );
 
     // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
     const linkedAccountsVisible = computed(
@@ -850,6 +859,7 @@ export default defineComponent({
       raw,
       getImageURL,
       enterpriseButtonText,
+      aiSlotPending,
       ingestionQuotaPercentage,
       ingestionQuotaColor,
       showEnterpriseDialog,

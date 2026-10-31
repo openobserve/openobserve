@@ -253,6 +253,50 @@ describe("useHistogram Composable", () => {
       });
     });
 
+    it("leaves the total open when the histogram failed and only the rows probe counted", () => {
+      mockState.searchObj.data.queryResults.hits = Array.from({ length: 100 }, (_, i) => ({ i }));
+      mockState.searchObj.data.queryResults.total = 101;
+      mockState.searchObj.data.histogram.errorMsg = "Error# 500";
+
+      expect(wrapper.vm.getHistogramTitleParts()).toMatchObject({ end: 100, total: "100+" });
+    });
+
+    it("keeps the exact total when the histogram is unavailable for the query, not failed", () => {
+      mockState.searchObj.meta.resultGrid.rowsPerPage = 50;
+      mockState.searchObj.data.queryResults.hits = Array.from({ length: 100 }, (_, i) => ({ i }));
+      mockState.searchObj.data.queryResults.total = 100;
+      mockState.searchObj.data.histogram.errorMsg = "Histogram is not available for limit queries.";
+      mockState.searchObj.data.histogram.errorCode = -1;
+
+      expect(wrapper.vm.getHistogramTitleParts()).toMatchObject({ end: 50, total: "100" });
+    });
+
+    it("keeps the histogram total exact when the histogram counted the events", () => {
+      mockState.searchObj.data.queryResults.hits = Array.from({ length: 100 }, (_, i) => ({ i }));
+      mockState.searchObj.data.queryResults.aggs = [{ zo_sql_num: 7400000 }];
+      mockState.searchObj.data.queryResults.total = 7400000;
+
+      expect(wrapper.vm.getHistogramTitleParts()).toMatchObject({ end: 100, total: "7.4M" });
+    });
+
+    it("leaves a live-mode total open when only a full first page is known", () => {
+      mockState.searchObj.meta.refreshInterval = 5;
+      mockState.searchObj.data.queryResults.aggs = undefined as any;
+      mockState.searchObj.data.queryResults.total = 0;
+      mockState.searchObj.data.queryResults.hits = Array.from({ length: 100 }, (_, i) => ({ i }));
+
+      expect(wrapper.vm.getHistogramTitleParts()).toMatchObject({ end: 100, total: "100+" });
+    });
+
+    it("keeps a live-mode total exact when the window holds less than a page", () => {
+      mockState.searchObj.meta.refreshInterval = 5;
+      mockState.searchObj.data.queryResults.aggs = undefined as any;
+      mockState.searchObj.data.queryResults.total = 0;
+      mockState.searchObj.data.queryResults.hits = Array.from({ length: 30 }, (_, i) => ({ i }));
+
+      expect(wrapper.vm.getHistogramTitleParts()).toMatchObject({ end: 30, total: "30" });
+    });
+
     it("returns null when the computation throws, so the chips hide", () => {
       mockState.searchObj.data.resultGrid = undefined as any;
 

@@ -1488,3 +1488,88 @@ describe("JsonPreview Component", () => {
     });
   });
 });
+
+describe("JsonPreview in-place copy", () => {
+  const mountInPlace = () =>
+    mount(JsonPreview, {
+      props: { value: { a: 1 }, mode: "sidebar", copyInPlace: true },
+      global: {
+        plugins: [i18n],
+        provide: { store },
+        stubs: {
+          AppTabs: true,
+          CodeQueryEditor: true,
+          OButton: { template: '<button v-bind="$attrs"><slot /></button>' },
+          ODropdown: true,
+          ODropdownItem: true,
+          ODropdownSeparator: true,
+          OSelect: true,
+          OIcon: true,
+          OInput: true,
+          OSpinner: true,
+          OTooltip: true,
+          LogsHighLighting: true,
+          ChunkedContent: true,
+          EqualIcon: true,
+          NotEqualIcon: true,
+        },
+      },
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+  });
+
+  it("copies the log itself and shows Copied on the button, with no toast and no emit", async () => {
+    const wrapper = mountInPlace();
+    const button = wrapper.find('[data-test="logs-json-preview-copy-btn"]');
+
+    await button.trigger("click");
+    await flushPromises();
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(JSON.stringify({ a: 1 }));
+    expect(wrapper.emitted("copy")).toBeUndefined();
+    expect(mockToast).not.toHaveBeenCalled();
+    const visible = button.findAll("span span").filter((el) => !el.classes("invisible"));
+    expect(visible).toHaveLength(1);
+    expect(visible[0].text()).toBe(i18n.global.t("common.copied"));
+    wrapper.unmount();
+  });
+
+  it("shows an error toast and keeps the copy label when the clipboard refuses", async () => {
+    (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("denied"),
+    );
+    const wrapper = mountInPlace();
+    const button = wrapper.find('[data-test="logs-json-preview-copy-btn"]');
+
+    await button.trigger("click");
+    await flushPromises();
+
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    const visible = button.findAll("span span").filter((el) => !el.classes("invisible"));
+    expect(visible[0].text()).toBe(i18n.global.t("common.copyToClipboard"));
+    wrapper.unmount();
+  });
+
+  it("confirms a copied selection inside the menu, then closes it", async () => {
+    vi.useFakeTimers();
+    try {
+      const wrapper = mountInPlace();
+      (wrapper.vm as any).selectedText = "picked";
+      (wrapper.vm as any).showMenu = true;
+      await (wrapper.vm as any).copySelectedText();
+      await flushPromises();
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("picked");
+      expect((wrapper.vm as any).selectionCopied).toBe(true);
+      expect((wrapper.vm as any).showMenu).toBe(true);
+      vi.advanceTimersByTime(1000);
+      expect((wrapper.vm as any).showMenu).toBe(false);
+      wrapper.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

@@ -112,6 +112,7 @@ vi.mock("@/composables/useStreams", () => ({
       list: [{ name: "k8s_json", stream_type: "logs", stats: { doc_time_max: 0 }, schema: [] }],
     })),
     getStream: vi.fn(async () => ({ name: "k8s_json", schema: [{ name: "_timestamp" }] })),
+    prefetchStreamSchema: vi.fn(),
     isStreamExists: vi.fn(() => true),
     isStreamFetched: vi.fn(() => true),
     getMultiStreams: vi.fn(async () => []),
@@ -238,8 +239,10 @@ describe("Logs Index — opening a line link (4c C5)", { timeout: 30000 }, () =>
     await vi.waitFor(() =>
       expect(document.querySelector('[data-test="logs-permalink-detail-dialog"]')).not.toBeNull(),
     );
-    expect(document.querySelector('[data-test="log-detail-json-content"]')?.textContent).toContain(
-      "payment declined",
+    await vi.waitFor(() =>
+      expect(
+        document.querySelector('[data-test="log-detail-json-content"]')?.textContent,
+      ).toContain("payment declined"),
     );
     logs.mockClear();
     wrapper.vm.onGuardRunAnyway();

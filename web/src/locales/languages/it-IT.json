@@ -19124,8 +19124,7 @@
     "detailTable": {
       "noDataAvailable": "Nessun dato disponibile.",
       "addIcon": "Aggiungi icona",
-      "sendToAiChat": "Invia alla chat AI",
-      "contentCopiedSuccessfully": "Contenuto copiato con successo!"
+      "sendToAiChat": "Invia alla chat AI"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "La query SELECT * non è supportata per la visualizzazione.",
@@ -19411,7 +19410,24 @@
     "hideDetail": "Nascondi dettagli",
     "runAs": "Esegui come",
     "searchTextFor": "Cerca il testo \"{text}\"",
-    "searchTextDesc": "Cerca l'intero input come un'unica frase"
+    "searchTextDesc": "Cerca l'intero input come un'unica frase",
+    "explain": {
+      "missingStream": "Manca il nome dello stream dopo {from}. Aggiungilo, ad esempio {example}.",
+      "unexpectedEnd": "La query termina prima di essere completa. Completa l'ultima condizione o clausola.",
+      "unexpectedEndAfter": "La query termina subito dopo {keyword}. Aggiungi ciò che deve seguire o rimuovi {keyword}.",
+      "unclosedBracket": "Una parentesi è aperta ma non chiusa. Aggiungi la {char} mancante.",
+      "notAStatement": "Una query deve iniziare con una parola chiave come {keyword}, ma questa inizia con {token}. Controlla l'ortografia.",
+      "unexpectedToken": "{token} non è valido nel punto della query in cui compare. Controlla l'ortografia e le parole vicine.",
+      "unclosedQuote": "A un valore di testo manca la virgoletta di chiusura. Aggiungi il ' mancante dopo il valore.",
+      "unclosedDelimiter": "A un nome tra virgolette manca il {char} di chiusura. Aggiungi il {char} mancante.",
+      "streamNotFound": "Non esiste uno stream chiamato {name}. Controlla il nome o scegli uno stream dall'elenco.",
+      "unknownField": "Questo stream non ha un campo chiamato {name}. Controlla l'ortografia o scegli un campo dall'elenco dei campi.",
+      "unknownFunction": "Non esiste una funzione chiamata {name}. Controlla l'ortografia.",
+      "unknownFunctionSuggest": "Non esiste una funzione chiamata {name}. Forse intendevi {suggestion}?",
+      "notANumber": "{value} è un testo, ma il campo con cui viene confrontato contiene numeri. Usa un numero senza virgolette.",
+      "functionArgs": "I valori passati a {name} non corrispondono a ciò che la funzione accetta. Controlla quanti valori accetta e i loro tipi.",
+      "notGrouped": "{name} è selezionato senza essere raggruppato né aggregato. Aggiungilo a {groupBy} o rimuovilo dalle colonne selezionate."
+    }
   },
   "refreshButton": {
     "justNow": "proprio ora",

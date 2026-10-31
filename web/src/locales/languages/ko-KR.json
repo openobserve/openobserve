@@ -19124,8 +19124,7 @@
     "detailTable": {
       "noDataAvailable": "사용 가능한 데이터가 없습니다.",
       "addIcon": "아이콘 추가",
-      "sendToAiChat": "AI 채팅으로 보내기",
-      "contentCopiedSuccessfully": "콘텐츠가 성공적으로 복사되었습니다!"
+      "sendToAiChat": "AI 채팅으로 보내기"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "시각화에 SELECT * 쿼리가 지원되지 않습니다.",
@@ -19411,7 +19410,24 @@
     "hideDetail": "세부 정보 숨기기",
     "runAs": "다른 사용자로 실행",
     "searchTextFor": "\"{text}\"에 대한 텍스트 검색",
-    "searchTextDesc": "전체 입력을 하나의 구문으로 검색"
+    "searchTextDesc": "전체 입력을 하나의 구문으로 검색",
+    "explain": {
+      "missingStream": "{from} 뒤에 스트림 이름이 없습니다. 예를 들어 {example}처럼 추가하세요.",
+      "unexpectedEnd": "쿼리가 완성되기 전에 끝납니다. 마지막 조건이나 절을 완성하세요.",
+      "unexpectedEndAfter": "쿼리가 {keyword} 바로 뒤에서 끝납니다. 뒤에 올 내용을 추가하거나 {keyword}를 제거하세요.",
+      "unclosedBracket": "괄호가 열렸지만 닫히지 않았습니다. 빠진 {char}를 추가하세요.",
+      "notAStatement": "쿼리는 {keyword} 같은 키워드로 시작해야 하지만 이 쿼리는 {token}(으)로 시작합니다. 철자를 확인하세요.",
+      "unexpectedToken": "{token}은(는) 쿼리의 이 위치에 올 수 없습니다. 철자와 주변 단어를 확인하세요.",
+      "unclosedQuote": "텍스트 값에 닫는 따옴표가 없습니다. 값 뒤에 빠진 '를 추가하세요.",
+      "unclosedDelimiter": "따옴표로 묶은 이름에 닫는 {char}가 없습니다. 빠진 {char}를 추가하세요.",
+      "streamNotFound": "{name}(이)라는 스트림이 없습니다. 이름을 확인하거나 스트림 목록에서 선택하세요.",
+      "unknownField": "이 스트림에는 {name}(이)라는 필드가 없습니다. 철자를 확인하거나 필드 목록에서 선택하세요.",
+      "unknownFunction": "{name}(이)라는 함수가 없습니다. 철자를 확인하세요.",
+      "unknownFunctionSuggest": "{name}(이)라는 함수가 없습니다. {suggestion}을(를) 의미하셨나요?",
+      "notANumber": "{value}은(는) 텍스트이지만 비교 대상 필드는 숫자를 담고 있습니다. 따옴표 없이 숫자를 사용하세요.",
+      "functionArgs": "{name}에 전달된 값이 함수가 받는 값과 맞지 않습니다. 값의 개수와 유형을 확인하세요.",
+      "notGrouped": "{name}이(가) 그룹화나 집계 없이 선택되어 있습니다. {groupBy}에 추가하거나 선택한 열에서 제거하세요."
+    }
   },
   "refreshButton": {
     "justNow": "바로 지금",

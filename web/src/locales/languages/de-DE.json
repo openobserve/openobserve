@@ -19124,8 +19124,7 @@
     "detailTable": {
       "noDataAvailable": "Keine Daten verfügbar.",
       "addIcon": "Symbol hinzufügen",
-      "sendToAiChat": "An KI-Chat senden",
-      "contentCopiedSuccessfully": "Inhalt erfolgreich kopiert!"
+      "sendToAiChat": "An KI-Chat senden"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "SELECT *-Abfrage wird für die Visualisierung nicht unterstützt.",
@@ -19411,7 +19410,24 @@
     "hideDetail": "Details ausblenden",
     "runAs": "Ausführen als",
     "searchTextFor": "Text für \"{text}\" suchen",
-    "searchTextDesc": "Die gesamte Eingabe als eine Phrase suchen"
+    "searchTextDesc": "Die gesamte Eingabe als eine Phrase suchen",
+    "explain": {
+      "missingStream": "Nach {from} fehlt der Stream-Name. Ergänzen Sie ihn, zum Beispiel {example}.",
+      "unexpectedEnd": "Die Abfrage endet, bevor sie vollständig ist. Vervollständigen Sie die letzte Bedingung oder Klausel.",
+      "unexpectedEndAfter": "Die Abfrage endet direkt nach {keyword}. Ergänzen Sie, was darauf folgen soll, oder entfernen Sie {keyword}.",
+      "unclosedBracket": "Eine Klammer wird geöffnet, aber nicht geschlossen. Ergänzen Sie die fehlende {char}.",
+      "notAStatement": "Eine Abfrage muss mit einem Schlüsselwort wie {keyword} beginnen, diese beginnt aber mit {token}. Prüfen Sie die Schreibweise.",
+      "unexpectedToken": "{token} passt an dieser Stelle der Abfrage nicht. Prüfen Sie die Schreibweise und die Wörter davor und danach.",
+      "unclosedQuote": "Einem Textwert fehlt das schließende Anführungszeichen. Ergänzen Sie das fehlende ' nach dem Wert.",
+      "unclosedDelimiter": "Einem Namen in Anführungszeichen fehlt das schließende {char}. Ergänzen Sie das fehlende {char}.",
+      "streamNotFound": "Es gibt keinen Stream namens {name}. Prüfen Sie den Namen oder wählen Sie einen Stream aus der Stream-Liste.",
+      "unknownField": "Dieser Stream hat kein Feld namens {name}. Prüfen Sie die Schreibweise oder wählen Sie ein Feld aus der Feldliste.",
+      "unknownFunction": "Es gibt keine Funktion namens {name}. Prüfen Sie die Schreibweise.",
+      "unknownFunctionSuggest": "Es gibt keine Funktion namens {name}. Meinten Sie {suggestion}?",
+      "notANumber": "{value} ist Text, aber das verglichene Feld enthält Zahlen. Verwenden Sie eine Zahl ohne Anführungszeichen.",
+      "functionArgs": "Die an {name} übergebenen Werte passen nicht zu dem, was die Funktion akzeptiert. Prüfen Sie Anzahl und Typen der Werte.",
+      "notGrouped": "{name} wird ausgewählt, ist aber weder gruppiert noch aggregiert. Fügen Sie es zu {groupBy} hinzu oder entfernen Sie es aus den ausgewählten Spalten."
+    }
   },
   "refreshButton": {
     "justNow": "gerade eben",

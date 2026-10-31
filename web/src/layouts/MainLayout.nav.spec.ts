@@ -36,7 +36,7 @@ import MainLayout from "./MainLayout.vue";
 const StubDiv = defineComponent({ setup: () => () => h("div") });
 const NavbarStub = defineComponent({
   name: "ONavbar",
-  props: { linksList: { type: Array, default: () => [] } },
+  props: { linksList: { type: Array, default: () => [] }, loading: Boolean },
   setup: () => () => h("div"),
 });
 
@@ -156,5 +156,55 @@ describe("MainLayout — Product Analytics menu entry", () => {
     for (const icon of [experience.icon, ...experience.children.map((c) => c.icon)]) {
       expect(Object.keys(iconRegistry)).toContain(icon);
     }
+  });
+});
+
+describe("MainLayout — rail while the config loads", () => {
+  let wrapper: VueWrapper | undefined;
+  const version = store.state.zoConfig.version;
+
+  const railLoading = async () => {
+    wrapper = mount(MainLayout, {
+      global: {
+        plugins: [store, i18n, router],
+        stubs: {
+          AppHeader: StubDiv,
+          ONavbar: NavbarStub,
+          O2AIChat: StubDiv,
+          WebinarBanner: StubDiv,
+          AnnouncementBanner: StubDiv,
+          ShortcutCheatsheet: StubDiv,
+          GetStarted: StubDiv,
+          CommunitySlackInvite: StubDiv,
+          ThemeSwitcher: StubDiv,
+          PredefinedThemes: StubDiv,
+          SlackIcon: StubDiv,
+          ManagementIcon: StubDiv,
+          ODialog: StubDiv,
+          "router-view": StubDiv,
+        },
+      },
+    });
+    await flushPromises();
+    return wrapper.findAllComponents(NavbarStub)[0].props("loading");
+  };
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = undefined;
+    store.state.zoConfig.version = version;
+  });
+
+  it("asks the rail for placeholder tiles while the menu is not ready", async () => {
+    store.state.zoConfig.version = "v1";
+    expect(await railLoading()).toBe(false);
+    (wrapper!.vm as unknown as { menuReady: boolean }).menuReady = false;
+    await flushPromises();
+    expect(wrapper!.findAllComponents(NavbarStub)[0].props("loading")).toBe(true);
+  });
+
+  it("shows the real rail when the config is already loaded", async () => {
+    store.state.zoConfig.version = "v1";
+    expect(await railLoading()).toBe(false);
   });
 });
