@@ -20,6 +20,7 @@ import {
   getPreferredLabels,
   buildPromqlSeriesNames,
   getLegendPosition,
+  labelFreeName,
 } from "./legendBuilder";
 
 describe("legendBuilder", () => {
@@ -628,5 +629,44 @@ describe("getPromqlLegendName — empty label sets", () => {
 
   it("ignores an empty fallback string", () => {
     expect(getPromqlLegendName({}, "", "")).toBe("{}");
+  });
+});
+
+describe("label-free series name (issue 16022)", () => {
+  it("names a series with no labels by its query", () => {
+    const metric = {};
+    const names = buildPromqlSeriesNames([{ metrics: [metric], expr: "avg(node_load1{})" }]);
+    expect(names.get(metric)).toBe("avg(node_load1{})");
+  });
+
+  it("keeps label-based names when the series has labels", () => {
+    const metrics = [{ job: "a" }, { job: "b" }];
+    const names = buildPromqlSeriesNames([{ metrics, expr: "sum by (job) (up)" }]);
+    expect(metrics.map((m) => names.get(m))).toEqual(["a", "b"]);
+  });
+
+  it("keeps an explicit fallback over the query", () => {
+    const metric = {};
+    const names = buildPromqlSeriesNames([{ metrics: [metric], fallback: "A", expr: "avg(up)" }]);
+    expect(names.get(metric)).toBe("A");
+  });
+
+  it("uses the legend template when one is set", () => {
+    const metric = {};
+    const names = buildPromqlSeriesNames([{ metrics: [metric], template: "CPU", expr: "avg(up)" }]);
+    expect(names.get(metric)).toBe("CPU");
+  });
+
+  it("shortens long queries and collapses whitespace", () => {
+    const expr = `avg(\n  rate(${"x".repeat(80)}[5m])\n)`;
+    const name = labelFreeName({}, expr)!;
+    expect(name.endsWith("...")).toBe(true);
+    expect(name.length).toBe(63);
+    expect(name).not.toContain("\n");
+  });
+
+  it("returns undefined without a query or with labels", () => {
+    expect(labelFreeName({}, "")).toBeUndefined();
+    expect(labelFreeName({ job: "a" }, "up")).toBeUndefined();
   });
 });

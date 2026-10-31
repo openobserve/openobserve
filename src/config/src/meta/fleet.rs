@@ -69,7 +69,7 @@ pub struct Collector {
     pub version: Option<String>,
     pub outdated: bool,
     pub status: CollectorStatus,
-    /// The connection's peer address, honouring `X-Forwarded-For`.
+    /// The connection's client address, as `ZO_HTTP_REAL_IP_SOURCE` resolves it.
     pub last_connected_from: Option<String>,
     pub fleet: CollectorFleet,
     pub token_id: Option<String>,

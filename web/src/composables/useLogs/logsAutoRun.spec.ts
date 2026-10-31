@@ -779,3 +779,65 @@ describe("item 1: scan consent in the signature, the Stop guard and G1 inputs", 
     );
   });
 });
+
+describe("recent searches: settled runs", () => {
+  const dispatch = (reason: "run" | "refresh") => {
+    let generation: { id: number } | null = null;
+    run().setExecutors({
+      logs: (ctx: { generation: { id: number } }) => {
+        generation = ctx.generation;
+      },
+    });
+    run().engine.requestRun(reason);
+    return generation as unknown as { id: number };
+  };
+  const hitsOf = (generationId: number, extra: Record<string, unknown> = {}) => ({
+    traceId: "t-hits",
+    type: "search",
+    generationId,
+    queryReq: { query: { start_time: 10, end_time: 20 } },
+    ...extra,
+  });
+
+  it("reports the first page of a run with its reasons and request window", () => {
+    const settled = vi.fn();
+    run().onRunSettled(settled);
+    const hits = hitsOf(dispatch("run").id);
+    run().bindPayload(hits);
+    run().onPayloadComplete(hits);
+    expect(settled).toHaveBeenCalledTimes(1);
+    expect(settled.mock.calls[0][0]).toMatchObject({
+      reasons: ["run"],
+      startUs: 10,
+      endUs: 20,
+      partial: false,
+      error: null,
+    });
+  });
+
+  it("reports a failed search with its error", () => {
+    const settled = vi.fn();
+    run().onRunSettled(settled);
+    const hits = hitsOf(dispatch("run").id);
+    run().bindPayload(hits);
+    run().onPayloadError(hits, { code: 20001, message: "syntax" });
+    expect(settled.mock.calls[0][0].error).toEqual({ code: 20001, message: "syntax" });
+  });
+
+  it("never reports a page fetch, a histogram or a run after unsubscribing", () => {
+    const settled = vi.fn();
+    const stop = run().onRunSettled(settled);
+    const id = dispatch("run").id;
+    const page = hitsOf(id, { isPagination: true });
+    run().bindPayload(page);
+    run().onPayloadComplete(page);
+    run().onPayloadComplete({ traceId: "t-h", type: "histogram", generationId: id });
+    expect(settled).not.toHaveBeenCalled();
+
+    stop();
+    const hits = hitsOf(dispatch("run").id);
+    run().bindPayload(hits);
+    run().onPayloadComplete(hits);
+    expect(settled).not.toHaveBeenCalled();
+  });
+});

@@ -166,6 +166,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { getDashboard } from "@/utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "@/utils/date";
+import { overviewStateOnly } from "@/utils/rum/performanceOverview";
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
@@ -327,6 +328,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
+          ...(activePerformanceTab.value === "overview" ? overviewStateOnly(route.query) : {}),
         },
       });
     };
@@ -479,6 +481,7 @@ export default defineComponent({
           folder: route.query.folder,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
+          ...overviewStateOnly(route.query),
         },
       });
     });

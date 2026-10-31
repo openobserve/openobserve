@@ -51,8 +51,14 @@ cloud = [
 ]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
+cpu-profiling = [
+    "openobserve-api-http/cpu-profiling",
+    "openobserve-jobs/cpu-profiling",
+    "openobserve-core/cpu-profiling",
+]
 profiling = [
     "jemalloc",
+    "cpu-profiling",
     "openobserve-api-http/profiling",
     "openobserve-jobs/profiling",
     "openobserve-core/profiling",
