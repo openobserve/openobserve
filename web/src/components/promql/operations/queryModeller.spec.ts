@@ -823,7 +823,7 @@ describe("QueryModeller", () => {
       ).toBe('x{code=~"(?:500|a\\\\.b)"}');
     });
 
-    it("renders nothing past the branch cap, so the query does not run", () => {
+    it("refuses to render past the branch cap rather than return a blank query", () => {
       const labels = Array.from({ length: 17 }, (_, i) => ({
         label: `l${i}`,
         op: "=",
@@ -831,7 +831,9 @@ describe("QueryModeller", () => {
         group: 1,
         negate: true,
       }));
-      expect(render(labels, [{ id: PromqlStepId.Rate, params: ["5m"] }])).toBe("");
+      expect(() => render(labels, [{ id: PromqlStepId.Rate, params: ["5m"] }])).toThrow(
+        /17 selectors/,
+      );
     });
   });
 

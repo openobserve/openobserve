@@ -187,14 +187,14 @@
       </div>
     </div>
     <div
-      v-if="!compiled.ok"
+      v-if="tooMany"
       class="text-status-error-text ps-2 text-xs"
       role="alert"
       data-test="promql-labelfilter-too-many-branches"
     >
       {{
         t("metrics.labelGroups.tooManyBranches", {
-          count: compiled.branchCount,
+          count: tooMany,
           max: MAX_FILTER_BRANCHES,
         })
       }}
@@ -203,7 +203,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, watch } from "vue";
+import { computed, inject, ref, watch } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -261,6 +261,23 @@ const labelOptionsFor = (group: number) => {
 };
 
 const compiled = computed(() => compileLabelFilters(props.labels));
+
+/** The branch count of an add or NOT toggle that was refused for passing the cap; 0 once an edit lands. */
+const refusedCount = ref(0);
+const tooMany = computed(() =>
+  compiled.value.ok ? refusedCount.value : compiled.value.branchCount,
+);
+
+/** Emits `labels` unless they would expand past the cap, which leaves the query unrenderable. */
+const emitWithinCap = (labels: PromqlLabelMatcher[]) => {
+  const next = compileLabelFilters(labels);
+  if (!next.ok) {
+    refusedCount.value = next.branchCount;
+    return;
+  }
+  refusedCount.value = 0;
+  emit("update:labels", labels);
+};
 
 const sections = computed(() => {
   const items = props.labels.map((label, index) => ({ label, index }));
@@ -329,18 +346,17 @@ const emptyMatcher = (group: number): PromqlLabelMatcher => {
 };
 
 const addLabel = (group = 0) => {
-  emit("update:labels", [...props.labels, emptyMatcher(group)]);
+  emitWithinCap([...props.labels, emptyMatcher(group)]);
 };
 
 const addGroup = () => {
   const next = Math.max(0, ...props.labels.map((l) => l.group ?? 0)) + 1;
-  emit("update:labels", [...props.labels, emptyMatcher(next)]);
+  emitWithinCap([...props.labels, emptyMatcher(next)]);
 };
 
 const toggleNegate = (group: number) => {
   const negate = !props.labels.some((l) => l.group === group && l.negate);
-  emit(
-    "update:labels",
+  emitWithinCap(
     props.labels.map((l) => {
       if (l.group !== group) return l;
       const next = { ...l };
@@ -353,6 +369,7 @@ const toggleNegate = (group: number) => {
 
 const removeLabel = (index: number) => {
   const newLabels = props.labels.filter((_, idx) => idx !== index);
+  refusedCount.value = 0;
   emit("update:labels", newLabels);
 };
 

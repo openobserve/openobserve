@@ -188,10 +188,12 @@ class PromqlRendererImpl implements PromqlRenderer {
     return `${id}(${args})`;
   }
 
-  /** The PromQL text, or "" when the label filters expand past the branch cap. */
+  /** The PromQL text; throws past the branch cap, so a caller keeps its last query instead of writing a blank one. */
   renderQuery(query: PromqlBuilderQuery): string {
     const compiled = compileLabelFilters(query.labels);
-    if (!compiled.ok) return "";
+    if (!compiled.ok) {
+      throw new Error(`label filters expand to ${compiled.branchCount} selectors`);
+    }
 
     const steps = query.operations.filter((op) => this.operations.has(normalizeStepId(op.id)));
     const offsetStep = steps.filter((op) => normalizeStepId(op.id) === PromqlStepId.Offset).pop();

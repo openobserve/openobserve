@@ -526,6 +526,28 @@ describe("LabelFilterEditor", () => {
       );
     });
 
+    it("refuses an add or NOT toggle that would pass the branch cap, and says why", async () => {
+      const labels = Array.from({ length: 16 }, (_, i) => ({
+        label: `l${i}`,
+        op: "=",
+        value: "v",
+        group: 1,
+        negate: true,
+      }));
+      wrapper = createWrapper({ labels });
+      await wrapper.find('[data-test="promql-labelfilter-group-add-1"]').trigger("click");
+      expect(wrapper.emitted("update:labels")).toBeUndefined();
+      expect(wrapper.find('[data-test="promql-labelfilter-too-many-branches"]').text()).toContain(
+        "17",
+      );
+
+      const positive = labels.map(({ negate: _negate, ...l }) => l);
+      positive.push({ label: "x", op: "=", value: "1", group: 2 } as any);
+      await wrapper.setProps({ labels: positive });
+      await wrapper.find('[data-test="promql-labelfilter-group-not-1"]').trigger("click");
+      expect(wrapper.emitted("update:labels")).toBeUndefined();
+    });
+
     it("shows no group chrome for a plain AND list", () => {
       wrapper = createWrapper();
       expect(wrapper.find('[data-test^="promql-labelfilter-group-"]').exists()).toBe(false);
