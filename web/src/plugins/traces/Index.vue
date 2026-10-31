@@ -116,8 +116,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               id="tracesThirdLevel"
               class="traces-search-result-container relative-position relative h-full"
             >
-              <!-- Drill down teleports into this; it covers the results so their scroll and brush state survive. -->
-              <div id="traces-drill-down-page" class="absolute inset-0 z-20 hidden has-[>*]:flex" />
               <!-- Note: Splitter max-height to be dynamically calculated with JS -->
               <OSplitter
                 v-model="searchObj.config.splitterModel"

@@ -79,6 +79,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-latency-heatmap-chart"
         @updated:dataZoom="onDataZoom"
       />
+      <!-- Drawn over the canvas, not as a markArea: the chart resets its option after every zoom brush. -->
+      <!-- The box passes pointer events through so a new brush can start inside it. -->
+      <div
+        v-if="status === 'ready' && shownBox"
+        class="border-accent bg-accent/10 rounded-default pointer-events-none absolute border"
+        :style="shownBox.style"
+        data-test="traces-latency-heatmap-selection"
+      >
+        <ODropdown
+          :open="popoverOpen"
+          side="right"
+          align="start"
+          content-class="w-[min(18rem,calc(100vw-1.5rem))]"
+          @update:open="popoverOpen = $event"
+        >
+          <template #trigger>
+            <OButton
+              variant="secondary"
+              size="icon-xs-sq"
+              icon-left="more-horiz"
+              class="pointer-events-auto absolute top-0.5 right-0.5"
+              :aria-label="t('traces.latencyHeatmap.selection.reopen')"
+              data-test="traces-latency-heatmap-selection-reopen"
+            />
+          </template>
+          <div
+            ref="menuBody"
+            role="group"
+            :aria-label="t('traces.latencyHeatmap.selection.label')"
+            data-test="traces-latency-heatmap-selection-menu"
+          >
+            <div class="flex flex-col gap-0.5 px-3 py-1.5">
+              <span
+                class="text-text-heading text-sm font-semibold"
+                data-test="traces-latency-heatmap-selection-count"
+              >
+                {{
+                  t(
+                    "traces.latencyHeatmap.selection.count",
+                    { count: shownBox.count.toLocaleString() },
+                    shownBox.count,
+                  )
+                }}
+              </span>
+              <span
+                class="text-text-secondary text-xs"
+                data-test="traces-latency-heatmap-selection-range"
+              >
+                {{ shownBox.range }}
+              </span>
+            </div>
+            <ODropdownSeparator />
+            <ODropdownItem
+              icon-left="filter-alt"
+              shortcut="f"
+              data-test="traces-latency-heatmap-selection-filter"
+              @select="filterSelection"
+            >
+              {{ t("traces.latencyHeatmap.selection.filter") }}
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="timeline"
+              shortcut="d"
+              data-test="traces-latency-heatmap-selection-drill-down"
+              @select="drillDown"
+            >
+              {{ t("traces.latencyHeatmap.selection.drillDown") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="aiEnabled"
+              data-test="traces-latency-heatmap-selection-ask-ai"
+              @select="askAi"
+            >
+              <template #icon-left>
+                <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+              </template>
+              {{ t("traces.latencyHeatmap.selection.askAi") }}
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="close"
+              shortcut="esc"
+              data-test="traces-latency-heatmap-selection-clear"
+              @select="clearSelection"
+            >
+              {{ t("traces.latencyHeatmap.selection.clear") }}
+            </ODropdownItem>
+          </div>
+        </ODropdown>
+      </div>
     </div>
   </div>
 </template>
@@ -86,11 +175,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { computed, defineAsyncComponent, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useTheme from "@/composables/useTheme";
+import { useAiIcon } from "@/composables/useAiIcon";
 import searchService from "@/services/search";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -100,11 +194,14 @@ import { timestampToTimezoneDate } from "@/utils/timezone";
 import { escapeHtml } from "@/utils/html";
 import {
   HEATMAP_ROW_LIMIT,
+  boxCells,
   bucketBounds,
   buildHeatmapGrid,
   formatDurationBound,
   selectionFromBox,
+  spansInCells,
   type HeatmapBox,
+  type HeatmapCellRange,
   type LatencyHeatmapCell,
   type LatencyHeatmapGrid,
   type LatencyHeatmapSelection,
@@ -114,28 +211,53 @@ const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
 );
 
+export interface LatencyHeatmapAskAi {
+  selection: LatencyHeatmapSelection;
+  count: number;
+  band: string;
+  window: string;
+}
+
 export interface LatencyHeatmapRequest {
   sql: string;
   startTime: number;
   endTime: number;
 }
 
-const props = defineProps<{ request: LatencyHeatmapRequest | null }>();
+const props = defineProps<{
+  request: LatencyHeatmapRequest | null;
+  selection?: LatencyHeatmapSelection | null;
+  aiEnabled?: boolean;
+}>();
 
 const emit = defineEmits<{
   (e: "select", selection: LatencyHeatmapSelection): void;
+  (e: "filter"): void;
+  (e: "drill-down"): void;
+  (e: "clear"): void;
+  (e: "ask-ai", payload: LatencyHeatmapAskAi): void;
 }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
 const { isDark } = useTheme();
+const { aiIconSrc } = useAiIcon();
 
 const MINUTE_US = 60 * 1_000_000;
+// ECharts canvas sizes are pixel numbers with no CSS cascade, and no chart size tokens exist.
+const GRID = { left: 52, right: 8, top: 8, bottom: 22 };
 const DAY_US = 24 * 3600 * 1_000_000;
 
 const status = ref<"idle" | "loading" | "ready" | "empty" | "unavailable" | "error">("idle");
 const grid = shallowRef<LatencyHeatmapGrid | null>(null);
 const colorBy = ref<"spans" | "errors">("spans");
+// The box the user drew, kept in grid cells; it shows only while the parent holds its selection.
+const drawn = shallowRef<{ selection: LatencyHeatmapSelection; cells: HeatmapCellRange } | null>(
+  null,
+);
+const popoverOpen = ref(false);
+// Once filtered, the box stands for the staged filter, so only Clear or a reload may erase it.
+const filtered = ref(false);
 
 let controller: AbortController | null = null;
 
@@ -145,6 +267,9 @@ async function load(request: LatencyHeatmapRequest | null) {
   controller?.abort();
   controller = null;
   grid.value = null;
+  drawn.value = null;
+  popoverOpen.value = false;
+  filtered.value = false;
   if (!request) {
     status.value = "idle";
     return;
@@ -234,8 +359,7 @@ const options = computed(() => {
   const byErrors = colorBy.value === "errors";
   return {
     animation: false,
-    // ECharts canvas sizes are pixel numbers with no CSS cascade, and no chart size tokens exist.
-    grid: { left: 52, right: 8, top: 8, bottom: 22 },
+    grid: GRID,
     tooltip: {
       trigger: "item",
       backgroundColor: chartColor("--color-tooltip-bg"),
@@ -318,8 +442,122 @@ const options = computed(() => {
   };
 });
 
+const windowText = (startUs: number, endUs: number) => {
+  const format = endUs - startUs > DAY_US ? "MM-dd HH:mm" : "HH:mm:ss";
+  const at = (us: number) => timestampToTimezoneDate(us / 1000, store.state.timezone, format);
+  return `${at(startUs)}–${at(endUs)}`;
+};
+
+const bandText = ({ durationLoUs: lo, durationHiUs: hi }: LatencyHeatmapSelection) =>
+  hi === null
+    ? `≥ ${formatDurationBound(lo)}`
+    : lo
+      ? `${formatDurationBound(lo)}–${formatDurationBound(hi)}`
+      : `< ${formatDurationBound(hi)}`;
+
+const shownBox = computed<{
+  style: Record<string, string>;
+  count: number;
+  range: I18nText;
+} | null>(() => {
+  const g = grid.value;
+  const d = drawn.value;
+  const held = props.selection;
+  const same =
+    !!held &&
+    !!d &&
+    held.timeStartUs === d.selection.timeStartUs &&
+    held.timeEndUs === d.selection.timeEndUs &&
+    held.durationLoUs === d.selection.durationLoUs &&
+    held.durationHiUs === d.selection.durationHiUs;
+  if (!g || !d || !same) return null;
+  const { i0, i1, j0, j1 } = d.cells;
+  const cols = g.colStartUs.length;
+  const rows = g.rows.length;
+  const plotW = `(100% - ${GRID.left + GRID.right}px)`;
+  const plotH = `(100% - ${GRID.top + GRID.bottom}px)`;
+  // Row 0 is the bottom of the y axis, so the box's top edge is its highest row.
+  return {
+    style: {
+      left: `calc(${GRID.left}px + ${plotW} * ${i0 / cols})`,
+      width: `calc(${plotW} * ${(i1 - i0 + 1) / cols})`,
+      top: `calc(${GRID.top}px + ${plotH} * ${(rows - 1 - j1) / rows})`,
+      height: `calc(${plotH} * ${(j1 - j0 + 1) / rows})`,
+    },
+    count: spansInCells(g, d.cells),
+    range: t("traces.latencyHeatmap.selection.range", {
+      band: raw(bandText(d.selection)),
+      window: raw(windowText(d.selection.timeStartUs, d.selection.timeEndUs)),
+    }),
+  };
+});
+
 const onDataZoom = (box: HeatmapBox) => {
   if (!grid.value) return;
-  emit("select", selectionFromBox(grid.value, box));
+  const selection = selectionFromBox(grid.value, box);
+  drawn.value = { selection, cells: boxCells(grid.value, box) };
+  popoverOpen.value = true;
+  filtered.value = false;
+  emit("select", selection);
 };
+
+const filterSelection = () => {
+  popoverOpen.value = false;
+  filtered.value = true;
+  emit("filter");
+};
+
+// The Drill down panel keeps its own copy of the selection, so only the drawn box goes.
+const drillDown = () => {
+  popoverOpen.value = false;
+  if (!filtered.value) drawn.value = null;
+  emit("drill-down");
+};
+
+const askAi = () => {
+  const d = drawn.value;
+  const g = grid.value;
+  popoverOpen.value = false;
+  if (!filtered.value) drawn.value = null;
+  if (!d || !g) return;
+  emit("ask-ai", {
+    selection: d.selection,
+    count: spansInCells(g, d.cells),
+    band: bandText(d.selection),
+    window: windowText(d.selection.timeStartUs, d.selection.timeEndUs),
+  });
+};
+
+const clearSelection = () => {
+  popoverOpen.value = false;
+  filtered.value = false;
+  drawn.value = null;
+  emit("clear");
+};
+
+const menuBody = ref<HTMLElement | null>(null);
+const MENU_KEYS: Record<string, () => void> = {
+  f: filterSelection,
+  d: drillDown,
+  escape: clearSelection,
+};
+
+// On document, not the menu body: the menu content itself holds focus on open, and reka's Escape only closes.
+const onMenuKeydown = (event: KeyboardEvent) => {
+  const content = menuBody.value?.closest<HTMLElement>('[role="menu"]');
+  if (!content || !(event.target instanceof Node) || !content.contains(event.target)) return;
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  const action = MENU_KEYS[event.key.toLowerCase()];
+  if (!action) return;
+  event.preventDefault();
+  event.stopPropagation();
+  action();
+};
+
+watch(popoverOpen, (open) => {
+  if (open) document.addEventListener("keydown", onMenuKeydown, true);
+  else document.removeEventListener("keydown", onMenuKeydown, true);
+});
+
+onBeforeUnmount(() => document.removeEventListener("keydown", onMenuKeydown, true));
 </script>
