@@ -2805,12 +2805,10 @@ async function loadData() {
     }
   } catch (err: any) {
     console.error("Failed to load workload detection data:", err);
-    if (err?.response?.status !== 403) {
-      toast({
-        variant: "error",
-        message: t("settings.correlation.loadRecommendationsFailed"),
-      });
-    }
+    toast({
+      variant: "error",
+      message: t("settings.correlation.loadRecommendationsFailed"),
+    });
   } finally {
     loading.value = false;
   }

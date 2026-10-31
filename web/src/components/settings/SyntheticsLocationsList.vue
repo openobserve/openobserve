@@ -452,7 +452,6 @@ export default defineComponent({
           (l) => l.kind === "public",
         );
       } catch (error: any) {
-        if (error?.response?.status === 403) return;
         toast({
           message: error?.response?.data?.message || t("synthetics.locations.fetchFailed"),
           variant: "error",
