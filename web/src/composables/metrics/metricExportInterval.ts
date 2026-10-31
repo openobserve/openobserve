@@ -19,6 +19,12 @@ export const EXPORT_INTERVAL_TTL_MS = 10 * 60_000;
 /** One localStorage item per org, holding its streams' measured intervals. */
 const STORAGE_PREFIX = "o2-metrics-export-intervals:";
 
+/** Streams remembered at once; the least recently measured go first. */
+export const MAX_EXPORT_INTERVAL_ENTRIES = 500;
+
+/** A grid measures many cards in a burst, so their writes coalesce into one per org. */
+const SAVE_DELAY_MS = 1000;
+
 interface Entry {
   /** Seconds, or null when the probe could not tell. */
   value: number | null;
@@ -38,8 +44,16 @@ export function createExportIntervalCache(
   ttlMs: number = EXPORT_INTERVAL_TTL_MS,
   now: () => number = Date.now,
   storage: () => Storage | null = () => null,
+  saveDelayMs = 0,
 ): ExportIntervalCache {
   const entries = new Map<string, Entry>();
+  const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // Re-inserted on every write, so the map's first key is always the least recently measured.
+  const remember = (key: string, entry: Entry) => {
+    entries.delete(key);
+    entries.set(key, entry);
+    while (entries.size > MAX_EXPORT_INTERVAL_ENTRIES) entries.delete(entries.keys().next().value!);
+  };
   const pending = new Map<string, Promise<number | null>>();
   const loadedOrgs = new Set<string>();
   const orgOf = (key: string) => key.slice(0, key.indexOf("|"));
@@ -55,13 +69,13 @@ export function createExportIntervalCache(
         const valid =
           (entry?.value === null || Number.isFinite(entry?.value)) && Number.isFinite(entry?.at);
         const key = `${org}|${stream}`;
-        if (valid && fresh(entry) && !entries.has(key)) entries.set(key, entry);
+        if (valid && fresh(entry) && !entries.has(key)) remember(key, entry);
       }
     } catch {
       // Unreadable storage is the same as an empty one.
     }
   };
-  const save = (org: string) => {
+  const write = (org: string) => {
     try {
       const out: Record<string, Entry> = {};
       for (const [key, entry] of entries) {
@@ -71,6 +85,17 @@ export function createExportIntervalCache(
     } catch {
       // Not persisted; this session still has it in memory.
     }
+  };
+  const save = (org: string) => {
+    if (saveDelayMs <= 0) return write(org);
+    if (saveTimers.has(org)) return;
+    saveTimers.set(
+      org,
+      setTimeout(() => {
+        saveTimers.delete(org);
+        write(org);
+      }, saveDelayMs),
+    );
   };
 
   return {
@@ -86,7 +111,7 @@ export function createExportIntervalCache(
       if (inFlight) return inFlight;
       const run = measure()
         .then((value) => {
-          entries.set(key, { value, at: now() });
+          remember(key, { value, at: now() });
           save(orgOf(key));
           return value;
         })
@@ -95,6 +120,8 @@ export function createExportIntervalCache(
       return run;
     },
     clear() {
+      saveTimers.forEach((timer) => clearTimeout(timer));
+      saveTimers.clear();
       entries.clear();
       pending.clear();
       loadedOrgs.clear();
@@ -107,4 +134,5 @@ export const exportIntervalCache = createExportIntervalCache(
   EXPORT_INTERVAL_TTL_MS,
   Date.now,
   () => (typeof localStorage === "undefined" ? null : localStorage),
+  SAVE_DELAY_MS,
 );

@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
-import { createExportIntervalCache, EXPORT_INTERVAL_TTL_MS } from "./metricExportInterval";
+import {
+  createExportIntervalCache,
+  EXPORT_INTERVAL_TTL_MS,
+  MAX_EXPORT_INTERVAL_ENTRIES,
+} from "./metricExportInterval";
 
 const clock = () => {
   let t = 0;
@@ -76,6 +80,16 @@ describe("export interval cache", () => {
     expect(cache.peek("org|a")).toBeNull();
   });
 
+  it("forgets the least recently measured stream past the entry cap", async () => {
+    const cache = createExportIntervalCache();
+    for (let i = 0; i <= MAX_EXPORT_INTERVAL_ENTRIES; i++) {
+      await cache.detect(`org|m${i}`, () => Promise.resolve(15));
+    }
+    expect(cache.peek("org|m0")).toBeUndefined();
+    expect(cache.peek("org|m1")).toBe(15);
+    expect(cache.peek(`org|m${MAX_EXPORT_INTERVAL_ENTRIES}`)).toBe(15);
+  });
+
   describe("in storage", () => {
     const memoryStorage = () => {
       const items = new Map<string, string>();
@@ -103,6 +117,34 @@ describe("export interval cache", () => {
       expect(await reloaded.detect("org1|m", measure)).toBe(60);
       expect(await reloaded.detect("org2|m", measure)).toBe(15);
       expect(measure).not.toHaveBeenCalled();
+    });
+
+    it("coalesces a burst of measurements into one write, without expired entries", async () => {
+      vi.useFakeTimers();
+      try {
+        const time = clock();
+        const storage = memoryStorage();
+        const setItem = vi.spyOn(storage, "setItem");
+        const cache = createExportIntervalCache(
+          EXPORT_INTERVAL_TTL_MS,
+          time.now,
+          () => storage,
+          1000,
+        );
+        await cache.detect("org|old", () => Promise.resolve(60));
+        time.advance(EXPORT_INTERVAL_TTL_MS);
+        for (const stream of ["a", "b", "c"]) {
+          await cache.detect(`org|${stream}`, () => Promise.resolve(15));
+        }
+        expect(setItem).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(1000);
+        expect(setItem).toHaveBeenCalledTimes(1);
+        expect(
+          Object.keys(JSON.parse(storage.items.get("o2-metrics-export-intervals:org")!)),
+        ).toEqual(["a", "b", "c"]);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("measures again once the stored answer is past the TTL", async () => {
