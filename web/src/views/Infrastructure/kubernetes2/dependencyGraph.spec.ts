@@ -275,6 +275,11 @@ describe("buildGraph", () => {
     const weakestKept = Math.min(...graph.edges.map((e) => e.total));
     const left = dense.filter((e) => !graph.edges.includes(e));
     expect(Math.max(...left.map((e) => e.total))).toBeLessThanOrEqual(weakestKept);
+    // A card's rate is its drawn edges' alone.
+    for (const n of graph.nodes) {
+      const drawn = graph.edges.filter((e) => e.source.id === n.end.id || e.target.id === n.end.id);
+      expect(n.total).toBe(drawn.reduce((sum, e) => sum + e.total, 0));
+    }
   });
 
   it("survives a cycle", () => {

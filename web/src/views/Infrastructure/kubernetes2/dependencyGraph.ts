@@ -267,14 +267,6 @@ export function buildGraph(
   limit = MAX_GRAPH_NODES,
   edgeLimit = MAX_GRAPH_EDGES,
 ): FlowGraph {
-  const totals = new Map<string, { end: FlowEnd; total: number }>();
-  for (const e of edges) {
-    for (const end of [e.source, e.target]) {
-      const entry = totals.get(end.id) ?? { end, total: 0 };
-      entry.total += e.total;
-      totals.set(end.id, entry);
-    }
-  }
   // Picking ends first could keep every client of disjoint pairs and none of their servers.
   const kept = new Set<string>();
   const keptEdges: FlowEdge[] = [];
@@ -287,10 +279,17 @@ export function buildGraph(
     kept.add(e.target.id);
     keptEdges.push(e);
   }
+  // Each card's rate from its drawn edges alone, matching the connections it counts.
+  const totals = new Map<string, { end: FlowEnd; total: number }>();
+  for (const e of keptEdges) {
+    for (const end of [e.source, e.target]) {
+      const entry = totals.get(end.id) ?? { end, total: 0 };
+      entry.total += e.total;
+      totals.set(end.id, entry);
+    }
+  }
   const ranks = rankOf(keptEdges);
-  const nodes = [...totals.values()]
-    .filter((n) => kept.has(n.end.id))
-    .map((n) => ({ ...n, rank: ranks.get(n.end.id) ?? 0 }));
+  const nodes = [...totals.values()].map((n) => ({ ...n, rank: ranks.get(n.end.id) ?? 0 }));
   return { nodes, edges: keptEdges };
 }
 
