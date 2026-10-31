@@ -186,6 +186,38 @@ receivers:
     expect(headers.label).toBe("plain text");
   });
 
+  it("writes a quoted value's text literally and keeps quotes that are part of the value", () => {
+    const yaml = `exporters:
+  otlphttp:
+    headers:
+      etag: '"abc"'
+      single: "'x'"
+      path: 'C:\\temp'
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [otlphttp]
+receivers:
+  otlp: {}
+`;
+    const graph = yamlToGraph(yaml);
+    expect(graph).not.toBeNull();
+    expect(load(graphToYaml(graph!))).toEqual(load(yaml));
+    const settings = graph!.components["exporter:otlphttp"].settings;
+    settings["headers.pattern"] = '"^\\d+$"';
+    settings["headers.dir"] = '"C:\\temp"';
+    settings["headers.typed"] = "'true'";
+    const headers = (load(graphToYaml(graph!)) as any).exporters.otlphttp.headers;
+    expect(headers).toMatchObject({
+      etag: '"abc"',
+      single: "'x'",
+      pattern: "^\\d+$",
+      dir: "C:\\temp",
+      typed: "true",
+    });
+  });
+
   it("quotes a key that holds a dot or other path syntax and writes it back", () => {
     const yaml = `receivers:
   hostmetrics:

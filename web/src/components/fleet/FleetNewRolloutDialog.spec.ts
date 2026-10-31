@@ -290,6 +290,16 @@ describe("FleetNewRolloutDialog", () => {
     expect(wrapper.text()).toContain("Pick a fleet");
   });
 
+  it("fills the picked fleet's desired configuration when none was given", async () => {
+    wrapper = mountDialog({});
+    await settlePreview();
+    expect(form(wrapper).state.values.config).toBe("");
+    form(wrapper).setFieldValue("fleet", "default");
+    wrapper.findComponent({ name: "OFormSelect" }).vm.$emit("update:modelValue", "default");
+    await flushPromises();
+    expect(form(wrapper).state.values).toMatchObject({ config: "other", version: 0 });
+  });
+
   it("picks the only fleet the user can read when opened without one", async () => {
     vi.mocked(fleet.listFleets).mockResolvedValue({
       data: { items: [fleetOf("one", 1)] },

@@ -367,8 +367,12 @@ watch(
 );
 
 function onFleetPicked(id: unknown) {
+  const fleet = String(id ?? "");
+  if (!props.config && !form.state.values.config) {
+    form.setFieldValue("config", desiredOf(fleet) ?? "");
+  }
   if (props.toVersion != null) return;
-  form.setFieldValue("version", defaultVersion(String(id ?? ""), form.state.values.config));
+  form.setFieldValue("version", defaultVersion(fleet, form.state.values.config));
 }
 
 function onConfigPicked(id: unknown) {
