@@ -17,13 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section class="mb-5" :data-test="`overview-${testSection}-${kind}`">
     <div class="mb-2 flex items-center ps-1">
-      <div class="text-text-heading text-sm font-medium tracking-[0.01em]">{{ title }}</div>
+      <div class="text-text-heading text-sm font-medium">{{ title }}</div>
     </div>
     <div
       class="border-border-default rounded-default bg-surface-base overflow-hidden border border-[0.0625em]"
     >
-      <OEmptyState v-if="kind === 'forbidden'" size="inline" preset="no-access" />
-      <OEmptyState v-else size="inline" :title="t(`overview.empty.${section}`)" />
+      <OEmptyState
+        size="inline"
+        :icon="kind === 'forbidden' ? 'lock' : undefined"
+        :title="message"
+        :data-test="`overview-${testSection}-${kind}-message`"
+      />
     </div>
   </section>
 </template>
@@ -37,9 +41,16 @@ const props = defineProps<{
   section: "incidents" | "services" | "anomalies" | "recentEvents";
   title: I18nText;
   kind: "empty" | "forbidden";
+  noChecks?: boolean;
 }>();
 
 const { t } = useI18nTyped();
+
+const message = computed(() => {
+  if (props.kind === "forbidden") return t("overview.state.tileForbidden");
+  if (props.section === "anomalies" && props.noChecks) return t("overview.empty.anomalyNoChecks");
+  return t(`overview.empty.${props.section}`);
+});
 
 // data-test ids follow the existing overview-<section>-section ids, which spell recent events with a hyphen
 const testSection = computed(() =>

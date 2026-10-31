@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     section="alerts"
     :title="t('overview.sections.alerts')"
     :link-label="t('overview.viewAll')"
+    :link-aria-label="t('overview.alerts.viewAllAria')"
     :view="view"
+    :summary-forbidden="forbidden"
     @retry="emit('retry')"
     @view-all="emit('open')"
   >
@@ -33,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             data-test="overview-alerts-open-btn"
-            @click="emit('open')"
+            @click="emit('create')"
           >
             {{ t("overview.alerts.emptyAction") }}
           </OButton>
@@ -71,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("overview.alerts.allClear") }}
         </p>
         <ul v-else class="flex flex-col">
-          <li v-for="row in rows" :key="`${row.stream}-${row.name}`">
+          <li v-for="(row, index) in rows" :key="`${row.stream}-${row.name}-${row.since}-${index}`">
             <OverviewRowButton
               :data-test="`overview-alerts-firing-${row.name}`"
               @click="emit('open')"
@@ -79,10 +81,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="flex min-w-0 items-center gap-2">
                 <OTag
                   type="countChip"
-                  :value="levelTone(row.level)"
+                  :value="rowTone(row.level)"
                   class="shrink-0"
                   :data-test="`overview-alerts-firing-level-${row.name}`"
-                  >{{ t(`overview.level.${row.level}`) }}</OTag
+                  >{{
+                    row.level === "ok"
+                      ? t("overview.level.okFiring")
+                      : t(`overview.level.${row.level}`)
+                  }}</OTag
                 >
                 <OTruncatedText class="text-text-body text-sm">{{ raw(row.name) }}</OTruncatedText>
                 <OTruncatedText class="text-text-secondary text-xs max-md:hidden">{{
@@ -114,13 +120,18 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import type { OverviewAlertsData, OverviewSection } from "@/ts/interfaces/overview";
+import type {
+  OverviewAlertLevel,
+  OverviewAlertsData,
+  OverviewSection,
+} from "@/ts/interfaces/overview";
 import type { IncidentsTile } from "./OverviewHeadlineStrip.vue";
 import OverviewRowButton from "./OverviewRowButton.vue";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
 import {
   firingRows,
   firingTotal,
+  hasKnownSince,
   levelCount,
   levelTone,
   microsToMs,
@@ -137,7 +148,7 @@ const props = defineProps<{
   incidentsTotal?: number;
 }>();
 
-const emit = defineEmits<{ retry: []; open: [] }>();
+const emit = defineEmits<{ retry: []; open: []; create: [] }>();
 
 const { t } = useI18nTyped();
 const { formatElapsed } = useOverviewTime();
@@ -151,15 +162,19 @@ const view = computed(() => {
 const rows = computed(() =>
   firingRows(props.section?.data).map((row) => ({
     ...row,
-    age: formatElapsed(Date.now() - microsToMs(row.since)),
+    age: hasKnownSince(row.since) ? formatElapsed(Date.now() - microsToMs(row.since)) : "",
   })),
 );
 const remaining = computed(() => Math.max(0, firingTotal(props.section?.data) - rows.value.length));
+
+// a rule in the firing list is firing whatever its configured level, so "ok" must not read as healthy
+const rowTone = (level: OverviewAlertLevel) => (level === "ok" ? "neutral" : levelTone(level));
 
 const tiles = computed(() => {
   const data = props.section?.data;
   const critical = levelCount(data, "critical");
   const warning = levelCount(data, "warning");
+  const other = Math.max(0, firingTotal(data) - critical - warning);
   const failing = data?.failed_evaluation ?? 0;
   const list = [
     {
@@ -175,6 +190,14 @@ const tiles = computed(() => {
       valueClass: warning > 0 ? "text-status-warning-text" : "text-text-heading",
     },
   ];
+  if (other > 0) {
+    list.push({
+      key: "other",
+      label: t("overview.alerts.otherLevel"),
+      value: other,
+      valueClass: "text-text-heading",
+    });
+  }
   if (props.incidentsState === "ok") {
     list.push({
       key: "incidents",

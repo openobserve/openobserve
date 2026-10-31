@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{future::Future, io::Error};
+use std::{collections::HashSet, future::Future, io::Error};
 
 use arrow_schema::{DataType, Field, Schema};
 use axum::{http, response::Response as HttpResponse};
@@ -108,12 +108,15 @@ pub async fn try_get_streams(
     let indices = db::schema::list(org_id, stream_type, fetch_schema).await?;
 
     let filtered_indices = match permitted_streams {
-        Some(permitted) => indices
-            .into_iter()
-            .filter(|loc| {
-                is_stream_permitted(&permitted, org_id, loc.stream_type, &loc.stream_name)
-            })
-            .collect::<Vec<_>>(),
+        Some(permitted) => {
+            let grants: HashSet<&str> = permitted.iter().map(String::as_str).collect();
+            indices
+                .into_iter()
+                .filter(|loc| {
+                    is_stream_permitted(&grants, org_id, loc.stream_type, &loc.stream_name)
+                })
+                .collect::<Vec<_>>()
+        }
         None => indices,
     };
     let mut indices_res = Vec::with_capacity(filtered_indices.len());
@@ -386,7 +389,7 @@ pub async fn save_stream_settings(
 
 /// Checks a stream against the caller's permitted object list, using the stream's own type.
 fn is_stream_permitted(
-    permitted: &[String],
+    permitted: &HashSet<&str>,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -395,11 +398,11 @@ fn is_stream_permitted(
         StreamType::EnrichmentTables => "enrichment_table",
         _ => stream_type.as_str(),
     };
-    if permitted.contains(&format!("{s_type}:_all_{org_id}")) {
+    if permitted.contains(format!("{s_type}:_all_{org_id}").as_str()) {
         return true;
     }
     let grant_name = config::utils::str::into_ofga_supported_format(stream_name);
-    permitted.contains(&format!("{s_type}:{grant_name}"))
+    permitted.contains(format!("{s_type}:{grant_name}").as_str())
 }
 
 async fn sync_associated_metadata_stream_retention(
@@ -1239,7 +1242,7 @@ mod tests {
 
     #[test]
     fn test_is_stream_permitted_uses_each_streams_own_type() {
-        let permitted = vec!["logs:app".to_string(), "metrics:cpu".to_string()];
+        let permitted = HashSet::from(["logs:app", "metrics:cpu"]);
         assert!(is_stream_permitted(
             &permitted,
             "o",
@@ -1268,7 +1271,7 @@ mod tests {
 
     #[test]
     fn test_is_stream_permitted_matches_sanitized_grant_names() {
-        let permitted = vec!["logs:app.v2".to_string()];
+        let permitted = HashSet::from(["logs:app.v2"]);
         assert!(is_stream_permitted(
             &permitted,
             "o",
@@ -1285,7 +1288,7 @@ mod tests {
 
     #[test]
     fn test_is_stream_permitted_all_grant_and_enrichment_key() {
-        let all = vec!["logs:_all_o".to_string()];
+        let all = HashSet::from(["logs:_all_o"]);
         assert!(is_stream_permitted(&all, "o", StreamType::Logs, "anything"));
         assert!(!is_stream_permitted(
             &all,
@@ -1293,7 +1296,7 @@ mod tests {
             StreamType::Metrics,
             "anything"
         ));
-        let enrich = vec!["enrichment_table:geo".to_string()];
+        let enrich = HashSet::from(["enrichment_table:geo"]);
         assert!(is_stream_permitted(
             &enrich,
             "o",

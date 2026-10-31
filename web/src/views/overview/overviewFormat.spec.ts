@@ -17,8 +17,11 @@ import { describe, expect, it } from "vitest";
 import {
   elapsedParts,
   firingTotal,
+  hasKnownSince,
   levelCount,
   mergeTopStreams,
+  oldestKnownFiring,
+  isUnderOnePercent,
   percentOf,
   percentToFraction,
   percentVariant,
@@ -98,10 +101,9 @@ describe("top streams", () => {
     ]);
   });
 
-  it("scales the share against the largest listed row", () => {
-    const rows = mergeTopStreams(byType);
-    expect(sizeShare(450, rows)).toBe(0.5);
-    expect(sizeShare(5, [])).toBe(0);
+  it("scales the share against total storage, zero for an empty total", () => {
+    expect(sizeShare(450, 900)).toBe(0.5);
+    expect(sizeShare(5, 0)).toBe(0);
   });
 });
 
@@ -115,6 +117,15 @@ describe("percentOf", () => {
   it("is zero, not NaN or Infinity, for a zero total", () => {
     expect(percentOf(5, 0)).toBe(0);
     expect(percentOf(0, 0)).toBe(0);
+  });
+});
+
+describe("isUnderOnePercent", () => {
+  it("is true only for a non-empty share below one percent", () => {
+    expect(isUnderOnePercent(1, 1000)).toBe(true);
+    expect(isUnderOnePercent(10, 1000)).toBe(false);
+    expect(isUnderOnePercent(0, 1000)).toBe(false);
+    expect(isUnderOnePercent(5, 0)).toBe(false);
   });
 });
 
@@ -177,5 +188,19 @@ describe("firing totals", () => {
     expect(firingTotal(alerts)).toBe(3);
     const noLevels = { ...alerts, firing_by_level: undefined } as never;
     expect(firingTotal(noLevels)).toBe(3);
+  });
+
+  it("treats a zero or negative since as unknown", () => {
+    expect(hasKnownSince(0)).toBe(false);
+    expect(hasKnownSince(-5)).toBe(false);
+    expect(hasKnownSince(1_699_996_400_000_000)).toBe(true);
+  });
+
+  it("takes the oldest age from the first firing row with a known since", () => {
+    const [first, second] = alerts.firing;
+    const rows = [{ ...first, since: 0 }, second];
+    expect(oldestKnownFiring({ ...alerts, firing: rows })?.name).toBe(second.name);
+    expect(oldestKnownFiring({ ...alerts, firing: [{ ...first, since: 0 }] })).toBeUndefined();
+    expect(oldestKnownFiring(undefined)).toBeUndefined();
   });
 });

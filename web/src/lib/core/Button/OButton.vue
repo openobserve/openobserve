@@ -292,6 +292,24 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
+  // row: list row whose content is itself the action; start-aligned name, end-aligned value.
+  row: [
+    "bg-transparent text-button-ghost-text border-0 text-start rounded-default",
+    "h-auto! justify-between! gap-3! px-0! py-1.5!",
+    "enabled:hover:bg-button-ghost-hover-bg",
+    "enabled:active:bg-button-ghost-active-bg",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
+    "disabled:text-text-disabled",
+  ].join(" "),
+  // locked-body: outlined full-width prompt whose message wraps and starts at the leading edge.
+  "locked-body": [
+    "bg-transparent text-button-outline-text border border-button-outline-border text-start",
+    "h-auto! justify-start! px-3! py-3! whitespace-normal!",
+    "enabled:hover:bg-button-outline-hover-bg enabled:hover:border-button-outline-hover-border",
+    "enabled:active:bg-button-outline-active-bg",
+    "focus-visible:ring-3 focus-visible:ring-button-outline-hover-border",
+    "disabled:opacity-50",
+  ].join(" "),
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
     "bg-transparent text-inherit border border-border-default",
@@ -366,6 +384,8 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "tint-blue": "opacity-60",
   "tint-orange": "opacity-60",
   cell: "opacity-60",
+  row: "text-text-disabled",
+  "locked-body": "opacity-50",
 };
 
 const unavailableClasses = computed(() => {
@@ -376,9 +396,10 @@ const unavailableClasses = computed(() => {
       .split(" ")
       .filter(
         (value) =>
-          !value.startsWith("enabled:") &&
-          !value.startsWith("disabled:") &&
-          !overriddenGroups.includes(value.split("-")[0]),
+          value === "text-start" ||
+          (!value.startsWith("enabled:") &&
+            !value.startsWith("disabled:") &&
+            !overriddenGroups.includes(value.split("-")[0])),
       ),
     ...disabledClasses,
     "cursor-not-allowed!",

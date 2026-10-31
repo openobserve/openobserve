@@ -13,12 +13,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <OButton variant="ghost" block class="h-auto! justify-between! gap-3! px-0! py-1.5! text-start">
+  <OButton variant="row" block>
     <slot />
   </OButton>
 </template>
 
 <script setup lang="ts">
-// OButton centers its content; rows need start and end alignment with no inset
 import OButton from "@/lib/core/Button/OButton.vue";
 </script>

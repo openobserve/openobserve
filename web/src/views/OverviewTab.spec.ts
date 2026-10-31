@@ -164,9 +164,7 @@ describe("OverviewTab", () => {
   let originalZoConfig: Record<string, unknown>;
   let originalFlags: { isEnterprise: string; isCloud: string };
 
-  // the compact empty message of the recent-events section stands in for the removed all-clear hero
   const EMPTY_STATE = '[data-test="overview-recent-events-empty"]';
-  const ALL_CLEAR_HERO = '[data-test="overview-all-clear-empty-state"]';
   const RECENT_EVENTS = '[data-test="overview-recent-events-section"]';
   const ANOMALIES = '[data-test="overview-anomalies-section"]';
   const INCIDENTS = '[data-test="overview-incidents-section"]';
@@ -283,7 +281,7 @@ describe("OverviewTab", () => {
       await flushPromises();
     });
 
-    it("should render the all-clear empty state when loading finished with no data", () => {
+    it("should render the per-section empty message when loading finished with no data", () => {
       expect(internals(wrapper).isLoading).toBe(false);
       expect(internals(wrapper).hasAnyData).toBe(false);
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
@@ -593,7 +591,6 @@ describe("OverviewTab", () => {
       expect(internals(wrapper).hasAnyData).toBe(true);
       expect(wrapper.find(ANOMALIES).exists()).toBe(true);
       expect(wrapper.find(ANOMALIES).text()).toContain("Checkout latency anomaly");
-      expect(wrapper.find(ALL_CLEAR_HERO).exists()).toBe(false);
       expect(visibleSkeletons()).toEqual([]);
     });
 
@@ -673,8 +670,34 @@ describe("OverviewTab", () => {
       expect(internals(wrapper).hasAnyData).toBe(true);
       expect(wrapper.find(INCIDENTS).exists()).toBe(true);
       expect(wrapper.find(INCIDENTS).text()).toContain("Checkout service degraded");
-      expect(wrapper.find(ALL_CLEAR_HERO).exists()).toBe(false);
       expect(visibleSkeletons()).toEqual([]);
+    });
+
+    it("should show the incidents tile skeleton, not the old org's count, after an org switch", async () => {
+      vi.mocked(incidentsService.list).mockResolvedValue({
+        data: mockOverview.buildIncidentList(),
+      } as never);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const tile = '[data-test="overview-headline-incidents"]';
+      const skeleton = '[data-test="o-stat-card-value-skeleton"]';
+      const orgA = wrapper.get(tile).text();
+      expect(wrapper.get(tile).find(skeleton).exists()).toBe(false);
+
+      const pending = deferred<{ data: { incidents: unknown[]; total: number } }>();
+      vi.mocked(incidentsService.list).mockReturnValue(pending.promise as never);
+      store.commit("setSelectedOrganization", {
+        ...store.state.selectedOrganization,
+        identifier: `overview-org-switched-${++orgSeq}`,
+      });
+      await flushPromises();
+      expect(wrapper.get(tile).find(skeleton).exists()).toBe(true);
+
+      pending.resolve({ data: { incidents: [], total: 0 } });
+      await flushPromises();
+      expect(wrapper.get(tile).find(skeleton).exists()).toBe(false);
+      expect(wrapper.get(tile).text()).not.toBe(orgA);
+      expect(wrapper.get(tile).text()).toContain("0");
     });
 
     it("should count services as data when the topology returns nodes", async () => {
@@ -687,7 +710,6 @@ describe("OverviewTab", () => {
 
       expect(internals(wrapper).hasAnyData).toBe(true);
       expect(wrapper.find(SERVICES).exists()).toBe(true);
-      expect(wrapper.find(ALL_CLEAR_HERO).exists()).toBe(false);
       expect(visibleSkeletons()).toEqual([]);
     });
 
@@ -754,8 +776,21 @@ describe("OverviewTab", () => {
       vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(err());
     };
 
-    it("should show load-error with Retry, not all clear, when the only OSS section fails", async () => {
+    it("should keep the cards and show an inline section error when the only OSS section fails but the overview loaded", async () => {
       vi.mocked(alertsService.getHistory).mockRejectedValue(serverError());
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-headline-strip"]').exists()).toBe(true);
+      expect(wrapper.findAll(SECTION_ERROR).length).toBeGreaterThan(0);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+    });
+
+    it("should show load-error with Retry, not all clear, when the overview and the only OSS section fail", async () => {
+      vi.mocked(alertsService.getHistory).mockRejectedValue(serverError());
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(serverError());
 
       wrapper = mountOverviewTab();
       await flushPromises();
@@ -769,6 +804,7 @@ describe("OverviewTab", () => {
     it("should show load-error in every edition with the flag off when every section fails", async () => {
       givenEnterprise(false);
       givenEverySectionFails(serverError);
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(serverError());
 
       wrapper = mountOverviewTab();
       await flushPromises();
@@ -781,9 +817,13 @@ describe("OverviewTab", () => {
     it("should reload every section when Retry is clicked", async () => {
       givenEnterprise(false);
       givenEverySectionFails(serverError);
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(serverError());
       wrapper = mountOverviewTab();
       await flushPromises();
       vi.mocked(alertsService.getHistory).mockClear();
+      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
+        data: buildHealthyOverview(),
+      } as never);
       givenNoData();
 
       await wrapper.find(RETRY_CARD).trigger("click");
@@ -807,7 +847,6 @@ describe("OverviewTab", () => {
         "overview-incidents-load-error",
       ]);
       expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
-      expect(wrapper.find(ALL_CLEAR_HERO).exists()).toBe(false);
       expect(refreshLastRun()).not.toBeNull();
     });
 
@@ -834,6 +873,7 @@ describe("OverviewTab", () => {
     it("should count a 403 as a failure and never show no-access with the flag off", async () => {
       givenEnterprise(false);
       givenEverySectionFails(forbidden);
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(serverError());
 
       wrapper = mountOverviewTab();
       await flushPromises();
@@ -841,6 +881,19 @@ describe("OverviewTab", () => {
       expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
       expect(wrapper.find(NO_ACCESS).exists()).toBe(false);
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+    });
+
+    it("should show the no-access state, never the load error, when the overview and every section answer 403 with the flag off", async () => {
+      givenEnterprise(false);
+      givenEverySectionFails(forbidden);
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(forbidden());
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(NO_ACCESS).exists()).toBe(true);
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+      expect(wrapper.get('[data-test="overview-headline-firing"]').text()).toContain("No access");
     });
 
     it("should show the no-access state without the toolbar when every section answers 403 with the flag on", async () => {
@@ -859,6 +912,7 @@ describe("OverviewTab", () => {
       givenEnterprise(true);
       givenEverySectionFails(forbidden);
       vi.mocked(alertsService.getHistory).mockRejectedValue(serverError());
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(serverError());
 
       wrapper = mountOverviewTab();
       await flushPromises();
@@ -907,13 +961,11 @@ describe("OverviewTab", () => {
 
       expect(wrapper.find(NOT_MONITORED).exists()).toBe(false);
       expect(wrapper.find(EMPTY_STATE).text()).toContain(
-        "No alert or pipeline events in the selected time range",
+        "No alert events in the selected time range",
       );
-      expect(wrapper.find(ALL_CLEAR_HERO).exists()).toBe(false);
-      expect(wrapper.text()).not.toContain("All systems clear");
     });
 
-    it("should show load-error with Retry, never all clear or nothing watched, when only the summary fails", async () => {
+    it("should keep the cards and per-section messages, and not claim nothing is watched, when only the summary fails", async () => {
       vi.mocked(organizationsService.get_organization_summary).mockRejectedValue(
         Object.assign(new Error("boom"), { response: { status: 500 } }),
       );
@@ -921,14 +973,14 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="overview-load-error-retry-card"]').exists()).toBe(true);
-      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-alerts-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(false);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
       expect(wrapper.find(NOT_MONITORED).exists()).toBe(false);
-      expect(wrapper.findComponent({ name: "ORefreshButton" }).props("lastRunAt")).toBeNull();
+      expect(wrapper.findComponent({ name: "ORefreshButton" }).props("lastRunAt")).not.toBeNull();
     });
 
-    it("should read the summary again on Retry and settle on nothing watched", async () => {
+    it("should read the summary again on refresh and settle on nothing watched", async () => {
       vi.mocked(organizationsService.get_organization_summary).mockRejectedValueOnce(
         new Error("boom"),
       );
@@ -937,13 +989,35 @@ describe("OverviewTab", () => {
       );
       wrapper = mountOverviewTab();
       await flushPromises();
+      expect(wrapper.find(NOT_MONITORED).exists()).toBe(false);
 
-      await wrapper.find('[data-test="overview-load-error-retry-card"]').trigger("click");
+      wrapper.findComponent({ name: "ORefreshButton" }).vm.$emit("click");
       await flushPromises();
 
       expect(organizationsService.get_organization_summary).toHaveBeenCalledTimes(2);
-      expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(false);
       expect(wrapper.find(NOT_MONITORED).exists()).toBe(true);
+    });
+
+    it("should ignore a late summary from the previous org", async () => {
+      const late = deferred<unknown>();
+      vi.mocked(organizationsService.get_organization_summary).mockReturnValueOnce(
+        late.promise as never,
+      );
+      vi.mocked(organizationsService.get_organization_summary).mockResolvedValue(
+        summaryWithAlerts(1) as never,
+      );
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      store.commit("setSelectedOrganization", {
+        ...store.state.selectedOrganization,
+        identifier: `overview-org-switched-${++orgSeq}`,
+      });
+      await flushPromises();
+      expect(wrapper.find(NOT_MONITORED).exists()).toBe(false);
+
+      late.resolve(summaryWithAlerts(0));
+      await flushPromises();
+      expect(wrapper.find(NOT_MONITORED).exists()).toBe(false);
     });
 
     it("should keep rows on screen when only the summary fails", async () => {
@@ -975,7 +1049,6 @@ describe("OverviewTab", () => {
   describe("an org with no user streams and the flag off", () => {
     const HERO = '[data-test="home-first-data-hero"]';
     const LOAD_ERROR = '[data-test="overview-load-error-empty-state"]';
-    const RETRY_CARD = '[data-test="overview-load-error-retry-card"]';
     const serverError = () => Object.assign(new Error("boom"), { response: { status: 500 } });
     const internalOnly = {
       logs: [
@@ -1053,7 +1126,7 @@ describe("OverviewTab", () => {
       expect(wrapper.find(HERO).exists()).toBe(true);
     });
 
-    it("should ask nothing and keep all clear when the notice recorded data for the org", async () => {
+    it("should ask nothing and show the per-section empty message when the notice recorded data for the org", async () => {
       const org = store.state.selectedOrganization.identifier;
       localStorage.setItem(
         firstDataStorageKey(org),
@@ -1086,7 +1159,7 @@ describe("OverviewTab", () => {
       expect(wrapper.find(HERO).exists()).toBe(true);
     });
 
-    it("should keep all clear when a page of internal streams leaves the rest unread", async () => {
+    it("should show the per-section empty message when a page of internal streams leaves the rest unread", async () => {
       const many = Array.from({ length: 25 }, (_, i) => ({
         name: `_o2_s${i}`,
         stream_type: "logs",
@@ -1113,7 +1186,7 @@ describe("OverviewTab", () => {
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
     });
 
-    it("should keep all clear unchanged for an org that has a user stream", async () => {
+    it("should show the per-section empty message for an org that has a user stream", async () => {
       givenStreams({ ...internalOnly, logs: [{ name: "app", stream_type: "logs" }] });
 
       wrapper = mountOverviewTab();
@@ -1123,7 +1196,7 @@ describe("OverviewTab", () => {
       expect(wrapper.find(HERO).exists()).toBe(false);
     });
 
-    it("should keep all clear when a stream list answers 403", async () => {
+    it("should show the per-section empty message when a stream list answers 403", async () => {
       vi.mocked(streamService.nameList).mockRejectedValue(
         Object.assign(new Error("forbidden"), { response: { status: 403 } }),
       );
@@ -1137,32 +1210,32 @@ describe("OverviewTab", () => {
       expect(refreshLastRun()).not.toBeNull();
     });
 
-    it("should show load-error with Retry, not all clear, when a stream probe hits a network error", async () => {
+    it("should keep the cards and per-section messages when a stream probe hits a network error", async () => {
       vi.mocked(streamService.nameList).mockRejectedValue(new Error("Network Error"));
 
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
-      expect(wrapper.find(RETRY_CARD).exists()).toBe(true);
-      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-alerts-card"]').exists()).toBe(true);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
       expect(wrapper.find(HERO).exists()).toBe(false);
-      expect(refreshLastRun()).toBeNull();
+      expect(refreshLastRun()).not.toBeNull();
     });
 
-    it("should show load-error, not all clear, when a stream probe answers 500", async () => {
+    it("should keep the cards and not show the hero when a stream probe answers 500", async () => {
       vi.mocked(streamService.nameList).mockRejectedValue(serverError());
 
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
-      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
       expect(wrapper.find(HERO).exists()).toBe(false);
-      expect(refreshLastRun()).toBeNull();
+      expect(refreshLastRun()).not.toBeNull();
     });
 
-    it("should show load-error when only one type's probe answers 500 and the others are empty", async () => {
+    it("should not show the hero when only one type's probe answers 500 and the others are empty", async () => {
       const answer = vi.mocked(streamService.nameList).getMockImplementation()!;
       vi.mocked(streamService.nameList).mockImplementation(((org: string, type: string, ...rest) =>
         type === "traces" ? Promise.reject(serverError()) : answer(org, type, ...rest)) as never);
@@ -1170,11 +1243,12 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
-      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+      expect(wrapper.find(HERO).exists()).toBe(false);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
     });
 
-    it("should keep all clear when one probe fails but another type has a user stream", async () => {
+    it("should show the per-section empty message when one probe fails but another type has a user stream", async () => {
       givenStreams({ ...internalOnly, logs: [{ name: "app", stream_type: "logs" }] });
       const answer = vi.mocked(streamService.nameList).getMockImplementation()!;
       vi.mocked(streamService.nameList).mockImplementation(((org: string, type: string, ...rest) =>
@@ -1187,36 +1261,19 @@ describe("OverviewTab", () => {
       expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
     });
 
-    it("should re-run the probes on Retry and show the hero once they answer empty", async () => {
+    it("should re-run the probes on refresh and show the hero once they answer empty", async () => {
       vi.mocked(streamService.nameList).mockRejectedValue(serverError());
       wrapper = mountOverviewTab();
       await flushPromises();
-      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
+      expect(wrapper.find(HERO).exists()).toBe(false);
       givenStreams(internalOnly);
       const before = vi.mocked(streamService.nameList).mock.calls.length;
 
-      await wrapper.find(RETRY_CARD).trigger("click");
+      wrapper.findComponent({ name: "ORefreshButton" }).vm.$emit("click");
       await flushPromises();
 
       expect(vi.mocked(streamService.nameList).mock.calls.length).toBeGreaterThan(before);
-      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
       expect(wrapper.find(HERO).exists()).toBe(true);
-      expect(refreshLastRun()).not.toBeNull();
-    });
-
-    it("should re-run the probes on Retry and show all clear once a user stream is found", async () => {
-      vi.mocked(streamService.nameList).mockRejectedValue(new Error("Network Error"));
-      wrapper = mountOverviewTab();
-      await flushPromises();
-      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
-      givenStreams({ ...internalOnly, metrics: [{ name: "cpu", stream_type: "metrics" }] });
-
-      await wrapper.find(RETRY_CARD).trigger("click");
-      await flushPromises();
-
-      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
-      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
-      expect(wrapper.find(HERO).exists()).toBe(false);
     });
 
     it("should show rows and no load-error when a section has rows, even if the probes would fail", async () => {
@@ -1243,6 +1300,7 @@ describe("OverviewTab", () => {
 
     it("should let load-error win over the hero when every section fails", async () => {
       vi.mocked(alertsService.getHistory).mockRejectedValue(new Error("boom"));
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(new Error("boom"));
 
       wrapper = mountOverviewTab();
       await flushPromises();
@@ -1261,7 +1319,6 @@ describe("OverviewTab", () => {
 
       expect(wrapper.find('[data-test="overview-incidents-load-error"]').exists()).toBe(true);
       expect(wrapper.find(HERO).exists()).toBe(false);
-      expect(wrapper.find(ALL_CLEAR_HERO).exists()).toBe(false);
     });
 
     it("should leave the flag-on page unchanged and never ask for the stream lists", async () => {
@@ -1404,6 +1461,16 @@ describe("OverviewTab", () => {
       expect(wrapper.text()).not.toContain("enterprise only, english");
     });
 
+    it("should not render the ingest limit card on cloud", async () => {
+      config.isCloud = "true";
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-limit-card"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-storage-card"]').exists()).toBe(true);
+    });
+
     it("should show forbidden on the alerts card for a forbidden section", async () => {
       vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
         data: buildOverview({ alerts: { status: "forbidden" } }),
@@ -1453,20 +1520,35 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="overview-freshness-note"]').exists()).toBe(false);
     });
 
-    it("should never render an all-clear hero, even when the overview shows no problem", async () => {
+    it("should show zero counts and no all-clear claim when the overview shows no problem", async () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.find(ALL_CLEAR_HERO).exists()).toBe(false);
-      expect(wrapper.text()).not.toContain("All systems clear");
+      expect(wrapper.get('[data-test="overview-headline-firing"]').text()).toContain("0");
+      expect(wrapper.get('[data-test="overview-headline-pipelines"]').text()).toContain("0");
     });
 
     it.each([
-      ["firing alerts", { alerts: { by_state: { firing: 1 }, failed_evaluation: 0 } }],
-      ["failing rules", { alerts: { by_state: { firing: 0 }, failed_evaluation: 2 } }],
-      ["notify-failed rules", { alerts: { by_state: { firing: 0, notify_failed: 1 } } }],
-      ["pipeline errors", { pipelines: { errored: 1 } }],
-    ])("should not render the all-clear hero while %s are reported", async (_n, patch) => {
+      [
+        "firing alerts",
+        { alerts: { by_state: { firing: 1 }, failed_evaluation: 0 } },
+        "firing",
+        "1",
+      ],
+      [
+        "failing rules",
+        { alerts: { by_state: { firing: 0 }, failed_evaluation: 2 } },
+        "failing",
+        "2",
+      ],
+      [
+        "notify-failed rules",
+        { alerts: { by_state: { firing: 0, notify_failed: 1 } } },
+        "firing",
+        "1",
+      ],
+      ["pipeline errors", { pipelines: { errored: 1 } }, "pipelines", "1"],
+    ])("should show the %s count on its headline tile", async (_n, patch, key, expected) => {
       const base = buildHealthyOverview();
       const data = {
         ...base,
@@ -1481,7 +1563,8 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.find(ALL_CLEAR_HERO).exists()).toBe(false);
+      const text = wrapper.get(`[data-test="overview-headline-${key}"]`).text();
+      expect(text).toContain(expected);
     });
 
     it("should retry a single card with only the /overview request", async () => {
@@ -1545,28 +1628,17 @@ describe("OverviewTab", () => {
       expect(wrapper.get(tile("firing")).text()).toContain("No access");
     });
 
-    it("should hold the all-clear hero back while the overview is pending", async () => {
-      vi.mocked(overviewService.getOrgOverview).mockReturnValue(
-        deferred<{ data: unknown }>().promise as never,
-      );
-      wrapper = mountOverviewTab();
-      await flushPromises();
-
-      expect(wrapper.find(ALL_CLEAR_HERO).exists()).toBe(false);
-    });
-
-    it("should hold the all-clear hero back when the overview request failed", async () => {
+    it("should show a dash, not a zero, on the firing tile when the overview request failed", async () => {
       vi.mocked(overviewService.getOrgOverview).mockRejectedValue(new Error("boom"));
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.find(ALL_CLEAR_HERO).exists()).toBe(false);
+      const text = wrapper.get('[data-test="overview-headline-firing"]').text();
+      expect(text).toContain("—");
+      expect(text).not.toContain("0");
     });
 
-    it("should hold the all-clear hero back when the alerts section errored", async () => {
-      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
-        data: buildHealthyOverview(),
-      } as never);
+    it("should mark the firing tile unavailable when the alerts section errored", async () => {
       const base = buildHealthyOverview();
       vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
         data: { ...base, alerts: { status: "error" } },
@@ -1574,7 +1646,9 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.find(ALL_CLEAR_HERO).exists()).toBe(false);
+      const text = wrapper.get('[data-test="overview-headline-firing"]').text();
+      expect(text).toContain("—");
+      expect(text).toContain("Could not load");
     });
 
     it("should clear the previous org's overview when the org changes", async () => {
@@ -1600,7 +1674,7 @@ describe("OverviewTab", () => {
       await flushPromises();
 
       expect(wrapper.get('[data-test="overview-freshness-note"]').text()).toMatch(
-        /Updated \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(UTC\)\. Incidents and recent events follow their own scope\./,
+        /Updated \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(UTC\)\./,
       );
     });
 
@@ -1625,25 +1699,119 @@ describe("OverviewTab", () => {
     const statusError = (status: number) =>
       Object.assign(new Error("failed"), { response: { status } });
 
+    it("says no anomaly checks are set up when detection is on but no checks exist", async () => {
+      enterprise();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.get(msg("anomalies")).text()).toContain("No anomaly checks are set up");
+    });
+
+    it("places active incidents above the alerts and data health grid", async () => {
+      enterprise();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const incidents = wrapper.get(msg("incidents")).element;
+      const grid = wrapper.get('[data-test="overview-alerts-health-grid"]').element;
+      expect(
+        incidents.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("places the incidents upsell below the alerts and data health grid on OSS", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const locked = wrapper.get('[data-test="overview-incidents-locked"]').element;
+      const grid = wrapper.get('[data-test="overview-alerts-health-grid"]').element;
+      expect(grid.compareDocumentPosition(locked) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("keeps the incidents tile and empty message as a skeleton until a late zoConfig load settles", async () => {
+      config.isEnterprise = "true";
+      store.commit("setConfig", { ...store.state.zoConfig, incidents_enabled: false });
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const pending = deferred<{ data: { incidents: unknown[]; total: number } }>();
+      vi.mocked(incidentsService.list).mockReturnValue(pending.promise as never);
+      store.commit("setConfig", { ...store.state.zoConfig, incidents_enabled: true });
+      await flushPromises();
+
+      const tileSel = '[data-test="overview-headline-incidents"]';
+      expect(wrapper.get(tileSel).find('[data-test="o-stat-card-value-skeleton"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find(msg("incidents")).exists()).toBe(false);
+
+      pending.resolve({ data: { incidents: [], total: 0 } });
+      await flushPromises();
+      expect(wrapper.get(tileSel).find('[data-test="o-stat-card-value-skeleton"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find(msg("incidents")).exists()).toBe(true);
+    });
+
+    it("drops the previous org's section data on an org switch and ignores its late responses", async () => {
+      enterprise();
+      const late = deferred<{ data: unknown }>();
+      vi.mocked(incidentsService.list).mockReturnValueOnce(late.promise as never);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: mockOverview.serviceGraphTopology,
+      } as never);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find('[data-test="overview-services-section"]').exists()).toBe(true);
+
+      const pendingServices = deferred<{ data: unknown }>();
+      vi.mocked(serviceGraphService.getCurrentTopology).mockReturnValue(
+        pendingServices.promise as never,
+      );
+      vi.mocked(incidentsService.list).mockResolvedValue({
+        data: { incidents: [], total: 0 },
+      } as never);
+      store.commit("setSelectedOrganization", {
+        ...store.state.selectedOrganization,
+        identifier: `overview-org-switched-${++orgSeq}`,
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="overview-services-section"]').exists()).toBe(false);
+
+      late.resolve({ data: mockOverview.buildIncidentList() });
+      await flushPromises();
+      expect(wrapper.find(INCIDENTS).exists()).toBe(false);
+      expect(wrapper.get(msg("incidents")).text()).toContain("No open incidents");
+    });
+
+    it("shows no access on the incidents tile and does not open the list when incidents answer 403", async () => {
+      enterprise();
+      vi.mocked(incidentsService.list).mockRejectedValue(statusError(403));
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const tileEl = wrapper.get('[data-test="overview-headline-incidents"]');
+      expect(tileEl.text()).toContain("No access");
+      expect(tileEl.text()).not.toContain("Could not load");
+      await tileEl.trigger("click");
+      expect(push).not.toHaveBeenCalledWith(expect.objectContaining({ name: "incidentList" }));
+      push.mockRestore();
+    });
+
     it("shows a specific empty message for each section with no data", async () => {
       enterprise();
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.get(msg("incidents")).text()).toContain(
-        "No open incidents in the selected time range",
-      );
-      expect(wrapper.get(msg("anomalies")).text()).toContain(
-        "No anomalies detected in the selected time range",
-      );
+      expect(wrapper.get(msg("incidents")).text()).toContain("No open incidents");
+      expect(wrapper.get(msg("anomalies")).text()).toContain("No anomaly checks are set up");
       expect(wrapper.get(msg("services")).text()).toContain(
-        "No service data yet. Services appear once traces arrive",
+        "No service data in the selected time range",
       );
       expect(wrapper.get(msg("recent-events")).text()).toContain(
-        "No alert or pipeline events in the selected time range",
+        "No alert events in the selected time range",
       );
-      expect(wrapper.find(ALL_CLEAR_HERO).exists()).toBe(false);
-      expect(wrapper.text()).not.toContain("All systems clear");
     });
 
     it("omits the empty message of a section that has rows", async () => {

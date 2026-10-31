@@ -37,18 +37,11 @@ export interface OverviewStreamTypeSummary {
   top: OverviewTopStream[];
 }
 
-export interface OverviewQuietStream {
-  name: string;
-  stream_type: string;
-  last_write: number;
-}
-
 export interface OverviewStreamsData {
   total_streams: number;
   total_storage_size_mb: number;
   by_type: OverviewStreamTypeSummary[];
   quiet_count: number;
-  quiet: OverviewQuietStream[];
   schema_changes_24h: number;
   compaction_pending: number | null;
 }

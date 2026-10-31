@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     section="storage"
     :title="t('overview.sections.storage')"
     :view="view"
+    :summary-forbidden="forbidden"
     @retry="emit('retry')"
   >
     <template #empty>

@@ -17,7 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     section="limit"
     :title="t('overview.sections.ingestLimit')"
     :view="view"
-    :locked-message="t('overview.limit.lockedMessage')"
+    :summary-forbidden="forbidden"
+    :locked-message="
+      isCloud ? t('overview.limit.unavailableMessage') : t('overview.limit.lockedMessage')
+    "
+    :can-unlock="!isCloud"
     @retry="emit('retry')"
     @unlock="emit('unlock')"
   >
@@ -55,12 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
       <div class="flex items-center justify-between gap-3">
         <span class="text-text-secondary text-sm">{{ t("overview.limit.daysOver") }}</span>
-        <OTag
-          type="countChip"
-          :value="daysOver > 0 ? 'warning' : 'neutral'"
-          data-test="overview-limit-days-over"
-          >{{ daysOverLabel }}</OTag
-        >
+        <OTag type="countChip" :value="daysOverTone" data-test="overview-limit-days-over">{{
+          daysOverLabel
+        }}</OTag>
       </div>
       <p class="text-text-secondary text-xs" data-test="overview-limit-block-note">
         {{ t("overview.limit.blockNote") }}
@@ -82,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import config from "@/aws-exports";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatSizeFromMB } from "@/utils/formatters";
 import type { OverviewLimitsData, OverviewSection } from "@/ts/interfaces/overview";
@@ -100,6 +102,9 @@ const emit = defineEmits<{ retry: []; unlock: [] }>();
 
 const { t } = useI18nTyped();
 const { formatCountdown } = useOverviewTime();
+
+// cloud limits are locked by the edition, so there is no license to upgrade to
+const isCloud = config.isCloud === "true";
 
 const view = computed(() => sectionView(props.section, props));
 const percent = computed(() => props.section?.data?.ingestion_used_percent ?? 0);
@@ -137,6 +142,11 @@ const daysOverLabel = computed(() => {
   const allowed = props.section?.data?.allowed_days;
   if (allowed == null) return raw(daysOver.value);
   return t("overview.limit.daysOverOf", { days: daysOver.value, allowed });
+});
+const daysOverTone = computed(() => {
+  const allowed = props.section?.data?.allowed_days;
+  if (typeof allowed === "number" && daysOver.value > allowed) return "error";
+  return daysOver.value > 0 ? "warning" : "neutral";
 });
 const expired = computed(() => props.section?.data?.expired === true);
 </script>
