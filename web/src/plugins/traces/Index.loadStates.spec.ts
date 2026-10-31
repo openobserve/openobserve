@@ -504,6 +504,28 @@ describe("Traces page load states", () => {
       expect(mockRecordRecent).toHaveBeenCalledTimes(1);
     });
 
+    it("runs a newer restore over one it left mid-load", async () => {
+      setRouteQuery({ stream: "default" });
+      mockTakeLanding.mockReturnValueOnce({ run: false });
+      const streams = deferred<typeof streamList>();
+      mockGetStreams.mockReturnValueOnce(streams.promise);
+      const { show } = mountKeptAlive();
+      await vi.waitFor(() => expect(mockGetStreams).toHaveBeenCalledTimes(1));
+
+      show.value = false;
+      await flushPromises();
+      streams.resolve(streamList);
+      await flushPromises();
+      mockTakeLanding.mockReturnValueOnce({ run: true });
+      show.value = true;
+      await flushPromises();
+      await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      lastCall("main")[1].complete(null);
+      await flushPromises();
+
+      expect(mockRecordRecent).toHaveBeenCalledTimes(1);
+    });
+
     it("writes no field or schema state when it leaves while the stream schema loads", async () => {
       setRouteQuery({ stream: "default" });
       const schema = deferred<(typeof streamList.list)[number]>();
