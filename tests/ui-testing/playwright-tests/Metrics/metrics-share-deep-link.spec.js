@@ -43,7 +43,7 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
 
   // ─── P2: Default State ─────────────────────────────────────────────────────
 
-  test("Default state — page loads with defaults, no auto-run", {
+  test("Default state — page loads with the editor, date picker and share control", {
     tag: ['@metrics-share-deep-link', '@P2', '@default-state', '@all']
   }, async ({ page }, testInfo) => {
     const pm = await setupTest(page, testInfo);
@@ -148,11 +148,13 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     // Page should load
     await pm.metricsPage.expectMetricsPageVisible();
 
-    // Wait for auto-run to start (the Apply button may cycle through loading)
-    await pm.metricsPage.waitForMetricsResults();
+    await pm.metricsPage.waitForMetricsResults({ strict: true });
 
-    // After auto-run, URL should be normalized and contain a metrics_data blob
-    // or at minimum the page should be functional
+    // The router folds the override params into the blob Visualize charts from.
+    await expect
+      .poll(async () => (await pm.metricsPage.decodeMetricsBlob())?.data?.queries?.[0]?.query)
+      .toBe(promqlQuery);
+    expect((await pm.metricsPage.decodeMetricsBlob())?.data?.type).toBe('bar');
     await pm.metricsPage.expectApplyButtonVisible();
 
     testLogger.info('Override params deep-link validated');

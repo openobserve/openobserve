@@ -628,11 +628,12 @@ export class MetricsPage {
         await this.page.keyboard.press('Escape');
     }
 
-    async waitForMetricsResults() {
+    /** `strict` lets a missing chart, table or no-data state fail the test instead of passing silently. */
+    async waitForMetricsResults({ strict = false } = {}) {
         // Wait for results to load after query execution.
         // networkidle never resolves on OpenObserve (persistent WebSocket/RUM)
         await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-        await this.page.waitForFunction(
+        const rendered = this.page.waitForFunction(
             () => {
                 const canvases = document.querySelectorAll('[data-test="chart-renderer"] canvas');
                 if (canvases.length > 0) return true;
@@ -649,7 +650,9 @@ export class MetricsPage {
             },
             null,
             { timeout: 15000, polling: 'raf' }
-        ).catch(() => {});
+        );
+        if (strict) await rendered;
+        else await rendered.catch(() => {});
     }
 
     // Query type switching methods
