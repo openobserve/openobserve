@@ -28,16 +28,6 @@
         size="sm"
         data-test="oncall-team-coverage"
       />
-      <!-- The server's own count. It is computed, never stored, so it cannot
-           disagree with the configuration it describes. -->
-      <OTag
-        v-if="configRiskCount"
-        variant="amber-soft"
-        size="sm"
-        data-test="oncall-team-config-risks"
-      >
-        {{ t("oncall.riskConfigCount", { count: configRiskCount }, configRiskCount) }}
-      </OTag>
     </template>
 
     <template #actions>
@@ -216,6 +206,7 @@
               </span>
               <OnCallCoverageStrip
                 :rotations="schedule?.rotations ?? []"
+                :unreachable="unreachableEmails"
                 :timezone="team?.timezone ?? 'UTC'"
                 :viewer-timezone="store.state.timezone"
                 :days="COVERAGE_DAYS"
@@ -242,6 +233,7 @@
           <OnCallMembers
             ref="membersRef"
             :team-id="teamId"
+            :team-name="team?.name ?? ''"
             :members="members"
             :rotations="schedule?.rotations ?? []"
             :timezone="team?.timezone ?? 'UTC'"
@@ -249,11 +241,9 @@
             :on-call-now="onCallNow"
             :reachability="reachability"
             :load="teamLoad"
-            :testing="testingPage"
             :can-configure="canConfigure"
             @changed="onMembersChanged"
             @open-schedule="activeTab = 'schedule'"
-            @test-page="sendTestPage"
           />
         </OTabPanel>
 
@@ -335,9 +325,11 @@
               :schedule="schedule"
               :members="members"
               :intent="scheduleIntent"
+              :policy="policy"
               @saved="onScheduleSaved"
               @intent-handled="scheduleIntent = null"
               @open-members="activeTab = 'members'"
+              @open-policy="openPolicyFromRemove"
             />
           </OContent>
         </OTabPanel>
@@ -354,8 +346,10 @@
               :rotations="teamRotations"
               :preview="preview"
               :loading="previewLoading"
+              :can-configure="canConfigure"
               @edit="openPolicyEditor"
               @open-members="activeTab = 'members'"
+              @send-test="testPageOpen = true"
             />
 
             <!-- Same move as the schedule tab: the editor is a drawer, so the
@@ -368,6 +362,7 @@
               :policy="policy"
               :rotations="teamRotations"
               @saved="onPolicySaved"
+              @policy-written="fetchAll()"
               @open-members="activeTab = 'members'"
             />
           </OContent>
@@ -387,14 +382,25 @@
 
     <!-- Named in the prompt: a rotation is what puts somebody on call, and two
          rotations in one team routinely differ by one word. -->
+    <OnCallRemoveRotationDialog
+      :open="!!rotationToDelete"
+      :rotation-id="rotationToDelete ?? ''"
+      :rotations="teamRotations"
+      :holders="holdersByName"
+      :policy="policy"
+      @update:open="(v: boolean) => (v ? null : (rotationToDelete = null))"
+      @confirm="deleteRotation"
+      @open-policy="openPolicyFromRemove"
+    />
+
+    <!-- Named from the loaded preview: the first step can be the whole team, so this is the last look at who gets woken. -->
     <ConfirmDialog
-      :model-value="!!rotationToDelete"
-      :title="t('oncall.laneDeleteTitle')"
-      message-keypath="oncall.laneDeleteMessage"
-      :message-name="rotationNameToDelete"
-      ok-variant="destructive"
-      @update:ok="deleteRotation"
-      @update:cancel="rotationToDelete = null"
+      :model-value="testPageOpen"
+      :title="t('oncall.testPageConfirmTitle')"
+      :message="testPageMessage"
+      :ok-label="t('oncall.ladderSendTest')"
+      @update:ok="sendTestPage"
+      @update:cancel="testPageOpen = false"
     />
 
     <OnCallCoverForm
@@ -442,8 +448,10 @@ import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import OnCallEscalationLadder from "@/components/oncall/OnCallEscalationLadder.vue";
 import OnCallTeamAttention from "@/components/oncall/OnCallTeamAttention.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
+import OnCallRemoveRotationDialog from "@/components/oncall/OnCallRemoveRotationDialog.vue";
 import OnCallTeamDetailSkeleton from "@/views/OnCall/OnCallTeamDetailSkeleton.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -506,7 +514,13 @@ import type {
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatInZone, isOnCallUnavailable, upcomingShifts, winningRule } from "@/utils/oncall";
+import {
+  channelList,
+  formatInZone,
+  isOnCallUnavailable,
+  upcomingShifts,
+  winningRule,
+} from "@/utils/oncall";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -530,7 +544,7 @@ const onCallNow = ref<OnCallPosition[]>([]);
 const teams = ref<OnCallTeam[]>([]);
 const responses = ref<OnCallResponse[]>([]);
 const pagesLoading = ref(false);
-const testingPage = ref(false);
+const testPageOpen = ref(false);
 const overview = ref<TeamOverview | null>(null);
 const reachability = ref<TeamReachability | null>(null);
 const configRisks = ref<ConfigRisks | null>(null);
@@ -589,11 +603,13 @@ const presetsOpen = ref(false);
 /// up rather than carried: a name is renameable and two rotations may share
 /// one, so it cannot say which row the reader picked.
 const rotationToDelete = ref<string | null>(null);
-const rotationNameToDelete = computed(() =>
-  raw(
-    (schedule.value?.rotations ?? []).find((rotation) => rotation.id === rotationToDelete.value)
-      ?.name ?? "",
-  ),
+const { nameOf } = useOrgUserNames();
+/// Who each rotation puts on call now, by name, for the delete confirm.
+const holdersByName = computed(() =>
+  onCallNow.value.map((position) => ({
+    rotation_id: position.rotation_id,
+    name: nameOf(position.user_email),
+  })),
 );
 const coverSaving = ref(false);
 const coverGap = ref<{ from: number; to: number } | null>(null);
@@ -945,25 +961,50 @@ const coverageState = computed<"covered" | "gap" | "unreachable">(() => {
   return "covered";
 });
 
-/// `total` rather than `risks.length`: the server truncates the list it
-/// returns but reports the real count, and a badge that quietly under-reported
-/// would be worse than no badge.
-const configRiskCount = computed(() => configRisks.value?.total ?? 0);
+/// Who the strip must not count as cover: the server judged a page to them would not land.
+const unreachableEmails = computed(() =>
+  (reachability.value?.members ?? [])
+    .filter((member) => !member.would_a_page_land)
+    .map((member) => member.user_email),
+);
+
+/// The server sends a test to the first step only, so the first step's people are who it names.
+const testPageMessage = computed(() => {
+  const first = [...(preview.value?.rungs ?? [])].sort(
+    (a, b) => a.after_micros - b.after_micros,
+  )[0];
+  const people = first?.recipients ?? [];
+  // A person is sent only what they can receive, so a channel nobody on the step can receive is not sent.
+  const sent = (preview.value?.channels ?? []).filter((channel) =>
+    people.some((one) => (one.deliverable_channels ?? []).includes(channel)),
+  );
+  const params = {
+    priority: raw(selectedPriority.value),
+    names: raw(people.map((one) => one.user_email).join(", ")),
+  };
+  return sent.length
+    ? t("oncall.testPageConfirm", { ...params, channels: raw(channelList(sent, t)) })
+    : t("oncall.testPageConfirmNoChannel", params);
+});
 
 /// The one honest answer to "would a page actually land": send a real one and
 /// report who it reached. `reached_anyone: false` carries the server's own
 /// reason, which is rendered verbatim rather than re-worded.
 async function sendTestPage() {
-  testingPage.value = true;
+  testPageOpen.value = false;
   try {
-    const res = await testPageWrite.mutateAsync({ teamId: teamId.value });
+    const res = await testPageWrite.mutateAsync({
+      teamId: teamId.value,
+      priority: selectedPriorityNumber.value,
+    });
     const data = res.data;
     // `attempts`, not `recipients` — the latter never existed on the wire.
-    const reached = (data?.attempts ?? []).filter((attempt) => attempt.delivered).length;
+    const attempts = data?.attempts ?? [];
+    const sent = attempts.filter((attempt) => attempt.delivered).length;
     if (data?.reached_anyone) {
       toast({
-        variant: "success",
-        message: t("oncall.testPageSent", { count: reached }, reached),
+        variant: sent === attempts.length ? "success" : "warning",
+        message: t("oncall.testPageSentOf", { sent, total: attempts.length }, attempts.length),
       });
     } else {
       toast({
@@ -982,8 +1023,6 @@ async function sendTestPage() {
           ? t("oncall.configDenied")
           : raw(err?.response?.data?.message) || t("oncall.testPageFailed"),
     });
-  } finally {
-    testingPage.value = false;
   }
 }
 
@@ -1090,6 +1129,13 @@ async function deleteRotation() {
           : raw(err?.response?.data?.message) || t("oncall.laneDeleteFailed"),
     });
   }
+}
+
+/// A hand-edited policy still pages the rotation, so the remove waits for the policy edit.
+function openPolicyFromRemove() {
+  rotationToDelete.value = null;
+  activeTab.value = "policy";
+  void openPolicyEditor();
 }
 
 /// Every way into the cover dialog goes through one of these three, because

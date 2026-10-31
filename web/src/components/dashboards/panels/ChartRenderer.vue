@@ -97,6 +97,11 @@ import {
   SankeyChart,
   TreeChart,
   GraphChart,
+  PictorialBarChart,
+  TreemapChart,
+  SunburstChart,
+  FunnelChart,
+  BoxplotChart,
 } from "echarts/charts";
 import {
   TitleComponent,
@@ -164,6 +169,11 @@ echarts.use([
   SankeyChart,
   TreeChart,
   GraphChart,
+  PictorialBarChart,
+  TreemapChart,
+  SunburstChart,
+  FunnelChart,
+  BoxplotChart,
   LabelLayout,
   UniversalTransition,
   CanvasRenderer,
@@ -312,8 +322,12 @@ export default defineComponent({
         params.seriesIndex = params?.dataIndex;
       }
 
-      // Sankey and heatmap series are not lines to single out, and unnamed heatmaps share ECharts' default name.
-      if (params?.componentSubType === "sankey" || params?.componentSubType === "heatmap") {
+      // These series are not lines to single out, and unnamed heatmaps share ECharts' default name.
+      if (
+        ["sankey", "heatmap", "treemap", "sunburst", "funnel", "graph"].includes(
+          params?.componentSubType,
+        )
+      ) {
         params.seriesName = "";
         params.seriesIndex = -1;
       }

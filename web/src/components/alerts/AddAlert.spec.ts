@@ -135,7 +135,6 @@ const stubs = {
   QueryConfig: true,
   AlertSettings: true,
   CompareWithPast: true,
-  Deduplication: true,
   Advanced: true,
   PreviewAlert: true,
   AlertSummary: true,
@@ -680,6 +679,7 @@ describe("AddAlert (OForm owner)", () => {
           "notify_on_recovery",
           "recovery_destinations",
           "keep_firing_for",
+          "suppress_repeats",
         ].sort(),
       );
 

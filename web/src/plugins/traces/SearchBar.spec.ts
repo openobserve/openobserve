@@ -305,6 +305,7 @@ import SearchBar from "@/plugins/traces/SearchBar.vue";
 import analytics from "@/services/product_analytics";
 import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
 import { useToolbarPins } from "@/composables/useToolbarPins";
+import { placeCaret } from "@/test/unit/helpers/monacoCaret";
 
 // ---------------------------------------------------------------------------
 // DOM anchor node required by attachTo
@@ -339,7 +340,12 @@ const sharedStubs = {
     },
   },
   CodeQueryEditor: {
-    template: '<div data-test="code-query-editor-stub" />',
+    // Monaco's caret element: the recent-searches dropdown opens at it.
+    template:
+      '<div data-test="code-query-editor-stub"><div class="monaco-editor"><div class="cursors-layer"><div class="cursor" /></div></div></div>',
+    mounted(this: { $el: Element }) {
+      placeCaret(this.$el.querySelector(".cursor"));
+    },
     props: [
       "editorId",
       "query",
@@ -351,12 +357,14 @@ const sharedStubs = {
       "debounceTime",
       "fieldValueResolver",
     ],
-    emits: ["update:query", "run-query", "focus", "blur"],
-    setup() {
+    emits: ["update:query", "run-query", "focus", "blur", "user-edit"],
+    setup(_: unknown, { emit }: { emit: (event: "focus") => void }) {
       return {
         setValue: vi.fn(),
         getCursorIndex: vi.fn().mockReturnValue(0),
         triggerAutoComplete: vi.fn(),
+        // Monaco fires its focus event inside focus(), in the same tick.
+        focus: () => emit("focus"),
       };
     },
   },
@@ -2429,6 +2437,113 @@ describe("SearchBar", () => {
         undefined,
       );
       expect(searchObjInstance.data.parsedQuery).toEqual(previous);
+    });
+  });
+
+  describe("recent-searches dropdown and the editor placeholder", () => {
+    it("hides the typing placeholder while the dropdown is open, so only one list changes", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.editorValue = "";
+      searchObjInstance.meta.queryEditorPlaceholderFlag = true;
+      const vm = wrapper.vm as unknown as { recentFocusOpen: boolean };
+      vm.recentFocusOpen = false;
+      await flushPromises();
+      expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
+
+      vm.recentFocusOpen = true;
+      await flushPromises();
+      expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(false);
+
+      vm.recentFocusOpen = false;
+      await flushPromises();
+      expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
+    });
+  });
+
+  describe("the Run button once the editor differs from the searched query", () => {
+    const runButton = () => wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
+
+    it("shows the pending state for a typed edit or a loaded recent search, and clears it when they match again", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.appliedEditorValue = "service_name='a'";
+      searchObjInstance.data.editorValue = "service_name='a'";
+      await flushPromises();
+      expect(runButton().attributes("data-run-pending")).toBeUndefined();
+
+      searchObjInstance.data.editorValue = "service_name='b'";
+      await flushPromises();
+      expect(runButton().attributes("data-run-pending")).toBe("true");
+      expect(runButton().attributes("aria-label")).toBe("search.runQueryPendingLabel");
+
+      searchObjInstance.data.editorValue = "service_name='a' ";
+      await flushPromises();
+      expect(runButton().attributes("data-run-pending")).toBeUndefined();
+    });
+
+    it("shows no pending state before the first search", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.appliedEditorValue = null;
+      searchObjInstance.data.editorValue = "service_name='b'";
+      await flushPromises();
+      expect(runButton().attributes("data-run-pending")).toBeUndefined();
+    });
+  });
+
+  describe("recent-searches dropdown on an edit that empties the editor", () => {
+    it("opens without a refocus when the text is cleared and closes on the next character", async () => {
+      store.state.zoConfig.query_history_enabled = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.editorValue = "service_name='api'";
+      const vm = wrapper.vm as unknown as { recentFocusOpen: boolean };
+      const editor = wrapper.findComponent('[data-test="code-query-editor-stub"]');
+      editor.vm.$emit("focus");
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(false);
+
+      editor.vm.$emit("user-edit", true, false);
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(true);
+
+      editor.vm.$emit("user-edit", false, true);
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(false);
+
+      searchObjInstance.data.editorValue = "";
+      editor.vm.$emit("focus");
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(true);
+      vm.recentFocusOpen = false;
+      editor.vm.$emit("user-edit", true, false);
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(true);
+      delete store.state.zoConfig.query_history_enabled;
+    });
+
+    it("stays closed when Escape in the list hands focus back to the editor, until the next real focus", async () => {
+      store.state.zoConfig.query_history_enabled = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.editorValue = "";
+      const vm = wrapper.vm as unknown as { recentFocusOpen: boolean };
+      const editor = wrapper.findComponent('[data-test="code-query-editor-stub"]');
+      editor.vm.$emit("focus");
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(true);
+
+      const dropdown = wrapper.findComponent({ name: "RecentSearchesFocusDropdown" });
+      dropdown.vm.$emit("update:open", false);
+      dropdown.vm.$emit("dismiss");
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(false);
+
+      editor.vm.$emit("focus");
+      await flushPromises();
+      expect(vm.recentFocusOpen).toBe(true);
+      delete store.state.zoConfig.query_history_enabled;
     });
   });
 });

@@ -1005,7 +1005,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       }
 
       let query = "";
-      if (dashboardPanelData.data.type == "geomap") {
+      if (dashboardPanelData.data.type == "alert-list") {
+        query = "";
+      } else if (dashboardPanelData.data.type == "geomap") {
         query = geoMapChart(dashboardPanelData);
       } else if (isFlowChart(dashboardPanelData.data.type)) {
         query = sankeyChartQuery(dashboardPanelData);
@@ -1023,10 +1025,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     }
     return;
   };
-  // Heatmap y bucketing is panel config, so every builder tab's SQL must carry it, not only the active tab's.
+  // Heatmap y bucketing and box plot raw values shape the SQL, so every builder tab must carry them, not only the active tab.
   const regenerateOtherBuilderQueries = () => {
     if (
-      dashboardPanelData.data.type !== "heatmap" ||
+      !["heatmap", "boxplot"].includes(dashboardPanelData.data.type) ||
       dashboardPanelData.data.queryType === "promql"
     ) {
       return;

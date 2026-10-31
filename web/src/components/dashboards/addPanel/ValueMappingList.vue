@@ -52,10 +52,19 @@
               :options="mappingTypes"
               class="w-full"
               :data-test="`${dataTestPrefix}-type-select-${index}`"
-              @update:model-value="update(index, { type: $event })"
+              @update:model-value="onTypeChange(index, $event)"
             />
           </div>
-          <div v-if="mapping.type === 'range'" class="flex w-52 shrink-0 gap-2">
+          <div v-if="mapping.type === 'special'" class="w-52 shrink-0">
+            <OSelect
+              :model-value="mapping.match"
+              :options="specialMatches"
+              class="w-full"
+              :data-test="`${dataTestPrefix}-match-select-${index}`"
+              @update:model-value="update(index, { match: $event })"
+            />
+          </div>
+          <div v-else-if="mapping.type === 'range'" class="flex w-52 shrink-0 gap-2">
             <div class="min-w-0 flex-1">
               <OInput
                 :model-value="mapping.from"
@@ -185,6 +194,15 @@ const mappingTypes = computed(() => [
   { label: t("dashboard.valueMappingTypeLt"), value: "lt" },
   { label: t("dashboard.valueMappingTypeGte"), value: "gte" },
   { label: t("dashboard.valueMappingTypeLte"), value: "lte" },
+  { label: t("dashboard.valueMappingTypeSpecial"), value: "special" },
+]);
+
+const specialMatches = computed(() => [
+  { label: t("dashboard.valueMappingSpecialNull"), value: "null" },
+  { label: t("dashboard.valueMappingSpecialNan"), value: "nan" },
+  { label: t("dashboard.valueMappingSpecialEmpty"), value: "empty" },
+  { label: t("dashboard.valueMappingSpecialTrue"), value: "true" },
+  { label: t("dashboard.valueMappingSpecialFalse"), value: "false" },
 ]);
 
 const update = (index: number, change: Record<string, unknown>) =>
@@ -192,4 +210,17 @@ const update = (index: number, change: Record<string, unknown>) =>
     "update:modelValue",
     props.modelValue.map((mapping, i) => (i === index ? { ...mapping, ...change } : mapping)),
   );
+
+// A special mapping always names its match; other types never carry one.
+const onTypeChange = (index: number, type: unknown) => {
+  if (type === "special") {
+    update(index, { type, match: props.modelValue[index]?.match ?? "null" });
+    return;
+  }
+  const { match: _match, ...rest } = props.modelValue[index] ?? {};
+  emit(
+    "update:modelValue",
+    props.modelValue.map((mapping, i) => (i === index ? { ...rest, type } : mapping)),
+  );
+};
 </script>

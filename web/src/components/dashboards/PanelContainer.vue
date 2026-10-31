@@ -141,6 +141,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'heatmap',
               'metric',
               'gauge',
+              'bar-gauge',
+              'treemap',
+              'sunburst',
+              'funnel',
+              'node-graph',
+              'alert-list',
+              'flame-graph',
+              'boxplot',
+              'logs',
             ].includes(props.data.type)
           "
           variant="ghost"
@@ -454,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  panel's state through a pure adapter and the action owns the rest
                  (label, confirm dialog, transport). See CreateAlertAction.vue. -->
             <CreateAlertAction
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              v-if="!simplifiedPanelView && canCreateAlert"
               variant="menu-item"
               source="panel"
               :build="buildPanelAlertPrefill"
@@ -1440,6 +1449,11 @@ export default defineComponent({
     onMounted(() => window.addEventListener("keydown", handlePanelKeydown));
     onBeforeUnmount(() => window.removeEventListener("keydown", handlePanelKeydown));
 
+    // An alert list reads the alerts API, so it has no query to build an alert from.
+    const canCreateAlert = computed(
+      () => props.data?.type !== "alert-list" && (metaData.value?.queries?.length ?? 0) > 0,
+    );
+
     // Guards that used to fire as toasts AFTER the user clicked "Create alert".
     // Stated up front as a disabled reason instead — a dead-end click is worse
     // than a control that explains itself.
@@ -1478,6 +1492,7 @@ export default defineComponent({
       panelTitle,
       panelFileName,
       alertDisabledReason,
+      canCreateAlert,
       onEditPanel,
       onNoticeEditPanel,
       showDraftDot,

@@ -413,9 +413,12 @@ pub struct KeyedRange {
     pub refresh_secs: i64,
 }
 
-/// A dashboard variable as the public viewer sees it: display label and frozen value only.
+/// A dashboard variable as the public viewer sees it: name, display label and frozen value only.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PublicVariable {
+    /// The name panel titles reference as `$name`; empty in a result stored before it was added.
+    #[serde(default)]
+    pub name: String,
     pub label: String,
     pub value: serde_json::Value,
     /// Set for a tab-scoped variable: the tab this value belongs to.
@@ -472,6 +475,7 @@ impl PublicVariable {
                     .into_iter()
                     .map(|(key, tab_id, panel_id)| {
                         let entry = Self {
+                            name: v.name.clone(),
                             label: label.clone(),
                             value: values.get(&key).cloned().unwrap_or(serde_json::Value::Null),
                             tab_id,
@@ -748,6 +752,34 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(cfg.refresh_secs, 300);
+    }
+
+    #[test]
+    fn public_variables_carry_the_name_panel_titles_reference() {
+        let dash = Dashboard {
+            v8: Some(
+                serde_json::from_value(serde_json::json!({
+                    "variables": { "list": [
+                        { "type": "custom", "name": "level", "label": "Level" },
+                        { "type": "custom", "name": "svc", "scope": "tabs", "tabs": ["t1"] }
+                    ] }
+                }))
+                .unwrap(),
+            ),
+            ..Default::default()
+        };
+        let values = BTreeMap::from([("level".to_string(), serde_json::json!("error"))]);
+        let list = PublicVariable::list(&dash, &values);
+        let names: Vec<(&str, &str)> = list
+            .iter()
+            .map(|v| (v.name.as_str(), v.label.as_str()))
+            .collect();
+        assert_eq!(names, [("level", "Level"), ("svc", "svc")]);
+        assert_eq!(serde_json::to_value(&list[0]).unwrap()["name"], "level");
+        let stored: PublicVariable =
+            serde_json::from_value(serde_json::json!({ "label": "Level", "value": "error" }))
+                .unwrap();
+        assert_eq!(stored.name, "");
     }
 
     #[test]

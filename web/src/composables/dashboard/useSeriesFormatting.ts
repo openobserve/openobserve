@@ -25,6 +25,7 @@ import {
   seriesStyleKeyOf,
   type SeriesDrawStyle,
   type SeriesLineStyle,
+  type SeriesTransform,
   type SeriesYAxisSide,
 } from "@/utils/dashboard/seriesOverrides";
 
@@ -34,7 +35,7 @@ export type SeriesDraftMatch = "name" | "regex";
 /** Thresholds as an override stores them; same shape as `config.thresholds`. */
 export interface SeriesOverrideThresholds {
   mode?: "absolute" | "percentage";
-  showAs?: "color_line" | "color" | "line" | "color_band";
+  showAs?: "color_line" | "color" | "line" | "color_band" | "dashed_line";
   baseColor?: string | null;
   steps?: { value: number; color: string }[];
 }
@@ -55,6 +56,7 @@ export interface SeriesStyleDraft {
   stackGroup: string;
   yAxis: SeriesYAxisSide | null;
   hideFrom: { chart: boolean; legend: boolean; tooltip: boolean };
+  transform: SeriesTransform | null;
 }
 
 /** One override while the Series Formatting dialog edits it; "" and null mean inherit. */
@@ -97,6 +99,7 @@ export const emptySeriesStyleDraft = (): SeriesStyleDraft => ({
   stackGroup: "",
   yAxis: null,
   hideFrom: { chart: false, legend: false, tooltip: false },
+  transform: null,
 });
 
 const numberText = (value: unknown): string =>
@@ -233,6 +236,10 @@ export const getLegendSeriesNames = (options: any, chartType: string, extras?: a
     names = (series[0]?.data ?? []).map((item: any) => item?.name);
   } else if (chartType === "gauge") {
     names = series.map((s: any) => s?.data?.[0]?.name);
+  } else if (chartType === "bar-gauge") {
+    // The bars are the categories; the trailing label series holds bare numbers.
+    const axes = [options?.yAxis, options?.xAxis].flat();
+    names = axes.find((axis: any) => axis?.type === "category")?.data ?? [];
   } else if (isRowTimeline(chartType)) {
     names = extras?.rowEntities ?? [];
   } else if (chartType === "metric") {
@@ -264,7 +271,7 @@ export const getPromqlMetricSeriesNames = async (
   const [
     { alignShiftedPromQLResults, METRIC_MAX_CELLS },
     { buildPromqlSeriesNames },
-    { legendFallbackOf },
+    { legendFallbackOf, legendExprOf },
     cache,
   ] = await Promise.all([
     import("@/utils/dashboard/convertPromQLData"),
@@ -290,6 +297,7 @@ export const getPromqlMetricSeriesNames = async (
       metrics: (q?.result ?? []).map((m: any) => m?.metric).filter(Boolean),
       template: queries?.[parentQueryIndex[i]]?.config?.promql_legend,
       fallback: legendFallbackOf(queries, parentQueryIndex[i]),
+      expr: legendExprOf(queries, source.metadata, parentQueryIndex[i]),
     })),
     cache.getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );

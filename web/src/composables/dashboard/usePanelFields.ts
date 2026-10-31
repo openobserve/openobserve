@@ -22,6 +22,8 @@ import {
   HOSTMAP_NUMERIC_Y_FUNCTION,
 } from "@/utils/dashboard/convertHostmapData";
 import { isNumericYField } from "@/utils/dashboard/heatmapYAxis";
+import { TREEMAP_MAX_LEVELS } from "@/utils/dashboard/convertTreemapData";
+import { SUNBURST_MAX_LEVELS } from "@/utils/dashboard/convertSunburstData";
 
 const colors = [
   "#5960b2",
@@ -60,13 +62,29 @@ export const usePanelFields = ({
     );
   });
 
+  // Every group field and the sub-group each add one nesting level.
+  const treemapLevels = computed(() => {
+    const fields =
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields;
+    return (fields?.x?.length ?? 0) + (fields?.breakdown?.length ?? 0);
+  });
+  // Every x field and the breakdown add one ring, so the cap counts both wells together.
+  const sunburstLevelCount = () => {
+    const fields =
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
+    return (fields?.x?.length ?? 0) + (fields?.breakdown?.length ?? 0);
+  };
+
   const isAddXAxisNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
       case "pie":
       case "donut":
       case "heatmap":
       case "gauge":
+      case "bar-gauge":
       case "state-timeline":
+      case "funnel":
+      case "boxplot":
       case "hostmap":
       case "area":
       case "bar":
@@ -80,11 +98,20 @@ export const usePanelFields = ({
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 1
         );
+      case "sunburst":
+        return sunburstLevelCount() >= SUNBURST_MAX_LEVELS;
       case "metric":
+      case "distribution":
+      case "node-graph":
+      case "alert-list":
+      case "flame-graph":
+      case "logs":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
             .length >= 0
         );
+      case "treemap":
+        return treemapLevels.value >= TREEMAP_MAX_LEVELS;
       case "table":
         return false;
       default:
@@ -106,10 +133,28 @@ export const usePanelFields = ({
       case "stacked":
       case "h-stacked":
       case "state-timeline":
+      case "distribution":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
             .breakdown?.length >= 1
         );
+      case "treemap":
+        return (
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .breakdown?.length >= 1 || treemapLevels.value >= TREEMAP_MAX_LEVELS
+        );
+      case "sunburst":
+        return (
+          (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .breakdown?.length ?? 0) >= 1 || sunburstLevelCount() >= SUNBURST_MAX_LEVELS
+        );
+      case "funnel":
+      case "node-graph":
+      case "alert-list":
+      case "flame-graph":
+      case "boxplot":
+      case "logs":
+        return true;
       case "hostmap":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
@@ -131,10 +176,20 @@ export const usePanelFields = ({
       case "pie":
       case "donut":
       case "gauge":
+      case "bar-gauge":
+      case "treemap":
+      case "sunburst":
+      case "funnel":
+      case "boxplot":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
             .length >= 1
         );
+      case "node-graph":
+      case "alert-list":
+      case "flame-graph":
+      case "logs":
+        return true;
       case "metric":
         return (
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
@@ -351,6 +406,7 @@ export const usePanelFields = ({
       type: "build",
       functionName:
         dashboardPanelData.data.type == "heatmap" ||
+        dashboardPanelData.data.type == "boxplot" ||
         isRawValueChart(dashboardPanelData.data.type) ||
         isDerived
           ? null

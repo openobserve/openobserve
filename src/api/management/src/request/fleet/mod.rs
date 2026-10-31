@@ -27,9 +27,9 @@ use axum::{http::StatusCode, response::IntoResponse};
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::meta::fleet::{
     AuditQuery, CollectorsQuery, CreateConfigRequest, CreateFleetRequest, CreateTokenRequest,
-    FleetSettings, FlowQuery, MoveCollectorsRequest, PageQuery, PublishRequest,
-    RenameCollectorRequest, RenameFleetRequest, RolloutsQuery, SaveDraftRequest, SetDesiredRequest,
-    Settings, SkipRequest, ValidateRequest,
+    FleetSettings, FlowQuery, PageQuery, PublishRequest, RenameCollectorRequest,
+    RenameFleetRequest, RolloutsQuery, SaveDraftRequest, SetDesiredRequest, Settings, SkipRequest,
+    ValidateRequest,
 };
 #[cfg(feature = "enterprise")]
 use config::meta::folder::{Folder, FolderType};
@@ -772,77 +772,6 @@ pub async fn preview_desired(
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, fleet_id, body);
-        MetaHttpResponse::forbidden("Not Supported")
-    }
-}
-
-#[utoipa::path(
-    post,
-    path = "/{org_id}/fleet/fleets/move",
-    context_path = "/api",
-    tag = "Fleet",
-    operation_id = "MoveFleetCollectors",
-    summary = "Move up to 1000 collectors to another fleet, which assigns its stable version at once",
-    security(("Authorization" = [])),
-    params(("org_id" = String, Path, description = "Organization name")),
-    request_body(content = MoveCollectorsRequest, content_type = "application/json"),
-    responses(
-        (status = 200, description = "Moved", content_type = "application/json", body = config::meta::fleet::MoveCollectorsResponse),
-        (status = 400, description = "Invalid, too many, or already in the destination", content_type = "application/json", body = Object),
-        (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
-        (status = 404, description = "A collector or the destination not found", content_type = "application/json", body = Object),
-        (status = 409, description = "A collector moved meanwhile", content_type = "application/json", body = Object),
-    ),
-)]
-pub async fn move_collectors(
-    Path(org_id): Path<String>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    ValidatedJson(body): ValidatedJson<serde_json::Value>,
-) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        use config::meta::fleet::MAX_MOVE_COLLECTORS;
-        use o2_enterprise::enterprise::fleet::fleets;
-
-        let user_id = &user_email.user_id;
-        let req = match serde_json::from_value::<MoveCollectorsRequest>(body) {
-            Ok(req) => req,
-            Err(e) => return MetaHttpResponse::bad_request(e),
-        };
-        if req.collector_ids.len() > MAX_MOVE_COLLECTORS {
-            return MetaHttpResponse::bad_request(format!(
-                "at most {MAX_MOVE_COLLECTORS} collectors move at once"
-            ));
-        }
-        if let Some(failed) = ensure_default_fleet(&org_id).await {
-            return failed;
-        }
-        let found = match fleets::collector_fleets(&org_id, &req.collector_ids).await {
-            Ok(found) => found,
-            Err(e) => return to_response(e),
-        };
-        let sources = match fleets::move_sources(&found, &req.collector_ids, None) {
-            Ok(sources) => sources,
-            Err(e) => return to_response(e.into()),
-        };
-        // §13: a move needs `PUT` on every source fleet and on the destination.
-        let dest = req.to_fleet.as_str();
-        let mut distinct: HashSet<&str> = sources.values().map(String::as_str).collect();
-        distinct.insert(dest);
-        for fleet in distinct {
-            if let Some(refused) = fleet_write(&org_id, user_id, fleet, "PUT").await {
-                return refused;
-            }
-        }
-        let mv = fleets::Move { dest, sources };
-        match fleets::move_collectors(&org_id, mv).await {
-            Ok(moved) => MetaHttpResponse::json(moved),
-            Err(e) => to_response(e),
-        }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, body);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -1680,7 +1609,11 @@ pub async fn list_audit(
         if !allowed_on(FLEET_MANAGEMENT, &org_id, &user_email.user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match openobserve_core::fleet::list_audit(&org_id, query).await {
+        let permitted = match permitted_fleets(&org_id, &user_email.user_id).await {
+            Ok(permitted) => permitted,
+            Err(refused) => return refused,
+        };
+        match openobserve_core::fleet::list_audit(&org_id, query, permitted.as_ref()).await {
             Ok(mut list) => {
                 list.total = list.items.len();
                 MetaHttpResponse::json(list)
@@ -1879,7 +1812,7 @@ async fn desired_request(
     }
 }
 
-/// D19c: the fleets whose items an org-wide list or aggregate shows; `None` is unfiltered.
+/// D19c: the fleets an org-wide list or aggregate shows, whatever the list setting; `None` is all.
 #[cfg(feature = "enterprise")]
 async fn permitted_fleets(
     org_id: &str,
@@ -1892,7 +1825,7 @@ async fn permitted_fleets(
     if let Some(objects) = tests::listed_objects(org_id, user_id) {
         return Ok(permitted_from(org_id, key, objects));
     }
-    match db::authz::list_objects_for_user(org_id, user_id, "GET", key).await {
+    match db::authz::list_permitted_objects(org_id, user_id, "GET", key).await {
         Ok(objects) => Ok(permitted_from(org_id, key, objects)),
         Err(e) => Err(MetaHttpResponse::forbidden(e)),
     }
@@ -2212,7 +2145,6 @@ mod tests {
             ),
             (FleetError::Disabled, StatusCode::SERVICE_UNAVAILABLE),
             (FleetError::ClusterUpgrading, StatusCode::CONFLICT),
-            (FleetError::Moved("c1".into()), StatusCode::CONFLICT),
             (
                 FleetError::RolloutBusy {
                     collector: "c1".into(),
@@ -2344,7 +2276,7 @@ mod tests {
         assert_eq!(
             permitted_fleets(ORG, custom).await.ok(),
             Some(None),
-            "OpenFGA off, or the list flag off: unfiltered"
+            "OpenFGA off: unfiltered"
         );
         for (listed, want) in [
             (None, None),
@@ -2472,8 +2404,6 @@ mod tests {
         ] {
             assert!(serde_json::from_value::<CreateTokenRequest>(body).is_err());
         }
-        let wrong = serde_json::json!({"collector_ids": [], "to_fleet": "f", "folder": "g"});
-        assert!(serde_json::from_value::<MoveCollectorsRequest>(wrong).is_err());
         let wrong = serde_json::json!({"config": "edge", "version": 1, "strategy": "immediate"});
         assert!(serde_json::from_value::<SetDesiredRequest>(wrong).is_err());
         let wrong = serde_json::json!({"name": "n", "hostname": "h"});

@@ -151,6 +151,64 @@ describe("SetupCardRenderer — advanced section", () => {
   });
 });
 
+describe("SetupCardRenderer — ingest token gating", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const tokenContent: RichCardContent = {
+    ...CONTENT,
+    steps: [
+      {
+        ...CONTENT.steps[0],
+        code: {
+          lang: "bash",
+          raw: "curl -H 'Authorization: Basic tok'",
+          masked: "curl -H 'Authorization: Basic ••••'",
+          dataTest: "token-block",
+        },
+      },
+      {
+        id: "plain",
+        title: "Plain",
+        completeOn: "copy",
+        code: { lang: "bash", raw: "helm repo update", dataTest: "plain-block" },
+      },
+      CONTENT.steps[1],
+    ],
+  };
+
+  const mountWithToken = (tokenState?: "ready" | "loading" | "unavailable") =>
+    mount(SetupCardRenderer, {
+      props: { content: tokenContent, subs: SUBS, tokenState },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+  const has = (testId: string) => wrapper.find(`[data-test="${testId}"]`).exists();
+
+  it("shows a skeleton for the token block while the token loads, and keeps tokenless blocks", () => {
+    wrapper = mountWithToken("loading");
+    expect(has("token-block-loading")).toBe(true);
+    expect(has("token-block-copy-btn")).toBe(false);
+    expect(has("plain-block-copy-btn")).toBe(true);
+  });
+
+  it("drops the token block when no token can be had, and keeps tokenless blocks", () => {
+    wrapper = mountWithToken("unavailable");
+    expect(has("token-block-loading")).toBe(false);
+    expect(has("token-block-copy-btn")).toBe(false);
+    expect(has("plain-block-copy-btn")).toBe(true);
+  });
+
+  it("renders the token block by default", () => {
+    wrapper = mountWithToken();
+    expect(has("token-block-loading")).toBe(false);
+    expect(has("token-block-copy-btn")).toBe(true);
+  });
+});
+
 // Content builders (setupCard/content/*) store copy as i18n keys and the
 // renderer resolves them; a consumer that forgets t() shows the user a key.
 describe("SetupCardRenderer — key-as-data copy", () => {

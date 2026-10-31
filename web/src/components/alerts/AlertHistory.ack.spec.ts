@@ -46,7 +46,6 @@ const run = {
   is_realtime: false,
   is_silenced: false,
   retries: 0,
-  dedup_enabled: false,
 };
 
 const hits = [
@@ -60,6 +59,7 @@ const hits = [
     ack_source: "slack",
   },
   { ...run, timestamp: 1_786_498_000_000_000, status: "firing" },
+  { ...run, timestamp: 1_786_497_000_000_000, status: "firing", repeat_suppressed: true },
 ];
 
 let wrapper: VueWrapper<any>;
@@ -95,9 +95,9 @@ describe("AlertHistory ack rows", () => {
 
   it("shows an ack-suppressed run as Acknowledged, with whose ack suppressed it", async () => {
     await mountHistory();
-    expect(rowsOf()).toHaveLength(3);
+    expect(rowsOf()).toHaveLength(4);
     expect(cell(0, "status").text()).toContain("Acknowledged");
-    expect(cell(0, "dedup").text()).toContain("suppressed by ack (bob)");
+    expect(cell(0, "suppression").text()).toContain("suppressed by ack (bob)");
   });
 
   it("gives an ack event its own row with who, how and no run fields", async () => {
@@ -105,12 +105,18 @@ describe("AlertHistory ack rows", () => {
     expect(cell(1, "status").text()).toContain("Ack event");
     expect(cell(1, "condition").text()).toContain("Acknowledged by bob@acme.io from Slack");
     expect(cell(1, "duration").text()).toBe("—");
-    expect(cell(1, "dedup").text()).toBe("—");
+    expect(cell(1, "suppression").text()).toBe("—");
   });
 
   it("leaves an ordinary run as it was", async () => {
     await mountHistory();
     expect(cell(2, "status").text()).toContain("Firing");
-    expect(cell(2, "dedup").text()).not.toContain("suppressed by ack");
+    expect(cell(2, "suppression").text()).not.toContain("suppressed by ack");
+    expect(cell(2, "suppression").text()).toBe("—");
+  });
+
+  it("marks a run whose notification was withheld as a repeat", async () => {
+    await mountHistory();
+    expect(cell(3, "suppression").text()).toContain("Suppressed as a repeat");
   });
 });

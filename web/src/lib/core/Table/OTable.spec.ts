@@ -2814,6 +2814,64 @@ describe("OTable", () => {
       expect(emailCells).toEqual(["a1@example.com", "a2@example.com", "b1@example.com"]);
     });
 
+    it("renders one sticky total row for an object and one per entry for an array", () => {
+      const totals = (stickyTotalRow: any) => {
+        wrapper = mount(OTable, {
+          props: { data: makeRows(2), columns: makeColumns(), stickyTotalRow },
+        });
+        const rows = wrapper.findAll('[data-test="o2-table-pivot-total-foot"] tr');
+        const names = wrapper
+          .findAll('[data-test="o2-table-pivot-total-cell-name"]')
+          .map((cell) => cell.text());
+        wrapper.unmount();
+        return { rows: rows.length, names };
+      };
+      expect(totals({ name: "Total" })).toEqual({ rows: 1, names: ["Total"] });
+      expect(totals([{ name: "Sum" }, { name: "Max" }])).toEqual({
+        rows: 2,
+        names: ["Sum", "Max"],
+      });
+      expect(totals(null).rows).toBe(0);
+      expect(totals([]).rows).toBe(0);
+    });
+
+    it("mutes a calculated-totals row's label and makes its values bold", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          stickyTotalRow: [
+            { name: "Sum", id: "3", __labelKey: "name" },
+            { name: "Total", id: "9" },
+          ],
+        },
+      });
+      const cell = (id: string, row: number) =>
+        wrapper.findAll(`[data-test="o2-table-pivot-total-cell-${id}"]`)[row].classes();
+      expect(cell("name", 0)).toContain("text-text-secondary");
+      expect(cell("name", 0)).not.toContain("font-semibold");
+      expect(cell("id", 0)).toContain("font-semibold");
+      expect(cell("name", 1)).not.toContain("text-text-secondary");
+      expect(cell("id", 1)).not.toContain("font-semibold");
+    });
+
+    it("separates borders on a bordered table only while sticky total rows are pinned", () => {
+      const tableClasses = (extra: Record<string, any>) => {
+        wrapper = mount(OTable, {
+          props: { data: makeRows(2), columns: makeColumns(), bordered: true, ...extra },
+        });
+        const classes = wrapper.find("table").classes();
+        wrapper.unmount();
+        return classes;
+      };
+      const totals = [{ name: "Sum", id: "3", __labelKey: "name" }];
+      expect(tableClasses({})).not.toContain("border-separate");
+      expect(tableClasses({ stickyTotalRow: totals })).not.toContain("border-separate");
+      expect(tableClasses({ stickyTotalRow: totals, stickyRowTotals: true })).toContain(
+        "border-separate",
+      );
+    });
+
     it("renders standard header when pivotHeaderLevels is empty", () => {
       wrapper = mount(OTable, {
         props: {
@@ -3542,5 +3600,35 @@ describe("OTable sort header button", () => {
     });
     await trigger().trigger("click");
     expect((wrapper.vm as any).table.getState().sorting).toEqual([]);
+  });
+});
+
+describe("OTable row entrance", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("fades the body in when rows replace the loading skeleton", async () => {
+    vi.useFakeTimers();
+    wrapper = mount(OTable, { props: { data: [], columns: makeColumns(), loading: true } });
+    await wrapper.setProps({ data: makeRows(3), loading: false });
+    // The skeleton holds for a minimum time before the body replaces it.
+    await vi.runAllTimersAsync();
+    vi.useRealTimers();
+
+    const body = wrapper.find('[data-test="o2-table-body"]');
+    expect(body.exists()).toBe(true);
+    expect(body.classes()).toContain("motion-safe:animate-in");
+  });
+
+  it("keeps the same body element across a re-sort, so the fade does not replay", async () => {
+    wrapper = mount(OTable, { props: { data: makeRows(3), columns: makeColumns() } });
+    const before = wrapper.find('[data-test="o2-table-body"]').element;
+    await wrapper.setProps({ data: makeRows(3).reverse() });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="o2-table-body"]').element).toBe(before);
   });
 });
