@@ -58,15 +58,22 @@ const WEB = W("frontend", "web");
 const API = W("backend", "api");
 const DB = W("data", "postgres", "StatefulSet");
 
+// The nodes hosting the source and destination pods.
+const onNodes = (s: Series, src: string, dst: string): Series => ({
+  ...s,
+  metric: { ...s.metric, k8s_src_node_name: src, k8s_dst_node_name: dst },
+});
+
 const names = (e: FlowEdge) => [e.source.name, e.target.name];
 
 const ALL: FlowFilter = { namespaces: [], search: "", showSystem: true, showNodeTraffic: true };
 
 describe("flowQuery", () => {
-  it("sums per reporting node and direction, and drops Service rows", () => {
+  it("sums per reporting node, end nodes and direction, and drops Service rows", () => {
     expect(flowQuery(null, 3600)).toBe(
       "sum by (k8s_cluster, k8s_src_namespace, k8s_src_owner_name, k8s_src_owner_type, " +
-        "k8s_dst_namespace, k8s_dst_owner_name, k8s_dst_owner_type, direction, host_id) (" +
+        "k8s_dst_namespace, k8s_dst_owner_name, k8s_dst_owner_type, k8s_src_node_name, k8s_dst_node_name, " +
+        "direction, host_id) (" +
         'rate(obi_network_flow_bytes{k8s_src_owner_type!="Service", k8s_dst_owner_type!="Service"}[3600s]))',
     );
   });
@@ -139,6 +146,33 @@ describe("pairFlows", () => {
     expect(edge).toMatchObject({ total: 400, directed: true, request: 100, response: 300 });
     expect(edge.unknown).toBe(0);
     expect(names(edge)).toEqual(["web", "api"]);
+  });
+
+  // One web and one api replica per node, 100 B/s between every pair; each node reports the pairs with a pod on it.
+  it.each([
+    [2, 400],
+    [3, 900],
+  ])("adds up the node pairs of %s replicas spread across nodes", (replicas, total) => {
+    const nodes = Array.from({ length: replicas }, (_, i) => `n${i}`);
+    const rows = nodes.flatMap((host) =>
+      nodes.flatMap((src) =>
+        nodes
+          .filter((dst) => src === host || dst === host)
+          .map((dst) => onNodes(flow(WEB, API, "request", 100, host), src, dst)),
+      ),
+    );
+    const [edge] = pairFlows(rows);
+    expect(edge).toMatchObject({ total, forward: total, request: total, directed: true });
+  });
+
+  it("counts a node pair's bytes once though both of its nodes report them", () => {
+    const [edge] = pairFlows([
+      onNodes(flow(WEB, API, "request", 100, "n1"), "n1", "n2"),
+      onNodes(flow(WEB, API, "unknown", 100, "n2"), "n1", "n2"),
+      onNodes(flow(WEB, API, "request", 40, "n1"), "n1", "n1"),
+      onNodes(flow(WEB, API, "request", 30, "n2"), "n2", "n2"),
+    ]);
+    expect(edge).toMatchObject({ total: 170, request: 170, unknown: 0 });
   });
 
   it("keeps the busier node's count for each direction of travel", () => {

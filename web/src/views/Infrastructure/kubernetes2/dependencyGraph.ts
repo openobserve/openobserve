@@ -87,13 +87,14 @@ export interface FlowGraph<E extends { id: string } = FlowEnd> {
 const END = (side: "src" | "dst") =>
   `k8s_${side}_namespace, k8s_${side}_owner_name, k8s_${side}_owner_type`;
 
-const PAIR = `k8s_cluster, ${END("src")}, ${END("dst")}, direction, host_id`;
+const PAIR = `k8s_cluster, ${END("src")}, ${END("dst")}, k8s_src_node_name, k8s_dst_node_name, direction, host_id`;
 
 // The rate covers the selected range, bounded so a short range still has samples and a long one stays cheap.
 export const flowWindowSeconds = (startUs: number, endUs: number) =>
   Math.min(MAX_WINDOW_S, Math.max(MIN_WINDOW_S, Math.round((endUs - startUs) / 1_000_000)));
 
-// Per reporting node, since both nodes report cross-node traffic; pairFlows keeps one node's count.
+// Per reporting node and per node of each end, since both of those nodes report the bytes between them;
+// pairFlows keeps one node's count of each.
 // Service rows repeat the workload rows on the client's node, so they are left out.
 export function flowQuery(cluster: string | null, windowS: number): string {
   const matchers = ['k8s_src_owner_type!="Service"', 'k8s_dst_owner_type!="Service"'];
@@ -143,24 +144,32 @@ interface Flow<E> {
 
 const known = (f: Flow<unknown>) => f.request + f.response;
 
-// One flow per direction of travel: the bytes from the node that saw the most of them, split by direction
-// as the node that saw the most request and response bytes did, since a node whose eBPF pod restarted
-// reports the same bytes as unknown. Adding nodes' rows together would count cross-node bytes twice.
+// One flow per direction of travel. Its bytes between one source node and one destination node are seen in full
+// by both of those nodes and by no other, so each such share is the count from the node that saw the most of it,
+// split by direction as the node that saw the most request and response bytes did, since a node whose eBPF pod
+// restarted reports the same bytes as unknown; the shares then add up. Adding nodes' rows together would count
+// cross-node bytes twice. Rows without the end node labels are one share.
 function busiestNode<E extends { id: string }>(
   series: Series[],
   endOf: EndOf<E>,
   reporter: string,
 ): Flow<E>[] {
-  const perNode = new Map<string, Flow<E>>();
+  const perNode = new Map<string, { share: string; flow: Flow<E> }>();
   for (const { metric, value } of series) {
     if (!(value > 0)) continue;
     const src = endOf(metric, "src");
     const dst = endOf(metric, "dst");
-    const key = `${src.id}\n${dst.id}\n${metric[reporter] ?? ""}`;
-    let f = perNode.get(key);
+    const share = [
+      src.id,
+      dst.id,
+      metric.k8s_src_node_name ?? "",
+      metric.k8s_dst_node_name ?? "",
+    ].join("\n");
+    const key = `${share}\n${metric[reporter] ?? ""}`;
+    let f = perNode.get(key)?.flow;
     if (!f) {
       f = { src, dst, request: 0, response: 0, unknown: 0, total: 0 };
-      perNode.set(key, f);
+      perNode.set(key, { share, flow: f });
     }
     if (metric.direction === "request") f.request += value;
     else if (metric.direction === "response") f.response += value;
@@ -168,25 +177,30 @@ function busiestNode<E extends { id: string }>(
     f.total += value;
   }
   const best = new Map<string, { busiest: Flow<E>; informed: Flow<E> }>();
-  for (const f of perNode.values()) {
-    const key = `${f.src.id}\n${f.dst.id}`;
-    const kept = best.get(key);
+  for (const { share, flow: f } of perNode.values()) {
+    const kept = best.get(share);
     if (!kept) {
-      best.set(key, { busiest: f, informed: f });
+      best.set(share, { busiest: f, informed: f });
       continue;
     }
     if (f.total > kept.busiest.total) kept.busiest = f;
     if (known(f) > known(kept.informed)) kept.informed = f;
   }
-  return [...best.values()].map(({ busiest, informed }) => {
+  const flows = new Map<string, Flow<E>>();
+  for (const { busiest, informed } of best.values()) {
     const scale = busiest.total / informed.total;
-    return {
-      ...busiest,
-      request: informed.request * scale,
-      response: informed.response * scale,
-      unknown: informed.unknown * scale,
-    };
-  });
+    const key = `${busiest.src.id}\n${busiest.dst.id}`;
+    let f = flows.get(key);
+    if (!f) {
+      f = { src: busiest.src, dst: busiest.dst, request: 0, response: 0, unknown: 0, total: 0 };
+      flows.set(key, f);
+    }
+    f.request += informed.request * scale;
+    f.response += informed.response * scale;
+    f.unknown += informed.unknown * scale;
+    f.total += busiest.total;
+  }
+  return [...flows.values()];
 }
 
 interface Pair<E> {
