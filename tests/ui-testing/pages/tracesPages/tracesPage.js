@@ -895,6 +895,32 @@ export class TracesPage {
     }
   }
 
+  traceRowLinks() {
+    return this.page.locator('[data-test="trace-row-link"]');
+  }
+
+  // A cell without the link, so the row's own middle-click handler runs rather than the browser's native link handling.
+  firstRowNonLinkCell() {
+    return this.page
+      .locator('[data-test^="o2-table-row-"]')
+      .first()
+      .locator('td[data-test^="o2-table-cell-"]:not(:has(a))')
+      .first();
+  }
+
+  trackNewPages(context) {
+    const opened = [];
+    context.on('page', (p) => opened.push(p));
+    return opened;
+  }
+
+  // The fixed wait is deliberate: a second tab would open late, and there is no event for "nothing else opened".
+  async expectOneNewPage(opened) {
+    await expect.poll(() => opened.length, { timeout: 10000 }).toBe(1);
+    await this.page.waitForTimeout(1000);
+    expect(opened, 'exactly one new tab must open').toHaveLength(1);
+  }
+
   /**
    * Setup trace search with stream and time range
    * @param {string} streamName - Stream name to select

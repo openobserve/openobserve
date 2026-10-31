@@ -1722,6 +1722,9 @@ defineExpose({
             @row-dblclick="
               (row: TData, evt: MouseEvent) => !staleDimmed && emit('row-dblclick', row, evt)
             "
+            @row-auxclick="
+              (row: TData, evt: MouseEvent) => !staleDimmed && emit('row-auxclick', row, evt)
+            "
             @row-mouseenter="(row: TData, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
             @row-mouseleave="(row: TData) => emit('row-mouseleave', row)"
             @cell-click="(params: any) => !staleDimmed && emit('cell-click', params)"
