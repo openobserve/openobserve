@@ -34,7 +34,11 @@ import {
 } from "./forecast";
 
 import type { LocationQuery } from "vue-router";
-import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
+import type {
+  ExplorerSort,
+  LabelFilter,
+  UsageFilter,
+} from "@/composables/metrics/useMetricsExplorerGrid";
 
 export interface ExplorerFilterState {
   searchTerm: string;
@@ -44,7 +48,9 @@ export interface ExplorerFilterState {
   labelFilters: LabelFilter[];
   showFavoritesOnly: boolean;
   hideEmptyPanels: boolean;
-  sortBy: "a-z" | "z-a";
+  sortBy: ExplorerSort;
+  /** Absent means no usage filter. */
+  usageFilters?: Set<UsageFilter>;
   viewMode: "grid" | "rows";
   /** Page mode — the Explore grid vs the query-driven Visualize workspace. */
   mode: "explore" | "visualize" | "workspace";
@@ -83,6 +89,7 @@ export const EXPLORER_FILTER_PARAM_KEYS = [
   "labels",
   "show_empty",
   "sort",
+  "usage",
   "view",
   "mode",
   // Never `stream`: that is an editor key and would redirect /metrics to the editor.
@@ -95,6 +102,8 @@ export const EXPLORER_FILTER_PARAM_KEYS = [
 ] as const;
 
 const TYPE_IDS = new Set(["counter", "gauge", "histogram", "summary", "other"]);
+const SORT_IDS = new Set<string>(["z-a", "dashboards", "alerts"]);
+const USAGE_IDS = new Set<string>(["dashboards", "alerts", "slos"]);
 
 // Sorted for a stable URL: the same selection always serializes identically,
 // so the change-guard in the component can compare strings.
@@ -126,7 +135,8 @@ export function explorerFiltersToQuery(
   // (Workspace ⇒ pinned-only), so `?mode=workspace` already implies it. Keeping
   // it out of the URL removes the double-source that could flip it unexpectedly.
   if (!state.hideEmptyPanels) query.show_empty = "true";
-  if (state.sortBy === "z-a") query.sort = "z-a";
+  if (state.sortBy !== "a-z") query.sort = state.sortBy;
+  if (state.usageFilters?.size) query.usage = joinSet(state.usageFilters);
   if (state.viewMode === "rows") query.view = "rows";
   // Explore is the default landing mode, so only the non-default is serialized.
   if (state.mode === "visualize" || state.mode === "workspace") query.mode = state.mode;
@@ -171,7 +181,11 @@ export function queryToExplorerFilters(
   // `favorites` is intentionally not read from the URL — the mode drives
   // showFavoritesOnly (see explorerFiltersToQuery).
   if (query.show_empty === "true") out.hideEmptyPanels = false;
-  if (query.sort === "z-a") out.sortBy = "z-a";
+  if (typeof query.sort === "string" && SORT_IDS.has(query.sort)) {
+    out.sortBy = query.sort as ExplorerSort;
+  }
+  const usage = splitList(query.usage).filter((u) => USAGE_IDS.has(u)) as UsageFilter[];
+  if (usage.length) out.usageFilters = new Set(usage);
   if (query.view === "rows") out.viewMode = "rows";
   if (query.mode === "visualize" || query.mode === "workspace") out.mode = query.mode;
 

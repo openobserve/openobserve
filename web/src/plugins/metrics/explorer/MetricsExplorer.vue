@@ -440,12 +440,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ resultCountLabel }}</span
           >
 
+          <OToggleGroup
+            :model-value="[...grid.usageFilters.value]"
+            type="multiple"
+            data-test="metrics-explorer-usage-filter"
+            @update:model-value="onUsageFilterChange"
+          >
+            <OToggleGroupItem
+              v-for="opt in usageFilterOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              :data-test="`metrics-explorer-usage-${opt.value}`"
+              >{{ opt.label }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+          <OSpinner
+            v-if="grid.usageLoading.value"
+            size="xs"
+            :title="t('metrics.explorer.usageLoading')"
+            data-test="metrics-explorer-usage-loading"
+          />
+          <OButton
+            v-else-if="grid.usageError.value"
+            variant="ghost-destructive"
+            size="xs"
+            icon-left="refresh"
+            data-test="metrics-explorer-usage-retry"
+            @click="grid.retryUsage"
+          >
+            {{ t("metrics.explorer.usageFailed") }}
+          </OButton>
+
           <OToggleGroup v-model="sortModel" type="single" data-test="metrics-explorer-sort">
             <OToggleGroupItem
               v-for="opt in sortOptions"
               :key="opt.value"
               :value="opt.value"
               size="sm"
+              :tooltip="opt.tooltip"
               :data-test="`metrics-explorer-sort-${opt.value}`"
               >{{ opt.label }}</OToggleGroupItem
             >
@@ -912,9 +945,27 @@ export default defineComponent({
     /* ---------------------------------------------------------- toolbar */
 
     const sortOptions = computed(() => [
-      { value: "a-z", label: t("metrics.explorer.sortAsc") },
-      { value: "z-a", label: t("metrics.explorer.sortDesc") },
+      { value: "a-z", label: t("metrics.explorer.sortAsc"), tooltip: undefined },
+      { value: "z-a", label: t("metrics.explorer.sortDesc"), tooltip: undefined },
+      {
+        value: "dashboards",
+        label: t("metrics.explorer.sortDashboards"),
+        tooltip: t("metrics.explorer.sortDashboardsTitle"),
+      },
+      {
+        value: "alerts",
+        label: t("metrics.explorer.sortAlerts"),
+        tooltip: t("metrics.explorer.sortAlertsTitle"),
+      },
     ]);
+    const usageFilterOptions = computed(() => [
+      { value: "dashboards", label: t("metrics.explorer.usageInDashboards") },
+      { value: "alerts", label: t("metrics.explorer.usageHasAlerts") },
+      { value: "slos", label: t("metrics.explorer.usageInSlos") },
+    ]);
+    const onUsageFilterChange = (value: any) => {
+      grid.usageFilters.value = new Set(Array.isArray(value) ? value : []);
+    };
     const viewOptions = computed(() => [
       { value: "grid", label: t("metrics.explorer.viewGrid"), icon: "grid-on" },
       { value: "rows", label: t("metrics.explorer.viewRows"), icon: "list" },
@@ -1637,6 +1688,7 @@ export default defineComponent({
       // showFavoritesOnly is not restored from the URL — the mode drives it.
       if (f.hideEmptyPanels !== undefined) grid.hideEmptyPanels.value = f.hideEmptyPanels;
       if (f.sortBy) grid.sortBy.value = f.sortBy;
+      if (f.usageFilters) grid.usageFilters.value = f.usageFilters;
       if (f.viewMode) grid.viewMode.value = f.viewMode;
       if (f.mode) mode.value = f.mode;
       if (f.metric && f.mode !== "visualize") {
@@ -1686,6 +1738,7 @@ export default defineComponent({
         showFavoritesOnly: grid.showFavoritesOnly.value,
         hideEmptyPanels: grid.hideEmptyPanels.value,
         sortBy: grid.sortBy.value,
+        usageFilters: grid.usageFilters.value,
         viewMode: grid.viewMode.value,
         mode: mode.value,
         // Visualize has no detail view; without `metric` its tab keys drop too.
@@ -1813,6 +1866,7 @@ export default defineComponent({
         grid.showFavoritesOnly.value,
         grid.hideEmptyPanels.value,
         grid.sortBy.value,
+        grid.usageFilters.value,
         grid.viewMode.value,
         mode.value,
         detailMetric.value,
@@ -1911,6 +1965,7 @@ export default defineComponent({
       grid.labelFilters.value = f.labelFilters ?? [];
       grid.hideEmptyPanels.value = f.hideEmptyPanels ?? true;
       grid.sortBy.value = f.sortBy ?? "a-z";
+      grid.usageFilters.value = f.usageFilters ?? new Set();
       grid.viewMode.value = f.viewMode ?? "grid";
       // Setting mode last lets the isWorkspace watcher set showFavoritesOnly.
       mode.value = f.mode ?? "explore";
@@ -2315,6 +2370,8 @@ export default defineComponent({
       onRemoveLabelFilter,
       onClearLabelFilters,
       sortOptions,
+      usageFilterOptions,
+      onUsageFilterChange,
       PAGE_SIZE_INCREMENT,
       viewOptions,
       sortModel,

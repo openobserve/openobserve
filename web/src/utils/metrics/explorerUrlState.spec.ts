@@ -138,6 +138,20 @@ describe("explorerUrlState", () => {
     expect(out.labelFilters).toEqual([{ label: "pod", operator: "=", value: "api" }]);
   });
 
+  it("round-trips a usage sort and usage filters, dropping unknown filter ids", () => {
+    const query = explorerFiltersToQuery({
+      ...defaults(),
+      sortBy: "dashboards",
+      usageFilters: new Set(["slos", "alerts"]),
+    });
+    expect(query).toEqual({ sort: "dashboards", usage: "alerts,slos" });
+    const f = queryToExplorerFilters({ ...query, usage: "alerts,slos,pipelines" });
+    expect(f.sortBy).toBe("dashboards");
+    expect([...(f.usageFilters ?? [])]).toEqual(["alerts", "slos"]);
+    expect(queryToExplorerFilters({ sort: "alerts" }).sortBy).toBe("alerts");
+    expect(queryToExplorerFilters({ usage: "bogus" }).usageFilters).toBeUndefined();
+  });
+
   it("ignores non-literal boolean and enum values", () => {
     const out = queryToExplorerFilters({
       favorites: "1",

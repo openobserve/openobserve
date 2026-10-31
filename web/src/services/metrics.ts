@@ -119,12 +119,31 @@ const getMetricUsage = ({
 }): Promise<{ data: MetricUsage }> =>
   http().get(`/api/${org_identifier}/metrics/${encodeURIComponent(metric)}/usage`, { signal });
 
+/** How many objects of each kind read one metric. */
+export interface MetricUsageCounts {
+  dashboards: number;
+  alerts: number;
+  slos: number;
+  pipelines: number;
+}
+
+/** Usage counts for every metric in the org, from one scan; a metric absent from `metrics` is unused. */
+const getOrgMetricUsage = ({
+  org_identifier,
+  signal,
+}: {
+  org_identifier: string;
+  signal?: AbortSignal;
+}): Promise<{ data: { metrics: Record<string, MetricUsageCounts> } }> =>
+  http().get(`/api/${org_identifier}/metrics/usage`, { signal });
+
 /** The backend's JSON tree of a PromQL query; a 400 carries the parser's message. */
 const parsePromqlQuery = ({ org_identifier, query }: { org_identifier: string; query: string }) =>
   http().post(`/api/${org_identifier}/prometheus/api/v1/parse_tree`, { query });
 
 export default {
   getMetricUsage,
+  getOrgMetricUsage,
   parsePromqlQuery,
   formatPromqlQuery,
   get_promql_series,

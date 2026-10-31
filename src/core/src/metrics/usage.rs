@@ -30,7 +30,6 @@ use config::meta::{
     pipeline::{Pipeline, components::PipelineSource},
     slo::{CountSource, QueryLanguage, SliConfig, Slo},
     sql::resolve_stream_names_with_type,
-    stream::StreamType,
 };
 use dashmap::DashMap;
 #[cfg(feature = "enterprise")]
@@ -39,7 +38,7 @@ use promql::{ast::visitor::walk_expr, utils::metric_name};
 use promql_parser::{parser::Expr, util::ExprVisitor};
 use serde::Serialize;
 use serde_json::Value;
-use tokio::sync::Semaphore;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use utoipa::ToSchema;
 
 use crate::{
@@ -106,6 +105,21 @@ pub struct MetricUsage {
     pub pipelines: Vec<ObjectUsage>,
     /// Queries that name the metric but could not be parsed, so matched only as text.
     pub unparsed: usize,
+}
+
+/// How many objects of each kind read one metric, counted as `MetricUsage` lists them.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, ToSchema)]
+pub struct UsageCounts {
+    pub dashboards: usize,
+    pub alerts: usize,
+    pub slos: usize,
+    pub pipelines: usize,
+}
+
+/// Usage counts for every metric an org's visible objects read; an absent metric is unused.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, ToSchema)]
+pub struct OrgMetricUsage {
+    pub metrics: HashMap<String, UsageCounts>,
 }
 
 #[derive(Default)]
@@ -227,18 +241,98 @@ impl ExprVisitor for SelectedNames {
     }
 }
 
+/// One query an object runs, as the scan reads it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Query<'a> {
+    PromQl(&'a str),
+    Sql {
+        sql: &'a str,
+        default_type: &'a str,
+    },
+    Stream {
+        stream_type: &'a str,
+        stream: &'a str,
+    },
+}
+
+impl Query<'_> {
+    fn outcome(&self, metric: &str) -> Outcome {
+        match *self {
+            Query::PromQl(query) => promql_outcome(metric, Some(query)),
+            Query::Sql { sql, default_type } => sql_outcome(metric, sql, default_type),
+            Query::Stream {
+                stream_type,
+                stream,
+            } => outcome_of(stream_type == "metrics" && stream == metric),
+        }
+    }
+
+    /// Adds every metric `outcome` would list this query under.
+    fn add_names(&self, names: &mut HashSet<String>) {
+        match *self {
+            Query::PromQl(query) => {
+                let query = query.trim();
+                if query.is_empty() {
+                    return;
+                }
+                match selected_names(query) {
+                    Some(selected) => names.extend(selected),
+                    None => add_identifiers(query, names),
+                }
+            }
+            Query::Sql { sql, default_type } => match resolve_stream_names_with_type(sql) {
+                Ok(tables) => names.extend(
+                    tables
+                        .iter()
+                        .filter(|table| table.schema().unwrap_or(default_type) == "metrics")
+                        .map(|table| table.table().to_string()),
+                ),
+                Err(_) => add_identifiers(sql, names),
+            },
+            Query::Stream {
+                stream_type,
+                stream,
+            } => {
+                if stream_type == "metrics" && !stream.is_empty() {
+                    names.insert(stream.to_string());
+                }
+            }
+        }
+    }
+}
+
 /// Scans everything in `org_id` that `user_id` can list for queries that use `metric`.
 pub async fn metric_usage(
     org_id: &str,
     user_id: &str,
     metric: &str,
 ) -> Result<MetricUsage, anyhow::Error> {
+    let (_permit, sources) = visible_sources(org_id, user_id).await?;
+    Ok(scan(metric, sources))
+}
+
+/// Counts, for every metric any visible object reads, the objects of each kind that read it.
+pub async fn org_metric_usage(
+    org_id: &str,
+    user_id: &str,
+) -> Result<OrgMetricUsage, anyhow::Error> {
+    let (_permit, sources) = visible_sources(org_id, user_id).await?;
+    Ok(OrgMetricUsage {
+        metrics: count_usage(&sources),
+    })
+}
+
+/// Loads what `user_id` can list in `org_id`; the permit is held until the caller's scan ends.
+async fn visible_sources(
+    org_id: &str,
+    user_id: &str,
+) -> Result<(OwnedSemaphorePermit, UsageSources), anyhow::Error> {
     let scans = Arc::clone(
         &SCANS
             .entry(org_id.to_string())
             .or_insert_with(|| Arc::new(Semaphore::new(1))),
     );
-    let _permit = scans.acquire().await?;
+    let permit = scans.acquire_owned().await?;
     let conn = infra::db::get_orm_client_ro().await;
     let sources = UsageSources {
         dashboards: infra::table::dashboards::list_skipping_invalid(ListDashboardsParams::new(
@@ -250,7 +344,7 @@ pub async fn metric_usage(
         pipelines: crate::pipeline::db::list_by_org(org_id).await?,
     };
     let access = load_access(org_id, user_id, &sources).await?;
-    Ok(scan(metric, visible(org_id, sources, &access)))
+    Ok((permit, visible(org_id, sources, &access)))
 }
 
 /// Everything is visible without fine-grained permissions, as in the OSS list endpoints.
@@ -516,6 +610,43 @@ fn scan(metric: &str, sources: UsageSources) -> MetricUsage {
     usage
 }
 
+/// One pass over the sources, parsing each query once rather than once per metric.
+fn count_usage(sources: &UsageSources) -> HashMap<String, UsageCounts> {
+    let mut counts = HashMap::new();
+    for (_, dashboard) in &sources.dashboards {
+        let inner = dashboard_json(dashboard);
+        tally(&mut counts, &dashboard_queries(&inner), |c| {
+            &mut c.dashboards
+        });
+    }
+    for (_, alert) in &sources.alerts {
+        tally(&mut counts, &alert_queries(alert), |c| &mut c.alerts);
+    }
+    for slo in &sources.slos {
+        tally(&mut counts, &slo_queries(slo), |c| &mut c.slos);
+    }
+    for pipeline in &sources.pipelines {
+        let queries: Vec<Query> = pipeline_query(pipeline).into_iter().collect();
+        tally(&mut counts, &queries, |c| &mut c.pipelines);
+    }
+    counts
+}
+
+/// Counts one object once under every metric any of its queries reads.
+fn tally(
+    counts: &mut HashMap<String, UsageCounts>,
+    queries: &[Query],
+    field: fn(&mut UsageCounts) -> &mut usize,
+) {
+    let mut names = HashSet::new();
+    for query in queries {
+        query.add_names(&mut names);
+    }
+    for name in names {
+        *field(counts.entry(name).or_default()) += 1;
+    }
+}
+
 fn push_object(list: &mut Vec<ObjectUsage>, hits: &Hits, id: &str, name: &str) {
     if let Some(match_kind) = hits.listing() {
         list.push(ObjectUsage {
@@ -648,95 +779,133 @@ fn outcome_of(matched: bool) -> Outcome {
     }
 }
 
-fn is_metric_stream(stream_type: &Value, stream: &Value, metric: &str) -> bool {
-    stream_type.as_str() == Some("metrics") && stream.as_str() == Some(metric)
+/// Adds each identifier in `text`: exactly the metrics `mentions` finds in it.
+fn add_identifiers(text: &str, names: &mut HashSet<String>) {
+    names.extend(
+        text.split(|ch: char| !is_ident_char(ch))
+            .filter(|word| !word.is_empty())
+            .map(str::to_string),
+    );
 }
 
-/// Walks the stored JSON, so every dashboard version is read the same way.
-fn dashboard_hits(metric: &str, dashboard: &Dashboard) -> Hits {
-    let value = serde_json::to_value(dashboard).unwrap_or_default();
-    let inner = &value[format!("v{}", dashboard.version)];
+/// The stored JSON of the dashboard's own version, so every version is read the same way.
+fn dashboard_json(dashboard: &Dashboard) -> Value {
+    let mut value = serde_json::to_value(dashboard).unwrap_or_default();
+    value[format!("v{}", dashboard.version)].take()
+}
+
+fn dashboard_queries(inner: &Value) -> Vec<Query<'_>> {
     let tab_panels = inner["tabs"]
         .as_array()
         .into_iter()
         .flatten()
         .flat_map(|tab| tab["panels"].as_array().into_iter().flatten());
     let top_panels = inner["panels"].as_array().into_iter().flatten();
-    let mut hits = Hits::default();
+    let mut queries = Vec::new();
     for panel in tab_panels.chain(top_panels) {
         let promql = panel["queryType"].as_str() == Some("promql");
         // A v1 panel is its own single query.
-        let queries = match panel["queries"].as_array() {
-            Some(queries) => queries.iter().collect(),
+        let panel_queries = match panel["queries"].as_array() {
+            Some(panel_queries) => panel_queries.iter().collect(),
             None => vec![panel],
         };
-        for query in queries {
-            hits.add(dashboard_query_outcome(metric, query, promql));
-        }
+        queries.extend(
+            panel_queries
+                .into_iter()
+                .filter_map(|query| dashboard_query(query, promql)),
+        );
     }
     for variable in inner["variables"]["list"].as_array().into_iter().flatten() {
-        let query_data = &variable["query_data"];
-        hits.add(outcome_of(is_metric_stream(
-            &query_data["stream_type"],
-            &query_data["stream"],
-            metric,
-        )));
+        queries.push(stream_query(&variable["query_data"]));
+    }
+    queries
+}
+
+fn stream_query(fields: &Value) -> Query<'_> {
+    Query::Stream {
+        stream_type: fields["stream_type"].as_str().unwrap_or_default(),
+        stream: fields["stream"].as_str().unwrap_or_default(),
+    }
+}
+
+fn dashboard_query(query: &Value, promql: bool) -> Option<Query<'_>> {
+    // A formula's inputs are scanned in their own right.
+    if query["config"]["formula"].is_string() {
+        return None;
+    }
+    if query["customQuery"].as_bool() != Some(true) {
+        return Some(stream_query(&query["fields"]));
+    }
+    let text = query["query"].as_str().unwrap_or_default().trim();
+    if text.is_empty() {
+        None
+    } else if promql {
+        Some(Query::PromQl(text))
+    } else {
+        Some(Query::Sql {
+            sql: text,
+            default_type: query["fields"]["stream_type"].as_str().unwrap_or_default(),
+        })
+    }
+}
+
+fn dashboard_hits(metric: &str, dashboard: &Dashboard) -> Hits {
+    let inner = dashboard_json(dashboard);
+    let mut hits = Hits::default();
+    for query in dashboard_queries(&inner) {
+        hits.add(query.outcome(metric));
     }
     hits
 }
 
-fn dashboard_query_outcome(metric: &str, query: &Value, promql: bool) -> Outcome {
-    // A formula's inputs are scanned in their own right.
-    if query["config"]["formula"].is_string() {
-        return Outcome::NoMatch;
-    }
-    if query["customQuery"].as_bool() != Some(true) {
-        let fields = &query["fields"];
-        return outcome_of(is_metric_stream(
-            &fields["stream_type"],
-            &fields["stream"],
-            metric,
-        ));
-    }
-    let text = query["query"].as_str().unwrap_or_default().trim();
-    if text.is_empty() {
-        Outcome::NoMatch
-    } else if promql {
-        promql_outcome(metric, Some(text))
-    } else {
-        let default_type = query["fields"]["stream_type"].as_str().unwrap_or_default();
-        sql_outcome(metric, text, default_type)
-    }
-}
-
-fn alert_outcome(metric: &str, alert: &Alert) -> Outcome {
+/// An SQL alert is filed under a stream but may join others, so the stream comes first.
+fn alert_queries(alert: &Alert) -> Vec<Query<'_>> {
     let condition = &alert.query_condition;
     if condition.query_type == QueryType::PromQL {
-        return promql_outcome(metric, condition.promql.as_deref());
+        return condition
+            .promql
+            .as_deref()
+            .map(Query::PromQl)
+            .into_iter()
+            .collect();
     }
-    if alert.stream_type == StreamType::Metrics && alert.stream_name == metric {
-        return Outcome::Match;
-    }
-    // an SQL alert may join streams besides the one it is filed under
+    let mut queries = vec![Query::Stream {
+        stream_type: alert.stream_type.as_str(),
+        stream: &alert.stream_name,
+    }];
     match condition.sql.as_deref().map(str::trim) {
         Some(sql) if condition.query_type == QueryType::SQL && !sql.is_empty() => {
-            sql_outcome(metric, sql, alert.stream_type.as_str())
+            queries.push(Query::Sql {
+                sql,
+                default_type: alert.stream_type.as_str(),
+            })
         }
-        _ => Outcome::NoMatch,
+        _ => {}
     }
+    queries
 }
 
-fn slo_hits(metric: &str, slo: &Slo) -> Hits {
-    let on_stream =
-        |stream: &str, stream_type: &str| outcome_of(stream_type == "metrics" && stream == metric);
-    let mut hits = Hits::default();
+/// A match on the alert's own stream settles it before its SQL is read.
+fn alert_outcome(metric: &str, alert: &Alert) -> Outcome {
+    let mut outcome = Outcome::NoMatch;
+    for query in alert_queries(alert) {
+        outcome = query.outcome(metric);
+        if outcome == Outcome::Match {
+            break;
+        }
+    }
+    outcome
+}
+
+fn slo_queries<'a>(slo: &'a Slo) -> Vec<Query<'a>> {
+    let on_stream = |stream: &'a str, stream_type: &'a str| Query::Stream {
+        stream_type,
+        stream,
+    };
     match &slo.definition.sli_config {
         SliConfig::Count {
             source: CountSource::PromQl { good, total },
-        } => {
-            hits.add(promql_outcome(metric, Some(good)));
-            hits.add(promql_outcome(metric, Some(total)));
-        }
+        } => vec![Query::PromQl(good), Query::PromQl(total)],
         SliConfig::Count {
             source:
                 CountSource::SingleQuery {
@@ -744,42 +913,53 @@ fn slo_hits(metric: &str, slo: &Slo) -> Hits {
                     stream_type,
                     ..
                 },
-        } => hits.add(on_stream(stream, stream_type)),
+        } => vec![on_stream(stream, stream_type)],
         SliConfig::Count {
             source: CountSource::DualQuery { good, total },
-        } => {
-            hits.add(on_stream(&good.stream, &good.stream_type));
-            hits.add(on_stream(&total.stream, &total.stream_type));
-        }
+        } => vec![
+            on_stream(&good.stream, &good.stream_type),
+            on_stream(&total.stream, &total.stream_type),
+        ],
         SliConfig::TimeSlice {
             query_language: QueryLanguage::PromQl,
             query,
             ..
-        } => hits.add(promql_outcome(metric, Some(query))),
+        } => vec![Query::PromQl(query)],
         // an SQL slice is an aggregate without a FROM; its stream is declared
         SliConfig::TimeSlice {
             query_language: QueryLanguage::Sql,
             stream,
             stream_type,
             ..
-        } => hits.add(on_stream(stream, stream_type)),
-        SliConfig::Alert { .. } => {}
+        } => vec![on_stream(stream, stream_type)],
+        SliConfig::Alert { .. } => vec![],
+    }
+}
+
+fn slo_hits(metric: &str, slo: &Slo) -> Hits {
+    let mut hits = Hits::default();
+    for query in slo_queries(slo) {
+        hits.add(query.outcome(metric));
     }
     hits
 }
 
-fn pipeline_outcome(metric: &str, pipeline: &Pipeline) -> Outcome {
+fn pipeline_query(pipeline: &Pipeline) -> Option<Query<'_>> {
     let PipelineSource::Scheduled(derived) = &pipeline.source else {
-        return Outcome::NoMatch;
+        return None;
     };
     let condition = &derived.query_condition;
     if condition.query_type == QueryType::PromQL {
-        return promql_outcome(metric, condition.promql.as_deref());
+        return condition.promql.as_deref().map(Query::PromQl);
     }
-    match condition.sql.as_deref() {
-        Some(sql) => sql_outcome(metric, sql, derived.stream_type.as_str()),
-        _ => Outcome::NoMatch,
-    }
+    condition.sql.as_deref().map(|sql| Query::Sql {
+        sql,
+        default_type: derived.stream_type.as_str(),
+    })
+}
+
+fn pipeline_outcome(metric: &str, pipeline: &Pipeline) -> Outcome {
+    pipeline_query(pipeline).map_or(Outcome::NoMatch, |query| query.outcome(metric))
 }
 
 #[cfg(test)]
@@ -787,6 +967,7 @@ mod tests {
     use config::meta::{
         alerts::{QueryType, alert::Alert},
         dashboards::{v1, v8},
+        stream::StreamType,
     };
     use serde_json::json;
 
@@ -1410,6 +1591,106 @@ mod tests {
                 usage.pipelines.len()
             ),
             (1, 1, 1, 1)
+        );
+    }
+
+    fn mixed_sources() -> UsageSources {
+        let mut joined = sql_alert(StreamType::Logs, "app");
+        joined.query_condition.sql = Some(r#"SELECT * FROM "metrics"."node_load1""#.to_string());
+        UsageSources {
+            dashboards: vec![
+                (
+                    folder("f"),
+                    dashboard(
+                        "promql",
+                        vec![
+                            custom("sum(rate(http_requests_total[5m])) / sum(rate(up[5m]))"),
+                            custom("http_requests_total"),
+                        ],
+                    ),
+                ),
+                (
+                    folder("f"),
+                    dashboard("promql", vec![custom("sum(http_requests_total[5m]")]),
+                ),
+                (
+                    folder("f"),
+                    dashboard_with(
+                        "d3",
+                        "sql",
+                        vec![builder("node_load1", "metrics"), builder("app", "logs")],
+                        json!([]),
+                    ),
+                ),
+            ],
+            alerts: vec![
+                (folder("g"), promql_alert("a", "up > 0")),
+                (folder("g"), sql_alert(StreamType::Metrics, METRIC)),
+                (folder("g"), joined),
+            ],
+            slos: vec![promql_slo("h")],
+            pipelines: vec![scheduled("p1", "rate(http_requests_total[5m])")],
+        }
+    }
+
+    #[test]
+    fn org_counts_match_what_each_metric_lists() {
+        let counts = count_usage(&mixed_sources());
+        assert_eq!(
+            counts[METRIC],
+            UsageCounts {
+                dashboards: 2,
+                alerts: 1,
+                slos: 1,
+                pipelines: 1
+            }
+        );
+        assert_eq!(counts["up"].dashboards, 1);
+        assert_eq!(counts["node_load1"].alerts, 1);
+        assert!(!counts.contains_key("app"));
+        for metric in ["http_requests_total", "up", "ok", "node_load1", "missing"] {
+            let usage = scan(metric, mixed_sources());
+            let listed = UsageCounts {
+                dashboards: usage.dashboards.len(),
+                alerts: usage.alerts.len(),
+                slos: usage.slos.len(),
+                pipelines: usage.pipelines.len(),
+            };
+            assert_eq!(
+                counts.get(metric).copied().unwrap_or_default(),
+                listed,
+                "{metric}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_object_reading_a_metric_twice_counts_once() {
+        let sources = UsageSources {
+            dashboards: vec![(
+                folder("f"),
+                dashboard(
+                    "promql",
+                    vec![
+                        custom("http_requests_total"),
+                        custom("rate(http_requests_total[1m])"),
+                    ],
+                ),
+            )],
+            ..Default::default()
+        };
+        assert_eq!(count_usage(&sources)[METRIC].dashboards, 1);
+    }
+
+    #[test]
+    fn org_usage_serializes_counts_under_metrics() {
+        let usage = OrgMetricUsage {
+            metrics: count_usage(&mixed_sources()),
+        };
+        let body = serde_json::to_value(&usage).unwrap();
+        assert_eq!(
+            body["metrics"][METRIC],
+            json!({"dashboards": 2, "alerts": 1, "slos": 1, "pipelines": 1})
         );
     }
 }

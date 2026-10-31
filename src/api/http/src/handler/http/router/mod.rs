@@ -1263,6 +1263,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/streams/{stream_name}/data_by_time_range", delete(stream::delete_stream_data_by_time_range))
         .route("/{org_id}/streams/{stream_name}/data_by_time_range/status/{id}", get(stream::get_delete_stream_data_status))
         .route("/{org_id}/metrics/{metric_name}/usage", get(metrics_usage::get_metric_usage))
+        .route("/{org_id}/metrics/usage", get(metrics_usage::get_org_metric_usage))
 
         // Logs ingestion
         .route("/{org_id}/_bulk", post(logs::ingest::bulk))
@@ -4839,6 +4840,26 @@ mod tests {
 
         let post = app.oneshot(request("POST")).await.unwrap();
         assert_eq!(post.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[test]
+    fn org_metric_usage_route_is_registered_and_published() {
+        assert!(
+            service_routes_registrations().contains(
+                r#".route("/{org_id}/metrics/usage",get(metrics_usage::get_org_metric_usage))"#
+            ),
+            "GET /{{org_id}}/metrics/usage must be registered in service_routes()"
+        );
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/metrics/usage")
+            .expect("org metric usage is missing from the OpenAPI surface");
+        assert_eq!(
+            path.get.as_ref().and_then(|op| op.operation_id.as_deref()),
+            Some("GetOrgMetricUsage")
+        );
     }
 
     #[tokio::test]

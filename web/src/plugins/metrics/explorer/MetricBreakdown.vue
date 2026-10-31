@@ -142,6 +142,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`metrics-breakdown-distinct-${activeLabel}`"
             >{{ distinctText(activeLabel) }}</span
           >
+          <div class="flex-1" />
+          <OToggleGroup
+            v-if="!heatmap"
+            v-model="rowSortModel"
+            type="single"
+            class="shrink-0"
+            data-test="metrics-breakdown-sort"
+          >
+            <OToggleGroupItem
+              value="avg"
+              size="xs"
+              :title="t('metrics.explorer.detail.breakdown.sortAvgTitle')"
+              data-test="metrics-breakdown-sort-avg"
+              >{{ t("metrics.explorer.detail.breakdown.sortAvg") }}</OToggleGroupItem
+            >
+            <OToggleGroupItem
+              value="outlying"
+              size="xs"
+              :title="t('metrics.explorer.detail.breakdown.sortOutlyingTitle')"
+              data-test="metrics-breakdown-sort-outlying"
+              >{{ t("metrics.explorer.detail.breakdown.sortOutlying") }}</OToggleGroupItem
+            >
+          </OToggleGroup>
         </PanelBar>
 
         <div class="p-2">
@@ -203,12 +226,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @row-mouseleave="(row) => highlight(row, 'downplay')"
           >
             <template #cell-value="{ row }">
-              <span
-                class="text-text-body block truncate font-mono text-xs"
-                :title="row.value"
-                :data-test="`metrics-breakdown-value-${activeLabel}-${row.value}`"
-                >{{ row.value }}</span
-              >
+              <div class="flex min-w-0 items-center gap-1">
+                <span
+                  class="text-text-body block truncate font-mono text-xs"
+                  :title="row.value"
+                  :data-test="`metrics-breakdown-value-${activeLabel}-${row.value}`"
+                  >{{ row.value }}</span
+                >
+                <OTag
+                  v-if="row.outlier"
+                  variant="warning-outline"
+                  size="sm"
+                  class="shrink-0"
+                  :data-test="`metrics-breakdown-outlier-${activeLabel}-${row.value}`"
+                  >{{ t("metrics.explorer.detail.breakdown.outlier") }}</OTag
+                >
+              </div>
             </template>
 
             <template #cell-trend="{ row }">
@@ -408,6 +441,8 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import streamService from "@/services/stream";
@@ -436,6 +471,7 @@ import {
   type HeatmapStats,
   type SeriesStats,
 } from "@/utils/metrics/breakdownStats";
+import { OUTLIER_SCORE, outlierScores, seriesPointsByValue } from "@/utils/metrics/outlierScore";
 import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { labelFiltersToSql } from "@/utils/metrics/labelFilterSql";
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
@@ -478,6 +514,9 @@ const STAT_COLUMNS = ["avg", "latest", "share", "rate", "p50", "p90", "p99"] as 
 
 const ABSENT = raw("—");
 
+/** At most this many rows carry the outlier tag, so it marks the standouts rather than a crowd. */
+const OUTLIER_TAGS = 3;
+
 interface BreakdownRow {
   value: string;
   /** Formatted like the chart's y-axis; `null` when the value has no series. */
@@ -492,6 +531,8 @@ interface BreakdownRow {
   /** Sparkline path in a 100×24 box, one subpath per unbroken run. */
   trend: string | null;
   color: string | null;
+  /** Among the few series that stray furthest from the rest, under the Outlying sort. */
+  outlier: boolean;
 }
 
 /**
@@ -538,6 +579,8 @@ export default defineComponent({
     OSkeleton,
     OTooltip,
     OTable,
+    OToggleGroup,
+    OToggleGroupItem,
   },
   props: {
     card: { type: Object as PropType<MetricCardModel>, required: true },
@@ -990,12 +1033,25 @@ export default defineComponent({
         focusedChart()?.dispatchAction({ type, seriesName: chartNameOf(row.value) });
     };
 
+    const rowSort = ref<"avg" | "outlying">("avg");
+    // A toggle group emits undefined when its active item is clicked again; the table always has one order.
+    const rowSortModel = computed({
+      get: () => rowSort.value,
+      set: (v: any) => {
+        if (v) rowSort.value = v;
+      },
+    });
+
     const rows = computed<BreakdownRow[]>(() => {
       const label = activeLabel.value;
       const stats =
         label && focused.value.status === "done" && !heatmap.value
           ? seriesStatsByValue(focused.value.results, label)
           : new Map<string, SeriesStats>();
+      const scores =
+        rowSort.value === "outlying" && label && stats.size
+          ? outlierScores(seriesPointsByValue(focused.value.results, label))
+          : null;
       const values = [...activeValues.value];
       for (const value of [...stats.keys(), ...heatmapStats.value.keys()])
         if (!values.includes(value)) values.push(value);
@@ -1015,7 +1071,7 @@ export default defineComponent({
             : null;
         return {
           value,
-          rank: h?.rate ?? s?.avg ?? -Infinity,
+          rank: h?.rate ?? (scores && s ? scores.get(value) : s?.avg) ?? -Infinity,
           avg: s ? format(s.avg, s.decimals) : null,
           latest: s ? format(s.latest, s.decimals) : null,
           share: s && total > 0 ? `${((s.sum / total) * 100).toFixed(1)}%` : null,
@@ -1029,7 +1085,10 @@ export default defineComponent({
       });
       // Stable: values without a series keep their count order, after the rest.
       ranked.sort((a, b) => b.rank - a.rank);
-      return ranked.map(({ rank: _rank, ...row }) => row);
+      return ranked.map(({ rank, ...row }, i) => ({
+        ...row,
+        outlier: !!scores && i < OUTLIER_TAGS && rank >= OUTLIER_SCORE,
+      }));
     });
 
     const columns = computed<OTableColumnDef<BreakdownRow>[]>(() => [
@@ -1179,6 +1238,7 @@ export default defineComponent({
       focusedTile,
       statsLoading,
       rows,
+      rowSortModel,
       columns,
       highlight,
       select,

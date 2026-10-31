@@ -46,6 +46,10 @@ const grid = vi.hoisted(() => {
     selectedTypes: { value: new Set() },
     labelFilters: { value: [] },
     sortBy: { value: "a-z" },
+    usageFilters: { value: new Set() },
+    usageLoading: { value: false },
+    usageError: { value: false },
+    retryUsage: vi.fn(),
     viewMode: { value: "grid" },
     activeRail: { value: "prefix" },
     showFavoritesOnly: { value: false },
@@ -305,6 +309,47 @@ describe("MetricsExplorer wiring", () => {
       expect(wrapper.find('[data-test="metrics-explorer-sort-a-z"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="metrics-explorer-sort-z-a"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="metrics-explorer-sort-recent"]').exists()).toBe(false);
+    });
+
+    it("offers the usage sorts and the usage filter chips", () => {
+      const wrapper = mountExplorer();
+      for (const id of ["sort-dashboards", "sort-alerts", "usage-dashboards", "usage-alerts"]) {
+        expect(wrapper.find(`[data-test="metrics-explorer-${id}"]`).exists()).toBe(true);
+      }
+      expect(wrapper.find('[data-test="metrics-explorer-usage-slos"]').exists()).toBe(true);
+    });
+
+    it("hands a chip selection to the grid", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).onUsageFilterChange(["alerts", "slos"]);
+      expect([...grid.usageFilters.value]).toEqual(["alerts", "slos"]);
+      (wrapper.vm as any).onUsageFilterChange(undefined);
+      expect(grid.usageFilters.value.size).toBe(0);
+    });
+
+    it("shows the scan loading, and a retry once it fails", async () => {
+      grid.usageLoading.value = true;
+      const loading = mountExplorer();
+      expect(loading.find('[data-test="metrics-explorer-usage-loading"]').exists()).toBe(true);
+      expect(loading.find('[data-test="metrics-explorer-usage-retry"]').exists()).toBe(false);
+
+      grid.usageLoading.value = false;
+      grid.usageError.value = true;
+      const failed = mountExplorer();
+      expect(failed.find('[data-test="metrics-explorer-usage-loading"]').exists()).toBe(false);
+      expect(failed.find('[data-test="metrics-explorer-usage-retry"]').exists()).toBe(true);
+      grid.usageError.value = false;
+    });
+
+    it("restores a usage sort and chips from the URL, and writes them back", () => {
+      routerState.query = { sort: "alerts", usage: "slos,dashboards" };
+      const wrapper = mountExplorer();
+      expect(grid.sortBy.value).toBe("alerts");
+      expect([...grid.usageFilters.value].sort()).toEqual(["dashboards", "slos"]);
+      const state = wrapper.findComponent('[data-test="metrics-explorer-views"]').props("state");
+      expect(state).toMatchObject({ sort: "alerts", usage: "dashboards,slos" });
+      grid.sortBy.value = "a-z";
+      grid.usageFilters.value = new Set();
     });
   });
 
@@ -1027,6 +1072,7 @@ describe("MetricsExplorer wiring", () => {
       grid.labelFilters.value = [];
       grid.hideEmptyPanels.value = true;
       grid.sortBy.value = "a-z";
+      grid.usageFilters.value = new Set();
       grid.viewMode.value = "grid";
     });
     afterEach(() => {
