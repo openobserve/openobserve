@@ -39,10 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <TracesLatencyHeatmap
             :request="heatmapRequest"
             :selection="heatmapSelection"
+            :ai-enabled="aiEnabled"
             @select="onHeatmapSelect"
             @filter="heatmapSelection && onHeatmapFilter(heatmapSelection)"
             @drill-down="onHeatmapDrillDown"
             @clear="onHeatmapClear"
+            @ask-ai="onHeatmapAskAi"
           />
         </div>
       </div>
@@ -69,7 +71,10 @@ import { SERIES_OVERRIDE_MATCH_BY } from "@/utils/dashboard/seriesOverrides";
 import metrics from "./metrics.json";
 import { deepCopy } from "@/utils/zincutils";
 import type { MetricsRangeFilter } from "@/ts/interfaces/traces/trace.types";
-import TracesLatencyHeatmap, { type LatencyHeatmapRequest } from "./TracesLatencyHeatmap.vue";
+import TracesLatencyHeatmap, {
+  type LatencyHeatmapAskAi,
+  type LatencyHeatmapRequest,
+} from "./TracesLatencyHeatmap.vue";
 import type { ComparisonSelection, PresetContext } from "./traceComparison";
 import {
   buildLatencyHeatmapSql,
@@ -90,6 +95,14 @@ const RenderDashboardCharts = defineAsyncComponent(
 
 const TracesComparison = defineAsyncComponent(() => import("./TracesComparison.vue"));
 
+export interface AiChatHandoff {
+  query: string;
+  chipName: string;
+  newChat: boolean;
+  autoSend: boolean;
+  context: Record<string, unknown>;
+}
+
 export interface TimeRange {
   startTime: number;
   endTime: number;
@@ -99,12 +112,14 @@ defineProps<{
   streamName: string;
   show?: boolean;
   streamFields?: any[];
+  aiEnabled?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "time-range-selected", range: { start: number; end: number }): void;
   (e: "editor-filter-set", text: string): void;
   (e: "editor-filter-run", text: string): void;
+  (e: "send-to-ai-chat", payload: AiChatHandoff): void;
 }>();
 
 const LATENCY_HEATMAP_PANEL_ID = "traces_latency_heatmap";
@@ -174,6 +189,9 @@ let comparisonEntry: MetricsRangeFilter | null = null;
 let chartsRange: TimeRange | null = null;
 // The editor text the charts ran with; with auto-run off the editor may hold an unrun edit.
 let chartsFilter = "";
+// The stream and mode the charts ran with, for the same reason.
+let chartsStream = "";
+let chartsMode: "spans" | "traces" = "traces";
 // The range the open comparison measured, which its Filter/Exclude restores.
 let comparisonRange: TimeRange | null = null;
 // Store the original time range before selection for baseline comparison
@@ -232,6 +250,8 @@ const loadDashboard = async () => {
     };
     chartsRange = { ...effectiveTimeRange.value };
     chartsFilter = searchObj.data.editorValue ?? "";
+    chartsStream = streamName;
+    chartsMode = isSpansMode ? "spans" : "traces";
     heatmapSelection.value = null;
     convertedDashboard.tabs[0].panels.forEach(
       (
@@ -393,6 +413,37 @@ const onHeatmapClear = () => {
   clearOriginalTimeRange();
   rangeFiltersVersion.value++;
   emit("editor-filter-set", entry.baselineFilter);
+};
+
+// The chip carries the box, the stream and the filter the charts ran; the user writes the question.
+const onHeatmapAskAi = ({ selection, count, band, window }: LatencyHeatmapAskAi) => {
+  const { timeStartUs, timeEndUs, durationLoUs, durationHiUs } = selection;
+  const stream = chartsStream;
+  const mode = chartsMode;
+  const from = new Date(timeStartUs / 1000).toISOString();
+  const to = new Date(timeEndUs / 1000).toISOString();
+  // Model input, not screen copy: kept English, like the traces page's other Ask AI prompts.
+  const query = `I selected a box on the traces latency heatmap. Spans in the box: ${count}. Duration: ${band}. Time: ${from} to ${to} (shown as ${window}). I am searching ${mode}. Stream: ${stream}. The filter expression is: ${chartsFilter.trim() || "(none)"}. This is a WHERE-clause filter — not a full SQL query. What do these spans have in common, and what explains their duration?`;
+  emit("send-to-ai-chat", {
+    query,
+    chipName: t(
+      "traces.latencyHeatmap.selection.askAiChip",
+      { count: count.toLocaleString() },
+      count,
+    ),
+    newChat: true,
+    autoSend: false,
+    context: {
+      currentPage: "traces",
+      selectedStreams: stream ? [stream] : [],
+      streamType: "traces",
+      currentQuery: chartsFilter,
+      searchMode: mode,
+      timeRange: { type: "absolute", startTime: timeStartUs, endTime: timeEndUs },
+      durationRange: { startUs: durationLoUs || null, endUs: durationHiUs },
+      organization_identifier: store.state.selectedOrganization?.identifier ?? "",
+    },
+  });
 };
 
 const onHeatmapFilter = async (selection: LatencyHeatmapSelection) => {

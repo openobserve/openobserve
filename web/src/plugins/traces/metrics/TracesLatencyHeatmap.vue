@@ -87,11 +87,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :style="shownBox.style"
         data-test="traces-latency-heatmap-selection"
       >
-        <OPopover
+        <ODropdown
           :open="popoverOpen"
           side="right"
           align="start"
-          :aria-label="t('traces.latencyHeatmap.selection.label')"
+          content-class="w-[min(18rem,calc(100vw-1.5rem))]"
           @update:open="popoverOpen = $event"
         >
           <template #trigger>
@@ -104,53 +104,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-latency-heatmap-selection-reopen"
             />
           </template>
-          <div class="flex w-64 max-w-[calc(100vw-1.5rem)] flex-col gap-1 p-2">
-            <span
-              class="text-text-heading text-sm font-semibold"
-              data-test="traces-latency-heatmap-selection-count"
-            >
-              {{
-                t(
-                  "traces.latencyHeatmap.selection.count",
-                  { count: shownBox.count.toLocaleString() },
-                  shownBox.count,
-                )
-              }}
-            </span>
-            <span
-              class="text-text-secondary text-xs"
-              data-test="traces-latency-heatmap-selection-range"
-            >
-              {{ shownBox.range }}
-            </span>
-            <div class="mt-1 flex flex-col items-stretch gap-0.5">
-              <OButton
-                variant="ghost"
-                size="sm"
-                data-test="traces-latency-heatmap-selection-filter"
-                @click="filterSelection"
+          <div
+            ref="menuBody"
+            role="group"
+            :aria-label="t('traces.latencyHeatmap.selection.label')"
+            data-test="traces-latency-heatmap-selection-menu"
+          >
+            <div class="flex flex-col gap-0.5 px-3 py-1.5">
+              <span
+                class="text-text-heading text-sm font-semibold"
+                data-test="traces-latency-heatmap-selection-count"
               >
-                {{ t("traces.latencyHeatmap.selection.filter") }}
-              </OButton>
-              <OButton
-                variant="ghost"
-                size="sm"
-                data-test="traces-latency-heatmap-selection-drill-down"
-                @click="drillDown"
+                {{
+                  t(
+                    "traces.latencyHeatmap.selection.count",
+                    { count: shownBox.count.toLocaleString() },
+                    shownBox.count,
+                  )
+                }}
+              </span>
+              <span
+                class="text-text-secondary text-xs"
+                data-test="traces-latency-heatmap-selection-range"
               >
-                {{ t("traces.latencyHeatmap.selection.drillDown") }}
-              </OButton>
-              <OButton
-                variant="ghost"
-                size="sm"
-                data-test="traces-latency-heatmap-selection-clear"
-                @click="emit('clear')"
-              >
-                {{ t("traces.latencyHeatmap.selection.clear") }}
-              </OButton>
+                {{ shownBox.range }}
+              </span>
             </div>
+            <ODropdownSeparator />
+            <ODropdownItem
+              icon-left="filter-alt"
+              shortcut="f"
+              data-test="traces-latency-heatmap-selection-filter"
+              @select="filterSelection"
+            >
+              {{ t("traces.latencyHeatmap.selection.filter") }}
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="timeline"
+              shortcut="d"
+              data-test="traces-latency-heatmap-selection-drill-down"
+              @select="drillDown"
+            >
+              {{ t("traces.latencyHeatmap.selection.drillDown") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="aiEnabled"
+              data-test="traces-latency-heatmap-selection-ask-ai"
+              @select="askAi"
+            >
+              <template #icon-left>
+                <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+              </template>
+              {{ t("traces.latencyHeatmap.selection.askAi") }}
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="close"
+              shortcut="esc"
+              data-test="traces-latency-heatmap-selection-clear"
+              @select="clearSelection"
+            >
+              {{ t("traces.latencyHeatmap.selection.clear") }}
+            </ODropdownItem>
           </div>
-        </OPopover>
+        </ODropdown>
       </div>
     </div>
   </div>
@@ -161,11 +177,14 @@ import { computed, defineAsyncComponent, onBeforeUnmount, ref, shallowRef, watch
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useTheme from "@/composables/useTheme";
+import { useAiIcon } from "@/composables/useAiIcon";
 import searchService from "@/services/search";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -192,6 +211,13 @@ const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
 );
 
+export interface LatencyHeatmapAskAi {
+  selection: LatencyHeatmapSelection;
+  count: number;
+  band: string;
+  window: string;
+}
+
 export interface LatencyHeatmapRequest {
   sql: string;
   startTime: number;
@@ -201,6 +227,7 @@ export interface LatencyHeatmapRequest {
 const props = defineProps<{
   request: LatencyHeatmapRequest | null;
   selection?: LatencyHeatmapSelection | null;
+  aiEnabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -208,11 +235,13 @@ const emit = defineEmits<{
   (e: "filter"): void;
   (e: "drill-down"): void;
   (e: "clear"): void;
+  (e: "ask-ai", payload: LatencyHeatmapAskAi): void;
 }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
 const { isDark } = useTheme();
+const { aiIconSrc } = useAiIcon();
 
 const MINUTE_US = 60 * 1_000_000;
 // ECharts canvas sizes are pixel numbers with no CSS cascade, and no chart size tokens exist.
@@ -227,6 +256,8 @@ const drawn = shallowRef<{ selection: LatencyHeatmapSelection; cells: HeatmapCel
   null,
 );
 const popoverOpen = ref(false);
+// Once filtered, the box stands for the staged filter, so only Clear or a reload may erase it.
+const filtered = ref(false);
 
 let controller: AbortController | null = null;
 
@@ -237,6 +268,8 @@ async function load(request: LatencyHeatmapRequest | null) {
   controller = null;
   grid.value = null;
   drawn.value = null;
+  popoverOpen.value = false;
+  filtered.value = false;
   if (!request) {
     status.value = "idle";
     return;
@@ -464,16 +497,67 @@ const onDataZoom = (box: HeatmapBox) => {
   const selection = selectionFromBox(grid.value, box);
   drawn.value = { selection, cells: boxCells(grid.value, box) };
   popoverOpen.value = true;
+  filtered.value = false;
   emit("select", selection);
 };
 
 const filterSelection = () => {
   popoverOpen.value = false;
+  filtered.value = true;
   emit("filter");
 };
 
+// The Drill down panel keeps its own copy of the selection, so only the drawn box goes.
 const drillDown = () => {
   popoverOpen.value = false;
+  if (!filtered.value) drawn.value = null;
   emit("drill-down");
 };
+
+const askAi = () => {
+  const d = drawn.value;
+  const g = grid.value;
+  popoverOpen.value = false;
+  if (!filtered.value) drawn.value = null;
+  if (!d || !g) return;
+  emit("ask-ai", {
+    selection: d.selection,
+    count: spansInCells(g, d.cells),
+    band: bandText(d.selection),
+    window: windowText(d.selection.timeStartUs, d.selection.timeEndUs),
+  });
+};
+
+const clearSelection = () => {
+  popoverOpen.value = false;
+  filtered.value = false;
+  drawn.value = null;
+  emit("clear");
+};
+
+const menuBody = ref<HTMLElement | null>(null);
+const MENU_KEYS: Record<string, () => void> = {
+  f: filterSelection,
+  d: drillDown,
+  escape: clearSelection,
+};
+
+// On document, not the menu body: the menu content itself holds focus on open, and reka's Escape only closes.
+const onMenuKeydown = (event: KeyboardEvent) => {
+  const content = menuBody.value?.closest<HTMLElement>('[role="menu"]');
+  if (!content || !(event.target instanceof Node) || !content.contains(event.target)) return;
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  const action = MENU_KEYS[event.key.toLowerCase()];
+  if (!action) return;
+  event.preventDefault();
+  event.stopPropagation();
+  action();
+};
+
+watch(popoverOpen, (open) => {
+  if (open) document.addEventListener("keydown", onMenuKeydown, true);
+  else document.removeEventListener("keydown", onMenuKeydown, true);
+});
+
+onBeforeUnmount(() => document.removeEventListener("keydown", onMenuKeydown, true));
 </script>

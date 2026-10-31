@@ -481,32 +481,45 @@ describe("TracesLatencyHeatmap", () => {
       durationLoUs: 100_000,
       durationHiUs: 500_000,
     };
-    const popoverStub = {
-      OPopover: {
-        name: "OPopover",
-        props: ["open"],
-        emits: ["update:open"],
-        // Models reka's trigger, which toggles the popover on a click of its child.
-        template:
-          '<div><div @click="$emit(\'update:open\', !open)"><slot name="trigger" /></div><div v-if="open"><slot /></div></div>',
-      },
-    };
-    const close = async () => {
-      wrapper.findComponent({ name: "OPopover" }).vm.$emit("update:open", false);
+    // The real menu portals into <body>, so the heatmap is attached and queried there.
+    const mountAttached = async (props: Record<string, unknown> = {}) => {
+      const w = mount(TracesLatencyHeatmap, {
+        props: { request: request(), selection: null, ...props },
+        attachTo: document.body,
+        global: { plugins: [i18n, store] },
+      });
       await settle();
+      return w;
     };
+    const el = (name: string) =>
+      document.body.querySelector<HTMLElement>(
+        `[data-test="traces-latency-heatmap-selection-${name}"]`,
+      );
+    const menu = () => document.body.querySelector<HTMLElement>('[role="menu"]');
     const drawn = () => wrapper.find('[data-test="traces-latency-heatmap-selection"]');
-    const action = (name: string) =>
-      wrapper.find(`[data-test="traces-latency-heatmap-selection-${name}"]`);
     // The parent stores what the heatmap emits and hands it back, as TracesMetricsDashboard does.
     const drawBox = async () => {
       wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("updated:dataZoom", BOX);
       await wrapper.setProps({ selection: wrapper.emitted("select")!.at(-1)![0] });
       await settle();
     };
+    const press = async (key: string, target: Element | null = document.activeElement) => {
+      target!.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+      await settle();
+    };
+    const choose = async (name: string) => {
+      el(name)!.click();
+      await settle();
+    };
+
+    afterEach(() => {
+      wrapper?.unmount();
+      wrapper = null;
+      document.body.innerHTML = "";
+    });
 
     it("keeps the box drawn after the chart resets its zoom brush", async () => {
-      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      wrapper = await mountAttached();
       expect(drawn().exists()).toBe(false);
       await drawBox();
       expect(wrapper.emitted("select")).toEqual([[SELECTED]]);
@@ -516,45 +529,139 @@ describe("TracesLatencyHeatmap", () => {
       expect(JSON.stringify(options(wrapper))).not.toContain("markArea");
     });
 
-    it("summarises the selection with its span count, duration band and time window", async () => {
-      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+    it("opens as a menu headed by the span count, duration band and time window", async () => {
+      wrapper = await mountAttached();
       await drawBox();
-      expect(action("count").text()).toBe("40 spans selected");
-      expect(action("range").text()).toBe("100ms–500ms · 10:00:10–10:00:30");
+      expect(menu()).not.toBeNull();
+      expect(el("count")!.textContent!.trim()).toBe("40 spans selected");
+      expect(el("range")!.textContent!.trim()).toBe("100ms–500ms · 10:00:10–10:00:30");
+      expect(menu()!.querySelector('[role="separator"]')).not.toBeNull();
+    });
+
+    it("lists each action as a menu item with its icon and key hint", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      const items = [...menu()!.querySelectorAll('[role="menuitem"]')];
+      expect(items.map((i) => i.getAttribute("data-test"))).toEqual([
+        "traces-latency-heatmap-selection-filter",
+        "traces-latency-heatmap-selection-drill-down",
+        "traces-latency-heatmap-selection-clear",
+      ]);
+      const hint = (i: Element) => i.querySelector("kbd")!.textContent!.trim();
+      const label = (i: Element) => {
+        const copy = i.cloneNode(true) as Element;
+        copy.querySelector("kbd")!.remove();
+        return copy.textContent!.trim();
+      };
+      expect(items.map(label)).toEqual(["Filter to selection", "Drill down", "Clear selection"]);
+      expect(items.map(hint)).toEqual(["F", "D", "Esc"]);
+      for (const item of items) expect(item.querySelector("svg")).not.toBeNull();
+    });
+
+    it("moves focus into the menu when it opens", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      expect(menu()!.contains(document.activeElement)).toBe(true);
+    });
+
+    it("moves between items with the arrow keys, like the other menus", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      el("filter")!.focus();
+      await press("ArrowDown");
+      expect(document.activeElement).toBe(el("drill-down"));
+      await press("ArrowDown");
+      expect(document.activeElement).toBe(el("clear"));
+    });
+
+    it("runs F as soon as the menu opens, while the menu itself holds focus", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await press("f");
+      expect(wrapper.emitted("filter")).toHaveLength(1);
+      expect(menu()).toBeNull();
+    });
+
+    it("keeps the box but closes the menu after Filter to selection", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await choose("filter");
+      expect(wrapper.emitted("filter")).toHaveLength(1);
+      expect(menu()).toBeNull();
+      expect(drawn().exists()).toBe(true);
+      expect(el("reopen")).not.toBeNull();
+    });
+
+    it("closes the menu and erases the box after Drill down, the parent still holding the selection", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await choose("drill-down");
+      expect(wrapper.emitted("drill-down")).toHaveLength(1);
+      expect(menu()).toBeNull();
+      expect(drawn().exists()).toBe(false);
+      expect(wrapper.emitted("clear")).toBeUndefined();
+    });
+
+    it("closes the menu and erases the box after Clear selection", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await choose("clear");
+      expect(wrapper.emitted("clear")).toHaveLength(1);
+      expect(menu()).toBeNull();
+      expect(drawn().exists()).toBe(false);
+    });
+
+    it("clears the selection on Escape", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await press("Escape");
+      expect(wrapper.emitted("clear")).toHaveLength(1);
+      expect(menu()).toBeNull();
+      expect(drawn().exists()).toBe(false);
     });
 
     it.each([
-      ["filter", "filter", "Filter to selection"],
-      ["drill-down", "drill-down", "Drill down"],
-      ["clear", "clear", "Clear selection"],
-    ])("emits %s from its popover action", async (name, event, label) => {
-      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      ["f", "filter", true],
+      ["d", "drill-down", false],
+    ])("runs the action whose hint is %s", async (key, event, boxStays) => {
+      wrapper = await mountAttached();
       await drawBox();
-      expect(action(name).text()).toBe(label);
-      await action(name).trigger("click");
+      await press(key);
       expect(wrapper.emitted(event)).toHaveLength(1);
+      expect(menu()).toBeNull();
+      expect(drawn().exists()).toBe(boxStays);
+    });
+
+    it("leaves the box and the parent selection alone when the menu is dismissed outside", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      wrapper.findComponent({ name: "ODropdown" }).vm.$emit("update:open", false);
+      await settle();
+      expect(drawn().exists()).toBe(true);
+      expect(wrapper.emitted("clear")).toBeUndefined();
+    });
+
+    it("reopens the menu from the box's corner control, a labelled button, after it was dismissed", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      wrapper.findComponent({ name: "ODropdown" }).vm.$emit("update:open", false);
+      await settle();
+      expect(menu()).toBeNull();
+      const reopen = el("reopen")!;
+      expect(reopen.tagName).toBe("BUTTON");
+      expect(reopen.getAttribute("aria-label")).toBe("Show selection actions");
+      expect(reopen.classList).toContain("pointer-events-auto");
+      expect(drawn().element.contains(reopen)).toBe(true);
+      reopen.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await settle();
+      expect(el("count")).not.toBeNull();
     });
 
     it("lets a drag that starts inside the box reach the chart, so a smaller box can be drawn", async () => {
-      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      wrapper = await mountAttached();
       await drawBox();
       expect(drawn().element.tagName).not.toBe("BUTTON");
       expect(drawn().classes()).toContain("pointer-events-none");
-    });
-
-    it("reopens the popover from the box's corner control, a labelled button, after it was dismissed", async () => {
-      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
-      await drawBox();
-      await close();
-      expect(action("count").exists()).toBe(false);
-      const reopen = action("reopen");
-      expect(reopen.element.tagName).toBe("BUTTON");
-      expect(reopen.attributes("aria-label")).toBe("Show selection actions");
-      expect(reopen.classes()).toContain("pointer-events-auto");
-      expect(drawn().element.contains(reopen.element)).toBe(true);
-      await reopen.trigger("click");
-      await settle();
-      expect(action("count").exists()).toBe(true);
     });
 
     it("groups the span count's digits, as the Drill down panel does", async () => {
@@ -562,33 +669,114 @@ describe("TracesLatencyHeatmap", () => {
         hits: [{ ...HITS[0], span_count: 460_122 }, HITS[1]],
         histogram_interval: 10,
       });
-      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      wrapper = await mountAttached();
       await drawBox();
-      expect(action("count").text()).toBe(`${(460_122).toLocaleString()} spans selected`);
-    });
-
-    it("closes the popover once the selection is filtered", async () => {
-      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
-      await drawBox();
-      await action("filter").trigger("click");
-      await settle();
-      expect(wrapper.emitted("filter")).toHaveLength(1);
-      expect(action("count").exists()).toBe(false);
+      expect(el("count")!.textContent!.trim()).toBe(`${(460_122).toLocaleString()} spans selected`);
     });
 
     it("erases the box once the parent drops the selection", async () => {
-      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      wrapper = await mountAttached();
       await drawBox();
       await wrapper.setProps({ selection: null });
       expect(drawn().exists()).toBe(false);
     });
 
     it("forgets the box when a new search reloads the grid", async () => {
-      wrapper = await mountHeatmap({ request: request(), selection: null }, popoverStub);
+      wrapper = await mountAttached();
       await drawBox();
       await wrapper.setProps({ request: request("SELECT 2") });
       await settle();
       expect(drawn().exists()).toBe(false);
+    });
+
+    const reopenMenu = async () => {
+      el("reopen")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await settle();
+    };
+
+    it.each([
+      ["drill-down", false],
+      ["ask-ai", true],
+    ])(
+      "keeps the box of a filtered selection after %s, so Clear can still undo the filter",
+      async (action, aiEnabled) => {
+        wrapper = await mountAttached({ aiEnabled });
+        await drawBox();
+        await choose("filter");
+        await reopenMenu();
+        await choose(action);
+        expect(wrapper.emitted(action)).toHaveLength(1);
+        expect(menu()).toBeNull();
+        expect(drawn().exists()).toBe(true);
+        expect(wrapper.emitted("clear")).toBeUndefined();
+        await reopenMenu();
+        await choose("clear");
+        expect(wrapper.emitted("clear")).toHaveLength(1);
+        expect(drawn().exists()).toBe(false);
+      },
+    );
+
+    it("erases a new box on Drill down again after a filtered box was cleared", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await choose("filter");
+      await reopenMenu();
+      await choose("clear");
+      await wrapper.setProps({ selection: null });
+      await drawBox();
+      await choose("drill-down");
+      expect(drawn().exists()).toBe(false);
+    });
+
+    it("erases a new box on Drill down after a reload dropped the filtered one", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await choose("filter");
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+      await drawBox();
+      await choose("drill-down");
+      expect(drawn().exists()).toBe(false);
+    });
+
+    it("closes the menu when a new search reloads the grid while it is open", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await wrapper.setProps({ request: request("SELECT 2") });
+      await settle();
+      // The menu is gone with the box, so its open flag is the only trace left of the old box.
+      expect((wrapper.vm as any).popoverOpen).toBe(false);
+    });
+
+    it("draws a new box after an erased one, with the menu open again", async () => {
+      wrapper = await mountAttached();
+      await drawBox();
+      await choose("drill-down");
+      await drawBox();
+      expect(drawn().exists()).toBe(true);
+      expect(menu()).not.toBeNull();
+    });
+
+    describe("Ask AI", () => {
+      it("is hidden when AI is off", async () => {
+        wrapper = await mountAttached({ aiEnabled: false });
+        await drawBox();
+        expect(el("ask-ai")).toBeNull();
+      });
+
+      it("hands the selection to AI, then closes the menu and erases the box", async () => {
+        wrapper = await mountAttached({ aiEnabled: true });
+        await drawBox();
+        expect(el("ask-ai")!.textContent!.trim()).toBe("Ask AI");
+        expect(el("ask-ai")!.querySelector("img")).not.toBeNull();
+        await choose("ask-ai");
+        expect(wrapper.emitted("ask-ai")).toEqual([
+          [{ selection: SELECTED, count: 40, band: "100ms–500ms", window: "10:00:10–10:00:30" }],
+        ]);
+        expect(menu()).toBeNull();
+        expect(drawn().exists()).toBe(false);
+        expect(wrapper.emitted("clear")).toBeUndefined();
+      });
     });
   });
 });

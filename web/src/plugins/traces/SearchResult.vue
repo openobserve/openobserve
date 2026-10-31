@@ -173,9 +173,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :filter="searchObj.data.editorValue"
             :streamFields="searchObj.data.stream.selectedStreamFields"
             :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
+            :ai-enabled="aiEnabled"
             @time-range-selected="onMetricsTimeRangeSelected"
             @editor-filter-set="onMetricsEditorFilterSet"
             @editor-filter-run="onMetricsEditorFilterRun"
+            @send-to-ai-chat="(v) => $emit('send-to-ai-chat', v)"
           />
         </transition>
 

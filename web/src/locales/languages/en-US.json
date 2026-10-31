@@ -14791,6 +14791,8 @@
         "range": "{band} · {window}",
         "filter": "Filter to selection",
         "drillDown": "Drill down",
+        "askAi": "Ask AI",
+        "askAiChip": "Heatmap selection · {count} span | Heatmap selection · {count} spans",
         "clear": "Clear selection"
       }
     },
