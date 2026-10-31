@@ -1524,7 +1524,7 @@ describe("Header Component", () => {
   });
 
   describe("My on-call item (U1)", () => {
-    const mountMenu = (oncall_enabled: boolean, hasRoute: boolean) => {
+    const mountMenu = (oncall_enabled: boolean | undefined, hasRoute: boolean) => {
       const store = {
         ...mockStore,
         state: { ...mockStore.state, zoConfig: { ...mockStore.state.zoConfig, oncall_enabled } },
@@ -1570,6 +1570,7 @@ describe("Header Component", () => {
     it.each([
       ["on-call is off", false, true],
       ["the build has no on-call routes", true, false],
+      ["the full config has not loaded yet", undefined, true],
     ])("is absent when %s", (_case, oncallEnabled, hasRoute) => {
       const w = mountMenu(oncallEnabled, hasRoute);
       expect(w.find('[data-test="header-my-oncall"]').exists()).toBe(false);

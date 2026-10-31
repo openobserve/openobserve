@@ -14,6 +14,7 @@ const PROFILE = '[data-test="header-my-account-profile-icon"]';
 const THEME_ROW = '[data-test="menu-link-predefined-themes-item"]';
 const EN_OPTION = '[data-test="language-dropdown-item-en-us"]';
 const LANGUAGE_COOKIE = "vue3-typescript-admin-languageKey";
+const ONCALL_ROW = '[data-test="header-my-oncall"]';
 
 async function setLanguageCookie(page, code) {
   const url = new URL(process.env.ZO_BASE_URL);
@@ -23,6 +24,18 @@ async function setLanguageCookie(page, code) {
 }
 
 const isFocused = (locator) => locator.evaluate((el) => el === document.activeElement);
+
+// ODropdownItem animates its colours over 150 ms; read once its transitions have finished.
+async function settledBackground(locator) {
+  await expect.poll(() => locator.evaluate((el) => el.getAnimations().length)).toBe(0);
+  return locator.evaluate((el) => getComputedStyle(el).backgroundColor);
+}
+
+const focusedMenuRow = (page) =>
+  page.evaluate(() => {
+    const el = document.activeElement;
+    return el && el.closest('[role="menu"]') ? el.getAttribute("data-test") || el.textContent.trim() : null;
+  });
 
 async function openProfileMenuByKeyboard(page) {
   await page.locator(PROFILE).focus();
@@ -61,14 +74,11 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
         await expect(row).toHaveAttribute("aria-expanded", "false");
 
         testLogger.step("Focus style matches the sibling items");
-        // ODropdownItem animates its colours over 150 ms; read after the transition has settled.
-        await page.waitForTimeout(300);
-        const rowBg = await row.evaluate((el) => getComputedStyle(el).backgroundColor);
+        const rowBg = await settledBackground(row);
         await page.keyboard.press("ArrowDown");
         const themeRow = page.locator(THEME_ROW);
         expect(await isFocused(themeRow)).toBe(true);
-        await page.waitForTimeout(300);
-        const siblingBg = await themeRow.evaluate((el) => getComputedStyle(el).backgroundColor);
+        const siblingBg = await settledBackground(themeRow);
         expect(rowBg).toBe(siblingBg);
         await page.keyboard.press("ArrowUp");
         expect(await isFocused(row)).toBe(true);
@@ -137,6 +147,8 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
         await expect(page.locator(PROFILE)).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.dir || "ltr")).toBe("ltr");
 
+        // The mouse path does not depend on size or direction, so one variant pays for its reload.
+        if (size.width !== SIZES[0].width || dir !== "ltr") return;
         testLogger.step("The same choice works by mouse");
         await page.locator(PROFILE).click();
         await page.locator(ROW).click();
@@ -148,4 +160,51 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
       });
     }
   }
+
+  test("My on-call stays out of the menu while the full config loads, so arrows keep focus in it", async ({
+    page,
+  }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    const fullConfigPath = `/api/${process.env.ORGNAME}/config`;
+    let release;
+    const released = new Promise((resolve) => (release = resolve));
+    await page.route(
+      (url) => url.pathname.endsWith(fullConfigPath),
+      async (route) => {
+        await released;
+        const response = await route.fetch();
+        const json = { ...(await response.json()), oncall_enabled: false };
+        await route.fulfill({ response, json });
+      },
+    );
+    await page.addInitScript((selector) => {
+      window.__oncallRowSeen = false;
+      new MutationObserver(() => {
+        if (document.querySelector(selector)) window.__oncallRowSeen = true;
+      }).observe(document, { childList: true, subtree: true });
+    }, ONCALL_ROW);
+    await page.setViewportSize(SIZES[0]);
+    await setLanguageCookie(page, "en-us");
+
+    testLogger.step("Open the profile menu by keyboard while the full config is held");
+    await navigateToBase(page);
+    await openProfileMenuByKeyboard(page);
+    await expect(page.locator(ONCALL_ROW)).toHaveCount(0);
+
+    testLogger.step("Release the full config with on-call off");
+    const fulfilled = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith(fullConfigPath));
+    release();
+    await fulfilled;
+    await expect(page.locator(ROW)).toBeVisible();
+
+    testLogger.step("Arrow keys still move between menu rows");
+    await page.keyboard.press("ArrowDown");
+    const first = await focusedMenuRow(page);
+    expect(first, "focus is inside the menu").not.toBeNull();
+    await page.keyboard.press("ArrowDown");
+    const second = await focusedMenuRow(page);
+    expect(second, "focus is inside the menu").not.toBeNull();
+    expect(second).not.toBe(first);
+    expect(await page.evaluate(() => window.__oncallRowSeen), "My on-call never rendered").toBe(false);
+  });
 });
