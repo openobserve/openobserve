@@ -230,6 +230,20 @@ export const getPromqlLegendName = (
   }
 };
 
+const MAX_EXPR_LEGEND = 60;
+
+/**
+ * A query that aggregates every label away (`avg(up)`) returns a series with no
+ * labels, which would otherwise read "{}". The query text names it instead.
+ * Series that carry labels keep their label-based names.
+ */
+export const labelFreeName = (metric: any, expr?: string): string | undefined => {
+  if (!metric || typeof metric !== "object" || Object.keys(metric).length) return undefined;
+  const text = expr?.replace(/\s+/g, " ").trim();
+  if (!text) return undefined;
+  return text.length > MAX_EXPR_LEGEND ? `${text.slice(0, MAX_EXPR_LEGEND)}...` : text;
+};
+
 /**
  * Names every series in a panel at once, so series that would otherwise share a
  * name can be told apart.
@@ -248,16 +262,18 @@ export const getPromqlLegendName = (
  * Returns a Map keyed by the metric object each series was built from.
  */
 export const buildPromqlSeriesNames = (
-  queries: { metrics: any[]; template?: string; fallback?: string }[],
+  queries: { metrics: any[]; template?: string; fallback?: string; expr?: string }[],
   semanticGroups: FieldAlias[] = [],
 ): Map<any, string> => {
   const names = new Map<any, string>();
+  const fallbackOf = (query: { fallback?: string; expr?: string }, metric: any) =>
+    query.fallback ?? labelFreeName(metric, query.expr);
 
   // A templated query names itself and takes no part in the shared vocabulary.
   const templated = queries.filter((q) => q.template);
   for (const query of templated) {
     for (const metric of query.metrics) {
-      names.set(metric, getPromqlLegendName(metric, query.template!, query.fallback));
+      names.set(metric, getPromqlLegendName(metric, query.template!, fallbackOf(query, metric)));
     }
   }
 
@@ -281,7 +297,7 @@ export const buildPromqlSeriesNames = (
 
   const fallbackFor = new Map<any, string | undefined>();
   for (const query of auto)
-    for (const metric of query.metrics) fallbackFor.set(metric, query.fallback);
+    for (const metric of query.metrics) fallbackFor.set(metric, fallbackOf(query, metric));
 
   for (const metric of allMetrics) {
     names.set(metric, getPromqlLegendName(metric, "", fallbackFor.get(metric), varying, preferred));

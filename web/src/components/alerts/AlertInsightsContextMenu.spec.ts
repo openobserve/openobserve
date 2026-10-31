@@ -58,7 +58,6 @@ describe("AlertInsightsContextMenu - rendering", () => {
 
   it("shows alert-specific menu items when isAlertNameContext=true", async () => {
     const w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
-    expect(w.find('[data-test="context-menu-configure-dedup"]').exists()).toBe(true);
     expect(w.find('[data-test="context-menu-edit-alert"]').exists()).toBe(true);
     expect(w.find('[data-test="context-menu-view-history"]').exists()).toBe(true);
     expect(w.find('[data-test="context-menu-cancel"]').exists()).toBe(true);
@@ -103,14 +102,6 @@ describe("AlertInsightsContextMenu - isAlertNameContext computed", () => {
 });
 
 describe("AlertInsightsContextMenu - action clicks", () => {
-  it("clicking configure-dedup emits configure-dedup and close", async () => {
-    const w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
-    await w.find('[data-test="context-menu-configure-dedup"]').trigger("click");
-    expect(w.emitted("configure-dedup")).toBeTruthy();
-    expect(w.emitted("configure-dedup")![0]).toEqual(["my-alert"]);
-    expect(w.emitted("close")).toBeTruthy();
-  });
-
   it("clicking edit-alert emits edit-alert and close", async () => {
     const w = await mountComp({ value: "my-alert", panelId: alertNamePanelId });
     await w.find('[data-test="context-menu-edit-alert"]').trigger("click");

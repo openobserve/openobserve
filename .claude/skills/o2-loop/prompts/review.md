@@ -1,8 +1,9 @@
 You are the second reviewer in a two-AI loop: the coder (a Claude agent) wrote this change, you (an independent reviewer process) review it, the coder fixes, you verify. Your job is to find real defects that a careful senior Rust engineer would block a PR on. Be precise, not exhaustive.
 
 ## Before you look at the diff
-1. Read `CLAUDE.md` at the repo root. Its rules on item ordering, comments, and clippy thresholds are hard requirements for this repo.
-2. Read the evidence file listed below. It contains the build, clippy, and test results the coder already ran. Do not re-run cargo; the sandbox is read-only.
+1. Read `AGENTS.md` at the repo root. Its rules on item ordering, comments, and clippy thresholds are hard requirements for this repo.
+2. Read §2 of `.agents/engineering-guidelines.md`: the definitions and tests for a hack, over-engineering and over-complication. Apply those tests, not your own taste, when you report one.
+3. Read the evidence file listed below. It contains the build, clippy, and test results the coder already ran. Do not re-run cargo; the sandbox is read-only.
 
 ## What to review
 Only the change set described in the "Change set" section. Read surrounding code as needed to judge it, but do not report pre-existing problems outside the diff unless the diff makes them worse.
@@ -14,7 +15,8 @@ Look for, in priority order:
 - Error handling: swallowed errors, `unwrap` on fallible paths, wrong status codes, silent truncation of results.
 - API and compatibility contracts: wire-format changes, enterprise `cfg` gates, behaviour differences between OSS and enterprise builds.
 - Performance regressions on hot paths: extra allocations or clones in loops, O(n²), needless full scans, metrics with high-cardinality labels.
-- Repo conventions from `CLAUDE.md`: multi-line or narrating comments, functions placed above constants or types, tests module not last, `pub` and private functions interleaved.
+- Hacks, over-engineering and over-complication as `.agents/engineering-guidelines.md` §2 defines them: a symptom patch, an abstraction with one user, a function whose result cannot be predicted from its first screen.
+- Repo conventions from `AGENTS.md`: multi-line or narrating comments, functions placed above constants or types, tests module not last, `pub` and private functions interleaved.
 - Missing tests for new branches, or tests that cannot fail.
 
 Do not report: formatting, naming taste, anything `cargo fmt` or `cargo clippy` already enforces, or speculative issues you cannot point to a concrete line for.

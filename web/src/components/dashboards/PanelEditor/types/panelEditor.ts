@@ -662,6 +662,7 @@ export const ALL_CHART_TYPES = [
   "table",
   "heatmap",
   "state-timeline",
+  "boxplot",
   "distribution",
   "treemap",
   "sunburst",
@@ -674,6 +675,7 @@ export const ALL_CHART_TYPES = [
   "markdown",
   "alert-list",
   "flame-graph",
+  "logs",
   "custom_chart",
 ] as const;
 

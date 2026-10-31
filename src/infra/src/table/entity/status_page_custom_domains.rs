@@ -2,7 +2,9 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Default, Debug, PartialEq, DeriveEntityModel, serde::Serialize, serde::Deserialize,
+)]
 #[sea_orm(table_name = "status_page_custom_domains")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]

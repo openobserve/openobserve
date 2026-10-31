@@ -211,6 +211,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'funnel',
                           'node-graph',
                           'flame-graph',
+                          'boxplot',
+                          'logs',
                           'geomap',
                           'maps',
                         ].includes(dashboardPanelData.data.type)
@@ -1465,6 +1467,7 @@ watch(
 
 watch(
   () => [
+    dashboardPanelData.data.type,
     dashboardPanelData.data.config?.heatmap_y_bucket,
     dashboardPanelData.data.config?.heatmap_y_min,
     dashboardPanelData.data.config?.heatmap_y_max,

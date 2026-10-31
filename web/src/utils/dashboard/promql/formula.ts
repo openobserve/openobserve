@@ -139,6 +139,15 @@ export const substituteFormula = (
   return { expr: expr + formula.slice(last) };
 };
 
+/** A query's text for naming a label-free series: as sent, with dashboard variables filled in. */
+export const legendExprOf = (
+  queries: any[] | undefined,
+  metadata: any,
+  index: number,
+): string | undefined =>
+  metadata?.queries?.find((meta: any) => meta?.panelQueryIndex === index && meta?.query)?.query ??
+  queries?.[index]?.query;
+
 /** Inputs get their letter only beside a formula, so formula-free panels keep today's legends. */
 export const legendFallbackOf = (queries: any[] | undefined, index: number): string | undefined => {
   const query = queries?.[index];

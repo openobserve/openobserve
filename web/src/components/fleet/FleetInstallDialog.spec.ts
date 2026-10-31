@@ -428,6 +428,37 @@ describe("FleetInstallDialog", () => {
     );
   });
 
+  it("polls for the collector of a token created in place and shows it connected", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const created = token({ id: "t9", name: "new", fleet: { id: "empty", name: "empty" } });
+    vi.mocked(fleet.createToken).mockResolvedValue({
+      data: { ...created, token: "o2ft_fresh" },
+    } as any);
+    vi.mocked(fleet.listCollectors).mockResolvedValue({ data: { total: 0, items: [] } } as any);
+    wrapper = mountDialog({ fleetId: "empty" });
+    await flushPromises();
+    vi.mocked(fleet.listTokens).mockResolvedValue({ data: { items: [created] } } as any);
+    const form = (wrapper.findComponent({ name: "OForm" }).vm as any).form;
+    form.setFieldValue("name", "new");
+    await wrapper.find("form").trigger("submit");
+    await vi.waitFor(async () => {
+      await flushPromises();
+      expect(wrapper.findComponent(FleetInstallCommand).exists()).toBe(true);
+    });
+    await pollWith([]);
+    await pollWith([
+      collector({
+        id: "c9",
+        name: "node-new",
+        token_id: "t9",
+        fleet: { id: "empty", name: "empty" },
+      }),
+    ]);
+    expect(wrapper.find('[data-test="fleet-install-dialog-connected"]').text()).toContain(
+      "node-new",
+    );
+  });
+
   it("keeps a create started for one fleet out of another fleet's dialog", async () => {
     let resolve!: (v: unknown) => void;
     vi.mocked(fleet.createToken).mockReturnValue(new Promise((r) => (resolve = r)) as any);

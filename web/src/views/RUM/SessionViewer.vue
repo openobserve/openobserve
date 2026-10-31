@@ -888,11 +888,11 @@ const searchWithRetry = (req: any, options: RetryOptions = { isCancelled: () => 
 const getSession = async () => {
   let geoFields = "";
 
-  if (performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_country"]) {
+  if (performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_city"]) {
     geoFields += "min(geo_info_city) as city,";
   }
 
-  if (performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_city"]) {
+  if (performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_country"]) {
     geoFields += "min(geo_info_country) as country,";
   }
 
