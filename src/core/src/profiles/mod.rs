@@ -415,11 +415,7 @@ async fn buffer_records(
     if !stream_schema_map.contains_key(stream_name) {
         let mut schema = infra::schema::get(org_id, stream_name, StreamType::Profiles).await?;
         if schema.fields().is_empty() {
-            let first_str = json::to_string(&records[0]).unwrap();
-            let mut schema_reader = BufReader::new(first_str.as_bytes());
-            let inferred_schema =
-                infer_json_schema(&mut schema_reader, None, StreamType::Profiles)?;
-            schema = inferred_schema;
+            schema = new_stream_schema(org_id, stream_name, &records[0])?;
             db::schema::merge(
                 org_id,
                 stream_name,
@@ -483,6 +479,25 @@ async fn buffer_records(
         hour_buf.records_size += record_str_len;
     }
     Ok(())
+}
+
+/// check_for_schema takes its fast path once this schema is saved, so the columns limit is checked
+/// here.
+fn new_stream_schema(
+    org_id: &str,
+    stream_name: &str,
+    first_record: &json::Map<String, json::Value>,
+) -> Result<arrow_schema::Schema, anyhow::Error> {
+    let first_str = json::to_string(first_record).unwrap();
+    let mut schema_reader = BufReader::new(first_str.as_bytes());
+    let schema = infer_json_schema(&mut schema_reader, None, StreamType::Profiles)?;
+    schema::check_request_columns_limit(
+        org_id,
+        StreamType::Profiles,
+        stream_name,
+        schema.fields().len(),
+    )?;
+    Ok(schema)
 }
 
 /// Redacts flattened profile records before they are buffered for the WAL.
@@ -2029,6 +2044,21 @@ mod tests {
             Err(ProfilesExportError::InvalidArgument(msg)) if msg.starts_with("Stream name too long")
         );
         assert_eq!(rejected, bounded);
+    }
+
+    #[test]
+    fn new_stream_over_columns_limit_is_rejected() {
+        let limit = get_config().limit.req_cols_per_record_limit;
+        let mut record = json::Map::new();
+        record.insert(TIMESTAMP_COL_NAME.to_string(), json::json!(now_micros()));
+        for i in 0..=limit {
+            record.insert(format!("attr_{i}"), json::json!("v"));
+        }
+        let err = new_stream_schema("test_org_id", "profiles_columns_limit", &record).unwrap_err();
+        assert!(
+            err.to_string().contains("ZO_COLS_PER_RECORD_LIMIT"),
+            "{err}"
+        );
     }
 
     #[test]
