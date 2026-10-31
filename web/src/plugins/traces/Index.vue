@@ -1780,7 +1780,8 @@ const onSearchModeChange = (mode: TraceSearchMode) => {
 watch(
   () => [router.currentRoute.value.name, router.currentRoute.value.query.tab] as const,
   ([routeName, tab]) => {
-    if (routeName !== "traces") return;
+    // A cached page applies the URL it returns to on activation, not while it sits in the cache.
+    if (routeName !== "traces" || !pageActive.value) return;
     const mode = supportedTraceSearchMode(tab);
     if (mode !== searchObj.meta.searchMode) {
       onSearchModeChange(mode);

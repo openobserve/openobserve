@@ -504,6 +504,27 @@ describe("Traces page load states", () => {
       expect(mockRecordRecent).toHaveBeenCalledTimes(1);
     });
 
+    it("starts no search from a URL tab change while it sits in the cache", async () => {
+      const route = ref({ query: { stream: "default" } as Record<string, string>, name: "traces" });
+      routeSpy.mockReturnValue(route as any);
+      const { show } = mountKeptAlive();
+      await settleSearch();
+      await flushPromises();
+
+      show.value = false;
+      await flushPromises();
+      const shownMode = searchObj.meta.searchMode;
+      const otherMode = shownMode === "spans" ? "traces" : "spans";
+      route.value = {
+        query: { stream: "incoming", tab: otherMode, reload: "true" },
+        name: "traces",
+      };
+      await flushPromises();
+      // A mode switch clears the results and re-runs the search, for a URL this page is not showing yet.
+      expect(searchObj.meta.searchMode).toBe(shownMode);
+      expect(callsOfType("main")).toHaveLength(1);
+    });
+
     it("runs a newer restore over one it left mid-load", async () => {
       setRouteQuery({ stream: "default" });
       mockTakeLanding.mockReturnValueOnce({ run: false });
