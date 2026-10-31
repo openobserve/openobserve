@@ -5156,6 +5156,8 @@
       "opsgenieEuRegionHelp": "0bec4cdf285ea4f8",
       "opsgeniePriority": "07fbbf0b06078098",
       "opsgeniePriorityHelp": "6f1721f0c2b614d5",
+      "pagerdutyEuRegion": "a6fdd95180835673",
+      "pagerdutyEuRegionHelp": "c38c624dd12d454b",
       "pagerdutyIntegrationKey": "5071fe6cbfb29439",
       "pagerdutyIntegrationKeyHelp": "3d489293350f7b68",
       "pagerdutyIntegrationKeyLength": "52d90da97a526774",

@@ -11753,6 +11753,8 @@
       "pagerdutyIntegrationKeyLength": "La clé d'intégration PagerDuty doit comporter 32 caractères",
       "pagerdutySeverity": "Gravité par défaut",
       "pagerdutySeverityHelp": "Sélectionnez la gravité par défaut pour les incidents PagerDuty",
+      "pagerdutyEuRegion": "Région de service UE",
+      "pagerdutyEuRegionHelp": "Activez si votre compte PagerDuty se trouve dans la région de service UE",
       "severityCritical": "Critique",
       "severityError": "Erreur",
       "severityWarning": "Avertissement",

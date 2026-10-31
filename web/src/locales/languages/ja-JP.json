@@ -11753,6 +11753,8 @@
       "pagerdutyIntegrationKeyLength": "PagerDuty統合キーは32文字である必要があります",
       "pagerdutySeverity": "デフォルトの重要度",
       "pagerdutySeverityHelp": "PagerDutyインシデントのデフォルトの重要度を選択してください",
+      "pagerdutyEuRegion": "EUサービスリージョン",
+      "pagerdutyEuRegionHelp": "PagerDutyアカウントがEUサービスリージョンにある場合に有効にします",
       "severityCritical": "重大",
       "severityError": "エラー",
       "severityWarning": "警告",

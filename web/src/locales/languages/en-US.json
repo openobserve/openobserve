@@ -11751,6 +11751,8 @@
       "pagerdutyIntegrationKeyLength": "PagerDuty integration key should be 32 characters",
       "pagerdutySeverity": "Default Severity",
       "pagerdutySeverityHelp": "Select the default severity for PagerDuty incidents",
+      "pagerdutyEuRegion": "EU service region",
+      "pagerdutyEuRegionHelp": "Turn on if your PagerDuty account is in the EU service region",
       "severityCritical": "Critical",
       "severityError": "Error",
       "severityWarning": "Warning",

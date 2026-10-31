@@ -11753,6 +11753,8 @@
       "pagerdutyIntegrationKeyLength": "PagerDuty-integratiesleutel moet 32 tekens lang zijn",
       "pagerdutySeverity": "Standaard Ernst",
       "pagerdutySeverityHelp": "Selecteer de standaard ernst voor PagerDuty-incidenten",
+      "pagerdutyEuRegion": "EU-serviceregio",
+      "pagerdutyEuRegionHelp": "Schakel in als uw PagerDuty-account zich in de EU-serviceregio bevindt",
       "severityCritical": "Kritiek",
       "severityError": "Fout",
       "severityWarning": "Waarschuwing",
