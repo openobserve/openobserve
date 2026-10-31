@@ -1070,10 +1070,12 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const exportIntervalKey = (card: MetricCard) =>
     `${org.value}|${operandStreamsOf(card)[0] ?? card.name}`;
 
-  /** The card's measured export interval in seconds; 0 until measured, or when it cannot be. */
+  /** The interval a card's step aligns to: measured when known, else the org's scrape interval, so the first query already fits it. */
   const exportIntervalFor = (card: MetricCard): number => {
     const key = exportIntervalKey(card);
-    return measuredIntervals.get(key) ?? exportIntervalCache.peek(key) ?? 0;
+    return (
+      measuredIntervals.get(key) || exportIntervalCache.peek(key) || scrapeIntervalSeconds.value
+    );
   };
 
   /** A card's step: from the range, aligned to the metric's export interval once known. */
@@ -1483,16 +1485,15 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     return null;
   };
 
-  /** What a card's last request charted: re-queried only when alignment changes it. */
-  const previewSignatures = new Map<string, string>();
-  const signatureOf = (step: number, resolved: any) =>
-    `${step}|${((resolved?.queries ?? []) as any[]).map((q) => q.expr).join("\n")}`;
+  /** The step each card's last request charted at. */
+  const previewSteps = new Map<string, number>();
 
-  /** A settled card whose step or windows moved since it was queried asks again, keeping its chart up meanwhile. */
+  /** A settled card asks again, keeping its chart up, only when the measured interval does not divide the step it ran. */
   const realignIfStale = (card: MetricCard) => {
-    const used = previewSignatures.get(card.name);
+    const used = previewSteps.get(card.name);
     if (!used || previews.value[card.name]?.status !== "done") return;
-    if (used === signatureOf(stepFor(card), effectiveVariant(card).resolved)) return;
+    const measured = measuredIntervals.get(exportIntervalKey(card));
+    if (!measured || used % measured === 0) return;
     void requestPreview(card, { realign: true });
   };
 
@@ -1759,7 +1760,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // dashboard panel gets on revisit. Matters more here than there: a first
     // screenful is ~60 queries against a backend that already times out on the
     // heavy metrics.
-    previewSignatures.set(card.name, signatureOf(step, resolved));
+    previewSteps.set(card.name, step);
     // A realign may paint from the persisted aligned result over the chart it replaces.
     if (!opts?.skipCache && (opts?.realign || !previews.value[card.name])) {
       const restored = await restoreFromCache(card, resolved, defaults, step, epoch);
@@ -2056,7 +2057,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     queue.cancelAll();
     exemplars.clearAll();
     previews.value = {};
-    previewSignatures.clear();
+    previewSteps.clear();
     previewOrder = [];
     emptyMetrics.value = new Set();
     emptyRecheckedCards.value = new Set();

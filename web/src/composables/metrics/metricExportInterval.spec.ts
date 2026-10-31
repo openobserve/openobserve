@@ -75,4 +75,71 @@ describe("export interval cache", () => {
     expect(retry).toHaveBeenCalledTimes(1);
     expect(cache.peek("org|a")).toBeNull();
   });
+
+  describe("in storage", () => {
+    const memoryStorage = () => {
+      const items = new Map<string, string>();
+      return {
+        getItem: (k: string) => items.get(k) ?? null,
+        setItem: (k: string, v: string) => void items.set(k, v),
+        items,
+      } as unknown as Storage & { items: Map<string, string> };
+    };
+
+    it("answers a reload within the TTL without measuring, per org", async () => {
+      const time = clock();
+      const storage = memoryStorage();
+      const first = createExportIntervalCache(EXPORT_INTERVAL_TTL_MS, time.now, () => storage);
+      await first.detect("org1|m", () => Promise.resolve(60));
+      await first.detect("org2|m", () => Promise.resolve(15));
+      expect([...storage.items.keys()].sort()).toEqual([
+        "o2-metrics-export-intervals:org1",
+        "o2-metrics-export-intervals:org2",
+      ]);
+
+      const reloaded = createExportIntervalCache(EXPORT_INTERVAL_TTL_MS, time.now, () => storage);
+      const measure = vi.fn().mockResolvedValue(30);
+      expect(reloaded.peek("org1|m")).toBe(60);
+      expect(await reloaded.detect("org1|m", measure)).toBe(60);
+      expect(await reloaded.detect("org2|m", measure)).toBe(15);
+      expect(measure).not.toHaveBeenCalled();
+    });
+
+    it("measures again once the stored answer is past the TTL", async () => {
+      const time = clock();
+      const storage = memoryStorage();
+      await createExportIntervalCache(EXPORT_INTERVAL_TTL_MS, time.now, () => storage).detect(
+        "org|m",
+        () => Promise.resolve(60),
+      );
+      time.advance(EXPORT_INTERVAL_TTL_MS);
+      const reloaded = createExportIntervalCache(EXPORT_INTERVAL_TTL_MS, time.now, () => storage);
+      expect(reloaded.peek("org|m")).toBeUndefined();
+      expect(await reloaded.detect("org|m", () => Promise.resolve(30))).toBe(30);
+    });
+
+    it("keeps working in memory when storage throws or holds garbage", async () => {
+      const throwing = {
+        getItem: () => {
+          throw new Error("SecurityError");
+        },
+        setItem: () => {
+          throw new Error("QuotaExceededError");
+        },
+      } as unknown as Storage;
+      for (const storage of [
+        () => throwing,
+        () => {
+          throw new Error("no storage");
+        },
+        () => ({ getItem: () => "{not json", setItem: () => {} }) as unknown as Storage,
+      ]) {
+        const cache = createExportIntervalCache(EXPORT_INTERVAL_TTL_MS, Date.now, storage);
+        const measure = vi.fn().mockResolvedValue(15);
+        expect(await cache.detect("org|m", measure)).toBe(15);
+        expect(await cache.detect("org|m", measure)).toBe(15);
+        expect(measure).toHaveBeenCalledTimes(1);
+      }
+    });
+  });
 });

@@ -655,9 +655,9 @@ describe("useMetricsExplorerGrid", () => {
 
       // Nothing measures while the first chart is still loading.
       expect(probes()).toEqual([]);
-      // 1h over 50 points: a 72s step and a [1m27s] window at the org's 15s scrape.
+      // 1h over 50 points is 72s, aligned to the org's 15s scrape: 75s, and a [1m30s] window.
       expect(ranges().map((q) => [q.query, q.step])).toEqual([
-        [`sum(rate({__name__="${COUNTER}"}[1m27s]))`, "72s"],
+        [`sum(rate({__name__="${COUNTER}"}[1m30s]))`, "75s"],
       ]);
       land(ranges()[0], SERIES);
       await preview;
@@ -670,7 +670,7 @@ describe("useMetricsExplorerGrid", () => {
       expect(probes()[0].start).toBe(NOW_US);
       expect(probes()[0].end).toBe(NOW_US);
 
-      // 10 samples in 10m: a 60s exporter, so a 120s step and a [4m] window.
+      // 10 samples in 10m: a 60s exporter does not divide 75s, so a 120s step and a [4m] window.
       land(probes()[0], counted(10));
       await flush();
       expect(ranges().map((q) => [q.query, q.step])).toEqual([
@@ -730,19 +730,19 @@ describe("useMetricsExplorerGrid", () => {
       land(stranded, counted(10));
       await flush();
       expect(ranges()).toEqual([]);
-      expect(grid.detailStepFor(card)).toBe(72);
+      expect(grid.detailStepFor(card)).toBe(75);
 
       await grid.requestPreview(card);
       await flush();
       expect(probes()).toHaveLength(1);
     });
 
-    it("re-queries nothing when the aligned step and window already match", async () => {
+    it("re-queries nothing when the scrape-aligned step already fits the measured interval", async () => {
       const grid = await setup();
       await charted(grid, cardNamed(grid, COUNTER));
 
-      // One sample a second: 72s is already a multiple, and the 15s scrape still sizes the window.
-      land(probes()[0], counted(600));
+      // 40 samples in 10m: a 15s exporter, which divides the 75s step already charted.
+      land(probes()[0], counted(40));
       await flush();
       await flush();
       expect(inFlight).toEqual([]);
@@ -761,7 +761,7 @@ describe("useMetricsExplorerGrid", () => {
       await flush();
       await flush();
       expect(inFlight).toEqual([]);
-      expect(grid.detailStepFor(cardNamed(grid, COUNTER))).toBe(72);
+      expect(grid.detailStepFor(cardNamed(grid, COUNTER))).toBe(75);
     });
 
     it("aligns from the first query once the interval is cached", async () => {
@@ -1505,8 +1505,8 @@ describe("useMetricsExplorerGrid", () => {
       inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES)); // probe: samples exist
       await flush();
 
-      // 1h range, 50 points, 15s scrape → standard window [1m27s], first retry 4x.
-      expect(inFlight.map((q) => q.query).join()).toContain("[5m48s]");
+      // 1h range, 50 points, 15s scrape → a 75s step aligned to the scrape, standard window [1m30s], first retry 4x.
+      expect(inFlight.map((q) => q.query).join()).toContain("[6m]");
       inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
       await preview;
 
@@ -1517,7 +1517,7 @@ describe("useMetricsExplorerGrid", () => {
       // Carried for the drill-in: the editor resolves `$__rate_interval` from
       // the same overstated scrape interval, so it needs the window that
       // actually worked.
-      expect(settled.widenedRateWindow).toBe("5m48s");
+      expect(settled.widenedRateWindow).toBe("6m");
     });
 
     it("escalates to a second, wider window before conceding sparseness", async () => {
@@ -1532,12 +1532,12 @@ describe("useMetricsExplorerGrid", () => {
       inFlight.splice(0, inFlight.length).forEach((q) => q.complete(NO_SERIES)); // 4x: still nothing
       await flush();
 
-      expect(inFlight.map((q) => q.query).join()).toContain("[23m12s]"); // 16x
+      expect(inFlight.map((q) => q.query).join()).toContain("[24m]"); // 16x
       inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
       await preview;
 
       expect(grid.previews.value["lat_seconds_count"].sparse).toBe(false);
-      expect(grid.previews.value["lat_seconds_count"].widenedRateWindow).toBe("23m12s");
+      expect(grid.previews.value["lat_seconds_count"].widenedRateWindow).toBe("24m");
       expect(names(grid)).toContain("lat_seconds_count");
     });
 
