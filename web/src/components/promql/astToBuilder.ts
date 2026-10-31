@@ -223,12 +223,15 @@ const branchesToGroups = (branches: PromqlLabelMatcher[][]): PromqlLabelMatcher[
     branches.every((branch) => branch.some((other) => matcherKey(other) === matcherKey(m))),
   );
   const shared = new Set(common.map(matcherKey));
+  const base = common.map((m) => ({ label: m.label, op: m.op, value: m.value }));
+  // A branch that is only the shared matchers is the base itself, which absorbs every other branch.
+  if (branches.some((branch) => branch.every((m) => shared.has(matcherKey(m))))) return base;
   const groups = branches.flatMap((branch, index) =>
     branch
       .filter((m) => !shared.has(matcherKey(m)))
       .map((m) => ({ label: m.label, op: m.op, value: m.value, group: index + 1 })),
   );
-  return [...common.map((m) => ({ label: m.label, op: m.op, value: m.value })), ...groups];
+  return [...base, ...groups];
 };
 
 /** `A or B …` over one metric, each side the same range step (or none), is a set of filter branches. */

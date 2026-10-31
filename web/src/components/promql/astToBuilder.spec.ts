@@ -224,6 +224,11 @@ describe("treeToBuilder: or, offset and without", () => {
     );
   });
 
+  it("maps a union that one branch absorbs onto that branch alone", () => {
+    const tree = bin("or", sel("x", [eq("a", "1")]), sel("x", [eq("a", "1"), eq("b", "2")]));
+    expect(ok(tree).labels).toEqual([eq("a", "1")]);
+  });
+
   it("refuses a union whose sides differ in metric, step or offset", () => {
     const refusal = "The builder cannot show the set operator or";
     expect(reason(bin("or", sel("x"), sel("y")))).toBe(refusal);
@@ -299,7 +304,7 @@ describe("promqlToBuilder", () => {
     });
   });
 
-  it("round-trips a union, an offset and a without through the parser", async () => {
+  it("maps a union, an offset and a without, rendering them back to the original text", async () => {
     const text = 'sum without (pod) (rate(x{a="1"}[5m] offset 1h) or rate(x{b="2"}[5m] offset 1h))';
     const branch = (label: string, value: string) =>
       call("rate", {
