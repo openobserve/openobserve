@@ -23,6 +23,7 @@ import organizationsService from "@/services/organizations";
 import apiKeysService from "@/services/api_keys";
 import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
+import { createMemoryHistory, createRouter } from "vue-router";
 
 // Mock services with default resolved values
 vi.mock("@/services/organizations", async (importOriginal) => {
@@ -1338,5 +1339,44 @@ describe("Ingestion", () => {
       );
       replace.mockRestore();
     });
+  });
+});
+
+describe("Ingestion default child", () => {
+  it("replaces the bare section URL with Recommended, so Back skips it", async () => {
+    const Stub = { template: "<div />" };
+    const sectionRouter = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/ingestion", name: "ingestion", component: Stub },
+        { path: "/ingestion/recommended", name: "recommended", component: Stub },
+      ],
+    });
+    await sectionRouter.push({
+      name: "ingestion",
+      query: { org_identifier: "default", ref: "nav" },
+    });
+    const push = vi.spyOn(sectionRouter, "push");
+    const replace = vi.spyOn(sectionRouter, "replace");
+    const w = mount(Ingestion, {
+      global: {
+        provide: { store },
+        plugins: [i18n, sectionRouter],
+        stubs: {
+          ConfirmDialog: { template: "<div />" },
+          OButton: { template: "<button><slot /></button>" },
+          OTabs: { template: "<div><slot /></div>" },
+          ORouteTab: { template: "<div><slot /></div>" },
+          "router-view": { template: "<div />" },
+        },
+      },
+    });
+    await flushPromises();
+    expect(replace).toHaveBeenCalledWith({
+      name: "recommended",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+    expect(push).not.toHaveBeenCalled();
+    w.unmount();
   });
 });
