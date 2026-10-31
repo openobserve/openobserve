@@ -93,7 +93,10 @@ describe("HostsDependenciesView", () => {
     );
     expect(metricsQuery.mock.calls[0][0]).toMatchObject({ org_identifier: "org1", end_time: END });
     expect(testId("hosts-deps-caption").text()).toContain("over 1h");
-    expect(testId("hosts-deps-caption").text()).toContain("--network-flows");
+    const caption = testId("hosts-deps-caption").text();
+    expect(caption).toContain("same --network-flows list on every host");
+    expect(caption).toContain("a /32 entry named after each host's host name");
+    expect(caption).toContain("busiest host's traffic");
   });
 
   it("names a window that is not a whole number of hours in minutes", async () => {
