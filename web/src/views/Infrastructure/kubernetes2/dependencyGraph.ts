@@ -296,7 +296,7 @@ export function buildGraph(
 }
 
 // Longest chain of callers above each end; an edge back into the current chain is a cycle and ignored.
-function rankOf(edges: FlowEdge[]): Map<string, number> {
+function rankOf(edges: Link[]): Map<string, number> {
   const callers = new Map<string, string[]>();
   for (const e of edges) {
     if (!e.directed) continue;
@@ -343,15 +343,15 @@ interface Link {
 }
 
 // Columns by rank, each starting in `compare` order. An end that only calls sits just left of the nearest end it
-// calls, so its edges do not run behind the columns in between. The `aside` ends get a column of their own past the
-// rest, so catch-all ends many workloads talk to do not land among the callers. Each column is then reordered a few
+// calls, so its edges do not run behind the columns in between. The `aside` ends get columns of their own past the
+// rest, ranked only by the calls between them, so catch-all ends many workloads talk to do not land among the callers. Each column is then reordered a few
 // times by the mean position of its neighbours in the columns already placed, keeping the order with the fewest
 // crossings.
 export function layoutColumns<E extends { id: string }>(
   nodes: { end: E; rank: number }[],
   compare: (x: E, y: E) => number,
-  edges: Link[] = [],
-  aside: (end: E) => boolean = () => false,
+  edges: Link[],
+  aside: (end: E) => boolean,
 ): Map<string, Position> {
   const rank = new Map(nodes.map((n) => [n.end.id, n.rank]));
   const isAside = new Set(nodes.filter((n) => aside(n.end)).map((n) => n.end.id));
@@ -363,8 +363,14 @@ export function layoutColumns<E extends { id: string }>(
     nearest.set(source.id, Math.min(nearest.get(source.id) ?? Infinity, rank.get(target.id)! - 1));
   }
   const last = Math.max(-1, ...nodes.filter((n) => !isAside.has(n.end.id)).map((n) => n.rank)) + 1;
+  // Only an aside caller pushes an aside end right, so ends the main columns call share the first aside column.
+  const asideRank = rankOf(
+    edges.filter((e) => isAside.has(e.source.id) && isAside.has(e.target.id)),
+  );
   const rankOfNode = (n: { end: E; rank: number }) =>
-    isAside.has(n.end.id) ? last : (nearest.get(n.end.id) ?? n.rank);
+    isAside.has(n.end.id)
+      ? last + (asideRank.get(n.end.id) ?? 0)
+      : (nearest.get(n.end.id) ?? n.rank);
   // Renumbered, so a rank emptied by moving its ends aside leaves no gap.
   const used = [...new Set(nodes.map(rankOfNode))].sort((a, b) => a - b);
   let order: E[][] = used.map(() => []);
@@ -423,7 +429,8 @@ export function layoutColumns<E extends { id: string }>(
   return out;
 }
 
-// Pairs of edges between the same two columns whose ends are in opposite orders.
+// Pairs of edges between the same two columns whose ends are in opposite orders; edges between different column
+// pairs are not compared.
 function crossings(
   edges: Link[],
   columnOf: Map<string, number>,
@@ -458,7 +465,7 @@ export const layoutGraph = ({ nodes, edges }: FlowGraph) =>
     (end) => end.kind !== "workload",
   );
 
-// Nodes, then the outside world, in the column aside.
+// Nodes before the outside world aside, until the sweeps reorder them by their neighbours.
 const orderOf = (end: FlowEnd) => (end.kind === "workload" ? 0 : end.kind === "node" ? 1 : 2);
 
 export const formatRate = (value: number) => formatUnitValue(getUnitValue(value, "bps", "", 1));

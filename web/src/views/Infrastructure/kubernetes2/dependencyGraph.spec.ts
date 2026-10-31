@@ -304,7 +304,7 @@ describe("layoutGraph", () => {
     expect(api.y).toBeLessThan(db.y);
   });
 
-  it("puts nodes and the outside world in a column of their own past the workloads", () => {
+  it("puts nodes and the outside world in columns of their own past the workloads", () => {
     const graph = buildGraph(
       pairFlows([
         flow(EXTERNAL, WEB, "request", 10),
@@ -315,11 +315,47 @@ describe("layoutGraph", () => {
     const at = layoutGraph(graph);
     // The outside world calls web, yet it does not take the first column: web does.
     expect(at.get(ids(WEB))!.x).toBe(0);
-    const aside = [at.get("prod/external")!, at.get("prod/node/n1")!];
-    expect(aside[0].x).toBe(aside[1].x);
-    expect(aside[0].x).toBeGreaterThan(at.get(ids(API))!.x);
-    // Nodes before the outside world in that column.
-    expect(aside[1].y).toBeLessThan(aside[0].y);
+    for (const id of ["prod/external", "prod/node/n1"]) {
+      expect(at.get(id)!.x).toBeGreaterThan(at.get(ids(API))!.x);
+    }
+  });
+
+  it("spreads a graph of only nodes and the outside world across their ranks", () => {
+    const graph = buildGraph(
+      pairFlows(
+        [
+          [NODE("n1"), NODE("n2")],
+          [NODE("n2"), EXTERNAL],
+        ].map(([from, to]) => flow(from, to, "request", 10)),
+      ),
+    );
+    const at = layoutGraph(graph);
+    const xs = ["prod/node/n1", "prod/node/n2", "prod/external"].map((id) => at.get(id)!.x);
+    expect(xs[0]).toBe(0);
+    expect(xs[1]).toBeGreaterThan(xs[0]);
+    expect(xs[2]).toBeGreaterThan(xs[1]);
+  });
+
+  it("keeps ends the workloads call in the first column aside", () => {
+    const graph = buildGraph(
+      pairFlows([
+        flow(WEB, API, "request", 10),
+        flow(API, NODE("n1"), "request", 10),
+        flow(WEB, EXTERNAL, "unknown", 10),
+      ]),
+    );
+    const at = layoutGraph(graph);
+    expect(at.get("prod/node/n1")!.x).toBe(at.get("prod/external")!.x);
+  });
+
+  it("keeps ranked nodes right of every workload", () => {
+    const graph = buildGraph(
+      pairFlows([flow(WEB, API, "request", 10), flow(NODE("n1"), NODE("n2"), "request", 10)]),
+    );
+    const at = layoutGraph(graph);
+    const n1 = at.get("prod/node/n1")!.x;
+    expect(n1).toBeGreaterThan(at.get(ids(API))!.x);
+    expect(at.get("prod/node/n2")!.x).toBeGreaterThan(n1);
   });
 
   it("puts an end that only calls just left of what it calls", () => {

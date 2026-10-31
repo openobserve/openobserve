@@ -95,7 +95,8 @@ const { fitView, areNodesInitialized } = useVueFlow();
 // Rate labels only on the busiest edges, so the rest of the map stays readable.
 const LABELLED = 8;
 
-const FIT = { padding: 0.12, maxZoom: 1 };
+// Never below a zoom where the cards stay readable; a wider map is then panned.
+const FIT = { padding: 0.06, minZoom: 0.8, maxZoom: 1 };
 
 // Both sides take edges either way: an edge leaves the side facing its target, and one within a
 // column loops out to the right.
@@ -276,8 +277,8 @@ function onKeydown(event: KeyboardEvent) {
       @node-mouse-enter="({ node }) => (hovered = node.id)"
       @node-mouse-leave="hovered = null"
     >
-      <Background :size="1.5" :gap="22" />
-      <Controls :show-interactive="false" position="top-left" />
+      <Background :size="2" :gap="22" />
+      <Controls :show-interactive="false" :fit-view-params="FIT" position="top-left" />
 
       <template #node-end="{ id, data }">
         <div
@@ -363,7 +364,7 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 .dependency-map :deep(.vue-flow__background circle) {
-  fill: var(--color-border-default);
+  fill: var(--color-border-strong);
 }
 
 .dependency-map :deep(.vue-flow__node) {
