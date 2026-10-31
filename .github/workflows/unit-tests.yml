@@ -258,6 +258,10 @@ jobs:
       labels: eks-openobserve-standard-16
     permissions:
       contents: read
+    strategy:
+      matrix:
+        shardIndex: [1, 2, 3, 4]
+        shardTotal: [4]
 
     steps:
       - name: Clone the current repo
@@ -280,7 +284,51 @@ jobs:
 
       - name: Run frontend unit tests with coverage and check thresholds
         working-directory: web
-        run: DEBUG=vitest:coverage ./coverage.sh check
+        run: DEBUG=vitest:coverage npx vitest --coverage --run --reporter=blob --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+
+      - name: Upload Vitest results GitHub Actions Artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-results-${{ matrix.shardIndex }}
+          path: .vitest
+          include-hidden-files: true
+          retention-days: 1
+
+  merge-reports:
+    if: ${{ !cancelled() }}
+    needs: [ui_unit_tests]
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+      - uses: ./.github/actions/github-auth
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        timeout-minutes: 5
+        run: npm ci
+
+      - name: Download Vitest results from GitHub Actions Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: .vitest
+          merge-multiple: true
+
+      - name: Merge reports
+        run: npx vitest --merge-reports
+      - name: check coverage
+        working-directory: web
+        run: ./coverage.sh check
 
   ui_code_quality:
     needs: [check_changes]

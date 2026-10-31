@@ -51,7 +51,7 @@ export default mergeConfig(
     },
     test: {
       environment: 'jsdom',
-      maxWorkers: '90%',
+      maxWorkers: '80%',
       exclude: [...configDefaults.exclude, 'e2e/**'],
       include: ["src/**/*.spec.{ts,js,vue}"],
       root: fileURLToPath(new URL('.', import.meta.url)),
