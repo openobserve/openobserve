@@ -15,7 +15,6 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as echarts from "echarts";
-import { getECData } from "echarts/lib/util/innerStore";
 import { gt } from "@/types/i18n";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { usePanelDrilldown } from "./usePanelDrilldown";
@@ -118,7 +117,7 @@ const dataItemPoint = (chart: echarts.ECharts) => {
   zr.flush();
   let best: { x: number; y: number; area: number } | null = null;
   zr.storage.getDisplayList(true).forEach((el: any) => {
-    const ecData = getECData(el);
+    const ecData = echarts.helper.getECData(el);
     if (el.silent || el.ignore || ecData?.dataIndex == null || el.type === "text") return;
     const rect = el.getBoundingRect().clone();
     const transform = el.getComputedTransform();

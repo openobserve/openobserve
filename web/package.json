@@ -17,7 +17,7 @@
     "postbuild": "run-p copy",
     "preview": "vite preview",
     "copy": "cd dist && mkdir src && cd src && mkdir assets && cd .. && cd .. && cp -r src/assets/* dist/src/assets/",
-    "test:unit": "vitest --environment jsdom --root src/",
+    "test:unit": "vitest",
     "test:unit:coverage": "vitest --coverage --run",
     "test:coverage:check": "./coverage.sh check",
     "test:e2e": "start-server-and-test preview :4173 'cypress run --e2e'",

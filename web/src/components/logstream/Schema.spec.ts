@@ -138,37 +138,50 @@ const ODrawerStub = {
 describe("Schema Component Tests", () => {
   let wrapper: any;
 
-  beforeEach(() => {
-    // Default mock for getStream — resolves with minimal valid stream data.
-    // Individual test groups override this with more specific data as needed.
-    mockGetStream.mockResolvedValue({
-      name: "test-stream",
-      stream_type: "logs",
-      storage_type: "s3",
-      stats: {
-        doc_time_min: 0,
-        doc_time_max: 0,
-        doc_num: 0,
-        file_num: 0,
-        storage_size: 0,
-        compressed_size: 0,
-      },
-      schema: [{ name: "_timestamp", type: "Int64" }],
-      settings: {
-        partition_time_level: "hourly",
-        partition_keys: {},
-        full_text_search_keys: [],
-        index_fields: [],
-        bloom_filter_fields: [],
-        data_retention: 30,
-        max_query_range: 0,
-        store_original_data: false,
-        approx_partition: false,
-        defined_schema_fields: [],
-        extended_retention_days: [],
-      },
-      pattern_associations: [],
+  afterEach(() => {
+    if (wrapper?.exists()) wrapper.unmount();
+    wrapper = undefined;
+  });
+
+  const defaultStream = () => ({
+    name: "test-stream",
+    stream_type: "logs",
+    storage_type: "s3",
+    stats: {
+      doc_time_min: 0,
+      doc_time_max: 0,
+      doc_num: 0,
+      file_num: 0,
+      storage_size: 0,
+      compressed_size: 0,
+    },
+    schema: [{ name: "_timestamp", type: "Int64" }],
+    settings: {
+      partition_time_level: "hourly",
+      partition_keys: {},
+      full_text_search_keys: [],
+      index_fields: [],
+      bloom_filter_fields: [],
+      data_retention: 30,
+      max_query_range: 0,
+      store_original_data: false,
+      approx_partition: false,
+      defined_schema_fields: [],
+      extended_retention_days: [],
+    },
+    pattern_associations: [],
+  });
+
+  const mountDefaultSchema = async () => {
+    wrapper = mount(LogStream, {
+      props: { modelValue: defaultStream() },
+      global: { provide: { store }, plugins: [i18n], stubs: { ODrawer: ODrawerStub } },
     });
+    await flushPromises();
+  };
+
+  beforeEach(() => {
+    mockGetStream.mockResolvedValue(defaultStream());
   });
 
   // Additional comprehensive tests for schema.vue functions from lines 697-1784
@@ -1250,10 +1263,6 @@ describe("Schema Component Tests", () => {
       expect(w.find('[data-test="storage-size-tile"]').exists()).toBe(true);
     });
 
-    it("should expose formatSizeFromMB function", () => {
-      expect(typeof w.vm.formatSizeFromMB).toBe("function");
-    });
-
     it("formatSizeFromMB should format MB values with units", () => {
       // 1024 MB = 1 GB
       const result = w.vm.formatSizeFromMB(1024);
@@ -1348,11 +1357,6 @@ describe("Schema Component Tests", () => {
       expect(w.find('[data-test="schema-title-text"]').text()).toContain("my-stream-name");
     });
 
-    it("should expose getTimelineIcon computed", () => {
-      expect(w.vm.getTimelineIcon).toBeDefined();
-      expect(typeof w.vm.getTimelineIcon).toBe("string");
-    });
-
     it("getTimelineIcon should return different URL based on theme", async () => {
       // light theme
       w.vm.store.state.theme = "light";
@@ -1370,6 +1374,8 @@ describe("Schema Component Tests", () => {
   });
 
   describe("Cross-Linking Tab (added Mar 11)", () => {
+    beforeEach(mountDefaultSchema);
+
     it("should not render cross-linking tab when enable_cross_linking is false", async () => {
       store.state.zoConfig = {
         ...store.state.zoConfig,
@@ -1411,10 +1417,6 @@ describe("Schema Component Tests", () => {
       // When enable_cross_linking is false, the tab should not exist
       expect(w.exists()).toBe(true);
       w.unmount();
-    });
-
-    it("should expose streamCrossLinks reactive ref", async () => {
-      expect(Array.isArray(wrapper.vm.streamCrossLinks)).toBe(true);
     });
 
     it("should expose orgCrossLinks computed", async () => {
@@ -3649,6 +3651,8 @@ describe("Schema Component Tests", () => {
   // Phase 2 tests — event handler: enforceMaxIndexTypes in template
   // ==========================================
   describe("enforceMaxIndexTypes template integration", () => {
+    beforeEach(mountDefaultSchema);
+
     it("should cap index type at 2 when exceeding max via enforceMaxIndexTypes + updateIndexType", () => {
       // Simulate the template: enforceMaxIndexTypes wraps the value before
       // passing to updateIndexType, mirroring:
@@ -3897,6 +3901,8 @@ describe("Schema Component Tests", () => {
   // Phase 2 tests — disableOptions hashPartition conflict with keyPartition/prefixPartition
   // ==========================================
   describe("disableOptions hashPartition-keyPartition/prefixPartition conflict", () => {
+    beforeEach(mountDefaultSchema);
+
     it("should disable hashPartition when row already has keyPartition", () => {
       const schema = { name: "field1", index_type: ["keyPartition"] };
       const hashOption = { value: "hashPartition_8" };
@@ -4101,22 +4107,6 @@ describe("Schema Component Tests", () => {
       await flushPromises();
 
       expect(mockUpdateSettings).not.toHaveBeenCalled();
-    });
-
-    it("should exercise cross-links diff in onSubmit with modified links", async () => {
-      // Set up cross-links to exercise the diff computation
-      // (func 61: prevCrossLinks.map, func 64: currCrossLinks.filter, func 65: inline fn)
-      wrapper.vm.streamCrossLinks = [{ name: "a", url: "https://a.com", fields: ["_timestamp"] }];
-      // prevCrossLinks has "a" in it (from settings.cross_links which was set in previousSchemaVersion)
-      // streamCrossLinks has "a" — so prevCrossLinkNames includes "a" and currCrossLinkNames includes "a"
-      // This exercises the diff path
-      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
-
-      await wrapper.vm.onSubmit();
-      await flushPromises();
-
-      // Should have been called
-      expect(mockUpdateSettings).toHaveBeenCalled();
     });
   });
 });

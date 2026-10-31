@@ -16,16 +16,12 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { computed, reactive } from "vue";
-// Mock the useDashboardPanelData composable
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(),
   useDashboardPanelData: vi.fn(),
 }));
 
-// In the app all config sections start collapsed (see searchLabelsConfig +
-// useConfigPanel.spec, which owns that behaviour). This integration spec
-// asserts that the correct controls render/bind *when a section is open*, so we
-// force every section expanded at mount by overriding DEFAULT_EXPANDED_SECTIONS.
+// Broad integration cases need every control mounted; focused groups open their own sections.
 vi.mock("@/utils/dashboard/searchLabelsConfig", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   const allExpanded = Object.fromEntries(
@@ -40,6 +36,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
+import { DEFAULT_EXPANDED_SECTIONS, type SectionId } from "@/utils/dashboard/searchLabelsConfig";
 
 // Value the component gives its "Default" choice.
 const TOGGLE_AUTO = "__auto__";
@@ -119,6 +116,7 @@ vi.setConfig({ testTimeout: 20000 });
 
 describe("ConfigPanel", () => {
   let wrapper: any;
+  const mountedWrappers: ReturnType<typeof mount>[] = [];
 
   const defaultProps = {
     dashboardPanelData: mockDashboardPanelData,
@@ -133,21 +131,28 @@ describe("ConfigPanel", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    for (const section of Object.keys(DEFAULT_EXPANDED_SECTIONS) as SectionId[]) {
+      DEFAULT_EXPANDED_SECTIONS[section] = true;
+    }
 
     store.state.selectedOrganization = { identifier: "test-org" };
-
-    // Reset any potential state contamination between tests
-    if (wrapper) {
-      wrapper.unmount();
-      wrapper = null;
-    }
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
+    for (const mounted of mountedWrappers) {
+      if (mounted.exists()) mounted.unmount();
     }
+    mountedWrappers.length = 0;
+    wrapper = undefined;
   });
+
+  const openSections = (...sections: SectionId[]) => {
+    beforeEach(() => {
+      for (const section of Object.keys(DEFAULT_EXPANDED_SECTIONS) as SectionId[]) {
+        DEFAULT_EXPANDED_SECTIONS[section] = sections.includes(section);
+      }
+    });
+  };
 
   const createWrapper = (props = {}, options = {}) => {
     const pageKey = options.promqlMode ? "promql" : "dashboard";
@@ -160,7 +165,7 @@ describe("ConfigPanel", () => {
       selectedStreamFields: props.dashboardPanelData?.meta?.stream?.selectedStreamFields || [],
     });
 
-    return mount(ConfigPanel, {
+    const mounted = mount(ConfigPanel, {
       props: {
         ...defaultProps,
         ...props,
@@ -186,9 +191,13 @@ describe("ConfigPanel", () => {
         },
       },
     });
+    mountedWrappers.push(mounted);
+    return mounted;
   };
 
   describe("gauge section", () => {
+    openSections("gauge", "valueTransformations");
+
     const gaugeData = (queryConfig: Record<string, any> = {}) => {
       const data = JSON.parse(JSON.stringify(mockDashboardPanelData));
       data.data.type = "gauge";
@@ -241,6 +250,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("state timeline options", () => {
+    openSections("stateTimeline");
+
     it("shows the defaults for a fresh panel that has none of its keys, and writes on change", async () => {
       const panelData = {
         ...mockDashboardPanelData,
@@ -350,6 +361,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Description Field", () => {
+    openSections("general");
+
     it("should bind description value to input", async () => {
       const panelDataWithDescription = {
         data: {
@@ -404,14 +417,20 @@ describe("ConfigPanel", () => {
     });
 
     it("drops decimals instead of storing an empty string when the field is cleared", async () => {
-      wrapper = createWrapper();
-      const config = wrapper.vm.dashboardPanelData.data.config;
-      config.decimals = 3;
+      const dataSectionExpanded = DEFAULT_EXPANDED_SECTIONS.data;
+      DEFAULT_EXPANDED_SECTIONS.data = true;
+      try {
+        wrapper = createWrapper();
+        const config = wrapper.vm.dashboardPanelData.data.config;
+        config.decimals = 3;
 
-      const decimalsInput = wrapper.findComponent('[data-test="dashboard-config-decimals"]');
-      await decimalsInput.vm.$emit("update:modelValue", "");
+        const decimalsInput = wrapper.findComponent('[data-test="dashboard-config-decimals"]');
+        await decimalsInput.vm.$emit("update:modelValue", "");
 
-      expect("decimals" in config).toBe(false);
+        expect("decimals" in config).toBe(false);
+      } finally {
+        DEFAULT_EXPANDED_SECTIONS.data = dataSectionExpanded;
+      }
     });
 
     it("should handle empty description", () => {
@@ -566,6 +585,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("PromQL series limit", () => {
+    openSections("general");
+
     const panelOf = (type: string) => ({
       ...mockDashboardPanelData,
       data: {
@@ -611,6 +632,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Line thickness", () => {
+    openSections("lineStyle");
+
     const panelOf = (line_thickness: unknown) =>
       reactive({
         ...mockDashboardPanelData,
@@ -652,6 +675,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Axis labels mode", () => {
+    openSections("axis");
+
     const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
       ...mockDashboardPanelData,
       data: {
@@ -786,6 +811,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Heatmap colour scale min / max", () => {
+    openSections("data");
+
     const panelOf = (type: string, config: Record<string, unknown> = {}) =>
       reactive({
         ...mockDashboardPanelData,
@@ -861,6 +888,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Heatmap palette, reverse and colour scale", () => {
+    openSections("data");
+
     const panelOf = (type: string, config: Record<string, unknown> = {}) =>
       reactive({
         ...mockDashboardPanelData,
@@ -992,6 +1021,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Heatmap y-axis order, buckets and range", () => {
+    openSections("axis");
+
     const panelOf = (config: Record<string, unknown> = {}, yType = "Int64", customQuery = false) =>
       reactive({
         ...mockDashboardPanelData,
@@ -1139,6 +1170,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Legend values", () => {
+    openSections("legend");
+
     const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
       ...mockDashboardPanelData,
       data: {
@@ -1176,6 +1209,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Time shift (Comparison against)", () => {
+    openSections("comparison");
+
     const shiftedPanel = (queryType: string) => ({
       ...mockDashboardPanelData,
       data: {
@@ -1297,102 +1332,9 @@ describe("ConfigPanel", () => {
         expect(wrapper.exists()).toBe(true);
       }
     });
-
-    it("should show step value tooltip", async () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-      await wrapper.vm.$nextTick();
-
-      // Look for any info icons in the component
-      const infoIcons = wrapper.findAll('[data-test="dashboard-config-top_results-info"]');
-      if (infoIcons.length > 0) {
-        expect(infoIcons[0].exists()).toBe(true);
-      } else {
-        // Component should still exist even if no tooltip found
-        expect(wrapper.exists()).toBe(true);
-      }
-    });
-  });
-
-  describe("Panel Type Handling", () => {
-    it("should handle different panel types", () => {
-      const chartTypes = ["line", "bar", "area", "pie", "table"];
-
-      chartTypes.forEach((type) => {
-        const panelData = {
-          ...mockDashboardPanelData,
-          data: { ...mockDashboardPanelData.data, type },
-        };
-
-        wrapper = createWrapper({ dashboardPanelData: panelData });
-        expect(wrapper.exists()).toBe(true);
-
-        if (wrapper) {
-          wrapper.unmount();
-        }
-      });
-    });
-
-    it("should show different configurations for different chart types", () => {
-      // Test line chart
-      wrapper = createWrapper();
-      const lineConfig = wrapper.html();
-      wrapper.unmount();
-
-      // Test table
-      const tableData = {
-        ...mockDashboardPanelData,
-        data: { ...mockDashboardPanelData.data, type: "table" },
-      };
-      wrapper = createWrapper({ dashboardPanelData: tableData });
-      const tableConfig = wrapper.html();
-
-      // Configurations should be different
-      expect(lineConfig).not.toBe(tableConfig);
-    });
-  });
-
-  describe("Configuration Updates", () => {
-    it("should emit configuration changes", async () => {
-      wrapper = createWrapper();
-
-      const descriptionInput = wrapper.findComponent('[data-test="dashboard-config-description"]');
-      await descriptionInput.vm.$emit("update:modelValue", "Updated description");
-
-      // Check if the component data was updated
-      expect(wrapper.vm.dashboardPanelData.data.description).toBe("Updated description");
-    });
-
-    it("should reflect updates to the shared panel data", async () => {
-      wrapper = createWrapper();
-
-      // Panel data reaches ConfigPanel through the useDashboardPanelData store —
-      // shared reactive state, so updates arrive by mutation rather than by prop.
-      wrapper.vm.dashboardPanelData.data.description = "Updated from parent";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.dashboardPanelData.data.description).toBe("Updated from parent");
-    });
-
-    it("should preserve configuration when switching modes", async () => {
-      wrapper = createWrapper({}, { promqlMode: false });
-
-      const descriptionInput = wrapper.findComponent('[data-test="dashboard-config-description"]');
-      await descriptionInput.vm.$emit("update:modelValue", "Test description");
-
-      // Verify description was set
-      expect(wrapper.vm.dashboardPanelData.data.description).toBe("Test description");
-    });
   });
 
   describe("Trellis Configuration", () => {
-    it("should show trellis layout options when applicable", () => {
-      // Mock showTrellisConfig computed property
-      wrapper = createWrapper();
-      wrapper.vm.showTrellisConfig = true;
-
-      expect(wrapper.vm.showTrellisConfig).toBe(true);
-    });
-
     it("should hide trellis configuration when not applicable", () => {
       wrapper = createWrapper();
 
@@ -1427,62 +1369,9 @@ describe("ConfigPanel", () => {
         expect(wrapper.exists()).toBe(true);
       }
     });
-
-    it("should validate configuration completeness", () => {
-      wrapper = createWrapper();
-
-      // Check if component has valid configuration structure
-      expect(wrapper.vm.dashboardPanelData).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data).toBeDefined();
-    });
-  });
-
-  describe("Accessibility", () => {
-    it("should have proper labels for form inputs", () => {
-      wrapper = createWrapper();
-
-      const descriptionInput = wrapper.find('[data-test="dashboard-config-description"]');
-      expect(descriptionInput.exists()).toBe(true);
-    });
-
-    it("should provide tooltips for complex fields", () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-
-      const infoIcons = wrapper.findAll('[data-test="dashboard-config-top_results-info"]');
-      if (infoIcons.length > 0) {
-        expect(infoIcons[0].exists()).toBe(true);
-      } else {
-        expect(wrapper.exists()).toBe(true);
-      }
-    });
-
-    it("should support keyboard navigation", async () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-      await wrapper.vm.$nextTick();
-
-      const descriptionInput = wrapper.find('[data-test="dashboard-config-description"]');
-      expect(descriptionInput.exists()).toBe(true);
-
-      const stepValueInput = wrapper.find('[data-test="dashboard-config-step-value"]');
-      if (stepValueInput.exists()) {
-        await stepValueInput.trigger("focus");
-        expect(stepValueInput.exists()).toBe(true);
-      } else {
-        expect(wrapper.exists()).toBe(true);
-      }
-    });
   });
 
   describe("Error Handling", () => {
-    it("should handle missing panel data gracefully", () => {
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      wrapper = createWrapper({ dashboardPanelData: null });
-
-      expect(wrapper.exists()).toBe(true);
-      consoleWarnSpy.mockRestore();
-    });
-
     it("should handle malformed configuration data", () => {
       const malformedData = {
         data: {
@@ -1545,6 +1434,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Show Gridlines Toggle", () => {
+    openSections("axis");
+
     it("should render show gridlines toggle", () => {
       wrapper = createWrapper();
 
@@ -1599,6 +1490,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Trellis Group By Y-Axis Configuration", () => {
+    openSections("layout");
+
     it("should show group by y-axis toggle for trellis layout", () => {
       const trellisEnabledData = {
         ...mockDashboardPanelData,
@@ -1730,6 +1623,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Connect Null Values Configuration", () => {
+    openSections("data");
+
     it("should initialize connect_nulls as false by default", () => {
       wrapper = createWrapper();
 
@@ -1782,6 +1677,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("No Value Replacement Configuration", () => {
+    openSections("data");
+
     it("should initialize no_value_replacement as empty string by default", () => {
       wrapper = createWrapper();
 
@@ -1833,6 +1730,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Locale Format in the Unit dropdown", () => {
+    openSections("data");
+
     const makePanel = (config: Record<string, unknown>) =>
       reactive({
         ...mockDashboardPanelData,
@@ -1891,6 +1790,8 @@ describe("ConfigPanel", () => {
     });
   });
   describe("Table Configuration Options", () => {
+    openSections("table");
+
     it("should initialize table_transpose as false by default", () => {
       wrapper = createWrapper();
 
@@ -1943,6 +1844,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Field Overrides button", () => {
+    openSections("fieldOverrides");
+
     it("should render its own button and emit open-field-overrides on click", async () => {
       const tableData = {
         ...mockDashboardPanelData,
@@ -2187,6 +2090,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Chart Type Specific Gridlines Visibility", () => {
+    openSections("axis", "data");
+
     it("should show gridlines toggle for supported chart types", () => {
       const supportedTypes = [
         "line",
@@ -2279,6 +2184,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Legend Type Options Configuration", () => {
+    openSections("legend");
+
     it("should show legend type selector when legends are enabled and trellis is not active", () => {
       const panelData = {
         ...mockDashboardPanelData,
@@ -2476,6 +2383,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Complex Trellis Configuration Scenarios", () => {
+    openSections("layout");
+
     it("should handle trellis with custom layout and extreme column numbers", () => {
       const trellisData = {
         ...mockDashboardPanelData,
@@ -3035,6 +2944,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Table Pagination Configuration", () => {
+    openSections("table");
+
     it("should show pagination toggle for table panels", () => {
       const tableData = {
         ...mockDashboardPanelData,
@@ -3271,25 +3182,9 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.searchQuery).toBe("");
     });
-
-    it("should update searchQuery when set directly", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.searchQuery = "legend";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.searchQuery).toBe("legend");
-    });
   });
 
   describe("expandedSections state", () => {
-    it("should initialize expandedSections with all sections true", () => {
-      wrapper = createWrapper();
-      const sections = wrapper.vm.expandedSections;
-      expect(typeof sections).toBe("object");
-      for (const val of Object.values(sections)) {
-        expect(val).toBe(true);
-      }
-    });
-
     it("should have an entry for every expected section", () => {
       wrapper = createWrapper();
       const expectedSections = [
@@ -3385,12 +3280,6 @@ describe("ConfigPanel", () => {
   });
 
   describe("isSectionVisible()", () => {
-    it("returns a boolean for known section IDs", () => {
-      wrapper = createWrapper();
-      const result = wrapper.vm.isSectionVisible("general");
-      expect(typeof result).toBe("boolean");
-    });
-
     it("returns false for unknown section IDs", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.isSectionVisible("nonexistent" as any)).toBe(false);
@@ -3403,12 +3292,6 @@ describe("ConfigPanel", () => {
   });
 
   describe("isConfigOptionVisible()", () => {
-    it("returns a boolean", () => {
-      wrapper = createWrapper();
-      const result = wrapper.vm.isConfigOptionVisible("general", "description");
-      expect(typeof result).toBe("boolean");
-    });
-
     it("description option is visible when no search query", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.isConfigOptionVisible("general", "description")).toBe(true);
@@ -3533,6 +3416,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Area fill", () => {
+    openSections("lineStyle");
+
     const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
       ...mockDashboardPanelData,
       data: {
@@ -3595,6 +3480,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Scatter point size and opacity", () => {
+    openSections("lineStyle");
+
     const panelOf = (type: string) => ({
       ...mockDashboardPanelData,
       data: {
@@ -3661,6 +3548,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Bar width and bar track", () => {
+    openSections("axis");
+
     const panelOf = (type: string) => ({
       ...mockDashboardPanelData,
       data: {

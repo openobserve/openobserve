@@ -308,22 +308,6 @@ describe("ServiceAccountsList Component", () => {
       expect(wrapper.vm.confirmDelete).toBe(true);
     });
 
-    it("prevents deletion of system service accounts", () => {
-      const sreAgentAccount = {
-        email: "o2-sre-agent.org-test-org@openobserve.internal",
-        is_system: true,
-      };
-
-      // System accounts should not be deletable - this test verifies the UI logic
-      // In a real implementation, the delete button should be disabled for system accounts
-      expect(sreAgentAccount.is_system).toBe(true);
-
-      // If confirmDeleteAction is called on a system account, it should be prevented
-      // This would typically be handled in the UI by disabling the delete button
-      const isSystemAccount = sreAgentAccount.is_system;
-      expect(isSystemAccount).toBe(true);
-    });
-
     it("deletes user service account successfully", async () => {
       vi.mocked(service_accounts.delete).mockResolvedValue({
         data: { code: 200 },
@@ -381,21 +365,6 @@ describe("ServiceAccountsList Component", () => {
 
       expect(wrapper.vm.confirmRefresh).toBe(true);
       expect(wrapper.vm.toBeRefreshed).toEqual(row);
-    });
-
-    it("should handle system account token refresh restrictions", () => {
-      const sreAgentRow = {
-        email: "o2-sre-agent.org-test-org@openobserve.internal",
-        is_system: true,
-      };
-
-      // System accounts should have restricted token operations
-      // In the UI, refresh button should be disabled for system accounts
-      expect(sreAgentRow.is_system).toBe(true);
-
-      // Verify that system accounts are properly identified
-      const isSystemAccount = sreAgentRow.is_system;
-      expect(isSystemAccount).toBe(true);
     });
   });
 
@@ -508,123 +477,6 @@ describe("ServiceAccountsList Component", () => {
       const userAccount = mockServiceAccountsState.service_accounts_users[1];
       expect(userAccount.is_system).toBe(false);
       expect(userAccount.role).toBe("ServiceAccount");
-    });
-  });
-
-  describe("Filtering", () => {
-    // Local helper that replicates ServiceAccountsList's OTable client-side filter logic:
-    // OTable filters each row by matching the search term against string values of all fields.
-    const filterData = (rows, term) => {
-      if (!term) return rows;
-      const lowerTerm = term.toLowerCase();
-      return rows.filter((row) =>
-        Object.values(row).some(
-          (val) => val != null && String(val).toLowerCase().includes(lowerTerm),
-        ),
-      );
-    };
-
-    beforeEach(() => {
-      mockServiceAccountsState.service_accounts_users = [
-        {
-          email: "o2-sre-agent.org-test-org@openobserve.internal",
-          first_name: "SRE Agent",
-          last_name: "System",
-          is_system: true,
-          role: "SreAgent",
-          description: "System-managed SRE Agent",
-        },
-        {
-          email: "user1@example.com",
-          first_name: "John",
-          last_name: "Doe",
-          is_system: false,
-          role: "ServiceAccount",
-          description: null,
-        },
-        {
-          email: "user2@example.com",
-          first_name: "Jane",
-          last_name: "Smith",
-          is_system: false,
-          role: "ServiceAccount",
-          description: null,
-        },
-        {
-          email: "admin@example.com",
-          first_name: "Admin",
-          last_name: "User",
-          is_system: false,
-          role: "ServiceAccount",
-          description: null,
-        },
-      ];
-    });
-
-    it("filters by email", () => {
-      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "admin");
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].email).toContain("admin");
-    });
-
-    it("filters by first name", () => {
-      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "John");
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].first_name).toBe("John");
-    });
-
-    it("filters by last name", () => {
-      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "Smith");
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].last_name).toBe("Smith");
-    });
-
-    it("filters by SRE Agent system account", () => {
-      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "SRE");
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].first_name).toBe("SRE Agent");
-      expect(filtered[0].is_system).toBe(true);
-    });
-
-    it("is case insensitive", () => {
-      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "JANE");
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].first_name).toBe("Jane");
-    });
-
-    it("returns empty array for no matches", () => {
-      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "nonexistent");
-      expect(filtered).toHaveLength(0);
-    });
-
-    it("handles empty search term", () => {
-      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "");
-      expect(filtered).toHaveLength(4); // Updated to include SRE Agent account
-    });
-
-    it("handles null/undefined fields", () => {
-      const dataWithNulls = [
-        { email: null, first_name: "Test", last_name: undefined, is_system: false },
-        { email: "test@example.com", first_name: null, last_name: "User", is_system: false },
-      ];
-
-      const filtered = filterData(dataWithNulls, "test");
-      expect(filtered).toHaveLength(2);
-    });
-
-    it("can distinguish system vs user accounts in filtering", () => {
-      const systemAccounts = mockServiceAccountsState.service_accounts_users.filter(
-        (acc) => acc.is_system,
-      );
-      const userAccounts = mockServiceAccountsState.service_accounts_users.filter(
-        (acc) => !acc.is_system,
-      );
-
-      expect(systemAccounts).toHaveLength(1);
-      expect(systemAccounts[0].role).toBe("SreAgent");
-
-      expect(userAccounts).toHaveLength(3);
-      expect(userAccounts.every((acc) => acc.role === "ServiceAccount")).toBe(true);
     });
   });
 
@@ -741,23 +593,6 @@ describe("ServiceAccountsList Component", () => {
       expect(sreAgent.is_system).toBe(true);
       expect(sreAgent.email).toContain("o2-sre-agent.org-");
       expect(sreAgent.description).toContain("System-managed");
-    });
-
-    it("prevents modification of system accounts", () => {
-      const sreAgent = {
-        email: "o2-sre-agent.org-test-org@openobserve.internal",
-        is_system: true,
-        role: "SreAgent",
-      };
-
-      // Verify system account properties that should prevent modification
-      expect(sreAgent.is_system).toBe(true);
-      expect(sreAgent.role).toBe("SreAgent");
-
-      // In the UI, delete and edit buttons should be disabled for system accounts
-      // This test verifies the properties are correctly identified
-      const shouldDisableActions = sreAgent.is_system;
-      expect(shouldDisableActions).toBe(true);
     });
 
     it("displays proper role label for SRE Agent", async () => {
