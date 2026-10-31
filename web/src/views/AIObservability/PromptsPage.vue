@@ -51,6 +51,7 @@
         :columns="columns"
         row-key="entityId"
         :loading="promptQuery.isPending.value"
+        :loading-reset-key="activeFolderId"
         :error="listError"
         :forbidden="errorStatus(promptQuery.error.value) === 403"
         :frame="false"

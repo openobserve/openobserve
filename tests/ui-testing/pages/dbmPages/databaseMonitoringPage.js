@@ -322,7 +322,7 @@ export class DatabaseMonitoringPage {
     // are content-free (`"\t\t\t\t\t"`), so nothing downstream could tell
     // them from data either.
     return tableLocator
-      .locator('tbody:not([data-test="o2-table-skeleton-body"]) tr')
+      .locator('tbody:not([data-test="o2-table-skeleton-body"]):not([data-test-stale]) tr')
       .count();
   }
 

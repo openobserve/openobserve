@@ -1722,7 +1722,7 @@ export class AlertsPage {
             // until the row renders. Deterministic (each probe waits for the actual cell); no
             // reliance on one slow fetch landing inside a fixed window.
             const inputField = this.page.locator(this.locators.alertSearchInputField);
-            const listSkeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
+            const listSkeleton = this.page.locator('[data-test="o2-table"][data-test-loading="true"]');
             let found = false;
             for (let attempt = 1; attempt <= 4 && !found; attempt++) {
                 if (attempt === 3) {
@@ -1744,7 +1744,7 @@ export class AlertsPage {
         }
 
         // Final deterministic assertions (the row is present by now under normal + slow paths).
-        await this.page.locator('[data-test="o2-table-skeleton-body"]').first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+        await this.page.locator('[data-test="o2-table"][data-test-loading="true"]').first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
         await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible({ timeout: 15000 });
         await expect(this.page.locator(this.locators.pauseStartAlert.replace('{alertName}', nameToVerify)).first()).toBeVisible({ timeout: 10000 });
     }

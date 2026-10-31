@@ -23,6 +23,7 @@ import type { DowntimeDetail as DowntimeDetailData } from "@/services/downtimes"
 import alerts from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 
 vi.mock("@/services/downtimes", () => ({
   default: {
@@ -155,6 +156,26 @@ describe("DowntimeDetail", () => {
       "default",
       expect.objectContaining({ downtime_id: "dt-1", status: "suppressed" }),
     );
+    wrapper.unmount();
+  });
+
+  it("keys the suppressed table on the downtime so a switch shows the skeleton, not the last one's rows", async () => {
+    vi.mocked(downtimes.get).mockResolvedValue({ data: detail } as never);
+    const { wrapper, router } = await mountDetail();
+    await wrapper.get('[data-test="downtime-detail-tab-suppressed"]').trigger("mousedown", {
+      button: 0,
+    });
+    await flushPromises();
+    const table = () => wrapper.findComponent(OTable);
+    expect(table().props("loadingResetKey")).toBe("dt-1");
+
+    await router.push({
+      name: "downtimeDetail",
+      params: { id: "dt-2" },
+      query: { org_identifier: "default", folder: "default" },
+    });
+    await flushPromises();
+    expect(table().props("loadingResetKey")).toBe("dt-2");
     wrapper.unmount();
   });
 
