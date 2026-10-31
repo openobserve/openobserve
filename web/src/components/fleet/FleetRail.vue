@@ -202,7 +202,7 @@ import {
 import type { FleetRolloutStatus } from "@/services/fleet";
 import { raw, useI18nTyped } from "@/types/i18n";
 import FleetNameDialog from "./FleetNameDialog.vue";
-import { serverMessage, type FleetRow } from "./useFleetApi";
+import { type FleetRow, failureText } from "./useFleetApi";
 
 const props = defineProps<{
   rows: FleetRow[];
@@ -242,7 +242,7 @@ const filtered = computed(() => {
 const mobileOptions = computed(() => props.rows.map((f) => ({ label: raw(f.name), value: f.id })));
 
 function failure(err: unknown) {
-  toast({ variant: "error", message: raw(serverMessage(err)) || t("fleet.common.requestFailed") });
+  toast({ variant: "error", message: failureText(err, t) });
 }
 
 function create() {
