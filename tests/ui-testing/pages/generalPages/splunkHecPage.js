@@ -27,7 +27,8 @@ export class SplunkHecPage {
         // Copy feedback toast (global success notification), kept local so this
         // spec does not depend on another page object's toast helper.
         this.successToast = page.locator('[data-test-variant="success"]');
-        this.successToastMessage = page.locator('[data-test-variant="success"] [data-test="o-toast-message"]');
+        // A copy confirms in place on its control, so either element means success.
+        this.successToastMessage = page.locator('[data-test-variant="success"] [data-test="o-toast-message"], [data-test="copy-confirm"]');
     }
 
     // ==================== Navigation ====================
