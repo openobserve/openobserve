@@ -99,9 +99,10 @@ describe("HostsDependenciesView", () => {
     expect(metricsQuery.mock.calls[0][0]).toMatchObject({ org_identifier: "org1", end_time: END });
     expect(testId("hosts-deps-caption").text()).toContain("over 1h");
     const caption = testId("hosts-deps-caption-more").attributes("aria-label");
-    expect(caption).toContain("same --network-flows list on every host");
-    expect(caption).toContain("a /32 entry named after each host's host name");
-    expect(caption).toContain("busiest host's traffic");
+    expect(caption).toContain("same --network-flows list");
+    expect(caption).toContain(
+      "give each host's own address (/32) an entry named after its host name",
+    );
   });
 
   it("names a window that is not a whole number of hours in minutes", async () => {
@@ -189,12 +190,41 @@ describe("HostsDependenciesView", () => {
     await mountView();
     const empty = testId("hosts-deps-no-flows");
     expect(empty.text()).toContain("--network-flows");
-    expect(empty.text()).toContain("in the last 1h of the selected time range");
+    expect(empty.text()).toContain("in the selected time range");
     await empty.find("button").trigger("click");
     expect(push).toHaveBeenCalledWith({
       name: "ingestFromLinux",
       query: { org_identifier: "org1" },
     });
+  });
+
+  it("names the rate window when it is not the whole selected range", async () => {
+    metricsQuery.mockResolvedValue({ data: { data: { result: [] } } } as any);
+    await mountView({ range: { start: END - MIN_US, end: END, relative: true } });
+    expect(testId("hosts-deps-no-flows").text()).toContain(
+      "in the last 5m of the selected time range",
+    );
+  });
+
+  it("closes the edge panel on Escape and on empty map space", async () => {
+    await mountView();
+    chart().vm.$emit("select", "api\nweb");
+    await flushPromises();
+    await testId("hosts-deps-view").trigger("keydown", { key: "Escape" });
+    expect(testId("hosts-deps-edge").exists()).toBe(false);
+    chart().vm.$emit("select", "api\nweb");
+    await flushPromises();
+    chart().vm.$emit("select", null);
+    await flushPromises();
+    expect(testId("hosts-deps-edge").exists()).toBe(false);
+  });
+
+  it("does not draw a pair whose rate is nothing", async () => {
+    metricsQuery.mockResolvedValue({
+      data: { data: { result: [FLOWS[0], row("web", "web", "idle", "unknown", 0)] } },
+    } as any);
+    await mountView();
+    expect(edges().map((e: any) => e.target)).toEqual(["api"]);
   });
 
   it("reads traffic only within names as no flows", async () => {
@@ -225,15 +255,13 @@ describe("HostsDependenciesView", () => {
     });
     expect(metricsQuery).toHaveBeenCalledTimes(2);
     expect(chart().exists()).toBe(true);
-    const refresh = wrapper.findComponent({ name: "ORefreshButton" });
-    expect(refresh.props("loading")).toBe(true);
-    expect(refresh.props("lastRunAt")).toEqual(expect.any(Number));
+    // The page's Refresh does the reloading; the view only says how fresh the map is.
+    expect(testId("hosts-deps-refresh").exists()).toBe(false);
+    expect(testId("hosts-deps-updated").text()).toContain("Last refreshed");
+    expect(testId("hosts-deps-updated").findComponent({ name: "OSpinner" }).exists()).toBe(true);
     resolve({ data: { data: { result: [] } } });
     await flushPromises();
-    expect(refresh.props("loading")).toBe(false);
     expect(testId("hosts-deps-no-flows").exists()).toBe(true);
-    await testId("hosts-deps-refresh").trigger("click");
-    expect(wrapper.emitted("refresh")).toHaveLength(1);
   });
 
   it("drops another org's graph at once and ignores its late response", async () => {

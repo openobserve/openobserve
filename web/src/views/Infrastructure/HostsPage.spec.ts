@@ -875,6 +875,11 @@ describe("HostsPage", () => {
       await flushPromises();
       expect(router.currentRoute.value.query.view).toBeUndefined();
       expect(wrapper.find('[data-test="hosts-table-stub"]').exists()).toBe(true);
+      // Each switch is a history entry, so Back returns to the map.
+      router.back();
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(router.currentRoute.value.query.view).toBe("dependencies");
     });
 
     it("marks each view's container as a tab panel named like its tab", async () => {

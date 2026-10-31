@@ -242,7 +242,8 @@ watch(view, (next) => {
 });
 const onViewChange = (name: string | number) => {
   const { view: _view, ...rest } = route.query;
-  router.replace({ query: name === "dependencies" ? { ...rest, view: "dependencies" } : rest });
+  // A history entry per tab, so Back returns to the other one.
+  router.push({ query: name === "dependencies" ? { ...rest, view: "dependencies" } : rest });
 };
 
 // ── Drawer — deep-linked via ?host= so it survives reload ───────────────────

@@ -21,7 +21,6 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -171,8 +170,10 @@ const KIND = {
   },
 } as const satisfies Record<HostEnd["kind"], { icon: IconName; detail: string; color: string }>;
 
+const layout = computed(() => layoutHostGraph(graph.value));
+
 const mapNodes = computed<MapNode[]>(() => {
-  const positions = layoutHostGraph(graph.value);
+  const { positions } = layout.value;
   return graph.value.nodes.map(({ end, total }) => ({
     id: end.id,
     position: positions.get(end.id)!,
@@ -193,11 +194,21 @@ const mapEdges = computed<MapEdge[]>(() =>
     target: e.target.id,
     directed: e.directed,
     total: e.total,
+    waypoints: layout.value.waypoints.get(e.id) ?? [],
   })),
 );
 
 const ariaLabel = computed(() =>
   t("infra.hosts.depsAria", { count: graph.value.edges.length }, graph.value.edges.length),
+);
+
+// The rate covers the whole selected range unless the range was too short or too long for it.
+const wholeRange = computed(
+  () => Math.round((props.range.end - props.range.start) / 1_000_000) === windowS.value,
+);
+
+const updatedAt = computed(() =>
+  lastUpdatedAt.value ? new Date(lastUpdatedAt.value).toLocaleTimeString() : "",
 );
 
 // Whole days or hours when exact, else minutes, so a 90 minute window does not read as 1h.
@@ -230,8 +241,9 @@ function showEdge(id: string, event: Event) {
   nextTick(() => edgePanel.value?.focus());
 }
 
-// Picked on the map, so a later close has no list button to return to.
-function selectEdge(id: string) {
+// Picked on the map, so a later close has no list button to return to; empty map space dismisses it.
+function selectEdge(id: string | null) {
+  if (id == null) return closeEdge();
   openedFrom = null;
   selectedEdgeId.value = id;
 }
@@ -257,6 +269,7 @@ function onSetUp() {
   <div
     class="px-page-edge flex h-full min-h-0 flex-col gap-2 py-3 max-md:overflow-y-auto"
     data-test="hosts-deps-view"
+    @keydown.esc="closeEdge"
   >
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1" data-test="hosts-deps-controls">
       <div class="flex items-center gap-1">
@@ -273,13 +286,16 @@ function onSetUp() {
           <OTooltip :content="t('infra.hosts.depsCaptionMore')" max-width="24rem" />
         </OButton>
       </div>
-      <ORefreshButton
-        class="ms-auto"
-        :last-run-at="lastUpdatedAt"
-        :loading="loading"
-        data-test="hosts-deps-refresh"
-        @click="emit('refresh')"
-      />
+      <!-- The page's Refresh reloads the map; this only says how fresh it is. -->
+      <OText
+        v-if="updatedAt"
+        tag="span"
+        class="text-text-secondary ms-auto flex items-center gap-1.5 text-xs"
+        data-test="hosts-deps-updated"
+      >
+        <OSpinner v-if="loading" size="xs" />
+        {{ t("refreshButton.lastRefreshed", { time: updatedAt }) }}
+      </OText>
     </div>
     <OEmptyState v-if="forbidden" preset="no-access" data-test="hosts-deps-forbidden" />
     <OEmptyState
@@ -300,7 +316,11 @@ function onSetUp() {
       v-else-if="!edges.length"
       preset="no-data"
       :title="t('infra.hosts.depsNoFlowsTitle')"
-      :description="t('infra.hosts.depsNoFlowsDescription', { window: windowText })"
+      :description="
+        wholeRange
+          ? t('infra.hosts.depsNoFlowsDescriptionRange')
+          : t('infra.hosts.depsNoFlowsDescription', { window: windowText })
+      "
       :action-label="t('infra.hosts.depsSetUp')"
       data-test="hosts-deps-no-flows"
       @action="onSetUp"

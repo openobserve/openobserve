@@ -166,7 +166,7 @@ describe("layoutHostGraph", () => {
         flow("web", "web", "", "unknown", 1),
       ]),
     );
-    const positions = layoutHostGraph(graph);
+    const { positions } = layoutHostGraph(graph);
     const at = (id: string) => positions.get(id)!;
     // Networks and unnamed addresses in a column past the hosts, networks first.
     expect(at("lan").x).toBe(at("(unnamed)").x);
