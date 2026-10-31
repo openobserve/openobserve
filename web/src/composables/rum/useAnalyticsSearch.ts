@@ -36,6 +36,7 @@ export interface SearchSpec {
   sampled: SampleRatio;
   /** False skips the server's result cache; omitted keeps the app-wide default. */
   useCache?: boolean;
+  stream?: string;
 }
 interface SearchError {
   code?: string;
@@ -180,7 +181,7 @@ export default function useAnalyticsSearch(
   };
 
   const run = async <T>(id: string, spec: SearchSpec, key: string): Promise<PanelState<T>> => {
-    assertJoinFree(spec.sql);
+    assertJoinFree(spec.sql, spec.stream);
     entries.get(id)?.controller?.abort();
     // Bound at enqueue: a search queued behind the cap must not run against an org switched to meanwhile.
     const org = appStore()?.state.selectedOrganization?.identifier ?? "";

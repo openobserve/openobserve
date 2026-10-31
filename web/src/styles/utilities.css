@@ -111,3 +111,13 @@
     transparent var(--hatch-line) 0.3125rem
   );
 }
+
+/* Green-to-red scale for the click heat legend; hues mirror the canvas palette in utils/rum/clickHeatmap.ts. */
+@utility bg-heat-legend {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-status-positive),
+    var(--color-warning),
+    var(--color-status-negative)
+  );
+}
