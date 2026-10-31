@@ -1111,6 +1111,14 @@ describe("buildBreakdownQuery", () => {
     );
   });
 
+  it("caps per step when no rank window is given, as an overview tile does", () => {
+    expect(
+      buildBreakdownQuery(CARD_KIND.COUNTER_RATE, ctx("http_requests_total"), "instance", {
+        topk: 10,
+      }),
+    ).toBe('topk(10, sum by (instance) (rate({__name__="http_requests_total"}[4m])))');
+  });
+
   it("has no breakdown for timestamp and other", () => {
     expect(buildBreakdownQuery(CARD_KIND.TIMESTAMP, ctx("x_created"), "route")).toBeNull();
     expect(buildBreakdownQuery(CARD_KIND.OTHER, ctx("x_bucket"), "route")).toBeNull();
@@ -1375,6 +1383,15 @@ describe("breakdownQueryOf", () => {
     );
     expect(breakdownQueryOf("sum(rate(x[4m]))", "az", { rank: null })).toBe(
       "sum by (az) (rate(x[4m]))",
+    );
+  });
+
+  it("caps per step with topk alone, and a rank wins over it", () => {
+    expect(breakdownQueryOf("sum(rate(x[4m]))", "az", { topk: 10 })).toBe(
+      "topk(10, sum by (az) (rate(x[4m])))",
+    );
+    expect(breakdownQueryOf("sum(rate(x[4m]))", "az", { topk: 10, rank: "topk(10, r)" })).toBe(
+      "(sum by (az) (rate(x[4m]))) and on (az) topk(10, r)",
     );
   });
 

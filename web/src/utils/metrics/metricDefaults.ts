@@ -1536,7 +1536,8 @@ export const BREAKDOWN_LABEL_LIMIT = 15;
 /** How many values a capped breakdown keeps, ranked over `window`: a duration, or `$__range` for a panel. */
 interface BreakdownCap {
   topk: number;
-  window: string;
+  /** Absent: a per-step `topk`, cheap enough for a tile per label. */
+  window?: string;
 }
 
 /** Labels a breakdown never groups by — the same set `resolveTopkLabel` skips. */
@@ -1626,9 +1627,11 @@ export function buildBreakdownQuery(
       return null;
   }
   const distributed = distributeUnionRanges(expr);
-  return cap
-    ? keepRanked(distributed, label, buildBreakdownRank(cardKind, ctx, label, cap))
-    : distributed;
+  if (!cap) return distributed;
+  const { topk, window } = cap;
+  return window
+    ? keepRanked(distributed, label, buildBreakdownRank(cardKind, ctx, label, { topk, window }))
+    : `topk(${topk}, ${distributed})`;
 }
 
 /** The `cap.topk` values of `label` busiest over the whole window, ranked once at its end by the kind's measure. */
@@ -1636,7 +1639,7 @@ export function buildBreakdownRank(
   cardKind: string,
   ctx: { metricName: string; filters?: FiltersArg; rateWindow?: string },
   label: string,
-  cap: BreakdownCap,
+  cap: BreakdownCap & { window: string },
 ): string | null {
   if (!supportsBreakdown(cardKind) || !LABEL_NAME_RE.test(label)) return null;
   const filters: FilterInput[] = Array.isArray(ctx.filters)
@@ -1759,7 +1762,7 @@ const AGGREGATION_RE = /\b(sum|avg|min|max|count|stddev)\s*(?:by\s*\(([^)]*)\)\s
 export function breakdownQueryOf(
   expr: string,
   label: string,
-  opts?: { rank?: string | null },
+  opts?: { topk?: number; rank?: string | null },
 ): string | null {
   if (!LABEL_NAME_RE.test(label)) return null;
   const inner = /^topk\(\s*\d+\s*,\s*([\s\S]*)\)$/.exec(expr.trim())?.[1] ?? expr.trim();
@@ -1783,7 +1786,8 @@ export function breakdownQueryOf(
     .join("");
 
   const result = split ? regrouped : `avg by (${label}) (${inner})`;
-  return keepRanked(result, label, opts?.rank ?? null);
+  if (opts?.rank) return keepRanked(result, label, opts.rank);
+  return opts?.topk ? `topk(${opts.topk}, ${result})` : result;
 }
 
 /** Footer label shown on the card — explorer UI only, never written to a panel. */

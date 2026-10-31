@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <MetricChartTile
         ref="focusedTile"
         :class="heatmap ? 'min-h-60' : 'h-60'"
-        :queries="heatmap ? heatmapQueries : queriesByLabel[activeLabel]"
+        :queries="heatmap ? heatmapQueries : focusedQueries"
         :chart-type="chartType"
         :unit="unit"
         :color="color"
@@ -828,16 +828,12 @@ export default defineComponent({
         ? t("metrics.explorer.detail.breakdown.titleFn", { fn: raw(fnLabel.value), label })
         : t(breakdownTitleKey(props.card.cardKind), { label });
 
-    /** `panel`: at the dashboard panel's rate window rather than the tile's. */
-    const queriesFor = (label: string, panel = false): TileQuery[] | null => {
+    /** `panel`: at the dashboard panel's rate window; `ranked`: capped by a whole-window rank, else per step. */
+    const queriesFor = (label: string, panel = false, ranked = false): TileQuery[] | null => {
       if (!countsByLabel.value[label].ready) return null;
       const { start_time, end_time } = props.timeRange;
-      const cap = topkByLabel.value[label]
-        ? {
-            topk: TOPK,
-            window: panel ? "$__range" : formatPromDuration((end_time - start_time) / 1e6),
-          }
-        : undefined;
+      const window = panel ? "$__range" : formatPromDuration((end_time - start_time) / 1e6);
+      const cap = topkByLabel.value[label] ? { topk: TOPK } : undefined;
       const ctx = {
         metricName: props.card.name,
         filters: props.filters,
@@ -851,10 +847,19 @@ export default defineComponent({
       const expr = follows.value
         ? source
           ? breakdownQueryOf(source, label, {
-              rank: cap && buildBreakdownRank(props.card.cardKind, ctx, label, cap),
+              topk: cap?.topk,
+              rank:
+                cap && ranked
+                  ? buildBreakdownRank(props.card.cardKind, ctx, label, { ...cap, window })
+                  : null,
             })
           : null
-        : buildBreakdownQuery(props.card.cardKind, ctx, label, cap);
+        : buildBreakdownQuery(
+            props.card.cardKind,
+            ctx,
+            label,
+            cap && ranked ? { ...cap, window } : cap,
+          );
       const stream =
         (follows.value && props.variant!.queries[0]?.builder?.metric) || props.card.name;
       return expr ? [{ expr, legendTemplate: `{${label}}`, stream }] : [];
@@ -863,6 +868,10 @@ export default defineComponent({
     /** `null` until the label's counts answer: only they know whether to cap at top 10. */
     const queriesByLabel = computed<Record<string, TileQuery[] | null>>(() =>
       Object.fromEntries(labels.value.map((label) => [label, queriesFor(label)])),
+    );
+    // One label, so its values can afford a rank over the whole window instead of rotating per step.
+    const focusedQueries = computed(() =>
+      activeLabel.value ? queriesFor(activeLabel.value, false, true) : null,
     );
 
     const distinctText = (label: string) => {
@@ -1182,7 +1191,7 @@ export default defineComponent({
       const label = activeLabel.value;
       if (label && heatmap.value) return openHeatmapToDashboard(label);
       // Not the tile's window, which would freeze the panel at this range.
-      const queries = label ? queriesFor(label, true) : null;
+      const queries = label ? queriesFor(label, true, true) : null;
       if (!label || !queries?.length) return;
       const data = buildPanelDataForCard(props.card, {
         queries,
@@ -1237,6 +1246,7 @@ export default defineComponent({
       retryCounts,
       topkByLabel,
       queriesByLabel,
+      focusedQueries,
       distinctText,
       activeCounts,
       ABSENT,
