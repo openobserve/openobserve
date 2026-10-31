@@ -679,10 +679,11 @@ export default defineComponent({
         .filter((query: any) => isFormulaQuery(query) === isFormulaQuery(tab)).length;
 
     const tabLabel = (tab: any, index: number) => {
-      if (isFormulaQuery(tab)) {
-        return tab.tabName || t("dashboard.formulaNumber", { index: numberAmongKind(tab, index) });
-      }
-      const name = tab.tabName || t("common.queryNumber", { index: numberAmongKind(tab, index) });
+      const name =
+        tab.tabName ||
+        (isFormulaQuery(tab)
+          ? t("dashboard.formulaNumber", { index: numberAmongKind(tab, index) })
+          : t("common.queryNumber", { index: numberAmongKind(tab, index) }));
       return promqlMode.value && tab.config?.ref
         ? t("dashboard.queryTabWithRef", { ref: raw(tab.config.ref), name })
         : name;
@@ -699,19 +700,21 @@ export default defineComponent({
       const queries = dashboardPanelData.data.queries;
       const out = substituteFormula(
         currentQuery.value.config.formula,
-        formulaInputs(
-          queries,
-          queries.map(() => ""),
-        ),
+        formulaInputs(queries, queries.map(queryTextOf)),
+        queryRefs(queries)[dashboardPanelData.layout.currentQueryIndex],
       );
       return "error" in out ? out.error : "";
     });
 
     const isFormulaInput = computed(() => {
       const letter = currentQuery.value?.config?.ref;
-      if (!letter || isFormulaQuery(currentQuery.value)) return false;
+      if (!letter) return false;
+      const names = queryRefs(dashboardPanelData.data.queries);
       return dashboardPanelData.data.queries.some(
-        (query: any) => isFormulaQuery(query) && formulaRefs(query.config.formula).includes(letter),
+        (query: any, i: number) =>
+          query !== currentQuery.value &&
+          isFormulaQuery(query) &&
+          formulaRefs(query.config.formula, names, names[i]).includes(letter),
       );
     });
 

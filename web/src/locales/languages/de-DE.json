@@ -1247,7 +1247,6 @@
       "moreExamples": "Für weitere Beispiele,",
       "clickHere": "klicken Sie hier"
     },
-    "legendLabel": "Legende",
     "switchToLogs": "Zurück zu Logs",
     "savedViewsLabel": "Gespeicherte Ansichten",
     "savedViewsNotFound": "Gespeicherte Ansicht wurde nicht gefunden!",
@@ -6816,7 +6815,9 @@
     "formulaNumber": "Formel {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} ist keine Abfrage in diesem Panel",
-    "formulaReferencesFormula": "{letter} ist eine Formel, und eine Formel darf nicht auf eine andere Formel verweisen",
+    "formulaCycle": "Formeln verweisen in einer Schleife aufeinander: {cycle}",
+    "formulaTooLong": "Die Formel wird auf mehr als {limit} Zeichen erweitert",
+    "formulaTooDeep": "Formeln sind mehr als {limit} Ebenen tief verschachtelt",
     "formulaInputNote": "In einer Formel verwendet: dort gelten die Instant-/Bereichseinstellung, die Legende, der Schritt und die Zeitverschiebung dieser Abfrage nicht.",
     "multiSqlQueryLabel": "Bezeichnung abfragen",
     "multiSqlQueryLabelHint": "Benutzerdefinierter Name für diese Abfrage in Legenden (z. B. 'Production')",
@@ -9029,7 +9030,6 @@
     "hostmapValue": "Wert",
     "hostmapGroupBy": "Gruppieren nach",
     "otherColumn": "Andere Spalte",
-    "metric": "Metrisch",
     "filters": "Filter",
     "labelFilters": "Label-Filter",
     "operations": "Operationen",
@@ -13307,21 +13307,6 @@
     "awsStsSelfHostedInfo": "Dabei werden AWS sts verwendet, um Rollen zu übernehmen und Operationen durchzuführen. Stellen Sie sicher, dass Sie in der Installationsumgebung AWS-Anmeldeinformationen konfiguriert haben, die Zugriff auf diese Rolle haben."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "Für Instant-Vector-Selektoren verwenden Sie",
-      "rangeVector": "Für Range-Vector-Selektoren verwenden Sie",
-      "aggregate": "Zum Aggregieren von Daten verwenden Sie",
-      "or": "oder",
-      "rate": "Für Ratenberechnungen über einen Range-Vektor verwenden Sie",
-      "sqlTitle": "Syntax-Leitfaden: SQL-Modus",
-      "sqlFullText": "Für die Volltextsuche nach dem Wert 'error' verwenden Sie",
-      "sqlColumn": "Für die Spaltensuche nach dem Wert 'error' verwenden Sie",
-      "sqlCode": "Um den Wert 200 in der Spalte 'code' zu suchen, verwenden Sie",
-      "sqlStream": "Um den Wert 'stderr' in der Spalte 'stream' zu suchen, verwenden Sie",
-      "sqlFunction": "Um die Abfragefunktion {fn} auf der Spalte 'log' zu suchen und zu verwenden, verwenden Sie",
-      "sqlMoreExamples": "Für weitere Beispiele,",
-      "sqlClickHere": "klicken Sie hier"
-    },
     "add": "Hinzufügen",
     "runQuery": "Abfrage ausführen",
     "runQueryOptions": "Optionen für Abfrage ausführen",
@@ -13606,10 +13591,6 @@
         "clear": "Ansicht zurücksetzen"
       }
     },
-    "index": {
-      "namePanelRequired": "Name des Panels ist erforderlich",
-      "errorsFixTryAgain": "Es sind einige Fehler aufgetreten, bitte beheben Sie diese und versuchen Sie es erneut"
-    },
     "metricCard": {
       "lastRefreshed": "Zuletzt aktualisiert:",
       "traceId": "Trace-ID: {id}",
@@ -13620,25 +13601,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Diagramm konnte nicht gerendert werden"
-    },
-    "queryBuilder": {
-      "title": "PromQL-Abfrage-Builder",
-      "subtitle": "Erstellen und testen Sie PromQL-Abfragen visuell",
-      "generatedQuery": "Generierte PromQL-Abfrage:",
-      "noQueryBuilt": "Noch keine Abfrage erstellt",
-      "copyQuery": "Abfrage kopieren",
-      "clearAll": "Alle löschen",
-      "testQuery": "Abfrage testen",
-      "queryResultPreview": "Vorschau des Abfrageergebnisses:",
-      "queryCopied": "Abfrage in die Zwischenablage kopiert!",
-      "queryCleared": "Abfrage gelöscht",
-      "testingSoon": "Abfragetests werden bald implementiert",
-      "executionSoon": "Die Abfrageausführung wird in der nächsten Phase implementiert"
-    },
-    "metricSelector": {
-      "metricName": "Metrikname",
-      "loadingMetrics": "Metriken werden geladen...",
-      "noMetricsFound": "Keine Metriken gefunden"
     },
     "labelFilterEditor": {
       "label": "Label",

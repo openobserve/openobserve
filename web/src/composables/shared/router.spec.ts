@@ -80,10 +80,12 @@ vi.mock("@/plugins/logs/Index.vue", () => ({ default: { name: "Search" } }));
 vi.mock("@/plugins/logs/SearchJobInspector.vue", () => ({
   default: { name: "SearchJobInspector" },
 }));
-vi.mock("@/plugins/metrics/Index.vue", () => ({ default: { name: "AppMetrics" } }));
 vi.mock("@/plugins/traces/Index.vue", () => ({ default: { name: "AppTraces" } }));
 vi.mock("@/plugins/traces/TraceDetails.vue", () => ({ default: { name: "TraceDetails" } }));
-vi.mock("@/views/PromQL/QueryBuilder.vue", () => ({ default: { name: "PromQLQueryBuilder" } }));
+// The translation itself is covered in metricsUrlState.spec; here only its hand-off.
+vi.mock("@/composables/metrics/metricsUrlState", () => ({
+  legacyLinkToVisualizeQuery: vi.fn((query: any) => ({ translated: Object.keys(query).join(",") })),
+}));
 vi.mock("@/views/Dashboards/ViewDashboard.vue", () => ({ default: { name: "ViewDashboard" } }));
 vi.mock("@/views/Dashboards/addPanel/AddPanel.vue", () => ({ default: { name: "AddPanel" } }));
 vi.mock("@/views/Dashboards/Dashboards.vue", () => ({ default: { name: "Dashboards" } }));
@@ -657,38 +659,94 @@ describe("useRoutes (router.ts)", () => {
       expect(routeGuard).toHaveBeenCalledTimes(1);
     });
 
-    // The back-compat redirect and its Visualize exception. routeGuard is mocked
-    // to pass its next() straight through, so a redirect surfaces as next() being
-    // called with a `{ name: "metricsEditor" }` target, and a plain admit as
-    // next() with no args.
-    it("redirects a legacy metrics_data deep link (no mode) to the editor route", () => {
+    // routeGuard is mocked to pass its next() straight through, so a redirect
+    // surfaces as next() called with a target, and a plain admit as next().
+    it("opens a legacy metrics_data deep link (no mode) in Visualize, blob untouched", async () => {
       const { homeChildRoutes } = useRoutes();
       const metricsRoute = findRoute(homeChildRoutes, "metrics");
 
       const next = vi.fn();
-      metricsRoute.beforeEnter({ query: { metrics_data: "abc" }, hash: "" }, {}, next);
+      await metricsRoute.beforeEnter(
+        { query: { org_identifier: "o", metrics_data: "abc" }, hash: "#x" },
+        {},
+        next,
+      );
 
       expect(next).toHaveBeenCalledTimes(1);
-      expect(next).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "metricsEditor",
-          query: { metrics_data: "abc" },
+      expect(next).toHaveBeenCalledWith({
+        name: "metrics",
+        query: { org_identifier: "o", metrics_data: "abc", mode: "visualize" },
+        hash: "#x",
+        replace: true,
+      });
+    });
+
+    it.each([
+      [{ stream_name: "cpu" }, "stream_name"],
+      [{ stream: "cpu" }, "stream"],
+      [{ query: "dXA=", query_type: "promql" }, "query,query_type"],
+      [{ "query.1": "dXA=" }, "query.1"],
+      [{ chart_type: "bar" }, "chart_type"],
+      [{ metrics_data: "abc", query: "dXA=" }, "metrics_data,query"],
+      [{ mode: "visualize", query: "dXA=" }, "mode,query"],
+    ])(
+      "hands the editor params of %o to the translator and redirects to its query",
+      async (query, translated) => {
+        const { homeChildRoutes } = useRoutes();
+        const metricsRoute = findRoute(homeChildRoutes, "metrics");
+
+        const next = vi.fn();
+        await metricsRoute.beforeEnter({ query, hash: "" }, {}, next);
+
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(next).toHaveBeenCalledWith({
+          name: "metrics",
+          query: { translated },
+          hash: "",
           replace: true,
-        }),
+        });
+      },
+    );
+
+    // routeGuard's useStore() is inject(), which returns undefined once the guard has awaited.
+    it.each([
+      [{ org_identifier: "o", query: "dXA=", query_type: "promql" }],
+      [{ metrics_data: "abc" }],
+    ])("runs routeGuard before any await for a legacy link %o", async (query) => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      let injectable = true;
+      vi.mocked(routeGuard).mockImplementationOnce((_to: any, _from: any, next: any) => {
+        if (!injectable)
+          throw new TypeError("Cannot read properties of undefined (reading 'state')");
+        next();
+      });
+      const metricsRoute = findRoute(useRoutes().homeChildRoutes, "metrics");
+      const next = vi.fn();
+
+      const done = metricsRoute.beforeEnter({ query, hash: "" }, {}, next);
+      injectable = false;
+      await done;
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "metrics", replace: true }),
       );
     });
 
-    it("redirects other editor params (e.g. stream_name) to the editor route", () => {
-      const { homeChildRoutes } = useRoutes();
-      const metricsRoute = findRoute(homeChildRoutes, "metrics");
-
+    it("passes routeGuard's own redirect through instead of the Visualize link", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      vi.mocked(routeGuard).mockImplementationOnce((_to: any, _from: any, next: any) =>
+        next({ name: "plans" }),
+      );
+      const metricsRoute = findRoute(useRoutes().homeChildRoutes, "metrics");
       const next = vi.fn();
-      metricsRoute.beforeEnter({ query: { stream_name: "cpu" }, hash: "" }, {}, next);
 
-      expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: "metricsEditor" }));
+      await metricsRoute.beforeEnter({ query: { query: "dXA=" }, hash: "" }, {}, next);
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(next).toHaveBeenCalledWith({ name: "plans" });
     });
 
-    it("keeps a mode=visualize link in the explorer — no editor redirect", () => {
+    it("keeps a mode=visualize link in the explorer — no redirect", () => {
       // The explorer's in-page Visualize owns metrics_data and rehydrates it
       // itself; redirecting would kick the user out on every refresh.
       const { homeChildRoutes } = useRoutes();
@@ -729,16 +787,55 @@ describe("useRoutes (router.ts)", () => {
       expect(next).toHaveBeenCalledWith();
     });
 
-    it("should include promqlBuilder route", () => {
+    it("has no promql-builder or metricsEditor page left, only redirects", () => {
       const { homeChildRoutes } = useRoutes();
-      const route = findRoute(homeChildRoutes, "promqlBuilder");
-      expect(route).toBeDefined();
+      expect(findRoute(homeChildRoutes, "promqlBuilder")).toBeUndefined();
+      expect(findRoute(homeChildRoutes, "metricsEditor")).toBeUndefined();
+      const builder = homeChildRoutes.find((route: any) => route.path === "promql-builder");
+      expect(builder.component).toBeUndefined();
     });
 
-    it("should have correct path for promqlBuilder route", () => {
-      const { homeChildRoutes } = useRoutes();
-      const route = findRoute(homeChildRoutes, "promqlBuilder");
-      expect(route.path).toBe("promql-builder");
+    it("sends a /promql-builder bookmark to Visualize with its query", () => {
+      const builder = useRoutes().homeChildRoutes.find(
+        (route: any) => route.path === "promql-builder",
+      );
+      expect(builder.redirect({ query: { org_identifier: "o", period: "1h" }, hash: "" })).toEqual({
+        name: "metrics",
+        query: { org_identifier: "o", period: "1h", mode: "visualize" },
+        hash: "",
+      });
+    });
+
+    describe("the retired /metrics/editor path", () => {
+      const redirectOf = (to: any) =>
+        useRoutes()
+          .homeChildRoutes.find((route: any) => route.path === "metrics/editor")
+          .redirect(to);
+
+      it("sends a bare editor bookmark to Visualize", () => {
+        expect(redirectOf({ query: {}, hash: "" })).toEqual({
+          name: "metrics",
+          query: { mode: "visualize" },
+          hash: "",
+        });
+      });
+
+      it("keeps the org, time and blob of an editor link", () => {
+        const query = { org_identifier: "o", period: "1h", metrics_data: "abc" };
+        expect(redirectOf({ query, hash: "#h" })).toEqual({
+          name: "metrics",
+          query: { ...query, mode: "visualize" },
+          hash: "#h",
+        });
+      });
+
+      it("passes override params on for the /metrics guard to fold into a blob", () => {
+        expect(redirectOf({ query: { query: "dXA=", stream: "cpu" }, hash: "" }).query).toEqual({
+          query: "dXA=",
+          stream: "cpu",
+          mode: "visualize",
+        });
+      });
     });
   });
 
@@ -2135,18 +2232,6 @@ describe("useRoutes (router.ts)", () => {
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
 
-    it("should call routeGuard for promqlBuilder route beforeEnter", async () => {
-      const { routeGuard } = await import("@/utils/zincutils");
-      const { homeChildRoutes } = useRoutes();
-      const route = findRoute(homeChildRoutes, "promqlBuilder");
-
-      const mockTo = {};
-      const mockFrom = {};
-      const mockNext = vi.fn();
-      route.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
-    });
-
     it("should call routeGuard for traces route beforeEnter", async () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const { homeChildRoutes } = useRoutes();
@@ -2634,13 +2719,10 @@ describe("useRoutes (router.ts)", () => {
       },
     );
 
-    it.each(["metricsEditor", "viewDashboard", "searchJobInspector", "promqlBuilder"])(
-      "keeps the empty-data guard on %s",
-      (name) => {
-        const { homeChildRoutes } = useRoutes();
-        expect(findRoute(homeChildRoutes, name).meta?.allowOnEmptyData).toBeUndefined();
-      },
-    );
+    it.each(["viewDashboard", "searchJobInspector"])("keeps the empty-data guard on %s", (name) => {
+      const { homeChildRoutes } = useRoutes();
+      expect(findRoute(homeChildRoutes, name).meta?.allowOnEmptyData).toBeUndefined();
+    });
   });
 });
 

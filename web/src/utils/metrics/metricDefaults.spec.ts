@@ -20,21 +20,27 @@ import {
   breakdownLabelsOf,
   breakdownTitleKey,
   buildBreakdownQuery,
+  buildBreakdownRank,
+  buildExportIntervalQuery,
   buildHeatmapBreakdownQuery,
   buildHeatmapValueQuery,
   breakdownQueryOf,
   buildSelector,
+  distributeUnionRanges,
   supportsBreakdown,
+  computeAlignedStepSeconds,
   computePercentileWindow,
   computeRateWindow,
   computeStepSeconds,
   computeWidenedRateWindows,
   formatPromDuration,
   getMetricDefaults,
+  MAX_DATA_POINTS,
   MIN_PERCENTILE_SAMPLES,
   inferUnit,
   resolveCardKind,
   resolveVariant,
+  snapExportInterval,
   toO2Unit,
 } from "./metricDefaults";
 
@@ -53,6 +59,87 @@ const unitOf = (name: string, type?: string, ctx?: Record<string, any>) =>
   getMetricDefaults(name, type, undefined, { rateWindow: W, ...ctx }).unit;
 
 const streamNames = (...names: string[]) => new Set(names);
+
+describe("OR-grouped filters", () => {
+  const GROUPED = [
+    { label: "job", value: "api" },
+    { label: "a", value: "1", group: 1 },
+    { label: "b", value: "2", group: 2 },
+  ] as any[];
+
+  it("buildSelector unions one selector per branch", () => {
+    expect(buildSelector("m", GROUPED)).toBe(
+      '({__name__="m",job="api",a="1"} or {__name__="m",job="api",b="2"})',
+    );
+    expect(buildSelector("m", GROUPED, { quantile: "0.5" })).toBe(
+      '({__name__="m",job="api",quantile="0.5",a="1"} or {__name__="m",job="api",quantile="0.5",b="2"})',
+    );
+  });
+
+  it("buildSelector merges equality branches into one regex selector", () => {
+    expect(
+      buildSelector("m", [
+        { label: "code", value: "500", group: 1 },
+        { label: "code", value: "5.3", group: 2 },
+      ] as any[]),
+    ).toBe('{__name__="m",code=~"(?:500|5\\\\.3)"}');
+  });
+
+  it("buildSelector refuses filters past the branch cap", () => {
+    const many = Array.from({ length: 17 }, (_, i) => ({
+      label: `l${i}`,
+      value: "x",
+      group: 1,
+      negate: true,
+    })) as any[];
+    expect(() => buildSelector("m", many)).toThrow(/17 selectors/);
+  });
+
+  it("distributes range calls over a union and drops parens a whole argument does not need", () => {
+    const u = '({__name__="m",a="1"} or {__name__="m",b="}"})';
+    expect(distributeUnionRanges(`sum(rate(${u}[5m]))`)).toBe(
+      'sum(rate({__name__="m",a="1"}[5m]) or rate({__name__="m",b="}"}[5m]))',
+    );
+    expect(distributeUnionRanges(`quantile_over_time(0.5, ${u}[5m])`)).toBe(
+      'quantile_over_time(0.5, {__name__="m",a="1"}[5m]) or quantile_over_time(0.5, {__name__="m",b="}"}[5m])',
+    );
+    expect(distributeUnionRanges(`rate(${u}[5m]) * 2`)).toBe(
+      '(rate({__name__="m",a="1"}[5m]) or rate({__name__="m",b="}"}[5m])) * 2',
+    );
+    expect(distributeUnionRanges(`increase(${u}[1h] @ end())`)).toBe(
+      'increase({__name__="m",a="1"}[1h] @ end()) or increase({__name__="m",b="}"}[1h] @ end())',
+    );
+    expect(distributeUnionRanges(`avg(${u})`)).toBe(
+      'avg({__name__="m",a="1"} or {__name__="m",b="}"})',
+    );
+    expect(distributeUnionRanges(`(${u} and ${u} > -Inf)`)).toBe(`(${u} and ${u} > -Inf)`);
+    expect(distributeUnionRanges('sum(rate({__name__="m"}[5m]))')).toBe(
+      'sum(rate({__name__="m"}[5m]))',
+    );
+  });
+
+  it("every card query and breakdown runs with the union distributed", () => {
+    const counter = getMetricDefaults("http_requests_total", "Counter", undefined, {
+      filters: GROUPED,
+      rateWindow: W,
+    });
+    expect(counter.defaultQuery).toBe(
+      'sum(rate({__name__="http_requests_total",job="api",a="1"}[4m]) or rate({__name__="http_requests_total",job="api",b="2"}[4m]))',
+    );
+    expect(
+      buildBreakdownQuery(CARD_KIND.COUNTER_RATE, { metricName: "x", filters: GROUPED }, "pod"),
+    ).not.toContain(")[");
+    expect(
+      buildHeatmapBreakdownQuery({ metricName: "x", filters: GROUPED }, "pod", {
+        topk: 3,
+        windowSeconds: 3600,
+      }),
+    ).not.toContain(")[");
+    expect(buildHeatmapValueQuery({ metricName: "x", filters: GROUPED }, "pod", "a")).not.toContain(
+      ")[",
+    );
+  });
+});
 
 describe("buildSelector", () => {
   it("always emits the __name__ form, never a bare identifier", () => {
@@ -140,6 +227,79 @@ describe("rate window (PRD 6.4)", () => {
     expect(formatPromDuration(3660)).toBe("1h1m");
     expect(formatPromDuration(90)).toBe("1m30s");
     expect(formatPromDuration(86400)).toBe("1d");
+  });
+});
+
+describe("export-interval alignment", () => {
+  it("probes the densest series with one instant count", () => {
+    expect(buildExportIntervalQuery("http_requests_total", 600)).toBe(
+      'max(count_over_time({__name__="http_requests_total"}[10m]))',
+    );
+  });
+
+  it.each([
+    [600, 10, 60],
+    [600, 11, 60],
+    [600, 40, 15],
+    [600, 41, 15],
+    [600, 20, 30],
+    [600, 60, 10],
+    [600, 2, 300],
+    [3600, 30, 120],
+    [3600, 6, 600],
+    [600, 600, 1],
+    [600, 1200, 1],
+  ])("snaps %ss / %s samples to %ss", (window, count, expected) => {
+    expect(snapExportInterval(window, count)).toBe(expected);
+  });
+
+  it("cannot tell from fewer than two samples, or past the scale", () => {
+    expect(snapExportInterval(600, 1)).toBeNull();
+    expect(snapExportInterval(600, 0)).toBeNull();
+    expect(snapExportInterval(600, NaN)).toBeNull();
+    expect(snapExportInterval(3600, 2)).toBeNull();
+  });
+
+  it("raises the step to the smallest multiple of the interval", () => {
+    // 1h over 50 points is a 72s step: a 60s exporter gets 120s, a 15s one 75s.
+    expect(computeStepSeconds(3600, 50)).toBe(72);
+    expect(computeAlignedStepSeconds(3600, 50, 60)).toBe(120);
+    expect(computeAlignedStepSeconds(3600, 50, 15)).toBe(75);
+    expect(computeAlignedStepSeconds(3600, 50, 1)).toBe(72);
+    expect(computeAlignedStepSeconds(900, 50, 60)).toBe(60);
+  });
+
+  it("keeps the range step when the interval is unknown or wider than the range", () => {
+    expect(computeAlignedStepSeconds(3600, 50)).toBe(72);
+    expect(computeAlignedStepSeconds(3600, 50, 0)).toBe(72);
+    expect(computeAlignedStepSeconds(300, 50, 600)).toBe(15);
+  });
+
+  it("never asks for more than MAX_DATA_POINTS", () => {
+    for (const range of [900, 3600, 6 * 3600, 7 * 86400]) {
+      for (const interval of [1, 10, 15, 30, 60, 300]) {
+        const step = computeAlignedStepSeconds(range, MAX_DATA_POINTS, interval);
+        expect(range / step, `range=${range} interval=${interval}`).toBeLessThanOrEqual(
+          MAX_DATA_POINTS,
+        );
+        expect(step % interval, `range=${range} interval=${interval}`).toBe(0);
+      }
+    }
+  });
+
+  it("sizes rate windows to hold the measured cadence: at least max(step, 4 x interval)", () => {
+    // 1h at a 15s org scrape: [1m27s] before; a 60s exporter needs 4 samples' worth.
+    expect(computeRateWindow(3600, 50, 15)).toBe("1m27s");
+    expect(computeRateWindow(3600, 50, 15, 60)).toBe("4m");
+    // Step-dominated: 7d over 50 points aligned to 60s is a 3h22m step.
+    expect(computeRateWindow(7 * 86400, 50, 15, 60)).toBe("3h23m");
+    // A measured cadence faster than the configured one never narrows the window.
+    expect(computeRateWindow(900, 50, 60, 15)).toBe("4m");
+  });
+
+  it("widens the percentile and retry windows from the measured cadence too", () => {
+    expect(computePercentileWindow(6 * 3600, 120, 15, 60)).toBe("20m");
+    expect(computeWidenedRateWindows(3600, 50, 15, 60)).toEqual(["16m", "30m"]);
   });
 });
 
@@ -939,7 +1099,19 @@ describe("buildBreakdownQuery", () => {
     ).toBe('sum by (route) (rate({__name__="http_requests_total",status="500"}[4m]))');
   });
 
-  it("wraps the query in topk when a limit is given", () => {
+  it("keeps the values busiest over the whole window when capped, not a per-step topk", () => {
+    expect(
+      buildBreakdownQuery(CARD_KIND.COUNTER_RATE, ctx("http_requests_total"), "instance", {
+        topk: 10,
+        window: "1h",
+      }),
+    ).toBe(
+      '(sum by (instance) (rate({__name__="http_requests_total"}[4m]))) and on (instance) ' +
+        'topk(10, sum by (instance) (increase({__name__="http_requests_total",instance!=""}[1h] @ end())))',
+    );
+  });
+
+  it("caps per step when no rank window is given, as an overview tile does", () => {
     expect(
       buildBreakdownQuery(CARD_KIND.COUNTER_RATE, ctx("http_requests_total"), "instance", {
         topk: 10,
@@ -955,6 +1127,83 @@ describe("buildBreakdownQuery", () => {
   it("refuses a label name that is not a valid PromQL identifier", () => {
     expect(buildBreakdownQuery(CARD_KIND.GAUGE, ctx("up"), "1bad")).toBeNull();
     expect(buildBreakdownQuery(CARD_KIND.GAUGE, ctx("up"), "a) or vector(1")).toBeNull();
+  });
+});
+
+describe("buildBreakdownRank", () => {
+  const ctx = { metricName: "m", rateWindow: W };
+
+  it("distributes an OR-group union into each branch, @ end() on every range selector", () => {
+    const filters = [
+      { label: "job", value: "api" },
+      { label: "a", value: "1", group: 1 },
+      { label: "b", value: "2", group: 2 },
+    ] as any[];
+    const branch = (m: string) => `{__name__="m",az!="",job="api",${m}}[6h] @ end()`;
+    const rank = `topk(10, sum by (az) (increase(${branch('a="1"')}) or increase(${branch('b="2"')})))`;
+    expect(buildBreakdownRank(CARD_KIND.COUNTER_RATE, { ...ctx, filters }, "az", cap)).toBe(rank);
+    expect(buildBreakdownQuery(CARD_KIND.COUNTER_RATE, { ...ctx, filters }, "az", cap)).toBe(
+      `(sum by (az) (rate({__name__="m",job="api",a="1"}[4m]) or rate({__name__="m",job="api",b="2"}[4m]))) and on (az) ${rank}`,
+    );
+    const gauge = buildBreakdownQuery(CARD_KIND.GAUGE, { ...ctx, filters }, "az", cap)!;
+    expect(gauge).toContain(
+      `avg_over_time(${branch('a="1"')}) or avg_over_time(${branch('b="2"')})`,
+    );
+    expect(gauge).not.toMatch(/\)\[/);
+  });
+  const cap = { topk: 10, window: "6h" };
+  const SEL = '{__name__="m",az!=""}[6h] @ end()';
+
+  it.each([
+    [CARD_KIND.GAUGE, `topk(10, avg by (az) (avg_over_time(${SEL})))`],
+    [CARD_KIND.COUNTER_RATE, `topk(10, sum by (az) (increase(${SEL})))`],
+    [
+      CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS,
+      'topk(10, sum by (az) (increase({__name__="m",az!="",le=~"[+]?[Ii]nf"}[6h] @ end())))',
+    ],
+    [
+      CARD_KIND.MEAN_PAIR,
+      'topk(10, sum by (az) (increase({__name__="m_count",az!=""}[6h] @ end())))',
+    ],
+    [
+      CARD_KIND.EXP_HISTOGRAM_FALLBACK,
+      'topk(10, sum by (az) (increase({__name__="m_count",az!=""}[6h] @ end())))',
+    ],
+    [
+      CARD_KIND.SUMMARY_QUANTILES,
+      'topk(10, avg by (az) (avg_over_time({__name__="m",az!="",quantile="0.5"}[6h] @ end())))',
+    ],
+    [CARD_KIND.INFO, `topk(10, count by (az) (last_over_time(${SEL})))`],
+  ])("%s ranks once at the window's end, @ on the selector only", (kind, expected) => {
+    expect(buildBreakdownRank(kind, ctx, "az", cap)).toBe(expected);
+  });
+
+  it("keeps the active filters", () => {
+    expect(
+      buildBreakdownRank(
+        CARD_KIND.COUNTER_RATE,
+        { ...ctx, filters: [{ label: "job", value: "api" }] },
+        "az",
+        cap,
+      ),
+    ).toBe('topk(10, sum by (az) (increase({__name__="m",az!="",job="api"}[6h] @ end())))');
+  });
+
+  it("never ranks over less than the rate window, and passes a panel's $__range through", () => {
+    expect(buildBreakdownRank(CARD_KIND.COUNTER_RATE, ctx, "az", { topk: 5, window: "1m" })).toBe(
+      'topk(5, sum by (az) (increase({__name__="m",az!=""}[4m] @ end())))',
+    );
+    expect(
+      buildBreakdownRank(CARD_KIND.COUNTER_RATE, { ...ctx, rateWindow: "$__rate_interval" }, "az", {
+        topk: 5,
+        window: "$__range",
+      }),
+    ).toBe('topk(5, sum by (az) (increase({__name__="m",az!=""}[$__range] @ end())))');
+  });
+
+  it("has no rank where there is no breakdown", () => {
+    expect(buildBreakdownRank(CARD_KIND.OTHER, ctx, "az", cap)).toBeNull();
+    expect(buildBreakdownRank(CARD_KIND.GAUGE, ctx, "a z", cap)).toBeNull();
   });
 });
 
@@ -1128,9 +1377,21 @@ describe("breakdownQueryOf", () => {
     );
   });
 
-  it("caps to the top values when asked", () => {
+  it("keeps only the values a rank picks, matched on the label", () => {
+    expect(breakdownQueryOf("sum(rate(x[4m]))", "az", { rank: "topk(10, r)" })).toBe(
+      "(sum by (az) (rate(x[4m]))) and on (az) topk(10, r)",
+    );
+    expect(breakdownQueryOf("sum(rate(x[4m]))", "az", { rank: null })).toBe(
+      "sum by (az) (rate(x[4m]))",
+    );
+  });
+
+  it("caps per step with topk alone, and a rank wins over it", () => {
     expect(breakdownQueryOf("sum(rate(x[4m]))", "az", { topk: 10 })).toBe(
       "topk(10, sum by (az) (rate(x[4m])))",
+    );
+    expect(breakdownQueryOf("sum(rate(x[4m]))", "az", { topk: 10, rank: "topk(10, r)" })).toBe(
+      "(sum by (az) (rate(x[4m]))) and on (az) topk(10, r)",
     );
   });
 

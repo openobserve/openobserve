@@ -1247,7 +1247,6 @@
       "moreExamples": "更多示例，",
       "clickHere": "请点击此处"
     },
-    "legendLabel": "图例",
     "switchToLogs": "切换回日志",
     "savedViewsLabel": "已保存的视图",
     "savedViewsNotFound": "未找到已保存的视图！",
@@ -6816,7 +6815,9 @@
     "formulaNumber": "公式 {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} 不是此面板中的查询",
-    "formulaReferencesFormula": "{letter} 是公式，而公式不能引用另一个公式",
+    "formulaCycle": "公式之间形成循环引用：{cycle}",
+    "formulaTooLong": "公式展开后超过 {limit} 个字符",
+    "formulaTooDeep": "公式嵌套层数超过 {limit} 层",
     "formulaInputNote": "用于公式时，此查询的即时/范围设置、图例、步长和时间偏移均不适用。",
     "multiSqlQueryLabel": "查询标签",
     "multiSqlQueryLabelHint": "图例中此查询的自定义名称（例如，“生产”）",
@@ -9029,7 +9030,6 @@
     "hostmapValue": "值",
     "hostmapGroupBy": "分组依据",
     "otherColumn": "其他列",
-    "metric": "指标",
     "filters": "筛选",
     "labelFilters": "标签过滤器",
     "operations": "操作",
@@ -13307,21 +13307,6 @@
     "awsStsSelfHostedInfo": "这使用 AWS sts 来代入角色并执行操作。确保您在安装环境中配置了有权访问此角色的 aws 证书。"
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "对于即时向量选择器，使用",
-      "rangeVector": "对于范围向量选择器，使用",
-      "aggregate": "要聚合数据，使用",
-      "or": "或",
-      "rate": "对于范围向量上的速率计算，使用",
-      "sqlTitle": "语法指南：SQL模式",
-      "sqlFullText": "要对值'error'进行全文搜索，使用",
-      "sqlColumn": "要对值'error'进行列搜索，使用",
-      "sqlCode": "要搜索code列的值为200，使用",
-      "sqlStream": "要搜索stream列的值为'stderr'，使用",
-      "sqlFunction": "要对log列搜索并使用查询函数{fn}，使用",
-      "sqlMoreExamples": "更多示例，",
-      "sqlClickHere": "点击此处"
-    },
     "add": "添加",
     "runQuery": "查询",
     "runQueryOptions": "查询运行选项",
@@ -13606,10 +13591,6 @@
         "clear": "清除视图"
       }
     },
-    "index": {
-      "namePanelRequired": "面板名称是必填项",
-      "errorsFixTryAgain": "存在一些错误，请修正后重试"
-    },
     "metricCard": {
       "lastRefreshed": "上次刷新时间：",
       "traceId": "追踪ID: {id}",
@@ -13620,25 +13601,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "渲染图表失败"
-    },
-    "queryBuilder": {
-      "title": "PromQL 查询构建器",
-      "subtitle": "可视化构建和测试 PromQL 查询",
-      "generatedQuery": "生成的 PromQL 查询：",
-      "noQueryBuilt": "尚未构建查询",
-      "copyQuery": "复制查询",
-      "clearAll": "全部清除",
-      "testQuery": "测试查询",
-      "queryResultPreview": "查询结果预览：",
-      "queryCopied": "查询已复制到剪贴板！",
-      "queryCleared": "查询已清除",
-      "testingSoon": "查询测试功能即将实现",
-      "executionSoon": "查询执行将在下一阶段实现"
-    },
-    "metricSelector": {
-      "metricName": "指标名称",
-      "loadingMetrics": "正在加载指标...",
-      "noMetricsFound": "未找到任何指标"
     },
     "labelFilterEditor": {
       "label": "标签",

@@ -43,7 +43,7 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
 
   // ─── P2: Default State ─────────────────────────────────────────────────────
 
-  test("Default state — page loads with defaults, no auto-run", {
+  test("Default state — page loads with the editor, date picker and share control", {
     tag: ['@metrics-share-deep-link', '@P2', '@default-state', '@all']
   }, async ({ page }, testInfo) => {
     const pm = await setupTest(page, testInfo);
@@ -56,9 +56,7 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     await pm.metricsPage.expectApplyButtonVisible();
     await pm.metricsPage.expectDatePickerVisible();
 
-    // No metrics_data blob in URL by default
-    const hasBlob = await pm.metricsPage.hasMetricsDataParam();
-    expect(hasBlob).toBe(false);
+    // No "no blob by default" check: Visualize auto-picks a metric on mount and writes its blob.
 
     // Share button should be in DOM (but may be disabled if web_url not configured)
     const shareInDom = await pm.metricsPage.isShareButtonInDom();
@@ -150,11 +148,13 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     // Page should load
     await pm.metricsPage.expectMetricsPageVisible();
 
-    // Wait for auto-run to start (the Apply button may cycle through loading)
-    await pm.metricsPage.waitForMetricsResults();
+    await pm.metricsPage.waitForMetricsResults({ strict: true });
 
-    // After auto-run, URL should be normalized and contain a metrics_data blob
-    // or at minimum the page should be functional
+    // The router folds the override params into the blob Visualize charts from.
+    await expect
+      .poll(async () => (await pm.metricsPage.decodeMetricsBlob())?.data?.queries?.[0]?.query)
+      .toBe(promqlQuery);
+    expect((await pm.metricsPage.decodeMetricsBlob())?.data?.type).toBe('bar');
     await pm.metricsPage.expectApplyButtonVisible();
 
     testLogger.info('Override params deep-link validated');
@@ -168,19 +168,9 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     const pm = await setupTest(page, testInfo);
     testLogger.info('Testing URL sync after manual query change');
 
-    // Ensure we start without a metrics_data blob in URL
-    const hasBlobBefore = await pm.metricsPage.hasMetricsDataParam();
-    if (hasBlobBefore) {
-      // Re-navigate cleanly. Must target the editor explicitly: a bare
-      // `/metrics` carries no editor params, so it lands on the Metrics
-      // Explorer — which has no query bar for the Apply below to use.
-      const baseUrl = `${process.env.ZO_BASE_URL}/web/metrics/editor`;
-      const orgId = process.env.ORGNAME || 'default';
-      await pm.metricsPage.navigateToMetricsUrl(`${baseUrl}?org_identifier=${orgId}`);
-    }
-
-    // Enter a query and click Apply
-    await pm.metricsPage.enterMetricsQuery('cpu_usage');
+    // An expression the mount-time auto-seed never writes, so only this edit can put it in the blob.
+    const typed = 'max by (job)(cpu_usage) * 2';
+    await pm.metricsPage.enterMetricsQuery(typed);
     await pm.metricsPage.clickApplyButton();
 
     // Wait for results to render
@@ -194,6 +184,9 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     const blob = await pm.metricsPage.decodeMetricsBlob();
     expect(blob).not.toBeNull();
     expect(blob.v).toBe(1);
+    await expect
+      .poll(async () => (await pm.metricsPage.decodeMetricsBlob())?.data?.queries?.[0]?.query)
+      .toBe(typed);
 
     testLogger.info('URL sync after manual query verified');
   });
@@ -526,7 +519,7 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
 
   // ─── P2: Deep-Link Without Stream ──────────────────────────────────────────
 
-  test("Deep-link without stream — query populated, no stream selected", {
+  test("Deep-link without stream — query populated, stream taken from the query", {
     tag: ['@metrics-share-deep-link', '@P2', '@deeplink', '@edge-case', '@all']
   }, async ({ page }, testInfo) => {
     const pm = await setupTest(page, testInfo);
@@ -545,10 +538,15 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     // Page should load without crash
     await pm.metricsPage.expectMetricsPageVisible();
 
-    // Page should be functional
     await pm.metricsPage.expectApplyButtonVisible();
 
-    testLogger.info('Deep-link without stream validated — no crash');
+    // The link names no stream, so the translator takes it from the metric the query selects.
+    await expect
+      .poll(async () => (await pm.metricsPage.decodeMetricsBlob())?.data?.queries?.[0]?.fields?.stream)
+      .toBe(promqlQuery);
+    expect((await pm.metricsPage.decodeMetricsBlob())?.data?.queries?.[0]?.query).toBe(promqlQuery);
+
+    testLogger.info('Deep-link without stream validated — stream inferred from the query');
   });
 
   // ─── P2: Share URL Freezes Time to Absolute from/to ────────────────────────
@@ -583,16 +581,22 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
       testLogger.warn('Share success toast not detected');
     });
 
-    // Read clipboard URL
     const clipboardUrl = await pm.metricsPage.getCopiedShortUrl(15000);
-    if (clipboardUrl && clipboardUrl.includes('/short/')) {
-      testLogger.info(`Clipboard URL: ${clipboardUrl}`);
+    testLogger.info(`Clipboard URL: ${clipboardUrl}`);
+    expect(clipboardUrl).toContain('/short/');
 
-      // Parse the URL — the short URL redirects to the long URL with params.
-      // The clipboard contains the short URL itself, not the expanded URL.
-      // We can at least verify it's a valid short URL.
-      expect(clipboardUrl).toContain('/short/');
-    }
+    // The short link redirects to the long one, which must carry the frozen window; opened on this
+    // session's origin, since web_url may name another host the browser holds no session for.
+    const short = new URL(clipboardUrl);
+    await page.goto(new URL(short.pathname + short.search, process.env.ZO_BASE_URL).href);
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('from'), { timeout: 15000 })
+      .toMatch(/^\d+$/);
+    testLogger.info(`Short URL resolved to ${page.url()}`);
+    const params = new URL(page.url()).searchParams;
+    expect(params.get('to')).toMatch(/^\d+$/);
+    expect(params.get('period')).toBeNull();
+    expect(Number(params.get('to'))).toBeGreaterThan(Number(params.get('from')));
 
     testLogger.info('Share time-freeze test completed');
   });

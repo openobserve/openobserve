@@ -1247,7 +1247,6 @@
       "moreExamples": "추가 예제는,",
       "clickHere": "여기를 클릭하세요"
     },
-    "legendLabel": "범례",
     "switchToLogs": "로그로 다시 전환",
     "savedViewsLabel": "저장된 뷰",
     "savedViewsNotFound": "저장된 뷰를 찾을 수 없습니다!",
@@ -6816,7 +6815,9 @@
     "formulaNumber": "수식 {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter}은(는) 이 패널의 쿼리가 아닙니다",
-    "formulaReferencesFormula": "{letter}은(는) 수식이며, 수식은 다른 수식을 참조할 수 없습니다",
+    "formulaCycle": "수식이 서로 순환 참조합니다: {cycle}",
+    "formulaTooLong": "수식을 펼치면 {limit}자를 초과합니다",
+    "formulaTooDeep": "수식 중첩이 {limit}단계를 초과합니다",
     "formulaInputNote": "수식에 사용되는 경우: 이 쿼리의 인스턴트/범위 설정, 범례, 스텝, 시간 이동은 적용되지 않습니다.",
     "multiSqlQueryLabel": "쿼리 라벨",
     "multiSqlQueryLabelHint": "범례로 표시된 이 쿼리의 사용자 지정 이름 (예: 'Production')",
@@ -9029,7 +9030,6 @@
     "hostmapValue": "값",
     "hostmapGroupBy": "그룹 기준",
     "otherColumn": "기타 칼럼",
-    "metric": "메트릭",
     "filters": "필터",
     "labelFilters": "라벨 필터",
     "operations": "오퍼레이션",
@@ -13307,21 +13307,6 @@
     "awsStsSelfHostedInfo": "이는 AWS sts를 사용하여 역할을 맡아 작업을 수행합니다.설치 환경에서 이 역할에 액세스할 수 있는 AWS 자격 증명을 구성했는지 확인하십시오."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "즉시 벡터 선택기의 경우 사용",
-      "rangeVector": "범위 벡터 선택기의 경우 사용",
-      "aggregate": "데이터를 집계하려면 사용",
-      "or": "또는",
-      "rate": "범위 벡터에 대한 비율 계산의 경우 사용",
-      "sqlTitle": "구문 가이드: SQL 모드",
-      "sqlFullText": "값 'error'의 전체 텍스트 검색의 경우 사용",
-      "sqlColumn": "값 'error'의 컬럼 검색의 경우 사용",
-      "sqlCode": "코드 컬럼에서 값 200을 검색하려면 사용",
-      "sqlStream": "스트림 컬럼에서 값 'stderr'을 검색하려면 사용",
-      "sqlFunction": "로그 컬럼에서 쿼리 함수 {fn}을 검색 및 사용하려면 사용",
-      "sqlMoreExamples": "추가 예시는",
-      "sqlClickHere": "여기를 클릭하세요"
-    },
     "add": "추가",
     "runQuery": "쿼리 실행",
     "runQueryOptions": "쿼리 실행 옵션",
@@ -13606,10 +13591,6 @@
         "clear": "뷰 초기화"
       }
     },
-    "index": {
-      "namePanelRequired": "패널 이름은 필수입니다.",
-      "errorsFixTryAgain": "오류가 있습니다. 수정한 후 다시 시도하세요."
-    },
     "metricCard": {
       "lastRefreshed": "마지막 새로고침:",
       "traceId": "트레이스 ID: {id}",
@@ -13620,25 +13601,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "차트 렌더링 실패"
-    },
-    "queryBuilder": {
-      "title": "PromQL 쿼리 빌더",
-      "subtitle": "시각적으로 PromQL 쿼리 작성 및 테스트",
-      "generatedQuery": "생성된 PromQL 쿼리:",
-      "noQueryBuilt": "아직 쿼리가 생성되지 않음",
-      "copyQuery": "쿼리 복사",
-      "clearAll": "모두 지우기",
-      "testQuery": "쿼리 테스트",
-      "queryResultPreview": "쿼리 결과 미리보기:",
-      "queryCopied": "클립보드에 쿼리 복사됨!",
-      "queryCleared": "쿼리 지워짐",
-      "testingSoon": "쿼리 테스트 기능이 곧 구현될 예정입니다",
-      "executionSoon": "쿼리 실행은 다음 단계에서 구현될 예정입니다"
-    },
-    "metricSelector": {
-      "metricName": "메트릭 이름",
-      "loadingMetrics": "메트릭 로딩 중...",
-      "noMetricsFound": "메트릭을 찾을 수 없음"
     },
     "labelFilterEditor": {
       "label": "레이블",

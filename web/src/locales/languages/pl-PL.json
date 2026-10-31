@@ -1247,7 +1247,6 @@
       "moreExamples": "Aby zobaczyć więcej przykładów,",
       "clickHere": "kliknij tutaj"
     },
-    "legendLabel": "Legenda",
     "switchToLogs": "Przełącz z powrotem na Logi",
     "savedViewsLabel": "Zapisany widok",
     "savedViewsNotFound": "Nie znaleziono zapisanego widoku!",
@@ -6816,7 +6815,9 @@
     "formulaNumber": "Formuła {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} nie jest zapytaniem w tym panelu",
-    "formulaReferencesFormula": "{letter} to formuła, a formuła nie może odwoływać się do innej formuły",
+    "formulaCycle": "Formuły odwołują się do siebie w pętli: {cycle}",
+    "formulaTooLong": "Po rozwinięciu formuła przekracza {limit} znaków",
+    "formulaTooDeep": "Formuły są zagnieżdżone na więcej niż {limit} poziomów",
     "formulaInputNote": "Używane w formule: tam ustawienie instant/range tego zapytania, legenda, krok i przesunięcie czasu nie mają zastosowania.",
     "multiSqlQueryLabel": "Etykieta zapytania",
     "multiSqlQueryLabelHint": "Niestandardowa nazwa tego zapytania w legendach (np. 'Produkcja')",
@@ -9029,7 +9030,6 @@
     "hostmapValue": "Wartość",
     "hostmapGroupBy": "Grupuj według",
     "otherColumn": "Inne kolumny",
-    "metric": "Metryka",
     "filters": "Filtry",
     "labelFilters": "Filtry etykiet",
     "operations": "Operacje",
@@ -13307,21 +13307,6 @@
     "awsStsSelfHostedInfo": "To używa AWS STS do przyjęcia roli i wykonania operacji. Upewnij się, że skonfigurowałeś poświadczenia AWS w środowisku instalacyjnym, które mają dostęp do tej roli."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "W przypadku selektorów wektorów natychmiastowych użyj",
-      "rangeVector": "W przypadku selektorów wektorów zakresowych użyj",
-      "aggregate": "Aby agregować dane, użyj",
-      "or": "lub",
-      "rate": "Do obliczeń tempa w wektorze zakresowym użyj",
-      "sqlTitle": "Przewodnik składni: tryb SQL",
-      "sqlFullText": "Aby wyszukać pełnotekstowo wartość 'error', użyj",
-      "sqlColumn": "Aby wyszukać w kolumnie wartość 'error', użyj",
-      "sqlCode": "Aby wyszukać wartość 200 w kolumnie code, użyj",
-      "sqlStream": "Aby wyszukać wartość 'stderr' w kolumnie stream, użyj",
-      "sqlFunction": "Aby wyszukać i użyć funkcji zapytania {fn} na kolumnie log, użyj",
-      "sqlMoreExamples": "Aby uzyskać dodatkowe przykłady,",
-      "sqlClickHere": "kliknij tutaj"
-    },
     "add": "Dodaj",
     "runQuery": "Uruchom zapytanie",
     "runQueryOptions": "Opcje uruchamiania zapytania",
@@ -13606,10 +13591,6 @@
         "clear": "Wyczyść widok"
       }
     },
-    "index": {
-      "namePanelRequired": "Nazwa panelu jest wymagana",
-      "errorsFixTryAgain": "Wystąpiły błędy, popraw je i spróbuj ponownie"
-    },
     "metricCard": {
       "lastRefreshed": "Ostatnie odświeżenie:",
       "traceId": "ID trace: {id}",
@@ -13620,25 +13601,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Nie udało się wyrenderować wykresu"
-    },
-    "queryBuilder": {
-      "title": "Kreator zapytań PromQL",
-      "subtitle": "Twórz i testuj zapytania PromQL wizualnie",
-      "generatedQuery": "Wygenerowane zapytanie PromQL:",
-      "noQueryBuilt": "Nie zbudowano jeszcze zapytania",
-      "copyQuery": "Kopiuj zapytanie",
-      "clearAll": "Wyczyść wszystko",
-      "testQuery": "Testuj zapytanie",
-      "queryResultPreview": "Podgląd wyniku zapytania:",
-      "queryCopied": "Zapytanie skopiowane do schowka!",
-      "queryCleared": "Zapytanie wyczyszczone",
-      "testingSoon": "Testowanie zapytań zostanie wkrótce zaimplementowane",
-      "executionSoon": "Wykonywanie zapytań zostanie zaimplementowane w następnej fazie"
-    },
-    "metricSelector": {
-      "metricName": "Nazwa metryki",
-      "loadingMetrics": "Ładowanie metryk...",
-      "noMetricsFound": "Nie znaleziono metryk"
     },
     "labelFilterEditor": {
       "label": "Etykieta",

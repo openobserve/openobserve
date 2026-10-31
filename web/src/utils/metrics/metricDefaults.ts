@@ -32,12 +32,15 @@ import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 
 import { PromqlStepId } from "@/components/promql/types";
 import type { PromqlBuilderQuery, PromqlLabelMatcher, PromqlStep } from "@/components/promql/types";
+import { compileLabelFilters } from "@/components/promql/labelBoolean";
 
-/** A filter as callers pass it in: label/value plus an optional operator. */
+/** A filter as callers pass it in: label/value plus an optional operator and OR group. */
 interface FilterInput {
   label: I18nText;
   value: string;
   operator?: string;
+  group?: number;
+  negate?: boolean;
 }
 
 /** Filters accepted by the selector builders: a list, or a label->value map. */
@@ -48,6 +51,8 @@ interface NormalizedMatcher {
   label: I18nText;
   operator: PromqlOperator;
   value: string;
+  group?: number;
+  negate?: boolean;
 }
 
 /** Extra context resolving a stream to a card kind. */
@@ -513,9 +518,9 @@ function escapePromqlString(value: unknown): string {
  * cache key stable.
  *
  * @param {string} metricName
- * @param {Array<{label: I18nText, value: string, operator?: string}>|Record<string,string>} [filters]
+ * @param {Array<{label: I18nText, value: string, operator?: string, group?: number, negate?: boolean}>|Record<string,string>} [filters]
  * @param {Record<string,string>} [extraMatchers] appended verbatim as `=` matchers
- * @returns {string} e.g. `{__name__="http_requests_total",job="api"}`
+ * @returns {string} e.g. `{__name__="http_requests_total",job="api"}`; OR groups give `(sel1 or sel2)`
  */
 export function buildSelector(
   metricName: string,
@@ -524,13 +529,60 @@ export function buildSelector(
 ): string {
   if (!metricName) throw new Error("buildSelector: metricName is required");
 
-  const matchers = normalizeMatchers(filters, extraMatchers).map(
-    (f) => `${f.label}${f.operator}"${escapePromqlString(f.value)}"`,
+  const selectors = selectorBranches(normalizeMatchers(filters, extraMatchers)).map(
+    (branch) =>
+      `{__name__="${escapePromqlString(metricName)}"${branch
+        .map((f) => `,${f.label}${f.operator}"${escapePromqlString(f.value)}"`)
+        .join("")}}`,
   );
+  return selectors.length === 1 ? selectors[0] : `(${selectors.join(" or ")})`;
+}
 
-  return `{__name__="${escapePromqlString(metricName)}"${
-    matchers.length ? `,${matchers.join(",")}` : ""
-  }}`;
+/** The OR branches of a normalized filter list, in the order the builder renders them; throws past the branch cap. */
+function selectorBranches(matchers: NormalizedMatcher[]): NormalizedMatcher[][] {
+  const compiled = compileLabelFilters(
+    matchers.map((m) => ({ ...m, label: String(m.label), op: m.operator })),
+  );
+  if (!compiled.ok) {
+    throw new Error(`buildSelector: filters expand to ${compiled.branchCount} selectors`);
+  }
+  return compiled.branches.map((branch) =>
+    branch.map((m) => ({ label: raw(m.label), operator: m.op, value: m.value })),
+  );
+}
+
+const compareMatchers = (a: NormalizedMatcher, b: NormalizedMatcher) =>
+  a.label === b.label ? a.value.localeCompare(b.value) : a.label.localeCompare(b.label);
+
+const UNION_SELECTOR = String.raw`\{(?:[^{}"]|"(?:[^"\\]|\\.)*")*\}`;
+const UNION = String.raw`\(${UNION_SELECTOR}(?: or ${UNION_SELECTOR})+\)`;
+const UNION_RANGE_CALL = new RegExp(
+  String.raw`(\w+)\(([^(),"]*,\s*)?(${UNION})(\[[^\]]+\](?:\s*@\s*end\(\))?)\)`,
+  "g",
+);
+const BARE_UNION = new RegExp(UNION, "g");
+
+/** Parenthesised unless it already fills a whole argument, where `or` cannot bind wrongly. */
+const unionIn = (expr: string, at: number, length: number, parts: string[]): string => {
+  const before = expr.slice(0, at).trimEnd().at(-1);
+  const after = expr.slice(at + length).trimStart()[0];
+  const whole = [undefined, "(", ","].includes(before) && [undefined, ")", ","].includes(after);
+  return whole ? parts.join(" or ") : `(${parts.join(" or ")})`;
+};
+
+/** Moves range calls inside `buildSelector` unions (`rate((a or b)[w])` does not parse) and drops redundant union parens. */
+export function distributeUnionRanges(expr: string): string {
+  const distributed = expr.replace(
+    UNION_RANGE_CALL,
+    (match, fn: string, lead: string | undefined, union: string, range: string, at: number) => {
+      const branches = union.match(new RegExp(UNION_SELECTOR, "g")) ?? [];
+      const calls = branches.map((sel) => `${fn}(${lead ?? ""}${sel}${range})`);
+      return unionIn(expr, at, match.length, calls);
+    },
+  );
+  return distributed.replace(BARE_UNION, (match, at: number) =>
+    unionIn(distributed, at, match.length, match.match(new RegExp(UNION_SELECTOR, "g")) ?? []),
+  );
 }
 
 /**
@@ -542,9 +594,9 @@ export function buildSelector(
  * panel editor's PromQL builder stores. Sharing this step is what keeps the two
  * from drifting apart.
  *
- * @param {Array<{label: I18nText, value: string, operator?: string}>|Record<string,string>} [filters]
+ * @param {Array<{label: I18nText, value: string, operator?: string, group?: number, negate?: boolean}>|Record<string,string>} [filters]
  * @param {Record<string,string>} [extraMatchers] appended as `=` matchers
- * @returns {Array<{label: I18nText, operator: string, value: string}>}
+ * @returns {Array<{label: I18nText, operator: string, value: string, group?: number, negate?: boolean}>}
  */
 function normalizeMatchers(
   filters?: FiltersArg,
@@ -577,11 +629,16 @@ function normalizeMatchers(
       if (!isPromqlOperator(operator)) {
         throw new Error(`buildSelector: invalid operator "${operator}"`);
       }
-      return { label: raw(label), operator, value: String(f.value ?? "") };
+      const matcher: NormalizedMatcher = {
+        label: raw(label),
+        operator,
+        value: String(f.value ?? ""),
+      };
+      if ((f.group ?? 0) > 0) matcher.group = f.group;
+      if (f.negate) matcher.negate = true;
+      return matcher;
     })
-    .sort((a, b) =>
-      a.label === b.label ? a.value.localeCompare(b.value) : a.label.localeCompare(b.label),
-    );
+    .sort(compareMatchers);
 }
 
 /**
@@ -591,14 +648,15 @@ function normalizeMatchers(
  * Values are handed over RAW: the query modeller escapes them itself when it
  * renders, so escaping here would double it.
  *
- * @returns {Array<{label: I18nText, op: string, value: string}>}
+ * @returns {Array<{label: I18nText, op: string, value: string, group?: number, negate?: boolean}>}
  */
 export function builderLabelsOf(filters?: FiltersArg): PromqlLabelMatcher[] {
-  return normalizeMatchers(filters).map(({ label, operator, value }) => ({
-    label,
-    op: operator,
-    value,
-  }));
+  return normalizeMatchers(filters).map(({ label, operator, value, group, negate }) => {
+    const matcher: PromqlLabelMatcher = { label, op: operator, value };
+    if (group) matcher.group = group;
+    if (negate) matcher.negate = true;
+    return matcher;
+  });
 }
 
 /**
@@ -645,7 +703,7 @@ export function isRateBasedKind(cardKind: string): boolean {
  * empty only when the window truly holds nothing.
  *
  * @param {string} streamName
- * @param {Array<{label: I18nText, value: string, operator?: string}>} [filters]
+ * @param {Array<{label: I18nText, value: string, operator?: string, group?: number, negate?: boolean}>} [filters]
  * @returns {string} PromQL
  */
 export function buildPresenceQuery(streamName: string, filters?: FiltersArg): string {
@@ -712,6 +770,43 @@ export function computeStepSeconds(
   return Math.max(MIN_STEP_SECONDS, Math.ceil(range / points));
 }
 
+/** Cadences metrics are commonly exported at, in seconds; a measured interval snaps to the nearest. */
+const COMMON_EXPORT_INTERVALS = [1, 5, 10, 15, 30, 60, 120, 300, 600];
+
+/** Windows the export-interval probe counts samples over, in seconds; the wider one only for sparse metrics. */
+export const EXPORT_INTERVAL_PROBE_WINDOWS = [600, 3600];
+
+/** One instant query: the most samples any series of the stream holds in the window. */
+export function buildExportIntervalQuery(streamName: string, windowSeconds: number): string {
+  return `max(count_over_time(${buildSelector(streamName)}[${formatPromDuration(windowSeconds)}]))`;
+}
+
+/** The interval `count` samples in the window imply, snapped to a common cadence; null when unmeasurable. */
+export function snapExportInterval(windowSeconds: number, count: number): number | null {
+  // One sample gives no spacing, and a cadence far past the scale is not one alignment can serve.
+  if (!Number.isFinite(count) || count < 2 || !(windowSeconds > 0)) return null;
+  const measured = windowSeconds / count;
+  const widest = COMMON_EXPORT_INTERVALS[COMMON_EXPORT_INTERVALS.length - 1];
+  if (measured > widest * 1.5) return null;
+  const distance = (interval: number) => Math.abs(Math.log(measured / interval));
+  return COMMON_EXPORT_INTERVALS.reduce((best, interval) =>
+    distance(interval) < distance(best) ? interval : best,
+  );
+}
+
+/** The range-based step raised to a multiple of the export interval, so every step holds the same number of samples; unaligned when that multiple would pass the range. */
+export function computeAlignedStepSeconds(
+  rangeSeconds: number,
+  maxDataPoints: number = MAX_DATA_POINTS,
+  exportIntervalSeconds = 0,
+): number {
+  const step = computeStepSeconds(rangeSeconds, maxDataPoints);
+  if (!(exportIntervalSeconds > 0)) return step;
+  // Raising the step only lowers the point count, so MAX_DATA_POINTS still holds; past the range nothing would draw.
+  const aligned = Math.ceil(step / exportIntervalSeconds) * exportIntervalSeconds;
+  return aligned > Math.max(0, Number(rangeSeconds) || 0) ? step : aligned;
+}
+
 /**
  * The rate window `[W]`.
  *
@@ -738,17 +833,23 @@ function rateWindowSeconds(
   rangeSeconds: number,
   maxDataPoints: number,
   scrapeIntervalSeconds: number,
+  exportIntervalSeconds = 0,
 ): number {
-  const step = computeStepSeconds(rangeSeconds, maxDataPoints);
-  return Math.max(4 * scrapeIntervalSeconds, step + scrapeIntervalSeconds);
+  // A measured cadence slower than the configured one is the one two samples must fit.
+  const cadence = Math.max(scrapeIntervalSeconds, exportIntervalSeconds);
+  const step = computeAlignedStepSeconds(rangeSeconds, maxDataPoints, exportIntervalSeconds);
+  return Math.max(4 * cadence, step + cadence);
 }
 
 export function computeRateWindow(
   rangeSeconds: number,
   maxDataPoints: number = MAX_DATA_POINTS,
   scrapeIntervalSeconds: number = DEFAULT_SCRAPE_INTERVAL_SECONDS,
+  exportIntervalSeconds = 0,
 ): string {
-  return formatPromDuration(rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds));
+  return formatPromDuration(
+    rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds, exportIntervalSeconds),
+  );
 }
 
 /**
@@ -780,8 +881,14 @@ export function computeWidenedRateWindows(
   rangeSeconds: number,
   maxDataPoints: number = MAX_DATA_POINTS,
   scrapeIntervalSeconds: number = DEFAULT_SCRAPE_INTERVAL_SECONDS,
+  exportIntervalSeconds = 0,
 ): string[] {
-  const base = rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds);
+  const base = rateWindowSeconds(
+    rangeSeconds,
+    maxDataPoints,
+    scrapeIntervalSeconds,
+    exportIntervalSeconds,
+  );
   const cap = Math.floor(Math.max(0, Number(rangeSeconds) || 0) / 2);
   const widths: number[] = [];
   for (const factor of [4, 16]) {
@@ -843,9 +950,15 @@ export function computePercentileWindow(
   rangeSeconds: number,
   maxDataPoints: number = MAX_DATA_POINTS,
   scrapeIntervalSeconds: number = DEFAULT_SCRAPE_INTERVAL_SECONDS,
+  exportIntervalSeconds = 0,
 ): string {
-  const floor = rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds);
-  const target = MIN_PERCENTILE_SAMPLES * scrapeIntervalSeconds;
+  const floor = rateWindowSeconds(
+    rangeSeconds,
+    maxDataPoints,
+    scrapeIntervalSeconds,
+    exportIntervalSeconds,
+  );
+  const target = MIN_PERCENTILE_SAMPLES * Math.max(scrapeIntervalSeconds, exportIntervalSeconds);
   const cap = Math.max(floor, Math.max(0, Number(rangeSeconds) || 0) / 4);
   return formatPromDuration(Math.min(Math.max(floor, target), cap));
 }
@@ -974,7 +1087,7 @@ function resolveUnit(
  * through the real query modeller and diffs it against `expr`.
  */
 const q = (expr: string, legendTemplate?: string, builder?: PromqlBuilderQuery): VariantQuery => {
-  const out: VariantQuery = { expr };
+  const out: VariantQuery = { expr: distributeUnionRanges(expr) };
   if (legendTemplate !== undefined) out.legendTemplate = legendTemplate;
   if (builder !== undefined) out.builder = builder;
   return out;
@@ -1420,6 +1533,13 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
 /** At most this many labels get value counts: each one costs the server a scan. */
 export const BREAKDOWN_LABEL_LIMIT = 15;
 
+/** How many values a capped breakdown keeps, ranked over `window`: a duration, or `$__range` for a panel. */
+interface BreakdownCap {
+  topk: number;
+  /** Absent: a per-step `topk`, cheap enough for a tile per label. */
+  window?: string;
+}
+
 /** Labels a breakdown never groups by — the same set `resolveTopkLabel` skips. */
 const NON_BREAKDOWN_LABELS = new Set(["le", "quantile"]);
 
@@ -1469,7 +1589,7 @@ export function buildBreakdownQuery(
     applyNanGuard?: boolean;
   },
   label: string,
-  opts?: { topk?: number },
+  cap?: BreakdownCap,
 ): string | null {
   if (!supportsBreakdown(cardKind) || !LABEL_NAME_RE.test(label)) return null;
 
@@ -1506,7 +1626,59 @@ export function buildBreakdownQuery(
     default:
       return null;
   }
-  return opts?.topk ? `topk(${opts.topk}, ${expr})` : expr;
+  const distributed = distributeUnionRanges(expr);
+  if (!cap) return distributed;
+  const { topk, window } = cap;
+  return window
+    ? keepRanked(distributed, label, buildBreakdownRank(cardKind, ctx, label, { topk, window }))
+    : `topk(${topk}, ${distributed})`;
+}
+
+/** The `cap.topk` values of `label` busiest over the whole window, ranked once at its end by the kind's measure. */
+export function buildBreakdownRank(
+  cardKind: string,
+  ctx: { metricName: string; filters?: FiltersArg; rateWindow?: string },
+  label: string,
+  cap: BreakdownCap & { window: string },
+): string | null {
+  if (!supportsBreakdown(cardKind) || !LABEL_NAME_RE.test(label)) return null;
+  const filters: FilterInput[] = Array.isArray(ctx.filters)
+    ? ctx.filters
+    : Object.entries(ctx.filters ?? {}).map(([name, value]) => ({ label: raw(name), value }));
+  // Series without the label would otherwise take one of the slots as a group of their own.
+  const labelled: FilterInput[] = [...filters, { label: raw(label), operator: "!=", value: "" }];
+  const window = rankWindowOf(cap.window, ctx.rateWindow || DEFAULT_RATE_WINDOW);
+  const ranged = (selector: string) => `${selector}[${window}] @ end()`;
+  const own = ranged(buildSelector(ctx.metricName, labelled));
+  const count = ranged(buildSelector(`${baseNameOf(ctx.metricName)}_count`, labelled));
+
+  let measure: string;
+  switch (cardKind) {
+    case CARD_KIND.GAUGE:
+      measure = `avg by (${label}) (avg_over_time(${own}))`;
+      break;
+    case CARD_KIND.SUMMARY_QUANTILES:
+      measure = `avg by (${label}) (avg_over_time(${ranged(buildSelector(ctx.metricName, labelled, { quantile: "0.5" }))}))`;
+      break;
+    case CARD_KIND.COUNTER_RATE:
+      measure = `sum by (${label}) (increase(${own}))`;
+      break;
+    case CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS: {
+      const inf = { label: raw("le"), operator: "=~", value: "[+]?[Ii]nf" };
+      measure = `sum by (${label}) (increase(${ranged(buildSelector(ctx.metricName, [...labelled, inf]))}))`;
+      break;
+    }
+    case CARD_KIND.MEAN_PAIR:
+    case CARD_KIND.EXP_HISTOGRAM_FALLBACK:
+      measure = `sum by (${label}) (increase(${count}))`;
+      break;
+    case CARD_KIND.INFO:
+      measure = `count by (${label}) (last_over_time(${own}))`;
+      break;
+    default:
+      return null;
+  }
+  return distributeUnionRanges(`topk(${cap.topk}, ${measure})`);
 }
 
 interface HeatmapQueryContext {
@@ -1525,6 +1697,17 @@ function promDurationSeconds(duration: string): number {
   );
 }
 
+/** Never shorter than the rate window: a range holding one sample has no increase, and `and` would drop every value. */
+function rankWindowOf(window: string, rateWindow: string): string {
+  const seconds = promDurationSeconds(window);
+  return seconds ? formatPromDuration(Math.max(seconds, promDurationSeconds(rateWindow))) : window;
+}
+
+/** `expr` narrowed to the values `rank` keeps; uncapped when no rank could be built. */
+function keepRanked(expr: string, label: string, rank: string | null): string {
+  return rank ? `(${expr}) and on (${label}) ${rank}` : expr;
+}
+
 /** A classic histogram's buckets split by `label`, one heatmap per value; `cap` keeps the values busiest over the window. */
 export function buildHeatmapBreakdownQuery(
   ctx: HeatmapQueryContext,
@@ -1533,7 +1716,9 @@ export function buildHeatmapBreakdownQuery(
 ): string | null {
   if (!LABEL_NAME_RE.test(label)) return null;
   const w = ctx.rateWindow || DEFAULT_RATE_WINDOW;
-  const expr = `sum by (le, ${label}) (rate(${buildSelector(ctx.metricName, ctx.filters)}[${w}]))`;
+  const expr = distributeUnionRanges(
+    `sum by (le, ${label}) (rate(${buildSelector(ctx.metricName, ctx.filters)}[${w}]))`,
+  );
   if (!cap) return expr;
   // A character class, not `\+`: PromQL strings reject the escape. OTLP writes the bound as "inf".
   const total = buildSelector(ctx.metricName, [
@@ -1546,7 +1731,7 @@ export function buildHeatmapBreakdownQuery(
   // Never shorter than the rate window: a range holding one sample has no increase, and `and` would drop every value.
   const window = formatPromDuration(Math.max(cap.windowSeconds, promDurationSeconds(w)));
   const ranked = `topk(${cap.topk}, sum by (${label}) (increase(${total}[${window}] @ end())))`;
-  return `${expr} and on (${label}) ${ranked}`;
+  return distributeUnionRanges(`${expr} and on (${label}) ${ranked}`);
 }
 
 /** The heatmap of one value of `label`: the card's own heatmap, narrowed to that value. */
@@ -1558,7 +1743,7 @@ export function buildHeatmapValueQuery(
   if (!LABEL_NAME_RE.test(label)) return null;
   const w = ctx.rateWindow || DEFAULT_RATE_WINDOW;
   const sel = buildSelector(ctx.metricName, ctx.filters, { [label]: value });
-  return `sum by (le) (rate(${sel}[${w}]))`;
+  return distributeUnionRanges(`sum by (le) (rate(${sel}[${w}]))`);
 }
 
 const AGGREGATION_RE = /\b(sum|avg|min|max|count|stddev)\s*(?:by\s*\(([^)]*)\)\s*)?\(/g;
@@ -1577,7 +1762,7 @@ const AGGREGATION_RE = /\b(sum|avg|min|max|count|stddev)\s*(?:by\s*\(([^)]*)\)\s
 export function breakdownQueryOf(
   expr: string,
   label: string,
-  opts?: { topk?: number },
+  opts?: { topk?: number; rank?: string | null },
 ): string | null {
   if (!LABEL_NAME_RE.test(label)) return null;
   const inner = /^topk\(\s*\d+\s*,\s*([\s\S]*)\)$/.exec(expr.trim())?.[1] ?? expr.trim();
@@ -1601,6 +1786,7 @@ export function breakdownQueryOf(
     .join("");
 
   const result = split ? regrouped : `avg by (${label}) (${inner})`;
+  if (opts?.rank) return keepRanked(result, label, opts.rank);
   return opts?.topk ? `topk(${opts.topk}, ${result})` : result;
 }
 

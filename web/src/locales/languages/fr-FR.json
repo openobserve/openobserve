@@ -1247,7 +1247,6 @@
       "moreExamples": "Pour des exemples supplémentaires,",
       "clickHere": "cliquez ici"
     },
-    "legendLabel": "Légende",
     "switchToLogs": "Revenir aux Logs",
     "savedViewsLabel": "Vues enregistrées",
     "savedViewsNotFound": "La vue enregistrée n'a pas été trouvée !",
@@ -6816,7 +6815,9 @@
     "formulaNumber": "Formule {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} n'est pas une requête dans ce panneau",
-    "formulaReferencesFormula": "{letter} est une formule, et une formule ne peut pas référencer une autre formule",
+    "formulaCycle": "Des formules se référencent mutuellement en boucle : {cycle}",
+    "formulaTooLong": "La formule développée dépasse {limit} caractères",
+    "formulaTooDeep": "Les formules sont imbriquées sur plus de {limit} niveaux",
     "formulaInputNote": "Utilisé dans une formule : là, le paramètre instantané/plage, la légende, le pas et le décalage temporel de cette requête ne s'appliquent pas.",
     "multiSqlQueryLabel": "Libellé de requête",
     "multiSqlQueryLabelHint": "Nom personnalisé pour cette requête dans les légendes (par exemple, « Production »)",
@@ -9029,7 +9030,6 @@
     "hostmapValue": "Valeur",
     "hostmapGroupBy": "Regrouper par",
     "otherColumn": "Autres colonnes",
-    "metric": "Métrique",
     "filters": "Filtres",
     "labelFilters": "Filtres d'étiquettes",
     "operations": "Opérations",
@@ -13307,21 +13307,6 @@
     "awsStsSelfHostedInfo": "Cela utilise AWS sts pour assumer le rôle et effectuer des opérations. Assurez-vous d'avoir configuré les informations d'identification AWS dans l'environnement d'installation qui ont accès à ce rôle."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "Pour les sélecteurs de vecteurs instantanés, utilisez",
-      "rangeVector": "Pour les sélecteurs de vecteurs de plage, utilisez",
-      "aggregate": "Pour agréger des données, utilisez",
-      "or": "ou",
-      "rate": "Pour les calculs de taux sur un vecteur de plage, utilisez",
-      "sqlTitle": "Guide de syntaxe : mode SQL",
-      "sqlFullText": "Pour une recherche en texte intégral de la valeur 'error', utilisez",
-      "sqlColumn": "Pour une recherche par colonne de la valeur 'error', utilisez",
-      "sqlCode": "Pour rechercher la valeur 200 dans la colonne code, utilisez",
-      "sqlStream": "Pour rechercher la valeur 'stderr' dans la colonne stream, utilisez",
-      "sqlFunction": "Pour rechercher et utiliser la fonction de requête {fn} sur la colonne log, utilisez",
-      "sqlMoreExamples": "Pour plus d'exemples,",
-      "sqlClickHere": "cliquez ici"
-    },
     "add": "Ajouter",
     "runQuery": "Exécuter une requête",
     "runQueryOptions": "Options d'exécution de la requête",
@@ -13606,10 +13591,6 @@
         "clear": "Effacer la vue"
       }
     },
-    "index": {
-      "namePanelRequired": "Le nom du panneau est requis",
-      "errorsFixTryAgain": "Il y a des erreurs, veuillez les corriger et réessayer"
-    },
     "metricCard": {
       "lastRefreshed": "Dernière actualisation :",
       "traceId": "ID de trace: {id}",
@@ -13620,25 +13601,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Échec du rendu du graphique"
-    },
-    "queryBuilder": {
-      "title": "Constructeur de requête PromQL",
-      "subtitle": "Construire et tester visuellement les requêtes PromQL",
-      "generatedQuery": "Requête PromQL générée :",
-      "noQueryBuilt": "Aucune requête construite pour le moment",
-      "copyQuery": "Copier la requête",
-      "clearAll": "Tout effacer",
-      "testQuery": "Tester la requête",
-      "queryResultPreview": "Aperçu du résultat de la requête :",
-      "queryCopied": "Requête copiée dans le presse-papiers !",
-      "queryCleared": "Requête effacée",
-      "testingSoon": "Le test de requête sera bientôt implémenté",
-      "executionSoon": "L'exécution de la requête sera implémentée dans la prochaine phase"
-    },
-    "metricSelector": {
-      "metricName": "Nom de la métrique",
-      "loadingMetrics": "Chargement des métriques...",
-      "noMetricsFound": "Aucune métrique trouvée"
     },
     "labelFilterEditor": {
       "label": "Étiquette",
