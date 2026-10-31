@@ -603,7 +603,8 @@ onMounted(async () => {
           storage_account: parsed.storage_account || "",
         });
       }
-    } catch {
+    } catch (error) {
+      if ((error as { response?: { status?: number } })?.response?.status === 403) return;
       toast({
         variant: "error",
         message: t("settings.orgStorageEditor.loadStorageConfigError"),

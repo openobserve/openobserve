@@ -443,7 +443,7 @@ export default defineComponent({
     // The query owns its failure now, so this reports it once per error however
     // the read was triggered.
     watch(tokensList.error, (e: any) => {
-      if (!e) return;
+      if (!e || e.response?.status === 403) return;
       toast({
         variant: "error",
         message: e.response?.data?.message || t("synthetics.tokens.fetchError"),

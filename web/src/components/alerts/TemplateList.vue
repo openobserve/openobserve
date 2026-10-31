@@ -908,7 +908,7 @@ const bulkDeleteTemplates = () => {
         err.response?.data?.message ||
         err?.message ||
         t("alerts.messages.bulkDeleteTemplatesFailed");
-      if (err.response?.status != 403 || err?.status != 403) {
+      if (err.response?.status !== 403 && err?.status !== 403) {
         toast({
           variant: "error",
           message: errorMessage,

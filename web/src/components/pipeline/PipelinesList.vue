@@ -1560,7 +1560,7 @@ const bulkDeletePipelines = async () => {
     // Show error message from response if available
     const errorMessage =
       error.response?.data?.message || error?.message || t("pipeline.bulkDeletePipelinesError");
-    if (error.response?.status != 403 || error?.status != 403) {
+    if (error.response?.status !== 403 && error?.status !== 403) {
       toast({
         variant: "error",
         message: errorMessage,

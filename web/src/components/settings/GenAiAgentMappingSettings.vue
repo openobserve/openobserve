@@ -268,10 +268,12 @@ const loadConfig = async () => {
       setDraft(saved);
     }
   } catch (error: any) {
-    toast({
-      variant: "error",
-      message: error?.message || t("settings.genAiAgentMapping.loadFailed"),
-    });
+    if (error?.response?.status !== 403) {
+      toast({
+        variant: "error",
+        message: error?.message || t("settings.genAiAgentMapping.loadFailed"),
+      });
+    }
     setDraft(genAiAgentMappingService.emptyConfig());
   } finally {
     loading.value = false;
