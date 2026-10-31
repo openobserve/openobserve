@@ -73,9 +73,9 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { updateFleetSettingsOfMutation } from "@/services/fleet.queries";
 import type { FleetSettings } from "@/services/fleet";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import FleetSettingsForm from "./FleetSettingsForm.vue";
-import { serverMessage, useFleetSettings, useFleetSettingsOf } from "./useFleetApi";
+import { useFleetSettings, useFleetSettingsOf, failureText } from "./useFleetApi";
 
 const props = defineProps<{ open: boolean; fleetId: string; fleetName: I18nText }>();
 const emit = defineEmits<{ "update:open": [open: boolean] }>();
@@ -108,7 +108,7 @@ async function save(body: FleetSettings) {
   } catch (err) {
     toast({
       variant: "error",
-      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
+      message: failureText(err, t),
     });
   }
 }

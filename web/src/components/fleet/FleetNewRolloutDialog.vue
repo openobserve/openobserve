@@ -210,12 +210,12 @@ import { makeRolloutSchema, requestOf, type RolloutForm } from "./FleetNewRollou
 import { useRolloutText } from "./rolloutText";
 import {
   isForbidden,
-  serverMessage,
   useFleetConfigs,
   useFleetRollouts,
   useFleetSettings,
   useFleets,
   usePlanPreview,
+  failureText,
 } from "./useFleetApi";
 
 const props = defineProps<{
@@ -417,7 +417,7 @@ async function submit(value: RolloutForm) {
   } catch (err) {
     toast({
       variant: "error",
-      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
+      message: failureText(err, t),
     });
   }
 }

@@ -165,11 +165,11 @@ import {
   isForbidden,
   isNotFound,
   rolloutTagValue,
-  serverMessage,
   useFleetRollout,
   useFleetRollouts,
   useFleets,
   type RolloutRow,
+  failureText,
 } from "./useFleetApi";
 
 const props = defineProps<{
@@ -330,7 +330,7 @@ async function onExit(exit: FleetHaltExit) {
   } catch (err) {
     toast({
       variant: "error",
-      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
+      message: failureText(err, t),
     });
   }
 }
