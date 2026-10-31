@@ -199,20 +199,19 @@ describe("OTable refetch keeps settled rows", () => {
     expect(wrapper.find(SKELETON).exists()).toBe(true);
   });
 
-  it("does not repaint kept rows when the consumer mutates its row objects mid-load", async () => {
+  it("keeps the rows when the consumer clears or replaces its array mid-load", async () => {
     const rows = reactive(makeRows(3));
     mountTable({ data: rows });
     await wrapper.setProps({ loading: true });
-    rows[0].name = "Mutated";
-    rows.push({ id: 99, name: "Pushed" });
+    rows.splice(0);
     await nextTick();
     expect(bodyText()).toContain("User 1");
-    expect(bodyText()).not.toContain("Mutated");
-    expect(bodyText()).not.toContain("Pushed");
+    await wrapper.setProps({ data: [] });
+    expect(bodyText()).toContain("User 1");
 
-    await wrapper.setProps({ loading: false });
-    expect(bodyText()).toContain("Mutated");
-    expect(bodyText()).toContain("Pushed");
+    await wrapper.setProps({ data: makeRows(2, "Fresh"), loading: false });
+    expect(bodyText()).toContain("Fresh 1");
+    expect(bodyText()).not.toContain("User 3");
   });
 
   it("exposes data-test-loading and data-test-stale so tests can tell stale rows from fresh ones", async () => {
@@ -246,6 +245,27 @@ describe("OTable kept rows keep the table's own state", () => {
     await flushPromises();
     expect(wrapper.vm.table.getState().pagination.pageIndex).toBe(1);
     expect(bodyText()).toContain("User 11");
+  });
+
+  it("passes the consumer's own row objects to accessors while rows are kept", async () => {
+    const rows = reactive(makeRows(3));
+    const orderColumns: OTableColumnDef<Row>[] = [
+      ...columns,
+      { id: "order", header: "Order", accessorFn: (row) => rows.indexOf(row) + 1 },
+    ];
+    mountTable({ data: rows, columns: orderColumns });
+    await wrapper.setProps({ loading: true });
+    expect(wrapper.find(BODY).attributes("data-test-stale")).toBe("true");
+    const orders = wrapper.findAll('[data-test="o2-table-cell-order"]').map((cell) => cell.text());
+    expect(orders).toEqual(["1", "2", "3"]);
+  });
+
+  it("keeps the tree's metadata when the consumer rebuilds its rows as loading starts", async () => {
+    const tree = () => [{ id: 1, name: "Parent", children: [{ id: 2, name: "Child" }] }];
+    mountTable({ data: tree(), tree: true, expandedIds: ["1"] });
+    await wrapper.setProps({ data: tree(), loading: true });
+    expect(wrapper.find(BODY).attributes("data-test-stale")).toBe("true");
+    expect(wrapper.find('[data-test="o2-table-tree-toggle-id"]').exists()).toBe(true);
   });
 
   it("keeps the tree's chevrons and indentation on kept rows", async () => {

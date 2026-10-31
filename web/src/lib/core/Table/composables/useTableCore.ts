@@ -370,9 +370,7 @@ export function useTableCore<TData>(
     get columns() {
       return tanstackColumns.value;
     },
-    get autoResetPageIndex() {
-      return !props.keepPageOnDataChange;
-    },
+    autoResetPageIndex: !props.keepPageOnDataChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: isClientSort.value ? getSortedRowModel() : undefined,
     getFilteredRowModel: isClientFilter.value ? getFilteredRowModel() : undefined,

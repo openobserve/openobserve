@@ -10,7 +10,6 @@ import {
   provide,
   ref,
   shallowRef,
-  toRaw,
   watch,
   watchEffect,
 } from "vue";
@@ -202,30 +201,18 @@ let loadingStartedAt = 0;
 let releaseTimer: ReturnType<typeof setTimeout> | null = null;
 
 const staleRows = shallowRef<readonly TData[] | null>(null);
-// Tree metadata is keyed by row object, so the kept copies carry their originals' metadata.
+// A consumer that rebuilds its tree mid-load drops the kept rows from the live tree, so their metadata is kept too.
 const staleTreeMeta = shallowRef<Map<TData, OTableTreeRowMeta | null> | null>(null);
 const staleDimmed = ref(false);
 let settledRows: TData[] | null = null;
-let keptFrom: TData[] | null = null;
+let settledTreeMeta: Map<TData, OTableTreeRowMeta | null> | null = null;
 let staleDimTimer: ReturnType<typeof setTimeout> | null = null;
-// Swapping the kept copies in or out is no data change, so it must not send a paged table to page 1.
-let holdPageIndex = false;
-
-function holdPageIndexForSwap(hold: boolean): void {
-  holdPageIndex = hold;
-  if (hold) void nextTick(() => (holdPageIndex = false));
-}
 
 function keepSettledRows(): void {
   if (props.skeletonOnRefetch || !settledRows?.length) return;
-  keptFrom = settledRows;
-  // Row copies: a consumer that mutates its row objects mid-load cannot repaint the kept rows.
-  const copies = settledRows.map((row) => ({ ...toRaw(row) }) as TData);
-  staleTreeMeta.value = tree.enabled.value
-    ? new Map(copies.map((copy, i) => [copy, tree.getMeta(keptFrom![i])]))
-    : null;
-  holdPageIndexForSwap(true);
-  staleRows.value = Object.freeze(copies);
+  // The very array the table already shows: same row objects for accessors, same identity so paging stays put.
+  staleRows.value = settledRows;
+  staleTreeMeta.value = settledTreeMeta;
   staleDimTimer = setTimeout(() => {
     staleDimmed.value = true;
     staleDimTimer = null;
@@ -240,7 +227,6 @@ function dropStaleRows(): void {
   staleDimmed.value = false;
   staleRows.value = null;
   staleTreeMeta.value = null;
-  keptFrom = null;
 }
 
 watch(
@@ -255,7 +241,6 @@ watch(
       if (!heldLoading.value) keepSettledRows();
       heldLoading.value = true;
     } else if (staleRows.value) {
-      holdPageIndexForSwap(tableData.value === keptFrom);
       dropStaleRows();
       heldLoading.value = false;
     } else if (heldLoading.value) {
@@ -493,11 +478,19 @@ watch(
     if (previous && resetKey !== previous[3]) {
       if (staleRows.value) dropStaleRows();
       settledRows = null;
+      settledTreeMeta = null;
       // The rows still on screen belong to the old context; only rows that arrive with the new key may be kept.
       if (rows === previous[0]) return;
     }
-    if (error) settledRows = null;
-    else if (!loading) settledRows = rows;
+    if (error) {
+      settledRows = null;
+      settledTreeMeta = null;
+    } else if (!loading) {
+      settledRows = rows;
+      settledTreeMeta = tree.enabled.value
+        ? new Map(rows.map((row) => [row, tree.getMeta(row)]))
+        : null;
+    }
   },
   { immediate: true },
 );
@@ -595,7 +588,7 @@ const {
       return props.horizontalScroll;
     },
     get keepPageOnDataChange() {
-      return props.keepPageOnDataChange || holdPageIndex;
+      return props.keepPageOnDataChange;
     },
   },
   emit,
