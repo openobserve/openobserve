@@ -59,6 +59,7 @@ export interface MapLegendItem {
 import { computed, nextTick, ref, watch } from "vue";
 import {
   BaseEdge,
+  EdgeLabelRenderer,
   Handle,
   MarkerType,
   Position,
@@ -112,7 +113,7 @@ function fit(duration = 0) {
     ]),
     ...props.edges.flatMap((e) => e.waypoints),
     // A bow's tip, where its label sits, can reach past the right-most column.
-    ...edgesAtRest.value.flatMap((e) => e.data.route.spots),
+    ...flowEdges.value.flatMap((e) => e.data.route.spots),
   ];
   const { width, height } = dimensions.value;
   setViewport(fitTransform(points, width, height, MIN_ZOOM), { duration });
@@ -202,7 +203,8 @@ const flowNodes = computed<Node<MapNode>[]>(() =>
     })),
 );
 
-const edgesAtRest = computed<Edge[]>(() => {
+// From the data alone: hovering never rebuilds them, which would make Vue Flow reparse every edge.
+const flowEdges = computed<Edge[]>(() => {
   const max = Math.max(1, ...drawn.value.map((e) => e.total));
   return drawn.value.map((e) => {
     const from = byId.value.get(e.source)!;
@@ -265,14 +267,7 @@ function strokeOf(edge: EdgeProps) {
 }
 
 // Busiest first, each label where it clears the cards and the labels already placed; a hovered edge's always shows.
-// A hovered edge is drawn over the rest, so its label is never hidden under another edge.
-const flowEdges = computed<Edge[]>(() =>
-  hoveredEdge.value
-    ? edgesAtRest.value.map((e) => (e.id === hoveredEdge.value ? { ...e, zIndex: 1 } : e))
-    : edgesAtRest.value,
-);
-
-const routes = computed(() => new Map(edgesAtRest.value.map((e) => [e.id, e.data])));
+const routes = computed(() => new Map(flowEdges.value.map((e) => [e.id, e.data])));
 
 // Placed without the hovered edge, so hovering one does not move the others.
 const placed = computed(() => {
@@ -290,11 +285,14 @@ const placed = computed(() => {
   );
 });
 
-// The hovered edge's label goes on top wherever it falls, overlapping or not.
-const labelAt = computed(() => {
+// The hovered edge's label, where it was placed or else on its route, drawn in the HTML label layer above every edge
+// so no other edge or label covers it.
+const hoveredLabel = computed(() => {
   const id = hoveredEdge.value;
-  if (!id || placed.value.has(id) || !routes.value.has(id)) return placed.value;
-  return new Map([...placed.value, [id, routes.value.get(id)!.route.spots[0]]]);
+  const route = id ? routes.value.get(id) : undefined;
+  if (!id || !route) return null;
+  const at = placed.value.get(id) ?? route.route.spots[0];
+  return { id, text: route.rate, at };
 });
 
 // Fit when the drawn ends or their places change, not on a refresh that redraws the same map.
@@ -411,15 +409,28 @@ function onKeydown(event: KeyboardEvent) {
             :path="edge.data.route.path"
             :marker-end="edge.markerEnd"
             :style="strokeOf(edge)"
-            :label="labelAt.has(edge.id) ? edge.data.rate : undefined"
-            :label-x="labelAt.get(edge.id)?.x"
-            :label-y="labelAt.get(edge.id)?.y"
+            :label="
+              placed.has(edge.id) && edge.id !== hoveredLabel?.id ? edge.data.rate : undefined
+            "
+            :label-x="placed.get(edge.id)?.x"
+            :label-y="placed.get(edge.id)?.y"
             :label-style="LABEL_STYLE"
             :label-show-bg="true"
             :label-bg-style="LABEL_BG_STYLE"
             :label-bg-padding="[5, 3]"
             :label-bg-border-radius="8"
           />
+          <EdgeLabelRenderer v-if="edge.id === hoveredLabel?.id">
+            <div
+              class="bg-surface-base border-border-default text-text-secondary text-3xs pointer-events-none absolute top-0 left-0 [transform:var(--dep-label,none)] rounded-full border px-1.5 py-px font-medium tabular-nums"
+              :style="{
+                '--dep-label': `translate(-50%, -50%) translate(${hoveredLabel.at.x}px, ${hoveredLabel.at.y}px)`,
+              }"
+              data-test="dependency-map-hovered-label"
+            >
+              {{ raw(hoveredLabel.text) }}
+            </div>
+          </EdgeLabelRenderer>
         </template>
       </VueFlow>
       <div

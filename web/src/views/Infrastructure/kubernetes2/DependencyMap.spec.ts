@@ -56,6 +56,7 @@ vi.mock("@vue-flow/core", () => ({
     template: "<i />",
   },
   Handle: { name: "Handle", template: "<i />" },
+  EdgeLabelRenderer: { name: "EdgeLabelRenderer", template: "<div><slot /></div>" },
   MarkerType: { ArrowClosed: "arrowclosed" },
   Position: { Left: "left", Right: "right" },
   useVueFlow: () => ({
@@ -107,6 +108,7 @@ describe("DependencyMap", () => {
   const flow = () => wrapper.findComponent({ name: "VueFlow" });
   const baseEdge = (id: string) =>
     wrapper.findAllComponents({ name: "BaseEdge" }).find((e) => e.props("id") === id)!;
+  const hoveredLabel = () => wrapper.find('[data-test="dependency-map-hovered-label"]');
   const card = (id: string) => wrapper.find(`[data-id="${id}"] [data-test="dependency-map-node"]`);
 
   afterEach(() => wrapper?.unmount());
@@ -215,7 +217,7 @@ describe("DependencyMap", () => {
     expect(shown).toContain("api-db");
     expect(shown).not.toContain("w0-api");
     await flow().vm.$emit("edge-mouse-enter", { edge: { id: "w0-api" } });
-    expect(baseEdge("w0-api").props("label")).toBeDefined();
+    expect(hoveredLabel().text()).toMatch(/KB\/s/);
   });
 
   it("shows a hovered edge's rate even when it is not among the busiest", async () => {
@@ -225,9 +227,10 @@ describe("DependencyMap", () => {
       ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))),
     );
     await flow().vm.$emit("edge-mouse-enter", { edge: { id: "w1-api" } });
-    expect(baseEdge("w1-api").props("label")).toMatch(/KB\/s/);
+    expect(hoveredLabel().text()).toBe("2.0KB/s");
     expect(baseEdge("w1-api").props("style").opacity).toBe(1);
     await flow().vm.$emit("edge-mouse-leave");
+    expect(hoveredLabel().exists()).toBe(false);
     expect(baseEdge("w1-api").props("label")).toBeUndefined();
   });
 
@@ -243,13 +246,14 @@ describe("DependencyMap", () => {
         .filter((e) => e.props("id") !== "w0-api")
         .map((e) => [e.props("id"), e.props("label"), e.props("labelX"), e.props("labelY")]);
     const before = at();
+    const edges = flow().props("edges");
     await flow().vm.$emit("edge-mouse-enter", { edge: { id: "w0-api" } });
     expect(at()).toEqual(before);
-    expect(
-      flow()
-        .props("edges")
-        .find((e: any) => e.id === "w0-api").zIndex,
-    ).toBe(1);
+    // Hovering leaves Vue Flow's edges alone; the hovered label is drawn in the label layer instead.
+    expect(flow().props("edges")).toBe(edges);
+    expect(hoveredLabel().exists()).toBe(true);
+    await flow().vm.$emit("edge-mouse-leave");
+    expect(flow().props("edges")).toBe(edges);
   });
 
   it("makes a clickable card a named button, and leaves the others plain", () => {
