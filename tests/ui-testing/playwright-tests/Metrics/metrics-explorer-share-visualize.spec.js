@@ -8,9 +8,10 @@
  *       written to the URL (debounced 300ms), stripped when leaving Visualize, and
  *       rehydrated into the chart when a shared link is opened.
  *
- *  F2 — The back-compat route guard hijacked shared Visualize links. `/metrics`
- *       carrying editor params redirects to `/metrics/editor`; that redirect now
- *       skips when `mode=visualize`, so an explorer share link opens the explorer.
+ *  F2 — The back-compat route guard. A `/metrics` link carrying a legacy
+ *       `metrics_data` blob without a mode is redirected into Visualize
+ *       (`mode=visualize`, blob kept); a link that already has `mode=visualize`
+ *       opens as-is.
  *
  * NOT covered here (deliberately, per test-scope decision): F3 favorites/facet
  * gating and F4 stacked charts + OEmptyState migration.
@@ -58,14 +59,12 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
 
   // ═══ F2: ROUTE GUARD ══════════════════════════════════════════════════════
 
-  test("Visualize deep-link stays on the explorer instead of redirecting to the editor", {
+  test("Visualize deep-link opens the explorer in Visualize mode", {
     tag: ['@metrics-explorer-share', '@P0', '@deeplink', '@route-guard', '@all']
   }, async ({ page }, testInfo) => {
     const pm = await setupTest(page, testInfo);
-    testLogger.info('Testing mode=visualize deep-link is exempt from the editor redirect');
+    testLogger.info('Testing a mode=visualize deep-link opens the explorer as-is');
 
-    // `metrics_data` is an editor param, so pre-fix this URL was redirected to
-    // /metrics/editor and the shared chart never opened in the explorer.
     const blob = pm.metricsExplorerPage.buildPromqlBlob(SEEDED_METRIC);
     const url = pm.metricsExplorerPage.buildExplorerUrl({
       mode: 'visualize',
@@ -74,31 +73,29 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
 
     await pm.metricsExplorerPage.navigateToUrl(url);
 
-    // The fix: still on /web/metrics, not /web/metrics/editor.
     await pm.metricsExplorerPage.expectOnExplorerRoute();
     await pm.metricsExplorerPage.expectModeActive('visualize');
     await pm.metricsExplorerPage.expectVisualizeVisible();
 
-    testLogger.info('Visualize deep-link opened the explorer — guard exemption verified');
+    testLogger.info('Visualize deep-link opened the explorer in Visualize mode');
   });
 
-  test("Legacy metrics_data link without a mode still redirects to the editor", {
+  test("Legacy metrics_data link without a mode redirects into Visualize", {
     tag: ['@metrics-explorer-share', '@P1', '@deeplink', '@route-guard', '@backcompat', '@all']
   }, async ({ page }, testInfo) => {
     const pm = await setupTest(page, testInfo);
-    testLogger.info('Testing the back-compat branch of the guard is intact');
+    testLogger.info('Testing the back-compat branch of the guard');
 
     // Links shared before the explorer existed carry metrics_data with NO mode.
-    // Those must keep landing on the editor — the fix narrowed the redirect, it
-    // did not remove it.
     const blob = pm.metricsExplorerPage.buildPromqlBlob(SEEDED_METRIC);
     const url = pm.metricsExplorerPage.buildExplorerUrl({ metrics_data: blob });
 
     await pm.metricsExplorerPage.navigateToUrl(url);
 
-    await pm.metricsExplorerPage.expectRedirectedToEditor();
+    await pm.metricsExplorerPage.expectRedirectedToVisualize();
+    await pm.metricsExplorerPage.expectVisualizeQueryToContain(SEEDED_METRIC);
 
-    testLogger.info('Legacy deep-link still routed to the editor — back-compat preserved');
+    testLogger.info('Legacy deep-link redirected into Visualize with its query');
   });
 
   test("Explorer mode links without editor params are never redirected", {

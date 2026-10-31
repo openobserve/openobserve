@@ -1247,7 +1247,6 @@
       "moreExamples": "For additional examples,",
       "clickHere": "click here"
     },
-    "legendLabel": "Legend",
     "switchToLogs": "Switch back to Logs",
     "savedViewsLabel": "Saved View",
     "savedViewsNotFound": "Saved view not found!",
@@ -6806,7 +6805,9 @@
     "formulaNumber": "Formula {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} is not a query in this panel",
-    "formulaReferencesFormula": "{letter} is a formula, and a formula may not reference another formula",
+    "formulaCycle": "Formulas refer to each other in a loop: {cycle}",
+    "formulaTooLong": "The formula expands to more than {limit} characters",
+    "formulaTooDeep": "Formulas nest more than {limit} levels deep",
     "formulaInputNote": "Used in a formula: there, this query's instant/range setting, legend, step and time shift do not apply.",
     "multiSqlQueryLabel": "Query Label",
     "multiSqlQueryLabelHint": "Custom name for this query in legends (e.g., 'Production')",
@@ -9017,7 +9018,6 @@
     "hostmapValue": "Value",
     "hostmapGroupBy": "Group by",
     "otherColumn": "Other Columns",
-    "metric": "Metric",
     "filters": "Filters",
     "labelFilters": "Label filters",
     "operations": "Operations",
@@ -13295,21 +13295,6 @@
     "awsStsSelfHostedInfo": "This uses AWS sts to assume role and perform operations. Make sure you have configured aws credentials in the installation env that have access to this role."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "For instant vector selectors, use",
-      "rangeVector": "For range vector selectors, use",
-      "aggregate": "To aggregate data, use",
-      "or": "or",
-      "rate": "For rate calculations over a range vector, use",
-      "sqlTitle": "Syntax Guide: SQL Mode",
-      "sqlFullText": "For full text search of value 'error' use",
-      "sqlColumn": "For column search of value 'error' use",
-      "sqlCode": "To search value 200 for code column use",
-      "sqlStream": "To search value 'stderr' for stream column use",
-      "sqlFunction": "To search and use query function {fn} on column log use",
-      "sqlMoreExamples": "For additional examples,",
-      "sqlClickHere": "click here"
-    },
     "add": "Add",
     "runQuery": "Run query",
     "runQueryOptions": "Run query options",
@@ -13608,10 +13593,6 @@
         "clear": "Clear view"
       }
     },
-    "index": {
-      "namePanelRequired": "Name of Panel is required",
-      "errorsFixTryAgain": "There are some errors, please fix them and try again"
-    },
     "metricCard": {
       "lastRefreshed": "Last Refreshed:",
       "traceId": "Trace ID: {id}",
@@ -13622,25 +13603,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Failed to render chart"
-    },
-    "queryBuilder": {
-      "title": "PromQL Query Builder",
-      "subtitle": "Build and test PromQL queries visually",
-      "generatedQuery": "Generated PromQL Query:",
-      "noQueryBuilt": "No query built yet",
-      "copyQuery": "Copy Query",
-      "clearAll": "Clear All",
-      "testQuery": "Test Query",
-      "queryResultPreview": "Query Result Preview:",
-      "queryCopied": "Query copied to clipboard!",
-      "queryCleared": "Query cleared",
-      "testingSoon": "Query testing will be implemented soon",
-      "executionSoon": "Query execution will be implemented in the next phase"
-    },
-    "metricSelector": {
-      "metricName": "Metric Name",
-      "loadingMetrics": "Loading metrics...",
-      "noMetricsFound": "No metrics found"
     },
     "labelFilterEditor": {
       "label": "Label",

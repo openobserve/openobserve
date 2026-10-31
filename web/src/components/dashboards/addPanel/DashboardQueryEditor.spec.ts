@@ -819,18 +819,20 @@ describe("formula letters and the saved hide flag", () => {
     await wrapper.vm.removeTab(0);
     await wrapper.vm.$nextTick();
 
-    expect(refs(data)).toEqual(["B", undefined]);
+    expect(refs(data)).toEqual(["B", "F1"]);
     expect(wrapper.find('[data-test="dashboard-panel-formula-error"]').exists()).toBe(false);
   });
 
-  it("labels each non-formula tab with its letter", async () => {
+  it("labels each tab, formulas included, with its letter", async () => {
     mountWith([q({ ref: "A" }), q({ formula: "A" }, "")]);
     await wrapper.vm.$nextTick();
 
     expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-0"]').text()).toBe(
       "A · Query 1",
     );
-    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-1"]').text()).toBe("Formula 1");
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-1"]').text()).toBe(
+      "F1 · Formula 1",
+    );
   });
 
   it("backs the visibility toggle with config.hide", async () => {
@@ -845,7 +847,7 @@ describe("formula letters and the saved hide flag", () => {
     expect(data.layout.hiddenQueries).toEqual([0, 1]);
   });
 
-  it("adds a formula as a lettered-free code query", async () => {
+  it("adds a formula as a lettered code query", async () => {
     const data = mountWith([q({ ref: "A" })]);
     await wrapper.find('[data-test="dashboard-panel-query-tab-add-formula"]').trigger("click");
     await wrapper.vm.$nextTick();
@@ -853,7 +855,7 @@ describe("formula letters and the saved hide flag", () => {
     const formula = data.data.queries[1];
     expect(formula.config.formula).toBe("");
     expect(formula.customQuery).toBe(true);
-    expect(formula.config.ref).toBeUndefined();
+    expect(formula.config.ref).toBe("F1");
     expect(data.layout.currentQueryIndex).toBe(1);
   });
 
@@ -872,6 +874,53 @@ describe("formula letters and the saved hide flag", () => {
     expect(wrapper.find('[data-test="dashboard-panel-formula-error"]').text()).toBe(
       "B is not a query in this panel",
     );
+  });
+
+  it("shows a cycle between formulas under the formula", async () => {
+    mountWith(
+      [
+        q({ ref: "A" }),
+        q({ ref: "F1", formula: "F2 + A" }, ""),
+        q({ ref: "F2", formula: "F1" }, ""),
+      ],
+      1,
+    );
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="dashboard-panel-formula-error"]').text()).toBe(
+      "Formulas refer to each other in a loop: F1 → F2 → F1",
+    );
+  });
+
+  it("accepts a formula that references another formula", async () => {
+    mountWith(
+      [
+        q({ ref: "A" }),
+        q({ ref: "F1", formula: "A * 2" }, ""),
+        q({ ref: "F2", formula: "F1 + A" }, ""),
+      ],
+      2,
+    );
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="dashboard-panel-formula-error"]').exists()).toBe(false);
+  });
+
+  it("tells a formula referenced by another formula that its own settings do not apply there", async () => {
+    mountWith(
+      [
+        q({ ref: "A" }),
+        q({ ref: "F1", formula: "A * 2" }, ""),
+        q({ ref: "F2", formula: "F1 + 1" }, ""),
+      ],
+      1,
+    );
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-test="dashboard-panel-formula-input-note"]').exists()).toBe(true);
+
+    wrapper.vm.dashboardPanelData.layout.currentQueryIndex = 2;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-test="dashboard-panel-formula-input-note"]').exists()).toBe(false);
   });
 
   it("tells a referenced input that its own settings do not apply in the formula", async () => {
@@ -945,8 +994,12 @@ describe("formula letters and the saved hide flag", () => {
   it("numbers formulas among formulas", async () => {
     mountWith([q({ ref: "A" }), q({ ref: "B" }), q({ formula: "A" }, ""), q({ formula: "B" }, "")]);
     await wrapper.vm.$nextTick();
-    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-2"]').text()).toBe("Formula 1");
-    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-3"]').text()).toBe("Formula 2");
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-2"]').text()).toBe(
+      "F1 · Formula 1",
+    );
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-3"]').text()).toBe(
+      "F2 · Formula 2",
+    );
   });
 
   it("numbers queries among queries", async () => {

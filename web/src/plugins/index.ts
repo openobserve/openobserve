@@ -15,13 +15,11 @@
 
 import type { App } from "vue";
 import Logs from "./logs/Index.vue";
-import AppMetrics from "./metrics/Index.vue";
 import AppTraces from "./traces/Index.vue";
 
 export default {
   install: (app: App) => {
     app.component("zinc-logs", Logs);
-    app.component("zinc-metrics", AppMetrics);
     app.component("zinc-traces", AppTraces);
   },
 };

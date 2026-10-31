@@ -103,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
           v-model="selectedDate"
+          data-test="metrics-date-picker"
           :auto-apply-dashboard="mode === 'visualize'"
           calendar-presets
           @on:date-change="onDateChange"
@@ -110,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AutoRefreshInterval
           v-model="refreshInterval"
           trigger
+          data-test="metrics-auto-refresh"
           :is-compact="isMobile"
           @trigger="onRefreshTick"
         />
@@ -2284,9 +2286,7 @@ export default defineComponent({
     );
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    // Registered here (not just in the editor Index.vue) because `/metrics`
-    // mounts THIS explorer — the editor lives at `/metrics/editor`. Keys and
-    // scope come from the "metrics" group in shortcutRegistry.ts.
+    // Keys and scope come from the "metrics" group in shortcutRegistry.ts.
     useShortcuts([
       {
         // ⌘/Ctrl+Enter: an explicit Run in Visualize; elsewhere a grid refresh (there is no single query).

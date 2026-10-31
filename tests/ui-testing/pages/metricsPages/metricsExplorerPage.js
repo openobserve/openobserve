@@ -1,13 +1,9 @@
 // metricsExplorerPage.js
 //
 // Page object for the Metrics EXPLORER (`/web/metrics`) — the zero-query browse
-// grid and its in-page Visualize workspace.
-//
-// NOT the same surface as metricsPage.js, which drives the legacy panel editor at
-// `/web/metrics/editor`. The two share a route prefix and nothing else: the
-// explorer has a mode toggle, a card grid and its own share button
-// (`metrics-explorer-share-btn`), while the editor has the PromQL bar and
-// `metrics-share-btn`.
+// grid and its in-page Visualize workspace. metricsPage.js drives the same
+// Visualize pane's panel editor in depth; this file owns the explorer shell,
+// modes, cards and URL state.
 //
 // Selectors verified against:
 //   web/src/plugins/metrics/explorer/MetricsExplorer.vue
@@ -109,7 +105,7 @@ export class MetricsExplorerPage {
 
     /**
      * The org the page is CURRENTLY on, falling back to the configured one.
-     * Mirrors gotoMetricsEditor: change-org tests must not be pinned to default.
+     * Mirrors gotoMetricsVisualize: change-org tests must not be pinned to default.
      */
     resolveOrgIdentifier() {
         let orgIdentifier = getOrgIdentifier();
@@ -155,13 +151,7 @@ export class MetricsExplorerPage {
         await expect(this.page.locator(this.explorerRoot)).toBeVisible({ timeout: 30000 });
     }
 
-    /**
-     * Asserts the browser stayed on the EXPLORER route.
-     *
-     * The back-compat guard redirects `/metrics` + editor params to
-     * `/metrics/editor`, so "did not redirect" is exactly "the path is /metrics
-     * and not /metrics/editor".
-     */
+    /** Asserts the browser is on the EXPLORER route (`/web/metrics`). */
     async expectOnExplorerRoute() {
         await expect
             .poll(() => new URL(this.page.url()).pathname, { timeout: 15000 })
@@ -169,11 +159,14 @@ export class MetricsExplorerPage {
         await expect(this.page.locator(this.explorerRoot)).toBeVisible({ timeout: 30000 });
     }
 
-    /** Asserts the back-compat guard sent a legacy deep link to the editor route. */
-    async expectRedirectedToEditor() {
+    /** Asserts a legacy deep link was redirected into the explorer's Visualize mode. */
+    async expectRedirectedToVisualize() {
+        await this.expectOnExplorerRoute();
         await expect
-            .poll(() => new URL(this.page.url()).pathname, { timeout: 15000 })
-            .toMatch(/\/web\/metrics\/editor\/?$/);
+            .poll(() => this.getQueryParam('mode'), { timeout: 15000 })
+            .toBe('visualize');
+        await this.expectModeActive('visualize');
+        await this.expectVisualizeVisible();
     }
 
     /* ----------------------------------------------------------------- modes */

@@ -16,13 +16,13 @@
 /**
  * URL <-> explorer filter state.
  *
- * The explorer keeps its filters in the URL so leaving the page (e.g. into the
- * editor) and coming back restores them. Defaults are omitted, so an
+ * The explorer keeps its filters in the URL so leaving the page and coming
+ * back restores them. Defaults are omitted, so an
  * unfiltered grid keeps a bare `/metrics` URL.
  *
  * None of these keys may appear in METRICS_EDITOR_PARAM_KEYS — a `/metrics`
- * URL carrying an editor key redirects to `/metrics/editor` and the filters
- * would never be seen.
+ * URL carrying an editor key is rewritten into a Visualize link and the
+ * filters would never be seen.
  */
 
 import { raw } from "@/types/i18n";
