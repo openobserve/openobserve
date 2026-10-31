@@ -30,6 +30,7 @@ use config::meta::{
     pipeline::{Pipeline, components::PipelineSource},
     slo::{CountSource, QueryLanguage, SliConfig, Slo},
     sql::resolve_stream_names_with_type,
+    stream::StreamType,
 };
 use dashmap::DashMap;
 #[cfg(feature = "enterprise")]
@@ -317,8 +318,13 @@ pub async fn org_metric_usage(
     user_id: &str,
 ) -> Result<OrgMetricUsage, anyhow::Error> {
     let (_permit, sources) = visible_sources(org_id, user_id).await?;
+    let streams: HashSet<String> =
+        crate::db::schema::list_streams_from_cache(org_id, StreamType::Metrics)
+            .await
+            .into_iter()
+            .collect();
     Ok(OrgMetricUsage {
-        metrics: count_usage(&sources),
+        metrics: known_metrics(count_usage(&sources), &streams),
     })
 }
 
@@ -629,6 +635,15 @@ fn count_usage(sources: &UsageSources) -> HashMap<String, UsageCounts> {
         let queries: Vec<Query> = pipeline_query(pipeline).into_iter().collect();
         tally(&mut counts, &queries, |c| &mut c.pipelines);
     }
+    counts
+}
+
+/// An unparsed query counts every word it holds, so only names that are metric streams stay.
+fn known_metrics(
+    mut counts: HashMap<String, UsageCounts>,
+    streams: &HashSet<String>,
+) -> HashMap<String, UsageCounts> {
+    counts.retain(|name, _| streams.contains(name));
     counts
 }
 
@@ -1662,6 +1677,21 @@ mod tests {
                 "{metric}"
             );
         }
+    }
+
+    #[test]
+    fn org_counts_keep_only_metric_streams() {
+        let counts = count_usage(&mixed_sources());
+        // The unparsed `sum(http_requests_total[5m]` counts each of its words.
+        assert!(counts.contains_key("sum"));
+        let streams = HashSet::from([METRIC.to_string(), "up".to_string()]);
+        let known = known_metrics(counts.clone(), &streams);
+        assert_eq!(
+            known.keys().collect::<HashSet<_>>(),
+            HashSet::from([&METRIC.to_string(), &"up".to_string()])
+        );
+        assert_eq!(known[METRIC], counts[METRIC]);
+        assert_eq!(known["up"], counts["up"]);
     }
 
     #[test]
