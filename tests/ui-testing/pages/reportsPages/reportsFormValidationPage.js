@@ -215,6 +215,14 @@ export class ReportsFormValidationPage {
         await this.#pickOption('add-report-dashboard-folder-select', folderId);
     }
 
+    /** Waits for the onBeforeMount reset without picking a folder, so the folder can stay empty. */
+    async waitForFormSeeded() {
+        await this.page.locator('[data-test="add-report-dashboard-folder-select-trigger"]').click();
+        await expect(this.page.locator('[data-test="add-report-dashboard-folder-select-option"]').first()).toBeVisible();
+        await this.page.keyboard.press('Escape');
+        await expect(this.page.locator(this.dashboardFolderPopover)).toBeHidden();
+    }
+
     async selectDashboard(dashboardId, title) {
         await this.#pickOption('add-report-dashboard-name-select', dashboardId, title);
     }

@@ -3,7 +3,7 @@
 //
 // Covers:
 //   1. Empty submit → name required error shown (blocks save)
-//   2. Absolute timerange with no range set → save blocked (no from/to validation)
+//   2. Absolute timerange with no dates → picker falls back to the relative default
 //   3. Valid full config → report created successfully
 //
 // Cleanup: the happy-path test deletes the report and dashboard it created.
@@ -29,6 +29,7 @@ test.describe("Reports form validation — required field errors", () => {
         // deterministically empty — the Add-Report button would pre-scope it to
         // "default" and race the folder-required validation (CI flake).
         await pm.reportsFormValidation.openCreateReportFormDirect();
+        await pm.reportsFormValidation.waitForFormSeeded();
         testLogger.info('Navigated to Create Report form');
     });
 
@@ -103,7 +104,7 @@ test.describe("Reports form validation — required field errors", () => {
 // from/to are both 0 (not set), validateReportData returns false and save is
 // blocked. No toast is shown — the form simply stays open.
 
-test.describe("Reports form validation — absolute timerange with no range blocks save", () => {
+test.describe("Reports form validation — absolute timerange with no dates falls back to relative", () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
 
@@ -113,21 +114,20 @@ test.describe("Reports form validation — absolute timerange with no range bloc
         pm = new PageManager(page);
         await pm.reportsFormValidation.navigateToReports();
         await pm.reportsFormValidation.openCreateReportForm();
+        await pm.reportsFormValidation.waitForFormSeeded();
         testLogger.info('Navigated to Create Report form for timerange test');
     });
 
-    test("should block save when absolute timerange has no from/to date set", {
+    test("absolute timerange with no dates falls back to the relative default", {
         tag: ['@reports-form-validation', '@P1', '@smoke']
     }, async ({ page }) => {
         testLogger.info('Testing absolute timerange with no dates → save blocked');
 
-        // Fill a valid name
-        await pm.reportsFormValidation.fillReportName('validname_tr_test');
-
         // Select folder and dashboard (must be present to reach timerange validation)
-        await pm.reportsFormValidation.selectFirstDashboardFolder();
+        await pm.reportsFormValidation.selectDashboardFolder('default');
         await pm.reportsFormValidation.selectFirstDashboard();
         await pm.reportsFormValidation.selectFirstDashboardTab();
+        await pm.reportsFormValidation.fillReportName('validname_tr_test');
 
         // Open the timerange picker and switch to absolute mode without setting dates
         await pm.reportsFormValidation.openTimerangeDropdown();
@@ -141,12 +141,16 @@ test.describe("Reports form validation — absolute timerange with no range bloc
         // Dismiss the picker by pressing Escape
         await pm.reportsFormValidation.dismissTimerangePicker();
 
+        // The picker never applies an absolute range with no dates, so the form keeps its relative default.
+        await expect(pm.reportsFormValidation.getTimerangeDropdownLocator()).toContainText('Past 30 Minutes');
+
         // Attempt to save
         await pm.reportsFormValidation.clickSave();
 
         // Form must remain on the create-report page — success toast must NOT appear
         await expect(pm.reportsFormValidation.getAddReportSectionLocator()).toBeVisible();
         await expect(pm.reportsFormValidation.getToastSuccessLocator()).not.toBeVisible();
+        await expect(pm.reportsFormValidation.getReportNameErrorLocator()).toBeHidden();
 
         testLogger.info('Save correctly blocked when absolute timerange has no from/to');
     });
