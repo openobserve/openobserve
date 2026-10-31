@@ -11743,6 +11743,8 @@
       "pagerdutyIntegrationKeyLength": "يجب أن يكون مفتاح تكامل PagerDuty مكونا من 32 حرفا",
       "pagerdutySeverity": "الخطورة الافتراضية",
       "pagerdutySeverityHelp": "اختر الخطورة الافتراضية لحوادث PagerDuty",
+      "pagerdutyEuRegion": "منطقة خدمة الاتحاد الأوروبي",
+      "pagerdutyEuRegionHelp": "فعّل هذا الخيار إذا كان حساب PagerDuty الخاص بك في منطقة خدمة الاتحاد الأوروبي",
       "severityCritical": "حرج",
       "severityError": "خطأ",
       "severityWarning": "تحذير",

@@ -11743,6 +11743,8 @@
       "pagerdutyIntegrationKeyLength": "Klucz integracji PagerDuty powinien mieć 32 znaki",
       "pagerdutySeverity": "Domyślna ważność",
       "pagerdutySeverityHelp": "Wybierz domyślną ważność dla incydentów PagerDuty",
+      "pagerdutyEuRegion": "Region usług UE",
+      "pagerdutyEuRegionHelp": "Włącz, jeśli Twoje konto PagerDuty znajduje się w regionie usług UE",
       "severityCritical": "Krytyczne",
       "severityError": "Błąd",
       "severityWarning": "Ostrzeżenie",

@@ -11743,6 +11743,8 @@
       "pagerdutyIntegrationKeyLength": "PagerDuty 통합 키는 32자여야 합니다.",
       "pagerdutySeverity": "기본 심각도",
       "pagerdutySeverityHelp": "PagerDuty 인시던트의 기본 심각도를 선택하세요.",
+      "pagerdutyEuRegion": "EU 서비스 지역",
+      "pagerdutyEuRegionHelp": "PagerDuty 계정이 EU 서비스 지역에 있는 경우 켜세요",
       "severityCritical": "심각",
       "severityError": "오류",
       "severityWarning": "경고",
