@@ -49,6 +49,7 @@ import { refreshFreeTextSchemas } from "@/composables/useLogs/freeTextSearch";
 import { decodeFtScan } from "@/utils/logs/freeTextScan";
 import {
   decodeColumns,
+  endLogsArrival,
   initShownSearchFromUrl,
   parseRowsParam,
   writeLogsUrl,
@@ -308,6 +309,7 @@ const useLogs = (t: TranslateFn) => {
         if (result === "scheduled" && !userSearchInFlight)
           releaseLoadingIfRunNeverStarts(latest?.id);
         else if (result !== "scheduled" && result !== "dispatched") {
+          endLogsArrival();
           if (!userSearchInFlight) searchObj.loading = false;
           showNoQueryAppliedIfIdle();
         }

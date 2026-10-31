@@ -306,6 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="suppressedColumns"
           row-key="key"
           :loading="historyQuery.isLoading.value"
+          :loading-reset-key="id"
           :fill-height="false"
           :show-global-filter="false"
           :page-size="20"

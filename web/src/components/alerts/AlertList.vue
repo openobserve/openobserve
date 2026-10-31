@@ -115,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               show-index
               row-key="alert_id"
               :loading="loading"
+              :loading-reset-key="`${activeFolderId}:${activeTab}`"
               :forbidden="forbidden"
               pagination="client"
               :page-size="pageSize"

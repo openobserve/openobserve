@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach, beforeAll, afterAll } from "vitest";
+import { resetListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises } from "@vue/test-utils";
 import User from "@/components/iam/users/User.vue";
 import { createI18n } from "vue-i18n";
@@ -265,6 +266,15 @@ describe("User Component", () => {
   afterEach(() => {
     if (wrapper && typeof wrapper.unmount === "function") wrapper.unmount();
     vi.useRealTimers();
+    resetListViewState();
+  });
+
+  it("keeps the search text when the user comes back to the list", async () => {
+    wrapper.vm.filterQuery = "alice";
+    wrapper.unmount();
+    wrapper = mountUser();
+    await flushPromises();
+    expect(wrapper.vm.filterQuery).toBe("alice");
   });
 
   // ---------------------------------------------------------------------

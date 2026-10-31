@@ -21,6 +21,7 @@
       ref="fieldListRef"
       class="min-h-0 flex-1"
       :fields="flattenGroupedFields"
+      :loading="fieldsLoading"
       :search="dashboardPanelData.meta.stream.filterField"
       :search-placeholder="t('search.searchField')"
       :page-size="250"
@@ -542,6 +543,8 @@ const streamTypeOptions = computed(() =>
 const filteredStreams = ref<any[]>([]);
 
 const streamListLoading = ref(false);
+const groupedFieldsInFlight = ref(0);
+const fieldsLoading = computed(() => streamListLoading.value || groupedFieldsInFlight.value > 0);
 
 const currentQueryFields = () =>
   dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields;
@@ -957,8 +960,13 @@ watch(
         ?.stream_type,
     joins: dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.joins,
   }),
-  () => {
-    updateGroupedFields();
+  async () => {
+    groupedFieldsInFlight.value++;
+    try {
+      await updateGroupedFields();
+    } finally {
+      groupedFieldsInFlight.value--;
+    }
   },
   { deep: true, immediate: true },
 );

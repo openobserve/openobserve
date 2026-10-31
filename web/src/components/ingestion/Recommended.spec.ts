@@ -18,7 +18,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import Recommended from "./Recommended.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
-import { createRouter, createWebHistory } from "vue-router";
+import { createMemoryHistory, createRouter, createWebHistory } from "vue-router";
 
 // Mock getImageURL
 vi.mock("@/utils/zincutils", () => ({
@@ -369,6 +369,38 @@ describe("Recommended: Get started pick", () => {
     localStorage.setItem("o2.onboarding.firstSource.other", "kubernetes");
     const wrapper = await mountRail();
     expect(wrapper.find('[data-test="ingestion-recommended-pick-group"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+describe("Recommended default child", () => {
+  it("replaces the bare section URL with its default child, so Back skips it", async () => {
+    const store = createStore({
+      state: {
+        selectedOrganization: { identifier: "org123" },
+        userInfo: { email: "test@example.com" },
+        zoConfig: { ai_enabled: false },
+      },
+    });
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", name: "recommended", component: { template: "<div />" } },
+        { path: "/kubernetes", name: "ingestFromKubernetes", component: { template: "<div />" } },
+      ],
+    });
+    await router.push({ name: "recommended", query: { org_identifier: "org123", ref: "nav" } });
+    const push = vi.spyOn(router, "push");
+    const replace = vi.spyOn(router, "replace");
+    const wrapper = mount(Recommended, {
+      global: { plugins: [i18n, store, router], stubs: { "router-view": true } },
+    });
+    await flushPromises();
+    expect(replace).toHaveBeenCalledWith({
+      name: "ingestFromKubernetes",
+      query: { org_identifier: "org123" },
+    });
+    expect(push).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 });

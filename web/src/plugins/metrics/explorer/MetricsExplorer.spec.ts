@@ -654,6 +654,50 @@ describe("MetricsExplorer wiring", () => {
     });
   });
 
+  describe("the facet rails wait for the first metric load", () => {
+    beforeEach(() => {
+      grid.cards.value = [];
+    });
+    afterEach(() => {
+      grid.loading.value = false;
+      grid.cards.value = [];
+      grid.activeRail.value = "prefix";
+    });
+
+    it.each(["prefix", "suffix"])(
+      "passes loading to the %s rail until the metrics settle",
+      (rail) => {
+        grid.activeRail.value = rail;
+        grid.loading.value = true;
+        expect(mountExplorer().findComponent({ name: "PrefixFilterPanel" }).props("loading")).toBe(
+          true,
+        );
+        grid.loading.value = false;
+        expect(mountExplorer().findComponent({ name: "PrefixFilterPanel" }).props("loading")).toBe(
+          false,
+        );
+      },
+    );
+
+    it("does not mark the rail loading on a reload that already has cards", () => {
+      grid.loading.value = true;
+      grid.cards.value = [CARD];
+      expect(mountExplorer().findComponent({ name: "PrefixFilterPanel" }).props("loading")).toBe(
+        false,
+      );
+    });
+
+    it("shows no type empty state while the metrics load, and shows it once they settle empty", () => {
+      grid.activeRail.value = "type";
+      grid.loading.value = true;
+      expect(mountExplorer().find('[data-test="metrics-explorer-type-empty"]').exists()).toBe(
+        false,
+      );
+      grid.loading.value = false;
+      expect(mountExplorer().find('[data-test="metrics-explorer-type-empty"]').exists()).toBe(true);
+    });
+  });
+
   describe("the type facet uses OCheckboxGroup over a Set<->array boundary", () => {
     it("exposes selectedTypes as an array for the group, and writes back a Set", () => {
       // The composable keeps selectedTypes as a Set (URL state + filtering depend

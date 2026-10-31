@@ -15,6 +15,7 @@
 
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
+import { defineComponent, h, KeepAlive, nextTick, ref } from "vue";
 import i18n from "@/locales";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import TracesDrillDownPage from "./TracesDrillDownPage.vue";
@@ -162,5 +163,40 @@ describe("TracesDrillDownPage", () => {
 
     document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(emitted["update:open"]).toBeUndefined();
+  });
+
+  it("should ignore Escape while its page is cached by keep-alive, and listen again on return", async () => {
+    const onUpdate = vi.fn();
+    const shown = ref<"page" | "other">("page");
+    const Other = defineComponent({ render: () => h("div") });
+    wrapper = mount(
+      defineComponent({
+        setup: () => () =>
+          h(KeepAlive, null, {
+            default: () =>
+              shown.value === "page"
+                ? h(TracesDrillDownPage, {
+                    open: true,
+                    title: "Volume Insights",
+                    "onUpdate:open": onUpdate,
+                  })
+                : h(Other),
+          }),
+      }),
+      { attachTo: document.body, global: { plugins: [i18n] } },
+    );
+    const escape = () =>
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+    shown.value = "other";
+    await nextTick();
+    escape();
+    expect(onUpdate).not.toHaveBeenCalled();
+
+    shown.value = "page";
+    await nextTick();
+    escape();
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith(false);
   });
 });
