@@ -202,21 +202,21 @@ test.describe("PromQL pie — legend values and instant reducer", () => {
     await setupPromQLRegionPiePanelWithConfig(page, pm, dashboardName);
 
     await pm.dashboardPanelConfigs.selectConfigOption("dashboard-config-aggregation", AGG_LAST);
-    await pm.dashboardPanelActions.applyDashboardBtn();
+    // The query streams in time partitions, so a legend read before the stream ends holds partial counts.
+    await pm.dashboardPanelActions.applyAndWaitForPromQLQuery();
     const lastEntries = await pm.dashboardPanelActions.waitForPieLegendEntries((e) => e.length > 0);
 
     await pm.dashboardPanelConfigs.selectConfigOption("dashboard-config-aggregation", AGG_COUNT);
-    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyAndWaitForPromQLQuery();
     const lastByName = Object.fromEntries(lastEntries.map((e) => [e.name, e.value]));
     const countEntries = await pm.dashboardPanelActions.waitForPieLegendEntries(
       (e) => e.some((entry) => entry.value !== lastByName[entry.name])
     );
     testLogger.info("Range slices under Last and Count", { lastEntries, countEntries });
-    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPromQLEditor.selectQueryType("Instant");
     await pm.dashboardPanelConfigs.expectAggregationVisible(false);
-    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyAndWaitForPromQLQuery();
 
     const countByName = Object.fromEntries(countEntries.map((e) => [e.name, e.value]));
     // Wait for the Instant render to replace the Count one; the stale Count values already pass the >= check.
