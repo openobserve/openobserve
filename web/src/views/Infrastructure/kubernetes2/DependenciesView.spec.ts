@@ -294,6 +294,10 @@ describe("DependenciesView", () => {
     await testId("k8s2-deps-link").trigger("click");
     await flushPromises();
     expect(document.activeElement).toBe(testId("k8s2-deps-edge").element);
+    await testId("k8s2-deps-edge-close").trigger("click");
+    await flushPromises();
+    expect(testId("k8s2-deps-edge").exists()).toBe(false);
+    expect(document.activeElement).toBe(testId("k8s2-deps-link").element);
   });
 
   it("lists every drawn edge for keyboard users", async () => {

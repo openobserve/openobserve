@@ -47,6 +47,18 @@ export interface MapEdge {
   total: number;
 }
 
+// A bezier between two right-hand handles has no room to curve, so an edge within a column is drawn as a bow out
+// to the right, deeper the further apart its ends are, with its label at the bow's tip.
+export function loopPath(sx: number, sy: number, tx: number, ty: number): [string, number, number] {
+  const bow = 40 + 0.25 * Math.abs(ty - sy);
+  const tip = Math.max(sx, tx) + bow;
+  return [
+    `M${sx},${sy} C${tip},${sy} ${tip},${ty} ${tx},${ty}`,
+    (sx + tx) / 8 + 0.75 * tip,
+    (sy + ty) / 2,
+  ];
+}
+
 export interface MapLegendItem {
   label: string;
   color: string;
@@ -96,8 +108,9 @@ const { fitView, zoomIn, zoomOut, areNodesInitialized } = useVueFlow();
 // Rate labels only on the busiest edges, so the rest of the map stays readable.
 const LABELLED = 8;
 
-// Never below a zoom where the cards stay readable; a wider map is then panned.
+// Never below a zoom where the cards stay readable; a wider map is then panned. The fit button shows all of it.
 const FIT = { padding: 0.04, minZoom: 0.65, maxZoom: 1 };
+const FIT_ALL = { ...FIT, minZoom: 0.1, duration: 150 };
 
 // Both sides take edges either way: an edge leaves the side facing its target, and one within a
 // column loops out to the right.
@@ -195,7 +208,13 @@ const flowEdges = computed<Edge[]>(() => {
             markerUnits: "userSpaceOnUse",
           }
         : undefined,
-      data: { color: from.color, width, directed: e.directed, rate: formatRate(e.total) },
+      data: {
+        color: from.color,
+        width,
+        directed: e.directed,
+        rate: formatRate(e.total),
+        loop: dx === 0,
+      },
     };
   });
 });
@@ -228,7 +247,10 @@ const labelOf = (edge: EdgeProps) =>
     ? edge.data.rate
     : undefined;
 
-const pathOf = (edge: EdgeProps) => getBezierPath(edge);
+const pathOf = (edge: EdgeProps): [string, number, number] =>
+  edge.data.loop
+    ? loopPath(edge.sourceX, edge.sourceY, edge.targetX, edge.targetY)
+    : (getBezierPath(edge).slice(0, 3) as [string, number, number]);
 
 // Fit when the drawn ends or their places change, not on a refresh that redraws the same map.
 let fitPending = true;
@@ -385,7 +407,7 @@ function onKeydown(event: KeyboardEvent) {
         class="rounded-none"
         :aria-label="t('fleet.flow.fitView')"
         data-test="dependency-map-fit"
-        @click="fitView({ ...FIT, duration: 150 })"
+        @click="fitView(FIT_ALL)"
       >
         <OTooltip side="left" :content="t('fleet.flow.fitView')" />
       </OButton>

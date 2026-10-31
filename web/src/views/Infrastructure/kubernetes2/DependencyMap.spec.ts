@@ -17,7 +17,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
-import DependencyMap, { type MapEdge, type MapNode } from "./DependencyMap.vue";
+import DependencyMap, { loopPath, type MapEdge, type MapNode } from "./DependencyMap.vue";
+
+const fitView = vi.fn();
 
 // VueFlow measures the DOM, which jsdom cannot do, so this stand-in renders every node and edge through the
 // map's own slots and passes the rest through.
@@ -41,7 +43,7 @@ vi.mock("@vue-flow/core", () => ({
           <slot name="node-end" :id="n.id" :data="n.data" />
         </div>
         <template v-for="e in edges" :key="e.id">
-          <slot name="edge-flow" v-bind="{ ...e, sourceX: 0, sourceY: 0, targetX: 1, targetY: 1 }" />
+          <slot name="edge-flow" v-bind="{ ...e, sourceX: 100, sourceY: 0, targetX: 100, targetY: 80 }" />
         </template>
       </div>
     `,
@@ -52,7 +54,7 @@ vi.mock("@vue-flow/core", () => ({
   Position: { Left: "left", Right: "right" },
   getBezierPath: () => ["M0 0", 0, 0],
   useVueFlow: () => ({
-    fitView: vi.fn(),
+    fitView,
     zoomIn: vi.fn(),
     zoomOut: vi.fn(),
     areNodesInitialized: { value: true },
@@ -111,6 +113,26 @@ describe("DependencyMap", () => {
       ["b-a", "sl", "tr", "arrowclosed"],
       ["b-c", "sr", "tr", undefined],
     ]);
+  });
+
+  it("bows an edge within a column out to the right, with its label at the tip", () => {
+    const [path, x, y] = loopPath(100, 0, 100, 80);
+    // 40 plus a quarter of the 80 between the ends.
+    expect(path).toBe("M100,0 C160,0 160,80 100,80");
+    expect([x, y]).toEqual([145, 40]);
+    mountMap(
+      [node("a", 0), node("b", 0), node("c", 340)],
+      [edge("a", "b", 10), edge("a", "c", 10)],
+    );
+    expect(baseEdge("a-b").props("path")).toBe(path);
+    expect(baseEdge("a-c").props("path")).toBe("M0 0");
+  });
+
+  it("fits the whole map from the fit button, past the zoom the automatic fit stops at", async () => {
+    mountMap([node("a", 0)], []);
+    fitView.mockClear();
+    await wrapper.find('[data-test="dependency-map-fit"]').trigger("click");
+    expect(fitView).toHaveBeenCalledWith(expect.objectContaining({ minZoom: 0.1 }));
   });
 
   it("labels only the busiest edges with their rate", () => {

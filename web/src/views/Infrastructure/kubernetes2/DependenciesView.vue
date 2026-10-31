@@ -317,10 +317,27 @@ function openEnd(end: FlowEnd) {
 
 const edgePanel = ref<HTMLElement | null>(null);
 
+// The keyboard list's button that opened the panel, so closing it returns there.
+let openedFrom: HTMLElement | null = null;
+
 // From the keyboard list, focus follows to the panel, which comes after the map.
-function showEdge(id: string) {
+function showEdge(id: string, event: Event) {
+  openedFrom = (event.target as HTMLElement | null)?.closest("button") ?? null;
   selectedEdgeId.value = id;
   nextTick(() => edgePanel.value?.focus());
+}
+
+// Picked on the map, so a later close has no list button to return to.
+function selectEdge(id: string) {
+  openedFrom = null;
+  selectedEdgeId.value = id;
+}
+
+function closeEdge() {
+  selectedEdgeId.value = null;
+  const back = openedFrom;
+  openedFrom = null;
+  if (back?.isConnected) nextTick(() => back.focus());
 }
 
 function openNode(id: string) {
@@ -463,7 +480,7 @@ function showEverything() {
               variant="ghost-primary"
               size="xs"
               data-test="k8s2-deps-link"
-              @click="showEdge(edge.id)"
+              @click="showEdge(edge.id, $event)"
             >
               {{ raw(edgeText(edge)) }}
             </OButton>
@@ -477,7 +494,7 @@ function showEverything() {
           :legend="legend"
           data-test="k8s2-deps-chart"
           @open="openNode"
-          @select="(id: string) => (selectedEdgeId = id)"
+          @select="selectEdge"
         />
         <div
           v-if="selectedEdge"
@@ -515,7 +532,7 @@ function showEverything() {
               icon-left="close"
               :aria-label="t('common.close')"
               data-test="k8s2-deps-edge-close"
-              @click="selectedEdgeId = null"
+              @click="closeEdge"
             />
           </div>
           <OText
