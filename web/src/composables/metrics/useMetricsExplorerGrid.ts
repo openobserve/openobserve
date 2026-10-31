@@ -1488,13 +1488,19 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   /** The step each card's last request charted at. */
   const previewSteps = new Map<string, number>();
 
+  /** Cards with a realign request in flight, so a landing result cannot queue another. */
+  const realigning = new Set<string>();
+
   /** A settled card asks again, keeping its chart up, only when the measured interval does not divide the step it ran. */
   const realignIfStale = (card: MetricCard) => {
     const used = previewSteps.get(card.name);
     if (!used || previews.value[card.name]?.status !== "done") return;
     const measured = measuredIntervals.get(exportIntervalKey(card));
     if (!measured || used % measured === 0) return;
-    void requestPreview(card, { realign: true });
+    // An interval wider than the range leaves the step unaligned, and asking again would only repeat it.
+    if (stepFor(card) === used || realigning.has(card.name)) return;
+    realigning.add(card.name);
+    void requestPreview(card, { realign: true }).finally(() => realigning.delete(card.name));
   };
 
   /** Measures an on-screen card's export interval once its chart has landed, behind every preview in the queue. */

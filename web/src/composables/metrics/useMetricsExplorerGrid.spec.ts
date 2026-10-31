@@ -786,6 +786,24 @@ describe("useMetricsExplorerGrid", () => {
       expect(probes()).toEqual([]);
     });
 
+    it("does not re-query when the measured interval is wider than the range", async () => {
+      const grid = await setup();
+      grid.setTimeRange({ start_time: NOW_US - 5 * 60 * 1e6, end_time: NOW_US });
+      inFlight.length = 0;
+      const card = cardNamed(grid, COUNTER);
+      await charted(grid, card);
+      const step = grid.detailStepFor(card);
+
+      // One sample in 10m, then 6 in an hour: a 600s exporter, which cannot align a 5m range.
+      land(probes()[0], counted(1));
+      await flush();
+      land(probes()[0], counted(6));
+      for (let i = 0; i < 5; i++) await flush();
+
+      expect(ranges()).toEqual([]);
+      expect(grid.detailStepFor(card)).toBe(step);
+    });
+
     it("measures a stream once however often its card asks", async () => {
       const grid = await setup();
       const card = cardNamed(grid, COUNTER);
