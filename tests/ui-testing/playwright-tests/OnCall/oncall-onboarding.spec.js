@@ -333,11 +333,11 @@ test.describe('On-call onboarding', {
     // A handover at a known absolute instant: 2026-03-04T00:00:00Z, which is
     // 05:30 the same day in Asia/Kolkata and never 00:00 in any other zone.
     const anchorMicros = Date.UTC(2026, 2, 4, 0, 0, 0) * 1000;
+    await addTeamMembers(page, team.id, users);
     await setTeamSchedule(page, team.id, {
       timezone: TEAM_ZONE,
       rotations: [rotation({ id: 'Primary', members: users, anchorMicros })],
     });
-    await addTeamMembers(page, team.id, users);
 
     await pm.oncallTeamDetailPage.goto(ORG, team.id);
     await pm.oncallTeamDetailPage.openTab('schedule');
@@ -451,11 +451,11 @@ test.describe('On-call onboarding', {
     const prefix = uniqueName(`${workerPrefix(testInfo)}_ack`);
     const emails = await createOrgUsers(page, prefix, 1);
     const team = await createTeam(page, { name: `${prefix}_team` });
+    await addTeamMembers(page, team.id, emails);
     await setTeamSchedule(page, team.id, {
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: emails })],
     });
-    await addTeamMembers(page, team.id, emails);
 
     // A REAL firing, not a test page. The test-page mail carries a link to the
     // configuration, not an ack token — W-01 is precisely that its link is
