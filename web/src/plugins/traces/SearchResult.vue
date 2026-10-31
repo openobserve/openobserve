@@ -64,10 +64,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="logsResultChip"
           value="neutral"
           class="me-[0.6rem]"
-          >{{
-            `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === "spans" ? t("traces.spansFound") : t("traces.tracesFound")}`
-          }}</OTag
+          :aria-busy="countPending"
         >
+          <OSpinner v-if="countPending" size="xs" data-test="traces-count-pending" />
+          {{
+            countPending
+              ? countLabel
+              : `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${countLabel}`
+          }}
+        </OTag>
         <OTag
           v-if="
             searchObj.data.queryResults.errorCount != null &&
@@ -145,7 +150,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Combined scroll area: RED metrics + trace list scroll together.
            This is the single vertical scroller — the trace table delegates its
            virtualizer here (via :scroll-el) so it doesn't add a nested one. -->
-      <div ref="scrollContainerRef" class="bg-card-glass-solid flex-1 overflow-auto">
+      <div
+        ref="scrollContainerRef"
+        class="bg-card-glass-solid flex-1 overflow-auto"
+        @scroll.passive="rememberScrollTop"
+      >
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <transition
           enter-active-class="transition-all duration-300 ease-in-out"
@@ -218,6 +227,9 @@ import {
   computed,
   defineAsyncComponent,
   defineComponent,
+  nextTick,
+  onActivated,
+  onDeactivated,
   onMounted,
   ref,
   watch,
@@ -240,6 +252,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -250,6 +263,7 @@ export default defineComponent({
     OSelect,
     OPagination,
     OTag,
+    OSpinner,
     TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
@@ -325,6 +339,26 @@ export default defineComponent({
     // trace table's virtualizer (:scroll-el) so the table doesn't render its own
     // nested scrollbar — fixes the double-scrollbar on the traces page.
     const scrollContainerRef = ref<HTMLElement | null>(null);
+
+    // Keep-alive detaches the DOM before onDeactivated runs, and a detached element reads scrollTop 0.
+    let savedScrollTop = 0;
+    let restoringScroll = false;
+    const rememberScrollTop = () => {
+      if (!restoringScroll && scrollContainerRef.value?.isConnected) {
+        savedScrollTop = scrollContainerRef.value.scrollTop;
+      }
+    };
+    onDeactivated(() => {
+      restoringScroll = true;
+    });
+    onActivated(async () => {
+      await nextTick();
+      // The virtualized rows lay out in the next frame; before that the offset would clamp short.
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.value) scrollContainerRef.value.scrollTop = savedScrollTop;
+        restoringScroll = false;
+      });
+    });
 
     onMounted(() => {
       // Restore the wrap choice: a preference that resets on every reload is
@@ -403,6 +437,12 @@ export default defineComponent({
 
     const rowsPerPageOptions = [10, 25, 50, 100];
 
+    // The count runs after the rows, so until it answers there is no total to show.
+    const countPending = computed(() => searchObj.data.queryResults?.countPending === true);
+    const countLabel = computed(() =>
+      searchObj.meta.searchMode === "spans" ? t("traces.spansFound") : t("traces.tracesFound"),
+    );
+
     const totalPages = computed(() =>
       searchObj.data.queryResults.total && searchObj.meta.resultGrid.rowsPerPage
         ? Math.max(
@@ -478,6 +518,9 @@ export default defineComponent({
       getDashboardData,
       hits,
       searchPerformed,
+      countPending,
+      countLabel,
+      rememberScrollTop,
       changePage,
       changeRowsPerPage,
       changeSortBy,

@@ -949,6 +949,8 @@ describe("Index.vue (Main Traces Page)", () => {
     it("should show no stream selected message when no stream is selected", async () => {
       mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
       mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
+      // An in-flight search owns the load, so the mount keeps this stream state as is.
+      mockSearchObj.loading = true;
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -967,6 +969,9 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
       await flushPromises();
+      // The mock is not reactive, so re-render the slotted results once the mount has settled.
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
 
       expect(wrapper.find('[data-test="traces-no-stream-selected-text"]').exists()).toBe(true);
     });
@@ -984,6 +989,8 @@ describe("Index.vue (Main Traces Page)", () => {
     it("should show apply search message when no search is applied", async () => {
       mockSearchObj.searchApplied = false;
       mockSearchObj.data.queryResults = { hits: [] };
+      // An in-flight search owns the load, so the mount does not auto-run another.
+      mockSearchObj.loading = true;
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -1002,6 +1009,9 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
       await flushPromises();
+      // The mock is not reactive, so re-render the slotted results once the mount has settled.
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
 
       expect(wrapper.find('[data-test="traces-search-not-started-text"]').exists()).toBe(true);
     });

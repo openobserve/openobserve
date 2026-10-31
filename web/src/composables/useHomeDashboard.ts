@@ -34,15 +34,27 @@ const SETTING_CATEGORY = "ui";
 // Module-level shared reactive state — one source for all consumers.
 const homeDashboard: Ref<HomeDashboard | null> = ref(null);
 const isLoading = ref(false);
+// The pin is per org but this state is shared, so loads are keyed to the org they were started for.
+const currentOrg = ref("");
+const loadedOrg = ref("");
 
 export function useHomeDashboard(t: TranslateFn) {
   const isHome = (dashboardId: string) => homeDashboard.value?.dashboardId === dashboardId;
 
+  const isLoadedFor = (org: string | undefined) => !!org && loadedOrg.value === org;
+
   /** Cached read — see useFavoriteDashboards.load for the same rationale. */
   const load = async (org: string, force = false) => {
     if (!org) return;
+    if (org !== currentOrg.value) {
+      if (currentOrg.value) homeDashboard.value = null;
+      currentOrg.value = org;
+      loadedOrg.value = "";
+    }
     const apply = (val: any) => {
+      if (org !== currentOrg.value) return;
       homeDashboard.value = val && val.dashboardId ? (val as HomeDashboard) : null;
+      loadedOrg.value = org;
     };
     try {
       if (force) {
@@ -62,7 +74,10 @@ export function useHomeDashboard(t: TranslateFn) {
     } catch {
       // A 404 already arrives as `null` from the query; anything else is transient and must not drop the pin.
     } finally {
-      isLoading.value = false;
+      if (org === currentOrg.value) {
+        isLoading.value = false;
+        loadedOrg.value = org;
+      }
     }
   };
 
@@ -137,6 +152,7 @@ export function useHomeDashboard(t: TranslateFn) {
     homeDashboard,
     isLoading,
     isHome,
+    isLoadedFor,
     load,
     setHomeDashboard,
     clearHomeDashboard,
