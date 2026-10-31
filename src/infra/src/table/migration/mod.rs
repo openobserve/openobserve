@@ -439,10 +439,13 @@ pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Re
 
 /// Apply only the Slack app tables, idempotently, for tests in any crate.
 #[cfg(any(test, feature = "test-utils"))]
-pub(crate) async fn create_slack_tables<C: sea_orm::ConnectionTrait>(db: &C) -> Result<(), DbErr> {
+pub(crate) async fn create_slack_tables(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
     m20261018_000001_create_slack_tables::create_all(db).await?;
     m20261025_000004_create_slack_alert_messages::create_all(db).await?;
-    m20261025_000005_add_held_action_to_slack_link_requests::add_column(db).await
+    m20261025_000005_add_held_action_to_slack_link_requests::Migration
+        .up(&SchemaManager::new(db))
+        .await
 }
 
 /// Apply only `alert_acks`, idempotently, for tests in any crate.
