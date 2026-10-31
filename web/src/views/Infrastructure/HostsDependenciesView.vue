@@ -27,6 +27,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import searchService from "@/services/search";
 import DependencyMap, { type MapEdge, type MapNode } from "./kubernetes2/DependencyMap.vue";
 import { parseVector, type Series } from "./kubernetes2/kubernetesModel";
+import { useEscapeToClose } from "./kubernetes2/useEscapeToClose";
 import { buildGraph, flowWindowSeconds, formatRate } from "./kubernetes2/dependencyGraph";
 import {
   hostFlowQuery,
@@ -263,6 +264,11 @@ function closeEdge() {
   if (back?.isConnected) nextTick(() => back.focus());
 }
 
+useEscapeToClose(
+  computed(() => !!selectedEdge.value),
+  () => closeEdge(),
+);
+
 function openNode(id: string) {
   const node = graph.value.nodes.find((n) => n.end.id === id);
   if (node) openEnd(node.end);
@@ -277,7 +283,6 @@ function onSetUp() {
   <div
     class="px-page-edge flex h-full min-h-0 flex-col gap-2 py-3 max-md:overflow-y-auto"
     data-test="hosts-deps-view"
-    @keydown.esc="selectedEdge && closeEdge()"
   >
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1" data-test="hosts-deps-controls">
       <div class="flex items-center gap-1">

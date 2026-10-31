@@ -210,7 +210,8 @@ describe("HostsDependenciesView", () => {
     await mountView();
     chart().vm.$emit("select", "api\nweb");
     await flushPromises();
-    await testId("hosts-deps-view").trigger("keydown", { key: "Escape" });
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flushPromises();
     expect(testId("hosts-deps-edge").exists()).toBe(false);
     chart().vm.$emit("select", "api\nweb");
     await flushPromises();
@@ -222,7 +223,7 @@ describe("HostsDependenciesView", () => {
   it("leaves Escape alone while no edge panel is open, and tells the page when it reloads", async () => {
     await mountView();
     const esc = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
-    testId("hosts-deps-view").element.dispatchEvent(esc);
+    document.body.dispatchEvent(esc);
     expect(esc.defaultPrevented).toBe(false);
     expect(wrapper.emitted("loading")).toEqual([[false], [true], [false]]);
   });
