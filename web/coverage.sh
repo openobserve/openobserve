@@ -49,6 +49,7 @@ EOF
 
 cmd_check() {
     echo "Running frontend tests with coverage..."
+    export DEBUG=vitest:coverage
     npm run test:unit:coverage
     
     if [ -f "coverage/coverage-summary.json" ]; then
