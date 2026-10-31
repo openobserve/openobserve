@@ -149,19 +149,8 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
     await pm.metricsExplorerPage.gotoExplorer({ mode: 'visualize' });
     await pm.metricsExplorerPage.waitForVisualizeReady();
 
-    // No "param is absent" assertion here: the explorer auto-picks the first metric on mount, so a pre-existing blob is a race against that — what this test owns is that the query WE type reaches the URL, hence the baseline-and-change check.
-    const before = pm.metricsExplorerPage.getMetricsDataParam();
-
     await pm.metricsExplorerPage.enterVisualizeQuery(SEEDED_METRIC);
-
-    // The write-back is debounced 300ms, so poll for it.
-    await pm.metricsExplorerPage.waitForMetricsDataParam();
-    await expect
-      .poll(() => pm.metricsExplorerPage.getMetricsDataParam() !== before, {
-        timeout: 20000,
-        intervals: [200, 400, 800],
-      })
-      .toBe(true);
+    await pm.metricsExplorerPage.waitForBlobQueryToContain(SEEDED_METRIC);
 
     const blob = pm.metricsExplorerPage.decodeMetricsBlob();
     expect(blob).not.toBeNull();
@@ -254,12 +243,7 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
     await pm.metricsExplorerPage.gotoExplorer({ mode: 'visualize' });
     await pm.metricsExplorerPage.waitForVisualizeReady();
     await pm.metricsExplorerPage.enterVisualizeQuery(SEEDED_METRIC);
-    // Visualize writes a blob for its default query on mount, so wait for the one carrying the edit.
-    await expect
-      .poll(() => pm.metricsExplorerPage.decodeMetricsBlob()?.data?.queries?.[0]?.query ?? '', {
-        timeout: 20000,
-      })
-      .toContain(SEEDED_METRIC);
+    await pm.metricsExplorerPage.waitForBlobQueryToContain(SEEDED_METRIC);
 
     const sharedUrl = page.url();
     testLogger.info(`Captured shared URL of length ${sharedUrl.length}`);

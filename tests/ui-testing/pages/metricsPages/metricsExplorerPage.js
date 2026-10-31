@@ -259,6 +259,13 @@ export class MetricsExplorerPage {
         );
     }
 
+    /** Visualize writes a blob for its default query on mount, so wait for the one whose query carries `text`. */
+    async waitForBlobQueryToContain(text, timeout = 20000) {
+        await expect
+            .poll(() => this.decodeMetricsBlob()?.data?.queries?.[0]?.query ?? '', { timeout })
+            .toContain(text);
+    }
+
     /**
      * The URL write-back is debounced 300ms, so poll rather than read once.
      * Returns the blob param so callers can round-trip it.
