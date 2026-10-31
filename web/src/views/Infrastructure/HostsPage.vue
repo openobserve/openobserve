@@ -498,8 +498,12 @@ const osToggleLabel = (slug: string) =>
       </div>
     </div>
 
+    <!-- Labelled by name: the tab buttons carry generated ids and no aria-controls without a tab-content
+         primitive, which would re-nest every branch below. -->
     <HostsDependenciesView
       v-else-if="view === 'dependencies'"
+      role="tabpanel"
+      :aria-label="t('infra.hosts.viewDependencies')"
       :org-id="orgId"
       :range="range"
       :refresh-nonce="refreshNonce"
@@ -511,6 +515,8 @@ const osToggleLabel = (slug: string) =>
     <!-- Total failure: ONE page-level surface, never stacked column warnings. -->
     <div
       v-else-if="pageError"
+      role="tabpanel"
+      :aria-label="t('infra.hosts.viewTable')"
       class="flex min-h-60 flex-col items-center justify-center gap-2"
       data-test="hosts-page-error"
     >
@@ -521,7 +527,12 @@ const osToggleLabel = (slug: string) =>
       </OButton>
     </div>
 
-    <div v-else class="flex h-full min-h-0 flex-col gap-2">
+    <div
+      v-else
+      role="tabpanel"
+      :aria-label="t('infra.hosts.viewTable')"
+      class="flex h-full min-h-0 flex-col gap-2"
+    >
       <div
         v-if="banners.liveness"
         class="border-border-default bg-surface-base rounded-default flex items-center justify-between gap-2 border px-3 py-2"

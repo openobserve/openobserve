@@ -29,8 +29,9 @@ const flow = (
   dst: string,
   direction: string,
   value: number,
+  hostId = `id-${host}`,
 ): Series => ({
-  metric: { host_name: host, src_cidr: src, dst_cidr: dst, direction },
+  metric: { host_name: host, host_id: hostId, src_cidr: src, dst_cidr: dst, direction },
   value,
 });
 
@@ -72,7 +73,7 @@ const edge = (edges: HostFlowEdge[], a: string, b: string) =>
 describe("hostFlowQuery", () => {
   it("sums per reporting host and direction, without a direction filter, leaving out Kubernetes rows", () => {
     expect(hostFlowQuery(3600)).toBe(
-      "sum by (src_cidr, dst_cidr, direction, host_name) " +
+      "sum by (src_cidr, dst_cidr, direction, host_name, host_id) " +
         '(rate(obi_network_flow_bytes{k8s_cluster=""}[3600s]))',
     );
   });
@@ -112,6 +113,16 @@ describe("pairHostFlows", () => {
     // m1-api's 231576 response bytes, not m1-web's 2580 added to them.
     expect(pair.backward).toBeCloseTo(231576.26);
     expect(pair.forward).toBeCloseTo(1856.41);
+  });
+
+  it("keeps two agents that share a hostname apart, by host_id", () => {
+    const [e] = pairHostFlows([
+      flow("web", "web", "db", "request", 100, "a"),
+      flow("web", "web", "db", "request", 70, "b"),
+    ]);
+    // The busier agent's 100, not the two added to 170.
+    expect(e.total).toBe(100);
+    expect(e.source.kind).toBe("host");
   });
 
   it("keeps an edge only one agent reports, with its direction split", () => {

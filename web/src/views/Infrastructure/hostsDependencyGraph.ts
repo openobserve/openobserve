@@ -40,9 +40,10 @@ export type HostFlowEdge = FlowEdge<HostEnd>;
 const UNNAMED_ID = "(unnamed)";
 
 // Per reporting host, since both hosts report traffic between two agents; pairEnds keeps one host's count.
+// host_id tells apart agents that share a hostname; host_name only classifies ends.
 // Kubernetes rows share the stream; an empty match keeps the series that carry no cluster label.
 export const hostFlowQuery = (windowS: number) =>
-  `sum by (src_cidr, dst_cidr, direction, host_name) (rate(${FLOW_STREAM}{k8s_cluster=""}[${windowS}s]))`;
+  `sum by (src_cidr, dst_cidr, direction, host_name, host_id) (rate(${FLOW_STREAM}{k8s_cluster=""}[${windowS}s]))`;
 
 // A name is a host when a reporting agent or the hosts list uses it as a host_name. Traffic inside one
 // name, such as loopback, is not a dependency.
@@ -53,7 +54,7 @@ export function pairHostFlows(series: Series[], knownHosts: string[] = []): Host
     const kind = !name ? "unnamed" : hosts.has(name) ? "host" : "network";
     return { id: name || UNNAMED_ID, kind, name };
   };
-  return pairEnds(series, endOf, "host_name").filter((e) => e.source.id !== e.target.id);
+  return pairEnds(series, endOf, "host_id").filter((e) => e.source.id !== e.target.id);
 }
 
 const ORDER: Record<HostEndKind, number> = { host: 0, network: 1, unnamed: 2 };

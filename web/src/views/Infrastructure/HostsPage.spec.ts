@@ -877,6 +877,28 @@ describe("HostsPage", () => {
       expect(wrapper.find('[data-test="hosts-table-stub"]').exists()).toBe(true);
     });
 
+    it("marks each view's container as a tab panel named like its tab", async () => {
+      wrapper = await mountPage();
+      const panel = () => wrapper.find('[role="tabpanel"]');
+      const tabLabels = wrapper.findAll('[role="tab"]').map((tab) => tab.text());
+      expect(tabLabels).toEqual(["Table", "Dependencies"]);
+      expect(panel().attributes("aria-label")).toBe("Table");
+      expect(panel().find('[data-test="hosts-table-stub"]').exists()).toBe(true);
+      hostsListState.pageError.value = "boom";
+      await flushPromises();
+      expect(panel().attributes()).toMatchObject({
+        "aria-label": "Table",
+        "data-test": "hosts-page-error",
+      });
+      await router.replace({ query: { view: "dependencies" } });
+      await flushPromises();
+      expect(wrapper.findAll('[role="tabpanel"]')).toHaveLength(1);
+      expect(panel().attributes()).toMatchObject({
+        "aria-label": "Dependencies",
+        "data-test": "hosts-deps-stub",
+      });
+    });
+
     it("offers no view tabs before hosts are detected", async () => {
       workloadStates.value = { ...workloadStates.value, hosts: "undetected" };
       wrapper = await mountPage({ view: "dependencies" });

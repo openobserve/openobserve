@@ -39,7 +39,7 @@ const MIN_US = 60_000_000;
 const END = 1_800_000_000_000_000;
 
 const row = (host: string, src: string, dst: string, direction: string, value: number) => ({
-  metric: { host_name: host, src_cidr: src, dst_cidr: dst, direction },
+  metric: { host_name: host, host_id: `id-${host}`, src_cidr: src, dst_cidr: dst, direction },
   value: [1, String(value)],
 });
 
@@ -88,7 +88,7 @@ describe("HostsDependenciesView", () => {
     await mountView();
     const sent = decodeURIComponent((metricsQuery.mock.calls[0][0] as any).query);
     expect(sent).toBe(
-      "sum by (src_cidr, dst_cidr, direction, host_name) " +
+      "sum by (src_cidr, dst_cidr, direction, host_name, host_id) " +
         '(rate(obi_network_flow_bytes{k8s_cluster=""}[3600s]))',
     );
     expect(metricsQuery.mock.calls[0][0]).toMatchObject({ org_identifier: "org1", end_time: END });
