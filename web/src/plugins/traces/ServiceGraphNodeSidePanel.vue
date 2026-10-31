@@ -292,6 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :sort-by="sortBy"
                 :sort-order="sortOrderProp"
                 :loading="loadingOperations"
+                :loading-reset-key="selectedNode?.id"
                 :default-columns="false"
                 :row-height="38"
                 :show-global-filter="false"

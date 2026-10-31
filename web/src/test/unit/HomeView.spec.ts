@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from "vitest";
 import { gt } from "@/types/i18n";
 import { mount, flushPromises } from "@vue/test-utils";
 import HomeView from "../../views/HomeView.vue";
@@ -21,6 +21,7 @@ import store from "./helpers/store";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { queryClient } from "@/composables/query/queryClient";
 
 vi.mock("../../aws-exports", () => ({
   default: {
@@ -189,6 +190,29 @@ describe("HomeView.vue", () => {
         await nextTick();
         expect(localStorage.getItem("o2_home_active_tab")).toBe(otherTab);
       }
+    });
+
+    it("puts a late AI tab first and keeps the saved tab while the config loads", async () => {
+      const cfg = vi.mocked((await import("../../aws-exports")).default);
+      const previous = cfg.isEnterprise;
+      cfg.isEnterprise = "true";
+      onTestFinished(() => {
+        cfg.isEnterprise = previous;
+      });
+      localStorage.setItem("o2_home_active_tab", "ai");
+      store.state.zoConfig = {};
+      wrapper = createWrapper();
+      await flushPromises();
+
+      store.state.zoConfig = { version: "v1", ai_enabled: true };
+      await flushPromises();
+
+      expect(wrapper.vm.tabOrder.map((tab: { id: string }) => tab.id)).toEqual([
+        "ai",
+        "overview",
+        "usage",
+      ]);
+      expect(localStorage.getItem("o2_home_active_tab")).toBe("ai");
     });
 
     it("should restore saved tab order from localStorage", () => {
@@ -511,5 +535,64 @@ describe("HomeView org home dashboard tab", () => {
     expect(hd.homeDashboard.value).toBeNull();
     // Never flipped to the dashboard tab on the way out.
     expect(wrapper.vm.activeHomeTab).toBe("usage");
+  });
+
+  describe("while the home dashboard is still loading", () => {
+    const PINNED = { dashboardId: "abc", folderId: "default", label: "Payments Health" };
+    let answer: (v: unknown) => void = () => {};
+
+    const startPendingLoad = async () => {
+      queryClient.clear();
+      (settingsService.getSetting as any).mockResolvedValueOnce({ data: null });
+      await useHomeDashboard(gt).load("another-org");
+      (settingsService.getSetting as any).mockReturnValueOnce(new Promise((r) => (answer = r)));
+      void useHomeDashboard(gt).load("test-org");
+    };
+
+    afterEach(() => queryClient.clear());
+
+    it("keeps a saved pinned tab selected and shows a skeleton until the pin arrives", async () => {
+      localStorage.setItem("o2_home_active_tab", "dash:default:abc");
+      await startPendingLoad();
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.activeHomeTab).toBe("dash:default:abc");
+      expect(wrapper.find('[data-test="home-view-skeleton-streams-header"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-tab"]').exists()).toBe(false);
+
+      answer({ data: { setting_value: PINNED } });
+      await flushPromises();
+      expect(wrapper.vm.activeHomeTab).toBe("dash:default:abc");
+      expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).exists()).toBe(true);
+    });
+
+    it("falls back to the first tab once the org turns out to have no pin", async () => {
+      localStorage.setItem("o2_home_active_tab", "dash:default:abc");
+      await startPendingLoad();
+      wrapper = createWrapper();
+      await flushPromises();
+      answer({ data: null });
+      await flushPromises();
+      expect(wrapper.vm.activeHomeTab).toBe("overview");
+      expect(wrapper.find('[data-test="overview-tab"]').exists()).toBe(true);
+    });
+
+    it("puts a late pinned tab at its saved position", async () => {
+      localStorage.setItem(
+        "o2_home_tab_order",
+        JSON.stringify(["dash:default:abc", "overview", "usage"]),
+      );
+      await startPendingLoad();
+      wrapper = createWrapper();
+      await flushPromises();
+      answer({ data: { setting_value: PINNED } });
+      await flushPromises();
+      expect(wrapper.vm.tabOrder.map((t: any) => t.id)).toEqual([
+        "dash:default:abc",
+        "overview",
+        "usage",
+      ]);
+    });
   });
 });

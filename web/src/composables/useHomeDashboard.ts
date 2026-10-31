@@ -34,15 +34,35 @@ const SETTING_CATEGORY = "ui";
 // Module-level shared reactive state — one source for all consumers.
 const homeDashboard: Ref<HomeDashboard | null> = ref(null);
 const isLoading = ref(false);
+// The pin is per org but this state is shared, so loads are keyed to the org they were started for.
+const currentOrg = ref("");
+const loadedOrg = ref("");
+// Pages mount before the pin read answers, so a read older than a pin change must not undo it.
+let pinWrites = 0;
+
+function notePinWrite(org: string): void {
+  pinWrites++;
+  void queryClient.cancelQueries({ queryKey: settingKeys.one(org, SETTING_KEY), exact: true });
+}
 
 export function useHomeDashboard(t: TranslateFn) {
   const isHome = (dashboardId: string) => homeDashboard.value?.dashboardId === dashboardId;
 
+  const isLoadedFor = (org: string | undefined) => !!org && loadedOrg.value === org;
+
   /** Cached read — see useFavoriteDashboards.load for the same rationale. */
   const load = async (org: string, force = false) => {
     if (!org) return;
+    if (org !== currentOrg.value) {
+      if (currentOrg.value) homeDashboard.value = null;
+      currentOrg.value = org;
+      loadedOrg.value = "";
+    }
+    const writesAtStart = pinWrites;
     const apply = (val: any) => {
+      if (org !== currentOrg.value || pinWrites !== writesAtStart) return;
       homeDashboard.value = val && val.dashboardId ? (val as HomeDashboard) : null;
+      loadedOrg.value = org;
     };
     try {
       if (force) {
@@ -62,7 +82,10 @@ export function useHomeDashboard(t: TranslateFn) {
     } catch {
       // A 404 already arrives as `null` from the query; anything else is transient and must not drop the pin.
     } finally {
-      isLoading.value = false;
+      if (org === currentOrg.value) {
+        isLoading.value = false;
+        loadedOrg.value = org;
+      }
     }
   };
 
@@ -73,6 +96,7 @@ export function useHomeDashboard(t: TranslateFn) {
 
   const setHomeDashboard = async (org: string, d: HomeDashboard) => {
     if (!org) return; // no org → don't hit the API with an undefined segment
+    notePinWrite(org);
     const prev = homeDashboard.value;
     homeDashboard.value = d; // optimistic
     try {
@@ -89,6 +113,7 @@ export function useHomeDashboard(t: TranslateFn) {
 
   const clearHomeDashboard = async (org: string) => {
     if (!org) return; // no org → don't hit the API with an undefined segment
+    notePinWrite(org);
     const prev = homeDashboard.value;
     homeDashboard.value = null; // optimistic
     try {
@@ -137,6 +162,7 @@ export function useHomeDashboard(t: TranslateFn) {
     homeDashboard,
     isLoading,
     isHome,
+    isLoadedFor,
     load,
     setHomeDashboard,
     clearHomeDashboard,

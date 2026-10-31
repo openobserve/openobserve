@@ -278,6 +278,7 @@ function mountSessionViewer(router = createTestRouter()) {
             "endTime",
             "rumWindowUs",
             "markedTimestamps",
+            "loading",
           ],
         },
         EventDetailDrawer: {
@@ -2805,6 +2806,68 @@ describe("SessionViewer.vue — opened from a funnel (AC-18)", () => {
   it("drops an oversize or unknown-kind label instead of rendering it", async () => {
     const { wrapper } = await mountFromFunnel({ af_kind: "x" });
     expect(wrapper.find('[data-test="session-viewer-analytics-context"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+describe("SessionViewer.vue — the breadcrumbs wait for the events", () => {
+  const savedFields = replaySchema.fields;
+  const sidebarLoading = (wrapper: VueWrapper) =>
+    wrapper.findComponent({ name: "PlayerEventsSidebar" }).props("loading");
+  const answer = (sql: string) => ({
+    data: { hits: sql.includes("min(start)") ? [sessionLookupRow] : [] },
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetStreaming(rowsResponder(fixtureRows));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    streamsMock.getStream = null;
+    replaySchema.fields = savedFields;
+    vi.mocked(searchService.search).mockImplementation((async (params: any) =>
+      answer(params?.query?.query?.sql ?? "")) as any);
+  });
+
+  it("passes loading to the sidebar until the events request settles", async () => {
+    let release: (v: unknown) => void = () => {};
+    vi.mocked(searchService.search).mockImplementation(((params: any) => {
+      const sql: string = params?.query?.query?.sql ?? "";
+      if (sql.includes('"_rumdata"') && sql.includes("type='error'"))
+        return new Promise((resolve) => (release = resolve));
+      return Promise.resolve(answer(sql));
+    }) as any);
+    const wrapper = mountSessionViewer(await pushRoute());
+    await flushMany();
+    expect(sidebarLoading(wrapper)).toBe(true);
+
+    release({ data: { hits: [] } });
+    await flushMany();
+    expect(sidebarLoading(wrapper)).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("stops loading when the replay schema lookup fails", async () => {
+    replaySchema.fields = undefined as never;
+    streamsMock.getStream = async () => {
+      throw new Error("network down");
+    };
+    const wrapper = mountSessionViewer(await pushRoute());
+    await flushMany();
+    expect((wrapper.vm as any).loadState).toBe("error");
+    expect(sidebarLoading(wrapper)).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("stops loading when the session lookup fails", async () => {
+    vi.useFakeTimers();
+    vi.mocked(searchService.search).mockRejectedValue({ response: { status: 503 } });
+    const wrapper = mountSessionViewer(await pushRoute());
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect((wrapper.vm as any).loadState).toBe("error");
+    expect(sidebarLoading(wrapper)).toBe(false);
     wrapper.unmount();
   });
 });

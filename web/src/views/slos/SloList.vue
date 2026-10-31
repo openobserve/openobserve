@@ -70,6 +70,7 @@
       :columns="columns"
       row-key="id"
       :loading="loading"
+      :loading-reset-key="activeFolderId"
       :error="error"
       :page-size="pageSize"
       :page-size-options="[25, 50, 100]"

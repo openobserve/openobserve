@@ -93,7 +93,9 @@
               size="xs"
               icon-right="expand-more"
             >
-              <span class="text-text-secondary font-bold">{{ totalEntities }}</span>
+              <span v-if="lastRunAt !== null" class="text-text-secondary font-bold">{{
+                totalEntities
+              }}</span>
               <span class="text-text-body ms-1">{{ t("traces.serviceGraph.entities") }}</span>
             </OButton>
           </template>
@@ -236,7 +238,12 @@
             data-test="service-graph-container"
             class="graph-container rounded-default bg-surface-subtle relative h-full w-full overflow-hidden"
           >
-            <div v-if="loading" class="flex h-full items-center justify-center">
+            <!-- Before the first load settles an empty graph means "not fetched yet", not "no data". -->
+            <div
+              v-if="loading || lastRunAt === null"
+              class="flex h-full items-center justify-center"
+              data-test="service-graph-loading"
+            >
               <div class="flex flex-col items-center text-center">
                 <OSpinner size="lg" />
                 <div class="text-text-secondary mt-3 text-sm">
@@ -1916,6 +1923,7 @@ export default defineComponent({
       raw,
       t,
       loading,
+      lastRunAt,
       error,
       graphData,
       filteredGraphData,

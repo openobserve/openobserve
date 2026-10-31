@@ -78,9 +78,34 @@ describe("updateGroupedFields — a coalesced caller waits for the fields", () =
     expect(secondSettled).toBe(true);
   });
 
+  it("waits for the queued run that carries its change, not only the run it coalesced into", async () => {
+    const p = panelWithStream();
+    let releaseFirst: (v: unknown) => void = () => {};
+    let releaseQueued: (v: unknown) => void = () => {};
+    mockGetStream
+      .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = resolve)))
+      .mockImplementationOnce(() => new Promise((resolve) => (releaseQueued = resolve)));
+
+    const first = p.updateGroupedFields();
+    let secondSettled = false;
+    const second = p.updateGroupedFields().then(() => (secondSettled = true));
+    await flushPromises();
+    releaseFirst(STREAM);
+    await first;
+    await flushPromises();
+    expect(mockGetStream).toHaveBeenCalledTimes(2);
+    expect(secondSettled).toBe(false);
+
+    releaseQueued(STREAM);
+    await second;
+    expect(secondSettled).toBe(true);
+  });
+
   it("has the grouped fields populated by the time it resolves", async () => {
     const p = panelWithStream();
     let releaseSchema: (v: unknown) => void = () => {};
+    // The coalesced caller also waits for the queued run, which needs a schema of its own.
+    mockGetStream.mockResolvedValue(STREAM);
     mockGetStream.mockImplementationOnce(() => new Promise((resolve) => (releaseSchema = resolve)));
 
     const first = p.updateGroupedFields();

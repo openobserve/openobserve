@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :loading="status === 'loading'"
+        :loading-reset-key="app"
         :forbidden="status === 'forbidden'"
         selection="multiple"
         :is-row-selectable="() => canWrite"
