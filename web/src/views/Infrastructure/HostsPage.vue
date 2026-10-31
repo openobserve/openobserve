@@ -79,7 +79,11 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "")
 
 const dateTimePickerRef = ref<{ refresh?: () => void } | null>(null);
 
+// Set when a reload on the Dependencies tab skipped the list, so the table catches up when shown.
+let listStale = false;
+
 const refreshList = async () => {
+  listStale = false;
   loading.value = true;
   try {
     await list.refresh({ orgId: orgId.value, start: range.value.start, end: range.value.end });
@@ -88,11 +92,13 @@ const refreshList = async () => {
   }
 };
 
-// The Dependencies view loads on its own when shown and on an org switch; this reloads it with the list.
+// The Dependencies view loads on its own when shown and on an org switch. On its tab a reload refreshes
+// only the map, which keeps the host names the list already loaded.
 const refreshNonce = ref(0);
 const reload = () => {
   refreshNonce.value++;
-  refreshList();
+  if (view.value === "dependencies") listStale = true;
+  else refreshList();
 };
 
 // Set while picker.refresh() runs so its programmatic re-emit may fetch; the
@@ -231,6 +237,9 @@ const view = computed(() =>
   first(route.query.view) === "dependencies" ? "dependencies" : "table",
 );
 const knownHosts = computed(() => list.rows.value.map((r) => r.host_name));
+watch(view, (next) => {
+  if (next === "table" && listStale && hostsState.value === "detected") refreshList();
+});
 const onViewChange = (name: string | number) => {
   const { view: _view, ...rest } = route.query;
   router.replace({ query: name === "dependencies" ? { ...rest, view: "dependencies" } : rest });

@@ -921,6 +921,30 @@ describe("HostsPage", () => {
       expect(deps().props("refreshNonce")).toBe(2);
     });
 
+    it("reloads only the map on its tab, and the table when switched back", async () => {
+      wrapper = await mountPage({ view: "dependencies" });
+      // Opening on the map still loads the list once, for the drawer and the host names.
+      expect(hostsListState.refresh).toHaveBeenCalledTimes(1);
+      expect(deps().props("knownHosts")).toEqual(["web-01", "web-02", "db-01"]);
+      hostsListState.refresh.mockClear();
+      const picker = wrapper.findComponent({ name: "DateTime" });
+      picker.vm.$emit("on:date-change", { startTime: 3, endTime: 4, valueType: "absolute" });
+      await flushPromises();
+      deps().vm.$emit("refresh");
+      await flushPromises();
+      expect(deps().props("refreshNonce")).toBe(2);
+      expect(hostsListState.refresh).not.toHaveBeenCalled();
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", "table");
+      await flushPromises();
+      expect(hostsListState.refresh).toHaveBeenCalledTimes(1);
+      expect(hostsListState.refresh).toHaveBeenCalledWith({ orgId: "test-org", start: 3, end: 4 });
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", "dependencies");
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", "table");
+      await flushPromises();
+      expect(hostsListState.refresh).toHaveBeenCalledTimes(1);
+    });
+
     it("opens a host's drawer from the map", async () => {
       wrapper = await mountPage({ view: "dependencies" });
       deps().vm.$emit("open", "web-01");
