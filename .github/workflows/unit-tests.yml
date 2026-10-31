@@ -280,7 +280,7 @@ jobs:
 
       - name: Run frontend unit tests with coverage and check thresholds
         working-directory: web
-        run: ./coverage.sh check
+        run: DEBUG=vitest:coverage ./coverage.sh check
 
   ui_code_quality:
     needs: [check_changes]
