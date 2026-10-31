@@ -54,7 +54,10 @@ pub fn run() {
         log::debug!("[ONCALL_MAINTENANCE] not a scheduler node, skipping");
         return;
     }
-    if !o2_enterprise::enterprise::oncall::is_enabled() {
+    if !o2_enterprise::enterprise::common::config::get_config()
+        .oncall
+        .enabled
+    {
         log::debug!("[ONCALL_MAINTENANCE] on-call is disabled, skipping");
         return;
     }
@@ -62,6 +65,10 @@ pub fn run() {
     log::info!("[ONCALL_MAINTENANCE] initialized with interval: {INTERVAL_SECS}s");
 
     spawn_pausable_job!("oncall_maintenance", INTERVAL_SECS, {
+        // spawned on the operator flag alone, so a license granted or revoked later applies here
+        if !o2_enterprise::enterprise::oncall::is_enabled() {
+            continue;
+        }
         if !is_leader().await {
             log::debug!("[ONCALL_MAINTENANCE] not leader, skipping this pass");
             continue;
@@ -76,6 +83,9 @@ pub fn run() {
 
     // Separate jobs, not counters in one loop: a failed pass must not stop the others running.
     spawn_pausable_job!("oncall_retention", RETENTION_INTERVAL_SECS, {
+        if !o2_enterprise::enterprise::oncall::is_enabled() {
+            continue;
+        }
         if !is_leader().await {
             log::debug!("[ONCALL_RETENTION] not leader, skipping this pass");
             continue;
@@ -89,6 +99,9 @@ pub fn run() {
     log::info!("[ONCALL_COVERAGE] initialized with interval: {COVERAGE_INTERVAL_SECS}s");
 
     spawn_pausable_job!("oncall_coverage", COVERAGE_INTERVAL_SECS, {
+        if !o2_enterprise::enterprise::oncall::is_enabled() {
+            continue;
+        }
         if !is_leader().await {
             log::debug!("[ONCALL_COVERAGE] not leader, skipping this pass");
             continue;
