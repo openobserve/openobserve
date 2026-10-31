@@ -634,7 +634,11 @@
       "ai": "IA",
       "downtimes": "Janelas de manutenção",
       "fleetConfigs": "Configurações de frota",
-      "publicDashboards": "Dashboards públicos"
+      "publicDashboards": "Dashboards públicos",
+      "groups": "Grupos",
+      "serviceAccounts": "Contas de serviço",
+      "cipherKeys": "Chaves de cifra",
+      "regexPatterns": "Padrões regex"
     },
     "resourcesInline": {
       "dashboards": "dashboards",
@@ -654,7 +658,11 @@
       "ai": "IA",
       "downtimes": "janelas de manutenção",
       "fleetConfigs": "configurações de frota",
-      "publicDashboards": "dashboards públicos"
+      "publicDashboards": "dashboards públicos",
+      "groups": "grupos",
+      "serviceAccounts": "contas de serviço",
+      "cipherKeys": "chaves de cifra",
+      "regexPatterns": "padrões regex"
     },
     "denied": {
       "view": "Não pode ver {resource}",

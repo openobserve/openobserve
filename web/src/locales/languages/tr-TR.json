@@ -634,7 +634,11 @@
       "ai": "Yapay zekâ",
       "downtimes": "Bakım pencereleri",
       "fleetConfigs": "Filo yapılandırmaları",
-      "publicDashboards": "Herkese açık panolar"
+      "publicDashboards": "Herkese açık panolar",
+      "groups": "Gruplar",
+      "serviceAccounts": "Hizmet hesapları",
+      "cipherKeys": "Şifreleme anahtarları",
+      "regexPatterns": "Regex desenleri"
     },
     "resourcesInline": {
       "dashboards": "panolar",
@@ -654,7 +658,11 @@
       "ai": "yapay zekâ",
       "downtimes": "bakım pencereleri",
       "fleetConfigs": "filo yapılandırmaları",
-      "publicDashboards": "herkese açık panolar"
+      "publicDashboards": "herkese açık panolar",
+      "groups": "gruplar",
+      "serviceAccounts": "hizmet hesapları",
+      "cipherKeys": "şifreleme anahtarları",
+      "regexPatterns": "regex desenleri"
     },
     "denied": {
       "view": "{resource} görüntüleyemezsiniz",

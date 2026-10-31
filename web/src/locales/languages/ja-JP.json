@@ -634,7 +634,11 @@
       "ai": "AI",
       "downtimes": "ダウンタイム",
       "fleetConfigs": "フリート構成",
-      "publicDashboards": "公開ダッシュボード"
+      "publicDashboards": "公開ダッシュボード",
+      "groups": "グループ",
+      "serviceAccounts": "サービスアカウント",
+      "cipherKeys": "暗号化キー",
+      "regexPatterns": "正規表現パターン"
     },
     "resourcesInline": {
       "dashboards": "ダッシュボード",
@@ -654,7 +658,11 @@
       "ai": "AI",
       "downtimes": "ダウンタイム",
       "fleetConfigs": "フリート構成",
-      "publicDashboards": "公開ダッシュボード"
+      "publicDashboards": "公開ダッシュボード",
+      "groups": "グループ",
+      "serviceAccounts": "サービスアカウント",
+      "cipherKeys": "暗号化キー",
+      "regexPatterns": "正規表現パターン"
     },
     "denied": {
       "view": "{resource} を表示できません",

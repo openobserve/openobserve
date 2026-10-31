@@ -634,7 +634,11 @@
       "ai": "AI",
       "downtimes": "Thời gian bảo trì",
       "fleetConfigs": "Cấu hình fleet",
-      "publicDashboards": "Bảng điều khiển công khai"
+      "publicDashboards": "Bảng điều khiển công khai",
+      "groups": "Nhóm",
+      "serviceAccounts": "Tài khoản dịch vụ",
+      "cipherKeys": "Khóa mã hóa",
+      "regexPatterns": "Mẫu regex"
     },
     "resourcesInline": {
       "dashboards": "bảng điều khiển",
@@ -654,7 +658,11 @@
       "ai": "AI",
       "downtimes": "thời gian bảo trì",
       "fleetConfigs": "cấu hình fleet",
-      "publicDashboards": "bảng điều khiển công khai"
+      "publicDashboards": "bảng điều khiển công khai",
+      "groups": "nhóm",
+      "serviceAccounts": "tài khoản dịch vụ",
+      "cipherKeys": "khóa mã hóa",
+      "regexPatterns": "mẫu regex"
     },
     "denied": {
       "view": "Bạn không thể xem {resource}",

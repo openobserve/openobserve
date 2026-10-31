@@ -634,7 +634,11 @@
       "ai": "AI",
       "downtimes": "Downtimes",
       "fleetConfigs": "Fleet configurations",
-      "publicDashboards": "Public dashboards"
+      "publicDashboards": "Public dashboards",
+      "groups": "Groups",
+      "serviceAccounts": "Service accounts",
+      "cipherKeys": "Cipher keys",
+      "regexPatterns": "Regex patterns"
     },
     "resourcesInline": {
       "dashboards": "dashboards",
@@ -654,7 +658,11 @@
       "ai": "AI",
       "downtimes": "downtimes",
       "fleetConfigs": "fleet configurations",
-      "publicDashboards": "public dashboards"
+      "publicDashboards": "public dashboards",
+      "groups": "groups",
+      "serviceAccounts": "service accounts",
+      "cipherKeys": "cipher keys",
+      "regexPatterns": "regex patterns"
     },
     "denied": {
       "view": "You can't view {resource}",

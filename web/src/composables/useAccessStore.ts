@@ -124,6 +124,10 @@ const FRIENDLY_NAME_KEYS: Record<string, I18nKey> = {
   reports: "accessBoundary.resources.reports",
   passcode: "accessBoundary.resources.passcode",
   "llm/models": "accessBoundary.resources.llmModelPricing",
+  groups: "accessBoundary.resources.groups",
+  service_accounts: "accessBoundary.resources.serviceAccounts",
+  cipher_keys: "accessBoundary.resources.cipherKeys",
+  re_patterns: "accessBoundary.resources.regexPatterns",
 };
 
 // Resources only a view's own lock names; the URL classifier leaves their 403s silent, so the lock is not repeated as a chip.
@@ -170,6 +174,10 @@ const INLINE_LABEL_KEYS: Record<string, I18nKey> = {
   "accessBoundary.resources.reports": "accessBoundary.resourcesInline.reports",
   "accessBoundary.resources.llmModelPricing": "accessBoundary.resourcesInline.llmModelPricing",
   "accessBoundary.resources.passcode": "accessBoundary.resourcesInline.passcode",
+  "accessBoundary.resources.groups": "accessBoundary.resourcesInline.groups",
+  "accessBoundary.resources.serviceAccounts": "accessBoundary.resourcesInline.serviceAccounts",
+  "accessBoundary.resources.cipherKeys": "accessBoundary.resourcesInline.cipherKeys",
+  "accessBoundary.resources.regexPatterns": "accessBoundary.resourcesInline.regexPatterns",
   "accessBoundary.resources.ai": "accessBoundary.resourcesInline.ai",
   "accessBoundary.resources.downtimes": "accessBoundary.resourcesInline.downtimes",
   "accessBoundary.resources.fleetConfigs": "accessBoundary.resourcesInline.fleetConfigs",
@@ -240,7 +248,6 @@ export const accessBoundaryKey: InjectionKey<true> = Symbol("accessBoundary");
 const routerRef = shallowRef<Router | null>(null);
 let shellStore: AccessShellStore | null = null;
 let activations: Activation[] = [];
-let lastActivationAt = 0;
 let listenersInstalled = false;
 let anchorObserver: MutationObserver | null = null;
 
@@ -280,7 +287,7 @@ const deepestBoundary = computed(() =>
 
 /** Route key a request is stamped with when it starts, so its response is judged against the page that asked. */
 export function currentAccessRouteKey(): string | undefined {
-  return currentRoute.value ? routeKey(currentRoute.value) : undefined;
+  return currentRoute.value ? accessStamp(routeKey(currentRoute.value)) : undefined;
 }
 
 /** Classifies one 403 and records it as page-denied, a section entry or an action notice. */
@@ -290,7 +297,7 @@ export function recordForbidden({ url, method, routeKey: startedOn }: AccessRequ
   if (!route) return;
   const key = routeKey(route);
   // A response from a page the user has already left says nothing about the page now on screen.
-  if (startedOn !== undefined && startedOn !== key) return;
+  if (startedOn !== undefined && startedOn !== accessStamp(key)) return;
   const verb = (method ?? "get").toUpperCase();
   const resource = extractResourceInfo(url);
   // A resource without a friendly name would surface a raw URL word, so it stays silent like a background read.
@@ -301,7 +308,6 @@ export function recordForbidden({ url, method, routeKey: startedOn }: AccessRequ
   const permission = accessPermission(verb, url);
   const denied: DeniedRequest = { permission, request: `${verb} ${resource.path}` };
   const isRead = permission === "list" || permission === "get";
-  const recentlyActivated = Date.now() - lastActivationAt <= ACTIVATION_WINDOW_MS;
   if (!isRead) {
     const [el, ...fallbacks] = anchorCandidates();
     if (el) {
@@ -310,14 +316,14 @@ export function recordForbidden({ url, method, routeKey: startedOn }: AccessRequ
     }
   }
   const pageResource = routeResource(route);
-  if (pageResource && resource.key === pageResource && (isRead || !recentlyActivated)) {
+  if (pageResource && resource.key === pageResource && isRead) {
     markPageDenied(deniedEntry(route, pageResource), denied);
     return;
   }
   addSectionEntry(key, resource, denied);
 }
 
-/** Lifts a page lock or a section entry once a GET for that resource succeeds on the same route. */
+/** Lifts a page lock or a section entry once the same permission on that resource succeeds on the same route. */
 export function noteAccessSuccess({
   url,
   method,
@@ -325,18 +331,17 @@ export function noteAccessSuccess({
 }: Partial<AccessRequest>): void {
   // Two cached reads per response; parsing happens only while the route shows a denial.
   if (!url || (!pageDenied.value && sectionEntries.value.length === 0)) return;
-  if ((method ?? "get").toLowerCase() !== "get") return;
   const route = currentRoute.value;
-  if (!route || (startedOn !== undefined && startedOn !== routeKey(route))) return;
+  if (!route || (startedOn !== undefined && startedOn !== accessStamp(routeKey(route)))) return;
   const info = extractResourceInfo(url);
   if (!info) return;
+  const permission = accessPermission(method ?? "get", url);
   const entry = currentEntry.value;
   const org = currentOrg();
-  if (entry && pageDenied.value && info.key === currentResource.value) {
+  if (entry && deniedPermission.value === permission && info.key === currentResource.value) {
     writeMemory(org, { ...readMemory(org), pages: omitKey(readMemory(org).pages, entry) });
     deniedRequests.delete(entry);
   }
-  const permission = accessPermission("GET", url);
   const key = routeKey(route);
   const entries = sectionEntries.value;
   const kept = entries.filter((e) => entryId(e) !== info.key || e.permission !== permission);
@@ -347,7 +352,6 @@ export function noteAccessSuccess({
 export function resetAccess(): void {
   dismissAction();
   activations = [];
-  lastActivationAt = 0;
   deniedRequests.clear();
   memoryByOrg.clear();
   try {
@@ -482,13 +486,9 @@ export function extractResourceInfo(rawUrl: string): AccessResource | null {
   } catch {
     return null;
   }
-  const segments = apiSegments(parsed.pathname);
-  // The segment after the optional version is the org (or a `_` system scope), never the resource.
-  const start = (/^v\d+$/.test(segments[0] ?? "") ? 1 : 0) + 1;
-  const names = segments.slice(start).filter((s) => !isIdSegment(s));
-  while (names.length && NON_RESOURCE_SEGMENTS.has(names[names.length - 1])) names.pop();
-  const joined = names.join("/");
-  const matched = isKnownResource(joined) ? joined : (names[names.length - 1] ?? "");
+  const located = locateResource(apiSegments(parsed.pathname));
+  if (!located) return null;
+  const { matched } = located;
   const key = Object.hasOwn(RESOURCE_ALIASES, matched) ? RESOURCE_ALIASES[matched] : matched;
   return resourceForKey(key, parsed.pathname);
 }
@@ -505,7 +505,8 @@ export function accessPermission(method: string, rawUrl: string): AccessPermissi
   if (verb === "POST") return segments.some((s) => READ_POST_ACTIONS.has(s)) ? "list" : "create";
   if (verb === "PUT" || verb === "PATCH") return "update";
   if (verb === "DELETE") return "delete";
-  return hasItemId(segments) ? "get" : "list";
+  const itemNamed = locateResource(segments)?.after.some((s) => !NON_RESOURCE_SEGMENTS.has(s));
+  return itemNamed || hasItemId(segments) ? "get" : "list";
 }
 
 /** Translated IAM permission name, as the role editor shows it. */
@@ -556,7 +557,6 @@ function bindAccess(router: Router, store: AccessShellStore): void {
 function onActivation(event: Event): void {
   if (event instanceof KeyboardEvent && event.key !== "Enter" && event.key !== " ") return;
   const at = Date.now();
-  lastActivationAt = at;
   const el =
     event.target instanceof Element ? event.target.closest("button,[role=button],a") : null;
   if (!el) return;
@@ -598,7 +598,7 @@ function keepAnchored(): void {
     return;
   }
   dismissAction();
-  if (notice.routeKey === currentAccessRouteKey())
+  if (currentRoute.value && notice.routeKey === routeKey(currentRoute.value))
     addSectionEntry(notice.routeKey, notice.resource, {
       permission: notice.permission,
       request: `${notice.method} ${notice.resource.path}`,
@@ -721,6 +721,20 @@ function resourceForKey(key: string, path = ""): AccessResource | null {
     : null;
 }
 
+// The segment after the optional version is the org (or a `_` system scope), never the resource; the last named word wins, so `functions/my_fn` is Functions.
+function locateResource(segments: string[]): { matched: string; after: string[] } | null {
+  const rest = segments.slice((/^v\d+$/.test(segments[0] ?? "") ? 1 : 0) + 1);
+  for (let i = rest.length; i > 0; i--) {
+    const joined = rest
+      .slice(0, i)
+      .filter((s) => !isIdSegment(s))
+      .join("/");
+    const matched = isKnownResource(joined) ? joined : rest[i - 1];
+    if (isKnownResource(matched)) return { matched, after: rest.slice(i) };
+  }
+  return null;
+}
+
 function isKnownResource(path: string): boolean {
   return Object.hasOwn(FRIENDLY_NAME_KEYS, path) || Object.hasOwn(RESOURCE_ALIASES, path);
 }
@@ -748,7 +762,17 @@ function hasItemId(segments: string[]): boolean {
 }
 
 function isIdSegment(s: string): boolean {
-  return s.includes("@") || /^\d+$/.test(s) || UUID_RE.test(s) || GENERATED_ID_RE.test(s);
+  return (
+    s.includes("@") ||
+    s.includes("%40") ||
+    /^\d+$/.test(s) ||
+    UUID_RE.test(s) ||
+    GENERATED_ID_RE.test(s)
+  );
+}
+
+function accessStamp(key: string): string {
+  return `${currentOrg()}|${key}`;
 }
 
 function routeKey(route: { name?: unknown; path: string }): string {

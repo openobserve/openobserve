@@ -634,7 +634,11 @@
       "ai": "ИИ",
       "downtimes": "Окна обслуживания",
       "fleetConfigs": "Конфигурации парка",
-      "publicDashboards": "Публичные дашборды"
+      "publicDashboards": "Публичные дашборды",
+      "groups": "Группы",
+      "serviceAccounts": "Сервисные аккаунты",
+      "cipherKeys": "Ключи шифрования",
+      "regexPatterns": "Регулярные выражения"
     },
     "resourcesInline": {
       "dashboards": "дашборды",
@@ -654,7 +658,11 @@
       "ai": "ИИ",
       "downtimes": "окна обслуживания",
       "fleetConfigs": "конфигурации парка",
-      "publicDashboards": "публичные дашборды"
+      "publicDashboards": "публичные дашборды",
+      "groups": "группы",
+      "serviceAccounts": "сервисные аккаунты",
+      "cipherKeys": "ключи шифрования",
+      "regexPatterns": "регулярные выражения"
     },
     "denied": {
       "view": "Вы не можете просматривать {resource}",

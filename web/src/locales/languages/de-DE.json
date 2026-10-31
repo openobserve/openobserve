@@ -634,7 +634,11 @@
       "ai": "KI",
       "downtimes": "Wartungsfenster",
       "fleetConfigs": "Fleet-Konfigurationen",
-      "publicDashboards": "Öffentliche Dashboards"
+      "publicDashboards": "Öffentliche Dashboards",
+      "groups": "Gruppen",
+      "serviceAccounts": "Dienstkonten",
+      "cipherKeys": "Verschlüsselungsschlüssel",
+      "regexPatterns": "Regex-Muster"
     },
     "resourcesInline": {
       "dashboards": "Dashboards",
@@ -654,7 +658,11 @@
       "ai": "KI",
       "downtimes": "Wartungsfenster",
       "fleetConfigs": "Fleet-Konfigurationen",
-      "publicDashboards": "öffentliche Dashboards"
+      "publicDashboards": "öffentliche Dashboards",
+      "groups": "Gruppen",
+      "serviceAccounts": "Dienstkonten",
+      "cipherKeys": "Verschlüsselungsschlüssel",
+      "regexPatterns": "Regex-Muster"
     },
     "denied": {
       "view": "Sie können {resource} nicht anzeigen",

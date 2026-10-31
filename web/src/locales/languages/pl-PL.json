@@ -634,7 +634,11 @@
       "ai": "AI",
       "downtimes": "Okna serwisowe",
       "fleetConfigs": "Konfiguracje floty",
-      "publicDashboards": "Pulpity publiczne"
+      "publicDashboards": "Pulpity publiczne",
+      "groups": "Grupy",
+      "serviceAccounts": "Konta usługi",
+      "cipherKeys": "Klucze szyfrujące",
+      "regexPatterns": "Wzorce regex"
     },
     "resourcesInline": {
       "dashboards": "pulpity",
@@ -654,7 +658,11 @@
       "ai": "AI",
       "downtimes": "okna serwisowe",
       "fleetConfigs": "konfiguracje floty",
-      "publicDashboards": "pulpity publiczne"
+      "publicDashboards": "pulpity publiczne",
+      "groups": "grupy",
+      "serviceAccounts": "konta usługi",
+      "cipherKeys": "klucze szyfrujące",
+      "regexPatterns": "wzorce regex"
     },
     "denied": {
       "view": "Nie możesz wyświetlać: {resource}",

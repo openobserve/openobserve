@@ -634,7 +634,11 @@
       "ai": "الذكاء الاصطناعي",
       "downtimes": "فترات الصيانة",
       "fleetConfigs": "إعدادات الأسطول",
-      "publicDashboards": "لوحات المعلومات العامة"
+      "publicDashboards": "لوحات المعلومات العامة",
+      "groups": "المجموعات",
+      "serviceAccounts": "حسابات الخدمة",
+      "cipherKeys": "مفاتيح التشفير",
+      "regexPatterns": "أنماط Regex"
     },
     "resourcesInline": {
       "dashboards": "لوحات المعلومات",
@@ -654,7 +658,11 @@
       "ai": "الذكاء الاصطناعي",
       "downtimes": "فترات الصيانة",
       "fleetConfigs": "إعدادات الأسطول",
-      "publicDashboards": "لوحات المعلومات العامة"
+      "publicDashboards": "لوحات المعلومات العامة",
+      "groups": "المجموعات",
+      "serviceAccounts": "حسابات الخدمة",
+      "cipherKeys": "مفاتيح التشفير",
+      "regexPatterns": "أنماط Regex"
     },
     "denied": {
       "view": "لا يمكنك عرض {resource}",

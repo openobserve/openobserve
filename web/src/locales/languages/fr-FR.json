@@ -634,7 +634,11 @@
       "ai": "IA",
       "downtimes": "Plages de maintenance",
       "fleetConfigs": "Configurations de flotte",
-      "publicDashboards": "Tableaux de bord publics"
+      "publicDashboards": "Tableaux de bord publics",
+      "groups": "Groupes",
+      "serviceAccounts": "Comptes de service",
+      "cipherKeys": "Clés de chiffrement",
+      "regexPatterns": "Motifs regex"
     },
     "resourcesInline": {
       "dashboards": "tableaux de bord",
@@ -654,7 +658,11 @@
       "ai": "l'IA",
       "downtimes": "plages de maintenance",
       "fleetConfigs": "configurations de flotte",
-      "publicDashboards": "tableaux de bord publics"
+      "publicDashboards": "tableaux de bord publics",
+      "groups": "groupes",
+      "serviceAccounts": "comptes de service",
+      "cipherKeys": "clés de chiffrement",
+      "regexPatterns": "motifs regex"
     },
     "denied": {
       "view": "Vous ne pouvez pas afficher {resource}",

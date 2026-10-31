@@ -634,7 +634,11 @@
       "ai": "AI",
       "downtimes": "停机时间",
       "fleetConfigs": "机群配置",
-      "publicDashboards": "公开仪表盘"
+      "publicDashboards": "公开仪表盘",
+      "groups": "组",
+      "serviceAccounts": "服务账号",
+      "cipherKeys": "加密密钥",
+      "regexPatterns": "正则表达式模式"
     },
     "resourcesInline": {
       "dashboards": "仪表盘",
@@ -654,7 +658,11 @@
       "ai": "AI",
       "downtimes": "停机时间",
       "fleetConfigs": "机群配置",
-      "publicDashboards": "公开仪表盘"
+      "publicDashboards": "公开仪表盘",
+      "groups": "组",
+      "serviceAccounts": "服务账号",
+      "cipherKeys": "加密密钥",
+      "regexPatterns": "正则表达式模式"
     },
     "denied": {
       "view": "您无法查看{resource}",
