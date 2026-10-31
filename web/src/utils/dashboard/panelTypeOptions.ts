@@ -20,6 +20,7 @@ import { echartsPaletteColor } from "./thresholds";
 import { labelColorOn } from "./chartLabelContrast";
 import { calculateWidthText } from "./chartDimensionUtils";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { pieLegendPercentDecimals, piePercentPrecision } from "./legendConfiguration";
 
 export const GAUGE_STYLES = ["semi", "arc", "circle"] as const;
 export const DEFAULT_GAUGE_STYLE = "semi";
@@ -150,12 +151,20 @@ export const applyGaugeOptions = (options: any, panelSchema: any): void => {
 
 const pieLabelFormatter = (contents: string[], panelSchema: any) => {
   const lookup = createSeriesOverrideLookup(panelSchema?.config);
+  const panelDecimals = piePercentPrecision(panelSchema?.config);
+  // ECharts' percent trims trailing zeros, which would disagree with the legend.
+  const percentText = (params: any) => {
+    const overrideDecimals = lookup.get(params?.name)?.decimals;
+    const decimals =
+      overrideDecimals === undefined ? panelDecimals : pieLegendPercentDecimals(overrideDecimals);
+    return `${Number(params?.percent ?? 0).toFixed(decimals)}%`;
+  };
   return (params: any) =>
     contents
       .map((content) => {
         if (content === "name") return String(lookup.displayName(params?.name ?? ""));
         if (content === "value") return lookup.formatValue(params?.value, params?.name);
-        return `${params?.percent ?? 0}%`;
+        return percentText(params);
       })
       .join(" · ");
 };
@@ -292,8 +301,9 @@ const percentLabel = (series: any, item: any, index: number) => ({
 });
 
 /** Percent labels inside each slice, hidden on slices too thin to hold the text. */
-const placePercentInside = (series: any, panel: PanelSize | null) => {
-  series.label = { ...series.label, position: "inside", formatter: "{d}%" };
+const placePercentInside = (series: any, panel: PanelSize | null, panelSchema: any) => {
+  const formatter = pieLabelFormatter(["percent"], panelSchema);
+  series.label = { ...series.label, position: "inside", formatter };
   const shares = sliceShares(series.data);
   const geometry = panel ? pieGeometry(series, panel) : null;
   const fontSize = Number(series.label?.fontSize) || PIE_LABEL_FONT_SIZE;
@@ -328,7 +338,7 @@ const placePieLabels = (
   }
   // Labels too long for the room beside the pie fall back to percents inside, leaving names to the legend and tooltip.
   if (panel && !outsideLabelsFit(series, contents, panel, panelSchema)) {
-    placePercentInside(series, panel);
+    placePercentInside(series, panel, panelSchema);
     return;
   }
   series.label = {

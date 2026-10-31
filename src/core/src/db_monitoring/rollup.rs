@@ -34,12 +34,16 @@
 //!    the remainder folded into one "other-errors" row per `(system, instance, code)`.
 //!
 //! Offsets are PER-`(org, stream)` (`/db_monitoring/offsets/{org}/{stream}`):
-//! a failing stream retries its window next tick WITHOUT advancing its own
-//! offset and WITHOUT blocking any other stream (design D3).
+//! a failing stream retries its window on a later tick WITHOUT advancing its
+//! own offset and WITHOUT blocking any other stream (design D3).
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
 
 use config::{cluster::LOCAL_NODE, get_config, meta::stream::StreamType, utils::time::now_micros};
+use dashmap::DashMap;
 use futures::StreamExt;
 use infra::cluster::get_node_by_uuid;
 use serde_json::{Value, json};
@@ -222,6 +226,25 @@ const MAX_CATCHUP_WINDOWS: usize = 4;
 /// (per-stream offsets and locks), so a modest fan-out shortens the tick
 /// without stampeding the search path.
 const STREAM_CONCURRENCY: usize = 4;
+
+/// Per-(org, stream) search back-off, in memory: a restart retries at once.
+static RETRY_BACKOFF: LazyLock<DashMap<(String, String), Backoff>> = LazyLock::new(DashMap::new);
+
+/// The window whose search keeps failing, its failures in a row, and when it may run again.
+#[derive(Clone, Copy)]
+struct Backoff {
+    window_end: i64,
+    misses: u32,
+    next_at: i64,
+}
+
+/// A failed window search, the only failure that backs off; it prints as the error it wraps.
+#[derive(Debug, thiserror::Error)]
+#[error("{error}")]
+struct WindowSearchError {
+    window_end: i64,
+    error: anyhow::Error,
+}
 
 #[derive(serde::Deserialize)]
 struct RecentIngestedTraceStream {
@@ -752,6 +775,14 @@ pub async fn process_db_monitoring() -> Result<(), anyhow::Error> {
         discovered.len()
     );
 
+    // How long a window stays writable before `process_stream` skips it; no wait may outlast that.
+    let writable_span = now
+        - keep_from(
+            now,
+            now - cfg.limit.cache_delay_secs * 1_000_000,
+            cfg.limit.ingest_allowed_upto_micro,
+        );
+
     // Streams are independent (per-stream offsets/locks) — process a few
     // concurrently, keeping per-stream error isolation.
     futures::stream::iter(discovered)
@@ -761,6 +792,17 @@ pub async fn process_db_monitoring() -> Result<(), anyhow::Error> {
                  org_id,
                  stream_name,
              }| async move {
+                let key = (org_id.clone(), stream_name.clone());
+                let prev = RETRY_BACKOFF.get(&key).map(|b| *b);
+                if let Some(backoff) = prev
+                    && now < backoff.next_at
+                {
+                    log::debug!(
+                        "[DbMonitoring] {org_id}/{stream_name} backing off after {} failed searches",
+                        backoff.misses
+                    );
+                    return;
+                }
                 // Schema gate BEFORE any search: skip streams without the
                 // fingerprint column. DB-backed lookup, deliberately not the
                 // cache-only variant. Fetched ONCE per (stream, tick) — the
@@ -787,15 +829,52 @@ pub async fn process_db_monitoring() -> Result<(), anyhow::Error> {
                 if let Err(e) =
                     process_stream(&org_id, &stream_name, now, window_micros, has_rows_col).await
                 {
-                    log::error!(
-                        "[DbMonitoring] stream {org_id}/{stream_name} failed (offset NOT advanced, retried next tick): {e}"
-                    );
+                    match e.downcast_ref::<WindowSearchError>() {
+                        Some(failed) => {
+                            let backoff = next_backoff(
+                                prev,
+                                failed.window_end,
+                                now,
+                                window_micros,
+                                writable_span,
+                            );
+                            log::error!(
+                                "[DbMonitoring] stream {org_id}/{stream_name} failed (offset NOT advanced; {} in a row, next attempt in {}s): {e}",
+                                backoff.misses,
+                                (backoff.next_at - now) / 1_000_000
+                            );
+                            RETRY_BACKOFF.insert(key, backoff);
+                        }
+                        None => log::error!(
+                            "[DbMonitoring] stream {org_id}/{stream_name} failed (offset NOT advanced, retried next tick): {e}"
+                        ),
+                    }
                 }
             },
         )
         .await;
 
     Ok(())
+}
+
+/// Never waits past a window's last writable tick, or the 5 h skip drops the windows behind it.
+fn next_backoff(
+    prev: Option<Backoff>,
+    window_end: i64,
+    now: i64,
+    window_micros: i64,
+    writable_span: i64,
+) -> Backoff {
+    let misses = match prev {
+        Some(b) if b.window_end == window_end => b.misses.saturating_add(1),
+        _ => 1,
+    };
+    let wait = (window_micros << (misses - 1).min(16)).min(MAX_DELTA_INTERVALS * window_micros);
+    Backoff {
+        window_end,
+        misses,
+        next_at: (now + wait).min(window_end + writable_span).max(now),
+    }
 }
 
 /// What the meta store must still hold for this node's offset advance to be
@@ -814,7 +893,7 @@ fn expected_stored_offset(start_time: i64, stored_before: i64, processed: usize)
 ///
 /// First run (offset 0) starts one grid window behind the settle horizon. On each successful
 /// window the offset advances and persists; on failure it does NOT advance —
-/// the same window is retried next tick. At most [`MAX_CATCHUP_WINDOWS`]
+/// the same window is retried on a later tick. At most [`MAX_CATCHUP_WINDOWS`]
 /// windows are scanned per tick.
 ///
 /// Both the lock claim and every advance are COMPARE-AND-SWAP against the value
@@ -932,12 +1011,18 @@ async fn process_window(
     end_time: i64,
     has_rows_col: bool,
 ) -> Result<(), anyhow::Error> {
+    let search_failed = |error| WindowSearchError {
+        window_end: end_time,
+        error,
+    };
     // (1) stage-1 rank query: top-N fingerprints per (system, instance).
     // `end_time` IS this window's grid boundary (the job walks the grid), and
     // `to_record` re-stamps the same value — passing it keeps the row
     // self-consistent between the two.
     let rank_sql = build_rank_sql(stream_name, ROLLUP_TOP_N, has_rows_col, end_time);
-    let stage1_rows = run_dbm_search(org_id, None, rank_sql, start_time, end_time, false).await?;
+    let stage1_rows = run_dbm_search(org_id, None, rank_sql, start_time, end_time, false)
+        .await
+        .map_err(search_failed)?;
     if stage1_rows.is_empty() {
         // Idle window — nothing to roll up, nothing to write.
         return Ok(());
@@ -952,7 +1037,10 @@ async fn process_window(
         run_dbm_search(org_id, None, totals_sql, start_time, end_time, false),
         run_dbm_search(org_id, None, error_sql, start_time, end_time, false)
     );
-    let (totals_rows, error_rows) = (totals_rows?, error_rows?);
+    let (totals_rows, error_rows) = (
+        totals_rows.map_err(search_failed)?,
+        error_rows.map_err(search_failed)?,
+    );
 
     // A query answering exactly the request size was truncated by the cap.
     let truncated = stage1_rows.len() == SEARCH_SIZE
@@ -1936,6 +2024,66 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
                 target + w
             );
         }
+    }
+
+    /// A window that kills a querier must not be re-run every tick.
+    #[test]
+    fn a_failing_window_waits_one_two_then_four_intervals() {
+        let (w, now) = (15 * MIN, 1_000 * HOUR);
+        let (mut backoff, mut waits) = (None, Vec::new());
+        for _ in 0..5 {
+            let next = next_backoff(backoff, now - w, now, w, 5 * HOUR);
+            waits.push((next.next_at - now) / w);
+            backoff = Some(next);
+        }
+        assert_eq!(waits, [1, 2, 4, 4, 4]);
+        let worn = Backoff {
+            misses: u32::MAX,
+            ..backoff.expect("the loop ran")
+        };
+        assert_eq!(
+            next_backoff(Some(worn), now - w, now, w, 5 * HOUR).next_at,
+            now + 4 * w
+        );
+        assert_eq!(
+            next_backoff(backoff, now, now, w, 5 * HOUR).misses,
+            1,
+            "a later window failing starts the count again"
+        );
+    }
+
+    /// Waiting past a window's last writable tick lets the 5 h skip drop the windows behind it.
+    #[test]
+    fn a_waiting_window_is_retried_before_it_ages_out() {
+        let (w, writable, end) = (15 * MIN, 5 * HOUR, 1_000 * HOUR);
+        let (mut now, mut backoff, mut attempts) = (end + 5 * MIN, None, 0);
+        while now < end + writable {
+            attempts += 1;
+            let next = next_backoff(backoff, end, now, w, writable);
+            now = next.next_at;
+            backoff = Some(next);
+        }
+        assert_eq!((now, attempts), (end + writable, 7));
+        // At the 5 h line every window still gets its one try by the next tick, as today.
+        assert_eq!(
+            next_backoff(None, now - writable + MIN, now, w, writable).next_at,
+            now + MIN
+        );
+        // A window already past it (a tiny ZO_INGEST_ALLOWED_UPTO) keeps today's every-tick retry.
+        let later = now + HOUR;
+        assert_eq!(next_backoff(None, end, later, w, writable).next_at, later);
+    }
+
+    /// Tagging a search failure must not change what the error log prints.
+    #[test]
+    fn a_search_failure_prints_the_error_it_wraps() {
+        let e = anyhow::Error::from(WindowSearchError {
+            window_end: 42,
+            error: anyhow::anyhow!("partial result"),
+        });
+        let tagged = e.downcast_ref::<WindowSearchError>().map(|s| s.window_end);
+        assert_eq!(tagged, Some(42));
+        assert_eq!(e.to_string(), "partial result");
     }
 
     fn reply(code: i32) -> Result<proto::cluster_rpc::IngestionResponse, anyhow::Error> {

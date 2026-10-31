@@ -353,11 +353,11 @@ test.describe('On-call team staffing', {
     const name = uniqueName(`${workerPrefix(testInfo)}_holder`);
     const users = await createOrgUsers(page, name, 3);
     const team = await createTeam(page, { name, timezone: 'UTC' });
+    await addTeamMembers(page, team.id, users);
     await setTeamSchedule(page, team.id, {
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: users })],
     });
-    await addTeamMembers(page, team.id, users);
 
     const before = (await whoIsOnCall(page, team.id)) ?? [];
     expect(before.length, 'somebody must be on call before this test removes them')
