@@ -278,9 +278,10 @@ describe("buildPromqlStepCatalog", () => {
       const topK = definitions.find((d) => d.id === PromqlStepId.TopK);
       expect(topK).toBeDefined();
       expect(topK!.name).toBe("Top K");
-      expect(topK!.params).toHaveLength(2);
+      expect(topK!.params).toHaveLength(3);
       expect(topK!.params[0].type).toBe("number");
       expect(topK!.params[1].type).toBe("select");
+      expect(topK!.params[2].type).toBe("boolean");
       expect(topK!.defaultParams).toEqual([10, []]);
     });
 
@@ -294,9 +295,10 @@ describe("buildPromqlStepCatalog", () => {
     it("should include Quantile with quantile and labels params", () => {
       const quantile = definitions.find((d) => d.id === PromqlStepId.Quantile);
       expect(quantile).toBeDefined();
-      expect(quantile!.params).toHaveLength(2);
+      expect(quantile!.params).toHaveLength(3);
       expect(quantile!.params[0].type).toBe("number");
       expect(quantile!.params[1].type).toBe("select");
+      expect(quantile!.params[2].type).toBe("boolean");
       expect(quantile!.defaultParams[0]).toBe(0.95);
       expect(quantile!.defaultParams[1]).toEqual([]);
     });
@@ -553,8 +555,17 @@ describe("buildPromqlStepCatalog", () => {
       expect(dim!.name).toBe("Days in Month");
     });
 
+    it("should include Offset with a duration param", () => {
+      const offset = definitions.find((d) => d.id === PromqlStepId.Offset);
+      expect(offset!.group).toBe(PromqlStepGroup.TimeAndDate);
+      expect(offset!.params.map((p) => p.type)).toEqual(["string"]);
+      expect(offset!.defaultParams).toEqual(["1h"]);
+    });
+
     it("should have all time functions with no params and no default params", () => {
-      const timeFunctions = definitions.filter((d) => d.group === PromqlStepGroup.TimeAndDate);
+      const timeFunctions = definitions.filter(
+        (d) => d.group === PromqlStepGroup.TimeAndDate && d.id !== PromqlStepId.Offset,
+      );
       timeFunctions.forEach((op) => {
         expect(op.params).toHaveLength(0);
         expect(op.defaultParams).toHaveLength(0);

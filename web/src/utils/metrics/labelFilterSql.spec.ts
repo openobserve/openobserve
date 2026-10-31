@@ -17,6 +17,18 @@ import { describe, it, expect } from "vitest";
 import { labelFiltersToSql } from "./labelFilterSql";
 
 describe("labelFiltersToSql", () => {
+  it("ORs the branches of OR groups, NOT pushed down to the predicates", () => {
+    expect(
+      labelFiltersToSql("m", [
+        { label: "job", value: "api" },
+        { label: "a", value: "1", group: 1 },
+        { label: "b", value: "2", group: 2, negate: true },
+      ] as any[]),
+    ).toBe(
+      `SELECT * FROM "m" WHERE ("job" = 'api' AND "a" = '1') OR ("job" = 'api' AND "b" != '2')`,
+    );
+  });
+
   it("is a complete statement even with no filters — the server rejects a bare WHERE", () => {
     expect(labelFiltersToSql("http_requests_total", [])).toBe(
       'SELECT * FROM "http_requests_total"',

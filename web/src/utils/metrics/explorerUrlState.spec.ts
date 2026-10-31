@@ -42,6 +42,18 @@ describe("explorerUrlState", () => {
     }
   });
 
+  it("round-trips OR groups and their negation as a matcher prefix", () => {
+    const labelFilters = [
+      { label: "job", operator: "=", value: "api" },
+      { label: "code", operator: "=", value: "5:00", group: 1 },
+      { label: "env", operator: "!=", value: "prod", group: 2, negate: true },
+    ] as any[];
+    const query = explorerFiltersToQuery({ ...defaults(), labelFilters });
+    expect(query.labels).toEqual(["job=api", "1:code=5:00", "!2:env!=prod"]);
+    expect(queryToExplorerFilters(query).labelFilters).toEqual(labelFilters);
+    expect(queryToExplorerFilters({ labels: ["0:a=1", "!a=1"] }).labelFilters).toBeUndefined();
+  });
+
   it("serializes defaults to an empty query", () => {
     expect(explorerFiltersToQuery(defaults())).toEqual({});
   });

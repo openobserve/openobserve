@@ -120,7 +120,10 @@ export function explorerFiltersToQuery(
   // arbitrary strings, but a label NAME cannot contain `=` or `!`, so the
   // first operator token splits unambiguously — no JSON needed.
   if (state.labelFilters.length) {
-    query.labels = state.labelFilters.map((f) => `${f.label}${f.operator ?? "="}${f.value}`);
+    query.labels = state.labelFilters.map(
+      (f) =>
+        `${f.group ? `${f.negate ? "!" : ""}${f.group}:` : ""}${f.label}${f.operator ?? "="}${f.value}`,
+    );
   }
   // `showFavoritesOnly` is NOT serialized: it is now derived from the mode
   // (Workspace ⇒ pinned-only), so `?mode=workspace` already implies it. Keeping
@@ -200,12 +203,16 @@ const LABEL_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
 // `=~` before `=` so the regex operator is not split into `=` + a value
 // starting with `~`. The `s` flag lets a matcher value carry newlines.
-const MATCHER = /^([a-zA-Z_:][a-zA-Z0-9_:]*)(=~|!~|!=|=)(.*)$/s;
+// An OR group rides as a `2:` (or negated `!2:`) prefix, which no label name can start with.
+const MATCHER = /^(?:(!?)([1-9]\d*):)?([a-zA-Z_:][a-zA-Z0-9_:]*)(=~|!~|!=|=)(.*)$/s;
 
 /** A hand-edited or truncated URL must degrade to "no filter", never throw. */
 function parseMatcher(matcher: unknown): LabelFilter | null {
   if (typeof matcher !== "string") return null;
   const m = matcher.match(MATCHER);
   if (!m) return null;
-  return { label: raw(m[1]), operator: m[2], value: m[3] };
+  const filter: LabelFilter = { label: raw(m[3]), operator: m[4], value: m[5] };
+  if (m[2]) filter.group = Number(m[2]);
+  if (m[2] && m[1]) filter.negate = true;
+  return filter;
 }

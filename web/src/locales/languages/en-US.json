@@ -13550,9 +13550,9 @@
         "selectLabel": "Select a label",
         "invalidLabel": "Invalid label name.",
         "selectOrTypeValue": "Select or type a value",
-        "operatorHelp": "=  is exactly this value\n!=  is anything but this value\n=~  matches a regex — use 500{'|'}503 to match either\n!~  does not match a regex\n\nFilters are combined with AND. To match either of two values, use =~ with a regex.",
+        "operatorHelp": "=  is exactly this value\n!=  is anything but this value\n=~  matches a regex — use 500{'|'}503 to match either\n!~  does not match a regex\n\nFilters are combined with AND. To match either of two values, use =~ with a regex or add an OR group.",
         "andSeparator": "and",
-        "andSeparatorTitle": "Filters are combined with AND — a metric must match all of them. To match either of two values, use the =~ operator with a regex.",
+        "andSeparatorTitle": "Filters are combined with AND — a metric must match all of them. To match either of two values, use the =~ operator with a regex or add an OR group.",
         "noSuggestions": "No suggestions — type a value.",
         "moreFilters": "+{count} more",
         "moreFiltersTooltip": "Click to show all filters inline",
@@ -13643,14 +13643,23 @@
       "regexPattern": "Regex pattern (e.g., prod.*)",
       "regexNotMatching": "Regex not matching (e.g., test.*)"
     },
+    "labelGroups": {
+      "addGroup": "+ OR group",
+      "addGroupTooltip": "Add a group of filters; a series matches when it matches any group",
+      "addToGroup": "Add a filter to this group",
+      "anyOf": "any of",
+      "andAnyOf": "and any of",
+      "or": "or",
+      "not": "not",
+      "notTooltip": "Match the series this whole group does not match",
+      "tooManyBranches": "These filters expand to {count} separate selectors; at most {max} can run. Merge values into one regex filter or remove a group."
+    },
     "builderSwitch": {
       "unsupported": "The builder cannot show {construct}",
       "twoMetrics": "The builder cannot show an operation between two metrics — use a formula",
       "noMetric": "The builder needs a query over one named metric",
       "mismatch": "The builder cannot show this query exactly",
       "constructs": {
-        "without": "a without (…) grouping",
-        "offset": "an offset modifier",
         "at": "an {'@'} modifier",
         "orMatchers": "an or between label matchers",
         "subquery": "a subquery",
@@ -13684,6 +13693,10 @@
         "byLabelsLabel": "By Labels",
         "quantileLabel": "Quantile",
         "kLabel": "K",
+        "withoutLabel": "Without (drop these labels)",
+        "withoutDesc": "Aggregate away the selected labels and keep every other label",
+        "offsetLabel": "Offset",
+        "offsetDesc": "How far back to read the metric, e.g. 1h or 1d",
         "nearestMultipleLabel": "Nearest multiple"
       },
       "rangeOnlyFirst": "A range function can only be the first step",
@@ -22369,6 +22382,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "Reads the metric as it was the given duration ago",
       "rateDoc": "Calculates the per-second average rate of increase over the specified time range",
       "irateDoc": "Calculates the per-second instant rate of increase based on the last two data points",
       "increaseDoc": "Calculates the total increase over the specified time range",

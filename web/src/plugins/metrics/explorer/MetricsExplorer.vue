@@ -238,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @focus-picker="grid.loadLabelNames"
         @add="onAddLabelFilter"
         @remove="onRemoveLabelFilter"
+        @negate-group="onNegateLabelGroup"
         @clear-all="onClearLabelFilters"
       />
     </div>
@@ -1308,6 +1309,11 @@ export default defineComponent({
       await requestOnScreen({ skipCache: true });
     };
 
+    const onNegateLabelGroup = async (group: number, negate: boolean) => {
+      grid.setLabelGroupNegated(group, negate);
+      await requestOnScreen({ skipCache: true });
+    };
+
     const onClearLabelFilters = async () => {
       // Over a copy: each removal mutates the source array.
       [...grid.labelFilters.value].forEach((f) => grid.removeLabelFilter(f));
@@ -2313,6 +2319,7 @@ export default defineComponent({
       onSuffixChange,
       onAddLabelFilter,
       onRemoveLabelFilter,
+      onNegateLabelGroup,
       onClearLabelFilters,
       sortOptions,
       PAGE_SIZE_INCREMENT,

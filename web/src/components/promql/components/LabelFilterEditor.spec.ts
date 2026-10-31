@@ -442,4 +442,96 @@ describe("LabelFilterEditor", () => {
       expect(wrapper.vm.loadingLabels).toBe(false);
     });
   });
+
+  describe("OR groups", () => {
+    const grouped = [
+      { label: "job", op: "=", value: "api" },
+      { label: "code", op: "=", value: "500", group: 1 },
+      { label: "env", op: "=", value: "prod", group: 2, negate: true },
+    ];
+
+    it("adds a new OR group after the highest one", async () => {
+      wrapper = createWrapper({ labels: grouped });
+      await wrapper.find('[data-test="promql-add-label-group"]').trigger("click");
+      expect(wrapper.emitted("update:labels")![0][0].at(-1)).toEqual({
+        label: "",
+        op: "=",
+        value: "",
+        group: 3,
+      });
+    });
+
+    it("renders each group in its own box, joined by or", () => {
+      wrapper = createWrapper({ labels: grouped });
+      expect(wrapper.find('[data-test="promql-labelfilter-group-1"]').text()).toContain("code");
+      expect(wrapper.find('[data-test="promql-labelfilter-group-2"]').text()).toContain("env");
+      expect(wrapper.find('[data-test="promql-labelfilter-group-join-1"]').text()).toBe(
+        "and any of",
+      );
+      expect(wrapper.find('[data-test="promql-labelfilter-group-join-2"]').text()).toBe("or");
+    });
+
+    it("adds a filter inside a negated group as negated too", async () => {
+      wrapper = createWrapper({ labels: grouped });
+      await wrapper.find('[data-test="promql-labelfilter-group-add-2"]').trigger("click");
+      expect(wrapper.emitted("update:labels")![0][0].at(-1)).toEqual({
+        label: "",
+        op: "=",
+        value: "",
+        group: 2,
+        negate: true,
+      });
+    });
+
+    it("toggles NOT on every matcher of the group and no other", async () => {
+      wrapper = createWrapper({ labels: grouped });
+      await wrapper.find('[data-test="promql-labelfilter-group-not-1"]').trigger("click");
+      const [labels] = wrapper.emitted("update:labels")![0];
+      expect(labels[1]).toEqual({ label: "code", op: "=", value: "500", group: 1, negate: true });
+      expect(labels[2]).toEqual(grouped[2]);
+
+      await wrapper.setProps({ labels });
+      await wrapper.find('[data-test="promql-labelfilter-group-not-1"]').trigger("click");
+      expect(wrapper.emitted("update:labels")![1][0][1]).toEqual({
+        label: "code",
+        op: "=",
+        value: "500",
+        group: 1,
+      });
+    });
+
+    it("lets another group reuse a label the base list already uses", () => {
+      wrapper = createWrapper({
+        labels: [
+          { label: "method", op: "=", value: "GET" },
+          { label: "status", op: "=", value: "500", group: 1 },
+        ],
+      });
+      expect(wrapper.vm.labelOptionsFor(1)).toContain("method");
+      expect(wrapper.vm.labelOptionsFor(1)).not.toContain("status");
+      expect(wrapper.vm.labelOptionsFor(0)).not.toContain("method");
+    });
+
+    it("says why the query will not run past the branch cap", () => {
+      const labels = Array.from({ length: 17 }, (_, i) => ({
+        label: `l${i}`,
+        op: "=",
+        value: "v",
+        group: 1,
+        negate: true,
+      }));
+      wrapper = createWrapper({ labels });
+      expect(wrapper.find('[data-test="promql-labelfilter-too-many-branches"]').text()).toContain(
+        "17",
+      );
+    });
+
+    it("shows no group chrome for a plain AND list", () => {
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test^="promql-labelfilter-group-"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="promql-labelfilter-too-many-branches"]').exists()).toBe(
+        false,
+      );
+    });
+  });
 });

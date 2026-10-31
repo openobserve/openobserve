@@ -119,8 +119,8 @@ describe("treeToBuilder", () => {
   });
 
   it("names the first construct it cannot show", () => {
-    expect(reason({ type: "unsupported", kind: "without" })).toBe(
-      "The builder cannot show a without (…) grouping",
+    expect(reason(bin("or", agg("sum", sel("x")), call("vector", num(0))))).toBe(
+      "The builder cannot show the set operator or",
     );
     expect(reason(call("rate", { type: "unsupported", kind: "subquery" }))).toBe(
       "The builder cannot show a subquery",
@@ -166,8 +166,8 @@ describe("treeToBuilder", () => {
   });
 
   it("names an unsupported construct on either side of a binary", () => {
-    expect(reason(bin("/", sel("x"), { type: "unsupported", kind: "offset" }))).toBe(
-      "The builder cannot show an offset modifier",
+    expect(reason(bin("/", sel("x"), { type: "unsupported", kind: "@" }))).toBe(
+      "The builder cannot show an @ modifier",
     );
   });
 
@@ -179,6 +179,89 @@ describe("treeToBuilder", () => {
     expect(reason(bin("/", call("rate", matrix("a", "5m")), call("rate", matrix("b", "5m"))))).toBe(
       "The builder cannot show an operation between two metrics — use a formula",
     );
+  });
+});
+
+describe("treeToBuilder: or, offset and without", () => {
+  const eq = (label: string, value: string) => ({ label, op: "=", value });
+
+  it("maps a union of selectors over one metric onto OR groups", () => {
+    const tree = bin(
+      "or",
+      sel("x", [eq("job", "api"), eq("a", "1")]),
+      sel("x", [eq("job", "api"), eq("b", "2")]),
+    );
+    expect(ok(tree)).toEqual({
+      metric: "x",
+      labels: [eq("job", "api"), { ...eq("a", "1"), group: 1 }, { ...eq("b", "2"), group: 2 }],
+      operations: [],
+    });
+  });
+
+  it("maps a union of one range step, wrapped by an aggregation", () => {
+    const tree = agg(
+      "sum",
+      paren(
+        bin(
+          "or",
+          call("rate", matrix("x", "5m", [eq("a", "1")])),
+          bin(
+            "or",
+            call("rate", matrix("x", "5m", [eq("b", "2")])),
+            call("rate", matrix("x", "5m", [eq("c", "3")])),
+          ),
+        ),
+      ),
+    );
+    const query = ok(tree);
+    expect(query.labels.map((l) => l.group)).toEqual([1, 2, 3]);
+    expect(query.operations).toEqual([
+      { id: "rate", params: ["5m"] },
+      { id: "sum", params: [[]] },
+    ]);
+    expect(promqlRenderer.renderQuery(query)).toBe(
+      'sum(rate(x{a="1"}[5m]) or rate(x{b="2"}[5m]) or rate(x{c="3"}[5m]))',
+    );
+  });
+
+  it("refuses a union whose sides differ in metric, step or offset", () => {
+    const refusal = "The builder cannot show the set operator or";
+    expect(reason(bin("or", sel("x"), sel("y")))).toBe(refusal);
+    expect(
+      reason(bin("or", call("rate", matrix("x", "5m")), call("irate", matrix("x", "5m")))),
+    ).toBe(refusal);
+    expect(reason(bin("or", sel("x"), { ...sel("x"), offset: "1h" }))).toBe(refusal);
+    expect(reason(bin("or", sel("x"), { type: "unsupported", kind: "@" }))).toBe(
+      "The builder cannot show an @ modifier",
+    );
+  });
+
+  it("maps an offset onto a trailing offset step", () => {
+    expect(ok({ ...sel("x"), offset: "1h" }).operations).toEqual([
+      { id: "offset", params: ["1h"] },
+    ]);
+    const query = ok(
+      agg(
+        "sum",
+        call("rate", { ...matrix("x", "5m"), selector: { name: "x", matchers: [], offset: "1d" } }),
+      ),
+    );
+    expect(query.operations).toEqual([
+      { id: "rate", params: ["5m"] },
+      { id: "sum", params: [[]] },
+      { id: "offset", params: ["1d"] },
+    ]);
+    expect(promqlRenderer.renderQuery(query)).toBe("sum(rate(x{}[5m] offset 1d))");
+  });
+
+  it("maps without onto the aggregation's trailing flag", () => {
+    const tree = { ...agg("topk", sel("x"), [], num(3)), without: ["instance"] };
+    const query = ok(tree);
+    expect(query.operations).toEqual([{ id: "topk", params: [3, ["instance"], true] }]);
+    expect(promqlRenderer.renderQuery(query)).toBe("topk without (instance) (3, x{})");
+    expect(ok({ ...agg("sum", sel("x")), without: [] }).operations).toEqual([
+      { id: "sum", params: [[], true] },
+    ]);
   });
 });
 
@@ -214,6 +297,24 @@ describe("promqlToBuilder", () => {
       ok: false,
       reason: "The builder cannot show this query exactly",
     });
+  });
+
+  it("round-trips a union, an offset and a without through the parser", async () => {
+    const text = 'sum without (pod) (rate(x{a="1"}[5m] offset 1h) or rate(x{b="2"}[5m] offset 1h))';
+    const branch = (label: string, value: string) =>
+      call("rate", {
+        type: "matrix",
+        range: "5m",
+        selector: { name: "x", matchers: [{ label, op: "=", value }], offset: "1h" },
+      });
+    const tree = {
+      ...agg("sum", paren(bin("or", branch("a", "1"), branch("b", "2")))),
+      without: ["pod"],
+    };
+    parsePromqlQuery.mockResolvedValue({ data: { data: tree } });
+    const result = await promqlToBuilder("org", text);
+    expect(result.ok).toBe(true);
+    expect(parsePromqlQuery.mock.calls[1][0].query).toBe(text);
   });
 
   it("returns the parser's message for a query that does not parse", async () => {
