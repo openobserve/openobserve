@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
+import { computed, onScopeDispose, reactive, ref, shallowRef, watch } from "vue";
 import { type TranslateFn, I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
@@ -40,12 +40,16 @@ import {
   type SuffixGroup,
 } from "@/utils/metrics/prefixGrouping";
 import {
+  buildExportIntervalQuery,
   buildPresenceQuery,
+  computeAlignedStepSeconds,
   computeRateWindow,
   computePercentileWindow,
-  computeStepSeconds,
   computeWidenedRateWindows,
   DEFAULT_SCRAPE_INTERVAL_SECONDS,
+  EXPORT_INTERVAL_PROBE_WINDOWS,
+  MIN_STEP_SECONDS,
+  snapExportInterval,
   baseNameOf,
   getMetricDefaults,
   inferUnit,
@@ -61,6 +65,7 @@ import {
   PRIORITY,
 } from "./useMetricsPreviewQueue";
 import { useMetricsExplorerExemplars } from "./useMetricsExplorerExemplars";
+import { exportIntervalCache } from "./metricExportInterval";
 
 export interface LabelFilter {
   label: I18nText;
@@ -969,6 +974,23 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const pointsFor = (card: MetricCard) =>
     card.chartType === "heatmap" ? HEATMAP_POINTS : PREVIEW_POINTS;
 
+  /** Intervals measured by this grid; reactive per key, so a landing measurement re-renders only its cards. */
+  const measuredIntervals = reactive(new Map<string, number>());
+
+  /** Keyed on the stream the card's default query reads: a histogram card's own name holds no samples. */
+  const exportIntervalKey = (card: MetricCard) =>
+    `${org.value}|${operandStreamsOf(card)[0] ?? card.name}`;
+
+  /** The card's measured export interval in seconds; 0 until measured, or when it cannot be. */
+  const exportIntervalFor = (card: MetricCard): number => {
+    const key = exportIntervalKey(card);
+    return measuredIntervals.get(key) ?? exportIntervalCache.peek(key) ?? 0;
+  };
+
+  /** A card's step: from the range, aligned to the metric's export interval once known. */
+  const stepFor = (card: MetricCard, points = pointsFor(card)) =>
+    computeAlignedStepSeconds(rangeSeconds.value, points, exportIntervalFor(card));
+
   const exemplars = useMetricsExplorerExemplars({
     queue,
     org,
@@ -978,7 +1000,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         expr: q.expr,
         legend: q.legendTemplate && !q.legendTemplate.includes("{") ? q.legendTemplate : undefined,
       })),
-    stepOf: (card) => computeStepSeconds(rangeSeconds.value, pointsFor(card as MetricCard)),
+    stepOf: (card) => stepFor(card as MetricCard),
     valueUnitOf: (card) => {
       const model = card as MetricCard;
       const bucketUnit = effectiveVariant(model).defaults?.bucketUnit;
@@ -1076,7 +1098,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       cachedEpoch = epoch;
     }
     const exemplarsOn = !opts?.ignoreExemplars && exemplars.enabled(card.name);
-    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}|${opts?.percentileWindow ?? ""}|${exemplarsOn ? 1 : 0}`;
+    const interval = exportIntervalFor(card);
+    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}|${opts?.percentileWindow ?? ""}|${exemplarsOn ? 1 : 0}|${interval}`;
     const hit = variantCache.get(cacheKey);
     if (hit) return hit;
 
@@ -1102,12 +1125,17 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         // `$__rate_interval` instead, because a PANEL resolves that itself.
         rateWindow:
           opts?.rateWindow ??
-          computeRateWindow(rangeSeconds.value, points, scrapeIntervalSeconds.value),
+          computeRateWindow(rangeSeconds.value, points, scrapeIntervalSeconds.value, interval),
         // Wider than the rate window on purpose — a quantile needs samples, not
         // just two points. See `computePercentileWindow`.
         percentileWindow:
           opts?.percentileWindow ??
-          computePercentileWindow(rangeSeconds.value, points, scrapeIntervalSeconds.value),
+          computePercentileWindow(
+            rangeSeconds.value,
+            points,
+            scrapeIntervalSeconds.value,
+            interval,
+          ),
         labels: card.labels ?? labelsByStream.value[card.name],
         applyNanGuard: opts?.applyNanGuard,
       },
@@ -1330,6 +1358,69 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     }
   };
 
+  /** The stream's export interval, from the most samples one series holds at the window's end. */
+  const measureExportInterval = async (
+    stream: string,
+    owner: string,
+    priority: number,
+  ): Promise<number | null> => {
+    const end = timeRange.value.end_time;
+    const window = { start: end, end };
+    for (const windowSeconds of EXPORT_INTERVAL_PROBE_WINDOWS) {
+      const expr = buildExportIntervalQuery(stream, windowSeconds);
+      let response: any;
+      try {
+        response = await queue.run(
+          previewCacheKey(expr, MIN_STEP_SECONDS, window, true),
+          priority,
+          (signal) => streamQuery(expr, MIN_STEP_SECONDS, signal, 1, window, "instant"),
+          { owner, cache: false },
+        );
+      } catch (error) {
+        // Only a cancel stays uncached: the next request measures again.
+        if (isCancelled(error)) throw error;
+        return null;
+      }
+      const series = response?.result?.[0];
+      const count = Number((series?.value ?? series?.values?.at(-1))?.[1]);
+      const interval = snapExportInterval(windowSeconds, count);
+      if (interval !== null) return interval;
+    }
+    return null;
+  };
+
+  /** What a card's last request charted: re-queried only when alignment changes it. */
+  const previewSignatures = new Map<string, string>();
+  const signatureOf = (step: number, resolved: any) =>
+    `${step}|${((resolved?.queries ?? []) as any[]).map((q) => q.expr).join("\n")}`;
+
+  /** A settled card whose step or windows moved since it was queried asks again, keeping its chart up meanwhile. */
+  const realignIfStale = (card: MetricCard) => {
+    const used = previewSignatures.get(card.name);
+    if (!used || previews.value[card.name]?.status !== "done") return;
+    if (used === signatureOf(stepFor(card), effectiveVariant(card).resolved)) return;
+    void requestPreview(card, { realign: true });
+  };
+
+  /** Measures the card's export interval in the background; never awaited, so the first render keeps its step. */
+  const ensureExportInterval = (card: MetricCard, priority: number) => {
+    // A never-written metric has no cadence to find, and the long tail of them would each cost two probes.
+    if (!card.hasData) return;
+    const key = exportIntervalKey(card);
+    const stream = operandStreamsOf(card)[0] ?? card.name;
+    const epoch = previewsEpoch;
+    exportIntervalCache
+      .detect(key, () => measureExportInterval(stream, card.name, priority))
+      .then((interval) => {
+        if (epoch !== previewsEpoch) return;
+        measuredIntervals.set(key, interval ?? 0);
+        realignIfStale(card);
+      })
+      .catch(() => {
+        // Cancelled with the state that asked; that card keeps its unaligned step.
+      });
+  };
+
   /* -------------------------------------------------- persistent card cache */
 
   const cacheFor = (card: MetricCard) =>
@@ -1480,7 +1571,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
   const requestPreview = async (
     card: MetricCard,
-    opts?: { skipCache?: boolean; priority?: number },
+    opts?: { skipCache?: boolean; priority?: number; realign?: boolean },
   ) => {
     if (card.unsupported) return;
     if (!timeRange.value.end_time) return;
@@ -1525,7 +1616,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       return;
     }
 
-    const step = computeStepSeconds(rangeSeconds.value, points);
+    const step = stepFor(card, points);
+    ensureExportInterval(card, opts?.priority ?? PRIORITY.VISIBLE);
 
     // Already resolved — reuse it, fire NO query. A card that already has a
     // SETTLED preview (done/no-data/unavailable) is just being re-triggered
@@ -1546,6 +1638,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
     if (
       !opts?.skipCache &&
+      !opts?.realign &&
       !pendingRefresh &&
       settled &&
       settled.status !== "loading" &&
@@ -1569,9 +1662,11 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // dashboard panel gets on revisit. Matters more here than there: a first
     // screenful is ~60 queries against a backend that already times out on the
     // heavy metrics.
-    if (!opts?.skipCache && !previews.value[card.name]) {
+    previewSignatures.set(card.name, signatureOf(step, resolved));
+    // A realign may paint from the persisted aligned result over the chart it replaces.
+    if (!opts?.skipCache && (opts?.realign || !previews.value[card.name])) {
       const restored = await restoreFromCache(card, resolved, defaults, step, epoch);
-      if (restored === "painted") return;
+      if (restored === "painted") return realignIfStale(card);
       if (restored === "recheck") forcedRecheck = true;
     }
 
@@ -1668,6 +1763,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
           rangeSeconds.value,
           points,
           scrapeIntervalSeconds.value,
+          exportIntervalFor(card),
         )) {
           const widened = effectiveVariant(card, points, { rateWindow });
           if (!widened.resolved?.queries.length) break;
@@ -1729,6 +1825,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       markEmptiness(card.name, !results.some(hasSamples) && !sparse);
       rememberPreview(card.name);
       persistToCache(card, previews.value[card.name], resolved.queries, step);
+      realignIfStale(card);
     } catch (error: any) {
       // A cancelled request belongs to a state the user has already left; it is
       // not an error the card should show. Restore whatever was on screen before
@@ -1802,7 +1899,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    */
   const previewKeysOf = (card: MetricCard): string[] => {
     const points = pointsFor(card);
-    const step = computeStepSeconds(rangeSeconds.value, points);
+    const step = stepFor(card, points);
     const keys = new Set<string>(exemplars.exemplarKeysOf(card));
 
     for (const guarded of [false, true]) {
@@ -1817,6 +1914,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       rangeSeconds.value,
       points,
       scrapeIntervalSeconds.value,
+      exportIntervalFor(card),
     )) {
       const { resolved } = effectiveVariant(card, points, { rateWindow });
       for (const q of (resolved?.queries ?? []) as any[]) {
@@ -1861,6 +1959,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     queue.cancelAll();
     exemplars.clearAll();
     previews.value = {};
+    previewSignatures.clear();
     previewOrder = [];
     emptyMetrics.value = new Set();
     emptyRecheckedCards.value = new Set();
@@ -1890,8 +1989,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * already loaded, and `cancelDialogQueries` would compute keys that match
    * nothing and cancel nothing.
    */
-  const dialogStepFor = (card: MetricCard) =>
-    computeStepSeconds(rangeSeconds.value, pointsFor(card));
+  const dialogStepFor = (card: MetricCard) => stepFor(card);
 
   /**
    * Runs one query for a ⚙-dialog tile.
@@ -1956,7 +2054,12 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   /** The rate window the card charts with, widened if it was, so a breakdown measures alike. */
   const rateWindowFor = (card: MetricCard): string =>
     previews.value[card.name]?.widenedRateWindow ??
-    computeRateWindow(rangeSeconds.value, pointsFor(card), scrapeIntervalSeconds.value);
+    computeRateWindow(
+      rangeSeconds.value,
+      pointsFor(card),
+      scrapeIntervalSeconds.value,
+      exportIntervalFor(card),
+    );
 
   /** The family map the cards were built from (`buildMetricFamilies`). */
   const familyByName = computed(() => new Map(cards.value.map((c) => [c.name, c.familyName])));

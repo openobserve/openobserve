@@ -52,6 +52,11 @@ vi.mock("echarts/core", async (importOriginal) => ({
 }));
 
 /** `n` values for one label, counts descending. */
+/** `expr` kept to the 10 values of `label` with the most requests over the whole window, ranked at its end. */
+const ranked = (expr: string, label: string, window = "4m") =>
+  `(${expr}) and on (${label}) topk(10, sum by (${label}) ` +
+  `(increase({__name__="http_requests_total",${label}!=""}[${window}] @ end())))`;
+
 const values = (prefix: string, n: number) =>
   Array.from({ length: n }, (_, i) => ({ zo_sql_key: `${prefix}${i}`, zo_sql_num: 1000 - i }));
 
@@ -319,7 +324,7 @@ describe("MetricBreakdown", () => {
       wrapper = mountBreakdown();
       await flushPromises();
       expect(exprs()).toEqual([
-        'topk(10, sum by (instance) (rate({__name__="http_requests_total"}[4m])))',
+        ranked('sum by (instance) (rate({__name__="http_requests_total"}[4m]))', "instance"),
         'sum by (method) (rate({__name__="http_requests_total"}[4m]))',
         'sum by (route) (rate({__name__="http_requests_total"}[4m]))',
         'sum by (status) (rate({__name__="http_requests_total"}[4m]))',
@@ -343,7 +348,7 @@ describe("MetricBreakdown", () => {
       wrapper = mountBreakdown({ card: WIDE });
       await flushPromises();
       expect(exprs()).toContain(
-        'topk(10, sum by (tenant_id) (rate({__name__="http_requests_total"}[4m])))',
+        ranked('sum by (tenant_id) (rate({__name__="http_requests_total"}[4m]))', "tenant_id"),
       );
       expect(exprs()).toContain('sum by (a00) (rate({__name__="http_requests_total"}[4m]))');
       wrapper.unmount();
@@ -353,7 +358,7 @@ describe("MetricBreakdown", () => {
       wrapper = mountBreakdown();
       await flushPromises();
       expect(exprs()).toContain(
-        'topk(10, sum by (method) (rate({__name__="http_requests_total"}[4m])))',
+        ranked('sum by (method) (rate({__name__="http_requests_total"}[4m]))', "method"),
       );
     });
 
@@ -529,7 +534,7 @@ describe("MetricBreakdown", () => {
       await flushPromises();
 
       expect(runQuery).toHaveBeenCalledWith(
-        'topk(10, sum by (instance) (rate({__name__="http_requests_total"}[4m])))',
+        ranked('sum by (instance) (rate({__name__="http_requests_total"}[4m]))', "instance"),
         expect.any(AbortSignal),
       );
       expect(wrapper.find('[data-test="metrics-breakdown-topk"]').text()).toContain("top 10");
@@ -541,7 +546,7 @@ describe("MetricBreakdown", () => {
       await flushPromises();
 
       expect(runQuery).toHaveBeenCalledWith(
-        'topk(10, sum by (method) (rate({__name__="http_requests_total"}[4m])))',
+        ranked('sum by (method) (rate({__name__="http_requests_total"}[4m]))', "method"),
         expect.any(AbortSignal),
       );
     });
@@ -1258,7 +1263,7 @@ describe("MetricBreakdown", () => {
         await flushPromises();
 
         expect(exprs()).toEqual([
-          'topk(10, sum by (tenant_id) (rate({__name__="http_requests_total"}[4m])))',
+          ranked('sum by (tenant_id) (rate({__name__="http_requests_total"}[4m]))', "tenant_id"),
         ]);
       });
 
@@ -1314,7 +1319,7 @@ describe("MetricBreakdown", () => {
       wrapper = mountBreakdown({ variant: AVG, panelQueries: AVG_PANEL });
       await flushPromises();
       expect(exprs()).toEqual([
-        `topk(10, avg by (instance) (rate(${SEL}[4m])))`,
+        ranked(`avg by (instance) (rate(${SEL}[4m]))`, "instance"),
         `avg by (method) (rate(${SEL}[4m]))`,
         `avg by (route) (rate(${SEL}[4m]))`,
         `avg by (status) (rate(${SEL}[4m]))`,
@@ -1331,7 +1336,7 @@ describe("MetricBreakdown", () => {
       await wrapper.setProps({ variant: INCREASE });
       await flushPromises();
       expect(exprs()).toEqual([
-        `topk(10, sum by (instance) (increase(${SEL}[4m])))`,
+        ranked(`sum by (instance) (increase(${SEL}[4m]))`, "instance"),
         `sum by (method) (increase(${SEL}[4m]))`,
         `sum by (route) (increase(${SEL}[4m]))`,
         `sum by (status) (increase(${SEL}[4m]))`,
@@ -1882,7 +1887,11 @@ describe("MetricBreakdown", () => {
       await button(wrapper).trigger("click");
 
       expect(dialog(wrapper).props("dashboardPanelData")!.data.queries[0].query).toBe(
-        'topk(10, sum by (instance) (rate({__name__="http_requests_total"}[$__rate_interval])))',
+        ranked(
+          'sum by (instance) (rate({__name__="http_requests_total"}[$__rate_interval]))',
+          "instance",
+          "$__range",
+        ),
       );
     });
 
