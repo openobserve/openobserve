@@ -170,20 +170,27 @@ export function placeLabels(
     ...cards.map((c) => ({ x: c.x, y: c.y, w: CARD_W, h: CARD_H })),
     ...obstacles,
   ];
+  // Each trace's bounds first, so a spot skips the points of every edge nowhere near it.
+  const bounded = [...traces].map(([other, points]) => {
+    const xs = points.map((p) => p.x);
+    const ys = points.map((p) => p.y);
+    const [x, y] = [Math.min(...xs), Math.min(...ys)];
+    return { other, points, bounds: { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y } };
+  });
   const out = new Map<string, Position>();
   for (const { id, text, spots } of wanted) {
-    const crossed = (box: Box) =>
-      [...traces].some(
-        ([other, points]) =>
+    const crossed = (box: Box) => {
+      const near = { x: box.x - 2, y: box.y - 2, w: box.w + 4, h: box.h + 4 };
+      return bounded.some(
+        ({ other, points, bounds }) =>
           other !== id &&
+          overlaps(near, bounds) &&
           points.some(
             (p) =>
-              p.x > box.x - 2 &&
-              p.x < box.x + box.w + 2 &&
-              p.y > box.y - 2 &&
-              p.y < box.y + box.h + 2,
+              p.x > near.x && p.x < near.x + near.w && p.y > near.y && p.y < near.y + near.h,
           ),
       );
+    };
     const clear = (at: Position) => !blocked.some((other) => overlaps(labelBox(text, at), other));
     // Best clear of every other line; failing that, over another line, which the opaque pill hides, rather than
     // leaving a busy edge without its rate.
