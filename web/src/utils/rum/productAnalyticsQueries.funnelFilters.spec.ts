@@ -218,7 +218,7 @@ describe("Why N? query", () => {
     const sql = whyEnteredSql(scope(), fdef({ f: [COUNTRY, EMAIL] }), opts);
     assertJoinFree(sql);
     expect(sql).toContain(
-      "SELECT SUM(o1) AS opened, SUM(CASE WHEN k1 = 1 AND ki1 = 1 THEN 1 ELSE 0 END) AS kept FROM g LIMIT 1",
+      "SELECT SUM(o1) AS opened, SUM(CASE WHEN k1 = 1 AND ki1 = 1 THEN 1 ELSE 0 END) AS kept, SUM(CASE WHEN o1 = 1 AND hf1 = 1 THEN 1 ELSE 0 END) AS carry1 FROM g LIMIT 1",
     );
     expect(sql).toContain(`AND ${COUNTRY_PRED} THEN 1 ELSE 0 END) AS k1`);
     expect(sql).toContain(EMAIL_KI);

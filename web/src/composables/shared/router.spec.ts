@@ -1690,7 +1690,7 @@ describe("useRoutes (router.ts)", () => {
       expect(findRoute(homeChildRoutes, "RumAnalytics")).toBeUndefined();
     });
 
-    it("renders the six sub-tab routes inside the shell, each lazy and guarded", async () => {
+    it("renders the seven sub-tab routes inside the shell, each lazy and guarded", async () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const route = shell();
       expect(typeof route.component).toBe("function");
@@ -1700,6 +1700,7 @@ describe("useRoutes (router.ts)", () => {
         ["funnels", PA_ROUTES.funnels],
         ["funnels/build", PA_ROUTES.funnelBuilder],
         ["paths", PA_ROUTES.paths],
+        ["heatmaps", PA_ROUTES.heatmaps],
         ["retention", PA_ROUTES.retention],
         ["events", PA_ROUTES.events],
       ]);
@@ -1709,6 +1710,20 @@ describe("useRoutes (router.ts)", () => {
         child.beforeEnter({}, {}, next);
         expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
       }
+    });
+
+    it("redirects the old RUM heatmaps path to the Product Analytics route with its query", async () => {
+      const router = realRouter();
+      await router.push("/rum/heatmaps?page_url=%2Fhome&device=tablet&app=web&range=30d&junk=1");
+
+      expect(router.currentRoute.value.name).toBe(PA_ROUTES.heatmaps);
+      expect(router.currentRoute.value.path).toBe("/product-analytics/heatmaps");
+      expect(router.currentRoute.value.query).toEqual({
+        page_url: "/home",
+        device: "tablet",
+        app: "web",
+        period: "30d",
+      });
     });
 
     it("registers the named event editors as siblings of the shell, outside its tab strip", () => {

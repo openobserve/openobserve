@@ -76,10 +76,12 @@ import useProductAnalytics, { resetProductAnalytics } from "@/composables/rum/us
 import AnalyticsFunnels from "./AnalyticsFunnels.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
 import { assertJoinFree } from "@/utils/rum/productAnalyticsQueries";
 import { decodeDef, encodeDef } from "@/utils/rum/productAnalyticsModel";
+import { formatWindow } from "@/utils/rum/funnelCompare";
 import { alertCreationDialog } from "@/composables/alerts/useAlertCreation";
 
 type Hit = Record<string, unknown>;
@@ -227,6 +229,7 @@ describe("AnalyticsFunnels", () => {
             template: "<div><slot /></div>",
           },
           ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+          ODropdownSub: { template: '<div><slot name="trigger" /><slot /></div>' },
           OPopover: {
             props: ["open"],
             emits: ["update:open"],
@@ -272,6 +275,19 @@ describe("AnalyticsFunnels", () => {
   };
 
   const text = (dt: string) => wrapper!.find(`[data-test="${dt}"]`).text();
+
+  // A searchable OSelect's popover trigger replaces our id, so its label points at nothing.
+  const expectLabelFocusesSelect = (dt: string, label: string) => {
+    const select = wrapper!.findComponent(`[data-test="${dt}"]`);
+    expect(select.props("searchable")).toBe(false);
+    const id = select.props("id") as string;
+    const labelEl = document.querySelector<HTMLLabelElement>(`label[for="${id}"]`);
+    expect(labelEl?.textContent?.trim()).toBe(label);
+    const trigger = select.find(`[data-test="${dt}-trigger"]`).element;
+    expect(document.getElementById(id)).toBe(trigger);
+    labelEl!.click();
+    expect(document.activeElement).toBe(trigger);
+  };
 
   // Suggestions and the step picker render only once the toolbar Add step has been clicked.
   const openAddStep = async () => {
@@ -361,9 +377,9 @@ describe("AnalyticsFunnels", () => {
     expect(header.findAll("[data-test^=rum-analytics-funnel-col-]").map((c) => c.text())).toEqual([
       "Step",
       "Sessions",
-      "From previous",
+      "Conversion from previous step",
       "Time from step 1",
-      "Of step 1",
+      "Conversion from step 1",
     ]);
     expect(header.text()).not.toContain("Reached, as share of step 1");
     expect(
@@ -376,6 +392,11 @@ describe("AnalyticsFunnels", () => {
         .find('[data-test="rum-analytics-funnel-col-unit"] [aria-label]')
         .attributes("aria-label"),
     ).toBe("Sessions that reached this step");
+    expect(
+      wrapper!
+        .find('[data-test="rum-analytics-funnel-col-of-previous"] [aria-label]')
+        .attributes("aria-label"),
+    ).toBe("Share of the step above that reached this step");
   });
 
   it("computes with one join-free search scoped to the app (AC-12, AC-14)", async () => {
@@ -435,7 +456,8 @@ describe("AnalyticsFunnels", () => {
     expect(
       wrapper!.find('[data-test="rum-analytics-funnel-count-by-users"]').attributes("disabled"),
     ).toBeDefined();
-    expect(wrapper!.find('[data-test="rum-analytics-funnel-window-fixed"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-window-fixed"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-window-select"]').exists()).toBe(false);
     await wrapper!.find('[data-test="rum-analytics-funnel-identity-hint-link"]').trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("productAnalyticsRetention");
@@ -603,7 +625,8 @@ describe("AnalyticsFunnels", () => {
     expect(text("rum-analytics-funnel-step-0-time")).toBe("—");
     expect(text("rum-analytics-funnel-step-1-time")).toContain("24 s");
     expect(text("rum-analytics-funnel-step-1-time")).toContain("2.0 min");
-    expect(text("rum-analytics-funnel-overall-time")).toContain("36 s");
+    expect(text("rum-analytics-funnel-overall-median")).toBe("median 36 s to convert");
+    expect(text("rum-analytics-funnel-overall-p90")).toBe("p90 3.0 min");
   });
 
   it("splits by a breakdown dimension into rows summing to the total and keeps it in the URL (AC-47)", async () => {
@@ -621,9 +644,33 @@ describe("AnalyticsFunnels", () => {
     expect(funnelSqls().at(-1)).toContain("SELECT dim, ");
     expect(text("rum-analytics-funnel-breakdown-row-0")).toContain("Chrome");
     expect(text("rum-analytics-funnel-breakdown")).toContain("200");
+    expect(funnelSqls().at(-1)).toContain("AS mt1");
+    expect(wrapper!.text()).not.toContain("Time to convert is shown");
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-breakdown-summary"]').exists()).toBe(
+      false,
+    );
     expect(wrapper!.find('[data-test="rum-analytics-funnel-step-1-time"]').exists()).toBe(false);
     expect((decodeDef(router.currentRoute.value.query.funnel as string) as { b: string }).b).toBe(
       "browser",
+    );
+  });
+
+  it("says when a linked attribute breakdown names a field this app's data lacks", async () => {
+    await mountFunnels();
+    await setSteps([
+      ["p", "/a"],
+      ["c", "b"],
+    ]);
+    useProductAnalytics().funnel.value = {
+      ...useProductAnalytics().funnel.value,
+      breakdown: { f: "context_missing" },
+    };
+    await settle();
+    expect(text("rum-analytics-funnel-breakdown-start")).toBe(
+      "context_missing is not a field in this app's data, so all sessions read as not set.",
+    );
+    expect((decodeDef(router.currentRoute.value.query.funnel as string) as { b: string }).b).toBe(
+      "context_missing",
     );
   });
 
@@ -2114,6 +2161,125 @@ describe("AnalyticsFunnels", () => {
       });
     });
 
+    it("an attribute filter few step-1 sessions carry gets its notice without opening Why N?, and Break down swaps it", async () => {
+      const PAY = "context_payment_method";
+      withSchema(["usr_email", PAY]);
+      routes = [[/AS opened/, [{ opened: 84, kept: 8, carry1: 36 }]], ...baseRoutes()];
+      respond();
+      await mountFunnels();
+      await twoSteps();
+      const whySql = () => sqls().filter((q) => q.includes("AS opened"));
+      expect(whySql()).toHaveLength(0);
+      const pa = useProductAnalytics();
+      layout().vm.$emit("update:def", {
+        ...pa.funnel.value,
+        f: [{ field: PAY, op: "in", values: ["upi"] }],
+      });
+      await settle();
+      await settle();
+      expect(whySql()).toHaveLength(1);
+      expect(whySql()[0]).toContain("AS carry1");
+      expect(layout().props("filterNotice")).toEqual({
+        field: PAY,
+        kept: 8,
+        opened: 84,
+        carry: 36,
+      });
+      layout().vm.$emit("break-down", PAY);
+      await settle();
+      expect(pa.funnel.value.f).toBeUndefined();
+      expect(pa.funnel.value.breakdown).toEqual({ f: PAY });
+    });
+
+    it("a built-in filter never runs Why N? on its own and gets no notice", async () => {
+      withSchema(["usr_email", "geo_info_country"]);
+      await mountFunnels();
+      await twoSteps();
+      layout().vm.$emit("update:def", {
+        ...useProductAnalytics().funnel.value,
+        f: [{ field: "geo_info_country", op: "in", values: ["India"] }],
+      });
+      await settle();
+      expect(sqls().filter((q) => q.includes("AS opened"))).toHaveLength(0);
+      expect(layout().props("filterNotice")).toBeNull();
+    });
+
+    it("the step-field sample runs once per funnel on request and hands its fields to the layout", async () => {
+      const PAY = "context_payment_method";
+      withSchema(["usr_email", PAY, "view_url"]);
+      routes = [
+        [/PARTITION BY s1 ORDER BY _timestamp DESC/, [{ s1: 0, s2: 1, [PAY]: "card" }]],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels();
+      await twoSteps();
+      const sampleSql = () =>
+        sqls().filter((q) => q.includes("PARTITION BY s1 ORDER BY _timestamp DESC"));
+      expect(sampleSql()).toHaveLength(0);
+      expect(layout().props("fieldSampleState")).toBe("idle");
+      layout().vm.$emit("load-fields");
+      await settle();
+      layout().vm.$emit("load-fields");
+      await settle();
+      expect(sampleSql()).toHaveLength(1);
+      expect(sampleSql()[0]).toContain(`"${PAY}"`);
+      expect(sampleSql()[0]).not.toContain('view_url"');
+      expect(layout().props("fieldSample")).toEqual({
+        fields: [{ field: PAY, steps: [2], top: ["card"], more: 0, many: false }],
+      });
+    });
+
+    it("a step menu's break-down opens the rail's Breakdown picker on that step's fields and pins the pick", async () => {
+      const PAY = "context_payment_method";
+      withSchema(["usr_email", PAY]);
+      routes = [
+        [/PARTITION BY s1 ORDER BY _timestamp DESC/, [{ s1: 0, s2: 1, [PAY]: "card" }]],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels();
+      await twoSteps();
+      layout().vm.$emit("load-fields");
+      layout().vm.$emit("break-down-step", 2);
+      await settle();
+      const picker = wrapper!
+        .find("aside")
+        .find('[data-test="rum-analytics-funnel-breakdown-section"]')
+        .find('[data-test="rum-analytics-funnel-field-picker"]');
+      expect(picker.text()).toContain("On step 2 (1)");
+      await wrapper!
+        .find(`[data-test="rum-analytics-funnel-field-picker-field-${PAY}"]`)
+        .trigger("click");
+      await settle();
+      expect(useProductAnalytics().funnel.value.breakdown).toEqual({ f: PAY, s: 2 });
+    });
+
+    it("a step menu's break-down expands a collapsed rail first, then opens the picker on that step", async () => {
+      const PAY = "context_payment_method";
+      withSchema(["usr_email", PAY]);
+      routes = [
+        [/PARTITION BY s1 ORDER BY _timestamp DESC/, [{ s1: 0, s2: 1, [PAY]: "card" }]],
+        ...baseRoutes(),
+      ];
+      respond();
+      window.localStorage.setItem("o2.rum.analytics.funnelRailCollapsed", "1");
+      await mountFunnels();
+      await twoSteps();
+      const toggle = () => wrapper!.find('[data-test="rum-analytics-funnel-rail-collapse-btn"]');
+      expect(toggle().attributes("aria-expanded")).toBe("false");
+      layout().vm.$emit("load-fields");
+      layout().vm.$emit("break-down-step", 2);
+      await settle();
+      expect(toggle().attributes("aria-expanded")).toBe("true");
+      const section = wrapper!
+        .find("aside")
+        .find('[data-test="rum-analytics-funnel-breakdown-section"]');
+      expect(section.find('[data-test="rum-analytics-funnel-field-picker"]').text()).toContain(
+        "On step 2 (1)",
+      );
+    });
+
     it("Why N? runs its own query only when opened, and its lines add up to the entry count", async () => {
       routes = [
         [
@@ -2196,6 +2362,1183 @@ describe("AnalyticsFunnels", () => {
         queries: { query: string }[];
       }[];
       expect(panels[0].queries[0].query).not.toContain("env IN");
+    });
+  });
+
+  describe("toolbar and rail: count, window, breakdown section, headline badges", () => {
+    const at = (dt: string) => wrapper!.find(`[data-test="${dt}"]`);
+    const controls = () => at("rum-analytics-funnel-toolbar-controls");
+    const badge = (dt: string) =>
+      wrapper!.findAllComponents(OBadge).find((b) => b.attributes("data-test") === dt);
+    const threeSteps = async () => {
+      await setSteps([
+        ["p", "/a"],
+        ["c", "b"],
+        ["p", "/c"],
+      ]);
+    };
+    const patch = async (d: Record<string, unknown>) => {
+      const pa = useProductAnalytics();
+      pa.funnel.value = { ...pa.funnel.value, ...d };
+      await settle();
+    };
+    const COLLAPSED_KEY = "o2.rum.analytics.funnelRailCollapsed";
+    const BREAKDOWN_SECTION = '[data-test="rum-analytics-funnel-breakdown-section"]';
+    const follows = (a: Element, b: Element) =>
+      !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    it("reads View as and Count by, with Compare to pushed to the end; Sessions has no window control", async () => {
+      await mountFunnels();
+      await threeSteps();
+      const row = controls();
+      expect(row.text()).toContain("View as");
+      expect(row.text()).toContain("Count by");
+      expect(at("rum-analytics-funnel-window-select").exists()).toBe(false);
+      expect(at("rum-analytics-funnel-window-fixed").exists()).toBe(false);
+      expect(row.text()).not.toContain("Same session");
+      expect(row.text()).not.toContain("who finish steps in");
+      const compare = row.find('[data-test="rum-analytics-funnel-compare"]');
+      expect(compare.classes()).toContain("ms-auto");
+      expect(row.element.lastElementChild).toBe(compare.element);
+    });
+
+    it("Visitors adds who finish steps in after Count by, its menu naming what each clock starts from", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await at("rum-analytics-funnel-count-by-users").trigger("click");
+      await settle();
+      expect(controls().text()).toContain("who finish steps in");
+      const select = wrapper!.findComponent('[data-test="rum-analytics-funnel-window-select"]');
+      expect(select.exists()).toBe(true);
+      expect(follows(at("rum-analytics-funnel-count-by").element, select.element)).toBe(true);
+      const options = select.props("options") as { label: string; value: string }[];
+      expect(options.map((o) => [String(o.label), o.value])).toEqual([
+        ["the same session · one visit", "session"],
+        ["1 hour · of step 1", "1h"],
+        ["1 day · of step 1", "1d"],
+        ["7 days · of step 1", "7d"],
+      ]);
+    });
+
+    it("who finish steps in and Compare to are plain menus their labels focus, both narrow", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await at("rum-analytics-funnel-count-by-users").trigger("click");
+      await settle();
+      expectLabelFocusesSelect("rum-analytics-funnel-window-select", "who finish steps in");
+      expectLabelFocusesSelect("rum-analytics-funnel-compare-select", "Compare to");
+      const window = wrapper!.findComponent('[data-test="rum-analytics-funnel-window-select"]');
+      expect(window.props("width")).toBe("sm");
+    });
+
+    it("the who finish steps in trigger shows a short window while its menu keeps the long labels", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await patch({ unit: "users", window: "session" });
+      const select = wrapper!.findComponent('[data-test="rum-analytics-funnel-window-select"]');
+      const trigger = () => at("rum-analytics-funnel-window-select-trigger").text().trim();
+      expect(select.props("width")).toBe("sm");
+      expect(trigger()).toBe("the same session");
+      await patch({ window: "1d" });
+      expect(trigger()).toBe("1 day");
+      const labels = (select.props("options") as { label: string }[]).map((o) => String(o.label));
+      expect(labels).toContain("the same session · one visit");
+      expect(labels).toContain("1 day · of step 1");
+    });
+
+    it("Breakdown is the rail's first section, not a toolbar control, and its + sets the breakdown", async () => {
+      await mountFunnels();
+      await threeSteps();
+      expect(controls().find('[data-test="rum-analytics-funnel-breakdown-select"]').exists()).toBe(
+        false,
+      );
+      expect(controls().find(BREAKDOWN_SECTION).exists()).toBe(false);
+      const aside = wrapper!.find("aside");
+      const section = aside.find(BREAKDOWN_SECTION);
+      expect(section.exists()).toBe(true);
+      expect(
+        follows(
+          section.element,
+          aside.find('[data-test="rum-analytics-funnel-filter-all"]').element,
+        ),
+      ).toBe(true);
+      await section.find('[data-test="rum-analytics-funnel-add-breakdown-btn"]').trigger("click");
+      await settle();
+      await section
+        .find('[data-test="rum-analytics-funnel-field-picker-dim-browser"]')
+        .trigger("click");
+      await settle();
+      expect(useProductAnalytics().funnel.value.breakdown).toBe("browser");
+      expect(aside.find('[data-test="rum-analytics-funnel-breakdown-chip"]').text()).toContain(
+        "Browser",
+      );
+    });
+
+    it("the Sessions headline shows count, median and p90 as badges, then Why N?", async () => {
+      await mountFunnels();
+      await threeSteps();
+      const ids = [
+        "rum-analytics-funnel-overall-count",
+        "rum-analytics-funnel-overall-median",
+        "rum-analytics-funnel-overall-p90",
+      ];
+      for (const id of ids) {
+        expect(badge(id)?.props("variant")).toBe("default-soft");
+        expect(badge(id)?.props("size")).toBe("sm");
+      }
+      expect(text("rum-analytics-funnel-overall-count")).toBe("40 of 200 sessions");
+      expect(at("rum-analytics-funnel-overall-window").exists()).toBe(false);
+      expect(at("rum-analytics-funnel-overall-breakdown").exists()).toBe(false);
+      const order = at("rum-analytics-funnel-overall")
+        .findAll("[data-test]")
+        .map((e) => e.attributes("data-test"))
+        .filter((id) => [...ids, "rum-analytics-funnel-why-btn"].includes(id!));
+      expect(order).toEqual([...ids, "rum-analytics-funnel-why-btn"]);
+    });
+
+    it("Visitors with a window adds within 1 day of step 1, and the same-session window adds none", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await patch({ unit: "users", window: "1d" });
+      expect(badge("rum-analytics-funnel-overall-window")?.props("variant")).toBe("default-soft");
+      expect(text("rum-analytics-funnel-overall-window")).toBe("within 1 day of step 1");
+      expect(
+        follows(
+          at("rum-analytics-funnel-overall-count").element,
+          at("rum-analytics-funnel-overall-window").element,
+        ),
+      ).toBe(true);
+      expect(at("rum-analytics-funnel-why-btn").exists()).toBe(false);
+      await patch({ window: "session" });
+      expect(at("rum-analytics-funnel-overall-window").exists()).toBe(false);
+    });
+
+    it("a breakdown adds a clickable by-field badge tied to the rail, and drops median and p90", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await patch({ breakdown: "browser" });
+      const by = badge("rum-analytics-funnel-overall-breakdown")!;
+      expect(by).toBeDefined();
+      expect(by.text()).toBe("by Browser");
+      expect(by.props("clickable")).toBe(true);
+      expect(by.props("variant")).toBe("primary-soft");
+      expect(by.element.tagName).toBe("BUTTON");
+      expect(by.attributes("aria-expanded")).toBe("true");
+      expect(at("rum-analytics-funnel-overall-median").exists()).toBe(false);
+      expect(at("rum-analytics-funnel-overall-p90").exists()).toBe(false);
+      await at("rum-analytics-funnel-rail-collapse-btn").trigger("click");
+      expect(at("rum-analytics-funnel-overall-breakdown").attributes("aria-expanded")).toBe(
+        "false",
+      );
+    });
+
+    it("the by-field badge expands a collapsed rail and moves focus to the Breakdown section", async () => {
+      window.localStorage.setItem(COLLAPSED_KEY, "1");
+      await mountFunnels();
+      await threeSteps();
+      await patch({ breakdown: "browser" });
+      const toggle = () => at("rum-analytics-funnel-rail-collapse-btn");
+      expect(toggle().attributes("aria-expanded")).toBe("false");
+      await at("rum-analytics-funnel-overall-breakdown").trigger("click");
+      await settle();
+      expect(toggle().attributes("aria-expanded")).toBe("true");
+      expect(at("rum-analytics-funnel-overall-breakdown").attributes("aria-expanded")).toBe("true");
+      const section = wrapper!.find("aside").find(BREAKDOWN_SECTION).element;
+      expect(section.contains(document.activeElement)).toBe(true);
+    });
+
+    it("the by-field badge on a collapsed rail focuses the breakdown chip with a visible focus ring", async () => {
+      window.localStorage.setItem(COLLAPSED_KEY, "1");
+      await mountFunnels();
+      await threeSteps();
+      await patch({ breakdown: "browser" });
+      const focus = vi.spyOn(HTMLElement.prototype, "focus");
+      try {
+        await at("rum-analytics-funnel-overall-breakdown").trigger("click");
+        await settle();
+        const chip = wrapper!.find('[data-test="rum-analytics-funnel-breakdown-chip"]').element;
+        expect(document.activeElement).toBe(chip);
+        const onChip = focus.mock.calls.filter((_, i) => focus.mock.contexts[i] === chip);
+        expect(onChip.length).toBeGreaterThan(0);
+        expect(onChip.at(-1)).toEqual([{ focusVisible: true }]);
+      } finally {
+        focus.mockRestore();
+      }
+    });
+
+    it("the by-field badge on an expanded rail keeps it expanded and moves focus to the Breakdown section", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await patch({ breakdown: "browser" });
+      const toggle = () => at("rum-analytics-funnel-rail-collapse-btn");
+      expect(toggle().attributes("aria-expanded")).toBe("true");
+      await at("rum-analytics-funnel-overall-breakdown").trigger("click");
+      await settle();
+      expect(toggle().attributes("aria-expanded")).toBe("true");
+      expect(at("rum-analytics-funnel-overall-breakdown").attributes("aria-expanded")).toBe("true");
+      const section = wrapper!.find("aside").find(BREAKDOWN_SECTION).element;
+      expect(section.contains(document.activeElement)).toBe(true);
+    });
+
+    it("the by-field badge still shows in Trend view", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await patch({ breakdown: "browser" });
+      await at("rum-analytics-funnel-view-trend").trigger("click");
+      await settle();
+      expect(router.currentRoute.value.query.fv).toBe("trend");
+      expect(text("rum-analytics-funnel-overall-breakdown")).toBe("by Browser");
+    });
+
+    it("orders the badges count, window, breakdown, change for Visitors with a window, a breakdown and compare", async () => {
+      await mountFunnels({ fc: "prev" });
+      await threeSteps();
+      await patch({ unit: "users", window: "1d", breakdown: "browser" });
+      const ids = ["count", "window", "breakdown", "change"].map(
+        (k) => `rum-analytics-funnel-overall-${k}`,
+      );
+      const order = at("rum-analytics-funnel-overall")
+        .findAll("[data-test]")
+        .map((e) => e.attributes("data-test"))
+        .filter((id) => ids.includes(id!));
+      expect(order).toEqual(ids);
+    });
+
+    it("the by-field badge and a step menu's break-down scroll the Breakdown section into view", async () => {
+      const scroll = vi.fn();
+      Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+        configurable: true,
+        value: scroll,
+      });
+      try {
+        await mountFunnels();
+        await threeSteps();
+        await patch({ breakdown: "browser" });
+        const section = () => wrapper!.find("aside").find(BREAKDOWN_SECTION).element;
+        await at("rum-analytics-funnel-overall-breakdown").trigger("click");
+        await settle();
+        expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+        expect(scroll.mock.contexts.at(-1)).toBe(section());
+        scroll.mockClear();
+        wrapper!.findComponent({ name: "FunnelLayoutRail" }).vm.$emit("break-down-step", 2);
+        await settle();
+        expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+        expect(scroll.mock.contexts.at(-1)).toBe(section());
+      } finally {
+        delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+      }
+    });
+
+    it("shows no breakdown values line above the steps table", async () => {
+      await mountFunnels();
+      await threeSteps();
+      await patch({ breakdown: "browser" });
+      expect(text("rum-analytics-funnel-breakdown-row-0")).toContain("Chrome");
+      expect(at("rum-analytics-funnel-breakdown-summary").exists()).toBe(false);
+      expect(wrapper!.text()).not.toMatch(/Chrome 40\.0%\s*·\s*Firefox/);
+    });
+  });
+
+  describe("compare to the previous period (P1-11)", () => {
+    const isFunnel = (sql: string) => /FROM (ps|pu) LIMIT 1|SELECT dim, /.test(sql);
+    type Call = { sql: string; start_time: number; end_time: number };
+    const calls = (): Call[] =>
+      vi.mocked(searchService.search).mock.calls.map((c) => c[0].query.query as Call);
+    const prevCalls = () => {
+      const cur = useProductAnalytics().range.value!;
+      return calls().filter((q) => isFunnel(q.sql) && q.end_time <= cur.startUs);
+    };
+
+    // The previous window answers with its own numbers; everything else goes to the shared routes.
+    const answerPrevious = (prev: (sql: string, q: Call) => Hit[] | Promise<Hit[]>) => {
+      const base = vi.mocked(searchService.search).getMockImplementation()!;
+      vi.mocked(searchService.search).mockImplementation((async (args: {
+        query: { query: Call };
+      }) => {
+        const q = args.query.query;
+        const cur = useProductAnalytics().range.value;
+        if (cur && q.end_time <= cur.startUs && isFunnel(q.sql)) {
+          return { data: { hits: await prev(q.sql, q) } };
+        }
+        return base(args as never);
+      }) as never);
+    };
+
+    const prevHit = (counts: number[]) => (sql: string) => {
+      const n = (sql.match(/AS m\d+/g) ?? []).length;
+      return [
+        Object.fromEntries(
+          counts.slice(0, n).flatMap((c, i) => [
+            [`c${i + 1}`, c],
+            [`seen${i + 1}`, c],
+          ]),
+        ),
+      ];
+    };
+
+    const DAY_US = 86_400_000_000;
+    const COMPARE = "rum-analytics-funnel-compare-select";
+    const compareSelect = () => wrapper!.findComponent(`[data-test="${COMPARE}"]`);
+    const pickCompare = async (v: string) => {
+      compareSelect().vm.$emit("update:modelValue", v);
+      await settle();
+    };
+    const turnOn = () => pickCompare("prev");
+    const turnOff = () => pickCompare("off");
+    const compareOptions = () =>
+      (
+        compareSelect().props("options") as { label: unknown; value: string; disabled?: boolean }[]
+      ).map((o) => ({ label: String(o.label), value: o.value, disabled: !!o.disabled }));
+    const shifted = (byUs: number) => {
+      const cur = useProductAnalytics().range.value!;
+      return formatWindow({ startUs: cur.startUs - byUs, endUs: cur.endUs - byUs }, "UTC");
+    };
+    const colTip = (id: string) =>
+      wrapper!
+        .find(`[data-test="rum-analytics-funnel-col-${id}"] [aria-label]`)
+        .attributes("aria-label");
+
+    const threeSteps = [
+      ["p", "/a"],
+      ["c", "b"],
+      ["p", "/c"],
+    ];
+
+    it("runs the same funnel over the window before and never changes this period's numbers", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels();
+      await setSteps(threeSteps);
+      const before = {
+        counts: [0, 1, 2].map((i) => text(`rum-analytics-funnel-step-${i}-count`)),
+        overall: text("rum-analytics-funnel-overall"),
+        funnelRuns: calls().filter((q) => isFunnel(q.sql)).length,
+      };
+      const current = calls()
+        .filter((q) => isFunnel(q.sql))
+        .at(-1)!;
+      await turnOn();
+      expect(router.currentRoute.value.query.fc).toBe("prev");
+      expect(calls().filter((q) => isFunnel(q.sql))).toHaveLength(before.funnelRuns + 1);
+      const prev = prevCalls();
+      expect(prev).toHaveLength(1);
+      expect(prev[0].sql).toBe(current.sql);
+      expect(prev[0].start_time).toBe(current.start_time - (current.end_time - current.start_time));
+      expect([0, 1, 2].map((i) => text(`rum-analytics-funnel-step-${i}-count`))).toEqual(
+        before.counts,
+      );
+      expect(text("rum-analytics-funnel-overall")).toContain(before.overall.split(" ")[0]);
+      expect(text("rum-analytics-funnel-overall")).toContain("20.0%");
+      expect(text("rum-analytics-funnel-step-1-prev-count")).toBe("vs 60");
+      expect(text("rum-analytics-funnel-step-1-prev-rate")).toBe("60.0%");
+      expect(text("rum-analytics-funnel-step-1-change")).toContain("▼ 20.0 pts");
+      expect(text("rum-analytics-funnel-step-0-change")).toBe("—");
+      expect(text("rum-analytics-funnel-overall-change")).toContain("vs 30.0% in");
+      await turnOff();
+      expect(useProductAnalytics().funnelCompare.value).toBeNull();
+      expect(router.currentRoute.value.query.fc).toBeUndefined();
+      expect([0, 1, 2].map((i) => text(`rum-analytics-funnel-step-${i}-count`))).toEqual(
+        before.counts,
+      );
+      expect(calls().filter((q) => isFunnel(q.sql))).toHaveLength(before.funnelRuns + 1);
+    });
+
+    it("splits the step-to-step column under a group header and labels drop-offs with both periods", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels({ fc: "prev" });
+      await setSteps(threeSteps);
+      const header = wrapper!.find('[data-test="rum-analytics-funnel-steps-header"]');
+      expect(header.findAll("[data-test^=rum-analytics-funnel-col-]").map((c) => c.text())).toEqual(
+        [
+          "Conversion from previous step",
+          "Step",
+          "Sessions",
+          "This period",
+          "Previous period",
+          "Change (pts)",
+          "Time from step 1",
+          "Conversion from step 1",
+        ],
+      );
+      expect(
+        wrapper!
+          .find('[data-test="rum-analytics-funnel-col-change"] [aria-label]')
+          .attributes("aria-label"),
+      ).toBe("Change in percentage points, in conversion from the step above.");
+      expect(text("rum-analytics-funnel-dropoff-0")).toBe(
+        "60.0% dropped (120) vs 40.0% (40) previous period",
+      );
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-bar-previous"]').exists()).toBe(true);
+      // The previous run is enqueued after the current one, so it is the last funnel search.
+      const funnelRuns = calls().filter((q) => isFunnel(q.sql));
+      expect(funnelRuns.at(-1)!.end_time).toBe(useProductAnalytics().range.value!.startUs);
+      expect(funnelRuns.at(-2)!.end_time).toBe(useProductAnalytics().range.value!.endUs);
+    });
+
+    it.each([
+      ["down", [100, 60, 30], "error-soft"],
+      ["up", [100, 60, 10], "success-soft"],
+      ["low volume", [10, 6, 3], "default-soft"],
+    ] as const)(
+      "the headline change is a badge toned by its direction (%s)",
+      async (kind, counts, tone) => {
+        answerPrevious(prevHit([...counts]));
+        await mountFunnels({ fc: "prev" });
+        await setSteps(threeSteps);
+        const change = wrapper!
+          .findAllComponents(OBadge)
+          .find((b) => b.attributes("data-test") === "rum-analytics-funnel-overall-change");
+        expect(change?.props("variant")).toBe(tone);
+        expect(change?.props("size")).toBe("sm");
+        if (kind === "low volume") expect(change!.text()).toMatch(/low volume/i);
+      },
+    );
+
+    it("the headline change badge keeps its ±CI tooltip", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels({ fc: "prev" });
+      await setSteps(threeSteps);
+      const headline = wrapper!.find('[data-test="rum-analytics-funnel-overall"]').element;
+      const change = wrapper!.find('[data-test="rum-analytics-funnel-overall-change"]');
+      expect(change.exists()).toBe(true);
+      const tips = wrapper!
+        .findAllComponents(OTooltip)
+        .filter((t) => headline.contains(t.element))
+        .map((t) => String(t.props("content")));
+      expect(tips.some((c) => /95% interval: ±/.test(c))).toBe(true);
+    });
+
+    it("puts no plain range text between the headline badges", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels({ fc: "prev" });
+      await setSteps(threeSteps);
+      const headline = wrapper!.find('[data-test="rum-analytics-funnel-overall"]');
+      expect(headline.find('[data-test="rum-analytics-funnel-overall-change"]').exists()).toBe(
+        true,
+      );
+      expect(headline.find('[data-test="rum-analytics-funnel-overall-range"]').exists()).toBe(
+        false,
+      );
+      expect(headline.text()).not.toContain(`· ${shifted(0)}`);
+    });
+
+    it("a one-step funnel shows no range and no change in the headline", async () => {
+      answerPrevious(prevHit([100]));
+      await mountFunnels({ fc: "prev" });
+      await setSteps([["p", "/a"]]);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-overall-range"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-overall-change"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("a funnel with no steps keeps the compare-off layout", async () => {
+      await mountFunnels({ fc: "prev" });
+      expect(useProductAnalytics().funnelCompare.value).toBe("prev");
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-col-previous-period"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-overall-change"]').exists()).toBe(
+        false,
+      );
+      expect(prevCalls()).toHaveLength(0);
+    });
+
+    it("an empty previous period says so in words and shows dashes, not 0% or 100%", async () => {
+      answerPrevious(prevHit([0, 0, 0]));
+      await mountFunnels({ fc: "prev" });
+      await setSteps(threeSteps);
+      expect(text("rum-analytics-funnel-compare-empty")).toMatch(
+        /^No sessions in .+ to compare with$/,
+      );
+      expect(text("rum-analytics-funnel-step-1-prev-rate")).toBe("—");
+      expect(text("rum-analytics-funnel-step-1-change")).toBe("—");
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-step-1-prev-count"]').exists()).toBe(
+        false,
+      );
+      expect(text("rum-analytics-funnel-dropoff-0")).toBe("120 dropped (60.0%)");
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-overall-change"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("a failed previous run blanks only the compare cells", async () => {
+      answerPrevious(() =>
+        Promise.reject(Object.assign(new Error("boom"), { response: { status: 500 } })),
+      );
+      await mountFunnels({ fc: "prev" });
+      await setSteps(threeSteps);
+      expect(text("rum-analytics-funnel-step-1-count")).toBe("80");
+      expect(text("rum-analytics-funnel-step-1-prev-rate")).toBe("—");
+      expect(text("rum-analytics-funnel-step-1-change")).toBe("—");
+      expect(text("rum-analytics-funnel-dropoff-0")).toBe("120 dropped (60.0%)");
+    });
+
+    it("is offered only up to 31 days and stays on across a range change", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels({ fc: "prev", period: "60d" });
+      await setSteps(threeSteps);
+      expect(compareSelect().props("disabled")).toBe(true);
+      const trigger = wrapper!.find(`[data-test="${COMPARE}-trigger"]`).text().trim();
+      expect(trigger).toBe("Previous period");
+      expect(trigger).not.toMatch(/·|overlaps this range|same as previous period/);
+      const tips = wrapper!
+        .find('[data-test="rum-analytics-funnel-compare"]')
+        .findAllComponents(OTooltip)
+        .map((t) => String(t.props("content")));
+      expect(tips).toContain(
+        "Compare works on ranges up to 31 days. Pick a shorter range to compare.",
+      );
+      expect(prevCalls()).toHaveLength(0);
+      useProductAnalytics().setScope({
+        datetime: { valueType: "relative", relativeTimePeriod: "7d", startTime: 0, endTime: 0 },
+      });
+      await settle();
+      expect(compareSelect().props("disabled")).toBeFalsy();
+      expect(useProductAnalytics().funnelCompare.value).toBe("prev");
+      expect(prevCalls()).toHaveLength(1);
+      expect(text("rum-analytics-funnel-overall-change")).toContain("vs 30.0% in");
+    });
+
+    it("is one labelled Compare to select, Off by default, replacing the switch and its vs text", async () => {
+      await mountFunnels();
+      await setSteps(threeSteps);
+      const wrap = wrapper!.find('[data-test="rum-analytics-funnel-compare"]');
+      expect(wrap.find(`[data-test="${COMPARE}"]`).exists()).toBe(true);
+      const id = compareSelect().props("id") as string;
+      expect(id).toBeTruthy();
+      expect(wrap.find(`label[for="${id}"]`).text()).toBe("Compare to");
+      expect(compareSelect().props("modelValue")).toBe("off");
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-compare-switch"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-compare-vs"]').exists()).toBe(false);
+      expect(compareOptions().map((o) => o.value)).toEqual(["off", "prev", "1h", "1d", "1w"]);
+      expect(compareOptions()[0]).toEqual({ label: "Off", value: "off", disabled: false });
+    });
+
+    it("the Compare to trigger names only the mode, while its menu options keep their dates", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels({ period: "1d" });
+      await setSteps(threeSteps);
+      const trigger = () => wrapper!.find(`[data-test="${COMPARE}-trigger"]`);
+      expect(compareSelect().props("width")).toBe("sm");
+      expect(trigger().text().trim()).toBe("Off");
+      await pickCompare("prev");
+      const range = useProductAnalytics().range.value!;
+      const prevDates = shifted(range.endUs - range.startUs);
+      expect(trigger().text().trim()).toBe("Previous period");
+      expect(compareOptions()[1].label).toContain(prevDates);
+      await pickCompare("1w");
+      expect(trigger().text().trim()).toBe("1 week ago");
+      expect(trigger().text()).not.toContain(shifted(7 * DAY_US));
+      expect(compareOptions()[4].label).toContain(shifted(7 * DAY_US));
+    });
+
+    it("on a 7-day range offers only Previous period, with its dates; the offsets say why they are greyed", async () => {
+      await mountFunnels();
+      await setSteps(threeSteps);
+      const range = useProductAnalytics().range.value!;
+      const [, prev, h, d, w] = compareOptions();
+      expect(prev.disabled).toBe(false);
+      expect(prev.label).toContain("Previous period");
+      expect(prev.label).toContain(shifted(range.endUs - range.startUs));
+      expect(h).toMatchObject({ disabled: true });
+      expect(h.label).toContain("1 hour ago");
+      expect(h.label).toContain("overlaps this range");
+      expect(d).toMatchObject({ disabled: true });
+      expect(d.label).toContain("1 day ago");
+      expect(d.label).toContain("overlaps this range");
+      expect(w).toMatchObject({ disabled: true });
+      expect(w.label).toContain("1 week ago");
+      expect(w.label).toContain("same as previous period");
+    });
+
+    it("on a 1-day range offers 1 week ago with its dates, greys 1 day ago as the previous period", async () => {
+      await mountFunnels({ period: "1d" });
+      await setSteps(threeSteps);
+      const [, prev, h, d, w] = compareOptions();
+      expect(prev.disabled).toBe(false);
+      expect(h.disabled).toBe(true);
+      expect(h.label).toContain("overlaps this range");
+      expect(d.disabled).toBe(true);
+      expect(d.label).toContain("same as previous period");
+      expect(w.disabled).toBe(false);
+      expect(w.label).toContain("1 week ago");
+      expect(w.label).toContain(shifted(7 * DAY_US));
+      expect(w.label).not.toContain("overlaps this range");
+    });
+
+    it("1 week ago runs the funnel a week back and names that period in the headline and the table", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels({ period: "1d" });
+      await setSteps(threeSteps);
+      await pickCompare("1w");
+      expect(router.currentRoute.value.query.fc).toBe("1w");
+      expect(compareSelect().props("modelValue")).toBe("1w");
+      const cur = useProductAnalytics().range.value!;
+      const prev = prevCalls();
+      expect(prev).toHaveLength(1);
+      expect(prev[0].start_time).toBe(cur.startUs - 7 * DAY_US);
+      expect(prev[0].end_time).toBe(cur.endUs - 7 * DAY_US);
+      const change = text("rum-analytics-funnel-overall-change");
+      expect(change).toContain("30.0%");
+      expect(change).toContain("1 week ago");
+      expect(change).toContain(shifted(7 * DAY_US));
+      expect(text("rum-analytics-funnel-col-previous-period")).toBe("1 week ago");
+      expect(text("rum-analytics-funnel-step-1-prev-rate")).toBe("60.0%");
+    });
+
+    it("switching the mode reruns the previous funnel for the new window", async () => {
+      answerPrevious((sql, q) => {
+        const cur = useProductAnalytics().range.value!;
+        return prevHit(q.end_time === cur.startUs ? [100, 60, 30] : [100, 90, 80])(sql);
+      });
+      await mountFunnels({ period: "1d" });
+      await setSteps(threeSteps);
+      await pickCompare("prev");
+      expect(text("rum-analytics-funnel-overall-change")).toContain("vs 30.0%");
+      await pickCompare("1w");
+      expect(prevCalls()).toHaveLength(2);
+      expect(text("rum-analytics-funnel-overall-change")).toContain("80.0%");
+      expect(text("rum-analytics-funnel-step-2-prev-rate")).toBe("88.9%");
+      await pickCompare("prev");
+      expect(text("rum-analytics-funnel-overall-change")).toContain("vs 30.0%");
+      expect(text("rum-analytics-funnel-step-2-prev-rate")).toBe("50.0%");
+    });
+
+    it("a range the offset no longer fits compares with the previous period and keeps fc, so going back restores it", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels({ fc: "1w", period: "1d" });
+      await setSteps(threeSteps);
+      const setPeriod = async (p: string) => {
+        useProductAnalytics().setScope({
+          datetime: { valueType: "relative", relativeTimePeriod: p, startTime: 0, endTime: 0 },
+        });
+        await settle();
+      };
+      const last = () => prevCalls().at(-1)!;
+      expect(last().end_time).toBe(useProductAnalytics().range.value!.endUs - 7 * DAY_US);
+      await setPeriod("7d");
+      expect(router.currentRoute.value.query.fc).toBe("1w");
+      expect(useProductAnalytics().funnelCompare.value).toBe("1w");
+      expect(compareSelect().props("modelValue")).toBe("prev");
+      expect(wrapper!.find(`[data-test="${COMPARE}-trigger"]`).text().trim()).toBe(
+        "Previous period",
+      );
+      expect(last().end_time).toBe(useProductAnalytics().range.value!.startUs);
+      expect(text("rum-analytics-funnel-col-previous-period")).toBe("Previous period");
+      await setPeriod("1d");
+      expect(compareSelect().props("modelValue")).toBe("1w");
+      expect(last().end_time).toBe(useProductAnalytics().range.value!.endUs - 7 * DAY_US);
+      expect(text("rum-analytics-funnel-col-previous-period")).toBe("1 week ago");
+    });
+
+    it("picking Previous period while a remembered offset falls back to it writes fc=prev", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels({ fc: "1d" });
+      await setSteps(threeSteps);
+      expect(compareSelect().props("modelValue")).toBe("prev");
+      await pickCompare("prev");
+      expect(useProductAnalytics().funnelCompare.value).toBe("prev");
+      expect(router.currentRoute.value.query.fc).toBe("prev");
+    });
+
+    it("re-picking Previous period while a remembered offset already falls back to it starts no new previous run", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels({ fc: "1d" });
+      await setSteps(threeSteps);
+      expect(prevCalls()).toHaveLength(1);
+      await pickCompare("prev");
+      expect(router.currentRoute.value.query.fc).toBe("prev");
+      expect(prevCalls()).toHaveLength(1);
+      expect(text("rum-analytics-funnel-overall-change")).toContain("vs 30.0% in");
+    });
+
+    it("has no legend row above the steps table; the step-1 column tooltip explains the bars while comparing", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels();
+      await setSteps(threeSteps);
+      expect(colTip("of-first")).toBe(
+        "Share of step 1 that reached this step. Hatched part: removed by exclusion steps",
+      );
+      await turnOn();
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-compare-legend"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper!.text()).not.toContain("Bars: share of step-1");
+      expect(wrapper!.text()).not.toContain("Change: conversion from the step above.");
+      expect(colTip("of-first")).toBe(
+        "Share of step 1 that reached this step. Solid bar: this period. Hatched bar: previous period.",
+      );
+      expect(colTip("change")).toBe(
+        "Change in percentage points, in conversion from the step above.",
+      );
+    });
+
+    it("with a breakdown and 1 week ago, the breakdown table names that period", async () => {
+      answerPrevious(() => [{ dim: "Chrome", c1: 100, c2: 50 }]);
+      await mountFunnels({ fc: "1w", period: "1d" });
+      await setSteps([
+        ["p", "/a"],
+        ["c", "b"],
+      ]);
+      useProductAnalytics().funnel.value = {
+        ...useProductAnalytics().funnel.value,
+        breakdown: "browser",
+      };
+      await settle();
+      const table = wrapper!.find('[data-test="rum-analytics-funnel-breakdown"]');
+      expect(table.text()).toContain("1 week ago");
+      expect(table.text()).not.toContain("Previous period");
+      expect(text("rum-analytics-funnel-breakdown-row-0-prev")).toBe("50.0%");
+    });
+
+    it("with a breakdown, compares each value's overall conversion in its own columns", async () => {
+      answerPrevious(() => [
+        { dim: "Chrome", c1: 100, c2: 50 },
+        { dim: "Safari", c1: 10, c2: 5 },
+      ]);
+      await mountFunnels({ fc: "prev" });
+      await setSteps([
+        ["p", "/a"],
+        ["c", "b"],
+      ]);
+      useProductAnalytics().funnel.value = {
+        ...useProductAnalytics().funnel.value,
+        breakdown: "browser",
+      };
+      await settle();
+      expect(prevCalls().at(-1)!.sql).toMatch(/SELECT dim, /);
+      const table = wrapper!.find('[data-test="rum-analytics-funnel-breakdown"]');
+      expect(table.text()).toContain("Previous period");
+      expect(table.text()).toContain("Change (pts)");
+      expect(text("rum-analytics-funnel-breakdown-row-0-prev")).toBe("50.0%");
+      expect(text("rum-analytics-funnel-breakdown-row-1-prev")).toBe("—");
+      expect(table.text()).toContain("Safari");
+      const safari = table
+        .findAll("[data-test^=rum-analytics-funnel-breakdown-row-]")
+        .find((c) => c.text() === "Safari")!
+        .element.closest("tr")!.textContent!;
+      // Steps, this period's conversion and its median are dashes; only the previous period has a value.
+      expect(safari).toBe("Safari————50.0%—");
+    });
+  });
+
+  describe("conversion over time, Steps | Trend (P0-9)", () => {
+    type Call = { sql: string; start_time: number; end_time: number };
+    const calls = (): Call[] =>
+      vi.mocked(searchService.search).mock.calls.map((c) => c[0].query.query as Call);
+    const trendCalls = () => calls().filter((q) => / AS bk, | AS gd, /.test(q.sql));
+    const fourSteps = [
+      ["p", "/a"],
+      ["c", "b"],
+      ["p", "/c"],
+      ["c", "d"],
+    ];
+
+    const fourPages = [
+      ["p", "/a"],
+      ["p", "/b"],
+      ["p", "/c"],
+      ["p", "/d"],
+    ];
+    const FROM = "rum-analytics-funnel-trend-from-select";
+    const TO = "rum-analytics-funnel-trend-to-select";
+    const sel = (dt: string) => wrapper!.findComponent(`[data-test="${dt}"]`);
+    const follows = (a: Element, b: Element) =>
+      !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    beforeEach(() => {
+      routes.unshift([/ AS bk, | AS gd, /, () => [{ bk: 1, ca: 20, cb: 5 }]]);
+    });
+
+    it("Steps view and page load never run the trend query", async () => {
+      await mountFunnels();
+      await setSteps(fourSteps);
+      expect(trendCalls()).toHaveLength(0);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-trend"]').exists()).toBe(false);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-trend-steps"]').exists()).toBe(false);
+    });
+
+    it("Trend runs once, writes fv=trend, holds Alert me back, and Steps comes back without a rerun", async () => {
+      await mountFunnels();
+      await setSteps(fourSteps);
+      const stepsRuns = funnelSqls().length;
+      await wrapper!.find('[data-test="rum-analytics-funnel-view-trend"]').trigger("click");
+      await settle();
+      expect(router.currentRoute.value.query.fv).toBe("trend");
+      expect(trendCalls()).toHaveLength(1);
+      expect(trendCalls()[0].sql).toContain("MIN(CASE WHEN m1 = 1 THEN ts END) AS entry_ts");
+      expect(funnelSqls()).toHaveLength(stepsRuns);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-trend-table"]').text()).toContain(
+        "Entered step 1",
+      );
+      expect(
+        wrapper!.find('[data-test="rum-analytics-funnel-alert-btn"]').attributes("disabled"),
+      ).toBeDefined();
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(false);
+      await wrapper!.find('[data-test="rum-analytics-funnel-view-steps"]').trigger("click");
+      await settle();
+      expect(router.currentRoute.value.query.fv).toBeUndefined();
+      expect(trendCalls()).toHaveLength(1);
+      expect(funnelSqls()).toHaveLength(stepsRuns);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(true);
+    });
+
+    it("an attribute breakdown's lines rank at its pinned step, or wait for the funnel's start step", async () => {
+      const PAY = "context_payment_method";
+      const { performanceState } = usePerformance();
+      performanceState.data.streams._rumdata = {
+        name: "_rumdata",
+        schema: { usr_email: { name: "usr_email" }, [PAY]: { name: PAY } },
+      };
+      routes.unshift([
+        /SELECT dim, /,
+        () => [
+          { dim: "card", c1: 20, c2: 18, c3: 17, c4: 17, dc1: 0, dc2: 0, dc3: 17, dc4: 17 },
+          { dim: null, c1: 60, c2: 30, c3: 3, c4: 1, dc1: 0, dc2: 0, dc3: 0, dc4: 0 },
+        ],
+      ]);
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourSteps);
+      const pa = useProductAnalytics();
+      pa.funnel.value = { ...pa.funnel.value, breakdown: { f: PAY, s: 2 } };
+      await settle();
+      expect(trendCalls().at(-1)!.sql).toContain("SUM(r1) AS c1, SUM(r2) AS c2, SUM(r1) AS ca");
+      pa.funnel.value = { ...pa.funnel.value, breakdown: { f: PAY } };
+      await settle();
+      await settle();
+      expect(trendCalls().at(-1)!.sql).toContain("SUM(r3) AS c3, SUM(r1) AS ca");
+      expect(trendCalls().at(-1)!.sql).toContain("un = 0 AND tot > 0 AND rk <= 5");
+    });
+
+    it("a pair from the link picks its own reach columns; a pair the funnel cannot hold falls back", async () => {
+      await mountFunnels({ fv: "trend", fp: "2-3" });
+      await setSteps(fourSteps);
+      expect(trendCalls().at(-1)!.sql).toMatch(
+        /SUM\(r2\) AS ca, SUM\(r3\) AS cb FROM ps WHERE r2 = 1/,
+      );
+      expect(sel(FROM).props("modelValue")).toBe(2);
+      expect(sel(TO).props("modelValue")).toBe(3);
+      useProductAnalytics().funnelPair.value = { a: 3, b: 9 };
+      await settle();
+      expect(trendCalls().at(-1)!.sql).toMatch(/SUM\(r1\) AS ca, SUM\(r4\) AS cb/);
+      expect(sel(FROM).props("modelValue")).toBe(1);
+      expect(sel(TO).props("modelValue")).toBe(4);
+    });
+
+    it("removing a step resets a pair it breaks to step 1 → the last step", async () => {
+      await mountFunnels({ fv: "trend", fp: "3-4" });
+      await setSteps(fourSteps);
+      expect(sel(FROM).props("modelValue")).toBe(3);
+      await setSteps(fourSteps.slice(0, 3));
+      expect(sel(FROM).props("modelValue")).toBe(1);
+      expect(sel(TO).props("modelValue")).toBe(3);
+      expect(trendCalls().at(-1)!.sql).toMatch(/SUM\(r1\) AS ca, SUM\(r3\) AS cb/);
+    });
+
+    it("Trend puts Conversion from, to and Interval in a row under the toolbar, with no pair select left in the toolbar", async () => {
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourSteps);
+      const row = wrapper!.find('[data-test="rum-analytics-funnel-trend-steps"]');
+      expect(row.exists()).toBe(true);
+      expect(row.text()).toContain("Conversion from");
+      expect(row.text()).toContain("Interval");
+      const fromId = sel(FROM).props("id") as string;
+      expect(fromId).toBeTruthy();
+      expect(row.find(`label[for="${fromId}"]`).text()).toBe("Conversion from");
+      const toId = sel(TO).props("id") as string;
+      expect(toId).toBeTruthy();
+      expect(row.find(`label[for="${toId}"]`).text()).toBe("to");
+      for (const dt of [FROM, TO, "rum-analytics-funnel-trend-interval-select"])
+        expect(row.find(`[data-test="${dt}"]`).exists()).toBe(true);
+      const controls = wrapper!.find('[data-test="rum-analytics-funnel-toolbar-controls"]');
+      expect(controls.find(`[data-test="${FROM}"]`).exists()).toBe(false);
+      expect(
+        controls.find('[data-test="rum-analytics-funnel-trend-interval-select"]').exists(),
+      ).toBe(false);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-trend-pair"]').exists()).toBe(false);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-trend-pair-select"]').exists()).toBe(
+        false,
+      );
+      expect(controls.text()).not.toContain("Conversion from");
+      const chart = wrapper!.find('[data-test="rum-analytics-funnel-trend"]');
+      expect(follows(controls.element, row.element)).toBe(true);
+      expect(follows(row.element, chart.element)).toBe(true);
+    });
+
+    it("Conversion from, to and Interval are plain menus their labels focus; from and to fit a step name", async () => {
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourSteps);
+      expectLabelFocusesSelect(FROM, "Conversion from");
+      expectLabelFocusesSelect(TO, "to");
+      expectLabelFocusesSelect("rum-analytics-funnel-trend-interval-select", "Interval");
+      expect(sel(FROM).props("width")).toBe("md");
+      expect(sel(TO).props("width")).toBe("md");
+    });
+
+    it("from lists steps 1 to n-1 and to the later steps, as N · step name, with the last step marked", async () => {
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourPages);
+      const labels = (dt: string) =>
+        (sel(dt).props("options") as { label: unknown }[]).map((o) => String(o.label));
+      const values = (dt: string) =>
+        (sel(dt).props("options") as { value: unknown }[]).map((o) => o.value);
+      expect(labels(FROM)).toEqual(["1 · /a", "2 · /b", "3 · /c"]);
+      expect(values(FROM)).toEqual([1, 2, 3]);
+      expect(values(TO)).toEqual([2, 3, 4]);
+      const to = labels(TO);
+      expect(to[0]).toBe("2 · /b");
+      expect(to[1]).toBe("3 · /c");
+      expect(to[2]).toContain("4 · /d");
+      expect(to[2]).toContain("last step");
+      expect(sel(FROM).props("modelValue")).toBe(1);
+      expect(sel(TO).props("modelValue")).toBe(4);
+    });
+
+    it("picking from and to writes fp, from at or past to moves to to the last step, and step 1 → last drops fp", async () => {
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourSteps);
+      const pick = async (dt: string, v: number) => {
+        sel(dt).vm.$emit("update:modelValue", v);
+        await settle();
+      };
+      await pick(FROM, 2);
+      expect(router.currentRoute.value.query.fp).toBe("2-4");
+      expect((sel(TO).props("options") as { value: unknown }[]).map((o) => o.value)).toEqual([
+        3, 4,
+      ]);
+      expect(trendCalls().at(-1)!.sql).toMatch(/SUM\(r2\) AS ca, SUM\(r4\) AS cb/);
+      await pick(TO, 3);
+      expect(router.currentRoute.value.query.fp).toBe("2-3");
+      await pick(FROM, 3);
+      expect(router.currentRoute.value.query.fp).toBe("3-4");
+      expect(sel(TO).props("modelValue")).toBe(4);
+      await pick(FROM, 1);
+      expect(router.currentRoute.value.query.fp).toBeUndefined();
+      expect(sel(TO).props("modelValue")).toBe(4);
+    });
+
+    it("a 2-step funnel shows both step selects disabled", async () => {
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourSteps.slice(0, 2));
+      expect(sel(FROM).props("disabled")).toBe(true);
+      expect(sel(TO).props("disabled")).toBe(true);
+      await setSteps(fourSteps.slice(0, 3));
+      expect(sel(FROM).props("disabled")).toBeFalsy();
+      expect(sel(TO).props("disabled")).toBeFalsy();
+    });
+
+    it("a step's Show conversion trend from this step opens Trend from that step to the last", async () => {
+      await mountFunnels();
+      await setSteps(fourSteps);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-step-3-trend-from"]').exists()).toBe(
+        false,
+      );
+      await wrapper!.find('[data-test="rum-analytics-funnel-step-1-trend-from"]').trigger("click");
+      await settle();
+      expect(router.currentRoute.value.query.fv).toBe("trend");
+      expect(router.currentRoute.value.query.fp).toBe("2-4");
+      expect(sel(FROM).props("modelValue")).toBe(2);
+      expect(sel(TO).props("modelValue")).toBe(4);
+      expect(trendCalls().at(-1)!.sql).toMatch(/SUM\(r2\) AS ca, SUM\(r4\) AS cb/);
+    });
+
+    it("Show conversion trend from this step moves focus to the Conversion from select", async () => {
+      await mountFunnels();
+      await setSteps(fourSteps);
+      await wrapper!.find('[data-test="rum-analytics-funnel-step-1-trend-from"]').trigger("click");
+      await settle();
+      expect(document.activeElement).not.toBe(document.body);
+      expect(sel(FROM).element.contains(document.activeElement)).toBe(true);
+    });
+
+    it("trend-from-step on step 1 opens Trend at the default pair, clearing a picked one", async () => {
+      await mountFunnels({ fp: "2-3" });
+      await setSteps(fourSteps);
+      wrapper!.findComponent({ name: "FunnelLayoutRail" }).vm.$emit("trend-from-step", 1);
+      await settle();
+      expect(router.currentRoute.value.query.fv).toBe("trend");
+      expect(router.currentRoute.value.query.fp).toBeUndefined();
+      expect(sel(FROM).props("modelValue")).toBe(1);
+      expect(sel(TO).props("modelValue")).toBe(4);
+    });
+
+    it("with compare on, runs the trend again over the window before", async () => {
+      await mountFunnels({ fv: "trend", fc: "prev" });
+      await setSteps(fourSteps);
+      const cur = useProductAnalytics().range.value!;
+      const prev = trendCalls().filter((q) => q.end_time === cur.startUs);
+      expect(prev).toHaveLength(1);
+      expect(prev[0].start_time).toBe(cur.startUs - (cur.endUs - cur.startUs));
+      expect(
+        wrapper!.find('[data-test="rum-analytics-funnel-trend-table"] thead').text(),
+      ).toContain("Previous period, same day");
+    });
+
+    it("switching compare from the previous period to 1 week ago runs the trend's previous line again", async () => {
+      await mountFunnels({ fv: "trend", fc: "prev", period: "3d" });
+      await setSteps(fourSteps);
+      const cur = useProductAnalytics().range.value!;
+      const prevTrend = () => trendCalls().filter((q) => q.end_time <= cur.startUs);
+      expect(prevTrend()).toHaveLength(1);
+      expect(prevTrend()[0].end_time).toBe(cur.startUs);
+      sel("rum-analytics-funnel-compare-select").vm.$emit("update:modelValue", "1w");
+      await settle();
+      expect(router.currentRoute.value.query.fc).toBe("1w");
+      expect(prevTrend()).toHaveLength(2);
+      expect(prevTrend()[1].start_time).toBe(cur.startUs - 7 * 86_400_000_000);
+      expect(prevTrend()[1].end_time).toBe(cur.endUs - 7 * 86_400_000_000);
+    });
+
+    it("an offset the 7-day range cannot use runs the trend's previous line over the previous period and keeps fc", async () => {
+      await mountFunnels({ fv: "trend", fc: "1d" });
+      await setSteps(fourSteps);
+      const cur = useProductAnalytics().range.value!;
+      const prevTrend = trendCalls().filter((q) => q.end_time <= cur.startUs);
+      expect(prevTrend).toHaveLength(1);
+      expect(prevTrend[0].end_time).toBe(cur.startUs);
+      expect(prevTrend[0].start_time).toBe(cur.startUs - (cur.endUs - cur.startUs));
+      expect(router.currentRoute.value.query.fc).toBe("1d");
+    });
+
+    describe("the missing comparison line with a breakdown", () => {
+      const WARN = "rum-analytics-funnel-trend-compare-warning";
+      const warn = () => wrapper!.find(`[data-test="${WARN}"]`);
+      const withBreakdown = async () => {
+        const pa = useProductAnalytics();
+        pa.funnel.value = { ...pa.funnel.value, breakdown: "browser" };
+        await settle();
+      };
+
+      it("shows a warning icon at the end of the Conversion from row only in Trend with compare and a breakdown", async () => {
+        await mountFunnels({ fv: "trend", fc: "prev" });
+        await setSteps(fourSteps);
+        expect(warn().exists()).toBe(false);
+        await withBreakdown();
+        const row = wrapper!.find('[data-test="rum-analytics-funnel-trend-steps"]');
+        const btn = row.find(`[data-test="${WARN}"]`);
+        expect(btn.exists()).toBe(true);
+        expect(btn.attributes("aria-label")).toBe("About the missing comparison line");
+        expect(btn.text()).toBe("");
+        expect(btn.element.closest(".ms-auto")).not.toBeNull();
+        sel("rum-analytics-funnel-compare-select").vm.$emit("update:modelValue", "off");
+        await settle();
+        expect(warn().exists()).toBe(false);
+      });
+
+      it("is not shown when the range is too long to compare", async () => {
+        await mountFunnels({ fv: "trend", fc: "prev", period: "60d" });
+        await setSteps(fourSteps);
+        await withBreakdown();
+        expect(wrapper!.find('[data-test="rum-analytics-funnel-trend-steps"]').exists()).toBe(true);
+        expect(warn().exists()).toBe(false);
+      });
+
+      it("names the offset's dates in the popover with 1 week ago on a 1-day range", async () => {
+        await mountFunnels({ fv: "trend", fc: "1w", period: "1d" });
+        await setSteps(fourSteps);
+        await withBreakdown();
+        const range = useProductAnalytics().range.value!;
+        const week = 7 * 86_400_000_000;
+        const dates = formatWindow(
+          { startUs: range.startUs - week, endUs: range.endUs - week },
+          "UTC",
+        );
+        await warn().trigger("click");
+        await settle();
+        expect(wrapper!.text()).toContain(`the whole funnel with ${dates}.`);
+      });
+
+      it("is not shown in Steps view with compare and a breakdown", async () => {
+        await mountFunnels({ fc: "prev" });
+        await setSteps(fourSteps);
+        await withBreakdown();
+        expect(warn().exists()).toBe(false);
+      });
+
+      it("moves focus to the Conversion from select after Remove breakdown unmounts the popover", async () => {
+        await mountFunnels({ fv: "trend", fc: "prev" });
+        await setSteps(fourSteps);
+        await withBreakdown();
+        await warn().trigger("click");
+        await settle();
+        const remove = wrapper!.find(
+          '[data-test="rum-analytics-funnel-trend-compare-remove-breakdown"]',
+        );
+        (remove.element as HTMLElement).focus();
+        await remove.trigger("click");
+        await settle();
+        expect(warn().exists()).toBe(false);
+        expect(document.activeElement).not.toBe(document.body);
+        expect(sel(FROM).element.contains(document.activeElement)).toBe(true);
+      });
+
+      it("opens a popover saying why, and its Remove breakdown clears the breakdown and closes it", async () => {
+        await mountFunnels({ fv: "trend", fc: "prev" });
+        await setSteps(fourSteps);
+        await withBreakdown();
+        const range = useProductAnalytics().range.value!;
+        const prevRange = formatWindow(
+          { startUs: range.startUs - (range.endUs - range.startUs), endUs: range.startUs },
+          "UTC",
+        );
+        expect(wrapper!.text()).not.toContain("The chart has no comparison line");
+        await warn().trigger("click");
+        await settle();
+        const body = wrapper!.text();
+        expect(body).toMatch(
+          /The chart has no comparison line while a breakdown is on: .+ is its own line\. The headline still compares the whole funnel with /,
+        );
+        expect(body).toMatch(/breakdown is on: [^.]*\bBrowser\b[^.]* is its own line\./);
+        expect(body).not.toContain("each Browser is its own line");
+        expect(body).toContain(`the whole funnel with ${prevRange}.`);
+        const remove = wrapper!
+          .findAllComponents(OButton)
+          .find((b) => b.text() === "Remove breakdown" && !b.element.closest("aside"));
+        expect(remove).toBeTruthy();
+        expect(remove!.props("variant")).toBe("outline");
+        await remove!.trigger("click");
+        await settle();
+        expect(useProductAnalytics().funnel.value.breakdown).toBeFalsy();
+        expect(warn().exists()).toBe(false);
+        expect(wrapper!.text()).not.toContain("The chart has no comparison line");
+      });
+    });
+
+    it("Add to dashboard from Trend adds a line panel bucketed by histogram", async () => {
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourSteps);
+      await wrapper!.find('[data-test="rum-analytics-funnel-add-dashboard-btn"]').trigger("click");
+      await flushPromises();
+      const panels = wrapper!.findComponent({ name: "AddToDashboard" }).props("panels") as {
+        type: string;
+        queries: { query: string }[];
+      }[];
+      expect(panels[0].type).toBe("line");
+      expect(panels[0].queries[0].query).toContain("histogram(entry_ts, '1 day')");
+    });
+
+    it("Add to dashboard from Trend bakes the picked steps and interval into the panel", async () => {
+      await mountFunnels({ fv: "trend", period: "30d" });
+      await setSteps(fourSteps);
+      sel(FROM).vm.$emit("update:modelValue", 2);
+      await settle();
+      sel(TO).vm.$emit("update:modelValue", 3);
+      await settle();
+      sel("rum-analytics-funnel-trend-interval-select").vm.$emit("update:modelValue", "week");
+      await settle();
+      expect(useProductAnalytics().funnelPair.value).toEqual({ a: 2, b: 3 });
+      await wrapper!.find('[data-test="rum-analytics-funnel-add-dashboard-btn"]').trigger("click");
+      await flushPromises();
+      const panels = wrapper!.findComponent({ name: "AddToDashboard" }).props("panels") as {
+        title: string;
+        queries: { query: string }[];
+      }[];
+      expect(String(panels[0].title)).toBe("Conversion over time: b → /c");
+      expect(panels[0].queries[0].query).toContain("histogram(entry_ts, '1 week')");
     });
   });
 });
