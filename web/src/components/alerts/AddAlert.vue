@@ -362,6 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :formattedDestinations="getFormattedDestinations"
                     :destinationObjects="destinations"
                     :workflows="formData.workflows"
+                    :sampleRow="previewSampleRow"
                     @update:trigger="updateTriggerCondition"
                     @update:aggregation="updateAggregation"
                     @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
@@ -869,6 +870,7 @@ export default defineComponent({
     const activeEvaluationStatus = computed(
       () => alertForm.previewAlertRef.value?.evaluationStatus || null,
     );
+    const previewSampleRow = computed(() => alertForm.previewAlertRef.value?.sampleRow || null);
     const alertTypeOptions = computed(() => [
       { label: alertForm.t("alerts.scheduled"), value: "false", icon: "schedule" },
       { label: alertForm.t("alerts.realTime"), value: "true", icon: "bolt" },
@@ -1057,6 +1059,7 @@ export default defineComponent({
       saveModeInfo,
       saveModeNote,
       activeEvaluationStatus,
+      previewSampleRow,
       isCompositeMode,
       availableCompositeChildren,
       updateCompositeDraft,

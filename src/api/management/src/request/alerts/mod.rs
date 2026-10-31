@@ -488,6 +488,9 @@ fn composite_input(
         owner: alert.owner.or_else(|| Some(user_id.clone())),
         last_edited_by: Some(user_id),
         pending_period_sec: alert.pending_period_sec,
+        incident_title_template: alert
+            .incident_title_template
+            .filter(|t| !t.trim().is_empty()),
     }
 }
 
@@ -647,6 +650,7 @@ async fn composite_detail_response(
         "children": children,
         "evaluation": evaluation_json,
         "pending_period_sec": definition.pending_period_sec,
+        "incident_title_template": definition.incident_title_template,
     }))
 }
 
