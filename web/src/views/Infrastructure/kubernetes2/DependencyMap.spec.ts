@@ -162,6 +162,24 @@ describe("DependencyMap", () => {
     expect(card("c").classes()).not.toContain("opacity-30");
   });
 
+  it("labels only a hovered hub's busiest edges", async () => {
+    const ends = Array.from({ length: 12 }, (_, i) => node(`w${i}`, 0));
+    mountMap(
+      [...ends, node("api", 340), node("db", 680)],
+      [...ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))), edge("api", "db", 50_000)],
+    );
+    await flow().vm.$emit("node-mouse-enter", { node: { id: "api" } });
+    const shown = wrapper
+      .findAllComponents({ name: "BaseEdge" })
+      .filter((e) => e.props("label") !== undefined)
+      .map((e) => e.props("id"));
+    expect(shown).toHaveLength(8);
+    expect(shown).toContain("api-db");
+    expect(shown).not.toContain("w0-api");
+    await flow().vm.$emit("edge-mouse-enter", { edge: { id: "w0-api" } });
+    expect(baseEdge("w0-api").props("label")).toBeDefined();
+  });
+
   it("shows a hovered edge's rate even when it is not among the busiest", async () => {
     const ends = Array.from({ length: 10 }, (_, i) => node(`w${i}`, 0));
     mountMap(

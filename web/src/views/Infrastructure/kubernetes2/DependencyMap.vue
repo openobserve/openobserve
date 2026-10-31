@@ -153,14 +153,18 @@ const neighbours = computed(() => {
   return out;
 });
 
-const busiest = computed(
-  () =>
-    new Set(
-      [...drawn.value]
-        .sort((a, b) => b.total - a.total)
-        .slice(0, LABELLED)
-        .map((e) => e.id),
-    ),
+const busiestOf = (edges: MapEdge[]) =>
+  new Set(
+    [...edges]
+      .sort((a, b) => b.total - a.total)
+      .slice(0, LABELLED)
+      .map((e) => e.id),
+  );
+
+// The map's busiest edges, or while a card is hovered its own busiest: a hub can have dozens of edges, and each
+// new label is measured as it appears.
+const labelled = computed(() =>
+  busiestOf(hovered.value ? drawn.value.filter((e) => touches(e, hovered.value!)) : drawn.value),
 );
 
 const openLabel = (node: MapNode) =>
@@ -240,12 +244,9 @@ function strokeOf(edge: EdgeProps) {
   };
 }
 
-// The busiest edges' rates, or while a card is hovered only its own edges' rates; a hovered edge always shows its own.
+// A hovered edge always shows its rate.
 const labelOf = (edge: EdgeProps) =>
-  edge.id === hoveredEdge.value ||
-  (hovered.value ? touches(edge, hovered.value) : busiest.value.has(edge.id))
-    ? edge.data.rate
-    : undefined;
+  edge.id === hoveredEdge.value || labelled.value.has(edge.id) ? edge.data.rate : undefined;
 
 const pathOf = (edge: EdgeProps): [string, number, number] =>
   edge.data.loop
