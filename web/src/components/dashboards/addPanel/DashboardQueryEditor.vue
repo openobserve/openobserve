@@ -634,6 +634,12 @@ export default defineComponent({
         });
       }
 
+      if (dashboardPanelData.data.type === "boxplot") {
+        return t("dashboard.multiQueryWarning", {
+          chartType: t("dashboard.chartSelection.boxplot"),
+        });
+      }
+
       return null;
     });
 

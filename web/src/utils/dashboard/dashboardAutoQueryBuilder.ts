@@ -2,6 +2,7 @@ import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { DEFAULT_CAST_TARGET_TYPE, isCastTargetType } from "@/utils/dashboard/castSuggestion";
 import { DISTRIBUTION_ROW_LIMIT, isRawValueChart } from "@/utils/dashboard/chartTypeGroups";
+import { BOXPLOT_STATS, boxplotStatAlias } from "@/utils/dashboard/boxplotStats";
 import {
   heatmapYBucketError,
   heatmapYBucketing,
@@ -363,6 +364,8 @@ export function buildSQLChartQuery(config: {
     return "";
   }
 
+  if (chartType === "boxplot") return buildBoxplotStatsQuery(queryData, dashboardPanelData);
+
   const stream = queryData.fields.stream;
   const streamAlias = queryData?.joins?.length ? stream : "";
 
@@ -501,6 +504,40 @@ export function buildSQLChartQuery(config: {
     query += ` LIMIT ${queryLimit}`;
   }
 
+  return query;
+}
+
+/** Double-quotes a stored identifier; an imported dashboard's alias or stream must not reach the SQL as syntax. */
+const quoteIdentifier = (name: unknown): string => `"${String(name).replace(/"/g, '""')}"`;
+
+/** A box plot's builder query: the y field's five-number summary per x category, over every matching row. */
+function buildBoxplotStatsQuery(queryData: any, dashboardPanelData: any): string {
+  const stream = queryData.fields.stream;
+  const streamAlias = queryData?.joins?.length ? stream : "";
+  const valueField = queryData.fields.y.find((field: any) => !field?.isDerived);
+  const value = valueField ? buildSQLQueryFromInput(valueField, streamAlias) : "";
+  if (!value) return "";
+  const category = queryData.fields.x.find((field: any) => !field?.isDerived);
+  const categorySql = category ? buildSQLQueryFromInput(category, streamAlias) : "";
+  const categoryAlias = categorySql ? quoteIdentifier(category.alias) : "";
+  const categoryExpr = categorySql ? `${categorySql} as ${categoryAlias}` : "";
+  const stats = BOXPLOT_STATS.map(
+    (stat) =>
+      `${stat.sql(value)} as ${quoteIdentifier(boxplotStatAlias(valueField.alias, stat.column))}`,
+  );
+
+  let query = `SELECT ${[categoryExpr, ...stats].filter(Boolean).join(", ")}`;
+  query += ` FROM ${quoteIdentifier(stream)} ${buildSQLJoinsFromInput(queryData.joins, streamAlias)}`;
+  query += buildWhereClause(queryData.fields.filter.conditions, dashboardPanelData);
+  if (categoryExpr) {
+    query += ` GROUP BY ${categoryAlias}`;
+    const direction = String(category.sortBy ?? "").toUpperCase();
+    if (["ASC", "DESC"].includes(direction)) query += ` ORDER BY ${categoryAlias} ${direction}`;
+  }
+  // A high-cardinality category must not return more boxes than a panel can draw.
+  const limit =
+    queryData.config.limit > 0 ? queryData.config.limit : categoryExpr ? DISTRIBUTION_ROW_LIMIT : 0;
+  if (limit) query += ` LIMIT ${limit}`;
   return query;
 }
 

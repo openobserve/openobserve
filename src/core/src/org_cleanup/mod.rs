@@ -32,6 +32,9 @@ use infra::{
 };
 use sea_orm::TransactionTrait;
 
+#[cfg(feature = "cloud")]
+use crate::{org_domain_ownership, org_domain_requests};
+
 const LOCK_KEY: &str = "/org_cleanup/worker_lock";
 const MAX_ATTEMPTS: i32 = 10;
 
@@ -1034,17 +1037,11 @@ async fn delete_org_offsets_and_caches(org_id: &str) -> Result<(), anyhow::Error
     Ok(())
 }
 
-// The mappings live in the `_meta` org's settings, so the org's own settings delete misses them.
 #[cfg(feature = "cloud")]
 async fn delete_org_domain_mappings(org_id: &str) -> Result<(), anyhow::Error> {
-    // The shared writer serializes this with the settings API and other orgs' cleanups.
     let org_id = org_id.to_string();
-    crate::db::organization::update_org_setting(config::META_ORG_ID, move |settings| {
-        let before = settings.domain_org_mappings.len();
-        settings.domain_org_mappings.retain(|m| m.org_id != org_id);
-        settings.domain_org_mappings.len() != before
-    })
-    .await?;
+    org_domain_requests::delete_by_org(&org_id).await?;
+    org_domain_ownership::delete_by_org(&org_id).await?;
     Ok(())
 }
 

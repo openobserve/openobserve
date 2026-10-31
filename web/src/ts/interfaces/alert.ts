@@ -50,16 +50,13 @@ export interface Alert {
   context_attributes: { [key: string]: string };
   description: I18nText;
   uuid?: string;
-  deduplication?: {
-    enabled: boolean;
-    fingerprint_fields: string[];
-    time_window_minutes?: number;
-  };
   creates_incident?: boolean;
   /** Send one notification to the firing's destinations when the alert recovers. */
   notify_on_recovery?: boolean;
   /** Seconds the condition must stay clear before the alert recovers. 0 = immediately. */
   keep_firing_for?: number;
+  /** Notify once per state change instead of on every firing evaluation. Enterprise only. */
+  suppress_repeats?: boolean;
 }
 
 // Alert object which is modified in frontend to display in table and form

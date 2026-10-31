@@ -3650,9 +3650,9 @@ export const LEDGER: LedgerFact[] = [
     state: "kept",
     confidence: 89,
     evidence:
-      "The 3 alerts fired together 94% of the time in 30 days, so one slowdown paged 3 times.",
-    before: "dedup: off",
-    after: "dedup:\n  window: 15m\n  fields: [service.name]",
+      "Each of the 3 alerts notified on every 1-minute evaluation while it stayed firing, so one 40-minute slowdown paged 120 times.",
+    before: "suppress_repeats: false",
+    after: "suppress_repeats: true",
     day: "monday",
     time: "08:30",
     note: "Kept — checks passed at the end of the review window",

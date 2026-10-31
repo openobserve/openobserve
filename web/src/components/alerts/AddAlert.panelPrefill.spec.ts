@@ -113,7 +113,6 @@ vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn
 const stubs = {
   AlertSettings: true,
   CompareWithPast: true,
-  Deduplication: true,
   Advanced: true,
   PanelSchemaRenderer: true,
   AlertSummary: true,
