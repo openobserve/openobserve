@@ -102,7 +102,13 @@ const passthrough = (name: string) =>
   defineComponent({
     name,
     setup(_p: any, { slots }: any) {
-      return () => h("div", {}, [slots.default?.(), slots.actions?.(), slots.header?.()]);
+      return () =>
+        h("div", {}, [
+          slots["header-tabs"]?.(),
+          slots.default?.(),
+          slots.actions?.(),
+          slots.header?.(),
+        ]);
     },
   });
 
@@ -124,6 +130,13 @@ const drawerStub = {
   emits: ["close"],
   template:
     "<div data-test='host-drawer-stub' :data-host='hostName' :data-display-name='displayName' :data-os='osType' :data-last-seen-us='lastSeenUs' />",
+};
+
+const depsStub = {
+  name: "HostsDependenciesView",
+  props: ["orgId", "range", "refreshNonce"],
+  emits: ["open", "refresh"],
+  template: "<div data-test='hosts-deps-stub' />",
 };
 
 const setupCardStub = {
@@ -196,6 +209,7 @@ describe("HostsPage", () => {
           DateTime: dateTimeStub,
           HostDetailDrawer: drawerStub,
           DataSourceSetupCard: setupCardStub,
+          HostsDependenciesView: depsStub,
         },
       },
     });
@@ -836,6 +850,63 @@ describe("HostsPage", () => {
       const banner = wrapper.find('[data-test="hosts-lastseen-banner"]');
       expect(banner.exists()).toBe(true);
       expect(banner.text()).toContain("Inactive hosts and last-seen are unavailable");
+    });
+  });
+
+  describe("Dependencies view", () => {
+    const deps = () => wrapper.findComponent({ name: "HostsDependenciesView" });
+
+    it("swaps the table for the dependency map from ?view=dependencies", async () => {
+      wrapper = await mountPage({ view: "dependencies" });
+      expect(wrapper.find('[data-test="hosts-table-stub"]').exists()).toBe(false);
+      expect(deps().props("orgId")).toBe("test-org");
+      expect(deps().props("range")).toMatchObject({ relative: true });
+    });
+
+    it("writes the chosen view into the URL and drops it for the table", async () => {
+      wrapper = await mountPage({ name: "web" });
+      const tabs = wrapper.findComponent({ name: "OTabs" });
+      tabs.vm.$emit("change", "dependencies");
+      await flushPromises();
+      expect(router.currentRoute.value.query).toMatchObject({ view: "dependencies", name: "web" });
+      expect(deps().exists()).toBe(true);
+      tabs.vm.$emit("change", "table");
+      await flushPromises();
+      expect(router.currentRoute.value.query.view).toBeUndefined();
+      expect(wrapper.find('[data-test="hosts-table-stub"]').exists()).toBe(true);
+    });
+
+    it("offers no view tabs before hosts are detected", async () => {
+      workloadStates.value = { ...workloadStates.value, hosts: "undetected" };
+      wrapper = await mountPage({ view: "dependencies" });
+      expect(wrapper.findComponent({ name: "OTabs" }).exists()).toBe(false);
+      expect(deps().exists()).toBe(false);
+    });
+
+    it("reloads the map on a time change and on Refresh, not on the picker's mount replay", async () => {
+      wrapper = await mountPage({ view: "dependencies" });
+      const picker = wrapper.findComponent({ name: "DateTime" });
+      picker.vm.$emit("on:date-change", { startTime: 1, endTime: 2, userChangedValue: false });
+      await flushPromises();
+      expect(deps().props("refreshNonce")).toBe(0);
+      picker.vm.$emit("on:date-change", { startTime: 3, endTime: 4, valueType: "absolute" });
+      await flushPromises();
+      expect(deps().props("refreshNonce")).toBe(1);
+      expect(deps().props("range")).toEqual({ start: 3, end: 4, relative: false });
+      deps().vm.$emit("refresh");
+      await flushPromises();
+      expect(deps().props("refreshNonce")).toBe(2);
+    });
+
+    it("opens a host's drawer from the map", async () => {
+      wrapper = await mountPage({ view: "dependencies" });
+      deps().vm.$emit("open", "web-01");
+      await flushPromises();
+      expect(router.currentRoute.value.query).toMatchObject({
+        view: "dependencies",
+        host: "web-01",
+      });
+      expect(wrapper.find('[data-test="host-drawer-stub"]').attributes("data-host")).toBe("web-01");
     });
   });
 });

@@ -1,0 +1,249 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { defineComponent, h } from "vue";
+import { routerKey } from "vue-router";
+import i18n from "@/locales";
+import searchService from "@/services/search";
+import HostsDependenciesView from "./HostsDependenciesView.vue";
+
+vi.mock("@/services/search", () => ({ default: { metrics_query: vi.fn() } }));
+
+const metricsQuery = vi.mocked(searchService.metrics_query);
+const push = vi.fn();
+
+const ChartStub = defineComponent({
+  name: "ChartRenderer",
+  props: ["data", "label"],
+  emits: ["click"],
+  setup() {
+    return () => h("div", { "data-test": "chart-stub" });
+  },
+});
+
+const MIN_US = 60_000_000;
+const END = 1_800_000_000_000_000;
+
+const row = (host: string, src: string, dst: string, direction: string, value: number) => ({
+  metric: { host_name: host, src_cidr: src, dst_cidr: dst, direction },
+  value: [1, String(value)],
+});
+
+const FLOWS = [
+  row("web", "web", "api", "request", 2048),
+  row("api", "web", "api", "request", 2000),
+  row("api", "api", "web", "response", 4096),
+  row("web", "web", "lan", "unknown", 10),
+  row("web", "loopback", "loopback", "unknown", 50),
+];
+
+describe("HostsDependenciesView", () => {
+  let wrapper: VueWrapper<any>;
+
+  const mountView = async (props: Record<string, any> = {}) => {
+    wrapper = mount(HostsDependenciesView, {
+      props: {
+        orgId: "org1",
+        range: { start: END - 60 * MIN_US, end: END, relative: true },
+        refreshNonce: 0,
+        ...props,
+      },
+      global: {
+        plugins: [i18n],
+        provide: { [routerKey as symbol]: { push } },
+        stubs: { ChartRenderer: ChartStub },
+      },
+    });
+    await flushPromises();
+    return wrapper;
+  };
+
+  const chart = () => wrapper.findComponent(ChartStub);
+  const series = () => chart().props("data").options.series[0];
+  const testId = (id: string) => wrapper.find(`[data-test="${id}"]`);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    metricsQuery.mockResolvedValue({ data: { data: { result: FLOWS } } } as any);
+  });
+
+  afterEach(() => wrapper?.unmount());
+
+  it("asks for flows per reporting host, rated over the selected range", async () => {
+    await mountView();
+    const sent = decodeURIComponent((metricsQuery.mock.calls[0][0] as any).query);
+    expect(sent).toBe(
+      "sum by (src_cidr, dst_cidr, direction, host_name) (rate(obi_network_flow_bytes[3600s]))",
+    );
+    expect(metricsQuery.mock.calls[0][0]).toMatchObject({ org_identifier: "org1", end_time: END });
+    expect(testId("hosts-deps-caption").text()).toContain("over 1h");
+    expect(testId("hosts-deps-caption").text()).toContain("--network-flows");
+  });
+
+  it("names a window that is not a whole number of hours in minutes", async () => {
+    await mountView({ range: { start: END - 90 * MIN_US, end: END, relative: true } });
+    expect(testId("hosts-deps-caption").text()).toContain("over 90m");
+  });
+
+  it("draws hosts and networks, hiding traffic within a name by default", async () => {
+    await mountView();
+    expect(series().links).toHaveLength(2);
+    expect(series().links[0]).toMatchObject({
+      source: "web",
+      target: "api",
+      symbol: ["none", "arrow"],
+    });
+    expect(series().categories).toMatchObject([
+      { name: "Hosts", symbol: "circle" },
+      { name: "Networks", symbol: "roundRect" },
+    ]);
+    const node = (id: string) => series().data.find((n: any) => n.id === id);
+    expect(node("api")).toMatchObject({ category: 0, symbol: "circle" });
+    expect(node("lan")).toMatchObject({ category: 1, symbol: "roundRect" });
+    expect(series().data.some((n: any) => n.id === "loopback")).toBe(false);
+    expect(chart().props("data").options.legend.selectedMode).toBe(false);
+    expect(chart().props("label")).toBe("Host dependency map of 2 connections");
+  });
+
+  it("shows traffic within a name on its box when switched on", async () => {
+    await mountView();
+    await testId("hosts-deps-show-self-btn").trigger("click");
+    expect(series().links).toHaveLength(2);
+    // Loopback's 50 B/s, more than web to lan, must not thin the drawn edges.
+    expect(series().links[1].lineStyle.width).toBeCloseTo(1 + 7 * Math.sqrt(10 / 6144));
+    const box = series().data.find((n: any) => n.id === "loopback");
+    expect(box.tooltip.formatter).toMatch(/Within loopback: approximately 50(\.0+)?\s?B\/s/);
+    chart().vm.$emit("click", { dataType: "node", data: { id: "loopback" } });
+    await flushPromises();
+    const ways = wrapper.findAll('[data-test="hosts-deps-edge-way"]').map((w) => w.text());
+    expect(ways).toHaveLength(1);
+    expect(testId("hosts-deps-edge-target").exists()).toBe(false);
+    expect(wrapper.emitted("open")).toBeUndefined();
+  });
+
+  it("counts traffic both agents report once, from the busier host", async () => {
+    await mountView();
+    const link = series().links.find((l: any) => l.source === "web" && l.target === "api");
+    expect(link.value).toBe(2048 + 4096);
+  });
+
+  it("opens a host's drawer from its box and ignores a network box", async () => {
+    await mountView();
+    chart().vm.$emit("click", { dataType: "node", data: { id: "lan" } });
+    chart().vm.$emit("click", { dataType: "node", data: { id: "api" } });
+    expect(wrapper.emitted("open")).toEqual([["api"]]);
+  });
+
+  it("shows an edge's bytes each way and its direction split", async () => {
+    await mountView();
+    chart().vm.$emit("click", { dataType: "edge", data: { id: "api\nweb" } });
+    await flushPromises();
+    const ways = wrapper.findAll('[data-test="hosts-deps-edge-way"]').map((w) => w.text());
+    expect(ways[0]).toMatch(/^web to api: approximately 2(\.0+)?\s?KB\/s$/);
+    expect(ways[1]).toMatch(/^api to web: approximately 4(\.0+)?\s?KB\/s$/);
+    expect(testId("hosts-deps-edge-split").text()).toBe(
+      "Request 33%, response 67%, unknown direction 0%",
+    );
+    await testId("hosts-deps-edge-target").trigger("click");
+    expect(wrapper.emitted("open")).toEqual([["api"]]);
+  });
+
+  it("lists the edges as buttons for keyboard users, busiest first", async () => {
+    await mountView();
+    const links = wrapper.findAll('[data-test="hosts-deps-link"]');
+    expect(links.map((l) => l.text())).toEqual(["web → api", "lan ↔ web"]);
+    await links[1].trigger("click");
+    expect(testId("hosts-deps-edge-source").attributes("disabled")).toBeDefined();
+    expect(testId("hosts-deps-edge-target").attributes("disabled")).toBeUndefined();
+    expect(testId("hosts-deps-edge-undirected").text()).toContain("without seeing");
+  });
+
+  it("draws at most 200 edges, busiest first, and says how many it left out", async () => {
+    // 21 hosts all talking to each other: 210 pairs between only 21 ends.
+    const names = Array.from({ length: 21 }, (_, i) => `h${String(i).padStart(2, "0")}`);
+    const many = names.flatMap((a, i) =>
+      names.slice(i + 1).map((b, j) => row(a, a, b, "request", 1000 - i * 21 - j)),
+    );
+    metricsQuery.mockResolvedValue({ data: { data: { result: many } } } as any);
+    await mountView();
+    expect(series().links).toHaveLength(200);
+    expect(wrapper.findAll('[data-test="hosts-deps-link"]')).toHaveLength(200);
+    expect(testId("hosts-deps-capped").text()).toBe("Showing the 200 busiest of 210 connections.");
+  });
+
+  it("explains how to get flows when there are none, and links to the Linux setup", async () => {
+    metricsQuery.mockResolvedValue({ data: { data: { result: [] } } } as any);
+    await mountView();
+    const empty = testId("hosts-deps-no-flows");
+    expect(empty.text()).toContain("--network-flows");
+    expect(empty.text()).toContain("in the last 1h of the selected time range");
+    await empty.find("button").trigger("click");
+    expect(push).toHaveBeenCalledWith({
+      name: "ingestFromLinux",
+      query: { org_identifier: "org1" },
+    });
+  });
+
+  it("offers to show traffic within a name when that is all there is", async () => {
+    metricsQuery.mockResolvedValue({ data: { data: { result: [FLOWS[4]] } } } as any);
+    await mountView();
+    expect(testId("hosts-deps-empty").exists()).toBe(true);
+    await testId("hosts-deps-empty").find("button").trigger("click");
+    expect(series().data.map((n: any) => n.id)).toEqual(["loopback"]);
+  });
+
+  it("shows the no-access state on a 403 and a retry on other failures", async () => {
+    metricsQuery.mockRejectedValue(Object.assign(new Error("no"), { response: { status: 403 } }));
+    await mountView();
+    expect(testId("hosts-deps-forbidden").exists()).toBe(true);
+    expect(testId("hosts-deps-error").exists()).toBe(false);
+    wrapper.unmount();
+    metricsQuery.mockRejectedValue(new Error("boom"));
+    await mountView();
+    await testId("hosts-deps-error").find("button").trigger("click");
+    expect(wrapper.emitted("refresh")).toHaveLength(1);
+  });
+
+  it("reloads on a refresh, keeping the graph while it loads", async () => {
+    await mountView();
+    let resolve!: (v: any) => void;
+    metricsQuery.mockReturnValue(new Promise((r) => (resolve = r)) as any);
+    await wrapper.setProps({
+      refreshNonce: 1,
+      range: { start: END - 59 * MIN_US, end: END + MIN_US, relative: true },
+    });
+    expect(metricsQuery).toHaveBeenCalledTimes(2);
+    expect(chart().exists()).toBe(true);
+    resolve({ data: { data: { result: [] } } });
+    await flushPromises();
+    expect(testId("hosts-deps-no-flows").exists()).toBe(true);
+  });
+
+  it("drops another org's graph at once and ignores its late response", async () => {
+    await mountView();
+    let resolve!: (v: any) => void;
+    metricsQuery.mockReturnValueOnce(new Promise((r) => (resolve = r)) as any);
+    metricsQuery.mockResolvedValueOnce({ data: { data: { result: [] } } } as any);
+    await wrapper.setProps({ orgId: "org2" });
+    expect(testId("hosts-deps-loading").exists()).toBe(true);
+    await wrapper.setProps({ orgId: "org3" });
+    await flushPromises();
+    resolve({ data: { data: { result: FLOWS } } });
+    await flushPromises();
+    expect(testId("hosts-deps-no-flows").exists()).toBe(true);
+  });
+});

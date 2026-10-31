@@ -34,11 +34,14 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 import DateTime from "@/components/DateTime.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import HostDetailDrawer from "./HostDetailDrawer.vue";
+import HostsDependenciesView from "./HostsDependenciesView.vue";
 import { useHostsList, utilizationTint, type HostRow } from "./useHostsList";
 import { HOSTS_DEFAULT_RELATIVE_PERIOD, HOSTS_DEFAULT_WINDOW_US } from "./hostsQueries";
 import { useWorkloadDetection } from "@/composables/useWorkloadDetection";
@@ -70,7 +73,7 @@ const hostsState = computed(() => detection.states.value.hosts);
 const loading = ref(false);
 
 const nowUs = () => Date.now() * 1000;
-const range = ref({ start: nowUs() - HOSTS_DEFAULT_WINDOW_US, end: nowUs() });
+const range = ref({ start: nowUs() - HOSTS_DEFAULT_WINDOW_US, end: nowUs(), relative: true });
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
@@ -85,6 +88,13 @@ const refreshList = async () => {
   }
 };
 
+// The Dependencies view loads on its own when shown and on an org switch; this reloads it with the list.
+const refreshNonce = ref(0);
+const reload = () => {
+  refreshNonce.value++;
+  refreshList();
+};
+
 // Set while picker.refresh() runs so its programmatic re-emit may fetch; the
 // mount replay, which carries the same userChangedValue:false, still must not.
 let reAnchoring = false;
@@ -97,7 +107,7 @@ let reAnchorFetched = false;
 const onRefreshClick = () => {
   const picker = dateTimePickerRef.value;
   if (!picker?.refresh) {
-    refreshList();
+    reload();
     return;
   }
   reAnchoring = true;
@@ -109,17 +119,26 @@ const onRefreshClick = () => {
   }
   // DateTime.refresh() emits synchronously today; if that ever changes, the
   // window is merely stale rather than the button going dead.
-  if (!reAnchorFetched) refreshList();
+  if (!reAnchorFetched) reload();
 };
 
-const onDateChange = (date: { startTime: number; endTime: number; userChangedValue?: boolean }) => {
-  range.value = { start: date.startTime, end: date.endTime };
+const onDateChange = (date: {
+  startTime: number;
+  endTime: number;
+  valueType?: string;
+  userChangedValue?: boolean;
+}) => {
+  range.value = {
+    start: date.startTime,
+    end: date.endTime,
+    relative: date.valueType !== "absolute",
+  };
   // DateTime replays on mount with userChangedValue:false — "do not fetch" (DateTime.vue contract).
   if (date.userChangedValue === false && !reAnchoring) return;
   // The picker re-emitted, so the window is current whether or not we fetch.
   if (reAnchoring) reAnchorFetched = true;
   if (hostsState.value !== "detected") return;
-  refreshList();
+  reload();
 };
 
 // ── URL-carried state (design 4.7: flat routes remount, params persist) ─────
@@ -206,6 +225,15 @@ onMounted(() => {
   detection.refresh();
   if (hostsState.value === "detected") refreshList();
 });
+
+// ── View — ?view=dependencies swaps the table for the dependency map ─────────
+const view = computed(() =>
+  first(route.query.view) === "dependencies" ? "dependencies" : "table",
+);
+const onViewChange = (name: string | number) => {
+  const { view: _view, ...rest } = route.query;
+  router.replace({ query: name === "dependencies" ? { ...rest, view: "dependencies" } : rest });
+};
 
 // ── Drawer — deep-linked via ?host= so it survives reload ───────────────────
 const drawerHost = computed(() => first(route.query.host) ?? "");
@@ -383,6 +411,22 @@ const osToggleLabel = (slug: string) =>
 
 <template>
   <OPageLayout :title="t('menu.hosts')" icon="dns" bleed>
+    <template v-if="hostsState === 'detected'" #header-tabs>
+      <OTabs :model-value="view" align="left" data-test="hosts-view-tabs" @change="onViewChange">
+        <OTab
+          name="table"
+          :label="t('infra.hosts.viewTable')"
+          icon="table-chart"
+          data-test="hosts-view-table"
+        />
+        <OTab
+          name="dependencies"
+          :label="t('infra.hosts.viewDependencies')"
+          icon="account-tree"
+          data-test="hosts-view-dependencies"
+        />
+      </OTabs>
+    </template>
     <template #actions>
       <div class="flex items-center gap-2">
         <OText
@@ -452,6 +496,15 @@ const osToggleLabel = (slug: string) =>
         <DataSourceSetupCard :slug="osSlug" @detected="detection.refresh({ force: true })" />
       </div>
     </div>
+
+    <HostsDependenciesView
+      v-else-if="view === 'dependencies'"
+      :org-id="orgId"
+      :range="range"
+      :refresh-nonce="refreshNonce"
+      @open="openDrawer"
+      @refresh="onRefreshClick"
+    />
 
     <!-- Total failure: ONE page-level surface, never stacked column warnings. -->
     <div
