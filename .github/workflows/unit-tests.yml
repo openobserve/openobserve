@@ -3,8 +3,6 @@ name: Unit tests
 on:
   # Kept as the Rust cache writer on main: caches saved from merge-queue refs are never restored by PRs.
   push:
-    branches:
-      - "main"
   pull_request:
     branches:
       - "**"
@@ -257,7 +255,7 @@ jobs:
     if: needs.check_changes.outputs.has_ui_changes == 'true'
     timeout-minutes: 45
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
 
