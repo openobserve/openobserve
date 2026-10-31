@@ -156,21 +156,6 @@ pub async fn try_get_streams(
     Ok(indices_res)
 }
 
-/// Checks a stream against the caller's permitted object list, using the stream's own type.
-fn is_stream_permitted(
-    permitted: &[String],
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-) -> bool {
-    let s_type = match stream_type {
-        StreamType::EnrichmentTables => "enrichment_table",
-        _ => stream_type.as_str(),
-    };
-    permitted.contains(&format!("{s_type}:_all_{org_id}"))
-        || permitted.contains(&format!("{s_type}:{stream_name}"))
-}
-
 // org_id is only for pattern associations, which is ent only
 pub fn stream_res(
     org_id: &str,
