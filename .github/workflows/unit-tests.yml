@@ -255,13 +255,13 @@ jobs:
     if: needs.check_changes.outputs.has_ui_changes == 'true'
     timeout-minutes: 45
     runs-on:
-      labels: eks-openobserve-standard-8
+      labels: ubicloud-standard-8
     permissions:
       contents: read
     strategy:
       matrix:
-        shardIndex: [1, 2, 3, 4]
-        shardTotal: [4]
+        shardIndex: [1, 2, 3, 4, 5, 6, 7, 8]
+        shardTotal: [8]
 
     steps:
       - name: Clone the current repo

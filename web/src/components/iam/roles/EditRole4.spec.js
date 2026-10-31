@@ -880,6 +880,11 @@ describe("EditRole - review drawer wiring", () => {
 describe("EditRole - save toast", () => {
   useNavigationFixture();
 
+  const withSaved = (vm, keys) => {
+    vm.permissionsHash = new Set(keys);
+    vm.selectedPermissionsHash = new Set(keys);
+  };
+
   const toastAfterSave = async (vm) => {
     mockToast.mockClear();
     await vm.saveRole();
