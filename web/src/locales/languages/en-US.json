@@ -23690,6 +23690,7 @@
       "depsSetUp": "Set up network flows",
       "depsLoadError": "Network flows could not be loaded",
       "depsNoMatch": "No connections match the filters",
+      "depsNoMatchDescription": "No connections match the namespace filter or search. Try changing or clearing them.",
       "depsHiddenBySwitches": "The connections here are in system namespaces or between nodes, which the switches above hide.",
       "depsShowAll": "Show system namespaces and node traffic",
       "depsClearDescription": "Clear the namespace filter and search",

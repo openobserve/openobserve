@@ -228,9 +228,13 @@ const split = (edge: FlowEdge) =>
 // A chart colour per namespace; nodes and the outside world are neutral and told apart by their icons.
 const NEUTRAL = "var(--color-grey-500)";
 
-// Over every namespace the view knows, not only those drawn, so the namespace filter, search and switches never
-// recolour one.
-const colors = computed(() => namespaceColors(namespaceChoices.value));
+// Over every namespace in the flows before any filter or switch, so those never recolour one, while namespaces
+// with no traffic do not take colours from those that have it.
+const colors = computed(() =>
+  namespaceColors(
+    allEdges.value.flatMap((e) => [e.source.namespace, e.target.namespace]).filter(Boolean),
+  ),
+);
 
 const colorOf = (end: FlowEnd) =>
   end.kind === "workload" ? (colors.value.get(end.namespace) ?? NEUTRAL) : NEUTRAL;
@@ -489,6 +493,7 @@ function clearFilters() {
     <OEmptyState
       v-else-if="!graph.edges.length && switchesHide"
       variant="no-results"
+      illustration="no-results"
       :title="t('infra.k8s2.depsNoMatch')"
       :description="t('infra.k8s2.depsHiddenBySwitches')"
       :action-label="t('infra.k8s2.depsShowAll')"
@@ -500,7 +505,9 @@ function clearFilters() {
     <OEmptyState
       v-else-if="!graph.edges.length"
       variant="no-results"
+      illustration="no-results"
       :title="t('infra.k8s2.depsNoMatch')"
+      :description="t('infra.k8s2.depsNoMatchDescription')"
       :actions="CLEAR_ACTION"
       data-test="k8s2-deps-empty"
       @action="clearFilters"

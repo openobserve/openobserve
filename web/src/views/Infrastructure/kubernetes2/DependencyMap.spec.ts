@@ -288,6 +288,48 @@ describe("DependencyMap", () => {
     expect(view.x).toBeCloseTo(32 * 0.75);
   });
 
+  it("treats a pill as part of its edge: hovering it lights the edge, clicking it selects the edge", async () => {
+    mountMap([node("a", 0), node("b", 340)], [edge("a", "b", 2000)]);
+    await pill("a-b").trigger("mouseenter");
+    expect(hoveredLabel().exists()).toBe(true);
+    expect(baseEdge("a-b").props("style").opacity).toBe(1);
+    await hoveredLabel().trigger("click");
+    expect(wrapper.emitted("select")).toEqual([["a-b"]]);
+    await hoveredLabel().trigger("mouseleave");
+    expect(hoveredLabel().exists()).toBe(false);
+  });
+
+  it("refits on a resize with the floor the last fit used", async () => {
+    vi.useFakeTimers();
+    let resized = () => {};
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          resized = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    try {
+      mountMap(
+        Array.from({ length: 12 }, (_, i) => node(`c${i}`, i * 312)),
+        [],
+      );
+      await wrapper.find('[data-test="dependency-map-fit"]').trigger("click");
+      const whole = setViewport.mock.calls.at(-1)![0].zoom;
+      expect(whole).toBeLessThan(0.75);
+      setViewport.mockClear();
+      resized();
+      vi.advanceTimersByTime(200);
+      expect(setViewport.mock.calls.at(-1)![0].zoom).toBe(whole);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.useRealTimers();
+    }
+  });
+
   it("makes a clickable card a named button, and leaves the others plain", () => {
     mountMap([node("a", 0), node("net", 340, false)], [edge("a", "net", 10)]);
     expect(card("a").attributes("role")).toBe("button");

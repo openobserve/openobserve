@@ -281,6 +281,22 @@ describe("DependenciesView", () => {
     await flushPromises();
     expect(testId("k8s2-deps-edge").exists()).toBe(true);
     dialog.remove();
+    // One animating closed no longer takes it, nor does Escape typed in a text field.
+    const closing = document.createElement("div");
+    closing.setAttribute("role", "dialog");
+    closing.setAttribute("data-state", "closed");
+    document.body.appendChild(closing);
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    const typed = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    input.dispatchEvent(typed);
+    expect(typed.defaultPrevented).toBe(false);
+    input.remove();
+    expect(esc().defaultPrevented).toBe(true);
+    await flushPromises();
+    expect(testId("k8s2-deps-edge").exists()).toBe(false);
+    closing.remove();
   });
 
   it("returns focus to the list when the map dismisses a panel that holds it", async () => {
@@ -306,7 +322,7 @@ describe("DependenciesView", () => {
   });
 
   it("colours a namespace the same across the namespace filter, search and both switches", async () => {
-    await mountView({ namespaceOptions: ["aaa", "backend", "frontend"] });
+    await mountView();
     const colour = (name: string) => nodes().find((n: any) => n.label === name)?.color;
     const before = { api: colour("api"), web: colour("web") };
     for (const query of [
@@ -319,6 +335,13 @@ describe("DependenciesView", () => {
       if (colour("api")) expect(colour("api")).toBe(before.api);
       if (colour("web")) expect(colour("web")).toBe(before.web);
     }
+  });
+
+  it("leaves colours alone when the inventory's namespaces arrive", async () => {
+    await mountView();
+    const before = nodes().map((n: any) => n.color);
+    await wrapper.setProps({ namespaceOptions: ["aaa", "abc", "backend", "frontend", "zzz"] });
+    expect(nodes().map((n: any) => n.color)).toEqual(before);
   });
 
   it("totals the connections the switches leave in the header", async () => {

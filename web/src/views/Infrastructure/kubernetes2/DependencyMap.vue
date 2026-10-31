@@ -128,21 +128,20 @@ function fit(duration = 0, floor = READABLE_ZOOM) {
   ];
   const { width, height } = dimensions.value;
   setViewport(fitTransform(points, width, height, floor), { duration });
-  userMoved = false;
+  userMoved.value = false;
+  lastFloor = floor;
 }
+
+// The floor the last fit used, so a resize after the fit button keeps showing the whole map.
+let lastFloor = READABLE_ZOOM;
 
 // Set once the user pans or zooms, so a resize no longer refits over what they chose.
-let userMoved = false;
+const userMoved = ref(false);
 
 function zoomBy(inward: boolean) {
-  userMoved = true;
+  userMoved.value = true;
   if (inward) zoomIn({ duration: 150 });
   else zoomOut({ duration: 150 });
-}
-
-// Only a pan or zoom from the pointer or wheel carries an event; the fit's own moves do not.
-function onMoveEnd({ event }: { event?: unknown }) {
-  if (event) userMoved = true;
 }
 
 // Exactly the size the layout routes edges around, whatever the root font size.
@@ -336,7 +335,6 @@ const hoveredLabel = computed(() => {
   return { id, text: route.rate, at };
 });
 
-// Fit when the drawn ends or their places change, not on a refresh that redraws the same map.
 // A resize refits, a moment after it settles, unless the user has moved the map since the last fit.
 const pane = ref<HTMLElement | null>(null);
 let resizeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -346,7 +344,7 @@ onMounted(() => {
   observer = new ResizeObserver(() => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      if (!userMoved && areNodesInitialized.value) fit();
+      if (!userMoved.value && areNodesInitialized.value) fit(0, lastFloor);
     }, 150);
   });
   observer.observe(pane.value);
@@ -356,6 +354,7 @@ onBeforeUnmount(() => {
   clearTimeout(resizeTimer);
 });
 
+// Fit when the drawn ends or their places change, not on a refresh that redraws the same map.
 let fitPending = true;
 function fitIfPending() {
   if (!fitPending) return;
@@ -412,7 +411,7 @@ function onKeydown(event: KeyboardEvent) {
         @node-click="({ node }) => node.data.clickable && emit('open', node.id)"
         @edge-click="({ edge }) => emit('select', edge.id)"
         @pane-click="emit('select', null)"
-        @move-end="onMoveEnd"
+        @move-end="({ event }) => event && (userMoved = true)"
         @node-mouse-enter="({ node }) => (hovered = node.id)"
         @node-mouse-leave="hovered = null"
         @edge-mouse-enter="({ edge }) => (hoveredEdge = edge.id)"
@@ -475,7 +474,8 @@ function onKeydown(event: KeyboardEvent) {
         </template>
       </VueFlow>
       <!-- Every rate pill in one layer over the canvas, moved with it, so no edge or arrowhead is drawn over one.
-           The rates are in the edge panel and the connection list too, so this layer is hidden from screen readers. -->
+           The rates are in the edge panel and the connection list too, so this layer is hidden from screen readers.
+           A pill is part of its edge: hovering or clicking it does what the edge does, not what the pane does. -->
       <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <div
           class="absolute top-0 left-0 origin-top-left [transform:var(--dep-viewport,none)]"
@@ -486,12 +486,15 @@ function onKeydown(event: KeyboardEvent) {
           <div
             v-for="[id, pill] in pills"
             :key="id"
-            class="bg-surface-base border-border-default text-text-secondary text-2xs absolute top-0 left-0 flex [transform:var(--dep-label,none)] items-center justify-center rounded-full border font-medium whitespace-nowrap tabular-nums"
+            class="bg-surface-base border-border-default text-text-secondary text-2xs pointer-events-auto absolute top-0 left-0 flex [transform:var(--dep-label,none)] cursor-pointer items-center justify-center rounded-full border font-medium whitespace-nowrap tabular-nums"
             :style="pillStyle(pill)"
             :data-edge="id"
             :data-test="
               id === hoveredLabel?.id ? 'dependency-map-hovered-label' : 'dependency-map-label'
             "
+            @click.stop="emit('select', id)"
+            @mouseenter="hoveredEdge = id"
+            @mouseleave="hoveredEdge = null"
           >
             {{ raw(pill.text) }}
           </div>

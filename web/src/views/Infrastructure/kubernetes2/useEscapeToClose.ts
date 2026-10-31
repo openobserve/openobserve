@@ -15,15 +15,23 @@
 
 import { onBeforeUnmount, watch, type Ref } from "vue";
 
-// A drawer, dialog or menu open over the page takes Escape for itself.
-const OVERLAY = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
+// A drawer, dialog or menu open over the page takes Escape for itself; one still animating closed does not count.
+const OVERLAY = ["dialog", "alertdialog", "menu", "listbox"]
+  .map((role) => `[role="${role}"]:not([data-state="closed"]):not([hidden])`)
+  .join(", ");
+
+// Escape in a text field belongs to the field, to clear it or close its suggestions.
+const typing = (el: Element | null) =>
+  !!el &&
+  (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable);
 
 // While `open` is true, Escape anywhere on the page calls `close`, so a panel opened with the mouse, which leaves
-// focus outside it, still closes from the keyboard. An Escape something else already handled is left alone.
+// focus outside it, still closes from the keyboard. An Escape something else already handled, one typed in a text
+// field, and one an open overlay takes are left alone.
 export function useEscapeToClose(open: Ref<boolean>, close: () => void) {
   const onKey = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.defaultPrevented) return;
-    if (document.querySelector(OVERLAY)) return;
+    if (document.querySelector(OVERLAY) || typing(document.activeElement)) return;
     event.preventDefault();
     close();
   };
