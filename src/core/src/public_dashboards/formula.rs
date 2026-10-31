@@ -29,14 +29,27 @@ const LABEL_LIST_KEYWORDS: [&str; 6] = [
     "group_right",
 ];
 const QUOTES: [char; 3] = ['"', '\'', '`'];
+const MAX_FORMULA_LENGTH: usize = 100_000;
+const MAX_FORMULA_DEPTH: usize = 10;
 
-/// A formula letter the live executor refuses to substitute.
+/// A formula the live executor refuses to expand.
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum FormulaError {
     #[error("{0}, which is not a query in this panel")]
-    Unknown(char),
-    #[error("{0}, which is another formula")]
-    Formula(char),
+    Unknown(String),
+    #[error("formulas that refer to each other in a loop: {0}")]
+    Cycle(String),
+    #[error("formulas nested more than {} levels deep", MAX_FORMULA_DEPTH)]
+    TooDeep,
+    #[error("an expansion longer than {} characters", MAX_FORMULA_LENGTH)]
+    TooLong,
+}
+
+/// `FormulaInput`: a query's final text, and whether that text is itself a formula.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FormulaInput {
+    pub text: String,
+    pub is_formula: bool,
 }
 
 /// `isFormulaQuery`: any string formula, even an empty one.
@@ -44,7 +57,7 @@ pub fn is_formula(config: &Value) -> bool {
     config.get("formula").is_some_and(Value::is_string)
 }
 
-/// `queryRefs`: each query's stored ref, else the first letter no other query holds.
+/// `queryRefs`: the stored ref, else the first free letter, or `F<n>` for a formula.
 pub fn query_refs(configs: &[Value]) -> Vec<Option<String>> {
     let stored = |cfg: &Value| {
         cfg.get("ref")
@@ -59,34 +72,42 @@ pub fn query_refs(configs: &[Value]) -> Vec<Option<String>> {
             if let Some(r) = stored(cfg) {
                 return Some(r);
             }
-            if is_formula(cfg) {
-                return None;
-            }
-            let letter = LETTERS
-                .chars()
-                .map(String::from)
-                .find(|l| !used.contains(l))?;
-            used.push(letter.clone());
-            Some(letter)
+            // Formulas live apart from the letters, so a letter a formula waits on stays free.
+            let name = if is_formula(cfg) {
+                (1..).map(|n| format!("F{n}")).find(|r| !used.contains(r))?
+            } else {
+                LETTERS
+                    .chars()
+                    .map(String::from)
+                    .find(|l| !used.contains(l))?
+            };
+            used.push(name.clone());
+            Some(name)
         })
         .collect()
 }
 
-/// Each query's text, a formula's letters replaced by its inputs'; hiding is the caller's.
+/// Each query's text, a formula's references replaced by their inputs'; hiding is the caller's.
 pub fn expand(configs: &[Value], texts: &[String]) -> Vec<Result<String, FormulaError>> {
-    let inputs: BTreeMap<String, Option<String>> = query_refs(configs)
-        .into_iter()
+    let refs = query_refs(configs);
+    let inputs: BTreeMap<String, FormulaInput> = refs
+        .iter()
         .zip(configs.iter().zip(texts))
-        .filter_map(|(letter, (cfg, text))| {
-            Some((letter?, (!is_formula(cfg)).then(|| text.clone())))
+        .filter_map(|(name, (cfg, text))| {
+            let input = FormulaInput {
+                text: text.clone(),
+                is_formula: is_formula(cfg),
+            };
+            Some((name.clone()?, input))
         })
         .collect();
     configs
         .iter()
         .zip(texts)
-        .map(|(cfg, text)| {
+        .zip(&refs)
+        .map(|((cfg, text), name)| {
             if is_formula(cfg) {
-                substitute(text, &inputs)
+                substitute(text, &inputs, name.as_deref())
             } else {
                 Ok(text.clone())
             }
@@ -119,46 +140,94 @@ pub fn viewer_legend_fallbacks(configs: &[Value]) -> Vec<Option<String>> {
         .collect()
 }
 
-/// `substituteFormula`: each letter becomes its input's text in parentheses.
+/// `substituteFormula`: references become their inputs in parentheses, formulas recursively.
 pub fn substitute(
     formula: &str,
-    inputs: &BTreeMap<String, Option<String>>,
+    inputs: &BTreeMap<String, FormulaInput>,
+    self_ref: Option<&str>,
 ) -> Result<String, FormulaError> {
-    let chars: Vec<char> = formula.chars().collect();
-    let positions = letter_positions(&chars);
-    for &pos in &positions {
-        match inputs.get(&chars[pos].to_string()) {
-            None => return Err(FormulaError::Unknown(chars[pos])),
-            Some(None) => return Err(FormulaError::Formula(chars[pos])),
-            Some(Some(_)) => {}
-        }
-    }
-    let mut expr = String::new();
-    let mut last = 0;
-    for pos in positions {
-        let text = inputs[&chars[pos].to_string()]
-            .as_deref()
-            .unwrap_or_default();
-        expr.extend(&chars[last..pos]);
-        // A trailing `#` comment in the input would otherwise swallow the closing parenthesis.
-        let newline = if text.contains('#') { "\n" } else { "" };
-        expr.push_str(&format!("({text}{newline})"));
-        last = pos + 1;
-    }
-    expr.extend(&chars[last..]);
-    Ok(expr)
+    let mut expander = Expander {
+        inputs,
+        expanded: BTreeMap::new(),
+    };
+    let mut path: Vec<String> = self_ref.map(str::to_string).into_iter().collect();
+    expander.expand(formula, &mut path)
 }
 
-fn letter_positions(text: &[char]) -> Vec<usize> {
-    let mut letters = Vec::new();
+struct Expander<'a> {
+    inputs: &'a BTreeMap<String, FormulaInput>,
+    expanded: BTreeMap<String, String>,
+}
+
+impl Expander<'_> {
+    fn expand(&mut self, text: &str, path: &mut Vec<String>) -> Result<String, FormulaError> {
+        let chars: Vec<char> = text.chars().collect();
+        let mut expr = String::new();
+        let mut length = 0;
+        let mut last = 0;
+        for (start, name) in ref_tokens(&chars) {
+            let input = self
+                .inputs
+                .get(&name)
+                .ok_or_else(|| FormulaError::Unknown(name.clone()))?;
+            let inner = if input.is_formula {
+                self.expand_formula(&name, &input.text, path)?
+            } else {
+                input.text.clone()
+            };
+            // A trailing `#` comment in the input would otherwise swallow the closing parenthesis.
+            let newline = if inner.contains('#') { "\n" } else { "" };
+            let piece: String = chars[last..start].iter().collect();
+            let piece = format!("{piece}({inner}{newline})");
+            length += piece.chars().count();
+            expr.push_str(&piece);
+            last = start + name.chars().count();
+            // Each nesting level can double the text, so the cap stops exponential growth early.
+            if length > MAX_FORMULA_LENGTH {
+                return Err(FormulaError::TooLong);
+            }
+        }
+        expr.extend(&chars[last..]);
+        Ok(expr)
+    }
+
+    fn expand_formula(
+        &mut self,
+        name: &str,
+        text: &str,
+        path: &mut Vec<String>,
+    ) -> Result<String, FormulaError> {
+        if let Some(done) = self.expanded.get(name) {
+            return Ok(done.clone());
+        }
+        if let Some(at) = path.iter().position(|p| p == name) {
+            let mut cycle = path[at..].to_vec();
+            cycle.push(name.to_string());
+            return Err(FormulaError::Cycle(cycle.join(" → ")));
+        }
+        if path.len() >= MAX_FORMULA_DEPTH {
+            return Err(FormulaError::TooDeep);
+        }
+        path.push(name.to_string());
+        let out = self.expand(text, path);
+        path.pop();
+        let out = out?;
+        self.expanded.insert(name.to_string(), out.clone());
+        Ok(out)
+    }
+}
+
+/// Each reference's char offset and name, outside strings, braces, comments and label lists.
+fn ref_tokens(text: &[char]) -> Vec<(usize, String)> {
+    let mut refs = Vec::new();
     let mut i = 0;
     while i < text.len() {
-        i = next_token(text, i, &mut letters);
+        i = next_token(text, i, &mut refs);
     }
-    letters
+    refs
 }
 
-fn next_token(text: &[char], i: usize, letters: &mut Vec<usize>) -> usize {
+fn next_token(text: &[char], i: usize, refs: &mut Vec<(usize, String)>) -> usize {
     let ch = text[i];
     if QUOTES.contains(&ch) {
         return skip_string(text, i);
@@ -180,7 +249,7 @@ fn next_token(text: &[char], i: usize, letters: &mut Vec<usize>) -> usize {
         return end;
     }
     if is_ident_start(ch) {
-        return scan_word(text, i, letters);
+        return scan_word(text, i, refs);
     }
     i + 1
 }
@@ -193,7 +262,7 @@ fn is_ident_part(ch: char) -> bool {
     ch.is_ascii_alphanumeric() || ch == '_' || ch == ':'
 }
 
-fn scan_word(text: &[char], start: usize, letters: &mut Vec<usize>) -> usize {
+fn scan_word(text: &[char], start: usize, refs: &mut Vec<(usize, String)>) -> usize {
     let mut end = start;
     while end < text.len() && is_ident_part(text[end]) {
         end += 1;
@@ -202,10 +271,17 @@ fn scan_word(text: &[char], start: usize, letters: &mut Vec<usize>) -> usize {
     if LABEL_LIST_KEYWORDS.contains(&word.to_lowercase().as_str()) {
         return skip_label_list(text, end);
     }
-    if word.len() == 1 && LETTERS.contains(&word) {
-        letters.push(start);
+    if (word.len() == 1 && LETTERS.contains(&word)) || is_formula_ref(&word) {
+        refs.push((start, word));
     }
     end
+}
+
+/// `F<n>` with no leading zero, the name `queryRefs` gives a formula.
+fn is_formula_ref(word: &str) -> bool {
+    word.strip_prefix('F').is_some_and(|n| {
+        n.starts_with(|c: char| ('1'..='9').contains(&c)) && n.chars().all(|c| c.is_ascii_digit())
+    })
 }
 
 fn skip_label_list(text: &[char], word_end: usize) -> usize {
@@ -255,15 +331,41 @@ mod tests {
     const ERR_RATE: &str = r#"sum by (job)(rate(http_requests_total{code=~"5.."}[5m]))"#;
     const ALL_RATE: &str = "sum by (job)(rate(http_requests_total[5m]))";
 
-    fn inputs(pairs: &[(&str, Option<&str>)]) -> BTreeMap<String, Option<String>> {
+    fn inputs(pairs: &[(&str, Option<&str>)]) -> BTreeMap<String, FormulaInput> {
         pairs
             .iter()
-            .map(|(k, v)| (k.to_string(), v.map(str::to_string)))
+            .map(|(k, v)| (k.to_string(), q(v.unwrap_or_default())))
             .collect()
     }
 
     fn sub(formula: &str, pairs: &[(&str, Option<&str>)]) -> Result<String, FormulaError> {
-        substitute(formula, &inputs(pairs))
+        substitute(formula, &inputs(pairs), None)
+    }
+
+    fn q(text: &str) -> FormulaInput {
+        FormulaInput {
+            text: text.to_string(),
+            is_formula: false,
+        }
+    }
+
+    fn f(text: &str) -> FormulaInput {
+        FormulaInput {
+            text: text.to_string(),
+            is_formula: true,
+        }
+    }
+
+    fn nested(
+        formula: &str,
+        pairs: &[(&str, FormulaInput)],
+        self_ref: &str,
+    ) -> Result<String, FormulaError> {
+        let map = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect();
+        substitute(formula, &map, Some(self_ref))
     }
 
     #[test]
@@ -344,19 +446,106 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_letter_or_a_formula_letter_is_refused() {
+    fn an_unknown_letter_is_refused() {
         assert_eq!(
             sub("A / B", &[("A", Some("up"))]),
-            Err(FormulaError::Unknown('B'))
+            Err(FormulaError::Unknown("B".into()))
         );
+        let pairs = [("A", q("up")), ("B", f("A / Z"))];
         assert_eq!(
-            sub("A / F", &[("A", Some("up")), ("F", None)]),
-            Err(FormulaError::Formula('F'))
+            nested("B * 2", &pairs, "C"),
+            Err(FormulaError::Unknown("Z".into()))
         );
     }
 
     #[test]
-    fn letters_follow_stored_refs_then_position_and_formulas_take_none() {
+    fn inlines_formulas_referenced_by_name_with_parentheses() {
+        let pairs = [
+            ("A", q("x")),
+            ("B", q("y")),
+            ("F1", f("A / B")),
+            ("F2", f("F1 * 100")),
+        ];
+        assert_eq!(
+            nested("F2 - F1", &pairs, "F3"),
+            Ok("(((x) / (y)) * 100) - ((x) / (y))".into())
+        );
+        let pairs = [("A", q("x")), ("B", q("y")), ("C", f("A + B"))];
+        assert_eq!(nested("C * 2", &pairs, "D"), Ok("((x) + (y)) * 2".into()));
+        let pairs = [
+            ("A", q("up")),
+            ("B", f("A + 1")),
+            ("C", f("B * 2")),
+            ("D", f("C - B")),
+        ];
+        assert_eq!(
+            nested("D", &pairs, "E"),
+            Ok("((((up) + 1) * 2) - ((up) + 1))".into())
+        );
+    }
+
+    #[test]
+    fn reads_f_names_only_as_whole_tokens_outside_label_lists() {
+        let pairs = [("A", q("x")), ("F1", f("A"))];
+        assert_eq!(
+            nested("F1 + F10x + F01 + sum by (F1) (F1)", &pairs, "F2"),
+            Ok("((x)) + F10x + F01 + sum by (F1) (((x)))".into())
+        );
+    }
+
+    #[test]
+    fn reports_cycles_with_their_path() {
+        assert_eq!(
+            nested("A + 1", &[("A", f("A + 1"))], "A"),
+            Err(FormulaError::Cycle("A → A".into()))
+        );
+        let pairs = [
+            ("A", q("up")),
+            ("B", f("C + A")),
+            ("C", f("D")),
+            ("D", f("B * 2")),
+        ];
+        assert_eq!(
+            nested("C + A", &pairs, "B"),
+            Err(FormulaError::Cycle("B → C → D → B".into()))
+        );
+        assert_eq!(
+            nested("B", &[("B", f("C")), ("C", f("B"))], "D"),
+            Err(FormulaError::Cycle("B → C → B".into()))
+        );
+        let pairs = [("A", f("A + 1"))];
+        let map = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect();
+        assert_eq!(
+            substitute("A + 1", &map, None),
+            Err(FormulaError::Cycle("A → A".into()))
+        );
+    }
+
+    #[test]
+    fn caps_depth_and_length() {
+        let mut pairs = vec![("A".to_string(), q("x")), ("F1".to_string(), f("A"))];
+        for n in 2..=12 {
+            pairs.push((format!("F{n}"), f(&format!("F{}", n - 1))));
+        }
+        let map: BTreeMap<String, FormulaInput> = pairs.into_iter().collect();
+        assert_eq!(
+            substitute("F12", &map, Some("F13")),
+            Err(FormulaError::TooDeep)
+        );
+        assert!(substitute("F8", &map, Some("F13")).is_ok());
+
+        let big = "x".repeat(1000);
+        let sixty = vec!["A"; 60].join(" + ");
+        let pairs = [("A", q(&big)), ("F1", f(&sixty)), ("F2", f("F1 + F1"))];
+        assert!(nested("F1", &pairs, "F3").is_ok());
+        assert_eq!(nested("F2", &pairs, "F3"), Err(FormulaError::TooLong));
+    }
+
+    #[test]
+    fn refs_follow_stored_refs_then_position_and_formulas_take_f_names() {
         let configs = [
             json!({ "ref": "B" }),
             json!({}),
@@ -369,11 +558,20 @@ mod tests {
             [
                 Some("B".to_string()),
                 Some("A".to_string()),
-                None,
+                Some("F1".to_string()),
                 Some("C".to_string()),
                 Some("F".to_string()),
             ]
         );
+        let configs = [
+            json!({ "ref": "A" }),
+            json!({ "formula": "A + B" }),
+            json!({}),
+            json!({ "formula": "", "ref": "F1" }),
+            json!({ "formula": "" }),
+        ];
+        let names: Vec<_> = query_refs(&configs).into_iter().flatten().collect();
+        assert_eq!(names, ["A", "F2", "B", "F1", "F3"]);
         assert!(is_formula(&json!({ "formula": "" })));
         assert!(!is_formula(&json!({ "formula": null })));
         assert!(!is_formula(&json!({})));
