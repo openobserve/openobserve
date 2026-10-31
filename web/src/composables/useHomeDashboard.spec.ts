@@ -183,4 +183,45 @@ describe("useHomeDashboard", () => {
     updateLabel("org1", "abc", D.label);
     expect(settings.setOrgSetting).not.toHaveBeenCalled();
   });
+
+  describe("per-org scoping", () => {
+    const deferred = () => {
+      let resolve: (v: unknown) => void = () => {};
+      const promise = new Promise((r) => (resolve = r));
+      return { promise, resolve };
+    };
+
+    beforeEach(() => queryClient.clear());
+
+    it("an org switch drops the previous org's pin before the new one loads", async () => {
+      const { load, homeDashboard, isLoadedFor } = useHomeDashboard(gt);
+      (settings.getSetting as any).mockResolvedValueOnce({ data: { setting_value: D } });
+      await load("switch-a");
+      expect(homeDashboard.value).toEqual(D);
+      expect(isLoadedFor("switch-a")).toBe(true);
+
+      const b = deferred();
+      (settings.getSetting as any).mockReturnValueOnce(b.promise);
+      const pending = load("switch-b");
+      expect(homeDashboard.value).toBeNull();
+      expect(isLoadedFor("switch-b")).toBe(false);
+      b.resolve({ data: null });
+      await pending;
+      expect(isLoadedFor("switch-b")).toBe(true);
+    });
+
+    it("a late answer for an earlier org never lands on the current one", async () => {
+      const { load, homeDashboard, isLoadedFor } = useHomeDashboard(gt);
+      const a = deferred();
+      (settings.getSetting as any).mockReturnValueOnce(a.promise);
+      const first = load("late-a");
+      (settings.getSetting as any).mockResolvedValueOnce({ data: null });
+      await load("late-b");
+      a.resolve({ data: { setting_value: D } });
+      await first;
+      expect(homeDashboard.value).toBeNull();
+      expect(isLoadedFor("late-a")).toBe(false);
+      expect(isLoadedFor("late-b")).toBe(true);
+    });
+  });
 });
