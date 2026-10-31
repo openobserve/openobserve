@@ -12742,7 +12742,6 @@
     "statReady": "جاهز للاستخدام",
     "statNeedsData": "لم يتم استيعابه",
     "statAll": "الجميع",
-    "notIngested": "لم يتم استيعابه: {stream}",
     "notIngestedHint": "هذه المؤسسة لا تتلقى {stream}، لذا لن يتم تفعيل هذا التنبيه أبدا. أضفه على أي حال وسيبدأ العمل بمجرد وصول البيانات.",
     "alertCount": "تنبيه {count} تنبيهات | {count}",
     "noCollectorTitle": "لا شيء هنا يطابق بياناتك حتى الآن",
@@ -12769,6 +12768,9 @@
     "alertTypeAnomaly": "شذوذ",
     "enterprise": "Enterprise",
     "enterpriseHint": "تتطلب تنبيهات اكتشاف الشذوذ OpenObserve Enterprise.",
+    "card": {
+      "customizeTooltip": "يفتح محرر التنبيهات مملوءًا مسبقًا"
+    },
     "drawer": {
       "dataAvailable": "البيانات متاحة",
       "streamNotFound": "التدفق غير موجود",

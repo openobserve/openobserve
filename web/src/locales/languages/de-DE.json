@@ -12742,7 +12742,6 @@
     "statReady": "Einsatzbereit",
     "statNeedsData": "Nicht erfasst",
     "statAll": "Alle",
-    "notIngested": "Nicht erfasst: {stream}",
     "notIngestedHint": "Diese Organisation empfängt {stream} nicht, daher würde dieser Alarm nie ausgelöst. Fügen Sie ihn trotzdem hinzu, und er funktioniert, sobald die Daten eintreffen.",
     "alertCount": "{count} Alarm | {count} Alarme",
     "noCollectorTitle": "Hier passt noch nichts zu Ihren Daten.",
@@ -12769,6 +12768,9 @@
     "alertTypeAnomaly": "Anomalie",
     "enterprise": "Enterprise",
     "enterpriseHint": "Alarme zur Anomalieerkennung erfordern OpenObserve Enterprise.",
+    "card": {
+      "customizeTooltip": "Öffnet den Alarm-Editor vorausgefüllt"
+    },
     "drawer": {
       "dataAvailable": "Daten verfügbar",
       "streamNotFound": "Stream nicht gefunden",

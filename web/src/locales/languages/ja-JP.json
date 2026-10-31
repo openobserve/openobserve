@@ -12742,7 +12742,6 @@
     "statReady": "利用可能",
     "statNeedsData": "未取り込み",
     "statAll": "すべて",
-    "notIngested": "未取り込み: {stream}",
     "notIngestedHint": "この組織は {stream} を受信していないため、このアラートは発火しません。それでも追加すると、データが到着した時点で動作を開始します。",
     "alertCount": "{count}件のアラート | {count}件のアラート",
     "noCollectorTitle": "ここに一致するデータはまだありません",
@@ -12769,6 +12768,9 @@
     "alertTypeAnomaly": "異常",
     "enterprise": "Enterprise",
     "enterpriseHint": "異常検知アラートには OpenObserve Enterprise が必要です。",
+    "card": {
+      "customizeTooltip": "入力済みのアラートエディターを開きます"
+    },
     "drawer": {
       "dataAvailable": "データあり",
       "streamNotFound": "ストリームが見つかりません",

@@ -12742,7 +12742,6 @@
     "statReady": "Kullanıma hazır",
     "statNeedsData": "Alınmadı",
     "statAll": "Tümü",
-    "notIngested": "Alınmadı: {stream}",
     "notIngestedHint": "Bu kuruluş {stream} almıyor, bu nedenle bu uyarı asla tetiklenmez. Yine de ekleyin; veri geldiğinde çalışmaya başlayacaktır.",
     "alertCount": "{count} uyarı | {count} uyarı",
     "noCollectorTitle": "Burada henüz verilerinizle eşleşen bir şey yok",
@@ -12769,6 +12768,9 @@
     "alertTypeAnomaly": "Anomali",
     "enterprise": "Enterprise",
     "enterpriseHint": "Anomali algılama uyarıları OpenObserve Enterprise gerektirir.",
+    "card": {
+      "customizeTooltip": "Uyarı düzenleyicisini önceden doldurulmuş olarak açar"
+    },
     "drawer": {
       "dataAvailable": "Veri mevcut",
       "streamNotFound": "Akış bulunamadı",

@@ -28,6 +28,11 @@ export interface LibraryFacet {
   count: number;
 }
 
+/** A category rail entry, listed under the pack heading it belongs to. */
+export interface LibraryCategoryFacet extends LibraryFacet {
+  pack: string;
+}
+
 /** The rail's alert-type facet; the manifest's `scheduled` reads as Threshold. */
 export type LibraryAlertType = "scheduled" | "anomaly";
 

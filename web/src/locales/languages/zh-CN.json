@@ -12742,7 +12742,6 @@
     "statReady": "可立即使用",
     "statNeedsData": "未摄取",
     "statAll": "全部",
-    "notIngested": "未摄取：{stream}",
     "notIngestedHint": "此组织未接收 {stream}，因此此告警永远不会触发。仍要添加，数据到达后它将开始工作。",
     "alertCount": "{count} 个告警 | {count} 个告警",
     "noCollectorTitle": "这里还没有与你的数据匹配的内容",
@@ -12769,6 +12768,9 @@
     "alertTypeAnomaly": "异常",
     "enterprise": "Enterprise",
     "enterpriseHint": "异常检测告警需要 OpenObserve Enterprise。",
+    "card": {
+      "customizeTooltip": "打开已预填的告警编辑器"
+    },
     "drawer": {
       "dataAvailable": "数据可用",
       "streamNotFound": "未找到流",
