@@ -31,9 +31,7 @@ use config::{
     },
     utils::{
         parquet::get_recordbatch_reader_from_bytes,
-        time::{
-            BASE_TIME, HourFormat, day_micros, get_ymdh_from_micros, hour_micros, now, now_micros,
-        },
+        time::{BASE_TIME, day_micros, hour_micros, now, now_micros},
     },
 };
 use db;
@@ -366,6 +364,7 @@ pub async fn delete_all(
         stream_type,
         stream_name,
         (BASE_TIME.timestamp_micros(), Utc::now().timestamp_micros()),
+        false,
     )
     .await
 }
@@ -376,11 +375,13 @@ pub async fn delete_all(
 //   3. if not all the files need to be deleted, we need to generate new dump files
 //   4. insert the deleted items into file_list_deleted table
 //   5. make the old files deleted and add the new files to file_list table
+/// With `strict`, a dumped row whose data reaches outside `range` is kept.
 pub async fn delete_by_time_range(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     range: (i64, i64),
+    strict: bool,
 ) -> Result<(), errors::Error> {
     let cfg = get_config();
     if !cfg.compact.file_list_dump_enabled {
@@ -403,12 +404,9 @@ pub async fn delete_by_time_range(
         .flat_map(record_batch_to_file_record)
         .collect::<Vec<_>>();
 
-    // Filter files based on the time range to find files to delete
-    let start_date = get_ymdh_from_micros(range.0, HourFormat::Real);
-    let end_date = get_ymdh_from_micros(range.1, HourFormat::Real);
     let (files_to_delete, files_to_keep): (Vec<_>, Vec<_>) = files
         .into_iter()
-        .partition(|f| f.date >= start_date && f.date <= end_date);
+        .partition(|f| dump_row_deletable(f, range, strict));
 
     if files_to_delete.is_empty() {
         return Ok(()); // nothing need to do
@@ -559,6 +557,23 @@ fn rows_time_range(files: &[FileRecord]) -> (i64, i64) {
     let min_ts = files.iter().map(|f| f.min_ts).min().unwrap_or_default();
     let max_ts = files.iter().map(|f| f.max_ts).max().unwrap_or_default();
     (min_ts, max_ts)
+}
+
+fn dump_row_deletable(file: &FileRecord, range: (i64, i64), strict: bool) -> bool {
+    let meta = FileMeta::from(file);
+    let overlaps = meta.overlaps(range);
+    if strict && overlaps && !meta.within(range) {
+        log::warn!(
+            "[FILE_LIST_DUMP] delete_by_time_range keep {}: its data [{}, {}] reaches outside the requested range [{}, {}], the data is stored by day",
+            file.file,
+            file.min_ts,
+            file.max_ts,
+            range.0,
+            range.1
+        );
+        return false;
+    }
+    overlaps
 }
 
 fn deleted_data_file(file: &FileRecord) -> FileListDeleted {
@@ -1930,5 +1945,27 @@ mod tests {
             rows_time_range(&[late_hour, merged_day]),
             (DAY + 5, DAY + day_micros(1) - 9)
         );
+    }
+
+    fn dump_row(min_ts: i64, max_ts: i64) -> FileRecord {
+        FileRecord {
+            min_ts,
+            max_ts,
+            ..delete_pairs_record(0, "")
+        }
+    }
+
+    #[test]
+    fn test_dump_row_deletable_strict_keeps_rows_exceeding_the_range() {
+        let range = (1000, 1999);
+        // inside the range: deleted either way
+        assert!(dump_row_deletable(&dump_row(1000, 1999), range, true));
+        assert!(dump_row_deletable(&dump_row(1200, 1300), range, false));
+        // outside: never
+        assert!(!dump_row_deletable(&dump_row(2000, 3000), range, true));
+        assert!(!dump_row_deletable(&dump_row(0, 999), range, false));
+        // reaching outside, a merged day: kept under strict, deleted otherwise
+        assert!(!dump_row_deletable(&dump_row(500, 2500), range, true));
+        assert!(dump_row_deletable(&dump_row(500, 2500), range, false));
     }
 }
