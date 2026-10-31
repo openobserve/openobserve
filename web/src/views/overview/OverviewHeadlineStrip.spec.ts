@@ -79,7 +79,14 @@ describe("OverviewHeadlineStrip", () => {
       ...base,
       alerts: {
         status: "ok",
-        data: { ...base.alerts.data!, total: 0, failed_evaluation: 0, firing: [], by_state: {} },
+        data: {
+          ...base.alerts.data!,
+          total: 0,
+          enabled: 0,
+          failed_evaluation: 0,
+          firing: [],
+          by_state: {},
+        },
       },
     } as typeof base;
     const w = mountStrip({ overview });
@@ -242,6 +249,25 @@ describe("OverviewHeadlineStrip", () => {
     expect(tile(w, "incidents").text()).toContain("No access");
     await tile(w, "incidents").trigger("click");
     expect(w.emitted("select")).toBeUndefined();
+  });
+
+  it("makes a tile selectable only when its section loaded", async () => {
+    const overview = buildOverview({ pipelines: { status: "forbidden" } });
+    const w = mountStrip({ overview });
+    await tile(w, "pipelines").trigger("click");
+    expect(w.emitted("select")).toBeUndefined();
+    await tile(w, "streams").trigger("click");
+    expect(w.emitted("select")).toEqual([["streams"]]);
+  });
+
+  it("reads not set up when every alert rule is disabled", () => {
+    const full = buildOverview();
+    const overview = buildOverview({
+      alerts: { status: "ok", data: { ...full.alerts.data!, total: 3, enabled: 0, disabled: 3 } },
+    });
+    const w = mountStrip({ overview });
+    expect(tile(w, "firing").text()).toContain("Not set up");
+    expect(tile(w, "failing").text()).toContain("Not set up");
   });
 
   it("shows a note and is not clickable when incidents are unavailable", async () => {

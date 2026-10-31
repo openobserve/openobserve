@@ -309,10 +309,13 @@ pub async fn resolve_scope(org_id: &str, user_id: &str) -> Result<OverviewScope,
     Ok(scope)
 }
 
-/// Overview when grants cannot be resolved; alerts load only past the module LIST check.
-pub async fn scope_unavailable(org_id: &str, user_id: &str, top_n: usize) -> Overview {
+/// Overview when grants cannot be resolved; `None` when the module LIST check denies everything.
+pub async fn scope_unavailable(org_id: &str, user_id: &str, top_n: usize) -> Option<Overview> {
     let mut scope = OverviewScope::default();
     apply_module_access(&mut scope, &module_access(org_id, user_id).await);
+    if scope.denies_everything() {
+        return None;
+    }
     let (alerts, limits) = tokio::join!(
         async {
             if scope.alerts_forbidden {
@@ -322,23 +325,14 @@ pub async fn scope_unavailable(org_id: &str, user_id: &str, top_n: usize) -> Ove
         },
         limits_section(),
     );
-    Overview {
+    Some(Overview {
         streams: unresolved_section(streams_forbidden(&scope)),
         alerts,
         pipelines: unresolved_section(scope.pipeline_grants.as_ref().is_some_and(Vec::is_empty)),
         limits,
         generated_at: now_micros(),
         cached: false,
-    }
-}
-
-/// A section the module check denied stays forbidden; an allowed one failed to resolve.
-fn unresolved_section<T>(denied: bool) -> Section<T> {
-    if denied {
-        Section::forbidden()
-    } else {
-        Section::error("failed to resolve permissions")
-    }
+    })
 }
 
 /// Returns a fresh cached overview for the caller, so a hit can skip the permission lookups.
@@ -374,6 +368,15 @@ pub async fn get_overview(org_id: &str, scope: &OverviewScope, top_n: usize) -> 
         cache_put(key, overview.clone(), ttl_micros);
     }
     overview
+}
+
+/// A section the module check denied stays forbidden; an allowed one failed to resolve.
+fn unresolved_section<T>(denied: bool) -> Section<T> {
+    if denied {
+        Section::forbidden()
+    } else {
+        Section::error("failed to resolve permissions")
+    }
 }
 
 /// The module LIST check gates a section even when per-object grants exist, as on list routes.
@@ -415,7 +418,8 @@ async fn module_access(_org_id: &str, _user_id: &str) -> ModuleAccess {
     ModuleAccess::all()
 }
 
-/// Runs the same route-table check the auth middleware applies to the sibling list route.
+/// Mirrors the middleware list check; alerts need LIST on all alert folders, stricter than a
+/// folder-scoped list.
 #[cfg(feature = "enterprise")]
 async fn can_list(
     org_id: &str,
@@ -1292,20 +1296,10 @@ mod tests {
     #[tokio::test]
     async fn test_cache_is_keyed_per_caller_and_marks_hits() {
         let org = "overview_cache_org";
-        seed_stream(org, StreamType::Logs, "only_for_admin", 7.0).await;
-        let admin = OverviewScope {
-            user_id: "admin@example.com".to_string(),
-            ..Default::default()
-        };
-        let limited = OverviewScope {
-            user_id: "limited@example.com".to_string(),
-            stream_grants: HashMap::from([(StreamType::Logs, vec![])]),
-            pipeline_grants: None,
-            alerts_forbidden: false,
-        };
+        let (admin, limited) = ("admin@example.com", "limited@example.com");
         let key = CacheKey {
             org_id: org.to_string(),
-            user_id: admin.user_id.clone(),
+            user_id: admin.to_string(),
             top_n: 5,
         };
         let seeded = Overview {
@@ -1322,14 +1316,14 @@ mod tests {
         };
         cache_put(key, seeded, 30 * 1_000_000);
 
-        let hit = cached_overview(org, &admin.user_id, 5).unwrap();
+        let hit = cached_overview(org, admin, 5).unwrap();
         assert!(hit.cached);
         assert_eq!(hit.streams.data.unwrap().total_streams, 1);
-        assert!(cached_overview(org, &limited.user_id, 5).is_none());
+        assert!(cached_overview(org, limited, 5).is_none());
 
         let limited_key = CacheKey {
             org_id: org.to_string(),
-            user_id: limited.user_id.clone(),
+            user_id: limited.to_string(),
             top_n: 5,
         };
         assert!(CACHE.get(&limited_key).is_none());

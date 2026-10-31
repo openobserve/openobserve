@@ -67,9 +67,9 @@ export type ButtonVariant =
   | "tint-orange"
   // Table-cell content that is itself the action: no chrome, full cell width, stacked lines.
   | "cell"
-  // Borderless list row: full width, name at the start and value at the end, auto height.
+  // Borderless list row whose whole content is the action.
   | "row"
-  // Outlined full-width action whose wrapping message sits at the start, e.g. a locked-section prompt.
+  // Outlined prompt whose message is the action, e.g. a locked section.
   | "locked-body";
 
 /** Size controls height, padding, font-size, and border-radius */

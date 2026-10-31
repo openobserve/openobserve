@@ -292,7 +292,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
-  // row: list row whose content is itself the action; start-aligned name, end-aligned value.
+  // row: list row whose content is itself the action.
   row: [
     "bg-transparent text-button-ghost-text border-0 text-start rounded-default",
     "h-auto! justify-between! gap-3! px-0! py-1.5!",
@@ -301,7 +301,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:text-text-disabled",
   ].join(" "),
-  // locked-body: outlined full-width prompt whose message wraps and starts at the leading edge.
+  // locked-body: outlined prompt whose message is the action.
   "locked-body": [
     "bg-transparent text-button-outline-text border border-button-outline-border text-start",
     "h-auto! justify-start! px-3! py-3! whitespace-normal!",

@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :link-label="t('overview.viewAll')"
     :link-aria-label="t('overview.alerts.viewAllAria')"
     :view="view"
-    :summary-forbidden="forbidden"
     @retry="emit('retry')"
     @view-all="emit('open')"
   >
