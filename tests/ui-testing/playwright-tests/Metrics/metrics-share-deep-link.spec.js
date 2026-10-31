@@ -56,9 +56,7 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     await pm.metricsPage.expectApplyButtonVisible();
     await pm.metricsPage.expectDatePickerVisible();
 
-    // No metrics_data blob in URL by default
-    const hasBlob = await pm.metricsPage.hasMetricsDataParam();
-    expect(hasBlob).toBe(false);
+    // No "no blob by default" check: Visualize auto-picks a metric on mount and writes its blob.
 
     // Share button should be in DOM (but may be disabled if web_url not configured)
     const shareInDom = await pm.metricsPage.isShareButtonInDom();
@@ -168,17 +166,6 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     const pm = await setupTest(page, testInfo);
     testLogger.info('Testing URL sync after manual query change');
 
-    // Ensure we start without a metrics_data blob in URL
-    const hasBlobBefore = await pm.metricsPage.hasMetricsDataParam();
-    if (hasBlobBefore) {
-      // Re-navigate cleanly. Must target the editor explicitly: a bare
-      // `/metrics` carries no editor params, so it lands on the Metrics
-      // Explorer — which has no query bar for the Apply below to use.
-      const baseUrl = `${process.env.ZO_BASE_URL}/web/metrics/editor`;
-      const orgId = process.env.ORGNAME || 'default';
-      await pm.metricsPage.navigateToMetricsUrl(`${baseUrl}?org_identifier=${orgId}`);
-    }
-
     // Enter a query and click Apply
     await pm.metricsPage.enterMetricsQuery('cpu_usage');
     await pm.metricsPage.clickApplyButton();
@@ -194,6 +181,7 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     const blob = await pm.metricsPage.decodeMetricsBlob();
     expect(blob).not.toBeNull();
     expect(blob.v).toBe(1);
+    expect(await pm.metricsPage.verifyQueryInUrl('cpu_usage')).toBe(true);
 
     testLogger.info('URL sync after manual query verified');
   });

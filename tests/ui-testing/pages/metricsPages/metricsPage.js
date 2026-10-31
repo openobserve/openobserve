@@ -1,6 +1,6 @@
 // metricsPage.js
 import { expect } from '@playwright/test';
-import { gotoMetricsEditor } from '../commonActions.js';
+import { gotoMetricsVisualize } from '../commonActions.js';
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
@@ -11,12 +11,11 @@ export class MetricsPage {
 
         // Navigation
         this.metricsPageMenu = page.locator('[data-test="menu-link-\\/metrics-item"]');
-        this.metricsPageIndicator = page.locator('[data-test="metrics-page"]');
+        this.metricsPageIndicator = page.locator('[data-test="metrics-explorer-visualize"]');
 
         // VERIFIED selectors from Phase 1 analysis
         // Main metrics controls
-        this.applyButton = '[data-test="metrics-apply"]';
-        this.cancelButton = '[data-test="metrics-cancel"]';
+        this.applyButton = '[data-test="metrics-explorer-run"]';
         this.datePicker = '[data-test="metrics-date-picker"]';
         this.autoRefresh = '[data-test="metrics-auto-refresh"]';
 
@@ -36,7 +35,6 @@ export class MetricsPage {
         this.schemaTitleText = '[data-test="schema-title-text"]';
 
         // Other UI elements
-        this.syntaxGuideButton = '[data-cy="syntax-guide-button"]';
         this.themeToggleButton = '[data-test="navbar-theme-toggle-btn"]';
 
         // Inline error list locator (DashboardErrors component)
@@ -150,8 +148,8 @@ export class MetricsPage {
         this.configYAxisMaxField = page.locator('[data-test="dashboard-config-y_axis_max-field"]').first();
 
         // ===== Metrics Share & Deep-Link locators =====
-        this.shareButton = '[data-test="metrics-share-btn"]';
-        this.metricsPageContainer = '[data-test="metrics-page"]';
+        this.shareButton = '[data-test="metrics-explorer-share-btn"]';
+        this.metricsPageContainer = '[data-test="metrics-explorer-visualize"]';
         // Scoped success toast for the share-link "Link Copied" message as in dashboard-share-export
         this.shareSuccessToast = page.locator('[data-test-variant="success"][data-test-message*="Link Copied"]');
         this.shareErrorToast = page.locator('[data-test-variant="error"][data-test-message*="Error shortening link"]');
@@ -238,16 +236,11 @@ export class MetricsPage {
         }
     }
     /**
-     * Opens the metrics PANEL EDITOR — the page every caller of this method
-     * actually drives (PromQL input, Apply, visualizations, Add to Dashboard).
-     *
-     * It used to click the sidebar, which was the same thing until `/metrics`
-     * became the Metrics Explorer browse grid; the editor moved to
-     * `/metrics/editor`. Navigating there directly also drops the cloud
-     * sidebar-click fallback this method used to need.
+     * Opens the Metrics Explorer's Visualize mode — the panel editor every caller
+     * of this method drives (PromQL input, Run, visualizations, Add to Dashboard).
      */
     async gotoMetricsPage() {
-        await gotoMetricsEditor(this.page);
+        await gotoMetricsVisualize(this.page);
 
         // Wait for a key editor control before proceeding.
         await this.page.locator(this.applyButton).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
@@ -255,8 +248,7 @@ export class MetricsPage {
 
     async metricsPageValidation() {
 
-        await expect(this.page.locator('[data-cy="syntax-guide-button"]')).toContainText('Syntax Guide');
-        //await expect(this.page.locator('[data-test="zinc-metrics"]')).toContainText('PromQL:');
+        await expect(this.metricsPageIndicator).toBeVisible();
 
 
     }
@@ -321,14 +313,6 @@ export class MetricsPage {
 
     async expectApplyButtonEnabled() {
         await expect(this.page.locator(this.applyButton)).toBeEnabled();
-    }
-
-    async clickCancelButton() {
-        await this.page.locator(this.cancelButton).click();
-    }
-
-    async expectCancelButtonVisible() {
-        await expect(this.page.locator(this.cancelButton)).toBeVisible();
     }
 
     async openDatePicker() {
@@ -399,10 +383,6 @@ export class MetricsPage {
 
     async isDatePickerVisible() {
         return await this.page.locator(this.datePicker).isVisible().catch(() => false);
-    }
-
-    async isSyntaxGuideVisible() {
-        return await this.page.locator(this.syntaxGuideButton).isVisible().catch(() => false);
     }
 
     async searchInFieldList(searchTerm) {
@@ -582,10 +562,6 @@ export class MetricsPage {
 
     async clickSchemaCancel() {
         await this.page.locator(this.schemaCancel).click();
-    }
-
-    async expectSyntaxGuideVisible() {
-        await expect(this.page.locator(this.syntaxGuideButton)).toBeVisible();
     }
 
     async enterMetricsQuery(query) {

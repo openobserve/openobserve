@@ -19,6 +19,9 @@
 import { b64EncodeUnicode, b64DecodeUnicodeSafe } from "@/utils/zincutils";
 import { applyOverridesFromRegistry } from "@/utils/url/deepLinkParams";
 import { METRICS_PARAMS, defaultMetricsQuery } from "@/utils/metrics/metricsParamRegistry";
+import { METRICS_EDITOR_PARAM_KEYS } from "@/utils/metrics/metricsEditorParams";
+import { getDefaultDashboardPanelData } from "@/composables/dashboard/useDashboardPanelDefaults";
+import store from "@/stores";
 
 // bump when the blob payload shape changes; older blobs decode to null
 export const METRICS_BLOB_VERSION = 1;
@@ -112,4 +115,27 @@ export const applyDeepLinkOverrides = (
       if (slot?.fields) slot.fields.stream_type = "metrics";
     },
   });
+};
+
+// The panel the retired editor opened before laying a link's params over it.
+const legacyEditorPanel = (): any => {
+  const data = JSON.parse(JSON.stringify(getDefaultDashboardPanelData(store).data));
+  data.type = "line";
+  data.queryType = "promql";
+  data.queries[0].fields.stream_type = "metrics";
+  data.queries[0].customQuery = false;
+  return { data, layout: {} };
+};
+
+// An editor deep link's params folded into one `metrics_data` blob, the only panel state Visualize reads.
+export const legacyLinkToVisualizeQuery = (query: Record<string, any>): Record<string, any> => {
+  const panel = legacyEditorPanel();
+  if (query.metrics_data) applyMetricsBlob(query.metrics_data, panel);
+  applyDeepLinkOverrides(query, panel);
+  const rest = Object.fromEntries(
+    Object.entries(query).filter(
+      ([key]) => !(METRICS_EDITOR_PARAM_KEYS as readonly string[]).includes(key.split(".")[0]),
+    ),
+  );
+  return { ...rest, mode: "visualize", metrics_data: encodeMetricsConfig(getMetricsConfig(panel)) };
 };

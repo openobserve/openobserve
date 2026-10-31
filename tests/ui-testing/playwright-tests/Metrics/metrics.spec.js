@@ -36,17 +36,14 @@ test.describe("Metrics testcases", () => {
     // Verify core UI elements are visible
     await pm.metricsPage.expectApplyButtonVisible();
     await pm.metricsPage.expectDatePickerVisible();
-    await pm.metricsPage.expectSyntaxGuideVisible();
 
     // Assert that all critical UI elements are present (P0 smoke test requirement)
     // Final verification with explicit visibility checks using page object methods
     const applyButtonVisible = await pm.metricsPage.isApplyButtonVisible();
     const datePickerVisible = await pm.metricsPage.isDatePickerVisible();
-    const syntaxGuideVisible = await pm.metricsPage.isSyntaxGuideVisible();
 
     expect(applyButtonVisible).toBe(true);
     expect(datePickerVisible).toBe(true);
-    expect(syntaxGuideVisible).toBe(true);
 
     testLogger.info('Metrics page loaded successfully with all core elements');
   });

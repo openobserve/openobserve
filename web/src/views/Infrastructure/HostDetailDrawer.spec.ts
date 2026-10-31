@@ -692,7 +692,7 @@ describe("HostDetailDrawer", () => {
       // Same defect the curated page carried: `new Date(us / 1000)` builds a
       // ms-epoch Date, and usePanelDataLoader:418 reads it straight back as µs,
       // so convertPromQLData's gap-fill snapped the axis floor to 1970.
-      // Every other producer feeds it undivided — plugins/metrics/Index.vue:425.
+      // Every other producer feeds it undivided — plugins/metrics/explorer/MetricsVisualize.vue applyDateTime.
       wrapper = await mountDrawer();
       expect(lastCurrentTimeObj.__global.start_time.getTime()).toBe(RANGE.from);
       expect(lastCurrentTimeObj.__global.end_time.getTime()).toBe(RANGE.to);
