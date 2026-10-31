@@ -153,17 +153,6 @@ describe("placeLabels", () => {
     expect(placed.get("moved")).toEqual({ x: 252, y: 200 });
   });
 
-  it("always places a forced label, first", () => {
-    const placed = placeLabels(
-      [
-        { id: "busy", text: "10.0KB/s", spots: [{ x: 252, y: 38 }] },
-        { id: "hovered", text: "1.0KB/s", spots: [{ x: 252, y: 38 }], forced: true },
-      ],
-      [],
-    );
-    expect([...placed.keys()]).toEqual(["hovered"]);
-  });
-
   it("fits a typical rate label in the gap between two columns", () => {
     const box = labelBox("174.4KB/s", { x: CARD_W + 36, y: 0 });
     expect(box.x).toBeGreaterThan(CARD_W);

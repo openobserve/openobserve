@@ -238,6 +238,20 @@ describe("DependenciesView", () => {
     expect(wrapper.emitted("update")).toEqual([[{ system: true, nodeTraffic: true }]]);
   });
 
+  it("offers both to show what the switches hide and to clear a search they also hide", async () => {
+    await mountView({ state: parseUrlState({ view: "dependencies", search: "coredns" }) });
+    const empty = testId("k8s2-deps-empty");
+    expect(empty.text()).toContain("which the switches above hide");
+    const [show, clear] = empty.findAll("button");
+    expect(clear.text()).toBe("Clear filters");
+    await show.trigger("click");
+    await clear.trigger("click");
+    expect(wrapper.emitted("update")).toEqual([
+      [{ system: true, nodeTraffic: true }],
+      [{ namespaces: [], search: "" }],
+    ]);
+  });
+
   it("offers to clear the filters when the namespace filter or search hides every edge", async () => {
     await mountView({ state: parseUrlState({ view: "dependencies", search: "nothing" }) });
     await testId("k8s2-deps-empty").find("button").trigger("click");

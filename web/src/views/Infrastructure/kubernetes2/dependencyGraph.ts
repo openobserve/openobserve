@@ -476,22 +476,48 @@ export function layoutColumns<E extends { id: string }>(
   return { positions, waypoints };
 }
 
-// Pairs of segments between the same two adjacent columns whose ends are in opposite orders.
-function crossings(
+// Pairs of segments in the same gap between adjacent columns whose ends are in opposite orders. Only segments in one
+// gap can cross, so each gap is counted on its own, as inversions: sorted by their left ends, a pair crosses where the
+// right ends run the other way. A merge sort counts them in n log n, where comparing every pair stalls on a big map.
+export function crossings(
   segments: [string, string][],
   columnOf: Map<string, number>,
   middles: Map<string, number>,
 ): number {
+  const gaps = new Map<number, [number, number][]>();
+  for (const [a, b] of segments) {
+    const gap = columnOf.get(a)!;
+    if (!gaps.has(gap)) gaps.set(gap, []);
+    gaps.get(gap)!.push([middles.get(a)!, middles.get(b)!]);
+  }
   let count = 0;
-  for (let i = 0; i < segments.length; i++) {
-    for (let j = i + 1; j < segments.length; j++) {
-      const [[p1, p2], [q1, q2]] = [segments[i], segments[j]];
-      if (columnOf.get(p1) !== columnOf.get(q1)) continue;
-      if ((middles.get(p1)! - middles.get(q1)!) * (middles.get(p2)! - middles.get(q2)!) < 0) {
-        count++;
-      }
+  for (const ends of gaps.values()) {
+    // Equal left ends never cross, so ordering them by their right ends keeps them from counting.
+    ends.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+    count += inversions(ends.map((e) => e[1]));
+  }
+  return count;
+}
+
+// Pairs i < j with values[i] > values[j], strictly.
+function inversions(values: number[]): number {
+  if (values.length < 2) return 0;
+  const mid = values.length >> 1;
+  const left = values.slice(0, mid);
+  const right = values.slice(mid);
+  let count = inversions(left) + inversions(right);
+  let i = 0;
+  let j = 0;
+  let k = 0;
+  while (i < left.length && j < right.length) {
+    if (left[i] <= right[j]) values[k++] = left[i++];
+    else {
+      count += left.length - i;
+      values[k++] = right[j++];
     }
   }
+  while (i < left.length) values[k++] = left[i++];
+  while (j < right.length) values[k++] = right[j++];
   return count;
 }
 

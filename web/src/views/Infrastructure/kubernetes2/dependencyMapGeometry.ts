@@ -91,22 +91,19 @@ const overlaps = (a: Box, b: Box) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 // Busiest first, each label at the first spot on its route where it clears every card and every label placed so far;
-// one that fits nowhere is left out. `forced` labels are placed first and wherever their first spot is.
+// one that fits nowhere is left out.
 export function placeLabels(
-  wanted: { id: string; text: string; spots: Position[]; forced?: boolean }[],
+  wanted: { id: string; text: string; spots: Position[] }[],
   cards: Position[],
 ): Map<string, Position> {
   const cardBoxes = cards.map((c) => ({ x: c.x, y: c.y, w: CARD_W, h: CARD_H }));
   const placed: Box[] = [];
   const out = new Map<string, Position>();
-  const order = [...wanted.filter((w) => w.forced), ...wanted.filter((w) => !w.forced)];
-  for (const { id, text, spots, forced } of order) {
-    const spot = forced
-      ? spots[0]
-      : spots.find((at) => {
-          const box = labelBox(text, at);
-          return ![...cardBoxes, ...placed].some((other) => overlaps(box, other));
-        });
+  for (const { id, text, spots } of wanted) {
+    const spot = spots.find((at) => {
+      const box = labelBox(text, at);
+      return ![...cardBoxes, ...placed].some((other) => overlaps(box, other));
+    });
     if (!spot) continue;
     placed.push(labelBox(text, spot));
     out.set(id, spot);

@@ -19,10 +19,12 @@ import {
   CARD_H,
   MAX_GRAPH_EDGES,
   buildGraph,
+  crossings,
   endOf,
   filterFlows,
   flowQuery,
   flowWindowSeconds,
+  layoutColumns,
   layoutGraph,
   namespaceColors,
   pairFlows,
@@ -459,5 +461,65 @@ describe("namespaceColors", () => {
     const before = namespaceColors(DEFAULT);
     const after = namespaceColors([...DEFAULT, "kube-system", "openobserve-collector", "zz"]);
     for (const name of DEFAULT) expect(after.get(name)).toBe(before.get(name));
+  });
+});
+
+describe("crossings", () => {
+  // Every pair compared, as the count must equal.
+  const naive = (
+    segments: [string, string][],
+    columnOf: Map<string, number>,
+    at: Map<string, number>,
+  ) => {
+    let count = 0;
+    for (let i = 0; i < segments.length; i++) {
+      for (let j = i + 1; j < segments.length; j++) {
+        const [[p1, p2], [q1, q2]] = [segments[i], segments[j]];
+        if (columnOf.get(p1) !== columnOf.get(q1)) continue;
+        if ((at.get(p1)! - at.get(q1)!) * (at.get(p2)! - at.get(q2)!) < 0) count++;
+      }
+    }
+    return count;
+  };
+
+  it("counts what comparing every pair counts, ties included", () => {
+    // A small seeded generator, so the fixture is the same every run.
+    let seed = 7;
+    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let round = 0; round < 20; round++) {
+      const columnOf = new Map<string, number>();
+      const at = new Map<string, number>();
+      for (let c = 0; c < 4; c++) {
+        for (let r = 0; r < 6; r++) {
+          columnOf.set(`${c}:${r}`, c);
+          // Few distinct rows, so equal ends are common.
+          at.set(`${c}:${r}`, Math.floor(random() * 4));
+        }
+      }
+      const segments: [string, string][] = Array.from({ length: 30 }, () => {
+        const c = Math.floor(random() * 3);
+        return [`${c}:${Math.floor(random() * 6)}`, `${c + 1}:${Math.floor(random() * 6)}`];
+      });
+      expect(crossings(segments, columnOf, at)).toBe(naive(segments, columnOf, at));
+    }
+  });
+
+  it("lays out the largest map drawn, 80 ends and 200 edges across many columns, quickly", () => {
+    const nodes = Array.from({ length: 80 }, (_, i) => ({ end: { id: `e${i}` }, rank: i % 10 }));
+    const edges = Array.from({ length: 200 }, (_, i) => ({
+      id: `x${i}`,
+      source: { id: `e${(i * 7) % 80}` },
+      target: { id: `e${(i * 13 + 5) % 80}` },
+      directed: true,
+    }));
+    const started = performance.now();
+    const { positions } = layoutColumns(
+      nodes,
+      (x, y) => x.id.localeCompare(y.id),
+      edges,
+      () => false,
+    );
+    expect(positions.size).toBe(80);
+    expect(performance.now() - started).toBeLessThan(200);
   });
 });

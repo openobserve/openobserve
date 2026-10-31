@@ -342,6 +342,13 @@ function onSetUp() {
 
 const filtersSet = computed(() => props.state.namespaces.length > 0 || !!props.state.search);
 
+// Whether the switches, not only the namespace filter and search, keep flows off the map.
+const switchesHide = computed(
+  () =>
+    filterFlows(allEdges.value, { ...scope.value, showSystem: true, showNodeTraffic: true })
+      .length > edges.value.length,
+);
+
 // Only the namespace filter and search; the switches keep what they show.
 function clearFilters() {
   emit("update", { namespaces: [], search: "" });
@@ -442,22 +449,24 @@ function clearFilters() {
       data-test="k8s2-deps-no-flows"
       @action="onSetUp"
     />
-    <!-- With no namespace filter or search set, only the switches can be hiding every edge. -->
+    <!-- The switches hide what the namespace filter and search let through: turning them on shows it. -->
     <OEmptyState
-      v-else-if="!graph.edges.length && filtersSet"
-      filtered
-      :title="t('infra.k8s2.depsNoMatch')"
-      data-test="k8s2-deps-empty"
-      @action="clearFilters"
-    />
-    <OEmptyState
-      v-else-if="!graph.edges.length"
+      v-else-if="!graph.edges.length && switchesHide"
       variant="no-results"
       :title="t('infra.k8s2.depsNoMatch')"
       :description="t('infra.k8s2.depsHiddenBySwitches')"
       :action-label="t('infra.k8s2.depsShowAll')"
+      :secondary-action-label="filtersSet ? t('emptyState.filtered.action') : undefined"
       data-test="k8s2-deps-empty"
       @action="emit('update', { system: true, nodeTraffic: true })"
+      @secondary-action="clearFilters"
+    />
+    <OEmptyState
+      v-else-if="!graph.edges.length"
+      filtered
+      :title="t('infra.k8s2.depsNoMatch')"
+      data-test="k8s2-deps-empty"
+      @action="clearFilters"
     />
     <template v-else>
       <OText
