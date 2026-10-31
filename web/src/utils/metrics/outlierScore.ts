@@ -51,7 +51,7 @@ export function seriesPointsByValue(
   return out;
 }
 
-/** Per series, the mean over its points of |value − median| / (max(1.4826·MAD, 1% of |median|) + ε) at timestamps two or more series share; 0 with none. */
+/** Per series, the mean over its points of |value − median| / (max(1.4826·MAD, or 1.2533·mean |deviation| when the MAD is 0, 1% of |median|) + ε) at timestamps two or more series share; 0 with none. */
 export function outlierScores(series: Map<string, Map<number, number>>): Map<string, number> {
   const atTime = new Map<number, number[]>();
   for (const points of series.values()) {

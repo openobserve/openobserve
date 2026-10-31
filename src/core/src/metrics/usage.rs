@@ -117,7 +117,7 @@ pub struct UsageCounts {
     pub pipelines: usize,
 }
 
-/// Usage counts for every metric an org's visible objects read; an absent metric is unused.
+/// Usage counts for each current metric stream that visible objects read; other names are dropped.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, ToSchema)]
 pub struct OrgMetricUsage {
     pub metrics: HashMap<String, UsageCounts>,

@@ -794,7 +794,7 @@ export function snapExportInterval(windowSeconds: number, count: number): number
   );
 }
 
-/** The range-based step raised to a multiple of the export interval, so every step holds the same number of samples. */
+/** The range-based step raised to a multiple of the export interval, so every step holds the same number of samples; unaligned when that multiple would pass the range. */
 export function computeAlignedStepSeconds(
   rangeSeconds: number,
   maxDataPoints: number = MAX_DATA_POINTS,
