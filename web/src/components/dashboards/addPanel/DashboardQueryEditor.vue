@@ -709,11 +709,12 @@ export default defineComponent({
     const isFormulaInput = computed(() => {
       const letter = currentQuery.value?.config?.ref;
       if (!letter) return false;
+      const names = queryRefs(dashboardPanelData.data.queries);
       return dashboardPanelData.data.queries.some(
-        (query: any) =>
+        (query: any, i: number) =>
           query !== currentQuery.value &&
           isFormulaQuery(query) &&
-          formulaRefs(query.config.formula).includes(letter),
+          formulaRefs(query.config.formula, names, names[i]).includes(letter),
       );
     });
 

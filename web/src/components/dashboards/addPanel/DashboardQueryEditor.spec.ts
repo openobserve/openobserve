@@ -892,6 +892,13 @@ describe("formula letters and the saved hide flag", () => {
     );
   });
 
+  it("accepts a saved formula that reads a metric named F1 when no formula holds that name", async () => {
+    mountWith([q({ ref: "A" }), q({ formula: "A + F1" }, "")], 1);
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="dashboard-panel-formula-error"]').exists()).toBe(false);
+  });
+
   it("accepts a formula that references another formula", async () => {
     mountWith(
       [

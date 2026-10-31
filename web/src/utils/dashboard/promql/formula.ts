@@ -60,18 +60,32 @@ const skipLabelList = (text: string, wordEnd: number): number => {
   return text[i] === "(" ? skipUntil(text, i, ")") : wordEnd;
 };
 
-const scanWord = (text: string, start: number, refs: RefToken[]): number => {
+// An `F<n>` is a reference only when another query holds that name; otherwise it stays a metric name, as saved panels read it.
+const scanWord = (
+  text: string,
+  start: number,
+  refs: RefToken[],
+  names: ReadonlySet<string>,
+): number => {
   let end = start;
   while (end < text.length && isIdentPart(text[end])) end++;
   const word = text.slice(start, end);
   if (LABEL_LIST_KEYWORDS.has(word.toLowerCase())) return skipLabelList(text, end);
-  if ((word.length === 1 && LETTERS.includes(word)) || FORMULA_REF.test(word)) {
+  if (
+    (word.length === 1 && LETTERS.includes(word)) ||
+    (FORMULA_REF.test(word) && names.has(word))
+  ) {
     refs.push({ start, name: word });
   }
   return end;
 };
 
-const nextToken = (text: string, i: number, refs: RefToken[]): number => {
+const nextToken = (
+  text: string,
+  i: number,
+  refs: RefToken[],
+  names: ReadonlySet<string>,
+): number => {
   const ch = text[i];
   if (QUOTES.has(ch)) return skipString(text, i);
   if (ch === "{") return skipUntil(text, i, "}");
@@ -84,14 +98,14 @@ const nextToken = (text: string, i: number, refs: RefToken[]): number => {
     while (end < text.length && /[A-Za-z0-9_.]/.test(text[end])) end++;
     return end;
   }
-  if (isIdentStart(ch)) return scanWord(text, i, refs);
+  if (isIdentStart(ch)) return scanWord(text, i, refs, names);
   return i + 1;
 };
 
-const refTokens = (formula: string): RefToken[] => {
+const refTokens = (formula: string, names: ReadonlySet<string>): RefToken[] => {
   const refs: RefToken[] = [];
   let i = 0;
-  while (i < formula.length) i = nextToken(formula, i, refs);
+  while (i < formula.length) i = nextToken(formula, i, refs, names);
   return refs;
 };
 
@@ -123,28 +137,36 @@ export const formulaInputs = (queries: any[], texts: string[]): Record<string, F
   return inputs;
 };
 
-export const formulaRefs = (formula: string): string[] => [
-  ...new Set(refTokens(formula).map((ref) => ref.name)),
-];
+/** The panel's query names an `F<n>` may refer to: never the formula's own, which a saved panel may use as a metric name. */
+const refNames = (names: Iterable<string | undefined>, self?: string): Set<string> =>
+  new Set([...names].filter((n): n is string => !!n && n !== self));
+
+/** The names a formula reads, given the panel's query names and the formula's own. */
+export const formulaRefs = (
+  formula: string,
+  names: Iterable<string | undefined> = [],
+  self?: string,
+): string[] => [...new Set(refTokens(formula, refNames(names, self)).map((ref) => ref.name))];
 
 /** The letters of the non-formula queries a formula reads, through any formulas it references. */
-export const formulaLeafRefs = (queries: any[], formula: string): Set<string> => {
+export const formulaLeafRefs = (queries: any[], formula: string, self?: string): Set<string> => {
   const formulaByLetter: Record<string, string> = {};
-  queryRefs(queries).forEach((letter, i) => {
+  const names = queryRefs(queries);
+  names.forEach((letter, i) => {
     if (letter && isFormulaQuery(queries[i])) formulaByLetter[letter] = queries[i].config.formula;
   });
   const leaves = new Set<string>();
   const seen = new Set<string>();
-  const visit = (text: string) => {
-    for (const letter of formulaRefs(text)) {
+  const visit = (text: string, owner?: string) => {
+    for (const letter of formulaRefs(text, names, owner)) {
       if (!(letter in formulaByLetter)) leaves.add(letter);
       else if (!seen.has(letter)) {
         seen.add(letter);
-        visit(formulaByLetter[letter]);
+        visit(formulaByLetter[letter], letter);
       }
     }
   };
-  visit(formula);
+  visit(formula, self);
   return leaves;
 };
 
@@ -155,10 +177,11 @@ export const substituteFormula = (
   self?: string,
 ): FormulaResult => {
   const expanded: Record<string, string> = {};
+  const names = Object.keys(inputsByLetter);
   const expand = (text: string, path: string[]): FormulaResult => {
     let expr = "";
     let last = 0;
-    for (const { start, name: letter } of refTokens(text)) {
+    for (const { start, name: letter } of refTokens(text, refNames(names, path.at(-1)))) {
       const input = inputsByLetter[letter];
       if (!input) return { error: gt("dashboard.formulaUnknownLetter", { letter }) };
       if (input.isFormula && !(letter in expanded)) {

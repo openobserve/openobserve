@@ -5757,6 +5757,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_formula_naming_a_metric_f1_sends_it_as_promql() {
+        let search = FakeSearch {
+            series: 1,
+            ..Default::default()
+        };
+        let panel = promql_panel(
+            "line",
+            json!([
+                { "query": "x", "config": { "hide": true } },
+                { "query": "", "config": { "formula": "A + F1" } }
+            ]),
+        );
+        let run = run_one(&search, panel).await;
+        assert_eq!(run.class, Class::Fresh);
+        let sent: Vec<String> = promql_reqs(&search).into_iter().map(|r| r.0).collect();
+        assert_eq!(sent, ["(x) + F1"]);
+    }
+
+    #[tokio::test]
     async fn a_formula_over_a_formula_sends_the_nested_expansion() {
         let search = FakeSearch {
             series: 1,

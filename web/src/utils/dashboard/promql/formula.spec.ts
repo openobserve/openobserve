@@ -155,6 +155,17 @@ describe("substituteFormula", () => {
       });
     });
 
+    it("keeps an F name no query holds as literal PromQL, as saved formulas read it", () => {
+      expect(substituteFormula("A + F1", { A: q("up") }, "F2")).toEqual({ expr: "(up) + F1" });
+      // A legacy formula is assigned F1 itself, so its own name is still the metric.
+      expect(substituteFormula("A + F1", { A: q("up"), F1: f("A + F1") }, "F1")).toEqual({
+        expr: "(up) + F1",
+      });
+      expect(substituteFormula("A + F1", { A: q("up"), F1: f("A * 2") }, "F2")).toEqual({
+        expr: "(up) + ((up) * 2)",
+      });
+    });
+
     it("refuses nesting deeper than the depth cap", () => {
       const inputs: Record<string, any> = { A: q("x"), F1: f("A") };
       for (let n = 2; n <= 12; n++) inputs[`F${n}`] = f(`F${n - 1}`);
@@ -240,6 +251,12 @@ describe("formulaRefs", () => {
   it("lists each referenced letter once, in order, skipping literals", () => {
     expect(formulaRefs('B / A + B + up{x="C"} + sum by (D) (A)')).toEqual(["B", "A"]);
   });
+
+  it("reads an F name only when a query in the panel holds it", () => {
+    expect(formulaRefs("A + F1")).toEqual(["A"]);
+    expect(formulaRefs("A + F1", ["A", "F1"])).toEqual(["A", "F1"]);
+    expect(formulaRefs("A + F1", ["A", "F1"], "F1")).toEqual(["A"]);
+  });
 });
 
 describe("formulaLeafRefs", () => {
@@ -252,6 +269,17 @@ describe("formulaLeafRefs", () => {
       { config: { formula: "D + B", ref: "E" } },
     ];
     expect([...formulaLeafRefs(queries, "E / 2")].sort()).toEqual(["A", "B"]);
+  });
+
+  it("treats an F name no query holds as a metric, and one a formula holds as that formula", () => {
+    const metric = [{ config: { ref: "A" } }, { config: { formula: "A + F1" } }];
+    expect([...formulaLeafRefs(metric, "A + F1", "F1")]).toEqual(["A"]);
+    const formula = [
+      { config: { ref: "A" } },
+      { config: { ref: "B" } },
+      { config: { formula: "B * 2" } },
+    ];
+    expect([...formulaLeafRefs(formula, "A + F1")].sort()).toEqual(["A", "B"]);
   });
 
   it("stops at a cycle", () => {

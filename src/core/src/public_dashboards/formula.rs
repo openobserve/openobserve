@@ -52,6 +52,71 @@ pub struct FormulaInput {
     pub is_formula: bool,
 }
 
+struct Expander<'a> {
+    inputs: &'a BTreeMap<String, FormulaInput>,
+    expanded: BTreeMap<String, String>,
+}
+
+impl Expander<'_> {
+    fn expand(&mut self, text: &str, path: &mut Vec<String>) -> Result<String, FormulaError> {
+        let chars: Vec<char> = text.chars().collect();
+        let mut expr = String::new();
+        let mut length = 0;
+        let mut last = 0;
+        let (inputs, owner) = (self.inputs, path.last().cloned());
+        let held = |word: &str| inputs.contains_key(word) && owner.as_deref() != Some(word);
+        for (start, name) in ref_tokens(&chars, &held) {
+            let input = self
+                .inputs
+                .get(&name)
+                .ok_or_else(|| FormulaError::Unknown(name.clone()))?;
+            let inner = if input.is_formula {
+                self.expand_formula(&name, &input.text, path)?
+            } else {
+                input.text.clone()
+            };
+            // A trailing `#` comment in the input would otherwise swallow the closing parenthesis.
+            let newline = if inner.contains('#') { "\n" } else { "" };
+            let piece: String = chars[last..start].iter().collect();
+            let piece = format!("{piece}({inner}{newline})");
+            length += piece.chars().count();
+            expr.push_str(&piece);
+            last = start + name.chars().count();
+            // Each nesting level can double the text, so the cap stops exponential growth early.
+            if length > MAX_FORMULA_LENGTH {
+                return Err(FormulaError::TooLong);
+            }
+        }
+        expr.extend(&chars[last..]);
+        Ok(expr)
+    }
+
+    fn expand_formula(
+        &mut self,
+        name: &str,
+        text: &str,
+        path: &mut Vec<String>,
+    ) -> Result<String, FormulaError> {
+        if let Some(done) = self.expanded.get(name) {
+            return Ok(done.clone());
+        }
+        if let Some(at) = path.iter().position(|p| p == name) {
+            let mut cycle = path[at..].to_vec();
+            cycle.push(name.to_string());
+            return Err(FormulaError::Cycle(cycle.join(" → ")));
+        }
+        if path.len() >= MAX_FORMULA_DEPTH {
+            return Err(FormulaError::TooDeep);
+        }
+        path.push(name.to_string());
+        let out = self.expand(text, path);
+        path.pop();
+        let out = out?;
+        self.expanded.insert(name.to_string(), out.clone());
+        Ok(out)
+    }
+}
+
 /// `isFormulaQuery`: any string formula, even an empty one.
 pub fn is_formula(config: &Value) -> bool {
     config.get("formula").is_some_and(Value::is_string)
@@ -154,80 +219,22 @@ pub fn substitute(
     expander.expand(formula, &mut path)
 }
 
-struct Expander<'a> {
-    inputs: &'a BTreeMap<String, FormulaInput>,
-    expanded: BTreeMap<String, String>,
-}
-
-impl Expander<'_> {
-    fn expand(&mut self, text: &str, path: &mut Vec<String>) -> Result<String, FormulaError> {
-        let chars: Vec<char> = text.chars().collect();
-        let mut expr = String::new();
-        let mut length = 0;
-        let mut last = 0;
-        for (start, name) in ref_tokens(&chars) {
-            let input = self
-                .inputs
-                .get(&name)
-                .ok_or_else(|| FormulaError::Unknown(name.clone()))?;
-            let inner = if input.is_formula {
-                self.expand_formula(&name, &input.text, path)?
-            } else {
-                input.text.clone()
-            };
-            // A trailing `#` comment in the input would otherwise swallow the closing parenthesis.
-            let newline = if inner.contains('#') { "\n" } else { "" };
-            let piece: String = chars[last..start].iter().collect();
-            let piece = format!("{piece}({inner}{newline})");
-            length += piece.chars().count();
-            expr.push_str(&piece);
-            last = start + name.chars().count();
-            // Each nesting level can double the text, so the cap stops exponential growth early.
-            if length > MAX_FORMULA_LENGTH {
-                return Err(FormulaError::TooLong);
-            }
-        }
-        expr.extend(&chars[last..]);
-        Ok(expr)
-    }
-
-    fn expand_formula(
-        &mut self,
-        name: &str,
-        text: &str,
-        path: &mut Vec<String>,
-    ) -> Result<String, FormulaError> {
-        if let Some(done) = self.expanded.get(name) {
-            return Ok(done.clone());
-        }
-        if let Some(at) = path.iter().position(|p| p == name) {
-            let mut cycle = path[at..].to_vec();
-            cycle.push(name.to_string());
-            return Err(FormulaError::Cycle(cycle.join(" → ")));
-        }
-        if path.len() >= MAX_FORMULA_DEPTH {
-            return Err(FormulaError::TooDeep);
-        }
-        path.push(name.to_string());
-        let out = self.expand(text, path);
-        path.pop();
-        let out = out?;
-        self.expanded.insert(name.to_string(), out.clone());
-        Ok(out)
-    }
-}
-
 /// Each reference's char offset and name, outside strings, braces, comments and label lists.
-fn ref_tokens(text: &[char]) -> Vec<(usize, String)> {
+fn ref_tokens(text: &[char], held: &dyn Fn(&str) -> bool) -> Vec<(usize, String)> {
     let mut refs = Vec::new();
     let mut i = 0;
     while i < text.len() {
-        i = next_token(text, i, &mut refs);
+        i = next_token(text, i, &mut refs, held);
     }
     refs
 }
 
-fn next_token(text: &[char], i: usize, refs: &mut Vec<(usize, String)>) -> usize {
+fn next_token(
+    text: &[char],
+    i: usize,
+    refs: &mut Vec<(usize, String)>,
+    held: &dyn Fn(&str) -> bool,
+) -> usize {
     let ch = text[i];
     if QUOTES.contains(&ch) {
         return skip_string(text, i);
@@ -249,7 +256,7 @@ fn next_token(text: &[char], i: usize, refs: &mut Vec<(usize, String)>) -> usize
         return end;
     }
     if is_ident_start(ch) {
-        return scan_word(text, i, refs);
+        return scan_word(text, i, refs, held);
     }
     i + 1
 }
@@ -262,7 +269,12 @@ fn is_ident_part(ch: char) -> bool {
     ch.is_ascii_alphanumeric() || ch == '_' || ch == ':'
 }
 
-fn scan_word(text: &[char], start: usize, refs: &mut Vec<(usize, String)>) -> usize {
+fn scan_word(
+    text: &[char],
+    start: usize,
+    refs: &mut Vec<(usize, String)>,
+    held: &dyn Fn(&str) -> bool,
+) -> usize {
     let mut end = start;
     while end < text.len() && is_ident_part(text[end]) {
         end += 1;
@@ -271,7 +283,9 @@ fn scan_word(text: &[char], start: usize, refs: &mut Vec<(usize, String)>) -> us
     if LABEL_LIST_KEYWORDS.contains(&word.to_lowercase().as_str()) {
         return skip_label_list(text, end);
     }
-    if (word.len() == 1 && LETTERS.contains(&word)) || is_formula_ref(&word) {
+    // An `F<n>` no other query holds stays a metric name, as saved panels read it.
+    let reference = is_formula_ref(&word) && held(&word);
+    if (word.len() == 1 && LETTERS.contains(&word)) || reference {
         refs.push((start, word));
     }
     end
@@ -491,6 +505,18 @@ mod tests {
             nested("F1 + F10x + F01 + sum by (F1) (F1)", &pairs, "F2"),
             Ok("((x)) + F10x + F01 + sum by (F1) (((x)))".into())
         );
+    }
+
+    #[test]
+    fn an_f_name_no_query_holds_stays_a_metric_name() {
+        assert_eq!(sub("A + F1", &[("A", Some("up"))]), Ok("(up) + F1".into()));
+        let pairs = [("A", q("up")), ("F1", f("A * 2"))];
+        assert_eq!(
+            nested("A + F1", &pairs, "F2"),
+            Ok("(up) + ((up) * 2)".into())
+        );
+        let pairs = [("A", q("up")), ("F1", f("A + F1"))];
+        assert_eq!(nested("A + F1", &pairs, "F1"), Ok("(up) + F1".into()));
     }
 
     #[test]
