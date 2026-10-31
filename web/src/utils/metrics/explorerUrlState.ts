@@ -26,6 +26,7 @@
  */
 
 import { raw } from "@/types/i18n";
+import { compileLabelFilters, type LabelMatchOp } from "@/components/promql/labelBoolean";
 import {
   isForecastHorizon,
   isForecastMethod,
@@ -178,7 +179,9 @@ export function queryToExplorerFilters(
     : query.labels != null
       ? [query.labels]
       : [];
-  const labelFilters = rawLabels.map(parseMatcher).filter((f): f is LabelFilter => f !== null);
+  const labelFilters = withinBranchCap(
+    rawLabels.map(parseMatcher).filter((f): f is LabelFilter => f !== null),
+  );
   if (labelFilters.length) out.labelFilters = labelFilters;
 
   // `favorites` is intentionally not read from the URL — the mode drives
@@ -219,6 +222,14 @@ const LABEL_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 // starting with `~`. The `s` flag lets a matcher value carry newlines.
 // An OR group rides as a `2:` (or negated `!2:`) prefix, which no label name can start with.
 const MATCHER = /^(?:(!?)([1-9]\d*):)?([a-zA-Z_:][a-zA-Z0-9_:]*)(=~|!~|!=|=)(.*)$/s;
+
+/** Groups past the branch cap would make every selector throw, so a URL carrying them keeps its base filters. */
+function withinBranchCap(filters: LabelFilter[]): LabelFilter[] {
+  const compiled = compileLabelFilters(
+    filters.map((f) => ({ ...f, label: String(f.label), op: (f.operator ?? "=") as LabelMatchOp })),
+  );
+  return compiled.ok ? filters : filters.filter((f) => !f.group);
+}
 
 /** A hand-edited or truncated URL must degrade to "no filter", never throw. */
 function parseMatcher(matcher: unknown): LabelFilter | null {
