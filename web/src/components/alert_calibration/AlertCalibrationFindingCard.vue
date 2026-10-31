@@ -33,6 +33,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OBadge variant="default-soft" size="xs" shape="rounded">
             {{ t(CONFIDENCE_LABEL[finding.confidence]) }}
           </OBadge>
+          <OBadge
+            v-if="tier"
+            variant="primary-soft"
+            size="xs"
+            shape="rounded"
+            data-test="alert-calibration-finding-tier"
+          >
+            {{ t(TIER_LABEL[tier]) }}
+          </OBadge>
+          <OBadge
+            v-if="quality"
+            variant="warning-soft"
+            size="xs"
+            shape="rounded"
+            data-test="alert-calibration-finding-quality"
+          >
+            {{ t(QUALITY_LABEL[quality]) }}
+          </OBadge>
           <OBadge variant="default-outline" size="xs" shape="rounded">{{
             t(meta.labelKey)
           }}</OBadge>
@@ -67,6 +85,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTruncatedText>
         </div>
       </dl>
+
+      <div
+        v-if="limitations.length"
+        class="flex flex-col gap-0.5"
+        data-test="alert-calibration-finding-limitations"
+      >
+        <OText variant="label" as="div">{{ t("alertCalibration.detail.limitations") }}</OText>
+        <OText v-for="(line, index) in limitations" :key="index" variant="meta" as="div">{{
+          line
+        }}</OText>
+      </div>
 
       <div v-if="lagLists.length" class="grid gap-3 lg:grid-cols-2">
         <div
@@ -142,14 +171,16 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
-import { parseLagRows, type FindingRecord, type LagRow } from "./digests";
+import { limitationsOf, parseLagRows, type FindingRecord, type LagRow } from "./digests";
 import { ACTION_META, isProposedAction, RULE_META } from "./rules";
 import {
   CONFIDENCE_LABEL,
   formatEvidence,
+  QUALITY_LABEL,
   SEVERITY_BADGE,
   SEVERITY_LABEL,
   SEVERITY_TILE,
+  TIER_LABEL,
 } from "./format";
 
 const props = defineProps<{ finding: FindingRecord }>();
@@ -165,6 +196,17 @@ const router = useRouter();
 const orgId = useOrgId();
 
 const meta = computed(() => RULE_META[props.finding.rule_id]);
+
+/** Version-2 fields, shown only when the record carries a value this build knows. */
+const tier = computed(() => {
+  const value = props.finding.tier;
+  return value && value in TIER_LABEL ? value : null;
+});
+const quality = computed(() => {
+  const value = props.finding.quality;
+  return value && value in QUALITY_LABEL ? value : null;
+});
+const limitations = computed(() => limitationsOf(props.finding));
 
 /** A new tab, so the digest stays where it was while the alert is fixed. */
 const openAlert = () => {

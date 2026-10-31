@@ -159,6 +159,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         hide-action
         data-test="alert-calibration-digest-none-found"
       />
+
+      <div
+        v-if="skips.length"
+        class="flex flex-col gap-2"
+        data-test="alert-calibration-digest-skips"
+      >
+        <div class="flex min-w-0 flex-col gap-0.5">
+          <OText variant="card-title" as="h2">{{
+            t("alertCalibration.detail.declinedHeading")
+          }}</OText>
+          <OText variant="meta" as="p">{{ t("alertCalibration.detail.declinedDesc") }}</OText>
+        </div>
+        <OCard variant="glass">
+          <OCardSection role="body" class="flex flex-col gap-1.5 py-2">
+            <div
+              v-for="skip in skips"
+              :key="`${skip.rule_id}:${skip.alert_id}`"
+              class="flex min-w-0 flex-wrap items-baseline gap-x-2"
+              data-test="alert-calibration-digest-skip"
+            >
+              <OBadge variant="default-outline" size="xs" shape="rounded">{{
+                ruleLabel(skip.rule_id)
+              }}</OBadge>
+              <span class="text-text-body text-xs font-medium">{{
+                skip.alert_name ?? skip.alert_id
+              }}</span>
+              <OText variant="meta" as="span">{{ skipReasonLabel(t, skip.skip_reason) }}</OText>
+              <OText v-if="skip.skip_detail" variant="meta" as="span" class="tabular-nums">{{
+                skip.skip_detail
+              }}</OText>
+            </div>
+          </OCardSection>
+        </OCard>
+        <OText v-if="omittedRoutine > 0" variant="meta" as="div">
+          {{
+            t("alertCalibration.detail.declinedCounted", { count: omittedRoutine }, omittedRoutine)
+          }}
+        </OText>
+      </div>
     </div>
   </OPageLayout>
 </template>
@@ -169,6 +208,9 @@ import { useRoute, useRouter } from "vue-router";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -194,7 +236,7 @@ import {
   type DigestRecord,
   type RuleId,
 } from "./digests";
-import { COVERAGE_BADGE, formatMinutes } from "./format";
+import { COVERAGE_BADGE, formatMinutes, skipReasonLabel } from "./format";
 import { isRuleId, RULE_IDS, RULE_META } from "./rules";
 
 const props = defineProps<{ windowStart: string | number; windowEnd: string | number }>();
@@ -227,6 +269,12 @@ const records = useLatestRead(async () => {
 
 const run = computed(() => records.data.value?.run ?? null);
 const findings = computed(() => records.data.value?.findings ?? []);
+const skips = computed(() => records.data.value?.skips ?? []);
+/** Floors not met are only counted by a version-2 run; a version-1 run has no split. */
+const omittedRoutine = computed(() => run.value?.omitted_routine_skip_count ?? 0);
+/** A skip names its rule as stored, which a build without that rule still shows. */
+const ruleLabel = (rule: string): I18nText =>
+  isRuleId(rule) ? t(RULE_META[rule].labelKey) : raw(rule);
 const hitCount = computed(() => records.data.value?.hits ?? 0);
 
 const loadError = computed<I18nText | null>(() => {
