@@ -166,6 +166,9 @@ describe("HostsDependenciesView", () => {
     expect(testId("hosts-deps-edge-source").attributes("disabled")).toBeDefined();
     expect(testId("hosts-deps-edge-target").attributes("disabled")).toBeUndefined();
     expect(testId("hosts-deps-edge-undirected").text()).toContain("without seeing");
+    await testId("hosts-deps-edge-close").trigger("click");
+    await flushPromises();
+    expect(document.activeElement).toBe(links[1].element);
   });
 
   it("draws at most 200 edges, busiest first, and says how many it left out", async () => {
