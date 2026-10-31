@@ -79,11 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div class="min-h-0 flex-1 overflow-hidden">
-      <div
-        v-if="showHistogram"
-        class="histogram-container"
-        data-test="logs-search-result-loading-histogram"
-      >
+      <div v-if="showHistogram" class="h-25 pt-1" data-test="logs-search-result-loading-histogram">
         <LogsHistogramSkeleton />
       </div>
       <LogsTableSkeleton v-if="logsTab" />
@@ -140,12 +136,7 @@ onBeforeUnmount(() => observer?.disconnect());
 </script>
 
 <style scoped>
-.histogram-container {
-  height: 6.25rem;
-  padding-top: 0.25rem;
-  border-radius: 0.5rem;
-}
-
+/* keep(lib-override:opagination): sizes the OPagination/OSelect-rendered buttons, which expose no class hook */
 .paginator-section {
   line-height: 1.5rem;
   max-height: 2rem;

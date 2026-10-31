@@ -48,6 +48,7 @@ const bars = Array.from({ length: 250 }, (_, i) => ({ id: i, pct: HEIGHTS[i % HE
 </script>
 
 <style scoped>
+/* keep(generated-content): the shimmer is an ::after overlay animated by a scoped @keyframes */
 .histogram-skeleton {
   --hsk-bar: var(--color-grey-100);
   --hsk-shimmer: color-mix(in srgb, var(--color-white) 65%, transparent);
