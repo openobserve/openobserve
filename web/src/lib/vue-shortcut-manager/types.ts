@@ -30,6 +30,8 @@ export interface Shortcut {
   allowInInput?: boolean;
   /** Never fire while a text input has focus, even as a modifier combo, so the input keeps its own Ctrl+Z. */
   skipInInput?: boolean;
+  /** Fire a plain-key shortcut even while focus is inside a dialog or drawer, which otherwise owns those keys. */
+  allowInDialog?: boolean;
 }
 
 /**

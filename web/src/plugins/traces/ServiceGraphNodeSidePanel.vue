@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :modal="false"
     :portal-target="containerEl"
     :title="selectedNode?.name || selectedNode?.label || selectedNode?.id"
+    title-data-test="service-graph-side-panel-title"
     data-test="service-graph-side-panel"
     @update:open="
       (v) => {
@@ -637,6 +638,7 @@ import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
+import { serviceHealthFromErrorRate, serviceNodeErrorRate } from "@/utils/traces/serviceHealth";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { gt, useI18nTyped, raw, type I18nText, type I18nKey } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -1785,25 +1787,8 @@ export default defineComponent({
         };
       }
 
-      // Use node's own error_rate directly
-      const errorRate = props.selectedNode.error_rate || 0;
-
-      if (errorRate > 10) {
-        return {
-          status: "critical",
-          text: t("traces.serviceGraphNodeSidePanel.critical"),
-        };
-      } else if (errorRate > 5) {
-        return {
-          status: "degraded",
-          text: t("traces.serviceGraphNodeSidePanel.degraded"),
-        };
-      } else {
-        return {
-          status: "healthy",
-          text: t("traces.serviceGraphNodeSidePanel.healthy"),
-        };
-      }
+      const status = serviceHealthFromErrorRate(serviceNodeErrorRate(props.selectedNode));
+      return { status, text: t(`traces.servicesCatalog.status.${status}`) };
     });
 
     // Computed: Check if "All Streams" is selected

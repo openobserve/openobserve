@@ -2,6 +2,7 @@ import { toZonedTime } from "date-fns-tz";
 import { computeTreeLayout } from "./computeTreeLayout";
 import { resolveModelVendorLogo } from "./modelVendorLogo";
 import { cssToken } from "@/utils/theme";
+import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "./serviceHealth";
 import { gt } from "@/types/i18n";
 import { escapeHtml } from "@/utils/html";
 import { dataZoomBrushStyle } from "@/utils/chartTheme";
@@ -329,19 +330,6 @@ export const convertServiceGraphToTree = (
   // Tighten the label offset from the node as things shrink.
   const labelDistance = Math.max(3, Math.round(labelFontSize / 2));
 
-  const green = isDarkMode ? "#10b981" : "#52c41a";
-
-  // Node color: same absolute thresholds as Graph View so color matches tooltip
-  // error rate. Dark-mode values resolve from the semantic token layer (exact
-  // token matches); the light-mode values are the legacy Ant palette with no
-  // exact token, so they stay as literals until the palette is unified.
-  const getNodeColor = (errRate: number): string => {
-    if (errRate > 10) return isDarkMode ? cssToken("--color-error-500", "#ef4444") : "#f5222d"; // Red — critical
-    if (errRate > 5) return isDarkMode ? cssToken("--color-orange-500", "#f97316") : "#fa8c16"; // Orange — warning
-    if (errRate > 1) return isDarkMode ? cssToken("--color-amber-400", "#fbbf24") : "#faad14"; // Yellow — degraded
-    return green;
-  };
-
   // Track all visited nodes across all trees to find orphaned components
   const globalVisited = new Set<string>();
 
@@ -386,7 +374,7 @@ export const convertServiceGraphToTree = (
     // Node border: colored by this node's error rate relative to baseline
     const nodeErrorRate =
       node.error_rate ?? (node.requests > 0 ? (node.errors / node.requests) * 100 : 0);
-    const borderColor = getNodeColor(nodeErrorRate);
+    const borderColor = nodeBorderColor(serviceHealthFromErrorRate(nodeErrorRate), isDarkMode);
 
     // Tree edges are always neutral gray — color belongs on node borders only
     const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3";
@@ -1385,27 +1373,7 @@ export const convertServiceGraphToNetwork = (
     };
     const errorRate = metrics.requests > 0 ? (metrics.errors / metrics.requests) * 100 : 0;
 
-    // Border color based on error rate (theme-aware). Dark-mode red/orange/yellow
-    // resolve from the semantic token layer (exact matches); the healthy green
-    // and all light-mode values are the legacy Ant palette with no exact token.
-    let borderColor: string;
-    if (isDarkMode) {
-      // Dark mode colors
-      borderColor = "#10b981"; // Green (healthy)
-      if (errorRate > 10)
-        borderColor = cssToken("--color-error-500", "#ef4444"); // Red (critical)
-      else if (errorRate > 5)
-        borderColor = cssToken("--color-orange-500", "#f97316"); // Orange (warning)
-      else if (errorRate > 1) borderColor = cssToken("--color-amber-400", "#fbbf24"); // Yellow (degraded)
-    } else {
-      // Light mode colors
-      borderColor = "#52c41a"; // Green (healthy)
-      if (errorRate > 10)
-        borderColor = "#f5222d"; // Red (critical)
-      else if (errorRate > 5)
-        borderColor = "#fa8c16"; // Orange (warning)
-      else if (errorRate > 1) borderColor = "#faad14"; // Yellow (degraded)
-    }
+    const borderColor = nodeBorderColor(serviceHealthFromErrorRate(errorRate), isDarkMode);
 
     // Node size: scales with request volume (70–110 px range)
     const baseSymbolSize = Math.max(
@@ -1714,6 +1682,17 @@ export const convertServiceGraphToNetwork = (
   };
 
   return { options };
+};
+
+// Dark-mode red/orange/yellow come from tokens; the greens and light-mode values are the legacy palette with no exact token.
+const nodeBorderColor = (health: ServiceHealthStatus, isDarkMode: boolean): string => {
+  if (health === "critical")
+    return isDarkMode ? cssToken("--color-error-500", "#ef4444") : "#f5222d";
+  if (health === "warning")
+    return isDarkMode ? cssToken("--color-orange-500", "#f97316") : "#fa8c16";
+  if (health === "degraded")
+    return isDarkMode ? cssToken("--color-amber-400", "#fbbf24") : "#faad14";
+  return isDarkMode ? "#10b981" : "#52c41a";
 };
 
 const formatNumber = (num: number) => {

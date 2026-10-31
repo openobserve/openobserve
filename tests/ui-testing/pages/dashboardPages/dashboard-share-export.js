@@ -37,6 +37,14 @@ export default class DashboardShareExportPage {
     this.tabListContainer = page.locator(
       '[data-test="dashboard-tab-list-container"]'
     );
+    // The `x` shortcut clicks this header button, so counting its clicks counts exports.
+    this.exportDashboardSelector = '[data-test="export-dashboard"]';
+    this.publicLinksBtn = page.locator('[data-test="dashboard-publish-public-btn"]');
+    this.publicLinksPanelSelector = '[data-test="dashboards-public-links-panel"]';
+    this.publicLinksPanel = page.locator(this.publicLinksPanelSelector);
+    this.publicLinksPanelCloseBtn = page.locator(
+      '[data-test="dashboards-public-links-panel"] [data-test="o-drawer-close-btn"]'
+    );
   }
 
   //share dashboard
@@ -206,5 +214,53 @@ export default class DashboardShareExportPage {
       state: "visible",
     });
     await this.exportBtn.click();
+  }
+
+  /** Count clicks on the header Export button; the `x` shortcut clicks it synchronously inside keydown. */
+  async trackExportClicks() {
+    await this.page.locator(this.exportDashboardSelector).waitFor({ state: "visible" });
+    await this.page.evaluate((selector) => {
+      window.__e2eExportClicks = 0;
+      document.addEventListener(
+        "click",
+        (event) => {
+          if (event.target?.closest?.(selector)) window.__e2eExportClicks += 1;
+        },
+        true,
+      );
+    }, this.exportDashboardSelector);
+  }
+
+  async getExportClickCount() {
+    return await this.page.evaluate(() => window.__e2eExportClicks ?? 0);
+  }
+
+  async pressExportShortcut() {
+    await this.page.keyboard.press("x");
+  }
+
+  async openPublicLinksPanel() {
+    await this.publicLinksBtn.click();
+    await expect(this.publicLinksPanel).toBeVisible({ timeout: 15000 });
+  }
+
+  /** Click the header's left padding, away from the back button and every control, so focus rests on the drawer itself. */
+  async focusPublicLinksPanelHeader() {
+    await this.publicLinksPanel.click({ position: { x: 8, y: 28 } });
+  }
+
+  /** True when focus is inside the Public links drawer on something that is not a text field. */
+  async isFocusOnPublicLinksPanelChrome() {
+    return await this.page.evaluate((selector) => {
+      const el = document.activeElement;
+      if (!el?.closest(selector)) return false;
+      return !["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) && !el.isContentEditable;
+    }, this.publicLinksPanelSelector);
+  }
+
+  async closePublicLinksPanel() {
+    if (!(await this.publicLinksPanel.isVisible())) return;
+    await this.publicLinksPanelCloseBtn.click();
+    await expect(this.publicLinksPanel).toBeHidden({ timeout: 15000 });
   }
 }

@@ -132,7 +132,7 @@ const baseNode = {
 };
 
 const healthyNode = { ...baseNode, error_rate: 0, errors: 0 };
-const degradedNode = { ...baseNode, error_rate: 8 };
+const warningNode = { ...baseNode, error_rate: 8 };
 const criticalNode = { ...baseNode, error_rate: 15 };
 
 const baseGraphData = {
@@ -373,9 +373,9 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(badge.text()).toBe("Healthy");
     });
 
-    it("should show Degraded badge when error_rate is above 5", () => {
-      wrapper = mountPanel({ selectedNode: degradedNode });
-      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Degraded");
+    it("should show Warning badge when error_rate is above 5", () => {
+      wrapper = mountPanel({ selectedNode: warningNode });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Warning");
     });
 
     it("should show Critical badge when error_rate is above 10", () => {
@@ -383,16 +383,46 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Critical");
     });
 
-    it("should show Healthy badge when error_rate is exactly 5", () => {
-      // error_rate <= 5 maps to "healthy" per the component logic (> 5 triggers degraded)
+    it("should show Degraded badge when error_rate is exactly 5", () => {
       wrapper = mountPanel({ selectedNode: { ...baseNode, error_rate: 5 } });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Degraded");
+    });
+
+    it("should show Warning badge when error_rate is exactly 10", () => {
+      wrapper = mountPanel({ selectedNode: { ...baseNode, error_rate: 10 } });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Warning");
+    });
+
+    it("should show Degraded badge when error_rate is exactly 1, as the legend's 1 – 5% band says", () => {
+      wrapper = mountPanel({ selectedNode: { ...baseNode, error_rate: 1 } });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Degraded");
+    });
+
+    it("control: should show Healthy badge when error_rate is just under 1", () => {
+      wrapper = mountPanel({ selectedNode: { ...baseNode, error_rate: 0.99 } });
       expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Healthy");
     });
 
-    it("should show Degraded badge when error_rate is exactly 10", () => {
-      // error_rate <= 10 maps to "degraded" per component logic (> 10 triggers critical)
-      wrapper = mountPanel({ selectedNode: { ...baseNode, error_rate: 10 } });
-      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Degraded");
+    // o2-enterprise#3126: Graph View chart nodes carry errors and value but no error_rate.
+    it("should derive Critical from errors over value when the node has no error_rate", () => {
+      wrapper = mountPanel({
+        selectedNode: { id: "database", name: "database", value: 2, errors: 1 },
+      });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Critical");
+    });
+
+    it("should derive the badge from errors over requests when the node has no error_rate", () => {
+      wrapper = mountPanel({
+        selectedNode: { id: "db", name: "db", requests: 100, errors: 7 },
+      });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Warning");
+    });
+
+    it("control: should prefer the node's error_rate over errors and requests", () => {
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, error_rate: 0, value: 10, errors: 9 },
+      });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Healthy");
     });
   });
 

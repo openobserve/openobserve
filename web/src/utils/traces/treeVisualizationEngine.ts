@@ -16,6 +16,7 @@
 import type { I18nText } from "@/types/i18n";
 
 import { getServiceColorHex } from "@/utils/traces/traceColors";
+import { serviceHealthFromErrorRate } from "@/utils/traces/serviceHealth";
 
 /**
  * Tree node interface for tree visualization with coordinate support
@@ -261,13 +262,13 @@ export function createTreeVisualizationEngine() {
    * Reuses exact color logic from convertServiceGraphToTree
    */
   const getHealthColor = (errorRate: number, isDarkMode: boolean): string => {
-    // Use more contrasting colors for better visibility
-    if (errorRate > 10) return isDarkMode ? "#ef4444" : "#dc2626"; // Red — critical
-    if (errorRate > 5) return isDarkMode ? "#f97316" : "#ea580c"; // Orange — warning
-    if (errorRate > 1) return isDarkMode ? "#fbbf24" : "#d97706"; // Yellow — degraded
-
-    // Healthy nodes - use more contrasting green
-    return isDarkMode ? "#10b981" : "#16a34a"; // Green — healthy (more contrasting)
+    const colors = {
+      critical: ["#ef4444", "#dc2626"],
+      warning: ["#f97316", "#ea580c"],
+      degraded: ["#fbbf24", "#d97706"],
+      healthy: ["#10b981", "#16a34a"],
+    }[serviceHealthFromErrorRate(errorRate)];
+    return isDarkMode ? colors[0] : colors[1];
   };
 
   /**

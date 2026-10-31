@@ -635,13 +635,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- View mode toggle toolbar -->
           <div class="flex h-fit! items-center justify-start pb-1.5!">
             <OToggleGroup v-model="attributesViewMode" class="rounded-default!">
-              <OToggleGroupItem value="json" size="xs" class="h-5! text-xs!">
+              <OToggleGroupItem
+                value="json"
+                size="xs"
+                class="h-5! text-xs!"
+                data-test="trace-details-sidebar-attributes-view-json"
+              >
                 <template #icon-left
                   ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
                 {{ t("common.json") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="table" size="xs" class="h-5! text-xs!">
+              <OToggleGroupItem
+                value="table"
+                size="xs"
+                class="h-5! text-xs!"
+                data-test="trace-details-sidebar-attributes-view-table"
+              >
                 <template #icon-left
                   ><OIcon name="table-chart" size="xs" class="shrink-0"
                 /></template>

@@ -24,6 +24,7 @@ const t = (i18nInstance.global as any).t as TranslateFn;
 // ---------------------------------------------------------------------------
 
 const mockRouterPush = vi.fn();
+const mockStoreDispatch = vi.fn();
 const mockCurrentRoute = {
   value: {
     query: { trace_id: "trace-abc", span_id: "span-xyz" },
@@ -59,7 +60,7 @@ vi.mock("vuex", async (importOriginal) => {
           organizationSettings: mockOrgSettings,
         },
       },
-      dispatch: vi.fn(),
+      dispatch: mockStoreDispatch,
     })),
   };
 });
@@ -691,6 +692,38 @@ describe("useTraces", () => {
     beforeEach(() => {
       // Default: the span has logs of its own, so no fallback.
       mockSearch.mockResolvedValue({ data: { hits: [{ zo_count: 3 }] } });
+    });
+
+    // o2-enterprise#1280: without the reset, a second View Logs re-showed the first span's logs.
+    it("resets the logs page before every View Logs navigation, one span after another", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-A", "trace-1");
+      await navigateToCorrelatedLogs({
+        ...correlationProps(),
+        timeRange: { startTime: 1000, endTime: 2000 },
+      });
+      selectSpan("span-B", "trace-1");
+      await navigateToCorrelatedLogs({
+        ...correlationProps(),
+        timeRange: { startTime: 3000, endTime: 4000 },
+      });
+
+      const resetOrder = mockStoreDispatch.mock.calls
+        .map((call, i) => ({ call, order: mockStoreDispatch.mock.invocationCallOrder[i] }))
+        .filter(({ call }) => call[0] === "logs/setIsInitialized" && call[1] === false)
+        .map(({ order }) => order);
+      const pushOrder = mockRouterPush.mock.invocationCallOrder;
+      expect(pushOrder).toHaveLength(2);
+      expect(resetOrder).toHaveLength(2);
+      expect(resetOrder[0]).toBeLessThan(pushOrder[0]);
+      expect(resetOrder[1]).toBeGreaterThan(pushOrder[0]);
+      expect(resetOrder[1]).toBeLessThan(pushOrder[1]);
+
+      const pushed = mockRouterPush.mock.calls.map((c) => c[0].query);
+      expect(String(pushed[0].query)).toContain("span_id = 'span-A'");
+      expect(pushed[0]).toMatchObject({ from: "1000", to: "2000" });
+      expect(String(pushed[1].query)).toContain("span_id = 'span-B'");
+      expect(pushed[1]).toMatchObject({ from: "3000", to: "4000" });
     });
 
     it("drops the stream dimension filters once the trace id is known", async () => {

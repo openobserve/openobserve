@@ -1452,6 +1452,34 @@ describe("ServicesCatalog", () => {
       expect(panelAfter.vm).toBe(panelBefore.vm);
       expect(panelAfter.props("selectedNode")?.name).toBe("auth-service");
     });
+
+    // o2-enterprise#3126: without the row's error rate the panel badge always read Healthy.
+    it("should hand the clicked row's error rate to the side panel", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+        }));
+        callbacks?.data?.(null, { type: "search_response_hits", content: { results: { hits } } });
+        callbacks?.complete?.(null, {});
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      const payment = wrapper.vm.services.find(
+        (s: { service_name: string }) => s.service_name === "payment-service",
+      );
+      wrapper.vm.handleRowClick(payment);
+      await flushPromises();
+
+      const panel = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panel.props("selectedNode")).toMatchObject({
+        name: "payment-service",
+        error_rate: 7.0,
+      });
+    });
   });
 
   // -----------------------------------------------------------------------
