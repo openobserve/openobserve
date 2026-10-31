@@ -160,7 +160,7 @@ describe("FleetSettings", () => {
     expect(wrapper.text()).not.toContain("Only organization administrators");
   });
 
-  it("toasts the server's 403 when a save is refused", async () => {
+  it("says the user lacks permission when a save gets a bare 403", async () => {
     vi.mocked(fleet.updateSettings).mockRejectedValue({
       response: { status: 403, data: { code: 403, message: "Unauthorized Access" } },
     });
@@ -168,7 +168,10 @@ describe("FleetSettings", () => {
     await edit(null, "0.170.0");
     await save();
     expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error", message: "Unauthorized Access" }),
+      expect.objectContaining({
+        variant: "error",
+        message: "You don't have permission to do this",
+      }),
     );
   });
 
@@ -252,7 +255,7 @@ describe("FleetSettings", () => {
     await mountSettings();
     const denied = wrapper.find(sel("no-access"));
     expect(denied.find('[data-test="o2-empty-state"]').exists()).toBe(true);
-    expect(denied.text()).toContain("You do not have access to Fleet Manager settings");
+    expect(denied.text()).toContain("You do not have access to Fleet management settings");
     expect(wrapper.find(sel("restricted-trigger")).exists()).toBe(false);
     expect(targetField().exists()).toBe(false);
     expect(saveButton().exists()).toBe(false);
@@ -329,7 +332,7 @@ describe("FleetSettings", () => {
     await mountSettings();
     const failed = wrapper.find(sel("load-failed"));
     expect(failed.find('[data-test="o2-empty-state"]').exists()).toBe(true);
-    expect(failed.text()).toContain("Could not load the Fleet Manager settings");
+    expect(failed.text()).toContain("Could not load the Fleet management settings");
     expect(wrapper.find(sel("restricted-trigger")).exists()).toBe(false);
     expect(targetField().exists()).toBe(false);
     expect(saveButton().exists()).toBe(false);

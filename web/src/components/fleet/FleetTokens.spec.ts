@@ -449,16 +449,18 @@ describe("FleetTokens", () => {
   });
 
   it.each([
-    [409, "token name exists"],
-    [400, "max_uses must be positive"],
-    [403, "Unauthorized Access"],
-  ])("shows the server's %s message and keeps the form filled", async (status, message) => {
+    [409, "token name exists", "token name exists"],
+    [400, "max_uses must be positive", "max_uses must be positive"],
+    [403, "Unauthorized Access", "You don't have permission to do this"],
+  ])("toasts the %s refusal and keeps the form filled", async (status, message, shown) => {
     vi.mocked(fleet.createToken).mockRejectedValue({
       response: { status, data: { code: status, message } },
     });
     wrapper = await mountTokens();
     await fillAndSubmit(wrapper, { name: "dup" });
-    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "error", message }));
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error", message: shown }),
+    );
     expect(wrapper.findComponent({ name: "OCodeBlock" }).exists()).toBe(false);
     expect(form(wrapper).state.values.name).toBe("dup");
   });
