@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :items="items"
     :loading="pending"
     compact
+    stack-sub
     selectable
     data-test="overview-headline-strip"
     @select="(key) => emit('select', key as OverviewTarget)"
