@@ -24,7 +24,7 @@ describe("OToastProvider", () => {
     vi.useRealTimers();
   });
 
-  it("closes without the toast fallback when a scroll finds its anchor gone", () => {
+  it("closes with the toast fallback when a scroll finds its anchor gone before it was seen", () => {
     const anchor = document.createElement("button");
     document.body.appendChild(anchor);
     const onUnseen = vi.fn();
@@ -33,7 +33,7 @@ describe("OToastProvider", () => {
     anchor.remove();
     document.dispatchEvent(new Event("scroll"));
     expect(copyConfirm.open).toBe(false);
-    expect(onUnseen).not.toHaveBeenCalled();
+    expect(onUnseen).toHaveBeenCalledTimes(1);
   });
 
   it("listens for the activated control only while mounted", () => {

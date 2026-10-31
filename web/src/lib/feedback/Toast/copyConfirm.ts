@@ -50,11 +50,16 @@ export function confirmCopy(anchor: HTMLElement, message: I18nText, onUnseen?: (
   copyConfirm.message = message;
   copyConfirm.open = true;
   timer = setTimeout(dismissCopyConfirm, COPY_CONFIRM_MS);
+  const shownAt = Date.now();
+  const closeEarly = () => {
+    dismissCopyConfirm();
+    if (Date.now() - shownAt < COPY_CONFIRM_SEEN_MS) onUnseen?.();
+  };
   // A dialog closed right after its copy takes the anchor along, and a detached anchor parks the bubble top-left.
   detachWatch = setInterval(() => {
-    if (!anchor.isConnected) dismissCopyConfirm();
+    if (!anchor.isConnected) closeEarly();
   }, DETACH_CHECK_MS);
-  watchAnchorMoves(anchor, onUnseen);
+  watchAnchorMoves(anchor, closeEarly);
 }
 
 export function dismissCopyConfirm(): void {
@@ -96,15 +101,13 @@ function stopTimers(): void {
 }
 
 // The bubble follows its anchor, so a scroll that moves the anchor would carry it over sticky headers.
-function watchAnchorMoves(anchor: HTMLElement, onUnseen?: () => void): void {
+function watchAnchorMoves(anchor: HTMLElement, closeEarly: () => void): void {
   const start = anchor.getBoundingClientRect();
-  const shownAt = Date.now();
   const onScroll = () => {
-    if (!anchor.isConnected) return dismissCopyConfirm();
+    if (!anchor.isConnected) return closeEarly();
     const now = anchor.getBoundingClientRect();
     if (now.top === start.top && now.left === start.left) return;
-    dismissCopyConfirm();
-    if (Date.now() - shownAt < COPY_CONFIRM_SEEN_MS) onUnseen?.();
+    closeEarly();
   };
   document.addEventListener("scroll", onScroll, { capture: true, passive: true });
   stopScrollWatch = () => document.removeEventListener("scroll", onScroll, { capture: true });
