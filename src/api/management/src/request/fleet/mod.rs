@@ -782,7 +782,7 @@ pub async fn preview_desired(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "ListFleetTokens",
-    summary = "List enrollment tokens with their values",
+    summary = "List enrollment tokens; a token's value only on fleets the caller may PUT",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), PageQuery),
     responses(
@@ -804,7 +804,8 @@ pub async fn list_tokens(
         let fleets = permitted.as_ref();
         match o2_enterprise::enterprise::fleet::service::list_tokens(&org_id, fleets).await {
             Ok(list) => {
-                let (total, items) = page.page(list.items);
+                let (total, mut items) = page.page(list.items);
+                withhold_token_values(&org_id, &user_email.user_id, &mut items).await;
                 MetaHttpResponse::json(config::meta::fleet::TokenList { total, items })
             }
             Err(e) => to_response(e),
@@ -1006,7 +1007,7 @@ pub async fn create_config(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "GetFleetConfig",
-    summary = "Get a configuration with its draft and version history",
+    summary = "Get a configuration with its draft and version history; the draft YAML is masked without fleet_configs PUT or POST",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1033,7 +1034,14 @@ pub async fn get_config(
         };
         let fleets = permitted.as_ref();
         match o2_enterprise::enterprise::fleet::configs::get_config(&org_id, &id, fleets).await {
-            Ok(detail) => MetaHttpResponse::json(detail),
+            Ok(mut detail) => {
+                if !can_edit_configs(&org_id, &user_email.user_id).await
+                    && let Some(draft) = detail.draft.as_mut()
+                {
+                    draft.yaml = masked_yaml(&draft.yaml);
+                }
+                MetaHttpResponse::json(detail)
+            }
             Err(e) => to_response(e),
         }
     }
@@ -1189,7 +1197,7 @@ pub async fn publish_config_version(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "GetFleetConfigVersion",
-    summary = "Get one published version's YAML and hash",
+    summary = "Get one published version's YAML and hash; the YAML is masked without fleet_configs PUT or POST",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1213,7 +1221,12 @@ pub async fn get_config_version(
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::fleet::configs::get_version(&org_id, &id, version).await {
-            Ok(v) => MetaHttpResponse::json(v),
+            Ok(mut v) => {
+                if !can_edit_configs(&org_id, &user_email.user_id).await {
+                    v.yaml = masked_yaml(&v.yaml);
+                }
+                MetaHttpResponse::json(v)
+            }
             Err(e) => to_response(e),
         }
     }
@@ -1831,6 +1844,61 @@ async fn permitted_fleets(
     }
 }
 
+/// Per-fleet checks in flight at once when withholding token values.
+#[cfg(feature = "enterprise")]
+const FLEET_CHECK_CONCURRENCY: usize = 16;
+
+/// An enrollment token ingests into the org, so only a caller who may change its fleet sees it:
+/// one org-wide check for standard writers and `_all_` grants, then one per distinct fleet.
+#[cfg(feature = "enterprise")]
+async fn withhold_token_values(
+    org_id: &str,
+    user_id: &str,
+    items: &mut [config::meta::fleet::EnrollmentToken],
+) {
+    use futures::StreamExt;
+
+    let mut fleets: Vec<String> = items
+        .iter()
+        .filter(|t| t.token.is_some())
+        .map(|t| t.fleet.id.clone())
+        .collect();
+    if fleets.is_empty() || allowed_on(FLEETS, org_id, user_id, "PUT").await {
+        return;
+    }
+    fleets.sort_unstable();
+    fleets.dedup();
+    let writable: HashSet<String> = futures::stream::iter(fleets)
+        .map(|fleet| async move {
+            fleet_allowed(org_id, user_id, &fleet, "PUT")
+                .await
+                .then_some(fleet)
+        })
+        .buffer_unordered(FLEET_CHECK_CONCURRENCY)
+        .filter_map(|fleet| async move { fleet })
+        .collect()
+        .await;
+    for item in items.iter_mut() {
+        if !writable.contains(&item.fleet.id) {
+            item.token = None;
+        }
+    }
+}
+
+/// Saving a draft (PUT) and publishing (POST) both write the YAML back, so either caller reads
+/// it whole: a masked copy published as is would replace the stored credentials.
+#[cfg(feature = "enterprise")]
+async fn can_edit_configs(org_id: &str, user_id: &str) -> bool {
+    allowed_on(FLEET_CONFIGS, org_id, user_id, "PUT").await
+        || allowed_on(FLEET_CONFIGS, org_id, user_id, "POST").await
+}
+
+/// Exporter credentials are for configuration editors; unparsable YAML is withheld whole.
+#[cfg(feature = "enterprise")]
+fn masked_yaml(yaml: &str) -> String {
+    o2_enterprise::enterprise::fleet::inventory::redact::redact_yaml(yaml).unwrap_or_default()
+}
+
 /// D19b: one fleet's items; without `GET` on it, the D19c filter bounded to it.
 #[cfg(feature = "enterprise")]
 async fn in_fleet(
@@ -2238,6 +2306,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_draft_saver_or_a_publisher_reads_configuration_yaml_whole() {
+        let custom = "configs-yaml@fleet-fleets-handlers.test";
+        seed_member(custom, config::meta::user::UserRole::User, ORG);
+        for (grants, whole) in [
+            (&[(FLEET_CONFIGS, "GET")][..], false),
+            (&[(FLEET_CONFIGS, "GET"), (FLEET_CONFIGS, "PUT")][..], true),
+            (&[(FLEET_CONFIGS, "GET"), (FLEET_CONFIGS, "POST")][..], true),
+        ] {
+            openfga_on(grants, None);
+            assert_eq!(can_edit_configs(ORG, custom).await, whole, "{grants:?}");
+        }
+        openfga_off();
+        forget(custom, ORG);
+    }
+
+    #[tokio::test]
     async fn configs_and_management_are_checked_on_their_own_modules() {
         let custom = "modules@fleet-fleets-handlers.test";
         seed_member(custom, config::meta::user::UserRole::User, ORG);
@@ -2296,6 +2380,60 @@ mod tests {
                 "{listed:?}"
             );
         }
+        forget(custom, ORG);
+    }
+
+    #[tokio::test]
+    async fn token_values_show_only_on_fleets_the_caller_may_change() {
+        use config::meta::fleet::{CollectorFleet, EnrollmentToken};
+
+        let custom = "tokens@fleet-fleets-handlers.test";
+        seed_member(custom, config::meta::user::UserRole::User, ORG);
+        let token = |id: &str, fleet: &str, value: Option<&str>| EnrollmentToken {
+            id: id.to_string(),
+            name: id.to_string(),
+            prefix: "o2ft_abcd".to_string(),
+            created_at: 1,
+            expires_at: None,
+            uses: 0,
+            max_uses: None,
+            fleet: CollectorFleet {
+                id: fleet.to_string(),
+                name: None,
+            },
+            revoked: false,
+            token: value.map(str::to_string),
+        };
+        let mut items = vec![
+            token("t1", "f", Some("o2ft_f1")),
+            token("t2", "g", Some("o2ft_g1")),
+            token("t3", "g", Some("o2ft_g2")),
+            token("t4", "f", None),
+        ];
+        openfga_on(&[("fleets:f", "PUT"), ("fleets:g", "GET")], None);
+        withhold_token_values(ORG, custom, &mut items).await;
+        let values: Vec<_> = items.iter().map(|t| t.token.as_deref()).collect();
+        assert_eq!(values, vec![Some("o2ft_f1"), None, None, None]);
+        assert_eq!(
+            asked(),
+            vec![
+                ("fleets".to_string(), "PUT".to_string()),
+                ("fleets:f".to_string(), "PUT".to_string()),
+                ("fleets:g".to_string(), "PUT".to_string()),
+            ],
+            "one PUT check per fleet after the org-wide one; reading a fleet does not reveal its tokens"
+        );
+
+        let mut items = vec![token("t1", "f", Some("o2ft_f1"))];
+        openfga_on(&[(FLEETS, "PUT")], None);
+        withhold_token_values(ORG, custom, &mut items).await;
+        assert_eq!(items[0].token.as_deref(), Some("o2ft_f1"));
+        assert_eq!(
+            asked(),
+            vec![("fleets".to_string(), "PUT".to_string())],
+            "an org-wide writer needs no per-fleet check"
+        );
+        openfga_off();
         forget(custom, ORG);
     }
 

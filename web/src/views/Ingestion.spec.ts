@@ -842,6 +842,23 @@ describe("Ingestion", () => {
       expect(apiKeysService.listRUMTokens).toHaveBeenCalledWith("default");
       expect(dispatchSpy).toHaveBeenCalledWith("setRUMToken", mockResponse.data.data);
     });
+
+    it("should hide the token actions only when the read is forbidden", async () => {
+      if (!wrapper) {
+        expect.fail("Component failed to mount");
+        return;
+      }
+
+      apiKeysService.listRUMTokens.mockRejectedValue({ response: { status: 403 } });
+      queryClient.clear();
+      await wrapper.vm.getRUMToken();
+      expect(wrapper.vm.rumTokenForbidden).toBe(true);
+
+      apiKeysService.listRUMTokens.mockRejectedValue({ response: { status: 500 } });
+      queryClient.clear();
+      await wrapper.vm.getRUMToken();
+      expect(wrapper.vm.rumTokenForbidden).toBe(false);
+    });
   });
 
   describe("updatePasscode", () => {
