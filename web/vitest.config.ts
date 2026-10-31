@@ -51,6 +51,7 @@ export default mergeConfig(
     },
     test: {
       environment: 'jsdom',
+      maxWorkers: '90%',
       exclude: [...configDefaults.exclude, 'e2e/**'],
       include: ["src/**/*.spec.{ts,js,vue}"],
       root: fileURLToPath(new URL('.', import.meta.url)),
@@ -94,7 +95,7 @@ export default mergeConfig(
         provider: 'v8',
         reporter: ["text", "json", "html", "json-summary"],
         include: ['src/**/*.{js,ts,vue}'],
-        processingConcurrency: 512,
+        processingConcurrency: 64,
         thresholds: {
           lines: 33,
           functions: 33,
