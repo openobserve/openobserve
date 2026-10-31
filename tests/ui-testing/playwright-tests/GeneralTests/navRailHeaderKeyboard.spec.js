@@ -16,8 +16,6 @@ const THEME_ROW = '[data-test="menu-link-predefined-themes-item"]';
 const EN_OPTION = '[data-test="language-dropdown-item-en-us"]';
 const LANGUAGE_COOKIE = "vue3-typescript-admin-languageKey";
 const ONCALL_ROW = '[data-test="header-my-oncall"]';
-const HOME_PAGE = '[data-test="home-page"]';
-const HOME_SKELETON = '[data-test="home-view-skeleton-tile"]';
 
 async function setLanguageCookie(page, code) {
   const url = new URL(process.env.ZO_BASE_URL);
@@ -28,19 +26,13 @@ async function setLanguageCookie(page, code) {
 
 const isFocused = (locator) => locator.evaluate((el) => el === document.activeElement);
 
-const expectFocusInMenu = (page) =>
-  expect
-    .poll(() => page.evaluate(() => !!document.activeElement?.closest('[role="menu"]')))
-    .toBe(true);
-
 async function openProfileMenuByKeyboard(page) {
-  // A menu opened while the home view is still loading can end with focus on <body>, so arrows go nowhere.
-  await expect(page.locator(HOME_PAGE)).toBeVisible();
-  await expect(page.locator(HOME_SKELETON)).toHaveCount(0);
+  const navRail = new NavRailPage(page);
+  await navRail.waitForHomeLoaded();
   await page.locator(PROFILE).focus();
   await page.keyboard.press("Enter");
   await expect(page.locator(ROW)).toBeVisible();
-  await expectFocusInMenu(page);
+  await navRail.expectFocusInMenu();
 }
 
 async function arrowToRow(page) {

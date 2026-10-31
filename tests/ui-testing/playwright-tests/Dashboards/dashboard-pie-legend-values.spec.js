@@ -23,23 +23,6 @@ const MIN_SEEDED_CPU = 25;
 const AGG_LAST = "Last (most recent value)";
 const AGG_COUNT = "Count (number of data points)";
 
-/** Sorted sample values of every series in a finished PromQL query_range event-stream response. */
-async function promqlSampleValues(response) {
-  return (await response.text())
-    .split("\n")
-    .filter((line) => line.startsWith("data: "))
-    .map((line) => {
-      try {
-        return JSON.parse(line.slice("data: ".length));
-      } catch {
-        return null;
-      }
-    })
-    .flatMap((event) => event?.data?.result ?? [])
-    .map((series) => Number((series.value ?? series.values?.at(-1))?.[1]))
-    .sort((a, b) => a - b);
-}
-
 test.describe("Pie & Donut legend values — SQL", () => {
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
@@ -237,7 +220,7 @@ test.describe("PromQL pie — legend values and instant reducer", () => {
     const instantResponse = await pm.dashboardPanelActions.applyAndWaitForPromQLQuery(
       (url) => url.searchParams.get("start") !== null && url.searchParams.get("start") === url.searchParams.get("end")
     );
-    const instantSamples = await promqlSampleValues(instantResponse);
+    const instantSamples = await pm.dashboardPanelActions.promqlSampleValues(instantResponse);
     testLogger.info("Instant query samples", { instantSamples });
     expect(instantSamples.length, "instant query returned samples").toBeGreaterThan(0);
 

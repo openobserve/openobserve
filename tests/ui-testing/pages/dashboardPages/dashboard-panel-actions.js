@@ -384,6 +384,23 @@ export default class DashboardactionPage {
     );
   }
 
+  /** Sorted sample values of every series in a finished PromQL query_range event-stream response. */
+  async promqlSampleValues(response) {
+    return (await response.text())
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => {
+        try {
+          return JSON.parse(line.slice("data: ".length));
+        } catch {
+          return null;
+        }
+      })
+      .flatMap((event) => event?.data?.result ?? [])
+      .map((series) => Number((series.value ?? series.values?.at(-1))?.[1]))
+      .sort((a, b) => a - b);
+  }
+
   async selectPanelAction(panelName, action) {
     const actionDataTestIds = {
       Edit: "dashboard-edit-panel",
