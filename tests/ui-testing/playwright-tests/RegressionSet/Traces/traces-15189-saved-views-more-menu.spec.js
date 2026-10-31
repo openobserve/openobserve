@@ -51,7 +51,7 @@ test.describe('Traces saved views in the More menu with a pin (#15189)', () => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  test('the More menu on Traces search offers "List saved views" and "Create saved view" with a pin', {
+  test('the More menu on Traces search offers a Saved views submenu with "Create saved view" and a pin', {
     tag: ['@bug-15189', '@P1', '@regression', '@tracesRegression'],
   }, async () => {
     await pm.tracesPage.openMoreMenu();
@@ -62,25 +62,14 @@ test.describe('Traces saved views in the More menu with a pin (#15189)', () => {
     testLogger.info('Create saved view opened from the More menu');
   });
 
-  test('unpinning moves saved views out of the toolbar, pinning brings them back, and both stick after reload', {
+  test('saved views are not pinned by default, pinning shows them in the toolbar, unpinning removes them, and both stick after reload', {
     tag: ['@bug-15189', '@P1', '@regression', '@tracesRegression'],
   }, async () => {
-    await pm.tracesPage.expectPinnedSavedViewsInToolbar();
-
-    await pm.tracesPage.toggleSavedViewsPinFromMoreMenu();
-    await pm.tracesPage.expectSavedViewsPinTitle(PIN_TITLE);
-    await pm.tracesPage.closeMoreMenu();
     await pm.tracesPage.expectPinnedSavedViewsNotInToolbar();
-
     await pm.tracesPage.openMoreMenu();
+    await pm.tracesPage.expectSavedViewsPinTitle(PIN_TITLE);
     await pm.tracesPage.expectMoreMenuSavedViewsEntriesVisible();
     await pm.tracesPage.closeMoreMenu();
-
-    await pm.tracesPage.reloadPage();
-    await pm.tracesPage.openMoreMenu();
-    await pm.tracesPage.expectSavedViewsPinTitle(PIN_TITLE);
-    await pm.tracesPage.closeMoreMenu();
-    await pm.tracesPage.expectPinnedSavedViewsNotInToolbar();
 
     await pm.tracesPage.toggleSavedViewsPinFromMoreMenu();
     await pm.tracesPage.expectSavedViewsPinTitle(UNPIN_TITLE);
@@ -89,27 +78,38 @@ test.describe('Traces saved views in the More menu with a pin (#15189)', () => {
 
     await pm.tracesPage.reloadPage();
     await pm.tracesPage.expectPinnedSavedViewsInToolbar();
+
+    await pm.tracesPage.toggleSavedViewsPinFromMoreMenu();
+    await pm.tracesPage.expectSavedViewsPinTitle(PIN_TITLE);
+    await pm.tracesPage.closeMoreMenu();
+    await pm.tracesPage.expectPinnedSavedViewsNotInToolbar();
+
+    await pm.tracesPage.reloadPage();
+    await pm.tracesPage.expectPinnedSavedViewsNotInToolbar();
   });
 
   test('a saved view applies from the pinned toolbar dropdown', {
     tag: ['@bug-15189', '@P1', '@regression', '@tracesRegression'],
   }, async () => {
+    await pm.tracesPage.toggleSavedViewsPinFromMoreMenu();
+    await pm.tracesPage.closeMoreMenu();
     await pm.tracesPage.expectPinnedSavedViewsInToolbar();
     await pm.tracesPage.applySavedViewFromPinnedGroup(viewName);
     await pm.tracesPage.expectQueryEditorEventuallyContains(viewFilter);
   });
 
-  test('a saved view applies from the List saved views dialog opened from the More menu', {
+  test('a saved view applies from the Saved views submenu in the More menu', {
     tag: ['@bug-15189', '@P1', '@regression', '@tracesRegression'],
   }, async () => {
-    await pm.tracesPage.openSavedViewsListFromMoreMenu();
-    await pm.tracesPage.applySavedViewFromListDialog(viewName);
+    await pm.tracesPage.applySavedViewFromMoreMenu(viewName);
     await pm.tracesPage.expectQueryEditorEventuallyContains(viewFilter);
   });
 
   test('the saved views group is hidden on Services Catalog', {
     tag: ['@bug-15189', '@P2', '@regression', '@tracesRegression'],
   }, async () => {
+    await pm.tracesPage.toggleSavedViewsPinFromMoreMenu();
+    await pm.tracesPage.closeMoreMenu();
     await pm.tracesPage.expectPinnedSavedViewsInToolbar();
 
     await pm.tracesPage.navigateToServicesViaTab();

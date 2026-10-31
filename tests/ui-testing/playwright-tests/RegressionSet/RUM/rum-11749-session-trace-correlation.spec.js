@@ -156,7 +156,7 @@ test.describe('RUM session trace correlation (#11749)', () => {
   });
 
   test('P1: the session player offers a Traces tab listing the correlated traces', {
-    tag: ['@rum', '@sessionReplay', '@regression', '@P1', '@all'],
+    tag: ['@rum', '@sessionReplay', '@bug-11749', '@regression', '@P1', '@all'],
   }, async ({ page }) => {
     // Discoverability is the whole issue: the tab sits with Breadcrumbs and Tags,
     // not behind a menu or a trace id the user has to already know.
@@ -185,7 +185,7 @@ test.describe('RUM session trace correlation (#11749)', () => {
   });
 
   test('P1: the failed request is flagged in the list', {
-    tag: ['@rum', '@sessionReplay', '@regression', '@P1', '@all'],
+    tag: ['@rum', '@sessionReplay', '@bug-11749', '@regression', '@P1', '@all'],
   }, async ({ page }) => {
     await page.locator('[data-test="tab-traces"]').click();
     await expect(page.locator('[data-test="rum-player-traces-tab-table"]')).toBeVisible({
@@ -207,7 +207,7 @@ test.describe('RUM session trace correlation (#11749)', () => {
   });
 
   test('P2: a trace opens its waterfall inline, without leaving the session', {
-    tag: ['@rum', '@sessionReplay', '@regression', '@P2', '@all'],
+    tag: ['@rum', '@sessionReplay', '@bug-11749', '@regression', '@P2', '@all'],
   }, async ({ page }) => {
     await page.locator('[data-test="tab-traces"]').click();
     await expect(page.locator('[data-test="rum-player-traces-tab-table"]')).toBeVisible({
