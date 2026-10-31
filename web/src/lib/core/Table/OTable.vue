@@ -46,7 +46,11 @@ import { useTablePagination } from "./composables/useTablePagination";
 import { useTableSorting } from "./composables/useTableSorting";
 import { useTableSelection } from "./composables/useTableSelection";
 import { useTableExpansion } from "./composables/useTableExpansion";
-import { useTableTree, OTableTreeContextKey } from "./composables/useTableTree";
+import {
+  useTableTree,
+  OTableTreeContextKey,
+  type OTableTreeRowMeta,
+} from "./composables/useTableTree";
 import { useTableHighlight } from "./composables/useTableHighlight";
 import { useTableColumnManagement } from "./composables/useTableColumnManagement";
 import { useTableVirtualization } from "./composables/useTableVirtualization";
@@ -198,14 +202,30 @@ let loadingStartedAt = 0;
 let releaseTimer: ReturnType<typeof setTimeout> | null = null;
 
 const staleRows = shallowRef<readonly TData[] | null>(null);
+// Tree metadata is keyed by row object, so the kept copies carry their originals' metadata.
+const staleTreeMeta = shallowRef<Map<TData, OTableTreeRowMeta | null> | null>(null);
 const staleDimmed = ref(false);
 let settledRows: TData[] | null = null;
+let keptFrom: TData[] | null = null;
 let staleDimTimer: ReturnType<typeof setTimeout> | null = null;
+// Swapping the kept copies in or out is no data change, so it must not send a paged table to page 1.
+let holdPageIndex = false;
+
+function holdPageIndexForSwap(hold: boolean): void {
+  holdPageIndex = hold;
+  if (hold) void nextTick(() => (holdPageIndex = false));
+}
 
 function keepSettledRows(): void {
   if (props.skeletonOnRefetch || !settledRows?.length) return;
+  keptFrom = settledRows;
   // Row copies: a consumer that mutates its row objects mid-load cannot repaint the kept rows.
-  staleRows.value = Object.freeze(settledRows.map((row) => ({ ...toRaw(row) }) as TData));
+  const copies = settledRows.map((row) => ({ ...toRaw(row) }) as TData);
+  staleTreeMeta.value = tree.enabled.value
+    ? new Map(copies.map((copy, i) => [copy, tree.getMeta(keptFrom![i])]))
+    : null;
+  holdPageIndexForSwap(true);
+  staleRows.value = Object.freeze(copies);
   staleDimTimer = setTimeout(() => {
     staleDimmed.value = true;
     staleDimTimer = null;
@@ -219,6 +239,8 @@ function dropStaleRows(): void {
   }
   staleDimmed.value = false;
   staleRows.value = null;
+  staleTreeMeta.value = null;
+  keptFrom = null;
 }
 
 watch(
@@ -233,6 +255,7 @@ watch(
       if (!heldLoading.value) keepSettledRows();
       heldLoading.value = true;
     } else if (staleRows.value) {
+      holdPageIndexForSwap(tableData.value === keptFrom);
       dropStaleRows();
       heldLoading.value = false;
     } else if (heldLoading.value) {
@@ -332,7 +355,14 @@ const tree = useTableTree<TData>(
 );
 
 // Provide the computed (a reactive ref). Consumers `inject` and read `.value`.
-provide(OTableTreeContextKey, tree.context);
+const treeContext = computed(() => {
+  const context = tree.context.value;
+  const kept = staleTreeMeta.value;
+  return kept
+    ? { ...context, getMeta: (row: TData) => kept.get(row) ?? context.getMeta(row) }
+    : context;
+});
+provide(OTableTreeContextKey, treeContext);
 
 // Expose horizontalScroll to descendant cells without prop-drilling.
 provide(
@@ -565,7 +595,7 @@ const {
       return props.horizontalScroll;
     },
     get keepPageOnDataChange() {
-      return props.keepPageOnDataChange;
+      return props.keepPageOnDataChange || holdPageIndex;
     },
   },
   emit,
