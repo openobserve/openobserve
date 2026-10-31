@@ -151,6 +151,10 @@ vi.mock("vue-router", () => ({
   }),
 }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
+const showErrorNotification = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({ showErrorNotification }),
+}));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@tanstack/vue-virtual", () => ({
   useVirtualizer: () =>
@@ -974,6 +978,15 @@ describe("MetricsExplorer wiring", () => {
         routerState.query = { mode: "visualize" };
         const wrapper = mountExplorer();
         expect((wrapper.vm as any).visualizeSeed).toBeNull();
+      });
+
+      it("says once that a link's label groups were dropped for passing the branch cap", () => {
+        showErrorNotification.mockClear();
+        const groups = Array.from({ length: 17 }, (_, i) => `${i + 1}:l${i}=v`);
+        routerState.query = { labels: ["job=api", ...groups] };
+        mountExplorer();
+        expect(showErrorNotification).toHaveBeenCalledTimes(1);
+        expect(grid.labelFilters.value).toEqual([{ label: "job", operator: "=", value: "api" }]);
       });
 
       it("ignores a malformed blob rather than throwing", () => {

@@ -52,6 +52,8 @@ export interface ExplorerFilterState {
   sortBy: ExplorerSort;
   /** Absent means no usage filter. */
   usageFilters?: Set<UsageFilter>;
+  /** Read from a URL only: the branch count of label groups dropped for passing the cap. */
+  labelGroupsOverCap?: number;
   viewMode: "grid" | "rows";
   /** Page mode — the Explore grid vs the query-driven Visualize workspace. */
   mode: "explore" | "visualize" | "workspace";
@@ -179,9 +181,10 @@ export function queryToExplorerFilters(
     : query.labels != null
       ? [query.labels]
       : [];
-  const labelFilters = withinBranchCap(
-    rawLabels.map(parseMatcher).filter((f): f is LabelFilter => f !== null),
-  );
+  const parsed = rawLabels.map(parseMatcher).filter((f): f is LabelFilter => f !== null);
+  const overCap = branchesOverCap(parsed);
+  const labelFilters = overCap ? parsed.filter((f) => !f.group) : parsed;
+  if (overCap) out.labelGroupsOverCap = overCap;
   if (labelFilters.length) out.labelFilters = labelFilters;
 
   // `favorites` is intentionally not read from the URL — the mode drives
@@ -223,12 +226,12 @@ const LABEL_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 // An OR group rides as a `2:` (or negated `!2:`) prefix, which no label name can start with.
 const MATCHER = /^(?:(!?)([1-9]\d*):)?([a-zA-Z_:][a-zA-Z0-9_:]*)(=~|!~|!=|=)(.*)$/s;
 
-/** Groups past the branch cap would make every selector throw, so a URL carrying them keeps its base filters. */
-function withinBranchCap(filters: LabelFilter[]): LabelFilter[] {
+/** The branch count when groups pass the cap, which would make every selector throw; 0 within it. */
+function branchesOverCap(filters: LabelFilter[]): number {
   const compiled = compileLabelFilters(
     filters.map((f) => ({ ...f, label: String(f.label), op: (f.operator ?? "=") as LabelMatchOp })),
   );
-  return compiled.ok ? filters : filters.filter((f) => !f.group);
+  return compiled.ok ? 0 : compiled.branchCount;
 }
 
 /** A hand-edited or truncated URL must degrade to "no filter", never throw. */

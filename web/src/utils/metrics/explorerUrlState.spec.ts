@@ -56,9 +56,12 @@ describe("explorerUrlState", () => {
 
   it("keeps only the base filters when the groups expand past the branch cap", () => {
     const groups = Array.from({ length: 17 }, (_, i) => `${i + 1}:l${i}=v`);
-    expect(queryToExplorerFilters({ labels: ["job=api", ...groups] }).labelFilters).toEqual([
-      { label: "job", operator: "=", value: "api" },
-    ]);
+    const f = queryToExplorerFilters({ labels: ["job=api", ...groups] });
+    expect(f.labelFilters).toEqual([{ label: "job", operator: "=", value: "api" }]);
+    expect(f.labelGroupsOverCap).toBe(17);
+    expect(
+      queryToExplorerFilters({ labels: ["job=api", "1:a=1"] }).labelGroupsOverCap,
+    ).toBeUndefined();
   });
 
   it("serializes defaults to an empty query", () => {

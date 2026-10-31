@@ -761,6 +761,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useNotifications from "@/composables/useNotifications";
+import { MAX_FILTER_BRANCHES } from "@/components/promql/labelBoolean";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
@@ -896,6 +898,18 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18nTyped();
+    const { showErrorNotification } = useNotifications();
+
+    /** A link whose label groups expand past the cap loses them; say so rather than filter less in silence. */
+    const notifyGroupsOverCap = (f: { labelGroupsOverCap?: number }) => {
+      if (!f.labelGroupsOverCap) return;
+      showErrorNotification(
+        t("metrics.labelGroups.tooManyBranches", {
+          count: f.labelGroupsOverCap,
+          max: MAX_FILTER_BRANCHES,
+        }),
+      );
+    };
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
@@ -1728,6 +1742,7 @@ export default defineComponent({
         // Without membership data the chips fail open and narrow nothing.
         grid.ensureSchemas();
       }
+      notifyGroupsOverCap(f);
 
       if (q.period || (q.from && q.to)) {
         selectedDate.value = queryParamsToSelectedDate(q);
@@ -1999,6 +2014,7 @@ export default defineComponent({
       grid.selectedSuffixes.value = f.selectedSuffixes ?? new Set();
       grid.selectedTypes.value = f.selectedTypes ?? new Set();
       grid.labelFilters.value = f.labelFilters ?? [];
+      notifyGroupsOverCap(f);
       grid.hideEmptyPanels.value = f.hideEmptyPanels ?? true;
       grid.sortBy.value = f.sortBy ?? "a-z";
       grid.usageFilters.value = f.usageFilters ?? new Set();
