@@ -322,6 +322,17 @@ describe("MetricDetailView", () => {
       expect(chart().props("stepSeconds")).toBe(60);
     });
 
+    it("re-queries the overview when only its step is aligned, keeping the drawn chart", async () => {
+      wrapper = mountView({ overview: LINE, timeRange: WINDOW, stepSeconds: 72 });
+      await flushPromises();
+      const calls = runQuery.mock.calls.length;
+      runQuery.mockImplementation(() => new Promise(() => {}));
+      await wrapper.setProps({ stepSeconds: 120 });
+      await flushPromises();
+      expect(runQuery.mock.calls.length).toBeGreaterThan(calls);
+      expect(wrapper.findComponent({ name: "MetricCardChart" }).props("stepSeconds")).toBe(72);
+    });
+
     it("charts the earlier period when only it has samples", async () => {
       const EMPTY = { resultType: "matrix", result: [] };
       runQuery.mockImplementation((_expr: string, _signal: AbortSignal, _card: any, opts: any) =>

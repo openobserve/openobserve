@@ -1151,14 +1151,15 @@ export default defineComponent({
         () => compareShift.value?.gapMs,
         () => `${activeForecast.value?.method}|${activeForecast.value?.horizon}`,
         () => props.timeRange,
+        () => props.stepSeconds,
       ],
-      // Only the window or the forecast changed: the drawn chart stays up while the new one loads.
+      // Only the window, step or forecast changed: the drawn chart stays up while the new one loads.
       (now, before) => {
         // A kept chart must not go on drawing a forecast the control no longer asks for.
         if (before && now[4] !== before[4] && overviewState.value.forecast) {
           overviewState.value = { ...overviewState.value, forecast: null };
         }
-        loadOverview(!!before && now.slice(0, -2).every((v, i) => v === before[i]));
+        loadOverview(!!before && now.slice(0, 4).every((v, i) => v === before[i]));
       },
       { immediate: true },
     );

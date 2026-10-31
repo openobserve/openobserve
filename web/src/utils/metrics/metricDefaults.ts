@@ -712,6 +712,43 @@ export function computeStepSeconds(
   return Math.max(MIN_STEP_SECONDS, Math.ceil(range / points));
 }
 
+/** Cadences metrics are commonly exported at, in seconds; a measured interval snaps to the nearest. */
+const COMMON_EXPORT_INTERVALS = [1, 5, 10, 15, 30, 60, 120, 300, 600];
+
+/** Windows the export-interval probe counts samples over, in seconds; the wider one only for sparse metrics. */
+export const EXPORT_INTERVAL_PROBE_WINDOWS = [600, 3600];
+
+/** One instant query: the most samples any series of the stream holds in the window. */
+export function buildExportIntervalQuery(streamName: string, windowSeconds: number): string {
+  return `max(count_over_time(${buildSelector(streamName)}[${formatPromDuration(windowSeconds)}]))`;
+}
+
+/** The interval `count` samples in the window imply, snapped to a common cadence; null when unmeasurable. */
+export function snapExportInterval(windowSeconds: number, count: number): number | null {
+  // One sample gives no spacing, and a cadence far past the scale is not one alignment can serve.
+  if (!Number.isFinite(count) || count < 2 || !(windowSeconds > 0)) return null;
+  const measured = windowSeconds / count;
+  const widest = COMMON_EXPORT_INTERVALS[COMMON_EXPORT_INTERVALS.length - 1];
+  if (measured > widest * 1.5) return null;
+  const distance = (interval: number) => Math.abs(Math.log(measured / interval));
+  return COMMON_EXPORT_INTERVALS.reduce((best, interval) =>
+    distance(interval) < distance(best) ? interval : best,
+  );
+}
+
+/** The range-based step raised to a multiple of the export interval, so every step holds the same number of samples. */
+export function computeAlignedStepSeconds(
+  rangeSeconds: number,
+  maxDataPoints: number = MAX_DATA_POINTS,
+  exportIntervalSeconds = 0,
+): number {
+  const step = computeStepSeconds(rangeSeconds, maxDataPoints);
+  if (!(exportIntervalSeconds > 0)) return step;
+  // Raising the step only lowers the point count, so MAX_DATA_POINTS still holds; past the range nothing would draw.
+  const aligned = Math.ceil(step / exportIntervalSeconds) * exportIntervalSeconds;
+  return aligned > Math.max(0, Number(rangeSeconds) || 0) ? step : aligned;
+}
+
 /**
  * The rate window `[W]`.
  *
@@ -738,17 +775,23 @@ function rateWindowSeconds(
   rangeSeconds: number,
   maxDataPoints: number,
   scrapeIntervalSeconds: number,
+  exportIntervalSeconds = 0,
 ): number {
-  const step = computeStepSeconds(rangeSeconds, maxDataPoints);
-  return Math.max(4 * scrapeIntervalSeconds, step + scrapeIntervalSeconds);
+  // A measured cadence slower than the configured one is the one two samples must fit.
+  const cadence = Math.max(scrapeIntervalSeconds, exportIntervalSeconds);
+  const step = computeAlignedStepSeconds(rangeSeconds, maxDataPoints, exportIntervalSeconds);
+  return Math.max(4 * cadence, step + cadence);
 }
 
 export function computeRateWindow(
   rangeSeconds: number,
   maxDataPoints: number = MAX_DATA_POINTS,
   scrapeIntervalSeconds: number = DEFAULT_SCRAPE_INTERVAL_SECONDS,
+  exportIntervalSeconds = 0,
 ): string {
-  return formatPromDuration(rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds));
+  return formatPromDuration(
+    rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds, exportIntervalSeconds),
+  );
 }
 
 /**
@@ -780,8 +823,14 @@ export function computeWidenedRateWindows(
   rangeSeconds: number,
   maxDataPoints: number = MAX_DATA_POINTS,
   scrapeIntervalSeconds: number = DEFAULT_SCRAPE_INTERVAL_SECONDS,
+  exportIntervalSeconds = 0,
 ): string[] {
-  const base = rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds);
+  const base = rateWindowSeconds(
+    rangeSeconds,
+    maxDataPoints,
+    scrapeIntervalSeconds,
+    exportIntervalSeconds,
+  );
   const cap = Math.floor(Math.max(0, Number(rangeSeconds) || 0) / 2);
   const widths: number[] = [];
   for (const factor of [4, 16]) {
@@ -843,9 +892,15 @@ export function computePercentileWindow(
   rangeSeconds: number,
   maxDataPoints: number = MAX_DATA_POINTS,
   scrapeIntervalSeconds: number = DEFAULT_SCRAPE_INTERVAL_SECONDS,
+  exportIntervalSeconds = 0,
 ): string {
-  const floor = rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds);
-  const target = MIN_PERCENTILE_SAMPLES * scrapeIntervalSeconds;
+  const floor = rateWindowSeconds(
+    rangeSeconds,
+    maxDataPoints,
+    scrapeIntervalSeconds,
+    exportIntervalSeconds,
+  );
+  const target = MIN_PERCENTILE_SAMPLES * Math.max(scrapeIntervalSeconds, exportIntervalSeconds);
   const cap = Math.max(floor, Math.max(0, Number(rangeSeconds) || 0) / 4);
   return formatPromDuration(Math.min(Math.max(floor, target), cap));
 }
@@ -1420,6 +1475,12 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
 /** At most this many labels get value counts: each one costs the server a scan. */
 export const BREAKDOWN_LABEL_LIMIT = 15;
 
+/** How many values a capped breakdown keeps, ranked over `window`: a duration, or `$__range` for a panel. */
+interface BreakdownCap {
+  topk: number;
+  window: string;
+}
+
 /** Labels a breakdown never groups by — the same set `resolveTopkLabel` skips. */
 const NON_BREAKDOWN_LABELS = new Set(["le", "quantile"]);
 
@@ -1469,7 +1530,7 @@ export function buildBreakdownQuery(
     applyNanGuard?: boolean;
   },
   label: string,
-  opts?: { topk?: number },
+  cap?: BreakdownCap,
 ): string | null {
   if (!supportsBreakdown(cardKind) || !LABEL_NAME_RE.test(label)) return null;
 
@@ -1506,7 +1567,55 @@ export function buildBreakdownQuery(
     default:
       return null;
   }
-  return opts?.topk ? `topk(${opts.topk}, ${expr})` : expr;
+  return cap ? keepRanked(expr, label, buildBreakdownRank(cardKind, ctx, label, cap)) : expr;
+}
+
+/** The `cap.topk` values of `label` busiest over the whole window, ranked once at its end by the kind's measure. */
+export function buildBreakdownRank(
+  cardKind: string,
+  ctx: { metricName: string; filters?: FiltersArg; rateWindow?: string },
+  label: string,
+  cap: BreakdownCap,
+): string | null {
+  if (!supportsBreakdown(cardKind) || !LABEL_NAME_RE.test(label)) return null;
+  const filters: FilterInput[] = Array.isArray(ctx.filters)
+    ? ctx.filters
+    : Object.entries(ctx.filters ?? {}).map(([name, value]) => ({ label: raw(name), value }));
+  // Series without the label would otherwise take one of the slots as a group of their own.
+  const labelled: FilterInput[] = [...filters, { label: raw(label), operator: "!=", value: "" }];
+  const window = rankWindowOf(cap.window, ctx.rateWindow || DEFAULT_RATE_WINDOW);
+  // On each range selector, not the expression: the engine pins selectors and rejects `@` on a subquery.
+  const ranged = (selector: string) => `${selector}[${window}] @ end()`;
+  const own = ranged(buildSelector(ctx.metricName, labelled));
+  const count = ranged(buildSelector(`${baseNameOf(ctx.metricName)}_count`, labelled));
+
+  let measure: string;
+  switch (cardKind) {
+    case CARD_KIND.GAUGE:
+      measure = `avg by (${label}) (avg_over_time(${own}))`;
+      break;
+    case CARD_KIND.SUMMARY_QUANTILES:
+      measure = `avg by (${label}) (avg_over_time(${ranged(buildSelector(ctx.metricName, labelled, { quantile: "0.5" }))}))`;
+      break;
+    case CARD_KIND.COUNTER_RATE:
+      measure = `sum by (${label}) (increase(${own}))`;
+      break;
+    case CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS: {
+      const inf = { label: raw("le"), operator: "=~", value: "[+]?[Ii]nf" };
+      measure = `sum by (${label}) (increase(${ranged(buildSelector(ctx.metricName, [...labelled, inf]))}))`;
+      break;
+    }
+    case CARD_KIND.MEAN_PAIR:
+    case CARD_KIND.EXP_HISTOGRAM_FALLBACK:
+      measure = `sum by (${label}) (increase(${count}))`;
+      break;
+    case CARD_KIND.INFO:
+      measure = `count by (${label}) (last_over_time(${own}))`;
+      break;
+    default:
+      return null;
+  }
+  return `topk(${cap.topk}, ${measure})`;
 }
 
 interface HeatmapQueryContext {
@@ -1523,6 +1632,17 @@ function promDurationSeconds(duration: string): number {
     (sum, [, n, unit]) => sum + Number(n) * size[unit],
     0,
   );
+}
+
+/** Never shorter than the rate window: a range holding one sample has no increase, and `and` would drop every value. */
+function rankWindowOf(window: string, rateWindow: string): string {
+  const seconds = promDurationSeconds(window);
+  return seconds ? formatPromDuration(Math.max(seconds, promDurationSeconds(rateWindow))) : window;
+}
+
+/** `expr` narrowed to the values `rank` keeps; uncapped when no rank could be built. */
+function keepRanked(expr: string, label: string, rank: string | null): string {
+  return rank ? `(${expr}) and on (${label}) ${rank}` : expr;
 }
 
 /** A classic histogram's buckets split by `label`, one heatmap per value; `cap` keeps the values busiest over the window. */
@@ -1577,7 +1697,7 @@ const AGGREGATION_RE = /\b(sum|avg|min|max|count|stddev)\s*(?:by\s*\(([^)]*)\)\s
 export function breakdownQueryOf(
   expr: string,
   label: string,
-  opts?: { topk?: number },
+  opts?: { rank?: string | null },
 ): string | null {
   if (!LABEL_NAME_RE.test(label)) return null;
   const inner = /^topk\(\s*\d+\s*,\s*([\s\S]*)\)$/.exec(expr.trim())?.[1] ?? expr.trim();
@@ -1601,7 +1721,7 @@ export function breakdownQueryOf(
     .join("");
 
   const result = split ? regrouped : `avg by (${label}) (${inner})`;
-  return opts?.topk ? `topk(${opts.topk}, ${result})` : result;
+  return keepRanked(result, label, opts?.rank ?? null);
 }
 
 /** Footer label shown on the card — explorer UI only, never written to a panel. */

@@ -364,6 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :unit="unit"
           :color="color"
           :time-range="timeRange"
+          :step-seconds="stepSeconds"
           :run-query="runQuery"
           :data-test="`metrics-breakdown-card-${label}`"
           @select="select(label)"
@@ -454,10 +455,12 @@ import {
   BREAKDOWN_LABEL_LIMIT,
   breakdownTitleKey,
   buildBreakdownQuery,
+  buildBreakdownRank,
   buildHeatmapBreakdownQuery,
   buildHeatmapValueQuery,
   breakdownQueryOf,
   CARD_KIND,
+  formatPromDuration,
   toO2Unit,
 } from "@/utils/metrics/metricDefaults";
 import {
@@ -828,26 +831,30 @@ export default defineComponent({
     /** `panel`: at the dashboard panel's rate window rather than the tile's. */
     const queriesFor = (label: string, panel = false): TileQuery[] | null => {
       if (!countsByLabel.value[label].ready) return null;
-      const topk = topkByLabel.value[label] ? { topk: TOPK } : undefined;
+      const { start_time, end_time } = props.timeRange;
+      const cap = topkByLabel.value[label]
+        ? {
+            topk: TOPK,
+            window: panel ? "$__range" : formatPromDuration((end_time - start_time) / 1e6),
+          }
+        : undefined;
+      const ctx = {
+        metricName: props.card.name,
+        filters: props.filters,
+        rateWindow: panel ? props.panelRateWindow : props.rateWindow,
+        applyNanGuard: props.nanGuard,
+      };
       // Several-line functions chart their first line: a tile is one series per label value.
       const source = follows.value
         ? (panel ? props.panelQueries : props.variant!.queries)[0]?.expr
         : undefined;
       const expr = follows.value
         ? source
-          ? breakdownQueryOf(source, label, topk)
+          ? breakdownQueryOf(source, label, {
+              rank: cap && buildBreakdownRank(props.card.cardKind, ctx, label, cap),
+            })
           : null
-        : buildBreakdownQuery(
-            props.card.cardKind,
-            {
-              metricName: props.card.name,
-              filters: props.filters,
-              rateWindow: panel ? props.panelRateWindow : props.rateWindow,
-              applyNanGuard: props.nanGuard,
-            },
-            label,
-            topk,
-          );
+        : buildBreakdownQuery(props.card.cardKind, ctx, label, cap);
       const stream =
         (follows.value && props.variant!.queries[0]?.builder?.metric) || props.card.name;
       return expr ? [{ expr, legendTemplate: `{${label}}`, stream }] : [];
