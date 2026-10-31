@@ -908,6 +908,7 @@ export default class DashboardactionPage {
                 series: (option.series ?? []).map((s) => ({
                   name: s?.name ? String(s.name) : "",
                   type: s?.type ?? null,
+                  silent: s?.silent === true,
                   stack: s?.stack === undefined || s?.stack === null ? null : String(s.stack),
                   radius: s?.radius ?? null,
                   center: Array.isArray(s?.center) ? s.center.map(String) : null,
@@ -945,7 +946,8 @@ export default class DashboardactionPage {
     if (Math.abs(width - chart.hostWidth) > 1 || Math.abs(height - chart.hostHeight) > 1) {
       problems.push(`canvas ${width}x${height} does not match its container ${chart.hostWidth}x${chart.hostHeight}`);
     }
-    const dials = chart.series;
+    // A display-name override adds a silent title-only gauge on top of its dial; it is not a dial.
+    const dials = chart.series.filter((s) => !s.silent);
     if (expected.count !== undefined && dials.length !== expected.count) {
       problems.push(`expected ${expected.count} dials, found ${dials.length}`);
     }
@@ -997,7 +999,7 @@ export default class DashboardactionPage {
 
   async getGaugeDialNames(scopeSelector = this.chartRendererSelector) {
     const [chart] = await this.getChartOptionSnapshots(scopeSelector);
-    return chart ? chart.series.filter((s) => s.type === "gauge").map((s) => s.pointNames[0] ?? "") : [];
+    return chart ? chart.series.filter((s) => s.type === "gauge" && !s.silent).map((s) => s.pointNames[0] ?? "") : [];
   }
 
   /**
