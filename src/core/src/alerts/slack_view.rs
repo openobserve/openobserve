@@ -285,11 +285,16 @@ async fn live_page(org_id: &str, alert_id: &str) -> Option<MessagePage> {
         .map_or_else(|| team_id.to_string(), |t| t.name);
     let priority = AlertPriority::from_i32(first.priority)
         .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
-    let steps = infra::table::oncall_policies::get_or_create_cached(org_id, team_id)
-        .await
-        .ok()
-        .and_then(|p| p.rung(priority).map(|r| r.steps.clone()))
-        .unwrap_or_default();
+    // A teamless page has no ladder, and reading one would create a policy for team "".
+    let steps = if team_id.is_empty() {
+        vec![]
+    } else {
+        infra::table::oncall_policies::get_or_create_cached(org_id, team_id)
+            .await
+            .ok()
+            .and_then(|p| p.rung(priority).map(|r| r.steps.clone()))
+            .unwrap_or_default()
+    };
     let timeline = infra::table::oncall_responses::list_events(&first.id)
         .await
         .unwrap_or_default();

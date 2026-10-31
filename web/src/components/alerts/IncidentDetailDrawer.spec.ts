@@ -65,6 +65,8 @@ vi.mock("@/services/incidents", async (importOriginal) => {
     default: {
       get: vi.fn(),
       updateStatus: vi.fn(),
+      acknowledge: vi.fn(),
+      unacknowledge: vi.fn(),
       triggerRca: vi.fn(),
       resumeRca: vi.fn(),
       cancelRca: vi.fn(),
@@ -267,6 +269,10 @@ describe("IncidentDetailDrawer.vue", () => {
     (incidentsService.updateStatus as any).mockResolvedValue({
       data: { status: "acknowledged" },
     });
+    (incidentsService.acknowledge as any).mockResolvedValue({
+      data: { status: "acknowledged" },
+    });
+    (incidentsService.unacknowledge as any).mockResolvedValue({ data: { status: "open" } });
 
     (incidentsService.triggerRca as any).mockResolvedValue({
       data: { message: "started", run_id: "run-1" },
@@ -466,10 +472,81 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
     });
 
-    it("should acknowledge incident", async () => {
+    it("should acknowledge incident through the one-ack route", async () => {
       await wrapper.vm.acknowledgeIncident();
 
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "acknowledged");
+      expect(incidentsService.acknowledge).toHaveBeenCalledWith("default", "1");
+    });
+
+    it("clears the acknowledged-by header after Unacknowledge", async () => {
+      wrapper.vm.incidentDetails.status = "acknowledged";
+      wrapper.vm.incidentDetails.acknowledged_by = "ana@acme.io";
+      wrapper.vm.editableStatus = "acknowledged";
+      (incidentsService.unacknowledge as any).mockResolvedValue({
+        data: { status: "open", acknowledged_by: null, acknowledged_at: null },
+        ack: { changed: true },
+      });
+      await wrapper.vm.handleStatusChange("open");
+      await flushPromises();
+      expect(wrapper.vm.incidentDetails.acknowledged_by).toBeNull();
+      expect(mockToast.mock.calls.at(-1)?.[0]).toMatchObject({ variant: "success" });
+    });
+
+    it("keeps a successful acknowledge when the incident could not be read back", async () => {
+      (incidentsService.acknowledge as any).mockResolvedValue({
+        ack: { changed: true, acks: [], other_groups_unacked: 0 },
+      });
+      mockToast.mockClear();
+      await wrapper.vm.acknowledgeIncident();
+      await flushPromises();
+      expect(mockToast.mock.calls.at(-1)?.[0]).toMatchObject({ variant: "success" });
+    });
+
+    it("reloads the incident when the write's read-back failed", async () => {
+      (incidentsService.acknowledge as any).mockResolvedValue({
+        ack: { changed: true, acks: [], other_groups_unacked: 0 },
+      });
+      vi.mocked(incidentsService.get).mockClear();
+      await wrapper.vm.acknowledgeIncident();
+      await flushPromises();
+      expect(incidentsService.get).toHaveBeenCalledWith("default", "1");
+    });
+
+    it("toasts who was faster when the acknowledge changed nothing", async () => {
+      (incidentsService.acknowledge as any).mockResolvedValue({
+        data: { status: "acknowledged", acknowledged_by: "ana@acme.io" },
+        ack: {
+          changed: false,
+          acks: [
+            {
+              group_key: "",
+              firing_started_at: 1,
+              acked_by: "ana@acme.io",
+              acked_at: 1,
+              ack_source: "incident",
+            },
+          ],
+          other_groups_unacked: 0,
+        },
+      });
+      mockToast.mockClear();
+      await wrapper.vm.acknowledgeIncident();
+      await flushPromises();
+      expect(mockToast.mock.calls.at(-1)?.[0]).toEqual({
+        variant: "info",
+        message: "Already acknowledged by ana@acme.io",
+      });
+    });
+
+    it("offers Unacknowledge in the Manage status chips of an acknowledged incident", async () => {
+      wrapper.vm.incidentDetails.status = "acknowledged";
+      wrapper.vm.editableStatus = "acknowledged";
+      await nextTick();
+      expect(wrapper.vm.statusOptions[0]).toEqual({ label: "Unacknowledge", value: "open" });
+      await wrapper.vm.handleStatusChange("open");
+      await flushPromises();
+      expect(incidentsService.unacknowledge).toHaveBeenCalledWith("default", "1");
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
     });
 
     it("should resolve incident", async () => {
@@ -538,7 +615,7 @@ describe("IncidentDetailDrawer.vue", () => {
       const pendingUpdate = new Promise((resolve) => {
         resolveUpdate = resolve;
       });
-      (incidentsService.updateStatus as any).mockReturnValue(pendingUpdate);
+      (incidentsService.acknowledge as any).mockReturnValue(pendingUpdate);
 
       const updatePromise = wrapper.vm.acknowledgeIncident();
       await flushPromises();
@@ -567,12 +644,12 @@ describe("IncidentDetailDrawer.vue", () => {
       await wrapper.vm.acknowledgeIncident();
 
       // Just verify the API was called
-      expect(incidentsService.updateStatus).toHaveBeenCalled();
+      expect(incidentsService.acknowledge).toHaveBeenCalled();
     });
 
     it("should handle status update error", async () => {
       mockToast.mockClear();
-      (incidentsService.updateStatus as any).mockRejectedValue(new Error("Update failed"));
+      (incidentsService.acknowledge as any).mockRejectedValue(new Error("Update failed"));
 
       await wrapper.vm.acknowledgeIncident();
 
@@ -1091,11 +1168,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
       await wrapper.vm.acknowledgeIncident();
 
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith(
-        "org-123",
-        expect.any(String),
-        "acknowledged",
-      );
+      expect(incidentsService.acknowledge).toHaveBeenCalledWith("org-123", expect.any(String));
     });
 
     it("should use organization in RCA trigger", async () => {

@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
-import incidents from "./incidents";
+import incidents, { type Incident } from "./incidents";
+import type { AckAlertResponse, UnackAlertResponse } from "@/ts/interfaces/alert";
 import { incidentKeys } from "./incidents.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
@@ -34,11 +35,32 @@ export const incidentQuery = (org: string, id: string) =>
 
 // ── Writes ──────────────────────────────────────────────────────────────────
 
+/** What a status write answers: the incident when it could be read, and the one ack's answer. */
+export interface IncidentStatusWrite {
+  data?: Incident;
+  ack?: AckAlertResponse | UnackAlertResponse;
+}
+
+/** Acknowledging, and reopening an acknowledged incident, go through the one ack; the rest is a PATCH. */
+export const setIncidentStatus = (
+  org: string,
+  id: string,
+  status: "open" | "acknowledged" | "resolved",
+  from?: "open" | "acknowledged" | "resolved",
+): Promise<IncidentStatusWrite> => {
+  if (status === "acknowledged") return incidents.acknowledge(org, id);
+  if (status === "open" && from === "acknowledged") return incidents.unacknowledge(org, id);
+  return incidents.updateStatus(org, id, status);
+};
+
 /** Dropping the scope is what repaints the list: its `shouldRefresh` store flag only lands on a remount, which the drawer's back button often skips. */
 export const updateIncidentStatusMutation = (org: string) =>
   mutationOptions({
-    mutationFn: (vars: { id: string; status: "open" | "acknowledged" | "resolved" }) =>
-      incidents.updateStatus(org, vars.id, vars.status),
+    mutationFn: (vars: {
+      id: string;
+      status: "open" | "acknowledged" | "resolved";
+      from?: "open" | "acknowledged" | "resolved";
+    }) => setIncidentStatus(org, vars.id, vars.status, vars.from),
     // The drawer reads the response to update its own header and toasts itself.
     meta: { invalidates: [incidentKeys.all(org)], silentError: true },
   });

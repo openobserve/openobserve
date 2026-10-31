@@ -24,7 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alerts-alertdetail-ack"
     @click="onAcknowledge"
   >
-    {{ acknowledgeLabel }}
+    {{ t("alerts.ack.acknowledge") }}
+    <OTooltip v-if="acknowledgeHint" :content="acknowledgeHint" />
   </OButton>
 
   <template v-if="muteEnabled">
@@ -135,6 +136,7 @@ import {
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import MuteMenuItems from "./downtimes/MuteMenuItems.vue";
 import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
 import AlertMuteUntilDialog from "./AlertMuteUntilDialog.vue";
@@ -178,11 +180,9 @@ const showAcknowledge = computed(() =>
   isMulti.value ? (props.unackedGroups ?? 0) > 0 : props.firing && !props.ack,
 );
 
-const acknowledgeLabel = computed(() => {
+const acknowledgeHint = computed(() => {
   const count = props.unackedGroups ?? 0;
-  return isMulti.value
-    ? t("alerts.ack.acknowledgeGroups", { count }, count)
-    : t("alerts.ack.acknowledge");
+  return isMulti.value ? t("alerts.ack.acknowledgeGroups", { count }, count) : "";
 });
 
 const muteSelection = computed<QuickMuteSelection[]>(() => [

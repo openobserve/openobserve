@@ -24,6 +24,8 @@ vi.mock("@/services/incidents", async (importOriginal) => {
     default: {
       list: vi.fn(),
       updateStatus: vi.fn(),
+      acknowledge: vi.fn(),
+      unacknowledge: vi.fn(),
       triggerRca: vi.fn(),
     },
   });
@@ -42,6 +44,7 @@ vi.mock("@/utils/date", () => ({
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // acknowledgeIncident awaits a confirm dialog that only resolves via user
 // interaction with a rendered provider — unmocked, the call hangs until timeout.
@@ -188,6 +191,8 @@ describe("IncidentList.vue", () => {
     });
 
     (incidentsService.updateStatus as any).mockResolvedValue({});
+    (incidentsService.acknowledge as any).mockResolvedValue({});
+    (incidentsService.unacknowledge as any).mockResolvedValue({});
   });
 
   afterEach(() => {
@@ -431,15 +436,58 @@ describe("IncidentList.vue", () => {
       await flushPromises();
     });
 
-    it("acknowledgeIncident calls updateStatus with acknowledged", async () => {
+    it("acknowledgeIncident goes through the one-ack route", async () => {
       const incident = (wrapper.vm as any).allIncidents[0];
       await (wrapper.vm as any).acknowledgeIncident(incident);
       await flushPromises();
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith(
-        "default",
-        incident.id,
-        "acknowledged",
-      );
+      expect(incidentsService.acknowledge).toHaveBeenCalledWith("default", incident.id);
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+    });
+
+    it("toasts the incident and the teams its acknowledge stopped paging", async () => {
+      (incidentsService.acknowledge as any).mockResolvedValue({
+        data: {},
+        ack: {
+          changed: true,
+          acks: [],
+          oncall: {
+            acknowledged: ["p1"],
+            still_paging: [],
+            stopped: [{ response_id: "p1", team: "Payments" }],
+          },
+          other_groups_unacked: 0,
+        },
+      });
+      const incident = (wrapper.vm as any).allIncidents[0];
+      await (wrapper.vm as any).acknowledgeIncident(incident);
+      await flushPromises();
+      expect(vi.mocked(toast).mock.calls.at(-1)?.[0]).toMatchObject({
+        variant: "success",
+        message: `Acknowledged incident ${incident.title} · paging stopped for Payments`,
+      });
+    });
+
+    it("shows who can act when the acknowledge is refused", async () => {
+      (incidentsService.acknowledge as any).mockRejectedValue({
+        response: {
+          status: 403,
+          data: {
+            code: "ack_refused",
+            message: "m",
+            rule: "role",
+            on_call: [{ email: "bo@acme.io", team: "sre" }],
+            can_act: [],
+          },
+        },
+      });
+      const incident = (wrapper.vm as any).allIncidents[0];
+      await (wrapper.vm as any).acknowledgeIncident(incident);
+      await flushPromises();
+      expect(vi.mocked(toast).mock.calls.at(-1)?.[0]).toMatchObject({
+        variant: "error",
+        title: "You can't acknowledge this.",
+        message: "On call: bo@acme.io",
+      });
     });
 
     it("resolveIncident calls updateStatus with resolved", async () => {
