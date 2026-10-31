@@ -170,4 +170,21 @@ describe("access store classification", () => {
     });
     expect(access.sectionEntries.value).toHaveLength(0);
   });
+
+  it("asks for Update, not Create, on a POST that toggles existing items", () => {
+    expect(accessPermission("POST", "/api/acme/alerts/bulk/enable")).toBe("update");
+    expect(accessPermission("POST", "/api/acme/pipelines/bulk/disable")).toBe("update");
+    expect(accessPermission("POST", "/api/acme/alerts")).toBe("create");
+  });
+
+  it("keeps the list lock when only a sub-read of the same resource succeeds", async () => {
+    await boot("/roles");
+    forbidden("GET", "/api/acme/roles");
+    noteAccessSuccess({
+      method: "get",
+      url: "/api/acme/users/roles/all",
+      routeKey: currentAccessRouteKey(),
+    });
+    expect(access.pageDenied.value).toBe(true);
+  });
 });

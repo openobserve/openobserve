@@ -233,6 +233,21 @@ describe("http 403 interceptor", () => {
     });
   });
 
+  it("stamps a new request with the current page but keeps a retried request's stamp", () => {
+    let stamp: (config: any) => any = (c) => c;
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: {
+        request: { use: (fn: (config: any) => any) => (stamp = fn) },
+        response: { use: vi.fn() },
+      },
+    } as any);
+    http();
+    currentAccessRouteKey.mockReturnValue("acme|settings" as any);
+    expect(stamp({}).accessRouteKey).toBe("acme|settings");
+    expect(stamp({ accessRouteKey: "acme|users" }).accessRouteKey).toBe("acme|users");
+    currentAccessRouteKey.mockReturnValue(undefined);
+  });
+
   it("leaves a 403 unrecorded when the request opts out, and still rejects", async () => {
     const error = forbidden({ skipAccessToast: true });
     await expect(errorHandler()(error)).rejects.toBe(error);

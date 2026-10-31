@@ -106,7 +106,8 @@ const http = ({ headers } = {} as any) => {
   });
 
   instance.interceptors.request.use((requestConfig) => {
-    requestConfig.accessRouteKey = currentAccessRouteKey();
+    // A retry after a token refresh reuses its config, so it keeps the page that first asked.
+    requestConfig.accessRouteKey ??= currentAccessRouteKey();
     return requestConfig;
   });
 

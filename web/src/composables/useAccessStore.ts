@@ -227,6 +227,9 @@ const READ_POST_ACTIONS = new Set([
   "_correlate",
 ]);
 
+// A POST that toggles an existing item is checked against Update on the server, not Create.
+const UPDATE_POST_ACTIONS = new Set(["enable", "disable"]);
+
 const PERMISSION_ORDER: AccessPermission[] = ["list", "get", "create", "update", "delete"];
 
 /** Resources a collapsed list names before it folds the rest into "N more". */
@@ -342,7 +345,12 @@ export function noteAccessSuccess({
   if (!info) return;
   const entry = currentEntry.value;
   const org = currentOrg();
-  if (entry && deniedPermission.value === permission && info.key === currentResource.value) {
+  if (
+    entry &&
+    deniedPermission.value === permission &&
+    info.key === currentResource.value &&
+    isPageList(permission, url)
+  ) {
     writeMemory(org, { ...readMemory(org), pages: omitKey(readMemory(org).pages, entry) });
     deniedRequests.delete(entry);
   }
@@ -515,7 +523,10 @@ export function accessPermission(method: string, rawUrl: string): AccessPermissi
   } catch {
     // An unparseable URL reads as a collection.
   }
-  if (verb === "POST") return segments.some((s) => READ_POST_ACTIONS.has(s)) ? "list" : "create";
+  if (verb === "POST") {
+    if (segments.some((s) => READ_POST_ACTIONS.has(s))) return "list";
+    return segments.some((s) => UPDATE_POST_ACTIONS.has(s)) ? "update" : "create";
+  }
   if (verb === "PUT" || verb === "PATCH") return "update";
   if (verb === "DELETE") return "delete";
   const itemNamed = locateResource(segments)?.after.some((s) => !NON_RESOURCE_SEGMENTS.has(s));

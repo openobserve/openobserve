@@ -1362,6 +1362,7 @@ export default defineComponent({
       refreshing.value = true;
       loading.value = dashboardList.value.length === 0;
       forbidden.value = false;
+      const target = `${showFavoritesOnly.value}|${activeFolderId.value}`;
       try {
         if (showFavoritesOnly.value) {
           // Refresh in the favorites view: re-read the favorites setting and
@@ -1402,6 +1403,8 @@ export default defineComponent({
           stampFolders([folderId]);
         }
       } catch (err) {
+        // A late failure for a folder the user already left must not lock the folder now on screen.
+        if (target !== `${showFavoritesOnly.value}|${activeFolderId.value}`) return;
         forbidden.value = asCaughtError(err).response?.status === 403;
         if (!forbidden.value) {
           showErrorNotification(
