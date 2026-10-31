@@ -1113,6 +1113,33 @@ describe("MetricsExplorer wiring", () => {
         expect(vm.visualizeSeed).toBeNull();
       });
 
+      it("rehydrates on Back to a chart the page wrote itself before a shared link replaced it", async () => {
+        const wrapper = mountExplorer();
+        const vm = wrapper.vm as any;
+        await enterVisualizeWith(wrapper, "chart_b");
+        vi.advanceTimersByTime(300);
+        const written = blobWrites().at(-1);
+        expect(written).toBeTruthy();
+        routerState.query = { mode: "visualize", metrics_data: written };
+        vm.onRouteQueryChange();
+
+        const shared = encodeMetricsConfig(
+          getMetricsConfig({ data: { type: "bar", queries: [{ query: "chart_c", fields: {} }] } }),
+        );
+        routerState.query = { mode: "visualize", metrics_data: shared };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeSeed?.queries?.[0]?.query).toBe("chart_c");
+        visualizePanel.data.queries[0].query = "chart_c";
+        vm.visualizeSeed = null;
+        await wrapper.vm.$nextTick();
+        const mounted = vm.visualizeMount;
+
+        routerState.query = { mode: "visualize", metrics_data: written };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeSeed?.queries?.[0]?.query).toBe("chart_b");
+        expect(vm.visualizeMount).toBe(mounted + 1);
+      });
+
       it("does not touch metrics_data while in a grid mode", async () => {
         const wrapper = mountExplorer();
         // A pure grid interaction (sort change) fires syncUrlState, never the

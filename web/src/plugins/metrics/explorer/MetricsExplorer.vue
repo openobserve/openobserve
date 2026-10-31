@@ -1945,11 +1945,14 @@ export default defineComponent({
 
       // Visualize seeds only on mount, so another link's chart (or Back/Forward) remounts it.
       const blobIn = String(route.query.metrics_data ?? "");
+      const ownWrite = !!blobIn && blobIn === writtenBlob;
+      // The marker is spent once its own update lands, or Back to that blob later would be ignored.
+      if (ownWrite) writtenBlob = "";
       if (
+        !ownWrite &&
         mode.value === "visualize" &&
         route.query.mode === "visualize" &&
         blobIn &&
-        blobIn !== writtenBlob &&
         blobIn !== visualizeBlob.value
       ) {
         seedVisualizeFromUrl(route.query as Record<string, any>);
