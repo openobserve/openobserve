@@ -613,6 +613,66 @@
       "actionDesc": "再次运行同一查询"
     }
   },
+  "accessBoundary": {
+    "copyDetails": "复制详情",
+    "copied": "已复制！",
+    "resources": {
+      "dashboards": "仪表盘",
+      "alerts": "告警",
+      "streams": "数据流",
+      "functions": "函数",
+      "savedviews": "已保存视图",
+      "users": "用户",
+      "roles": "角色",
+      "organizations": "组织",
+      "pipelines": "流水线",
+      "destinations": "目标",
+      "templates": "模板",
+      "reports": "报表",
+      "llmModelPricing": "LLM 模型定价",
+      "passcode": "数据摄取令牌",
+      "ai": "AI",
+      "downtimes": "停机时间",
+      "fleetConfigs": "机群配置",
+      "publicDashboards": "公开仪表盘"
+    },
+    "resourcesInline": {
+      "dashboards": "仪表盘",
+      "alerts": "告警",
+      "streams": "数据流",
+      "functions": "函数",
+      "savedviews": "已保存视图",
+      "users": "用户",
+      "roles": "角色",
+      "organizations": "组织",
+      "pipelines": "流水线",
+      "destinations": "目标",
+      "templates": "模板",
+      "reports": "报表",
+      "llmModelPricing": "LLM 模型定价",
+      "passcode": "数据摄取令牌",
+      "ai": "AI",
+      "downtimes": "停机时间",
+      "fleetConfigs": "机群配置",
+      "publicDashboards": "公开仪表盘"
+    },
+    "denied": {
+      "view": "您无法查看{resource}",
+      "create": "您无法创建{resource}",
+      "edit": "您无法编辑{resource}",
+      "delete": "您无法删除{resource}",
+      "missing": "您的角色缺少对{resource}的“{permission}”权限。",
+      "parts": "您无法查看此页面的 {count} 个部分",
+      "missingIntro": "您的角色缺少以下权限：",
+      "more": "另外 {count} 项",
+      "showLess": "收起"
+    },
+    "chip": {
+      "label": "访问被拒绝",
+      "ariaLabel": "访问被拒绝：{title}",
+      "popoverLabel": "此页面已隐藏的内容"
+    }
+  },
   "common": {
     "dismiss": "关闭",
     "exitFullscreen": "退出全屏",
@@ -6978,7 +7038,6 @@
       "publishFailed": "发布失败",
       "revokedToast": "公开链接已撤销并删除",
       "revokeFailed": "撤销并删除链接失败",
-      "noPublishPermission": "您无权查看此仪表盘的公开链接。请向管理员申请“公开仪表盘”权限。",
       "linkCopied": "链接已复制",
       "copyLink": "复制链接",
       "expired": "此链接已过期。请让分享链接的人延长有效期。"
@@ -22005,27 +22064,6 @@
       "refresh": "刷新",
       "invalidSqlSyntax": "无效的 SQL 语法",
       "pleaseWaitWhileLoadingStreams": "正在加载流，请稍候...",
-      "copied": "已复制！",
-      "copyDetails": "复制详情",
-      "accessRequiredTitle": "需要访问权限",
-      "accessRequiredMessage": "某些部分无法加载，因为您没有所需的权限。如果您认为自己应该拥有访问权限，请联系管理员。",
-      "resourceFallback": "资源",
-      "resources": {
-        "dashboards": "仪表盘",
-        "alerts": "告警",
-        "streams": "数据流",
-        "functions": "函数",
-        "savedviews": "已保存视图",
-        "users": "用户",
-        "roles": "角色",
-        "organizations": "组织",
-        "pipelines": "流水线",
-        "destinations": "目标",
-        "templates": "模板",
-        "reports": "报表",
-        "llmModelPricing": "LLM 模型定价",
-        "passcode": "数据摄取令牌"
-      },
       "noPermissionToChangeFavorites": "您没有权限更改收藏",
       "couldNotUpdateFavoriteDashboards": "无法更新收藏的仪表盘"
     },

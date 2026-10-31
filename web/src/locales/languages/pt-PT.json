@@ -613,6 +613,66 @@
       "actionDesc": "Executar a mesma consulta novamente"
     }
   },
+  "accessBoundary": {
+    "copyDetails": "Copiar detalhes",
+    "copied": "Copiado!",
+    "resources": {
+      "dashboards": "Dashboards",
+      "alerts": "Alertas",
+      "streams": "Streams",
+      "functions": "Funções",
+      "savedviews": "Visualizações guardadas",
+      "users": "Utilizadores",
+      "roles": "Funções",
+      "organizations": "Organizações",
+      "pipelines": "Pipelines",
+      "destinations": "Destinos",
+      "templates": "Modelos",
+      "reports": "Relatórios",
+      "llmModelPricing": "Preços de Modelos LLM",
+      "passcode": "Token de ingestão",
+      "ai": "IA",
+      "downtimes": "Janelas de manutenção",
+      "fleetConfigs": "Configurações de frota",
+      "publicDashboards": "Dashboards públicos"
+    },
+    "resourcesInline": {
+      "dashboards": "dashboards",
+      "alerts": "alertas",
+      "streams": "streams",
+      "functions": "funções",
+      "savedviews": "visualizações guardadas",
+      "users": "utilizadores",
+      "roles": "funções",
+      "organizations": "organizações",
+      "pipelines": "pipelines",
+      "destinations": "destinos",
+      "templates": "modelos",
+      "reports": "relatórios",
+      "llmModelPricing": "preços de modelos LLM",
+      "passcode": "token de ingestão",
+      "ai": "IA",
+      "downtimes": "janelas de manutenção",
+      "fleetConfigs": "configurações de frota",
+      "publicDashboards": "dashboards públicos"
+    },
+    "denied": {
+      "view": "Não pode ver {resource}",
+      "create": "Não pode criar {resource}",
+      "edit": "Não pode editar {resource}",
+      "delete": "Não pode eliminar {resource}",
+      "missing": "Falta à sua função a permissão {permission} em {resource}.",
+      "parts": "Não pode ver {count} parte desta página | Não pode ver {count} partes desta página",
+      "missingIntro": "Faltam à sua função estas permissões:",
+      "more": "mais {count}",
+      "showLess": "Mostrar menos"
+    },
+    "chip": {
+      "label": "Acesso negado",
+      "ariaLabel": "Acesso negado: {title}",
+      "popoverLabel": "Partes ocultas desta página"
+    }
+  },
   "common": {
     "dismiss": "Dispensar",
     "exitFullscreen": "Sair do ecrã inteiro",
@@ -6978,7 +7038,6 @@
       "publishFailed": "Falha ao publicar",
       "revokedToast": "Link público revogado e excluído",
       "revokeFailed": "Falha ao revogar e excluir o link",
-      "noPublishPermission": "Você não tem permissão para ver os links públicos deste painel. Peça a um administrador a permissão de Painéis Públicos.",
       "linkCopied": "Link copiado",
       "copyLink": "Copiar link",
       "expired": "Este link expirou. Peça à pessoa que o compartilhou para estendê-lo."
@@ -22005,27 +22064,6 @@
       "refresh": "Atualizar",
       "invalidSqlSyntax": "Sintaxe SQL inválida",
       "pleaseWaitWhileLoadingStreams": "Aguarde enquanto os streams são carregados...",
-      "copied": "Copiado!",
-      "copyDetails": "Copiar detalhes",
-      "accessRequiredTitle": "Acesso Necessário",
-      "accessRequiredMessage": "Algumas secções não puderam carregar porque não tem as permissões necessárias. Contacte o administrador se acredita que deveria ter acesso.",
-      "resourceFallback": "Recurso",
-      "resources": {
-        "dashboards": "Dashboards",
-        "alerts": "Alertas",
-        "streams": "Streams",
-        "functions": "Funções",
-        "savedviews": "Visualizações guardadas",
-        "users": "Utilizadores",
-        "roles": "Funções",
-        "organizations": "Organizações",
-        "pipelines": "Pipelines",
-        "destinations": "Destinos",
-        "templates": "Modelos",
-        "reports": "Relatórios",
-        "llmModelPricing": "Preços de Modelos LLM",
-        "passcode": "Token de ingestão"
-      },
       "noPermissionToChangeFavorites": "Não tem permissão para alterar favoritos",
       "couldNotUpdateFavoriteDashboards": "Não foi possível atualizar os dashboards favoritos"
     },

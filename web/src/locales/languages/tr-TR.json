@@ -613,6 +613,66 @@
       "actionDesc": "Aynı sorguyu tekrar çalıştır"
     }
   },
+  "accessBoundary": {
+    "copyDetails": "Ayrıntıları kopyala",
+    "copied": "Kopyalandı!",
+    "resources": {
+      "dashboards": "Panolar",
+      "alerts": "Uyarılar",
+      "streams": "Akışlar",
+      "functions": "Fonksiyonlar",
+      "savedviews": "Kaydedilmiş Görünümler",
+      "users": "Kullanıcılar",
+      "roles": "Roller",
+      "organizations": "Kuruluşlar",
+      "pipelines": "İşlem hatları",
+      "destinations": "Hedefler",
+      "templates": "Şablonlar",
+      "reports": "Raporlar",
+      "llmModelPricing": "LLM Model Fiyatlandırması",
+      "passcode": "Veri Alımı Token'ı",
+      "ai": "Yapay zekâ",
+      "downtimes": "Bakım pencereleri",
+      "fleetConfigs": "Filo yapılandırmaları",
+      "publicDashboards": "Herkese açık panolar"
+    },
+    "resourcesInline": {
+      "dashboards": "panolar",
+      "alerts": "uyarılar",
+      "streams": "akışlar",
+      "functions": "fonksiyonlar",
+      "savedviews": "kaydedilmiş görünümler",
+      "users": "kullanıcılar",
+      "roles": "roller",
+      "organizations": "kuruluşlar",
+      "pipelines": "işlem hatları",
+      "destinations": "hedefler",
+      "templates": "şablonlar",
+      "reports": "raporlar",
+      "llmModelPricing": "LLM model fiyatlandırması",
+      "passcode": "veri alımı token'ı",
+      "ai": "yapay zekâ",
+      "downtimes": "bakım pencereleri",
+      "fleetConfigs": "filo yapılandırmaları",
+      "publicDashboards": "herkese açık panolar"
+    },
+    "denied": {
+      "view": "{resource} görüntüleyemezsiniz",
+      "create": "{resource} oluşturamazsınız",
+      "edit": "{resource} düzenleyemezsiniz",
+      "delete": "{resource} silemezsiniz",
+      "missing": "Rolünüzde {resource} için {permission} izni eksik.",
+      "parts": "Bu sayfanın {count} bölümünü görüntüleyemezsiniz",
+      "missingIntro": "Rolünüzde şu izinler eksik:",
+      "more": "{count} tane daha",
+      "showLess": "Daha az göster"
+    },
+    "chip": {
+      "label": "Erişim reddedildi",
+      "ariaLabel": "Erişim reddedildi: {title}",
+      "popoverLabel": "Bu sayfanın gizli bölümleri"
+    }
+  },
   "common": {
     "dismiss": "Kapat",
     "exitFullscreen": "Tam ekrandan çık",
@@ -6978,7 +7038,6 @@
       "publishFailed": "Yayımlanamadı",
       "revokedToast": "Genel bağlantı iptal edildi ve silindi",
       "revokeFailed": "Bağlantı iptal edilemedi ve silinemedi",
-      "noPublishPermission": "Bu gösterge panosunun genel bağlantılarını görüntüleme izniniz yok. Yöneticiden Genel Gösterge Panoları iznini isteyin.",
       "linkCopied": "Bağlantı kopyalandı",
       "copyLink": "Bağlantıyı kopyala",
       "expired": "Bu bağlantının süresi dolmuş. Paylaşan kişiden süresini uzatmasını isteyin."
@@ -22005,27 +22064,6 @@
       "refresh": "Yenile",
       "invalidSqlSyntax": "Geçersiz SQL Sözdizimi",
       "pleaseWaitWhileLoadingStreams": "Akışlar yüklenirken lütfen bekleyin...",
-      "copied": "Kopyalandı!",
-      "copyDetails": "Ayrıntıları kopyala",
-      "accessRequiredTitle": "Erişim Gerekli",
-      "accessRequiredMessage": "Bazı bölümler yüklenemedi çünkü gerekli izinlere sahip değilsiniz. Erişiminiz olması gerektiğini düşünüyorsanız yöneticinize başvurun.",
-      "resourceFallback": "Kaynak",
-      "resources": {
-        "dashboards": "Panolar",
-        "alerts": "Uyarılar",
-        "streams": "Akışlar",
-        "functions": "Fonksiyonlar",
-        "savedviews": "Kaydedilmiş Görünümler",
-        "users": "Kullanıcılar",
-        "roles": "Roller",
-        "organizations": "Kuruluşlar",
-        "pipelines": "İşlem hatları",
-        "destinations": "Hedefler",
-        "templates": "Şablonlar",
-        "reports": "Raporlar",
-        "llmModelPricing": "LLM Model Fiyatlandırması",
-        "passcode": "Veri Alımı Token'ı"
-      },
       "noPermissionToChangeFavorites": "Favorileri değiştirme izniniz yok",
       "couldNotUpdateFavoriteDashboards": "Favori panolar güncellenemedi"
     },

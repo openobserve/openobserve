@@ -613,6 +613,66 @@
       "actionDesc": "Run the same query again"
     }
   },
+  "accessBoundary": {
+    "copyDetails": "Copy details",
+    "copied": "Copied!",
+    "resources": {
+      "dashboards": "Dashboards",
+      "alerts": "Alerts",
+      "streams": "Streams",
+      "functions": "Functions",
+      "savedviews": "Saved views",
+      "users": "Users",
+      "roles": "Roles",
+      "organizations": "Organizations",
+      "pipelines": "Pipelines",
+      "destinations": "Destinations",
+      "templates": "Templates",
+      "reports": "Reports",
+      "llmModelPricing": "LLM model pricing",
+      "passcode": "Ingestion token",
+      "ai": "AI",
+      "downtimes": "Downtimes",
+      "fleetConfigs": "Fleet configurations",
+      "publicDashboards": "Public dashboards"
+    },
+    "resourcesInline": {
+      "dashboards": "dashboards",
+      "alerts": "alerts",
+      "streams": "streams",
+      "functions": "functions",
+      "savedviews": "saved views",
+      "users": "users",
+      "roles": "roles",
+      "organizations": "organizations",
+      "pipelines": "pipelines",
+      "destinations": "destinations",
+      "templates": "templates",
+      "reports": "reports",
+      "llmModelPricing": "LLM model pricing",
+      "passcode": "the ingestion token",
+      "ai": "AI",
+      "downtimes": "downtimes",
+      "fleetConfigs": "fleet configurations",
+      "publicDashboards": "public dashboards"
+    },
+    "denied": {
+      "view": "You can't view {resource}",
+      "create": "You can't create {resource}",
+      "edit": "You can't edit {resource}",
+      "delete": "You can't delete {resource}",
+      "missing": "Your role is missing the {permission} permission on {resource}.",
+      "parts": "You can't view {count} part of this page | You can't view {count} parts of this page",
+      "missingIntro": "Your role is missing these permissions:",
+      "more": "{count} more",
+      "showLess": "Show less"
+    },
+    "chip": {
+      "label": "Access denied",
+      "ariaLabel": "Access denied: {title}",
+      "popoverLabel": "Hidden parts of this page"
+    }
+  },
   "common": {
     "dismiss": "Dismiss",
     "exitFullscreen": "Exit full screen",
@@ -6978,7 +7038,6 @@
       "publishFailed": "Failed to publish",
       "revokedToast": "Public link revoked and deleted",
       "revokeFailed": "Failed to revoke and delete the link",
-      "noPublishPermission": "You don't have permission to view this dashboard's public links. Ask an admin for the Public Dashboards permission.",
       "linkCopied": "Link copied",
       "copyLink": "Copy link",
       "expired": "This link has expired. Ask the person who shared it to extend it."
@@ -22023,27 +22082,6 @@
       "refresh": "Refresh",
       "invalidSqlSyntax": "Invalid SQL Syntax",
       "pleaseWaitWhileLoadingStreams": "Please wait while loading streams...",
-      "copied": "Copied!",
-      "copyDetails": "Copy details",
-      "accessRequiredTitle": "Access Required",
-      "accessRequiredMessage": "Some sections couldn't load because you don't have the required permissions. Contact your administrator if you believe you should have access.",
-      "resourceFallback": "Resource",
-      "resources": {
-        "dashboards": "Dashboards",
-        "alerts": "Alerts",
-        "streams": "Streams",
-        "functions": "Functions",
-        "savedviews": "Saved Views",
-        "users": "Users",
-        "roles": "Roles",
-        "organizations": "Organizations",
-        "pipelines": "Pipelines",
-        "destinations": "Destinations",
-        "templates": "Templates",
-        "reports": "Reports",
-        "llmModelPricing": "LLM Model Pricing",
-        "passcode": "Ingestion Token"
-      },
       "noPermissionToChangeFavorites": "You don't have permission to change favorites",
       "couldNotUpdateFavoriteDashboards": "Couldn't update favorite dashboards"
     },

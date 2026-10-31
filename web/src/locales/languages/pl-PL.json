@@ -613,6 +613,66 @@
       "actionDesc": "Uruchom to samo zapytanie ponownie"
     }
   },
+  "accessBoundary": {
+    "copyDetails": "Kopiuj szczegóły",
+    "copied": "Skopiowano!",
+    "resources": {
+      "dashboards": "Pulpity",
+      "alerts": "Alerty",
+      "streams": "Strumienie",
+      "functions": "Funkcje",
+      "savedviews": "Zapisane widoki",
+      "users": "Użytkownicy",
+      "roles": "Role",
+      "organizations": "Organizacje",
+      "pipelines": "Potoki",
+      "destinations": "Miejsca docelowe",
+      "templates": "Szablony",
+      "reports": "Raporty",
+      "llmModelPricing": "Cennik modeli LLM",
+      "passcode": "Token pozyskiwania danych",
+      "ai": "AI",
+      "downtimes": "Okna serwisowe",
+      "fleetConfigs": "Konfiguracje floty",
+      "publicDashboards": "Pulpity publiczne"
+    },
+    "resourcesInline": {
+      "dashboards": "pulpity",
+      "alerts": "alerty",
+      "streams": "strumienie",
+      "functions": "funkcje",
+      "savedviews": "zapisane widoki",
+      "users": "użytkownicy",
+      "roles": "role",
+      "organizations": "organizacje",
+      "pipelines": "potoki",
+      "destinations": "miejsca docelowe",
+      "templates": "szablony",
+      "reports": "raporty",
+      "llmModelPricing": "cennik modeli LLM",
+      "passcode": "token pozyskiwania danych",
+      "ai": "AI",
+      "downtimes": "okna serwisowe",
+      "fleetConfigs": "konfiguracje floty",
+      "publicDashboards": "pulpity publiczne"
+    },
+    "denied": {
+      "view": "Nie możesz wyświetlać: {resource}",
+      "create": "Nie możesz tworzyć: {resource}",
+      "edit": "Nie możesz edytować: {resource}",
+      "delete": "Nie możesz usuwać: {resource}",
+      "missing": "Twojej roli brakuje uprawnienia {permission} dla: {resource}.",
+      "parts": "Nie możesz wyświetlić części tej strony ({count})",
+      "missingIntro": "Twojej roli brakuje tych uprawnień:",
+      "more": "{count} więcej",
+      "showLess": "Pokaż mniej"
+    },
+    "chip": {
+      "label": "Odmowa dostępu",
+      "ariaLabel": "Odmowa dostępu: {title}",
+      "popoverLabel": "Ukryte części tej strony"
+    }
+  },
   "common": {
     "dismiss": "Odrzuć",
     "exitFullscreen": "Wyjdź z pełnego ekranu",
@@ -6978,7 +7038,6 @@
       "publishFailed": "Nie udało się opublikować",
       "revokedToast": "Unieważniono i usunięto link publiczny",
       "revokeFailed": "Nie udało się unieważnić i usunąć linku",
-      "noPublishPermission": "Nie masz uprawnień do wyświetlania publicznych linków tego pulpitu. Poproś administratora o uprawnienie do publicznych pulpitów.",
       "linkCopied": "Skopiowano link",
       "copyLink": "Kopiuj link",
       "expired": "Ten link wygasł. Poproś osobę, która go udostępniła, o przedłużenie ważności."
@@ -22005,27 +22064,6 @@
       "refresh": "Odśwież",
       "invalidSqlSyntax": "Nieprawidłowa składnia SQL",
       "pleaseWaitWhileLoadingStreams": "Proszę czekać podczas ładowania strumieni...",
-      "copied": "Skopiowano!",
-      "copyDetails": "Kopiuj szczegóły",
-      "accessRequiredTitle": "Wymagany dostęp",
-      "accessRequiredMessage": "Niektóre sekcje nie mogły zostać wczytane, ponieważ nie masz wymaganych uprawnień. Skontaktuj się z administratorem, jeśli uważasz, że powinieneś mieć do nich dostęp.",
-      "resourceFallback": "Zasób",
-      "resources": {
-        "dashboards": "Pulpity",
-        "alerts": "Alerty",
-        "streams": "Strumienie",
-        "functions": "Funkcje",
-        "savedviews": "Zapisane widoki",
-        "users": "Użytkownicy",
-        "roles": "Role",
-        "organizations": "Organizacje",
-        "pipelines": "Potoki",
-        "destinations": "Miejsca docelowe",
-        "templates": "Szablony",
-        "reports": "Raporty",
-        "llmModelPricing": "Cennik modeli LLM",
-        "passcode": "Token pozyskiwania danych"
-      },
       "noPermissionToChangeFavorites": "Nie masz uprawnień do zmiany ulubionych",
       "couldNotUpdateFavoriteDashboards": "Nie udało się zaktualizować ulubionych pulpitów"
     },

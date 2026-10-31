@@ -613,6 +613,66 @@
       "actionDesc": "Esegui di nuovo la stessa query"
     }
   },
+  "accessBoundary": {
+    "copyDetails": "Copia dettagli",
+    "copied": "Copiato!",
+    "resources": {
+      "dashboards": "Dashboard",
+      "alerts": "Avvisi",
+      "streams": "Stream",
+      "functions": "Funzioni",
+      "savedviews": "Viste salvate",
+      "users": "Utenti",
+      "roles": "Ruoli",
+      "organizations": "Organizzazioni",
+      "pipelines": "Pipeline",
+      "destinations": "Destinazioni",
+      "templates": "Template",
+      "reports": "Report",
+      "llmModelPricing": "Prezzi dei modelli LLM",
+      "passcode": "Token di ingestione",
+      "ai": "IA",
+      "downtimes": "Downtime",
+      "fleetConfigs": "Configurazioni fleet",
+      "publicDashboards": "Dashboard pubbliche"
+    },
+    "resourcesInline": {
+      "dashboards": "dashboard",
+      "alerts": "avvisi",
+      "streams": "stream",
+      "functions": "funzioni",
+      "savedviews": "viste salvate",
+      "users": "utenti",
+      "roles": "ruoli",
+      "organizations": "organizzazioni",
+      "pipelines": "pipeline",
+      "destinations": "destinazioni",
+      "templates": "template",
+      "reports": "report",
+      "llmModelPricing": "prezzi dei modelli LLM",
+      "passcode": "token di ingestione",
+      "ai": "IA",
+      "downtimes": "downtime",
+      "fleetConfigs": "configurazioni fleet",
+      "publicDashboards": "dashboard pubbliche"
+    },
+    "denied": {
+      "view": "Non puoi visualizzare {resource}",
+      "create": "Non puoi creare {resource}",
+      "edit": "Non puoi modificare {resource}",
+      "delete": "Non puoi eliminare {resource}",
+      "missing": "Al tuo ruolo manca il permesso {permission} su {resource}.",
+      "parts": "Non puoi visualizzare {count} parte di questa pagina | Non puoi visualizzare {count} parti di questa pagina",
+      "missingIntro": "Al tuo ruolo mancano questi permessi:",
+      "more": "altri {count}",
+      "showLess": "Mostra meno"
+    },
+    "chip": {
+      "label": "Accesso negato",
+      "ariaLabel": "Accesso negato: {title}",
+      "popoverLabel": "Parti nascoste di questa pagina"
+    }
+  },
   "common": {
     "dismiss": "Ignora",
     "exitFullscreen": "Esci da schermo intero",
@@ -6978,7 +7038,6 @@
       "publishFailed": "Pubblicazione non riuscita",
       "revokedToast": "Link pubblico revocato ed eliminato",
       "revokeFailed": "Impossibile revocare ed eliminare il link",
-      "noPublishPermission": "Non hai il permesso di visualizzare i link pubblici di questa dashboard. Chiedi a un amministratore il permesso Dashboard pubbliche.",
       "linkCopied": "Link copiato",
       "copyLink": "Copia link",
       "expired": "Questo link è scaduto. Chiedi a chi lo ha condiviso di estenderne la scadenza."
@@ -22005,27 +22064,6 @@
       "refresh": "Aggiorna",
       "invalidSqlSyntax": "Sintassi SQL non valida",
       "pleaseWaitWhileLoadingStreams": "Attendere mentre si caricano gli stream...",
-      "copied": "Copiato!",
-      "copyDetails": "Copia dettagli",
-      "accessRequiredTitle": "Accesso richiesto",
-      "accessRequiredMessage": "Alcune sezioni non hanno potuto caricarsi perché non si dispone delle autorizzazioni richieste. Contattare l'amministratore se si ritiene di dover avere accesso.",
-      "resourceFallback": "Risorsa",
-      "resources": {
-        "dashboards": "Dashboard",
-        "alerts": "Avvisi",
-        "streams": "Stream",
-        "functions": "Funzioni",
-        "savedviews": "Viste salvate",
-        "users": "Utenti",
-        "roles": "Ruoli",
-        "organizations": "Organizzazioni",
-        "pipelines": "Pipeline",
-        "destinations": "Destinazioni",
-        "templates": "Template",
-        "reports": "Report",
-        "llmModelPricing": "Prezzi dei modelli LLM",
-        "passcode": "Token di ingestione"
-      },
       "noPermissionToChangeFavorites": "Non hai il permesso di modificare i preferiti",
       "couldNotUpdateFavoriteDashboards": "Impossibile aggiornare le dashboard preferite"
     },

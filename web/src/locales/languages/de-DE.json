@@ -613,6 +613,66 @@
       "actionDesc": "Dieselbe Abfrage erneut ausführen"
     }
   },
+  "accessBoundary": {
+    "copyDetails": "Details kopieren",
+    "copied": "Kopiert!",
+    "resources": {
+      "dashboards": "Dashboards",
+      "alerts": "Alarme",
+      "streams": "Streams",
+      "functions": "Funktionen",
+      "savedviews": "Gespeicherte Ansichten",
+      "users": "Benutzer",
+      "roles": "Rollen",
+      "organizations": "Organisationen",
+      "pipelines": "Pipelines",
+      "destinations": "Ziele",
+      "templates": "Vorlagen",
+      "reports": "Berichte",
+      "llmModelPricing": "LLM-Modellpreise",
+      "passcode": "Datenerfassungs-Token",
+      "ai": "KI",
+      "downtimes": "Wartungsfenster",
+      "fleetConfigs": "Fleet-Konfigurationen",
+      "publicDashboards": "Öffentliche Dashboards"
+    },
+    "resourcesInline": {
+      "dashboards": "Dashboards",
+      "alerts": "Alarme",
+      "streams": "Streams",
+      "functions": "Funktionen",
+      "savedviews": "gespeicherte Ansichten",
+      "users": "Benutzer",
+      "roles": "Rollen",
+      "organizations": "Organisationen",
+      "pipelines": "Pipelines",
+      "destinations": "Ziele",
+      "templates": "Vorlagen",
+      "reports": "Berichte",
+      "llmModelPricing": "LLM-Modellpreise",
+      "passcode": "Datenerfassungs-Token",
+      "ai": "KI",
+      "downtimes": "Wartungsfenster",
+      "fleetConfigs": "Fleet-Konfigurationen",
+      "publicDashboards": "öffentliche Dashboards"
+    },
+    "denied": {
+      "view": "Sie können {resource} nicht anzeigen",
+      "create": "Sie können {resource} nicht erstellen",
+      "edit": "Sie können {resource} nicht bearbeiten",
+      "delete": "Sie können {resource} nicht löschen",
+      "missing": "Ihrer Rolle fehlt die Berechtigung „{permission}“ für {resource}.",
+      "parts": "Sie können {count} Teil dieser Seite nicht anzeigen | Sie können {count} Teile dieser Seite nicht anzeigen",
+      "missingIntro": "Ihrer Rolle fehlen diese Berechtigungen:",
+      "more": "{count} weitere",
+      "showLess": "Weniger anzeigen"
+    },
+    "chip": {
+      "label": "Zugriff verweigert",
+      "ariaLabel": "Zugriff verweigert: {title}",
+      "popoverLabel": "Ausgeblendete Bereiche dieser Seite"
+    }
+  },
   "common": {
     "dismiss": "Schließen",
     "exitFullscreen": "Vollbild verlassen",
@@ -6978,7 +7038,6 @@
       "publishFailed": "Veröffentlichen fehlgeschlagen",
       "revokedToast": "Öffentlicher Link widerrufen und gelöscht",
       "revokeFailed": "Widerrufen und Löschen des Links fehlgeschlagen",
-      "noPublishPermission": "Sie haben keine Berechtigung, die öffentlichen Links dieses Dashboards anzuzeigen. Bitten Sie einen Administrator um die Berechtigung für öffentliche Dashboards.",
       "linkCopied": "Link kopiert",
       "copyLink": "Link kopieren",
       "expired": "Dieser Link ist abgelaufen. Bitten Sie die Person, die ihn geteilt hat, ihn zu verlängern."
@@ -22005,27 +22064,6 @@
       "refresh": "Aktualisieren",
       "invalidSqlSyntax": "Ungültige SQL-Syntax",
       "pleaseWaitWhileLoadingStreams": "Bitte warten Sie, während die Streams geladen werden...",
-      "copied": "Kopiert!",
-      "copyDetails": "Details kopieren",
-      "accessRequiredTitle": "Zugriff erforderlich",
-      "accessRequiredMessage": "Einige Abschnitte konnten nicht geladen werden, da Sie nicht über die erforderlichen Berechtigungen verfügen. Wenden Sie sich an Ihren Administrator, wenn Sie der Meinung sind, dass Sie Zugriff haben sollten.",
-      "resourceFallback": "Ressource",
-      "resources": {
-        "dashboards": "Dashboards",
-        "alerts": "Alarme",
-        "streams": "Streams",
-        "functions": "Funktionen",
-        "savedviews": "Gespeicherte Ansichten",
-        "users": "Benutzer",
-        "roles": "Rollen",
-        "organizations": "Organisationen",
-        "pipelines": "Pipelines",
-        "destinations": "Ziele",
-        "templates": "Vorlagen",
-        "reports": "Berichte",
-        "llmModelPricing": "LLM-Modellpreise",
-        "passcode": "Datenerfassungs-Token"
-      },
       "noPermissionToChangeFavorites": "Sie haben keine Berechtigung, Favoriten zu ändern",
       "couldNotUpdateFavoriteDashboards": "Favoriten-Dashboards konnten nicht aktualisiert werden"
     },

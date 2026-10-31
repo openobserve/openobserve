@@ -613,6 +613,66 @@
       "actionDesc": "Dezelfde query opnieuw uitvoeren"
     }
   },
+  "accessBoundary": {
+    "copyDetails": "Details kopiëren",
+    "copied": "Gekopieerd!",
+    "resources": {
+      "dashboards": "Dashboards",
+      "alerts": "Alarmen",
+      "streams": "Streams",
+      "functions": "Functies",
+      "savedviews": "Opgeslagen weergaven",
+      "users": "Gebruikers",
+      "roles": "Rollen",
+      "organizations": "Organisaties",
+      "pipelines": "Pipelines",
+      "destinations": "Bestemmingen",
+      "templates": "Sjablonen",
+      "reports": "Rapporten",
+      "llmModelPricing": "LLM-modelprijzen",
+      "passcode": "Ingestietoken",
+      "ai": "AI",
+      "downtimes": "Onderhoudsperiodes",
+      "fleetConfigs": "Fleetconfiguraties",
+      "publicDashboards": "Openbare dashboards"
+    },
+    "resourcesInline": {
+      "dashboards": "dashboards",
+      "alerts": "alarmen",
+      "streams": "streams",
+      "functions": "functies",
+      "savedviews": "opgeslagen weergaven",
+      "users": "gebruikers",
+      "roles": "rollen",
+      "organizations": "organisaties",
+      "pipelines": "pipelines",
+      "destinations": "bestemmingen",
+      "templates": "sjablonen",
+      "reports": "rapporten",
+      "llmModelPricing": "LLM-modelprijzen",
+      "passcode": "ingestietoken",
+      "ai": "AI",
+      "downtimes": "onderhoudsperiodes",
+      "fleetConfigs": "fleetconfiguraties",
+      "publicDashboards": "openbare dashboards"
+    },
+    "denied": {
+      "view": "U kunt {resource} niet bekijken",
+      "create": "U kunt {resource} niet aanmaken",
+      "edit": "U kunt {resource} niet bewerken",
+      "delete": "U kunt {resource} niet verwijderen",
+      "missing": "Uw rol mist de machtiging {permission} op {resource}.",
+      "parts": "U kunt {count} deel van deze pagina niet bekijken | U kunt {count} delen van deze pagina niet bekijken",
+      "missingIntro": "Uw rol mist deze machtigingen:",
+      "more": "{count} meer",
+      "showLess": "Minder weergeven"
+    },
+    "chip": {
+      "label": "Toegang geweigerd",
+      "ariaLabel": "Toegang geweigerd: {title}",
+      "popoverLabel": "Verborgen delen van deze pagina"
+    }
+  },
   "common": {
     "dismiss": "Sluiten",
     "exitFullscreen": "Volledig scherm sluiten",
@@ -6978,7 +7038,6 @@
       "publishFailed": "Publiceren mislukt",
       "revokedToast": "Openbare link ingetrokken en verwijderd",
       "revokeFailed": "Intrekken en verwijderen van de link mislukt",
-      "noPublishPermission": "Je hebt geen toestemming om de openbare links van dit dashboard te bekijken. Vraag een beheerder om de machtiging Openbare dashboards.",
       "linkCopied": "Link gekopieerd",
       "copyLink": "Link kopiëren",
       "expired": "Deze link is verlopen. Vraag degene die hem heeft gedeeld om hem te verlengen."
@@ -22005,27 +22064,6 @@
       "refresh": "Vernieuwen",
       "invalidSqlSyntax": "Ongeldige SQL-syntaxis",
       "pleaseWaitWhileLoadingStreams": "Even geduld terwijl streams worden geladen...",
-      "copied": "Gekopieerd!",
-      "copyDetails": "Details kopiëren",
-      "accessRequiredTitle": "Toegang vereist",
-      "accessRequiredMessage": "Sommige secties konden niet worden geladen omdat u niet over de vereiste rechten beschikt. Neem contact op met uw beheerder als u denkt dat u toegang zou moeten hebben.",
-      "resourceFallback": "Resource",
-      "resources": {
-        "dashboards": "Dashboards",
-        "alerts": "Alarmen",
-        "streams": "Streams",
-        "functions": "Functies",
-        "savedviews": "Opgeslagen weergaven",
-        "users": "Gebruikers",
-        "roles": "Rollen",
-        "organizations": "Organisaties",
-        "pipelines": "Pipelines",
-        "destinations": "Bestemmingen",
-        "templates": "Sjablonen",
-        "reports": "Rapporten",
-        "llmModelPricing": "LLM-modelprijzen",
-        "passcode": "Ingestietoken"
-      },
       "noPermissionToChangeFavorites": "Je hebt geen toestemming om favorieten te wijzigen",
       "couldNotUpdateFavoriteDashboards": "Kan favoriete dashboards niet bijwerken"
     },

@@ -613,6 +613,66 @@
       "actionDesc": "Ejecutar la misma consulta de nuevo"
     }
   },
+  "accessBoundary": {
+    "copyDetails": "Copiar detalles",
+    "copied": "¡Copiado!",
+    "resources": {
+      "dashboards": "Dashboards",
+      "alerts": "Alertas",
+      "streams": "Streams",
+      "functions": "Funciones",
+      "savedviews": "Vistas guardadas",
+      "users": "Usuarios",
+      "roles": "Roles",
+      "organizations": "Organizaciones",
+      "pipelines": "Pipelines",
+      "destinations": "Destinos",
+      "templates": "Plantillas",
+      "reports": "Informes",
+      "llmModelPricing": "Precios de modelos LLM",
+      "passcode": "Token de ingesta",
+      "ai": "IA",
+      "downtimes": "Periodos de mantenimiento",
+      "fleetConfigs": "Configuraciones de flota",
+      "publicDashboards": "Dashboards públicos"
+    },
+    "resourcesInline": {
+      "dashboards": "dashboards",
+      "alerts": "alertas",
+      "streams": "streams",
+      "functions": "funciones",
+      "savedviews": "vistas guardadas",
+      "users": "usuarios",
+      "roles": "roles",
+      "organizations": "organizaciones",
+      "pipelines": "pipelines",
+      "destinations": "destinos",
+      "templates": "plantillas",
+      "reports": "informes",
+      "llmModelPricing": "precios de modelos LLM",
+      "passcode": "token de ingesta",
+      "ai": "IA",
+      "downtimes": "periodos de mantenimiento",
+      "fleetConfigs": "configuraciones de flota",
+      "publicDashboards": "dashboards públicos"
+    },
+    "denied": {
+      "view": "No puedes ver {resource}",
+      "create": "No puedes crear {resource}",
+      "edit": "No puedes editar {resource}",
+      "delete": "No puedes eliminar {resource}",
+      "missing": "A tu rol le falta el permiso {permission} sobre {resource}.",
+      "parts": "No puedes ver {count} parte de esta página | No puedes ver {count} partes de esta página",
+      "missingIntro": "A tu rol le faltan estos permisos:",
+      "more": "{count} más",
+      "showLess": "Mostrar menos"
+    },
+    "chip": {
+      "label": "Acceso denegado",
+      "ariaLabel": "Acceso denegado: {title}",
+      "popoverLabel": "Partes ocultas de esta página"
+    }
+  },
   "common": {
     "dismiss": "Descartar",
     "exitFullscreen": "Salir de pantalla completa",
@@ -6978,7 +7038,6 @@
       "publishFailed": "No se pudo publicar",
       "revokedToast": "Enlace público revocado y eliminado",
       "revokeFailed": "No se pudo revocar y eliminar el enlace",
-      "noPublishPermission": "No tienes permiso para ver los enlaces públicos de este dashboard. Solicita a un administrador el permiso de Dashboards públicos.",
       "linkCopied": "Enlace copiado",
       "copyLink": "Copiar enlace",
       "expired": "Este enlace ha caducado. Pide a la persona que lo compartió que amplíe su vigencia."
@@ -22005,27 +22064,6 @@
       "refresh": "Actualizar",
       "invalidSqlSyntax": "Sintaxis SQL no válida",
       "pleaseWaitWhileLoadingStreams": "Espere mientras se cargan los streams...",
-      "copied": "¡Copiado!",
-      "copyDetails": "Copiar detalles",
-      "accessRequiredTitle": "Acceso requerido",
-      "accessRequiredMessage": "Algunas secciones no pudieron cargarse porque no tienes los permisos necesarios. Contacta a tu administrador si crees que deberías tener acceso.",
-      "resourceFallback": "Recurso",
-      "resources": {
-        "dashboards": "Dashboards",
-        "alerts": "Alertas",
-        "streams": "Streams",
-        "functions": "Funciones",
-        "savedviews": "Vistas guardadas",
-        "users": "Usuarios",
-        "roles": "Roles",
-        "organizations": "Organizaciones",
-        "pipelines": "Pipelines",
-        "destinations": "Destinos",
-        "templates": "Plantillas",
-        "reports": "Informes",
-        "llmModelPricing": "Precios de modelos LLM",
-        "passcode": "Token de ingesta"
-      },
       "noPermissionToChangeFavorites": "No tienes permiso para cambiar favoritos",
       "couldNotUpdateFavoriteDashboards": "No se pudieron actualizar los Dashboards favoritos"
     },

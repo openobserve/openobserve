@@ -613,6 +613,66 @@
       "actionDesc": "同じクエリをもう一度実行します"
     }
   },
+  "accessBoundary": {
+    "copyDetails": "詳細をコピー",
+    "copied": "コピーしました！",
+    "resources": {
+      "dashboards": "ダッシュボード",
+      "alerts": "アラート",
+      "streams": "ストリーム",
+      "functions": "関数",
+      "savedviews": "保存済みビュー",
+      "users": "ユーザー",
+      "roles": "ロール",
+      "organizations": "組織",
+      "pipelines": "パイプライン",
+      "destinations": "宛先",
+      "templates": "テンプレート",
+      "reports": "レポート",
+      "llmModelPricing": "LLMモデルの価格設定",
+      "passcode": "取り込みトークン",
+      "ai": "AI",
+      "downtimes": "ダウンタイム",
+      "fleetConfigs": "フリート構成",
+      "publicDashboards": "公開ダッシュボード"
+    },
+    "resourcesInline": {
+      "dashboards": "ダッシュボード",
+      "alerts": "アラート",
+      "streams": "ストリーム",
+      "functions": "関数",
+      "savedviews": "保存済みビュー",
+      "users": "ユーザー",
+      "roles": "ロール",
+      "organizations": "組織",
+      "pipelines": "パイプライン",
+      "destinations": "宛先",
+      "templates": "テンプレート",
+      "reports": "レポート",
+      "llmModelPricing": "LLMモデルの価格設定",
+      "passcode": "取り込みトークン",
+      "ai": "AI",
+      "downtimes": "ダウンタイム",
+      "fleetConfigs": "フリート構成",
+      "publicDashboards": "公開ダッシュボード"
+    },
+    "denied": {
+      "view": "{resource} を表示できません",
+      "create": "{resource} を作成できません",
+      "edit": "{resource} を編集できません",
+      "delete": "{resource} を削除できません",
+      "missing": "あなたのロールには {resource} に対する {permission} 権限がありません。",
+      "parts": "このページの {count} 箇所を表示できません",
+      "missingIntro": "あなたのロールには次の権限がありません：",
+      "more": "他 {count} 件",
+      "showLess": "表示を減らす"
+    },
+    "chip": {
+      "label": "アクセス拒否",
+      "ariaLabel": "アクセス拒否: {title}",
+      "popoverLabel": "このページの非表示の項目"
+    }
+  },
   "common": {
     "dismiss": "閉じる",
     "exitFullscreen": "全画面表示を終了",
@@ -6978,7 +7038,6 @@
       "publishFailed": "公開に失敗しました",
       "revokedToast": "公開リンクを取り消して削除しました",
       "revokeFailed": "リンクの取り消しと削除に失敗しました",
-      "noPublishPermission": "このダッシュボードの公開リンクを表示する権限がありません。管理者に「公開ダッシュボード」権限を依頼してください。",
       "linkCopied": "リンクをコピーしました",
       "copyLink": "リンクをコピー",
       "expired": "このリンクは有効期限が切れています。共有した人に延長を依頼してください。"
@@ -22005,27 +22064,6 @@
       "refresh": "更新",
       "invalidSqlSyntax": "無効なSQL構文です",
       "pleaseWaitWhileLoadingStreams": "ストリームを読み込んでいます。お待ちください...",
-      "copied": "コピーしました！",
-      "copyDetails": "詳細をコピー",
-      "accessRequiredTitle": "アクセスが必要です",
-      "accessRequiredMessage": "一部のセクションを読み込めませんでした。必要な権限がないためです。アクセスできるはずだと思われる場合は、管理者にお問い合わせください。",
-      "resourceFallback": "リソース",
-      "resources": {
-        "dashboards": "ダッシュボード",
-        "alerts": "アラート",
-        "streams": "ストリーム",
-        "functions": "関数",
-        "savedviews": "保存済みビュー",
-        "users": "ユーザー",
-        "roles": "ロール",
-        "organizations": "組織",
-        "pipelines": "パイプライン",
-        "destinations": "宛先",
-        "templates": "テンプレート",
-        "reports": "レポート",
-        "llmModelPricing": "LLMモデルの価格設定",
-        "passcode": "取り込みトークン"
-      },
       "noPermissionToChangeFavorites": "お気に入りを変更する権限がありません",
       "couldNotUpdateFavoriteDashboards": "お気に入りのダッシュボードを更新できませんでした"
     },

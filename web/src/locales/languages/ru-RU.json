@@ -613,6 +613,66 @@
       "actionDesc": "Запустить тот же запрос ещё раз"
     }
   },
+  "accessBoundary": {
+    "copyDetails": "Копировать сведения",
+    "copied": "Скопировано!",
+    "resources": {
+      "dashboards": "Дашборды",
+      "alerts": "Оповещения",
+      "streams": "Потоки",
+      "functions": "Функции",
+      "savedviews": "Сохранённые представления",
+      "users": "Пользователи",
+      "roles": "Роли",
+      "organizations": "Организации",
+      "pipelines": "Конвейеры",
+      "destinations": "Получатели",
+      "templates": "Шаблоны",
+      "reports": "Отчёты",
+      "llmModelPricing": "Цены на модели LLM",
+      "passcode": "Токен приема данных",
+      "ai": "ИИ",
+      "downtimes": "Окна обслуживания",
+      "fleetConfigs": "Конфигурации парка",
+      "publicDashboards": "Публичные дашборды"
+    },
+    "resourcesInline": {
+      "dashboards": "дашборды",
+      "alerts": "оповещения",
+      "streams": "потоки",
+      "functions": "функции",
+      "savedviews": "сохранённые представления",
+      "users": "пользователи",
+      "roles": "роли",
+      "organizations": "организации",
+      "pipelines": "конвейеры",
+      "destinations": "получатели",
+      "templates": "шаблоны",
+      "reports": "отчёты",
+      "llmModelPricing": "цены на модели LLM",
+      "passcode": "токен приема данных",
+      "ai": "ИИ",
+      "downtimes": "окна обслуживания",
+      "fleetConfigs": "конфигурации парка",
+      "publicDashboards": "публичные дашборды"
+    },
+    "denied": {
+      "view": "Вы не можете просматривать {resource}",
+      "create": "Вы не можете создавать «{resource}»",
+      "edit": "Вы не можете изменять «{resource}»",
+      "delete": "Вы не можете удалять «{resource}»",
+      "missing": "У вашей роли нет разрешения «{permission}» для «{resource}».",
+      "parts": "Вы не можете просматривать части этой страницы ({count})",
+      "missingIntro": "У вашей роли нет этих разрешений:",
+      "more": "ещё {count}",
+      "showLess": "Свернуть"
+    },
+    "chip": {
+      "label": "Доступ запрещён",
+      "ariaLabel": "Доступ запрещён: {title}",
+      "popoverLabel": "Скрытые части этой страницы"
+    }
+  },
   "common": {
     "dismiss": "Закрыть",
     "exitFullscreen": "Выйти из полноэкранного режима",
@@ -6978,7 +7038,6 @@
       "publishFailed": "Не удалось опубликовать",
       "revokedToast": "Публичная ссылка отозвана и удалена",
       "revokeFailed": "Не удалось отозвать и удалить ссылку",
-      "noPublishPermission": "У вас нет разрешения на просмотр публичных ссылок этого дашборда. Попросите администратора предоставить разрешение «Публичные дашборды».",
       "linkCopied": "Ссылка скопирована",
       "copyLink": "Копировать ссылку",
       "expired": "Срок действия этой ссылки истёк. Попросите того, кто ею поделился, продлить его."
@@ -22005,27 +22064,6 @@
       "refresh": "Обновить",
       "invalidSqlSyntax": "Недопустимый синтаксис SQL",
       "pleaseWaitWhileLoadingStreams": "Подождите, идёт загрузка потоков...",
-      "copied": "Скопировано!",
-      "copyDetails": "Копировать сведения",
-      "accessRequiredTitle": "Требуется доступ",
-      "accessRequiredMessage": "Некоторые разделы не удалось загрузить, так как у вас нет необходимых разрешений. Свяжитесь с администратором, если вы считаете, что у вас должен быть доступ.",
-      "resourceFallback": "Ресурс",
-      "resources": {
-        "dashboards": "Дашборды",
-        "alerts": "Оповещения",
-        "streams": "Потоки",
-        "functions": "Функции",
-        "savedviews": "Сохранённые представления",
-        "users": "Пользователи",
-        "roles": "Роли",
-        "organizations": "Организации",
-        "pipelines": "Конвейеры",
-        "destinations": "Получатели",
-        "templates": "Шаблоны",
-        "reports": "Отчёты",
-        "llmModelPricing": "Цены на модели LLM",
-        "passcode": "Токен приема данных"
-      },
       "noPermissionToChangeFavorites": "У вас нет разрешения изменять избранное",
       "couldNotUpdateFavoriteDashboards": "Не удалось обновить избранные дашборды"
     },

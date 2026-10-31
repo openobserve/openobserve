@@ -613,6 +613,66 @@
       "actionDesc": "Chạy lại cùng truy vấn đó"
     }
   },
+  "accessBoundary": {
+    "copyDetails": "Sao chép chi tiết",
+    "copied": "Đã sao chép!",
+    "resources": {
+      "dashboards": "Bảng điều khiển",
+      "alerts": "Cảnh báo",
+      "streams": "Stream",
+      "functions": "Hàm",
+      "savedviews": "Chế độ xem đã lưu",
+      "users": "Người dùng",
+      "roles": "Vai trò",
+      "organizations": "Tổ chức",
+      "pipelines": "Pipeline",
+      "destinations": "Đích",
+      "templates": "Mẫu",
+      "reports": "Báo cáo",
+      "llmModelPricing": "Giá mô hình LLM",
+      "passcode": "Token tiếp nhận dữ liệu",
+      "ai": "AI",
+      "downtimes": "Thời gian bảo trì",
+      "fleetConfigs": "Cấu hình fleet",
+      "publicDashboards": "Bảng điều khiển công khai"
+    },
+    "resourcesInline": {
+      "dashboards": "bảng điều khiển",
+      "alerts": "cảnh báo",
+      "streams": "stream",
+      "functions": "hàm",
+      "savedviews": "chế độ xem đã lưu",
+      "users": "người dùng",
+      "roles": "vai trò",
+      "organizations": "tổ chức",
+      "pipelines": "pipeline",
+      "destinations": "đích",
+      "templates": "mẫu",
+      "reports": "báo cáo",
+      "llmModelPricing": "giá mô hình LLM",
+      "passcode": "token tiếp nhận dữ liệu",
+      "ai": "AI",
+      "downtimes": "thời gian bảo trì",
+      "fleetConfigs": "cấu hình fleet",
+      "publicDashboards": "bảng điều khiển công khai"
+    },
+    "denied": {
+      "view": "Bạn không thể xem {resource}",
+      "create": "Bạn không thể tạo {resource}",
+      "edit": "Bạn không thể chỉnh sửa {resource}",
+      "delete": "Bạn không thể xóa {resource}",
+      "missing": "Vai trò của bạn thiếu quyền {permission} trên {resource}.",
+      "parts": "Bạn không thể xem {count} phần của trang này",
+      "missingIntro": "Vai trò của bạn thiếu các quyền sau:",
+      "more": "{count} mục khác",
+      "showLess": "Thu gọn"
+    },
+    "chip": {
+      "label": "Truy cập bị từ chối",
+      "ariaLabel": "Truy cập bị từ chối: {title}",
+      "popoverLabel": "Các phần bị ẩn của trang này"
+    }
+  },
   "common": {
     "dismiss": "Bỏ qua",
     "exitFullscreen": "Thoát toàn màn hình",
@@ -6978,7 +7038,6 @@
       "publishFailed": "Công bố thất bại",
       "revokedToast": "Đã thu hồi và xóa liên kết công khai",
       "revokeFailed": "Thu hồi và xóa liên kết thất bại",
-      "noPublishPermission": "Bạn không có quyền xem các liên kết công khai của bảng điều khiển này. Hãy yêu cầu quản trị viên cấp quyền Public Dashboards.",
       "linkCopied": "Đã sao chép liên kết",
       "copyLink": "Sao chép liên kết",
       "expired": "Liên kết này đã hết hạn. Hãy yêu cầu người đã chia sẻ liên kết gia hạn nó."
@@ -22005,27 +22064,6 @@
       "refresh": "Làm mới",
       "invalidSqlSyntax": "Cú pháp SQL không hợp lệ",
       "pleaseWaitWhileLoadingStreams": "Vui lòng đợi trong khi tải stream...",
-      "copied": "Đã sao chép!",
-      "copyDetails": "Sao chép chi tiết",
-      "accessRequiredTitle": "Yêu cầu quyền truy cập",
-      "accessRequiredMessage": "Một số phần không thể tải vì bạn không có quyền cần thiết. Hãy liên hệ với quản trị viên nếu bạn cho rằng mình cần quyền truy cập.",
-      "resourceFallback": "Tài nguyên",
-      "resources": {
-        "dashboards": "Bảng điều khiển",
-        "alerts": "Cảnh báo",
-        "streams": "Stream",
-        "functions": "Hàm",
-        "savedviews": "Chế độ xem đã lưu",
-        "users": "Người dùng",
-        "roles": "Vai trò",
-        "organizations": "Tổ chức",
-        "pipelines": "Pipeline",
-        "destinations": "Đích",
-        "templates": "Mẫu",
-        "reports": "Báo cáo",
-        "llmModelPricing": "Giá mô hình LLM",
-        "passcode": "Token tiếp nhận dữ liệu"
-      },
       "noPermissionToChangeFavorites": "Bạn không có quyền thay đổi mục yêu thích",
       "couldNotUpdateFavoriteDashboards": "Không thể cập nhật bảng điều khiển yêu thích"
     },
