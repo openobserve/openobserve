@@ -181,7 +181,7 @@ vi.mock("@/services/stream", async (importOriginal) => {
   return overlayServiceMock(await importOriginal(), { default: { nameList: vi.fn() } });
 });
 vi.mock("@/services/metrics", () => ({
-  default: { labels: vi.fn(), labelValues: vi.fn(), metadata: vi.fn() },
+  default: { labels: vi.fn(), labelValues: vi.fn(), metadata: vi.fn(), getOrgMetricUsage: vi.fn() },
 }));
 
 // Every queue the composable creates, so a test can spy on the grid's scheduler.
@@ -2013,6 +2013,106 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.familyOf("http_requests_total")).not.toBe(grid.familyOf("lat_seconds_bucket"));
       // A concrete window for the breakdown query, sized like the card's own.
       expect(grid.rateWindowFor(cardNamed(grid, "http_requests_total"))).toMatch(/^\d+[smh]/);
+    });
+  });
+
+  describe("usage sorts and filters", () => {
+    const USAGE = {
+      cpu_temperature: { dashboards: 1, alerts: 3, slos: 0, pipelines: 0 },
+      http_requests_total: { dashboards: 5, alerts: 0, slos: 1, pipelines: 0 },
+      idle_metric_total: { dashboards: 1, alerts: 1, slos: 0, pipelines: 0 },
+    };
+    const usageMock = () => (metricsService as any).getOrgMetricUsage as ReturnType<typeof vi.fn>;
+    const names = (grid: any) => grid.sortedCards.value.map((c: any) => c.name);
+    let orgSeq = 0;
+
+    beforeEach(() => {
+      // The usage cache lives for the session, so each test gets an org of its own.
+      storeState.selectedOrganization = { identifier: `usage-org-${++orgSeq}` };
+      usageMock()
+        .mockReset()
+        .mockResolvedValue({ data: { metrics: USAGE } });
+    });
+    afterEach(() => {
+      storeState.selectedOrganization = { identifier: "org1" };
+    });
+
+    it("fetches nothing until a usage sort is picked, then ranks by dashboards with A–Z ties", async () => {
+      const grid = await setup();
+      await flush();
+      expect(usageMock()).not.toHaveBeenCalled();
+
+      grid.sortBy.value = "dashboards";
+      await flush();
+      expect(usageMock()).toHaveBeenCalledTimes(1);
+      expect(usageMock().mock.calls[0][0]).toMatchObject({ org_identifier: `usage-org-${orgSeq}` });
+      expect(names(grid).slice(0, 3)).toEqual([
+        "http_requests_total",
+        "cpu_temperature",
+        "idle_metric_total",
+      ]);
+      expect(grid.usageLoading.value).toBe(false);
+    });
+
+    it("ranks by alerts", async () => {
+      const grid = await setup();
+      grid.sortBy.value = "alerts";
+      await flush();
+      expect(names(grid).slice(0, 2)).toEqual(["cpu_temperature", "idle_metric_total"]);
+    });
+
+    it("filters AND together, and fail open while the scan is in flight", async () => {
+      let resolve!: (v: any) => void;
+      usageMock().mockReturnValue(new Promise((r) => (resolve = r)));
+      const grid = await setup();
+      const all = names(grid);
+
+      grid.usageFilters.value = new Set(["dashboards"]);
+      await flush();
+      expect(grid.usageLoading.value).toBe(true);
+      expect(names(grid)).toEqual(all);
+
+      resolve({ data: { metrics: USAGE } });
+      await flush();
+      expect(grid.usageLoading.value).toBe(false);
+      expect(names(grid)).toEqual(["cpu_temperature", "http_requests_total", "idle_metric_total"]);
+
+      grid.usageFilters.value = new Set(["dashboards", "alerts"]);
+      expect(names(grid)).toEqual(["cpu_temperature", "idle_metric_total"]);
+      grid.usageFilters.value = new Set(["slos"]);
+      expect(names(grid)).toEqual(["http_requests_total"]);
+      expect(grid.activeFilterCount.value).toBe(1);
+
+      grid.clearFilters();
+      expect(grid.usageFilters.value.size).toBe(0);
+      expect(names(grid)).toEqual(all);
+    });
+
+    it("scans an org once per session, however many grids ask", async () => {
+      const first = await setup();
+      first.sortBy.value = "dashboards";
+      await flush();
+      const second = await setup();
+      second.usageFilters.value = new Set(["alerts"]);
+      await flush();
+      expect(usageMock()).toHaveBeenCalledTimes(1);
+      expect(names(second)).toEqual(["cpu_temperature", "idle_metric_total"]);
+    });
+
+    it("surfaces a failed scan, keeps the A–Z order, and retries without the failure cached", async () => {
+      usageMock().mockRejectedValueOnce(new Error("boom"));
+      const grid = await setup();
+      const all = names(grid);
+      grid.sortBy.value = "dashboards";
+      await flush();
+      expect(grid.usageError.value).toBe(true);
+      expect(grid.usageLoading.value).toBe(false);
+      expect(names(grid)).toEqual(all);
+
+      await grid.retryUsage();
+      expect(usageMock()).toHaveBeenCalledTimes(2);
+      expect(grid.usageError.value).toBe(false);
+      expect(names(grid)[0]).toBe("http_requests_total");
     });
   });
 });

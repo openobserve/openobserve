@@ -24,7 +24,7 @@ import { isEqual } from "lodash-es";
 import { generateTraceContext } from "@/utils/zincutils";
 import { parseSearchError, toSearchErrorObject } from "@/utils/query/searchError";
 import StreamService from "@/services/stream";
-import metricsService from "@/services/metrics";
+import metricsService, { type MetricUsageCounts } from "@/services/metrics";
 import {
   buildMetricCards,
   operandStreamsOf,
@@ -81,6 +81,14 @@ export const labelFilterKey = (filter: LabelFilter): string =>
   // in review, and some editors refuse to open it at all. Same runtime value,
   // plain-text source.
   `${filter.label}\u0000${filter.operator ?? "="}\u0000${filter.value}`;
+
+export type ExplorerSort = "a-z" | "z-a" | "dashboards" | "alerts";
+
+/** Narrows the grid to metrics that some object of this kind reads. */
+export type UsageFilter = "dashboards" | "alerts" | "slos";
+
+/** The org's usage counts, fetched at most once per org in a session: a full scan of the org. */
+const orgUsageCache = new Map<string, Promise<Record<string, MetricUsageCounts>>>();
 
 /** A query window other than the grid's own, in µs. */
 export interface QueryWindow {
@@ -309,7 +317,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const selectedSuffixes = ref<Set<string>>(new Set());
   const selectedTypes = ref<Set<string>>(new Set());
   const labelFilters = ref<LabelFilter[]>([]);
-  const sortBy = ref<"a-z" | "z-a">("a-z");
+  const sortBy = ref<ExplorerSort>("a-z");
+  const usageFilters = ref<Set<UsageFilter>>(new Set());
   const viewMode = ref<"grid" | "rows">("grid");
   /**
    * The rail is exactly three filter panels. `""` means every panel is closed —
@@ -674,6 +683,58 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     emptyRecheckedCards.value = next;
   };
 
+  /** `null` until the org's usage has loaded; only a usage sort or filter asks for it. */
+  const metricUsage = shallowRef<Record<string, MetricUsageCounts> | null>(null);
+  const usageLoading = ref(false);
+  const usageError = ref(false);
+  const needsUsage = computed(
+    () => sortBy.value === "dashboards" || sortBy.value === "alerts" || usageFilters.value.size > 0,
+  );
+
+  const loadUsage = async () => {
+    const orgId = org.value;
+    if (!orgId) return;
+    let request = orgUsageCache.get(orgId);
+    if (!request) {
+      request = metricsService
+        .getOrgMetricUsage({ org_identifier: orgId })
+        .then((res) => res.data?.metrics ?? {});
+      orgUsageCache.set(orgId, request);
+    }
+    usageLoading.value = true;
+    usageError.value = false;
+    try {
+      const usage = await request;
+      if (org.value === orgId) metricUsage.value = usage;
+    } catch {
+      // Not cached, so a retry scans again.
+      orgUsageCache.delete(orgId);
+      if (org.value === orgId) usageError.value = true;
+    } finally {
+      if (org.value === orgId) usageLoading.value = false;
+    }
+  };
+
+  watch(
+    [needsUsage, org],
+    ([needed], [, previousOrg]) => {
+      if (org.value !== previousOrg) {
+        metricUsage.value = null;
+        usageLoading.value = false;
+        usageError.value = false;
+      }
+      if (needed && !metricUsage.value) loadUsage();
+    },
+    { immediate: true },
+  );
+
+  /** Fails open until usage has loaded, so a pending or failed scan never empties the grid. */
+  const passesUsage = (card: MetricCard): boolean => {
+    if (!usageFilters.value.size || !metricUsage.value) return true;
+    const counts = metricUsage.value[card.name];
+    return !!counts && [...usageFilters.value].every((kind) => counts[kind] > 0);
+  };
+
   /** Everything except one facet — for that facet's "how many more" counts. */
   const passesExcept = (card: MetricCard, except: string): boolean => {
     if (except !== "search" && !matchesSearch(card.name, card.help, searchTerm.value)) return false;
@@ -704,6 +765,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     if (showFavoritesOnly.value && !favorites.value.includes(card.name)) return false;
     if (except !== "empty" && hideEmptyPanels.value && emptyMetrics.value.has(card.name))
       return false;
+    if (!passesUsage(card)) return false;
     return true;
   };
 
@@ -742,6 +804,12 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     const out = [...list];
     out.sort((a, b) => a.name.localeCompare(b.name));
     if (sortBy.value === "z-a") out.reverse();
+    const kind = sortBy.value;
+    if ((kind === "dashboards" || kind === "alerts") && metricUsage.value) {
+      const usage = metricUsage.value;
+      // Stable over the A–Z order above, so equally used metrics stay alphabetical.
+      out.sort((a, b) => (usage[b.name]?.[kind] ?? 0) - (usage[a.name]?.[kind] ?? 0));
+    }
     return out;
   };
 
@@ -904,6 +972,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       selectedTypes,
       labelFilters,
       sortBy,
+      usageFilters,
       showFavoritesOnly,
     ],
     () => {
@@ -918,6 +987,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     selectedSuffixes.value = new Set();
     selectedTypes.value = new Set();
     labelFilters.value = [];
+    usageFilters.value = new Set();
     // Otherwise unpinning your last favorite while this is on strands you on an
     // empty grid with no visible way out.
     showFavoritesOnly.value = false;
@@ -929,6 +999,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       selectedSuffixes.value.size +
       selectedTypes.value.size +
       labelFilters.value.length +
+      usageFilters.value.size +
       (searchTerm.value ? 1 : 0) +
       (showFavoritesOnly.value ? 1 : 0),
   );
@@ -2401,6 +2472,10 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     selectedTypes,
     labelFilters,
     sortBy,
+    usageFilters,
+    usageLoading,
+    usageError,
+    retryUsage: loadUsage,
     viewMode,
     activeRail,
     showFavoritesOnly,
