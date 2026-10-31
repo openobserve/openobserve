@@ -13812,4 +13812,13 @@ export class LogsPage {
         await this.expectSuggestWidgetVisible();
     }
 
+    /** Field-value row (label) in the expanded field list, matched by visible text. */
+    fieldValueRow(field, text) {
+        return this.page.locator(`label${this.fieldValueLabelPrefix(field)}`).filter({ hasText: text });
+    }
+
+    /** Checkbox inside the field-value row matched by text. */
+    fieldValueCheckbox(field, text) {
+        return this.fieldValueRow(field, text).locator('input[type="checkbox"], [role="checkbox"]').first();
+    }
 }

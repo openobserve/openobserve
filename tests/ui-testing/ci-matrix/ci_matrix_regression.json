@@ -12,7 +12,8 @@
       "logs-14376-int64-precision.spec.js",
       "logs-stream-selector.spec.js",
       "logs-table-stream-switch.spec.js",
-      "logs-internal-streams.spec.js"
+      "logs-internal-streams.spec.js",
+      "logs-11966-value-multiselect-quotes.spec.js"
     ],
     "disabled": []
   },

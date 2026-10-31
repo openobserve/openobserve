@@ -274,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { unescapeSqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { defineComponent, ref, type Ref, watch, computed, nextTick, onUnmounted } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -640,7 +641,7 @@ export default defineComponent({
             if (node.left?.type === "column_ref") {
               const colName = extractColName(node.left.column);
               if (colName && node.right?.value != null) {
-                const val = String(node.right.value);
+                const val = unescapeSqlLiteral(node.right.value);
                 if (!result[colName]) result[colName] = [];
                 if (!result[colName].includes(val)) result[colName].push(val);
               }
@@ -691,7 +692,7 @@ export default defineComponent({
             if (node.left?.type === "column_ref") {
               const colName = extractColName(node.left.column);
               if (colName && node.right?.value != null) {
-                const val = String(node.right.value);
+                const val = unescapeSqlLiteral(node.right.value);
                 if (!result[colName]) result[colName] = [];
                 if (!result[colName].includes(val)) result[colName].push(val);
               }
