@@ -17,9 +17,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
-import DependencyMap, { loopPath, type MapEdge, type MapNode } from "./DependencyMap.vue";
+import DependencyMap, { type MapEdge, type MapNode } from "./DependencyMap.vue";
+import { routeEdge } from "./dependencyMapGeometry";
 
-const fitView = vi.fn();
+const setViewport = vi.fn();
 
 // VueFlow measures the DOM, which jsdom cannot do, so this stand-in renders every node and edge through the
 // map's own slots and passes the rest through.
@@ -30,6 +31,7 @@ vi.mock("@vue-flow/core", () => ({
     emits: [
       "node-click",
       "edge-click",
+      "pane-click",
       "node-mouse-enter",
       "node-mouse-leave",
       "edge-mouse-enter",
@@ -52,9 +54,9 @@ vi.mock("@vue-flow/core", () => ({
   Handle: { name: "Handle", template: "<i />" },
   MarkerType: { ArrowClosed: "arrowclosed" },
   Position: { Left: "left", Right: "right" },
-  getBezierPath: () => ["M0 0", 0, 0],
   useVueFlow: () => ({
-    fitView,
+    setViewport,
+    dimensions: { value: { width: 1000, height: 600 } },
     zoomIn: vi.fn(),
     zoomOut: vi.fn(),
     areNodesInitialized: { value: true },
@@ -62,9 +64,9 @@ vi.mock("@vue-flow/core", () => ({
 }));
 vi.mock("@vue-flow/background", () => ({ Background: { template: "<i />" } }));
 
-const node = (id: string, x: number, clickable = true): MapNode => ({
+const node = (id: string, x: number, clickable = true, y = 0): MapNode => ({
   id,
-  position: { x, y: 0 },
+  position: { x, y },
   label: id,
   detail: raw("Deployment in shop"),
   title: id,
@@ -80,7 +82,12 @@ const edge = (source: string, target: string, total: number, directed = true): M
   target,
   directed,
   total,
+  waypoints: [],
 });
+
+// Ends stacked in one column, a card's slot apart, so each edge's label has room of its own.
+const stack = (count: number) =>
+  Array.from({ length: count }, (_, i) => node(`w${i}`, 0, true, i * 92));
 
 describe("DependencyMap", () => {
   let wrapper: VueWrapper<any>;
@@ -115,28 +122,55 @@ describe("DependencyMap", () => {
     ]);
   });
 
-  it("bows an edge within a column out to the right, with its label at the tip", () => {
-    const [path, x, y] = loopPath(100, 0, 100, 80);
-    // 40 plus a quarter of the 80 between the ends.
-    expect(path).toBe("M100,0 C160,0 160,80 100,80");
-    expect([x, y]).toEqual([145, 40]);
+  it("draws each edge along its route from the layout", () => {
     mountMap(
-      [node("a", 0), node("b", 0), node("c", 340)],
-      [edge("a", "b", 10), edge("a", "c", 10)],
+      [node("a", 0), node("b", 0, true, 200), node("c", 576)],
+      [edge("a", "b", 10), { ...edge("a", "c", 10), waypoints: [{ x: 288, y: 300 }] }],
     );
-    expect(baseEdge("a-b").props("path")).toBe(path);
-    expect(baseEdge("a-c").props("path")).toBe("M0 0");
+    expect(baseEdge("a-b").props("path")).toBe(
+      routeEdge({ x: 0, y: 0 }, { x: 0, y: 200 }, []).path,
+    );
+    expect(baseEdge("a-c").props("path")).toBe(
+      routeEdge({ x: 0, y: 0 }, { x: 576, y: 0 }, [{ x: 288, y: 300 }]).path,
+    );
   });
 
-  it("fits the whole map from the fit button, past the zoom the automatic fit stops at", async () => {
-    mountMap([node("a", 0)], []);
-    fitView.mockClear();
+  it("fits the whole map, and the edges routed past it, from the fit button", async () => {
+    mountMap(
+      [node("a", 0), node("b", 2000)],
+      [{ ...edge("a", "b", 10), waypoints: [{ x: 1000, y: 3000 }] }],
+    );
+    setViewport.mockClear();
     await wrapper.find('[data-test="dependency-map-fit"]').trigger("click");
-    expect(fitView).toHaveBeenCalledWith(expect.objectContaining({ minZoom: 0.1 }));
+    const [view] = setViewport.mock.calls[0];
+    // Tall enough for the waypoint far below the cards, so the zoom is set by height.
+    expect(view.zoom).toBeLessThan(600 / 3000);
+  });
+
+  it("lists the cards for Tab in reading order, column by column", () => {
+    mountMap([node("c", 340), node("b", 0, true, 92), node("a", 0)], []);
+    expect(
+      flow()
+        .props("nodes")
+        .map((n: any) => n.id),
+    ).toEqual(["a", "b", "c"]);
+  });
+
+  it("dismisses the selection from empty map space, and lights the selected edge", async () => {
+    mountMap(
+      [node("a", 0), node("b", 340, true, 92), node("c", 340)],
+      [edge("a", "b", 10), edge("a", "c", 10)],
+    );
+    await wrapper.setProps({ selectedEdgeId: "a-b" });
+    expect(baseEdge("a-b").props("style")).toMatchObject({ opacity: 1 });
+    expect(baseEdge("a-b").props("style").filter).toContain("drop-shadow");
+    expect(baseEdge("a-c").props("style").opacity).toBeLessThan(0.5);
+    await flow().vm.$emit("pane-click");
+    expect(wrapper.emitted("select")).toEqual([[null]]);
   });
 
   it("labels only the busiest edges with their rate", () => {
-    const ends = Array.from({ length: 10 }, (_, i) => node(`w${i}`, 0));
+    const ends = stack(10);
     mountMap(
       [...ends, node("api", 340)],
       ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))),
@@ -163,7 +197,7 @@ describe("DependencyMap", () => {
   });
 
   it("labels only a hovered hub's busiest edges", async () => {
-    const ends = Array.from({ length: 12 }, (_, i) => node(`w${i}`, 0));
+    const ends = stack(12);
     mountMap(
       [...ends, node("api", 340), node("db", 680)],
       [...ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))), edge("api", "db", 50_000)],
@@ -181,7 +215,7 @@ describe("DependencyMap", () => {
   });
 
   it("shows a hovered edge's rate even when it is not among the busiest", async () => {
-    const ends = Array.from({ length: 10 }, (_, i) => node(`w${i}`, 0));
+    const ends = stack(10);
     mountMap(
       [...ends, node("api", 340)],
       ends.map((n, i) => edge(n.id, "api", 1000 * (i + 1))),

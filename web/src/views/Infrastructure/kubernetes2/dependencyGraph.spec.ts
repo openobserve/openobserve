@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 import type { Series } from "./kubernetesModel";
 import {
+  CARD_H,
   MAX_GRAPH_EDGES,
   buildGraph,
   endOf,
@@ -23,6 +24,7 @@ import {
   flowQuery,
   flowWindowSeconds,
   layoutGraph,
+  namespaceColor,
   pairFlows,
   type FlowEdge,
   type FlowFilter,
@@ -294,13 +296,13 @@ describe("layoutGraph", () => {
     const graph = buildGraph(
       pairFlows([flow(WEB, API, "request", 10), flow(WEB, DB, "request", 10)]),
     );
-    const at = layoutGraph(graph);
-    expect(at.get(ids(WEB))).toEqual({ x: 0, y: 0 });
+    const at = layoutGraph(graph).positions;
+    expect(at.get(ids(WEB))).toEqual({ x: 0, y: -CARD_H / 2 });
     const api = at.get(ids(API))!;
     const db = at.get(ids(DB))!;
     expect(api.x).toBe(db.x);
     expect(api.x).toBeGreaterThan(0);
-    expect(api.y + db.y).toBe(0);
+    expect(api.y + db.y).toBe(-CARD_H);
     expect(api.y).toBeLessThan(db.y);
   });
 
@@ -312,7 +314,7 @@ describe("layoutGraph", () => {
         flow(API, NODE("n1"), "request", 10),
       ]),
     );
-    const at = layoutGraph(graph);
+    const at = layoutGraph(graph).positions;
     // The outside world calls web, yet it does not take the first column: web does.
     expect(at.get(ids(WEB))!.x).toBe(0);
     for (const id of ["prod/external", "prod/node/n1"]) {
@@ -329,7 +331,7 @@ describe("layoutGraph", () => {
         ].map(([from, to]) => flow(from, to, "request", 10)),
       ),
     );
-    const at = layoutGraph(graph);
+    const at = layoutGraph(graph).positions;
     const xs = ["prod/node/n1", "prod/node/n2", "prod/external"].map((id) => at.get(id)!.x);
     expect(xs[0]).toBe(0);
     expect(xs[1]).toBeGreaterThan(xs[0]);
@@ -344,18 +346,37 @@ describe("layoutGraph", () => {
         flow(WEB, EXTERNAL, "unknown", 10),
       ]),
     );
-    const at = layoutGraph(graph);
+    const at = layoutGraph(graph).positions;
     expect(at.get("prod/node/n1")!.x).toBe(at.get("prod/external")!.x);
   });
 
-  it("keeps ranked nodes right of every workload", () => {
+  it("keeps nodes in one column right of every workload when workloads are drawn", () => {
     const graph = buildGraph(
       pairFlows([flow(WEB, API, "request", 10), flow(NODE("n1"), NODE("n2"), "request", 10)]),
     );
-    const at = layoutGraph(graph);
+    const at = layoutGraph(graph).positions;
     const n1 = at.get("prod/node/n1")!.x;
     expect(n1).toBeGreaterThan(at.get(ids(API))!.x);
-    expect(at.get("prod/node/n2")!.x).toBeGreaterThan(n1);
+    expect(at.get("prod/node/n2")!.x).toBe(n1);
+  });
+
+  it("gives an edge that skips columns a slot in each column it passes, between the cards", () => {
+    // web -> api -> db, and web -> db skipping api's column.
+    const graph = buildGraph(
+      pairFlows([
+        flow(WEB, API, "request", 10),
+        flow(API, DB, "request", 10),
+        flow(WEB, DB, "request", 10),
+      ]),
+    );
+    const { positions, waypoints } = layoutGraph(graph);
+    const skip = graph.edges.find((e) => e.source.name === "web" && e.target.name === "postgres")!;
+    expect([...waypoints.keys()]).toEqual([skip.id]);
+    const [slot] = waypoints.get(skip.id)!;
+    const api = positions.get(ids(API))!;
+    expect(slot.x).toBe(api.x);
+    // Clear of api's card, above or below it.
+    expect(slot.y < api.y || slot.y > api.y + CARD_H).toBe(true);
   });
 
   it("puts an end that only calls just left of what it calls", () => {
@@ -366,7 +387,7 @@ describe("layoutGraph", () => {
         flow(W("batch", "pinger"), API, "request", 10),
       ]),
     );
-    const at = layoutGraph(graph);
+    const at = layoutGraph(graph).positions;
     expect(at.get(ids(W("batch", "pinger")))!.x).toBe(at.get(ids(WEB))!.x);
     expect(at.get(ids(W("shop", "loadgen")))!.x).toBe(0);
   });
@@ -385,7 +406,7 @@ describe("layoutGraph", () => {
     );
 
   it("orders a column by its neighbours so edges do not cross", () => {
-    const at = layoutGraph(crossed());
+    const at = layoutGraph(crossed()).positions;
     const y = (name: string) => at.get(`prod/shop/Deployment/${name}`)!.y;
     expect(y("a")).toBeLessThan(y("b"));
     expect(y("b")).toBeLessThan(y("c"));
@@ -394,8 +415,17 @@ describe("layoutGraph", () => {
   });
 
   it("lays out the same graph the same way every time", () => {
-    const first = layoutGraph(crossed());
-    expect(layoutGraph(crossed())).toEqual(first);
+    const first = layoutGraph(crossed()).positions;
+    expect(layoutGraph(crossed()).positions).toEqual(first);
     expect(new Set([...first.values()].map((p) => `${p.x},${p.y}`)).size).toBe(first.size);
+  });
+});
+
+describe("namespaceColor", () => {
+  it("gives a namespace one colour from its name alone", () => {
+    expect(namespaceColor("backend")).toBe(namespaceColor("backend"));
+    expect(namespaceColor("backend")).toMatch(/^var\(--color-chart-series-\d+\)$/);
+    const many = ["backend", "frontend", "data", "batch", "bulk"].map(namespaceColor);
+    expect(new Set(many).size).toBe(5);
   });
 });

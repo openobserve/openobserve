@@ -45,18 +45,8 @@ export interface MapEdge {
   target: string;
   directed: boolean;
   total: number;
-}
-
-// A bezier between two right-hand handles has no room to curve, so an edge within a column is drawn as a bow out
-// to the right, deeper the further apart its ends are, with its label at the bow's tip.
-export function loopPath(sx: number, sy: number, tx: number, ty: number): [string, number, number] {
-  const bow = 40 + 0.25 * Math.abs(ty - sy);
-  const tip = Math.max(sx, tx) + bow;
-  return [
-    `M${sx},${sy} C${tip},${sy} ${tip},${ty} ${tx},${ty}`,
-    (sx + tx) / 8 + 0.75 * tip,
-    (sy + ty) / 2,
-  ];
+  // Where the edge passes the columns between its ends, from the layout.
+  waypoints: { x: number; y: number }[];
 }
 
 export interface MapLegendItem {
@@ -73,7 +63,6 @@ import {
   MarkerType,
   Position,
   VueFlow,
-  getBezierPath,
   useVueFlow,
   type Edge,
   type EdgeProps,
@@ -87,7 +76,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { formatRate } from "./dependencyGraph";
+import { CARD_H, CARD_W, formatRate } from "./dependencyGraph";
+import { fitTransform, placeLabels, routeEdge } from "./dependencyMapGeometry";
 
 const props = defineProps<{
   nodes: MapNode[];
@@ -99,21 +89,33 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   open: [id: string];
-  select: [id: string];
+  // null when the selection is dismissed on the map.
+  select: [id: string | null];
 }>();
 
 const { t } = useI18nTyped();
-const { fitView, zoomIn, zoomOut, areNodesInitialized } = useVueFlow();
+const { setViewport, dimensions, zoomIn, zoomOut, areNodesInitialized } = useVueFlow();
 
 // Rate labels only on the busiest edges, so the rest of the map stays readable.
 const LABELLED = 8;
 
-// Never below a zoom where the cards stay readable; a wider map is then panned. The fit button shows all of it.
-const FIT = { padding: 0.04, minZoom: 0.65, maxZoom: 1 };
-const FIT_ALL = { ...FIT, minZoom: 0.1, duration: 150 };
+// The whole map, cards and the edges routed past them, never zoomed in past its natural size. fitView only
+// knows the cards, and stops zooming out at 0.5.
+function fit(duration = 0) {
+  const points = [
+    ...props.nodes.flatMap((n) => [
+      n.position,
+      { x: n.position.x + CARD_W, y: n.position.y + CARD_H },
+    ]),
+    ...props.edges.flatMap((e) => e.waypoints),
+    // A bow's tip, where its label sits, can reach past the right-most column.
+    ...flowEdges.value.flatMap((e) => e.data.route.spots),
+  ];
+  const { width, height } = dimensions.value;
+  setViewport(fitTransform(points, width, height), { duration });
+}
 
-// Both sides take edges either way: an edge leaves the side facing its target, and one within a
-// column loops out to the right.
+// Vue Flow places an edge only between handles, though each edge draws its own route from the layout.
 const HANDLES = [
   { id: "tl", type: "target", position: Position.Left },
   { id: "sl", type: "source", position: Position.Left },
@@ -123,10 +125,15 @@ const HANDLES = [
 
 const LABEL_STYLE = {
   fill: "var(--color-text-secondary)",
-  fontSize: "0.6875rem",
+  fontSize: "0.625rem",
   fontWeight: 500,
 };
-const LABEL_BG_STYLE = { fill: "var(--color-surface-base)" };
+// A pill, so a label reads over the edges it sits on.
+const LABEL_BG_STYLE = {
+  fill: "var(--color-surface-base)",
+  stroke: "var(--color-border-default)",
+  strokeWidth: 1,
+};
 
 const hovered = ref<string | null>(null);
 const hoveredEdge = ref<string | null>(null);
@@ -175,22 +182,26 @@ function summaryOf(node: MapNode) {
   return t("infra.k8s2.depsEndSummary", { count, rate: formatRate(node.total) }, count);
 }
 
+// In reading order, column by column, so Tab moves through the cards as they are laid out.
 const flowNodes = computed<Node<MapNode>[]>(() =>
-  props.nodes.map((n) => ({
-    id: n.id,
-    type: "end",
-    position: n.position,
-    data: n,
-    // The card itself takes focus, as a button where it opens something.
-    focusable: false,
-  })),
+  [...props.nodes]
+    .sort((a, b) => a.position.x - b.position.x || a.position.y - b.position.y)
+    .map((n) => ({
+      id: n.id,
+      type: "end",
+      position: n.position,
+      data: n,
+      // The card itself takes focus, as a button where it opens something.
+      focusable: false,
+    })),
 );
 
 const flowEdges = computed<Edge[]>(() => {
   const max = Math.max(1, ...drawn.value.map((e) => e.total));
   return drawn.value.map((e) => {
     const from = byId.value.get(e.source)!;
-    const dx = byId.value.get(e.target)!.position.x - from.position.x;
+    const to = byId.value.get(e.target)!;
+    const dx = to.position.x - from.position.x;
     const [sourceHandle, targetHandle] =
       dx > 0 ? ["sr", "tl"] : dx < 0 ? ["sl", "tr"] : ["sr", "tr"];
     const width = 1.5 + 6 * Math.sqrt(e.total / max);
@@ -217,7 +228,7 @@ const flowEdges = computed<Edge[]>(() => {
         width,
         directed: e.directed,
         rate: formatRate(e.total),
-        loop: dx === 0,
+        route: routeEdge(from.position, to.position, e.waypoints),
       },
     };
   });
@@ -230,35 +241,47 @@ const dimmed = (id: string) =>
   hovered.value != null && hovered.value !== id && !neighbours.value.get(hovered.value)?.has(id);
 
 function strokeOf(edge: EdgeProps) {
+  const selected = edge.id === props.selectedEdgeId;
   const lit =
-    edge.id === props.selectedEdgeId ||
-    edge.id === hoveredEdge.value ||
-    (hovered.value && touches(edge, hovered.value));
-  const faded = hovered.value && !touches(edge, hovered.value);
+    selected || edge.id === hoveredEdge.value || (hovered.value && touches(edge, hovered.value));
+  // A hovered card outranks the selection; with neither, every edge reads at rest.
+  const faded = hovered.value
+    ? !touches(edge, hovered.value)
+    : props.selectedEdgeId != null && !selected && edge.id !== hoveredEdge.value;
   return {
     stroke: edge.data.color,
-    strokeWidth: edge.data.width + (edge.id === props.selectedEdgeId ? 1.5 : 0),
+    strokeWidth: edge.data.width + (selected ? 1.5 : 0),
     strokeDasharray: edge.data.directed ? undefined : "6 4",
-    opacity: faded ? 0.08 : lit ? 1 : 0.6,
+    opacity: faded ? (hovered.value ? 0.08 : 0.2) : lit ? 1 : 0.6,
+    filter: selected ? `drop-shadow(0 0 0.25rem ${edge.data.color})` : undefined,
     transition: "opacity 0.15s ease",
   };
 }
 
-// A hovered edge always shows its rate.
-const labelOf = (edge: EdgeProps) =>
-  edge.id === hoveredEdge.value || labelled.value.has(edge.id) ? edge.data.rate : undefined;
-
-const pathOf = (edge: EdgeProps): [string, number, number] =>
-  edge.data.loop
-    ? loopPath(edge.sourceX, edge.sourceY, edge.targetX, edge.targetY)
-    : (getBezierPath(edge).slice(0, 3) as [string, number, number]);
+// Busiest first, each label where it clears the cards and the labels already placed; a hovered edge's always shows.
+const labelAt = computed(() => {
+  const routes = new Map(flowEdges.value.map((e) => [e.id, e.data]));
+  const wanted = drawn.value
+    .filter((e) => labelled.value.has(e.id) || e.id === hoveredEdge.value)
+    .sort((a, b) => b.total - a.total)
+    .map((e) => ({
+      id: e.id,
+      text: routes.get(e.id)!.rate,
+      spots: routes.get(e.id)!.route.spots,
+      forced: e.id === hoveredEdge.value,
+    }));
+  return placeLabels(
+    wanted,
+    props.nodes.map((n) => n.position),
+  );
+});
 
 // Fit when the drawn ends or their places change, not on a refresh that redraws the same map.
 let fitPending = true;
 function fitIfPending() {
   if (!fitPending) return;
   fitPending = false;
-  fitView(FIT);
+  fit();
 }
 watch(
   () => props.nodes.map((n) => `${n.id}@${n.position.x},${n.position.y}`).join("\n"),
@@ -285,138 +308,142 @@ function onKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div
-    class="dependency-map bg-surface-panel border-border-default rounded-default relative h-full w-full overflow-hidden border"
-    role="group"
-    :aria-label="label"
-    data-test="dependency-map"
-    @keydown="onKeydown"
-    @focusin="hovered = endAt($event.target)?.id ?? null"
-    @focusout="hovered = null"
-  >
-    <VueFlow
-      :nodes="flowNodes"
-      :edges="flowEdges"
-      :nodes-draggable="false"
-      :nodes-connectable="false"
-      :elements-selectable="false"
-      :edges-focusable="false"
-      :disable-keyboard-a11y="true"
-      :min-zoom="0.1"
-      :max-zoom="2"
-      @nodes-initialized="fitIfPending"
-      @node-click="({ node }) => node.data.clickable && emit('open', node.id)"
-      @edge-click="({ edge }) => emit('select', edge.id)"
-      @node-mouse-enter="({ node }) => (hovered = node.id)"
-      @node-mouse-leave="hovered = null"
-      @edge-mouse-enter="({ edge }) => (hoveredEdge = edge.id)"
-      @edge-mouse-leave="hoveredEdge = null"
-    >
-      <Background :size="2" :gap="22" />
-
-      <template #node-end="{ id, data }">
-        <div
-          class="bg-surface-base border-border-default rounded-default focus-visible:ring-accent/40 relative flex w-56 items-center gap-2.5 overflow-hidden border py-2 ps-3.5 pe-3 shadow-sm transition-[opacity,box-shadow,border-color] duration-150"
-          :class="[
-            data.clickable
-              ? 'hover:border-border-strong cursor-pointer hover:shadow-md focus-visible:ring-2 focus-visible:outline-none'
-              : '',
-            dimmed(id) ? 'opacity-30' : '',
-          ]"
-          :title="data.title"
-          :role="data.clickable ? 'button' : undefined"
-          :tabindex="data.clickable ? 0 : undefined"
-          :aria-label="data.clickable ? openLabel(data) : undefined"
-          data-test="dependency-map-node"
-        >
-          <span
-            class="absolute inset-y-0 start-0 w-1"
-            :style="{ backgroundColor: data.color }"
-            aria-hidden="true"
-          />
-          <OIcon :name="data.icon" size="md" class="text-text-secondary shrink-0" />
-          <div class="min-w-0 flex-1 leading-tight">
-            <div class="text-text-heading truncate text-sm font-semibold">
-              {{ raw(data.label) }}
-            </div>
-            <div class="text-text-secondary truncate text-xs">{{ data.detail }}</div>
-            <div class="text-text-secondary truncate text-xs tabular-nums">
-              {{ summaryOf(data) }}
-            </div>
-          </div>
-          <Handle
-            v-for="h in HANDLES"
-            :id="h.id"
-            :key="h.id"
-            :type="h.type"
-            :position="h.position"
-            :connectable="false"
-            class="invisible"
-          />
-        </div>
-      </template>
-
-      <template #edge-flow="edge">
-        <BaseEdge
-          :id="edge.id"
-          :path="pathOf(edge)[0]"
-          :marker-end="edge.markerEnd"
-          :style="strokeOf(edge)"
-          :label="labelOf(edge)"
-          :label-x="pathOf(edge)[1]"
-          :label-y="pathOf(edge)[2]"
-          :label-style="LABEL_STYLE"
-          :label-show-bg="true"
-          :label-bg-style="LABEL_BG_STYLE"
-          :label-bg-padding="[4, 2]"
-          :label-bg-border-radius="4"
-        />
-      </template>
-    </VueFlow>
+  <div class="flex h-full w-full min-w-0 flex-col gap-2">
     <div
-      class="rounded-default border-border-default bg-surface-panel absolute end-3 bottom-3 z-10 flex flex-col overflow-hidden border"
-      data-test="dependency-map-zoom"
+      class="dependency-map bg-surface-panel border-border-default rounded-default relative min-h-0 w-full flex-1 overflow-hidden border"
+      role="group"
+      :aria-label="label"
+      data-test="dependency-map"
+      @keydown="onKeydown"
+      @focusin="hovered = endAt($event.target)?.id ?? null"
+      @focusout="hovered = null"
     >
-      <OButton
-        variant="ghost"
-        size="icon-sm"
-        icon-left="add"
-        class="rounded-none"
-        :aria-label="t('fleet.flow.zoomIn')"
-        data-test="dependency-map-zoom-in"
-        @click="zoomIn({ duration: 150 })"
+      <VueFlow
+        :nodes="flowNodes"
+        :edges="flowEdges"
+        :nodes-draggable="false"
+        :nodes-connectable="false"
+        :elements-selectable="false"
+        :edges-focusable="false"
+        :disable-keyboard-a11y="true"
+        :min-zoom="0.1"
+        :max-zoom="2"
+        @nodes-initialized="fitIfPending"
+        @node-click="({ node }) => node.data.clickable && emit('open', node.id)"
+        @edge-click="({ edge }) => emit('select', edge.id)"
+        @pane-click="emit('select', null)"
+        @node-mouse-enter="({ node }) => (hovered = node.id)"
+        @node-mouse-leave="hovered = null"
+        @edge-mouse-enter="({ edge }) => (hoveredEdge = edge.id)"
+        @edge-mouse-leave="hoveredEdge = null"
       >
-        <OTooltip side="left" :content="t('fleet.flow.zoomIn')" />
-      </OButton>
-      <OSeparator />
-      <OButton
-        variant="ghost"
-        size="icon-sm"
-        icon-left="remove"
-        class="rounded-none"
-        :aria-label="t('fleet.flow.zoomOut')"
-        data-test="dependency-map-zoom-out"
-        @click="zoomOut({ duration: 150 })"
+        <Background :size="2" :gap="22" />
+
+        <template #node-end="{ id, data }">
+          <div
+            class="bg-surface-base border-border-default rounded-default focus-visible:ring-accent/40 relative flex h-19 w-54 items-center gap-2 overflow-hidden border py-2 ps-3 pe-2 shadow-sm transition-[opacity,box-shadow,border-color] duration-150"
+            :class="[
+              data.clickable
+                ? 'hover:border-border-strong cursor-pointer hover:shadow-md focus-visible:ring-2 focus-visible:outline-none'
+                : '',
+              dimmed(id) ? 'opacity-30' : '',
+            ]"
+            :title="data.title"
+            :role="data.clickable ? 'button' : undefined"
+            :tabindex="data.clickable ? 0 : undefined"
+            :aria-label="data.clickable ? openLabel(data) : undefined"
+            data-test="dependency-map-node"
+          >
+            <span
+              class="absolute inset-y-0 start-0 w-1"
+              :style="{ backgroundColor: data.color }"
+              aria-hidden="true"
+            />
+            <OIcon :name="data.icon" size="sm" class="text-text-secondary shrink-0" />
+            <div class="min-w-0 flex-1 leading-tight">
+              <div class="text-text-heading truncate text-base font-semibold">
+                {{ raw(data.label) }}
+              </div>
+              <div class="text-text-secondary truncate text-[0.9375rem]">{{ data.detail }}</div>
+              <div class="text-text-secondary truncate text-[0.9375rem] tabular-nums">
+                {{ summaryOf(data) }}
+              </div>
+            </div>
+            <Handle
+              v-for="h in HANDLES"
+              :id="h.id"
+              :key="h.id"
+              :type="h.type"
+              :position="h.position"
+              :connectable="false"
+              class="invisible"
+            />
+          </div>
+        </template>
+
+        <template #edge-flow="edge">
+          <BaseEdge
+            :id="edge.id"
+            :path="edge.data.route.path"
+            :marker-end="edge.markerEnd"
+            :style="strokeOf(edge)"
+            :label="labelAt.has(edge.id) ? edge.data.rate : undefined"
+            :label-x="labelAt.get(edge.id)?.x"
+            :label-y="labelAt.get(edge.id)?.y"
+            :label-style="LABEL_STYLE"
+            :label-show-bg="true"
+            :label-bg-style="LABEL_BG_STYLE"
+            :label-bg-padding="[5, 3]"
+            :label-bg-border-radius="8"
+          />
+        </template>
+      </VueFlow>
+      <div
+        class="rounded-default border-border-default bg-surface-panel absolute end-3 bottom-3 z-10 flex flex-col overflow-hidden border"
+        data-test="dependency-map-zoom"
       >
-        <OTooltip side="left" :content="t('fleet.flow.zoomOut')" />
-      </OButton>
-      <OSeparator />
-      <OButton
-        variant="ghost"
-        size="icon-sm"
-        icon-left="fullscreen"
-        class="rounded-none"
-        :aria-label="t('fleet.flow.fitView')"
-        data-test="dependency-map-fit"
-        @click="fitView(FIT_ALL)"
-      >
-        <OTooltip side="left" :content="t('fleet.flow.fitView')" />
-      </OButton>
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="add"
+          class="rounded-none"
+          :aria-label="t('fleet.flow.zoomIn')"
+          data-test="dependency-map-zoom-in"
+          @click="zoomIn({ duration: 150 })"
+        >
+          <OTooltip side="left" :content="t('fleet.flow.zoomIn')" />
+        </OButton>
+        <OSeparator />
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="remove"
+          class="rounded-none"
+          :aria-label="t('fleet.flow.zoomOut')"
+          data-test="dependency-map-zoom-out"
+          @click="zoomOut({ duration: 150 })"
+        >
+          <OTooltip side="left" :content="t('fleet.flow.zoomOut')" />
+        </OButton>
+        <OSeparator />
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="fullscreen"
+          class="rounded-none"
+          :aria-label="t('fleet.flow.fitView')"
+          data-test="dependency-map-fit"
+          @click="fit(150)"
+        >
+          <OTooltip side="left" :content="t('fleet.flow.fitView')" />
+        </OButton>
+      </div>
     </div>
-    <!-- Informational only: it names the stripe colours and filters nothing. -->
+    <!-- Informational only: it names the stripe colours and filters nothing. Below the canvas, so it never
+         covers a card. -->
     <ul
       v-if="legend?.length"
-      class="bg-surface-overlay rounded-default border-border-default pointer-events-none absolute start-3 bottom-3 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-x-3 gap-y-1 border px-2.5 py-1.5"
+      class="flex flex-wrap gap-x-3 gap-y-1"
       data-test="dependency-map-legend"
     >
       <li

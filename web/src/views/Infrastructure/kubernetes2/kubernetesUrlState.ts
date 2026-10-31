@@ -47,6 +47,9 @@ export interface K8sUrlState {
   fill: MapFill;
   group: MapGroup;
   filter: string[];
+  // Dependencies: draw system namespaces, and node-to-node traffic.
+  system: boolean;
+  nodeTraffic: boolean;
   details: DetailsRef | null;
 }
 
@@ -65,6 +68,8 @@ const PAGE_PARAMS = [
   "fill",
   "group",
   "filter",
+  "system",
+  "nodeTraffic",
   "details",
   "kind",
   "name",
@@ -165,6 +170,8 @@ export const parseUrlState = (query: Query): K8sUrlState => {
       fillParam && ENTITY_FILLS[entity].includes(fillParam) ? fillParam : ENTITY_FILLS[entity][0],
     group: parseGroup(entity, first(query.group)),
     filter: parseFilter(first(query.filter)),
+    system: view === "dependencies" && first(query.system) === "true",
+    nodeTraffic: view === "dependencies" && first(query.nodeTraffic) === "true",
     details,
   };
 };
@@ -192,6 +199,10 @@ export const toQuery = (state: K8sUrlState, base: Query): LocationQueryRaw => {
     if (state.group !== DEFAULT_GROUP[state.entity]) out.group = state.group;
     if (state.filter.length) out.filter = state.filter.join(",");
   }
+  if (state.view === "dependencies") {
+    if (state.system) out.system = "true";
+    if (state.nodeTraffic) out.nodeTraffic = "true";
+  }
   if (state.details) out.details = encodeDetails(state.details);
   return out;
 };
@@ -213,6 +224,8 @@ export const withView = (state: K8sUrlState, view: View): K8sUrlState => ({
   fill: ENTITY_FILLS.pods[0],
   group: DEFAULT_GROUP.pods,
   filter: [],
+  system: false,
+  nodeTraffic: false,
   details: null,
 });
 

@@ -43,6 +43,7 @@ import {
   flowWindowSeconds,
   formatRate,
   layoutGraph,
+  namespaceColor,
   pairFlows,
   type FlowEdge,
   type FlowEnd,
@@ -75,8 +76,6 @@ const loadError = ref(false);
 const forbidden = ref(false);
 const loaded = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
-const showSystem = ref(false);
-const showNodeTraffic = ref(false);
 const selectedEdgeId = ref<string | null>(null);
 
 const hasFlows = computed(() => props.hasStream(FLOW_STREAM));
@@ -152,16 +151,9 @@ const scope = computed(() => ({
 const edges = computed(() =>
   filterFlows(allEdges.value, {
     ...scope.value,
-    showSystem: showSystem.value,
-    showNodeTraffic: showNodeTraffic.value,
+    showSystem: props.state.system,
+    showNodeTraffic: props.state.nodeTraffic,
   }),
-);
-
-// The header reads as filtered when the switches, not only the namespace filter or search, hide edges.
-const switchesHide = computed(
-  () =>
-    filterFlows(allEdges.value, { ...scope.value, showSystem: true, showNodeTraffic: true })
-      .length > edges.value.length,
 );
 
 const graph = computed(() => buildGraph(edges.value));
@@ -231,20 +223,11 @@ const split = (edge: FlowEdge) =>
     unknown: pct(edge.unknown, edge.total),
   });
 
-// One chart colour per namespace; nodes and the outside world are neutral and told apart by their icons.
+// A chart colour per namespace; nodes and the outside world are neutral and told apart by their icons.
 const NEUTRAL = "var(--color-grey-500)";
 
-const namespaceColors = computed(() => {
-  const names = [
-    ...new Set(
-      graph.value.nodes.filter((n) => n.end.kind === "workload").map((n) => n.end.namespace),
-    ),
-  ].sort((a, b) => a.localeCompare(b));
-  return new Map(names.map((name, i) => [name, `var(--color-chart-series-${(i % 12) + 1})`]));
-});
-
 const colorOf = (end: FlowEnd) =>
-  end.kind === "workload" ? (namespaceColors.value.get(end.namespace) ?? NEUTRAL) : NEUTRAL;
+  end.kind === "workload" ? namespaceColor(end.namespace) : NEUTRAL;
 
 // A workload by its owner's kind, as the resource tree shows it.
 function iconOf(end: FlowEnd): IconName {
@@ -253,8 +236,10 @@ function iconOf(end: FlowEnd): IconName {
   return (VIEW_ICON as Record<string, IconName>)[`${end.ownerType.toLowerCase()}s`] ?? "widgets";
 }
 
+const layout = computed(() => layoutGraph(graph.value));
+
 const mapNodes = computed<MapNode[]>(() => {
-  const positions = layoutGraph(graph.value);
+  const { positions } = layout.value;
   return graph.value.nodes.map(({ end, total }) => ({
     id: end.id,
     position: positions.get(end.id)!,
@@ -275,11 +260,18 @@ const mapEdges = computed<MapEdge[]>(() =>
     target: e.target.id,
     directed: e.directed,
     total: e.total,
+    waypoints: layout.value.waypoints.get(e.id) ?? [],
   })),
 );
 
 const legend = computed(() =>
-  [...namespaceColors.value].map(([label, color]) => ({ label, color })),
+  [
+    ...new Set(
+      graph.value.nodes.filter((n) => n.end.kind === "workload").map((n) => n.end.namespace),
+    ),
+  ]
+    .sort((a, b) => a.localeCompare(b))
+    .map((label) => ({ label, color: namespaceColor(label) })),
 );
 
 const ariaLabel = computed(() =>
@@ -327,8 +319,9 @@ function showEdge(id: string, event: Event) {
   nextTick(() => edgePanel.value?.focus());
 }
 
-// Picked on the map, so a later close has no list button to return to.
-function selectEdge(id: string) {
+// Picked on the map, so a later close has no list button to return to; empty map space dismisses it.
+function selectEdge(id: string | null) {
+  if (id == null) return closeEdge();
   openedFrom = null;
   selectedEdgeId.value = id;
 }
@@ -349,10 +342,8 @@ function onSetUp() {
   router.push({ name: "ingestFromKubernetes", query: { org_identifier: props.orgId } });
 }
 
-// The switches filter too, so clearing filters turns them on.
-function showEverything() {
-  showSystem.value = true;
-  showNodeTraffic.value = true;
+// Only the namespace filter and search; the switches keep what they show.
+function clearFilters() {
   emit("update", { namespaces: [], search: "" });
 }
 </script>
@@ -361,13 +352,13 @@ function showEverything() {
   <div
     class="flex h-full min-h-0 flex-col gap-2 p-3 max-md:overflow-y-auto"
     data-test="k8s2-deps-view"
+    @keydown.esc="closeEdge"
   >
     <K8sListHeader
       :title="t('infra.k8s2.depsTitle')"
       :count="graph.edges.length"
       :total="allEdges.length"
       :count-label="t('infra.k8s2.depsCount', { count: graph.edges.length }, graph.edges.length)"
-      :filtered="switchesHide"
       namespaced
       :namespace-options="namespaceChoices"
       :namespaces="state.namespaces"
@@ -375,7 +366,7 @@ function showEverything() {
       :search-placeholder="t('infra.k8s2.depsSearch')"
       @update:namespaces="(namespaces: string[]) => emit('update', { namespaces })"
       @update:search="(search: string) => emit('update', { search })"
-      @clear="showEverything"
+      @clear="clearFilters"
     >
       <template #trailing>
         <ORefreshButton
@@ -388,16 +379,20 @@ function showEverything() {
     </K8sListHeader>
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1" data-test="k8s2-deps-controls">
       <OSwitch
-        v-model="showSystem"
+        :model-value="state.system"
         size="sm"
         :label="t('infra.k8s2.depsShowSystem')"
         data-test="k8s2-deps-show-system"
+        @update:model-value="(system: unknown) => emit('update', { system: !!system })"
       />
       <OSwitch
-        v-model="showNodeTraffic"
+        :model-value="state.nodeTraffic"
         size="sm"
         :label="t('infra.k8s2.depsShowNodeTraffic')"
         data-test="k8s2-deps-show-node-traffic"
+        @update:model-value="
+          (nodeTraffic: unknown) => emit('update', { nodeTraffic: !!nodeTraffic })
+        "
       />
       <div class="flex items-center gap-1">
         <OText tag="span" class="text-text-secondary text-xs" data-test="k8s2-deps-caption">
@@ -452,7 +447,7 @@ function showEverything() {
       filtered
       :title="t('infra.k8s2.depsNoMatch')"
       data-test="k8s2-deps-empty"
-      @action="showEverything"
+      @action="clearFilters"
     />
     <template v-else>
       <OText

@@ -329,30 +329,45 @@ export interface Position {
   y: number;
 }
 
-// Sized to the map's cards: a card's width plus room for an edge's rate label, and a card's height plus a gap.
-const COLUMN_GAP = 290;
-const ROW_GAP = 84;
+// The map's card size; DependencyMap.vue draws its cards at exactly this size, so edges can be routed around them.
+export const CARD_W = 216;
+export const CARD_H = 76;
+// A column is a card wide plus a gap that fits an edge's rate label.
+const COLUMN_GAP = 288;
+// A card's slot is its height plus a gap; an edge passing through a column takes a thin slot of its own.
+const NODE_SLOT = CARD_H + 16;
+const PASS_SLOT = 20;
 
 // Alternating left-to-right and right-to-left passes; a few settle a graph of this size.
 const SWEEPS = 6;
 
 interface Link {
+  id: string;
   source: { id: string };
   target: { id: string };
   directed: boolean;
 }
 
+export interface Layout {
+  // Each card's top-left corner.
+  positions: Map<string, Position>;
+  // Per edge that skips columns, where it passes each column between its ends, in column order: the slot's left
+  // edge and its middle, so the edge runs straight across the column between the cards.
+  waypoints: Map<string, Position[]>;
+}
+
 // Columns by rank, each starting in `compare` order. An end that only calls sits just left of the nearest end it
-// calls, so its edges do not run behind the columns in between. The `aside` ends get columns of their own past the
-// rest, ranked only by the calls between them, so catch-all ends many workloads talk to do not land among the callers. Each column is then reordered a few
-// times by the mean position of its neighbours in the columns already placed, keeping the order with the fewest
-// crossings.
+// calls, so its edges do not run behind the columns in between. The `aside` ends get a column of their own past the
+// rest, so catch-all ends many workloads talk to do not land among the callers; a map of only aside ends is ranked
+// by the calls between them instead. An edge that skips columns takes a slot in each column it passes, and each
+// column is reordered a few times by the mean position of its neighbours and slots in the columns already placed,
+// keeping the order with the fewest crossings.
 export function layoutColumns<E extends { id: string }>(
   nodes: { end: E; rank: number }[],
   compare: (x: E, y: E) => number,
   edges: Link[],
   aside: (end: E) => boolean,
-): Map<string, Position> {
+): Layout {
   const rank = new Map(nodes.map((n) => [n.end.id, n.rank]));
   const isAside = new Set(nodes.filter((n) => aside(n.end)).map((n) => n.end.id));
   const called = new Set(edges.filter((e) => e.directed).map((e) => e.target.id));
@@ -362,38 +377,66 @@ export function layoutColumns<E extends { id: string }>(
       continue;
     nearest.set(source.id, Math.min(nearest.get(source.id) ?? Infinity, rank.get(target.id)! - 1));
   }
-  const last = Math.max(-1, ...nodes.filter((n) => !isAside.has(n.end.id)).map((n) => n.rank)) + 1;
-  // Only an aside caller pushes an aside end right, so ends the main columns call share the first aside column.
-  const asideRank = rankOf(
-    edges.filter((e) => isAside.has(e.source.id) && isAside.has(e.target.id)),
-  );
+  const main = nodes.filter((n) => !isAside.has(n.end.id));
+  const last = Math.max(-1, ...main.map((n) => n.rank)) + 1;
+  const asideRank = main.length
+    ? new Map<string, number>()
+    : rankOf(edges.filter((e) => isAside.has(e.source.id) && isAside.has(e.target.id)));
   const rankOfNode = (n: { end: E; rank: number }) =>
     isAside.has(n.end.id)
       ? last + (asideRank.get(n.end.id) ?? 0)
       : (nearest.get(n.end.id) ?? n.rank);
   // Renumbered, so a rank emptied by moving its ends aside leaves no gap.
   const used = [...new Set(nodes.map(rankOfNode))].sort((a, b) => a - b);
-  let order: E[][] = used.map(() => []);
-  for (const n of nodes) order[used.indexOf(rankOfNode(n))].push(n.end);
-  for (const column of order) column.sort(compare);
-
   const columnOf = new Map<string, number>();
-  order.forEach((column, i) => column.forEach((end) => columnOf.set(end.id, i)));
+  for (const n of nodes) columnOf.set(n.end.id, used.indexOf(rankOfNode(n)));
+  const columnEnds: E[][] = used.map(() => []);
+  for (const n of nodes) columnEnds[columnOf.get(n.end.id)!].push(n.end);
+  for (const column of columnEnds) column.sort(compare);
+  let order: string[][] = columnEnds.map((column) => column.map((end) => end.id));
+
+  // Each edge becomes segments between adjacent columns, through one pass slot per column it skips.
+  const passes = new Map<string, string[]>();
+  const segments: [string, string][] = [];
+  for (const e of edges) {
+    const [a, b] = [columnOf.get(e.source.id), columnOf.get(e.target.id)];
+    if (a == null || b == null || a === b) continue;
+    const [from, to] = a < b ? [e.source.id, e.target.id] : [e.target.id, e.source.id];
+    const [lo, hi] = [Math.min(a, b), Math.max(a, b)];
+    const chain = [from];
+    const slots: string[] = [];
+    for (let c = lo + 1; c < hi; c++) {
+      const slot = `${e.id}\u0000${c}`;
+      columnOf.set(slot, c);
+      order[c].push(slot);
+      slots.push(slot);
+      chain.push(slot);
+    }
+    chain.push(to);
+    if (slots.length) passes.set(e.id, slots);
+    for (let i = 1; i < chain.length; i++) segments.push([chain[i - 1], chain[i]]);
+  }
+  const isPass = (id: string) => id.includes("\u0000");
   const neighbours = new Map<string, string[]>();
-  const links = edges.filter((e) => columnOf.has(e.source.id) && columnOf.has(e.target.id));
-  for (const { source, target } of links) {
-    neighbours.set(source.id, [...(neighbours.get(source.id) ?? []), target.id]);
-    neighbours.set(target.id, [...(neighbours.get(target.id) ?? []), source.id]);
+  for (const [a, b] of segments) {
+    neighbours.set(a, [...(neighbours.get(a) ?? []), b]);
+    neighbours.set(b, [...(neighbours.get(b) ?? []), a]);
   }
 
-  // Centred row of each end, so columns of different heights line up on their middles.
-  const rows = new Map<string, number>();
-  const place = (column: E[]) =>
-    column.forEach((end, i) => rows.set(end.id, i - (column.length - 1) / 2));
+  // Middle of each slot, so columns of different heights line up on their middles.
+  const middles = new Map<string, number>();
+  const place = (column: string[]) => {
+    const heights = column.map((id) => (isPass(id) ? PASS_SLOT : NODE_SLOT));
+    let y = -heights.reduce((a, b) => a + b, 0) / 2;
+    column.forEach((id, i) => {
+      middles.set(id, y + heights[i] / 2);
+      y += heights[i];
+    });
+  };
   order.forEach(place);
 
   let best = order;
-  let fewest = crossings(links, columnOf, rows);
+  let fewest = crossings(segments, columnOf, middles);
   for (let sweep = 0; sweep < SWEEPS; sweep++) {
     const forward = sweep % 2 === 0;
     const next = [...order];
@@ -401,53 +444,53 @@ export function layoutColumns<E extends { id: string }>(
       const i = forward ? k : next.length - 1 - k;
       const placed = (id: string) => (forward ? columnOf.get(id)! < i : columnOf.get(id)! > i);
       const weight = new Map<string, number>();
-      for (const end of next[i]) {
-        const ys = (neighbours.get(end.id) ?? []).filter(placed).map((id) => rows.get(id)!);
-        weight.set(
-          end.id,
-          ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : rows.get(end.id)!,
-        );
+      for (const id of next[i]) {
+        const ys = (neighbours.get(id) ?? []).filter(placed).map((n) => middles.get(n)!);
+        weight.set(id, ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : middles.get(id)!);
       }
-      // A stable sort, so ends without placed neighbours and ties keep their order.
-      next[i] = [...next[i]].sort((x, y) => weight.get(x.id)! - weight.get(y.id)!);
+      // A stable sort, so slots without placed neighbours and ties keep their order.
+      next[i] = [...next[i]].sort((x, y) => weight.get(x)! - weight.get(y)!);
       place(next[i]);
     }
     order = next;
-    const count = crossings(links, columnOf, rows);
+    const count = crossings(segments, columnOf, middles);
     if (count < fewest) {
       fewest = count;
       best = order;
     }
   }
 
-  const out = new Map<string, Position>();
-  best.forEach((column, i) =>
-    column.forEach((end, j) =>
-      out.set(end.id, { x: i * COLUMN_GAP, y: (j - (column.length - 1) / 2) * ROW_GAP }),
-    ),
-  );
-  return out;
+  best.forEach(place);
+  const positions = new Map<string, Position>();
+  for (const [i, column] of best.entries()) {
+    for (const id of column) {
+      if (!isPass(id)) positions.set(id, { x: i * COLUMN_GAP, y: middles.get(id)! - CARD_H / 2 });
+    }
+  }
+  const waypoints = new Map<string, Position[]>();
+  for (const [id, slots] of passes) {
+    waypoints.set(
+      id,
+      slots.map((slot) => ({ x: columnOf.get(slot)! * COLUMN_GAP, y: middles.get(slot)! })),
+    );
+  }
+  return { positions, waypoints };
 }
 
-// Pairs of edges between the same two columns whose ends are in opposite orders; edges between different column
-// pairs are not compared.
+// Pairs of segments between the same two adjacent columns whose ends are in opposite orders.
 function crossings(
-  edges: Link[],
+  segments: [string, string][],
   columnOf: Map<string, number>,
-  rows: Map<string, number>,
+  middles: Map<string, number>,
 ): number {
-  const spans = edges
-    .map(({ source, target }) => {
-      const [a, b] = [source.id, target.id].sort((x, y) => columnOf.get(x)! - columnOf.get(y)!);
-      return { from: columnOf.get(a)!, to: columnOf.get(b)!, ya: rows.get(a)!, yb: rows.get(b)! };
-    })
-    .filter((s) => s.from !== s.to);
   let count = 0;
-  for (let i = 0; i < spans.length; i++) {
-    for (let j = i + 1; j < spans.length; j++) {
-      const [p, q] = [spans[i], spans[j]];
-      if (p.from !== q.from || p.to !== q.to) continue;
-      if ((p.ya - q.ya) * (p.yb - q.yb) < 0) count++;
+  for (let i = 0; i < segments.length; i++) {
+    for (let j = i + 1; j < segments.length; j++) {
+      const [[p1, p2], [q1, q2]] = [segments[i], segments[j]];
+      if (columnOf.get(p1) !== columnOf.get(q1)) continue;
+      if ((middles.get(p1)! - middles.get(q1)!) * (middles.get(p2)! - middles.get(q2)!) < 0) {
+        count++;
+      }
     }
   }
   return count;
@@ -468,4 +511,22 @@ export const layoutGraph = ({ nodes, edges }: FlowGraph) =>
 // Nodes before the outside world aside, until the sweeps reorder them by their neighbours.
 const orderOf = (end: FlowEnd) => (end.kind === "workload" ? 0 : end.kind === "node" ? 1 : 2);
 
-export const formatRate = (value: number) => formatUnitValue(getUnitValue(value, "bps", "", 1));
+// Below 0.1 B/s the unit formatter rounds to 0, which reads as no traffic at all.
+export const formatRate = (value: number) =>
+  value > 0 && value < 0.1 ? "<0.1 B/s" : formatUnitValue(getUnitValue(value, "bps", "", 1));
+
+// Chart colours told apart at a glance, so near-identical neighbours of the palette are left out.
+const NAMESPACE_COLORS = [1, 2, 3, 5, 8, 9, 6, 7].map((i) => `var(--color-chart-series-${i})`);
+
+// From the name alone, so a namespace keeps its colour whatever else is drawn or filtered.
+export function namespaceColor(namespace: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < namespace.length; i++) {
+    hash = Math.imul(hash ^ namespace.charCodeAt(i), 0x01000193);
+  }
+  // FNV-1a alone barely mixes its low bits for short names; this finaliser spreads them.
+  hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b);
+  hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2ae35);
+  hash ^= hash >>> 16;
+  return NAMESPACE_COLORS[(hash >>> 0) % NAMESPACE_COLORS.length];
+}

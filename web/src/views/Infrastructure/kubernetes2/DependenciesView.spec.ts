@@ -147,10 +147,14 @@ describe("DependenciesView", () => {
     expect(chart().props("label")).toBe("Dependency map of 1 connection");
   });
 
-  it("shows system namespaces and node traffic once switched on", async () => {
+  it("shows system namespaces and node traffic once switched on, keeping the switches in the URL", async () => {
     await mountView();
     await testId("k8s2-deps-show-system-btn").trigger("click");
     await testId("k8s2-deps-show-node-traffic-btn").trigger("click");
+    expect(wrapper.emitted("update")).toEqual([[{ system: true }], [{ nodeTraffic: true }]]);
+    await wrapper.setProps({
+      state: parseUrlState({ view: "dependencies", system: "true", nodeTraffic: "true" }),
+    });
     expect(edges()).toHaveLength(3);
     const node = nodes().find((n: any) => n.id === "prod/node/n1");
     expect(node).toMatchObject({ label: "n1", detail: "Node", icon: "dns", clickable: true });
@@ -195,22 +199,43 @@ describe("DependenciesView", () => {
     ],
   ])("explains an undirected edge that is %s", async (_case, result, text) => {
     metricsQuery.mockResolvedValue({ data: { data: { result } } } as any);
-    await mountView({ state: parseUrlState({ view: "dependencies", namespace: "backend" }) });
-    await testId("k8s2-deps-show-system-btn").trigger("click");
+    await mountView({
+      state: parseUrlState({ view: "dependencies", namespace: "backend", system: "true" }),
+    });
     chart().vm.$emit("select", edges()[0].id);
     await flushPromises();
     expect(testId("k8s2-deps-edge-undirected").text()).toContain(text);
   });
 
-  it("reads as filtered while the switches hide edges, and clearing turns them on", async () => {
-    await mountView();
+  it("clears only the namespace filter and search, leaving the switches as they are", async () => {
+    await mountView({ state: parseUrlState({ view: "dependencies", namespace: "backend" }) });
     const header = wrapper.findComponent({ name: "K8sListHeader" });
-    expect(header.props("filtered")).toBe(true);
+    expect(header.props("filtered")).toBe(false);
     header.vm.$emit("clear");
     await flushPromises();
-    expect(header.props("filtered")).toBe(false);
-    expect(edges()).toHaveLength(3);
     expect(wrapper.emitted("update")).toEqual([[{ namespaces: [], search: "" }]]);
+  });
+
+  it("closes the edge panel on Escape and on empty map space", async () => {
+    await mountView();
+    chart().vm.$emit("select", edges()[0].id);
+    await flushPromises();
+    await testId("k8s2-deps-view").trigger("keydown", { key: "Escape" });
+    expect(testId("k8s2-deps-edge").exists()).toBe(false);
+    chart().vm.$emit("select", edges()[0].id);
+    await flushPromises();
+    chart().vm.$emit("select", null);
+    await flushPromises();
+    expect(testId("k8s2-deps-edge").exists()).toBe(false);
+  });
+
+  it("colours a namespace the same whatever else is drawn", async () => {
+    await mountView();
+    const before = nodes().find((n: any) => n.label === "api").color;
+    await wrapper.setProps({
+      state: parseUrlState({ view: "dependencies", system: "true" }),
+    });
+    expect(nodes().find((n: any) => n.label === "api").color).toBe(before);
   });
 
   it("counts what it draws when there are too many endpoints", async () => {

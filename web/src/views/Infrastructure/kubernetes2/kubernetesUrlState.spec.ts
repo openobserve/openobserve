@@ -42,6 +42,15 @@ describe("kubernetesUrlState", () => {
     expect(roundTrip({ view })).toEqual({ view });
   });
 
+  it("keeps the Dependencies switches only on that view", () => {
+    const query = { view: "dependencies", system: "true", nodeTraffic: "true" };
+    expect(roundTrip(query)).toEqual(query);
+    expect(roundTrip({ view: "dependencies", system: "false" })).toEqual({ view: "dependencies" });
+    expect(roundTrip({ view: "pods", system: "true" })).toEqual({ view: "pods" });
+    const state = parseUrlState(query);
+    expect(toQuery(withView(state, "dependencies"), {})).toEqual({ view: "dependencies" });
+  });
+
   it("rewrites an unknown view to the Cluster overview", () => {
     expect(parseUrlState({ view: "configmaps" }).view).toBe("cluster");
     expect(isCanonical({ view: "configmaps" })).toBe(false);
