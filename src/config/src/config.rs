@@ -128,7 +128,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 128: widen alert_dedup_state.fingerprint to varchar(256).
 // 129: add source, query_key, streams, run_count, updated_at and status to query_history.
 // 130: add suppress_repeats to alerts.
-pub const DB_SCHEMA_VERSION: u64 = 130;
+// 131: org domain mapping migrations
+pub const DB_SCHEMA_VERSION: u64 = 131;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

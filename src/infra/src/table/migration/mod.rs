@@ -245,6 +245,8 @@ mod m20261027_000001_alter_query_history;
 mod m20261028_000001_add_group_label_set_to_alert_states;
 mod m20261029_000001_widen_alert_dedup_fingerprint;
 mod m20261030_000001_add_suppress_repeats_to_alerts;
+mod m20261030_000001_create_org_domain_ownership_table;
+mod m20261030_000002_create_org_domain_ownership_req_table;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -437,10 +439,13 @@ pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Re
 
 /// Apply only the Slack app tables, idempotently, for tests in any crate.
 #[cfg(any(test, feature = "test-utils"))]
-pub(crate) async fn create_slack_tables<C: sea_orm::ConnectionTrait>(db: &C) -> Result<(), DbErr> {
+pub(crate) async fn create_slack_tables(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
     m20261018_000001_create_slack_tables::create_all(db).await?;
     m20261025_000004_create_slack_alert_messages::create_all(db).await?;
-    m20261025_000005_add_held_action_to_slack_link_requests::add_column(db).await
+    m20261025_000005_add_held_action_to_slack_link_requests::Migration
+        .up(&SchemaManager::new(db))
+        .await
 }
 
 /// Apply only `alert_acks`, idempotently, for tests in any crate.
@@ -750,6 +755,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261029_000001_widen_alert_dedup_fingerprint::Migration),
             Box::new(m20261027_000001_alter_query_history::Migration),
             Box::new(m20261030_000001_add_suppress_repeats_to_alerts::Migration),
+            Box::new(m20261030_000001_create_org_domain_ownership_table::Migration),
+            Box::new(m20261030_000002_create_org_domain_ownership_req_table::Migration),
         ]
     }
 }
@@ -845,6 +852,10 @@ mod tests {
         (128, "m20261029_000001_widen_alert_dedup_fingerprint"),
         (129, "m20261027_000001_alter_query_history"),
         (130, "m20261030_000001_add_suppress_repeats_to_alerts"),
+        (
+            131,
+            "m20261030_000002_create_org_domain_ownership_req_table",
+        ),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

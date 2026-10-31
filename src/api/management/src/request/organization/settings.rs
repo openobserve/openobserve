@@ -19,6 +19,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+#[cfg(feature = "cloud")]
+use config::utils::str::is_valid_domain;
 use db::organization::{get_org_setting, set_org_setting};
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
@@ -28,7 +30,6 @@ use {
 };
 #[cfg(feature = "cloud")]
 use {
-    config::META_ORG_ID,
     o2_enterprise::enterprise::cloud::{
         billing_group::list_billing_group_members_of, billings::MeteringProvider, customer_billings,
     },
@@ -78,12 +79,18 @@ pub async fn create(
     #[cfg(feature = "cloud")]
     let settings = match check_domain_org_mappings(&org_id, settings).await {
         Ok(settings) => settings,
-        Err(refusal) => return refusal,
+        Err(refusal) => return MetaHttpResponse::bad_request(refusal),
     };
     #[cfg(feature = "cloud")]
     if let Err(response) = check_budget_config(&org_id, &settings).await {
         return response;
     }
+
+    #[cfg(feature = "cloud")]
+    let settings = match check_domain_management_config(settings).await {
+        Ok(settings) => settings,
+        Err(msg) => return MetaHttpResponse::bad_request(msg),
+    };
 
     match db::organization::update_org_setting(&org_id, |data| {
         apply_settings_payload(data, settings)
@@ -262,64 +269,130 @@ fn validate_settings_payload(settings: &OrganizationSettingPayload) -> Result<()
 async fn check_domain_org_mappings(
     org_id: &str,
     mut settings: OrganizationSettingPayload,
-) -> Result<OrganizationSettingPayload, Response> {
+) -> Result<OrganizationSettingPayload, String> {
+    use hashbrown::HashSet;
     let Some(mut mappings) = settings.domain_org_mappings.take() else {
         return Ok(settings);
     };
-    if org_id != META_ORG_ID {
-        return Ok(settings);
-    }
+    let child_orgs =
+        o2_enterprise::enterprise::cloud::billing_group::list_billing_group_members_of(&org_id)
+            .await
+            .unwrap_or_default();
+
+    let mut allowed_orgs: HashSet<_> = child_orgs.into_iter().map(|v| v.member_org_id).collect();
+    allowed_orgs.insert(org_id.to_string());
+
+    let mut seen_domains = HashSet::new();
     for mapping in &mut mappings {
+        use openobserve_core::org_domain_ownership;
+
+        let domain = mapping.domain.trim().to_lowercase();
+
+        if !is_valid_domain(&domain) {
+            return Err(format!("domain {domain} is not a valid domain",));
+        }
+
+        if seen_domains.contains(&(domain.clone(), mapping.org_id.clone())) {
+            return Err(format!(
+                "domain {domain} is linked to {} multiple times",
+                mapping.org_id
+            ));
+        }
+        seen_domains.insert((domain.clone(), mapping.org_id.clone()));
+
+        if !allowed_orgs.contains(&mapping.org_id) {
+            return Err(format!(
+                "Not allowed to setup a mapping for org {}",
+                mapping.org_id
+            ));
+        }
+
+        if openobserve_core::organization::get_org(&mapping.org_id)
+            .await
+            .is_none()
+        {
+            return Err(format!("No org with org id {} found", mapping.org_id));
+        }
+
         // A deleted org keeps its row as a tombstone, so the row alone does not make it a target.
         match db::org_status::read_active(&mapping.org_id).await {
             Ok(true) => {}
             Ok(false) => return Err(inactive_mapping_target(&mapping.org_id).await),
             Err(e) => {
-                return Err(MetaHttpResponse::internal_error(format!(
+                return Err(format!(
                     "cannot read the status of org {}: {e}",
                     mapping.org_id
-                )));
+                ));
             }
         }
 
-        if mapping.domain.is_empty() || mapping.domain.contains(' ') {
-            return Err(MetaHttpResponse::bad_request(format!(
+        if domain.is_empty() || domain.contains(' ') {
+            return Err(format!(
                 "domain cannot have space or be empty, bad domain '{}'",
                 mapping.domain
-            )));
+            ));
         }
 
         if !matches!(
             mapping.base_role.as_str(),
             "admin" | "editor" | "viewer" | "allowed_user"
         ) {
-            return Err(MetaHttpResponse::bad_request(format!(
+            return Err(format!(
                 "base role {} for org {} is not a valid base role - only admin, editor, viewer, allowed_user are supported",
                 mapping.base_role, mapping.org_id
-            )));
+            ));
         }
         if let Some(claim) = mapping.role_claim_name.as_mut() {
             if claim.trim().is_empty() {
-                return Err(MetaHttpResponse::bad_request(
-                    "role claim name must not be empty",
-                ));
+                return Err("role claim name must not be empty".into());
             }
             *claim = claim.trim().to_string();
         }
 
-        mapping.domain = mapping.domain.to_lowercase();
+        match org_domain_ownership::get_domain_org_record(&org_id, &domain).await {
+            Ok(None) => {
+                return Err("This domain is not linked yet".to_string());
+            }
+            Err(e) => {
+                return Err(format!("error getting domain mappings : {e}"));
+            }
+            Ok(Some(v)) => {
+                use infra::table::org_domain_ownership::OwnershipState;
+
+                if v.verification_state != OwnershipState::Verified as i32 {
+                    return Err("This domain is not verified yet".to_string());
+                }
+            }
+        }
+
+        mapping.domain = domain;
     }
     settings.domain_org_mappings = Some(mappings);
     Ok(settings)
 }
 
+#[cfg(feature = "cloud")]
+async fn check_domain_management_config(
+    mut settings: OrganizationSettingPayload,
+) -> Result<OrganizationSettingPayload, String> {
+    if let Some(mut config) = settings.domain_management_config {
+        config.blocked_emails = config
+            .blocked_emails
+            .into_iter()
+            .map(|v| v.trim().to_lowercase())
+            .collect();
+
+        settings.domain_management_config = Some(config);
+    }
+    Ok(settings)
+}
 /// The refusal for a mapping whose target org is not active: missing, blocked, or unreadable.
 #[cfg(feature = "cloud")]
-async fn inactive_mapping_target(org_id: &str) -> Response {
+async fn inactive_mapping_target(org_id: &str) -> String {
     match infra::table::organizations::find(org_id).await {
-        Ok(None) => MetaHttpResponse::bad_request(format!("No org with org id {org_id} found")),
-        Ok(Some(_)) => MetaHttpResponse::bad_request(format!("org {org_id} is not active")),
-        Err(e) => MetaHttpResponse::internal_error(format!("cannot read org {org_id}: {e}")),
+        Ok(None) => format!("No org with org id {org_id} found"),
+        Ok(Some(_)) => format!("org {org_id} is not active"),
+        Err(e) => format!("cannot read org {org_id}: {e}"),
     }
 }
 
@@ -448,6 +521,16 @@ fn apply_settings_payload(
     if let Some(configs) = settings.budget_config {
         field_found = true;
         data.budget_config = configs;
+    }
+    #[cfg(feature = "cloud")]
+    if let Some(enforce) = settings.enforce_allowed_orgs_only {
+        field_found = true;
+        data.enforce_allowed_orgs_only = enforce;
+    }
+    #[cfg(feature = "cloud")]
+    if let Some(config) = settings.domain_management_config {
+        field_found = true;
+        data.domain_management_config = config;
     }
     // this will always be taken from orgs table, never from settings
     data.free_trial_expiry = None;

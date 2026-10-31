@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import os
 import uuid
 
 import pytest
@@ -112,6 +113,10 @@ def test_ing07_no_stream_header_writes_default(client: OpenObserveClient):
     wait_merge_total(client, "default", recent_window(**cpu(service_name=service)), 77)
 
 
+@pytest.mark.skipif(
+    os.environ.get("ZO_FORMAT_STREAM_NAME_TO_LOWERCASE", "true").lower() == "false",
+    reason="stream names keep their case when ZO_FORMAT_STREAM_NAME_TO_LOWERCASE=false",
+)
 def test_ing08_upper_case_stream_name_lowered(client: OpenObserveClient, new_stream):
     lower = new_stream("prof_up")
     resp = ingest_json(client, lower.upper(), to_json(simple_request(A_STACKS)))

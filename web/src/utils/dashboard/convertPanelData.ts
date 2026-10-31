@@ -40,6 +40,7 @@ import { convertFunnelData } from "./convertFunnelData";
 import { convertNodeGraphData } from "./convertNodeGraphData";
 import { convertFlameGraphPanelData } from "./convertFlameGraphPanelData";
 import { convertBoxplotData } from "./convertBoxplotData";
+import { convertLogsPanelData } from "./convertLogsPanelData";
 import { convertHostmapData } from "./convertHostmapData";
 /**
  * Converts panel data based on the panel schema and data.
@@ -219,6 +220,12 @@ export const convertPanelData = async (
       return {
         chartType: panelSchema.type,
         ...convertBoxplotData(panelSchema, data, store, chartPanelRef),
+      };
+    }
+    case "logs": {
+      return {
+        chartType: panelSchema.type,
+        ...convertLogsPanelData(panelSchema, data, store),
       };
     }
     case "table": {

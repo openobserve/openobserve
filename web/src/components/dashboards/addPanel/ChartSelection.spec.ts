@@ -312,4 +312,19 @@ describe("ChartSelection", () => {
     expect(li.className.includes("cursor-not-allowed")).toBe(true);
     dashboardPanelData.data.queryType = previous;
   });
+
+  it("lists logs with its own icon, and disables it on PromQL", async () => {
+    const { dashboardPanelData } = wrapper.vm;
+    const item = wrapper.find("[data-test='selected-chart-logs-item']");
+    expect(item.exists()).toBe(true);
+    expect(item.find("img").attributes("src")).toContain("charts/logs.svg");
+    await item.trigger("click");
+    expect(wrapper.emitted()["update:selectedChartType"].at(-1)).toEqual(["logs"]);
+    const previous = dashboardPanelData.data.queryType;
+    dashboardPanelData.data.queryType = "promql";
+    await flushPromises();
+    const li = wrapper.find("[data-test='selected-chart-logs-item']").element.closest("li");
+    expect(li.className.includes("cursor-not-allowed")).toBe(true);
+    dashboardPanelData.data.queryType = previous;
+  });
 });
