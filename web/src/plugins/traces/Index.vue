@@ -1451,7 +1451,8 @@ async function loadPageData() {
   pageLoaded = false;
   const streamFromUrl = typeof router.currentRoute.value.query.stream === "string";
   // Claimed before any early return, so a restore that finds no stream is not left for a later landing.
-  const landing = pendingLanding ?? takeRecentLanding("traces");
+  // A newer restore wins over one a left load never acted on.
+  const landing = takeRecentLanding("traces") ?? pendingLanding;
   pendingLanding = landing;
   searchObj.loadingStream = true;
   if (!searchObj.data?.queryResults?.hits?.length) searchObj.data.resultGrid.currentPage = 0;
