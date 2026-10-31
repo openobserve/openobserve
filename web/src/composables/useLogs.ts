@@ -547,6 +547,7 @@ const useLogs = (t: TranslateFn) => {
         const itemObj = {
           label: item.name,
           value: item.name,
+          internal: item.is_internal === true,
         };
         searchObj.data.stream.streamLists.push(itemObj);
       });

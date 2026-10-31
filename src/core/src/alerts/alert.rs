@@ -4316,6 +4316,17 @@ async fn build_notification_context(
             // link must not cost a notification either way.
             None => String::new(),
         }
+    } else if alert.stream_type == StreamType::Traces {
+        // The traces page takes a filter expression in `query`, not SQL, so the query is left out.
+        format!(
+            "{}{}/web/traces?stream={}&from={}&to={}&org_identifier={}&tab=spans",
+            cfg.common.web_url,
+            cfg.common.base_uri,
+            alert.stream_name,
+            alert_start_time,
+            alert_end_time,
+            alert.org_id
+        )
     } else {
         match alert.query_condition.query_type {
             QueryType::SQL => {
@@ -9490,5 +9501,39 @@ mod rule_notification_tests {
             .await
             .unwrap_err();
         assert!(matches!(error, AlertError::PromqlMissingQuery));
+    }
+
+    #[tokio::test]
+    async fn traces_alert_url_opens_the_traces_page() {
+        let mut alert = Alert::default();
+        alert.org_id = "org".into();
+        alert.stream_type = StreamType::Traces;
+        alert.stream_name = "default".into();
+        alert.query_condition.query_type = QueryType::SQL;
+        alert.query_condition.sql = Some("SELECT span_id FROM \"default\"".into());
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+            episode_id: None,
+            resolved: false,
+        };
+        let context = build_notification_context("org", &alert, &[], &[], options, None).await;
+        let url = if let Some((_, suffix)) = context.alert_url.split_once("/web/short/") {
+            let id = suffix.split('?').next().unwrap();
+            short_url::retrieve(&alert.org_id, id).await.unwrap()
+        } else {
+            context.alert_url
+        };
+        assert!(url.contains("/web/traces?stream=default&"));
+        assert!(url.contains("&from=") && url.contains("&to="));
+        assert!(url.contains("&org_identifier=org&"));
+        assert!(url.ends_with("&tab=spans"));
+        assert!(!url.contains("/web/logs"));
+        assert!(!url.contains("sql_mode"));
+        assert!(!url.contains("query="));
     }
 }
