@@ -24,6 +24,7 @@ import {
   endOf,
   filterFlows,
   flowQuery,
+  flowTotalsQuery,
   flowWindowSeconds,
   layoutColumns,
   layoutGraph,
@@ -64,17 +65,56 @@ const onNodes = (s: Series, src: string, dst: string): Series => ({
   metric: { ...s.metric, k8s_src_node_name: src, k8s_dst_node_name: dst },
 });
 
+// Rows summed by the labels `keep` returns, as `sum by` does.
+const sumBy = (rows: Series[], keep: (m: Record<string, string>) => Record<string, string>) => {
+  const out = new Map<string, Series>();
+  for (const { metric, value } of rows) {
+    const m = keep(metric);
+    const key = JSON.stringify(m);
+    out.set(key, { metric: m, value: (out.get(key)?.value ?? 0) + value });
+  }
+  return [...out.values()];
+};
+
+const without = (m: Record<string, string>, ...labels: string[]) =>
+  Object.fromEntries(Object.entries(m).filter(([k]) => !labels.includes(k)));
+
+// What flowQuery and flowTotalsQuery return for rows labelled with the nodes of their ends.
+const queried = (rows: Series[]): [Series[], Series[]] => {
+  const perHost = sumBy(rows, (m) => without(m, "direction"));
+  const busiest = new Map<string, Series>();
+  for (const r of perHost) {
+    const key = JSON.stringify(without(r.metric, "host_id"));
+    if (r.value > (busiest.get(key)?.value ?? -Infinity)) busiest.set(key, r);
+  }
+  const totals = sumBy([...busiest.values()], (m) =>
+    without(m, "host_id", "k8s_src_node_name", "k8s_dst_node_name"),
+  );
+  return [sumBy(rows, (m) => without(m, "k8s_src_node_name", "k8s_dst_node_name")), totals];
+};
+
 const names = (e: FlowEdge) => [e.source.name, e.target.name];
 
 const ALL: FlowFilter = { namespaces: [], search: "", showSystem: true, showNodeTraffic: true };
 
 describe("flowQuery", () => {
-  it("sums per reporting node, end nodes and direction, and drops Service rows", () => {
+  it("sums per reporting node and direction, and drops Service rows", () => {
     expect(flowQuery(null, 3600)).toBe(
       "sum by (k8s_cluster, k8s_src_namespace, k8s_src_owner_name, k8s_src_owner_type, " +
-        "k8s_dst_namespace, k8s_dst_owner_name, k8s_dst_owner_type, k8s_src_node_name, k8s_dst_node_name, " +
-        "direction, host_id) (" +
+        "k8s_dst_namespace, k8s_dst_owner_name, k8s_dst_owner_type, direction, host_id) (" +
         'rate(obi_network_flow_bytes{k8s_src_owner_type!="Service", k8s_dst_owner_type!="Service"}[3600s]))',
+    );
+  });
+
+  it("totals each direction of travel over the busiest reporter of each node pair", () => {
+    const ends =
+      "k8s_cluster, k8s_src_namespace, k8s_src_owner_name, k8s_src_owner_type, " +
+      "k8s_dst_namespace, k8s_dst_owner_name, k8s_dst_owner_type";
+    const share = `${ends}, k8s_src_node_name, k8s_dst_node_name`;
+    expect(flowTotalsQuery('pr"od', 300)).toBe(
+      `sum by (${ends}) (max by (${share}) (sum by (${share}, host_id) (` +
+        'rate(obi_network_flow_bytes{k8s_cluster="pr\\"od", k8s_src_owner_type!="Service", ' +
+        'k8s_dst_owner_type!="Service"}[300s]))))',
     );
   });
 
@@ -161,18 +201,31 @@ describe("pairFlows", () => {
           .map((dst) => onNodes(flow(WEB, API, "request", 100, host), src, dst)),
       ),
     );
-    const [edge] = pairFlows(rows);
-    expect(edge).toMatchObject({ total, forward: total, request: total, directed: true });
+    const [edge] = pairFlows(...queried(rows));
+    expect(edge).toMatchObject({ total, forward: total, directed: true });
+    expect(edge.request).toBeCloseTo(total);
   });
 
   it("counts a node pair's bytes once though both of its nodes report them", () => {
-    const [edge] = pairFlows([
-      onNodes(flow(WEB, API, "request", 100, "n1"), "n1", "n2"),
-      onNodes(flow(WEB, API, "unknown", 100, "n2"), "n1", "n2"),
-      onNodes(flow(WEB, API, "request", 40, "n1"), "n1", "n1"),
-      onNodes(flow(WEB, API, "request", 30, "n2"), "n2", "n2"),
-    ]);
-    expect(edge).toMatchObject({ total: 170, request: 170, unknown: 0 });
+    const [edge] = pairFlows(
+      ...queried([
+        onNodes(flow(WEB, API, "request", 100, "n1"), "n1", "n2"),
+        onNodes(flow(WEB, API, "unknown", 100, "n2"), "n1", "n2"),
+        onNodes(flow(WEB, API, "request", 40, "n1"), "n1", "n1"),
+        onNodes(flow(WEB, API, "request", 30, "n2"), "n2", "n2"),
+      ]),
+    );
+    expect(edge).toMatchObject({ total: 170, unknown: 0 });
+    expect(edge.request).toBeCloseTo(170);
+  });
+
+  it("keeps the busiest node's count for a direction the totals leave out", () => {
+    const [toApi, toDb] = [flow(WEB, API, "request", 100, "n1"), flow(API, DB, "request", 50)];
+    const edges = pairFlows(
+      [toApi, flow(WEB, API, "request", 60, "n2"), toDb],
+      [{ ...toApi, value: 160 }],
+    );
+    expect(edges.map((e) => e.total)).toEqual([160, 50]);
   });
 
   it("keeps the busier node's count for each direction of travel", () => {

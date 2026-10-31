@@ -87,21 +87,31 @@ export interface FlowGraph<E extends { id: string } = FlowEnd> {
 const END = (side: "src" | "dst") =>
   `k8s_${side}_namespace, k8s_${side}_owner_name, k8s_${side}_owner_type`;
 
-const PAIR = `k8s_cluster, ${END("src")}, ${END("dst")}, k8s_src_node_name, k8s_dst_node_name, direction, host_id`;
+const ENDS = `k8s_cluster, ${END("src")}, ${END("dst")}`;
+const PAIR = `${ENDS}, direction, host_id`;
+const SHARE = `${ENDS}, k8s_src_node_name, k8s_dst_node_name`;
 
 // The rate covers the selected range, bounded so a short range still has samples and a long one stays cheap.
 export const flowWindowSeconds = (startUs: number, endUs: number) =>
   Math.min(MAX_WINDOW_S, Math.max(MIN_WINDOW_S, Math.round((endUs - startUs) / 1_000_000)));
 
-// Per reporting node and per node of each end, since both of those nodes report the bytes between them;
-// pairFlows keeps one node's count of each.
 // Service rows repeat the workload rows on the client's node, so they are left out.
-export function flowQuery(cluster: string | null, windowS: number): string {
+function flowRate(cluster: string | null, windowS: number): string {
   const matchers = ['k8s_src_owner_type!="Service"', 'k8s_dst_owner_type!="Service"'];
   if (cluster) matchers.unshift(`k8s_cluster="${escapeLabel(cluster)}"`);
-  const rate = `rate(${FLOW_STREAM}{${matchers.join(", ")}}[${windowS}s])`;
-  return `sum by (${PAIR}) (${rate})`;
+  return `rate(${FLOW_STREAM}{${matchers.join(", ")}}[${windowS}s])`;
 }
+
+// Per reporting node, since both nodes report cross-node traffic; pairFlows keeps one node's split by direction
+// and scales it to flowTotalsQuery's bytes.
+export const flowQuery = (cluster: string | null, windowS: number) =>
+  `sum by (${PAIR}) (${flowRate(cluster, windowS)})`;
+
+// Bytes per direction of travel. A node sees only the flows touching its own pods, and both nodes of a source node and
+// destination node pair see all of its bytes, so the busiest reporter of each node pair, added up. Rows without the
+// node labels are one node pair: the busiest node's count, as before.
+export const flowTotalsQuery = (cluster: string | null, windowS: number) =>
+  `sum by (${ENDS}) (max by (${SHARE}) (sum by (${SHARE}, host_id) (${flowRate(cluster, windowS)})))`;
 
 export function endOf(metric: Record<string, string>, side: "src" | "dst"): FlowEnd {
   const cluster = metric.k8s_cluster ?? "";
@@ -144,32 +154,24 @@ interface Flow<E> {
 
 const known = (f: Flow<unknown>) => f.request + f.response;
 
-// One flow per direction of travel. Its bytes between one source node and one destination node are seen in full
-// by both of those nodes and by no other, so each such share is the count from the node that saw the most of it,
-// split by direction as the node that saw the most request and response bytes did, since a node whose eBPF pod
-// restarted reports the same bytes as unknown; the shares then add up. Adding nodes' rows together would count
-// cross-node bytes twice. Rows without the end node labels are one share.
+// One flow per direction of travel: the bytes from the node that saw the most of them, split by direction
+// as the node that saw the most request and response bytes did, since a node whose eBPF pod restarted
+// reports the same bytes as unknown. Adding nodes' rows together would count cross-node bytes twice.
 function busiestNode<E extends { id: string }>(
   series: Series[],
   endOf: EndOf<E>,
   reporter: string,
 ): Flow<E>[] {
-  const perNode = new Map<string, { share: string; flow: Flow<E> }>();
+  const perNode = new Map<string, Flow<E>>();
   for (const { metric, value } of series) {
     if (!(value > 0)) continue;
     const src = endOf(metric, "src");
     const dst = endOf(metric, "dst");
-    const share = [
-      src.id,
-      dst.id,
-      metric.k8s_src_node_name ?? "",
-      metric.k8s_dst_node_name ?? "",
-    ].join("\n");
-    const key = `${share}\n${metric[reporter] ?? ""}`;
-    let f = perNode.get(key)?.flow;
+    const key = `${src.id}\n${dst.id}\n${metric[reporter] ?? ""}`;
+    let f = perNode.get(key);
     if (!f) {
       f = { src, dst, request: 0, response: 0, unknown: 0, total: 0 };
-      perNode.set(key, { share, flow: f });
+      perNode.set(key, f);
     }
     if (metric.direction === "request") f.request += value;
     else if (metric.direction === "response") f.response += value;
@@ -177,30 +179,25 @@ function busiestNode<E extends { id: string }>(
     f.total += value;
   }
   const best = new Map<string, { busiest: Flow<E>; informed: Flow<E> }>();
-  for (const { share, flow: f } of perNode.values()) {
-    const kept = best.get(share);
+  for (const f of perNode.values()) {
+    const key = `${f.src.id}\n${f.dst.id}`;
+    const kept = best.get(key);
     if (!kept) {
-      best.set(share, { busiest: f, informed: f });
+      best.set(key, { busiest: f, informed: f });
       continue;
     }
     if (f.total > kept.busiest.total) kept.busiest = f;
     if (known(f) > known(kept.informed)) kept.informed = f;
   }
-  const flows = new Map<string, Flow<E>>();
-  for (const { busiest, informed } of best.values()) {
+  return [...best.values()].map(({ busiest, informed }) => {
     const scale = busiest.total / informed.total;
-    const key = `${busiest.src.id}\n${busiest.dst.id}`;
-    let f = flows.get(key);
-    if (!f) {
-      f = { src: busiest.src, dst: busiest.dst, request: 0, response: 0, unknown: 0, total: 0 };
-      flows.set(key, f);
-    }
-    f.request += informed.request * scale;
-    f.response += informed.response * scale;
-    f.unknown += informed.unknown * scale;
-    f.total += busiest.total;
-  }
-  return [...flows.values()];
+    return {
+      ...busiest,
+      request: informed.request * scale,
+      response: informed.response * scale,
+      unknown: informed.unknown * scale,
+    };
+  });
 }
 
 interface Pair<E> {
@@ -216,19 +213,48 @@ interface Pair<E> {
 }
 
 // Traffic inside one workload, one node or the outside world is not a dependency.
-export const pairFlows = (series: Series[]): FlowEdge[] =>
-  pairEnds(series, endOf, "host_id").filter((e) => e.source.id !== e.target.id);
+export const pairFlows = (series: Series[], totals: Series[] = []): FlowEdge[] =>
+  pairEnds(series, endOf, "host_id", totals).filter((e) => e.source.id !== e.target.id);
+
+const flowKey = (src: { id: string }, dst: { id: string }) => `${src.id}\n${dst.id}`;
+
+// Each flow scaled to its total from `totals`, keeping its split by direction; a flow without one keeps its own.
+function scaleTo<E extends { id: string }>(
+  flows: Flow<E>[],
+  totals: Series[],
+  endOf: EndOf<E>,
+): Flow<E>[] {
+  const totalOf = new Map<string, number>();
+  for (const { metric, value } of totals) {
+    if (!(value > 0)) continue;
+    const key = flowKey(endOf(metric, "src"), endOf(metric, "dst"));
+    totalOf.set(key, (totalOf.get(key) ?? 0) + value);
+  }
+  return flows.map((f) => {
+    const total = totalOf.get(flowKey(f.src, f.dst));
+    if (total == null) return f;
+    const scale = total / f.total;
+    return {
+      ...f,
+      request: f.request * scale,
+      response: f.response * scale,
+      unknown: f.unknown * scale,
+      total,
+    };
+  });
+}
 
 // One edge per unordered pair. A request leaves the client and a response leaves the server, so both
 // count toward the same orientation; an edge is directed only when that evidence is most of its bytes.
-// `reporter` is the label naming the node or host that reported a row.
+// `reporter` is the label naming the node or host that reported a row; `totals`, where given, sets each flow's bytes.
 export function pairEnds<E extends { id: string }>(
   series: Series[],
   endOf: EndOf<E>,
   reporter: string,
+  totals: Series[] = [],
 ): FlowEdge<E>[] {
   const pairs = new Map<string, Pair<E>>();
-  const flows = busiestNode(series, endOf, reporter);
+  const flows = scaleTo(busiestNode(series, endOf, reporter), totals, endOf);
   for (const { src, dst, request, response, unknown, total } of flows) {
     const [a, b] = src.id < dst.id ? [src, dst] : [dst, src];
     const key = `${a.id}\n${b.id}`;

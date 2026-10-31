@@ -42,6 +42,7 @@ import {
   buildGraph,
   filterFlows,
   flowQuery,
+  flowTotalsQuery,
   flowWindowSeconds,
   dropQuiet,
   formatRate,
@@ -74,6 +75,7 @@ const { t } = useI18nTyped();
 const router = useRouter();
 
 const series = shallowRef<Series[]>([]);
+const totals = shallowRef<Series[]>([]);
 const loading = ref(false);
 const loadError = ref(false);
 const forbidden = ref(false);
@@ -100,6 +102,7 @@ async function load() {
   ]);
   if (scopeKey !== loadedFor) {
     series.value = [];
+    totals.value = [];
     loaded.value = false;
     selectedEdgeId.value = null;
     loadedFor = null;
@@ -112,12 +115,17 @@ async function load() {
   loadError.value = false;
   forbidden.value = false;
   try {
-    const text = flowQuery(props.cluster, windowS.value);
-    const out = await queryClient.fetchQuery(
-      k8sInstantQuery(props.orgId, "FLOW", text, props.range.end, props.range.relative),
-    );
+    const instant = (id: string, text: string) =>
+      queryClient.fetchQuery(
+        k8sInstantQuery(props.orgId, id, text, props.range.end, props.range.relative),
+      );
+    const [out, outTotals] = await Promise.all([
+      instant("FLOW", flowQuery(props.cluster, windowS.value)),
+      instant("FLOW_TOTALS", flowTotalsQuery(props.cluster, windowS.value)),
+    ]);
     if (gen !== generation) return;
     series.value = out;
+    totals.value = outTotals;
     loaded.value = true;
     loadedFor = scopeKey;
     lastUpdatedAt.value = Date.now();
@@ -144,7 +152,7 @@ watch(
   { immediate: true },
 );
 
-const allEdges = computed(() => pairFlows(series.value));
+const allEdges = computed(() => pairFlows(series.value, totals.value));
 
 const scope = computed(() => ({
   namespaces: props.state.namespaces,

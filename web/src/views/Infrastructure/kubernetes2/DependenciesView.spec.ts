@@ -114,6 +114,21 @@ describe("DependenciesView", () => {
     expect(testId("k8s2-deps-caption").text()).toContain("1h");
   });
 
+  it("sizes each edge from the totals query, sent alongside at the same time", async () => {
+    const totals = [{ ...FLOWS[0], value: [1, "8192"] }];
+    metricsQuery.mockImplementation(async ({ query }: any) => ({
+      data: { data: { result: decodeURIComponent(query).includes("max by") ? totals : FLOWS } },
+    }));
+    await mountView();
+    const [flows, sizes] = metricsQuery.mock.calls.map(([q]: any) => q);
+    expect(decodeURIComponent(sizes.query)).toContain("max by (k8s_cluster, ");
+    expect(sizes.end_time).toBe(flows.end_time);
+    expect(edges()[0]).toMatchObject({
+      source: "prod/frontend/Deployment/web",
+      total: 8192 + 4096,
+    });
+  });
+
   it.each([
     [1, "over 5m"],
     [7 * 24 * 60, "over 1d"],
@@ -516,7 +531,7 @@ describe("DependenciesView", () => {
     expect(testId("k8s2-deps-loading").exists()).toBe(true);
     await wrapper.setProps({ cluster: "prod", clusterPending: false });
     await flushPromises();
-    expect(metricsQuery).toHaveBeenCalledTimes(1);
+    expect(metricsQuery).toHaveBeenCalledTimes(2);
     expect(decodeURIComponent((metricsQuery.mock.calls[0][0] as any).query)).toContain(
       'k8s_cluster="prod"',
     );
@@ -528,6 +543,6 @@ describe("DependenciesView", () => {
     await queryClient.invalidateQueries();
     await wrapper.setProps({ refreshNonce: 1 });
     await flushPromises();
-    expect(metricsQuery).toHaveBeenCalledTimes(2);
+    expect(metricsQuery).toHaveBeenCalledTimes(4);
   });
 });
