@@ -1187,6 +1187,20 @@ mod tests {
             ("sum(sum_over_time(m[1m] @ 1100))", 72.0),
             ("topk(2, m @ 1100) * 2", 30.0),
             ("max_over_time((m @ 1100)[1m:20s])", 15.0),
+            // a pinned subquery evaluates its steps up to the `@`, whatever step reads it
+            ("max_over_time(m[1m:20s] @ 1100)", 15.0),
+            ("sum_over_time(m[1m:20s] @ 1100)", 36.0),
+            ("sum_over_time(m[1m:20s] @ 1120 offset 20s)", 36.0),
+            ("sum_over_time((sum(m))[1m:20s] @ 1100)", 72.0),
+            ("quantile_over_time(0.5, m[1m:20s] @ 1100)", 12.0),
+            ("sum(sum_over_time(m[1m:20s] @ 1100))", 72.0),
+            ("sum_over_time(m[1m:20s] @ 1100) - m @ 1100", 21.0),
+            // an `@` inside the body stays absolute on the subquery's own steps
+            ("sum_over_time((m @ 1040)[1m:20s] @ 1100)", 18.0),
+            (
+                "max_over_time(max_over_time(m[1m:20s])[1m:20s] @ 1100)",
+                15.0,
+            ),
             // a step-dependent parameter keeps the aggregation on the steps, not its pinned child
             ("topk(time(), sum_over_time(m[1m] @ 1100))", 36.0),
             ("topk(time(), m @ 1100)", 15.0),
@@ -1543,16 +1557,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_at_modifier_on_a_root_subquery_is_rejected_in_an_instant_query() {
-        let instant = BASE + 180 * SECOND;
-        for query in ["m[1m:20s] @ 1100", "(m[1m:20s] @ 1100)"] {
-            let mut engine = engine_at(provider(false, false), 30, instant, 0, None);
+    async fn test_at_modifier_on_the_root_subquery_of_an_instant_query() {
+        let exec_instant = async |at: i64, query: &str| {
+            let mut engine = engine_at(provider(false, false), 30, at, 0, None);
+            engine.eval_ctx.end = at;
+            let mut ctx = (*engine.ctx).clone();
+            ctx.end = at;
+            engine.ctx = Arc::new(ctx);
             let expr = promql_parser::parser::parse(query).unwrap();
-            let err = engine.exec(&expr).await.expect_err(query).to_string();
-            assert!(
-                err.contains("Subquery: @ modifier is not supported"),
-                "{query}: {err}"
-            );
+            engine.exec(&expr).await.unwrap()
+        };
+        let (expected, _) = exec_instant(BASE + 100 * SECOND, "m[1m:20s]").await;
+        for query in [
+            "m[1m:20s] @ 1100",
+            "(m[1m:20s] @ 1100)",
+            "m[1m:20s] @ 1120 offset 20s",
+        ] {
+            let (pinned, _) = exec_instant(BASE + 180 * SECOND, query).await;
+            let last = canonical(pinned.clone())[0].1.last().copied();
+            assert_eq!(last, Some((BASE + 100 * SECOND, 15.0)), "{query}");
+            assert_same_matrix(expected.clone(), pinned, query);
         }
     }
 
@@ -1652,11 +1676,8 @@ mod tests {
         let cases = [
             ("m[1m] @ 1100", "@ modifier is not supported"),
             ("(m[1m] @ 1100)", "@ modifier is not supported"),
-            (
-                "max_over_time(m[1m:20s] @ 1100)",
-                "Subquery: @ modifier is not supported",
-            ),
             ("m @ end()", "must be resolved"),
+            ("max_over_time(m[1m:20s] @ end())", "must be resolved"),
         ];
         for (query, expected) in cases {
             let err = eval_query(provider(false, false), 30, query)
