@@ -130,7 +130,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import type { FleetOrgSettings, FleetSettings } from "@/services/fleet";
 import FleetCollectorVersions from "./FleetCollectorVersions.vue";
 import FleetSettingsForm from "./FleetSettingsForm.vue";
-import { serverMessage, useFleetSettings } from "./useFleetApi";
+import { useFleetSettings, failureText } from "./useFleetApi";
 
 const { t } = useI18nTyped();
 const orgId = useOrgId();
@@ -221,7 +221,7 @@ async function put(next: FleetOrgSettings) {
   } catch (err) {
     toast({
       variant: "error",
-      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
+      message: failureText(err, t),
     });
   }
 }
