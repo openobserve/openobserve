@@ -14375,14 +14375,12 @@
       "tabLabel": "Gerenciamento de domínios",
       "tabDesc": "Associe os seus domínios de e-mail, mapeie os seus utilizadores para organizações e controle quais deles podem iniciar sessão.",
       "loadFailed": "Falha ao carregar as configurações da organização",
-      "title": "Mapeamentos de domínio para organização",
-      "subtitle": "Novos utilizadores que iniciam sessão com um domínio de e-mail correspondente são adicionados à organização automaticamente.",
       "addMapping": "Adicionar mapeamento",
       "editMapping": "Editar mapeamento",
       "domain": "Domínio de e-mail",
       "domainHelp": "A parte após {at_sign} no endereço de e-mail do utilizador.",
+      "domainHelpRequest": "A parte após {at_sign} no endereço de email do utilizador. O domínio é associado a esta organização assim que a OpenObserve aprovar o pedido.",
       "organization": "Organização",
-      "organizationPlaceholder": "Identificador da organização",
       "organizationHelp": "O identificador da organização à qual os utilizadores correspondentes são adicionados.",
       "organizationRequired": "A organização é obrigatória",
       "baseRole": "Função base",
@@ -14497,6 +14495,7 @@
       "filterAll": "Todos",
       "requestedBy": "Solicitado por",
       "requestedAt": "Solicitado em",
+      "verifiedAt": "Verificado",
       "answeredBy": "Respondido por",
       "reason": "Motivo",
       "reasonHelp": "Exibido para a organização que fez a solicitação.",
@@ -14509,9 +14508,7 @@
       "rejectBody": "{org} não receberá {domain}.",
       "requestApproved": "{domain} vinculado",
       "requestRejected": "Solicitação de {domain} rejeitada",
-      "decisionFailed": "Falha ao atualizar a solicitação",
-      "duplicateDomain": "Já existe um mapeamento para este domínio",
-      "confirmRemove": "Tem a certeza de que pretende eliminar o mapeamento para {domain}?"
+      "decisionFailed": "Falha ao atualizar a solicitação"
     }
   },
   "reports": {
