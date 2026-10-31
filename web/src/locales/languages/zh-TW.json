@@ -5824,7 +5824,7 @@
       },
       "installOneClick": "新增至 {client}",
       "skillsLabel": "新增 {brand} 技能（選填）",
-      "skillsHint": "教導您的 AI 助手如何在 {brand} 中查詢、設定警示及建立儀表板，讓它能更充分利用 MCP 工具。在您的專案中執行它，然後選擇要安裝到的代理程式。",
+      "skillsHint": "教導您的 AI 助手如何在 {brand} 中查詢、設定警示及建立儀表板，讓它能更充分利用 MCP 工具。在您的專案中執行它，它會安裝到您電腦上找到的每個 AI 工具中。",
       "skillsRepo": "在 {host} 上檢視技能"
     },
     "manageTokensBtnLabel": "管理權杖",

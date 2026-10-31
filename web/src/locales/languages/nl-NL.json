@@ -5824,7 +5824,7 @@
       },
       "installOneClick": "Toevoegen aan {client}",
       "skillsLabel": "Voeg de {brand}-vaardigheid toe (optioneel)",
-      "skillsHint": "Leert je AI-assistent hoe hij query's uitvoert, alarmen instelt en dashboards bouwt in {brand}, zodat je meer uit de MCP-tools haalt. Voer het uit in je project en kies vervolgens de agents waarin je het wilt installeren.",
+      "skillsHint": "Leert je AI-assistent hoe hij query's uitvoert, alarmen instelt en dashboards bouwt in {brand}, zodat je meer uit de MCP-tools haalt. Voer het uit in je project; het installeert ze in elke AI-tool die het op je computer vindt.",
       "skillsRepo": "Bekijk de vaardigheden op {host}"
     },
     "manageTokensBtnLabel": "Tokens beheren",

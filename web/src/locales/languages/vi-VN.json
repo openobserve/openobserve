@@ -5824,7 +5824,7 @@
       },
       "installOneClick": "Thêm vào {client}",
       "skillsLabel": "Thêm kỹ năng {brand} (không bắt buộc)",
-      "skillsHint": "Dạy Trợ lý AI của bạn cách truy vấn, cảnh báo và tạo bảng điều khiển trong {brand}, để tận dụng tốt hơn các công cụ MCP. Chạy nó trong dự án của bạn, sau đó chọn các agent để cài đặt.",
+      "skillsHint": "Dạy Trợ lý AI của bạn cách truy vấn, cảnh báo và tạo bảng điều khiển trong {brand}, để tận dụng tốt hơn các công cụ MCP. Chạy nó trong dự án của bạn; nó sẽ cài đặt vào mọi công cụ AI tìm thấy trên máy của bạn.",
       "skillsRepo": "Xem các kỹ năng trên {host}"
     },
     "manageTokensBtnLabel": "Quản lý mã thông báo",
