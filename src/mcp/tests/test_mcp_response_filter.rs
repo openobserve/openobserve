@@ -37,6 +37,7 @@ fn init_test_configs() {
                 "name".into(),
                 "stream_type".into(),
                 "stats.storage_size".into(),
+                "is_internal".into(),
             ],
         );
         configs.insert(
@@ -539,6 +540,25 @@ fn test_streams_token_reduction() {
         &["schema", "settings", "total_fields", "storage_type"],
     );
     assert_eq!(parsed["total"], 20);
+}
+
+#[test]
+fn test_streams_summary_keeps_is_internal() {
+    init_test_configs();
+    let full = serde_json::to_string(&json!({
+        "list": [
+            {"name": "_rumdata", "stream_type": "logs", "stats": {"storage_size": 1.0}, "is_internal": true, "total_fields": 3},
+            {"name": "default", "stream_type": "logs", "stats": {"storage_size": 2.0}, "total_fields": 3}
+        ],
+        "total": 2
+    }))
+    .unwrap();
+    let summary = filter_response("StreamList", &full, &DetailLevel::Summary);
+    let parsed: Value = serde_json::from_str(&summary).unwrap();
+    let items = parsed["items"].as_array().unwrap();
+    assert_eq!(items[0]["is_internal"], true);
+    assert!(items[1].get("is_internal").is_none());
+    assert_fields_absent(&parsed, &["total_fields"]);
 }
 
 #[test]

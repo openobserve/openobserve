@@ -7939,6 +7939,7 @@
       "aggRangeDesc": "최대값과 최소값의 차이",
       "aggDiffLabel": "차이:",
       "aggDiffDesc": "마지막 값과 첫 번째 값의 차이",
+      "aggInstantNote": "파이 또는 도넛 차트에서는 여러 샘플을 반환하는 쿼리(예: 범위 쿼리)에 적용됩니다. 단일 샘플의 즉시 쿼리는 해당 샘플을 유지하므로, 둘을 혼합하면 원시 값 옆에 축소된 값이 표시됩니다.",
       "geoLatTooltip": "위도 값을 포함하는 메트릭 레이블 이름. 기본값: \"latitude\" 또는 \"lat\"",
       "geoLonTooltip": "경도 값을 포함하는 메트릭 레이블 이름. 기본값: \"longitude\" 또는 \"lon\"",
       "geoWeightTooltip": "가중치 값을 포함하는 메트릭 레이블 이름. 기본값: \"weight\"",
@@ -21224,6 +21225,17 @@
       "moreInfoAbout": "{field}에 대한 자세한 정보",
       "moreInfo": "자세한 정보"
     },
+    "streamPicker": {
+      "internalStreams": "내부 스트림",
+      "hiddenCount": "{count}개 숨김",
+      "matchCount": "{count}개 숨김 일치 | {count}개 숨김 일치",
+      "hide": "숨기기",
+      "show": "표시",
+      "hideInternal": "내부 스트림 숨기기",
+      "showInternal": "내부 스트림 표시",
+      "announceHidden": "내부 스트림이 숨겨졌습니다",
+      "announceShown": "내부 스트림이 표시되었습니다"
+    },
     "templateInput": {
       "suggestions": "변수 제안"
     },
@@ -28315,11 +28327,6 @@
       "target": "대상",
       "auditDisabled": "감사 추적을 사용하려면 서버에 O2_AUDIT_ENABLED=true가 필요합니다",
       "auditDelayHint": "아직 기록이 없습니다. 서버는 감사 기록을 묶어서 발행하며 기본값은 10분마다입니다(O2_AUDIT_PUBLISH_INTERVAL).",
-      "alertAutoRolledBack": "롤아웃이 자동으로 롤백되었습니다",
-      "alertOfflineRatio": "플릿의 오프라인 비율이 임계값을 초과했습니다",
-      "alertRolloutHalted": "롤아웃이 중단되었습니다",
-      "alerts": "플릿 알림",
-      "alertsDesc": "플릿 관리는 자체적으로 알림을 보내지 않습니다. 이벤트를 기록하며, 알림 라이브러리에 해당 이벤트에 대한 기성 알림이 있습니다.",
       "fleetDefaults": "플릿 기본값",
       "fleetDefaultsDesc": "각 플릿은 자체 설정에서 따로 지정하지 않는 한 이 값을 사용합니다",
       "gateObserve": "게이트 관찰 시간 (초)",
@@ -28337,7 +28344,6 @@
       "offlineHeartbeatsHelp": "메시지 없이 이 횟수만큼 하트비트 간격이 지나면 수집기는 오프라인입니다",
       "offlineRatio": "오프라인 비율 이벤트 (%)",
       "offlineRatioHelp": "이 비율을 넘는 수집기가 오프라인이면 플릿 이벤트를 기록합니다",
-      "openAlertLibrary": "알림 라이브러리 열기",
       "outOfRange": "{min}에서 {max} 사이의 숫자를 입력하세요",
       "phaseTimeout": "단계 제한 시간 (초)",
       "phaseTimeoutHelp": "이 시간 안에 확인도 거부도 하지 않는 롤아웃 단계는 중단됩니다",

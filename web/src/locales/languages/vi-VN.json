@@ -7939,6 +7939,7 @@
       "aggRangeDesc": "Chênh lệch giữa tối đa và tối thiểu",
       "aggDiffLabel": "Sai lệch:",
       "aggDiffDesc": "Chênh lệch giữa cuối cùng và đầu tiên",
+      "aggInstantNote": "Trên biểu đồ tròn hoặc donut, điều này áp dụng cho các truy vấn trả về nhiều mẫu, như truy vấn Range. Truy vấn Instant có một mẫu duy nhất sẽ giữ nguyên mẫu đó, nên khi kết hợp cả hai, giá trị đã rút gọn sẽ hiển thị bên cạnh giá trị thô.",
       "geoLatTooltip": "Tên nhãn chỉ số chứa giá trị vĩ độ. Mặc định: \"latitude\" hoặc \"lat\"",
       "geoLonTooltip": "Tên nhãn chỉ số chứa giá trị kinh độ. Mặc định: \"longitude\" hoặc \"lon\"",
       "geoWeightTooltip": "Tên nhãn chỉ số chứa giá trị trọng số. Mặc định: \"weight\"",
@@ -21224,6 +21225,17 @@
       "moreInfoAbout": "Thêm thông tin về {field}",
       "moreInfo": "Thêm thông tin"
     },
+    "streamPicker": {
+      "internalStreams": "Stream nội bộ",
+      "hiddenCount": "{count} ẩn",
+      "matchCount": "{count} mục khớp bị ẩn | {count} mục khớp bị ẩn",
+      "hide": "Ẩn",
+      "show": "Hiện",
+      "hideInternal": "Ẩn stream nội bộ",
+      "showInternal": "Hiện stream nội bộ",
+      "announceHidden": "Đã ẩn stream nội bộ",
+      "announceShown": "Đã hiện stream nội bộ"
+    },
     "templateInput": {
       "suggestions": "Gợi ý biến"
     },
@@ -28315,11 +28327,6 @@
       "target": "Đối tượng",
       "auditDisabled": "Nhật ký kiểm toán cần O2_AUDIT_ENABLED=true trên máy chủ",
       "auditDelayHint": "Chưa có bản ghi. Máy chủ phát hành bản ghi kiểm toán theo lô, mặc định mỗi 10 phút (O2_AUDIT_PUBLISH_INTERVAL).",
-      "alertAutoRolledBack": "Một đợt triển khai đã tự động quay lui",
-      "alertOfflineRatio": "Tỷ lệ ngoại tuyến của một fleet vượt ngưỡng",
-      "alertRolloutHalted": "Một đợt triển khai đã dừng",
-      "alerts": "Cảnh báo cho fleet",
-      "alertsDesc": "Quản lý fleet không tự gửi thông báo. Nó ghi lại các sự kiện, và thư viện cảnh báo có sẵn các cảnh báo dựa trên chúng.",
       "fleetDefaults": "Mặc định của fleet",
       "fleetDefaultsDesc": "Mọi fleet dùng các giá trị này trừ khi nó đặt giá trị riêng trong cài đặt của mình",
       "gateObserve": "Quan sát cổng kiểm tra (giây)",
@@ -28337,7 +28344,6 @@
       "offlineHeartbeatsHelp": "Collector bị coi là ngoại tuyến sau chừng này chu kỳ heartbeat không có thông điệp",
       "offlineRatio": "Sự kiện tỷ lệ ngoại tuyến (%)",
       "offlineRatioHelp": "Ghi lại một sự kiện fleet khi hơn tỷ lệ này số collector ngoại tuyến",
-      "openAlertLibrary": "Mở thư viện cảnh báo",
       "outOfRange": "Nhập một số từ {min} đến {max}",
       "phaseTimeout": "Thời gian chờ giai đoạn (giây)",
       "phaseTimeoutHelp": "Giai đoạn triển khai không xác nhận cũng không từ chối trong thời gian này sẽ dừng",

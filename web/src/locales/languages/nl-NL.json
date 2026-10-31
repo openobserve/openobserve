@@ -7939,6 +7939,7 @@
       "aggRangeDesc": "Verschil tussen max en min",
       "aggDiffLabel": "Verschil:",
       "aggDiffDesc": "Verschil tussen laatste en eerste",
+      "aggInstantNote": "Op een cirkel- of ringdiagram geldt dit voor query's die meerdere samples retourneren, zoals Range-query's. Een Instant-query met één sample behoudt dat sample, dus als je beide combineert, zie je verlaagde waarden naast ruwe waarden.",
       "geoLatTooltip": "Naam van het metrieklabel met latitude-waarden. Standaard: \"latitude\" of \"lat\"",
       "geoLonTooltip": "Naam van het metrieklabel met longitude-waarden. Standaard: \"longitude\" of \"lon\"",
       "geoWeightTooltip": "Naam van het metrieklabel met weight-waarden. Standaard: \"weight\"",
@@ -21224,6 +21225,17 @@
       "moreInfoAbout": "Meer informatie over {field}",
       "moreInfo": "Meer informatie"
     },
+    "streamPicker": {
+      "internalStreams": "Interne streams",
+      "hiddenCount": "{count} verborgen",
+      "matchCount": "{count} verborgen overeenkomst | {count} verborgen overeenkomsten",
+      "hide": "Verbergen",
+      "show": "Tonen",
+      "hideInternal": "Interne streams verbergen",
+      "showInternal": "Interne streams tonen",
+      "announceHidden": "Interne streams verborgen",
+      "announceShown": "Interne streams getoond"
+    },
     "templateInput": {
       "suggestions": "Suggesties voor variabelen"
     },
@@ -28315,11 +28327,6 @@
       "target": "Doel",
       "auditDisabled": "Voor de audittrail is O2_AUDIT_ENABLED=true op de server nodig",
       "auditDelayHint": "Nog geen vermeldingen. De server publiceert auditrecords in batches, standaard elke 10 minuten (O2_AUDIT_PUBLISH_INTERVAL).",
-      "alertAutoRolledBack": "Een uitrol is automatisch teruggedraaid",
-      "alertOfflineRatio": "Het offline-aandeel van een fleet heeft de drempel overschreden",
-      "alertRolloutHalted": "Een uitrol is gestopt",
-      "alerts": "Alerts voor fleets",
-      "alertsDesc": "Fleetbeheer stuurt zelf geen meldingen. Het legt gebeurtenissen vast, en de alertbibliotheek heeft kant-en-klare alerts erop.",
       "fleetDefaults": "Fleet-standaardwaarden",
       "fleetDefaultsDesc": "Elke fleet gebruikt deze waarden, tenzij hij in zijn eigen instellingen andere instelt",
       "gateObserve": "Observatie van de poort (seconden)",
@@ -28337,7 +28344,6 @@
       "offlineHeartbeatsHelp": "Een collector is offline na zoveel heartbeat-intervallen zonder bericht",
       "offlineRatio": "Offline-aandeelgebeurtenis (%)",
       "offlineRatioHelp": "Legt een fleet-gebeurtenis vast wanneer meer dan dit aandeel van de collectors offline is",
-      "openAlertLibrary": "Alertbibliotheek openen",
       "outOfRange": "Voer een getal van {min} tot {max} in",
       "phaseTimeout": "Fasetime-out (seconden)",
       "phaseTimeoutHelp": "Een uitrolfase die in deze tijd niet bevestigt of weigert, stopt",

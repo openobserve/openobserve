@@ -1621,7 +1621,10 @@ describe("ChartRenderer", () => {
         series: [
           {
             type: "pie",
-            label: { show: true, formatter: "{d}%" },
+            label: {
+              show: true,
+              formatter: (params: { percent: number }) => `${params.percent.toFixed(1)}%`,
+            },
             data: [
               { name: "a", value: 10 },
               { name: "b", value: 10 },
