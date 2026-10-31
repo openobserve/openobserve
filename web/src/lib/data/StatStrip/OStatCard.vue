@@ -52,6 +52,8 @@ const props = withDefaults(
     clickable?: boolean;
     /** Active-filter state — accent border. */
     selected?: boolean;
+    /** Put the qualifier on its own line under the value row, so a long one never squeezes the label. */
+    stackSub?: boolean;
     /** Placeholder for the value until it first arrives; a 0 shown meanwhile reads as a real count. */
     loading?: boolean;
     dataTest?: string;
@@ -201,9 +203,11 @@ const trendClass = computed(() =>
         >
           <OTooltip :content="subTooltip || sub" />
         </OIcon>
-        <OTruncatedText v-else-if="sub" class="text-text-label text-2xs max-lg:hidden">{{
-          sub
-        }}</OTruncatedText>
+        <OTruncatedText
+          v-else-if="sub && !stackSub"
+          class="text-text-label text-2xs max-lg:hidden"
+          >{{ sub }}</OTruncatedText
+        >
       </div>
       <span
         v-if="icon || slots.icon"
@@ -217,6 +221,12 @@ const trendClass = computed(() =>
         </slot>
       </span>
     </div>
+    <OTruncatedText
+      v-if="sub && !subIcon && stackSub"
+      class="text-text-label text-2xs max-lg:hidden"
+      data-test="o-stat-card-sub-stacked"
+      >{{ sub }}</OTruncatedText
+    >
     <!-- Track is always rendered so the card height never shifts as data loads;
          only the fill width changes. -->
     <div class="bg-surface-subtle h-1 overflow-hidden rounded-full">

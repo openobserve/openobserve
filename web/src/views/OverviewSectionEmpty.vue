@@ -23,8 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-border-default rounded-default bg-surface-base overflow-hidden border border-[0.0625em]"
     >
       <OEmptyState
-        size="inline"
-        :icon="kind === 'forbidden' ? 'lock' : undefined"
+        size="slim"
         :title="message"
         :data-test="`overview-${testSection}-${kind}-message`"
       />

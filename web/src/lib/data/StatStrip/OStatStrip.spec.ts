@@ -180,4 +180,45 @@ describe("OStatStrip", () => {
       expect(wrapper.text()).toContain("wait time");
     });
   });
+
+  describe("stackSub", () => {
+    const mountStack = (props: Record<string, unknown>) =>
+      mount(OStatStrip, {
+        props: {
+          items: [{ key: "c", label: raw("Calls"), value: 5, sub: raw("Not set up") }],
+          ...props,
+        },
+      });
+
+    it("keeps the qualifier beside the label by default", () => {
+      const wrapper = mountStack({});
+      expect(wrapper.find("[data-test='o-stat-card-sub-stacked']").exists()).toBe(false);
+      expect(wrapper.text()).toContain("Not set up");
+    });
+
+    it("moves the qualifier to its own line without duplicating it", () => {
+      const wrapper = mountStack({ stackSub: true });
+      expect(wrapper.findAll("[data-test='o-stat-card-sub-stacked']")).toHaveLength(1);
+      expect(wrapper.text().match(/Not set up/g)).toHaveLength(1);
+    });
+
+    it("leaves a glyph qualifier in the row", () => {
+      const wrapper = mount(OStatStrip, {
+        props: {
+          stackSub: true,
+          items: [
+            {
+              key: "c",
+              label: raw("Calls"),
+              value: 5,
+              sub: raw("From traces"),
+              subIcon: "account-tree",
+            },
+          ],
+        },
+      });
+      expect(wrapper.find("[data-test='o-stat-card-sub-stacked']").exists()).toBe(false);
+      expect(wrapper.find("[data-test='o-stat-card-sub-icon']").exists()).toBe(true);
+    });
+  });
 });
