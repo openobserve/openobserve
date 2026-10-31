@@ -130,3 +130,32 @@ export const replaceSelectFieldList = (query: string, fieldList: string): string
 };
 
 export default replaceSelectFieldList;
+
+/**
+ * Quick mode selects only the interesting fields, so an expanded log row has
+ * fewer fields than the stream. Returns the counts for a hint, or null when the
+ * row was fetched with every field (quick mode off, SQL mode, several streams or
+ * no interesting fields) or already shows them all.
+ */
+export const quickModeHiddenFieldCount = (
+  row: Record<string, any> | null | undefined,
+  state: {
+    quickMode: boolean;
+    sqlMode: boolean;
+    streamCount: number;
+    interestingFields: string[];
+    streamFields: any[];
+    allFieldsName?: string;
+  },
+): { shown: number; total: number } | null => {
+  if (!row || !state.quickMode || state.sqlMode || state.streamCount !== 1) return null;
+  if (!state.interestingFields?.length) return null;
+  const names = new Set(
+    (state.streamFields ?? [])
+      .filter((field: any) => field?.isSchemaField && field.name !== state.allFieldsName)
+      .map((field: any) => field.name),
+  );
+  if (!names.size) return null;
+  const shown = [...names].filter((name) => Object.prototype.hasOwnProperty.call(row, name)).length;
+  return shown < names.size ? { shown, total: names.size } : null;
+};

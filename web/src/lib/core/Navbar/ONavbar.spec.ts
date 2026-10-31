@@ -207,7 +207,7 @@ describe("ONavbar", () => {
       const reliability = wrapper.find('[data-test="nav-group-reliability"]');
       expect(reliability.exists()).toBe(true);
       expect(reliability.attributes("data-children")).toBe(
-        "alertList,alertDestinations,alertTemplates,alertLibrary,alertCalibration,onCallResponses,onCallTeams,onCallRouting",
+        "alertList,alertDestinations,alertTemplates,alertLibrary,alertCalibration,onCallResponses,onCallTeams,onCallRouting,onCallMine",
       );
       expect(reliability.attributes("data-filtered")).toBe(
         "sloList,incidentList,downtimes,alertSources",

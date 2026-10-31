@@ -33,6 +33,14 @@ export const useHtmlPanelConfig = (dashboardPanelData: any) => {
     if (typeof numeric === "number" && Number.isFinite(numeric)) config.value[key] = numeric;
     else delete config.value[key];
   };
+  const setFlagConfig = (key: string, value: unknown) => {
+    if (value === true) config.value[key] = true;
+    else delete config.value[key];
+  };
+  const setDefaultOnFlag = (key: string, value: unknown) => {
+    if (value === false) config.value[key] = false;
+    else delete config.value[key];
+  };
   const setListConfig = (key: string, value: unknown) => {
     const list = Array.isArray(value)
       ? value.filter((item): item is string => typeof item === "string")
@@ -73,6 +81,8 @@ export const useHtmlPanelConfig = (dashboardPanelData: any) => {
     config,
     setTextConfig,
     setNumberConfig,
+    setFlagConfig,
+    setDefaultOnFlag,
     setListConfig,
     listModel,
     choiceModel,

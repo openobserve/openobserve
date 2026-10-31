@@ -30,5 +30,9 @@ export const organizationKeys = {
     orgKey(org, "organizations", "cleanupTasks", targetOrg),
   ingestionTokens: (org: string) => orgKey(org, "organizations", "ingestionTokens"),
   passcode: (org: string) => orgKey(org, "organizations", "passcode"),
+  domains: (org: string) => orgKey(org, "organizations", "domains"),
+  domainRequests: (org: string) => orgKey(org, "organizations", "domainRequests"),
+  billingGroupMembers: (org: string) => orgKey(org, "organizations", "billingGroupMembers"),
+  adminOrgs: (org: string) => orgKey(org, "organizations", "adminOrgs"),
   mine: () => globalKey("organizations", "mine"),
 };

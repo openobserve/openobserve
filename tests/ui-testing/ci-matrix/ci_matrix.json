@@ -637,5 +637,20 @@
       "slo-alerts.spec.js"
     ],
     "disabled": []
+  },
+  {
+    "testfolder": "Profiles",
+    "actual_folder": "Profiles",
+    "browser": "chrome",
+    "run_files": [
+      "profiles-navigation-entry.spec.js",
+      "profiles-query-controls.spec.js",
+      "profiles-chart-breakdown.spec.js",
+      "profiles-views.spec.js",
+      "profiles-flame-graph.spec.js",
+      "profiles-compare.spec.js",
+      "profiles-states-edge.spec.js"
+    ],
+    "disabled": []
   }
 ]

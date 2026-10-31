@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :selected-date-time="dashboardPanelData.meta.dateTime"
       @add-to-dashboard="onAddToDashboard"
       @chart-api-error="onChartApiError"
+      @renderer-error="onRendererError"
     />
 
     <AddToDashboard
@@ -69,6 +70,7 @@ import useNotifications from "@/composables/useNotifications";
 import { restoreMetricsStream } from "@/utils/streamPersist";
 import { applyMetricsBlob, normaliseMetricsBlobData } from "@/composables/metrics/metricsUrlState";
 import { useQueryHistoryRecorder } from "@/composables/metrics/useQueryHistoryRecorder";
+import type { PanelErrorDetail } from "@/utils/queryHistory/metrics";
 import type { SelectedDate } from "@/utils/dashboard/urlTimeParams";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
@@ -195,6 +197,11 @@ export default defineComponent({
       // PanelEditor surfaces its own error UI; nothing extra to do here.
     };
 
+    // History reads the renderer's error to classify the run; PanelEditor shows it itself.
+    const onRendererError = (error: PanelErrorDetail | string | null) => {
+      historyRecorder.onPanelError(error);
+    };
+
     const timeKey = () => `${props.selectedDateTime?.startTime}:${props.selectedDateTime?.endTime}`;
     // The window the chart last ran with; null until the first one is applied, which always applies.
     const appliedTimeKey = ref<string | null>(null);
@@ -270,27 +277,27 @@ export default defineComponent({
       if (on && isTimeChangePending.value) runQuery();
     });
 
-    const { record } = useQueryHistoryRecorder();
+    const historyRecorder = useQueryHistoryRecorder(() => !!panelEditorRef.value?.isLoading);
 
     /** An explicit Run (button, shortcut or Refresh Cache & Run): the only run that writes history. */
     const onUserRun = (selectedDate: SelectedDate, withoutCache = false) => {
       runQuery(withoutCache);
       const errors: string[] = [];
       validatePanel(errors, false);
-      if (!errors.length) record(dashboardPanelData, selectedDate);
+      if (!errors.length) historyRecorder.record(dashboardPanelData, selectedDate);
     };
 
     // Set while applying an entry, so its range change does not also run the old query.
     let applyingEntry = false;
 
-    /** Loads a history entry live: its panel in place, its range on the parent's picker, one run. */
-    const applyPanelData = async (metricsData: string, timeRange: SelectedDate) => {
+    /** Loads a history entry live: its panel in place, its range on the parent's picker; a re-run is a user Run. */
+    const applyPanelData = async (metricsData: string, timeRange: SelectedDate, run = true) => {
       if (!applyMetricsBlob(metricsData, dashboardPanelData)) return;
       applyingEntry = true;
       emit("update:time-range", timeRange);
       await nextTick();
       applyingEntry = false;
-      runQuery();
+      if (run) onUserRun(timeRange);
     };
 
     // Declared AFTER applyDateTime/runQuery: the hooks call them, and a const
@@ -332,6 +339,7 @@ export default defineComponent({
       showAddToDashboardDialog,
       onAddToDashboard,
       onChartApiError,
+      onRendererError,
       runQuery,
       onUserRun,
       applyPanelData,

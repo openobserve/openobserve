@@ -21,6 +21,7 @@ import {
   isFormulaQuery,
   queryRefs,
   substituteFormula,
+  legendExprOf,
 } from "./formula";
 
 const ERR_RATE = 'sum by (job)(rate(http_requests_total{code=~"5.."}[5m]))';
@@ -210,5 +211,18 @@ describe("legendFallbackOf", () => {
     expect(legendFallbackOf([{ config: { promql_legend_fallback: "x" } }], 0)).toBe("x");
     expect(legendFallbackOf([{ config: { ref: "A" } }, { config: {} }], 0)).toBeUndefined();
     expect(legendFallbackOf(undefined, 0)).toBeUndefined();
+  });
+});
+
+describe("legendExprOf", () => {
+  const queries = [{ query: 'avg(up{ns="$ns"})' }];
+
+  it("prefers the query as sent, with variables filled in", () => {
+    const metadata = { queries: [{ panelQueryIndex: 0, query: 'avg(up{ns="prod"})' }] };
+    expect(legendExprOf(queries, metadata, 0)).toBe('avg(up{ns="prod"})');
+  });
+
+  it("falls back to the saved query without metadata", () => {
+    expect(legendExprOf(queries, null, 0)).toBe('avg(up{ns="$ns"})');
   });
 });

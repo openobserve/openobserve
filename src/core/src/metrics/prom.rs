@@ -143,10 +143,15 @@ pub async fn remote_write(
     // check if stream is deleting from cache
     let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
     let mut skipped_records: u32 = 0;
+    // remote write has no partial success: a 4xx drops the whole batch, a 5xx retries it forever
+    let mut stream_key_checks = ingest::StreamKeyChecks::default();
 
     // parse metadata
     for item in request.metadata {
         let metric_name = format_stream_name(item.metric_family_name.to_string());
+        if stream_key_checks.violation(org_id, &metric_name).is_some() {
+            continue;
+        }
         let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
             .await
             .unwrap_or_else(|_| Schema::empty());
@@ -217,6 +222,8 @@ pub async fn remote_write(
             }
         }
     }
+
+    unique_metrics.retain(|name| stream_key_checks.violation(org_id, name).is_none());
 
     let mut preload_pipeline_time = 0u128;
     let mut preload_uds_time = 0u128;
@@ -376,6 +383,10 @@ pub async fn remote_write(
 
         if is_deleting {
             skipped_records += 1;
+            continue;
+        }
+
+        if stream_key_checks.violation(org_id, &metric_name).is_some() {
             continue;
         }
 
@@ -552,6 +563,8 @@ pub async fn remote_write(
                 .map(|(record, timestamp)| (record, timestamp, None)),
         );
     }
+    // histogram bucket, exemplar and pipeline output streams can be too long when the metric fits
+    stream_key_checks.drop_unstorable(org_id, &mut json_data_by_stream);
 
     let step_start = std::time::Instant::now();
     for (stream_name, mut json_data) in json_data_by_stream {
@@ -2307,6 +2320,87 @@ mod tests {
         let matchers = sel.matchers.find_matchers(NAME_LABEL);
         assert!(!matchers.iter().all(|m| m.is_match("node_cpu")));
         assert!(matchers.iter().all(|m| m.is_match("http_requests")));
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn remote_write_drops_only_the_streams_whose_key_is_too_long() {
+        use infra::file_list::STREAM_KEY_MAX_LEN;
+        use prost::Message;
+        use proto::prometheus_rpc;
+
+        let org_id = "test_org_id";
+        let now = Utc::now().timestamp_millis();
+        let series = |name: &str| prometheus_rpc::TimeSeries {
+            labels: vec![prometheus_rpc::Label {
+                name: NAME_LABEL.to_string(),
+                value: name.to_string(),
+            }],
+            samples: vec![prometheus_rpc::Sample {
+                value: 1.0,
+                timestamp: now,
+            }],
+            ..Default::default()
+        };
+        let long_name = "m".repeat(STREAM_KEY_MAX_LEN);
+        // `_sum` fills the key exactly; `_count`, `_bucket` and `_exemplars` overflow it
+        let histogram_name =
+            "h".repeat(STREAM_KEY_MAX_LEN - format!("{org_id}/metrics/_sum").len());
+        let histogram = prometheus_rpc::TimeSeries {
+            samples: vec![],
+            exemplars: vec![prometheus_rpc::Exemplar {
+                labels: vec![],
+                value: 1.0,
+                timestamp: now,
+            }],
+            histograms: vec![prometheus_rpc::Histogram {
+                sum: 1.0,
+                count: Some(prometheus_rpc::histogram::Count::CountInt(1)),
+                zero_count: Some(prometheus_rpc::histogram::ZeroCount::ZeroCountInt(1)),
+                timestamp: now,
+                ..Default::default()
+            }],
+            ..series(&histogram_name)
+        };
+        let request = prometheus_rpc::WriteRequest {
+            timeseries: vec![
+                series("test_prom_key_len_ok"),
+                series(&long_name),
+                histogram,
+            ],
+            metadata: vec![prometheus_rpc::MetricMetadata {
+                r#type: prometheus_rpc::metric_metadata::MetricType::Gauge as i32,
+                metric_family_name: long_name.clone(),
+                ..Default::default()
+            }],
+        };
+        let body = snap::raw::Encoder::new()
+            .compress_vec(&request.encode_to_vec())
+            .unwrap();
+        remote_write(
+            org_id,
+            Bytes::from(body),
+            IngestUser::User("root@example.com".to_string()),
+        )
+        .await
+        .unwrap();
+
+        let bounded =
+            infra::file_list::stream_key_violation(org_id, StreamType::Metrics, &long_name)
+                .is_some();
+        let expected = [
+            ("test_prom_key_len_ok".to_string(), true),
+            (format!("{histogram_name}_sum"), true),
+            (long_name, !bounded),
+            (format!("{histogram_name}_count"), !bounded),
+            (format!("{histogram_name}_bucket"), !bounded),
+            (exemplars_stream_name(&histogram_name), !bounded),
+        ];
+        for (name, created) in expected {
+            let exists = infra::schema::exists(org_id, StreamType::Metrics, &name).await;
+            assert_eq!(exists, created, "{name}");
+        }
     }
 
     #[tokio::test]

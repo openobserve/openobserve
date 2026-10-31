@@ -294,10 +294,13 @@ const useStreams = (t: TranslateFn) => {
                 updateStreamsInStore(streamType, streamList);
               } catch (err: any) {
                 return reject(
-                  new Error(
-                    t("logStream.errorWhileFetchingSchema", {
-                      message: err?.message || t("search.unknownError"),
-                    }),
+                  withResponse(
+                    new Error(
+                      t("logStream.errorWhileFetchingSchema", {
+                        message: err?.message || t("search.unknownError"),
+                      }),
+                    ),
+                    err,
                   ),
                 );
               }
