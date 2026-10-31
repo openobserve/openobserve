@@ -1208,7 +1208,8 @@ const inlineTriggerClasses = computed(() => [
   "rounded-default relative -mx-1 -my-0.5 flex w-auto shrink-0 items-center px-1 pe-6 py-0.5",
   "text-text-body text-xs font-medium",
   "ring-1 ring-inset transition-[color,background-color,box-shadow] duration-150",
-  "focus:outline-none focus-visible:outline-accent/40 focus-visible:outline-2",
+  // focus:outline-none zeroes the outline style, so the keyboard ring has to restore it.
+  "focus:outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-focus-ring-accent",
   // The hover ring is gated on !hasError so it can't override the resting error
   // ring on hover (equal specificity, later class wins) and hide the error.
   props.disabled
@@ -1217,6 +1218,12 @@ const inlineTriggerClasses = computed(() => [
       ? "ring-select-border-error cursor-pointer hover:bg-surface-subtle hover:text-text-heading"
       : "ring-transparent cursor-pointer hover:bg-surface-subtle hover:text-text-heading hover:ring-border-default",
 ]);
+
+const insideLabelClasses = computed(() =>
+  isInlineAppearance.value
+    ? "text-text-secondary pointer-events-none me-1.5 font-normal whitespace-nowrap select-none"
+    : "text-3xs text-text-secondary pointer-events-none ps-3 pe-7 text-start leading-none whitespace-nowrap select-none",
+);
 
 const triggerEndPadding = computed(() =>
   props.clearable && hasSelection.value ? "pe-12" : "pe-7",
@@ -1274,7 +1281,11 @@ const fieldWidthClass = computed(() => {
 
     <template v-if="listboxModeEnabled">
       <PopoverRoot v-model:open="popoverOpen">
-        <div ref="triggerWrapperRef" class="relative flex items-center">
+        <!-- An inline wrapper hugs its trigger so the absolutely placed chevron always lands on it. -->
+        <div
+          ref="triggerWrapperRef"
+          :class="['relative flex items-center', isInlineAppearance ? 'w-fit' : '']"
+        >
           <PopoverTrigger
             type="button"
             :id="inputId"
@@ -1324,16 +1335,14 @@ const fieldWidthClass = computed(() => {
             "
           >
             <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
-            <span
-              v-if="label && labelPosition === 'inside'"
-              class="text-3xs text-text-secondary pointer-events-none ps-3 pe-7 text-start leading-none whitespace-nowrap select-none"
+            <span v-if="label && labelPosition === 'inside'" :class="insideLabelClasses"
               >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
             >
 
             <!-- Content row: flex-row for inside-label; display:contents (transparent) for normal mode -->
             <div
               :class="
-                labelPosition === 'inside' && label
+                labelPosition === 'inside' && label && !isInlineAppearance
                   ? [
                       'flex w-full min-w-0 flex-1 items-center',
                       triggerEndPadding,
@@ -1930,7 +1939,10 @@ const fieldWidthClass = computed(() => {
         }
       "
     >
-      <div ref="selectTriggerWrapperRef" class="relative flex items-center">
+      <div
+        ref="selectTriggerWrapperRef"
+        :class="['relative flex items-center', isInlineAppearance ? 'w-fit' : '']"
+      >
         <SelectTrigger
           :id="inputId"
           :tabindex="inputTabindex"
@@ -1961,16 +1973,14 @@ const fieldWidthClass = computed(() => {
           "
         >
           <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
-          <span
-            v-if="label && labelPosition === 'inside'"
-            class="text-3xs text-text-secondary pointer-events-none ps-3 pe-7 text-start leading-none whitespace-nowrap select-none"
+          <span v-if="label && labelPosition === 'inside'" :class="insideLabelClasses"
             >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
           >
 
           <!-- Content row: flex-row for inside-label; display:contents for normal mode -->
           <div
             :class="
-              labelPosition === 'inside' && label
+              labelPosition === 'inside' && label && !isInlineAppearance
                 ? ['flex w-full min-w-0 flex-1 items-center', triggerEndPadding, 'ps-3']
                 : 'contents'
             "
