@@ -317,10 +317,14 @@ function showEdge(id: string, event: Event) {
   nextTick(() => edgePanel.value?.focus());
 }
 
-// Picked on the map, so a later close has no list button to return to; empty map space dismisses it.
+// Picked on the map, so a later close has no list button to return to. Empty map space dismisses it: focus goes back
+// to the list only if the panel holds it, so a mouse user's focus stays where it is and the hidden list stays shut.
 function selectEdge(id: string | null) {
+  if (id == null) {
+    if (!edgePanel.value?.contains(document.activeElement)) openedFrom = null;
+    return closeEdge();
+  }
   openedFrom = null;
-  if (id == null) return closeEdge();
   selectedEdgeId.value = id;
 }
 

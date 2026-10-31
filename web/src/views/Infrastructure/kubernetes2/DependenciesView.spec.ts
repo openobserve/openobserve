@@ -258,17 +258,33 @@ describe("DependenciesView", () => {
     expect(wrapper.emitted("update")).toEqual([[{ namespaces: [], search: "" }]]);
   });
 
-  it("leaves Escape alone while no edge panel is open, and keeps focus put when the map closes one", async () => {
-    await mountView({}, document.body);
+  it("leaves Escape alone while no edge panel is open", async () => {
+    await mountView();
     const esc = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
     testId("k8s2-deps-view").element.dispatchEvent(esc);
     expect(esc.defaultPrevented).toBe(false);
+  });
+
+  it("returns focus to the list when the map dismisses a panel that holds it", async () => {
+    await mountView({}, document.body);
     await testId("k8s2-deps-link").trigger("click");
     await flushPromises();
+    expect(document.activeElement).toBe(testId("k8s2-deps-edge").element);
     chart().vm.$emit("select", null);
     await flushPromises();
     expect(testId("k8s2-deps-edge").exists()).toBe(false);
-    expect(document.activeElement).not.toBe(testId("k8s2-deps-link").element);
+    expect(document.activeElement).toBe(testId("k8s2-deps-link").element);
+  });
+
+  it("leaves focus alone when the map dismisses a panel that does not hold it", async () => {
+    await mountView({}, document.body);
+    await testId("k8s2-deps-link").trigger("click");
+    await flushPromises();
+    (document.activeElement as HTMLElement).blur();
+    chart().vm.$emit("select", null);
+    await flushPromises();
+    expect(testId("k8s2-deps-edge").exists()).toBe(false);
+    expect(document.activeElement).toBe(document.body);
   });
 
   it("colours a namespace the same whatever else is drawn", async () => {
