@@ -128,6 +128,34 @@ describe("copyToClipboard in-place confirmation", () => {
     expect(toast).toHaveBeenCalledTimes(1);
   });
 
+  it("toasts when the copy's dialog closes and takes the control along before the bubble is seen", async () => {
+    vi.useFakeTimers();
+    const dialog = document.createElement("div");
+    document.body.appendChild(dialog);
+    const button = addButton(dialog);
+    press(button);
+    expect(await copyToClipboard("key", t, linkCopied)).toBe(true);
+    expect(copyConfirm.open).toBe(true);
+
+    dialog.remove();
+    vi.advanceTimersByTime(250);
+    expect(copyConfirm.open).toBe(false);
+    expect(toast).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not toast when the control leaves after the bubble was seen", async () => {
+    vi.useFakeTimers();
+    const button = addButton();
+    press(button);
+    await copyToClipboard("key", t, linkCopied);
+
+    vi.advanceTimersByTime(1500);
+    button.remove();
+    vi.advanceTimersByTime(250);
+    expect(copyConfirm.open).toBe(false);
+    expect(toast).not.toHaveBeenCalled();
+  });
+
   it("says Copied on the control when the caller has no message", async () => {
     press(addButton(), "keydown", "Enter");
     await copyToClipboard("x", t);
