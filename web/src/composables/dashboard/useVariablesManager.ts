@@ -29,7 +29,7 @@ export const LIVE_COMMIT_DEBOUNCE_MS = 300;
 export interface VariableConfig {
   name: string;
   label?: I18nText;
-  type: "query_values" | "custom" | "constant" | "textbox" | "dynamic_filters";
+  type: "query_values" | "custom" | "constant" | "textbox" | "date" | "dynamic_filters";
   scope: "global" | "tabs" | "panels";
   tabs?: string[];
   panels?: string[];
@@ -547,9 +547,14 @@ export const useVariablesManager = (t: TranslateFn) => {
 
     independentGlobalVars.forEach((v) => {
       // Mark as pending so selector will load them
-      // Non-API types (custom, constant, textbox) need to load to notify manager
+      // Non-API types (custom, constant, textbox, date) need to load to notify manager
       // query_values types without custom/all need API calls
-      if (v.type === "custom" || v.type === "constant" || v.type === "textbox") {
+      if (
+        v.type === "custom" ||
+        v.type === "constant" ||
+        v.type === "textbox" ||
+        v.type === "date"
+      ) {
         // Non-API types still need to load to set values and notify manager
         v.isVariableLoadingPending = true;
       } else if (v.type === "query_values") {
@@ -581,7 +586,7 @@ export const useVariablesManager = (t: TranslateFn) => {
 
         // Check if all parents are non-API types (don't require API calls to load)
         // These variables are treated the same: they load synchronously without API calls
-        // 1. Custom type variables: custom, constant, textbox, dynamic_filters
+        // 1. Custom type variables: custom, constant, textbox, date, dynamic_filters
         // 2. Query_values with custom/all defaults (values set from config, not API)
         const allParentsAreNonAPITypes = parentKeys.every((parentKey) => {
           const parentVar = globalVars.find((gv) => {
@@ -592,7 +597,7 @@ export const useVariablesManager = (t: TranslateFn) => {
           if (!parentVar) return false;
 
           // Parent is non-API type if:
-          // - It's a custom type variable (custom, constant, textbox, dynamic_filters)
+          // - It's a custom type variable (custom, constant, textbox, date, dynamic_filters)
           // - OR it's a query_values with custom/all default (no API call needed)
           // loadOptionsWithAllDefault makes an "all" parent genuinely fetch, so it
           // is NOT synchronous: pre-marking its child races the parent's response
@@ -601,6 +606,7 @@ export const useVariablesManager = (t: TranslateFn) => {
             parentVar.type === "custom" ||
             parentVar.type === "constant" ||
             parentVar.type === "textbox" ||
+            parentVar.type === "date" ||
             parentVar.type === "dynamic_filters" ||
             (parentVar.type === "query_values" &&
               parentVar.loadOptionsWithAllDefault !== true &&

@@ -289,6 +289,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-variable-textbox-default-value"
             />
           </div>
+          <div class="mt-3" v-if="variableData.type === 'date'">
+            <OFormDate
+              name="value"
+              :label="t('dashboard.DefaultValue')"
+              clearable
+              data-test="dashboard-variable-date-default-value"
+            />
+          </div>
           <div v-if="variableData.type == 'custom'">
             <div class="flex">
               <div class="w-6"></div>
@@ -531,6 +539,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -562,6 +571,7 @@ export default defineComponent({
     OForm,
     OFormSelect,
     OFormInput,
+    OFormDate,
     OFormSwitch,
     OFormCheckbox,
     OCheckbox,
@@ -856,6 +866,10 @@ export default defineComponent({
         value: "textbox",
       },
       {
+        label: t("dashboard.date"),
+        value: "date",
+      },
+      {
         label: t("dashboard.custom"),
         value: "custom",
       },
@@ -1068,6 +1082,15 @@ export default defineComponent({
     watch(
       () => [variableData.type],
       async () => {
+        // a date variable keeps its value only when it is a valid YYYY-MM-DD
+        // (only write when non-empty: the write re-triggers this watcher)
+        if (
+          variableData.type == "date" &&
+          variableData.value &&
+          !/^\d{4}-\d{2}-\d{2}$/.test(String(variableData.value))
+        ) {
+          form.setFieldValue("value", "" as never);
+        }
         if (variableData.type == "query_values") {
           // query_data always exists via the schema defaults (no manual init).
 
