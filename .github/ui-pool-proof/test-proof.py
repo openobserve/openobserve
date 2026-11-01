@@ -21,18 +21,24 @@ class PerformanceGuards(unittest.TestCase):
                 for i, (name, _) in enumerate(proof.TRIALS)]
 
     def test_under_fifteen_percent_is_not_accepted(self):
-        self.assertFalse(proof.performance_eligible(self.trials(wall=86), True))
+        self.assertFalse(proof.assess_performance(self.trials(wall=86), True)["sampledWallAndCpuImprovement"])
 
-    def test_memory_regression_is_not_accepted(self):
-        self.assertFalse(proof.performance_eligible(self.trials(rss=101), True))
+    def test_incomparable_rss_never_certifies_memory(self):
+        for rss in (1, 10000):
+            with self.subTest(rss=rss):
+                assessment = proof.assess_performance(self.trials(rss=rss), True)
+                self.assertTrue(assessment["sampledWallAndCpuImprovement"])
+                self.assertEqual(assessment["memoryRegressionAssurance"], "unverified")
+                self.assertFalse(assessment["memoryComparisonUsedForAcceptance"])
+
 
     def test_both_directions_complete_and_correct_required(self):
-        self.assertTrue(proof.performance_eligible(self.trials(), True))
-        self.assertFalse(proof.performance_eligible(self.trials()[:3], True))
-        self.assertFalse(proof.performance_eligible(self.trials(), False))
+        self.assertTrue(proof.assess_performance(self.trials(), True)["sampledWallAndCpuImprovement"])
+        self.assertFalse(proof.assess_performance(self.trials()[:3], True)["sampledWallAndCpuImprovement"])
+        self.assertFalse(proof.assess_performance(self.trials(), False)["sampledWallAndCpuImprovement"])
         trials = self.trials()
         trials[2]["resources"]["cpuSeconds"] = 101
-        self.assertFalse(proof.performance_eligible(trials, True))
+        self.assertFalse(proof.assess_performance(trials, True)["sampledWallAndCpuImprovement"])
 
 
 class CoverageGuards(unittest.TestCase):
@@ -136,6 +142,8 @@ class ProcessGuards(unittest.TestCase):
             result = json.loads((root / "out/result.json").read_text())
             self.assertFalse(result["complete"])
             self.assertFalse(result["screenAccepted"])
+            self.assertEqual(result["memoryRegressionAssurance"], "unverified")
+            self.assertFalse(result["memoryComparisonUsedForAcceptance"])
             self.assertIn("source mismatch", result["error"])
             self.assertFalse(result["sourceUnchangedAndWebClean"])
 

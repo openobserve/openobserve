@@ -148,14 +148,17 @@ def resources(path):
     return values
 
 
-def performance_eligible(trials, correctness):
+def assess_performance(trials, correctness):
+    result = {"sampledWallAndCpuImprovement": False, "memoryRegressionAssurance": "unverified",
+              "memoryComparisonUsedForAcceptance": False}
     by_name = {t["name"]: t for t in trials}
     if not correctness or [t["name"] for t in trials] != [t[0] for t in TRIALS]:
-        return False
-    return all(by_name[c]["run"]["wallSeconds"] <= 0.85 * by_name[a]["run"]["wallSeconds"]
-               and by_name[c]["resources"]["cpuSeconds"] <= by_name[a]["resources"]["cpuSeconds"]
-               and by_name[c]["run"]["processGroupPeakRssKiB"] <= by_name[a]["run"]["processGroupPeakRssKiB"]
-               for a, c in (("original-first", "candidate-first"), ("original-last", "candidate-second")))
+        return result
+    result["sampledWallAndCpuImprovement"] = all(
+        by_name[c]["run"]["wallSeconds"] <= 0.85 * by_name[a]["run"]["wallSeconds"]
+        and by_name[c]["resources"]["cpuSeconds"] <= by_name[a]["resources"]["cpuSeconds"]
+        for a, c in (("original-first", "candidate-first"), ("original-last", "candidate-second")))
+    return result
 
 
 def main():
@@ -171,7 +174,8 @@ def main():
     web, output = args.web.resolve(), args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     result = {"success": False, "complete": False, "screenAccepted": False,
-              "fullSuiteAndBillingUnverified": True}
+              "fullSuiteAndBillingUnverified": True,
+              "memoryRegressionAssurance": "unverified", "memoryComparisonUsedForAcceptance": False}
     trials = []
     try:
         raw = Path(__file__).with_name("sample.json").read_bytes()
@@ -200,7 +204,8 @@ def main():
         save(output / "environment.json", {"runtime": runtime, "npm": "11.19.1", "configuredRunner": "ubicloud-standard-8",
              "actualVmFamily": "requires this run's Set up job log review", "overallBudgetSeconds": args.overall_timeout,
              "trialLimitSeconds": 150, "executionLimitSeconds": 144, "cleanupReserveSeconds": 20,
-             "memoryMetric": "Sampled sum of owned process-group RSS; shared pages counted per process. GNUtime maxRSS is a largest-process diagnostic only.", "nodeExecutableSha256": digest(Path(node).read_bytes())})
+             "memoryMetric": "Diagnostic only: summed RSS counts shared pages repeatedly across forks; GNUtime maxRSS is per-process. Neither establishes comparable physical memory usage.",
+             "memoryRegressionAssurance": "unverified", "nodeExecutableSha256": digest(Path(node).read_bytes())})
         save(output / "source-inventory.json", {"sourceCommit": SOURCE, "webTree": WEB_TREE, "files": sample["files"]})
         save(output / "sample.json", sample)
         frozen_options, expected_cases = None, None
@@ -242,9 +247,10 @@ def main():
                 ("original-first", "candidate-first"), ("original-last", "candidate-second"),
                 ("original-first", "original-last"), ("candidate-first", "candidate-second"))]
             correct = all(c["accepted"] for c in comparisons)
-            accepted = performance_eligible(trials, correct)
+            assessment = assess_performance(trials, correct)
+            accepted = assessment["sampledWallAndCpuImprovement"]
             result.update(success=accepted, screenAccepted=accepted, correctnessAccepted=correct, complete=True,
-                          comparisons=comparisons, actualVmFamilyAndSetupLogReviewRequired=True,
+                          comparisons=comparisons, **assessment, actualVmFamilyAndSetupLogReviewRequired=True,
                           measuredBoundary="Fresh Vitest process through full stock V8 JSON coverage completion; excludes install/job/upload and production blob merge")
     except BaseException as error:
         result["error"] = repr(error)
