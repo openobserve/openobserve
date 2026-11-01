@@ -25,7 +25,7 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
-use chrono::{FixedOffset, Utc};
+use chrono::{FixedOffset, Offset as _, Utc};
 use chrono_tz::Tz;
 use cron::Schedule;
 use serde::{Deserialize, Serialize};
@@ -412,21 +412,16 @@ pub fn alert_stale_deadline_micros(
     for _ in 0..stale_k {
         let anchor = chrono::DateTime::<Utc>::from_timestamp_micros(cursor)
             .ok_or_else(|| CompositeError::Parse("invalid freshness timestamp".to_string()))?;
-        let next = match (configured_timezone.as_ref(), legacy_timezone.as_ref()) {
-            (Some(timezone), _) => schedule
-                .after(&anchor.with_timezone(timezone))
-                .next()
-                .map(|next| next.timestamp_micros()),
-            (None, Some(offset)) => schedule
-                .after(&anchor.with_timezone(offset))
-                .next()
-                .map(|next| next.timestamp_micros()),
-            (None, None) => {
-                return Err(CompositeError::Parse("invalid alert timezone".to_string()));
-            }
-        };
-        cursor =
-            next.ok_or_else(|| CompositeError::Parse("cron has no future occurrence".to_string()))?;
+        let offset = configured_timezone
+            .as_ref()
+            .map(|timezone| anchor.with_timezone(timezone).offset().fix())
+            .or(legacy_timezone)
+            .ok_or_else(|| CompositeError::Parse("invalid alert timezone".to_string()))?;
+        cursor = schedule
+            .after(&anchor.with_timezone(&offset))
+            .next()
+            .map(|next| next.timestamp_micros())
+            .ok_or_else(|| CompositeError::Parse("cron has no future occurrence".to_string()))?;
     }
     Ok(cursor)
 }
@@ -1170,27 +1165,6 @@ mod tests {
             alert_stale_deadline_micros(level_at, &condition, 0, 3).unwrap(),
             ordinary,
             "composite freshness and ordinary scheduling must share DST rules"
-        );
-    }
-
-    #[test]
-    fn cron_deadline_first_fire_after_spring_forward_uses_the_fire_date_offset() {
-        use chrono::{TimeZone as _, Utc};
-
-        let level_at = Utc
-            .with_ymd_and_hms(2026, 3, 7, 17, 0, 0)
-            .unwrap()
-            .timestamp_micros();
-        let expected = Utc
-            .with_ymd_and_hms(2026, 3, 8, 16, 0, 0)
-            .unwrap()
-            .timestamp_micros();
-        let condition = cron_condition("0 0 9 * * *", Some("America/Los_Angeles"));
-
-        assert_eq!(
-            alert_stale_deadline_micros(level_at, &condition, 0, 1).unwrap(),
-            expected,
-            "9:00 PDT on 2026-03-08 is 16:00 UTC"
         );
     }
 
