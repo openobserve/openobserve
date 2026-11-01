@@ -26,6 +26,7 @@ import {
 import type { GateCode } from "./assistantStore.types";
 import { resetAssistantV2ForTests } from "./flags";
 import {
+  ESCAPE_RUNGS,
   onAssistantOpen,
   registerAssistantFocusTarget,
   registerContainerCloser,
@@ -383,5 +384,32 @@ describe("assistantOpen", () => {
     expect(composer).toHaveBeenCalledTimes(1);
     expect(openAssistant).not.toHaveBeenCalled();
     expect(window.__o2telemetry?.at(-1)?.properties).toMatchObject({ effect: "focus" });
+  });
+});
+
+describe("assistantOpen beside dictation (`40` §1.8.6)", () => {
+  it("leaves the caret alone in a composer, so a hold dictates where it was", () => {
+    const field = document.createElement("textarea");
+    field.setAttribute("data-assistant-composer", "");
+    document.body.appendChild(field);
+    field.focus();
+    const refocus = vi.fn(() => true);
+    const off = registerAssistantFocusTarget("composer", refocus);
+    onAssistantOpen(new KeyboardEvent("keydown", { key: "i", ctrlKey: true }));
+    expect(refocus).not.toHaveBeenCalled();
+    off();
+    field.remove();
+  });
+
+  it("ignores the chord during an IME composition", () => {
+    const refocus = vi.fn(() => true);
+    const off = registerAssistantFocusTarget("composer", refocus);
+    onAssistantOpen(new KeyboardEvent("keydown", { key: "i", ctrlKey: true, isComposing: true }));
+    expect(refocus).not.toHaveBeenCalled();
+    off();
+  });
+
+  it("orders rung a2 straight after rung a", () => {
+    expect(ESCAPE_RUNGS.slice(0, 3)).toEqual(["a", "a2", "b"]);
   });
 });

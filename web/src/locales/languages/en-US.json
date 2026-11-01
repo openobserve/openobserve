@@ -9518,6 +9518,7 @@
       },
       "name": "Message {product}",
       "placeholder": "Ask about {summary}",
+      "offline": "You're offline. Your draft is kept; dictation needs a connection.",
       "placeholderEmpty": "Ask a question or add context with {'@'}",
       "rateLimited": "Wait for the Retry countdown to end.",
       "recalled": "Recalled prompt {n} of {count}",
@@ -10880,6 +10881,16 @@
         "stopped": "Stopped",
         "turns": "Turns"
       },
+      "voice": {
+        "browser": "In the browser",
+        "browserHelp": "Most browsers send audio to their vendor's speech service (Google, Microsoft or Apple); some transcribe on the device. Some browsers can't dictate.",
+        "help": "Members can dictate into the composer and edit the text before sending. Nothing is sent until they press Send.",
+        "localOnly": "Saved in this browser, for you only. Settings for the whole organization need a newer server version.",
+        "off": "Off",
+        "offHelp": "No mic button in the composer.",
+        "readOnly": "Server speech-to-text needs a newer server version.",
+        "title": "Voice dictation"
+      },
       "v2Optin": "Assistant v2 preview in this browser",
       "v2OptinDeployment": "Turned on for this deployment, so this browser can't turn it off.",
       "v2OptinHelp": "Reload the page to switch."
@@ -11359,6 +11370,61 @@
       "withElapsed": "{status} · {elapsed}",
       "writing": "Writing the answer"
     },
+    "voice": {
+      "allow": {
+        "chrome": "In Chrome, select the icon to the left of the address, open Site settings and set Microphone to Allow.",
+        "edge": "In Edge, select the lock icon next to the address, open Permissions for this site and set Microphone to Allow.",
+        "headphones": "With a screen reader, use headphones while dictating.",
+        "other": "Open this site's settings in your browser and set Microphone to Allow.",
+        "safari": "In Safari, open Settings for This Website from the Safari menu and set Microphone to Allow.",
+        "title": "How to allow the microphone"
+      },
+      "cancelled": "Dictation cancelled.",
+      "continue": "Continue",
+      "dictate": "Dictate",
+      "engine": {
+        "apple": "Safari turns speech into text with Apple's speech service.",
+        "device": "Your browser turns speech into text on this device.",
+        "google": "Chrome turns speech into text with Google's speech service.",
+        "microsoft": "Edge turns speech into text with Microsoft's speech service.",
+        "vendor": "Your browser sends speech to its maker's speech service to turn it into text."
+      },
+      "engineShort": {
+        "browser": "Your browser",
+        "device": "Your device"
+      },
+      "enterToSend": "Press Enter again to send.",
+      "error": {
+        "browser_silent": "Your browser didn't turn speech into text. Type instead, or try another browser.",
+        "how": "How to allow it",
+        "language_unsupported": "Dictation in {language} isn't supported by this browser.",
+        "mic_denied": "Microphone access is blocked for this site.",
+        "no_mic": "No microphone found. Connect one and try again.",
+        "no_speech": "Didn't hear anything. Try again.",
+        "service_unreachable": "Couldn't reach {vendor}'s speech service. Check your connection, then try again.",
+        "service_unreachable_generic": "Couldn't reach your browser's speech service. Check your connection, then try again.",
+        "stt_unavailable": "Speech-to-text stopped. What was heard is kept.",
+        "time_limit": "Dictation stops after 2 minutes. Press the mic to go on.",
+        "unsupported": "This browser can't dictate and server speech-to-text is off.",
+        "voice_off": "Voice dictation is off in this browser. An org admin can turn it on for their own browser under Settings, Assistant, Data."
+      },
+      "helperFinish": "Enter or Esc to finish, not send",
+      "helperListening": "{engineShort} · OpenObserve doesn't store the audio",
+      "listening": "Listening",
+      "notNow": "Not now",
+      "primerBody": "Your browser will ask to use the microphone. What you say appears in the box for you to edit; nothing is sent until you press Send.",
+      "primerEngine": "{engineSentence} OpenObserve doesn't store the audio.",
+      "primerTitle": "Dictate into the message",
+      "releaseToStop": "Listening · release {keys} to stop",
+      "seesLine": "Dictation: {engineSentence} OpenObserve doesn't store the audio.",
+      "started": "Listening. Press Enter, Escape or the mic to stop.",
+      "stopTooltip": "Stop dictation",
+      "stopped": "Dictation stopped. {count} word added. | Dictation stopped. {count} words added.",
+      "stoppedEnter": "Dictation stopped. {count} word added. Press Enter to send. | Dictation stopped. {count} words added. Press Enter to send.",
+      "tooltip": "Dictate · Hold {keys}",
+      "tryAgain": "Try again",
+      "waitingPermission": "Waiting for microphone permission"
+    },
     "welcome": {
       "capability": {
         "readOnly": "Ask about your logs, traces, metrics, alerts and dashboards. It runs read-only queries, links to what it finds and can't change anything in this organization.",
@@ -11378,7 +11444,6 @@
         "noRecentHint": "Start one above, or ask about a log row, panel or alert.",
         "openFull": "Open full view",
         "placeholder": "Ask about your logs, alerts and dashboards…",
-        "whatItSees": "What it sees",
         "yourChats": "Your chats"
       },
       "prefill": {
@@ -22888,6 +22953,7 @@
     }
   },
   "shortcuts": {
+    "hold": "Hold",
     "then": "then",
     "escKey": "Esc",
     "title": "Keyboard Shortcuts",
@@ -23064,6 +23130,7 @@
       "k8sPalette": "Search Kubernetes resources",
       "aiChatClose": "Close AI chat",
       "assistantClose": "Close {product}",
+      "assistantComposerDictate": "Dictate while held",
       "assistantComposerNewline": "New line",
       "assistantComposerRecall": "Recall previous prompt",
       "assistantComposerSend": "Send message",

@@ -2,14 +2,17 @@
 import type { ShortcutProps } from "./OShortcut.types";
 import { computed } from "vue";
 import { isMacOS } from "@/utils/keyboardShortcuts";
-import { getShortcutDisplay } from "@/lib/vue-shortcut-manager/shortcutRegistry";
+import { getShortcutDisplay, isHoldShortcut } from "@/lib/vue-shortcut-manager/shortcutRegistry";
+import { useI18nTyped } from "@/types/i18n";
 
 const props = withDefaults(defineProps<ShortcutProps>(), {
   size: "sm",
   tone: "default",
 });
 
+const { t } = useI18nTyped();
 const isMac = isMacOS();
+const hold = computed(() => !!props.id && isHoldShortcut(props.id));
 
 /** Explicit `keys` win; otherwise resolve from the registry by `id`. */
 const resolvedKeys = computed<string | string[]>(() => {
@@ -78,6 +81,7 @@ const sizeClasses: Record<NonNullable<ShortcutProps["size"]>, string> = {
 
 <template>
   <span class="inline-flex items-center gap-1" data-test="o-shortcut">
+    <span v-if="hold" class="text-xs" data-test="o-shortcut-hold">{{ t("shortcuts.hold") }}</span>
     <kbd
       v-for="(cap, i) in caps"
       :key="i"

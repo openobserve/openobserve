@@ -29,17 +29,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else #trigger>
       <slot name="trigger">
-        <OButton
-          variant="ghost"
-          size="sm"
-          :icon-left="assistantGlyph.info"
-          class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+        <AssistantIconButton
+          :label="t('assistant.context.title')"
+          :icon="assistantGlyph.info"
           data-test="assistant-context-sees"
-        >
-          <span :class="iconOnly ? 'sr-only' : 'max-md:sr-only'">{{
-            t("assistant.context.title")
-          }}</span>
-        </OButton>
+        />
       </slot>
     </template>
 
@@ -92,6 +86,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OText variant="meta" as="p" data-test="assistant-context-sees-disclosure">{{
         context.disclosure.value
       }}</OText>
+      <OText
+        v-if="voice.sentence.value"
+        variant="meta"
+        as="p"
+        data-test="assistant-context-sees-voice"
+      >
+        {{ t("assistant.voice.seesLine", { engineSentence: voice.sentence.value }) }}
+      </OText>
     </section>
   </OPopover>
 </template>
@@ -104,8 +106,6 @@ export interface AssistantContextSeesPopoverProps {
   /** Controlled open state; omit to let the trigger own it. */
   open?: boolean;
   align?: "start" | "center" | "end";
-  /** Below `md` the label is always for screen readers only; this hides it at every size. */
-  iconOnly?: boolean;
 }
 </script>
 
@@ -114,8 +114,8 @@ import { computed, nextTick, ref, useId, watch } from "vue";
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import { useVoiceAvailability } from "@/components/ai-assistant/composer/useAssistantVoice";
 import { useAssistantContext, useAssistantStore } from "@/composables/assistant";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
@@ -125,7 +125,6 @@ import { useI18nTyped } from "@/types/i18n";
 const props = withDefaults(defineProps<AssistantContextSeesPopoverProps>(), {
   open: undefined,
   align: "end",
-  iconOnly: false,
 });
 
 const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
@@ -134,6 +133,7 @@ defineSlots<{ trigger?: () => unknown; anchor?: () => unknown }>();
 
 const { t } = useI18nTyped();
 const context = useAssistantContext(() => props.sid, { store: useAssistantStore() });
+const voice = useVoiceAvailability();
 const headingId = `assistant-sees-${useId()}`;
 const heading = ref<InstanceType<typeof OText> | null>(null);
 const ownOpen = ref(false);

@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ul>
       <div class="ms-auto flex min-w-0 shrink-0 items-center gap-1">
         <AssistantAgentPicker :sid="sid" />
-        <AssistantContextSeesPopover :sid="sid" :icon-only="compact" />
+        <AssistantContextSeesPopover :sid="sid" />
       </div>
     </div>
 

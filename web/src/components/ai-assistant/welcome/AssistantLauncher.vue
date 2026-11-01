@@ -105,16 +105,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OText :id="disclosureId" variant="meta" as="p" data-test="assistant-launcher-disclosure">
             {{ disclosure }}
           </OText>
-          <OText variant="meta" as="span" aria-hidden="true">·</OText>
-          <AssistantContextSeesPopover :sid="null" align="start" icon-only>
+          <AssistantContextSeesPopover :sid="null" align="start">
             <template #trigger>
-              <OButton
-                variant="ghost-primary"
-                size="sm"
-                class="max-md:min-h-11 pointer-coarse:min-h-11"
+              <AssistantIconButton
+                :label="t('assistant.context.title')"
+                :icon="assistantGlyph.info"
                 data-test="assistant-launcher-sees"
-                >{{ t("assistant.welcome.launcher.whatItSees") }}</OButton
-              >
+              />
             </template>
           </AssistantContextSeesPopover>
         </div>

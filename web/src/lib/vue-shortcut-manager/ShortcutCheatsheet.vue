@@ -121,6 +121,9 @@
                     entry.label
                   }}</OTruncatedText>
                   <div class="ms-4 flex shrink-0 items-center gap-1">
+                    <span v-if="entry.hold" class="text-text-secondary text-xs">{{
+                      t("shortcuts.hold")
+                    }}</span>
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
                       <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
                         t("shortcuts.then")
@@ -178,6 +181,9 @@
                     entry.label
                   }}</OTruncatedText>
                   <div class="ms-4 flex shrink-0 items-center gap-1">
+                    <span v-if="entry.hold" class="text-text-secondary text-xs">{{
+                      t("shortcuts.hold")
+                    }}</span>
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
                       <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
                         t("shortcuts.then")
@@ -254,6 +260,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 // Loaded only with the flag on, so the legacy path neither builds nor downloads the assistant runtime.
 const assistantCanChat = shallowRef<(() => boolean) | null>(null);
+const voiceAvailable = shallowRef<(() => boolean) | null>(null);
 // A child of this component's scope, so the reader built after the import stops on unmount.
 const assistantScope = effectScope();
 if (isAssistantV2()) {
@@ -261,6 +268,11 @@ if (isAssistantV2()) {
     if (!assistantScope.active) return;
     const capability = assistantScope.run(() => useAssistantCapability());
     if (capability) assistantCanChat.value = () => capability.assistantCanChat.value;
+  });
+  void import("@/components/ai-assistant/composer/useAssistantVoice").then(({ useVoiceStatus }) => {
+    if (!assistantScope.active) return;
+    const voice = assistantScope.run(() => useVoiceStatus());
+    if (voice) voiceAvailable.value = () => voice.status.value === "ready";
   });
 }
 onUnmounted(() => assistantScope.stop());
@@ -279,6 +291,7 @@ const capabilities = computed<ShortcutCapabilities>(() => ({
   aiEnabled: Boolean(store.state.zoConfig?.ai_enabled),
   downtimesEnabled: store.state.zoConfig?.downtimes_enabled === true,
   assistantCanChat: assistantCanChat.value?.() ?? false,
+  voiceAvailable: voiceAvailable.value?.() ?? false,
 }));
 
 const open = computed({
@@ -294,6 +307,8 @@ interface DisplayEntry {
   /** Combo string rendered as keycaps (e.g. "ctrl+enter", "del / ⌫"). */
   display: string;
   label: I18nText;
+  /** Renders "Hold" before the keycaps. */
+  hold?: boolean;
 }
 interface DisplaySection {
   title: I18nText;
@@ -348,6 +363,7 @@ const allModules = computed<DisplayModule[]>(() => {
             .map((s) => ({
               id: s.id,
               display: entryDisplay(s),
+              hold: s.hold,
               label: t(s.descriptionKey, LABEL_PARAMS[s.descriptionKey] ?? {}),
             })),
         },

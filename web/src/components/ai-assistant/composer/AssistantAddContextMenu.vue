@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="text-text-secondary">{{ row.label }}</span>
           <OShortcut v-if="row.shortcut" :id="row.id" tone="strong" />
-          <kbd v-else class="text-text-body font-mono">{{ row.keys }}</kbd>
+          <kbd v-else-if="row.keys" class="text-text-body font-mono">{{ row.keys }}</kbd>
         </li>
       </ul>
     </div>
@@ -97,6 +97,8 @@ import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 
+import { useVoiceAvailability } from "./useAssistantVoice";
+
 defineProps<AssistantAddContextMenuProps>();
 
 const emit = defineEmits<AssistantAddContextMenuEmits>();
@@ -107,6 +109,24 @@ const query = ref("");
 const search = ref<InstanceType<typeof OInput> | null>(null);
 const menu = ref<InstanceType<typeof AssistantMentionMenu> | null>(null);
 const listboxId = `assistant-add-context-${useId()}`;
+const voice = useVoiceAvailability();
+
+const voiceRow = computed(() => {
+  if (voice.status.value === "ready")
+    return {
+      id: "assistantComposerDictate",
+      label: t("shortcuts.actions.assistantComposerDictate"),
+      shortcut: true,
+    };
+  return {
+    id: "voice",
+    label: t(
+      voice.status.value === "off"
+        ? "assistant.voice.error.voice_off"
+        : "assistant.voice.error.unsupported",
+    ),
+  };
+});
 
 // The keys the retired hints popover listed, plus the `@` that opens this same menu from the textbox.
 const keyRows = computed(() => [
@@ -126,6 +146,7 @@ const keyRows = computed(() => [
     label: t("shortcuts.actions.assistantComposerSend"),
     shortcut: true,
   },
+  voiceRow.value,
 ]);
 
 const searchAttrs = computed(() => ({

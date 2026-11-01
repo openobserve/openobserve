@@ -122,9 +122,11 @@ describe("AssistantContextSeesPopover", () => {
     ).toContain("included in any share");
   });
 
-  it("keeps the trigger label for screen readers below md (CT-04 AC 8)", async () => {
-    const { trigger } = await openPopover();
-    expect(trigger.find(".max-md\\:sr-only").exists()).toBe(true);
+  it("opens from a named icon that takes no text width at any size (PO A34)", async () => {
+    const { trigger, wrapper } = await openPopover();
+    expect(trigger.text()).toBe("");
+    expect(trigger.attributes("aria-label")).toBe("What the assistant sees");
     expect(trigger.classes()).toContain("max-md:min-h-11");
+    expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
   });
 });

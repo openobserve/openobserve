@@ -143,7 +143,17 @@ export {
   snapRect,
 } from "./windows";
 export type { DropTarget, PageArea, ResizeEdge, WindowRect } from "./windows";
-export { readRecall, readHints, readSidebar, markHintSeen, migrateHome, writeHome } from "./prefs";
+export {
+  readRecall,
+  readHints,
+  readSidebar,
+  markHintSeen,
+  migrateHome,
+  writeHome,
+  readVoiceOptIn,
+  writeVoiceOptIn,
+  watchPrefs,
+} from "./prefs";
 export { assistantDashboardDraft, clearDashboardDraft } from "./actions/appliers/drafts";
 export {
   assistantObjectNameKey,

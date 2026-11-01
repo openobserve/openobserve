@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- One frame holds the chips, the text and its controls, so the message reads as one control (D4 §3.1) -->
       <OTextarea
         ref="textbox"
-        :model-value="text"
+        :model-value="shownText"
         :rows="1"
         autogrow
         :max-rows="8"
@@ -190,6 +190,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="recallOpen = true"
             />
             <span class="flex-1" />
+            <AssistantDictationMeter
+              v-if="voice.listening.value"
+              :label="voice.rowLabel.value"
+              :level="voice.level.value"
+              :elapsed-ms="voice.elapsedMs.value"
+            />
+            <AssistantDictateButton
+              v-if="voice.show.value"
+              :pressed="voice.mine.value"
+              :denied="voice.denied.value"
+              :primer-open="voice.primerOpen.value"
+              :sentence="voice.sentence.value"
+              :disabled-reason="micOffReason"
+              @press="onMicPress"
+              @accept="voice.acceptPrimer"
+              @decline="voice.declinePrimer"
+            />
             <span class="grid">
               <AssistantIconButton
                 v-if="showStop"
@@ -213,8 +230,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
           </div>
+          <OText
+            v-if="voice.waiting.value"
+            variant="meta"
+            as="p"
+            class="px-3 pb-1.5"
+            data-test="assistant-dictate-waiting"
+          >
+            {{ t("assistant.voice.waitingPermission") }}
+          </OText>
         </template>
       </OTextarea>
+      <AssistantDictationTail
+        :field="textbox?.textarea ?? null"
+        :before="text.slice(0, voice.anchor.value)"
+        :tail="voice.tail.value"
+      />
       <span :id="ghostHintId" class="sr-only">{{ ghostHint }}</span>
       <OButton
         v-if="ghostShown && ghost"
@@ -258,6 +289,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("assistant.context.pasteInline") }}
       </OButton>
+      <OButton
+        v-if="helper === voice.helperLine.value && voice.action.value === 'retry'"
+        variant="ghost-primary"
+        size="xs"
+        :class="TOUCH_TARGET_CLASS"
+        data-test="assistant-dictate-retry"
+        @click="voice.retry"
+      >
+        {{ t("assistant.voice.tryAgain") }}
+      </OButton>
+      <AssistantVoiceAllowPopover
+        v-if="helper === voice.helperLine.value && voice.action.value === 'how'"
+        :steps="voice.allowSteps.value"
+      />
     </div>
     <OText
       v-if="storageBlocked"
@@ -377,7 +422,11 @@ import { formatBytes } from "@/utils/formatters";
 import { getUUIDv7 } from "@/utils/uuid";
 
 import AssistantAddContextMenu from "./AssistantAddContextMenu.vue";
+import AssistantDictateButton from "./AssistantDictateButton.vue";
+import AssistantDictationMeter from "./AssistantDictationMeter.vue";
+import AssistantDictationTail from "./AssistantDictationTail.vue";
 import AssistantRecallSheet from "./AssistantRecallSheet.vue";
+import AssistantVoiceAllowPopover from "./AssistantVoiceAllowPopover.vue";
 import {
   announceComposer,
   composerUi,
@@ -386,6 +435,7 @@ import {
   noteCap,
   noteDraftCleared,
 } from "./composerUi";
+import { useAssistantVoice } from "./useAssistantVoice";
 
 const props = withDefaults(defineProps<AssistantComposerProps>(), {
   density: "compact",
@@ -434,6 +484,10 @@ let clearedTimer: ReturnType<typeof setTimeout> | null = null;
 const usedSendIds = new Set<string>();
 const offs: (() => void)[] = [];
 
+function el(): HTMLTextAreaElement | null {
+  return textbox.value?.textarea ?? null;
+}
+
 const ownSession = computed(() => store.state.sessions[props.sid ?? ""] ?? null);
 // A chat of another user+org is never written to, so an org switch leaves this composer empty (D21).
 const session = computed(() =>
@@ -471,10 +525,29 @@ const inertKind = computed<"approval" | "consent" | null>(() => {
   return session.value?.pendingConsent ? "consent" : null;
 });
 
+const voice = useAssistantVoice({
+  field: el,
+  ensureSid,
+  draftOf: (id) => store.state.sessions[id]?.composer.text ?? null,
+  writeDraft(id, value) {
+    freshSendId(id);
+    emptyEnterSaid = false;
+    store.setDraft(id, { text: value });
+  },
+  blocked: () => !props.visible || !!inertKind.value,
+  touch: () => !mdUp.value && !!window.matchMedia?.("(pointer: coarse)").matches,
+  say,
+  focusField: () => el()?.focus({ preventScroll: true }),
+});
+
+// The textbox shows the unsettled tail; the draft never holds it.
+const shownText = computed(() => voice.shown(text.value));
+
 const state = computed(() => {
   if (inertKind.value) return "inert";
   if (replying.value) return "reply";
   if (turn.value?.state === "stopping") return "stopping";
+  if (voice.mine.value) return "listening";
   if (elsewhere.value) return "elsewhere";
   if (running.value) return "running";
   return hasContent.value ? "draft" : "empty";
@@ -503,9 +576,10 @@ const stalled = computed(() => {
 });
 const canSend = computed(
   () =>
-    hasContent.value &&
-    !inertKind.value &&
-    (replying.value || (!running.value && !props.cooldownReason)),
+    voice.mine.value ||
+    (hasContent.value &&
+      !inertKind.value &&
+      (replying.value || (!running.value && !props.cooldownReason))),
 );
 const sendBlockedReason = computed(() => {
   if (props.cooldownReason) return props.cooldownReason;
@@ -516,11 +590,25 @@ const sendBlockedReason = computed(() => {
   return hasContent.value ? undefined : t("assistant.composer.sendEmpty");
 });
 
+const micOffReason = computed<I18nText | undefined>(() => {
+  if (voice.status.value === "silent") return t("assistant.voice.error.browser_silent");
+  if (voice.offline.value && !voice.mine.value) return t("assistant.composer.offline");
+  if (inertKind.value === "approval") return t("assistant.composer.waitingApproval");
+  return inertKind.value === "consent" ? t("assistant.composer.waitingConsent") : undefined;
+});
+
+// A chat with no messages shows the welcome, and the ghost never repeats its starters (D5 decision 11, PO A34).
 const ghostShown = computed(
-  () => !!props.ghost && !hasContent.value && (composer.value?.recallIndex ?? -1) === -1,
+  () =>
+    !!props.ghost &&
+    !!session.value?.messages.length &&
+    !hasContent.value &&
+    (composer.value?.recallIndex ?? -1) === -1,
 );
 const ghostHint = computed(() =>
-  props.ghost ? t("assistant.welcome.ghostHint", { label: props.ghost.label }) : raw(""),
+  ghostShown.value && props.ghost
+    ? t("assistant.welcome.ghostHint", { label: props.ghost.label })
+    : raw(""),
 );
 
 const placeholder = computed<I18nText>(() => {
@@ -546,6 +634,7 @@ const creditsRefusedAbove = computed(() => {
 const helper = computed<I18nText | null>(() => {
   if (inertKind.value === "approval") return t("assistant.composer.waitingApproval");
   if (inertKind.value === "consent") return t("assistant.composer.waitingConsent");
+  if (voice.helperLine.value) return voice.helperLine.value;
   if (replying.value) return t("assistant.composer.replyHelper");
   if (blockedLine.value) return blockedLine.value;
   const notice = liveSid.value ? store.entryNotice(liveSid.value) : null;
@@ -560,6 +649,7 @@ const helper = computed<I18nText | null>(() => {
   // Send stays enabled: the server is the gate, the line only predicts a refusal not yet shown above.
   if (store.state.capability.creditMode === "exhausted" && !creditsRefusedAbove.value)
     return t("assistant.credits.predictedExhausted", { org: raw(org.value) });
+  if (voice.show.value && voice.offline.value) return t("assistant.composer.offline");
   return recallHint.value;
 });
 
@@ -599,10 +689,6 @@ const textboxAttrs = computed(() => ({
   "data-assistant-composer": "",
   class: "max-md:min-h-11 pointer-coarse:min-h-11",
 }));
-
-function el(): HTMLTextAreaElement | null {
-  return textbox.value?.textarea ?? null;
-}
 
 /** Puts the caret at the end or at an offset (CT-08 AC 9; `70` landing rules). */
 function focusInput(caret: "end" | number = "end"): void {
@@ -646,6 +732,7 @@ function onInput(value: string): void {
   if (inertKind.value) return;
   const id = ensureSid();
   if (!id) return;
+  voice.noteEdit(el()?.selectionStart ?? value.length);
   blockedLine.value = null;
   droppedImages.value = 0;
   pasteOffer.value = null;
@@ -780,11 +867,13 @@ function caretOnLastLine(target: HTMLTextAreaElement): boolean {
 // The one `keydown` owner (`40` §1.4); a composing IME key is never ours.
 function onKeydown(event: KeyboardEvent): void {
   if (event.isComposing || event.keyCode === 229) return;
+  voice.clearHint();
   if (mentionAt.value !== null && mentionKey(event)) return;
   const target = el();
   if (!target) return;
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
+    if (voice.mine.value) return voice.stop("enter");
     return void trySend();
   }
   // Ctrl+↑ / ⌘↑ on the first line goes to the latest answer; elsewhere the native caret move runs (round 2 X-28).
@@ -859,6 +948,7 @@ function mentionKey(event: KeyboardEvent): boolean {
 }
 
 function trySend(): void {
+  if (voice.mine.value) return voice.stop("send");
   const id = liveSid.value;
   if (!id || !composer.value) return;
   if (inertKind.value) {
@@ -941,6 +1031,7 @@ function stop(): void {
 }
 
 function recall(direction: "older" | "newer"): boolean {
+  voice.stop("other");
   const id = liveSid.value ?? ensureSid();
   const key = store.state.userOrgKey;
   if (!id || !key) return false;
@@ -1176,6 +1267,12 @@ function readBase64(picked: File): Promise<string> {
   });
 }
 
+// A keyboard press has `detail` 0 and keeps focus on the mic, so Enter or Space stops it (D4 §4.3).
+function onMicPress(event: MouseEvent): void {
+  voice.press("mic");
+  if (event.detail > 0 && !voice.primerOpen.value) el()?.focus({ preventScroll: true });
+}
+
 function removeImage(image: ImageAttachment): void {
   const id = liveSid.value;
   if (!id || !image.id) return;
@@ -1256,7 +1353,35 @@ watch(
 // A reason for a swallowed Enter is true only while its cause lasts (U8).
 watch(inertKind, (kind) => {
   if (kind === null) clearBlocked();
+  else voice.stop("other");
 });
+
+// The original chat keeps what was dictated: a switch, a hide or an org change settles there (`40` §1.8.3).
+watch(liveSid, (id, previous) => {
+  if (previous && id !== previous) voice.stop("other");
+});
+watch(
+  () => props.visible,
+  (visible) => {
+    if (!visible) voice.stop("other");
+  },
+);
+
+// Writing the textbox's value moves the caret to the end, so the caret is put back where the user had it.
+watch(
+  [shownText, voice.anchor],
+  (_, [, anchorBefore]) => {
+    const field = el();
+    if (!field || !voice.mine.value || document.activeElement !== field) return;
+    const caret = field.selectionStart ?? 0;
+    const fromEnd = field.value.length - caret;
+    void nextTick(() => {
+      const at = caret < anchorBefore ? caret : field.value.length - fromEnd;
+      field.setSelectionRange(at, at);
+    });
+  },
+  { flush: "pre" },
+);
 
 // A card answered or withdrawn elsewhere takes reply mode with it.
 watch(
@@ -1325,6 +1450,7 @@ watch(
 watch(
   () => store.state.userOrgKey,
   (next, previous) => {
+    voice.stop("other");
     const old = ownSession.value;
     // Every mounted composer may clear (the first one wins), so a closed assistant still forgets the draft.
     if (!old || !previous || next === previous || old.userOrgKey !== previous) return;
@@ -1381,9 +1507,15 @@ onMounted(() => {
   field?.addEventListener("click", detectMention);
   field?.addEventListener("keyup", onCaretKey);
   const onSelection = () => {
-    if (mentionAt.value !== null && document.activeElement === field) detectMention();
+    if (document.activeElement !== field) return;
+    if (mentionAt.value !== null) detectMention();
+    voice.noteCaret(field?.selectionStart ?? 0);
   };
   document.addEventListener("selectionchange", onSelection);
+  const onCompositionStart = () => voice.setComposing(true, field?.selectionStart ?? 0);
+  const onCompositionEnd = () => voice.setComposing(false, field?.selectionStart ?? 0);
+  field?.addEventListener("compositionstart", onCompositionStart);
+  field?.addEventListener("compositionend", onCompositionEnd);
   const press = () => (pointerDown = true);
   const release = () => (pointerDown = false);
   document.addEventListener("pointerdown", press, true);
@@ -1393,6 +1525,8 @@ onMounted(() => {
     field?.removeEventListener("click", detectMention);
     field?.removeEventListener("keyup", onCaretKey);
     document.removeEventListener("selectionchange", onSelection);
+    field?.removeEventListener("compositionstart", onCompositionStart);
+    field?.removeEventListener("compositionend", onCompositionEnd);
     document.removeEventListener("pointerdown", press, true);
     document.removeEventListener("pointerup", release, true);
     document.removeEventListener("pointercancel", release, true);
@@ -1401,6 +1535,17 @@ onMounted(() => {
     shell?.removeEventListener("drop", onDrop);
   });
   offs.push(
+    // Rung a2: Escape while dictating stops dictation only; the container stays open (`10` §6.3).
+    registerEscapeRung("a2", (event) => {
+      if (
+        !voice.mine.value ||
+        !(event.target instanceof Node) ||
+        !root.value?.contains(event.target)
+      )
+        return false;
+      voice.stop("escape");
+      return true;
+    }),
     registerAssistantFocusTarget("composer", () => {
       if (!props.visible || !el()) return false;
       focusInput("end");

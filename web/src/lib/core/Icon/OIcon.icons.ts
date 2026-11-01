@@ -160,6 +160,8 @@ import Public from "~icons/material-symbols/public";
 import Mail from "~icons/material-symbols/mail-outline";
 import ManageSearch from "~icons/material-symbols/manage-search";
 import Merge from "~icons/material-symbols/merge";
+import Mic from "~icons/material-symbols/mic-outline";
+import MicOff from "~icons/material-symbols/mic-off-outline";
 import MoreHoriz from "~icons/material-symbols/more-horiz";
 import NavigationIcon from "~icons/material-symbols/navigation-outline";
 import Notifications from "~icons/material-symbols/notifications-outline";
@@ -553,6 +555,8 @@ export const iconRegistry = {
   mail: Mail,
   "manage-search": ManageSearch,
   merge: Merge,
+  mic: Mic,
+  "mic-off": MicOff,
   "more-horiz": MoreHoriz,
   navigation: NavigationIcon,
   notifications: Notifications,

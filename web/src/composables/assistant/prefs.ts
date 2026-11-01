@@ -58,6 +58,7 @@ const LOCAL_KEYS = {
   sidebar: (k: string) => `o2.assistant.sidebar:${k}`,
   home: (k: string) => `o2.assistant.home:${k}`,
   hints: (k: string) => `o2.assistant.hints:${k}`,
+  voice: (k: string) => `o2.assistant.voice:${k}`,
   creditNotice: (k: string, threshold: number) => `o2.assistant.creditNotice:${k}:${threshold}`,
   importDismissed: (k: string) => `o2.assistant.importDismissed:${k}`,
   importSnoozed: (k: string) => `o2.assistant.importSnoozed:${k}`,
@@ -156,6 +157,8 @@ export interface HomePrefs {
 export interface HintPrefs {
   recall?: boolean;
   disclosure?: boolean;
+  /** The dictation primer was accepted (`40` §1.8.2). */
+  dictate?: boolean;
 }
 
 export interface PlacementPrefs {
@@ -164,7 +167,8 @@ export interface PlacementPrefs {
 }
 
 /** The cached values a `storage` event from another tab can change. */
-export type PrefName = "recall" | "sidebar" | "home" | "hints" | "creditNotice" | "importDismissed";
+export type PrefName =
+  "recall" | "sidebar" | "home" | "hints" | "voice" | "creditNotice" | "importDismissed";
 
 type Area = "local" | "session";
 
@@ -285,6 +289,15 @@ export function readHints(userOrgKey: string): HintPrefs {
 
 export function markHintSeen(userOrgKey: string, hint: keyof HintPrefs): void {
   mergeJson<HintPrefs>("local", LOCAL_KEYS.hints(userOrgKey), { [hint]: true });
+}
+
+/** The self-hosted opt-in to browser dictation; it stays in this browser until org voice settings ship (PO A30). */
+export function readVoiceOptIn(userOrgKey: string): boolean {
+  return readJson<boolean>("local", LOCAL_KEYS.voice(userOrgKey)) === true;
+}
+
+export function writeVoiceOptIn(userOrgKey: string, on: boolean): void {
+  writeJson("local", LOCAL_KEYS.voice(userOrgKey), on);
 }
 
 export function isImportDismissed(userOrgKey: string): boolean {
@@ -496,6 +509,7 @@ function prefNameOf(userOrgKey: string, key: string): PrefName | null {
   if (key === LOCAL_KEYS.sidebar(userOrgKey)) return "sidebar";
   if (key === LOCAL_KEYS.home(userOrgKey)) return "home";
   if (key === LOCAL_KEYS.hints(userOrgKey)) return "hints";
+  if (key === LOCAL_KEYS.voice(userOrgKey)) return "voice";
   if (key === LOCAL_KEYS.importDismissed(userOrgKey)) return "importDismissed";
   return key.startsWith(`o2.assistant.creditNotice:${userOrgKey}:`) ? "creditNotice" : null;
 }

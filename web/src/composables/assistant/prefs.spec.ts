@@ -28,6 +28,8 @@ import {
   markedUserOrgKeys,
   pushRecall,
   readAnnotations,
+  readVoiceOptIn,
+  writeVoiceOptIn,
   readHints,
   readHistoryFilter,
   readHome,
@@ -376,6 +378,25 @@ describe("one-time notices", () => {
     dismissImport(KEY);
     expect(isImportDismissed(KEY)).toBe(true);
     expect(isImportDismissed("other")).toBe(false);
+  });
+});
+
+describe("voice opt-in", () => {
+  it("is off until written, per user+org", () => {
+    expect(readVoiceOptIn(KEY)).toBe(false);
+    writeVoiceOptIn(KEY, true);
+    expect(readVoiceOptIn(KEY)).toBe(true);
+    expect(readVoiceOptIn(`${KEY}:other`)).toBe(false);
+    writeVoiceOptIn(KEY, false);
+    expect(readVoiceOptIn(KEY)).toBe(false);
+  });
+
+  it("is reported by watchPrefs when another tab writes it", () => {
+    const onChange = vi.fn();
+    const off = watchPrefs(KEY, onChange);
+    window.dispatchEvent(new StorageEvent("storage", { key: `o2.assistant.voice:${KEY}` }));
+    off();
+    expect(onChange).toHaveBeenCalledWith("voice");
   });
 });
 
