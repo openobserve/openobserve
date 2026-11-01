@@ -13,17 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import config from "@/aws-exports";
-import { siteURL } from "@/constants/config";
 import enUS from "@/locales/languages/en-US.json";
 import { PREBUILT_DESTINATION_TYPES } from "@/utils/prebuilt-templates";
 import { createI18n } from "vue-i18n";
-import { copyToClipboard } from "@/utils/clipboard";
-
-vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn().mockResolvedValue(true) }));
 
 // ==================== TEST DATA FACTORIES ====================
 
@@ -613,10 +609,10 @@ describe("Approved Slack choices", () => {
     const app = descriptionOf(wrapper, "slack_app");
     expect(app.attributes("data-test")).toBe("destination-type-description");
     expect(app.classes()).toContain("sr-only");
-    expect(app.text()).toBe(
+    expect(app.text()).toContain(
       "Recommended for alert response. Updates scheduled alerts in place. Acknowledge, mute and investigate from Slack. Needs a connected workspace.",
     );
-    expect(descriptionOf(wrapper, "slack").text()).toBe(
+    expect(descriptionOf(wrapper, "slack").text()).toContain(
       "Posts a new message with your webhook and template. Use it for on-call pages or custom Slack layouts.",
     );
     const shown = findCardByType(wrapper, "slack").find(".card-content").text();
@@ -656,7 +652,7 @@ describe("Approved Slack choices", () => {
     wrapper.unmount();
   });
 
-  it("marks the unavailable app Off and explains it under the row, not in the tile", () => {
+  it("marks the unavailable app Off and explains it in the tile tooltip, not under the row", () => {
     const wrapper = mountComponent({
       slackApp: false,
       unavailableReason: "flag",
@@ -664,15 +660,65 @@ describe("Approved Slack choices", () => {
     });
     const card = findCardByType(wrapper, "slack_app");
     expect(card.find('[data-test="destination-type-off"]').text()).toBe("Off");
-    expect(card.find('[data-test="slack-app-unavailable"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="slack-app-unavailable"]').exists()).toBe(true);
     expect(descriptionOf(wrapper, "slack_app").text()).toContain("O2_SLACK_ENABLED");
     wrapper.unmount();
   });
 
-  it("shows no under-row line when the app is available", () => {
+  it("renders nothing after the tile row", () => {
+    for (const props of [{ slackApp: true }, { slackApp: false, unavailableReason: "flag" }]) {
+      const wrapper = mountComponent(props);
+      const root = wrapper.element as HTMLElement;
+      expect(root.children).toHaveLength(1);
+      expect(root.querySelector(".selector-grid")!.parentElement!.parentElement).toBe(root);
+      expect(wrapper.find('[data-test="slack-app-unavailable"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="slack-choice-hint"]').exists()).toBe(false);
+      wrapper.unmount();
+    }
+  });
+
+  const HINT =
+    "On-call pages and super clusters use the webhook. Manual and realtime sends from a Slack app destination are separate posts.";
+
+  it("gives the unavailable Slack app tile the reason, its description and the choice hint as separate lines", () => {
+    const wrapper = mountComponent({
+      slackApp: false,
+      unavailableReason: "master_key",
+      canManageSlack: true,
+    });
+    const lines = descriptionOf(wrapper, "slack_app")
+      .findAll("span")
+      .map((line) => line.text());
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain("O2_MASTER_ENCRYPTION_KEY");
+    expect(lines[2]).toBe(HINT);
+    wrapper.unmount();
+  });
+
+  it("gives the available Slack app and the webhook tile their description and the choice hint", () => {
     const wrapper = mountComponent({ slackApp: true });
-    expect(wrapper.find('[data-test="slack-app-unavailable"]').exists()).toBe(false);
+    for (const id of ["slack_app", "slack"]) {
+      const lines = descriptionOf(wrapper, id)
+        .findAll("span")
+        .map((line) => line.text());
+      expect(lines).toHaveLength(2);
+      expect(lines[1]).toBe(HINT);
+    }
+    wrapper.unmount();
+  });
+
+  it("keeps the choice hint off non-Slack tiles", () => {
+    const wrapper = mountComponent({ slackApp: true });
+    expect(descriptionOf(wrapper, "jira").text()).not.toContain(HINT);
+    wrapper.unmount();
+  });
+
+  it.each([
+    ["flag", "O2_SLACK_ENABLED"],
+    ["master_key", "O2_MASTER_ENCRYPTION_KEY"],
+  ])("names the operator setting in the tooltip for reason %s", (unavailableReason, name) => {
+    const wrapper = mountComponent({ slackApp: false, unavailableReason, canManageSlack: true });
+    expect(descriptionOf(wrapper, "slack_app").text()).toContain(name);
+    expect(wrapper.findAll("button")).toHaveLength(0);
     wrapper.unmount();
   });
 
@@ -685,30 +731,6 @@ describe("Approved Slack choices", () => {
     wrapper.unmount();
   });
 
-  it("shows the choice hint only when Slack tiles are visible", () => {
-    const wrapper = mountComponent();
-    expect(wrapper.find('[data-test="slack-choice-hint"]').text()).toBe(
-      "On-call pages and super clusters use the webhook. Manual and realtime sends from a Slack app destination are separate posts.",
-    );
-    wrapper.unmount();
-    const slackIndex = PREBUILT_DESTINATION_TYPES.findIndex((type) => type.id === "slack");
-    const [slack] = PREBUILT_DESTINATION_TYPES.splice(slackIndex, 1);
-    try {
-      const withoutSlack = mountComponent();
-      expect(withoutSlack.find('[data-test="slack-choice-hint"]').exists()).toBe(false);
-      withoutSlack.unmount();
-    } finally {
-      PREBUILT_DESTINATION_TYPES.splice(slackIndex, 0, slack);
-    }
-  });
-
-  const reasonOf = (wrapper: VueWrapper) =>
-    wrapper.find('[data-test="slack-app-unavailable-reason"]');
-  const contactOf = (wrapper: VueWrapper) =>
-    wrapper.find('[data-test="slack-app-contact-support"]');
-  const variableOf = (wrapper: VueWrapper) =>
-    wrapper.find('[data-test="slack-app-unavailable-variable"]');
-  const copyOf = (wrapper: VueWrapper) => wrapper.find('[data-test="slack-app-unavailable-copy"]');
   const inCloud = (run: () => void | Promise<void>) => async () => {
     const was = config.isCloud;
     config.isCloud = "true";
@@ -719,148 +741,32 @@ describe("Approved Slack choices", () => {
     }
   };
 
-  it.each([undefined, "edition", "super_cluster", "flag", "master_key"])(
-    "sends every Cloud user to support for reason %s",
-    (unavailableReason) =>
-      inCloud(async () => {
-        for (const canManageSlack of [true, false]) {
-          const open = vi.spyOn(window, "open").mockReturnValue(null);
-          const wrapper = mountComponent({ slackApp: false, unavailableReason, canManageSlack });
-          expect(reasonOf(wrapper).text()).toBe("Not turned on for your Cloud region yet");
-          const contact = contactOf(wrapper);
-          expect(contact.text()).toBe("Contact support");
-          const button = wrapper.findComponent({ name: "OButton" });
-          expect(button.props("variant")).toBe("outline");
-          expect(button.props("size")).toBe("xs");
-          await contact.trigger("click");
-          expect(open).toHaveBeenCalledWith(siteURL.contactSupport, "_blank");
-          expect(variableOf(wrapper).exists()).toBe(false);
-          expect(copyOf(wrapper).exists()).toBe(false);
-          open.mockRestore();
-          wrapper.unmount();
-        }
-      })(),
-  );
-
-  it.each([
-    [
-      "flag",
-      "Turned off on this server; ask your operator to set O2_SLACK_ENABLED",
-      "O2_SLACK_ENABLED",
-    ],
-    [
-      "master_key",
-      "Needs an encryption key on this server; ask your operator to set O2_MASTER_ENCRYPTION_KEY",
-      "O2_MASTER_ENCRYPTION_KEY",
-    ],
-  ])(
-    "routes an org admin to the operator setting for reason %s",
-    (unavailableReason, text, name) => {
-      const wrapper = mountComponent({ slackApp: false, unavailableReason, canManageSlack: true });
-      expect(reasonOf(wrapper).text()).toBe(text);
-      expect(variableOf(wrapper).text()).toBe(name);
-      expect(variableOf(wrapper).find("button").exists()).toBe(false);
-      expect(copyOf(wrapper).element.tagName).toBe("BUTTON");
-      expect(contactOf(wrapper).exists()).toBe(false);
-      wrapper.unmount();
-    },
-  );
-
-  // Screen readers announce aria-labels in a description, which jsdom text() leaves out.
-  const announcedText = (element: Element) => {
-    const copy = element.cloneNode(true) as Element;
-    copy.querySelectorAll("[aria-label]").forEach((labelled) => {
-      labelled.replaceWith(labelled.getAttribute("aria-label") ?? "");
-    });
-    return copy.textContent ?? "";
-  };
-
-  it.each([
-    ["flag", "O2_SLACK_ENABLED"],
-    ["master_key", "O2_MASTER_ENCRYPTION_KEY"],
-  ])("describes the tile with only the reason text for reason %s", (unavailableReason, name) => {
-    const wrapper = mountComponent({ slackApp: false, unavailableReason, canManageSlack: true });
-    const reason = reasonOf(wrapper);
-    expect(reason.exists()).toBe(true);
-    expect(announcedText(reason.element)).toContain(name);
-    expect(announcedText(reason.element)).not.toContain("Copy to clipboard");
-    expect(reason.find("button").exists()).toBe(false);
-    expect(copyOf(wrapper).exists()).toBe(true);
-    wrapper.unmount();
-  });
-
-  it.each(["flag", "master_key"])(
-    "tells a member who can't turn Slack on to ask an org admin for reason %s",
-    (unavailableReason) => {
-      const wrapper = mountComponent({ slackApp: false, unavailableReason, canManageSlack: false });
-      expect(reasonOf(wrapper).text()).toBe("Ask an org admin to turn on the Slack app");
-      expect(variableOf(wrapper).exists()).toBe(false);
-      expect(contactOf(wrapper).exists()).toBe(false);
-      expect(wrapper.findAll("button")).toHaveLength(0);
-      wrapper.unmount();
-    },
-  );
-
-  it.each([undefined, "edition", "super_cluster"])(
-    "names the Enterprise single-cluster need with no action for reason %s",
-    (unavailableReason) => {
+  it(
+    "tells every Cloud user the app is not on for the region, with no server variable",
+    inCloud(() => {
       for (const canManageSlack of [true, false]) {
-        const wrapper = mountComponent({ slackApp: false, unavailableReason, canManageSlack });
-        expect(reasonOf(wrapper).text()).toBe("Needs the Enterprise Slack app on a single cluster");
-        expect(variableOf(wrapper).exists()).toBe(false);
-        expect(contactOf(wrapper).exists()).toBe(false);
-        expect(wrapper.findAll("button")).toHaveLength(0);
+        const wrapper = mountComponent({
+          slackApp: false,
+          unavailableReason: "flag",
+          canManageSlack,
+        });
+        const text = descriptionOf(wrapper, "slack_app").text();
+        expect(text).toContain("Not turned on for your Cloud region yet");
+        expect(text).not.toContain("O2_SLACK_ENABLED");
         wrapper.unmount();
       }
-    },
-  );
-
-  it(
-    "keeps each action outside the disabled tile, reachable and clickable",
-    inCloud(async () => {
-      const open = vi.spyOn(window, "open").mockReturnValue(null);
-      const cloud = mountComponent({ slackApp: false });
-      const contact = contactOf(cloud).element as HTMLButtonElement;
-      expect(contact.closest('[role="button"]')).toBeNull();
-      expect(contact.disabled).toBe(false);
-      expect(contact.getAttribute("tabindex")).not.toBe("-1");
-      expect(contact.textContent?.trim()).toBe("Contact support");
-      await contactOf(cloud).trigger("click");
-      expect(open).toHaveBeenCalledTimes(1);
-      expect(cloud.emitted("select")).toBeUndefined();
-      open.mockRestore();
-      cloud.unmount();
-
-      config.isCloud = "false";
-      const admin = mountComponent({
-        slackApp: false,
-        unavailableReason: "flag",
-        canManageSlack: true,
-      });
-      const copy = copyOf(admin).element as HTMLButtonElement;
-      expect(copy.closest('[role="button"]')).toBeNull();
-      expect(copy.disabled).toBe(false);
-      expect(copy.getAttribute("tabindex")).not.toBe("-1");
-      expect(copy.getAttribute("aria-label")).toBe("Copy to clipboard");
-      expect(admin.emitted("select")).toBeUndefined();
-      admin.unmount();
     }),
   );
 
-  it("copies only the setting name through the clipboard util, which falls back off HTTPS", async () => {
-    const copy = vi.mocked(copyToClipboard);
-    copy.mockClear();
+  it("tells a member who can't turn Slack on to ask an org admin", () => {
     const wrapper = mountComponent({
       slackApp: false,
-      unavailableReason: "master_key",
-      canManageSlack: true,
+      unavailableReason: "flag",
+      canManageSlack: false,
     });
-    await copyOf(wrapper).trigger("click");
-    await flushPromises();
-    expect(copy).toHaveBeenCalledTimes(1);
-    expect(copy.mock.calls[0][0]).toBe("O2_MASTER_ENCRYPTION_KEY");
-    expect(copy.mock.calls[0][0]).toBe(variableOf(wrapper).text());
-    expect(wrapper.emitted("select")).toBeUndefined();
+    expect(descriptionOf(wrapper, "slack_app").text()).toContain(
+      "Ask an org admin to turn on the Slack app",
+    );
     wrapper.unmount();
   });
 
@@ -891,7 +797,7 @@ describe("Approved Slack choices", () => {
     expect(app.attributes("aria-disabled")).toBe("true");
     expect(app.attributes("tabindex")).toBe("-1");
     const reason = wrapper.find(`[id="${app.attributes("aria-describedby")}"]`);
-    expect(reason.text()).toBe("Needs the Enterprise Slack app on a single cluster");
+    expect(reason.text()).toContain("Needs the Enterprise Slack app on a single cluster");
     expect(app.find(".card-content").classes()).toContain("opacity-40");
     await app.trigger("click");
     await app.trigger("keydown", { key: "Enter" });

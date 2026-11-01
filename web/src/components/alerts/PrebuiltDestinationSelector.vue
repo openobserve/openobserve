@@ -18,7 +18,12 @@ limitations under the License. -->
       <div
         class="selector-grid grid auto-cols-fr grid-flow-col gap-2 @max-[54rem]/dest-picker:auto-cols-auto @max-[54rem]/dest-picker:grid-flow-row @max-[54rem]/dest-picker:grid-cols-5 @max-[27rem]/dest-picker:grid-cols-2"
       >
-        <OTooltip v-for="tile in tiles" :key="tile.id" :content="tile.tip" :delay="300">
+        <OTooltip v-for="tile in tiles" :key="tile.id" :delay="300">
+          <template #content>
+            <div v-for="(part, index) in tile.tips" :key="index" :class="index > 0 && 'mt-1'">
+              {{ part }}
+            </div>
+          </template>
           <div
             data-test="destination-type-card"
             :data-type="tile.id"
@@ -38,11 +43,10 @@ limitations under the License. -->
             @keydown.enter.prevent="selectType(tile.id)"
             @keydown.space.prevent="selectType(tile.id)"
           >
-            <span
-              :id="`${uid}-${tile.id}`"
-              data-test="destination-type-description"
-              class="sr-only"
-              >{{ tile.tip }}</span
+            <span :id="`${uid}-${tile.id}`" data-test="destination-type-description" class="sr-only"
+              ><span v-for="(part, index) in tile.tips" :key="index" class="block">{{
+                part
+              }}</span></span
             >
             <div
               class="card-content flex min-w-0 flex-1 flex-col items-center"
@@ -92,70 +96,19 @@ limitations under the License. -->
           </div>
         </OTooltip>
       </div>
-      <div
-        v-if="appUnavailable"
-        data-test="slack-app-unavailable"
-        class="mt-3 flex flex-wrap items-center gap-2"
-      >
-        <p class="text-text-secondary mb-0 text-xs [line-height:1.3]">
-          <!-- The copy button sits outside the reason so it is not read as part of it. -->
-          <span data-test="slack-app-unavailable-reason"
-            ><i18n-t v-if="operatorSetting" :keypath="unavailableKey" tag="span">
-              <template #variable>
-                <span class="inline-flex items-center align-middle">
-                  <OCode data-test="slack-app-unavailable-variable">{{ operatorSetting }}</OCode>
-                </span>
-              </template>
-            </i18n-t>
-            <template v-else>{{ t(unavailableKey) }}</template></span
-          ><template v-if="operatorSetting"
-            >{{ WORD_JOINER
-            }}<OTooltip :content="t('common.copyToClipboard')">
-              <OButton
-                variant="ghost-muted"
-                size="icon"
-                class="-my-1 ms-0.5 align-middle"
-                :aria-label="t('common.copyToClipboard')"
-                data-test="slack-app-unavailable-copy"
-                @click="copyOperatorSetting"
-              >
-                <template #icon-left><OIcon name="content-copy" size="xs" /></template>
-              </OButton> </OTooltip
-          ></template>
-        </p>
-        <OButton
-          v-if="isCloud"
-          variant="outline"
-          size="xs"
-          data-test="slack-app-contact-support"
-          @click="contactSupport"
-          >{{ t("billing.trialStrip.contactSupport") }}</OButton
-        >
-      </div>
     </div>
-    <p
-      v-if="filteredDestinationTypes.some((type) => type.id === 'slack')"
-      data-test="slack-choice-hint"
-      class="text-text-secondary mt-4 mb-0 text-xs leading-none"
-    >
-      {{ t("slackApp.destination.choiceHint") }}
-    </p>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, useId } from "vue";
 import config from "@/aws-exports";
-import { siteURL } from "@/constants/config";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { SlackDisabledReason } from "@/types/slack";
-import { copyToClipboard } from "@/utils/clipboard";
 import { destinationTypeTiles } from "@/utils/prebuilt-templates";
 import type { DestinationTileId } from "@/utils/prebuilt-templates/types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
-import OCode from "@/lib/core/Code/OCode.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
@@ -182,8 +135,6 @@ interface Emits {
 const emit = defineEmits<Emits>();
 
 const { t } = useI18nTyped();
-// Keeps the copy button on the chip's line without adding any announced text.
-const WORD_JOINER = "\u2060";
 const uid = useId();
 const isCloud = computed(() => config.isCloud === "true");
 const serverReason = computed(() =>
@@ -205,15 +156,6 @@ const unavailableKey = computed(() => {
     : ("slackApp.destination.unavailableMasterKey" as const);
 });
 
-function contactSupport() {
-  window.open(siteURL.contactSupport, "_blank");
-}
-
-// The util falls back to execCommand, so the copy works on plain-HTTP self-hosted servers.
-function copyOperatorSetting() {
-  if (operatorSetting.value) copyToClipboard(operatorSetting.value, t);
-}
-
 const selectedType = computed({
   get: () => props.modelValue,
   // Only user selections flow through the setter, so null/'' never get emitted.
@@ -221,27 +163,34 @@ const selectedType = computed({
 });
 
 const filteredDestinationTypes = computed(() => destinationTypeTiles(props.slackApp));
-const appUnavailable = computed(() =>
-  filteredDestinationTypes.value.some((type) => type.id === "slack_app" && type.disabled),
-);
-
 const unavailableText = computed(() =>
   operatorSetting.value
     ? t(unavailableKey.value, { variable: raw(operatorSetting.value) })
     : t(unavailableKey.value),
 );
 
+// Separate lines, not one joined sentence, so every locale keeps its own punctuation.
+function tileTips(tile: (typeof filteredDestinationTypes.value)[number]): string[] {
+  const hasSlackWebhook = filteredDestinationTypes.value.some((type) => type.id === "slack");
+  const isSlack = tile.id === "slack" || tile.id === "slack_app";
+  return [
+    ...(tile.disabled ? [unavailableText.value] : []),
+    ...(tile.disabled && !isSlack ? [] : [t(tile.descriptionKey)]),
+    ...(isSlack && hasSlackWebhook ? [t("slackApp.destination.choiceHint")] : []),
+  ];
+}
+
 const tiles = computed(() => [
   ...filteredDestinationTypes.value.map((tile) => ({
     ...tile,
     short: t(tile.shortKey),
-    tip: tile.disabled ? unavailableText.value : t(tile.descriptionKey),
+    tips: tileTips(tile),
   })),
   {
     id: "custom" as const,
     name: t("alerts.customDestination"),
     short: t("alert_destinations.prebuilt.customShort"),
-    tip: t("alerts.customDestinationDescription"),
+    tips: [t("alerts.customDestinationDescription")],
     icon: "settings",
     image: undefined,
     disabled: false,
