@@ -1242,12 +1242,22 @@ mod tests {
 
     #[tokio::test]
     async fn with_downtimes_off_a_replicated_message_still_reaches_the_database() {
-        // Both flags reach the folder lookup, which fails without a region database.
-        let put = || DowntimeMessage::Put {
-            org: "acme".to_string(),
-            downtime: Box::new(slo_downtime()),
+        // The shared slot database outlives the test, so a fixed id could meet an earlier row.
+        let replicated = Downtime {
+            id: config::ider::generate(),
+            ..slo_downtime()
         };
-        assert!(apply(put(), true).await.is_err());
-        assert!(apply(put(), false).await.is_err());
+        let put = DowntimeMessage::Put {
+            org: "acme".to_string(),
+            downtime: Box::new(replicated.clone()),
+        };
+        apply(put, false).await.unwrap();
+        let db = infra::db::get_orm_client_rw().await;
+        assert_eq!(
+            table::downtimes::get_with(db, "acme", &replicated.id)
+                .await
+                .unwrap(),
+            Some(replicated)
+        );
     }
 }

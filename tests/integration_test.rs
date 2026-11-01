@@ -105,6 +105,8 @@ mod tests {
         ("enrichment_tables", "org"),
         ("enrichment_table_urls", "org"),
     ];
+    /// The stack infra's runtimes give every thread that polls a server future.
+    const E2E_STACK_SIZE: usize = 16 * 1024 * 1024;
 
     static START: Once = Once::new();
     // A sub-test that calls `setup()` after `tear_down` fails fast instead of using deleted state.
@@ -505,56 +507,33 @@ mod tests {
         log::info!("Cleanup: finished cleaning up previous test state");
     }
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn e2e_test() {
+    // tokio::test polls the body on the 2 MiB harness thread, which the enterprise build overflows.
+    #[test]
+    fn e2e_test() {
+        let body = std::thread::Builder::new()
+            .name("e2e_test".to_string())
+            .stack_size(E2E_STACK_SIZE)
+            .spawn(|| {
+                tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(4)
+                    .thread_stack_size(E2E_STACK_SIZE)
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(e2e_test_body());
+            })
+            .unwrap();
+        if let Err(panic) = body.join() {
+            std::panic::resume_unwind(panic);
+        }
+    }
+
+    async fn e2e_test_body() {
         let sandbox = Sandbox::create().await;
         setup();
         sandbox.assert_config_uses_it();
 
-        // start gRPC server
-        tokio::task::spawn(async move {
-            init_grpc_server()
-                .await
-                .expect("router gRPC server init failed");
-        });
-
-        // register node
-        common::infra::cluster::register_and_keep_alive()
-            .await
-            .unwrap();
-        // init config
-        config::init().await.unwrap();
-        // init infra
-        migration::init_db().await.unwrap();
-        // ensure database tables are created
-        infra::db::create_table().await.unwrap();
-        // db migration steps, since it's separated out
-        infra::table::migrate().await.unwrap();
-        infra::init().await.unwrap();
-        #[cfg(feature = "enterprise")]
-        let master_key = Some(
-            o2_enterprise::enterprise::common::config::get_config()
-                .encryption
-                .master_key
-                .clone(),
-        );
-        #[cfg(not(feature = "enterprise"))]
-        let master_key: Option<String> = None;
-        infra::table::cipher::boot(master_key.as_deref())
-            .await
-            .unwrap();
-        openobserve_core::bootstrap::init().await.unwrap();
-        // ingester init
-        ingester::init().await.unwrap();
-        // init job
-        openobserve_jobs::job::init().await.unwrap();
-
-        // Wait for async initialization tasks (like default user creation) to complete
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        // Clean up any leftover state from previous test runs/retries
-        // This ensures tests are idempotent
-        cleanup_previous_test_state().await;
+        e2e_boot().await;
 
         for _i in 0..3 {
             e2e_1_post_bulk().await;
@@ -625,6 +604,88 @@ mod tests {
         // the y column from the query on the next edit.
         e2e_dashboard_nested_cast_round_trip().await;
 
+        e2e_alerts().await;
+
+        // derived streams
+        e2e_create_test_pipeline().await;
+        e2e_handle_derived_stream_success().await;
+        e2e_handle_derived_stream_pipeline_not_found().await;
+        e2e_handle_derived_stream_max_retries().await;
+        test_derived_stream_invalid_timerange_delay_scenario().await;
+        test_derived_stream_invalid_timerange_with_cron_frequency().await;
+        e2e_handle_derived_stream_evaluation_failure().await;
+        e2e_cleanup_test_pipeline().await;
+
+        // enrichment table
+        test_enrichment_table_integration().await;
+        test_enrichment_table_local_all_sequential().await;
+
+        // backfill jobs
+        test_backfill_job_list_and_delete().await;
+        test_backfill_job_get_nonexistent().await;
+        test_backfill_job_delete_by_pipeline().await;
+        test_backfill_job_enable_disable().await;
+
+        // Own fn: inline spawns widen e2e_test's frame and overflow the debug stack.
+        e2e_org_deletion().await;
+
+        // others
+        e2e_health_check().await;
+        e2e_config().await;
+
+        // clear
+        e2e_delete_stream().await;
+        sandbox.tear_down().await;
+    }
+
+    async fn e2e_boot() {
+        // start gRPC server
+        tokio::task::spawn(async move {
+            init_grpc_server()
+                .await
+                .expect("router gRPC server init failed");
+        });
+
+        // register node
+        common::infra::cluster::register_and_keep_alive()
+            .await
+            .unwrap();
+        // init config
+        config::init().await.unwrap();
+        // init infra
+        migration::init_db().await.unwrap();
+        // ensure database tables are created
+        infra::db::create_table().await.unwrap();
+        // db migration steps, since it's separated out
+        infra::table::migrate().await.unwrap();
+        infra::init().await.unwrap();
+        #[cfg(feature = "enterprise")]
+        let master_key = Some(
+            o2_enterprise::enterprise::common::config::get_config()
+                .encryption
+                .master_key
+                .clone(),
+        );
+        #[cfg(not(feature = "enterprise"))]
+        let master_key: Option<String> = None;
+        infra::table::cipher::boot(master_key.as_deref())
+            .await
+            .unwrap();
+        openobserve_core::bootstrap::init().await.unwrap();
+        // ingester init
+        ingester::init().await.unwrap();
+        // init job
+        openobserve_jobs::job::init().await.unwrap();
+
+        // Wait for async initialization tasks (like default user creation) to complete
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Clean up any leftover state from previous test runs/retries
+        // This ensures tests are idempotent
+        cleanup_previous_test_state().await;
+    }
+
+    async fn e2e_alerts() {
         // alert
         e2e_post_alert_template().await;
         e2e_get_alert_template().await;
@@ -675,37 +736,6 @@ mod tests {
         // Cleanup
         e2e_delete_alert_with_sns_destination().await;
         e2e_delete_sns_alert_destination().await;
-
-        // derived streams
-        e2e_create_test_pipeline().await;
-        e2e_handle_derived_stream_success().await;
-        e2e_handle_derived_stream_pipeline_not_found().await;
-        e2e_handle_derived_stream_max_retries().await;
-        test_derived_stream_invalid_timerange_delay_scenario().await;
-        test_derived_stream_invalid_timerange_with_cron_frequency().await;
-        e2e_handle_derived_stream_evaluation_failure().await;
-        e2e_cleanup_test_pipeline().await;
-
-        // enrichment table
-        test_enrichment_table_integration().await;
-        test_enrichment_table_local_all_sequential().await;
-
-        // backfill jobs
-        test_backfill_job_list_and_delete().await;
-        test_backfill_job_get_nonexistent().await;
-        test_backfill_job_delete_by_pipeline().await;
-        test_backfill_job_enable_disable().await;
-
-        // Own fn: inline spawns widen e2e_test's frame and overflow the debug stack.
-        e2e_org_deletion().await;
-
-        // others
-        e2e_health_check().await;
-        e2e_config().await;
-
-        // clear
-        e2e_delete_stream().await;
-        sandbox.tear_down().await;
     }
 
     async fn e2e_org_deletion() {

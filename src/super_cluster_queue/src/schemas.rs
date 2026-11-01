@@ -160,8 +160,7 @@ mod tests {
 
     #[test]
     fn test_parse_key_valid() {
-        let (org, stream_type, stream_name) =
-            parse_key("/schemas/logs/myorg/logs/mystream").unwrap();
+        let (org, stream_type, stream_name) = parse_key("/schema/myorg/logs/mystream").unwrap();
         assert_eq!(org, "myorg");
         assert_eq!(stream_type, StreamType::Logs);
         assert_eq!(stream_name, "mystream");
@@ -169,13 +168,13 @@ mod tests {
 
     #[test]
     fn test_parse_key_too_short_returns_err() {
-        assert!(parse_key("/schemas/logs/myorg").is_err());
+        assert!(parse_key("/schema/myorg/logs").is_err());
     }
 
     #[test]
     fn test_parse_key_metrics() {
         let (org, stream_type, stream_name) =
-            parse_key("/schemas/metrics/testorg/metrics/cpu_usage").unwrap();
+            parse_key("/schema/testorg/metrics/cpu_usage").unwrap();
         assert_eq!(org, "testorg");
         assert_eq!(stream_type, StreamType::Metrics);
         assert_eq!(stream_name, "cpu_usage");

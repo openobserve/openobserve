@@ -444,6 +444,13 @@ mod tests {
 
     #[tokio::test]
     async fn a_switched_off_deployment_never_reads_the_config() {
+        // Enterprise switches calibration on by default, so the test has to turn it off.
+        #[cfg(feature = "enterprise")]
+        {
+            unsafe { std::env::set_var("O2_ALERT_CALIBRATION_ENABLED", "false") };
+            o2_enterprise::enterprise::common::config::refresh_config().unwrap();
+        }
+        assert!(!deployment_enabled());
         assert!(read_config(&Trigger::default()).await.is_none());
     }
 
