@@ -179,6 +179,11 @@ pub enum ShiftRuleError {
         got: u32,
         max: u32,
     },
+    /// A restriction names a day past Sunday, which matches no local day.
+    RestrictionDayOutOfRange {
+        field: String,
+        got: u8,
+    },
     /// Start and end are the same minute, so the restriction covers no instant
     /// at all. This is the trap `end_minute: 0` sets for someone who means
     /// "all day": the rule looks configured but never wins.
@@ -204,6 +209,10 @@ impl std::fmt::Display for ShiftRuleError {
             Self::RestrictionMinuteOutOfRange { field, got, max } => write!(
                 f,
                 "`{field}` is {got}; minutes past midnight must be between 0 and {max}"
+            ),
+            Self::RestrictionDayOutOfRange { field, got } => write!(
+                f,
+                "`{field}` has day {got}; days must be between 0 (Monday) and 6 (Sunday)"
             ),
             Self::EmptyRestriction { field, minute } => write!(
                 f,
@@ -261,16 +270,14 @@ impl ShiftRule {
         }
     }
 
-    /// The same rule, shifted `shifts` handovers earlier.
+    /// The same rule, shifted `shifts` handovers earlier on `tz`'s wall clock.
     ///
     /// The whole "secondary" mechanism, and deliberately a plain constructor
     /// the resolver knows nothing about. If somebody edits one side, the two
     /// drift and `config-risks` reports it — no hidden rule keeps them in step.
-    pub fn offset_from(other: &ShiftRule, shifts: i64) -> Self {
+    pub fn offset_from(other: &ShiftRule, shifts: i64, tz: chrono_tz::Tz) -> Self {
         Self {
-            anchor_micros: other
-                .anchor_micros
-                .saturating_sub(shifts.saturating_mul(other.shift_micros)),
+            anchor_micros: other.offset_anchor(shifts, tz),
             ..other.clone()
         }
     }
@@ -316,6 +323,12 @@ impl ShiftRule {
             return Err(ShiftRuleError::EmptyValidityWindow { starts_at, ends_at });
         }
         for (index, window) in self.restrictions.iter().enumerate() {
+            if let Some(&got) = window.days.iter().find(|&&d| d > 6) {
+                return Err(ShiftRuleError::RestrictionDayOutOfRange {
+                    field: format!("restrictions[{index}].days"),
+                    got,
+                });
+            }
             if window.start_minute >= MINUTES_PER_DAY {
                 return Err(ShiftRuleError::RestrictionMinuteOutOfRange {
                     field: format!("restrictions[{index}].start_minute"),
@@ -349,6 +362,17 @@ impl ShiftRule {
         let local_anchor = to_local_micros(self.anchor_micros, tz)?;
         let offset = index.checked_mul(self.shift_micros)?;
         from_local_micros(local_anchor.checked_add(offset)?, tz)
+    }
+
+    /// Handover `-shifts` on the local clock; an out-of-calendar anchor keeps the fixed step.
+    fn offset_anchor(&self, shifts: i64, tz: chrono_tz::Tz) -> i64 {
+        shifts
+            .checked_neg()
+            .and_then(|index| self.boundary(index, tz))
+            .unwrap_or_else(|| {
+                self.anchor_micros
+                    .saturating_sub(shifts.saturating_mul(self.shift_micros))
+            })
     }
 
     /// Zero-based index of the shift containing `at`.
@@ -781,6 +805,7 @@ impl Rotation {
         name: impl Into<String>,
         other: &Rotation,
         shifts: i64,
+        tz: chrono_tz::Tz,
     ) -> Self {
         Self {
             id: id.into(),
@@ -788,7 +813,7 @@ impl Rotation {
             shift_rules: other
                 .shift_rules
                 .iter()
-                .map(|r| ShiftRule::offset_from(r, shifts))
+                .map(|r| ShiftRule::offset_from(r, shifts, tz))
                 .collect(),
             source: other.source.clone(),
         }
@@ -874,6 +899,7 @@ impl Rotation {
     /// off from a shift, an absence is not being there at all. When that empties
     /// the level the ladder advances, and `WholeTeam` below it skips the away
     /// only while someone else is left, so a page still has somewhere to go.
+    /// The cover holder is never removed: a cover outranks an absence, as in [`Rotation::on_call`].
     pub fn everyone(
         &self,
         overrides: &[ScheduleOverride],
@@ -885,12 +911,12 @@ impl Rotation {
             .winning_rule(at, tz)
             .map(|r| r.members.clone())
             .unwrap_or_default();
+        out.retain(|m| !is_unavailable(unavailability, m, at));
         if let Some(ov) = covering_override_for(overrides, &self.id, at)
             && !out.iter().any(|m| m.eq_ignore_ascii_case(&ov.user_email))
         {
             out.push(ov.user_email.clone());
         }
-        out.retain(|m| !is_unavailable(unavailability, m, at));
         out
     }
 
@@ -1193,7 +1219,7 @@ fn holder_at(
 
 /// Every instant in `[from, to)` at which the answer could change, sorted and
 /// deduplicated, always beginning with `from`.
-fn candidate_boundaries(
+pub(super) fn candidate_boundaries(
     rotation: &Rotation,
     overrides: &[ScheduleOverride],
     unavailability: &[Unavailability],
@@ -3021,7 +3047,7 @@ mod tests {
     #[test]
     fn test_an_offset_rotation_is_never_the_person_already_on_call() {
         let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]);
-        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1, TZ);
 
         for week in 0..9i64 {
             let at = ANCHOR + week * MICROS_PER_WEEK;
@@ -3053,7 +3079,7 @@ mod tests {
         assert_eq!(primary.name, "Primary");
         assert_eq!(primary.shift_rules[0].name, DEFAULT_SHIFT_RULE_NAME);
 
-        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1, TZ);
         assert_eq!(secondary.name, "Secondary");
         assert_eq!(
             secondary.shift_rules[0].name, DEFAULT_SHIFT_RULE_NAME,
@@ -3079,7 +3105,7 @@ mod tests {
     #[test]
     fn test_a_one_person_roster_collides_with_its_own_offset() {
         let primary = rota("rot_p", &["ana@o2.ai"]);
-        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1, TZ);
         let rotations = [primary, secondary];
         let found = colliding_rotations(&rotations, &[], &[], ANCHOR, TZ);
         assert_eq!(found.len(), 1, "{found:?}");
@@ -3092,7 +3118,7 @@ mod tests {
     #[test]
     fn test_a_roster_edited_on_one_side_only_is_reported_as_a_collision() {
         let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai"]);
-        let mut secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        let mut secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1, TZ);
         // Somebody adds cara to the secondary and forgets the primary.
         secondary.shift_rules[0].members =
             vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()];
@@ -3133,7 +3159,7 @@ mod tests {
     #[test]
     fn test_a_cover_only_stands_over_the_rotation_it_names() {
         let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai"]);
-        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
+        let secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1, TZ);
         let ov = ScheduleOverride {
             rotation_id: "rot_p".into(),
             ..cover("ov_1", "sam@o2.ai", ANCHOR, ANCHOR + 1_000, 1)
@@ -3349,6 +3375,41 @@ mod tests {
             on_call_now(&rotations, &overrides, &unavailability, after, TZ).as_deref(),
             Some("bob@o2.ai")
         );
+    }
+
+    /// The cover holder is paged despite their absence; an absent roster member is not.
+    #[test]
+    fn test_everyone_keeps_an_absent_cover_holder() {
+        let rotation = of(&[ShiftRule::weekly(
+            "On-call rotation",
+            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
+            ANCHOR,
+        )]);
+        let end = ANCHOR + MICROS_PER_DAY;
+        let cases: [(&str, &[Unavailability], &[&str]); 3] = [
+            (
+                "sam@o2.ai",
+                &[
+                    away("sam@o2.ai", ANCHOR, end),
+                    away("bob@o2.ai", ANCHOR, end),
+                ],
+                &["ana@o2.ai", "sam@o2.ai"],
+            ),
+            (
+                "ana@o2.ai",
+                &[away("ana@o2.ai", ANCHOR, end)],
+                &["bob@o2.ai", "ana@o2.ai"],
+            ),
+            ("ana@o2.ai", &[], &["ana@o2.ai", "bob@o2.ai"]),
+        ];
+        for (holder, unavailability, expected) in cases {
+            let overrides = vec![cover("ov_1", holder, ANCHOR, end, 1)];
+            assert_eq!(
+                rotation.everyone(&overrides, unavailability, ANCHOR, TZ),
+                expected,
+                "{holder} covering, away: {unavailability:?}"
+            );
+        }
     }
 
     /// Determinism, which the whole skip rule stands on. Two properties.
@@ -3726,6 +3787,8 @@ mod tests {
             next_holder: String,
             shift_start: i64,
             next_handover: i64,
+            secondary_anchor: i64,
+            secondary_next_handover: i64,
         }
         let cases: Vec<Case> = serde_json::from_str(include_str!("shift_parity.json")).unwrap();
         for c in cases {
@@ -3751,6 +3814,15 @@ mod tests {
             assert_eq!(
                 rule.next_handover(at, tz),
                 Some(c.next_handover),
+                "{}",
+                c.case
+            );
+            // One shift earlier on the team's clock, so it hands over at the Primary's anchor.
+            let secondary = ShiftRule::offset_from(&rule, 1, tz);
+            assert_eq!(secondary.anchor_micros, c.secondary_anchor, "{}", c.case);
+            assert_eq!(
+                secondary.next_handover(c.secondary_anchor, tz),
+                Some(c.secondary_next_handover),
                 "{}",
                 c.case
             );
