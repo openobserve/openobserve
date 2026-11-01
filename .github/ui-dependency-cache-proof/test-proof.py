@@ -10,6 +10,17 @@ spec.loader.exec_module(proof)
 
 
 class CacheGuards(unittest.TestCase):
+    def test_setup_node_cannot_save_an_ordinary_package_cache(self):
+        workflow = Path(__file__).parents[1] / 'workflows/ui-dependency-cache-proof.yml'
+        source = workflow.read_text()
+        setup = source.split('uses: actions/setup-node@v7', 1)[1].split('      - ', 1)[0]
+        self.assertIn('package-manager-cache: false', setup)
+        self.assertNotRegex(setup, r'(?m)^\s+cache(?:-dependency-path)?:')
+        self.assertNotIn('uses: actions/cache@', source)
+        self.assertEqual(source.count('uses: actions/cache/save@'), 1)
+        saved = source.split('uses: actions/cache/save@v6', 1)[1].split('      - ', 1)[0]
+        self.assertIn('key: ${{ steps.identity.outputs.key }}', saved)
+
     def test_only_exact_successful_hit_can_skip_install(self):
         self.assertTrue(proof.exact_hit('true', 'expected', 'expected', 'expected', 'success'))
         for hit, matched, primary, outcome in (
