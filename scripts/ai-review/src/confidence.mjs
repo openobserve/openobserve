@@ -7,6 +7,8 @@ const TEST_PATH_RE = /(?:^|\/)(?:tests|__tests__|test)\/|\.(?:spec|test)\.[^/]*$
 // o2_* are the enterprise crates, whose sources do not sit under a top-level src/.
 const PROD_PATH_RE = /^(?:src|web\/src|o2_[^/]+\/src)\//;
 const RUST_TEST_ADDED_RE = /^\+\s*#\[(?:test\]|tokio::test\b|cfg\(test\)\])/m;
+// What a run writes over a verdict: the two lines below, which judge a head and not the review.
+const SETTLED_LINE_RE = /^\*\*Merge confidence: (?:🟢 High|🟡 Medium|🔴 Low)\*\* — (?!.* (?:is being|has not been) reviewed$)/;
 
 export function shortName(agentName) {
   return String(agentName || "unknown").replace(/\s+Reviewer$/i, "");
@@ -78,6 +80,10 @@ export function staleConfidenceLine(shortHead) {
 
 export function reviewingConfidenceLine(shortHead) {
   return `**Merge confidence: 🟡 Reviewing** — \`${shortHead}\` is being reviewed`;
+}
+
+export function isSettledConfidenceLine(line) {
+  return SETTLED_LINE_RE.test(line);
 }
 
 // A Rust test added beside the code counts as test evidence without making that file any less production code.

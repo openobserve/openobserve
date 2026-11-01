@@ -91,7 +91,9 @@ is skipped at it, the line turns to 🔴 Low and names the unreviewed commit, un
 replaces it.
 While a run reviews a new commit, the line reads `**Merge confidence: 🟡 Reviewing**` and names that
 commit, so an earlier level never stands for it; the final review replaces the line, and a cancelled
-run leaves it in place. The level is the trace attribute `review.merge_confidence` and `merge_confidence` in the findings
+run leaves it in place. The level it replaced is kept in a hidden `o2-review-held` tag: if the head
+later returns to the reviewed commit, the skip restores that level, at no pass and with no model
+call, while the gate's line stays off because its approval was dismissed. The level is the trace attribute `review.merge_confidence` and `merge_confidence` in the findings
 artifact.
 
 ## Auto-approve for small PRs
@@ -116,11 +118,12 @@ All of these are required:
    `changed_files`, `additions` and `deletions`.
 4. No path, old or new, matches `SENSITIVE_PATHS`.
 5. Merge confidence is High, no reviewer reported a finding and none was kept, the findings were
-   counted (one inline block, every entry with a title and a known severity), the coordinator did not fall back, and the review's decision callout is an approval.
+   counted (one inline block, every entry with a title and a known severity), the coordinator did not fall back, and the decision callout of the sanitized text, the one that gets posted, is an approval.
 6. The Security and Correctness reviewers ran and finished, as did every other selected reviewer,
    and each one that ran saw the whole filtered diff. Finished means the output parsed into findings
-   or held a complete `<no-issues>` element; empty, free-form or cut-off text does not count and also
-   keeps confidence below High. A PR within the size limit is forced to the `full` tier with `fileFocus` bypassed whenever
+   or held a complete `<no-issues>` element, with no `<finding>` or `<findings>` left open and no
+   `<finding>` block left unread; empty, free-form or cut-off text does not count, even after an earlier
+   finding parsed, and also keeps confidence below High. A PR within the size limit is forced to the `full` tier with `fileFocus` bypassed whenever
    the mode is not `off`; agents that require focus may still opt out when no file is in their domain.
 7. It is not a paired review, and the workflow proved that: only its "no open PR on this branch"
    path sets `REVIEW_PAIR_CLEAR`. A failed lookup, a missing token, a failed dispatch or

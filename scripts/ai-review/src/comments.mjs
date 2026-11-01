@@ -1,8 +1,11 @@
-import { mergeConfidenceLine, reviewingConfidenceLine, staleConfidenceLine } from "./confidence.mjs";
+import { isSettledConfidenceLine, mergeConfidenceLine, reviewingConfidenceLine, staleConfidenceLine } from "./confidence.mjs";
 import { scrubReviewBody } from "./scrub.mjs";
 
 export const REVIEW_PASS_TAG = "<!--\\s*o2-review-pass:(\\d+)\\s*-->";
-export const REVIEW_SHA_TAG = "<!--\\s*o2-review-sha:(\\S+?)\\s*-->";
+// The value class excludes `<` and `>` so a tag can neither cross into the next one nor backtrack across it.
+export const REVIEW_SHA_TAG = "<!--\\s*o2-review-sha:([^\\s<>]+)\\s*-->";
+// The verdict a later head's line replaced, kept in case the head returns to the reviewed commit.
+export const REVIEW_HELD_TAG = "<!--\\s*o2-review-held:([^\\s<>]+)\\s*-->";
 // Matched as a pattern so a retired leg's comment is still adopted; `[redacted]` is what redaction left in comments whose marker named the provider.
 export const ANY_REVIEW_MARKER = "<!--\\s*ai-code-review[a-z0-9-]*(?:\\[redacted\\])?\\s*-->";
 export const REVIEW_TITLE = "OpenObserve Code Review";
@@ -20,7 +23,9 @@ const AUTO_APPROVE_LINE_RE = /^(?:[^\w\n`]|<\/?[a-z]+>)*(?:auto[- ]?approved|nee
 const FORGED_LINE_RE = /mergeconfidence|autoapproved|needshumanreview|reviewedcommit/;
 // The fixed head of a finding line, glyph and location then category, which leaves no room for a status phrase ahead of the category.
 const FINDING_LINE_RE = /^\s*- (?:[^\w\s`*<]+\s+)?(?:`[^`\n]+`\s+)?\*\*\[[^\]\n]+\]\*\*/;
-const TRAILING_TAGS_RE = /(?:\s*<!--\s*o2-review-(?:sha:\S+?|pass:\d+)\s*-->)+\s*$/i;
+const TRAILING_TAGS_RE = /(?:\s*<!--\s*o2-review-(?:(?:sha|held):[^\s<>]+|pass:\d+)\s*-->)+\s*$/i;
+const HTML_COMMENT_RE = /<!--[\s\S]*?--!?>/g;
+const MARKUP_RE = /<!--[\s\S]*?--!?>|<[^>]*>|&[a-z]+;/gi;
 // "summary" stays out: it would strip the <summary> of the findings fold, and a leaked finding field sits inside a stripped <finding> block.
 const BOUNDARY_TAGS = ["mr_input", "mr_body", "mr_comments", "mr_details",
   "changed_files", "existing_inline_findings", "previous_review",
@@ -48,7 +53,7 @@ export function reviewPassTag(count) {
 }
 
 export function withPassTag(body, count) {
-  return `${body.replace(new RegExp(`\\n?${REVIEW_PASS_TAG}`, "gi"), "")}\n${reviewPassTag(count)}`;
+  return `${withoutTag(body, REVIEW_PASS_TAG)}\n${reviewPassTag(count)}`;
 }
 
 // A new commit on either side of a paired review is a new key.
@@ -65,8 +70,12 @@ export function reviewShaTag(key) {
   return `<!-- o2-review-sha:${key} -->`;
 }
 
+function withoutTag(body, tag) {
+  return body.replace(new RegExp(`\\n?${tag}`, "gi"), "");
+}
+
 export function withReviewShaTag(body, key) {
-  return `${body.replace(new RegExp(`\\n?${REVIEW_SHA_TAG}`, "gi"), "")}\n${reviewShaTag(key)}`;
+  return `${withoutTag(body, REVIEW_SHA_TAG)}\n${reviewShaTag(key)}`;
 }
 
 export function shouldSkipAsReviewed(body, key, { ignorePassLimit = false, forceFull = false } = {}) {
@@ -142,18 +151,45 @@ function withConfidenceLine(body, line) {
   return insertAfterCallout(withoutAutoApproveLine(body).replace(MERGE_CONFIDENCE_LINE_RE, ""), line);
 }
 
+function confidenceLineOf(body) {
+  return (body.match(MERGE_CONFIDENCE_LINE_RE)?.[0] ?? "").trim();
+}
+
+function heldLine(body) {
+  const encoded = body.match(new RegExp(REVIEW_HELD_TAG, "i"))?.[1];
+  const line = encoded ? Buffer.from(encoded, "base64url").toString("utf-8") : "";
+  return isSettledConfidenceLine(line) ? line : "";
+}
+
+// Base64 because a verdict's text is free to hold `-->`; only the first line replaced is the reviewed commit's verdict.
+function withHeldVerdict(body) {
+  const line = confidenceLineOf(body);
+  if (!reviewedKey(body) || !isSettledConfidenceLine(line) || body.search(new RegExp(REVIEW_HELD_TAG, "i")) !== -1) return body;
+  const tags = body.match(TRAILING_TAGS_RE)?.[0] ?? "";
+  return `${body.slice(0, body.length - tags.length)}\n<!-- o2-review-held:${Buffer.from(line, "utf-8").toString("base64url")} -->${tags}`;
+}
+
 // The old verdict must not read as the new head's while the run works; a cancelled run leaving "Reviewing" behind is still true of what happened.
 export function claimedReviewBody(body, count, key) {
   const bare = withoutAutoApproveLine(body);
   const newHead = key && reviewedKey(body) !== key && bare.search(MERGE_CONFIDENCE_LINE_RE) !== -1;
-  return withPassTag(newHead ? withConfidenceLine(bare, reviewingConfidenceLine(shortKey(key))) : bare, count);
+  return withPassTag(newHead ? withConfidenceLine(withHeldVerdict(bare), reviewingConfidenceLine(shortKey(key))) : bare, count);
 }
 
 // A head the review did not cover must not keep showing that review's confidence.
 export function bodyAtUnreviewedHead(body, head) {
   const reviewed = reviewedKey(body);
   const covered = reviewed ? reviewed === head : body.search(MERGE_CONFIDENCE_LINE_RE) === -1;
-  return head && !covered ? withConfidenceLine(body, staleConfidenceLine(shortKey(head))) : body;
+  return head && !covered ? withConfidenceLine(withHeldVerdict(body), staleConfidenceLine(shortKey(head))) : body;
+}
+
+// Only for a head the sha tag covers. No held verdict means no level is claimed, and the gate's line stays off because its approval was dismissed.
+export function bodyAtReviewedHead(body, maxPasses) {
+  const line = confidenceLineOf(body);
+  const held = body.search(new RegExp(REVIEW_HELD_TAG, "i")) !== -1;
+  if (!held && (!line || isSettledConfidenceLine(line))) return body;
+  const restored = withConfidenceLine(withoutTag(body, REVIEW_HELD_TAG), heldLine(body));
+  return maxPasses > 0 && restored.search(PASS_LIMIT_NOTE_RE) !== -1 ? withPassLimitNote(restored, passLimitNote(maxPasses)) : restored;
 }
 
 export function bodyAtPassLimit(body, maxPasses, head) {
@@ -173,19 +209,42 @@ export function finishReviewBody(body, { key, passes, maxPasses, reviewed, confi
 
 // What the reviewers see as <previous_review>: the review alone, none of the runner's bookkeeping.
 export function previousReviewText(body) {
-  return stripRunnerLines(String(body ?? ""))
-    .replace(new RegExp(`\\n?${REVIEW_SHA_TAG}`, "gi"), "")
-    .replace(new RegExp(`\\n?${REVIEW_PASS_TAG}`, "gi"), "");
+  return [REVIEW_SHA_TAG, REVIEW_PASS_TAG, REVIEW_HELD_TAG].reduce(withoutTag, stripRunnerLines(String(body ?? "")));
 }
 
-function lettersOf(line) {
-  return line.replace(/<!--.*?-->/g, "").replace(/<[^>]*>/g, "").replace(/&[a-z]+;/gi, "").normalize("NFKC").toLowerCase().replace(/[^a-z]/g, "");
+// Yields the text after each pass, last the first that changed nothing: a removal can splice a new match out of what surrounds it.
+function* removalPasses(text, pattern, replacement = "") {
+  let out = text;
+  let previous;
+  do {
+    previous = out;
+    out = out.replace(pattern, replacement);
+    yield out;
+  } while (out !== previous);
+}
+
+function removeRepeatedly(text, pattern, replacement) {
+  let last = text;
+  for (const pass of removalPasses(text, pattern, replacement)) last = pass;
+  return last;
+}
+
+function lettersOf(text) {
+  return text.normalize("NFKC").toLowerCase().replace(/[^a-z]/g, "");
+}
+
+// Every pass is judged, not only the last: a renderer does not rescan, so a comment rebuilt by one pass, which the next would swallow, is visible text.
+function isForgedLine(line) {
+  for (const pass of removalPasses(line, MARKUP_RE)) {
+    if (FORGED_LINE_RE.test(lettersOf(pass))) return true;
+  }
+  return false;
 }
 
 function stripForgedLines(text) {
-  const lines = text.replace(/<!--[\s\S]*?-->/g, comment => (comment.includes("\n") ? "" : comment)).split("\n");
+  const lines = removeRepeatedly(text, HTML_COMMENT_RE, comment => (comment.includes("\n") ? "" : comment)).split("\n");
   // A hidden real finding costs more than a cosmetic forgery, and the gate never reads these lines, so a finding's text is not judged.
-  return lines.filter(line => !FORGED_LINE_RE.test(lettersOf(line)) || FINDING_LINE_RE.test(line)).join("\n");
+  return lines.filter(line => !isForgedLine(line) || FINDING_LINE_RE.test(line)).join("\n");
 }
 
 function stripRunnerLines(text) {
@@ -218,16 +277,14 @@ function unwrapJsonBody(body) {
 export function sanitizeReviewBody(body, { marker, providerId, modelId, env }) {
   if (!body) return { text: "", secretHits: 0 };
   const anyMarker = new RegExp(ANY_REVIEW_MARKER, "gi");
+  const runnerTags = new RegExp(`${ANY_REVIEW_MARKER}|${REVIEW_PASS_TAG}|${REVIEW_SHA_TAG}|${REVIEW_HELD_TAG}`, "gi");
 
   let cleaned = unwrapJsonBody(body)
     .replace(/\\n/g, "\n")
     .replace(/\\t/g, "\t")
     .replace(/\\"/g, '"')
-    .replace(BOUNDARY_TAG_RE, "")
-    .replace(anyMarker, "")
-    .replace(new RegExp(REVIEW_PASS_TAG, "gi"), "")
-    .replace(new RegExp(REVIEW_SHA_TAG, "gi"), "");
-  cleaned = stripRunnerLines(cleaned);
+    .replace(BOUNDARY_TAG_RE, "");
+  cleaned = stripRunnerLines(removeRepeatedly(cleaned, runnerTags));
 
   // Runs after marker stripping so a leading marker cannot anchor the search at index 0 and hide a preamble behind it.
   const headingAt = cleaned.search(REVIEW_HEADING_RE);

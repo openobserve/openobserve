@@ -25,7 +25,7 @@ export const SENSITIVE_PATHS = [
   /(?:^|\/)(?:[^/]*\.lock|[^/]*-lock\.(?:json|ya?ml)|npm-shrinkwrap\.json|go\.sum)$/i,
   /^src\/config\/src\/config\.rs$/i,
   // Built from the sanitizer's own names, so whatever it treats as an instruction loader also needs a human.
-  new RegExp(`(?:^|/)(?:${[...LOADER_FILES, ...LOADER_DIRS].join("|").replace(/\./g, "\\.")})(?:/|$)`, "i"),
+  new RegExp(`(?:^|/)(?:${[...LOADER_FILES, ...LOADER_DIRS].map(name => name.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")).join("|")})(?:/|$)`, "i"),
   /(?:^|\/)\.?opencode[^/]*(?:\/|$)/i,
   /(?:^|\/)\.env[^/]*(?:\/|$)/i,
   /\.proto$/i,
