@@ -585,10 +585,10 @@ pub async fn get_role_permissions(Path(_path): Path<(String, String, String)>) -
     )
 )]
 pub async fn get_users_with_role(Path((org_id, role_id)): Path<(String, String)>) -> Response {
-    match o2_openfga::authorizer::roles::get_users_with_role(&org_id, &role_id).await {
-        Ok(res) => Json(res).into_response(),
-        Err(err) => MetaHttpResponse::internal_error(err),
-    }
+    role_lookup_response(
+        o2_openfga::authorizer::roles::get_users_with_role(&org_id, &role_id).await,
+        "Failed to get users with role",
+    )
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -639,13 +639,10 @@ pub async fn get_users_with_role(Path(_path): Path<(String, String)>) -> Respons
     )
 )]
 pub async fn get_roles_for_user(Path((org_id, user_email)): Path<(String, String)>) -> Response {
-    match o2_openfga::authorizer::roles::get_roles_for_org_user(&org_id, &user_email).await {
-        Ok(res) => Json(res).into_response(),
-        Err(e) => {
-            log::error!("Error getting roles for user {user_email} in org {org_id}: {e}");
-            MetaHttpResponse::internal_error("Failed to get roles for user")
-        }
-    }
+    role_lookup_response(
+        o2_openfga::authorizer::roles::get_roles_for_org_user(&org_id, &user_email).await,
+        "Failed to get roles for user",
+    )
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -1335,6 +1332,18 @@ fn hide_slack_unless_enabled<'a, 'b>(
         .collect()
 }
 
+/// The lookup's list, or a fixed 500 that keeps the OpenFGA error in the server log.
+#[cfg(feature = "enterprise")]
+fn role_lookup_response(result: Result<Vec<String>, anyhow::Error>, failure: &str) -> Response {
+    match result {
+        Ok(list) => Json(list).into_response(),
+        Err(e) => {
+            log::error!("{failure}: {e}");
+            MetaHttpResponse::internal_error(failure)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
@@ -1550,15 +1559,13 @@ mod tests {
             init_ofga_test();
             let resp =
                 get_users_with_role(Path(("test_org".to_string(), "test_role".to_string()))).await;
-            if o2_openfga::config::get_config().enabled {
-                assert_eq!(
-                    extract_status_code(&resp),
-                    StatusCode::INTERNAL_SERVER_ERROR
-                );
-            } else {
-                assert_eq!(extract_status_code(&resp), StatusCode::OK);
-                assert_eq!(response_json(resp).await, serde_json::json!([]));
-            }
+            // The failing-read 500 is covered by `role_lookup_response_hides_the_openfga_error`.
+            assert!(
+                !o2_openfga::config::get_config().enabled,
+                "unit tests run without OpenFGA"
+            );
+            assert_eq!(extract_status_code(&resp), StatusCode::OK);
+            assert_eq!(response_json(resp).await, serde_json::json!([]));
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1579,16 +1586,13 @@ mod tests {
                 "test@example.com".to_string(),
             )))
             .await;
-            // Disabled OpenFGA has no roles to report; an enabled one that cannot be read is a 500.
-            if o2_openfga::config::get_config().enabled {
-                assert_eq!(
-                    extract_status_code(&resp),
-                    StatusCode::INTERNAL_SERVER_ERROR
-                );
-            } else {
-                assert_eq!(extract_status_code(&resp), StatusCode::OK);
-                assert_eq!(response_json(resp).await, serde_json::json!([]));
-            }
+            // The failing-read 500 is covered by `role_lookup_response_hides_the_openfga_error`.
+            assert!(
+                !o2_openfga::config::get_config().enabled,
+                "unit tests run without OpenFGA"
+            );
+            assert_eq!(extract_status_code(&resp), StatusCode::OK);
+            assert_eq!(response_json(resp).await, serde_json::json!([]));
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1600,6 +1604,26 @@ mod tests {
             .await;
             assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn role_lookup_response_hides_the_openfga_error() {
+        let failed = role_lookup_response(
+            Err(anyhow::anyhow!("raw OpenFGA text")),
+            "Failed to get roles for user",
+        );
+        assert_eq!(
+            extract_status_code(&failed),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+        assert_eq!(
+            response_json(failed).await["message"],
+            "Failed to get roles for user"
+        );
+        let found = role_lookup_response(Ok(vec!["editor".to_string()]), "unused");
+        assert_eq!(extract_status_code(&found), StatusCode::OK);
+        assert_eq!(response_json(found).await, serde_json::json!(["editor"]));
     }
 
     #[tokio::test]

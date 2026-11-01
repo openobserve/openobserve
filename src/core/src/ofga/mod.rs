@@ -123,6 +123,19 @@ impl PendingMigrations {
             ..Default::default()
         }
     }
+
+    // The rejected 0.0.59 batch carried these for installs from before 0.0.30; sweeps ran apart.
+    fn writes_pipeline_tuples(&self) -> bool {
+        self.pipeline || self.ownership_repair
+    }
+
+    fn writes_alert_folder_tuples(&self) -> bool {
+        self.alert_folders || self.ownership_repair
+    }
+
+    fn writes_report_folder_tuples(&self) -> bool {
+        self.report_folders || self.ownership_repair
+    }
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -358,7 +371,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     for key in &all_org_keys {
                         get_ownership_all_org_tuple(org_name, key, &mut tuples);
                     }
-                    if pending.pipeline {
+                    if pending.writes_pipeline_tuples() {
                         get_ownership_all_org_tuple(org_name, "pipelines", &mut tuples);
                         match infra::pipeline::list_by_org(org_name).await {
                             Ok(pipelines) => {
@@ -373,11 +386,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             }
                         }
                     }
-                    if pending.alert_folders {
+                    if pending.writes_alert_folder_tuples() {
                         get_ownership_all_org_tuple(org_name, "alert_folders", &mut tuples);
                         get_ownership_tuple(org_name, "alert_folders", DEFAULT_FOLDER, &mut tuples);
                     }
-                    if pending.report_folders {
+                    if pending.writes_report_folder_tuples() {
                         get_ownership_all_org_tuple(org_name, "report_folders", &mut tuples);
                         get_ownership_tuple(
                             org_name,
@@ -497,7 +510,7 @@ async fn run_folder_and_data_migrations(pending: &PendingMigrations) {
     }
 }
 
-/// The resources a pending back-fill needs nothing but an `_all_` org tuple for.
+/// The `_all_` org keys a pending back-fill needs; the ownership repair asks for every one.
 ///
 /// Data rather than control flow. The three that also need a per-object tuple or
 /// a database sweep — pipelines, alert folders, report folders — stay as explicit
@@ -978,6 +991,12 @@ mod tests {
         assert!(!pending.alert_folders && !pending.report_folders && !pending.pipeline);
         assert!(!pending.prompt_folders && !pending.workflow_folders && !pending.stream_names);
         assert!(!pending.anomaly_detection);
+        assert!(pending.writes_pipeline_tuples());
+        assert!(pending.writes_alert_folder_tuples() && pending.writes_report_folder_tuples());
+        let current = pending_migrations("0.0.63", "0.0.63");
+        assert!(!current.writes_pipeline_tuples() && !current.writes_alert_folder_tuples());
+        assert!(!current.writes_report_folder_tuples());
+        assert!(pending_migrations("0.0.30", "0.0.29").writes_report_folder_tuples());
         assert!(!pending_migrations("0.0.63", "0.0.58").ownership_repair);
         assert!(!pending_migrations("0.0.63", "0.0.63").ownership_repair);
         assert!(!pending_migrations("0.0.62", "0.0.59").ownership_repair);

@@ -118,7 +118,7 @@ pub struct Synthetic {
     /// accepts and returns; it is resolved to the `folders.id` KSUID on write.
     #[serde(default)]
     pub folder_id: String,
-    /// Timezone offset in minutes from UTC (e.g. -300 = EST). Used for cron scheduling.
+    /// UTC offset in minutes, used only when `frequency.timezone` is absent or unparseable.
     #[serde(default)]
     pub tz_offset: i32,
     pub name: String,
