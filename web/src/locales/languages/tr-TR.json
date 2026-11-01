@@ -671,7 +671,7 @@
       "edit": "{resource} düzenleyemezsiniz",
       "delete": "{resource} silemezsiniz",
       "missing": "Rolünüzde {resource} için {permission} izni eksik.",
-      "parts": "Bu sayfanın {count} bölümünü görüntüleyemezsiniz",
+      "parts": "Bu sayfanın {count} bölümünü görüntüleyemezsiniz | Bu sayfanın {count} bölümünü görüntüleyemezsiniz",
       "missingIntro": "Rolünüzde şu izinler eksik:",
       "more": "{count} tane daha",
       "showLess": "Daha az göster"

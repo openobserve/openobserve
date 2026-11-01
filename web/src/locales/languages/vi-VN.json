@@ -671,7 +671,7 @@
       "edit": "Bạn không thể chỉnh sửa {resource}",
       "delete": "Bạn không thể xóa {resource}",
       "missing": "Vai trò của bạn thiếu quyền {permission} trên {resource}.",
-      "parts": "Bạn không thể xem {count} phần của trang này",
+      "parts": "Bạn không thể xem {count} phần của trang này | Bạn không thể xem {count} phần của trang này",
       "missingIntro": "Vai trò của bạn thiếu các quyền sau:",
       "more": "{count} mục khác",
       "showLess": "Thu gọn"

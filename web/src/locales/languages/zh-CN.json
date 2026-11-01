@@ -671,7 +671,7 @@
       "edit": "您无法编辑{resource}",
       "delete": "您无法删除{resource}",
       "missing": "您的角色缺少对{resource}的“{permission}”权限。",
-      "parts": "您无法查看此页面的 {count} 个部分",
+      "parts": "您无法查看此页面的 {count} 个部分 | 您无法查看此页面的 {count} 个部分",
       "missingIntro": "您的角色缺少以下权限：",
       "more": "另外 {count} 项",
       "showLess": "收起"

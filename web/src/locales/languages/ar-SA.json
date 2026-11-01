@@ -671,7 +671,7 @@
       "edit": "لا يمكنك تعديل {resource}",
       "delete": "لا يمكنك حذف {resource}",
       "missing": "يفتقد دورك إلى صلاحية {permission} على {resource}.",
-      "parts": "لا يمكنك عرض أجزاء من هذه الصفحة ({count})",
+      "parts": "لا يمكنك عرض {count} جزء من هذه الصفحة | لا يمكنك عرض أجزاء من هذه الصفحة ({count})",
       "missingIntro": "يفتقد دورك إلى هذه الصلاحيات:",
       "more": "{count} أخرى",
       "showLess": "عرض أقل"

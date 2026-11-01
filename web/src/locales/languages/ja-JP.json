@@ -671,7 +671,7 @@
       "edit": "{resource} を編集できません",
       "delete": "{resource} を削除できません",
       "missing": "あなたのロールには {resource} に対する {permission} 権限がありません。",
-      "parts": "このページの {count} 箇所を表示できません",
+      "parts": "このページの {count} 箇所を表示できません | このページの {count} 箇所を表示できません",
       "missingIntro": "あなたのロールには次の権限がありません：",
       "more": "他 {count} 件",
       "showLess": "表示を減らす"

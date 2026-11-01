@@ -671,7 +671,7 @@
       "edit": "Nie możesz edytować: {resource}",
       "delete": "Nie możesz usuwać: {resource}",
       "missing": "Twojej roli brakuje uprawnienia {permission} dla: {resource}.",
-      "parts": "Nie możesz wyświetlić części tej strony ({count})",
+      "parts": "Nie możesz wyświetlić {count} części tej strony | Nie możesz wyświetlić części tej strony ({count})",
       "missingIntro": "Twojej roli brakuje tych uprawnień:",
       "more": "{count} więcej",
       "showLess": "Pokaż mniej"

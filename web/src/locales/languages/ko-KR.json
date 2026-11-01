@@ -671,7 +671,7 @@
       "edit": "{resource}을(를) 편집할 수 없습니다",
       "delete": "{resource}을(를) 삭제할 수 없습니다",
       "missing": "내 역할에 {resource}에 대한 {permission} 권한이 없습니다.",
-      "parts": "이 페이지의 {count}개 부분을 볼 수 없습니다",
+      "parts": "이 페이지의 {count}개 부분을 볼 수 없습니다 | 이 페이지의 {count}개 부분을 볼 수 없습니다",
       "missingIntro": "내 역할에 다음 권한이 없습니다:",
       "more": "{count}개 더",
       "showLess": "간단히 보기"

@@ -671,7 +671,7 @@
       "edit": "您無法編輯{resource}",
       "delete": "您無法刪除{resource}",
       "missing": "您的角色缺少對{resource}的「{permission}」權限。",
-      "parts": "您無法檢視此頁面的 {count} 個部分",
+      "parts": "您無法檢視此頁面的 {count} 個部分 | 您無法檢視此頁面的 {count} 個部分",
       "missingIntro": "您的角色缺少以下權限：",
       "more": "另外 {count} 項",
       "showLess": "收合"

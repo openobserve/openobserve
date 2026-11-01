@@ -673,7 +673,7 @@
       "missing": "Il manque à votre rôle l'autorisation {permission} sur {resource}.",
       "parts": "Vous ne pouvez pas afficher {count} partie de cette page | Vous ne pouvez pas afficher {count} parties de cette page",
       "missingIntro": "Il manque à votre rôle ces autorisations :",
-      "more": "{count} autre | {count} autres",
+      "more": "{count} de plus",
       "showLess": "Afficher moins"
     },
     "chip": {
