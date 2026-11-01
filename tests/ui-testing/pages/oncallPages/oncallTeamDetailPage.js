@@ -71,7 +71,7 @@ export class OnCallTeamDetailPage {
       error: '[data-test="oncall-team-detail-error"]',
       notAvailable: '[data-test="oncall-team-detail-not-available"]',
       coverageTag: '[data-test="oncall-team-coverage"]',
-      configRisks: '[data-test="oncall-team-config-risks"]',
+      configRisks: '[data-test="oncall-attention-expand"]',
       coverageCard: '[data-test="oncall-team-coverage-card"]',
       openSchedule: '[data-test="oncall-team-open-schedule"]',
 

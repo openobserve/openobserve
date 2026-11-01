@@ -324,6 +324,9 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     await pm.oncallTeamsPage.fillTeamName(name);
     await pm.oncallTeamsPage.saveDrawer();
     await expect(pm.oncallTeamsPage.getFormDrawer()).toBeHidden({ timeout: 30000 });
+    await expect(page, 'create must open the new team')
+      .toHaveURL(/\/oncall\/teams\/[^/?]+/, { timeout: 30000 });
+    await pm.oncallTeamsPage.goto(ORG);
 
     await pm.oncallTeamsPage.search(name);
     const row = pm.oncallTeamsPage.getRows();
