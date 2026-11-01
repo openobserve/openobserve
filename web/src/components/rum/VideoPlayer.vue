@@ -226,6 +226,7 @@ import {
   type StaleSpan,
 } from "@/utils/rum/sessionReplayViews";
 import { resolveRelativeLinks } from "@/utils/rum/sessionReplayUrls";
+import { buildReplayCanvasPlaceholderRule } from "@/utils/rum/replayCanvasPlaceholder";
 import { MAX_ATTEMPTS } from "@/utils/rum/sessionReplayLoader";
 import {
   canResume,
@@ -784,6 +785,7 @@ const setupSession = async () => {
       props: {
         events: session.value,
         UNSAFE_replayCanvas: false,
+        insertStyleRules: [buildReplayCanvasPlaceholderRule(t("rum.replayCanvasNotRecorded"))],
         mouseTail: false,
         autoPlay: false,
         showController: false,
@@ -890,7 +892,7 @@ const getEventMarkerClass = (event: any) => {
   if (event.frustration_types && event.frustration_types.length > 0) {
     return "bg-badge-orange-solid-bg! shadow-glow shadow-badge-orange-solid-bg/60";
   }
-  if (event.type === "error") {
+  if (event.type === "error" || event.type === "failed_request") {
     return "bg-badge-error-solid-bg!";
   }
   return "bg-badge-teal-solid-bg!";
