@@ -153,6 +153,23 @@ function fallbackDedupNote(rawCount, uniqueCount, shownCount) {
   return deduped || capped ? `\n>${deduped}${capped}` : "";
 }
 
+function groupBySeverity(findings) {
+  return Object.fromEntries(SEVERITIES.map(s => [s, findings.filter(f => normalizeSeverity(f.severity) === s)]));
+}
+
+function severitySections(bySeverity) {
+  return SEVERITIES
+    .filter(s => bySeverity[s].length > 0)
+    .flatMap(s => [SEVERITY_SECTION[s], ...bySeverity[s].map(fallbackFindingLine), ""]);
+}
+
+// A cut-off report still holds finished findings, and a blocker must not vanish because the run failed.
+export function partialFindingsBlock(agentResults) {
+  const shown = selectFallbackFindings(agentResults);
+  if (shown.length === 0) return "";
+  return `<details open>\n<summary>📋 Findings so far (${shown.length})</summary>\n\n${severitySections(groupBySeverity(shown)).join("\n")}\n</details>`;
+}
+
 export function buildFallbackReview(agentResults, tier, failedAgents, marker) {
   const shown = selectFallbackFindings(agentResults);
   const failedLine = failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : "";
@@ -176,10 +193,8 @@ ${failedLine}
 </details>`;
   }
 
-  const bySeverity = Object.fromEntries(SEVERITIES.map(s => [s, shown.filter(f => normalizeSeverity(f.severity) === s)]));
-  const sections = SEVERITIES
-    .filter(s => bySeverity[s].length > 0)
-    .flatMap(s => [SEVERITY_SECTION[s], ...bySeverity[s].map(fallbackFindingLine), ""]);
+  const bySeverity = groupBySeverity(shown);
+  const sections = severitySections(bySeverity);
   const blocked = bySeverity.p0.length + bySeverity.p1.length > 0;
   const callout = blocked ? "> [!CAUTION]\n> ### ⛔ Blockers found" : "> [!NOTE]\n> ### 💬 Approved with comments";
   const rawCount = agentResults.flatMap(r => r.findings).length;

@@ -57,6 +57,7 @@ import { OpencodeServer, resolveOpencodeConfig, selfCheck, shouldRetry } from ".
 import { fetchPinnedDiff, prefixDiffPaths, reviewerDiff } from "./src/pr-diff.mjs";
 import {
   buildFallbackReview,
+  partialFindingsBlock,
   failedReviewersNote,
   insertAfterCallout,
   mapStrings,
@@ -1539,13 +1540,15 @@ async function main() {
         "review.all_agents_failed": true,
         "review.coordinator_skipped": true,
       });
+      const partial = partialFindingsBlock(results);
       finalReview = [
         REVIEW_HEADING,
         ``,
         `> [!CAUTION]`,
         `> ### ⛔ Not reviewed`,
-        `> All ${ranResults.length} reviewers failed, so there are no findings to report — this is an infrastructure failure, not an approval.`,
+        `> All ${ranResults.length} reviewers failed, so ${partial ? "the findings below are incomplete" : "there are no findings to report"} — this is an infrastructure failure, not an approval.`,
         ``,
+        ...(partial ? [partial, ``] : []),
         `<details>`,
         `<summary>🧾 Reviewer failures (${failedAgents.length})</summary>`,
         ``,
