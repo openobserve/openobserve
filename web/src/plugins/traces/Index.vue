@@ -259,6 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex h-full flex-col overflow-hidden pt-2.5">
         <IndexList
+          ref="mobileIndexListRef"
           :field-list="searchObj.data.stream.selectedStreamFields"
           :active-include-field-values="activeIncludeFilterValues"
           :active-exclude-field-values="activeExcludeFilterValues"
@@ -477,7 +478,13 @@ watch(
   { immediate: true },
 );
 const { showErrorNotification } = useNotifications();
-const indexListRef = ref(null);
+const indexListRef = ref<{ refreshOpenFieldValues?: () => void } | null>(null);
+const mobileIndexListRef = ref<{ refreshOpenFieldValues?: () => void } | null>(null);
+// Only once the new stream's fields and query are final, or open fields fetch from a half-applied state.
+const refreshOpenFieldValues = () => {
+  indexListRef.value?.refreshOpenFieldValues?.();
+  mobileIndexListRef.value?.refreshOpenFieldValues?.();
+};
 const { getStreams, getStream } = useStreams(t);
 const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 const chartRedrawTimeout = ref(null);
@@ -2211,6 +2218,7 @@ const onChangeStream = async () => {
     loadLocalLogFilterField(searchObj.meta.searchMode);
     rebuildColumns();
   }
+  refreshOpenFieldValues();
   if (!isAutoRunOff()) runQueryFn();
 };
 
@@ -2284,6 +2292,7 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
   if (view.editorValue && searchObj.data.stream.selectedStreamFields.length) {
     restoreFilters(view.editorValue);
   }
+  if (streamChanged) refreshOpenFieldValues();
   if (run) runQueryFn();
 };
 

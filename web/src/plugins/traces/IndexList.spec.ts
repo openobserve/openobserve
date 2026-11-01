@@ -28,17 +28,56 @@ document.body.appendChild(node);
 // ── vi.mock calls must be at the top level so Vitest can hoist them ──────────
 
 // Mock useTraces composable — vi.mock (not vi.doMock) so it is hoisted
-vi.mock("@/composables/useTraces", () => ({
-  default: () => ({
-    searchObj: mockSearchObj,
-    tracesParser: { value: null },
-    updatedLocalLogFilterField: vi.fn(),
-  }),
-  DEFAULT_TRACE_COLUMNS: {
-    traces: ["service_name", "operation_name", "duration", "spans", "status", "service_latency"],
-    spans: ["service_name", "operation_name", "duration", "status", "status_code", "method"],
-  },
+vi.mock("@/composables/useTraces", async () => {
+  const { reactive, ref } = await import("vue");
+  return {
+    default: () => ({
+      searchObj: reactive(mockSearchObj),
+      tracesParser: ref(null),
+      updatedLocalLogFilterField: vi.fn(),
+    }),
+    DEFAULT_TRACE_COLUMNS: {
+      traces: ["service_name", "operation_name", "duration", "spans", "status", "service_latency"],
+      spans: ["service_name", "operation_name", "duration", "status", "status_code", "method"],
+    },
+  };
+});
+
+const fieldExpansionReset = vi.hoisted(() => vi.fn());
+
+const fieldValuesApi = vi.hoisted(() => ({
+  fetchFieldValues: vi.fn(),
+  cancelFieldStream: vi.fn(),
+  resetFieldValues: vi.fn(),
+  fetchPercentiles: vi.fn(),
+  cancelPercentileFetch: vi.fn(),
 }));
+
+vi.mock("@/composables/useFieldValuesStream", async () => {
+  const { ref } = await import("vue");
+  return {
+    default: () => ({
+      fieldValues: ref({}),
+      fetchFieldValues: fieldValuesApi.fetchFieldValues,
+      cancelFieldStream: fieldValuesApi.cancelFieldStream,
+      resetFieldValues: fieldValuesApi.resetFieldValues,
+    }),
+  };
+});
+
+vi.mock("@/composables/useDurationPercentiles", async (importOriginal) => {
+  const { ref } = await import("vue");
+  return {
+    ...(await importOriginal<typeof import("@/composables/useDurationPercentiles")>()),
+    default: () => ({
+      percentiles: ref({ p25: null, p50: null, p75: null, p95: null, p99: null, max: null }),
+      isLoading: ref(false),
+      errMsg: ref(""),
+      fetchPercentiles: fieldValuesApi.fetchPercentiles,
+      cancelFetch: fieldValuesApi.cancelPercentileFetch,
+    }),
+  };
+});
 
 // Mock stream service
 vi.mock("@/services/stream", async (importOriginal) => {
@@ -238,6 +277,7 @@ function mountIndexList(props: Record<string, unknown> = {}) {
         },
         FieldExpansion: {
           template: '<div data-test="field-expansion">Field Expansion<slot name="caption" /></div>',
+          methods: { reset: fieldExpansionReset },
           props: [
             "field",
             "fieldValues",
@@ -805,10 +845,10 @@ describe("IndexList Component", () => {
   describe("field-values where clause with AND inside a quoted value (issue 11966)", () => {
     const valuesSql = async (editorValue: string, field: string) => {
       mockSearchObj.data.editorValue = editorValue;
-      mockFetchStream.mockClear();
+      fieldValuesApi.fetchFieldValues.mockClear();
       wrapper.vm.openFilterCreator({}, { name: field });
       await flushPromises();
-      return atob(mockFetchStream.mock.calls[0][0].queryReq.sql);
+      return atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql);
     };
     const clause = "service_name = 'x and y' AND status = '1'";
 
@@ -853,6 +893,101 @@ describe("IndexList Component", () => {
       wrapper.vm.searchObj.data.stream.streamLists = [newStream];
       await wrapper.vm.onStreamChange("new_stream");
       expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(newStream);
+    });
+  });
+
+  describe("open field values follow the selected stream", () => {
+    const streamFields = [{ name: "service_name" }, { name: "duration" }];
+
+    afterEach(() => {
+      mockSearchObj.data.stream.selectedStream = { label: "test_stream", value: "test_stream" };
+      delete mockSearchObj.data.stream.selectedStreamFields;
+    });
+
+    const loadStream = (value: string, fields = streamFields) => {
+      wrapper.vm.searchObj.data.stream.selectedStream = { label: value, value };
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = fields;
+      wrapper.vm.refreshOpenFieldValues();
+    };
+
+    it("re-fetches an open field's values from the new stream", async () => {
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      vi.clearAllMocks();
+
+      loadStream("stream2");
+
+      expect(fieldValuesApi.cancelFieldStream).toHaveBeenCalledWith("service_name");
+      expect(fieldValuesApi.resetFieldValues).toHaveBeenCalledWith("service_name", true);
+      expect(fieldValuesApi.fetchFieldValues).toHaveBeenCalledTimes(1);
+      expect(fieldValuesApi.fetchFieldValues.mock.calls[0][0]).toMatchObject({
+        fields: ["service_name"],
+        stream_name: "stream2",
+        from: 0,
+      });
+      expect(wrapper.vm.expandedFields.service_name).toBe(true);
+    });
+
+    it("fetches nothing while the picker swaps the stream, before its fields and query land", async () => {
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      vi.clearAllMocks();
+
+      wrapper.vm.searchObj.data.stream.streamLists = [{ label: "stream2", value: "stream2" }];
+      wrapper.vm.onStreamChange("stream2");
+      await flushPromises();
+
+      expect(fieldValuesApi.fetchFieldValues).not.toHaveBeenCalled();
+    });
+
+    it("clears the open field's value search along with its keyword", async () => {
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      wrapper.vm.handleSearchFieldValues("service_name", "checkout");
+      vi.clearAllMocks();
+
+      loadStream("stream2");
+
+      expect(fieldValuesApi.fetchFieldValues.mock.calls[0][0].keyword).toBeUndefined();
+      expect(fieldExpansionReset).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not fetch values for fields that are closed", async () => {
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      wrapper.vm.cancelFilterCreator({ name: "service_name" });
+      vi.clearAllMocks();
+
+      loadStream("stream2");
+
+      expect(fieldValuesApi.fetchFieldValues).not.toHaveBeenCalled();
+    });
+
+    it("fetches nothing when the stream is cleared", async () => {
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      vi.clearAllMocks();
+
+      loadStream("", []);
+
+      expect(fieldValuesApi.fetchFieldValues).not.toHaveBeenCalled();
+    });
+
+    it("closes an open field the new stream does not have instead of fetching it", async () => {
+      wrapper.vm.openFilterCreator({}, { name: "custom_field" });
+      vi.clearAllMocks();
+
+      loadStream("stream2");
+
+      expect(fieldValuesApi.fetchFieldValues).not.toHaveBeenCalled();
+      expect(fieldValuesApi.cancelFieldStream).toHaveBeenCalledWith("custom_field");
+      expect(wrapper.vm.expandedFields.custom_field).toBe(false);
+    });
+
+    it("re-fetches open duration percentiles from the new stream", async () => {
+      wrapper.vm.openFilterCreator({}, { name: "duration" });
+      vi.clearAllMocks();
+
+      loadStream("stream2");
+
+      expect(fieldValuesApi.fetchPercentiles).toHaveBeenCalledTimes(1);
+      expect(fieldValuesApi.fetchPercentiles.mock.calls[0][0].streamName).toBe("stream2");
+      expect(fieldValuesApi.fetchFieldValues).not.toHaveBeenCalled();
     });
   });
 
