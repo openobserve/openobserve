@@ -1646,11 +1646,11 @@ mod tests {
 
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     #[test]
-    fn test_parse_dn_with_invalid_format() {
+    fn test_parse_dn_uses_a_non_ldap_group_as_the_org() {
         let result = parse_dn("invalid_dn_format");
         assert!(result.is_some());
         let role_org = result.unwrap();
-        assert_eq!(role_org.org, "default");
+        assert_eq!(role_org.org, "invalid_dn_format");
     }
 
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
