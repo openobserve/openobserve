@@ -26,7 +26,11 @@ pub struct LlmJudgeScorerParams {
     pub provider_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional_f64"
+    )]
     pub temperature: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
@@ -38,6 +42,25 @@ pub struct LlmJudgeScorerParams {
     pub include_reasoning: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extra_metadata_fields: Option<Vec<ExtraMetadataField>>,
+}
+
+/// Deserializes an optional float through `serde_json::Number`.
+///
+/// The workspace enables `serde_json/arbitrary_precision`, under which a
+/// non-integer number is handed to visitors as a private map. Inside an
+/// internally tagged enum (`#[serde(tag = "type")]`) that map is buffered and
+/// a plain `f64` field rejects it with `invalid type: map, expected f64`.
+/// `Number` understands both the buffered map and a plain number.
+fn deserialize_optional_f64<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<serde_json::Number>::deserialize(deserializer)?
+        .map(|n| {
+            n.as_f64()
+                .ok_or_else(|| serde::de::Error::custom(format!("{n} is not a valid f64")))
+        })
+        .transpose()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -588,6 +611,54 @@ mod tests {
             scorer.params["extra_metadata_fields"][0]["description"],
             "Reason the score is low"
         );
+    }
+
+    /// Issue #3143: with `serde_json/arbitrary_precision`, a float inside the
+    /// internally tagged scorer config used to fail with
+    /// `invalid type: map, expected f64`. Parse from raw JSON, as the HTTP
+    /// extractor does.
+    #[test]
+    fn test_llm_judge_scorer_accepts_float_temperature() {
+        let scorer_json = r#"{
+            "type": "llm_judge",
+            "producesScoreConfigVersion": 2,
+            "template": "Judge {{input}}",
+            "params": {
+                "provider_id": "p1",
+                "temperature": 0.1,
+                "max_tokens": 256,
+                "timeout_ms": 30000
+            }
+        }"#;
+
+        let create: ScorerRequestBody =
+            serde_json::from_str(&format!(r#"{{"name": "judge", "scorer": {scorer_json}}}"#))
+                .unwrap();
+        let scorer = infra::table::scorers::Scorer::from(create);
+        assert_eq!(scorer.params["temperature"].as_f64(), Some(0.1));
+        assert_eq!(scorer.params["max_tokens"].as_u64(), Some(256));
+        let stored: LlmJudgeScorerParams = serde_json::from_value(scorer.params).unwrap();
+        assert_eq!(stored.temperature, Some(0.1));
+
+        let update: ScorerUpdateRequestBody =
+            serde_json::from_str(&format!(r#"{{"scorer": {scorer_json}}}"#)).unwrap();
+        let ScorerUpdateConfig::LlmJudge(update) = update.scorer else {
+            panic!("expected llm_judge");
+        };
+        assert_eq!(update.params.temperature, Some(0.1));
+
+        let test: ScorerTestRequestBody = serde_json::from_str(&format!(
+            r#"{{"name": "judge", "scorer": {scorer_json}, "inputVariables": {{}}}}"#
+        ))
+        .unwrap();
+        let ScorerCreateConfig::LlmJudge(test) = test.scorer else {
+            panic!("expected llm_judge");
+        };
+        assert_eq!(test.params.temperature, Some(0.1));
+
+        let omitted: LlmJudgeScorerParams =
+            serde_json::from_str(r#"{"provider_id": "p1"}"#).unwrap();
+        assert_eq!(omitted.temperature, None);
     }
 
     #[test]

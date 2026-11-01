@@ -867,11 +867,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::common::remote_defaults::spawn_refresher();
 
     if config::get_config().common.model_pricing_enabled {
+        // Warm from committed seed rows even offline or when coordinator notification fails.
+        if let Err(e) = openobserve_builtins::model_pricing::load_seed().await {
+            log::error!("[model_pricing] loading seed prices failed: {e}");
+        }
         db::model_pricing::cache()
             .await
             .expect("model pricing cache failed");
 
-        // Sync built-in model pricing from GitHub (initial + periodic)
+        // Only queriers perform the initial and periodic GitHub sync.
         if LOCAL_NODE.is_querier() {
             tokio::task::spawn(async {
                 if let Err(e) =

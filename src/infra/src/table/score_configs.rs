@@ -245,27 +245,26 @@ pub async fn get_versions(
     Ok(records)
 }
 
+/// Updating a score config deactivates its previous versions, so each entity
+/// has one active row; the dedupe only guards legacy rows written before that
+/// rule. Reads the primary: the web refetches this list right after a save, and a
+/// lagging read-only replica would return the pre-save rows.
 pub async fn get_all_by_org(org_id: &str) -> Result<Vec<ScoreConfig>, errors::Error> {
-    let client = get_orm_client_rw().await;
-
-    // Get the latest version per logical entity.
     let records: Vec<Model> = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::IsActive.eq(true))
         .order_by(Column::Name, Order::Asc)
         .order_by(Column::Version, Order::Desc)
-        .all(client)
+        .all(get_orm_client_rw().await)
         .await?;
 
-    // Deduplicate: keep only the highest version per entity.
+    // Keep the highest version per logical entity.
     let mut seen = std::collections::HashSet::new();
-    let records: Vec<_> = records
+    Ok(records
         .into_iter()
         .map(ScoreConfig::from)
         .filter(|c| seen.insert(c.entity_id.clone()))
-        .collect();
-
-    Ok(records)
+        .collect())
 }
 
 pub async fn delete(entity_id: &str, org_id: &str) -> Result<(), errors::Error> {

@@ -37,9 +37,13 @@ export interface EmptyStateAction {
   icon: IconName | (string & {});
   /** i18n key for the card title. */
   titleKey: I18nKey;
+  /** Interpolation values for `titleKey` (e.g. the integration a card opens). */
+  titleParams?: Record<string, string>;
   /** i18n key for the card description (optional). */
   descriptionKey?: I18nKey;
-  /** Identifier emitted with the `action` event so call sites can route. */
+  /** Interpolation values for `descriptionKey`. */
+  descriptionParams?: Record<string, string>;
+  /** Identifier emitted with the `action` event so call sites can route; also the action's `data-test` suffix. */
   id: string;
 }
 
@@ -930,7 +934,9 @@ export const emptyStatePresets = {
   // LLM Insights dashboard — single empty-state shape (used for all three
   // "no data" cases: no LLM streams in the org, the active stream has no
   // gen_ai_* fields, or the window came up empty). Filtered branch is
-  // intentionally not used (the page exposes no filter UI to clear).
+  // intentionally not used (the page exposes no filter UI to clear). The page
+  // puts its integration-specific cards (the guide the user most likely needs)
+  // before this catch-all, plus popular-guide chips under them.
   "no-llm-insights": {
     illustration: "constellation",
     variant: "create",
@@ -938,8 +944,8 @@ export const emptyStatePresets = {
     descriptionKey: "emptyState.noLLMInsights.description",
     actions: [
       {
-        id: "instrument",
-        icon: "auto-awesome",
+        id: "all-integrations",
+        icon: "widgets",
         titleKey: "emptyState.noLLMInsights.action",
         descriptionKey: "emptyState.noLLMInsights.actionDesc",
       },

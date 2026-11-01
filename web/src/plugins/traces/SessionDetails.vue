@@ -102,8 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="session-detail-skeleton"
         >
           <!-- Shape row: KPI tiles + ribbon -->
-          <div class="mb-2.5 grid flex-shrink-0 grid-cols-2 gap-2.5">
-            <div class="grid grid-cols-3 gap-2.5">
+          <div class="mb-2.5 grid flex-shrink-0 grid-cols-1 gap-2.5 lg:grid-cols-2">
+            <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
               <div v-for="n in 6" :key="n" :class="kpiCardClass()">
                 <OSkeleton type="rect" animation="wave" class="rounded-default h-[0.7rem] w-12" />
                 <OSkeleton
@@ -224,14 +224,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Content -->
         <template v-else>
-          <!-- Shape row: KPI tiles (left) + session ribbon (right), always two
-           equal columns side by side (matches the mockup's 1fr 1fr). -->
-          <div class="mb-2.5 grid flex-shrink-0 grid-cols-2 gap-2.5">
+          <!-- Shape row: KPI tiles (left) + session ribbon (right) as two equal
+           columns (the mockup's 1fr 1fr); below lg they stack so each KPI tile
+           keeps room for its label. -->
+          <div class="mb-2.5 grid flex-shrink-0 grid-cols-1 gap-2.5 lg:grid-cols-2">
             <!-- KPI strip — six session-level metric tiles. Card chrome + danger
            variant are Tailwind utilities (see kpiCardClass / kpiAccentClass),
            matching the LLM Insights dashboard so the AI module stays consistent. -->
             <div
-              class="grid h-full grid-cols-3 grid-rows-2 gap-2.5"
+              class="grid h-full grid-cols-2 gap-2.5 sm:grid-cols-3 sm:grid-rows-2"
               data-test="session-detail-kpis"
             >
               <div
@@ -346,22 +347,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <SessionRibbon :traces="traces" :cache-pct="cacheRatio" @jump="jumpToTurn" />
           </div>
 
-          <!-- Lower area: conversation column (left) + hotspot rail (right). Full-page
-           scroll — the column grows with content; the rail sticks (items-start so
-           it doesn't stretch to the tall conversation's height). -->
-          <div class="grid grid-cols-[minmax(0,1fr)_21.25rem] items-start gap-2.5">
+          <!-- Lower area: conversation column (left) + hotspot rail (right; below the
+           conversation under the lg breakpoint). Full-page scroll — the column grows with
+           content; the rail sticks (items-start so it doesn't stretch to the tall
+           conversation's height). -->
+          <div class="grid grid-cols-1 items-start gap-2.5 lg:grid-cols-[minmax(0,1fr)_21.25rem]">
             <!-- Conversation column: toolbar + panel -->
             <div class="flex min-h-0 min-w-0 flex-col">
               <!-- Conversation toolbar: search (fills width) + status + model filters.
            Sorting lives on the Collapsed view's metric column headers. -->
-              <div class="mb-2.5 flex flex-shrink-0 items-center gap-2">
+              <div class="mb-2.5 flex flex-shrink-0 flex-wrap items-center gap-2">
                 <OSearchInput
                   v-model="searchText"
                   :placeholder="t('traces.sessionDetail.searchPlaceholder')"
                   clearable
                   :debounce="200"
                   size="xs"
-                  class="no-border h-9 flex-1!"
+                  class="no-border h-9 min-w-48 flex-1!"
                 />
                 <div class="w-36 flex-shrink-0">
                   <OSelect
@@ -512,8 +514,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span
                             class="text-text-secondary text-right text-xs font-semibold tabular-nums"
                           >
-                            {{ t("traces.sessionDetail.currencySymbol")
-                            }}{{ trace.cost.toFixed(4) }}
+                            <LLMCostCell
+                              scope="trace"
+                              :cost="trace.cost"
+                              :tokens="trace.tokens"
+                              :unpriced-tokens="trace.unpricedTokens"
+                              :unpriced-models="trace.unpricedModels"
+                              :stream="streamName"
+                              :format="
+                                (c: number) =>
+                                  `${t('traces.sessionDetail.currencySymbol')}${c.toFixed(4)}`
+                              "
+                            />
                           </span>
                           <OProgressBar :value="ratio(trace.cost, maxTurnCost)" size="xs" />
                         </div>
@@ -765,7 +777,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-2xs flex flex-shrink-0 items-center gap-[0.3rem] tabular-nums"
                       >
                         <span class="text-text-secondary font-semibold">
-                          {{ formatDuration(row.duration) }}
+                          {{ formatDuration(row.durationNanos) }}
                         </span>
                         <span class="text-text-muted">
                           ·
@@ -964,6 +976,8 @@ import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDi
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
+import LLMCostCell from "./LLMCostCell.vue";
+import { costKind } from "./llmDataTrust.utils";
 import { renderMarkdown } from "./markdown";
 
 const ManualEvaluationDialog = defineAsyncComponent(
@@ -1084,6 +1098,11 @@ const sessionStats = computed(() => {
   const costs = rows.map((tr) => tr.cost);
   const maxCost = costs.length ? Math.max(...costs) : 0;
   const peakTurn = (costs.indexOf(maxCost) >= 0 ? costs.indexOf(maxCost) : 0) + 1;
+  // Whether the peak turn's cost is a price at all: a turn whose tokens are all
+  // unpriced has $0 recorded, which is not "the turn that cost the most".
+  const peakRow = rows[peakTurn - 1];
+  const peakTurnPriced =
+    !!peakRow && costKind(peakRow.cost, peakRow.tokens, peakRow.unpricedTokens ?? 0) !== "unknown";
 
   const cachedTokens = d.cacheReadInputTokens;
   const cacheDenominator = cacheInputDenominator(d);
@@ -1100,6 +1119,7 @@ const sessionStats = computed(() => {
     slowestTurn,
     maxCost,
     peakTurn,
+    peakTurnPriced,
     cachedTokens,
     cacheRatio,
     cacheImpact,
@@ -1173,8 +1193,23 @@ const kpiCards = computed<
   if (!d || !s) return [];
 
   const dur = splitDuration(d.durationNanos / 1000);
-  const lat = splitDuration(s.avgLat / 1000);
-  const cost = { value: usd4(d.cost), unit: "" };
+  // Unpriced tokens make the cost a lower bound ("≥ $X") or unknown, never a silent $0.
+  const unpricedTokens = d.unpricedTokens ?? 0;
+  const kind = costKind(d.cost, d.tokens, unpricedTokens);
+  const unpricedParams = {
+    models: (d.unpricedModels ?? []).join(", ") || t("llmDataTrust.cost.unknownModel"),
+    tokens: unpricedTokens.toLocaleString(),
+    scope: t("llmDataTrust.cost.scopeSession"),
+  };
+  const cost = {
+    value:
+      kind === "partial"
+        ? t("llmDataTrust.cost.atLeast", { cost: usd4(d.cost) })
+        : kind === "unknown"
+          ? t("llmDataTrust.cost.unknown")
+          : usd4(d.cost),
+    unit: "",
+  };
   const tokens = splitNumberWithUnit(d.tokens);
   const turnWord = t("traces.sessionDetail.turnLabel");
 
@@ -1221,11 +1256,13 @@ const kpiCards = computed<
       key: "latency",
       icon: "schedule",
       label: t("traces.sessionDetail.kpi.duration"),
-      value: lat.value,
-      unit: lat.unit,
+      // The session's own wall-clock span; per-turn latency goes in the sub-line.
+      value: dur.value,
+      unit: dur.unit,
       // Latency is never colour-flagged — "good" latency is too workload-
       // specific to threshold reliably, so the tile stays neutral.
       subLead: t("traces.sessionDetail.kpiSub.latencyLead", {
+        avg: formatDuration(s.avgLat),
         slowest: formatDuration(s.slowestLat),
       }),
       subTurns: [{ n: s.slowestTurn, label: raw(`${turnWord} ${s.slowestTurn}`) }],
@@ -1237,10 +1274,18 @@ const kpiCards = computed<
       label: t("traces.sessionDetail.kpi.cost"),
       value: cost.value,
       unit: cost.unit,
-      subLead: t("traces.sessionDetail.kpiSub.costLead", {
-        peak: usd4(s.maxCost),
-      }),
-      subTurns: [{ n: s.peakTurn, label: raw(`${turnWord} ${s.peakTurn}`) }],
+      subLead:
+        kind === "exact"
+          ? t("traces.sessionDetail.kpiSub.costLead", { peak: usd4(s.maxCost) })
+          : kind === "partial"
+            ? t("llmDataTrust.cost.partialTooltip", unpricedParams)
+            : t("llmDataTrust.cost.unknownTooltip", unpricedParams),
+      // An unknown cost has no peak turn; a partial one names it only when that
+      // turn carries a priced cost.
+      subTurns:
+        kind === "unknown" || (kind === "partial" && !s.peakTurnPriced)
+          ? []
+          : [{ n: s.peakTurn, label: raw(`${turnWord} ${s.peakTurn}`) }],
       subTail: "",
     },
     {
@@ -1485,7 +1530,8 @@ const costHotspots = computed(() =>
 );
 interface ToolHotspot {
   name: string;
-  duration: number;
+  /** Summed span duration in nanoseconds, the unit `formatDuration` takes. */
+  durationNanos: number;
   calls: number;
   tokens: number;
   topTraceId: string;
@@ -1498,20 +1544,21 @@ const toolHotspots = computed<ToolHotspot[]>(() => {
   for (const s of sessionSpans.value) {
     if (String(s.gen_ai_operation_name || "").toLowerCase() !== "execute_tool") continue;
     const name = String(s.tool_name || s.gen_ai_tool_name || s.operation_name || "tool");
-    const dur = Number(s.duration) || 0;
+    // Span `duration` is in microseconds; the rail formats nanoseconds.
+    const dur = (Number(s.duration) || 0) * 1000;
     const tokens = Number(s.gen_ai_usage_total_tokens) || 0;
     const a =
       agg[name] ||
       (agg[name] = {
         name,
-        duration: 0,
+        durationNanos: 0,
         calls: 0,
         tokens: 0,
         topTraceId: s.trace_id,
         topDur: -1,
         turnsSet: new Set<number>(),
       });
-    a.duration += dur;
+    a.durationNanos += dur;
     a.calls += 1;
     a.tokens += tokens;
     const turnNum = originalTurnIndex(String(s.trace_id)) + 1;
@@ -1529,7 +1576,7 @@ const toolHotspots = computed<ToolHotspot[]>(() => {
       ...rest,
       turns: [...turnsSet].sort((p, q) => p - q),
     }))
-    .sort((x, y) => y.calls - x.calls || y.duration - x.duration);
+    .sort((x, y) => y.calls - x.calls || y.durationNanos - x.durationNanos);
 });
 
 // Jump to a turn (1-based): clear filters so it's visible, expand it, then

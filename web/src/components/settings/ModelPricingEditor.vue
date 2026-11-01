@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :back="{
-      label: t('modelPricing.header'),
+      label: backToGaps ? t('modelPricing.unpriced.title') : t('modelPricing.header'),
       onClick: goBack,
       dataTest: 'model-pricing-editor-back-btn',
     }"
@@ -879,7 +879,17 @@ const headerTitle = computed(() =>
   isEdit.value ? t("modelPricing.editTitle") : t("modelPricing.newTitle"),
 );
 
-const model = ref<any>(createEmptyModel());
+/** A new model can open prefilled through `?name=&match_pattern=`, as Pricing gaps' Create price does. */
+function prefilledNewModel() {
+  const empty = createEmptyModel();
+  if (route.query.id) return empty;
+  const { name, match_pattern } = route.query;
+  if (typeof name === "string") empty.name = name;
+  if (typeof match_pattern === "string") empty.match_pattern = match_pattern;
+  return empty;
+}
+
+const model = ref<any>(prefilledNewModel());
 
 // Dynamic defaults (edit-prefill projects the working model) → a typed computed.
 // `model.value` holds the API-shaped record (per-token price MAP); the form holds
@@ -1417,7 +1427,17 @@ function validateUsageKey(key: string): string | null {
   return null;
 }
 
+// Pricing gaps' Create price sets `from=gaps&stream=`, so Back and Save return to that stream's gaps.
+const backToGaps = computed(() => route.query.from === "gaps");
+
 function goBack() {
+  if (backToGaps.value) {
+    router.push({
+      name: "modelPricingGaps",
+      query: { org_identifier: orgIdentifier.value, stream: route.query.stream as string },
+    });
+    return;
+  }
   router.push({
     name: "modelPricing",
     query: { org_identifier: orgIdentifier.value },

@@ -18,6 +18,9 @@
 import { reactive } from "vue";
 
 const mockListAgents = vi.fn();
+const mockGetStreams = vi.fn();
+const mockRouteQuery: Record<string, string> = {};
+const mockRouterReplace = vi.fn(() => Promise.resolve());
 
 // Module-scoped traces store singleton (mirrors useTraces()).
 const mockSearchObj = reactive({
@@ -50,6 +53,19 @@ vi.mock("vuex", () => ({
   useStore: vi.fn(() => ({
     state: { selectedOrganization: { identifier: "test-org" } },
   })),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStreams: (...args: any[]) => mockGetStreams(...args) }),
+}));
+
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ query: mockRouteQuery }),
+  useRouter: () => ({ replace: mockRouterReplace }),
+}));
+
+vi.mock("@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue", () => ({
+  default: { name: "AiNoAgentIdentityBanner", template: `<div />` },
 }));
 
 vi.mock("vue-i18n", () => ({
@@ -168,6 +184,7 @@ vi.mock("@/components/shared/SkeletonBox.vue", () => ({
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AgentGraphPage from "./AgentGraphPage.vue";
+import { queryClient } from "@/composables/query/queryClient";
 
 const AGENT = {
   name: "sre_agent",
@@ -185,6 +202,12 @@ async function mountPage() {
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+  // The agents query is cached per window bucket; each test brings its own list.
+  queryClient.clear();
+  for (const k of Object.keys(mockRouteQuery)) delete mockRouteQuery[k];
+  mockGetStreams.mockResolvedValue({
+    list: [{ name: "llm_traces", settings: { is_llm_stream: true } }],
+  });
 });
 
 describe("AgentGraphPage — agent-mode stream gating", () => {
@@ -200,16 +223,127 @@ describe("AgentGraphPage — agent-mode stream gating", () => {
     expect(sg.attributes("data-stream")).not.toBe("default");
   });
 
-  it("shows the 'no agents' empty state — NOT the default service graph — when no agents are discovered", async () => {
+  it("opens in Stream mode on the LLM stream with the no-agent-identity banner when no agents are discovered", async () => {
     mockListAgents.mockResolvedValue({ agents: [] });
 
     const wrapper = await mountPage();
 
-    // The regression: ServiceGraph must NOT render (it would have queried the
-    // fallback `default` stream and drawn the wrong graph).
+    // An LLM stream without agent identity is still graphed (never `default`).
+    const sg = wrapper.find('[data-test="service-graph-stub"]');
+    expect(sg.exists()).toBe(true);
+    expect(sg.attributes("data-stream")).toBe("llm_traces");
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+    expect(wrapper.findComponent({ name: "AiNoAgentIdentityBanner" }).exists()).toBe(true);
+  });
+
+  it("shows the 'no agents' empty state — NOT the default service graph — when there are no agents and no LLM stream", async () => {
+    mockListAgents.mockResolvedValue({ agents: [] });
+    mockGetStreams.mockResolvedValue({ list: [] });
+
+    const wrapper = await mountPage();
+
     expect(wrapper.find('[data-test="service-graph-stub"]').exists()).toBe(false);
-    // The empty state is shown instead.
     expect(wrapper.find('[data-test="agent-graph-no-agents"]').exists()).toBe(true);
+  });
+
+  it("keeps an explicit Agent choice from the URL even when no agents are discovered", async () => {
+    mockRouteQuery.type = "agent";
+    mockListAgents.mockResolvedValue({ agents: [] });
+
+    const wrapper = await mountPage();
+
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+    expect(wrapper.find('[data-test="service-graph-stub"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="agent-graph-no-agents"]').exists()).toBe(true);
+  });
+
+  async function pickWindow(wrapper: any, userChangedValue: boolean, startTime: number) {
+    wrapper.findComponent({ name: "AiPageShell" }).vm.$emit("date-change", {
+      valueType: "absolute",
+      startTime,
+      endTime: startTime + 1_000_000,
+      userChangedValue,
+    });
+    await flushPromises();
+  }
+
+  it("decides an auto mode again when the user picks a window with no agents", async () => {
+    mockListAgents.mockResolvedValue({ agents: [AGENT] });
+    const wrapper = await mountPage();
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+
+    // A replay (not the user's pick) of a window with no agents decides nothing.
+    mockListAgents.mockResolvedValue({ agents: [] });
+    await pickWindow(wrapper, false, 1_600_000_000_000_000);
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+
+    await pickWindow(wrapper, true, 1_500_000_000_000_000);
+    expect((wrapper.vm as any).filterMode).toBe("stream");
+  });
+
+  it("keeps an explicit Agent choice when the user picks a window with no agents", async () => {
+    mockRouteQuery.type = "agent";
+    mockListAgents.mockResolvedValue({ agents: [AGENT] });
+    const wrapper = await mountPage();
+
+    mockListAgents.mockResolvedValue({ agents: [] });
+    await pickWindow(wrapper, true, 1_500_000_000_000_000);
+    expect((wrapper.vm as any).filterMode).toBe("agent");
+  });
+
+  it("opens on the agent, env and version named in the URL, not the first agent", async () => {
+    mockRouteQuery.agent = "omp";
+    mockRouteQuery.env = "production";
+    mockRouteQuery.version = "2";
+    mockListAgents.mockResolvedValue({
+      agents: [
+        {
+          name: "a23ca1dd38a1ff350",
+          id: "a23ca1dd38a1ff350",
+          source_stream: "s1",
+          source_stream_type: "traces",
+          env: "staging",
+          version: "1",
+        },
+        {
+          name: "omp",
+          id: "agent-omp",
+          source_stream: "s_staging",
+          source_stream_type: "traces",
+          env: "staging",
+          version: "2",
+        },
+        {
+          name: "omp",
+          id: "agent-omp",
+          source_stream: "s_prod",
+          source_stream_type: "traces",
+          env: "production",
+          version: "1",
+        },
+        {
+          name: "omp",
+          id: "agent-omp",
+          source_stream: "s_prod2",
+          source_stream_type: "traces",
+          env: "production",
+          version: "2",
+        },
+      ],
+    });
+
+    const wrapper = await mountPage();
+
+    const vm = wrapper.vm as any;
+    expect(vm.filterMode).toBe("agent");
+    expect([vm.selectedEnv, vm.selectedAgentName, vm.selectedVersion]).toEqual([
+      "production",
+      "omp",
+      "2",
+    ]);
+    expect(wrapper.find('[data-test="service-graph-stub"]').attributes("data-stream")).toBe(
+      "s_prod2",
+    );
   });
 
   it("does not render ServiceGraph while agents are still loading", async () => {

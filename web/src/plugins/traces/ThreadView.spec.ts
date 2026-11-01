@@ -68,7 +68,7 @@ function makeLLMSpan(overrides: Record<string, unknown> = {}): Record<string, un
     gen_ai_usage_total_tokens: "150",
     start_time: BASE_TIME_NS,
     end_time: BASE_TIME_NS + 500_000_000, // 500 ms later
-    duration: 500_000_000,
+    duration: 500_000, // µs, as stored
     span_status: "UNSET",
     ...overrides,
   };
@@ -84,7 +84,7 @@ function makeToolSpan(overrides: Record<string, unknown> = {}): Record<string, u
     gen_ai_input_messages: undefined,
     start_time: BASE_TIME_NS + 100_000_000,
     end_time: BASE_TIME_NS + 300_000_000,
-    duration: 200_000_000,
+    duration: 200_000, // µs
     span_status: "UNSET",
     ...overrides,
   };
@@ -231,13 +231,13 @@ describe("ThreadView", () => {
       wrapper = mountThreadView({ spans: [makeLLMSpan()] });
       const durationChip = wrapper.find(".thread-chip--duration");
       expect(durationChip.exists()).toBe(true);
-      expect(durationChip.text()).toContain("500ms");
+      expect(durationChip.text()).toContain("500.00ms");
     });
 
-    it("should display Duration chip as '0ms' when spans is empty", () => {
+    it("should display Duration chip as '0us' when spans is empty", () => {
       wrapper = mountThreadView({ spans: [] });
       const durationChip = wrapper.find(".thread-chip--duration");
-      expect(durationChip.text()).toContain("0ms");
+      expect(durationChip.text()).toContain("0us");
     });
 
     it("should display Cost as '$0' when spans have no cost data", () => {
@@ -406,6 +406,28 @@ describe("ThreadView", () => {
       const tool = makeLinkedToolSpan("llm-p");
       wrapper = mountThreadView({ spans: [llm, tool] });
       expect(wrapper.find(".thread-tool-row").exists()).toBe(false);
+    });
+
+    // Issue #3135: `span.duration` is µs. A 3.51 s LLM call and a 10.10 ms
+    // tool call must read as the waterfall shows them.
+    it("shows per-turn and per-tool durations from a real µs span as the waterfall does", async () => {
+      const llm = makeLLMSpan({
+        span_id: "llm-p",
+        end_time: BASE_TIME_NS + 3_510_000_000,
+        duration: 3_510_000,
+      });
+      const tool = makeLinkedToolSpan("llm-p", {
+        end_time: BASE_TIME_NS + 110_100_000,
+        duration: 10_100,
+      });
+      wrapper = mountThreadView({ spans: [llm, tool] });
+
+      const turnMetric = wrapper.find('.thread-metric[title="Duration"]');
+      expect(turnMetric.text()).toContain("3.51s");
+      expect(wrapper.find(".tt-count").text()).toContain("10.10ms");
+
+      await reveal(wrapper);
+      expect(wrapper.find(".thread-pill").text()).toContain("10.10ms");
     });
 
     it("should not show tool body by default (collapsed)", async () => {
@@ -586,20 +608,20 @@ describe("ThreadView", () => {
   });
 
   // =========================================================================
-  // formatDuration — exercised through the Duration chip
+  // Duration formatting — exercised through the Duration chip
   // =========================================================================
 
-  describe("formatDuration (via Duration chip)", () => {
-    it("should show '0ms' when all span times are 0", () => {
+  describe("duration formatting (via Duration chip)", () => {
+    it("should show '0us' when all span times are 0", () => {
       wrapper = mountThreadView({
         spans: [makeLLMSpan({ start_time: 0, end_time: 0 })],
       });
       const chip = wrapper.find(".thread-chip--duration");
-      expect(chip.text()).toContain("0ms");
+      expect(chip.text()).toContain("0us");
     });
 
-    it("should format sub-millisecond durations with two decimal places", () => {
-      // end - start = 500_000 ns = 0.5 ms → "0.50ms"
+    it("should format sub-millisecond durations in microseconds", () => {
+      // end - start ≈ 500_000 ns ≈ 500 µs (BASE_TIME_NS exceeds float precision)
       wrapper = mountThreadView({
         spans: [
           makeLLMSpan({
@@ -609,13 +631,11 @@ describe("ThreadView", () => {
         ],
       });
       const chip = wrapper.find(".thread-chip--duration");
-      // Should not say "0ms" for a finite but sub-1ms duration
-      expect(chip.text()).not.toBe("Duration 0ms");
-      expect(chip.text()).toMatch(/0\.\d+ms/);
+      expect(chip.text()).toMatch(/\d{3}\.\d{2}us/);
     });
 
-    it("should format millisecond-range durations without decimal places", () => {
-      // 500 ms = 500_000_000 ns → "500ms"
+    it("should format millisecond-range durations with two decimal places", () => {
+      // 500 ms = 500_000_000 ns → "500.00ms"
       wrapper = mountThreadView({
         spans: [
           makeLLMSpan({
@@ -625,7 +645,7 @@ describe("ThreadView", () => {
         ],
       });
       const chip = wrapper.find(".thread-chip--duration");
-      expect(chip.text()).toContain("500ms");
+      expect(chip.text()).toContain("500.00ms");
     });
 
     it("computes the total duration over 200,000 spans without a RangeError", () => {

@@ -16,6 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ref } from "vue";
 import type { Ref } from "vue";
+import type { LocationQuery } from "vue-router";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { ALL_AGENTS_VALUE } from "@/enterprise/components/onlineEvals/utils/agentFilterSql";
 import { agentOptionKey } from "@/plugins/traces/llmAgentFilter";
@@ -30,7 +31,14 @@ vi.mock("@/services/gen-ai-agent-mapping.service", async (importOriginal) => {
   };
 });
 
-import { useAgentScope, UNSET } from "./useAgentScope";
+import {
+  useAgentScope,
+  resolveScopeMode,
+  UNSET,
+  scopeUrlQuery,
+  readUrlScope,
+  explicitScopeMode,
+} from "./useAgentScope";
 
 const t = (k: string) => k;
 
@@ -187,6 +195,196 @@ describe("useAgentScope — Shape 1 (allAgents:true, Sessions/LLM)", () => {
     expect(agents.value).toEqual([]);
     expect(scope.activeAgent.value).toBe(ALL_AGENTS_VALUE);
     expect(scope.agentsLoaded.value).toBe(true);
+  });
+
+  it("a failed load is an error, not 'no agents': no empty state, no identity banner", async () => {
+    const filterMode = ref<"stream" | "agent">("stream");
+    const scope = useAgentScope({
+      filterMode,
+      activeStream: ref("stream_a"),
+      availableStreams: ref(["stream_a"]),
+      orgId: () => "org1",
+      getWindow: () => ({ start: 100, end: 200 }),
+      allAgents: true,
+      t,
+    });
+    listAgents.mockRejectedValue(
+      Object.assign(new Error("boom"), { isAxiosError: true, response: { status: 500 } }),
+    );
+    await scope.loadAgents();
+    expect(scope.agentsError.value).toBe("failed");
+    expect(scope.noAgentIdentity.value).toBe(false);
+    filterMode.value = "agent";
+    expect(scope.agentEmpty.value).toBe(false);
+    expect(scope.agentsLoadFailed.value).toBe(true);
+
+    // A load that succeeds clears the error; an empty list is then "no agents".
+    listAgents.mockResolvedValue({ agents: [] });
+    await scope.loadAgents(undefined, undefined, true);
+    expect(scope.agentsError.value).toBeNull();
+    expect(scope.agentsLoadFailed.value).toBe(false);
+    expect(scope.agentEmpty.value).toBe(true);
+    filterMode.value = "stream";
+    expect(scope.noAgentIdentity.value).toBe(true);
+  });
+
+  it("a 403 is reported as forbidden", async () => {
+    const { scope } = makeScope(ref("agent"), ref(""));
+    listAgents.mockRejectedValue(
+      Object.assign(new Error("Forbidden"), { isAxiosError: true, response: { status: 403 } }),
+    );
+    await scope.loadAgents();
+    expect(scope.agentsError.value).toBe("forbidden");
+  });
+
+  it("drops an agents response or failure that lands after the org changed", async () => {
+    const org = ref("org-switch-old");
+    const agents = ref<GenAiAgentListItem[]>([]);
+    const agentsLoaded = ref(false);
+    const scope = useAgentScope({
+      filterMode: ref("agent"),
+      activeStream: ref(""),
+      orgId: () => org.value,
+      getWindow: () => ({ start: 100, end: 200 }),
+      allAgents: true,
+      agents,
+      agentsLoaded,
+      t,
+    });
+    const ok = Promise.withResolvers<unknown>();
+    listAgents.mockReturnValue(ok.promise);
+    const pending = scope.loadAgents();
+    org.value = "org-switch-new";
+    ok.resolve({ agents: [agentA] });
+    await pending;
+    expect(agents.value).toEqual([]);
+    expect(agentsLoaded.value).toBe(false);
+
+    // The error path is dropped the same way.
+    org.value = "org-switch-old-2";
+    const fail = Promise.withResolvers<unknown>();
+    listAgents.mockReturnValue(fail.promise);
+    agents.value = [agentB];
+    const failing = scope.loadAgents();
+    org.value = "org-switch-new";
+    fail.reject(
+      Object.assign(new Error("Forbidden"), { isAxiosError: true, response: { status: 403 } }),
+    );
+    await failing;
+    expect(agents.value).toEqual([agentB]);
+    expect(scope.agentsError.value).toBeNull();
+    expect(agentsLoaded.value).toBe(false);
+  });
+
+  it.each(["success", "failure"])(
+    "keeps the newer window after an older request finishes with %s",
+    async (outcome) => {
+      const scope = useAgentScope({
+        filterMode: ref("agent"),
+        activeStream: ref(""),
+        orgId: () => `window-race-${outcome}`,
+        getWindow: () => ({ start: 60_000_000, end: 120_000_000 }),
+        allAgents: true,
+        t,
+      });
+      const old = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+      const latest = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+      listAgents.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise);
+      const oldLoad = scope.loadAgents();
+      const latestLoad = scope.loadAgents(180_000_000, 240_000_000);
+      await vi.waitFor(() => expect(listAgents).toHaveBeenCalledTimes(2));
+      latest.resolve({ agents: [agentB] });
+      await latestLoad;
+      if (outcome === "success") old.resolve({ agents: [agentA] });
+      else old.reject(new Error("old window failed"));
+      await oldLoad;
+      expect(scope.agents.value).toEqual([agentB]);
+      expect(scope.agentsError.value).toBeNull();
+      expect(scope.agentsLoaded.value).toBe(true);
+    },
+  );
+
+  it("refreshes after an in-flight cached load rather than reusing its response", async () => {
+    const scope = useAgentScope({
+      filterMode: ref("agent"),
+      activeStream: ref(""),
+      orgId: () => "forced-load-after-entry",
+      getWindow: () => ({ start: 60_000_000, end: 120_000_000 }),
+      allAgents: true,
+      t,
+    });
+    const entry = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+    listAgents.mockReturnValueOnce(entry.promise).mockResolvedValueOnce({ agents: [agentB] });
+    const initialLoad = scope.loadAgents();
+    await vi.waitFor(() => expect(listAgents).toHaveBeenCalledTimes(1));
+    const refresh = scope.loadAgents(undefined, undefined, true);
+    entry.resolve({ agents: [agentA] });
+    await Promise.all([initialLoad, refresh]);
+    expect(listAgents).toHaveBeenCalledTimes(2);
+    expect(scope.agents.value).toEqual([agentB]);
+  });
+
+  it("the starter and joiners of a load wait for a forced refresh started after them", async () => {
+    const scope = useAgentScope({
+      filterMode: ref("agent"),
+      activeStream: ref(""),
+      orgId: () => "joiner-waits-for-forced",
+      getWindow: () => ({ start: 60_000_000, end: 120_000_000 }),
+      allAgents: true,
+      t,
+    });
+    const entry = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+    const forced = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
+    listAgents.mockReturnValueOnce(entry.promise).mockReturnValueOnce(forced.promise);
+    const seen: Record<string, GenAiAgentListItem[]> = {};
+    const starter = scope.loadAgents().then(() => {
+      seen.starter = scope.agents.value;
+    });
+    await vi.waitFor(() => expect(listAgents).toHaveBeenCalledTimes(1));
+    const joiner = scope.loadAgents().then(() => {
+      seen.joiner = scope.agents.value;
+    });
+    const refresh = scope.loadAgents(undefined, undefined, true);
+    entry.resolve({ agents: [agentA] });
+    await vi.waitFor(() => expect(listAgents).toHaveBeenCalledTimes(2));
+    expect(seen).toEqual({});
+    forced.resolve({ agents: [agentB] });
+    await Promise.all([starter, joiner, refresh]);
+    expect(seen).toEqual({ starter: [agentB], joiner: [agentB] });
+  });
+});
+
+describe("resolveScopeMode", () => {
+  it("an explicit choice wins; else agents decide; a failed load never picks Stream", () => {
+    expect(resolveScopeMode("stream", 3)).toBe("stream");
+    expect(resolveScopeMode(null, 3)).toBe("agent");
+    expect(resolveScopeMode(null, 0)).toBe("stream");
+    expect(resolveScopeMode(null, 0, "failed")).toBe("agent");
+    expect(resolveScopeMode(null, 0, "forbidden")).toBe("agent");
+    expect(resolveScopeMode("stream", 0, "failed")).toBe("stream");
+  });
+});
+
+describe("scopeUrlQuery", () => {
+  const agent = { name: "support-bot", env: "prod", version: "v2" };
+
+  beforeEach(() => localStorage.clear());
+
+  it("leaves an auto-picked agent out of the URL, so a reload with no agents ends in Stream", () => {
+    const query = scopeUrlQuery(
+      { from: "1" },
+      { mode: "agent", explicit: false, stream: "", agent },
+    );
+    expect(query).toEqual({ from: "1" });
+    const reloaded = readUrlScope(query as LocationQuery);
+    expect(resolveScopeMode(explicitScopeMode(reloaded), 0)).toBe("stream");
+  });
+
+  it("writes an explicit agent scope, which a reload keeps", () => {
+    const query = scopeUrlQuery({}, { mode: "agent", explicit: true, stream: "", agent });
+    expect(query).toEqual({ type: "agent", agent: "support-bot", env: "prod", version: "v2" });
+    const reloaded = readUrlScope(query as LocationQuery);
+    expect(resolveScopeMode(explicitScopeMode(reloaded), 0)).toBe("agent");
   });
 });
 
@@ -541,7 +739,7 @@ describe("useAgentScope — cascade with the All option (Quality)", () => {
 });
 
 describe("useAgentScope — stream options", () => {
-  it("streamSelectOptions + selectedStreamCount reflect availableStreams and agent counts", async () => {
+  it("counts each stream's distinct agent names, as the Agent picker lists them", async () => {
     const activeStream = ref("stream_a");
     const availableStreams = ref<string[]>(["stream_a", "stream_b"]);
     const scope = useAgentScope({
@@ -553,7 +751,10 @@ describe("useAgentScope — stream options", () => {
       allAgents: true,
       t,
     });
-    listAgents.mockResolvedValue({ agents: [agentA, agentA] });
+    // The same agent seen with and without an id, plus a second agent.
+    listAgents.mockResolvedValue({
+      agents: [agentA, { ...agentA, id: null }, { ...agentA, name: "gamma", id: "g1" }],
+    });
     await scope.loadAgents();
     const streamA = scope.streamSelectOptions.value.find((o: any) => o.value === "stream_a");
     expect(streamA?.agentCount).toBe(2);

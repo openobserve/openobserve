@@ -580,6 +580,9 @@ const useTraces = () => {
         gen_ai_usage_total_tokens: trace.gen_ai_usage_total_tokens,
         gen_ai_usage_cost: trace.gen_ai_usage_cost,
         gen_ai_input_messages: trace.gen_ai_input_messages,
+        // Unpriced tokens/models (AIO-16) — drive the partial-cost badge.
+        gen_ai_unpriced_tokens: trace.gen_ai_unpriced_tokens,
+        gen_ai_unpriced_models: trace.gen_ai_unpriced_models,
       };
 
       // Build per-trace service span count and duration map

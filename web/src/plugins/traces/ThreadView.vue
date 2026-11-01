@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t("traces.threadView.duration") }}</span
         >
         <span class="thread-chip__value text-text-body text-xs font-semibold">
-          {{ formatDuration(summary.totalDurationNs) }}
+          {{ formatTimeWithSuffix(summary.totalDurationNs / 1000) }}
         </span>
       </OTag>
 
@@ -280,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('traces.threadView.duration')"
                 >
                   <OIcon name="timer" size="xs" />
-                  {{ formatDuration(turn.span.duration) }}
+                  {{ formatTimeWithSuffix(Number(turn.span.duration)) }}
                 </span>
                 <span
                   class="thread-metric rounded-default bg-surface-subtle border-border-default text-text-secondary text-2xs inline-flex shrink-0 items-center gap-1 border px-2 py-[0.18rem] leading-none whitespace-nowrap"
@@ -365,6 +365,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
 import { renderMarkdown } from "./markdown";
+import { formatTimeWithSuffix } from "@/utils/zincutils";
 
 const { t } = useI18nTyped();
 
@@ -425,7 +426,8 @@ const displayGroups = computed<TraceGroup[]>(() => {
     const mergedSpan = {
       ...last,
       start_time: first.start_time,
-      duration: g.totalDurationNs,
+      // `duration` is in microseconds, like every span's (the waterfall unit).
+      duration: g.totalDurationNs / 1000,
       gen_ai_usage_cost: g.totalCost,
       gen_ai_usage_total_tokens: totalTokens,
       span_status: anyError ? "ERROR" : last.span_status,
@@ -489,15 +491,6 @@ const summary = computed(() => {
 });
 
 /* ─── formatters ──────────────────────────────────────────────────────── */
-function formatDuration(ns: number): string {
-  if (!ns || !isFinite(ns)) return "0ms";
-  const ms = ns / 1_000_000;
-  if (ms < 1) return ms.toFixed(2) + "ms";
-  if (ms < 1000) return Math.round(ms) + "ms";
-  if (ms < 60_000) return (ms / 1000).toFixed(2) + "s";
-  return (ms / 60_000).toFixed(2) + "m";
-}
-
 function formatCost(usd: number): string {
   if (!usd || usd <= 0) return "$0";
   if (usd >= 1) return `$${usd.toFixed(2)}`;

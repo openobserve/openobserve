@@ -232,6 +232,12 @@ static GEN_AI_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLo
         // written for label-resolved calls, so it must be provisioned up front.
         Field::new("gen_ai_prompt_name", DataType::Utf8, true),
         Field::new("gen_ai_prompt_label", DataType::Utf8, true),
+        // Written only for unpriced/approximate spans, so provision it for the readers.
+        Field::new(
+            config::meta::model_pricing::COST_STATUS_COLUMN,
+            DataType::Utf8,
+            true,
+        ),
         // Integer fields
         Field::new("gen_ai_prompt_version", DataType::Int64, true),
         Field::new("gen_ai_usage_input_tokens", DataType::Int64, true),
