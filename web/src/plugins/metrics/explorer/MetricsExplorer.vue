@@ -99,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex-1 max-md:hidden" />
 
       <div class="flex shrink-0 items-center gap-2 max-md:ms-auto max-md:gap-1">
+        <OPageHeaderStatus />
         <!-- Explore keeps Apply: a date change there re-queries the whole card grid. -->
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
@@ -736,6 +737,7 @@ import { isEqual, debounce } from "lodash-es";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OCheckboxGroup from "@/lib/forms/Checkbox/OCheckboxGroup.vue";
@@ -829,6 +831,7 @@ const ROW_HEIGHT = CARD_HEIGHT + ROW_GAP;
 export default defineComponent({
   name: "MetricsExplorer",
   components: {
+    OPageHeaderStatus,
     FirstDataPanel,
     DateTimePickerDashboard,
     AutoRefreshInterval,

@@ -610,6 +610,8 @@ export interface OTableEmits<TData = any> {
   // Row events
   "row-click": [row: TData, event: MouseEvent];
   "row-dblclick": [row: TData, event: MouseEvent];
+  /** Middle-button click on a row (not on an interactive child). */
+  "row-auxclick": [row: TData, event: MouseEvent];
   "row-mouseenter": [row: TData, event: MouseEvent];
   "row-mouseleave": [row: TData];
   "cell-click": [params: { columnId: string; row: TData; value: any }];

@@ -26,15 +26,11 @@ const useFunctions = () => {
    * request while the entry is fresh, and concurrent callers share the promise.
    */
   const getAllFunctions = async () => {
-    try {
-      const list = await queryClient.fetchQuery(
-        functionsQuery(store.state.selectedOrganization.identifier),
-      );
-      // Bridge for consumers still reading `organizationData.functions`.
-      store.dispatch("setFunctions", list);
-    } catch (e: any) {
-      throw new Error(e.message);
-    }
+    const list = await queryClient.fetchQuery(
+      functionsQuery(store.state.selectedOrganization.identifier),
+    );
+    // Bridge for consumers still reading `organizationData.functions`.
+    store.dispatch("setFunctions", list);
   };
 
   return { getAllFunctions };

@@ -67,7 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :default-columns="false"
                 :show-global-filter="false"
                 pagination="none"
-                @row-click="(row: any) => emit('row-click', row)"
+                @row-click="onRowClick"
+                @row-auxclick="onRowAuxclick"
                 @sort-change="onSortChange"
                 @column-order-change="onColumnReorder"
                 @close-column="onCloseColumn"
@@ -108,14 +109,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- The cell clips on its own, so the table-level `wrap`
                        is not enough: without dropping `truncate` here the name
                        stays cut off no matter what the table does. -->
-                  <span
-                    class="text-text-body text-xs"
-                    :class="wrap ? '' : 'truncate'"
-                    data-test="trace-row-operation-name"
+                  <component
+                    :is="rowHref ? 'a' : 'span'"
+                    :href="rowHref?.(row)"
+                    :tabindex="rowHref ? -1 : undefined"
+                    class="group block min-w-0"
+                    data-test="trace-row-link"
+                    @click="onRowLinkClick($event, row)"
                   >
-                    {{ row.operation_name }}
-                    <OTooltip :content="row.operation_name" side="bottom" align="center" />
-                  </span>
+                    <span
+                      class="text-text-body block text-xs group-hover:underline"
+                      :class="wrap ? '' : 'truncate'"
+                      data-test="trace-row-operation-name"
+                    >
+                      {{ row.operation_name }}
+                      <OTooltip :content="row.operation_name" side="bottom" align="center" />
+                    </span>
+                  </component>
                 </template>
 
                 <template #cell-duration="{ row }">
@@ -196,6 +206,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ contextCell.columnId }}
             </OContextMenuLabel>
             <OContextMenuSeparator />
+
+            <OContextMenuItem
+              v-if="rowHref"
+              icon-left="open-in-new"
+              data-test="trace-context-menu-open-new-tab"
+              @select="emit('open-in-new-tab', contextCell.row)"
+            >
+              {{ t("common.openInNewTab") }}
+            </OContextMenuItem>
 
             <OContextMenuItem
               icon-left="content-copy"
@@ -330,6 +349,8 @@ interface Props {
    *  metrics charts above). Delegated to the table's virtualizer so the table
    *  doesn't create a second, nested scrollbar. */
   scrollEl?: HTMLElement | null;
+  /** Resolves a row to its trace-details URL so the name cell is a real link. */
+  rowHref?: (row: any) => string | undefined;
 }
 
 const store = useStore();
@@ -351,10 +372,12 @@ const props = withDefaults(defineProps<Props>(), {
   streamDocTimeRange: undefined,
   queryWindowUs: undefined,
   scrollEl: null,
+  rowHref: undefined,
 });
 
 const emit = defineEmits<{
   "row-click": [row: any];
+  "open-in-new-tab": [row: any];
   "page-change": [page: number];
   "cross-page": [page: number];
   "rows-per-page-change": [rowsPerPage: number];
@@ -399,6 +422,24 @@ const addSearchTerm = (
           : String(fieldValue);
     searchObj.data.stream.addToFilter = `${field} ${operator} '${escapeSingleQuotes(displayValue)}'`;
   }
+};
+
+const onRowClick = (row: any, event?: MouseEvent) => {
+  if (props.rowHref && (event?.ctrlKey || event?.metaKey)) emit("open-in-new-tab", row);
+  else emit("row-click", row);
+};
+
+const onRowAuxclick = (row: any) => {
+  if (props.rowHref) emit("open-in-new-tab", row);
+};
+
+// Modified/non-primary clicks fall through so the browser opens its own tab.
+const onRowLinkClick = (event: MouseEvent, row: any) => {
+  if (!props.rowHref) return;
+  if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)
+    return;
+  event.preventDefault();
+  emit("row-click", row);
 };
 
 const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
