@@ -126,7 +126,8 @@ export function selectFallbackFindings(agentResults) {
     counts[severity] = (counts[severity] || 0) + 1;
     return counts[severity] <= (SEVERITY_CAPS[severity] ?? Infinity);
   });
-  return kept.slice(0, MAX_FALLBACK_FINDINGS);
+  // Ranked, so the cap only ever reaches past the blockers it must not drop.
+  return kept.filter((f, i) => i < MAX_FALLBACK_FINDINGS || !(normalizeSeverity(f.severity) in SEVERITY_CAPS));
 }
 
 function severityCountLine(counts) {
