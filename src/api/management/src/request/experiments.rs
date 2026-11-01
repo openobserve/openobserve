@@ -22,11 +22,11 @@ use axum::{
 use db::authz::{remove_ownership, set_ownership};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
-    auth::{UserEmail, is_ofga_object_visible},
+    auth::{UserEmail, check_permissions, is_ofga_object_visible},
     llm_evaluations::{
         datasets,
         experiments::{
-            self, ExperimentError, PinnedExperimentScorer, baseline,
+            self, ExperimentError, ExperimentTaskConfig, PinnedExperimentScorer, baseline,
             dispersion::{self, NormalizationSpans, RowDispersion},
             ingest::{self, IngestError},
             results::{self, ExperimentResultSlot, ExperimentSlotStatus},
@@ -53,7 +53,7 @@ use crate::{
             ExperimentResultRowSortBody, ExperimentResultsResponseBody,
             ExperimentRowDetailResponseBody, ExperimentRowNavigationBody,
             ExperimentRowSnapshotBody, ExperimentScoreSummaryBody, ExperimentSlotPageQuery,
-            ExperimentSlotPageResponseBody, ExperimentSummaryResponseBody, ExperimentTaskBody,
+            ExperimentSlotPageResponseBody, ExperimentSummaryResponseBody,
             ExperimentViewResponseBody, ListExperimentsResponseBody,
             RetryExperimentSlotRequestBody, SubmitExperimentRecordsRequestBody,
             SubmitExperimentRecordsResponseBody,
@@ -444,13 +444,46 @@ async fn require_remote_task_visibility(
     Ok(())
 }
 
-/// The `task_ref` of a Remote Task request, or `None` for the task types that
-/// never leave the platform.
-fn remote_task_ref(task: &ExperimentTaskBody) -> Option<&str> {
-    match task {
-        ExperimentTaskBody::Remote { task_ref, .. } => Some(task_ref.as_str()),
-        _ => None,
+/// The objects an Experiment reads besides itself, as `(resource, id)`.
+///
+/// A run returns the Dataset's rows, renders the Prompt's text and spends
+/// through the Provider's key, so the caller must be able to read each one. A
+/// Remote Task is checked on its own: its OpenFGA object is the resolved head,
+/// not the reference the Experiment carries.
+fn referenced_objects<'a>(
+    dataset_id: &'a str,
+    task: &'a ExperimentTaskConfig,
+) -> Vec<(&'static str, &'a str)> {
+    let mut objects = vec![("datasets", dataset_id)];
+    if let Some((prompt_id, ..)) = task.prompt_ref() {
+        objects.push(("prompts", prompt_id));
     }
+    if let Some(provider_id) = task.provider_id() {
+        objects.push(("providers", provider_id));
+    }
+    objects
+}
+
+/// The Experiment routes authorize the Experiment alone, so everything it
+/// references is checked here before it is pinned.
+async fn require_reference_access(
+    org_id: &str,
+    user_id: &str,
+    dataset_id: &str,
+    task: &ExperimentTaskConfig,
+) -> Result<(), Response> {
+    if let Some((task_ref, _)) = task.remote_task() {
+        require_remote_task_visibility(org_id, user_id, task_ref).await?;
+    }
+    for (resource, id) in referenced_objects(dataset_id, task) {
+        // One check per object, as the `GET /{resource}/{id}` routes make it:
+        // the permitted-object list is skipped when list filtering is off.
+        if !check_permissions(id, org_id, user_id, resource, "GET", None, false, false, true).await
+        {
+            return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+    Ok(())
 }
 
 #[utoipa::path(
@@ -467,6 +500,7 @@ fn remote_task_ref(task: &ExperimentTaskBody) -> Option<&str> {
     responses(
         (status = 200, body = inline(ExperimentPreviewResponseBody)),
         (status = 400, description = "Invalid Experiment definition", body = ()),
+        (status = 403, description = "A referenced Dataset, Prompt, Provider or Remote Task is not accessible", body = ()),
         (status = 404, description = "Dataset or scorer not found", body = ()),
     ),
 )]
@@ -476,13 +510,13 @@ pub async fn preview_experiment(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CreateExperimentRequestBody>,
 ) -> Response {
-    if let Some(task_ref) = remote_task_ref(&body.task)
-        && let Err(response) =
-            require_remote_task_visibility(&org_id, &user.user_id, task_ref).await
+    let input: experiments::CreateExperiment = body.into();
+    if let Err(response) =
+        require_reference_access(&org_id, &user.user_id, &input.dataset_id, &input.task).await
     {
         return response;
     }
-    match experiments::preview(&org_id, body.into(), query.sample_size).await {
+    match experiments::preview(&org_id, input, query.sample_size).await {
         Ok(preview) => MetaHttpResponse::json(ExperimentPreviewResponseBody::from(preview)),
         Err(error) => experiment_error_response(error),
     }
@@ -499,6 +533,7 @@ pub async fn preview_experiment(
     responses(
         (status = 200, body = inline(CreateExperimentResponseBody)),
         (status = 400, description = "Invalid Experiment definition", body = ()),
+        (status = 403, description = "A referenced Dataset, Prompt, Provider or Remote Task is not accessible", body = ()),
         (status = 409, description = "Idempotency conflict", body = ()),
         (status = 412, description = "Cost estimate is above the warning threshold and was not confirmed", body = ()),
     ),
@@ -508,12 +543,6 @@ pub async fn create_experiment(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CreateExperimentRequestBody>,
 ) -> Response {
-    if let Some(task_ref) = remote_task_ref(&body.task)
-        && let Err(response) =
-            require_remote_task_visibility(&org_id, &user.user_id, task_ref).await
-    {
-        return response;
-    }
     // Re-serialized rather than hashed from the raw bytes so two encodings of
     // the same request agree on their canonical hash.
     let canonical_request = match serde_json::to_value(&body) {
@@ -523,7 +552,13 @@ pub async fn create_experiment(
             return MetaHttpResponse::internal_error("Internal server error");
         }
     };
-    match experiments::create(&org_id, &user.user_id, body.into(), &canonical_request).await {
+    let input: experiments::CreateExperiment = body.into();
+    if let Err(response) =
+        require_reference_access(&org_id, &user.user_id, &input.dataset_id, &input.task).await
+    {
+        return response;
+    }
+    match experiments::create(&org_id, &user.user_id, input, &canonical_request).await {
         Ok(result) => {
             set_ownership(&org_id, "experiments", Authz::new(&result.experiment.id)).await;
             MetaHttpResponse::json(CreateExperimentResponseBody::from(result))
@@ -1435,6 +1470,7 @@ pub async fn retry_experiment_slot(
     responses(
         (status = 200, description = "Pending clone created", body = ExperimentResponseBody),
         (status = 400, description = "Invalid Experiment definition after overrides", body = ()),
+        (status = 403, description = "A referenced Dataset, Prompt, Provider or Remote Task is not accessible", body = ()),
         (status = 404, description = "Experiment, Dataset or scorer not found"),
         (status = 409, description = "Only sealed Experiments can be cloned, or the idempotency key describes a different clone"),
         (status = 412, description = "Cost estimate is above the warning threshold and was not confirmed", body = ()),
@@ -1445,24 +1481,25 @@ pub async fn clone_experiment(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CloneExperimentRequestBody>,
 ) -> Response {
-    // The clone reaches whichever Remote Task it ends up pinning — the source's
-    // when the request overrides nothing, the override's when it does.
+    // The clone pins whatever it ends up referencing: the source's Dataset and
+    // task where the request overrides nothing, the override's where it does.
     // Checking only at create would leave clone as the way around that check.
     let source = match experiments::get(&org_id, &experiment_id).await {
         Ok(source) => source,
         Err(error) => return experiment_error_response(error),
     };
-    let effective_task_ref = match body.task.as_ref() {
-        Some(task) => remote_task_ref(task),
-        None => source.task.remote_task().map(|(task_ref, _)| task_ref),
-    };
-    if let Some(task_ref) = effective_task_ref
-        && let Err(response) =
-            require_remote_task_visibility(&org_id, &user.user_id, task_ref).await
+    let overrides: experiments::CloneExperimentOverrides = body.into();
+    if let Err(response) = require_reference_access(
+        &org_id,
+        &user.user_id,
+        overrides.dataset_id.as_deref().unwrap_or(&source.dataset_id),
+        overrides.task.as_ref().unwrap_or(&source.task),
+    )
+    .await
     {
         return response;
     }
-    match experiments::clone_sealed(&org_id, &experiment_id, &user.user_id, body.into()).await {
+    match experiments::clone_sealed(&org_id, &experiment_id, &user.user_id, overrides).await {
         Ok(experiment) => {
             set_ownership(&org_id, "experiments", Authz::new(&experiment.id)).await;
             MetaHttpResponse::json(ExperimentResponseBody::from(experiment))
@@ -1768,34 +1805,42 @@ mod tests {
         ));
     }
 
-    /// The guard that decides whether the Remote Task check runs at all. If this
-    /// ever returned `None` for a Remote Task, `create_experiment` would go back
-    /// to reaching any Task in the org without a permission check, and no other
+    /// Every object a run reads must be checked; dropping one from this list
+    /// would let an Experiment pin it without a permission check, and no other
     /// test would notice.
     #[test]
-    fn only_a_remote_task_carries_a_reference_that_needs_checking() {
+    fn every_dataset_prompt_and_provider_an_experiment_reads_is_checked() {
+        let prompt_ref = ExperimentTaskConfig::PromptRef {
+            id: "prompt-1".to_string(),
+            version: 2,
+            provider_id: "provider-1".to_string(),
+            params_overrides: None,
+        };
         assert_eq!(
-            remote_task_ref(&ExperimentTaskBody::Remote {
-                task_ref: "grader@3".to_string(),
-                overrides: None,
-            }),
-            Some("grader@3")
+            referenced_objects("dataset-1", &prompt_ref),
+            vec![
+                ("datasets", "dataset-1"),
+                ("prompts", "prompt-1"),
+                ("providers", "provider-1"),
+            ]
         );
+        let inline = ExperimentTaskConfig::InlinePrompt {
+            messages: vec![],
+            provider_id: "provider-1".to_string(),
+            model: None,
+            params: None,
+        };
         assert_eq!(
-            remote_task_ref(&ExperimentTaskBody::Sdk {
-                task_fingerprint: "abc".to_string(),
-                config: serde_json::json!({}),
-            }),
-            None
+            referenced_objects("dataset-1", &inline),
+            vec![("datasets", "dataset-1"), ("providers", "provider-1")]
         );
+        let remote = ExperimentTaskConfig::Remote {
+            task_ref: "grader@3".to_string(),
+            overrides: None,
+        };
         assert_eq!(
-            remote_task_ref(&ExperimentTaskBody::InlinePrompt {
-                messages: vec![],
-                provider_id: "provider-1".to_string(),
-                model: None,
-                params: None,
-            }),
-            None
+            referenced_objects("dataset-1", &remote),
+            vec![("datasets", "dataset-1")]
         );
     }
 
