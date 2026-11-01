@@ -164,6 +164,14 @@ describe("TracesComparisonField", () => {
     expect(o.series[1].itemStyle.color).toBe("#0a4ce8");
   });
 
+  it("renders the histogram tooltip on the body, so the card does not clip it", async () => {
+    wrapper = mountField(numeric());
+    await settle();
+    const o = chartOptions(wrapper);
+    expect(o.tooltip.appendToBody).toBe(true);
+    expect(o.tooltip.className).toBe("o2-echarts-tooltip");
+  });
+
   it("pre-selects the most different bin and marks it", async () => {
     const field = numeric();
     wrapper = mountField(field);

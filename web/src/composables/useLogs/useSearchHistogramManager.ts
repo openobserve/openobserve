@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { isExplainQuery } from "@/utils/query/sqlUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import type { TranslateFn } from "@/types/i18n";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
@@ -34,6 +35,8 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
   const { searchObj, searchObjDebug, resetHistogramError } = searchState();
 
   const shouldShowHistogram = (parsedSQL: any) => {
+    // The histogram endpoint rejects an EXPLAIN statement as "not a query".
+    if (searchObj.meta.sqlMode && isExplainQuery(searchObj.data.query)) return false;
     return (
       ((isHistogramDataMissing(searchObj) &&
         isHistogramEnabled(searchObj) &&
@@ -226,6 +229,8 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
   };
 
   const shouldGetPageCount = (queryReq: any, parsedSQL: any): boolean => {
+    // The count request would re-run an EXPLAIN ANALYZE scan.
+    if (searchObj.meta.sqlMode && isExplainQuery(searchObj.data.query)) return false;
     return shouldShowHistogram(parsedSQL) || (searchObj.meta.sqlMode && isLimitQuery(parsedSQL))
       ? false
       : true;

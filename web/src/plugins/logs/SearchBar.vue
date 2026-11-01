@@ -829,7 +829,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownGroup v-if="searchObj.meta.sqlMode" :label="t('search.menuGroupExplain')">
             <ODropdownItem
               data-test="logs-search-bar-explain-query-menu-btn"
-              :disabled="!searchObj.data.query || searchObj.data.query.trim() === ''"
+              :disabled="
+                !searchObj.data.query ||
+                searchObj.data.query.trim() === '' ||
+                isExplainQuery(searchObj.data.query)
+              "
               @select="openExplainDialog"
             >
               <template #icon-left>
@@ -1768,7 +1772,7 @@ import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
-import { isSqlQuery } from "@/utils/query/sqlUtils";
+import { isExplainQuery, isSqlQuery } from "@/utils/query/sqlUtils";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
 import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
@@ -5252,6 +5256,7 @@ export default defineComponent({
       buildStreamQuery,
       updateEditorWidth,
       showExplainDialog,
+      isExplainQuery,
       openExplainDialog,
       vrlEditorNlpMode,
       shouldMoveShareToMenu,
