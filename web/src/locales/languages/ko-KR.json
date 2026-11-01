@@ -2054,8 +2054,11 @@
       "error": "오류",
       "action": "작업",
       "view": "보기",
-      "frustration": "불만"
+      "frustration": "불만",
+      "failedRequest": "실패한 요청",
+      "noResponse": "응답 없음"
     },
+    "replayCanvasNotRecorded": "캔버스 콘텐츠가 기록되지 않았습니다",
     "actionOnTarget": "{action}: \"{target}\"",
     "errorWhileFetchingErrorEvents": "오류 이벤트를 가져오는 중 오류 발생",
     "errorWhileFetchingSessionReplay": "세션 리플레이 데이터를 가져오는 중 오류 발생",
@@ -10628,6 +10631,8 @@
       "legendNoData": "데이터 없음"
     },
     "importAlertTitle": "알림 가져오기",
+    "importAlert": "알림 가져오기",
+    "alertLibrary": "알림 라이브러리",
     "exportDialogTitle": "알림 내보내기 | 알림 {count}개 내보내기",
     "exportDialogSubtitle": "정의를 검토한 다음 JSON 또는 OpenObserve 프로바이더용 Terraform으로 다운로드하세요.",
     "jsonFilesOnlyHint": ".json 파일만",
@@ -13098,21 +13103,11 @@
     },
     "install": {
       "title": "라이브러리에서 알림 추가",
-      "subtitle": "추가할 알림, 알림이 저장될 위치, 그리고 선택적으로 알림이 전송될 대상을 선택하세요.",
-      "stepDestination": "대상",
+      "subtitle": "이 알림을 보관할 위치를 선택한 후 추가하세요.",
       "stepAlerts": "알림",
       "stepFolder": "폴더",
       "stepTune": "조정",
       "stepInstall": "추가",
-      "destinationIntro": "이 배치의 모든 알림은 여기서 선택한 대상으로 알림을 전송합니다. 라이브러리 파일에는 내보낸 조직의 대상 이름이 지정되어 있으며, 그 대상은 현재 조직에 존재하지 않습니다. 이 단계는 선택 사항입니다. 건너뛰면 알림이 대상 없이 추가됩니다.",
-      "destinationLabel": "대상",
-      "destinationsLoadFailed": "기존 대상을 불러올 수 없습니다.",
-      "retry": "다시 시도",
-      "destinationsNoneBody": "이 조직에는 아직 알림 대상이 없습니다. 준비되면 대상 페이지에서 하나를 만드세요.",
-      "openDestinations": "대상 열기",
-      "selectAll": "모두 선택",
-      "clear": "선택 해제",
-      "selectedCount": "{total}개 중 {count}개 선택됨",
       "folderIntro": "추가된 알림은 여기에 보관됩니다. 이 묶음에 별도 폴더가 필요하면 + 버튼에서 폴더를 만드세요.",
       "tuneToggle": "이 배치의 모든 알림에 대해 설정",
       "tuneHint": "전체 배치에서 안전하게 설정할 수 있는 것은 “{frequency}”와 “{silence}”뿐입니다. 임계값은 알림별로 유지됩니다. 해당 알림을 열고 별도로 추가하여 변경할 수 있습니다.",
@@ -13131,7 +13126,6 @@
       "next": "다음",
       "cancel": "취소",
       "done": "완료",
-      "confirmLarge": "{folder}에 알림 {count}개를 만들고 각각 {destination}(으)로 알린다는 점을 이해합니다.",
       "tuneThresholdOnly": "임계값 알림에만 적용됩니다.",
       "anomalyTrainingNote": "이상 알림은 스트림 기록으로 충분히 학습한 후에 알림을 시작합니다.",
       "anomalyUnavailable": "이상 알림에는 이상 탐지가 켜진 OpenObserve Enterprise가 필요하므로 이 알림은 건너뛰었습니다.",
@@ -21723,7 +21717,8 @@
         "longtask": "긴 작업",
         "view": "보기",
         "action": "작업",
-        "resource": "리소스"
+        "resource": "리소스",
+        "failedrequest": "실패한 요청"
       },
       "subscriptionPlan": {
         "payasyougo": "종량제",

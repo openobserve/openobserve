@@ -2054,8 +2054,11 @@
       "error": "Errore",
       "action": "Azione",
       "view": "Vista",
-      "frustration": "Frustrazione"
+      "frustration": "Frustrazione",
+      "failedRequest": "Richieste non riuscite",
+      "noResponse": "Nessuna risposta"
     },
+    "replayCanvasNotRecorded": "Contenuto del canvas non registrato",
     "actionOnTarget": "{action} su \"{target}\"",
     "errorWhileFetchingErrorEvents": "Errore durante il recupero degli eventi di errore",
     "errorWhileFetchingSessionReplay": "Errore durante il recupero dei dati di riproduzione della sessione",
@@ -10628,6 +10631,8 @@
       "legendNoData": "Nessun dato"
     },
     "importAlertTitle": "Importa avviso",
+    "importAlert": "Importa avviso",
+    "alertLibrary": "Libreria avvisi",
     "exportDialogTitle": "Esporta avviso | Esporta {count} avvisi",
     "exportDialogSubtitle": "Rivedi la definizione, poi scaricala come JSON o come Terraform per il provider OpenObserve.",
     "jsonFilesOnlyHint": "Solo file .json",
@@ -13098,21 +13103,11 @@
     },
     "install": {
       "title": "Aggiungi avvisi dalla libreria",
-      "subtitle": "Scegli quali avvisi aggiungere, dove archiviarli e, facoltativamente, dove notificarli.",
-      "stepDestination": "Destinazione",
+      "subtitle": "Scegli dove archiviare questi avvisi, poi aggiungili.",
       "stepAlerts": "Avvisi",
       "stepFolder": "Cartella",
       "stepTune": "Regola",
       "stepInstall": "Aggiungi",
-      "destinationIntro": "Ogni avviso in questo batch notifica la destinazione scelta qui. I file della libreria indicano le destinazioni dell'organizzazione da cui sono stati esportati, che non esistono nella tua. Questo passaggio è facoltativo: salta e gli avvisi vengono aggiunti senza.",
-      "destinationLabel": "Destinazione",
-      "destinationsLoadFailed": "Non è stato possibile caricare le destinazioni esistenti.",
-      "retry": "Riprova",
-      "destinationsNoneBody": "Questa organizzazione non ha ancora destinazioni di avviso. Creane una nella pagina Destinazioni quando vuoi.",
-      "openDestinations": "Apri Destinazioni",
-      "selectAll": "Seleziona tutto",
-      "clear": "Cancella",
-      "selectedCount": "{count} di {total} selezionati",
       "folderIntro": "Gli avvisi aggiunti vengono archiviati qui. Crea una cartella dal pulsante + se questo lotto merita una cartella dedicata.",
       "tuneToggle": "Imposta questi valori per ogni avviso in questo lotto",
       "tuneHint": "Solo “{frequency}” e “{silence}” possono essere impostati in sicurezza per un intero lotto. Le soglie restano per singolo avviso: modificane una aprendo quell'avviso e aggiungendolo singolarmente.",
@@ -13131,7 +13126,6 @@
       "next": "Avanti",
       "cancel": "Annulla",
       "done": "Fatto",
-      "confirmLarge": "Ho capito che questo crea {count} avvisi in {folder}, ciascuno con notifica a {destination}.",
       "tuneThresholdOnly": "Vale solo per gli avvisi a soglia.",
       "anomalyTrainingNote": "Gli avvisi di anomalia iniziano a scattare dopo essersi addestrati su una cronologia sufficiente dello stream.",
       "anomalyUnavailable": "Gli avvisi di anomalia richiedono OpenObserve Enterprise con il rilevamento anomalie attivo, quindi questo è stato saltato.",
@@ -21723,7 +21717,8 @@
         "longtask": "Attività lunga",
         "view": "Visualizza",
         "action": "Azione",
-        "resource": "Risorsa"
+        "resource": "Risorsa",
+        "failedrequest": "Richiesta non riuscita"
       },
       "subscriptionPlan": {
         "payasyougo": "Pagamento a consumo",

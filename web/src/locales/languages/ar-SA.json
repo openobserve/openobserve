@@ -2054,8 +2054,11 @@
       "error": "خطأ",
       "action": "الحدث",
       "view": "منظر",
-      "frustration": "الإحباط"
+      "frustration": "الإحباط",
+      "failedRequest": "الطلبات الفاشلة",
+      "noResponse": "لا استجابة"
     },
+    "replayCanvasNotRecorded": "لم يتم تسجيل محتوى Canvas",
     "actionOnTarget": "{action} في \"{target}\"",
     "errorWhileFetchingErrorEvents": "حدث خطأ أثناء جلب الأخطاء",
     "errorWhileFetchingSessionReplay": "خطأ أثناء جلب بيانات إعادة تشغيل الجلسة",
@@ -10628,6 +10631,8 @@
       "legendNoData": "لا توجد بيانات"
     },
     "importAlertTitle": "استيراد تنبيه",
+    "importAlert": "استيراد التنبيه",
+    "alertLibrary": "مكتبة التنبيهات",
     "exportDialogTitle": "تصدير تنبيهات | تصدير تنبيهات {count}",
     "exportDialogSubtitle": "راجع التعريف، ثم قم بتحميله ك JSON أو Terraform لمزود OpenObserve.",
     "jsonFilesOnlyHint": ".json الملفات فقط",
@@ -13098,21 +13103,11 @@
     },
     "install": {
       "title": "إضافة تنبيهات من المكتبة",
-      "subtitle": "اختر التنبيهات التي تريد إضافتها، وأين تُحفظ، واختياريًا أين تُعلم.",
-      "stepDestination": "الوجهة",
+      "subtitle": "اختر مكان حفظ هذه التنبيهات، ثم أضفها.",
       "stepAlerts": "تنبيهات",
       "stepFolder": "المجلد",
       "stepTune": "لحن",
       "stepInstall": "إضافة",
-      "destinationIntro": "كل تنبيه في هذه الدفعة يُعلم الوجهة التي تختارها هنا. تسمي ملفات المكتبة وجهات المؤسسة التي تم تصديرها منها، والتي لا وجود لها في مؤسستك. هذه الخطوة اختيارية: تخطاها وتُضاف التنبيهات بدونها.",
-      "destinationLabel": "الوجهة",
-      "destinationsLoadFailed": "لم يكن بالإمكان تحميل وجهاتك الحالية.",
-      "retry": "حاول مرة أخرى",
-      "destinationsNoneBody": "لا توجد وجهات تنبيه لهذه المؤسسة بعد. أنشئ واحدة في صفحة الوجهات متى كنت مستعدًا.",
-      "openDestinations": "فتح الوجهات",
-      "selectAll": "تحديد الكل",
-      "clear": "مسح",
-      "selectedCount": "{count} من {total} المختارين",
       "folderIntro": "يتم حفظ التنبيهات المضافة هنا. أنشئ مجلدا من زر + إذا كانت هذه الدفعة تستحق مجلدها الخاص.",
       "tuneToggle": "اضبط هذه البطاقات لكل تنبيه في هذه الدفعة",
       "tuneHint": "يمكن ضبط «{frequency}» و«{silence}» فقط لدفعة كاملة. تبقى العتبات خاصة بكل تنبيه — لتغيير إحداها، افتح ذلك التنبيه وأضفه منفردا.",
@@ -13131,7 +13126,6 @@
       "next": "التالي",
       "cancel": "إلغاء",
       "done": "تم",
-      "confirmLarge": "أفهم أن هذا سينشئ في {folder} تنبيهات عددها {count}، وسيرسل كل منها إشعارا إلى {destination}.",
       "tuneThresholdOnly": "ينطبق على تنبيهات الحد فقط.",
       "anomalyTrainingNote": "تبدأ تنبيهات الشذوذ في الإطلاق بعد أن تتدرب على قدر كافٍ من سجل التدفق.",
       "anomalyUnavailable": "تتطلب تنبيهات الشذوذ OpenObserve Enterprise مع تفعيل اكتشاف الشذوذ، لذا تم تخطي هذا التنبيه.",
@@ -21723,7 +21717,8 @@
         "longtask": "مهمة طويلة",
         "view": "منظر",
         "action": "الحدث",
-        "resource": "المصدر"
+        "resource": "المصدر",
+        "failedrequest": "طلب فاشل"
       },
       "subscriptionPlan": {
         "payasyougo": "ادفع حسب الاستخدام",

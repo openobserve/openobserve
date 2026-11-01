@@ -2054,8 +2054,11 @@
       "error": "Erro",
       "action": "Ação",
       "view": "Visualização",
-      "frustration": "Frustração"
+      "frustration": "Frustração",
+      "failedRequest": "Pedidos falhados",
+      "noResponse": "Sem resposta"
     },
+    "replayCanvasNotRecorded": "Conteúdo do canvas não gravado",
     "actionOnTarget": "{action} em \"{target}\"",
     "errorWhileFetchingErrorEvents": "Erro ao obter eventos de erro",
     "errorWhileFetchingSessionReplay": "Erro ao obter dados de replay de sessão",
@@ -10628,6 +10631,8 @@
       "legendNoData": "Sem dados"
     },
     "importAlertTitle": "Importar alerta",
+    "importAlert": "Importar alerta",
+    "alertLibrary": "Biblioteca de alertas",
     "exportDialogTitle": "Exportar alerta | Exportar {count} alertas",
     "exportDialogSubtitle": "Reveja a definição e transfira-a como JSON ou como Terraform para o fornecedor OpenObserve.",
     "jsonFilesOnlyHint": "Apenas ficheiros .json",
@@ -13098,21 +13103,11 @@
     },
     "install": {
       "title": "Adicionar alertas da biblioteca",
-      "subtitle": "Escolha os alertas a adicionar, onde são arquivados e, opcionalmente, onde notificam.",
-      "stepDestination": "Destino",
+      "subtitle": "Escolha onde estes alertas são arquivados e, em seguida, adicione-os.",
       "stepAlerts": "Alertas",
       "stepFolder": "Pasta",
       "stepTune": "Ajustar",
       "stepInstall": "Adicionar",
-      "destinationIntro": "Todos os alertas deste lote notificam o destino que escolher aqui. Os ficheiros da biblioteca nomeiam os destinos da organização de onde foram exportados, que não existem na sua. Esta etapa é opcional: salte-a e os alertas serão adicionados sem um destino.",
-      "destinationLabel": "Destino",
-      "destinationsLoadFailed": "Não foi possível carregar os seus destinos existentes.",
-      "retry": "Tentar novamente",
-      "destinationsNoneBody": "Esta organização ainda não tem destinos de alerta. Crie um na página Destinos quando quiser.",
-      "openDestinations": "Abrir Destinos",
-      "selectAll": "Selecionar todos",
-      "clear": "Limpar",
-      "selectedCount": "{count} de {total} selecionados",
       "folderIntro": "Os alertas adicionados são arquivados aqui. Crie uma pasta pelo botão + se este lote merecer uma própria.",
       "tuneToggle": "Defina estes para cada alerta neste lote",
       "tuneHint": "Apenas “{frequency}” e “{silence}” são seguros para definir em todo um lote. Os limites permanecem por alerta — altere um abrindo este alerta e adicionando-o separadamente.",
@@ -13131,7 +13126,6 @@
       "next": "Avançar",
       "cancel": "Cancelar",
       "done": "Concluído",
-      "confirmLarge": "Compreendo que isto cria {count} alertas em {folder}, cada um a notificar {destination}.",
       "tuneThresholdOnly": "Aplica-se apenas a alertas de limiar.",
       "anomalyTrainingNote": "Os alertas de anomalia começam a disparar depois de treinarem com histórico suficiente do fluxo.",
       "anomalyUnavailable": "Os alertas de anomalia requerem o OpenObserve Enterprise com a deteção de anomalias ativada, por isso este foi ignorado.",
@@ -21723,7 +21717,8 @@
         "longtask": "Tarefa longa",
         "view": "Visualização",
         "action": "Ação",
-        "resource": "Recurso"
+        "resource": "Recurso",
+        "failedrequest": "Pedido falhado"
       },
       "subscriptionPlan": {
         "payasyougo": "Pagamento conforme a utilização",

@@ -2054,8 +2054,11 @@
       "error": "エラー",
       "action": "アクション",
       "view": "ビュー",
-      "frustration": "フラストレーション"
+      "frustration": "フラストレーション",
+      "failedRequest": "失敗したリクエスト",
+      "noResponse": "応答なし"
     },
+    "replayCanvasNotRecorded": "Canvas コンテンツは記録されていません",
     "actionOnTarget": "{action}（\"{target}\" に対して）",
     "errorWhileFetchingErrorEvents": "エラーイベントの取得中にエラーが発生しました",
     "errorWhileFetchingSessionReplay": "セッションリプレイデータの取得中にエラーが発生しました",
@@ -10628,6 +10631,8 @@
       "legendNoData": "データなし"
     },
     "importAlertTitle": "アラートのインポート",
+    "importAlert": "アラートをインポート",
+    "alertLibrary": "アラートライブラリ",
     "exportDialogTitle": "アラートをエクスポート | アラートを{count}件エクスポート",
     "exportDialogSubtitle": "定義を確認して、JSON または OpenObserve プロバイダー用の Terraform としてダウンロードします。",
     "jsonFilesOnlyHint": ".json ファイルのみ",
@@ -13098,21 +13103,11 @@
     },
     "install": {
       "title": "ライブラリからアラートを追加",
-      "subtitle": "追加するアラート、その保存先、そして任意で通知先を選択します。",
-      "stepDestination": "宛先",
+      "subtitle": "これらのアラートの登録先を選択してから、追加してください。",
       "stepAlerts": "アラート",
       "stepFolder": "フォルダー",
       "stepTune": "調整",
       "stepInstall": "追加",
-      "destinationIntro": "このバッチ内のすべてのアラートは、ここで選択した宛先に通知します。ライブラリファイルには、エクスポート元の組織の宛先名が記載されており、それらはお客様の組織には存在しません。この手順は任意です。スキップすると、宛先なしでアラートが追加されます。",
-      "destinationLabel": "宛先",
-      "destinationsLoadFailed": "既存の宛先を読み込めませんでした。",
-      "retry": "再試行",
-      "destinationsNoneBody": "この組織にはまだアラートの宛先がありません。準備ができたら、宛先ページで作成してください。",
-      "openDestinations": "宛先を開く",
-      "selectAll": "すべて選択",
-      "clear": "クリア",
-      "selectedCount": "{count} / {total} 選択中",
       "folderIntro": "追加されたアラートはここに保存されます。このバッチに専用のフォルダが必要な場合は、+ ボタンからフォルダを作成してください。",
       "tuneToggle": "このバッチのすべてのアラートに設定",
       "tuneHint": "バッチ全体で安全に設定できるのは「{frequency}」と「{silence}」のみです。しきい値はアラートごとに保持されます。変更するには、そのアラートを開いて個別に追加してください。",
@@ -13131,7 +13126,6 @@
       "next": "次へ",
       "cancel": "キャンセル",
       "done": "完了",
-      "confirmLarge": "{folder} に {count} 件のアラートを作成し、それぞれが {destination} に通知することを理解しました。",
       "tuneThresholdOnly": "しきい値アラートにのみ適用されます。",
       "anomalyTrainingNote": "異常アラートは、ストリームの履歴で十分に学習した後に通知を開始します。",
       "anomalyUnavailable": "異常アラートには異常検知が有効な OpenObserve Enterprise が必要なため、このアラートはスキップされました。",
@@ -21723,7 +21717,8 @@
         "longtask": "長時間タスク",
         "view": "表示",
         "action": "アクション",
-        "resource": "リソース"
+        "resource": "リソース",
+        "failedrequest": "失敗したリクエスト"
       },
       "subscriptionPlan": {
         "payasyougo": "従量課金",

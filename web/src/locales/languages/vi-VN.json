@@ -2054,8 +2054,11 @@
       "error": "Lỗi",
       "action": "Hành động",
       "view": "Lượt xem",
-      "frustration": "Bực bội"
+      "frustration": "Bực bội",
+      "failedRequest": "Yêu cầu thất bại",
+      "noResponse": "Không có phản hồi"
     },
+    "replayCanvasNotRecorded": "Nội dung canvas chưa được ghi lại",
     "actionOnTarget": "{action} trên \"{target}\"",
     "errorWhileFetchingErrorEvents": "Lỗi khi tải các sự kiện lỗi",
     "errorWhileFetchingSessionReplay": "Lỗi khi tải dữ liệu phát lại phiên",
@@ -10628,6 +10631,8 @@
       "legendNoData": "Không có dữ liệu"
     },
     "importAlertTitle": "Nhập cảnh báo",
+    "importAlert": "Nhập cảnh báo",
+    "alertLibrary": "Thư viện cảnh báo",
     "exportDialogTitle": "Xuất cảnh báo | Xuất {count} cảnh báo",
     "exportDialogSubtitle": "Xem lại định nghĩa, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve.",
     "jsonFilesOnlyHint": "Chỉ chấp nhận tệp .json",
@@ -13098,21 +13103,11 @@
     },
     "install": {
       "title": "Thêm cảnh báo từ thư viện",
-      "subtitle": "Chọn những cảnh báo cần thêm, nơi chúng được lưu, và tùy chọn nơi chúng thông báo.",
-      "stepDestination": "Đích",
+      "subtitle": "Chọn nơi lưu các cảnh báo này, sau đó thêm chúng.",
       "stepAlerts": "Cảnh báo",
       "stepFolder": "Thư mục",
       "stepTune": "Tinh chỉnh",
       "stepInstall": "Thêm",
-      "destinationIntro": "Mọi cảnh báo trong lô này sẽ thông báo đến đích bạn chọn ở đây. Các tệp thư viện ghi tên những đích thuộc tổ chức mà chúng được xuất ra, những đích này không tồn tại trong tổ chức của bạn. Bước này là tùy chọn: bỏ qua thì các cảnh báo vẫn được thêm mà không có đích nào.",
-      "destinationLabel": "Đích",
-      "destinationsLoadFailed": "Không thể tải các đích hiện có của bạn.",
-      "retry": "Thử lại",
-      "destinationsNoneBody": "Tổ chức này chưa có đích cảnh báo nào. Hãy tạo một đích trong trang Đích khi bạn sẵn sàng.",
-      "openDestinations": "Mở Đích",
-      "selectAll": "Chọn tất cả",
-      "clear": "Xóa",
-      "selectedCount": "Đã chọn {count} trong {total}",
       "folderIntro": "Các cảnh báo đã thêm được lưu trữ tại đây. Tạo một thư mục từ nút + nếu nhóm này xứng đáng có thư mục riêng.",
       "tuneToggle": "Đặt các giá trị này cho mọi cảnh báo trong lô này",
       "tuneHint": "Chỉ “{frequency}” và “{silence}” là an toàn để đặt cho cả một nhóm. Ngưỡng vẫn theo từng cảnh báo — thay đổi một cảnh báo bằng cách mở cảnh báo đó và thêm riêng nó.",
@@ -13131,7 +13126,6 @@
       "next": "Tiếp theo",
       "cancel": "Hủy",
       "done": "Hoàn tất",
-      "confirmLarge": "Tôi hiểu rằng thao tác này tạo {count} cảnh báo trong {folder}, mỗi cảnh báo thông báo tới {destination}.",
       "tuneThresholdOnly": "Chỉ áp dụng cho cảnh báo ngưỡng.",
       "anomalyTrainingNote": "Cảnh báo bất thường bắt đầu cảnh báo khi đã được huấn luyện trên đủ lịch sử của luồng dữ liệu.",
       "anomalyUnavailable": "Cảnh báo bất thường cần OpenObserve Enterprise có bật phát hiện bất thường, nên cảnh báo này đã bị bỏ qua.",
@@ -21723,7 +21717,8 @@
         "longtask": "Tác vụ dài",
         "view": "Xem",
         "action": "Hành động",
-        "resource": "Tài nguyên"
+        "resource": "Tài nguyên",
+        "failedrequest": "Yêu cầu thất bại"
       },
       "subscriptionPlan": {
         "payasyougo": "Trả theo mức sử dụng",

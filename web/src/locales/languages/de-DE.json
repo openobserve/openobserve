@@ -2054,8 +2054,11 @@
       "error": "Fehler",
       "action": "Aktion",
       "view": "Ansicht",
-      "frustration": "Frustration"
+      "frustration": "Frustration",
+      "failedRequest": "Fehlgeschlagene Anfragen",
+      "noResponse": "Keine Antwort"
     },
+    "replayCanvasNotRecorded": "Canvas-Inhalt nicht aufgezeichnet",
     "actionOnTarget": "{action} auf \"{target}\"",
     "errorWhileFetchingErrorEvents": "Fehler beim Abrufen der Fehlerereignisse",
     "errorWhileFetchingSessionReplay": "Fehler beim Abrufen der Session-Replay-Daten",
@@ -10628,6 +10631,8 @@
       "legendNoData": "Keine Daten"
     },
     "importAlertTitle": "Alarm importieren",
+    "importAlert": "Alarm importieren",
+    "alertLibrary": "Alarmbibliothek",
     "exportDialogTitle": "Alarm exportieren | {count} Alarme exportieren",
     "exportDialogSubtitle": "Überprüfen Sie die Definition und laden Sie sie dann als JSON oder als Terraform für den OpenObserve-Provider herunter.",
     "jsonFilesOnlyHint": "Nur .json-Dateien",
@@ -13098,21 +13103,11 @@
     },
     "install": {
       "title": "Alarme aus der Bibliothek hinzufügen",
-      "subtitle": "Wählen Sie aus, welche Alarme hinzugefügt werden, wo sie abgelegt werden und optional, wohin sie benachrichtigen.",
-      "stepDestination": "Ziel",
+      "subtitle": "Wählen Sie, wo diese Alarme abgelegt werden, und fügen Sie sie dann hinzu.",
       "stepAlerts": "Alarme",
       "stepFolder": "Ordner",
       "stepTune": "Anpassen",
       "stepInstall": "Hinzufügen",
-      "destinationIntro": "Jeder Alarm in diesem Stapel benachrichtigt das Ziel, das Sie hier auswählen. Bibliotheksdateien nennen die Ziele der Organisation, aus der sie exportiert wurden – diese existieren in Ihrer nicht. Dieser Schritt ist optional: Überspringen Sie ihn, und die Alarme werden ohne Ziel hinzugefügt.",
-      "destinationLabel": "Ziel",
-      "destinationsLoadFailed": "Ihre vorhandenen Ziele konnten nicht geladen werden.",
-      "retry": "Erneut versuchen",
-      "destinationsNoneBody": "Diese Organisation hat noch keine Alarm-Ziele. Erstellen Sie eines auf der Seite Ziele, sobald Sie bereit sind.",
-      "openDestinations": "Ziele öffnen",
-      "selectAll": "Alle auswählen",
-      "clear": "Löschen",
-      "selectedCount": "{count} von {total} ausgewählt",
       "folderIntro": "Hinzugefügte Alarme werden hier abgelegt. Erstellen Sie über die +-Schaltfläche einen Ordner, wenn dieser Stapel einen eigenen verdient.",
       "tuneToggle": "Diese für jeden Alarm in diesem Stapel festlegen",
       "tuneHint": "Nur „{frequency}“ und „{silence}“ können sicher für einen ganzen Stapel festgelegt werden. Schwellenwerte bleiben pro Alarm – ändern Sie einen, indem Sie den Alarm öffnen und ihn einzeln hinzufügen.",
@@ -13131,7 +13126,6 @@
       "next": "Weiter",
       "cancel": "Abbrechen",
       "done": "Fertig",
-      "confirmLarge": "Mir ist klar, dass dies {count} Alarme in {folder} erstellt, die jeweils {destination} benachrichtigen.",
       "tuneThresholdOnly": "Gilt nur für Schwellenwert-Alarme.",
       "anomalyTrainingNote": "Anomalie-Alarme lösen erst aus, wenn sie mit genügend Verlauf des Streams trainiert wurden.",
       "anomalyUnavailable": "Anomalie-Alarme erfordern OpenObserve Enterprise mit aktivierter Anomalieerkennung, daher wurde dieser übersprungen.",
@@ -21723,7 +21717,8 @@
         "longtask": "Lange Aufgabe",
         "view": "Anzeigen",
         "action": "Aktion",
-        "resource": "Ressource"
+        "resource": "Ressource",
+        "failedrequest": "Fehlgeschlagene Anfrage"
       },
       "subscriptionPlan": {
         "payasyougo": "Nutzungsbasierte Bezahlung",
