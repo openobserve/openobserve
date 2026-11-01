@@ -568,6 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="toolbarRightRef"
         class="flex flex-shrink-0 items-center gap-1 max-md:w-full max-md:justify-end"
       >
+        <OPageHeaderStatus />
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
           <FunctionSelector
             :function-options="functionOptions"
@@ -1699,6 +1700,7 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import RecentSearchesButton from "@/components/queryHistory/RecentSearchesButton.vue";
 import RecentSearchesDrawer from "@/components/queryHistory/RecentSearchesDrawer.vue";
@@ -1893,6 +1895,7 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OPageHeaderStatus,
     CreateAlertAction,
     OSeparator,
     OSplitter,

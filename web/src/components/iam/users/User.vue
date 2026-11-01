@@ -1054,7 +1054,6 @@ export default defineComponent({
             console.error("Failed to fetch org members:", err);
             dismiss();
             forbidden.value = err?.response?.status === 403;
-            // The grouped access toast already reports a 403; a second red toast adds nothing.
             if (!forbidden.value) {
               toast({
                 variant: "error",
@@ -1583,7 +1582,7 @@ export default defineComponent({
           });
         }
       } catch (err: any) {
-        if (err.response?.status != 403 || err?.status != 403) {
+        if (err.response?.status !== 403 && err?.status !== 403) {
           toast({
             message: blocked
               ? t("iam.user.blockedUsersNotRemoved", { count: emails.length })

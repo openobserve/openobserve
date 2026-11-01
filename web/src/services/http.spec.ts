@@ -46,8 +46,17 @@ vi.mock("@/utils/zincutils", () => ({
 
 vi.mock("axios");
 
-const { addUnauthorizedError } = vi.hoisted(() => ({ addUnauthorizedError: vi.fn() }));
-vi.mock("@/composables/useUnauthorizedErrorGrouper", () => ({ addUnauthorizedError }));
+const { recordForbidden, noteAccessSuccess, currentAccessRouteKey } = vi.hoisted(() => ({
+  recordForbidden: vi.fn(),
+  noteAccessSuccess: vi.fn(),
+  currentAccessRouteKey: vi.fn(() => undefined),
+}));
+vi.mock("@/composables/useAccessStore", () => ({
+  recordForbidden,
+  noteAccessSuccess,
+  currentAccessRouteKey,
+  resetAccess: vi.fn(),
+}));
 
 import config from "../aws-exports";
 import store from "../stores";
@@ -186,6 +195,7 @@ describe("http 403 interceptor", () => {
     let onError: (error: any) => Promise<unknown> = () => Promise.resolve();
     vi.mocked(axios.create).mockReturnValue({
       interceptors: {
+        request: { use: vi.fn() },
         response: {
           use: (_ok: unknown, err: (error: any) => Promise<unknown>) => {
             onError = err;
@@ -213,18 +223,35 @@ describe("http 403 interceptor", () => {
     (config as any).isEnterprise = "false";
   });
 
-  it("adds a 403 to the Access Required toast", async () => {
+  it("records a 403 with the access boundary", async () => {
     const error = forbidden();
     await expect(errorHandler()(error)).rejects.toBe(error);
-    expect(addUnauthorizedError).toHaveBeenCalledWith(
-      "http://localhost:5080/api/v2/org/folders/alerts",
-    );
+    expect(recordForbidden).toHaveBeenCalledWith({
+      url: "http://localhost:5080/api/v2/org/folders/alerts",
+      method: undefined,
+      routeKey: undefined,
+    });
   });
 
-  it("leaves a 403 out of the toast when the request opts out, and still rejects", async () => {
+  it("stamps a new request with the current page but keeps a retried request's stamp", () => {
+    let stamp: (config: any) => any = (c) => c;
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: {
+        request: { use: (fn: (config: any) => any) => (stamp = fn) },
+        response: { use: vi.fn() },
+      },
+    } as any);
+    http();
+    currentAccessRouteKey.mockReturnValue("acme|settings" as any);
+    expect(stamp({}).accessRouteKey).toBe("acme|settings");
+    expect(stamp({ accessRouteKey: "acme|users" }).accessRouteKey).toBe("acme|users");
+    currentAccessRouteKey.mockReturnValue(undefined);
+  });
+
+  it("leaves a 403 unrecorded when the request opts out, and still rejects", async () => {
     const error = forbidden({ skipAccessToast: true });
     await expect(errorHandler()(error)).rejects.toBe(error);
-    expect(addUnauthorizedError).not.toHaveBeenCalled();
+    expect(recordForbidden).not.toHaveBeenCalled();
   });
 });
 
@@ -237,9 +264,10 @@ describe("403 handling", () => {
   });
 
   beforeEach(() => {
-    addUnauthorizedError.mockClear();
+    recordForbidden.mockClear();
     vi.mocked(axios.create).mockReturnValue({
       interceptors: {
+        request: { use: vi.fn() },
         response: { use: (_ok: unknown, rejected: typeof onRejected) => (onRejected = rejected) },
       },
     } as any);
@@ -255,17 +283,21 @@ describe("403 handling", () => {
     ["enterprise", "isEnterprise"],
     ["cloud", "isCloud"],
   ])(
-    "on %s, toasts an unflagged 403 and stays silent on a silentForbidden one",
+    "on %s, records an unflagged 403 and stays silent on a silentForbidden one",
     async (_, flag) => {
       (config as any)[flag] = "true";
 
       await expect(onRejected(forbidden({}))).rejects.toBeDefined();
-      expect(addUnauthorizedError).toHaveBeenCalledWith("http://localhost:5080/api/acme/x");
+      expect(recordForbidden).toHaveBeenCalledWith({
+        url: "http://localhost:5080/api/acme/x",
+        method: undefined,
+        routeKey: undefined,
+      });
 
-      addUnauthorizedError.mockClear();
+      recordForbidden.mockClear();
       const silent = forbidden({ silentForbidden: true });
       await expect(onRejected(silent)).rejects.toBe(silent);
-      expect(addUnauthorizedError).not.toHaveBeenCalled();
+      expect(recordForbidden).not.toHaveBeenCalled();
     },
   );
 });
