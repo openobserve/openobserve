@@ -15,7 +15,8 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
-  cancel-in-progress: true
+  # Only a new commit cancels: a cancelled same-SHA run leaves a failed required summary that a newer run cannot clear.
+  cancel-in-progress: ${{ github.event_name != 'pull_request' || github.event.action == 'synchronize' }}
 
 env:
   COLUMNS: 150
