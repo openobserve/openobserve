@@ -2053,8 +2053,11 @@
       "error": "错误",
       "action": "操作",
       "view": "视图",
-      "frustration": "挫败"
+      "frustration": "挫败",
+      "failedRequest": "失败请求",
+      "noResponse": "无响应"
     },
+    "replayCanvasNotRecorded": "Canvas 内容未记录",
     "actionOnTarget": "在 \"{target}\" 上 {action}",
     "errorWhileFetchingErrorEvents": "获取错误事件时出错",
     "errorWhileFetchingSessionReplay": "获取会话重放数据时出错",
@@ -13765,6 +13768,15 @@
       "allTitle": "所有指标，包括在此范围内无数据的",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "仪表盘",
+      "sortDashboardsTitle": "仪表盘中用得最多的优先",
+      "sortAlerts": "告警",
+      "sortAlertsTitle": "告警中用得最多的优先",
+      "usageInDashboards": "仪表盘中",
+      "usageHasAlerts": "有告警",
+      "usageInSlos": "SLO 中",
+      "usageLoading": "正在加载指标的使用情况",
+      "usageFailed": "使用情况不可用，请重试",
       "viewGrid": "网格",
       "viewRows": "行",
       "modeExplore": "探索",
@@ -13898,16 +13910,7 @@
         "deleteMessage": "要为本组织中的所有人删除视图 {name} 吗？",
         "modified": "{name}（已修改）",
         "clear": "清除视图"
-      },
-      "sortDashboards": "仪表盘",
-      "sortDashboardsTitle": "仪表盘中用得最多的优先",
-      "sortAlerts": "告警",
-      "sortAlertsTitle": "告警中用得最多的优先",
-      "usageInDashboards": "仪表盘中",
-      "usageHasAlerts": "有告警",
-      "usageInSlos": "SLO 中",
-      "usageLoading": "正在加载指标的使用情况",
-      "usageFailed": "使用情况不可用，请重试"
+      }
     },
     "metricCard": {
       "lastRefreshed": "上次刷新时间：",
@@ -13934,6 +13937,17 @@
       "notEqualTo": "不等于",
       "regexPattern": "正则模式（例如 prod.*）",
       "regexNotMatching": "正则不匹配（例如 test.*）"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR 组",
+      "addGroupTooltip": "添加一组过滤器；序列匹配任意一组即视为匹配",
+      "addToGroup": "向此组添加过滤器",
+      "anyOf": "任一",
+      "andAnyOf": "并且任一",
+      "or": "或",
+      "not": "非",
+      "notTooltip": "匹配整个组都不匹配的序列",
+      "tooManyBranches": "这些过滤器会展开为 {count} 个独立选择器；最多可运行 {max} 个。请将值合并到一个正则过滤器中，或移除一个组。"
     },
     "builderSwitch": {
       "unsupported": "构建器无法显示 {construct}",
@@ -13974,11 +13988,11 @@
         "byLabelsLabel": "按标签",
         "quantileLabel": "分位数",
         "kLabel": "K",
-        "nearestMultipleLabel": "最接近的倍数",
         "withoutLabel": "不包含（丢弃这些标签）",
         "withoutDesc": "聚合时去除所选标签，并保留其他所有标签",
         "offsetLabel": "偏移",
-        "offsetDesc": "读取指标时回溯多久，例如 1h 或 1d"
+        "offsetDesc": "读取指标时回溯多久，例如 1h 或 1d",
+        "nearestMultipleLabel": "最接近的倍数"
       },
       "rangeOnlyFirst": "范围函数只能作为第一步",
       "rangeOnlyFirstNote": "范围函数读取原始样本，因此只能作为第一步。请移除其他步骤以添加范围函数。",
@@ -14048,17 +14062,6 @@
       "empty": "暂无查询",
       "noMatch": "没有查询匹配搜索或加星过滤器",
       "loadMore": "加载更多"
-    },
-    "labelGroups": {
-      "addGroup": "+ OR 组",
-      "addGroupTooltip": "添加一组过滤器；序列匹配任意一组即视为匹配",
-      "addToGroup": "向此组添加过滤器",
-      "anyOf": "任一",
-      "andAnyOf": "并且任一",
-      "or": "或",
-      "not": "非",
-      "notTooltip": "匹配整个组都不匹配的序列",
-      "tooManyBranches": "这些过滤器会展开为 {count} 个独立选择器；最多可运行 {max} 个。请将值合并到一个正则过滤器中，或移除一个组。"
     }
   },
   "settings": {
@@ -21717,7 +21720,8 @@
         "longtask": "长任务",
         "view": "查看",
         "action": "操作",
-        "resource": "资源"
+        "resource": "资源",
+        "failedrequest": "失败请求"
       },
       "subscriptionPlan": {
         "payasyougo": "按需付费",
@@ -22731,6 +22735,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "读取指标在指定时长之前的值",
       "rateDoc": "计算指定时间范围内的每秒平均增长率",
       "irateDoc": "基于最后两个数据点计算每秒瞬时增长率",
       "increaseDoc": "计算指定时间范围内的总增长量",
@@ -22801,8 +22806,7 @@
       "moduloName": "模运算",
       "multiplyByName": "乘以",
       "divideByName": "除以",
-      "exponentName": "指数",
-      "offsetDoc": "读取指标在指定时长之前的值"
+      "exponentName": "指数"
     }
   },
   "passwordPolicy": {

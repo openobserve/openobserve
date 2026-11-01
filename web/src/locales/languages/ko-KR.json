@@ -2053,8 +2053,11 @@
       "error": "오류",
       "action": "작업",
       "view": "보기",
-      "frustration": "불만"
+      "frustration": "불만",
+      "failedRequest": "실패한 요청",
+      "noResponse": "응답 없음"
     },
+    "replayCanvasNotRecorded": "캔버스 콘텐츠가 기록되지 않음",
     "actionOnTarget": "{action}: \"{target}\"",
     "errorWhileFetchingErrorEvents": "오류 이벤트를 가져오는 중 오류 발생",
     "errorWhileFetchingSessionReplay": "세션 리플레이 데이터를 가져오는 중 오류 발생",
@@ -13765,6 +13768,15 @@
       "allTitle": "이 범위에 데이터가 없는 메트릭을 포함한 모든 메트릭",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "대시보드",
+      "sortDashboardsTitle": "대시보드에서 가장 많이 사용된 순",
+      "sortAlerts": "알림",
+      "sortAlertsTitle": "알림에서 가장 많이 사용된 순",
+      "usageInDashboards": "대시보드에서 사용",
+      "usageHasAlerts": "알림 있음",
+      "usageInSlos": "SLO에서 사용",
+      "usageLoading": "메트릭 사용 위치를 불러오는 중",
+      "usageFailed": "사용 정보를 사용할 수 없음, 다시 시도",
       "viewGrid": "그리드",
       "viewRows": "행",
       "modeExplore": "탐색",
@@ -13898,16 +13910,7 @@
         "deleteMessage": "이 조직의 모든 사용자에 대해 {name} 보기를 삭제하시겠습니까?",
         "modified": "{name} (수정됨)",
         "clear": "뷰 초기화"
-      },
-      "sortDashboards": "대시보드",
-      "sortDashboardsTitle": "대시보드에서 가장 많이 사용된 순",
-      "sortAlerts": "알림",
-      "sortAlertsTitle": "알림에서 가장 많이 사용된 순",
-      "usageInDashboards": "대시보드에서 사용",
-      "usageHasAlerts": "알림 있음",
-      "usageInSlos": "SLO에서 사용",
-      "usageLoading": "메트릭 사용 위치를 불러오는 중",
-      "usageFailed": "사용 정보를 사용할 수 없음, 다시 시도"
+      }
     },
     "metricCard": {
       "lastRefreshed": "마지막 새로고침:",
@@ -13934,6 +13937,17 @@
       "notEqualTo": "같지 않음",
       "regexPattern": "정규식 패턴 (예: prod.*)",
       "regexNotMatching": "정규식 불일치 (예: test.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR 그룹",
+      "addGroupTooltip": "필터 그룹을 추가합니다. 시리즈는 그룹 중 하나라도 일치하면 일치합니다",
+      "addToGroup": "이 그룹에 필터 추가",
+      "anyOf": "다음 중 하나",
+      "andAnyOf": "그리고 다음 중 하나",
+      "or": "또는",
+      "not": "아님",
+      "notTooltip": "이 그룹 전체와 일치하지 않는 시리즈를 일치시킵니다",
+      "tooManyBranches": "이 필터는 {count}개의 개별 선택자로 확장됩니다. 최대 {max}개만 실행할 수 있습니다. 값을 하나의 정규식 필터로 병합하거나 그룹을 제거하세요."
     },
     "builderSwitch": {
       "unsupported": "빌더에서 {construct}을(를) 표시할 수 없습니다",
@@ -13974,11 +13988,11 @@
         "byLabelsLabel": "레이블별",
         "quantileLabel": "분위수",
         "kLabel": "K",
-        "nearestMultipleLabel": "가장 가까운 배수",
         "withoutLabel": "제외 (이 레이블 제거)",
         "withoutDesc": "선택한 레이블을 집계에서 제외하고 나머지 레이블은 모두 유지합니다",
         "offsetLabel": "오프셋",
-        "offsetDesc": "메트릭을 얼마나 이전 시점까지 읽을지, 예: 1h 또는 1d"
+        "offsetDesc": "메트릭을 얼마나 이전 시점까지 읽을지, 예: 1h 또는 1d",
+        "nearestMultipleLabel": "가장 가까운 배수"
       },
       "rangeOnlyFirst": "범위 함수는 첫 번째 단계에만 올 수 있습니다",
       "rangeOnlyFirstNote": "범위 함수는 원시 샘플을 읽으므로 첫 번째 단계에만 올 수 있습니다. 추가하려면 다른 단계를 제거하세요.",
@@ -14048,17 +14062,6 @@
       "empty": "아직 쿼리가 없습니다",
       "noMatch": "검색 또는 즐겨찾기 필터와 일치하는 쿼리가 없습니다",
       "loadMore": "더 보기"
-    },
-    "labelGroups": {
-      "addGroup": "+ OR 그룹",
-      "addGroupTooltip": "필터 그룹을 추가합니다. 시리즈는 그룹 중 하나라도 일치하면 일치합니다",
-      "addToGroup": "이 그룹에 필터 추가",
-      "anyOf": "다음 중 하나",
-      "andAnyOf": "그리고 다음 중 하나",
-      "or": "또는",
-      "not": "아님",
-      "notTooltip": "이 그룹 전체와 일치하지 않는 시리즈를 일치시킵니다",
-      "tooManyBranches": "이 필터는 {count}개의 개별 선택자로 확장됩니다. 최대 {max}개만 실행할 수 있습니다. 값을 하나의 정규식 필터로 병합하거나 그룹을 제거하세요."
     }
   },
   "settings": {
@@ -21717,7 +21720,8 @@
         "longtask": "긴 작업",
         "view": "보기",
         "action": "작업",
-        "resource": "리소스"
+        "resource": "리소스",
+        "failedrequest": "실패한 요청"
       },
       "subscriptionPlan": {
         "payasyougo": "종량제",
@@ -22731,6 +22735,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "지정된 기간 전 시점의 메트릭을 읽습니다",
       "rateDoc": "지정된 시간 범위에 대한 초당 평균 증가율을 계산합니다",
       "irateDoc": "마지막 두 데이터 포인트를 기반으로 초당 순간 증가율을 계산합니다",
       "increaseDoc": "지정된 시간 범위에 대한 총 증가량을 계산합니다",
@@ -22801,8 +22806,7 @@
       "moduloName": "모듈로",
       "multiplyByName": "곱하기",
       "divideByName": "나누기",
-      "exponentName": "지수",
-      "offsetDoc": "지정된 기간 전 시점의 메트릭을 읽습니다"
+      "exponentName": "지수"
     }
   },
   "passwordPolicy": {

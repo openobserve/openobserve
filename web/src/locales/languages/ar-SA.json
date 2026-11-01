@@ -2053,8 +2053,11 @@
       "error": "خطأ",
       "action": "الحدث",
       "view": "منظر",
-      "frustration": "الإحباط"
+      "frustration": "الإحباط",
+      "failedRequest": "الطلبات الفاشلة",
+      "noResponse": "لا يوجد استجابة"
     },
+    "replayCanvasNotRecorded": "لم يتم تسجيل محتوى اللوحة القماشية",
     "actionOnTarget": "{action} في \"{target}\"",
     "errorWhileFetchingErrorEvents": "حدث خطأ أثناء جلب الأخطاء",
     "errorWhileFetchingSessionReplay": "خطأ أثناء جلب بيانات إعادة تشغيل الجلسة",
@@ -13765,6 +13768,15 @@
       "allTitle": "كل المقاييس، بما في ذلك تلك التي لا تحتوي على بيانات ضمن هذا النطاق",
       "sortAsc": "من أ إلى ي",
       "sortDesc": "Z–A",
+      "sortDashboards": "لوحات المعلومات",
+      "sortDashboardsTitle": "الأكثر استخدامًا في لوحات المعلومات أولًا",
+      "sortAlerts": "التنبيهات",
+      "sortAlertsTitle": "الأكثر استخدامًا في التنبيهات أولًا",
+      "usageInDashboards": "في لوحات المعلومات",
+      "usageHasAlerts": "لديه تنبيهات",
+      "usageInSlos": "في SLOs",
+      "usageLoading": "جارٍ تحميل أماكن استخدام المقاييس",
+      "usageFailed": "الاستخدام غير متاح، أعد المحاولة",
       "viewGrid": "الشبكة",
       "viewRows": "الصفوف",
       "modeExplore": "استكشاف",
@@ -13898,16 +13910,7 @@
         "deleteMessage": "هل تريد حذف العرض {name} للجميع في هذه المؤسسة؟",
         "modified": "{name} (معدَّل)",
         "clear": "مسح العرض"
-      },
-      "sortDashboards": "لوحات المعلومات",
-      "sortDashboardsTitle": "الأكثر استخدامًا في لوحات المعلومات أولًا",
-      "sortAlerts": "التنبيهات",
-      "sortAlertsTitle": "الأكثر استخدامًا في التنبيهات أولًا",
-      "usageInDashboards": "في لوحات المعلومات",
-      "usageHasAlerts": "لديه تنبيهات",
-      "usageInSlos": "في SLOs",
-      "usageLoading": "جارٍ تحميل أماكن استخدام المقاييس",
-      "usageFailed": "الاستخدام غير متاح، أعد المحاولة"
+      }
     },
     "metricCard": {
       "lastRefreshed": "آخر تحديث:",
@@ -13934,6 +13937,17 @@
       "notEqualTo": "ليس مساويا ل",
       "regexPattern": "نمط Regex (مثل prod.*)",
       "regexNotMatching": "عدم تطابق Regex (مثلا، اختبار.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ مجموعة OR",
+      "addGroupTooltip": "أضف مجموعة من الفلاتر؛ تطابق السلسلة عندما تطابق أي مجموعة",
+      "addToGroup": "أضف فلترًا إلى هذه المجموعة",
+      "anyOf": "أي من",
+      "andAnyOf": "وأي من",
+      "or": "أو",
+      "not": "ليس",
+      "notTooltip": "طابِق السلسلة التي لا تطابقها هذه المجموعة بأكملها",
+      "tooManyBranches": "تتوسع هذه الفلاتر إلى {count} محدِّدات منفصلة؛ يمكن تشغيل {max} كحد أقصى. ادمج القيم في فلتر تعبير نمطي واحد أو أزل مجموعة."
     },
     "builderSwitch": {
       "unsupported": "لا يمكن للمنشئ عرض {construct}",
@@ -13974,11 +13988,11 @@
         "byLabelsLabel": "حسب العلامات التجارية",
         "quantileLabel": "كوانتيل",
         "kLabel": "K",
-        "nearestMultipleLabel": "أقرب مضاعف",
         "withoutLabel": "بدون (إسقاط هذه التسميات)",
         "withoutDesc": "جمّع مع إسقاط التسميات المحددة واحتفظ بكل تسمية أخرى",
         "offsetLabel": "الإزاحة",
-        "offsetDesc": "مدة الرجوع إلى الخلف لقراءة المقياس، مثل 1h أو 1d"
+        "offsetDesc": "مدة الرجوع إلى الخلف لقراءة المقياس، مثل 1h أو 1d",
+        "nearestMultipleLabel": "أقرب مضاعف"
       },
       "rangeOnlyFirst": "يمكن أن تكون دالة النطاق الخطوة الأولى فقط",
       "rangeOnlyFirstNote": "تقرأ دالة النطاق العينات الخام، لذا يمكن أن تكون الخطوة الأولى فقط. أزل الخطوات الأخرى لإضافة واحدة.",
@@ -14048,17 +14062,6 @@
       "empty": "لا توجد استعلامات بعد",
       "noMatch": "لا توجد استعلامات مطابقة للبحث أو عامل تصفية النجمة",
       "loadMore": "تحميل المزيد"
-    },
-    "labelGroups": {
-      "addGroup": "+ مجموعة OR",
-      "addGroupTooltip": "أضف مجموعة من الفلاتر؛ تطابق السلسلة عندما تطابق أي مجموعة",
-      "addToGroup": "أضف فلترًا إلى هذه المجموعة",
-      "anyOf": "أي من",
-      "andAnyOf": "وأي من",
-      "or": "أو",
-      "not": "ليس",
-      "notTooltip": "طابِق السلسلة التي لا تطابقها هذه المجموعة بأكملها",
-      "tooManyBranches": "تتوسع هذه الفلاتر إلى {count} محدِّدات منفصلة؛ يمكن تشغيل {max} كحد أقصى. ادمج القيم في فلتر تعبير نمطي واحد أو أزل مجموعة."
     }
   },
   "settings": {
@@ -21717,7 +21720,8 @@
         "longtask": "مهمة طويلة",
         "view": "منظر",
         "action": "الحدث",
-        "resource": "المصدر"
+        "resource": "المصدر",
+        "failedrequest": "طلب فاشل"
       },
       "subscriptionPlan": {
         "payasyougo": "ادفع حسب الاستخدام",
@@ -22731,6 +22735,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "يقرأ المقياس كما كان قبل المدة المحددة",
       "rateDoc": "يحسب متوسط معدل الزيادة في الثانية خلال النطاق الزمني المحدد",
       "irateDoc": "يحسب معدل الزيادة الفورية في الثانية بناء على آخر نقطتي بيانات",
       "increaseDoc": "يحسب الزيادة الكلية خلال النطاق الزمني المحدد",
@@ -22801,8 +22806,7 @@
       "moduloName": "مودولو",
       "multiplyByName": "الضرب في",
       "divideByName": "القسم على",
-      "exponentName": "الموس",
-      "offsetDoc": "يقرأ المقياس كما كان قبل المدة المحددة"
+      "exponentName": "الموس"
     }
   },
   "passwordPolicy": {

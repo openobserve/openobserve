@@ -2053,8 +2053,11 @@
       "error": "錯誤",
       "action": "動作",
       "view": "檢視",
-      "frustration": "沮喪"
+      "frustration": "沮喪",
+      "failedRequest": "失敗的請求",
+      "noResponse": "無回應"
     },
+    "replayCanvasNotRecorded": "未錄製 Canvas 內容",
     "actionOnTarget": "{action} 於「{target}」",
     "errorWhileFetchingErrorEvents": "擷取錯誤事件時發生錯誤",
     "errorWhileFetchingSessionReplay": "擷取工作階段重播資料時發生錯誤",
@@ -13760,6 +13763,15 @@
       "allTitle": "所有指標，包括在此範圍內沒有資料的",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "儀表板",
+      "sortDashboardsTitle": "儀表板中使用最多者優先",
+      "sortAlerts": "警示",
+      "sortAlertsTitle": "警示中使用最多者優先",
+      "usageInDashboards": "儀表板中",
+      "usageHasAlerts": "有警示",
+      "usageInSlos": "SLOs 中",
+      "usageLoading": "正在載入指標使用位置",
+      "usageFailed": "無法取得使用資訊，請重試",
       "viewGrid": "網格",
       "viewRows": "行",
       "modeExplore": "探索",
@@ -13893,16 +13905,7 @@
         "deleteMessage": "要為此組織中的所有使用者刪除檢視 {name} 嗎？",
         "modified": "{name}（已修改）",
         "clear": "清除檢視"
-      },
-      "sortDashboards": "儀表板",
-      "sortDashboardsTitle": "儀表板中使用最多者優先",
-      "sortAlerts": "警示",
-      "sortAlertsTitle": "警示中使用最多者優先",
-      "usageInDashboards": "儀表板中",
-      "usageHasAlerts": "有警示",
-      "usageInSlos": "SLOs 中",
-      "usageLoading": "正在載入指標使用位置",
-      "usageFailed": "無法取得使用資訊，請重試"
+      }
     },
     "metricCard": {
       "lastRefreshed": "上次重新整理：",
@@ -13929,6 +13932,17 @@
       "notEqualTo": "不等於",
       "regexPattern": "正則表達式模式 (例如：prod.*)",
       "regexNotMatching": "正則表達式不匹配 (例如：test.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR 群組",
+      "addGroupTooltip": "新增一組篩選條件；序列符合任一組即算符合",
+      "addToGroup": "新增篩選條件至此群組",
+      "anyOf": "任一",
+      "andAnyOf": "且任一",
+      "or": "或",
+      "not": "非",
+      "notTooltip": "改為符合此整組條件未涵蓋的序列",
+      "tooManyBranches": "這些篩選條件會展開成 {count} 個獨立選取器；最多只能執行 {max} 個。請將值合併為一個正規表達式篩選條件，或移除一個群組。"
     },
     "builderSwitch": {
       "unsupported": "建構器無法顯示 {construct}",
@@ -13969,11 +13983,11 @@
         "byLabelsLabel": "依標籤",
         "quantileLabel": "分位數",
         "kLabel": "K",
-        "nearestMultipleLabel": "最接近的倍數",
         "withoutLabel": "排除（捨棄這些標籤）",
         "withoutDesc": "將選取的標籤彙總排除，並保留其他所有標籤",
         "offsetLabel": "偏移",
-        "offsetDesc": "要往回讀取多久以前的指標，例如 1h 或 1d"
+        "offsetDesc": "要往回讀取多久以前的指標，例如 1h 或 1d",
+        "nearestMultipleLabel": "最接近的倍數"
       },
       "rangeOnlyFirst": "範圍函式只能是第一步",
       "rangeOnlyFirstNote": "範圍函式會讀取原始樣本，因此只能是第一步。請移除其他步驟以新增。",
@@ -14043,17 +14057,6 @@
       "empty": "尚無查詢",
       "noMatch": "沒有查詢符合搜尋或星號篩選條件",
       "loadMore": "載入更多"
-    },
-    "labelGroups": {
-      "addGroup": "+ OR 群組",
-      "addGroupTooltip": "新增一組篩選條件；序列符合任一組即算符合",
-      "addToGroup": "新增篩選條件至此群組",
-      "anyOf": "任一",
-      "andAnyOf": "且任一",
-      "or": "或",
-      "not": "非",
-      "notTooltip": "改為符合此整組條件未涵蓋的序列",
-      "tooManyBranches": "這些篩選條件會展開成 {count} 個獨立選取器；最多只能執行 {max} 個。請將值合併為一個正規表達式篩選條件，或移除一個群組。"
     }
   },
   "settings": {
@@ -21712,7 +21715,8 @@
         "longtask": "長任務",
         "view": "檢視",
         "action": "動作",
-        "resource": "資源"
+        "resource": "資源",
+        "failedrequest": "失敗的請求"
       },
       "subscriptionPlan": {
         "payasyougo": "隨用隨付",
@@ -22726,6 +22730,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "讀取指標在指定時間長度之前的值",
       "rateDoc": "計算指定時間範圍內每秒的平均增長率",
       "irateDoc": "根據最後兩個資料點計算每秒的瞬時增長率",
       "increaseDoc": "計算指定時間範圍內的總增長量",
@@ -22796,8 +22801,7 @@
       "moduloName": "模數",
       "multiplyByName": "乘以",
       "divideByName": "除以",
-      "exponentName": "冪運算",
-      "offsetDoc": "讀取指標在指定時間長度之前的值"
+      "exponentName": "冪運算"
     }
   },
   "passwordPolicy": {

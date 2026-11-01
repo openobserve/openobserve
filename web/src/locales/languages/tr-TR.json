@@ -2053,8 +2053,11 @@
       "error": "Hata",
       "action": "Eylem",
       "view": "Görünüm",
-      "frustration": "Hayal kırıklığı"
+      "frustration": "Hayal kırıklığı",
+      "failedRequest": "Başarısız istekler",
+      "noResponse": "Yanıt yok"
     },
+    "replayCanvasNotRecorded": "Canvas içeriği kaydedilmedi",
     "actionOnTarget": "\"{target}\" üzerinde {action}",
     "errorWhileFetchingErrorEvents": "Hata olayları alınırken hata oluştu",
     "errorWhileFetchingSessionReplay": "Oturum tekrarı verileri alınırken hata oluştu",
@@ -13765,6 +13768,15 @@
       "allTitle": "Bu aralıkta verisi olmayanlar dahil her metrik",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "Gösterge panoları",
+      "sortDashboardsTitle": "Gösterge panolarında en çok kullanılanlar önce",
+      "sortAlerts": "Uyarılar",
+      "sortAlertsTitle": "Uyarılarda en çok kullanılanlar önce",
+      "usageInDashboards": "Gösterge panolarında",
+      "usageHasAlerts": "Uyarıları var",
+      "usageInSlos": "SLO'larda",
+      "usageLoading": "Metriklerin kullanıldığı yerler yükleniyor",
+      "usageFailed": "Kullanım bilgisi kullanılamıyor, yeniden deneyin",
       "viewGrid": "Izgara",
       "viewRows": "Satırlar",
       "modeExplore": "Keşfet",
@@ -13898,16 +13910,7 @@
         "deleteMessage": "Bu kuruluştaki herkes için {name} görünümü silinsin mi?",
         "modified": "{name} (değiştirildi)",
         "clear": "Görünümü temizle"
-      },
-      "sortDashboards": "Gösterge panoları",
-      "sortDashboardsTitle": "Gösterge panolarında en çok kullanılanlar önce",
-      "sortAlerts": "Uyarılar",
-      "sortAlertsTitle": "Uyarılarda en çok kullanılanlar önce",
-      "usageInDashboards": "Gösterge panolarında",
-      "usageHasAlerts": "Uyarıları var",
-      "usageInSlos": "SLO'larda",
-      "usageLoading": "Metriklerin kullanıldığı yerler yükleniyor",
-      "usageFailed": "Kullanım bilgisi kullanılamıyor, yeniden deneyin"
+      }
     },
     "metricCard": {
       "lastRefreshed": "Son Yenileme:",
@@ -13934,6 +13937,17 @@
       "notEqualTo": "Eşit değil",
       "regexPattern": "Regex deseni (örn. prod.*)",
       "regexNotMatching": "Regex eşleşmiyor (örn. test.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR grubu",
+      "addGroupTooltip": "Bir filtre grubu ekleyin; bir seri, gruplardan herhangi biriyle eşleştiğinde eşleşir.",
+      "addToGroup": "Bu gruba filtre ekle",
+      "anyOf": "herhangi biri",
+      "andAnyOf": "ve herhangi biri",
+      "or": "veya",
+      "not": "değil",
+      "notTooltip": "Bu grubun tamamının eşleşmediği serilerle eşleş",
+      "tooManyBranches": "Bu filtreler {count} ayrı seçiciye genişler; en fazla {max} tanesi çalıştırılabilir. Değerleri tek bir regex filtresinde birleştirin veya bir grubu kaldırın."
     },
     "builderSwitch": {
       "unsupported": "Oluşturucu {construct} yapısını gösteremiyor",
@@ -13974,11 +13988,11 @@
         "byLabelsLabel": "Etiketlere Göre",
         "quantileLabel": "Kantil",
         "kLabel": "K",
-        "nearestMultipleLabel": "En yakın kat",
         "withoutLabel": "Hariç (bu etiketleri kaldır)",
         "withoutDesc": "Seçilen etiketleri toplulaştırarak kaldırın ve diğer tüm etiketleri koruyun",
         "offsetLabel": "Ofset",
-        "offsetDesc": "Metriğin ne kadar geriye dönük okunacağı, örn. 1h veya 1d"
+        "offsetDesc": "Metriğin ne kadar geriye dönük okunacağı, örn. 1h veya 1d",
+        "nearestMultipleLabel": "En yakın kat"
       },
       "rangeOnlyFirst": "Bir aralık fonksiyonu yalnızca ilk adım olabilir",
       "rangeOnlyFirstNote": "Bir aralık fonksiyonu ham örnekleri okur, bu nedenle yalnızca ilk adım olabilir. Bir tane eklemek için diğer adımları kaldırın.",
@@ -14048,17 +14062,6 @@
       "empty": "Henüz sorgu yok",
       "noMatch": "Arama veya yıldızlı filtresiyle eşleşen sorgu yok",
       "loadMore": "Daha fazla yükle"
-    },
-    "labelGroups": {
-      "addGroup": "+ OR grubu",
-      "addGroupTooltip": "Bir filtre grubu ekleyin; bir seri, gruplardan herhangi biriyle eşleştiğinde eşleşir.",
-      "addToGroup": "Bu gruba filtre ekle",
-      "anyOf": "herhangi biri",
-      "andAnyOf": "ve herhangi biri",
-      "or": "veya",
-      "not": "değil",
-      "notTooltip": "Bu grubun tamamının eşleşmediği serilerle eşleş",
-      "tooManyBranches": "Bu filtreler {count} ayrı seçiciye genişler; en fazla {max} tanesi çalıştırılabilir. Değerleri tek bir regex filtresinde birleştirin veya bir grubu kaldırın."
     }
   },
   "settings": {
@@ -21717,7 +21720,8 @@
         "longtask": "Uzun Görev",
         "view": "Görüntüle",
         "action": "İşlem",
-        "resource": "Kaynak"
+        "resource": "Kaynak",
+        "failedrequest": "Başarısız istek"
       },
       "subscriptionPlan": {
         "payasyougo": "Kullandıkça Öde",
@@ -22731,6 +22735,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "Metriği belirtilen süre önceki haliyle okur",
       "rateDoc": "Belirtilen zaman aralığında saniye başına ortalama artış hızını hesaplar",
       "irateDoc": "Son iki veri noktasına dayanarak saniye başına anlık artış hızını hesaplar",
       "increaseDoc": "Belirtilen zaman aralığındaki toplam artışı hesaplar",
@@ -22801,8 +22806,7 @@
       "moduloName": "Mod",
       "multiplyByName": "Çarpma",
       "divideByName": "Bölme",
-      "exponentName": "Üs",
-      "offsetDoc": "Metriği belirtilen süre önceki haliyle okur"
+      "exponentName": "Üs"
     }
   },
   "passwordPolicy": {
