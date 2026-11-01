@@ -15142,6 +15142,7 @@
       "noStreamsDetected": "Akış algılanmadı. Hizmet grafiği metriklerinin akış_adı etiketleri içerdiğinden emin olun.",
       "borderColor": "Kenarlık Rengi",
       "borderColorMetric": "Hatalar",
+      "dashedRingInferred": "Kesikli halka: çıkarsanan bağımlılık",
       "nodeSize": "Düğüm Boyutu",
       "nodeSizeMetric": "İstekler",
       "sizeLow": "Düşük",

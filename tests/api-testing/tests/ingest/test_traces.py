@@ -1,6 +1,8 @@
 import json
 import time
 
+import pytest
+
 
 def valid_trace():
     start_time = int(time.time()*1000000000)
@@ -167,6 +169,8 @@ def test_e2e_invalid_trace_ingestion(create_session, base_url):
     ), f"Invalid trace json response expected to contain incorrect field, but got {content}"
 
 
+# Compares trace counts on the shared default stream, which other files write to under xdist.
+@pytest.mark.serial
 def test_e2e_trace_invalid_ids(create_session, base_url):
     """Traces links with invalid ids should get be skipped."""
 

@@ -15142,6 +15142,7 @@
       "noStreamsDetected": "ストリームは検出されませんでした。サービスグラフのメトリクスに stream_name ラベルが含まれていることを確認してください。",
       "borderColor": "ボーダーカラー",
       "borderColorMetric": "エラー",
+      "dashedRingInferred": "破線の輪：推定された依存関係",
       "nodeSize": "ノードサイズ",
       "nodeSizeMetric": "リクエスト",
       "sizeLow": "低い",

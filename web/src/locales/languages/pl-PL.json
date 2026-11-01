@@ -15142,6 +15142,7 @@
       "noStreamsDetected": "Nie wykryto strumieni. Upewnij się, że metryki grafu usług zawierają etykiety stream_name.",
       "borderColor": "Kolor obramowania",
       "borderColorMetric": "Błędy",
+      "dashedRingInferred": "Przerywany pierścień: wywnioskowana zależność",
       "nodeSize": "Rozmiar węzła",
       "nodeSizeMetric": "Żądania",
       "sizeLow": "Niski",

@@ -15142,6 +15142,7 @@
       "noStreamsDetected": "Không phát hiện stream nào. Đảm bảo chỉ số đồ thị dịch vụ bao gồm nhãn stream_name.",
       "borderColor": "Màu viền",
       "borderColorMetric": "Lỗi",
+      "dashedRingInferred": "Vòng nét đứt: phụ thuộc được suy ra",
       "nodeSize": "Kích thước nút",
       "nodeSizeMetric": "Yêu cầu",
       "sizeLow": "Thấp",

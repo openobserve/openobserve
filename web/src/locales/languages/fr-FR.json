@@ -15142,6 +15142,7 @@
       "noStreamsDetected": "Aucun flux n'a été détecté. Assurez-vous que les métriques du graphique de service incluent les libellés stream_name.",
       "borderColor": "Couleur de la bordure",
       "borderColorMetric": "Erreurs",
+      "dashedRingInferred": "Anneau en pointillés : dépendance déduite",
       "nodeSize": "Taille du nœud",
       "nodeSizeMetric": "Demandes",
       "sizeLow": "Faible",
