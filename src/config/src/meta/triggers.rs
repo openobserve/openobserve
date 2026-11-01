@@ -58,13 +58,18 @@ pub enum TriggerModule {
     AlertCalibration,
     /// Fleet rollout engine: one job per rollout with work left, region-local.
     FleetRollout,
+    /// Slack sync of one on-call page, keyed by its response id; region-local (SY-8).
+    OncallSlackSync,
 }
 
 impl TriggerModule {
     /// Exhaustive, so a new module has to choose; keep-alive must renew the claim it completes by.
     pub fn completes_by_claim(&self) -> bool {
         match self {
-            Self::CompositeAlert | Self::AlertCalibration | Self::FleetRollout => true,
+            Self::CompositeAlert
+            | Self::AlertCalibration
+            | Self::FleetRollout
+            | Self::OncallSlackSync => true,
             Self::Report
             | Self::Alert
             | Self::DerivedStream
@@ -93,6 +98,7 @@ impl std::fmt::Display for TriggerModule {
             Self::OncallEscalation => write!(f, "oncall_escalation"),
             Self::AlertCalibration => write!(f, "alert_calibration"),
             Self::FleetRollout => write!(f, "fleet_rollout"),
+            Self::OncallSlackSync => write!(f, "oncall_slack_sync"),
         }
     }
 }
@@ -246,6 +252,26 @@ impl ScheduledTriggerData {
     }
 }
 
+/// The `data` of an `OncallSlackSync` row: the retry state of its passes (SY-6).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OncallSlackSyncData {
+    /// Failed passes in a row.
+    #[serde(default)]
+    pub attempt: u32,
+    /// No pass before this time, in microseconds; 0 for none.
+    #[serde(default)]
+    pub not_before: i64,
+}
+
+/// How a sync pass ends its row when no arm came in during it (SY-2.3).
+#[derive(Debug, Clone, PartialEq)]
+pub struct SlackSyncFinish {
+    pub status: TriggerStatus,
+    pub next_run_at: i64,
+    /// Stored as the row's `data`; its `not_before` also bounds an arm made during the pass.
+    pub data: OncallSlackSyncData,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -301,6 +327,12 @@ mod tests {
         assert_eq!(TriggerModule::AlertCalibration as i32, 10);
         assert_eq!(TriggerModule::FleetRollout as i32, 11);
         assert_eq!(TriggerModule::FleetRollout.to_string(), "fleet_rollout");
+        // SY-8: appended after FleetRollout; the stored value is pinned.
+        assert_eq!(TriggerModule::OncallSlackSync as i32, 12);
+        assert_eq!(
+            TriggerModule::OncallSlackSync.to_string(),
+            "oncall_slack_sync"
+        );
     }
 
     #[test]

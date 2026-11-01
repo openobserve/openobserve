@@ -65,38 +65,43 @@ fn domain_mappings_for_org(org_id: String) -> BoxFut<anyhow::Result<Vec<String>>
     Box::pin(async move { mapped_domains(&org_id).await })
 }
 
+/// The domains whose login rules send users to `org_id`: rules set by `org_id` or its billing
+/// payer, on a domain that owner proved, as login reads them (`process_domain_org_mapping`).
 #[cfg(feature = "cloud")]
 async fn mapped_domains(org_id: &str) -> anyhow::Result<Vec<String>> {
-    // A blocked org's domain is not passed on to the next mapping (`process_domain_org_mapping`).
-    if db::org_status::is_blocked(org_id) {
+    use o2_enterprise::enterprise::cloud::billing_group;
+    use openobserve_core::org_domain_ownership::get_cached_org_for_domain;
+
+    // Login skips a target org that is inactive or blocked.
+    if !db::org_status::read_active(org_id).await? {
         return Ok(vec![]);
     }
-    let settings = db::organization::get_org_setting(org_id).await?;
-    let mappings = settings
-        .domain_org_mappings
-        .iter()
-        .map(|m| (m.domain.as_str(), m.org_id.as_str()));
-    Ok(first_match_domains(mappings, org_id))
+    let mut owners = vec![org_id.to_string()];
+    if let Some(membership) = billing_group::list_billing_membership_of(org_id).await? {
+        owners.push(membership.payer_org_id);
+    }
+    let mut domains: Vec<String> = Vec::new();
+    for owner in owners {
+        let settings = db::organization::get_org_setting(&owner).await?;
+        for rule in settings
+            .domain_org_mappings
+            .iter()
+            .filter(|m| m.org_id == org_id)
+        {
+            let domain = rule.domain.to_lowercase();
+            let proved =
+                get_cached_org_for_domain(&domain).await.as_deref() == Some(owner.as_str());
+            if proved && !domains.contains(&domain) {
+                domains.push(domain);
+            }
+        }
+    }
+    Ok(domains)
 }
 
 #[cfg(not(feature = "cloud"))]
 async fn mapped_domains(_org_id: &str) -> anyhow::Result<Vec<String>> {
     Ok(vec![])
-}
-
-/// Login uses the first mapping per domain, so later ones for that domain never apply.
-#[cfg(any(feature = "cloud", test))]
-fn first_match_domains<'a>(
-    mappings: impl Iterator<Item = (&'a str, &'a str)>,
-    org_id: &str,
-) -> Vec<String> {
-    let mut seen = std::collections::HashSet::new();
-    mappings
-        .filter_map(|(domain, mapped_org)| {
-            let domain = domain.to_lowercase();
-            (seen.insert(domain.clone()) && mapped_org == org_id).then_some(domain)
-        })
-        .collect()
 }
 
 fn create_webhook_destination(d: WebhookDestination) -> BoxFut<anyhow::Result<CreatedDestination>> {
@@ -303,27 +308,6 @@ mod tests {
             x_unit: x_unit.to_string(),
             series,
         }
-    }
-
-    #[test]
-    fn first_match_domains_keeps_the_first_mapping_per_domain() {
-        let mappings = [
-            ("acme.com", "acme"),
-            ("ACME.io", "acme"),
-            ("shared.com", "first"),
-            ("shared.com", "acme"),
-            ("Acme.com", "other"),
-            ("beta.com", "beta"),
-        ];
-        assert_eq!(
-            first_match_domains(mappings.into_iter(), "acme"),
-            vec!["acme.com", "acme.io"]
-        );
-        assert_eq!(
-            first_match_domains(mappings.into_iter(), "first"),
-            vec!["shared.com"]
-        );
-        assert!(first_match_domains(mappings.into_iter(), "other").is_empty());
     }
 
     #[test]

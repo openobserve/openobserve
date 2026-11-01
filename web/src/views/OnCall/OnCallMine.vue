@@ -77,6 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Phone first: until it is verified, nothing below can reach the reader. -->
       <OnCallPhoneCard ref="phoneRef" />
 
+      <OnCallSlackCard v-if="slackOffered" ref="slackRef" />
+
       <div
         class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-2 border px-4 py-3"
         data-test="oncall-mine-teams"
@@ -176,6 +178,7 @@ import { useStore } from "vuex";
 
 import OnCallMyDeliveries from "@/components/oncall/OnCallMyDeliveries.vue";
 import OnCallPhoneCard from "@/components/oncall/OnCallPhoneCard.vue";
+import OnCallSlackCard from "@/components/oncall/OnCallSlackCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
@@ -189,6 +192,7 @@ import { myOnCallQuery } from "@/services/oncall.queries";
 import type { MyOnCall } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { isOnCallUnavailable } from "@/utils/oncall";
+import { readSlackOrgConfig } from "@/utils/slackSettings";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -278,12 +282,21 @@ function openTeam(teamId: string) {
 const refreshing = ref(false);
 const deliveriesRef = ref<{ refresh: () => Promise<void> } | null>(null);
 const phoneRef = ref<{ refresh: () => Promise<void> } | null>(null);
+const slackRef = ref<{ refresh: () => Promise<void> } | null>(null);
+
+// Members hear nothing about Slack while it is off, as in the policy editor.
+const slackOffered = computed(() => readSlackOrgConfig(store.state.zoConfig).enabled);
 
 /// Named, so the click event cannot land on `force`.
 async function refreshPage() {
   refreshing.value = true;
   try {
-    await Promise.all([fetchMine(true), deliveriesRef.value?.refresh(), phoneRef.value?.refresh()]);
+    await Promise.all([
+      fetchMine(true),
+      deliveriesRef.value?.refresh(),
+      phoneRef.value?.refresh(),
+      slackRef.value?.refresh(),
+    ]);
   } finally {
     refreshing.value = false;
   }

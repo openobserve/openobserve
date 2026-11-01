@@ -88,13 +88,14 @@ const router = useRouter();
 const store = useStore();
 
 /// The person channels in the order the chips read; webhook is the team's room, not a person's.
-const PERSON_CHANNELS: Channel[] = ["email", "sms", "voice"];
+const PERSON_CHANNELS: Channel[] = ["email", "slack", "sms", "voice"];
 const PHONE_CHANNELS = new Set<Channel>(["sms", "voice"]);
 
 /// A closed map rather than a built key: an unknown channel must fail to
 /// compile, not render a missing glyph next to a person's name.
 const CHANNEL_ICON: Record<Channel, IconName> = {
   email: "mail",
+  slack: "forum",
   sms: "chat",
   voice: "smartphone",
   webhook: "webhook",
@@ -104,6 +105,8 @@ function channelLabel(channel: Channel): I18nText {
   switch (channel) {
     case "email":
       return t("oncall.channel_email");
+    case "slack":
+      return t("oncall.channel_slack");
     case "sms":
       return t("oncall.channel_sms");
     case "voice":
@@ -157,9 +160,16 @@ function chipOf(c: ChannelReadiness): Chip {
     channel: c.channel,
     icon: CHANNEL_ICON[c.channel],
     tone,
-    tip: link ? t("oncall.channelAddPhone", { reason: tip }) : tip,
+    tip: link ? t("oncall.channelAddPhone", { reason: tip }) : ownFixTip(c, tip),
     link,
   };
+}
+
+/// DM-7: a person links their own Slack account from Slack, so only their own "not linked" chip says how. [pure]
+function ownFixTip(c: ChannelReadiness, reason: I18nText): I18nText {
+  return props.own && c.channel === "slack" && c.blocked_because === "not linked"
+    ? t("oncall.channelLinkSlack", { reason })
+    : reason;
 }
 
 /// One word for the worst blocked state; a cause no word names (no provider, failing sends) stays quiet rather than wrong.

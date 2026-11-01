@@ -702,6 +702,7 @@ fn resolve_module_configs(
             lease_timeout_secs: None,
         },
         oncall_module_config(cfg, base),
+        slack_sync_module_config(cfg, base),
         ModuleSchedulerConfig {
             module: TriggerModule::QueryRecommendations,
             concurrency: pick_concurrency(cfg.limit.scheduler_query_reco_concurrency),
@@ -732,7 +733,10 @@ fn always_on_module_configs(
     base: &SchedulerConfig,
 ) -> Vec<ModuleSchedulerConfig> {
     if oncall_lane_wanted() {
-        vec![oncall_module_config(cfg, base)]
+        vec![
+            oncall_module_config(cfg, base),
+            slack_sync_module_config(cfg, base),
+        ]
     } else {
         // Nothing pushes an escalation trigger when the feature is off, so a puller for it would
         // be a query per interval per node against rows that cannot exist.
@@ -782,6 +786,16 @@ fn oncall_module_config(cfg: &config::Config, base: &SchedulerConfig) -> ModuleS
             secs if secs > 0 => Some(secs),
             _ => None,
         },
+    }
+}
+
+/// SY-8, D43: the Slack sync lane, its own, at the escalation lane's budget and cadence but
+/// with the standard lease, so keep-alive renews a pass that waits on Slack before it lapses.
+fn slack_sync_module_config(cfg: &config::Config, base: &SchedulerConfig) -> ModuleSchedulerConfig {
+    ModuleSchedulerConfig {
+        module: TriggerModule::OncallSlackSync,
+        lease_timeout_secs: None,
+        ..oncall_module_config(cfg, base)
     }
 }
 
@@ -952,6 +966,8 @@ mod tests {
     #[test]
     fn claim_fenced_modules_keep_alive_only_their_own_claim() {
         assert!(TriggerModule::FleetRollout.completes_by_claim());
+        // D43: the sync pass ends its row by its own fenced finish.
+        assert!(TriggerModule::OncallSlackSync.completes_by_claim());
         assert!(TriggerModule::CompositeAlert.completes_by_claim());
         assert!(!TriggerModule::Alert.completes_by_claim());
     }
@@ -975,6 +991,7 @@ mod tests {
             TriggerModule::OncallEscalation,
             TriggerModule::AlertCalibration,
             TriggerModule::FleetRollout,
+            TriggerModule::OncallSlackSync,
         ];
         assert_eq!(configs.len(), all.len());
         let modules: std::collections::HashSet<_> =
@@ -1279,9 +1296,58 @@ mod tests {
         if !oncall_lane_wanted() {
             assert!(always_on_module_configs(&cfg, &base).is_empty());
         } else {
-            let lanes = always_on_module_configs(&cfg, &base);
-            assert_eq!(lanes.len(), 1, "on-call gets a lane, and only on-call");
-            assert_eq!(lanes[0].module, TriggerModule::OncallEscalation);
+            let modules: Vec<_> = always_on_module_configs(&cfg, &base)
+                .into_iter()
+                .map(|l| l.module)
+                .collect();
+            assert_eq!(
+                modules,
+                [
+                    TriggerModule::OncallEscalation,
+                    TriggerModule::OncallSlackSync
+                ],
+                "on-call gets its lanes, and only on-call"
+            );
+        }
+    }
+
+    /// SY-8, D43: the Slack sync lane has the escalation lane's budget and cadence in both puller
+    /// modes, but the standard lease (no escalation timeout), so keep-alive renews it in time.
+    #[test]
+    fn test_slack_sync_lane_takes_the_oncall_cadence_and_the_standard_lease() {
+        let base = make_config();
+        for oncall_interval in [7, 0] {
+            let mut cfg = config::Config::default();
+            cfg.limit.scheduler_oncall_interval = oncall_interval;
+            let escalation = oncall_module_config(&cfg, &base);
+            let sync = slack_sync_module_config(&cfg, &base);
+            assert_eq!(sync.module, TriggerModule::OncallSlackSync);
+            assert_eq!(
+                (
+                    sync.concurrency,
+                    sync.poll_interval_secs,
+                    sync.lease_timeout_secs
+                ),
+                (escalation.concurrency, escalation.poll_interval_secs, None),
+                "ZO_SCHEDULER_ONCALL_INTERVAL={oncall_interval}"
+            );
+            let per_module = resolve_module_configs(&cfg, &base);
+            assert_eq!(
+                per_module
+                    .iter()
+                    .filter(|c| c.module == TriggerModule::OncallSlackSync)
+                    .count(),
+                1,
+                "per-module pullers"
+            );
+            if oncall_lane_wanted() {
+                assert!(
+                    always_on_module_configs(&cfg, &base)
+                        .iter()
+                        .any(|c| c.module == TriggerModule::OncallSlackSync),
+                    "always-on lanes"
+                );
+            }
         }
     }
 

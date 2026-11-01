@@ -961,7 +961,38 @@ pub async fn handle_triggers(
             super::calibration::handle_triggers(trace_id, trigger).await
         }
         db::scheduler::TriggerModule::FleetRollout => handle_fleet_rollout_triggers(trigger).await,
+        db::scheduler::TriggerModule::OncallSlackSync => {
+            handle_oncall_slack_sync_triggers(trigger).await
+        }
     }
+}
+
+/// Runs one Slack sync pass of the page; the pass ends its own row (C11).
+#[cfg(feature = "enterprise")]
+async fn handle_oncall_slack_sync_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    o2_enterprise::enterprise::oncall::chat::pass::run(&trigger).await
+}
+
+/// Completes the page's sync row with no Slack call, fenced by this claim: this build has no
+/// sync pass. Region-local: `infra::scheduler` never replicates.
+#[cfg(not(feature = "enterprise"))]
+async fn handle_oncall_slack_sync_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    let finish = config::meta::triggers::SlackSyncFinish {
+        status: db::scheduler::TriggerStatus::Completed,
+        next_run_at: trigger.next_run_at,
+        data: Default::default(),
+    };
+    if !infra::scheduler::finish_slack_sync(&trigger, &finish).await? {
+        log::warn!(
+            "[ONCALL] Slack sync of {} lost its claim before it finished",
+            trigger.module_key
+        );
+    }
+    Ok(())
 }
 
 /// Region-local (D21): only `infra::scheduler`, which never replicates to other regions.

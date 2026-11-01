@@ -56,13 +56,16 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 
 pub(crate) async fn process_msg(msg: OncallMessage) -> Result<()> {
     match msg {
-        OncallMessage::TeamPut { team } => {
+        OncallMessage::TeamPut {
+            team,
+            slack_room_sent,
+        } => {
             log::debug!(
                 "[SUPER_CLUSTER:oncall] Put team org={} id={}",
                 team.org_id,
                 team.id
             );
-            table::super_cluster_oncall::put_team(&team).await?;
+            table::super_cluster_oncall::put_team(&team, slack_room_sent).await?;
         }
         OncallMessage::TeamDelete { org_id, team_id } => {
             log::debug!("[SUPER_CLUSTER:oncall] Delete team org={org_id} id={team_id}");

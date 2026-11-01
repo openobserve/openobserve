@@ -204,21 +204,39 @@ pub async fn check_save(
             &destinations,
             &rooms,
         ) {
+            let through = webhook.unwrap_or_else(|| "the OpenObserve app".to_string());
             let mut r = refusal_of(
                 400,
                 "oncall_room_unconfirmed",
                 format!(
-                    "On-call pages for team {team} also post to #{} through {webhook}; confirm \
+                    "On-call pages for team {team} also post to #{} through {through}; confirm \
                      that alerts here post separately",
                     target.channel_name
                 ),
             );
             r.team = Some(team);
-            r.destination = Some(webhook);
+            r.destination = Some(through);
             return Err(DestinationError::SlackApp(r));
         }
     }
     Ok(())
+}
+
+/// DM-8: an older node cannot read a Slack step and would page the whole team by email, so a
+/// policy ticking Slack waits until every node in `nodes` runs this version. The policy route
+/// passes this region's cached Online nodes, so an offline node or another region's is not
+/// seen; an accepted limit. [pure]
+pub fn slack_step_guard(
+    rungs: &[config::meta::oncall::PriorityRung],
+    nodes: &[Node],
+) -> Result<(), DestinationError> {
+    let ticks_slack = rungs
+        .iter()
+        .any(|r| r.channels.contains(&config::meta::oncall::Channel::Slack));
+    if !ticks_slack {
+        return Ok(());
+    }
+    version_guard(nodes)
 }
 
 /// Q8: a node on another release cannot read a Slack app row, so none is written until all match.
@@ -245,24 +263,35 @@ pub fn version_guard(nodes: &[Node]) -> Result<(), DestinationError> {
     ))
 }
 
-/// (b): an on-call team's room is this channel through a Slack webhook destination.
+/// (b): an on-call team's room is this channel, through a Slack webhook destination (its
+/// name), or as the team's native Slack room (RO-7, no name). [pure]
 pub fn oncall_room(
     target: &SlackAppTarget,
     team_id: &str,
     own_name: &str,
     destinations: &[Destination],
     rooms: &OncallRooms,
-) -> Option<(String, String)> {
+) -> Option<(String, Option<String>)> {
     let webhooks: Vec<&str> = destinations
         .iter()
         .filter(|d| d.name != own_name)
         .filter(|d| webhook_endpoint(d).is_some_and(|e| posts_to(e, team_id, &target.channel_id)))
         .map(|d| d.name.as_str())
         .collect();
-    rooms.rooms().find_map(|(team, room)| {
+    let by_webhook = rooms.rooms().find_map(|(team, room)| {
         room.iter()
             .find(|name| webhooks.contains(&name.as_str()))
-            .map(|name| (team.name.clone(), name.clone()))
+            .map(|name| (team.name.clone(), Some(name.clone())))
+    });
+    by_webhook.or_else(|| {
+        rooms
+            .teams
+            .iter()
+            .find(|t| {
+                t.slack_channel_id.as_deref() == Some(target.channel_id.as_str())
+                    && t.slack_workspace_id.as_deref() == Some(team_id)
+            })
+            .map(|t| (t.name.clone(), None))
     })
 }
 
@@ -499,6 +528,11 @@ mod tests {
             timezone: "UTC".into(),
             description: None,
             channel_destinations: Some(room.iter().map(|s| s.to_string()).collect()),
+            slack_enterprise_id: None,
+            slack_workspace_id: None,
+            slack_channel_id: None,
+            slack_channel_name: None,
+            slack_same_room_destination: None,
             created_at: 0,
             updated_at: 0,
         }
@@ -644,6 +678,75 @@ mod tests {
         let r = code(save_check(&env, &app("pay-slack", target()), Some(&previous)).await);
         assert_eq!((r.status, r.code), (400, "used_by_oncall"));
         assert!(r.message.contains("payments"), "{}", r.message);
+    }
+
+    /// RO-7: a team whose native Slack room is this channel needs the tick too.
+    #[tokio::test]
+    async fn an_oncall_teams_native_slack_room_needs_the_tick() {
+        let native = Team {
+            slack_workspace_id: Some("T0FAKE00001".into()),
+            slack_channel_id: Some("C0FAKE00001".into()),
+            ..team("t1", "payments", &[])
+        };
+        let first = FakeEnv {
+            rooms: OncallRooms {
+                teams: vec![native.clone()],
+                policies: vec![],
+            },
+            ..env()
+        };
+        let r = code(save_check(&first, &app("sre", target()), None).await);
+        assert_eq!((r.status, r.code), (400, "oncall_room_unconfirmed"));
+        // RO-7: the form's "through {destination}" reads whole for a native room.
+        assert_eq!(
+            (r.team.as_deref(), r.destination.as_deref()),
+            (Some("payments"), Some("the OpenObserve app"))
+        );
+        let ticked = SlackAppTarget {
+            oncall_room_confirmed: true,
+            ..target()
+        };
+        save_check(&first, &app("sre", ticked), None).await.unwrap();
+        let elsewhere = Team {
+            slack_workspace_id: Some("T0OTHER0001".into()),
+            ..native
+        };
+        let other = FakeEnv {
+            rooms: OncallRooms {
+                teams: vec![elsewhere],
+                policies: vec![],
+            },
+            ..env()
+        };
+        save_check(&other, &app("sre", target()), None)
+            .await
+            .unwrap();
+    }
+
+    /// DM-8: a policy ticking Slack is refused while a node runs another version; one without
+    /// Slack, or a cluster on one version, saves.
+    #[test]
+    fn a_slack_step_waits_for_every_node() {
+        use config::meta::{
+            alerts::priority::AlertPriority,
+            oncall::{Channel, PriorityRung},
+        };
+        let rung = |channels: &[Channel]| PriorityRung {
+            priority: AlertPriority::P2,
+            steps: vec![],
+            channels: channels.to_vec(),
+        };
+        let old = [node("node-b", "v0.80.0-fake")];
+        let slack = [rung(&[Channel::Email, Channel::Slack])];
+        let r = code(slack_step_guard(&slack, &old));
+        assert_eq!((r.status, r.code), (409, "version_mismatch"));
+        assert!(
+            r.message.starts_with("Upgrade every node first"),
+            "{}",
+            r.message
+        );
+        slack_step_guard(&[rung(&[Channel::Email])], &old).unwrap();
+        slack_step_guard(&slack, &[node("node-a", config::VERSION)]).unwrap();
     }
 
     #[tokio::test]

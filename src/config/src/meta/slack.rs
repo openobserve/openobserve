@@ -100,6 +100,8 @@ pub enum SetFrom {
     Settings,
     Install,
     Destination,
+    /// `/o2 oncall here` filled an empty default (D37).
+    Oncall,
 }
 
 /// The `slack_disabled_reason` value of the org config response.

@@ -361,6 +361,7 @@
               :team-id="teamId"
               :policy="policy"
               :rotations="teamRotations"
+              :team-name="team?.name ?? ''"
               @saved="onPolicySaved"
               @policy-written="fetchAll()"
               @open-members="activeTab = 'members'"
