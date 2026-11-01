@@ -6,6 +6,7 @@ export { insertAfterCallout } from "./comments.mjs";
 
 const MAX_FALLBACK_FINDINGS = 15;
 const NO_ISSUES_RE = /<no-issues(?:\s[^<>]*)?>[\s\S]*?<\/no-issues>|<no-issues(?:\s[^<>]*)?\/>/;
+const FINDING_BLOCK_RE = /<finding>([\s\S]*?)<\/finding>/g;
 const SEVERITY_GLYPH = { p0: "🔴", p1: "🟠", p2: "🟡", p3: "🔵" };
 const SEVERITY_SECTION = {
   p0: "#### 🔴 P0 · Blockers",
@@ -50,10 +51,7 @@ export function mapStrings(value, clean) {
 
 export function parseFindings(xmlText) {
   const findings = [];
-  const re = /<finding>([\s\S]*?)<\/finding>/g;
-  let match;
-  while ((match = re.exec(xmlText)) !== null) {
-    const block = match[1];
+  for (const [, block] of String(xmlText ?? "").matchAll(FINDING_BLOCK_RE)) {
     const getTag = (tag) => {
       const m = new RegExp(`<${tag}>(.*?)<\\/${tag}>`, "s").exec(block);
       return m ? m[1].trim() : "";
@@ -74,9 +72,17 @@ export function parseFindings(xmlText) {
   return findings;
 }
 
-// "No findings" must be stated in full: empty, free-form or cut-off output is a reviewer that said nothing, not one that found nothing.
+// Scanned outside the finished blocks, so a `<finding>` quoted inside one is not an opener; like an unclosed inline block, an opener left over means text was lost.
+function outputCutOff(text) {
+  const rest = text.replace(FINDING_BLOCK_RE, "");
+  return /<finding\b/.test(rest) || rest.lastIndexOf("<findings") > rest.lastIndexOf("</findings>");
+}
+
+// "No findings" must be stated in full: empty, free-form or cut-off output is a reviewer that said nothing, not one that found nothing, and an unread block could be the blocker.
 export function reviewerReported(text, findings) {
-  return findings.length > 0 || NO_ISSUES_RE.test(String(text ?? ""));
+  const output = String(text ?? "");
+  if (outputCutOff(output) || (output.match(FINDING_BLOCK_RE)?.length ?? 0) !== findings.length) return false;
+  return findings.length > 0 || NO_ISSUES_RE.test(output);
 }
 
 // Same shape as an entry of the coordinator's inline block.

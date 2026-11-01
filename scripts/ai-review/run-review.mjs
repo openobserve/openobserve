@@ -31,6 +31,7 @@ import {
   REVIEW_HEADING,
   REVIEW_TITLE,
   bodyAtPassLimit,
+  bodyAtReviewedHead,
   bodyAtUnreviewedHead,
   claimedReviewBody,
   finishReviewBody,
@@ -141,7 +142,7 @@ const REVIEW_PAIR_CLEAR = process.env.REVIEW_PAIR_CLEAR === "true";
 const REVIEW_ARTIFACT_DIR = process.env.REVIEW_ARTIFACT_DIR || "";
 
 const MAX_DIFF_TOKENS = 150_000;
-const UNPARSEABLE_OUTPUT = "output held neither findings nor a no-issues marker";
+const UNPARSEABLE_OUTPUT = "output was cut off or held neither findings nor a no-issues marker";
 const AGENT_TIMEOUT_MS = 20 * 60 * 1000;
 const OVERALL_TIMEOUT_MS = 40 * 60 * 1000;
 // Kept free at the end of the run for rendering and posting the comment.
@@ -935,7 +936,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     const findings = parseFindings(text);
     const parsed = reviewerReported(text, findings);
     if (!parsed) {
-      console.log(`[${isoNow()}] ${agentDef.name}: output held neither findings nor a no-issues marker`);
+      console.log(`[${isoNow()}] ${agentDef.name}: ${UNPARSEABLE_OUTPUT}`);
       console.log(`[${isoNow()}] ${agentDef.name} raw output (first 500 chars): ${text.slice(0, 500)}`);
     } else {
       console.log(`[${isoNow()}] ${agentDef.name}: ${findings.length} findings`);
@@ -1126,6 +1127,11 @@ function noteUnreviewedHead(prNumber, comment, key) {
   if (comment) noteOnComment(prNumber, comment, bodyAtUnreviewedHead(comment.body, key));
 }
 
+// Costs no pass and calls no model: the commit was reviewed, only a run that stopped on another head left its line behind.
+function noteReviewedHead(prNumber, comment) {
+  noteOnComment(prNumber, comment, bodyAtReviewedHead(comment.body, REVIEW_MAX_PASSES));
+}
+
 function noteSkippedPush(prNumber, comment, key) {
   noteOnComment(prNumber, comment, bodyAtPassLimit(comment.body, REVIEW_MAX_PASSES, key));
 }
@@ -1309,6 +1315,7 @@ async function main() {
     if (skipReason) {
       console.log(`[${isoNow()}] PR #${prNumber} skipped (${skipReason}): ${headKey || "no head"}, ${passesDone} review(s) so far. Dispatch the workflow with ignore_pass_limit to review again.`);
       if (skipReason === "pass_limit_reached") noteSkippedPush(prNumber, existingComment, headKey);
+      else noteReviewedHead(prNumber, existingComment);
       outcome = "skipped";
       TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": skipReason });
       return;
@@ -1574,6 +1581,11 @@ async function main() {
       "review.merge_confidence": confidence.level,
     });
 
+    // Ahead of the gate, which must judge what gets posted: the sanitizer can discard the callout the model led with.
+    const sanitizeSpan = TRACE.startSpan("ai_review.sanitize", {}, rootSpan);
+    const sanitizedReview = sanitizeForPosting(finalReview);
+    TRACE.endSpan(sanitizeSpan, { "review.sanitized_length": sanitizedReview.length });
+
     // Decided before the comment is written so the line can state what really happened; a failed approval never fails the job.
     const autoApprove = gate.conclude({
       diff: rawDiffFacts,
@@ -1587,7 +1599,7 @@ async function main() {
       reviewerFindingCount: totalFindings,
       findingsKnown: Boolean(coordinatorResult?.findingsKnown),
       coordinatorFallback: Boolean(coordinatorResult?.fallback),
-      decisionApproved: isApprovedReview(finalReview),
+      decisionApproved: isApprovedReview(sanitizedReview),
       reviewers: reviewerFacts(results),
       paired: Boolean(PAIRED.repo || PAIRED.prNumber || PAIRED.head),
       pairClear: REVIEW_PAIR_CLEAR,
@@ -1606,15 +1618,12 @@ async function main() {
     // Written now so a failed post still leaves the findings behind; rewritten with the inline outcome below.
     writeFindingsArtifact(prNumber, tier, results, coordinatorResult, null, confidence, autoApprove);
 
-    // Sanitize and validate before posting
-    const sanitizeSpan = TRACE.startSpan("ai_review.sanitize", {}, rootSpan);
-    finalReview = sanitizeForPosting(finalReview);
     // A run where no reviewer finished reviewed nothing, so it does not use up a pass.
     const reviewed = completedAgents.length > 0;
     const passes = reviewed ? passesDone + 1 : passesDone;
     if (reviewed && !diffPinned) console.warn(`[${isoNow()}] The reviewed diff is not tied to ${headKey}, so the commit stays reviewable`);
-    finalReview = finishReviewBody(finalReview, { key: headKey, passes, maxPasses: REVIEW_MAX_PASSES, reviewed: reviewed && diffPinned, confidence, gateLine: autoApproveLine(autoApprove) });
-    TRACE.endSpan(sanitizeSpan, { "review.final_length": finalReview.length });
+    finalReview = finishReviewBody(sanitizedReview, { key: headKey, passes, maxPasses: REVIEW_MAX_PASSES, reviewed: reviewed && diffPinned, confidence, gateLine: autoApproveLine(autoApprove) });
+    TRACE.setSpanAttributes(rootSpan, { "review.final_length": finalReview.length });
     console.log(`[${isoNow()}] Final review length: ${finalReview.length} chars`);
 
     // 8. Post or update review
