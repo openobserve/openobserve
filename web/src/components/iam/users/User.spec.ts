@@ -847,34 +847,37 @@ describe("User Component", () => {
 
     it("does not reopen the dialog on repaint after a manual edit", async () => {
       vi.useFakeTimers();
-      const org = store.state.selectedOrganization.identifier;
-      await router.replace({
-        query: {
-          ...router.currentRoute.value.query,
-          action: "update",
-          email: "test@example.com",
-        },
-      });
-      queryClient.setQueryData(userKeys.users(org), [
-        {
-          email: "test@example.com",
-          first_name: "Test",
-          last_name: "User",
-          role: "viewer",
-          is_external: false,
-        },
-      ]);
-      wrapper.vm.addUser({ row: { email: "test@example.com", role: "viewer" } }, true);
-      await vi.advanceTimersByTimeAsync(150);
-      expect(wrapper.vm.showAddUserDialog).toBe(true);
+      try {
+        const org = store.state.selectedOrganization.identifier;
+        await router.replace({
+          query: {
+            ...router.currentRoute.value.query,
+            action: "update",
+            email: "test@example.com",
+          },
+        });
+        queryClient.setQueryData(userKeys.users(org), [
+          {
+            email: "test@example.com",
+            first_name: "Test",
+            last_name: "User",
+            role: "viewer",
+            is_external: false,
+          },
+        ]);
+        wrapper.vm.addUser({ row: { email: "test@example.com", role: "viewer" } }, true);
+        await vi.advanceTimersByTimeAsync(150);
+        expect(wrapper.vm.showAddUserDialog).toBe(true);
 
-      // Save closes the dialog (as addMember does); the repaint while ?email=
-      // lingers must not reopen it.
-      wrapper.vm.showAddUserDialog = false;
-      await wrapper.vm.getOrgMembers(true);
-      await vi.advanceTimersByTimeAsync(200);
-      expect(wrapper.vm.showAddUserDialog).toBe(false);
-      vi.useRealTimers();
+        // Save closes the dialog; a repaint while ?email= lingers must not reopen it.
+        wrapper.vm.showAddUserDialog = false;
+        await wrapper.vm.getOrgMembers(true);
+        await vi.advanceTimersByTimeAsync(200);
+        expect(wrapper.vm.showAddUserDialog).toBe(false);
+      } finally {
+        vi.useRealTimers();
+        await router.replace({ query: {} });
+      }
     });
   });
 
