@@ -279,6 +279,14 @@ const emitWithinCap = (labels: PromqlLabelMatcher[]) => {
   emit("update:labels", labels);
 };
 
+// A new list, such as another query tab's, was never refused.
+watch(
+  () => props.labels,
+  () => {
+    refusedCount.value = 0;
+  },
+);
+
 const sections = computed(() => {
   const items = props.labels.map((label, index) => ({ label, index }));
   const base = items.filter(({ label }) => (label.group ?? 0) <= 0);

@@ -548,6 +548,26 @@ describe("LabelFilterEditor", () => {
       expect(wrapper.emitted("update:labels")).toBeUndefined();
     });
 
+    it("drops a refused edit's banner when another query's labels arrive", async () => {
+      const labels = Array.from({ length: 16 }, (_, i) => ({
+        label: `l${i}`,
+        op: "=",
+        value: "v",
+        group: 1,
+        negate: true,
+      }));
+      wrapper = createWrapper({ labels });
+      await wrapper.find('[data-test="promql-labelfilter-group-add-1"]').trigger("click");
+      expect(wrapper.find('[data-test="promql-labelfilter-too-many-branches"]').exists()).toBe(
+        true,
+      );
+
+      await wrapper.setProps({ labels: [{ label: "job", op: "=", value: "api" }] });
+      expect(wrapper.find('[data-test="promql-labelfilter-too-many-branches"]').exists()).toBe(
+        false,
+      );
+    });
+
     it("shows no group chrome for a plain AND list", () => {
       wrapper = createWrapper();
       expect(wrapper.find('[data-test^="promql-labelfilter-group-"]').exists()).toBe(false);
