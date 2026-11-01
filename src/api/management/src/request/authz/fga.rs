@@ -798,6 +798,7 @@ pub async fn get_groups_for_user(Path(_path): Path<(String, String)>) -> Respons
     request_body(content = inline(UserGroup), description = "UserGroup", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid group name or user id", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -876,6 +877,7 @@ pub async fn create_group(
     request_body(content = inline(UserGroupRequest), description = "UserGroupRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid group name or user id", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -884,6 +886,19 @@ pub async fn update_group(
     Json(user_group): Json<UserGroupRequest>,
 ) -> Response {
     let user_grp = user_group;
+
+    if o2_openfga::authorizer::org_scoped_object("group", &org_id, &group_name).is_none() {
+        return MetaHttpResponse::bad_request("Invalid group name");
+    }
+    if !user_grp
+        .add_users
+        .iter()
+        .chain(user_grp.remove_users.iter())
+        .flatten()
+        .all(|user| o2_openfga::authorizer::is_valid_user_id(user))
+    {
+        return MetaHttpResponse::bad_request("Invalid user id in group users");
+    }
 
     match o2_openfga::authorizer::groups::update_group(
         &org_id,
@@ -896,7 +911,8 @@ pub async fn update_group(
     .await
     {
         Ok(_) => MetaHttpResponse::ok("Group updated successfully"),
-        Err(err) => MetaHttpResponse::internal_error(err),
+        // The authorizer's error carries raw OpenFGA text, which stays in the server log.
+        Err(_) => MetaHttpResponse::internal_error("Failed to update group"),
     }
 }
 
@@ -1709,6 +1725,10 @@ mod tests {
                 extract_status_code(&resp),
                 StatusCode::INTERNAL_SERVER_ERROR
             );
+            assert_eq!(
+                response_json(resp).await["message"],
+                "Failed to update group"
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1726,6 +1746,36 @@ mod tests {
             )
             .await;
             assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn update_group_rejects_invalid_input_with_400() {
+        init_ofga_test();
+        let members = |user: &str| Some(HashSet::from([user.to_string()]));
+        for (name, add_users, remove_users) in [
+            ("test_group", members("*"), None),
+            ("test_group", members("a#b"), None),
+            ("test_group", None, members("")),
+            ("", members("user1"), None),
+        ] {
+            let group_request = UserGroupRequest {
+                add_users,
+                remove_users,
+                add_roles: None,
+                remove_roles: None,
+            };
+            let resp = update_group(
+                Path(("test_org".to_string(), name.to_string())),
+                Json(group_request),
+            )
+            .await;
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::BAD_REQUEST,
+                "{name:?}"
+            );
         }
     }
 

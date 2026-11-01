@@ -514,6 +514,9 @@ pub async fn update_user(
                     // An unreadable assignment counts as a change, so the self-update is refused.
                     && o2_openfga::authorizer::roles::get_roles_for_org_user(org_id, email)
                         .await
+                        .inspect_err(|e| {
+                            log::error!("Error reading custom roles for {email} in {org_id}: {e}")
+                        })
                         .ok()
                         .is_none_or(|existing| custom_roles_differ(&cr, &existing))
                 {
