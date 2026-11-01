@@ -10332,7 +10332,8 @@
       "stateWorking": "Answering: {title}",
       "toastReady": "Answer ready · {title}",
       "tooltip": "{product}",
-      "unavailableName": "{product}, unavailable"
+      "unavailableName": "{product}, unavailable",
+      "toastFailed": "{title} failed"
     },
     "helper": {
       "alreadyDoes": "The query already does that.",
@@ -10430,13 +10431,11 @@
       "checkStatus": "Check assistant status"
     },
     "history": {
-      "account": "Saved to your account · kept {retention}",
-      "accountNoRetention": "Saved to your account",
       "allPinned": "All 100 chats are pinned. Unpin or delete one to save new chats.",
       "clearAll": {
         "action": "Delete all chats",
         "bodyLocal": "This removes the chat saved in this browser for {org}. Pinned chats are deleted too. | This removes the {count} chats saved in this browser for {org}. Pinned chats are deleted too.",
-        "bodyServer": "This deletes them from every device and revokes {links} share links. Chats that are still answering are stopped. Pinned chats are deleted too.",
+        "bodyServer": "Deletes them from every device and revokes {links} share links. Chats still answering are stopped.",
         "confirm": "Delete {count} chat | Delete {count} chats",
         "confirmAll": "Delete all chats",
         "confirmWord": "delete",
@@ -10451,7 +10450,6 @@
       },
       "clearOnSignOut": "Delete my browser chats when I sign out",
       "clearSearch": "Clear search",
-      "current": "Open now",
       "delete": {
         "bodyLocal": "This removes the chat from this browser.",
         "bodyServer": "This deletes the chat from every device and stops any answer still running.",
@@ -10473,24 +10471,28 @@
       "downloadFailed": "Couldn't build the download",
       "downloaded": "Downloaded",
       "empty": {
-        "body": "Start one from the composer, or ask about a log row, panel or alert.",
         "title": "No chats yet"
       },
       "filter": {
-        "alert": "Alert",
-        "all": "All",
-        "editor": "Editor",
-        "incident": "Incident",
-        "label": "Show",
+        "active": "Filter · {n}",
+        "agent": "Agent",
+        "alertOrIncident": "Alert or incident",
+        "button": "Filter",
+        "clear": "Clear filters",
+        "count": "{count} chat | {count} chats",
         "pinned": "Pinned",
-        "shared": "Shared"
+        "queryEditor": "Query or function editor",
+        "remove": "Remove filter {filter}",
+        "shared": "Shared",
+        "show": "Show",
+        "started": "Started from"
       },
-      "filterEmpty": "No chats in this view",
+      "filterEmpty": "No chats match these filters",
       "group": {
         "browser": "In this browser",
         "older": "Older",
         "pinned": "Pinned",
-        "running": "In progress · {count}",
+        "running": "In progress · {count} of {cap}",
         "today": "Today",
         "week": "Previous 7 days",
         "yesterday": "Yesterday"
@@ -10520,10 +10522,9 @@
         "help": "Chats stay in this browser. Signing out keeps them unless you choose otherwise below; clearing site data removes them. An admin can turn on account history in Settings › Assistant.",
         "info": "About browser history",
         "keptOnSignOut": "Your browser chats were kept when you signed out.",
-        "title": "Saved in this browser only · {count} of {cap}"
+        "title": "Saved in this browser only"
       },
       "matchCount": "{count} chat matches | {count} chats match",
-      "new": "New chat",
       "noMatch": "No chats match “{q}”",
       "offline": "You're offline · showing chats saved in this browser",
       "open": "Open",
@@ -10547,21 +10548,19 @@
       "pruned": "Removed the oldest chat to make room: “{title}”",
       "readOnly": "You can read your chats. Starting or continuing one needs AI access.",
       "rename": "Rename",
-      "retention": "Chats are kept for {days} days",
-      "retentionDays": "{count} day | {count} days",
-      "retentionNone": "Chats are kept until you delete them",
       "rowMenu": "Actions for {title}",
       "search": "Search chats",
-      "searchPartial": "Searching the chats loaded so far · Load older to search more",
       "serverError": "Couldn't load your chats",
       "serverErrorCached": "Showing chats saved in this browser · Couldn't reach the server",
       "sharedLinks": "Shared links",
       "sharedByMe": "Shared by me",
-      "showAll": "Show all",
       "state": {
         "answering": "Answering",
-        "failed": "Answer failed",
-        "needsApproval": "Needs your approval"
+        "draft": "Draft",
+        "expired": "Expired",
+        "failed": "Failed",
+        "needsApproval": "Needs your approval",
+        "needsYou": "Needs you"
       },
       "storageBlocked": "Couldn't save to this browser. Private windows and full storage block history.",
       "title": "Chats",
@@ -10571,8 +10570,18 @@
       "unpinned": "Unpinned",
       "view": {
         "back": "Back to chat: {title}",
-        "title": "Chats"
-      }
+        "title": "All chats"
+      },
+      "deleteChat": "Delete chat",
+      "deleteDraft": "Delete draft",
+      "floatNeedsRoom": "Needs a wider screen",
+      "kept": "Kept {days} days",
+      "lastTried": "Last tried {time}",
+      "listMenu": "Chat list actions",
+      "openFloating": "Open in a floating window",
+      "serverErrorAgain": "Still couldn't load your chats",
+      "stop": "Stop",
+      "titlesOnly": "Searching titles of the chats loaded so far"
     },
     "label": {
       "acceptedAt": "Accepted {time}",
@@ -10660,10 +10669,12 @@
       "slotFree": "A chat finished. You can send now."
     },
     "notice": {
-      "decision": "{product} needs your decision",
-      "decisionMany": "{n} chats need your decision",
-      "hide": "Hide notice",
-      "region": "{product} notice"
+      "decision": "Needs you",
+      "decisionMany": "{n} chats need you",
+      "hide": "Hide",
+      "region": "{product} notice",
+      "inOrg": "in {org}",
+      "delete": "Delete {entity}"
     },
     "outcome": {
       "actions": {
@@ -10918,42 +10929,16 @@
         "investigator": "Investigator",
         "queryBuilder": "Query builder"
       },
-      "back": "Back to the chat",
-      "button": "{count} other chat: {summary} | {count} other chats: {summary}",
-      "capacity": "{active} of {cap} running chats",
       "chatInOrg": "A chat in {org}",
-      "clear": "Clear from this list",
-      "clearFinished": "Clear finished",
-      "footer": "Finished chats leave this list when you open them",
-      "heading": "Chats in progress",
-      "inOrg": "In {org}",
-      "openFull": "Open in full view",
-      "openHere": "Open here",
       "review": "Review",
-      "reviewName": "Review {title}",
-      "rowActions": "Actions for {title}",
-      "rowExpires": "{title}, {agent}, {status}, {time} left",
-      "rowMeta": "{agent} · {status}",
-      "rowName": "{title}, {agent}, {status}",
-      "state": {
-        "answering": "Answering",
-        "elsewhere": "Answering in another tab",
-        "failed": "Answer failed",
-        "needsApproval": "Needs your approval",
-        "ready": "Answer ready",
-        "reconnecting": "Reconnecting",
-        "stopped": "Stopped",
-        "working": "Answering · {elapsed}"
-      },
       "stop": "Stop",
-      "stopName": "Stop {title}",
       "summary": {
         "answering": "{count} answering",
-        "failed": "{count} failed",
-        "needs": "{count} needs you | {count} need you",
-        "ready": "{count} ready"
+        "needs": "{count} needs you | {count} need you"
       },
-      "thisChat": "This chat"
+      "state": {
+        "reconnecting": "Reconnecting"
+      }
     },
     "share": {
       "allOrgAdminOnly": "Only organization admins can see every shared chat.",
@@ -11023,7 +11008,6 @@
       },
       "scopeLabel": "Show links",
       "share": "Share",
-      "shareEllipsis": "Share…",
       "shared": "Shared",
       "sharedBy": "Shared by {name}",
       "sharedOrg": "Shared with your organization",
@@ -11055,7 +11039,10 @@
       "who": "Who can open",
       "whoContinue": "Continuing it in their own chats also needs AI access.",
       "whoOrg": "People in {org} with shared-chat access can read it.",
-      "whoPublic": "Anyone with the link can read it."
+      "whoPublic": "Anyone with the link can read it.",
+      "changedSince": "Changed since the snapshot",
+      "readersNeedAccess": "Readers need AI access to continue it.",
+      "yourOrg": "Your organization"
     },
     "shared": {
       "attachmentsHidden": "Attachments were hidden by the owner.",
@@ -11116,22 +11103,17 @@
       "leaveGuardTitle": "Unsaved changes",
       "loadFailed": "Couldn't load this chat",
       "loadingChat": "Loading your chat…",
-      "moreActions": "More actions",
       "newChat": "New chat",
       "notFound": "This chat isn't available",
-      "openInFullView": "Open in full view",
       "orgSwitchRunningBody": "{count} answer is still running in {org}. Stop it, or keep it running there? | {count} answers are still running in {org}. Stop them, or keep them running there?",
       "orgSwitchRunningTitle": "Answers are still running in {org}",
       "orgSwitchWithdrawn": "Keeping withdraws {count} waiting approval. | Keeping withdraws {count} waiting approvals.",
       "otherAccount": "Another account signed in. Reload to continue with it; this tab's chats stay with the account that signed out.",
       "placeDock": "Beside the editor",
       "placeFull": "Full view",
-      "placeFullHint": "The whole page, with your chats",
       "placeSidebar": "Sidebar",
-      "placeSidebarHint": "Beside the page; the page makes room",
       "placeWindow": "Floating window",
-      "placeWindowHint": "Over the page; drag it anywhere",
-      "placeWindowLimit": "4 floating chats is the limit. Close one first.",
+      "placeWindowLimit": "Limit is 4. Close one first.",
       "prefersWindowHint": "This page keeps its width with a floating window",
       "refresh": "Refresh",
       "reload": "Reload",
@@ -11140,7 +11122,6 @@
       "resizeHandleValue": "{width} rem",
       "sheetExpand": "Show more",
       "sheetPeek": "Show less",
-      "showIn": "Show this chat in",
       "signOutRunningBody": "{count} answer is still running. Signing out stops it. | {count} answers are still running. Signing out stops them.",
       "signOutRunningTitle": "Answers are still running",
       "signedOutElsewhere": "You signed out in another tab.",
@@ -11156,19 +11137,19 @@
       "widthLimit": "At the width limit",
       "widthNarrower": "Narrower",
       "widthNoRoom": "Not enough room at this window size",
-      "widthWider": "Wider"
+      "widthWider": "Wider",
+      "loadFailedAgain": "Still couldn't load this chat · tried {time}"
     },
     "tray": {
       "close": "Close {title}",
       "label": "Minimised chats",
       "more": "+{count}",
-      "restore": "Restore {agent} {title}, {status}",
+      "restore": "Restore {title}, {agent}, {status}",
       "status": {
-        "failed": "last answer failed",
-        "idle": "idle",
-        "needsYou": "needs you",
-        "ready": "answer ready",
-        "working": "answering"
+        "failed": "Failed",
+        "idle": "Idle",
+        "needsYou": "Needs you",
+        "working": "Answering"
       }
     },
     "window": {
@@ -11176,24 +11157,26 @@
       "cornerBottomStart": "bottom left",
       "cornerTopEnd": "top right",
       "cornerTopStart": "top left",
-      "dropSidebar": "Release to pin as the sidebar",
-      "dropTray": "Drop here to minimise to the tray",
+      "dropSidebar": "Pin as sidebar",
+      "dropTray": "Minimise",
       "gripMove": "Move {title}",
       "gripResize": "Resize {title}",
-      "group": "Window",
       "minimise": "Minimise to tray",
       "moveKeyboard": "Move with keyboard",
-      "moveModeHint": "Moving. Arrow keys move it, Shift + arrows move it further. Enter places it, Escape puts it back.",
+      "moveModeHint": "Arrows move · Shift faster · Enter place · Esc cancel",
       "moveTo": "Move to {corner}",
       "name": "{product}, {title}",
       "narrower": "Narrower",
       "resetSize": "Reset size",
       "resizeKeyboard": "Resize with keyboard",
-      "resizeModeHint": "Resizing. Arrow keys change the size. Enter keeps it, Escape puts it back.",
+      "resizeModeHint": "Arrows resize · Enter keep · Esc cancel",
       "shorter": "Shorter",
       "sizeLimit": "At the size limit",
       "taller": "Taller",
-      "wider": "Wider"
+      "wider": "Wider",
+      "position": "Position",
+      "size": "Size",
+      "stillAnswering": "{title} is still answering"
     },
     "signout": {
       "deleteLocal": "Also delete my browser chats on this device"
@@ -11248,32 +11231,34 @@
       "reviewExpires": "Review request · expires in {time}"
     },
     "thread": {
-      "chats": "Chats",
       "delete": "Delete chat",
-      "download": "Download chat",
+      "download": "Download",
       "downloadJson": "JSON",
       "downloadMarkdown": "Markdown",
       "draftKept": "Your draft is kept in “{title}”",
       "historyUnavailable": "History unavailable",
       "keepsAnswering": "“{title}” keeps answering",
       "loadToContinue": "Load the chat to continue it",
-      "menu": "Chat actions",
-      "new": "New",
       "newAnnounce": "New chat",
       "newChat": "New chat",
       "newChatTitle": "New chat",
       "notSaved": "Not saved",
-      "notSavedSuffix": "· not saved",
       "pin": "Pin",
       "rename": "Rename",
-      "renameDisabled": "Send a message first",
       "renameFailed": "Couldn't rename the chat",
       "renameLabel": "Chat title",
       "renamed": "Renamed",
       "renaming": "Renaming…",
-      "shareSettings": "Share settings",
       "titleCounter": "{count}/200",
-      "unpin": "Unpin"
+      "unpin": "Unpin",
+      "allChats": "All chats",
+      "moreChats": "{count} more",
+      "noOtherChats": "No other chats yet",
+      "newChatAbout": "New chat about {object}",
+      "titleName": "{title}, chats and chat actions",
+      "titleNameNeeds": "{title}, chats and chat actions, {count} other chat needs you | {title}, chats and chat actions, {count} other chats need you",
+      "titleNameAnswering": "{title}, chats and chat actions, {count} other chat answering | {title}, chats and chat actions, {count} other chats answering",
+      "titleTooltip": "{title} · {summary}"
     },
     "toolsets": {
       "add": "New toolset",

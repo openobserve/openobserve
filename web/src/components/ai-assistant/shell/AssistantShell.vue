@@ -42,32 +42,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="threadHeader"
         :sid="activeSid"
         :placement="sheet ? 'sheet' : placement"
-        :density="headerDensity"
         :container="container"
+        :narrow="narrow"
       >
-        <template #container-actions>
-          <AssistantRunsButton :sid="activeSid" />
+        <template #container-actions="{ narrow }">
+          <AssistantLayoutMenu
+            v-if="!narrow"
+            :placement="placement"
+            :sheet="sheet"
+            :sid="activeSid"
+            :dock-host="host?.id"
+          />
           <slot name="container-actions" />
-          <template v-if="placement !== 'window'">
-            <AssistantIconButton
-              v-if="placement === 'sidebar' && !sheet"
-              :label="t('assistant.shell.openInFullView')"
-              :icon="assistantGlyph.openFull"
-              data-test="assistant-shell-open-in-full-view"
-              @click="openInFullView"
-            />
-            <AssistantIconButton
-              :label="t('assistant.shell.close', { product })"
-              :icon="assistantGlyph.close"
-              data-test="assistant-shell-close"
-              @click="closeContainer"
-            />
-          </template>
+          <AssistantIconButton
+            v-if="placement !== 'window'"
+            :label="t('assistant.shell.close', { product })"
+            :icon="assistantGlyph.close"
+            size="xs"
+            data-test="assistant-shell-close"
+            @click="closeContainer"
+          />
         </template>
-        <template v-if="$slots['menu-first']" #menu-first>
-          <slot name="menu-first" />
-        </template>
-        <template v-if="placement !== 'window'" #menu-layout>
+        <template #menu-layout>
           <AssistantLayoutMenu
             bare
             :placement="placement"
@@ -76,69 +72,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :dock-host="host?.id"
           />
         </template>
-        <template v-if="activeSid && state === 'conversation'" #share>
-          <AssistantShareControl
-            :sid="activeSid"
-            variant="header"
-            @manage="shareManagerOpen = true"
-          />
-        </template>
         <template v-if="activeSid && state === 'conversation'" #menu-share>
           <AssistantShareControl
             :sid="activeSid"
             variant="menu-item"
+            @open-quick="shareQuickOpen = true"
             @settings="shareDrawerOpen = true"
+          />
+        </template>
+        <template v-if="activeSid && state === 'conversation'" #title-anchor>
+          <AssistantShareControl
+            v-model:open="shareQuickOpen"
+            :sid="activeSid"
+            variant="quick"
+            @settings="openShareDrawer"
           />
         </template>
       </AssistantThreadHeader>
       <template v-else>
-        <OSkeleton v-if="state === 'loading'" type="text" class="w-40" />
+        <OSkeleton v-if="state === 'loading'" type="text" class="ms-2 w-40" />
         <span class="flex-1" />
         <div class="flex shrink-0 items-center gap-1">
-          <AssistantRunsButton v-if="state !== 'gate'" :sid="activeSid" />
+          <ODropdown v-if="state === 'gate' && placement === 'sidebar'" align="end">
+            <template #trigger>
+              <AssistantIconButton
+                :label="t('assistant.shell.layout')"
+                :icon="assistantGlyph.layout"
+                size="xs"
+                data-test="assistant-layout-button"
+              />
+            </template>
+            <ODropdownItem data-test="assistant-shell-open-in-full-view" @select="openInFullView">
+              {{ t("assistant.shell.placeFull") }}
+            </ODropdownItem>
+          </ODropdown>
+          <AssistantLayoutMenu
+            v-else-if="state !== 'gate'"
+            :placement="placement"
+            :sheet="sheet"
+            :sid="activeSid"
+            :dock-host="host?.id"
+          />
           <slot name="container-actions" />
-          <template v-if="placement !== 'window'">
-            <AssistantIconButton
-              v-if="placement === 'sidebar' && (!sheet || state === 'gate')"
-              :label="t('assistant.shell.openInFullView')"
-              :icon="assistantGlyph.openFull"
-              data-test="assistant-shell-open-in-full-view"
-              @click="openInFullView"
-            />
-            <AssistantLayoutMenu
-              v-if="state !== 'gate'"
-              :placement="placement"
-              :sheet="sheet"
-              :sid="activeSid"
-              :dock-host="host?.id"
-            >
-              <template #trigger>
-                <AssistantIconButton
-                  :label="t('assistant.shell.moreActions')"
-                  :icon="assistantGlyph.more"
-                  data-test="assistant-shell-menu"
-                />
-              </template>
-            </AssistantLayoutMenu>
-            <AssistantIconButton
-              :label="t('assistant.shell.close', { product })"
-              :icon="assistantGlyph.close"
-              data-test="assistant-shell-close"
-              @click="closeContainer"
-            />
-          </template>
+          <AssistantIconButton
+            v-if="placement !== 'window'"
+            :label="t('assistant.shell.close', { product })"
+            :icon="assistantGlyph.close"
+            size="xs"
+            data-test="assistant-shell-close"
+            @click="closeContainer"
+          />
         </div>
       </template>
     </div>
 
     <div
-      v-if="notice || creditThreshold || historyUnavailable || $slots.notice"
+      v-if="notice || creditThreshold || historyUnavailable || sheetRequest || $slots.notice"
       ref="noticeRow"
       class="shrink-0 px-3 pt-2"
       data-test="assistant-shell-notice-row"
     >
       <OBanner
-        v-if="notice === 'signed_out'"
+        v-if="sheetRequest"
+        variant="warning"
+        dense
+        role="presentation"
+        :content="sheetRequestWord"
+        data-test="assistant-shell-needs-you"
+      >
+        <template #actions>
+          <OButton
+            variant="ghost"
+            size="xs"
+            class="max-md:min-h-11 pointer-coarse:min-h-11"
+            data-test="assistant-shell-needs-you-review"
+            @click="reviewSheetRequest"
+          >
+            {{ t("assistant.runs.review") }}
+          </OButton>
+        </template>
+      </OBanner>
+      <OBanner
+        v-else-if="notice === 'signed_out'"
         variant="info"
         dense
         role="presentation"
@@ -244,24 +259,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :window-sid="scopedSid"
       :container="container"
       @opened="chatsOpen = false"
-      @new="newFromChats"
       @close="closeChats"
+      @shared-links="shareManagerOpen = true"
     >
-      <template v-if="capability.persistence && capability.canShare !== 'no'" #shares>
-        <OButton
-          variant="ghost"
-          size="sm"
-          class="max-md:min-h-11 pointer-coarse:min-h-11"
-          data-test="assistant-history-shared-links"
-          @click="shareManagerOpen = true"
-          >{{ t("assistant.history.sharedLinks") }}</OButton
-        >
+      <template #menu-layout>
+        <AssistantLayoutMenu
+          bare
+          :placement="placement"
+          :sheet="sheet"
+          :sid="activeSid"
+          :dock-host="host?.id"
+        />
       </template>
     </AssistantHistoryList>
     <div
       v-show="!chatsOpen"
       :class="[
         'min-h-0 flex-1 max-md:min-h-20',
+        readingWidth,
         state === 'conversation' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
       ]"
       data-test="assistant-shell-body"
@@ -309,19 +324,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AssistantMark size="lg" muted />
         </template>
       </OEmptyState>
-      <OEmptyState
+      <div
         v-else-if="state === 'unavailable'"
-        size="block"
-        :backdrop="false"
-        :title="t('assistant.shell.loadFailed')"
-        :action-label="t('common.retry')"
+        class="px-3 pt-2"
         data-test="assistant-shell-unavailable"
-        @action="retryHistory"
       >
-        <template #illustration>
-          <AssistantMark size="lg" muted />
-        </template>
-      </OEmptyState>
+        <OBanner
+          variant="error"
+          dense
+          role="presentation"
+          :content="
+            loadTriedAt
+              ? t('assistant.shell.loadFailedAgain', { time: formatOrgTime(loadTriedAt) })
+              : t('assistant.shell.loadFailed')
+          "
+        >
+          <template #actions>
+            <OButton
+              variant="ghost"
+              size="xs"
+              class="max-md:min-h-11 pointer-coarse:min-h-11"
+              data-test="assistant-shell-unavailable-retry"
+              @click="retryHistory"
+            >
+              {{ t("common.retry") }}
+            </OButton>
+          </template>
+        </OBanner>
+      </div>
       <AssistantWelcome
         v-else-if="state === 'empty' && welcome"
         :variant="density === 'roomy' ? 'roomy' : 'compact'"
@@ -400,7 +430,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="state !== 'gate' && !isTerminalBody"
       v-show="!chatsOpen"
       ref="lower"
-      class="flex shrink-0 flex-col max-md:min-h-0 max-md:shrink max-md:overflow-y-auto"
+      :class="[
+        'flex shrink-0 flex-col max-md:min-h-0 max-md:shrink max-md:overflow-y-auto',
+        readingWidth,
+      ]"
       data-test="assistant-shell-lower"
     >
       <div
@@ -641,6 +674,8 @@ export interface AssistantShellProps {
   sid?: Sid | null;
   /** The window that holds focus; its title bar reads as the active one. */
   focused?: boolean;
+  /** Below 24 rem, when the container knows it from its geometry. */
+  narrow?: boolean;
   /** Rendered inside OSheet below `lg`; changes density and the menu items only. */
   sheet?: boolean;
   host?: AssistantHostAdapter;
@@ -722,6 +757,7 @@ import AssistantThreadHeader, {
 import AssistantShareControl from "@/components/ai-assistant/share/AssistantShareControl.vue";
 import AssistantHistoryList from "@/components/ai-assistant/history/AssistantHistoryList.vue";
 import AssistantShareManager from "@/components/ai-assistant/share/AssistantShareManager.vue";
+import { chatStatusWord } from "@/components/ai-assistant/history/chatStatus";
 import AssistantForkSource from "@/components/ai-assistant/thread/AssistantForkSource.vue";
 import AssistantTranscript from "@/components/ai-assistant/transcript/AssistantTranscript.vue";
 import AssistantTurnOutcome, {
@@ -778,15 +814,15 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { refreshSession } from "@/services/http";
 import type { ChatMessage, TurnOutcomeRecord } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
-import { formatCount, formatOrgIsoDay } from "@/utils/formatters";
-
-import AssistantRunsButton from "@/components/ai-assistant/runs/AssistantRunsButton.vue";
+import { formatCount, formatOrgIsoDay, formatOrgTime } from "@/utils/formatters";
 
 import AssistantLayoutMenu from "./AssistantLayoutMenu.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
@@ -798,6 +834,7 @@ provideAssistantSurface();
 const props = withDefaults(defineProps<AssistantShellProps>(), {
   sid: undefined,
   focused: false,
+  narrow: false,
   sheet: false,
   host: undefined,
   density: "compact",
@@ -805,7 +842,6 @@ const props = withDefaults(defineProps<AssistantShellProps>(), {
 
 defineSlots<{
   "chrome-start"?: () => unknown;
-  "menu-first"?: () => unknown;
   "container-actions"?: () => unknown;
   notice?: () => unknown;
   transcript?: () => unknown;
@@ -827,7 +863,7 @@ const routeContext = inject(SHELL_ROUTE_CONTEXT, null);
 const route = useRoute();
 const router = useRouter();
 const vuex = useStore();
-const { lgUp, mdUp } = useBreakpoint();
+const { lgUp } = useBreakpoint();
 const root = ref<HTMLElement | null>(null);
 const lower = ref<HTMLElement | null>(null);
 const noticeRow = ref<HTMLElement | null>(null);
@@ -847,6 +883,8 @@ const dismissedRefusal = shallowRef<unknown>(null);
 const learnOpen = ref(false);
 const shareManagerOpen = ref(false);
 const shareDrawerOpen = ref(false);
+const shareQuickOpen = ref(false);
+const loadTriedAt = ref<number | null>(null);
 const openedByUser = ref(false);
 const disclosureDismissed = ref(false);
 
@@ -899,33 +937,37 @@ const container = computed<Container>(() => {
   return props.placement === "docked" && props.host ? `docked.${props.host.id}` : "sidebar";
 });
 
-const headerDensity = computed(() =>
-  props.placement === "docked" || props.placement === "window" || props.sheet || !mdUp.value
-    ? "dense"
-    : "default",
-);
 const chromeClasses = computed(() => {
-  const base = "border-border-default flex shrink-0 items-center border-b";
+  const base = "border-border-subtle flex shrink-0 items-center gap-1 border-b ps-1 pe-2";
   if (props.placement === "window")
     return [
       base,
-      "h-10 cursor-grab gap-1 px-2",
+      "h-10 cursor-grab",
       props.focused
         ? "bg-surface-base"
         : "bg-surface-panel [&_[data-test=assistant-thread-title]]:text-text-secondary",
     ];
-  return [
-    base,
-    "gap-2 px-3",
-    props.placement === "docked" ? "h-15" : "h-12 max-md:h-auto max-md:min-h-12 max-md:flex-wrap",
-  ];
+  return [base, props.sheet ? "h-11" : "h-10 max-md:h-11"];
 });
+const readingWidth = computed(() =>
+  props.placement === "full" ? "mx-auto w-full max-w-160" : undefined,
+);
 // The Chats view hides the chat instead of unmounting it, so its draft, scroll and stream carry on.
 const chatsOpen = ref(false);
 provide(assistantThreadHostKey, {
   newChat,
   currentSid: () => activeSid.value,
+  openChat: (sid) => openChat({ sid }),
   chats: { open: chatsOpen, set: (open: boolean) => (chatsOpen.value = open) },
+  object: () =>
+    props.placement === "docked" && props.host
+      ? {
+          title: props.host.objectTitle(),
+          newLabel: String(
+            t("assistant.thread.newChatAbout", { object: raw(props.host.objectTitle()) }),
+          ),
+        }
+      : null,
 });
 
 const historyUnavailable = computed(
@@ -1005,7 +1047,9 @@ watch(
 
 async function retryHistory(): Promise<void> {
   const sid = activeSid.value;
-  if (sid) await history.open({ sid }).catch(() => undefined);
+  if (!sid) return;
+  await history.open({ sid }).catch(() => undefined);
+  loadTriedAt.value = state.value === "unavailable" ? Date.now() : null;
 }
 
 function refreshElsewhere(): void {
@@ -1249,6 +1293,16 @@ const reviewLabel = computed(() => {
   });
 });
 
+// A full phone sheet covers the notice, so the waiting request becomes one row under the bar.
+const sheetRequest = computed(() =>
+  props.sheet && store.state.shell.sheetSnap === "full"
+    ? (runs.decisions.value.find((row) => !row.otherOrg) ?? null)
+    : null,
+);
+const sheetRequestWord = computed(() =>
+  chatStatusWord("needs_you", sheetRequest.value?.expiresAt, reviewClock.value, t),
+);
+
 const approvalsHost: AssistantApprovalsHost = {
   pendingId: (sid) => store.state.sessions[sid]?.pendingApproval?.id ?? null,
   currentUser: () => vuex.state.userInfo?.email ?? "",
@@ -1311,6 +1365,10 @@ function reviewRequest(): void {
   decisionsEl.value?.scrollIntoView?.({ block: "nearest" });
   if (approvalCardEl.value?.focusDefault()) return;
   consentCardEl.value?.focusHeading();
+}
+
+function reviewSheetRequest(): void {
+  if (sheetRequest.value) void runs.open(sheetRequest.value, { focus: "card" });
 }
 
 function jumpToLatest(): void {
@@ -1389,7 +1447,7 @@ function onOutcomeAction(sid: string, action: OutcomeAction, outcome: TurnOutcom
       void stopBusy(sid).then((stopped) => stopped && focusAfterRequest(started));
       return;
     case "show_running":
-      return void runs.requestOpen(started instanceof HTMLElement ? started : null);
+      return threadHeader.value?.openChats();
     case "sign_in":
       return signIn();
     case "retry_save":
@@ -1569,7 +1627,9 @@ onBeforeUnmount(() => {
 
 // The strip's countdown runs only while a card with a known expiry is shown.
 watch(
-  () => typeof approvalCard.value?.expiresAt === "number",
+  () =>
+    typeof approvalCard.value?.expiresAt === "number" ||
+    typeof sheetRequest.value?.expiresAt === "number",
   (counting) => {
     if (reviewTimer) clearInterval(reviewTimer);
     reviewTimer = counting ? setInterval(() => (reviewClock.value = Date.now()), 1_000) : null;
@@ -1685,20 +1745,14 @@ function openChat(target: { sid: Sid } | { chatId: number }): Promise<Sid> {
   return own ? store.openInWindow(own, target) : store.openSession(target, { focus: true });
 }
 
-function newFromChats(): void {
-  chatsOpen.value = false;
-  askNew();
-}
-
 function closeChats(): void {
   chatsOpen.value = false;
   void nextTick(() => threadHeader.value?.focusChats());
 }
 
-/** New from outside the header (the full view's rail): the header's analytics and the shell's drafts still apply. */
-function askNew(): void {
-  if (threadHeader.value) threadHeader.value.askNew();
-  else newChat();
+function openShareDrawer(): void {
+  shareQuickOpen.value = false;
+  shareDrawerOpen.value = true;
 }
 
 // The previous chat keeps its draft; "Bring it here" moves it into the new chat (SH-03 AC 6, CT-06 AC 5, V6).
@@ -1741,19 +1795,8 @@ function retry(): void {
 
 // The locked sidebar has no placement to move, so its full view is the route's hero gate.
 function openInFullView(): void {
-  if (state.value === "gate") {
-    closeLockedPanel("move");
-    void router.push({ name: "assistant" });
-    return;
-  }
-  const sid = store.state.shell.activeSid;
-  trackAssistant("ai_container_moved", {
-    from: props.sheet ? "sheet" : "sidebar",
-    to: "full",
-    turn_running: !!session.value && isRunning(session.value.turn),
-  });
-  store.moveTo({ kind: "full" });
-  void router.push({ name: "assistant", params: sid ? { chatId: sid } : {} });
+  closeLockedPanel("move");
+  void router.push({ name: "assistant" });
 }
 
 function closeContainer(): void {
@@ -1765,6 +1808,32 @@ function closeContainer(): void {
   if (window.history.state?.back) router.back();
   else void router.push("/");
 }
+
+// A request from the page's button, the notice or a late mount opens All chats in the primary container.
+watch(
+  () => runs.openRequested.value && visible.value && !scopedSid.value,
+  (requested) => {
+    if (!requested) return;
+    runs.takeOpenRequest();
+    threadHeader.value?.openChats();
+  },
+  { immediate: true, flush: "post" },
+);
+
+// Once per refusal: a second chat ending changes nothing the reader has not been told (`95` §2.2).
+let freedFor: string | null = null;
+watch(
+  () => runs.active.value,
+  (active, before) => {
+    const turn = session.value?.turn;
+    if (active >= before || turn?.state !== "refused" || turn.error.code !== "run_limit_member")
+      return;
+    const turnId = session.value?.turnMeta.turnId ?? null;
+    if (freedFor === turnId) return;
+    freedFor = turnId;
+    region.value?.announce(t("assistant.limit.slotFree"));
+  },
+);
 
 function onGateAction(cta: GateCta): void {
   if (cta === "learn_more") learnOpen.value = true;
@@ -1899,5 +1968,5 @@ watch(lower, (el, _was, onCleanup) => {
   });
 });
 
-defineExpose({ askNew });
+defineExpose({ focusEntry, openSharedLinks: () => (shareManagerOpen.value = true) });
 </script>

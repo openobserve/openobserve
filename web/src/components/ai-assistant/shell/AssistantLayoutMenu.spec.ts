@@ -20,6 +20,7 @@ import { defineComponent, h } from "vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
+import { historyStubs } from "../__tests__/historyStubs";
 import AssistantLayoutMenu, { placementMode } from "./AssistantLayoutMenu.vue";
 import type { AssistantLayoutMenuProps } from "./AssistantLayoutMenu.vue";
 import { assistantWindowHostKey, type AssistantWindowHost } from "./assistantWindowHost";
@@ -90,6 +91,7 @@ async function setup(props: Partial<AssistantLayoutMenuProps>, windowHost?: Assi
     {
       global: {
         plugins: [router, fakeVuex()],
+        stubs: { ODropdownSub: historyStubs.ODropdownSub },
         provide: windowHost ? { [assistantWindowHostKey as symbol]: windowHost } : {},
       },
       attachTo: document.body,
@@ -127,7 +129,7 @@ afterEach(() => {
   track.mockClear();
 });
 
-describe("Show this chat in", () => {
+describe("Places", () => {
   it("offers sidebar, window and full view on a desktop sidebar with the current one checked", async () => {
     await setup({});
     expect(item("sidebar")!.getAttribute("aria-checked")).toBe("true");
@@ -159,7 +161,7 @@ describe("Show this chat in", () => {
       store.floatChat(store.createSession({ origin: ORIGIN, detached: true }), { focus: "none" });
     await setup({ sid });
     expect(item("window")!.getAttribute("aria-disabled")).toBe("true");
-    expect(item("window")!.textContent).toContain("4 floating chats is the limit");
+    expect(item("window")!.textContent).toContain("Limit is 4. Close one first.");
   });
 
   it("drops Floating window below lg, where windows do not exist", async () => {
@@ -209,7 +211,7 @@ describe("Show this chat in", () => {
   });
 });
 
-describe("Width group", () => {
+describe("Width submenu", () => {
   it("shows on a desktop sidebar only", async () => {
     await setup({});
     expect(anyTest("assistant-shell-width-default")).not.toBeNull();
@@ -230,7 +232,7 @@ describe("Width group", () => {
   });
 });
 
-describe("Window group", () => {
+describe("Position and Size", () => {
   it("lists the other three corners and hands a pick to the window", async () => {
     const host = windowHost();
     const { store } = fake.current;

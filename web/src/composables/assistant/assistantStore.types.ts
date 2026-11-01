@@ -493,8 +493,12 @@ export interface HistoryRow {
 }
 
 export interface HistoryFilter {
-  kind: "all" | "pinned" | "editor" | "alert" | "incident" | "shared";
+  kind: "all" | "pinned" | "shared";
   q: string;
+  /** The display agent, as `runAgentKey` names it. */
+  agent?: "general" | "investigator" | "queryBuilder" | null;
+  /** Where the chat started; a row keeps only the alert and editor origins. */
+  started?: "alert" | "editor" | null;
 }
 
 export type ImportState = "idle" | "offered" | "running" | "done" | "failed" | "dismissed";

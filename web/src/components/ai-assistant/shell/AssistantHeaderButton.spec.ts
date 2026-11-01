@@ -463,6 +463,20 @@ describe("AssistantHeaderButton announcements and toasts", () => {
     expect(openAssistant).toHaveBeenCalledWith(expect.objectContaining({ entryKind: "toast" }));
   });
 
+  it("tells of a chat that failed out of view once, with Open", async () => {
+    const { store } = setup();
+    const sid = session(store, "Latency alert draft");
+    store.state.sessions[sid].turn = { state: "failed" } as never;
+    store.state.sessions[sid].unread = true;
+    await flushPromises();
+    store.state.sessions[sid].turnMeta.lastSeq = 3;
+    await flushPromises();
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Latency alert draft failed" }),
+    );
+  });
+
   it("raises no toast for an ephemeral helper or analysis turn", async () => {
     const { store } = setup();
     const sid = store.createSession({

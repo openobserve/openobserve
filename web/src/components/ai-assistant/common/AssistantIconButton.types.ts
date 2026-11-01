@@ -23,8 +23,8 @@ export interface AssistantIconButtonProps {
   /** Registry id whose keycaps the tooltip renders (OTooltip `shortcut-id`). */
   shortcutId?: string;
   variant?: "ghost" | "outline" | "secondary" | "primary";
-  /** `sm` → OButton `icon-sm`, `toolbar` → `icon-toolbar`; 2.75 rem below md and on coarse pointers. */
-  size?: "sm" | "toolbar";
+  /** `sm` → OButton `icon-sm`, `toolbar` → `icon-toolbar`, `xs` → `icon-xs-sq`; 2.75 rem below md and on coarse pointers. */
+  size?: "sm" | "toolbar" | "xs";
   /** The busy spinner of an action in flight (Stop while stopping). */
   loading?: boolean;
   /** Renders `aria-pressed`. */

@@ -50,7 +50,7 @@ describe("AssistantLocalOnlyHeader", () => {
 
   it("names the mode with the count and cap", () => {
     const line = setup().get('[data-test="assistant-local-only-line"]');
-    expect(line.text()).toBe("Saved in this browser only · 37 of 100");
+    expect(line.text()).toBe("Saved in this browser only");
     expect(line.classes()).not.toContain("text-status-warning-text");
   });
 

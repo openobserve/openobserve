@@ -161,7 +161,7 @@ describe("AssistantHistoryList", () => {
     const { wrapper } = await setup();
     const list = wrapper.get('[data-test="assistant-history-list"]');
     const line = wrapper.get(`#${list.attributes("aria-describedby")}`);
-    expect(line.text()).toBe("Saved in this browser only · 5 of 100");
+    expect(line.text()).toBe("Saved in this browser only");
   });
 
   it("roves one tab stop over the row buttons with arrows, Home, End and type-ahead", async () => {
@@ -249,7 +249,7 @@ describe("AssistantHistoryList", () => {
     expect(db.rows.size).toBe(0);
   });
 
-  it("lands on the search once everything is cleared", async () => {
+  it("hands focus back to the chat once everything is cleared", async () => {
     const { wrapper, db } = await setup();
     await wrapper.get('[data-test="assistant-history-clear-all"]').trigger("click");
     await wrapper
@@ -258,33 +258,50 @@ describe("AssistantHistoryList", () => {
     await flushPromises();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(db.rows.size).toBe(0);
-    expect(document.activeElement).toBe(
-      wrapper.get('[data-test="assistant-history-search"] input').element,
-    );
+    expect(wrapper.emitted("close")).toHaveLength(1);
   });
 
-  it("says a filter chip is empty and offers Show all", async () => {
+  it("says the filters match nothing and offers Clear filters", async () => {
     const { wrapper, history } = await setup({}, { seed: SEED.filter((row) => !row.pinned) });
     history.setFilter({ kind: "pinned" });
     await flushPromises();
     const empty = wrapper.get('[data-test="assistant-history-filter-empty"]');
-    expect(empty.text()).toContain("No chats in this view");
+    expect(empty.text()).toContain("No chats match these filters");
     expect(wrapper.find('[data-test="assistant-history-no-match"]').exists()).toBe(false);
     await empty.get("button").trigger("click");
+    expect(history.filter.value.kind).toBe("all");
+  });
+
+  it("shows Filter from 8 chats or while one is active, and counts what the chips leave", async () => {
+    const { wrapper, history } = await setup();
+    expect(wrapper.find('[data-test="assistant-history-filter"]').exists()).toBe(false);
+    history.setFilter({ kind: "pinned" });
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-history-filter"]').text()).toBe("Filter · 1");
+    const rows = wrapper.findAll('[data-test="assistant-history-row"]');
+    expect(wrapper.get('[data-test="assistant-history-chips-count"]').text()).toBe(
+      `${rows.length} chat`,
+    );
+    await wrapper.get('[data-test="assistant-history-chip-pinned"]').trigger("click");
     expect(history.filter.value.kind).toBe("all");
   });
 
   it("offers a Shared filter only where the server keeps share links", async () => {
     const options = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) =>
       wrapper
-        .get('[data-test="assistant-history-filter"]')
-        .findAll('[role="radio"], button')
+        .get('[data-test="assistant-history-filter-show"]')
+        .findAll('[role="menuitemradio"]')
         .map((item) => item.text());
     const local = await setup();
+    local.history.setFilter({ kind: "pinned" });
+    await flushPromises();
     expect(options(local.wrapper)).not.toContain("Shared");
+    local.history.setFilter({ kind: "all" });
     local.wrapper.unmount();
     const server = await setup({}, { persistence: true });
     expect(server.history.mode.value).toBe("server");
+    server.history.setFilter({ kind: "pinned" });
+    await flushPromises();
     expect(options(server.wrapper)).toContain("Shared");
     expect(aiChatShare.listMine).not.toHaveBeenCalled();
     vi.mocked(aiChatShare.listMine).mockResolvedValueOnce({
@@ -357,7 +374,7 @@ describe("AssistantHistoryList", () => {
     const { wrapper } = await setup();
     const root = wrapper.get('[data-test="assistant-history"]');
     expect(root.attributes("role")).toBe("region");
-    expect(root.attributes("aria-label")).toBe("Chats");
+    expect(root.attributes("aria-label")).toBe("All chats");
     expect(wrapper.find('[data-test="assistant-history-new"]').exists()).toBe(false);
     const search = wrapper.get('[data-test="assistant-history-search"] input');
     await search.setValue("alpha");
@@ -377,9 +394,9 @@ describe("AssistantHistoryList", () => {
     await flushPromises();
     const groups = wrapper.findAll('[data-test="assistant-history-group"]');
     expect(groups[0].attributes("data-group")).toBe("running");
-    expect(groups[0].get("h3").text()).toBe("In progress · 1");
+    expect(groups[0].get("h3").text()).toBe("In progress · 1 of 3");
     expect(groups[0].text()).toContain("Gamma this week");
-    expect(groups[0].text()).toContain("Needs your approval");
+    expect(groups[0].text()).toContain("Needs you");
     expect(wrapper.find('[data-group="week"]').exists()).toBe(false);
   });
 

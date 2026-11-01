@@ -543,6 +543,14 @@ export function formatRelative(ts: number, now: number = Date.now()): string {
   return rtf.format(Math.round(seconds / 31_536_000), "year");
 }
 
+/** The row's age: "20 min", "3 h", "2 d", with the unit kept apart so a column of ages lines up. */
+export function formatRelativeCompact(ts: number, now: number = Date.now()): string {
+  const minutes = Math.max(Math.floor((now - ts) / 60_000), 1);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `${hours} h` : `${Math.floor(hours / 24)} d`;
+}
+
 /** "380 ms", "12 s", "1 min 4 s"; named apart from the older `formatDuration`, whose callers keep their output. */
 export function formatElapsed(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return "—";

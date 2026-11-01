@@ -99,6 +99,8 @@ export const assistantGlyph = {
   link: "call-made",
   warning: "warning",
   fork: "fork-right",
+  filter: "filter-list",
+  floatingWindow: "open-in-browser",
 } as const satisfies Record<string, IconName>;
 
 /** The glyph of each chip kind (`40` §2.1); the chip passes it to `OTag` as `icon`. */

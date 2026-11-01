@@ -25,6 +25,7 @@ import { raw } from "@/types/i18n";
 import { fakeAssistant, fakeRouter, fakeVuex, hintBus } from "../__tests__/fakeAssistant";
 import { historyStubs } from "../__tests__/historyStubs";
 import { fakeRuns } from "../runs/runsTestKit";
+import AssistantThreadHeader from "../thread/AssistantThreadHeader.vue";
 import AssistantShell, {
   SHELL_ROUTE_CONTEXT,
   STEP_ANNOUNCE_MS,
@@ -162,8 +163,7 @@ describe("AssistantShell states", () => {
     expect(root(wrapper).attributes("data-state")).toBe("gate");
     expect(wrapper.find('[data-gate="no_permission"][data-size="inline"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-shell-close"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="assistant-shell-open-in-full-view"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="assistant-shell-menu"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-layout-button"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-composer"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-welcome"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-shell-title"]').exists()).toBe(false);
@@ -173,7 +173,9 @@ describe("AssistantShell states", () => {
   it("moves the locked sidebar to the full view's hero and closes the panel", async () => {
     openLockedPanel(null);
     const { wrapper, router } = setup({}, "no_permission");
-    await wrapper.get('[data-test="assistant-shell-open-in-full-view"]').trigger("click");
+    await wrapper.get('[data-test="assistant-layout-button"]').trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    document.querySelector<HTMLElement>('[data-test="assistant-shell-open-in-full-view"]')?.click();
     await flushPromises();
     expect(useLockedPanel().value).toBeNull();
     expect(lockedPanelMoved()).toBe(true);
@@ -303,20 +305,21 @@ describe("AssistantShell states", () => {
 });
 
 describe("AssistantShell chrome and focus", () => {
-  it("offers full view and the layout menu in the sidebar, and close in every container", () => {
+  it("keeps one 40 px bar with Layout and close in the sidebar, and 44 px in the sheet", () => {
     const { wrapper } = setup();
-    expect(wrapper.find('[data-test="assistant-shell-open-in-full-view"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="assistant-thread-menu"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-layout-button"]').exists()).toBe(true);
     expect(wrapper.get('[data-test="assistant-shell-close"]').attributes("aria-label")).toBe(
       "Close O2 Assistant",
     );
+    expect(wrapper.get('[data-test="assistant-shell-chrome"]').classes()).toContain("h-10");
     document.body.innerHTML = "";
     const sheet = setup({ sheet: true }).wrapper;
-    expect(sheet.find('[data-test="assistant-shell-open-in-full-view"]').exists()).toBe(false);
+    expect(sheet.find('[data-test="assistant-layout-button"]').exists()).toBe(false);
+    expect(sheet.get('[data-test="assistant-shell-chrome"]').classes()).toContain("h-11");
     document.body.innerHTML = "";
     const docked = setup({ placement: "docked" }).wrapper;
     expect(docked.find('[data-test="assistant-shell-close"]').exists()).toBe(true);
-    expect(docked.get('[data-test="assistant-shell-chrome"]').classes()).toContain("h-15");
+    expect(docked.get('[data-test="assistant-shell-chrome"]').classes()).toContain("h-10");
   });
 
   it("closes through the store from ×, keeping the session", async () => {
@@ -769,7 +772,7 @@ describe("WP-06 conversation wiring", () => {
     await action.trigger("click");
     await flushPromises();
     setRuntimeHandle(null);
-    expect(runs.requestOpen).toHaveBeenCalled();
+    expect(refused.wrapper.find('[data-test="assistant-history"]').exists()).toBe(true);
   });
 
   it("keeps focus on Stop it when the cancel fails, and never takes focus the reader moved (V7)", async () => {
@@ -1179,29 +1182,38 @@ describe("AssistantShell history states", () => {
     await flushPromises();
     const header = wrapper.get('[data-test="assistant-thread-header"]');
     expect(header.find('[data-test="assistant-shell-close"]').exists()).toBe(true);
-    expect(header.find('[data-test="assistant-thread-menu"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="assistant-shell-menu"]').exists()).toBe(false);
+    expect(header.find('[data-test="assistant-thread-title-button"]').exists()).toBe(true);
   });
 
-  it("keeps the header's actions in their order and adds no button for the Layout menu", async () => {
+  it("orders the bar title, +, Layout, close once a turn exists, and drops + from an empty chat", async () => {
     const { wrapper, store } = setup();
-    open(store);
+    const sid = open(store);
+    store.state.sessions[sid].messages.length = 0;
     await flushPromises();
-    const tests = wrapper
-      .get('[data-test="assistant-thread-header"]')
-      .findAll("[data-test]")
-      .map((el) => el.attributes("data-test"))
-      .filter((id) => /^assistant-(thread-(history|new|menu)|shell-)/.test(id ?? ""));
-    expect(tests).toEqual([
-      "assistant-thread-history",
+    const order = () =>
+      wrapper
+        .get('[data-test="assistant-thread-header"]')
+        .findAll("[data-test]")
+        .map((el) => el.attributes("data-test"))
+        .filter((id) =>
+          /^assistant-(thread-(title-button|new)|layout-button|shell-close)$/.test(id ?? ""),
+        );
+    expect(order()).toEqual([
+      "assistant-thread-title-button",
+      "assistant-layout-button",
+      "assistant-shell-close",
+    ]);
+    store.state.sessions[sid].messages.push({ role: "user", content: raw("q") });
+    await flushPromises();
+    expect(order()).toEqual([
+      "assistant-thread-title-button",
       "assistant-thread-new",
-      "assistant-thread-menu",
-      "assistant-shell-open-in-full-view",
+      "assistant-layout-button",
       "assistant-shell-close",
     ]);
   });
 
-  it("reaches Floating window from More in the sidebar header", async () => {
+  it("reaches Floating window from the bar's Layout menu", async () => {
     fake.current = fakeAssistant();
     const { store } = fake.current;
     open(store);
@@ -1238,11 +1250,11 @@ describe("AssistantShell history states", () => {
     expect(wrapper.find('[data-test="assistant-shell-close"]').exists()).toBe(false);
   });
 
-  it("swaps the chat for the Chats view and back, keeping the chat mounted (D5 §3.2)", async () => {
+  it("swaps the chat for All chats and back, keeping the chat mounted (D5 §3.2)", async () => {
     const { wrapper, store } = setup();
     open(store);
     await flushPromises();
-    await wrapper.get('[data-test="assistant-thread-history"]').trigger("click");
+    wrapper.getComponent(AssistantThreadHeader).vm.openChats();
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-history"]').attributes("data-mode")).toBe("panel");
     const body = wrapper.get('[data-test="assistant-shell-body"]');
@@ -1253,7 +1265,7 @@ describe("AssistantShell history states", () => {
     expect(wrapper.find('[data-test="assistant-history"]').exists()).toBe(false);
     expect((body.element as HTMLElement).style.display).toBe("");
     expect(document.activeElement).toBe(
-      wrapper.get('[data-test="assistant-thread-history"]').element,
+      wrapper.get('[data-test="assistant-thread-title-button"]').element,
     );
   });
 

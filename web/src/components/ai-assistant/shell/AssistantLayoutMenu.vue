@@ -17,37 +17,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <component :is="bare ? BareMenu : ODropdown" v-bind="bare ? {} : { align: 'end' }">
     <template v-if="!bare" #trigger>
-      <slot name="trigger">
-        <AssistantIconButton
-          :label="t('assistant.shell.layout')"
-          :icon="assistantGlyph.layout"
-          data-test="assistant-window-layout"
-        />
-      </slot>
+      <AssistantIconButton
+        :label="t('assistant.shell.layout')"
+        :icon="assistantGlyph.layout"
+        size="xs"
+        data-test="assistant-layout-button"
+      />
     </template>
-    <ODropdownGroup :label="t('assistant.shell.showIn')" data-test="assistant-shell-show-in">
-      <ODropdownItem
-        v-for="item in places"
-        :key="item.id"
-        role="menuitemradio"
-        :aria-checked="item.checked"
-        :disabled="item.disabled"
-        :focusable-unavailable="item.disabled"
-        :description="item.hint"
-        :data-test="`assistant-shell-place-${item.id}`"
-        @select="item.run"
-      >
-        <template #icon-left>
-          <span class="inline-flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
-            <OIcon v-if="item.checked" :name="assistantGlyph.done" size="sm" />
-          </span>
-        </template>
-        {{ item.label }}
-      </ODropdownItem>
-    </ODropdownGroup>
+    <ODropdownItem
+      v-for="item in places"
+      :key="item.id"
+      role="menuitemradio"
+      :aria-checked="item.checked"
+      :disabled="item.disabled"
+      :focusable-unavailable="item.disabled"
+      :description="item.hint"
+      :data-test="`assistant-shell-place-${item.id}`"
+      @select="item.run"
+    >
+      {{ item.label }}
+      <template v-if="item.checked" #icon-right>
+        <OIcon :name="assistantGlyph.done" size="sm" class="text-assistant-link ms-auto" />
+      </template>
+    </ODropdownItem>
     <template v-if="placement === 'sidebar' && !sheet">
       <ODropdownSeparator />
-      <ODropdownGroup :label="t('assistant.shell.width')">
+      <ODropdownSub :text-value="t('assistant.shell.width')" data-test="assistant-shell-width">
+        <template #trigger>{{ t("assistant.shell.width") }}</template>
         <ODropdownItem
           v-for="item in widths"
           :key="item.id"
@@ -59,17 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="item.dataTest"
           @select="item.run"
         >
-          <template #icon-left>
-            <span
-              class="inline-flex size-4 shrink-0 items-center justify-center"
-              aria-hidden="true"
-            >
-              <OIcon v-if="item.checked" :name="assistantGlyph.done" size="sm" />
-            </span>
-          </template>
           {{ item.label }}
+          <template v-if="item.checked" #icon-right>
+            <OIcon :name="assistantGlyph.done" size="sm" class="text-assistant-link ms-auto" />
+          </template>
         </ODropdownItem>
-      </ODropdownGroup>
+      </ODropdownSub>
       <OText
         v-if="prefersWindow"
         as="p"
@@ -82,7 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-if="placement === 'window' && windowHost">
       <ODropdownSeparator />
-      <ODropdownGroup :label="t('assistant.window.group')">
+      <ODropdownSub :text-value="t('assistant.window.position')">
+        <template #trigger>
+          <span data-test="assistant-window-position">{{ t("assistant.window.position") }}</span>
+        </template>
         <ODropdownItem
           v-for="corner in corners"
           :key="corner.id"
@@ -91,7 +85,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("assistant.window.moveTo", { corner: corner.label }) }}
         </ODropdownItem>
-        <ODropdownSeparator />
+        <ODropdownItem
+          data-test="assistant-window-move-keyboard"
+          @select="windowHost.startMode('move')"
+        >
+          {{ t("assistant.window.moveKeyboard") }}
+        </ODropdownItem>
+      </ODropdownSub>
+      <ODropdownSub :text-value="t('assistant.window.size')">
+        <template #trigger>
+          <span data-test="assistant-window-size">{{ t("assistant.window.size") }}</span>
+        </template>
         <ODropdownItem
           v-for="step in steps"
           :key="step.id"
@@ -103,23 +107,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ step.label }}
         </ODropdownItem>
-        <ODropdownSeparator />
-        <ODropdownItem
-          data-test="assistant-window-move-keyboard"
-          @select="windowHost.startMode('move')"
-        >
-          {{ t("assistant.window.moveKeyboard") }}
-        </ODropdownItem>
         <ODropdownItem
           data-test="assistant-window-resize-keyboard"
           @select="windowHost.startMode('resize')"
         >
           {{ t("assistant.window.resizeKeyboard") }}
         </ODropdownItem>
+        <ODropdownSeparator />
         <ODropdownItem data-test="assistant-window-reset-size" @select="windowHost.resetSize()">
           {{ t("assistant.window.resetSize") }}
         </ODropdownItem>
-      </ODropdownGroup>
+      </ODropdownSub>
     </template>
   </component>
 </template>
@@ -187,9 +185,9 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -231,7 +229,7 @@ const places = computed(() => {
   const sidebar = {
     id: "sidebar",
     label: t("assistant.shell.placeSidebar"),
-    hint: t("assistant.shell.placeSidebarHint"),
+    hint: undefined,
     checked: props.placement === "sidebar",
     disabled: false,
     run: toSidebar,
@@ -242,7 +240,7 @@ const places = computed(() => {
     hint:
       atCap.value && props.placement !== "window"
         ? t("assistant.shell.placeWindowLimit")
-        : t("assistant.shell.placeWindowHint"),
+        : undefined,
     checked: props.placement === "window",
     disabled: atCap.value && props.placement !== "window",
     run: toWindow,
@@ -250,7 +248,7 @@ const places = computed(() => {
   const full = {
     id: "full",
     label: t("assistant.shell.placeFull"),
-    hint: t("assistant.shell.placeFullHint"),
+    hint: undefined,
     checked: props.placement === "full",
     disabled: false,
     run: toFull,
@@ -259,13 +257,14 @@ const places = computed(() => {
     id: "dock",
     label: t("assistant.shell.placeDock"),
     hint: undefined,
-    checked: false,
+    checked: props.placement === "docked",
     disabled: false,
     run: toDock,
   };
   if (modalDock.value) return [full];
   if (props.sheet) return props.placement === "sidebar" ? [full] : [sidebar, full];
   if (!lgUp.value) return [sidebar, full];
+  if (props.placement === "docked") return [dock, window, full];
   return [sidebar, window, full, ...(chatDock.value ? [dock] : [])];
 });
 

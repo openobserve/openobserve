@@ -33,6 +33,7 @@ export function runRow(sid: string, over: Partial<RunRow> = {}): RunRow {
     request: null,
     expiresAt: null,
     extendsLeft: null,
+    card: null,
     consent: false,
     otherOrg: false,
     stale: false,
@@ -48,7 +49,6 @@ export function fakeRuns(initial: RunRow[] = []) {
   const requested = ref(false);
   const runs = {
     rows: computed(() => rows.value),
-    rail: computed(() => rows.value),
     otherOrg: computed(() => rows.value.filter((row) => row.otherOrg)),
     cap: computed(() => 3),
     active: computed(() => active.value),
@@ -57,8 +57,6 @@ export function fakeRuns(initial: RunRow[] = []) {
     openRequested: requested,
     requestOpen: vi.fn(async () => void (requested.value = true)),
     takeOpenRequest: vi.fn(() => void (requested.value = false)),
-    clear: vi.fn(),
-    clearFinished: vi.fn(),
     stop: vi.fn(async () => undefined),
     open: vi.fn(async () => undefined),
     light: () => null,

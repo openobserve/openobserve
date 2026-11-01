@@ -19,7 +19,13 @@ import assistantService, { type ChatSummaryWire } from "@/services/assistant";
 import { raw, type I18nText } from "@/types/i18n";
 
 import { isRunning, openWindowsOf, type AssistantStoreInternal } from "./assistantStore";
-import type { AssistantSession, AssistantState, HintChannel, Sid } from "./assistantStore.types";
+import type {
+  AssistantSession,
+  AssistantState,
+  HintChannel,
+  PendingApproval,
+  Sid,
+} from "./assistantStore.types";
 import { isHelperChat } from "./historyContext";
 import { HEARTBEAT_TRUST_MS } from "./historyElsewhere";
 import type { RemoteTurn } from "./lifecycle";
@@ -72,10 +78,12 @@ export interface RunRow {
   expiresAt: number | null;
   /** The card's user More time left, once the server said. */
   extendsLeft: number | null;
+  /** The card this tab holds for the decision, which the notice names; `null` when only the server knows it. */
+  card: PendingApproval | null;
   consent: boolean;
   /** Another org's chat: counted in the light, never opened in place (PO B51). */
   otherOrg: boolean;
-  /** Past the 30 minutes: the rail keeps it, the list does not. */
+  /** Past the 30 minutes: the list no longer counts it as new. */
   stale: boolean;
 }
 
@@ -118,23 +126,19 @@ export interface RunsDeps {
 export interface AssistantRuns {
   /** Everything the list shows, this org first and then other orgs' rows. */
   rows: ComputedRef<RunRow[]>;
-  /** `rows` plus the finished rows past 30 minutes, for the full-view rail. */
-  rail: ComputedRef<RunRow[]>;
   otherOrg: ComputedRef<RunRow[]>;
   cap: ComputedRef<number>;
   /** Running chats, a chat waiting on an approval included (D2 decision 10). */
   active: ComputedRef<number>;
   /** One per decision, however many chats wait on it; other orgs' count too, as in the light. */
   needsCount: ComputedRef<number>;
-  /** Decisions no visible container shows, for the notice and the expiry warnings. */
+  /** Decisions no visible container shows, other orgs' included, expiring first; for the notice and its warnings. */
   decisions: ComputedRef<RunRow[]>;
-  /** Set until a Runs button takes the request, so a container that mounts late still opens the list. */
+  /** Set until a container takes the request, so one that mounts late still opens All chats. */
   openRequested: Readonly<Ref<boolean>>;
-  /** Shows the container and asks its Runs button for the list. */
+  /** Shows the container and asks it for All chats, In progress leading. */
   requestOpen(invoker?: HTMLElement | null): Promise<void>;
   takeOpenRequest(): void;
-  clear(sid: Sid): void;
-  clearFinished(): void;
   stop(row: RunRow): Promise<void>;
   open(
     row: RunRow,
@@ -187,6 +191,8 @@ export function otherOrgRuns(
       group: session.pendingApproval ? "needs_you" : "answering",
       status: session.pendingApproval ? "needsApproval" : "working",
       request: session.pendingApproval?.id ?? null,
+      expiresAt: session.pendingApproval?.expiresAt ?? null,
+      card: session.pendingApproval ?? null,
       otherOrg: true,
     });
   }
@@ -197,6 +203,7 @@ export function otherOrgRuns(
       group: turn.state === "needs_you" ? "needs_you" : "answering",
       status: turn.state === "needs_you" ? "needsApproval" : "working",
       request: turn.state === "needs_you" ? turn.sid : null,
+      expiresAt: turn.expiresAt ?? null,
       otherOrg: true,
     });
   }
@@ -285,7 +292,6 @@ export function createRuns(deps: RunsDeps): AssistantRuns {
   const otherOrg = computed(() => otherOrgRuns(input()));
   const listed = computed(() => all.value.filter((row) => !row.stale));
   const rows = computed(() => [...listed.value, ...otherOrg.value]);
-  const rail = computed(() => [...all.value, ...otherOrg.value]);
   const running = computed(() =>
     listed.value.filter(
       (row) => (row.group === "needs_you" && !row.consent) || row.group === "answering",
@@ -293,7 +299,9 @@ export function createRuns(deps: RunsDeps): AssistantRuns {
   );
   const decisions = computed(() => {
     const shown = shownSids(state());
-    return listed.value.filter((row) => row.group === "needs_you" && !shown.includes(row.sid));
+    return rows.value
+      .filter((row) => row.group === "needs_you" && !shown.includes(row.sid))
+      .sort((a, b) => expiryOf(a) - expiryOf(b));
   });
   const finished = (row: RunRow) => row.group === "failed" || row.group === "ready";
 
@@ -392,7 +400,6 @@ export function createRuns(deps: RunsDeps): AssistantRuns {
 
   return {
     rows,
-    rail,
     otherOrg,
     cap: computed(() => limit.value ?? RUN_CAP_DEFAULT),
     active: computed(() => running.value.length),
@@ -408,8 +415,6 @@ export function createRuns(deps: RunsDeps): AssistantRuns {
       openRequested.value = true;
     },
     takeOpenRequest: () => void (openRequested.value = false),
-    clear: (sid) => clearAll([sid]),
-    clearFinished: () => clearAll(listed.value.filter(finished).map((row) => row.sid)),
     stop: stopRow,
     open: openRow,
     light() {
@@ -440,7 +445,6 @@ function emptyRuns(): AssistantRuns {
   const zero = computed(() => 0);
   return {
     rows: none,
-    rail: none,
     otherOrg: none,
     cap: computed(() => RUN_CAP_DEFAULT),
     active: zero,
@@ -449,13 +453,15 @@ function emptyRuns(): AssistantRuns {
     openRequested: ref(false),
     requestOpen: async () => undefined,
     takeOpenRequest: () => undefined,
-    clear: () => undefined,
-    clearFinished: () => undefined,
     stop: async () => undefined,
     open: async () => undefined,
     light: () => null,
     dispose: () => undefined,
   };
+}
+
+function expiryOf(row: RunRow): number {
+  return row.expiresAt ?? Number.POSITIVE_INFINITY;
 }
 
 function baseRow(sid: Sid, org: string, now: number): RunRow {
@@ -472,6 +478,7 @@ function baseRow(sid: Sid, org: string, now: number): RunRow {
     request: null,
     expiresAt: null,
     extendsLeft: null,
+    card: null,
     consent: false,
     otherOrg: false,
     stale: false,
@@ -524,6 +531,7 @@ function sessionRow(session: AssistantSession, input: RunsInput): RunRow | null 
       request: pending.id,
       expiresAt: pending.expiresAt ?? null,
       extendsLeft: pending.userExtendsLeft ?? null,
+      card: pending,
     };
   if (isRunning(session.turn)) return { ...base, status: runningStatus(session, input) };
   return session.unread ? finishedRow(session, base, input) : null;
