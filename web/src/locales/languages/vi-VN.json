@@ -21619,7 +21619,8 @@
         "resetColumnWidths": "Đặt lại độ rộng cột"
       },
       "selectAllRows": "Chọn tất cả các hàng",
-      "selectRow": "Chọn hàng {name}",
+      "selectRowAt": "Chọn hàng {index}",
+      "selectRowAtNamed": "Chọn hàng {index}, {name}",
       "removeColumnAria": "Xóa cột",
       "formatColumnAria": "Định dạng cột",
       "selectedOfTotal": "Đã chọn {selected} trong {total}",
@@ -26418,6 +26419,8 @@
     "section_handled": "Đã xử lý",
     "section_resolved": "Đã giải quyết",
     "sectionHint_ringing": "chưa ai xác nhận — vẫn đang gọi",
+    "sectionHint_ringingRouted": "chưa ai xác nhận — {count} trong số này vẫn đang gọi trực | chưa ai xác nhận — {count} trong số này vẫn đang gọi trực",
+    "sectionHint_ringingUnrouted": "{count} không có nhóm nên không gọi trực | {count} không có nhóm nên không gọi trực",
     "sectionHint_snoozed": "tạm dừng gọi — chúng sẽ tự quay lại",
     "sectionHint_handled": "đã xác nhận — mỗi mục đều có người phụ trách",
     "sectionHint_resolved": "đã đóng — giữ lại để lưu hồ sơ",

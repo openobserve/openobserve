@@ -119,6 +119,14 @@ describe("journey steps that type a credential", () => {
     ...over,
   });
 
+  it("decides a long run of malformed placeholders without backtracking", () => {
+    const started = performance.now();
+    const step = typed({ selector: "#password", value: `{{a}} `.repeat(5000) + "{{" });
+
+    expect(stepTypesCredential(step)).toBe(true);
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
+
   it.each([
     ["a password input", { selector: 'input[type="password"]' }],
     [
