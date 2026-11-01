@@ -15191,6 +15191,10 @@
     "reviewAndApplyFilters": "查看筛选条件并将其应用于 Traces",
     "spansLabel": "Span",
     "errorsLabel": "错误",
+    "errorStrip": {
+      "spanLabel": "{service} · {operation}",
+      "menuTitle": "错误 Span，最深优先"
+    },
     "previousMatch": "上一个匹配项",
     "nextMatch": "下一个匹配项",
     "searchInSpans": "在 Span 中搜索",
@@ -15440,6 +15444,22 @@
       "roleAssistant": "助手",
       "roleSystem": "系统",
       "roleTool": "工具"
+    },
+    "results": {
+      "tracesWithMatchingSpan": "{count} 个追踪有匹配的 Span | {count} 个追踪有匹配的 Span",
+      "spansColumnTooltip": "追踪中的 Span 总数",
+      "fieldValueCountsCaption": "计数为当前时间范围内具有该值的 Span 数量",
+      "errorColumn": "错误",
+      "eventsColumn": "事件",
+      "eventExceptions": "{count} 个异常 | {count} 个异常",
+      "eventLogs": "{count} 条日志 | {count} 条日志",
+      "eventCounts": "{exceptions} · {logs}",
+      "eventsHoverTitle": "{operation} 上的事件",
+      "eventsHoverOrder": "{count}，按时间顺序",
+      "eventKindException": "异常",
+      "eventKindLog": "日志",
+      "eventOffset": "+{offset}",
+      "moreEvents": "另有 {count} 个"
     },
     "tableColumns": {
       "service": "服务",

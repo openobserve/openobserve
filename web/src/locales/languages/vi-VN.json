@@ -15191,6 +15191,10 @@
     "reviewAndApplyFilters": "Xem lại và áp dụng bộ lọc cho Trace",
     "spansLabel": "span",
     "errorsLabel": "lỗi",
+    "errorStrip": {
+      "spanLabel": "{service} · {operation}",
+      "menuTitle": "Span lỗi, sâu nhất trước"
+    },
     "previousMatch": "Kết quả trước",
     "nextMatch": "Kết quả tiếp theo",
     "searchInSpans": "Tìm kiếm trong span",
@@ -15440,6 +15444,22 @@
       "roleAssistant": "Trợ lý",
       "roleSystem": "Hệ thống",
       "roleTool": "Công cụ"
+    },
+    "results": {
+      "tracesWithMatchingSpan": "{count} trace có span khớp | {count} trace có span khớp",
+      "spansColumnTooltip": "Tổng số span trong trace",
+      "fieldValueCountsCaption": "Số lượng là các span có giá trị này trong phạm vi hiện tại",
+      "errorColumn": "Lỗi",
+      "eventsColumn": "Sự kiện",
+      "eventExceptions": "{count} ngoại lệ | {count} ngoại lệ",
+      "eventLogs": "{count} nhật ký | {count} nhật ký",
+      "eventCounts": "{exceptions} · {logs}",
+      "eventsHoverTitle": "Sự kiện trên {operation}",
+      "eventsHoverOrder": "{count}, theo thứ tự thời gian",
+      "eventKindException": "ngoại lệ",
+      "eventKindLog": "nhật ký",
+      "eventOffset": "+{offset}",
+      "moreEvents": "+{count} nữa"
     },
     "tableColumns": {
       "service": "Dịch vụ",

@@ -15191,6 +15191,10 @@
     "reviewAndApplyFilters": "Просмотреть и применить фильтры к трейсам",
     "spansLabel": "спаны",
     "errorsLabel": "ошибки",
+    "errorStrip": {
+      "spanLabel": "{service} · {operation}",
+      "menuTitle": "Спаны с ошибками, сначала самые глубокие"
+    },
     "previousMatch": "Предыдущее совпадение",
     "nextMatch": "Следующее совпадение",
     "searchInSpans": "Искать в спанах",
@@ -15440,6 +15444,22 @@
       "roleAssistant": "Ассистент",
       "roleSystem": "Система",
       "roleTool": "Инструмент"
+    },
+    "results": {
+      "tracesWithMatchingSpan": "{count} трейс с подходящим спаном | {count} трейсов с подходящим спаном",
+      "spansColumnTooltip": "Всего спанов в трейсе",
+      "fieldValueCountsCaption": "Счётчики — это спаны с этим значением в текущем диапазоне",
+      "errorColumn": "Ошибка",
+      "eventsColumn": "События",
+      "eventExceptions": "{count} исключение | {count} исключений",
+      "eventLogs": "{count} лог | {count} логов",
+      "eventCounts": "{exceptions} · {logs}",
+      "eventsHoverTitle": "События в {operation}",
+      "eventsHoverOrder": "{count}, в порядке времени",
+      "eventKindException": "исключение",
+      "eventKindLog": "лог",
+      "eventOffset": "+{offset}",
+      "moreEvents": "и ещё {count}"
     },
     "tableColumns": {
       "service": "Сервис",

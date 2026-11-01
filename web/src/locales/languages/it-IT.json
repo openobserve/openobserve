@@ -15191,6 +15191,10 @@
     "reviewAndApplyFilters": "Rivedi e applica i filtri alle tracce",
     "spansLabel": "span",
     "errorsLabel": "errori",
+    "errorStrip": {
+      "spanLabel": "{service} · {operation}",
+      "menuTitle": "Span con errori, dal più profondo"
+    },
     "previousMatch": "Corrispondenza precedente",
     "nextMatch": "Corrispondenza successiva",
     "searchInSpans": "Cerca negli span",
@@ -15440,6 +15444,22 @@
       "roleAssistant": "Assistente",
       "roleSystem": "Sistema",
       "roleTool": "Strumento"
+    },
+    "results": {
+      "tracesWithMatchingSpan": "{count} traccia con uno span corrispondente | {count} tracce con uno span corrispondente",
+      "spansColumnTooltip": "Span totali nella traccia",
+      "fieldValueCountsCaption": "I conteggi sono span con questo valore, nell'intervallo corrente",
+      "errorColumn": "Errore",
+      "eventsColumn": "Eventi",
+      "eventExceptions": "{count} eccezione | {count} eccezioni",
+      "eventLogs": "{count} log | {count} log",
+      "eventCounts": "{exceptions} · {logs}",
+      "eventsHoverTitle": "Eventi su {operation}",
+      "eventsHoverOrder": "{count}, in ordine temporale",
+      "eventKindException": "eccezione",
+      "eventKindLog": "log",
+      "eventOffset": "+{offset}",
+      "moreEvents": "+{count} altri"
     },
     "tableColumns": {
       "service": "Servizio",

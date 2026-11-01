@@ -16329,7 +16329,6 @@
     },
     "detailTable": {
       "addIcon": "ac9dfbff07ca5a3f",
-      "contentCopiedSuccessfully": "f98423629a72ca51",
       "noDataAvailable": "b00811d81b2f20d8",
       "sendToAiChat": "ca126ff149d20388"
     },
@@ -20868,6 +20867,23 @@
     "executionErrorDesc": "a416e218fd2e8118",
     "expandRange": "951a8f1dd3ac554c",
     "expandRangeDesc": "608a2013ea43b54e",
+    "explain": {
+      "functionArgs": "23ccb311e23591dc",
+      "missingStream": "6c9df1ac8e6fdb24",
+      "notANumber": "e59bdfd66bc6af20",
+      "notAStatement": "ca113cdf9328b827",
+      "notGrouped": "26442db638b19196",
+      "streamNotFound": "590b2fb0f51f4840",
+      "unclosedBracket": "86c4cde703e1f012",
+      "unclosedDelimiter": "663da4ab2c44fde6",
+      "unclosedQuote": "33d6fba874d7f9c1",
+      "unexpectedEnd": "a925691b4ea0ff51",
+      "unexpectedEndAfter": "ec8170badd42dbd1",
+      "unexpectedToken": "8846e9f8b283322a",
+      "unknownField": "4f28d8cf4a5530b2",
+      "unknownFunction": "13ff0e1450a91e6f",
+      "unknownFunctionSuggest": "0747842459e85e05"
+    },
     "fieldNotFound": "89920d262b850d8a",
     "fieldNotFoundDesc": "d705d7b17e7efe50",
     "fixQuery": "4ab707638498c314",
@@ -27652,6 +27668,10 @@
     "error": "d98ee0e5f9399db9",
     "errorCount": "6b8c59fe228558f0",
     "errorSpans": "19c03e5b2f215135",
+    "errorStrip": {
+      "menuTitle": "2a3929b2c638caac",
+      "spanLabel": "a35aeda058f35dd0"
+    },
     "errorTraces": "e9aefb224ed93ab1",
     "errorsLabel": "be4bd56772770471",
     "escapedLabel": "bc78f872d7b6c370",
@@ -27838,6 +27858,22 @@
     "p50Median": "76661f0c8ac6ce54",
     "previousMatch": "daa2f8c3fc897cc7",
     "redMetrics": "a9d1ab9a2d6d4dac",
+    "results": {
+      "errorColumn": "54a0e8c17ebb21a1",
+      "eventCounts": "7a0e9c1af1b3ba17",
+      "eventExceptions": "2ea75cfd9a3ec2ed",
+      "eventKindException": "2104e56ef446302c",
+      "eventKindLog": "836ff184e7b41b1e",
+      "eventLogs": "1f2a2a07ec3f5874",
+      "eventOffset": "b108bcbf6c8aa6cf",
+      "eventsColumn": "8d14f6e72de8f18a",
+      "eventsHoverOrder": "b8d161636fead509",
+      "eventsHoverTitle": "201a1b82683cb7e8",
+      "fieldValueCountsCaption": "c6ce1d3d4d2c5d21",
+      "moreEvents": "ecccea94c62457a7",
+      "spansColumnTooltip": "3d4bc223031676a9",
+      "tracesWithMatchingSpan": "628f865548a5bc81"
+    },
     "reviewAndApplyFilters": "28a6fd8929f1ffa5",
     "rowNav": {
       "firstResult": "9ca403a8f5809d02",
@@ -27859,6 +27895,7 @@
       "borderColor": "a42d1353ab153ecc",
       "borderColorMetric": "cb702378f31507ef",
       "close": "7d9eb7acb13e2462",
+      "dashedRingInferred": "48dcfdb67330a622",
       "distribution": "72a23e549d099bbd",
       "entities": "2cc497857559ff85",
       "errorAccessDenied": "40f6fa37d9dac17b",

@@ -15186,6 +15186,10 @@
     "reviewAndApplyFilters": "檢閱並套用篩選條件至追蹤",
     "spansLabel": "spans",
     "errorsLabel": "錯誤",
+    "errorStrip": {
+      "spanLabel": "{service} · {operation}",
+      "menuTitle": "錯誤 Span，由深至淺"
+    },
     "previousMatch": "上一個符合",
     "nextMatch": "下一個符合",
     "searchInSpans": "在 spans 中搜尋",
@@ -15435,6 +15439,22 @@
       "roleAssistant": "助手",
       "roleSystem": "系統",
       "roleTool": "工具"
+    },
+    "results": {
+      "tracesWithMatchingSpan": "{count} 個包含符合 Span 的追蹤 | {count} 個包含符合 Span 的追蹤",
+      "spansColumnTooltip": "追蹤中的 Span 總數",
+      "fieldValueCountsCaption": "計數為目前範圍內具有此值的 Span 數量",
+      "errorColumn": "錯誤",
+      "eventsColumn": "事件",
+      "eventExceptions": "{count} 個例外 | {count} 個例外",
+      "eventLogs": "{count} 筆日誌 | {count} 筆日誌",
+      "eventCounts": "{exceptions} · {logs}",
+      "eventsHoverTitle": "{operation} 上的事件",
+      "eventsHoverOrder": "{count}，依時間順序",
+      "eventKindException": "例外",
+      "eventKindLog": "日誌",
+      "eventOffset": "+{offset}",
+      "moreEvents": "還有 {count} 個"
     },
     "tableColumns": {
       "service": "服務",
