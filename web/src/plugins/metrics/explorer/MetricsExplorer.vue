@@ -1505,12 +1505,12 @@ export default defineComponent({
       const blob = visualizeBlob.value;
       if (blob) url.searchParams.set("metrics_data", blob);
       else url.searchParams.delete("metrics_data");
-      // A shared chart shows the window it was shared with, so a relative range is frozen (µs -> ms).
+      // A shared chart shows the window it was shared with, so a relative range is frozen.
       const ct = dateTimePickerRef.value?.getConsumableDateTime?.();
       if (ct?.startTime && ct?.endTime) {
         url.searchParams.delete("period");
-        url.searchParams.set("from", String(Math.floor(ct.startTime / 1000)));
-        url.searchParams.set("to", String(Math.floor(ct.endTime / 1000)));
+        url.searchParams.set("from", String(ct.startTime));
+        url.searchParams.set("to", String(ct.endTime));
       }
       return url.href;
     });

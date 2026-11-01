@@ -591,10 +591,11 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     await page.goto(new URL(short.pathname + short.search, process.env.ZO_BASE_URL).href);
     await expect
       .poll(() => new URL(page.url()).searchParams.get('from'), { timeout: 15000 })
-      .toMatch(/^\d+$/);
+      .toMatch(/^\d{16}$/);
     testLogger.info(`Short URL resolved to ${page.url()}`);
     const params = new URL(page.url()).searchParams;
-    expect(params.get('to')).toMatch(/^\d+$/);
+    // The picker's microseconds, as the explorer's own URL sync writes them.
+    expect(params.get('to')).toMatch(/^\d{16}$/);
     expect(params.get('period')).toBeNull();
     expect(Number(params.get('to'))).toBeGreaterThan(Number(params.get('from')));
 

@@ -950,7 +950,7 @@ describe("MetricsExplorer wiring", () => {
         expect(blob?.data?.type).toBe("line");
       });
 
-      it("freezes a relative window into the picker's absolute from/to, in ms", async () => {
+      it("freezes a relative window into the picker's absolute from/to, in µs", async () => {
         routerState.query = { period: "15m" };
         window.history.replaceState({}, "", "/metrics?period=15m");
         const wrapper = mountExplorer({
@@ -968,8 +968,8 @@ describe("MetricsExplorer wiring", () => {
 
         const params = new URL((wrapper.vm as any).shareUrl).searchParams;
         expect(params.get("period")).toBeNull();
-        expect(params.get("from")).toBe("1700000000000");
-        expect(params.get("to")).toBe("1700000900000");
+        expect(params.get("from")).toBe("1700000000000000");
+        expect(params.get("to")).toBe("1700000900000000");
         window.history.replaceState({}, "", "/");
       });
 
