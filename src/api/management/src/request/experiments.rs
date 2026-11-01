@@ -406,50 +406,13 @@ async fn require_experiment_visibility(
     Ok(())
 }
 
-/// The Remote Task reference is the one place an Experiment reaches outside
-/// itself, so the caller must be able to see the Task it names.
-///
-/// Without this, a caller who knows a hidden `name@version` can make the
-/// platform place that Task's credentialed outbound call and can read its output
-/// back through the Experiment results. The Experiment routes authorize the
-/// Experiment alone, so nothing else covers this.
-async fn require_remote_task_visibility(
-    org_id: &str,
-    user_id: &str,
-    task_ref: &str,
-) -> Result<(), Response> {
-    // The OpenFGA object is the head's `entity_id`, not the `name@version` an
-    // Experiment carries, so the reference has to be resolved first. An
-    // unresolvable reference is answered as a denial rather than a 404, so that
-    // a caller cannot use the difference to probe for hidden Tasks.
-    let task = remote_tasks::resolve_task_ref(org_id, task_ref)
-        .await
-        .map_err(|_| MetaHttpResponse::forbidden("Unauthorized Access"))?;
-    let permitted_objects = openobserve_api_common::auth::validator::list_objects_for_user(
-        org_id,
-        user_id,
-        "GET",
-        "remote_task",
-    )
-    .await
-    .map_err(|error| MetaHttpResponse::forbidden(error.to_string()))?;
-    if !is_ofga_object_visible(
-        org_id,
-        "remote_task",
-        &task.entity_id,
-        permitted_objects.as_deref(),
-    ) {
-        return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
-    }
-    Ok(())
-}
-
 /// The objects an Experiment reads besides itself, as `(resource, id)`.
 ///
 /// A run returns the Dataset's rows, renders the Prompt's text and spends
 /// through the Provider's key, so the caller must be able to read each one. A
-/// Remote Task is checked on its own: its OpenFGA object is the resolved head,
-/// not the reference the Experiment carries.
+/// Remote Task is added by the caller once its reference is resolved: its
+/// OpenFGA object is the head's `entity_id`, not the `name@version` the
+/// Experiment carries.
 fn referenced_objects<'a>(
     dataset_id: &'a str,
     task: &'a ExperimentTaskConfig,
@@ -472,13 +435,27 @@ async fn require_reference_access(
     dataset_id: &str,
     task: &ExperimentTaskConfig,
 ) -> Result<(), Response> {
-    if let Some((task_ref, _)) = task.remote_task() {
-        require_remote_task_visibility(org_id, user_id, task_ref).await?;
+    // An unresolvable Remote Task reference is answered as a denial rather than
+    // a 404, so that a caller cannot use the difference to probe for hidden Tasks.
+    let remote_task = match task.remote_task() {
+        Some((task_ref, _)) => Some(
+            remote_tasks::resolve_task_ref(org_id, task_ref)
+                .await
+                .map_err(|_| MetaHttpResponse::forbidden("Unauthorized Access"))?,
+        ),
+        None => None,
+    };
+    let mut objects = referenced_objects(dataset_id, task);
+    if let Some(remote_task) = &remote_task {
+        objects.push(("remote_tasks", remote_task.entity_id.as_str()));
     }
-    for (resource, id) in referenced_objects(dataset_id, task) {
+    for (resource, id) in objects {
         // One check per object, as the `GET /{resource}/{id}` routes make it:
         // the permitted-object list is skipped when list filtering is off.
-        if !check_permissions(id, org_id, user_id, resource, "GET", None, false, false, true).await
+        if !check_permissions(
+            id, org_id, user_id, resource, "GET", None, false, false, true,
+        )
+        .await
         {
             return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
@@ -1492,7 +1469,10 @@ pub async fn clone_experiment(
     if let Err(response) = require_reference_access(
         &org_id,
         &user.user_id,
-        overrides.dataset_id.as_deref().unwrap_or(&source.dataset_id),
+        overrides
+            .dataset_id
+            .as_deref()
+            .unwrap_or(&source.dataset_id),
         overrides.task.as_ref().unwrap_or(&source.task),
     )
     .await
@@ -1842,34 +1822,14 @@ mod tests {
             referenced_objects("dataset-1", &remote),
             vec![("datasets", "dataset-1")]
         );
-    }
-
-    /// The Remote Task check keys on the head `entity_id`, so it has to accept
-    /// the same grant shapes the Remote Task list already accepts.
-    #[test]
-    fn remote_task_visibility_accepts_exact_or_org_wildcard_and_rejects_other_tasks() {
-        let exact = vec!["remote_task:task-1".to_string()];
-        let wildcard = vec!["remote_task:_all_acme".to_string()];
-        let other = vec!["remote_task:task-2".to_string()];
-
-        assert!(is_ofga_object_visible(
-            "acme",
-            "remote_task",
-            "task-1",
-            Some(&exact)
-        ));
-        assert!(is_ofga_object_visible(
-            "acme",
-            "remote_task",
-            "task-1",
-            Some(&wildcard)
-        ));
-        assert!(!is_ofga_object_visible(
-            "acme",
-            "remote_task",
-            "task-1",
-            Some(&other)
-        ));
+        let sdk = ExperimentTaskConfig::Sdk {
+            task_fingerprint: "sha256:abc".to_string(),
+            config: serde_json::json!({}),
+        };
+        assert_eq!(
+            referenced_objects("dataset-1", &sdk),
+            vec![("datasets", "dataset-1")]
+        );
     }
 
     #[test]
