@@ -15,7 +15,10 @@
 
 //! Port of o2-ai's `project_events`; model names are not redacted (unknown here).
 
-use std::{collections::HashMap, sync::LazyLock};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
 
 use config::{
     meta::oncall::confidence::strip_call_ref,
@@ -37,6 +40,16 @@ const FLUSH_BREAKS: [char; 4] = ['.', '!', '?', '\n'];
 const STREAM_HOLDBACK_WORDS: usize = 3;
 const STREAM_CARRY_MAX: usize = 4096;
 const STREAM_HOLDBACK: usize = 48;
+// Blocks o2-ai's live stream holds out of the answer; only at the start of a line.
+const FINDINGS_FENCE: &str = "```findings";
+const HANDOFF_FENCE: &str = "```handoff";
+const FENCE_CLOSE: &str = "\n```";
+const CODE_FENCE: &str = "```";
+const FINDINGS_FRAME: &str = "findings";
+const FINDINGS_SCHEMA_JSON: &str = include_str!("findings.schema.json");
+const QUERY_AGENT: &str = "generate-query";
+// A model's `[^N]` step reference is its position among the turn's calls.
+const CALL_POSITION_MAX_DIGITS: usize = 3;
 
 pub(crate) const SESSION_ARG: &str = "_o2_session";
 const NAVIGATION_TOOL: &str = "create_navigation";
@@ -117,7 +130,7 @@ const STREAMLESS_TOOLS: [&str; 18] = [
 const TRUNCATED_SUFFIX: &str = " (truncated)";
 
 /// Tools no projection shows; the sentinels at the end are RCA thread structure.
-pub(crate) const HIDDEN_TOOLS: [&str; 25] = [
+pub(crate) const HIDDEN_TOOLS: [&str; 26] = [
     "tool_search",
     "convert_time_to_microseconds",
     "calculate_time_range",
@@ -137,6 +150,7 @@ pub(crate) const HIDDEN_TOOLS: [&str; 25] = [
     "todowrite",
     "todoread",
     "skill",
+    "ask_user",
     "record_step",
     "submit_report",
     "record_hypothesis",
@@ -215,6 +229,10 @@ static MODEL_NAME: LazyLock<(Regex, String)> = LazyLock::new(|| {
     )
 });
 
+static FINDINGS_SCHEMA: LazyLock<Value> = LazyLock::new(|| {
+    config::utils::json::from_str(FINDINGS_SCHEMA_JSON).expect("valid findings schema")
+});
+
 static QUERY_BLOCK: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?s)```([A-Za-z]+)[^\n]*\n(.*?)```").expect("valid query block"));
 static NONCED_OPENER: LazyLock<Regex> =
@@ -243,9 +261,94 @@ struct StreamState {
     scrub_carry: String,
     pending_tool_calls: HashMap<String, CallInfo>,
     last_tools_call_info: Option<CallInfo>,
+    /// The last character shown, so a fence opening a part is judged like the live stream.
+    shown_tail: Option<char>,
+    /// The body of the turn's last findings block that made a valid frame.
+    findings_raw: Option<String>,
+    turn_call_ids: Vec<String>,
+    step_call_ids: HashSet<String>,
 }
 
 impl StreamState {
+    /// What a text part shows: findings and hand-off blocks stay out, as on the live stream.
+    fn shape_text(&mut self, text: &str) -> String {
+        let mut shown = String::new();
+        let mut rest = text;
+        while let Some((start, fence)) = self.next_fence(rest) {
+            shown.push_str(&rest[..start]);
+            let body = &rest[start + fence.len()..];
+            let (block, after, closed) = match body.find(FENCE_CLOSE) {
+                Some(end) => (&body[..end], &body[end + FENCE_CLOSE.len()..], true),
+                None => (body, "", false),
+            };
+            rest = after;
+            if fence == FINDINGS_FENCE {
+                shown.push_str(&self.settle_findings(block, closed));
+            }
+        }
+        shown.push_str(rest);
+        if let Some(last) = shown.chars().next_back() {
+            self.shown_tail = Some(last);
+        }
+        shown
+    }
+
+    fn next_fence(&self, text: &str) -> Option<(usize, &'static str)> {
+        [FINDINGS_FENCE, HANDOFF_FENCE]
+            .into_iter()
+            .filter_map(|fence| Some((fence_start(text, self.shown_tail, fence)?, fence)))
+            .min_by_key(|(start, _)| *start)
+    }
+
+    /// Holds a valid block for the turn's `findings` frame; any other block stays as ordinary text.
+    fn settle_findings(&mut self, block: &str, closed: bool) -> String {
+        if findings_body(block).is_some() {
+            self.findings_raw = Some(block.to_string());
+            return String::new();
+        }
+        self.findings_raw = None;
+        let close = if closed { FENCE_CLOSE } else { "" };
+        format!("{FINDINGS_FENCE}{block}{close}")
+    }
+
+    /// The frame the live turn ended with: evidence naming no visible step is only inferred.
+    fn findings_frame(&self) -> Option<Value> {
+        let mut frame = findings_body(self.findings_raw.as_deref()?)?;
+        let evidence = frame.get_mut("evidence")?.as_array_mut()?;
+        for item in evidence.iter_mut().filter_map(Value::as_object_mut) {
+            let Some(reference) = item.get("call_id").and_then(Value::as_str) else {
+                continue;
+            };
+            match self.step_call_id(reference) {
+                Some(call_id) => {
+                    item.insert("call_id".into(), Value::String(call_id));
+                }
+                None => {
+                    item.shift_remove("call_id");
+                    item.insert("kind".into(), Value::String("inferred".into()));
+                }
+            }
+        }
+        Some(Value::Object(frame))
+    }
+
+    /// The visible step a reference names: its call id, or its 1-based position in the turn.
+    fn step_call_id(&self, reference: &str) -> Option<String> {
+        if self.step_call_ids.contains(reference) {
+            return Some(reference.to_string());
+        }
+        if reference.len() > CALL_POSITION_MAX_DIGITS
+            || !reference.bytes().all(|b| b.is_ascii_digit())
+        {
+            return None;
+        }
+        let position = reference.parse::<usize>().ok()?.checked_sub(1)?;
+        self.turn_call_ids
+            .get(position)
+            .filter(|call_id| self.step_call_ids.contains(*call_id))
+            .cloned()
+    }
+
     fn emit_text_delta(&mut self, delta: &str, frames: &mut Vec<Value>) {
         if delta.is_empty() {
             return;
@@ -329,6 +432,9 @@ impl StreamState {
                     .collect()
             })
             .unwrap_or_default();
+        if !call_id.is_empty() && !self.turn_call_ids.iter().any(|id| id == call_id) {
+            self.turn_call_ids.push(call_id.to_string());
+        }
         let Some(mut event) = format_tool_call_event(tool_name, &tool_input) else {
             return;
         };
@@ -344,6 +450,7 @@ impl StreamState {
         if !call_id.is_empty() {
             self.pending_tool_calls
                 .insert(call_id.to_string(), call_info);
+            self.step_call_ids.insert(call_id.to_string());
             event.insert("call_id".into(), Value::String(call_id.to_string()));
         }
         frames.push(Value::Object(event));
@@ -430,6 +537,7 @@ struct Turn {
     state: StreamState,
     error: Option<String>,
     aborted: bool,
+    query_mode: bool,
     seqs: Option<(i64, i64)>,
 }
 
@@ -473,6 +581,7 @@ impl Turn {
 
     /// Run one assistant message's final parts through the live mapper.
     fn project_assistant_message(&mut self, info: &Map<String, Value>, parts: &Map<String, Value>) {
+        self.query_mode |= info.get("agent").and_then(Value::as_str) == Some(QUERY_AGENT);
         for part in parts.values().filter_map(Value::as_object) {
             match part.get("type").and_then(Value::as_str) {
                 Some("text") => {
@@ -480,7 +589,8 @@ impl Turn {
                     let hidden = part.get("synthetic").is_some_and(truthy)
                         || part.get("ignored").is_some_and(truthy);
                     if !text.is_empty() && !hidden {
-                        self.state.emit_text_delta(text, &mut self.frames);
+                        let shown = self.state.shape_text(text);
+                        self.state.emit_text_delta(&shown, &mut self.frames);
                         // One text part is one block: never carry its tail into the next part.
                         self.state.flush_text_buffer(&mut self.frames);
                     }
@@ -514,7 +624,10 @@ impl Turn {
                     .filter(|v| truthy(v))
                     .or_else(|| error.get("name"))
                     .filter(|v| truthy(v));
-                self.error = Some(message.map_or_else(|| DEFAULT_TURN_ERROR.to_string(), py_str));
+                self.error = Some(message.map_or_else(
+                    || DEFAULT_TURN_ERROR.to_string(),
+                    |message| readable_error(&py_str(message)),
+                ));
             }
         }
     }
@@ -534,6 +647,11 @@ impl Turn {
         if let Some(error) = &self.error {
             self.frames
                 .push(json!({"type": "error", "error": error, "recoverable": false}));
+        } else if !self.aborted
+            && !self.query_mode
+            && let Some(findings) = self.state.findings_frame()
+        {
+            self.frames.push(findings);
         }
         let terminal = if self.aborted {
             "cancelled"
@@ -1135,6 +1253,121 @@ fn keep_decision_only(frame: &mut Value) {
     }
     if let Some(map) = frame.as_object_mut() {
         map.retain(|k, _| VIEWER_DECISION_KEYS.contains(&k.as_str()));
+    }
+}
+
+/// Where `fence` opens at the start of a line; mid-line it is plain text.
+fn fence_start(text: &str, before: Option<char>, fence: &str) -> Option<usize> {
+    text.match_indices(fence).map(|(at, _)| at).find(|&at| {
+        text[..at]
+            .chars()
+            .next_back()
+            .or(before)
+            .is_none_or(|previous| previous == '\n')
+    })
+}
+
+/// A findings block as its frame, only when it passes the schema the web client validates.
+fn findings_body(block: &str) -> Option<Map<String, Value>> {
+    let text = py_strip(block);
+    let text = text.strip_suffix(CODE_FENCE).unwrap_or(text);
+    let Ok(Value::Object(body)) = config::utils::json::from_str::<Value>(text) else {
+        return None;
+    };
+    let mut frame = Map::new();
+    frame.insert("type".into(), FINDINGS_FRAME.into());
+    frame.extend(body);
+    let frame = Value::Object(frame);
+    if !fits_schema(&frame, &FINDINGS_SCHEMA) {
+        return None;
+    }
+    match frame {
+        Value::Object(frame) => Some(frame),
+        _ => None,
+    }
+}
+
+/// Whether `value` fits the JSON Schema subset findings.schema.json uses (as o2-ai's check).
+fn fits_schema(value: &Value, schema: &Value) -> bool {
+    let fits_value = schema.get("const").is_none_or(|expected| expected == value)
+        && schema
+            .get("enum")
+            .and_then(Value::as_array)
+            .is_none_or(|allowed| allowed.contains(value));
+    fits_value
+        && match value {
+            Value::String(text) => fits_string(text, schema),
+            Value::Array(items) => fits_array(items, schema),
+            Value::Object(fields) => fits_object(fields, schema),
+            _ => schema.get("type").is_none(),
+        }
+}
+
+fn fits_string(text: &str, schema: &Value) -> bool {
+    let chars = text.chars().count() as u64;
+    has_type(schema, "string")
+        && schema
+            .get("minLength")
+            .and_then(Value::as_u64)
+            .is_none_or(|min| chars >= min)
+        && schema
+            .get("maxLength")
+            .and_then(Value::as_u64)
+            .is_none_or(|max| chars <= max)
+}
+
+fn fits_array(items: &[Value], schema: &Value) -> bool {
+    has_type(schema, "array")
+        && schema
+            .get("maxItems")
+            .and_then(Value::as_u64)
+            .is_none_or(|max| items.len() as u64 <= max)
+        && schema
+            .get("items")
+            .is_none_or(|item| items.iter().all(|value| fits_schema(value, item)))
+}
+
+fn fits_object(fields: &Map<String, Value>, schema: &Value) -> bool {
+    let empty = Map::new();
+    let properties = obj(schema.get("properties")).unwrap_or(&empty);
+    let closed = schema.get("additionalProperties") == Some(&Value::Bool(false));
+    has_type(schema, "object")
+        && schema
+            .get("required")
+            .and_then(Value::as_array)
+            .is_none_or(|keys| {
+                keys.iter()
+                    .filter_map(Value::as_str)
+                    .all(|key| fields.contains_key(key))
+            })
+        && fields.iter().all(|(key, value)| {
+            properties
+                .get(key)
+                .map_or(!closed, |property| fits_schema(value, property))
+        })
+}
+
+fn has_type(schema: &Value, kind: &str) -> bool {
+    schema
+        .get("type")
+        .and_then(Value::as_str)
+        .is_none_or(|declared| declared == kind)
+}
+
+/// A provider's own JSON error body stays out of the transcript; its prose passes.
+fn readable_error(message: &str) -> String {
+    let is_json = |text: &str| {
+        config::utils::json::from_str::<Value>(text)
+            .is_ok_and(|value| value.is_object() || value.is_array())
+    };
+    let raw = is_json(py_strip(message))
+        || message
+            .find('{')
+            .is_some_and(|start| is_json(&message[start..]));
+    if raw {
+        DEFAULT_TURN_ERROR.to_string()
+    } else {
+        message.to_string()
     }
 }
 
@@ -2774,5 +3007,170 @@ mod tests {
             Some(("metrics".to_string(), "cpu".to_string()))
         )));
         assert!(!steps.iter().any(|(id, _)| id.starts_with('l')));
+    }
+
+    /// A stored session's events with `answer` as its last assistant text.
+    fn session_answering(answer: &str, agent: &str, error: Value) -> Vec<DurableEvent> {
+        let (events, _) = load("findings.json");
+        events
+            .into_iter()
+            .map(|mut event| {
+                let is_text = event.data["part"]["type"] == "text";
+                if is_text
+                    && event.data["part"]["text"]
+                        .as_str()
+                        .unwrap_or("")
+                        .contains(FINDINGS_FENCE)
+                {
+                    event.data["part"]["text"] = answer.into();
+                }
+                if event.data["info"]["role"] == "assistant" {
+                    event.data["info"]["agent"] = agent.into();
+                    event.data["info"]["error"] = error.clone();
+                }
+                event
+            })
+            .collect()
+    }
+
+    fn last_frames(events: &[DurableEvent]) -> Vec<Value> {
+        let projected = project(events);
+        let turns = projected["turns"].as_array().unwrap();
+        turns.last().unwrap()["frames"].as_array().unwrap().clone()
+    }
+
+    fn answer_text(frames: &[Value]) -> String {
+        frames
+            .iter()
+            .filter(|f| f["type"] == "message_delta")
+            .filter_map(|f| f["content"].as_str())
+            .collect()
+    }
+
+    const FINDINGS_BLOCK: &str = r#"{"likely_cause": "pool", "confidence": "low", "evidence": [], "ruled_out": [], "unknowns": [], "next_steps": []}"#;
+
+    #[test]
+    fn a_reopened_chat_shows_a_findings_card_and_never_the_block() {
+        let (events, _) = load("findings.json");
+        let frames = last_frames(&events);
+        let text = answer_text(&frames);
+        assert!(
+            !text.contains("likely_cause") && !text.contains(CODE_FENCE),
+            "{text}"
+        );
+        let cards: Vec<&Value> = frames.iter().filter(|f| f["type"] == "findings").collect();
+        assert_eq!(cards.len(), 1);
+        assert_eq!(frames[frames.len() - 2]["type"], "findings");
+        let evidence = cards[0]["evidence"].as_array().unwrap();
+        assert!(
+            frames
+                .iter()
+                .any(|f| f["call_id"] == evidence[0]["call_id"] && f["type"] == "tool_call")
+        );
+        assert_eq!(
+            evidence[1],
+            json!({"text": "beyond the calls of this turn", "kind": "inferred"})
+        );
+    }
+
+    #[test]
+    fn a_handoff_block_stays_hidden_and_a_bad_findings_block_stays_text() {
+        let handoff = "Done.\n```handoff\n{\"agent\": \"sre\", \"reason\": \"dig\"}\n```\n";
+        let frames = last_frames(&session_answering(handoff, "o2-ai", Value::Null));
+        assert!(answer_text(&frames).ends_with("Done.\n\n"));
+        assert!(frames.iter().all(|f| f["type"] != "findings"));
+
+        let bad = "See.\n```findings\n{\"likely_cause\": \"no other keys\"}\n```\nMore.";
+        let frames = last_frames(&session_answering(bad, "o2-ai", Value::Null));
+        assert!(answer_text(&frames).ends_with(bad));
+        assert!(frames.iter().all(|f| f["type"] != "findings"));
+
+        let unclosed = format!("See.\n```findings\n{FINDINGS_BLOCK}");
+        let frames = last_frames(&session_answering(&unclosed, "o2-ai", Value::Null));
+        assert!(answer_text(&frames).ends_with("See.\n"));
+        assert_eq!(frames.iter().filter(|f| f["type"] == "findings").count(), 1);
+
+        let quoted = format!("Write it like this: ```findings\n{FINDINGS_BLOCK}\n```");
+        let frames = last_frames(&session_answering(&quoted, "o2-ai", Value::Null));
+        assert!(
+            answer_text(&frames).ends_with(&quoted),
+            "mid-line is plain text"
+        );
+    }
+
+    #[test]
+    fn findings_become_a_card_only_on_turns_that_ended_well_outside_query_mode() {
+        let block = format!("Why.\n```findings\n{FINDINGS_BLOCK}\n```\n");
+        let query = last_frames(&session_answering(&block, QUERY_AGENT, Value::Null));
+        assert!(answer_text(&query).ends_with("Why.\n\n"));
+        assert!(query.iter().all(|f| f["type"] != "findings"));
+        let aborted = json!({"name": ABORTED_ERROR});
+        let frames = last_frames(&session_answering(&block, "o2-ai", aborted));
+        assert!(frames.iter().all(|f| f["type"] != "findings"));
+    }
+
+    #[test]
+    fn a_failed_turn_never_shows_the_providers_json_body() {
+        for (message, shown) in [
+            (
+                r#"{"type":"error","error":{"type":"overloaded_error"}}"#,
+                DEFAULT_TURN_ERROR,
+            ),
+            (
+                r#"AI_APICallError: {"error":{"code":429}}"#,
+                DEFAULT_TURN_ERROR,
+            ),
+            (r#"[{"error":"quota"}]"#, DEFAULT_TURN_ERROR),
+            (
+                "The model is overloaded {try later}",
+                "The model is overloaded {try later}",
+            ),
+        ] {
+            let error = json!({"name": "APIError", "data": {"message": message}});
+            let events = session_answering("Partial.", "o2-ai", error);
+            let projected = project(&events);
+            assert_eq!(
+                projected["turns"].as_array().unwrap().last().unwrap()["error"],
+                shown
+            );
+        }
+    }
+
+    #[test]
+    fn the_findings_schema_matches_the_web_client() {
+        let path = assistant_web_dir().join("findings.schema.json");
+        let Ok(source) = std::fs::read_to_string(&path) else {
+            assert!(std::env::var_os("CI").is_none(), "no {path:?}");
+            eprintln!("skipped: no {path:?} (set O2_ASSISTANT_WEB_DIR)");
+            return;
+        };
+        assert_eq!(source, FINDINGS_SCHEMA_JSON, "findings.schema.json drifted");
+    }
+
+    #[test]
+    fn the_findings_schema_check_enforces_each_rule() {
+        let frame = |changes: Value| {
+            let mut body: Value = config::utils::json::from_str(FINDINGS_BLOCK).unwrap();
+            for (key, value) in changes.as_object().unwrap() {
+                body[key] = value.clone();
+            }
+            findings_body(&body.to_string()).is_some()
+        };
+        assert!(frame(json!({})));
+        assert!(frame(json!({"changed_since": ["new deploy"]})));
+        assert!(!frame(json!({"confidence": "certain"})));
+        assert!(!frame(json!({"extra": 1})));
+        assert!(!frame(json!({"ruled_out": [""]})));
+        assert!(!frame(json!({"ruled_out": [1]})));
+        assert!(!frame(json!({"likely_cause": "x".repeat(501)})));
+        assert!(!frame(json!({"evidence": [{"text": "no kind"}]})));
+        assert!(!frame(json!({"next_steps": vec!["x"; 21]})));
+        assert!(findings_body("[1]").is_none() && findings_body("not json").is_none());
+    }
+
+    #[test]
+    fn an_asked_question_leaves_no_step_in_history() {
+        let call = format_tool_call_event("ask_user", &Map::new());
+        assert!(call.is_none());
     }
 }
