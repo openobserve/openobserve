@@ -179,13 +179,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <!-- Enter-only fade; the body's slide lives in OPageLayout so the header stays put. -->
               <router-view v-slot="{ Component }">
-                <keep-alive :include="KEPT_ALIVE_VIEWS">
-                  <component
-                    :is="Component"
-                    :class="[ENTER_FADE, 'h-full']"
-                    @sendToAiChat="sendToAiChat"
-                  />
-                </keep-alive>
+                <OAccessBoundary>
+                  <keep-alive :include="KEPT_ALIVE_VIEWS">
+                    <component
+                      :is="Component"
+                      :class="[ENTER_FADE, 'h-full']"
+                      @sendToAiChat="sendToAiChat"
+                    />
+                  </keep-alive>
+                </OAccessBoundary>
               </router-view>
             </div>
             <div
@@ -276,6 +278,8 @@ import { ENTER_FADE } from "@/lib/styles/motion";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
+import OAccessBoundary from "@/components/access/OAccessBoundary.vue";
+import { resetAccess } from "@/composables/useAccessStore";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   useLocalOrganization,
@@ -372,6 +376,7 @@ export default defineComponent({
     PasswordExpiryBanner,
     LicenseSearchBanner,
     "keep-alive": KeepAlive,
+    OAccessBoundary,
     ONavbar,
     "router-view": RouterView,
     SlackIcon,
@@ -1829,6 +1834,8 @@ export default defineComponent({
       if (previous) purgeOrgQueries(previous, _next);
       // Clear notifications from the previous org — they no longer apply.
       dismissAll();
+      // The first org resolved on load is not a switch, so the session's page-denied memory survives a reload.
+      if (previous) resetAccess();
       this.store.dispatch("setOrganizationPasscode", "");
       this.store.dispatch("resetOrganizationData", {});
 

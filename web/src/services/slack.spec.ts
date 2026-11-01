@@ -33,7 +33,6 @@ const client = (http as unknown as ReturnType<typeof vi.fn>)();
 const ORG = "acme";
 const ID = "inst-1";
 const BASE = `/api/${ORG}/slack`;
-// The pages calling these render a 403 themselves, so it stays out of the grouped access toast.
 const SILENT_403 = { silentForbidden: true };
 
 type Method = "get" | "post" | "put" | "delete";
