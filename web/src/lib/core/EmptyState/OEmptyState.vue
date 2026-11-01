@@ -349,7 +349,7 @@ const SIZE_MAP: Record<
   block: {
     root: "w-full min-h-65 px-6 py-10 max-md:min-h-0 max-md:px-4 max-md:py-5",
     stack: "gap-5 max-md:gap-3",
-    copy: "gap-2 max-md:gap-1",
+    copy: "gap-2 max-md:gap-1.5",
     actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
     extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",
     title: raw("text-lg! max-md:text-base!"),
@@ -361,7 +361,7 @@ const SIZE_MAP: Record<
   compact: {
     root: "w-full min-h-0 px-6 py-4 max-md:px-4",
     stack: "gap-3",
-    copy: "gap-2 max-md:gap-1",
+    copy: "gap-2 max-md:gap-1.5",
     actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
     extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",
     title: raw("text-lg! max-md:text-base!"),

@@ -21,16 +21,20 @@
           class="loading-progress__shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
         ></div>
       </div>
-      <!-- Moving circle indicator -->
+      <!-- Moving circle indicator; moved with transform because animating `left` is a layout shift. -->
       <div
-        class="ring-brand-indigo/50 absolute top-0 h-0.5 w-0.75 -translate-x-1/2 transform rounded-full ring-2"
-        :class="'bg-brand-indigo'"
+        class="pointer-events-none absolute inset-0"
         :style="{
-          left: `${displayPercentage}%`,
-          transition: shouldAnimate ? 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+          transform: `translateX(${displayPercentage}%)`,
+          transition: shouldAnimate ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
         }"
       >
-        <div class="loading-progress__head-glow absolute inset-0 rounded-full bg-white/20"></div>
+        <div
+          class="ring-brand-indigo/50 absolute top-0 left-0 h-0.5 w-0.75 -translate-x-1/2 transform rounded-full ring-2"
+          :class="'bg-brand-indigo'"
+        >
+          <div class="loading-progress__head-glow absolute inset-0 rounded-full bg-white/20"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -122,7 +126,7 @@ export default defineComponent({
    utility, so the shimmer's own `left` wins regardless of stylesheet order. */
 .loading-progress__shimmer {
   width: 200%;
-  left: -200%;
+  left: 0;
   animation: shimmer 1.5s infinite linear;
 }
 
@@ -132,10 +136,10 @@ export default defineComponent({
 
 @keyframes shimmer {
   0% {
-    transform: translateX(-200%);
+    transform: translateX(-300%);
   }
   100% {
-    transform: translateX(200%);
+    transform: translateX(100%);
   }
 }
 

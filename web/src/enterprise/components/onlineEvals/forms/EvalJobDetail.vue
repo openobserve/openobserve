@@ -22,6 +22,7 @@
           ref="dateTimePickerRef"
           v-model="selectedDate"
           :auto-apply-dashboard="true"
+          calendar-presets
           class="flex-none"
           data-test="eval-job-detail-window"
         />
@@ -366,6 +367,7 @@
             :columns="runColumns"
             row-key="id"
             :loading="isLoadingRuns"
+            :loading-reset-key="jobIdRef"
             :show-global-filter="false"
             :show-footer="false"
             :page-size="20"
@@ -414,6 +416,7 @@
             :columns="runColumns"
             row-key="id"
             :loading="isLoadingRuns"
+            :loading-reset-key="jobIdRef"
             :show-global-filter="false"
             :show-footer="false"
             :page-size="20"

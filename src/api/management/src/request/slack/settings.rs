@@ -519,6 +519,86 @@ pub async fn put_help_contact(
     }
 }
 
+/// SlackOncallUnlinked
+#[utoipa::path(
+    get,
+    path = "/{org_id}/slack/installations/{installation_id}/oncall-unlinked",
+    context_path = "/api",
+    tag = "Slack",
+    operation_id = "SlackOncallUnlinked",
+    summary = "On-call members without a Slack link",
+    description = "Members of this organization's on-call teams who have not linked a Slack account in this workspace, with their next shift and the last reminder.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("installation_id" = String, Path, description = "Slack installation id"),
+    ),
+    responses(
+        (status = 200, description = "`{\"members\": [{\"email\", \"team_id\", \"team_name\", \"next_shift_at\", \"reminded_at\"}]}`; empty when on-call is off", content_type = "application/json", body = Object),
+        (status = 403, description = "Not an admin, or the OSS build", content_type = "application/json", body = ()),
+        (status = 404, description = "Slack is not enabled for this organization, or unknown installation", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Slack", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn oncall_unlinked(
+    Path((org_id, installation_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let caller = caller(&org_id, &user_email.user_id);
+        respond(ent::settings::oncall_unlinked(&caller, &installation_id).await)
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, installation_id, user_email);
+        not_supported()
+    }
+}
+
+/// SlackRemindOncallUnlinked
+#[utoipa::path(
+    post,
+    path = "/{org_id}/slack/installations/{installation_id}/oncall-unlinked/remind",
+    context_path = "/api",
+    tag = "Slack",
+    operation_id = "SlackRemindOncallUnlinked",
+    summary = "Send the pre-shift DM again",
+    description = "DMs every unlinked on-call member of this organization a fresh link prompt; people Slack does not know by email are skipped.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("installation_id" = String, Path, description = "Slack installation id"),
+    ),
+    responses(
+        (status = 200, description = "`{\"sent\"}`, the number of DMs that went out", content_type = "application/json", body = Object),
+        (status = 403, description = "Not an admin, or the OSS build", content_type = "application/json", body = ()),
+        (status = 404, description = "Slack is not enabled for this organization, or unknown installation", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Slack", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn remind_oncall_unlinked(
+    Path((org_id, installation_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let caller = caller(&org_id, &user_email.user_id);
+        respond(ent::settings::remind_oncall_unlinked(&caller, &installation_id).await)
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, installation_id, user_email);
+        not_supported()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(not(feature = "enterprise"))]

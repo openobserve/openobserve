@@ -20,8 +20,18 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
 import { ref } from "vue";
-import DataSourceSetupCard from "./DataSourceSetupCard.vue";
 import i18n from "@/locales";
+import { b64EncodeStandard } from "@/utils/formatters";
+import DataSourceSetupCard from "./DataSourceSetupCard.vue";
+
+const credentialMock = vi.hoisted(() => ({ ready: true }));
+
+vi.mock("@/composables/useOrgCredential", async () => {
+  const { computed } = await import("vue");
+  return {
+    useOrgCredential: () => ({ ready: computed(() => credentialMock.ready) }),
+  };
+});
 
 const { importHostMetricsDashboard, importSetupDashboard, toastMock } = vi.hoisted(() => ({
   importHostMetricsDashboard: vi.fn(),
@@ -57,7 +67,7 @@ vi.mock("@/composables/useIngestion", () => ({
 // The renderer is presentational — stub it and drive its emits directly.
 const rendererStub = {
   name: "SetupCardRenderer",
-  props: ["content", "subs"],
+  props: ["content", "subs", "tokenState"],
   emits: ["detected", "step-action"],
   template: '<div data-test="renderer-stub" />',
 };
@@ -70,12 +80,12 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
   let store: any;
   let router: any;
 
-  const mountCard = (slug: string) => {
+  const mountCard = (slug: string, passcode = "pc") => {
     store = createStore({
       state: {
         selectedOrganization: { identifier: "test-org" },
         userInfo: { email: "t@e.com" },
-        organizationData: { organizationPasscode: "pc" },
+        organizationData: { organizationPasscode: passcode },
         theme: "light",
       },
     });
@@ -101,6 +111,7 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    credentialMock.ready = true;
     importHostMetricsDashboard.mockResolvedValue({
       status: "created",
       dashboardId: "dash-1",
@@ -110,6 +121,30 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
+  });
+
+  const unavailableBanner = () =>
+    wrapper.find('[data-test="data-source-setup-card-passcode-unavailable"]');
+
+  it("holds token blocks while the credential loads, with no blank token", () => {
+    credentialMock.ready = false;
+    wrapper = mountCard("macos", "");
+    expect(renderer().props("subs").token).toBe("");
+    expect(renderer().props("tokenState")).toBe("loading");
+    expect(unavailableBanner().exists()).toBe(false);
+  });
+
+  it("encodes the org passcode once the credential has loaded", () => {
+    wrapper = mountCard("macos");
+    expect(renderer().props("subs").token).toBe(b64EncodeStandard("t@e.com:pc"));
+    expect(renderer().props("tokenState")).toBe("ready");
+    expect(unavailableBanner().exists()).toBe(false);
+  });
+
+  it("says so in the card when the settled read carries no passcode", () => {
+    wrapper = mountCard("kubernetes", "");
+    expect(renderer().props("tokenState")).toBe("unavailable");
+    expect(unavailableBanner().exists()).toBe(true);
   });
 
   it.each(["linux", "windows", "macos"])(
@@ -343,6 +378,7 @@ describe("DataSourceSetupCard — companion dashboard (NVIDIA GPU) wiring", () =
 
   beforeEach(() => {
     vi.clearAllMocks();
+    credentialMock.ready = true;
     importSetupDashboard.mockResolvedValue({
       status: "created",
       dashboardId: "gpu-1",

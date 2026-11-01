@@ -96,6 +96,7 @@ import {
 } from "@/utils/alerts/alertDataTransforms";
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import { isNotFoundError } from "@/utils/alerts/alertEditorDraft";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import type { AlertPrefill, AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
@@ -204,6 +205,8 @@ export const defaultAlertValue: any = () => {
     recovery_destinations: [],
     // Seconds the condition must stay clear before recovering. 0 = immediately.
     keep_firing_for: 0,
+    // Off by default: on, a still-firing alert sends nothing until its state changes.
+    suppress_repeats: false,
     // Feature 2 (PT-1/PT-6). `null` (not 0) is unset — 0 is not a valid
     // priority id, and the payload layer drops null so pre-Feature-2 alerts
     // serialize unchanged.
@@ -745,6 +748,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const isLoadingPrefill = ref(false);
   /** Lossy transforms the source adapter performed, surfaced in the form. */
   const prefillWarnings = ref<AlertPrefillWarning[]>([]);
+  /** Outcome of the anomaly edit fetch: "missing" when the server has no such config. */
+  const anomalyLoadStatus = ref<"idle" | "loaded" | "missing" | "failed">("idle");
+  // Late async seeding (timezone from the stored offset) that must land before the form counts as loaded.
+  let pendingSeeding: Promise<unknown> = Promise.resolve();
+  let resolveFormReady: () => void = () => {};
+  /** Resolves once the mounted form holds the item it opened with (edit, prefill or anomaly load). */
+  const formReady = new Promise<void>((resolve) => {
+    resolveFormReady = resolve;
+  });
 
   const folderQuery = router.currentRoute.value.query.folder;
   // Prefer the folder the caller (AlertList) hands us over the URL query: the
@@ -777,7 +789,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     condition: false,
     rules: false,
     compare: false,
-    dedup: false,
     advanced: false,
   });
   const chartCollapsed = ref(false);
@@ -847,8 +858,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       2: t("alerts.stepCaptions.conditions"),
       3: t("alerts.stepCaptions.compareWithPast"),
       4: t("alerts.stepCaptions.alertSettings"),
-      5: t("alerts.stepCaptions.deduplication"),
-      6: t("alerts.stepCaptions.advanced"),
+      5: t("alerts.stepCaptions.advanced"),
     };
     return captions[wizardStep.value] || "";
   });
@@ -857,7 +867,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (formData.value.is_real_time === "anomaly") {
       return wizardStep.value === 3;
     }
-    return wizardStep.value === 6;
+    return wizardStep.value === 5;
   });
 
   const getFormattedDestinations = computed(() => {
@@ -1543,7 +1553,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       condition: false,
       rules: false,
       compare: false,
-      dedup: false,
       advanced: false,
     };
 
@@ -1675,7 +1684,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // scalars directly by nested `name=`, so their update:* emits no-op in
   // descendant mode; these handlers still route the out-of-form widget values
   // (SQL/PromQL/VRL editors) and the bare wizard steps B (Advanced /
-  // CompareWithPast / Deduplication) into the form via setFieldValue.
+  // CompareWithPast) into the form via setFieldValue.
   const updateSqlQuery = (value: any) => setF("query_condition.sql", value);
   const updatePromqlQuery = (value: any) => setF("query_condition.promql", value);
   const updateVrlFunction = (value: any) => setF("query_condition.vrl_function", value);
@@ -1688,7 +1697,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const updateDescription = (value: any) => setF("description", value);
   const updateRowTemplate = (value: any) => setF("row_template", value);
   const updateRowTemplateType = (value: any) => setF("row_template_type", value);
-  const updateDeduplication = (value: any) => setF("deduplication", value);
 
   const handleGoToSqlEditor = () => {
     setF("query_condition.type", "sql");
@@ -1952,8 +1960,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (formData.value.is_real_time === "true") {
       if (wizardStep.value === 2) {
         wizardStep.value = 4;
-      } else if (wizardStep.value === 4) {
-        wizardStep.value = 6;
       } else {
         wizardStep.value = wizardStep.value + 1;
       }
@@ -1972,9 +1978,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return;
     }
     if (formData.value.is_real_time === "true") {
-      if (wizardStep.value === 6) {
-        wizardStep.value = 4;
-      } else if (wizardStep.value === 4) {
+      if (wizardStep.value === 4) {
         wizardStep.value = 2;
       } else {
         wizardStep.value = wizardStep.value - 1;
@@ -2615,7 +2619,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         }
       }
 
-      lastValidStep.value = 6;
+      lastValidStep.value = 5;
 
       if (data.is_real_time !== "composite" && !data.trigger_condition?.timezone) {
         if (data.tz_offset === 0) {
@@ -2723,7 +2727,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     // Resolve the timezone from the stored offset (edit prefill) after the reset.
     if (pendingTimezoneOffset != null) {
-      getTimezonesByOffset(pendingTimezoneOffset).then((res: any) => {
+      pendingSeeding = getTimezonesByOffset(pendingTimezoneOffset).then((res: any) => {
         if (res.length > 1) showTimezoneWarning.value = true;
         setF("trigger_condition.timezone", res[0]);
       });
@@ -3043,16 +3047,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     await getAllFunctions();
   });
 
-  onMounted(async () => {
-    // Initialize form data (replaces created() hook)
-    await initializeFormData();
-
-    // Pre-set anomaly mode
-    if (router.currentRoute.value.name === "addAnomalyDetection") {
-      setF("is_real_time", "anomaly");
-    }
-
-    // Load anomaly detection config when editing
+  // Load anomaly detection config when editing
+  const loadAnomalyForEdit = async () => {
     const routeAnomalyId = router.currentRoute.value.params.anomaly_id as string | undefined;
     if (routeAnomalyId) {
       try {
@@ -3115,20 +3111,41 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         setF("stream_type", data.stream_type);
         if (data.folder_id) activeFolderId.value = data.folder_id;
         anomalyEditMode.value = true;
-        lastValidStep.value = 6;
+        lastValidStep.value = 5;
 
         // The stream is only known NOW. initializeFormData already ran its
         // updateStreams, but at that point stream_type was empty, so it
         // returned early — leaving the stream select with no options and the
         // stream's columns unloaded. The form value was set, yet nothing was
         // selectable and every field picker downstream was empty.
+        anomalyLoadStatus.value = "loaded";
         if (data.stream_type) await updateStreams(false);
-      } catch {
+      } catch (error: unknown) {
+        if (anomalyLoadStatus.value === "idle") {
+          anomalyLoadStatus.value = isNotFoundError(error) ? "missing" : "failed";
+        }
         toast({
           variant: "error",
           message: t("alerts.messages.anomalyConfigLoadFailed"),
         });
       }
+    }
+  };
+
+  onMounted(async () => {
+    try {
+      // Initialize form data (replaces created() hook)
+      await initializeFormData();
+
+      // Pre-set anomaly mode
+      if (router.currentRoute.value.name === "addAnomalyDetection") {
+        setF("is_real_time", "anomaly");
+      }
+
+      await loadAnomalyForEdit();
+      await pendingSeeding.catch(() => undefined);
+    } finally {
+      resolveFormReady();
     }
 
     // Set up alerts context provider
@@ -3250,6 +3267,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     validationErrors,
     isLoadingPrefill,
     prefillWarnings,
+    anomalyLoadStatus,
+    formReady,
     activeFolderId,
     alertType,
 
@@ -3315,7 +3334,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     updateDescription,
     updateRowTemplate,
     updateRowTemplateType,
-    updateDeduplication,
     validateInputs,
     validateSqlQuery,
     validateConditionsAgainstUDS,

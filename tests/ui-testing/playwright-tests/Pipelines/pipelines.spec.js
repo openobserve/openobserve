@@ -429,11 +429,10 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
 
-    // Click the dashboards menu — onBeforeRouteLeave fires and shows a Vue
-    // ConfirmDialog instead of window.confirm (native dialog). Accept it.
+    // Leaving with unsaved changes opens the shared leave dialog; Discard completes the navigation.
     await pipelinePage.clickDashboardsMenu();
-    await pipelinePage.discardChangesOkBtn.waitFor({ state: 'visible', timeout: 10000 });
-    await pipelinePage.discardChangesOkBtn.click();
+    await pipelinePage.draftLeaveDiscardBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await pipelinePage.draftLeaveDiscardBtn.click();
 
     // Assert the page navigates to the desired URL containing "dashboards"
     await page.waitForURL(/dashboards/);
@@ -458,11 +457,10 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
 
-    // Click the dashboards menu — onBeforeRouteLeave fires and shows a Vue
-    // ConfirmDialog instead of window.confirm (native dialog). Dismiss it.
+    // Closing the leave dialog keeps the user on the editor.
     await pipelinePage.clickDashboardsMenu();
-    await pipelinePage.discardChangesCancelBtn.waitFor({ state: 'visible', timeout: 10000 });
-    await pipelinePage.discardChangesCancelBtn.click();
+    await pipelinePage.draftLeaveCloseBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await pipelinePage.draftLeaveCloseBtn.click();
 
     // Assert page url to have pipeline
     await expect(page).toHaveURL(/pipeline/);

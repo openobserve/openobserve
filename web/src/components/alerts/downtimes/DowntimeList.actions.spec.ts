@@ -7,8 +7,26 @@ import store from "@/test/unit/helpers/store";
 import DowntimeList from "./DowntimeList.vue";
 import downtimes, { type DowntimeListItem } from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 
 // The route guard opens this page only with downtimes on.
+const viewport = vi.hoisted(() => ({ mobile: false }));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => viewport.mobile),
+      isTablet: computed(() => false),
+      isDesktop: computed(() => !viewport.mobile),
+      mdUp: computed(() => !viewport.mobile),
+      lgUp: computed(() => !viewport.mobile),
+    }),
+  };
+});
 vi.mock("@/composables/downtimes/useDowntimesEnabled", async () => {
   const { computed } = await import("vue");
   return { useDowntimesEnabled: () => computed(() => true) };
@@ -106,9 +124,15 @@ const mountList = async (stubs: Record<string, unknown> = {}) => {
     global: { plugins: [store, router], stubs },
     attachTo: document.body,
   });
-  await flushPromises();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  await flushPromises();
+  // The rows land a variable number of ticks after mount, so wait for every one of them.
+  await vi.waitFor(
+    () => {
+      expect(wrapper.findAll('[data-test^="downtime-list-"][data-test$="-actions"]')).toHaveLength(
+        ROWS.length,
+      );
+    },
+    { timeout: 3000 },
+  );
   return wrapper;
 };
 
@@ -228,6 +252,97 @@ describe("DowntimeList row actions", () => {
       el.getAttribute("data-test")!.replace("downtime-list-", "").replace("-actions", ""),
     );
     expect(order).toEqual(["active", "scheduled", "ended", "early", "cancelled"]);
+    wrapper.unmount();
+  });
+});
+
+describe("DowntimeList drafts", () => {
+  const scope = (entityId: string | null): EditorDraftScope => ({
+    kind: "downtime",
+    org: "default",
+    entityId,
+    userEmail: "example@gmail.com",
+  });
+
+  beforeEach(() => {
+    viewport.mobile = false;
+    queryClient.clear();
+    localStorage.clear();
+    writeEditorDraft(scope(null), { data: {} });
+    writeEditorDraft(scope("scheduled"), { data: {} });
+    vi.mocked(downtimes.list).mockResolvedValue({
+      data: {
+        items: ROWS,
+        total: ROWS.length,
+        counts: { active: 1, scheduled: 1, recurring: 0, ended: 1, cancelled: 1, ended_early: 1 },
+      },
+    } as never);
+    vi.mocked(downtimes.remove)
+      .mockReset()
+      .mockResolvedValue({ data: {} } as never);
+  });
+
+  it("marks the New button and the drafted row only", async () => {
+    const wrapper = await mountList();
+    const add = wrapper.get('[data-test="downtime-list-add-btn"]');
+    expect(add.find('[data-test="downtime-list-add-draft-dot"]').exists()).toBe(true);
+    expect(add.attributes("aria-label")).toContain("unsaved draft");
+    expect(wrapper.find('[data-test="downtime-list-scheduled-draft-dot"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="downtime-list-active-draft-dot"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("marks the Duplicate action of a downtime whose duplicate has a kept draft", async () => {
+    writeEditorDraft({ ...scope(null), variant: "clone:ended" }, { data: {} });
+    const wrapper = await mountList();
+    const duplicate = wrapper.get('[data-test="downtime-list-ended-duplicate"]');
+    expect(duplicate.find('[data-test="downtime-list-ended-duplicate-draft-dot"]').exists()).toBe(
+      true,
+    );
+    expect(duplicate.attributes("aria-label")).toContain("unsaved draft");
+    expect(wrapper.find('[data-test="downtime-list-active-duplicate-draft-dot"]').exists()).toBe(
+      false,
+    );
+    wrapper.unmount();
+  });
+
+  it("names the draft on the desktop row menu only where its dot and Duplicate item show", async () => {
+    writeEditorDraft({ ...scope(null), variant: "clone:ended" }, { data: {} });
+    const wrapper = await mountList();
+    const more = wrapper.get('[data-test="downtime-list-ended-more"]');
+    expect(more.attributes("aria-label")).toBe("More actions");
+    wrapper.unmount();
+  });
+
+  it("marks the row menu and its Duplicate item for a kept duplicate draft", async () => {
+    viewport.mobile = true;
+    writeEditorDraft({ ...scope(null), variant: "clone:ended" }, { data: {} });
+    const wrapper = await mountList();
+    const more = wrapper.get('[data-test="downtime-list-ended-more"]');
+    expect(more.find('[data-test="downtime-list-ended-more-draft-dot"]').exists()).toBe(true);
+    expect(more.attributes("aria-label")).toMatch(/^More actions · unsaved draft · .*\d/);
+    expect(wrapper.find('[data-test="downtime-list-active-more-draft-dot"]').exists()).toBe(false);
+
+    await more.trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    const item = document.body.querySelector('[data-test="downtime-list-ended-duplicate-menu"]');
+    expect(
+      item?.querySelector('[data-test="downtime-list-ended-duplicate-menu-draft-dot"]'),
+    ).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it("drops a deleted downtime's draft", async () => {
+    const wrapper = await mountList();
+    const scheduled = ROWS.find((r) => r.id === "scheduled")!;
+    (wrapper.vm as unknown as { askDelete: (row: DowntimeListItem) => void }).askDelete(scheduled);
+    await flushPromises();
+    dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-primary-btn"]')!.click();
+    await flushPromises();
+
+    expect(downtimes.remove).toHaveBeenCalled();
+    expect(readEditorDraft(scope("scheduled"))).toBeNull();
+    expect(readEditorDraft(scope(null))).not.toBeNull();
     wrapper.unmount();
   });
 });

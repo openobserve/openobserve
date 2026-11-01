@@ -19,6 +19,7 @@ import fs from 'fs';
 import { CommonActions } from '../commonActions';
 import { AlertCreationWizard } from './alertCreationWizard.js';
 import { openOSelectDropdown } from './oselectHelpers.js';
+import { discardEditorDraftIfAsked } from './editorDraftHelpers.js';
 import { AlertManagement } from './alertManagement.js';
 import { AlertBulkOperations } from './alertBulkOperations.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -105,14 +106,7 @@ export class AlertsPage {
             multiTimeRangeDeleteButton: '[data-test="multi-time-range-alerts-delete-btn"]',
             goToViewEditorButton: '[data-test="go-to-view-editor-btn"]',
 
-            // Step 5: Deduplication (Scheduled only — in Advanced tab). Use data-test
-            // hooks from Deduplication.vue; the old `.step-deduplication .alert-v3-select`
-            // class chain no longer exists on newer builds (e.g. alpha pre-cloud).
-            stepDeduplication: '[data-test="alert-dedup-fingerprint-fields"]',
-            stepDeduplicationFingerprintSelect: '[data-test="alert-dedup-fingerprint-fields"]',
-            stepDeduplicationTimeWindowInput: '[data-test="alert-dedup-time-window-field"]',
-
-            // Step 6: Advanced settings
+            // Step 5: Advanced settings
             contextAttributesAddButton: '[data-test="alert-variables-add-btn"]',
             contextAttributeKeyInput: '[data-test="alert-variables-key-input"]',
             contextAttributeValueInput: '[data-test="alert-variables-value-input"]',
@@ -207,6 +201,7 @@ export class AlertsPage {
             alertCloneButton: '[data-test="alert-list-{alertName}-clone-alert"]',
             alertMoreOptions: '[data-test="alert-list-{alertName}-more-options"]',
             confirmButton: '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
+            confirmDialogProviderPrimary: '[data-test="confirm-dialog-provider"] [data-test="o-dialog-primary-btn"]',
 
             // Alert movement locators
             selectAllCheckboxRowName: '# Name Owner Period Frequency',
@@ -331,16 +326,6 @@ export class AlertsPage {
             // v3 AddAlert wizard tabs (OToggleGroupItem with data-test="add-alert-tab-{key}")
             addAlertTabCondition: '[data-test="add-alert-tab-condition"]',
             addAlertTabAdvanced: '[data-test="add-alert-tab-advanced"]',
-
-            // v3 Deduplication step (Advanced tab)
-            // OSelect wrapper has data-test, popover auto-derived suffix `-popover`,
-            // options auto-derived suffix `-option` with `data-test-value="<value>"` per item.
-            dedupFingerprintFieldsSelect: '[data-test="alert-dedup-fingerprint-fields"]',
-            dedupFingerprintFieldsTrigger: '[data-test="alert-dedup-fingerprint-fields-trigger"]',
-            dedupFingerprintFieldsPopover: '[data-test="alert-dedup-fingerprint-fields-popover"]',
-            dedupFingerprintFieldsOption: '[data-test="alert-dedup-fingerprint-fields-option"]',
-            dedupTimeWindowInput: '[data-test="alert-dedup-time-window"]',
-            dedupTimeWindowInputField: '[data-test="alert-dedup-time-window-field"]',
 
             // OToast (alerts module - success / error variants)
             oToastSuccess: '[data-test-variant="success"]',
@@ -756,18 +741,6 @@ export class AlertsPage {
         return result;
     }
 
-    async createScheduledAlertWithDeduplication(streamName, destinationName, randomValue, dedupConfig = {}) {
-        const result = await this.creationWizard.createScheduledAlertWithDeduplication(streamName, destinationName, randomValue, dedupConfig);
-        this.currentAlertName = result;
-        return result;
-    }
-
-    async createScheduledAlertWithDedupForValidation(streamName, column, value, destinationName, randomValue, dedupConfig = {}) {
-        const result = await this.creationWizard.createScheduledAlertWithDedupForValidation(streamName, column, value, destinationName, randomValue, dedupConfig);
-        this.currentAlertName = result;
-        return result;
-    }
-
     /**
      * Create a scheduled alert with PromQL query for metrics streams
      * Tests fix for bug #9967 - cannot save alert when selecting PromQL mode
@@ -802,14 +775,6 @@ export class AlertsPage {
 
     async deleteCondition(index = 0) {
         return this.creationWizard.deleteCondition(index);
-    }
-
-    async verifyDeduplicationStepVisible() {
-        return this.creationWizard.verifyDeduplicationStepVisible();
-    }
-
-    async getDeduplicationConfig() {
-        return this.creationWizard.getDeduplicationConfig();
     }
 
     // ==================== DELEGATE TO MANAGEMENT ====================
@@ -906,30 +871,10 @@ export class AlertsPage {
         return this.management.verifyAlertTriggerInValidationStream(alertName, validationStreamName, logsPage, waitTimeMs);
     }
 
-    // ==================== ALERT EDIT — DEDUP REGRESSION ====================
-
-    async waitForAlertListReady(timeout) {
-        return this.management.waitForAlertListReady(timeout);
-    }
-
-    async openAlertEditByName(alertName) {
-        return this.management.openAlertEditByName(alertName);
-    }
+    // ==================== ALERT EDIT ====================
 
     async openAdvancedTab() {
         return this.management.openAdvancedTab();
-    }
-
-    async getSelectedFingerprintFields() {
-        return this.management.getSelectedFingerprintFields();
-    }
-
-    async removeAllFingerprintFields() {
-        return this.management.removeAllFingerprintFields();
-    }
-
-    async submitAlertEdit() {
-        return this.management.submitAlertEdit();
     }
 
     // ==================== ALERT DETAIL PAGE ====================
@@ -1777,7 +1722,7 @@ export class AlertsPage {
             // until the row renders. Deterministic (each probe waits for the actual cell); no
             // reliance on one slow fetch landing inside a fixed window.
             const inputField = this.page.locator(this.locators.alertSearchInputField);
-            const listSkeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
+            const listSkeleton = this.page.locator('[data-test="o2-table"][data-test-loading="true"]');
             let found = false;
             for (let attempt = 1; attempt <= 4 && !found; attempt++) {
                 if (attempt === 3) {
@@ -1799,7 +1744,7 @@ export class AlertsPage {
         }
 
         // Final deterministic assertions (the row is present by now under normal + slow paths).
-        await this.page.locator('[data-test="o2-table-skeleton-body"]').first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+        await this.page.locator('[data-test="o2-table"][data-test-loading="true"]').first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
         await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible({ timeout: 15000 });
         await expect(this.page.locator(this.locators.pauseStartAlert.replace('{alertName}', nameToVerify)).first()).toBeVisible({ timeout: 10000 });
     }
@@ -1962,6 +1907,7 @@ export class AlertsPage {
 
             // Try clicking with force to bypass potential overlays
             await backButton.click({ force: true, timeout: 10000 });
+            await discardEditorDraftIfAsked(this.page);
             testLogger.info('Closed alert wizard via back button');
         } catch (error) {
             testLogger.warn('Back button click failed, trying close button', { error: error.message });
@@ -2388,6 +2334,7 @@ export class AlertsPage {
         testLogger.info(`Target lifecycle row index: ${targetIndex}`);
 
         await allRows.nth(targetIndex).locator(this.locators.incidentAckButton).click();
+        await this.page.locator(this.locators.confirmDialogProviderPrimary).click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked acknowledge button');
     }
@@ -2409,6 +2356,7 @@ export class AlertsPage {
         const resolveButton = row.locator(this.locators.incidentResolveButton);
         await resolveButton.waitFor({ state: 'visible', timeout: 10000 });
         await resolveButton.click();
+        await this.page.locator(this.locators.confirmDialogProviderPrimary).click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked resolve button');
     }
@@ -2422,6 +2370,7 @@ export class AlertsPage {
         const reopenButton = row.locator(this.locators.incidentReopenButton);
         await reopenButton.waitFor({ state: 'visible', timeout: 10000 });
         await reopenButton.click();
+        await this.page.locator(this.locators.confirmDialogProviderPrimary).click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked reopen button');
     }
@@ -3718,6 +3667,7 @@ export class AlertsPage {
      */
     async clickBackButton() {
         await this.page.locator(this.locators.alertBackButton).first().click({ timeout: 15000 });
+        await discardEditorDraftIfAsked(this.page);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
@@ -4314,7 +4264,7 @@ export class AlertsPage {
      * Navigate through wizard steps by clicking Continue button multiple times
      * @param {number} times - Number of times to click Continue
      */
-    async navigateThroughWizardSteps(times = 5) {
+    async navigateThroughWizardSteps(times = 4) {
         for (let i = 0; i < times; i++) {
             const clicked = await this.clickContinueButton();
             if (!clicked) break;

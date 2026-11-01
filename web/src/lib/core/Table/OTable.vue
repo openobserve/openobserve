@@ -45,7 +45,11 @@ import { useTablePagination } from "./composables/useTablePagination";
 import { useTableSorting } from "./composables/useTableSorting";
 import { useTableSelection } from "./composables/useTableSelection";
 import { useTableExpansion } from "./composables/useTableExpansion";
-import { useTableTree, OTableTreeContextKey } from "./composables/useTableTree";
+import {
+  useTableTree,
+  OTableTreeContextKey,
+  type OTableTreeRowMeta,
+} from "./composables/useTableTree";
 import { useTableHighlight } from "./composables/useTableHighlight";
 import { useTableColumnManagement } from "./composables/useTableColumnManagement";
 import { useTableVirtualization } from "./composables/useTableVirtualization";
@@ -190,9 +194,40 @@ const skeletonRowCount = computed(() => {
 // flash-and-disappear on fast responses. If the server is slow, the
 // skeleton stays visible until data actually arrives.
 const MIN_SKELETON_MS = 50;
+// Kept rows stay live until dimmed, so a fast refetch neither flickers nor swallows a click.
+const STALE_DIM_DELAY_MS = 150;
 const heldLoading = ref(false);
 let loadingStartedAt = 0;
 let releaseTimer: ReturnType<typeof setTimeout> | null = null;
+
+const staleRows = shallowRef<readonly TData[] | null>(null);
+// A consumer that rebuilds its tree mid-load drops the kept rows from the live tree, so their metadata is kept too.
+const staleTreeMeta = shallowRef<Map<TData, OTableTreeRowMeta | null> | null>(null);
+const staleDimmed = ref(false);
+let settledRows: TData[] | null = null;
+let settledTreeMeta: Map<TData, OTableTreeRowMeta | null> | null = null;
+let staleDimTimer: ReturnType<typeof setTimeout> | null = null;
+
+function keepSettledRows(): void {
+  if (props.skeletonOnRefetch || !settledRows?.length) return;
+  // The very array the table already shows: same row objects for accessors, same identity so paging stays put.
+  staleRows.value = settledRows;
+  staleTreeMeta.value = settledTreeMeta;
+  staleDimTimer = setTimeout(() => {
+    staleDimmed.value = true;
+    staleDimTimer = null;
+  }, STALE_DIM_DELAY_MS);
+}
+
+function dropStaleRows(): void {
+  if (staleDimTimer) {
+    clearTimeout(staleDimTimer);
+    staleDimTimer = null;
+  }
+  staleDimmed.value = false;
+  staleRows.value = null;
+  staleTreeMeta.value = null;
+}
 
 watch(
   () => props.loading,
@@ -203,7 +238,11 @@ watch(
         releaseTimer = null;
       }
       loadingStartedAt = Date.now();
+      if (!heldLoading.value) keepSettledRows();
       heldLoading.value = true;
+    } else if (staleRows.value) {
+      dropStaleRows();
+      heldLoading.value = false;
     } else if (heldLoading.value) {
       const elapsed = Date.now() - loadingStartedAt;
       const remaining = MIN_SKELETON_MS - elapsed;
@@ -225,6 +264,7 @@ onBeforeUnmount(() => {
     clearTimeout(releaseTimer);
     releaseTimer = null;
   }
+  if (staleDimTimer) clearTimeout(staleDimTimer);
 });
 
 // ── Internal global filter state (uncontrolled when no parent binds :global-filter) ──
@@ -300,7 +340,14 @@ const tree = useTableTree<TData>(
 );
 
 // Provide the computed (a reactive ref). Consumers `inject` and read `.value`.
-provide(OTableTreeContextKey, tree.context);
+const treeContext = computed(() => {
+  const context = tree.context.value;
+  const kept = staleTreeMeta.value;
+  return kept
+    ? { ...context, getMeta: (row: TData) => kept.get(row) ?? context.getMeta(row) }
+    : context;
+});
+provide(OTableTreeContextKey, treeContext);
 
 // Expose horizontalScroll to descendant cells without prop-drilling.
 provide(
@@ -425,6 +472,29 @@ const tableData = computed<TData[]>(() => {
   return source ? source.slice() : [];
 });
 
+watch(
+  [tableData, () => props.loading, () => props.error, () => props.loadingResetKey],
+  ([rows, loading, error, resetKey], previous) => {
+    if (previous && resetKey !== previous[3]) {
+      if (staleRows.value) dropStaleRows();
+      settledRows = null;
+      settledTreeMeta = null;
+      // The rows still on screen belong to the old context; only rows that arrive with the new key may be kept.
+      if (rows === previous[0]) return;
+    }
+    if (error) {
+      settledRows = null;
+      settledTreeMeta = null;
+    } else if (!loading) {
+      settledRows = rows;
+      settledTreeMeta = tree.enabled.value
+        ? new Map(rows.map((row) => [row, tree.getMeta(row)]))
+        : null;
+    }
+  },
+  { immediate: true },
+);
+
 // ── Windowed row model ──────────────────────────────────────────
 // TanStack builds a Row object per data row independent of virtual scroll,
 // which only bounds DOM nodes — 100k+ rows freeze the tab and ~1M rows OOM it.
@@ -453,7 +523,7 @@ const rowModelWindowed = computed(
 // identity; a fresh slice per read would re-trigger TanStack's reactive
 // options merge on every access.
 const windowedTableData = computed<TData[]>(() => {
-  const data = tableData.value;
+  const data = (staleRows.value as TData[] | null) ?? tableData.value;
   if (rowModelWindowed.value) {
     return data.slice(rowWindowStart.value, rowWindowEnd.value);
   }
@@ -559,6 +629,9 @@ const pagination = useTablePagination(
     },
     get data() {
       return props.data;
+    },
+    get rowModelWindowed() {
+      return rowModelWindowed.value;
     },
   },
   emit,
@@ -753,14 +826,25 @@ function getPivotMerge(
   return pivotMergeMap.value.get(row)?.[columnId] ?? null;
 }
 
-function pivotTotalCell(col: OTableColumnDef<TData>): any {
-  const row = props.stickyTotalRow;
+const stickyTotalRows = computed<Record<string, any>[]>(() => {
+  const rows = props.stickyTotalRow;
+  if (!rows) return [];
+  return Array.isArray(rows) ? rows : [rows];
+});
+
+function pivotTotalCell(col: OTableColumnDef<TData>, row: Record<string, any>): any {
   if (!row) return "";
   const key = (col.accessorKey ?? col.id) as string;
   const val = row[key];
   if (val === undefined || val === null) return "";
   const fmt = (col.meta as any)?.format as ((v: any, r: any) => any) | undefined;
   return fmt ? fmt(val, row) : val;
+}
+
+// A calculated-totals row names its calculation in `__labelKey`'s cell; the values are the figures to stand out.
+function calcRowCellClass(col: OTableColumnDef<TData>, row: Record<string, any>): string {
+  if (!row?.__labelKey) return "";
+  return (col.accessorKey ?? col.id) === row.__labelKey ? "text-text-secondary" : "font-semibold";
 }
 
 // Inline so the mono font wins over the scoped `td { --font-sans }` rule.
@@ -1227,11 +1311,6 @@ useTableKeyboard(table, scrollContainerRef, {
 useTableRowShortcuts(scrollContainerRef);
 
 // ── Table-level empty/loading/error state ──────────────────────
-// Use `heldLoading` (props.loading + min-2s hold) so skeleton doesn't flash.
-// While loading, the full skeleton always wins — never show partial rows
-// with a "Loading…" banner over them (that pattern lets consumers'
-// progressive data mutations leak through visually). Consumers that want
-// refetch-without-replacing-content should use the `streaming` prop.
 // Sectioned tables render `bodyRows`, not `displayRows` — a `rowSection` that
 // filters every loaded row to null (every row belongs to a hidden section)
 // left the body blank with neither a row nor the empty state, since the page
@@ -1252,7 +1331,7 @@ const showEmpty = computed(
     (sectionsEnabled.value ? bodyRows.value.length === 0 : displayRows.value.length === 0),
 );
 const showError = computed(() => !heldLoading.value && !!props.error);
-const showLoadingOverlay = computed(() => heldLoading.value);
+const showSkeleton = computed(() => heldLoading.value && !staleRows.value);
 /** Streaming: data is arriving incrementally. Show pulsing indicator while stream is active and data exists. */
 const showStreaming = computed(() => props.streaming && displayRows.value.length > 0);
 
@@ -1355,7 +1434,7 @@ defineExpose({
       <div
         v-if="slots.toolbar || slots['toolbar-trailing']"
         :class="[
-          'px-page-edge flex items-center gap-2 py-2 max-md:flex-wrap max-md:gap-y-1.5',
+          'px-page-edge flex items-center gap-2 py-2 max-md:flex-wrap max-md:gap-y-2',
           props.toolbarBordered ? 'border-table-row-divider border-b' : '',
         ]"
         data-test="o2-table-toolbar"
@@ -1370,6 +1449,7 @@ defineExpose({
             v-if="showColumnToggle"
             :columns="props.columns"
             :column-visibility="internalColumnVisibility"
+            :default-column-visibility="props.columnVisibility"
             :has-resized-columns="props.enableColumnResize && hasResizedColumns"
             class="shrink-0"
             data-test="o2-table-column-toggle"
@@ -1398,7 +1478,7 @@ defineExpose({
             :value="globalFilterLocal"
             type="text"
             :placeholder="props.globalFilterPlaceholder ?? t('common.searchEllipsis')"
-            class="text-primary placeholder-text-disabled w-full border-none bg-transparent py-1 ps-7 pe-2 text-sm outline-none"
+            class="text-primary placeholder:text-input-placeholder w-full border-none bg-transparent py-1 ps-7 pe-2 text-sm outline-none"
             data-test="o2-table-global-filter-input"
             @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"
           />
@@ -1413,6 +1493,7 @@ defineExpose({
           "
           :columns="props.columns"
           :column-visibility="internalColumnVisibility"
+          :default-column-visibility="props.columnVisibility"
           :has-resized-columns="props.enableColumnResize && hasResizedColumns"
           data-test="o2-table-column-toggle"
           @update:column-visibility="handleColumnVisibilityChange"
@@ -1420,9 +1501,6 @@ defineExpose({
         />
       </div>
 
-      <!-- ── Loading banner (shown when streaming with existing data) ──
-         Only used for the streaming pattern now — when `loading=true`,
-         the table body switches to the full skeleton instead. -->
       <slot
         v-if="props.streaming && displayRows.length > 0 && slots['loading-banner']"
         name="loading-banner"
@@ -1485,7 +1563,8 @@ defineExpose({
             props.bordered &&
             !props.columns.some((c) => c.pinned || c.isAction) &&
             !(props.pivotHeaderLevels && props.pivotHeaderLevels.length) &&
-            !props.stickyColTotals
+            !props.stickyColTotals &&
+            !(props.stickyRowTotals && stickyTotalRows.length)
               ? ''
               : 'border-separate border-spacing-0',
             // Symmetric edge inset (SPACING_AUDIT.md §7): the first and last cell
@@ -1517,7 +1596,8 @@ defineExpose({
                     : 'var(--table-row-height-normal, 2.75rem)',
           }"
           data-test="o2-table"
-          :data-test-loading="props.loading ? 'true' : 'false'"
+          :data-test-loading="heldLoading ? 'true' : 'false'"
+          :aria-busy="showSkeleton || staleDimmed ? 'true' : undefined"
         >
           <!-- ── Header ───────────────────────────────────────── -->
           <OTableHeader
@@ -1552,7 +1632,7 @@ defineExpose({
             :pivot-header-levels="props.pivotHeaderLevels"
             :pivot-row-columns="props.pivotRowColumns"
             :sticky-col-totals="props.stickyColTotals"
-            @toggle-all-rows="selection.toggleAllRows"
+            @toggle-all-rows="!staleDimmed && selection.toggleAllRows()"
             @sort="sorting.handleSort"
             @update:column-order="
               (order: string[]) => {
@@ -1570,7 +1650,7 @@ defineExpose({
 
           <!-- ── Skeleton Body (loading with no existing data) ───── -->
           <OTableLoading
-            v-if="showLoadingOverlay"
+            v-if="showSkeleton"
             :rows="skeletonRowCount"
             :table-columns="table.getVisibleLeafColumns()"
             :selection-enabled="selection.isEnabled.value"
@@ -1582,6 +1662,9 @@ defineExpose({
           <!-- ── Body ─────────────────────────────────────────── -->
           <OTableBody
             v-else-if="!showEmpty && !showError"
+            :class="['transition-opacity', staleDimmed ? 'opacity-60 dark:opacity-40' : '']"
+            :inert="staleDimmed ? true : undefined"
+            :data-test-stale="staleRows ? 'true' : undefined"
             :rows="bodyRows"
             :sections="sectionsEnabled ? rowSections : undefined"
             :table="table"
@@ -1622,10 +1705,11 @@ defineExpose({
             :measure-element="isVirtual ? measureElement : undefined"
             :measure-row-element="isVirtual && useDynamicRowHeight ? measureRowElement : undefined"
             :dynamic-row-height="isVirtual && useDynamicRowHeight"
-            @toggle-selection="selection.toggleRow"
-            @toggle-expansion="expansion.toggleRow"
+            @toggle-selection="(row: TData) => !staleDimmed && selection.toggleRow(row)"
+            @toggle-expansion="(row: TData) => !staleDimmed && expansion.toggleRow(row)"
             @row-click="
               (row: TData, evt: MouseEvent) => {
+                if (staleDimmed) return;
                 const canExpand =
                   typeof props.expandOnRowClick === 'function'
                     ? props.expandOnRowClick(row)
@@ -1634,12 +1718,14 @@ defineExpose({
                 emit('row-click', row, evt);
               }
             "
-            @row-reorder="(data: TData[]) => emit('row-reorder', data)"
-            @row-dblclick="(row: TData, evt: MouseEvent) => emit('row-dblclick', row, evt)"
+            @row-reorder="(data: TData[]) => !staleDimmed && emit('row-reorder', data)"
+            @row-dblclick="
+              (row: TData, evt: MouseEvent) => !staleDimmed && emit('row-dblclick', row, evt)
+            "
             @row-mouseenter="(row: TData, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
             @row-mouseleave="(row: TData) => emit('row-mouseleave', row)"
-            @cell-click="(params: any) => emit('cell-click', params)"
-            @cell-contextmenu="(params: any) => emit('cell-contextmenu', params)"
+            @cell-click="(params: any) => !staleDimmed && emit('cell-click', params)"
+            @cell-contextmenu="(params: any) => !staleDimmed && emit('cell-contextmenu', params)"
           >
             <!-- Pass through named cell slots from parent (only for columns where parent provides a slot) -->
             <template
@@ -1752,11 +1838,15 @@ defineExpose({
 
           <!-- ── Pivot grand-total row (sticky <tfoot>) ── -->
           <tfoot
-            v-if="props.stickyTotalRow"
+            v-if="stickyTotalRows.length"
             data-test="o2-table-pivot-total-foot"
             :class="props.stickyRowTotals ? 'o2-pivot-total-sticky sticky bottom-0 z-10' : ''"
           >
-            <tr class="bg-table-header-bg">
+            <tr
+              v-for="(totalRow, totalIndex) in stickyTotalRows"
+              :key="`pivot-total-row-${totalIndex}`"
+              class="bg-table-header-bg"
+            >
               <td
                 v-for="col in props.columns"
                 :key="`pivot-total-${col.id}`"
@@ -1769,10 +1859,11 @@ defineExpose({
                       ? 'text-center'
                       : 'text-left',
                   props.stickyColTotals && (col.meta as any)?._isTotalColumn ? 'font-semibold' : '',
+                  calcRowCellClass(col, totalRow),
                 ]"
                 :style="pivotTotalCellStyle(col)"
               >
-                {{ pivotTotalCell(col) }}
+                {{ pivotTotalCell(col, totalRow) }}
               </td>
             </tr>
           </tfoot>
@@ -1792,7 +1883,7 @@ defineExpose({
 
         <!-- ── Custom loading slot (overlay) ───────────────────── -->
         <div
-          v-if="showLoadingOverlay && slots.loading"
+          v-if="showSkeleton && slots.loading"
           class="bg-surface-base/70 absolute inset-0 z-10 flex items-center justify-center"
           data-test="o2-table-loading-slot"
         >
@@ -1817,10 +1908,10 @@ defineExpose({
 
         <!-- ── Streaming Indicator ─────────────────────────────── -->
         <div
-          v-if="showStreaming"
+          v-if="showStreaming || staleDimmed"
           data-test="o2-table-streaming-bar"
           class="bg-table-streaming-bar sticky bottom-0 z-10 h-1 w-full animate-pulse"
-          :aria-label="t('common.dataStreamingInProgress')"
+          :aria-label="staleDimmed ? t('common.loading') : t('common.dataStreamingInProgress')"
         />
       </div>
 

@@ -13,20 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  routeGuard,
-  useLocalUserInfo,
-  useLocalCurrentUser,
-  invalidateLoginData,
-  getPath,
-} from "@/utils/zincutils";
+import { routeGuard, getPath } from "@/utils/zincutils";
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
-import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
-import { forgetLinkRequest } from "@/utils/slackLink";
+import { PA_ROUTES, redirectHeatmaps } from "@/utils/rum/productAnalyticsRoutes";
+import { endSignedInSession } from "@/utils/drafts/signOutFlow";
+import { silenceUnloadPrompts } from "@/utils/sessionServices";
 import {
   PLAYLIST_TV_PATH,
   buildPlaylistQuery,
@@ -208,6 +203,7 @@ const NamedEventsListPage = () =>
   import("@/components/rum/productAnalytics/NamedEventsListPage.vue");
 const NamedEventEditor = () => import("@/views/RUM/NamedEventEditor.vue");
 const SourceMaps = () => import("@/views/RUM/SourceMaps.vue");
+const ClickHeatmap = () => import("@/views/RUM/ClickHeatmap.vue");
 const UploadSourceMaps = () => import("@/views/RUM/UploadSourceMaps.vue");
 
 const ReportList = () => import("@/components/reports/ReportList.vue");
@@ -259,11 +255,10 @@ const useRoutes = () => {
         // must run even if a clear throws, and must respect the app base —
         // a bare "/login" 404s when the app is served under /web/.
         try {
-          invalidateLoginData();
-          useLocalCurrentUser("", true);
-          useLocalUserInfo("", true);
-          forgetLinkRequest();
+          // Only the menu's sign-out confirms discarding drafts, so a direct link or a retried navigation keeps them, as an expired session does.
+          endSignedInSession(store, { keepDrafts: true });
         } finally {
+          silenceUnloadPrompts();
           window.location.href = `${getPath()}login`;
         }
       },
@@ -1295,6 +1290,10 @@ const useRoutes = () => {
           },
         },
         {
+          path: "heatmaps",
+          redirect: (to: any) => redirectHeatmaps(to),
+        },
+        {
           path: "source-maps",
           name: "SourceMaps",
           component: SourceMaps,
@@ -1403,6 +1402,14 @@ const useRoutes = () => {
           path: "paths",
           name: PA_ROUTES.paths,
           component: AnalyticsPaths,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "heatmaps",
+          name: PA_ROUTES.heatmaps,
+          component: ClickHeatmap,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

@@ -262,6 +262,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OButton>
           </template>
+          <span
+            v-else-if="aiSlotPending"
+            aria-hidden="true"
+            class="size-[1.875rem] shrink-0"
+            data-test="header-ai-slot-placeholder"
+          />
 
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
           <ThemeSwitcher class="max-md:hidden"></ThemeSwitcher>
@@ -417,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ref="languageListRef"
                   role="group"
                   :aria-label="t('menu.language')"
-                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border py-1 shadow-lg max-lg:static max-lg:me-0 max-lg:mt-1 max-lg:w-full max-lg:min-w-0 max-lg:shadow-none dark:shadow-lg"
+                  class="rounded-default bg-dropdown-bg shadow-overlay max-lg:border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border border-transparent py-1 max-lg:static max-lg:me-0 max-lg:mt-1 max-lg:w-full max-lg:min-w-0 max-lg:shadow-none"
                   data-test="language-dropdown-item"
                   @keydown="onLanguageListKeydown"
                 >
@@ -725,6 +731,9 @@ export default defineComponent({
     const aiButtonVisible = computed(
       () => !aiAccess.value.allowed || Boolean(props.store.state.zoConfig.ai_enabled),
     );
+    const aiSlotPending = computed(
+      () => aiAccess.value.allowed && !props.store.state.zoConfig?.version,
+    );
 
     // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
     const linkedAccountsVisible = computed(
@@ -828,9 +837,12 @@ export default defineComponent({
     };
 
     const navGateContext = useNavGateContext();
-    // Same gate and route check the nav flyout applies to the On-Call entries.
+    // Waits for an explicit `true`: the gate is open before the full config loads, and unmounting the first menu item then drops keyboard focus.
     const showMyOncall = computed(
-      () => isGateOpen(navGateContext.value, "oncall") && props.router.hasRoute("onCallMine"),
+      () =>
+        props.store.state.zoConfig?.oncall_enabled === true &&
+        isGateOpen(navGateContext.value, "oncall") &&
+        props.router.hasRoute("onCallMine"),
     );
 
     const goToMyOncall = () => {
@@ -847,6 +859,7 @@ export default defineComponent({
       raw,
       getImageURL,
       enterpriseButtonText,
+      aiSlotPending,
       ingestionQuotaPercentage,
       ingestionQuotaColor,
       showEnterpriseDialog,

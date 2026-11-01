@@ -99,6 +99,7 @@ vi.mock("./JsonPreview.vue", () => ({
       showCopyButton: { type: Boolean, default: false },
       mode: { type: String, default: "" },
       hideViewTrace: { type: Boolean, default: false },
+      copyInPlace: { type: Boolean, default: false },
     },
     emits: [
       "copy",
@@ -692,21 +693,17 @@ describe("DetailTable Component", () => {
   });
 
   // Test 41-45: Setup Function Utilities
-  it("should call copyToClipboard when copyContentToClipboard called", async () => {
-    const testData = { test: "value" };
+  it("has the JSON preview confirm a copy on its own button instead of a toast", async () => {
+    await flushPromises();
     const mockCopyToClipboard = copyToClipboard as Mock;
-    mockCopyToClipboard.mockResolvedValue(undefined);
+    mockCopyToClipboard.mockClear();
 
-    await wrapper.vm.copyContentToClipboard(testData);
+    const jsonPreview = wrapper.findComponent({ name: "JsonPreview" });
+    expect(jsonPreview.exists()).toBe(true);
+    expect(jsonPreview.props("copyInPlace")).toBe(true);
 
-    expect(mockCopyToClipboard).toHaveBeenCalledWith(
-      JSON.stringify(testData),
-      expect.any(Function),
-      {
-        successMessage: "Content Copied Successfully!",
-        timeout: 1000,
-      },
-    );
+    jsonPreview.vm.$emit("copy", { test: "value" });
+    expect(mockCopyToClipboard).not.toHaveBeenCalled();
   });
 
   it("should emit add:table when addFieldToTable called", () => {

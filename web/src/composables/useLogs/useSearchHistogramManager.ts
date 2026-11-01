@@ -127,6 +127,8 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
         !searchObj.data.queryResults.is_histogram_eligible)
     ) {
       if (shouldGetPageCount(queryReq, parsedSQL) && isFromZero) {
+        // Set now, not in the deferred call, so the interim page total never reads as final.
+        searchObj.loadingHistogram = true;
         setTimeout(async () => {
           searchObjDebug["pagecountStartTime"] = performance.now();
           getPageCountThroughSocket(
@@ -148,6 +150,7 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
       searchObj.meta.histogramDirtyFlag = false;
     } else {
       if (shouldGetPageCount(queryReq, parsedSQL) && isFromZero) {
+        searchObj.loadingHistogram = true;
         setTimeout(async () => {
           searchObjDebug["pagecountStartTime"] = performance.now();
           getPageCountThroughSocket(
@@ -175,40 +178,47 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
     generationId?: number,
   ) => {
     if (searchObj.data.queryResults.total > queryReq.query.from + queryReq.query.size) {
+      searchObj.loadingHistogram = false;
       return;
     }
 
-    searchObj.data.countErrorMsg = "";
-    queryReq.query.size = 0;
-    delete queryReq.query.from;
-    delete queryReq.query.quick_mode;
-    if (queryReq.query.action_id) delete queryReq.query.action_id;
+    // The caller already set loadingHistogram, so a throw here must clear it or the status row stays busy.
+    try {
+      searchObj.data.countErrorMsg = "";
+      queryReq.query.size = 0;
+      delete queryReq.query.from;
+      delete queryReq.query.quick_mode;
+      if (queryReq.query.action_id) delete queryReq.query.action_id;
 
-    queryReq.query.track_total_hits = true;
+      queryReq.query.track_total_hits = true;
 
-    if (
-      searchObj.data?.queryResults?.time_offset?.start_time &&
-      searchObj.data?.queryResults?.time_offset?.end_time
-    ) {
-      queryReq.query.start_time = searchObj.data.queryResults.time_offset.start_time;
-      queryReq.query.end_time = searchObj.data.queryResults.time_offset.end_time;
+      if (
+        searchObj.data?.queryResults?.time_offset?.start_time &&
+        searchObj.data?.queryResults?.time_offset?.end_time
+      ) {
+        queryReq.query.start_time = searchObj.data.queryResults.time_offset.start_time;
+        queryReq.query.end_time = searchObj.data.queryResults.time_offset.end_time;
+      }
+
+      const payload = buildWebSocketPayload(queryReq, false, "pageCount");
+      if (generationId !== null && generationId !== undefined) payload.generationId = generationId;
+
+      if (callbacks) {
+        payload.onData = callbacks.onData;
+        payload.onError = callbacks.onError;
+        payload.onComplete = callbacks.onComplete;
+      }
+
+      searchObj.loadingHistogram = true;
+      searchObj.loadingHistogramProgressPercentage = 0;
+
+      initializeSearchConnection(payload);
+
+      addTraceId(payload.traceId);
+    } catch (e) {
+      searchObj.loadingHistogram = false;
+      console.error("Error while requesting the page count", e);
     }
-
-    const payload = buildWebSocketPayload(queryReq, false, "pageCount");
-    if (generationId !== null && generationId !== undefined) payload.generationId = generationId;
-
-    if (callbacks) {
-      payload.onData = callbacks.onData;
-      payload.onError = callbacks.onError;
-      payload.onComplete = callbacks.onComplete;
-    }
-
-    searchObj.loadingHistogram = true;
-    searchObj.loadingHistogramProgressPercentage = 0;
-
-    initializeSearchConnection(payload);
-
-    addTraceId(payload.traceId);
   };
 
   const isHistogramDataMissing = (searchObj: any) => {

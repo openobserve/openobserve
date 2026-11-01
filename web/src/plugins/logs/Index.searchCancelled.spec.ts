@@ -291,5 +291,90 @@ describe(
       expect(wrapper.find('[data-test="logs-search-cancelled-notice"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="logs-search-cancelled-state"]').exists()).toBe(false);
     });
+
+    it("a query the server rejects keeps its error panel through a re-run", async () => {
+      const { searchObj } = wrapper.vm;
+      const panel = () => wrapper.find('[data-test="logs-search-error-state"]');
+      const failLast = async () => {
+        const { payload, handlers } = searchHits()[searchHits().length - 1];
+        handlers.error(payload, {
+          content: { message: "Search field not found: nosuchfield", code: 20002 },
+        });
+        await flushPromises();
+      };
+
+      await runButton().trigger("click");
+      await vi.waitFor(() => expect(searchHits()).toHaveLength(1));
+      await failLast();
+      await vi.waitFor(() => expect(searchObj.loading).toBe(false));
+      const shown = panel().text();
+      expect(shown).toContain("Field not found");
+
+      await runButton().trigger("click");
+      await vi.waitFor(() => expect(searchHits()).toHaveLength(2));
+      expect(searchObj.loading).toBe(true);
+      expect(searchObj.data.errorMsg).toBe("");
+      expect(panel().text()).toBe(shown);
+
+      await failLast();
+      await vi.waitFor(() => expect(searchObj.loading).toBe(false));
+      expect(panel().text()).toBe(shown);
+    });
+
+    it("explains the error for the query that failed, not the text typed after it", async () => {
+      const { searchObj } = wrapper.vm;
+      const panel = () => wrapper.find('[data-test="logs-search-error-state"]');
+      searchObj.meta.sqlMode = true;
+      searchObj.data.query = 'SELECT * FROM "app" WHERE';
+      searchObj.data.editorValue = searchObj.data.query;
+      await flushPromises();
+
+      await runButton().trigger("click");
+      await vi.waitFor(() => expect(searchHits()).toHaveLength(1));
+      const { payload, handlers } = searchHits()[0];
+      handlers.error(payload, {
+        content: {
+          message: 'SQL error: ParserError("Expected: an expression, found: EOF")',
+          code: 20001,
+        },
+      });
+      await flushPromises();
+      await vi.waitFor(() => expect(searchObj.loading).toBe(false));
+      const shown = panel().text();
+      expect(shown).toContain("WHERE");
+
+      searchObj.data.query = 'SELECT * FROM "app" WHERE level = 1 AND';
+      await flushPromises();
+      expect(panel().text()).toBe(shown);
+    });
+
+    it("a failing query run again keeps its error text until the next error lands", async () => {
+      const { searchObj } = wrapper.vm;
+      const panel = () => wrapper.find('[data-test="logs-search-error-state"]');
+      const serverError = 'Error# SQL error: ParserError("Expected: identifier, found: EOF")';
+      const preflightError = "SQL syntax error at line 1, column 14: Incomplete FROM";
+
+      searchObj.data.queryResults = {};
+      searchObj.loading = true;
+      searchObj.data.errorMsg = preflightError;
+      await flushPromises();
+      expect(panel().exists()).toBe(false);
+
+      searchObj.data.errorMsg = serverError;
+      searchObj.loading = false;
+      await flushPromises();
+      const shown = panel().text();
+      expect(shown).not.toBe("");
+
+      searchObj.loading = true;
+      searchObj.data.errorMsg = preflightError;
+      await flushPromises();
+      expect(panel().text()).toBe(shown);
+
+      searchObj.data.errorMsg = serverError;
+      searchObj.loading = false;
+      await flushPromises();
+      expect(panel().text()).toBe(shown);
+    });
   },
 );

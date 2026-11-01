@@ -48,6 +48,19 @@ export default class ChartTypeSelector {
     // HTML chart editor + rendered output
     this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
     this.htmlRenderer = page.locator('[data-test="html-renderer"]');
+
+    // Markdown chart editor + rendered output
+    this.markdownEditor = page.locator('[data-test="dashboard-markdown-editor"]');
+    this.markdownRenderer = page.locator('[data-test="markdown-renderer"]');
+  }
+
+  async fillMarkdownEditor(markdown) {
+    await this.markdownEditor.locator(".monaco-editor").click();
+    await this.markdownEditor.locator(".inputarea").fill(markdown);
+  }
+
+  getHtmlRendererElement(selector) {
+    return this.htmlRenderer.locator(selector);
   }
 
   // Click the geomap chart canvas at a given pixel position
@@ -74,6 +87,50 @@ export default class ChartTypeSelector {
   // Rendered HTML output: any <script> tags (should be sanitized away)
   getHtmlRendererScripts() {
     return this.htmlRenderer.locator("script");
+  }
+
+  getHtmlRendererElement(selector) {
+    return this.htmlRenderer.locator(selector);
+  }
+
+  // Page-wide, since an escaped element would land outside the renderer
+  getInjectedOnErrorImages() {
+    return this.page.locator("img[onerror]");
+  }
+
+  async getHtmlPanelSentinel() {
+    return this.page.evaluate(() => window.__o2HtmlPanelSentinel);
+  }
+
+  async addHtmlPanelContent(html) {
+    await this.selectChartType("html");
+    await this.fillHtmlEditor(html);
+  }
+
+  // A null target asserts the sanitizer dropped it and added no rel
+  async expectHtmlLinkTarget(selector, target) {
+    const element = this.getHtmlRendererElement(selector);
+    if (target === null) {
+      await expect(element).toHaveCount(1);
+      await expect(element).not.toHaveAttribute("target");
+      await expect(element).not.toHaveAttribute("rel");
+      return;
+    }
+    await expect(element).toHaveAttribute("target", target);
+    await expect(element).toHaveAttribute("rel", "noopener noreferrer");
+  }
+
+  async clickHtmlRendererElementForPopup(selector) {
+    const [popup] = await Promise.all([
+      this.page.context().waitForEvent("page"),
+      this.getHtmlRendererElement(selector).click(),
+    ]);
+    await popup.waitForLoadState("domcontentloaded");
+    return popup;
+  }
+
+  async isPopupOpenerNull(popup) {
+    return popup.evaluate(() => window.opener === null);
   }
 
   // Returns the field-list row for a given field name

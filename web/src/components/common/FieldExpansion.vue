@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OCollapsible
     :model-value="isExpanded"
     @update:model-value="handleToggle"
-    class="field-expansion-item rounded-default w-full overflow-hidden"
+    class="field-expansion-item rounded-default w-full overflow-clip [overflow-clip-margin:0.25rem]"
     trigger-class="px-0! py-0!"
   >
     <template #trigger>
@@ -108,6 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="py-0 ps-4 pe-2">
+      <slot name="caption" />
       <slot name="body">
         <FieldValuesPanel
           ref="fieldValuesPanelRef"

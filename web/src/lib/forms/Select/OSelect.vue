@@ -7,6 +7,7 @@ import type {
   SelectSlots,
   SelectValue as SelectPrimitiveValue,
   SelectModelValue,
+  SelectOption,
 } from "./OSelect.types";
 import {
   SELECT_VALUE_MAP_KEY,
@@ -14,6 +15,7 @@ import {
   NULL_VALUE_SENTINEL,
 } from "./OSelect.types";
 import OSelectItem from "./OSelectItem.vue";
+import OSelectHeaderRow from "./OSelectHeaderRow.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -95,6 +97,12 @@ type NormalizedOption = {
   parentKey?: string;
   /** Extra lowercase text the search matches besides the label, e.g. a zone's legacy names. */
   searchText?: string;
+  headerCount?: I18nText;
+  headerAction?: I18nText;
+  headerActionAriaLabel?: I18nText;
+  keepOnSearch?: boolean;
+  /** The header option as passed in, handed back by `header-action`. */
+  source?: SelectOption;
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -223,11 +231,17 @@ function normalizeOption(input: unknown): NormalizedOption | null {
   // Group header: items with header:true or isTab:true are non-selectable labels
   const isHeader = Boolean(option["header"]) || Boolean(option["isTab"]);
   if (isHeader) {
+    const header = option as SelectOption;
     return {
       label: raw(rawLabel === undefined || rawLabel === null ? "" : String(rawLabel)),
       value: `__header__${String(rawLabel)}`,
       disabled: true,
       header: true,
+      headerCount: header.headerCount,
+      headerAction: header.headerAction,
+      headerActionAriaLabel: header.headerActionAriaLabel,
+      keepOnSearch: header.keepOnSearch === true,
+      source: header,
     };
   }
 
@@ -351,7 +365,9 @@ const baseFilteredOptions = computed(() => {
   const result: NormalizedOption[] = [];
   for (let i = 0; i < options.length; i++) {
     const opt = options[i];
-    if (opt.header) {
+    if (opt.header && opt.keepOnSearch) {
+      result.push(opt);
+    } else if (opt.header) {
       // Include the header only if at least one subsequent non-header item matches
       let j = i + 1;
       while (j < options.length && !options[j].header) {
@@ -419,7 +435,9 @@ const nestedFilteredOptions = computed(() => {
   if (isSearching.value) {
     const flat = base.filter((o) => !o.expandable);
     // A header kept only for a matching expandable row has nothing left under it.
-    return flat.filter((o, i) => !o.header || (flat[i + 1] !== undefined && !flat[i + 1].header));
+    return flat.filter(
+      (o, i) => !o.header || o.keepOnSearch || (flat[i + 1] !== undefined && !flat[i + 1].header),
+    );
   }
   return base.filter((o) => o.parentKey === undefined || expandedParents.value.has(o.parentKey));
 });
@@ -769,19 +787,18 @@ const listboxScrollEl = ref<HTMLElement | null>(null);
 //
 // Strategy:
 //   - highlightedIndex tracks which filteredOptions entry is highlighted.
-//   - Up / Down move the index through selectable (non-header, non-disabled)
-//     items with wrap-around.
+//   - Up / Down move it through navigable rows with wrap-around.
 //   - Enter commits the selection; Escape closes the dropdown.
 //   - The highlight class is applied reactively — no DOM focus juggling.
 //   - The search <input> retains browser focus the whole time the dropdown is
 //     open, so typing always goes straight to the filter.
 const highlightedIndex = ref(-1);
 
-// Indices into filteredOptions that are actual selectable items (no headers/disabled).
+// Indices into filteredOptions the arrow keys land on: selectable items, plus action headers.
 const navigableIndices = computed(() =>
   filteredOptions.value
     .map((opt, i) => ({ opt, i }))
-    .filter(({ opt }) => !opt.header && !opt.disabled)
+    .filter(({ opt }) => isActionHeader(opt) || (!opt.header && !opt.disabled))
     .map(({ i }) => i),
 );
 
@@ -858,6 +875,55 @@ function handleExpandKey(e: KeyboardEvent): boolean {
   return true;
 }
 
+/** A header carrying a count or an action renders as OSelectHeaderRow instead of the plain label. */
+function isRichHeader(opt: NormalizedOption): boolean {
+  return opt.header && (opt.headerAction !== undefined || opt.headerCount !== undefined);
+}
+
+function isActionHeader(opt: NormalizedOption): boolean {
+  return opt.header && Boolean(opt.headerAction);
+}
+
+// Rows outside the virtual window are not in the DOM, so scrollIntoView alone cannot reach them.
+function highlightAndReveal(index: number) {
+  highlightedIndex.value = index;
+  virtualizer.value.scrollToIndex(index, { align: "auto" });
+  nextTick(scrollHighlightedIntoView);
+}
+
+// Enter or Space on a highlighted action header runs its action; the highlight follows the header across the swap.
+function handleHeaderActionKey(e: KeyboardEvent): boolean {
+  if (e.key !== "Enter" && e.key !== " ") return false;
+  const opt = filteredOptions.value[highlightedIndex.value];
+  if (!opt || !isActionHeader(opt)) return false;
+  // Reka's ListboxFilter guards: IME commits and modified keys do nothing, and must not fall through to select the header.
+  if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey || (e.key === " " && e.shiftKey))
+    return true;
+  e.preventDefault();
+  if (opt.source) emit("header-action", opt.source);
+  // Runs after the filteredOptions watcher has reset the highlight.
+  nextTick(() => {
+    const index = filteredOptions.value.findIndex((o) => o.header && o.value === opt.value);
+    if (index >= 0) highlightAndReveal(index);
+  });
+  return true;
+}
+
+// The consumer usually swaps this header's text in response; a keyboard user must stay on its action.
+function handleHeaderAction(opt: NormalizedOption, event: MouseEvent) {
+  const hadFocus =
+    event.currentTarget instanceof HTMLElement && event.currentTarget === document.activeElement;
+  if (opt.source) emit("header-action", opt.source);
+  if (!hadFocus) return;
+  nextTick(() => {
+    const index = filteredOptions.value.findIndex((o) => o.header && o.value === opt.value);
+    const button = listboxScrollEl.value?.querySelector<HTMLElement>(
+      `[data-vrow="${index}"] [data-select-header-action]`,
+    );
+    if (button && button !== document.activeElement) button.focus();
+  });
+}
+
 function handleDropdownKeydown(e: KeyboardEvent) {
   const nav = navigableIndices.value;
 
@@ -867,7 +933,7 @@ function handleDropdownKeydown(e: KeyboardEvent) {
     popoverOpen.value = false;
     return;
   }
-  if (handleExpandKey(e)) return;
+  if (handleExpandKey(e) || handleHeaderActionKey(e)) return;
 
   // Allow Enter to trigger create even when no options are visible.
   // Otherwise creatable=true with an empty filtered list silently swallows
@@ -883,13 +949,11 @@ function handleDropdownKeydown(e: KeyboardEvent) {
   if (e.key === "ArrowDown") {
     e.preventDefault();
     const cur = nav.indexOf(highlightedIndex.value);
-    highlightedIndex.value = cur < nav.length - 1 ? nav[cur + 1] : nav[0];
-    nextTick(scrollHighlightedIntoView);
+    highlightAndReveal(cur < nav.length - 1 ? nav[cur + 1] : nav[0]);
   } else if (e.key === "ArrowUp") {
     e.preventDefault();
     const cur = nav.indexOf(highlightedIndex.value);
-    highlightedIndex.value = cur > 0 ? nav[cur - 1] : nav[nav.length - 1];
-    nextTick(scrollHighlightedIntoView);
+    highlightAndReveal(cur > 0 ? nav[cur - 1] : nav[nav.length - 1]);
   } else if (e.key === "Enter") {
     e.preventDefault();
     if (highlightedIndex.value >= 0) {
@@ -908,6 +972,8 @@ const virtualizer = useVirtualizer(
     estimateSize: (index: number) => {
       const opt = filteredOptions.value[index];
       if (!opt) return 28;
+      // Must equal the min-h-8 of OSelectHeaderRow or the virtual rows drift.
+      if (isRichHeader(opt)) return 32;
       const hasSubLabel = !!opt.subLabel;
       const isInline = !!opt.subLabelInline;
       const hasPalette = !!opt.colorPalette?.length;
@@ -1482,7 +1548,7 @@ const fieldWidthClass = computed(() => {
             :class="[
               'z-10001 min-w-(--reka-popover-trigger-width)',
               'flex flex-col overflow-hidden',
-              'rounded-default shadow-lg',
+              'rounded-default shadow-overlay border border-transparent',
               'bg-select-content-bg',
             ]"
             :style="[
@@ -1535,7 +1601,7 @@ const fieldWidthClass = computed(() => {
                     'cursor-pointer outline-none select-none',
                     'hover:bg-select-item-hover-bg',
                     'focus-visible:bg-select-item-hover-bg',
-                    'transition-colors duration-100',
+                    'transition-colors duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
                     'border-select-content-border mb-1 border-b pb-1.5',
                   ]"
                   data-test="o-select-all"
@@ -1615,12 +1681,23 @@ const fieldWidthClass = computed(() => {
                         transform: `translateY(${vRow.start}px)`,
                       }"
                     >
+                      <OSelectHeaderRow
+                        v-if="isRichHeader(filteredOptions[vRow.index])"
+                        :label="filteredOptions[vRow.index].label"
+                        :count="filteredOptions[vRow.index].headerCount"
+                        :action="filteredOptions[vRow.index].headerAction"
+                        :action-aria-label="filteredOptions[vRow.index].headerActionAriaLabel"
+                        :highlighted="vRow.index === highlightedIndex"
+                        :data-test="parentDataTest ? `${parentDataTest}-header` : undefined"
+                        @action="handleHeaderAction(filteredOptions[vRow.index], $event)"
+                      />
+
                       <!-- Group header — non-interactive label. Virtualisation
                          renders each flex as a sibling, so a real ListboxGroup
                          can't wrap its items. Render a plain styled header
                          instead of misusing ListboxGroup/Label ARIA roles. -->
                       <div
-                        v-if="filteredOptions[vRow.index].header"
+                        v-else-if="filteredOptions[vRow.index].header"
                         :class="[
                           'text-select-item-text flex h-full w-full px-3 py-1 text-xs font-bold select-none',
                           collapsibleGroups
@@ -1654,7 +1731,7 @@ const fieldWidthClass = computed(() => {
                         :class="[
                           'flex h-full w-full items-center justify-between gap-2 ps-3 pe-3 text-sm',
                           'text-select-item-text cursor-pointer select-none',
-                          'transition-colors duration-100',
+                          'transition-colors duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
                           vRow.index === highlightedIndex
                             ? 'bg-select-item-hover-bg'
                             : 'hover:bg-select-item-hover-bg',
@@ -1700,7 +1777,7 @@ const fieldWidthClass = computed(() => {
                             'pe-3 text-sm',
                             'text-select-item-text',
                             'cursor-pointer outline-none select-none',
-                            'transition-colors duration-100',
+                            'transition-colors duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
                             // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
                             (filteredOptions[vRow.index].subLabel &&
                               !filteredOptions[vRow.index].subLabelInline) ||
@@ -2070,8 +2147,8 @@ const fieldWidthClass = computed(() => {
             'z-10001 min-w-(--reka-select-trigger-width) max-lg:max-w-[calc(100vw-1rem)]',
             'overflow-hidden',
             'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
-            'rounded-default border shadow-md',
-            'bg-select-content-bg border-select-content-border',
+            'rounded-default shadow-overlay border border-transparent',
+            'bg-select-content-bg',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft
             // ease-out-expo in (200ms), quick wipe out (140ms).

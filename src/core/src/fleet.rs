@@ -58,9 +58,19 @@ pub async fn get_pipelines(
 }
 
 /// The handler has already checked the caller's org-wide fleet access, so this runs as the server.
-pub async fn list_audit(org_id: &str, query: AuditQuery) -> Result<AuditList, anyhow::Error> {
-    o2_enterprise::enterprise::fleet::audit::list_audit(org_id, query, now_micros(), search_audit)
-        .await
+pub async fn list_audit(
+    org_id: &str,
+    query: AuditQuery,
+    fleets: Option<&HashSet<String>>,
+) -> Result<AuditList, anyhow::Error> {
+    o2_enterprise::enterprise::fleet::audit::list_audit(
+        org_id,
+        query,
+        fleets,
+        now_micros(),
+        search_audit,
+    )
+    .await
 }
 
 /// The check `/prometheus/api/v1/query` makes per metric stream; a refused query is `None`.

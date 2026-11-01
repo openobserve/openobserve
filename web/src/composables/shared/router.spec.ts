@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
-import { createMemoryHistory, createRouter } from "vue-router";
+import { createMemoryHistory, createRouter, type RouteRecordRaw } from "vue-router";
 import useRoutes from "./router";
 import Login from "@/views/Login.vue";
 import store from "@/stores";
@@ -381,6 +381,55 @@ describe("useRoutes (router.ts)", () => {
         writable: true,
         value: originalLocation,
       });
+    });
+
+    it("ends the session but keeps the drafts, since only the menu's sign-out confirms discarding them", async () => {
+      const { readEditorDraft, writeEditorDraft } = await import("@/utils/drafts/editorDraftStore");
+      const { resumeDraftSession } = await import("@/utils/drafts/draftSession");
+      const draftScope = {
+        kind: "function" as const,
+        org: "o",
+        entityId: "f",
+        userEmail: "me@x.io",
+      };
+      store.commit("setUserInfo", { email: "me@x.io" });
+      writeEditorDraft(draftScope, { data: {} });
+      const dispatch = vi.spyOn(store, "dispatch");
+      const aborted = vi.fn();
+      const prompt = vi.fn();
+      window.addEventListener("o2:abort-ai-streams", aborted);
+      window.addEventListener("beforeunload", prompt);
+      const originalLocation = window.location;
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: { href: "" },
+      });
+
+      const { parentRoutes } = useRoutes();
+      const logout = (parentRoutes as RouteRecordRaw[]).find((r) => r.path === "/logout");
+      const enter = logout?.beforeEnter;
+      if (typeof enter !== "function") throw new Error("/logout has no beforeEnter guard");
+      enter.call(undefined, {} as never, {} as never, vi.fn());
+      window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+
+      expect(dispatch).toHaveBeenCalledWith("logout");
+      expect(dispatch).not.toHaveBeenCalledWith("logout", expect.anything());
+      expect(readEditorDraft(draftScope)).not.toBeNull();
+      expect(aborted).toHaveBeenCalledTimes(1);
+      expect(prompt).not.toHaveBeenCalled();
+      expect(window.location.href).toBe("/login");
+
+      window.removeEventListener("o2:abort-ai-streams", aborted);
+      window.removeEventListener("beforeunload", prompt);
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: originalLocation,
+      });
+      dispatch.mockRestore();
+      resumeDraftSession();
+      localStorage.clear();
     });
 
     it("should redirect window.location.href to /login in /logout beforeEnter", () => {
@@ -1641,7 +1690,7 @@ describe("useRoutes (router.ts)", () => {
       expect(findRoute(homeChildRoutes, "RumAnalytics")).toBeUndefined();
     });
 
-    it("renders the six sub-tab routes inside the shell, each lazy and guarded", async () => {
+    it("renders the seven sub-tab routes inside the shell, each lazy and guarded", async () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const route = shell();
       expect(typeof route.component).toBe("function");
@@ -1651,6 +1700,7 @@ describe("useRoutes (router.ts)", () => {
         ["funnels", PA_ROUTES.funnels],
         ["funnels/build", PA_ROUTES.funnelBuilder],
         ["paths", PA_ROUTES.paths],
+        ["heatmaps", PA_ROUTES.heatmaps],
         ["retention", PA_ROUTES.retention],
         ["events", PA_ROUTES.events],
       ]);
@@ -1660,6 +1710,20 @@ describe("useRoutes (router.ts)", () => {
         child.beforeEnter({}, {}, next);
         expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
       }
+    });
+
+    it("redirects the old RUM heatmaps path to the Product Analytics route with its query", async () => {
+      const router = realRouter();
+      await router.push("/rum/heatmaps?page_url=%2Fhome&device=tablet&app=web&range=30d&junk=1");
+
+      expect(router.currentRoute.value.name).toBe(PA_ROUTES.heatmaps);
+      expect(router.currentRoute.value.path).toBe("/product-analytics/heatmaps");
+      expect(router.currentRoute.value.query).toEqual({
+        page_url: "/home",
+        device: "tablet",
+        app: "web",
+        period: "30d",
+      });
     });
 
     it("registers the named event editors as siblings of the shell, outside its tab strip", () => {

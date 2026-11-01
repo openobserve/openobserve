@@ -48,6 +48,7 @@ export interface StreamStatsEntry {
     storage_size?: number;
   } | null;
   settings?: { data_retention?: number } | null;
+  is_internal?: boolean;
 }
 
 export interface EstimateContext {
@@ -261,5 +262,7 @@ export function compareStreamsByLatest(a: StreamStatsEntry, b: StreamStatsEntry)
 export function pickLatestStream(list: StreamStatsEntry[]): string | null {
   const withData = list.filter((entry) => Number(entry.stats?.doc_time_max ?? 0) > 0);
   if (withData.length === 0) return null;
-  return [...withData].sort(compareStreamsByLatest)[0].name;
+  // Internal streams ingest constantly and would always win, so they only fill in when no user stream has data.
+  const userData = withData.filter((entry) => !entry.is_internal);
+  return [...(userData.length ? userData : withData)].sort(compareStreamsByLatest)[0].name;
 }

@@ -88,6 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-name="{ row }">
         <span class="flex min-w-0 items-center gap-2">
           <OTruncatedText>{{ row.name }}</OTruncatedText>
+          <EditorDraftDot
+            v-if="teamDraftTimes.has(row.id)"
+            :saved-at="teamDraftTimes.get(row.id) ?? null"
+            :data-test="`oncall-teams-${row.id}-draft-dot`"
+          />
           <OTag
             v-if="row.id === defaultTeamId"
             variant="primary-soft"
@@ -179,8 +184,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTooltip side="bottom" :content="t('oncall.editTeam')" />
         </OButton>
+        <!-- The server refuses to delete the default team, so its row offers no Delete, as the phone menu already does. -->
         <OButton
-          v-if="canConfigure"
+          v-if="canConfigure && row.id !== defaultTeamId"
           variant="ghost"
           size="icon-sm"
           icon-left="delete-outline"
@@ -278,9 +284,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :model-value="!!teamToDelete"
       :title="t('oncall.deleteTeamTitle')"
-      message-keypath="oncall.deleteTeamMessage"
+      :message-keypath="deleteTeamKeypath"
       :message-name="teamToDelete?.name"
+      :ok-label="t('oncall.deleteTeam')"
       ok-variant="destructive"
+      focus-cancel
       @update:ok="deleteTeam"
       @update:cancel="teamToDelete = null"
     />
@@ -323,9 +331,13 @@ import {
 import { userKeys } from "@/services/users.querykeys";
 import { useMutation } from "@tanstack/vue-query";
 import type { OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { isOnCallUnavailable } from "@/utils/oncall";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { dropScheduleDrafts, useScheduleDraftTimes } from "@/components/oncall/scheduleDrafts";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -366,7 +378,25 @@ const settingDefaultTeamId = ref<string | null>(null);
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const defaultTeamId = computed(() => routingConfig.value?.default_team_id ?? "");
 
+/// Where the deleted team's routed alerts land next: the default team if one is set, else the Unrouted queue.
+const deleteTeamKeypath = computed<I18nKey>(() =>
+  defaultTeamId.value ? "oncall.deleteTeamMessageToDefault" : "oncall.deleteTeamMessageToUnrouted",
+);
+
 const deleteTeamWrite = useMutation(() => deleteTeamMutation(orgId.value));
+
+const scheduleDraftAt = useScheduleDraftTimes();
+const policyDrafts = useEditorDraftIds("oncall_policy");
+
+/// A team's schedule and its policy are both edited from the team, so one dot carries the newer draft.
+const teamDraftTimes = computed(() => {
+  const times = new Map<string, number>();
+  for (const team of teams.value) {
+    const newest = Math.max(scheduleDraftAt(team.id) ?? 0, policyDrafts.savedAt(team.id) ?? 0);
+    if (newest > 0) times.set(team.id, newest);
+  }
+  return times;
+});
 const setRoutingConfigWrite = useMutation(() => setRoutingConfigMutation(orgId.value));
 
 // Named handler: `@click="fetchTeams"` would hand the MouseEvent to `force`.
@@ -572,6 +602,8 @@ async function deleteTeam() {
   if (!team) return;
   try {
     await deleteTeamWrite.mutateAsync(team.id);
+    deleteEditorDraftsFor({ kind: "oncall_policy", org: orgId.value, entityId: team.id });
+    dropScheduleDrafts({ org: orgId.value, teamId: team.id });
     toast({ variant: "success", message: t("oncall.teamDeleted") });
     // Unforced: the mutation expired the scope, so this read reaches the server
     // and repaints the rows this page holds in its own ref.
@@ -640,7 +672,7 @@ function openEdit(team: OnCallTeam) {
   formOpen.value = true;
 }
 
-function openTeam(team: OnCallTeam) {
+function openTeam(team: Pick<OnCallTeam, "id">) {
   router.push({
     name: "onCallTeamDetail",
     params: { teamId: team.id },
@@ -656,8 +688,14 @@ function onEmptyAction(id?: string) {
   openCreate();
 }
 
-function onSaved() {
+// A created team opens straight away: its members, schedule and ladder are set up there, not on this list.
+function onSaved(teamId: string) {
+  const created = !editingTeam.value;
   formOpen.value = false;
+  if (created && teamId) {
+    openTeam({ id: teamId });
+    return;
+  }
   fetchTeams();
 }
 

@@ -467,7 +467,12 @@ export interface OTableProps<TData = any> {
   fillHeight?: boolean;
 
   // ── Display ──
+  /** While true, a table that has settled rows keeps them on screen, dimmed and inert once the load is slow; otherwise it shows the skeleton. */
   loading?: boolean;
+  /** Show the skeleton on every load instead of keeping the last settled rows. */
+  skeletonOnRefetch?: boolean;
+  /** Changing it drops the kept rows so the next load shows the skeleton; bind the folder or tab whose rows must not show under another. */
+  loadingResetKey?: unknown;
   /** Data is arriving incrementally (SSE/WebSocket). Shows a pulsing indicator. */
   streaming?: boolean;
   error?: string | null;
@@ -562,9 +567,10 @@ export interface OTableProps<TData = any> {
   pivotHeaderLevels?: any[];
   /** Pivot row field columns (for sticky headers + row-field cell merge) */
   pivotRowColumns?: any[];
-  /** Grand-total row rendered as a sticky `<tfoot>`, keyed by each column's
-   *  `accessorKey`/`id`; values run through the column's `meta.format`. */
-  stickyTotalRow?: Record<string, any> | null;
+  /** Grand-total row (or rows, one `<tr>` each) rendered as a sticky `<tfoot>`, keyed by each column's
+   *  `accessorKey`/`id`; values run through the column's `meta.format`. A row with `__labelKey` is a
+   *  calculated-totals row: that column's cell shows the calculation's name, muted, and the values bold. */
+  stickyTotalRow?: Record<string, any> | Record<string, any>[] | null;
   /** Show sticky row totals (pins the grand-total `<tfoot>` to the bottom) */
   stickyRowTotals?: boolean;
   /** Show sticky column totals */
@@ -695,7 +701,6 @@ export interface OTableSlots<TData = any> {
   "selection-actions"?: () => any;
   /** Footer start-side line for what the pager cannot say (a cap, partial data), yielding to the selection count; like `#selection-actions`, it needs the built-in bar. */
   "footer-note"?: () => any;
-  /** Shown when loading=true AND data exists (thin banner, not overlay) */
   "loading-banner"?: () => any;
   /** Custom loading indicator (overlay when no data) */
   loading?: () => any;

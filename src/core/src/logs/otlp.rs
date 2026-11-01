@@ -32,7 +32,7 @@ use infra::{
     errors::{Error, Result},
     schema::get_flatten_level,
 };
-use ingestion_common::{IngestionStatus, StreamStatus};
+use ingestion_common::{IngestionStatus, RecordStatus, StreamStatus};
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -737,14 +737,6 @@ pub async fn handle_request(
     drop(user_defined_schema_map);
     drop(streams_need_original_map);
 
-    // Update partial success
-    if stream_status.status.failed > 0 {
-        res.partial_success = Some(ExportLogsPartialSuccess {
-            rejected_log_records: stream_status.status.failed as i64,
-            error_message: stream_status.status.error.clone(),
-        });
-    }
-
     let endpoint = match req_type {
         OtlpRequestType::Grpc => "/grpc/otlp/logs",
         _ => "/api/otlp/v1/logs",
@@ -752,6 +744,7 @@ pub async fn handle_request(
 
     // if no data, fast return
     if json_data_by_stream.is_empty() {
+        res.partial_success = partial_success(&stream_status.status);
         return Ok(otlp_export_response(&res, req_type)); // just return
     }
 
@@ -818,13 +811,14 @@ pub async fn handle_request(
     }
 
     // OTLP has no field for a deleting-stream skip, so a skipped stream still answers 200
+    let mut ingestion_status = IngestionStatus::Record(stream_status.status);
     let write_result = super::write_logs_by_stream(
         thread_id,
         org_id,
         user_email,
         (started_at, &start),
         UsageType::Logs,
-        &mut IngestionStatus::Record(stream_status.status),
+        &mut ingestion_status,
         json_data_by_stream,
         size_by_stream,
         derived_streams,
@@ -863,7 +857,18 @@ pub async fn handle_request(
         ));
     }
 
+    // the write rejects rows too, e.g. ones that do not fit the stream schema
+    if let IngestionStatus::Record(status) = &ingestion_status {
+        res.partial_success = partial_success(status);
+    }
     Ok(otlp_export_response(&res, req_type))
+}
+
+fn partial_success(status: &RecordStatus) -> Option<ExportLogsPartialSuccess> {
+    (status.failed > 0).then(|| ExportLogsPartialSuccess {
+        rejected_log_records: status.failed as i64,
+        error_message: status.error.clone(),
+    })
 }
 
 #[cfg(test)]
@@ -1872,7 +1877,7 @@ mod tests {
         // arbitrary_precision is enabled workspace-wide, so the plain decode must fail here
         assert!(json::from_slice::<ExportLogsServiceRequest>(body).is_err());
 
-        let request: ExportLogsServiceRequest = json::from_slice_lenient_floats(body).unwrap();
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_otlp(body).unwrap();
         let value = |kv: &KeyValue| kv.value.as_ref().and_then(|v| v.value.clone());
         let resource_logs = &request.resource_logs[0];
         let resource = resource_logs.resource.as_ref().unwrap();
@@ -1898,15 +1903,50 @@ mod tests {
     }
 
     #[test]
+    fn test_otlp_json_decodes_empty_any_values() {
+        use crate::ingestion::grpc::get_val_with_type_retained;
+
+        let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"geo.locality.region","value":{}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1789000000000000001","body":{},"attributes":[{"key":"region","value":{}},{"key":"tags","value":{"arrayValue":{}}},{"key":"map","value":{"kvlistValue":{"values":[{"key":"k","value":{}},{"key":"list","value":{"arrayValue":{"values":[{"stringValue":"a"},{"kvlistValue":{}}]}}}]}}},{"key":"empty.map","value":{"kvlistValue":{}}},{"key":"r","value":{"doubleValue":1.50}}]},{"timeUnixNano":"1789000000000000002","body":{"stringValue":"valid record in the same batch"}}]}]}]}"#;
+        assert!(json::from_slice::<ExportLogsServiceRequest>(body).is_err());
+
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_otlp(body).unwrap();
+        let resource_logs = &request.resource_logs[0];
+        assert_eq!(
+            resource_logs.resource.as_ref().unwrap().attributes[0].value,
+            None
+        );
+        let records = &resource_logs.scope_logs[0].log_records;
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0].body, None);
+        let attr = |i: usize| get_val_with_type_retained(&records[0].attributes[i].value.as_ref());
+        assert_eq!(attr(0), json::Value::Null);
+        assert_eq!(attr(1), json::json!([]));
+        assert_eq!(attr(2), json::json!({"k": null, "list": ["a", {}]}));
+        assert_eq!(attr(3), json::json!({}));
+        assert_eq!(
+            records[0].attributes[4]
+                .value
+                .as_ref()
+                .and_then(|v| v.value.clone()),
+            Some(DoubleValue(1.5))
+        );
+        assert_eq!(
+            records[1].body.as_ref().and_then(|v| v.value.clone()),
+            Some(StringValue("valid record in the same batch".into()))
+        );
+    }
+
+    #[test]
     fn test_otlp_json_keeps_strict_errors() {
         for body in [
             &br#"{"resourceLogs":[{"scopeLogs":[{"scope":{"name":"a","name":"b"},"logRecords":[]}]}]}"#[..],
             br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"stringValue":1}}]}]}]}"#,
             br#"{"resourceLogs":["#,
+            br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"arrayValue":{"values":[{"intValue":"1"},{},{"intValue":"3"}]}}}]}]}]}"#,
         ] {
             let strict = json::from_slice::<ExportLogsServiceRequest>(body).map(|_| ());
             let lenient =
-                json::from_slice_lenient_floats::<ExportLogsServiceRequest>(body).map(|_| ());
+                json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(body).map(|_| ());
             assert!(strict.is_err());
             assert_eq!(
                 strict.map_err(|e| e.to_string()),
@@ -1916,7 +1956,7 @@ mod tests {
 
         let float_with_bad_bytes = br#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"doubleValue":1.5},"attributes":[{"key":"b","value":{"bytesValue":"!"}}]}]}]}]}"#;
         assert!(
-            json::from_slice_lenient_floats::<ExportLogsServiceRequest>(float_with_bad_bytes)
+            json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(float_with_bad_bytes)
                 .is_err()
         );
     }
@@ -1925,7 +1965,7 @@ mod tests {
     fn test_otlp_json_without_floats_decodes_exactly_as_before() {
         let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"s","value":{"stringValue":"x"}}]},"scopeLogs":[{"logRecords":[{"timeUnixNano":"1789000000000000001","body":{"stringValue":"x"},"attributes":[{"key":"i","value":{"intValue":"42"}},{"key":"b","value":{"boolValue":true}}]}]}]}]}"#;
         assert_eq!(
-            json::from_slice_lenient_floats::<ExportLogsServiceRequest>(body).unwrap(),
+            json::from_slice_lenient_otlp::<ExportLogsServiceRequest>(body).unwrap(),
             json::from_slice::<ExportLogsServiceRequest>(body).unwrap()
         );
     }
@@ -1934,12 +1974,30 @@ mod tests {
     fn test_otlp_json_float_rescues_a_body_that_repeats_a_field() {
         // the retry decodes through a Value, which keeps the last of two repeated fields
         let body = br#"{"resourceLogs":[{"resource":{"attributes":[{"key":"r","value":{"doubleValue":1.5}}]},"scopeLogs":[{"scope":{"name":"a","name":"b"},"logRecords":[]}]}]}"#;
-        let request: ExportLogsServiceRequest = json::from_slice_lenient_floats(body).unwrap();
+        let request: ExportLogsServiceRequest = json::from_slice_lenient_otlp(body).unwrap();
         let scope = request.resource_logs[0].scope_logs[0]
             .scope
             .as_ref()
             .unwrap();
         assert_eq!(scope.name, "b");
+    }
+
+    #[test]
+    fn test_partial_success_reports_rows_failed_at_write() {
+        let accepted = ingestion_common::RecordStatus {
+            successful: 3,
+            ..Default::default()
+        };
+        assert_eq!(super::partial_success(&accepted), None);
+        let rejected = ingestion_common::RecordStatus {
+            successful: 3,
+            failed: 2,
+            error: "boom".to_string(),
+            ..Default::default()
+        };
+        let partial = super::partial_success(&rejected).unwrap();
+        assert_eq!(partial.rejected_log_records, 2);
+        assert_eq!(partial.error_message, "boom");
     }
 
     // cloud builds reject the unknown test org at the trial check before the columns check

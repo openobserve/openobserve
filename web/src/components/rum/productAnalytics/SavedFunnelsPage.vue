@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :loading="listStatus === 'loading'"
+        :loading-reset-key="pa.state.app"
         :forbidden="listStatus === 'forbidden'"
         :error="listStatus === 'failed' ? t('rum.analytics.saved.loadFailed') : null"
         :selection="canWrite ? 'multiple' : 'none'"

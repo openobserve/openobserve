@@ -418,6 +418,84 @@ describe("useStreams Composable", () => {
     });
   });
 
+  describe("Schema prefetch", () => {
+    const listStream = (name: string, schema: any[] = []) => {
+      mockStore.state.streams.logs = { list: [{ name, schema }] } as any;
+      mockStore.state.streams.streamsIndexMapping.logs = { [name]: 0 } as any;
+    };
+
+    it("lets getStream use a schema request started before the stream list arrived", async () => {
+      streamsInstance.prefetchStreamSchema("prefetch-a", "logs");
+      expect(StreamService.schema).toHaveBeenCalledTimes(1);
+      expect(StreamService.schema).toHaveBeenCalledWith("test-org", "prefetch-a", "logs", {
+        silentForbidden: true,
+      });
+
+      listStream("prefetch-a");
+      const stream = await streamsInstance.getStream("prefetch-a", "logs", true);
+
+      expect(StreamService.schema).toHaveBeenCalledTimes(1);
+      expect(stream).toBeTruthy();
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "streams/setStreams",
+        expect.objectContaining({ streamType: "logs" }),
+      );
+    });
+
+    it("hands a prefetched schema to one read only", async () => {
+      streamsInstance.prefetchStreamSchema("prefetch-b", "logs");
+      listStream("prefetch-b");
+      await streamsInstance.getStream("prefetch-b", "logs", true);
+      await streamsInstance.getStream("prefetch-b", "logs", true);
+      expect(StreamService.schema).toHaveBeenCalledTimes(2);
+    });
+
+    it("asks the server again when the read is forced", async () => {
+      streamsInstance.prefetchStreamSchema("prefetch-c", "logs");
+      listStream("prefetch-c");
+      await streamsInstance.getStream("prefetch-c", "logs", true, true);
+      expect(StreamService.schema).toHaveBeenCalledTimes(2);
+    });
+
+    it("ignores a prefetch older than its time to live", async () => {
+      const now = Date.now();
+      const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+      streamsInstance.prefetchStreamSchema("prefetch-d", "logs");
+      clock.mockReturnValue(now + 31_000);
+      listStream("prefetch-d");
+      await streamsInstance.getStream("prefetch-d", "logs", true);
+      clock.mockRestore();
+      expect(StreamService.schema).toHaveBeenCalledTimes(2);
+    });
+
+    it("starts nothing when the schema is already loaded", () => {
+      listStream("prefetch-e", [{ name: "field1", type: "string" }]);
+      streamsInstance.prefetchStreamSchema("prefetch-e", "logs");
+      expect(StreamService.schema).not.toHaveBeenCalled();
+    });
+
+    it("starts one request for repeated prefetches of the same stream", () => {
+      streamsInstance.prefetchStreamSchema("prefetch-f", "logs");
+      streamsInstance.prefetchStreamSchema("prefetch-f", "logs");
+      expect(StreamService.schema).toHaveBeenCalledTimes(1);
+    });
+
+    it("drops a failed prefetch so the next read asks the server again", async () => {
+      vi.mocked(StreamService.schema).mockRejectedValueOnce(new Error("offline"));
+      streamsInstance.prefetchStreamSchema("prefetch-g", "logs");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      listStream("prefetch-g");
+      await expect(streamsInstance.getStream("prefetch-g", "logs", true)).resolves.toBeTruthy();
+      expect(StreamService.schema).toHaveBeenCalledTimes(2);
+    });
+
+    it("ignores a prefetch without a stream name or type", () => {
+      streamsInstance.prefetchStreamSchema("", "logs");
+      streamsInstance.prefetchStreamSchema("prefetch-h", "");
+      expect(StreamService.schema).not.toHaveBeenCalled();
+    });
+  });
+
   // Test 16-20: Schema and Data Manipulation
   describe("Schema and Data Manipulation", () => {
     it("should remove schema fields (_o2_id, _original, _all_values)", () => {

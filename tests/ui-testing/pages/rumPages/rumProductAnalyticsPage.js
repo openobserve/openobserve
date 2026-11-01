@@ -74,7 +74,6 @@ export class RumProductAnalyticsPage {
         this.funnelAddStepBtn = page.locator('[data-test="rum-analytics-funnel-add-step-btn"]');
         this.funnelAddStep = page.locator('[data-test="rum-analytics-funnel-add-step"]');
         this.funnelAddDashboardBtn = page.locator('[data-test="rum-analytics-funnel-add-dashboard-btn"]');
-        this.breakdownSelect = page.locator('[data-test="rum-analytics-funnel-breakdown-select"]');
         this.breakdown = page.locator('[data-test="rum-analytics-funnel-breakdown"]');
 
         this.dropoffDrawer = page.locator('[data-test="rum-analytics-dropoff-drawer"]');
@@ -169,8 +168,8 @@ export class RumProductAnalyticsPage {
         this.addRuleBtn = page.locator('[data-test="rum-analytics-named-events-add-rule-btn"]');
         this.eventPreview = page.locator('[data-test="rum-analytics-named-events-preview"]');
         this.eventCancelBtn = page.locator('[data-test="rum-analytics-event-editor-cancel-btn"]');
-        this.eventDiscardDialog = page.locator('[data-test="rum-analytics-event-editor-discard-dialog"]');
-        this.eventDiscardConfirmBtn = this.eventDiscardDialog.locator('[data-test="o-dialog-primary-btn"]');
+        this.eventDiscardDialog = page.locator('[data-test="editor-draft-leave-dialog"]');
+        this.eventDiscardConfirmBtn = this.eventDiscardDialog.locator('[data-test="o-dialog-neutral-btn"]');
         this.eventRules = page.locator('[data-test^="rum-analytics-named-events-rule-"][data-test$="-kind"]');
 
         this.sessionsTable = page.locator('[data-test="rum-sessions-table"]');
@@ -593,7 +592,12 @@ export class RumProductAnalyticsPage {
 
     async pickConversionWindow(value) {
         await this.pickOption('rum-analytics-funnel-window-select', { value });
-        await expect(this.funnelWindowTrigger).toHaveAttribute('data-test-selected-value', value);
+        await expect.poll(() => this.funnelFromUrl()?.w).toBe(value);
+    }
+
+    async pickBreakdown(dim) {
+        await this.page.locator('[data-test="rum-analytics-funnel-add-breakdown-btn"]').click();
+        await this.page.locator(`[data-test="rum-analytics-funnel-field-picker-dim-${dim}"]`).click();
     }
 
     dropoffSessionReplayTag(i) {

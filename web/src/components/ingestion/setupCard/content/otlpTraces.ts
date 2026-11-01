@@ -207,6 +207,6 @@ export default function otlpTracesCard(subs: CardSubstitutions, t: TranslateFn):
         },
       ],
     },
-    docUrl: "https://openobserve.ai/docs/user-guide/data-sources-ingestion/traces/opentelemetry/",
+    docUrl: "https://openobserve.ai/docs/ingestion/traces/opentelemetry/",
   };
 }

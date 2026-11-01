@@ -27,7 +27,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 **Key props:**
 
 - `variant` (default `"primary"`) — one of: `primary`, `secondary`, `outline`, `ghost`, `ghost-primary`, `ghost-muted`, `ghost-subtle`, `ghost-destructive`, `ghost-success`, `ghost-warning`, `ghost-neutral`, `outline-destructive`, `sidebar-toggle`, `panel-collapse`, `sidebar-button`, `destructive`, `ai-gradient`, `on-dark-primary`, `on-dark-ghost`, `warning`, `pending`, `preview-slack`, `preview-teams`, `preview-email`, `preview-action`, `webinar-dismiss`, `pricing-chip`, `outline-primary`, and the four tinted-fill variants `tint-teal`, `tint-purple`, `tint-blue`, `tint-orange` (soft categorical fill for tiles that identify an entity by colour, e.g. a cluster code; not for status)
-- `size` (default `"md"`) — one of: `xs`, `chip`, `sm`, `sm-action`, `md`, `lg`, `icon`, `icon-xs`, `icon-xs-circle`, `icon-xs-sq`, `icon-chip`, `icon-sm`, `icon-md`, `icon-lg`, `icon-circle`, `icon-circle-sm`, `icon-toolbar`, `icon-panel`, `sidebar-button`, `sm-toolbar`, `chip-12`
+- `size` (default `"md"`) — one of: `xs`, `chip`, `sm`, `sm-action`, `md`, `cta`, `lg`, `icon`, `icon-xs`, `icon-xs-circle`, `icon-xs-sq`, `icon-chip`, `icon-sm`, `icon-md`, `icon-lg`, `icon-circle`, `icon-circle-sm`, `icon-toolbar`, `icon-panel`, `sidebar-button`, `sm-toolbar`, `chip-12`
 - `iconLeft` (`IconName`) — renders an OIcon before the label; `#icon-left` slot takes precedence if present
 - `iconRight` (`IconName`) — renders an OIcon after the label; `#icon-right` slot takes precedence if present
 - `loading` (boolean, default `false`) — shows a centered spinner overlay, keeps dimensions, disables interaction
@@ -73,6 +73,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 - `orientation` (`"horizontal"` | `"vertical"`, default `"horizontal"`)
 - `align` (`"stretch"` | `"center"` | `"start"` | `"end"`, default `"stretch"`) — cross-axis alignment of children
 - `radius` (`"sm"` | `"md"` | `"lg"`, default `"md"`) — must match the inner buttons' radius; use `"sm"` when children use `size="chip"` or `size="icon-chip"`
+- The group never clips overflow (a clip hides a child's offset focus outline) and lifts the focused child with `z-1`; each child paints its own outer corners, so wrap non-OButton children that need clipping yourself
   **Slots:** `default` (one or more OButton children)
   **Emits:** none
   **Example:**
@@ -338,6 +339,9 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 
 - **Display / layout**
   - `loading` (default false), `streaming` (default false — pulsing incremental indicator), `error` (`string|null`), `emptyMessage`
+    - A refetch (`loading` true again after a settled, non-empty answer) keeps the last rows on screen; if it runs past 150 ms they dim, go inert and the bottom bar pulses. A first load, or the load after an error or an empty answer, shows the skeleton.
+    - `loadingResetKey` — bind the folder, tab or entity the rows belong to; changing it drops the kept rows, so a switch shows the skeleton instead of the previous context's rows.
+    - `skeletonOnRefetch` — skeleton on every load, for tables whose old rows mislead once the query changes (log search results).
   - `dense` (default `true`), `bordered` (default `true`), `frame` (default `false` — outer frame border), `striped` (default false)
   - `stickyHeader` (default `true`), `showHeader` (default `true`), `wrap` (default false), `horizontalScroll` (natural-width cells + horizontal scroll; pair with `wrap=false`)
   - `cellOverflowTooltip` (default `true`) — the shared full-text tooltip on cut body cells; pass `false` for a table whose reveal is Wrap / row expansion (logs, correlated logs). See [Cut cell text](#cut-cell-text--the-shared-tooltip)

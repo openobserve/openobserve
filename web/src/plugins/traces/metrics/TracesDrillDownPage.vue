@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from "vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 
@@ -85,6 +85,9 @@ onMounted(() => {
   document.addEventListener("keydown", onKeydown);
   rootRef.value?.querySelector<HTMLElement>('[data-test="traces-drill-down-back-btn"]')?.focus();
 });
+// The Traces page is kept alive, so an Escape pressed on another page must not close this one.
+onActivated(() => document.addEventListener("keydown", onKeydown));
+onDeactivated(() => document.removeEventListener("keydown", onKeydown));
 onBeforeUnmount(() => {
   // Only a Back/Escape close leaves focus here; a close caused by a new search must not steal it.
   const active = document.activeElement;

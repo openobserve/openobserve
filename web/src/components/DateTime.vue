@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     icon="info"
-    class="date-time-container inline-flex items-stretch"
+    class="date-time-container inline-flex items-stretch [&_button:focus-visible]:z-1"
     :class="{
       'rounded-default border-button-outline-border min-h-7.5 border': !hideRangeShift,
       'w-full [&>*]:flex-1': fieldAppearance,
@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="date-time-dialog z-10001 flex max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] max-w-[calc(100vw-1rem)] flex-col max-sm:overflow-y-auto"
         :class="showRail ? 'w-158.25 max-sm:w-81.25' : 'w-81.25'"
         @keydown.capture="onPickerKeydown"
+        @paste="onPickerPaste"
       >
         <div
           class="grid min-h-0 flex-1 max-sm:flex max-sm:flex-col max-sm:overflow-y-auto"
@@ -364,7 +365,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="date-time-apply-btn"
                 variant="primary"
                 size="xs"
-                class="element-box-shadow"
                 @click="applyAndClose"
               >
                 {{ t("common.apply") }}
@@ -446,6 +446,7 @@ import {
   type ParsedSingleDateTime,
 } from "@/utils/dateTimeRangeParse";
 import { copyToClipboard } from "@/utils/clipboard";
+import { isInputFocused, isMacOS } from "@/utils/keyboardShortcuts";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
@@ -579,6 +580,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Drops the relative Seconds unit, for a caller that accepts only whole minutes. */
+    hideSeconds: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   emits: ["on:date-change", "on:timezone-change", "hide", "show"],
@@ -677,16 +683,9 @@ export default defineComponent({
       { label: t("common.days"), value: "d" },
       { label: t("common.weeks"), value: "w" },
       { label: t("common.months"), value: "M" },
-    ];
+    ].filter((period) => !props.hideSeconds || period.value !== "s");
 
-    let relativePeriodsSelect = ref([
-      { label: t("common.seconds"), value: "s" },
-      { label: t("common.minutes"), value: "m" },
-      { label: t("common.hours"), value: "h" },
-      { label: t("common.days"), value: "d" },
-      { label: t("common.weeks"), value: "w" },
-      { label: t("common.months"), value: "M" },
-    ]);
+    let relativePeriodsSelect = ref([...relativePeriods]);
 
     const relativeDates: Record<string, number[]> = {
       s: [1, 5, 10, 15, 30, 45],
@@ -1454,7 +1453,16 @@ export default defineComponent({
     const finalizeAbsoluteRange = (startMicros: number, endMicros: number) => {
       selectedType.value = "absolute";
       calendarToken.value = null;
+      // A day clicked before the paste would otherwise overwrite the pasted range when the panel closes.
+      pendingDay.value = null;
+      // Saved once below, so the auto-apply date watcher must not save it a second time.
+      isSeedingAbsolute = true;
       setAbsoluteTime(startMicros, endMicros);
+      nextTick(() => {
+        isSeedingAbsolute = false;
+      });
+      // A paste is the user's own change; setAbsoluteTime stamps it programmatic, which pages gating refetch on it ignore.
+      isUserInitiated = true;
       if (props.autoApply) {
         saveDate(null);
         recordAbsoluteRange();
@@ -1505,19 +1513,37 @@ export default defineComponent({
       return true;
     };
 
-    const pasteRange = async () => {
-      let text = "";
-      try {
-        text = await navigator.clipboard.readText();
-      } catch {
-        toast({ variant: "error", message: t("common.dateRangePasteError") });
-        return;
-      }
+    const applyPastedTextWithToast = (text: string) => {
       if (applyPastedText(text)) {
         toast({ variant: "success", message: t("common.dateRangePasted") });
       } else {
         toast({ variant: "error", message: t("common.dateRangePasteError") });
       }
+    };
+
+    const pasteRange = async () => {
+      let text = "";
+      try {
+        text = await navigator.clipboard.readText();
+      } catch {
+        toast({
+          variant: "error",
+          message: t("common.dateRangePasteBlocked", {
+            shortcut: isMacOS() ? raw("⌘V") : raw("Ctrl+V"),
+          }),
+        });
+        return;
+      }
+      applyPastedTextWithToast(text);
+    };
+
+    // A native paste event carries the clipboard text without the read permission pasteRange needs.
+    const onPickerPaste = (event: ClipboardEvent) => {
+      if (isInputFocused(event.target)) return;
+      const text = event.clipboardData?.getData("text") ?? "";
+      if (!text.trim()) return;
+      event.preventDefault();
+      applyPastedTextWithToast(text);
     };
 
     const timezoneFilterFn = (val: string, update: (cb: () => void) => void) => {
@@ -1956,10 +1982,13 @@ export default defineComponent({
     // The rail sits after the header band in DOM order, so reka's default autofocus would land on a tab button.
     const onPopoverOpenAutoFocus = (event: Event) => {
       if (!showRail.value) return;
+      const firstItem = document.querySelector<HTMLElement>(
+        "#date-time-menu [data-date-time-rail-item]:not([disabled])",
+      );
+      // An empty rail keeps reka's default focus, or focus stays on the trigger and ⌘V never reaches the panel.
+      if (!firstItem) return;
       event.preventDefault();
-      document
-        .querySelector<HTMLElement>("#date-time-menu [data-date-time-rail-item]:not([disabled])")
-        ?.focus();
+      firstItem.focus();
     };
 
     // A rail pick closes the panel the way a user dismissal does, so listeners waiting on hide still run.
@@ -2081,6 +2110,7 @@ export default defineComponent({
       triggerLabel,
       copyRange,
       pasteRange,
+      onPickerPaste,
       refresh,
       dateLocale,
       resetTime,

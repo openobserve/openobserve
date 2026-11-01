@@ -16,10 +16,21 @@
 import { describe, expect, it } from "vitest";
 
 import i18n from "@/locales";
-import type { TelephonyReason, TelephonyView } from "@/ts/interfaces/oncall";
+import type {
+  TelephonyReason,
+  TelephonyState,
+  TelephonyStatus,
+  TelephonyView,
+} from "@/ts/interfaces/oncall";
 import type { TranslateFn } from "@/types/i18n";
 import { makeTelephonySchema, type TelephonyForm } from "./TelephonyAccountDialog.schema";
-import { telephonyPageState, telephonyRefusalOf, telephonyRefusalText } from "./telephony";
+import {
+  liveTelephonyStatus,
+  telephonyHealth,
+  telephonyPageState,
+  telephonyRefusalOf,
+  telephonyRefusalText,
+} from "./telephony";
 
 const t = i18n.global.t as unknown as TranslateFn;
 
@@ -34,6 +45,11 @@ describe("telephonyRefusalText", () => {
       "account_rejected",
       "Twilio did not accept this account. Check the Account SID and auth token, and that the account is active.",
     ],
+    [
+      "from_not_on_account",
+      "This number is not on this Twilio account. Use one from Phone Numbers → Active numbers in Twilio.",
+    ],
+    ["unavailable", "Twilio could not be reached. Try again."],
     ["unreadable", "This organisation's phone provider account could not be read."],
   ];
 
@@ -57,14 +73,27 @@ describe("makeTelephonySchema", () => {
     auth_token: "secret",
     from_number: "+18335550100",
   };
-  const fieldsFailing = (mode: "connect" | "update", over: Partial<TelephonyForm>) => {
-    const result = makeTelephonySchema(t, mode).safeParse({ ...valid, ...over });
+  const fieldsFailing = (
+    mode: "connect" | "update",
+    over: Partial<TelephonyForm>,
+    savedSid?: string,
+  ) => {
+    const result = makeTelephonySchema(t, mode, savedSid).safeParse({ ...valid, ...over });
     return result.success ? [] : [...new Set(result.error.issues.map((i) => i.path.join(".")))];
   };
 
-  it("connect needs a token, update keeps the stored one", () => {
-    expect(fieldsFailing("connect", { auth_token: "" })).toEqual(["auth_token"]);
-    expect(fieldsFailing("update", { auth_token: "" })).toEqual([]);
+  it.each<[string, "connect" | "update", Partial<TelephonyForm>, string[]]>([
+    ["connect needs a token", "connect", { auth_token: "" }, ["auth_token"]],
+    ["update of the same account keeps the stored token", "update", { auth_token: "" }, []],
+    [
+      "update to another account needs its token",
+      "update",
+      { account_sid: "ACother", auth_token: " " },
+      ["auth_token"],
+    ],
+    ["update to another account with its token", "update", { account_sid: "ACother" }, []],
+  ])("%s", (_, mode, over, failing) => {
+    expect(fieldsFailing(mode, over, SID)).toEqual(failing);
   });
 
   const rows: [string, Partial<TelephonyForm>, string[]][] = [
@@ -115,5 +144,45 @@ describe("telephonyPageState", () => {
     ["a refetch that was denied keeps the data", none, denied, "empty"],
   ])("%s", (_, view, err, expected) => {
     expect(telephonyPageState(view, err)).toBe(expected);
+  });
+});
+
+describe("telephonyHealth", () => {
+  const status = (state: TelephonyState): TelephonyStatus => ({
+    state,
+    trial: false,
+    can_text: false,
+    can_call: false,
+  });
+
+  it.each<[string, TelephonyStatus | null, unknown, string]>([
+    ["no answer yet", null, null, "checking"],
+    ["the check itself failed", null, { response: { status: 500 } }, "unchecked"],
+    ["ok", status("ok"), null, "ok"],
+    [
+      "a re-check failed after an earlier answer",
+      status("ok"),
+      { response: { status: 500 } },
+      "unchecked",
+    ],
+    ["credentials refused", status("account_rejected"), null, "broken"],
+    ["number not on the account", status("from_not_on_account"), null, "broken"],
+    ["stored account unreadable", status("unreadable"), null, "broken"],
+    ["Twilio unreachable", status("unavailable"), null, "unchecked"],
+    ["no account to check", status("none"), null, "unchecked"],
+  ])("%s", (_, given, err, expected) => {
+    expect(telephonyHealth(given, err)).toBe(expected);
+  });
+});
+
+describe("liveTelephonyStatus", () => {
+  const ok: TelephonyStatus = { state: "ok", trial: false, can_text: true, can_call: true };
+
+  it.each<[string, TelephonyStatus | undefined, unknown, TelephonyStatus | null]>([
+    ["the latest answer", ok, null, ok],
+    ["no answer yet", undefined, null, null],
+    ["a cached answer after a failed re-check", ok, { response: { status: 500 } }, null],
+  ])("%s", (_, cached, err, expected) => {
+    expect(liveTelephonyStatus(cached, err)).toEqual(expected);
   });
 });

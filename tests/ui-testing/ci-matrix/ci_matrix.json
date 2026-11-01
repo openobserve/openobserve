@@ -58,6 +58,7 @@
       "dashboard-series-color-multiwindow.spec.js",
       "dashboard-config-advanced.spec.js",
       "dashboard-config-axis.spec.js",
+      "dashboard-stacked-axis-bounds.spec.js",
       "dashboard-config-gauge-maps.spec.js",
       "dashboard-config-general.spec.js",
       "dashboard-config-heatmap.spec.js",
@@ -69,7 +70,8 @@
       "dashboard-config-drilldown.spec.js",
       "dashboard-config-promql.spec.js",
       "dashboard-config-markline.spec.js",
-      "dashboard-config-unit-locale.spec.js"
+      "dashboard-config-unit-locale.spec.js",
+      "dashboard-chart-options-foundation.spec.js"
     ],
     "disabled": []
   },
@@ -84,8 +86,10 @@
       "dashboard-maps.spec.js",
       "dashboard-multi-y-axis.spec.js",
       "dashboard-html-chart.spec.js",
+      "dashboard-text-panel-variables.spec.js",
       "dashboard-sankey.spec.js",
       "dashboard-pie-donut.spec.js",
+      "dashboard-pie-legend-values.spec.js",
       "dashboard-enrichment-table-panel.spec.js",
       "dashboard-metric-camelcase.spec.js",
       "dashboard-create-alert.spec.js",
@@ -358,7 +362,9 @@
       "logsRefreshCacheDropdown.spec.js",
       "logs-highlighting.spec.js",
       "logs-search-around-multistream.spec.js",
-      "logs-default-columns.spec.js"
+      "logs-default-columns.spec.js",
+      "logsResultsToolbar.spec.js",
+      "logsSavedFunctionOverwrite.spec.js"
     ],
     "disabled": [
       {
@@ -386,7 +392,9 @@
       "logsActionReasons.spec.js",
       "logsSearchCancelled.spec.js",
       "logsToolbarPins.spec.js",
-      "logs-query-editor-keyboard.spec.js"
+      "logs-query-editor-keyboard.spec.js",
+      "logsCrossLinks.spec.js",
+      "logsFieldValuePaging.spec.js"
     ],
     "disabled": [
       {
@@ -627,6 +635,21 @@
     "run_files": [
       "slo-timeslice.spec.js",
       "slo-alerts.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Profiles",
+    "actual_folder": "Profiles",
+    "browser": "chrome",
+    "run_files": [
+      "profiles-navigation-entry.spec.js",
+      "profiles-query-controls.spec.js",
+      "profiles-chart-breakdown.spec.js",
+      "profiles-views.spec.js",
+      "profiles-flame-graph.spec.js",
+      "profiles-compare.spec.js",
+      "profiles-states-edge.spec.js"
     ],
     "disabled": []
   }

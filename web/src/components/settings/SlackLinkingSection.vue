@@ -35,6 +35,7 @@ import {
 import { useI18nTyped } from "@/types/i18n";
 import type { InstallationView } from "@/types/slack";
 import SlackLinkedPeople from "./SlackLinkedPeople.vue";
+import SlackOncallUnlinked from "./SlackOncallUnlinked.vue";
 import { makeLinkingSchema, type LinkingForm } from "./SlackSettings.schema";
 
 const props = defineProps<{ installation: InstallationView }>();
@@ -266,6 +267,8 @@ const runLinkAll = async (): Promise<void> => {
         <OTag variant="success-soft" :label="t('slackApp.linking.enabled')" />
       </div>
     </OCard>
+
+    <SlackOncallUnlinked :installation="installation" />
 
     <SlackLinkedPeople v-model:open="peopleOpen" :installation-id="installation.id" />
   </section>

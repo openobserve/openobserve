@@ -23,7 +23,8 @@ import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
 import { purgeAllQueries } from "@/composables/query/queryClient";
-import { clearAllPanelDrafts } from "@/composables/dashboard/usePanelDraft";
+import { clearPanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
+import { editorDraftSessionEnded, resumeEditorDraftSession } from "@/utils/drafts/editorDraftStore";
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 
@@ -448,14 +449,20 @@ const store = createStore({
   },
   actions: {
     login(context, payload) {
+      const current = context.state.userInfo as { email?: string } | null;
+      const sameSession = context.state.loggedIn && current?.email === payload?.userInfo?.email;
       context.commit("login", payload);
+      // A token refresh re-dispatches login, and a sign-out here always reloads, so a login after one in this tab is a refresh too.
+      const refresh = sameSession || editorDraftSessionEnded.value;
+      if (payload?.loginState && !refresh) resumeEditorDraftSession(payload.userInfo?.email);
     },
-    logout(context) {
+    logout(context, payload?: { draftsOf?: string }) {
       context.commit("logout");
       // Nothing from the previous session may survive — including anything the
       // query layer persisted to localStorage/IndexedDB.
       purgeAllQueries();
-      clearAllPanelDrafts();
+      // Only an explicit sign-out names a user to clear; an expired session keeps every draft for the next login.
+      if (payload?.draftsOf !== undefined) clearPanelDraftsFor(payload.draftsOf);
     },
     endpoint(context, payload) {
       context.commit("endpoint", payload);

@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdownItem @select="importDashboard" data-test="dashboard-import-custom">
           <div class="flex flex-col">
             <span>{{ t("dashboard.importCustom") }}</span>
-            <span class="text-dropdown-item-text text-xs opacity-60">{{
+            <span class="text-dropdown-item-text text-xs opacity-60 max-md:mt-0.5">{{
               t("dashboard.importCustomDesc")
             }}</span>
           </div>
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex flex-col">
             <span>{{ t("dashboard.importTemplates") }}</span>
-            <span class="text-dropdown-item-text text-xs opacity-60">{{
+            <span class="text-dropdown-item-text text-xs opacity-60 max-md:mt-0.5">{{
               t("dashboard.importTemplatesDesc")
             }}</span>
           </div>
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex w-full items-center gap-2">
             <div class="flex min-w-0 flex-1 flex-col">
               <span>{{ t(`dashboard.${migration.labelKey}`) }}</span>
-              <span class="text-dropdown-item-text text-xs opacity-60">{{
+              <span class="text-dropdown-item-text text-xs opacity-60 max-md:mt-0.5">{{
                 t(`dashboard.${migration.descKey}`)
               }}</span>
             </div>
@@ -146,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :loading="loading"
+            :loading-reset-key="activeFolderId"
             :forbidden="forbidden"
             :frame="false"
             :default-columns="false"

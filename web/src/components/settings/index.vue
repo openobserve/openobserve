@@ -96,6 +96,7 @@ export default defineComponent({
       queryManagement: "queryManagement",
       query_management: "queryManagement",
       domainManagement: "domain_management",
+      orgDomainMapping: "org_domain_mapping",
       passwordPolicy: "password_policy",
       announcementBanners: "announcements",
       announcementBannerEditor: "announcements",
@@ -176,6 +177,10 @@ export default defineComponent({
         (store.state.zoConfig.meta_org && !isMetaOrg.value) ||
         store.state.zoConfig?.synthetics_enabled === false;
       if (name === "syntheticsLocations" && syntheticsBlocked) {
+        toGeneral();
+        return;
+      }
+      if (name === "orgDomainMapping" && config.isCloud !== "true") {
         toGeneral();
         return;
       }
@@ -296,6 +301,16 @@ export default defineComponent({
           locked: !domainManagementAccess.allowed,
           lockedMessage: domainManagementAccess.message,
           dataTest: "domain-management-tab",
+          group: "Access & Security",
+        },
+        {
+          key: "org_domain_mapping",
+          label: t("settings.orgDomainMapping.tabLabel"),
+          description: t("settings.orgDomainMapping.tabDesc"),
+          icon: "domain",
+          to: { name: "orgDomainMapping", query: { org_identifier: org } },
+          visible: isCloud,
+          dataTest: "org-domain-mapping-tab",
           group: "Access & Security",
         },
         {

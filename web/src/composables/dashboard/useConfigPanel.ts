@@ -23,6 +23,12 @@ import {
   shouldShowBarWidthConfig,
   shouldShowDrilldown,
   shouldShowTimeShift,
+  shouldShowStackMode,
+  shouldShowSortOrder,
+  shouldShowBarRadius,
+  shouldShowScatterEncoding,
+  shouldShowConnectNullsThreshold,
+  shouldShowCartesianSeriesConfig,
   allVisibleQueriesInstant,
 } from "@/utils/dashboard/configUtils";
 import {
@@ -33,8 +39,10 @@ import {
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import { PROMETHEUS_HISTOGRAM_MODE } from "@/utils/dashboard/promql/convertPromQLHeatmapChart";
 import { isNumericYField } from "@/utils/dashboard/heatmapYAxis";
+import { isHtmlPanel, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { PROMQL_MODULAR_CHART_TYPES } from "@/utils/dashboard/promql/shared/types";
 import { isGaugeAutoRange } from "@/utils/dashboard/gaugeDial";
+import { isBarGaugeAutoRange } from "@/utils/dashboard/convertBarGaugeData";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,11 +71,24 @@ export const THRESHOLD_CHART_TYPES: readonly string[] = [
   "gauge",
   "metric",
   "state-timeline",
+  "bar-gauge",
   "hostmap",
 ];
 
+const hasBarGaugeColumn = (panel: any): boolean =>
+  (Array.isArray(panel?.config?.override_config) ? panel.config.override_config : []).some(
+    (entry: any) =>
+      (entry?.config ?? []).some(
+        (item: any) => item?.type === "field_type" && item?.value === "bar_gauge",
+      ),
+  );
+
+/** Thresholds apply to the threshold chart types, and colour the bar gauge cells of a SQL table. */
 export const shouldShowThresholds = (dashboardPanelData: any): boolean =>
-  THRESHOLD_CHART_TYPES.includes(dashboardPanelData?.data?.type);
+  THRESHOLD_CHART_TYPES.includes(dashboardPanelData?.data?.type) ||
+  (dashboardPanelData?.data?.type === "table" &&
+    dashboardPanelData?.data?.queryType !== "promql" &&
+    hasBarGaugeColumn(dashboardPanelData?.data));
 
 // Charts whose series have names an override can match; tables keep Column Formatting.
 export const SERIES_OVERRIDE_CHART_TYPES: readonly string[] = [
@@ -82,6 +103,7 @@ export const SERIES_OVERRIDE_CHART_TYPES: readonly string[] = [
   "pie",
   "donut",
   "gauge",
+  "bar-gauge",
   "metric",
   "state-timeline",
 ];
@@ -104,6 +126,16 @@ export const shouldShowHeatmapYBucket = (dashboardPanelData: any, promqlMode: bo
     isNumericYField(query?.fields?.y?.[0], dashboardPanelData)
   );
 };
+
+/** The only sections an HTML panel shows; every other section configures an ECharts option it never builds. */
+export const HTML_PANEL_SECTIONS: Record<string, readonly SectionId[]> = {
+  "alert-list": ["general", "alertList"],
+  "flame-graph": ["general", "data", "flameGraph"],
+  logs: ["general", "logs"],
+};
+
+export const isSectionAllowedForType = (sectionId: SectionId, type: unknown): boolean =>
+  !isHtmlPanel(type) || (HTML_PANEL_SECTIONS[type as string] ?? []).includes(sectionId);
 
 // ---------------------------------------------------------------------------
 // Pure filter helpers (exported so they can be unit-tested independently)
@@ -160,6 +192,18 @@ export function useConfigPanel(
   const { t, tm } = useI18nTyped();
 
   const isStateTimeline = computed(() => dashboardPanelData.data.type === "state-timeline");
+  const isRowChart = computed(() => isRowTimeline(dashboardPanelData.data.type));
+  const isBarGauge = computed(() => dashboardPanelData.data.type === "bar-gauge");
+  // An auto-range gauge picks its own bounds; a bar gauge is auto until the user picks Fixed.
+  const showGaugeBounds = computed(() => {
+    const queryConfig =
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config;
+    if (isBarGauge.value) return !isBarGaugeAutoRange(queryConfig);
+    return dashboardPanelData.data.type === "gauge" && !isGaugeAutoRange(queryConfig);
+  });
+  const isPieOrDonut = computed(
+    () => dashboardPanelData.data.type === "pie" || dashboardPanelData.data.type === "donut",
+  );
   const isHostmap = computed(() => dashboardPanelData.data.type === "hostmap");
 
   // ── Config options ────────────────────────────────────────────────────────
@@ -184,7 +228,10 @@ export function useConfigPanel(
         label: t("dashboard.showExemplarsLabel"),
         visible: !!promqlMode.value && isExemplarEligible(dashboardPanelData.data),
       },
-      "panel-default-time": { label: t("dashboard.panelTimeEnabled") },
+      "panel-default-time": {
+        label: t("dashboard.panelTimeEnabled"),
+        visible: dashboardPanelData.data.type !== "alert-list",
+      },
       "promql-chart-config": {
         label: t("dashboard.promqlChartConfig"),
         visible:
@@ -277,6 +324,14 @@ export function useConfigPanel(
         label: t("dashboard.chartAlign"),
         visible: shouldApplyChartAlign(dashboardPanelData),
       },
+      "chart-tooltip-mode": {
+        label: t("dashboard.chartTooltipMode"),
+        visible: shouldShowCartesianSeriesConfig(dashboardPanelData),
+      },
+      "tooltip-sort": {
+        label: t("dashboard.tooltipSort"),
+        visible: shouldShowCartesianSeriesConfig(dashboardPanelData),
+      },
       "legend-values": {
         label: t("dashboard.legendValues"),
         visible: shouldShowLegendValues(dashboardPanelData),
@@ -319,6 +374,50 @@ export function useConfigPanel(
         label: t("dashboard.heatmapColorScale"),
         visible: dashboardPanelData.data.type === "heatmap",
       },
+      "heatmap-cells": {
+        label: [t("dashboard.heatmapCellGap"), t("dashboard.heatmapHideBelow")],
+        visible: dashboardPanelData.data.type === "heatmap",
+      },
+      "distribution-buckets": {
+        label: [
+          t("dashboard.distributionBucketCount"),
+          t("dashboard.distributionBucketSize"),
+          t("dashboard.distributionBucketOffset"),
+        ],
+        visible: dashboardPanelData.data.type === "distribution",
+      },
+      "treemap-breadcrumb": {
+        label: t("dashboard.treemapShowBreadcrumb"),
+        visible: dashboardPanelData.data.type === "treemap",
+      },
+      "sunburst-labels": {
+        label: t("dashboard.sunburstShowLabels"),
+        visible: dashboardPanelData.data.type === "sunburst",
+      },
+      "funnel-sort": {
+        label: t("dashboard.funnelSort"),
+        visible: dashboardPanelData.data.type === "funnel",
+      },
+      "funnel-orient": {
+        label: t("dashboard.barGaugeOrientation"),
+        visible: dashboardPanelData.data.type === "funnel",
+      },
+      "funnel-show-percent": {
+        label: t("dashboard.funnelShowPercent"),
+        visible: dashboardPanelData.data.type === "funnel",
+      },
+      "node-graph-layout": {
+        label: t("dashboard.nodeGraphLayout"),
+        visible: dashboardPanelData.data.type === "node-graph",
+      },
+      "node-graph-edge-labels": {
+        label: t("dashboard.nodeGraphShowEdgeLabels"),
+        visible: dashboardPanelData.data.type === "node-graph",
+      },
+      "boxplot-whisker": {
+        label: t("dashboard.boxplotWhisker"),
+        visible: dashboardPanelData.data.type === "boxplot",
+      },
       "heatmap-histogram-mode": {
         label: t("dashboard.heatmapHistogramMode"),
         visible: !!promqlMode.value && dashboardPanelData.data.type === "heatmap",
@@ -357,6 +456,19 @@ export function useConfigPanel(
         label: t("dashboard.connectNullValues"),
         visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
       },
+      "connect-nulls-threshold": {
+        label: t("dashboard.connectNullsThreshold"),
+        visible: shouldShowConnectNullsThreshold(dashboardPanelData),
+      },
+      "scatter-encoding": {
+        label: [
+          t("dashboard.scatterSizeField"),
+          t("dashboard.scatterColorField"),
+          t("dashboard.scatterSizeMin"),
+          t("dashboard.scatterSizeMax"),
+        ],
+        visible: shouldShowScatterEncoding(dashboardPanelData, !!promqlMode.value),
+      },
       "no-value-replacement": {
         label: t("dashboard.noValueReplacement"),
         visible: shouldShowNoValueReplacement(dashboardPanelData, promqlMode.value),
@@ -371,13 +483,20 @@ export function useConfigPanel(
       },
     },
     stateTimeline: {
+      display: {
+        label: t("dashboard.stateTimelineDisplay"),
+        visible: isStateTimeline.value,
+      },
       "merge-gaps": {
         label: t("dashboard.stateTimelineMergeGaps"),
-        visible: isStateTimeline.value,
+        // Cells keep one block per time bucket, so there is nothing to merge.
+        visible:
+          isStateTimeline.value &&
+          dashboardPanelData.data.config?.state_timeline_display !== "cells",
       },
       "row-size": {
         label: [t("dashboard.stateTimelineRowHeight"), t("dashboard.stateTimelineRowGap")],
-        visible: isStateTimeline.value,
+        visible: isRowChart.value,
       },
       "show-state-text": {
         label: t("dashboard.stateTimelineShowStateText"),
@@ -385,11 +504,15 @@ export function useConfigPanel(
       },
       "row-sort": {
         label: t("dashboard.stateTimelineRowSort"),
-        visible: isStateTimeline.value,
+        visible: isRowChart.value,
       },
       "tooltip-mode": {
         label: t("dashboard.stateTimelineTooltipMode"),
-        visible: isStateTimeline.value,
+        visible: isRowChart.value,
+      },
+      "state-value-align": {
+        label: t("dashboard.stateValueAlign"),
+        visible: isRowChart.value,
       },
     },
     hostmap: {
@@ -437,6 +560,26 @@ export function useConfigPanel(
       "y-axis": {
         label: [t("common.yAxisMin"), t("common.yAxisMax")],
         visible: shouldShowCartesianAxisConfig(dashboardPanelData),
+      },
+      "y-axis-hard-range": {
+        label: [t("dashboard.yAxisHardMin"), t("dashboard.yAxisHardMax")],
+        visible: shouldShowCartesianSeriesConfig(dashboardPanelData),
+      },
+      "y-axis-scale": {
+        label: [t("dashboard.yAxisScale"), t("dashboard.yAxisLogBase")],
+        visible: shouldShowCartesianSeriesConfig(dashboardPanelData),
+      },
+      "y-axis-label": {
+        label: t("dashboard.yAxisLabel"),
+        visible: shouldShowCartesianSeriesConfig(dashboardPanelData),
+      },
+      "stack-mode": {
+        label: t("dashboard.stackMode"),
+        visible: shouldShowStackMode(dashboardPanelData),
+      },
+      "sort-order": {
+        label: t("dashboard.barSortOrder"),
+        visible: shouldShowSortOrder(dashboardPanelData),
       },
       "y-axis-min-interval": {
         label: t("dashboard.yAxisMinInterval"),
@@ -502,6 +645,14 @@ export function useConfigPanel(
         label: t("dashboard.pointOpacity"),
         visible: shouldShowScatterPointConfig(dashboardPanelData),
       },
+      "line-style": {
+        label: t("dashboard.lineStyle"),
+        visible: shouldShowAreaLineStyleConfig(dashboardPanelData),
+      },
+      "bar-radius": {
+        label: t("dashboard.barRadius"),
+        visible: shouldShowBarRadius(dashboardPanelData),
+      },
     },
     table: {
       wrap: {
@@ -534,6 +685,15 @@ export function useConfigPanel(
           !!dashboardPanelData.data.config.table_pagination &&
           dashboardPanelData.data.type === "table",
       },
+      "table-density": {
+        label: t("dashboard.tableDensity"),
+        visible: dashboardPanelData.data.type === "table",
+      },
+      "table-footer-calcs": {
+        label: t("dashboard.tableFooterCalcs"),
+        visible:
+          !promqlMode.value && dashboardPanelData.data.type === "table" && !isPivotMode.value,
+      },
     },
     pivotTable: {
       "pivot-show-row-totals": {
@@ -562,7 +722,13 @@ export function useConfigPanel(
       },
     },
     valueTransformations: {
-      "value-transformations": { label: t("dashboard.configSectionValueTransformations") },
+      "value-transformations": {
+        label: [
+          t("dashboard.configSectionValueTransformations"),
+          t("dashboard.valueMappingsTitle"),
+          t("dashboard.addValueMapping"),
+        ],
+      },
     },
     fieldOverrides: {
       "field-overrides": {
@@ -596,6 +762,10 @@ export function useConfigPanel(
         visible:
           dashboardPanelData.data.type === "geomap" || dashboardPanelData.data.type === "maps",
       },
+      "map-cluster": {
+        label: [t("dashboard.mapCluster"), t("dashboard.mapClusterRadius")],
+        visible: dashboardPanelData.data.type === "geomap",
+      },
       "map-roam": {
         label: t("dashboard.mapsEnableRoam"),
         visible: dashboardPanelData.data.type === "maps",
@@ -606,25 +776,67 @@ export function useConfigPanel(
         label: t("dashboard.gaugeRangeMode"),
         visible: dashboardPanelData.data.type === "gauge",
       },
+      "bar-gauge-range-mode": {
+        label: t("dashboard.gaugeRangeMode"),
+        visible: isBarGauge.value,
+      },
       "gauge-min": {
         label: t("dashboard.gaugeMinValue"),
-        visible:
-          dashboardPanelData.data.type === "gauge" &&
-          !isGaugeAutoRange(
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
-          ),
+        visible: showGaugeBounds.value,
       },
       "gauge-max": {
         label: t("dashboard.gaugeMaxValue"),
-        visible:
-          dashboardPanelData.data.type === "gauge" &&
-          !isGaugeAutoRange(
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config,
-          ),
+        visible: showGaugeBounds.value,
       },
       "gauge-end-labels": {
         label: t("dashboard.showGaugeEndLabels"),
         visible: dashboardPanelData.data.type === "gauge",
+      },
+      "bar-gauge-mode": {
+        label: t("dashboard.barGaugeMode"),
+        visible: isBarGauge.value,
+      },
+      "bar-gauge-orientation": {
+        label: t("dashboard.barGaugeOrientation"),
+        visible: isBarGauge.value,
+      },
+      "bar-gauge-show-unfilled": {
+        label: t("dashboard.barGaugeShowUnfilled"),
+        visible: isBarGauge.value,
+      },
+      "gauge-style": {
+        label: t("dashboard.gaugeStyle"),
+        visible: dashboardPanelData.data.type === "gauge",
+      },
+      "gauge-segments": {
+        label: t("dashboard.gaugeSegments"),
+        visible: dashboardPanelData.data.type === "gauge",
+      },
+      "gauge-neutral": {
+        label: t("dashboard.gaugeNeutral"),
+        visible: dashboardPanelData.data.type === "gauge",
+      },
+      "gauge-round-cap": {
+        label: t("dashboard.gaugeRoundCap"),
+        visible: dashboardPanelData.data.type === "gauge",
+      },
+    },
+    pie: {
+      "pie-label-content": {
+        label: t("dashboard.pieLabelContent"),
+        visible: isPieOrDonut.value,
+      },
+      "pie-sort-order": {
+        label: t("dashboard.pieSortOrder"),
+        visible: isPieOrDonut.value,
+      },
+      "pie-other-threshold": {
+        label: t("dashboard.pieOtherThreshold"),
+        visible: isPieOrDonut.value,
+      },
+      "donut-inner-radius": {
+        label: t("dashboard.donutInnerRadius"),
+        visible: dashboardPanelData.data.type === "donut",
       },
     },
     layout: {
@@ -669,6 +881,10 @@ export function useConfigPanel(
         label: t("dashboard.markLines"),
         visible: shouldShowCartesianAxisConfig(dashboardPanelData),
       },
+      "mark-areas": {
+        label: t("dashboard.markAreas"),
+        visible: shouldShowCartesianSeriesConfig(dashboardPanelData),
+      },
     },
     thresholds: {
       thresholds: {
@@ -678,6 +894,16 @@ export function useConfigPanel(
           t("dashboard.thresholdAddStep"),
         ],
         visible: shouldShowThresholds(dashboardPanelData),
+      },
+    },
+    metric: {
+      "stat-text-mode": {
+        label: t("dashboard.statTextMode"),
+        visible: dashboardPanelData.data.type === "metric",
+      },
+      "value-font-size": {
+        label: t("dashboard.valueFontSize"),
+        visible: dashboardPanelData.data.type === "metric",
       },
     },
     background: {
@@ -696,6 +922,56 @@ export function useConfigPanel(
             dashboardPanelData.data.queryType === "promql" &&
             allVisibleQueriesInstant(dashboardPanelData)
           ),
+      },
+    },
+    alertList: {
+      "alert-list-folder": {
+        label: t("dashboard.alertListFolder"),
+        visible: dashboardPanelData.data.type === "alert-list",
+      },
+      "alert-list-state": {
+        label: t("dashboard.alertListState"),
+        visible: dashboardPanelData.data.type === "alert-list",
+      },
+      "alert-list-sort": {
+        label: t("dashboard.alertListSort"),
+        visible: dashboardPanelData.data.type === "alert-list",
+      },
+      "alert-list-max": {
+        label: t("dashboard.alertListMax"),
+        visible: dashboardPanelData.data.type === "alert-list",
+      },
+    },
+    flameGraph: {
+      "flame-graph-fields": {
+        label: [t("dashboard.flameGraphStackField"), t("dashboard.flameGraphValueField")],
+        visible: dashboardPanelData.data.type === "flame-graph",
+      },
+    },
+    logs: {
+      "logs-fields": {
+        label: [
+          t("dashboard.logsMessageField"),
+          t("dashboard.logsLevelField"),
+          t("dashboard.logsTimeField"),
+        ],
+        visible: dashboardPanelData.data.type === "logs",
+      },
+      "logs-order": {
+        label: t("dashboard.logsOrder"),
+        visible: dashboardPanelData.data.type === "logs",
+      },
+      "logs-show-time": {
+        label: t("dashboard.logsShowTime"),
+        visible: dashboardPanelData.data.type === "logs",
+      },
+      "logs-wrap": {
+        label: t("dashboard.logsWrap"),
+        visible: dashboardPanelData.data.type === "logs",
+      },
+      "logs-prettify-json": {
+        label: t("dashboard.logsPrettifyJson"),
+        visible: dashboardPanelData.data.type === "logs",
       },
     },
   }));
@@ -735,6 +1011,7 @@ export function useConfigPanel(
     filterOption(configOptions.value[sectionId]?.[optionId], normalizedSearchQuery.value);
 
   const isSectionVisible = (sectionId: SectionId): boolean =>
+    isSectionAllowedForType(sectionId, dashboardPanelData.data.type) &&
     filterSection(configOptions.value[sectionId], normalizedSearchQuery.value);
 
   // ── Expand / collapse ─────────────────────────────────────────────────────

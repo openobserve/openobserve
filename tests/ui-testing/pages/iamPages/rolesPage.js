@@ -93,6 +93,16 @@ export class RolesPage {
         this.summaryEmpty = page.locator('[data-test="edit-role-summary-empty"]');
         this.summaryLoading = page.locator('[data-test="edit-role-summary-loading"]');
 
+        // ---------- presets panel (Role Overview, every role) ----------
+        // The panel shows either the preset list or one preset's detail, never both.
+        this.presetsPanel = page.locator('[data-test="edit-role-presets-panel"]');
+        this.presetDetail = page.locator('[data-test="edit-role-preset-detail"]');
+        this.presetBack = page.locator('[data-test="edit-role-preset-back"]');
+        this.presetApply = page.locator('[data-test="edit-role-preset-apply"]');
+        // A viewer can close the panel; the floating button reopens it, and each page visit starts open.
+        this.presetsClose = page.locator('[data-test="edit-role-presets-close"]');
+        this.presetsOpen = page.locator('[data-test="edit-role-presets-open"]');
+
         // ---------- pane pagination (OTable's own controls, scoped to the pane) ----------
         // MUST be scoped. GroupUsers and GroupServiceAccounts stay MOUNTED under
         // v-show in EditRole.vue, so an unscoped `o2-table-*` slug also matches the
@@ -113,12 +123,17 @@ export class RolesPage {
 
         // ---------- leaving with unsaved changes ----------
         // ConfirmDialog renders inside ODialog, so the buttons carry the dialog's slugs.
-        this.leaveConfirm = page.locator('[data-test="confirm-dialog"]');
-        this.leaveConfirmOk = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
-        this.leaveConfirmCancel = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]');
+        // The shared unsaved-changes dialog: Discard drops the changes, closing it stays on the editor.
+        this.leaveConfirm = page.locator('[data-test="editor-draft-leave-dialog"]');
+        this.leaveConfirmOk = page.locator('[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-neutral-btn"]');
+        this.leaveConfirmCancel = page.locator('[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-close-btn"]');
 
         // ---------- unsaved drawer ----------
         this.drawer = page.locator('[data-test="edit-role-unsaved-drawer"]');
+        // The drawer's own Save; the page Save underneath is unclickable while it is open.
+        this.drawerSave = page.locator('[data-test="edit-role-unsaved-save"]');
+        // "Not added yet": grants the role needs to work that are not staged.
+        this.drawerCompanions = page.locator('[data-test="edit-role-companions"]');
 
         this.toastMessages = page.locator('[data-test="o-toast-message"]');
     }
@@ -273,9 +288,46 @@ export class RolesPage {
         return this.page.locator('[data-test^="edit-role-unsaved-undo-"]');
     }
 
-    /** Preset cards in the empty state carry no slug of their own; match their label. */
-    presetCard(label) {
-        return this.summaryEmpty.getByText(label, { exact: true });
+    /** Companion row actions: Add stages the module-wide grant; Open (Streams Get only) opens the module instead. */
+    companionAdd(moduleKey) {
+        return this.page.locator(`[data-test="edit-role-companion-add-${moduleKey}"]`);
+    }
+    companionOpen(moduleKey) {
+        return this.page.locator(`[data-test="edit-role-companion-open-${moduleKey}"]`);
+    }
+
+    /** A row in the Presets panel, by preset id (readonly, dbm, k8s, rum_viewer, rum_editor, alert_manager, …). */
+    presetRow(id) {
+        return this.page.locator(`[data-test="edit-role-preset-${id}"]`);
+    }
+    /** The row's "+N" or "In Role" badge. */
+    presetStatus(id) {
+        return this.page.locator(`[data-test="edit-role-preset-${id}-status"]`);
+    }
+
+    /** Reopens the Presets panel if a test closed it earlier on the same page visit. */
+    async ensurePresetsOpen() {
+        await expect(this.presetsPanel.or(this.presetsOpen)).toBeVisible({ timeout: 15000 });
+        if (await this.presetsOpen.isVisible()) await this.presetsOpen.click();
+        await expect(this.presetsPanel).toBeVisible();
+    }
+
+    /** Opens a preset's detail in the panel. */
+    async openPreset(id) {
+        await this.ensurePresetsOpen();
+        await this.presetRow(id).click();
+        await expect(this.presetDetail).toBeVisible({ timeout: 15000 });
+    }
+
+    /**
+     * Opens a preset and clicks Add. Add stays disabled until the preview is ready
+     * (stream presets load their lists first), so wait for it rather than click early.
+     */
+    async applyPreset(id) {
+        await this.openPreset(id);
+        await expect(this.presetApply).toBeEnabled({ timeout: 30000 });
+        await this.presetApply.click();
+        await this.waitForPresetStaged();
     }
 
     // ================= capability probes =================
@@ -447,8 +499,11 @@ export class RolesPage {
 
     // ================= save =================
 
-    /** Resolves with the PUT body the save sent, or null when no request fired. */
-    async saveAndCapture({ expectRequest = true } = {}) {
+    /**
+     * Resolves with the PUT body the save sent, or null when no request fired.
+     * `via` picks the Save button: the page footer's (default) or the drawer's `drawerSave`.
+     */
+    async saveAndCapture({ expectRequest = true, via = this.saveButton } = {}) {
         let captured = null;
         const onRequest = (req) => {
             if (req.method() === 'PUT' && /\/roles\/[^/]+$/.test(new URL(req.url()).pathname)) {
@@ -456,7 +511,7 @@ export class RolesPage {
             }
         };
         this.page.on('request', onRequest);
-        await this.saveButton.click();
+        await via.click();
         // A save that legitimately sends nothing must not be papered over by a wait.
         await this.page.waitForTimeout(expectRequest ? 3000 : 2500);
         this.page.off('request', onRequest);
@@ -495,8 +550,9 @@ export class RolesPage {
      *
      * It is an ODrawer — a modal dismissable layer — so while it is open its subtree
      * intercepts pointer events and Save is visible and enabled but UNCLICKABLE. It
-     * self-closes only once nothing is staged (S-05), so any test that visits the
-     * drawer and then saves has to close it first.
+     * self-closes only once nothing is staged and no companion grant is missing (S-05),
+     * so any test that visits the drawer and then saves has to close it first, or save
+     * through `drawerSave`.
      */
     async closeDrawer() {
         if (!(await this.drawer.isVisible().catch(() => false))) return;

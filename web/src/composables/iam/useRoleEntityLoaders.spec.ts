@@ -10,6 +10,7 @@ const getStreamsMock = vi.hoisted(() =>
       logs: { list: [{ name: "app" }, { name: "sys" }] },
       metrics: { list: [{ name: "cpu" }] },
       traces: { list: [{ name: "svc-a" }] },
+      profiles: { list: [{ name: "cpu-prof" }] },
       index: { list: [{ name: "users" }] },
       enrichment_tables: { list: [{ name: "geo" }] },
       metadata: { list: [{ name: "meta" }] },
@@ -334,7 +335,7 @@ describe("useRoleEntityLoaders - getResourceEntities dispatch", () => {
 });
 
 describe("useRoleEntityLoaders - stream loaders", () => {
-  it("getStreamsTypes builds four type rows without a service call", async () => {
+  it("getStreamsTypes builds five type rows without a service call", async () => {
     const { getStreamsTypes, updateResourceResource } = setup();
     getStreamsMock.mockClear();
 
@@ -345,6 +346,7 @@ describe("useRoleEntityLoaders - stream loaders", () => {
       "logs",
       "traces",
       "metrics",
+      "profiles",
       "index",
     ]);
     expect(updateResourceResource.mock.calls[0]).toEqual([
@@ -356,6 +358,9 @@ describe("useRoleEntityLoaders - stream loaders", () => {
       "name",
     ]);
     expect(updateResourceResource.mock.calls[3][3]).toEqual([
+      { stream_type: "profiles", name: "menu.profiles" },
+    ]);
+    expect(updateResourceResource.mock.calls[4][3]).toEqual([
       { stream_type: "index", name: "iam.indices" },
     ]);
   });
@@ -374,26 +379,30 @@ describe("useRoleEntityLoaders - stream loaders", () => {
     );
   });
 
-  it("getMetrics, getTraces and getIndexStreams each ask for their own stream type", async () => {
-    const { getMetrics, getTraces, getIndexStreams, updateEntityEntities } = setup();
+  it("getMetrics, getTraces, getProfiles and getIndexStreams each ask for their own stream type", async () => {
+    const { getMetrics, getTraces, getProfiles, getIndexStreams, updateEntityEntities } = setup();
     getStreamsMock.mockClear();
 
     const metrics = row({ name: "metrics", childName: "metrics" });
     const traces = row({ name: "traces", childName: "traces" });
+    const profiles = row({ name: "profiles", childName: "profiles" });
     const index = row({ name: "index", childName: "index" });
 
     await getMetrics(metrics as any);
     await getTraces(traces as any);
+    await getProfiles(profiles as any);
     await getIndexStreams(index as any);
 
     expect(getStreamsMock.mock.calls).toEqual([
       ["metrics", false],
       ["traces", false],
+      ["profiles", false],
       ["index", false],
     ]);
     expect(updateEntityEntities.mock.calls.map((call) => call[2])).toEqual([
       [{ name: "cpu" }],
       [{ name: "svc-a" }],
+      [{ name: "cpu-prof" }],
       [{ name: "users" }],
     ]);
   });

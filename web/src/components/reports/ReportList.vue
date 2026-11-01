@@ -52,9 +52,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="report-list-add-report-btn"
           variant="primary"
           size="sm"
+          :aria-label="
+            reportDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('reports.add') })
+              : undefined
+          "
           @click="createNewReport"
         >
           {{ t(`reports.add`) }}
+          <EditorDraftDot
+            v-if="reportDrafts.hasNew"
+            :saved-at="reportDrafts.savedAt(null)"
+            corner
+            data-test="report-list-add-report-draft-dot"
+          />
         </OButton>
       </template>
 
@@ -86,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               row-key="report_id"
               :frame="false"
               :loading="isLoadingReports"
+              :loading-reset-key="activeFolderId"
               :forbidden="forbidden"
               pagination="client"
               selection="multiple"
@@ -191,9 +203,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Name column: badges for type/preview -->
               <template #cell-name="{ row }">
                 <div class="flex min-w-0 items-center">
-                  <OTruncatedText :data-test="`report-list-name-cell-${row.name}`">{{
-                    row.name
-                  }}</OTruncatedText>
+                  <div class="flex min-w-0 items-center gap-2">
+                    <OTruncatedText :data-test="`report-list-name-cell-${row.name}`">{{
+                      row.name
+                    }}</OTruncatedText>
+                    <EditorDraftDot
+                      v-if="reportDrafts.ids.has(rowDraftId(row))"
+                      :saved-at="reportDrafts.savedAt(rowDraftId(row))"
+                      :data-test="`report-list-${row.name}-draft-dot`"
+                    />
+                  </div>
                   <OTag
                     v-if="row.dashboards?.[0]?.report_type === 'png'"
                     type="reportTag"
@@ -430,6 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :report-name="runNowRow.name"
       :last-run-status="runNowRow.last_run_status"
       :last-run-error="runNowRow.last_run_error"
+      :folder-id="runNowRow.folder_id || activeFolderId"
       @update:running="(r) => (runningReportId = r ? runNowRow!.report_id : '')"
       @ran="refreshReports"
     />
@@ -461,6 +481,10 @@ import { useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { reportDraftId } from "@/components/reports/reportDraft";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import { convertUnixToDateFormat } from "@/utils/date";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -680,7 +704,7 @@ const lastRunTooltip = (row: any) => {
 const deleteDialog = ref({
   show: false,
   title: t("reports.deleteReportTitle"),
-  data: null as any, // { report_id, name }
+  data: null as { report_id: string; name: string; folder_id?: string } | null,
 });
 const confirmBulkDelete = ref<boolean>(false);
 const bulkDeleteLoading = ref<boolean>(false);
@@ -990,6 +1014,15 @@ const visibleRows = computed(() => {
   return filterData(reportsTableRows.value ?? [], filterQuery.value);
 });
 
+const reportDrafts = useEditorDraftIds("report");
+// The same folder fallback editReport opens the editor with, so the editor writes this id.
+const rowDraftId = (row: { folder_id?: string; name: string }) =>
+  reportDraftId(row.folder_id || activeFolderId.value, row.name);
+const dropReportDrafts = (rows: { folder_id?: string; name: string }[]) => {
+  const org = store.state.selectedOrganization.identifier;
+  rows.forEach((row) => deleteEditorDraftsFor({ kind: "report", org, entityId: rowDraftId(row) }));
+};
+
 // ── Actions ───────────────────────────────────────────────────────────────────
 const createNewReport = () => {
   track("Button Click", { button: "Add Report", page: "Reports" });
@@ -1061,11 +1094,16 @@ const toggleReportState = (report: any) => {
 // Delete — uses report_id (v2)
 const confirmDeleteReport = (report: any) => {
   deleteDialog.value.show = true;
-  deleteDialog.value.data = { report_id: report.report_id, name: report.name };
+  deleteDialog.value.data = {
+    report_id: report.report_id,
+    name: report.name,
+    folder_id: report.folder_id,
+  };
 };
 
 const deleteReport = () => {
-  const { report_id, name } = deleteDialog.value.data;
+  if (!deleteDialog.value.data) return;
+  const { report_id, name, folder_id } = deleteDialog.value.data;
   const dismiss = toast({
     variant: "loading",
     message: t("toastMessages.reports.deletingReport", { name: name }),
@@ -1075,6 +1113,7 @@ const deleteReport = () => {
   reports
     .deleteReportById(store.state.selectedOrganization.identifier, report_id)
     .then(() => {
+      dropReportDrafts([{ folder_id, name }]);
       staticReportsList.value = staticReportsList.value.filter(
         (r: any) => r.report_id !== report_id,
       );
@@ -1144,6 +1183,7 @@ const bulkDeleteReports = async () => {
     }
 
     const successfulIds = new Set(successful);
+    dropReportDrafts(staticReportsList.value.filter((r) => successfulIds.has(r.report_id)));
     staticReportsList.value = staticReportsList.value.filter(
       (r: any) => !successfulIds.has(r.report_id),
     );

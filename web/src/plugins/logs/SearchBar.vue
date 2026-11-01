@@ -29,7 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              (not `flex-1`) keeps this sized to its content so the More button
              sits right after the pinned items instead of being pushed to the
              far right; it still shrinks + clips when content overflows. -->
-        <div class="flex min-w-0 flex-initial flex-nowrap items-center gap-1 overflow-hidden">
+        <div
+          class="-my-1 flex min-w-0 flex-initial flex-nowrap items-center gap-1 overflow-hidden py-1"
+        >
           <!-- View Mode: Dropdown when very narrow, Toggle Group otherwise -->
           <ODropdown v-if="toolbarToggleAsDropdown" side="bottom" align="start">
             <template #trigger>
@@ -243,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButtonGroup
             v-if="showPinnedSavedViews"
             data-test="logs-search-bar-saved-views-pinned"
-            class="element-box-shadow border-button-outline-border border p-0"
+            class="border-button-outline-border border p-0"
           >
             <!-- A real dropdown, not a modal: one click to open, one click to
                apply. The heavyweight list dialog stays reachable via Manage. -->
@@ -265,74 +267,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
                 </OButton>
               </template>
-              <ODropdownGroup :label="t('search.savedViewsLabel')">
-                <div
-                  v-if="searchObj.loadingSavedView"
-                  class="text-text-secondary flex items-center gap-2 px-3 py-1.5 text-sm"
-                >
-                  <OSpinner size="xs" />
-                  {{ t("confirmDialog.loading") }}
-                </div>
-                <div
-                  v-else-if="sortedSavedViews.length"
-                  class="max-h-72 overflow-y-auto overscroll-contain"
-                  data-test="logs-search-bar-saved-views-menu-list"
-                >
-                  <ODropdownItem
-                    v-for="view in sortedSavedViews"
-                    :key="view.view_id"
-                    :data-test="`logs-search-bar-saved-views-menu-apply-${view.view_name}`"
-                    @select="applySavedView(view)"
-                  >
-                    <template #icon-left>
-                      <OIcon
-                        :name="favoriteViews.includes(view.view_id) ? 'star' : 'saved-search'"
-                        size="sm"
-                        :class="favoriteViews.includes(view.view_id) ? 'text-favorite' : ''"
-                      />
-                    </template>
-                    <OTruncatedText class="max-w-56">{{ view.view_name }}</OTruncatedText>
-                    <template #icon-right>
-                      <OButton
-                        variant="ghost"
-                        size="icon-xs-sq"
-                        icon-left="edit"
-                        class="ms-auto"
-                        :aria-label="t('search.updateSavedViewWithCurrent')"
-                        :disabled="!!saveViewReason"
-                        focusable-unavailable
-                        :data-test="`logs-search-bar-saved-views-menu-update-${view.view_name}`"
-                        @click.stop.prevent="quickUpdateSavedView(view)"
-                        @keydown.enter.stop.prevent="quickUpdateSavedView(view)"
-                        @keydown.space.stop
-                      >
-                        <template #unavailable-reason>{{ saveViewReason }}</template>
-                      </OButton>
-                    </template>
-                  </ODropdownItem>
-                </div>
-                <ODropdownItem v-else disabled>
-                  {{ t("search.savedViewsNotFound") }}
-                </ODropdownItem>
-              </ODropdownGroup>
-              <ODropdownSeparator />
-              <ODropdownItem
-                icon-left="save"
-                data-test="logs-search-bar-saved-views-menu-create"
-                :disabled="!!saveViewReason"
-                focusable-unavailable
-                :description="saveViewReason || saveViewNote"
-                @select="fnSavedView"
-              >
-                {{ t("search.createSavedView") }}
-              </ODropdownItem>
-              <ODropdownItem
-                icon-left="settings"
-                data-test="logs-search-bar-saved-views-menu-manage"
-                @select="openSavedViewsList"
-              >
-                {{ t("search.manageSavedViews") }}
-              </ODropdownItem>
+              <SavedViewsMenu
+                :views="searchObj.data.savedViews"
+                :favorite-ids="favoriteViews"
+                :applied-view-id="appliedSavedViewId"
+                :loading="!!searchObj.loadingSavedView"
+                :save-reason="saveViewReason"
+                :save-note="saveViewNote"
+                create-shortcut-id="logsSaveView"
+                data-test-prefix="logs-search-bar-saved-views-menu"
+                @apply="applySavedView"
+                @update="requestUpdateSavedView"
+                @toggle-favorite="handleFavoriteSavedView"
+                @create="fnSavedView"
+                @delete="handleDeleteSavedView"
+              />
             </ODropdown>
             <OSeparator vertical />
             <OButton
@@ -361,11 +310,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <!-- this is the button group responsible for showing all the utilities -->
-        <ODropdown class="flex-shrink-0" side="bottom" align="start">
+        <ODropdown
+          class="flex-shrink-0"
+          side="bottom"
+          align="start"
+          :open="utilitiesMenuOpen"
+          @update:open="onUtilitiesMenuOpenChange"
+        >
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="rounded-default hover:bg-button-outline-hover-bg element-box-shadow ms-1 h-[2.125rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease] max-md:ms-auto"
+              class="rounded-default hover:bg-button-outline-hover-bg h-[2.125rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease] max-md:ms-auto"
               icon-left="more-horiz"
               variant="outline"
               size="xs"
@@ -552,8 +507,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownSeparator />
 
           <!-- SAVED VIEWS -->
-          <ODropdownGroup :label="t('search.menuGroupSavedViews')">
-            <template #label-action>
+          <SavedViewsSubmenu
+            :views="searchObj.data.savedViews"
+            :favorite-ids="favoriteViews"
+            :applied-view-id="appliedSavedViewId"
+            :loading="!!searchObj.loadingSavedView"
+            :save-reason="saveViewReason"
+            :save-note="saveViewNote"
+            create-shortcut-id="logsSaveView"
+            data-test-prefix="logs-search-bar-menu-saved-views"
+            trigger-test-id="logs-search-bar-menu-list-saved-views-btn"
+            create-test-id="logs-search-bar-menu-create-saved-view-btn"
+            @apply="applySavedView"
+            @update="requestUpdateSavedView"
+            @toggle-favorite="handleFavoriteSavedView"
+            @create="fnSavedView"
+            @delete="handleDeleteSavedView"
+          >
+            <template #actions>
               <OButton
                 data-test="logs-search-bar-menu-pin-saved-views-btn"
                 variant="ghost-neutral"
@@ -566,40 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
               </OButton>
             </template>
-            <ODropdownItem
-              data-test="logs-search-bar-menu-list-saved-views-btn"
-              @select="openSavedViewsList"
-            >
-              <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon name="format-list-bulleted" size="sm" />
-                </span>
-              </template>
-              {{ t("search.listSavedViews") }}
-            </ODropdownItem>
-
-            <ODropdownItem
-              data-test="logs-search-bar-menu-create-saved-view-btn"
-              shortcut-id="logsSaveView"
-              :disabled="!!saveViewReason"
-              focusable-unavailable
-              :description="saveViewReason || saveViewNote"
-              @select="fnSavedView"
-            >
-              <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon name="add" size="sm" />
-                </span>
-              </template>
-              {{ t("search.createSavedView") }}
-            </ODropdownItem>
-          </ODropdownGroup>
-
-          <ODropdownSeparator />
+          </SavedViewsSubmenu>
 
           <!-- SYNTAX GUIDE -->
           <div class="flex w-full items-center pe-2">
@@ -650,7 +588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-more-options-btn"
-              class="download-logs-btn hover:bg-interactive-hover-bg! order-4"
+              class="download-logs-btn hover:bg-interactive-hover-bg! order-4 size-[2.125rem]!"
               variant="outline"
               size="icon-toolbar"
             >
@@ -692,7 +630,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="history" size="sm" />
                 </span>
               </template>
-              {{ t("search.searchHistory") }}
+              {{ t("search.usageCostHistory") }}
             </ODropdownItem>
           </ODropdownGroup>
 
@@ -912,7 +850,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
           :disabled="!!shareReason"
           :tooltip="shareReason || undefined"
-          class="order-3"
+          class="order-3 size-[2.125rem]!"
         />
         <!-- Function Editor (pinned) — sits to the left of the date picker -->
         <OButton
@@ -921,7 +859,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-function-editor-pinned-btn"
           size="xs"
           variant="outline"
-          class="element-box-shadow order-1 me-1 gap-1.5"
+          class="order-1 me-1 h-[2.125rem]! gap-1.5"
           @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
         >
           <OSwitch
@@ -952,14 +890,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
             :disable="disable"
-            class="element-box-shadow"
+            class="h-[2.125rem]!"
           />
         </div>
 
         <div class="search-time order-2">
           <div class="flex">
             <OButtonGroup
-              class="element-box-shadow border-card-glass-border me-1 border p-0"
+              class="border-card-glass-border me-1 border p-0"
               v-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -997,20 +935,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </ODropdown>
             </OButtonGroup>
+            <RecentSearchesButton
+              source="logs"
+              :examples="recentExamples"
+              data-test="logs-search-bar-recent-searches-btn"
+              @run="(entry, when) => restoreRecent(entry, when, true)"
+              @load="(entry, when) => restoreRecent(entry, when, false)"
+              @view-all="openRecentSearches"
+              @example="applyRecentExample"
+            />
             <div
               v-if="
                 searchObj.meta.logsVisualizeToggle === 'visualize' ||
                 searchObj.meta.logsVisualizeToggle === 'build'
               "
             >
-              <div v-if="config.isEnterprise == 'true'" class="flex items-center">
+              <div
+                v-if="config.isEnterprise == 'true'"
+                class="flex items-center [&_button:focus-visible]:z-1"
+              >
                 <OButton
                   v-if="visualizeSearchRequestTraceIds.length > 0"
                   data-test="logs-search-bar-visualize-cancel-btn"
                   :title="t('search.cancel')"
                   variant="ghost"
                   size="sm-toolbar"
-                  class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -1021,17 +971,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked"
                   size="sm-toolbar"
-                  class="element-box-shadow bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  class="bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}
                 </OButton>
-                <OSeparator class="h-[1.875rem]! w-px" vertical />
+                <OSeparator class="h-[2.125rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      class="h-[2.125rem]!"
                       :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
@@ -1058,7 +1009,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                 </ODropdown>
               </div>
-              <div v-else class="flex items-center">
+              <div v-else class="flex items-center [&_button:focus-visible]:z-1">
                 <!-- Cancel button when query is running -->
                 <OButton
                   v-if="visualizeSearchRequestTraceIds.length > 0 && config.isEnterprise == 'true'"
@@ -1066,7 +1017,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   :title="t('search.cancel')"
                   size="sm-toolbar"
-                  class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -1078,17 +1029,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked || disable"
                   size="sm-toolbar"
-                  class="element-box-shadow bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  class="bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}
                 </OButton>
-                <OSeparator class="h-[1.875rem]! w-px" vertical />
+                <OSeparator class="h-[2.125rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      class="h-[2.125rem]!"
                       :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
@@ -1116,7 +1068,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdown>
               </div>
             </div>
-            <div v-else class="flex items-center">
+            <div v-else class="flex items-center [&_button:focus-visible]:z-1">
+              <!-- Lift the focused half so its offset outline paints over the joined twin. -->
               <!-- Cancel button for patterns tab -->
               <OButton
                 v-if="searchObj.meta.logsVisualizeToggle === 'patterns' && patternsState.loading"
@@ -1124,7 +1077,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-default h-[1.875rem]! w-[5.875rem]! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-default h-[2.125rem]! w-[5.875rem]! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 @click="autoRun.engine.cancelGeneration(null, { cause: 'user' })"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -1135,7 +1088,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="primary"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 @click="cancelRun"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -1148,7 +1101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="showRunQueryPending ? 'pending' : 'primary'"
                 :title="t('search.runQuery')"
                 size="sm-toolbar"
-                class="element-box-shadow rounded-s-default! relative h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="rounded-s-default! relative h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 :class="[
                   showRunQueryPending
                     ? ''
@@ -1182,7 +1135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OSeparator
                 v-if="!showRunQueryPending || isRunQueryCancelShown"
-                class="h-[1.875rem]! w-px"
+                class="h-[2.125rem]! w-px"
                 vertical
               />
               <ODropdown align="end" side="bottom">
@@ -1190,6 +1143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     :variant="showRunQueryPending && !isRunQueryCancelShown ? 'pending' : 'ghost'"
                     size="icon-xs"
+                    class="h-[2.125rem]!"
                     :aria-label="t('search.refreshCacheAndRunQuery')"
                     data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                     :class="[
@@ -1247,7 +1201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
               <AutoRefreshInterval
-                class="ms-1"
+                class="ms-1 *:size-[2.125rem]!"
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"
                 :is-compact="true"
@@ -1297,7 +1251,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #before>
             <div
+              ref="queryEditorBoxRef"
               class="relative flex h-full flex-col overflow-hidden"
+              @keydown.capture="onRecentEditorKeydown"
+              @pointerdown.capture="noteEditorPointer"
               :class="{
                 'rounded-r-none border-e-0': searchObj.data.transformType,
                 'fn-editor-open': showFunctionEditor,
@@ -1311,6 +1268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :keywords="effectiveKeywords"
                 :suggestions="effectiveSuggestions"
                 :field-value-resolver="resolveFieldValues"
+                :recent-queries="recentQueries"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
                 :has-expand-button="!showFunctionEditor"
@@ -1324,6 +1282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :ai-placeholder="aiQueryPlaceholder || t('search.askAIPlaceholder')"
                 data-test="logs-search-bar-query-editor"
                 data-test-prefix="logs-search-bar"
+                text-preview
                 :free-text-decorations="
                   searchObj.meta.sqlMode ? null : searchObj.data.freeTextDecorations
                 "
@@ -1343,12 +1302,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @focus="onQueryEditorFocus"
                 @blur="handleQueryEditorBlur"
               />
+              <RecentSearchesFocusDropdown
+                ref="recentFocusRef"
+                v-model:open="recentFocusOpen"
+                source="logs"
+                :anchor="queryEditorBoxRef"
+                :examples="recentExamples"
+                @run="(entry, when) => restoreRecent(entry, when, true)"
+                @load="(entry, when) => restoreRecent(entry, when, false)"
+                @view-all="openRecentSearches"
+                @example="applyRecentExample"
+                @dismiss="dismissRecentFocus"
+              />
               <!-- Query editor placeholder overlay — shown when editor is empty and unfocused -->
               <div
                 v-if="
                   searchObj.data.editorValue == '' &&
                   searchObj.meta.queryEditorPlaceholderFlag &&
-                  !searchObj.meta.nlpMode
+                  !searchObj.meta.nlpMode &&
+                  !recentFocusOpen
                 "
                 class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
               >
@@ -1420,6 +1392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <RecentSearchesDrawer ref="recentDrawerRef" source="logs" @restore="restoreRecent" />
     <ODialog
       data-test="search-bar-confirm-dialog"
       ref="confirmDialog"
@@ -1674,28 +1647,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmDelete"
     />
     <ConfirmDialog
-      :title="t('search.updateSavedView')"
-      :message="t('search.updateSavedViewConfirm')"
-      @update:ok="confirmUpdateSavedViews"
-      @update:cancel="confirmUpdate = false"
-      v-model="confirmUpdate"
+      :title="t('search.overwriteSavedView')"
+      message-keypath="search.overwriteSavedViewConfirm"
+      :message-name="overwriteViewName"
+      :ok-label="t('search.overwriteSavedViewOk')"
+      focus-cancel
+      @update:ok="confirmOverwriteSavedView"
+      @update:cancel="cancelOverwriteSavedView"
+      v-model="confirmOverwrite"
     />
     <!-- Query Plan Dialog -->
     <QueryPlanDialog v-model="showExplainDialog" :searchObj="searchObj" />
-
-    <SavedViewsListDialog
-      v-model:open="savedViewsListDialog"
-      v-model:search="searchObj.data.savedViewFilterFields"
-      data-test-prefix="logs-saved-views-dialog"
-      :views="searchObj.data.savedViews"
-      :favorite-ids="favoriteViews"
-      :favorite-views="localSavedViews"
-      :loading="searchObj.loadingSavedView == true"
-      @apply="applySavedView"
-      @update="handleUpdateSavedView"
-      @delete="handleDeleteSavedView"
-      @toggle-favorite="handleFavoriteSavedView"
-    />
   </div>
 </template>
 
@@ -1734,6 +1696,28 @@ import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import RecentSearchesButton from "@/components/queryHistory/RecentSearchesButton.vue";
+import RecentSearchesDrawer from "@/components/queryHistory/RecentSearchesDrawer.vue";
+import RecentSearchesFocusDropdown from "@/components/queryHistory/RecentSearchesFocusDropdown.vue";
+import {
+  useRecentSearches,
+  useRecentSearchesList,
+} from "@/composables/queryHistory/useRecentSearches";
+import { useLogsHistoryRecorder } from "@/composables/queryHistory/useLogsHistoryRecorder";
+import {
+  recentQueryList,
+  recentsOpenAfterEdit,
+  routeEditorKeyToRecents,
+  type RestoreTime,
+} from "@/utils/queryHistory/recentSearches";
+import { openRecentOnItsPage } from "@/utils/queryHistory/routes";
+import {
+  isUntouchedLogsQuery,
+  logsExampleQueries,
+  logsRouteQuery,
+  requestLogsReapply,
+} from "@/utils/queryHistory/logs";
+import type { HistoryStatus, QueryHistoryEntry } from "@/services/query_history";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useLogs from "@/composables/useLogs";
 import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
@@ -1748,6 +1732,9 @@ import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDi
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 // Unified QueryEditor for main query editor (with built-in AI bar)
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
+const RECENT_SEARCHES_LAYERS =
+  '[data-test="recent-searches-popover"], [data-test="recent-searches-drawer"]';
+const EDITOR_POINTER_FOCUS_MS = 1000;
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -1824,9 +1811,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import { hasFieldCondition, removeFieldCondition } from "@/plugins/logs/filterUtils";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -1842,8 +1827,8 @@ import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTree from "@/lib/data/Tree/OTree.vue";
 import { makeSavedViewSchema, type SavedViewForm } from "./SearchBar.SavedView.schema";
-import { sortSavedViews } from "@/components/savedViews/savedViewsSort";
-import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
+import SavedViewsMenu from "@/components/savedViews/SavedViewsMenu.vue";
+import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useFavoriteSavedViews } from "@/composables/useFavoriteSavedViews";
 import { makeSavedFunctionSchema, type SavedFunctionForm } from "./SearchBar.SavedFunction.schema";
 import { applySessionTimezone } from "@/utils/storage";
@@ -1927,9 +1912,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OFormToggleGroup,
-    OSpinner,
     OTooltip,
-    OTruncatedText,
     OInput,
     OSelect,
     OForm,
@@ -1937,7 +1920,11 @@ export default defineComponent({
     OFormSelect,
     OSwitch,
     OTree,
-    SavedViewsListDialog,
+    RecentSearchesButton,
+    RecentSearchesDrawer,
+    RecentSearchesFocusDropdown,
+    SavedViewsMenu,
+    SavedViewsSubmenu,
   },
   emits: [
     "searchdata",
@@ -1969,24 +1956,11 @@ export default defineComponent({
     },
     handleDeleteSavedView(item: any) {
       this.savedViewDropdownModel = false;
-      this.savedViewsListDialog = false;
+      this.savedViewsDropdownOpen = false;
+      this.utilitiesMenuOpen = false;
       this.deleteViewID = item.view_id;
       this.deleteViewName = item.view_name;
       this.confirmDelete = true;
-    },
-    handleUpdateSavedView(item: any) {
-      if (this.searchObj.data.stream.selectedStream.length == 0) {
-        toast({
-          variant: "error",
-          message: this.t("logs.searchBar.noStreamUpdateView"),
-        });
-        return;
-      }
-      if (this.blockWithReason(this.saveViewReason)) return;
-      this.savedViewDropdownModel = false;
-      this.savedViewsListDialog = false;
-      this.updateViewObj = item;
-      this.confirmUpdate = true;
     },
     confirmDeleteSavedViews() {
       this.deleteSavedViews();
@@ -1994,10 +1968,6 @@ export default defineComponent({
     toggleCustomDownloadDialog() {
       if (this.blockWithReason(this.customRangeReason || this.downloadReason)) return;
       this.customDownloadDialog = true;
-    },
-    confirmUpdateSavedViews() {
-      this.updateSavedViews(this.updateViewObj.view_id, this.updateViewObj.view_name);
-      return;
     },
     downloadRangeData() {
       let initNumber = parseInt(this.downloadCustomInitialNumber);
@@ -2208,6 +2178,10 @@ export default defineComponent({
 
     const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams(t);
     const queryEditorRef = ref(null);
+    const queryEditorBoxRef = ref<HTMLElement | null>(null);
+    const recentFocusRef = ref<InstanceType<typeof RecentSearchesFocusDropdown> | null>(null);
+    const recentDrawerRef = ref<InstanceType<typeof RecentSearchesDrawer> | null>(null);
+    const recentFocusOpen = ref(false);
     const syntaxGuideRef = ref(null);
 
     const {
@@ -2235,9 +2209,17 @@ export default defineComponent({
     const onQueryEditorFocus = () => {
       searchObj.meta.queryEditorPlaceholderFlag = false;
       _sqlOnFocus();
+      openRecentOnFocus();
     };
 
     const focusEditor = () => queryEditorRef.value?.focus?.();
+
+    // Escape in the list hands focus back to the editor, and that focus must not reopen the list.
+    let recentFocusDismissed = false;
+    const dismissRecentFocus = () => {
+      recentFocusDismissed = true;
+      focusEditor();
+    };
 
     const handleQueryEditorBlur = async () => {
       searchObj.meta.queryEditorPlaceholderFlag = true;
@@ -2345,7 +2327,6 @@ export default defineComponent({
     const dateTimeRef = ref(null);
     const {
       favoriteIds: favoriteViews,
-      favoriteViews: localSavedViews,
       toggleFavorite: handleFavoriteSavedView,
       removeFavorite,
       pruneFavorites,
@@ -2383,10 +2364,12 @@ export default defineComponent({
     }));
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
+    const confirmOverwrite = ref(false);
+    const overwriteViewId = ref("");
+    const overwriteViewName = ref("");
     const deleteViewID = ref("");
     const deleteViewName = ref("");
     const savedViewDropdownModel = ref(false);
-    const savedViewsListDialog = ref(false);
     const moreOptionsDropdownModel = ref(false);
     const searchTerm = ref("");
 
@@ -2445,7 +2428,7 @@ export default defineComponent({
     // Approximate rendered widths (px) of each pinned control and of the fixed
     // left-section content, used only to decide how many pinned items fit before
     // they would clip. Hidden pinned items stay reachable inside the More menu.
-    const PIN_ITEM_WIDTH = { histogram: 46, sqlMode: 46, quickMode: 46, savedViews: 87 };
+    const PIN_ITEM_WIDTH = { histogram: 46, sqlMode: 46, quickMode: 46, savedViews: 89 };
     const SYNTAX_GUIDE_LABEL_WIDTH = 108;
     const SYNTAX_GUIDE_ICON_WIDTH = 40;
     const PIN_ITEM_GAP = 4;
@@ -2553,9 +2536,6 @@ export default defineComponent({
     );
 
     const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
-
-    const confirmUpdate = ref(false);
-    const updateViewObj = ref({});
 
     const transformTypes = computed(() => {
       return [{ label: t("logs.searchBar.transformTypeFunction"), value: "function" }];
@@ -2953,10 +2933,11 @@ export default defineComponent({
       }
       autoRun.engine.reconcileEditorDirty();
     };
+    // Esc first closes an open recent-searches list or drawer; only the next one leaves full-screen.
     const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        isFocused.value = false;
-      }
+      if (event.key !== "Escape") return;
+      if (document.querySelector(RECENT_SEARCHES_LAYERS)) return;
+      isFocused.value = false;
     };
 
     // DateTime.setCustomDate keeps second-precision local date/time strings; a zoom is matched on those.
@@ -3462,11 +3443,6 @@ export default defineComponent({
       savedViewDropdownModel.value = false;
     };
 
-    const openSavedViewsList = () => {
-      loadSavedView();
-      savedViewsListDialog.value = true;
-    };
-
     // ── Saved views quick dropdown (pinned toolbar) ──────────────────────
     // Controlled open state so a quick update can close the menu itself.
     const savedViewsDropdownOpen = ref(false);
@@ -3476,13 +3452,29 @@ export default defineComponent({
       if (open) loadSavedView();
     };
 
-    const sortedSavedViews = computed(() =>
-      sortSavedViews(searchObj.data.savedViews, favoriteViews.value),
-    );
+    const appliedSavedViewId = ref<string | null>(null);
+    const savedViewSignature = () =>
+      JSON.stringify([searchObj.data.query, searchObj.data.stream.selectedStream]);
+    let appliedSignature = "";
+    const markSavedViewApplied = (viewId: string) => {
+      appliedSignature = savedViewSignature();
+      appliedSavedViewId.value = viewId;
+    };
+    // While a view is being applied the search state is rewritten on purpose, so it re-baselines instead of clearing.
+    watch(savedViewSignature, (signature) => {
+      if (!appliedSavedViewId.value) return;
+      if (searchObj.shouldIgnoreWatcher) appliedSignature = signature;
+      else if (signature !== appliedSignature) appliedSavedViewId.value = null;
+    });
 
-    // One-click overwrite of a view with the current search state — no list
-    // dialog, no stacked confirm dialog.
-    const quickUpdateSavedView = (item: any) => {
+    const utilitiesMenuOpen = ref(false);
+    const onUtilitiesMenuOpenChange = (open: boolean) => {
+      utilitiesMenuOpen.value = open;
+      if (open) loadSavedView();
+    };
+
+    // Overwriting destroys the stored query, so it is confirmed first.
+    const requestUpdateSavedView = (item: any) => {
       if (searchObj.data.stream.selectedStream.length == 0) {
         toast({
           variant: "error",
@@ -3492,7 +3484,19 @@ export default defineComponent({
       }
       if (blockWithReason(saveViewReason.value)) return;
       savedViewsDropdownOpen.value = false;
-      updateSavedViews(item.view_id, item.view_name);
+      utilitiesMenuOpen.value = false;
+      overwriteViewId.value = item.view_id;
+      overwriteViewName.value = item.view_name;
+      confirmOverwrite.value = true;
+    };
+
+    const cancelOverwriteSavedView = () => {
+      confirmOverwrite.value = false;
+    };
+
+    const confirmOverwriteSavedView = () => {
+      confirmOverwrite.value = false;
+      updateSavedViews(overwriteViewId.value, overwriteViewName.value);
     };
 
     // Common function to restore visualization data and sync to URL
@@ -3905,6 +3909,7 @@ export default defineComponent({
               message: t("logs.searchBar.viewAppliedSuccess", { name: item.view_name }),
               variant: "success",
             });
+            markSavedViewApplied(item.view_id);
             setTimeout(async () => {
               try {
                 searchObj.loadingHistogram = false;
@@ -3987,6 +3992,7 @@ export default defineComponent({
           .then((res: any) => {
             removeFavorite(deleteViewID.value);
             if (res.status == 200) {
+              if (appliedSavedViewId.value === deleteViewID.value) appliedSavedViewId.value = null;
               toast({
                 message: t("search.viewDeletedSuccessfully"),
                 variant: "success",
@@ -4110,6 +4116,7 @@ export default defineComponent({
                 message: t("search.viewCreatedSuccessfully"),
                 variant: "success",
               });
+              if (res.data.view_id) markSavedViewApplied(res.data.view_id);
               refreshSavedViews();
               isSavedViewAction.value = "create";
             } else {
@@ -4168,6 +4175,7 @@ export default defineComponent({
                 },
               );
 
+              markSavedViewApplied(viewID);
               toast({
                 message: t("search.viewUpdatedSuccessfully"),
                 variant: "success",
@@ -4249,6 +4257,7 @@ export default defineComponent({
     }
 
     const resetFilters = () => {
+      appliedSavedViewId.value = null;
       flushEditorValue();
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL = fnParsedSQL();
@@ -4415,9 +4424,90 @@ export default defineComponent({
       t,
     );
 
-    const onEditorUserEdit = () => {
+    const onEditorUserEdit = (isBlank = false, wasBlank = false) => {
+      recentFocusDismissed = false;
       autoRun.engine.markEditorDirty();
       updateFreeTextPreview();
+      recentFocusOpen.value = recentsOpenAfterEdit(
+        recentFocusOpen.value,
+        wasBlank,
+        recentSearchesEnabled.value && isBlank,
+      );
+    };
+
+    useLogsHistoryRecorder();
+    const { enabled: recentSearchesEnabled } = useRecentSearches();
+    const recentListActive = ref(false);
+    const recentList = useRecentSearchesList("logs", recentListActive);
+    const recentQueries = computed(() =>
+      recentSearchesEnabled.value ? recentQueryList(recentList.data.value ?? []) : [],
+    );
+    const recentExamples = computed(() =>
+      logsExampleQueries(
+        String(searchObj.data.stream.selectedStream?.[0] ?? ""),
+        !!searchObj.meta.sqlMode,
+      ),
+    );
+
+    let lastEditorPointer = 0;
+    const noteEditorPointer = () => {
+      lastEditorPointer = Date.now();
+    };
+
+    function openRecentOnFocus() {
+      if (recentFocusDismissed) {
+        recentFocusDismissed = false;
+        return;
+      }
+      if (!recentSearchesEnabled.value) return;
+      // Full-screen opens it for a click into the editor only, so a scripted focus keeps Esc collapsing.
+      if (isFocused.value && Date.now() - lastEditorPointer > EDITOR_POINTER_FOCUS_MS) return;
+      recentListActive.value = true;
+      const text = String(searchObj.data.editorValue ?? searchObj.data.query ?? "");
+      if (isUntouchedLogsQuery(text, !!searchObj.meta.sqlMode)) recentFocusOpen.value = true;
+    }
+
+    // Capture phase: the editor's Escape binding stops the event, and that binding must still run.
+    const onRecentEditorKeydown = (e: KeyboardEvent) => {
+      if (!recentFocusOpen.value) return;
+      // In full-screen the first Esc only closes the list; the editor's own Esc would also collapse it.
+      if (isFocused.value && e.key === "Escape") {
+        recentFocusOpen.value = false;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      const text = String(searchObj.data.editorValue ?? searchObj.data.query ?? "");
+      routeEditorKeyToRecents(
+        e,
+        recentFocusRef.value,
+        () => (recentFocusOpen.value = false),
+        !text.trim(),
+      );
+    };
+
+    const openRecentSearches = (status: HistoryStatus | null = null) => {
+      if (!recentSearchesEnabled.value) return false;
+      recentDrawerRef.value?.show(status);
+      return true;
+    };
+
+    const restoreRecent = (entry: QueryHistoryEntry, when: RestoreTime, run: boolean) => {
+      const orgId = store.state.selectedOrganization.identifier;
+      if (entry.source !== "logs") {
+        void openRecentOnItsPage(router, entry, when, orgId, run);
+        return;
+      }
+      router
+        .push({ path: "/logs", query: logsRouteQuery(entry, when, orgId, false) })
+        .finally(() => requestLogsReapply(run));
+    };
+
+    const applyRecentExample = (query: string) => {
+      searchObj.data.query = query;
+      searchObj.data.editorValue = query;
+      updateQuery();
+      focusEditor();
     };
 
     const cancelRun = () => {
@@ -4967,6 +5057,7 @@ export default defineComponent({
       searchObj,
       queryEditorRef,
       focusEditor,
+      dismissRecentFocus,
       syntaxGuideRef,
       confirmDialogVisible,
       confirmCallback,
@@ -5000,6 +5091,17 @@ export default defineComponent({
       handleRunQueryFn,
       onQueryEditorFocus,
       handleQueryEditorBlur,
+      queryEditorBoxRef,
+      recentFocusRef,
+      recentDrawerRef,
+      recentFocusOpen,
+      recentQueries,
+      recentExamples,
+      onRecentEditorKeydown,
+      noteEditorPointer,
+      openRecentSearches,
+      restoreRecent,
+      applyRecentExample,
       autoCompleteKeywords,
       autoCompleteSuggestions,
       effectiveKeywords,
@@ -5009,12 +5111,9 @@ export default defineComponent({
       updateTimezone,
       dateTimeRef,
       fnSavedView,
-      openSavedViewsList,
       applySavedView,
       savedViewsDropdownOpen,
       onSavedViewsDropdownOpenChange,
-      sortedSavedViews,
-      quickUpdateSavedView,
       isSavedViewAction,
       // Saved-view OForm (schema returned from setup() so the Options-API
       // template resolves :schema; a bare import would be out of scope).
@@ -5026,8 +5125,12 @@ export default defineComponent({
       deleteViewID,
       deleteViewName,
       confirmDelete,
+      confirmOverwrite,
+      overwriteViewName,
+      requestUpdateSavedView,
+      confirmOverwriteSavedView,
+      cancelOverwriteSavedView,
       savedViewDropdownModel,
-      savedViewsListDialog,
       moreOptionsDropdownModel,
       fnSavedFunctionDialog,
       // Saved-function OForm (owner pattern, Rule ③): the form is created with
@@ -5052,7 +5155,9 @@ export default defineComponent({
       confirmSavedViewDialogVisible,
       handleFavoriteSavedView,
       favoriteViews,
-      localSavedViews,
+      appliedSavedViewId,
+      onUtilitiesMenuOpenChange,
+      utilitiesMenuOpen,
       loadSavedView,
       config,
       patternsAccess,
@@ -5098,8 +5203,6 @@ export default defineComponent({
       navigateToSearchInspect,
       searchTerm,
       filteredFunctionOptions,
-      confirmUpdate,
-      updateViewObj,
       updateSavedViews,
       checkQuery,
       checkFnQuery,
@@ -5393,7 +5496,6 @@ export default defineComponent({
 }
 
 .logs-search-bar-component .download-logs-btn {
-  height: 1.875rem;
   border-radius: var(--radius-default);
   transition: all 0.2s ease;
 }
@@ -5415,7 +5517,7 @@ export default defineComponent({
   font-weight: 600;
   font-size: var(--text-xs);
   padding-left: 0.5rem;
-  height: 1.875rem;
+  height: 2rem;
   padding-top: 0.1875rem;
   border-radius: var(--radius-default);
 }

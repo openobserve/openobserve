@@ -34,6 +34,9 @@ export interface SearchSpec {
   endUs: number;
   limit: number;
   sampled: SampleRatio;
+  /** False skips the server's result cache; omitted keeps the app-wide default. */
+  useCache?: boolean;
+  stream?: string;
 }
 interface SearchError {
   code?: string;
@@ -149,6 +152,8 @@ export default function useAnalyticsSearch(
           signal: entry.controller?.signal,
         },
         "RUM",
+        false,
+        entry.spec.useCache,
       )) as SearchResponse;
       const data = res?.data ?? {};
       const partial = data.function_error || (data.is_partial ? "partial" : null);
@@ -176,7 +181,7 @@ export default function useAnalyticsSearch(
   };
 
   const run = async <T>(id: string, spec: SearchSpec, key: string): Promise<PanelState<T>> => {
-    assertJoinFree(spec.sql);
+    assertJoinFree(spec.sql, spec.stream);
     entries.get(id)?.controller?.abort();
     // Bound at enqueue: a search queued behind the cap must not run against an org switched to meanwhile.
     const org = appStore()?.state.selectedOrganization?.identifier ?? "";
@@ -209,10 +214,11 @@ export default function useAnalyticsSearch(
   };
 
   // Dropping the entry is what stops a run already in flight from settling onto the held panel.
-  const hold = (id: string, status: "idle" | "loading") => {
+  const hold = (id: string, status: "idle" | "loading", keepRows = false) => {
     entries.get(id)?.controller?.abort();
     entries.delete(id);
-    panel(id).value = { ...emptyPanel(), status };
+    const p = panel(id);
+    p.value = keepRows ? { ...p.value, status, error: null } : { ...emptyPanel(), status };
   };
 
   const rerunAborted = async (): Promise<void> => {

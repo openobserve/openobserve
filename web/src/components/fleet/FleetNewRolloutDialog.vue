@@ -210,12 +210,12 @@ import { makeRolloutSchema, requestOf, type RolloutForm } from "./FleetNewRollou
 import { useRolloutText } from "./rolloutText";
 import {
   isForbidden,
-  serverMessage,
   useFleetConfigs,
   useFleetRollouts,
   useFleetSettings,
   useFleets,
   usePlanPreview,
+  failureText,
 } from "./useFleetApi";
 
 const props = defineProps<{
@@ -287,7 +287,7 @@ const fleetOptions = computed(() =>
   readableFleets.value.map((f) => ({ label: raw(f.name), value: f.id })),
 );
 const fleetRow = computed(() => readableFleets.value.find((f) => f.id === chosenFleet.value));
-const emptyFleet = computed(() => (fleetRow.value?.collectors ?? 0) === 0);
+const emptyFleet = computed(() => fleetRow.value?.collectors === 0);
 
 // The server refuses a schedule for a fleet with no members.
 watch(emptyFleet, (empty) => {
@@ -357,7 +357,8 @@ watch(
     }
     if (seeded.value || configsLoading || fleetsLoading || rolloutsLoading || listsUnusable) return;
     const ids = readableFleets.value.map((f) => f.id);
-    const fleet = props.fleetId ?? (ids.includes("default") ? "default" : (ids[0] ?? "default"));
+    // A guessed fleet would change what every new collector there receives, so only a sole one is picked.
+    const fleet = props.fleetId ?? (ids.length === 1 ? ids[0] : "");
     const config = props.config ?? desiredOf(fleet) ?? "";
     form.reset(blank(fleet, config, props.toVersion ?? defaultVersion(fleet, config)));
     seeded.value = true;
@@ -366,8 +367,12 @@ watch(
 );
 
 function onFleetPicked(id: unknown) {
+  const fleet = String(id ?? "");
+  if (!props.config && !form.state.values.config) {
+    form.setFieldValue("config", desiredOf(fleet) ?? "");
+  }
   if (props.toVersion != null) return;
-  form.setFieldValue("version", defaultVersion(String(id ?? ""), form.state.values.config));
+  form.setFieldValue("version", defaultVersion(fleet, form.state.values.config));
 }
 
 function onConfigPicked(id: unknown) {
@@ -412,7 +417,7 @@ async function submit(value: RolloutForm) {
   } catch (err) {
     toast({
       variant: "error",
-      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
+      message: failureText(err, t),
     });
   }
 }

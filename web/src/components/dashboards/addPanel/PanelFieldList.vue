@@ -21,6 +21,7 @@
       ref="fieldListRef"
       class="min-h-0 flex-1"
       :fields="flattenGroupedFields"
+      :loading="fieldsLoading"
       :search="dashboardPanelData.meta.stream.filterField"
       :search-placeholder="t('search.searchField')"
       :page-size="250"
@@ -140,6 +141,9 @@
                   dashboardPanelData.data.type == 'area-stacked' ||
                   dashboardPanelData.data.type == 'stacked' ||
                   dashboardPanelData.data.type == 'state-timeline' ||
+                  dashboardPanelData.data.type == 'distribution' ||
+                  dashboardPanelData.data.type == 'treemap' ||
+                  dashboardPanelData.data.type == 'sunburst' ||
                   dashboardPanelData.data.type == 'hostmap'
                 "
                 variant="ghost-neutral"
@@ -424,6 +428,7 @@ import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
+import { isFlowChart, isHtmlPanel } from "@/utils/dashboard/chartTypeGroups";
 
 const props = defineProps<{
   editMode?: boolean;
@@ -538,6 +543,8 @@ const streamTypeOptions = computed(() =>
 const filteredStreams = ref<any[]>([]);
 
 const streamListLoading = ref(false);
+const groupedFieldsInFlight = ref(0);
+const fieldsLoading = computed(() => streamListLoading.value || groupedFieldsInFlight.value > 0);
 
 const currentQueryFields = () =>
   dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields;
@@ -953,8 +960,13 @@ watch(
         ?.stream_type,
     joins: dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.joins,
   }),
-  () => {
-    updateGroupedFields();
+  async () => {
+    groupedFieldsInFlight.value++;
+    try {
+      await updateGroupedFields();
+    } finally {
+      groupedFieldsInFlight.value--;
+    }
   },
   { deep: true, immediate: true },
 );
@@ -1028,7 +1040,8 @@ function showStandardActions(row: FieldItem): boolean {
     chartType === "geomap" ||
     chartType === "maps" ||
     chartType === "custom_chart" ||
-    chartType === "sankey"
+    isFlowChart(chartType) ||
+    isHtmlPanel(chartType)
   ) {
     return false;
   }
@@ -1072,7 +1085,7 @@ function showSankeyActions(row: FieldItem): boolean {
     return false;
   }
 
-  return dashboardPanelData.data.type === "sankey";
+  return isFlowChart(dashboardPanelData.data.type);
 }
 
 // ── Stream list fetch ──────────────────────────────────────────────────

@@ -29,9 +29,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         variant="primary"
         data-test="synthetic-monitoring-new-check-btn"
+        :aria-label="
+          hasNewCheckDraft
+            ? t('common.editorDraft.newDot', { label: t('synthetics.newCheck.button') })
+            : undefined
+        "
         @click="showTypePicker = true"
       >
         {{ t("synthetics.newCheck.button") }}
+        <EditorDraftDot
+          v-if="hasNewCheckDraft"
+          :saved-at="newCheckDraftSavedAt"
+          corner
+          data-test="synthetic-monitoring-new-check-draft-dot"
+        />
       </OButton>
       <OButton
         v-else-if="activeSection === 'status-pages'"
@@ -138,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-ids="selectedMonitorIds"
           :show-folder-column="searchAcrossFolders"
           :location-names="locationNames"
+          :draft-saved-at="checkDraftSavedAt"
           data-test="synthetic-monitoring-monitors-table"
           :toggle-loading-map="toggleLoadingMap"
           :trigger-loading-map="triggerLoadingMap"
@@ -437,6 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OText>
         </div>
         <CheckTypePicker
+          :draft-saved-at="newCheckDraftSavedAtByType"
           variant="modal"
           layout="row"
           data-test="synthetic-monitoring-check-type-picker-modal"
@@ -552,6 +565,9 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -624,6 +640,25 @@ function formatTimeAgo(microseconds: number): string {
   return t("synthetics.daysAgo", { count: Math.floor(h / 24) });
 }
 
+/**
+ * Backend check status -> UI status key. The API sends strings, but the
+ * numeric enum (0 unknown, 1 passed, 2 warning, 3 failed, 4 error) may also
+ * reach us; anything unmapped becomes "unknown" so it never renders blank.
+ */
+const MONITOR_STATUS_BY_NUMBER: Record<number, string> = {
+  0: "unknown",
+  1: "passed",
+  2: "warning",
+  3: "failed",
+  4: "error",
+};
+const KNOWN_MONITOR_STATUSES = new Set(["passed", "warning", "failed", "error", "unknown"]);
+function normalizeMonitorStatus(status: unknown): string {
+  if (typeof status === "number") return MONITOR_STATUS_BY_NUMBER[status] ?? "unknown";
+  const s = String(status ?? "").toLowerCase();
+  return KNOWN_MONITOR_STATUSES.has(s) ? s : "unknown";
+}
+
 function mapMonitor(m: ApiMonitor) {
   return {
     id: m.id,
@@ -633,7 +668,7 @@ function mapMonitor(m: ApiMonitor) {
     url: m.target,
     type: m.type.toUpperCase(),
     interval: formatFrequency(m.frequency),
-    status: m.status,
+    status: normalizeMonitorStatus(m.status),
     responseTime: m.last_response_ms !== null ? `${m.last_response_ms}ms` : null,
     locations: m.locations,
     lastCheck: m.last_check_at !== null ? formatTimeAgo(m.last_check_at) : "—",
@@ -662,6 +697,49 @@ type DisplayMonitor = ReturnType<typeof mapMonitor>;
 const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
 );
+
+const protocolDrafts = useEditorDraftIds("synthetic_check");
+const browserDrafts = useEditorDraftIds("synthetic_browser");
+const hasNewCheckDraft = computed(
+  () =>
+    browserDrafts.hasNew ||
+    SYNTHETIC_CHECK_TYPES.some((type) => type !== "browser" && protocolDrafts.hasNewVariant(type)),
+);
+/** Each type's new-check draft time: the browser test has its own kind, a protocol check one slot per type. */
+const newCheckDraftSavedAtByType = computed(() =>
+  Object.fromEntries(
+    SYNTHETIC_CHECK_TYPES.map((type) => [
+      type,
+      type === "browser" ? browserDrafts.savedAt(null) : protocolDrafts.savedAtVariant(type),
+    ]),
+  ),
+);
+/** The newest of the new-check drafts, browser or any protocol type. */
+const newCheckDraftSavedAt = computed(() => {
+  const times = Object.values(newCheckDraftSavedAtByType.value).filter(
+    (at): at is number => at !== null,
+  );
+  return times.length ? Math.max(...times) : null;
+});
+/** Check id to its newest draft's time; one scan per kind, not per row. */
+const checkDraftSavedAt = computed(() => {
+  const map: Record<string, number> = {};
+  for (const drafts of [protocolDrafts, browserDrafts]) {
+    for (const id of drafts.ids) {
+      const at = drafts.savedAt(id) ?? 0;
+      map[id] = Math.max(map[id] ?? 0, at);
+    }
+  }
+  return map;
+});
+
+function dropCheckDrafts(ids: string[]) {
+  const org = orgIdentifier.value;
+  for (const entityId of ids) {
+    deleteEditorDraftsFor({ kind: "synthetic_check", org, entityId });
+    deleteEditorDraftsFor({ kind: "synthetic_browser", org, entityId });
+  }
+}
 
 const readFolder = ref<string | undefined>(undefined);
 // Distinct from readFolder being undefined, which is the "All folders" scope.
@@ -959,6 +1037,7 @@ const bulkDeleteMonitors = async () => {
     );
     // The bulk endpoint deletes all ids or fails, so a resolved call removed every selected test.
     analytics.track("synthetic_test_deleted", { count: selectedMonitorIds.value.length });
+    dropCheckDrafts(selectedMonitorIds.value.map(String));
     selectedMonitorIds.value = [];
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.bulkDeleteSuccess") });
@@ -1204,6 +1283,7 @@ const confirmDeleteStatusPage = async (page: StatusPageListItem) => {
   });
   try {
     await statusPagesService.delete(orgIdentifier.value, page.id);
+    deleteEditorDraftsFor({ kind: "status_page", org: orgIdentifier.value, entityId: page.id });
     statusPages.value = statusPages.value.filter((p) => p.id !== page.id);
     dismiss();
     toast({ variant: "success", message: t("statusPages.toast.deleted") });
@@ -1292,6 +1372,15 @@ const summaryStats = computed<StatItem[]>(() => {
       tone: "error",
       max: share,
       dataTest: "synthetics-summary-failed",
+    },
+    {
+      key: "error",
+      label: t("synthetics.filters.error"),
+      value: v(count("error")),
+      icon: "error-outline",
+      tone: "error",
+      max: share,
+      dataTest: "synthetics-summary-error",
     },
     {
       key: "warning",
@@ -1737,6 +1826,7 @@ async function deleteMonitor(m: any) {
   try {
     await syntheticsService.delete(org, String(m.id), activeFolderId.value);
     analytics.track("synthetic_test_deleted", { count: 1 });
+    dropCheckDrafts([String(m.id)]);
     // Every cached folder, not just the one on screen: a cross-folder view deletes rows another folder's entry still holds.
     queryClient.setQueriesData({ queryKey: syntheticsKeys.monitorsAll(org) }, (old: any) => {
       if (!Array.isArray(old)) return undefined;

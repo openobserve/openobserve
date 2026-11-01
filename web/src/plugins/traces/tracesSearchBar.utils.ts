@@ -85,3 +85,107 @@ export function isDatetimeChanged(
   }
   return prev.startTime !== value.startTime || prev.endTime !== value.endTime;
 }
+
+/** The part of the search state a Run applies; a difference from the last Run is a staged change. */
+export interface TracesRunState {
+  editorValue?: string | null;
+  stream?: string | null;
+  sqlMode?: boolean;
+  datetime: DatetimeSnapshot;
+}
+
+export function tracesRunSignature(state: TracesRunState): string {
+  const { datetime } = state;
+  const period = datetime.relativeTimePeriod;
+  const relative = datetime.type !== "absolute" && !!period;
+  // A calendar period's window moves with the timezone, so its start is part of what ran.
+  const window = relative
+    ? [period, parseCalendarToken(period) !== null ? String(datetime.startTime) : ""]
+    : [String(datetime.startTime), String(datetime.endTime)];
+  return JSON.stringify([
+    (state.editorValue ?? "").trim(),
+    state.stream ?? "",
+    !!state.sqlMode,
+    relative,
+    ...window,
+  ]);
+}
+
+/** Run signature of the traces `searchObj`; Index records it per Run and SearchBar compares against it. */
+export function tracesSearchRunSignature(searchObj: {
+  meta: { sqlMode?: boolean };
+  data: {
+    editorValue?: string | null;
+    stream: { selectedStream?: { value?: string } | null };
+    datetime: DatetimeSnapshot;
+  };
+}): string {
+  return tracesRunSignature({
+    editorValue: searchObj.data.editorValue,
+    stream: searchObj.data.stream.selectedStream?.value,
+    sqlMode: searchObj.meta.sqlMode,
+    datetime: searchObj.data.datetime,
+  });
+}
+
+/** True when auto-run is off and the search state differs from the last Run, so the edit waits for Run. */
+export function tracesRunIsStaged(
+  searchObj: Parameters<typeof tracesSearchRunSignature>[0] & {
+    meta: { liveMode?: boolean; lastRunSignature?: string | null };
+  },
+  autoQueryEnabled: boolean | undefined,
+): boolean {
+  const autoRunOn = !!autoQueryEnabled && !!searchObj.meta.liveMode;
+  const lastRun = searchObj.meta.lastRunSignature;
+  return !autoRunOn && !!lastRun && tracesSearchRunSignature(searchObj) !== lastRun;
+}
+
+export type TracesToolbarStage = "full" | "compactButtons" | "iconToggle" | "resetInMenu";
+
+// Approximate rendered widths of the left-section items; the only width table the toolbar collapse reads.
+export const TRACES_TOOLBAR_WIDTHS = {
+  gap: 6,
+  buffer: 60,
+  toggle: { enterprise: { text: 422, icon: 150 }, oss: { text: 298, icon: 114 } },
+  drillDown: { text: 97, icon: 36 },
+  reset: { text: 72, icon: 36 },
+  more: 70,
+  metricsPinned: 78,
+  savedViewsPinned: 93,
+};
+
+export interface TracesToolbarInput {
+  available: number;
+  serviceGraph: boolean;
+  drillDown: boolean;
+  reset: boolean;
+  pinnedWidth: number;
+}
+
+const LABEL_STAGES: TracesToolbarStage[] = ["full", "compactButtons", "iconToggle"];
+
+function tracesToolbarBaseWidth(input: TracesToolbarInput, stage: TracesToolbarStage): number {
+  const w = TRACES_TOOLBAR_WIDTHS;
+  const toggle = input.serviceGraph ? w.toggle.enterprise : w.toggle.oss;
+  const label = stage === "full" ? "text" : "icon";
+  const widths = [
+    stage === "full" || stage === "compactButtons" ? toggle.text : toggle.icon,
+    w.more,
+  ];
+  if (input.drillDown) widths.push(w.drillDown[label]);
+  if (input.reset && stage !== "resetInMenu") widths.push(w.reset[label]);
+  return widths.reduce((sum, x) => sum + x, 0) + (widths.length - 1) * w.gap;
+}
+
+/** Picks the collapse stage for a left-section width; labels shrink before a pinned group drops into More. */
+export function tracesToolbarLayout(input: TracesToolbarInput): {
+  stage: TracesToolbarStage;
+  pinnedBudget: number;
+} {
+  const fits = (stage: TracesToolbarStage, extra: number) =>
+    tracesToolbarBaseWidth(input, stage) + extra + TRACES_TOOLBAR_WIDTHS.buffer <= input.available;
+  const stage: TracesToolbarStage =
+    LABEL_STAGES.find((s) => fits(s, input.pinnedWidth)) ??
+    (fits("iconToggle", 0) || !input.reset ? "iconToggle" : "resetInMenu");
+  return { stage, pinnedBudget: input.available - tracesToolbarBaseWidth(input, stage) };
+}

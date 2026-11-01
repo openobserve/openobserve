@@ -468,6 +468,36 @@ impl ShiftRule {
         }
         self.boundary(self.shift_index(at, tz)? + 1, tz)
     }
+
+    /// This rule with roster `members`, keeping today's holder and every handover. [pure] [no-fail]
+    pub fn with_roster(&self, members: Vec<String>, now: i64, tz: chrono_tz::Tz) -> ShiftRule {
+        let key = |m: &str| m.trim().to_ascii_lowercase();
+        let wanted: std::collections::HashSet<String> = members.iter().map(|m| key(m)).collect();
+        let mut order: Vec<String> = self
+            .order_at(now, tz)
+            .into_iter()
+            .filter(|m| wanted.contains(&key(m)))
+            .map(str::to_string)
+            .collect();
+        let kept: std::collections::HashSet<String> = order.iter().map(|m| key(m)).collect();
+        order.extend(members.into_iter().filter(|m| !kept.contains(&key(m))));
+        // An unresolvable rule has no holder to keep, so the roster is taken as given.
+        let index = match self.validate() {
+            Ok(()) => self.shift_index(now, tz),
+            Err(_) => None,
+        };
+        let len = order.len() as i64;
+        if len > 0
+            && let Some(index) = index
+        {
+            // Rotated so the anchor's turn arithmetic lands `order[0]` on the shift holding `now`.
+            order.rotate_right(index.rem_euclid(len) as usize);
+        }
+        ShiftRule {
+            members: order,
+            ..self.clone()
+        }
+    }
 }
 
 /// How many times the local estimate may be walked towards the real boundary.
@@ -842,8 +872,8 @@ impl Rotation {
     ///
     /// The away are removed, which is a different judgement: a cover is a night
     /// off from a shift, an absence is not being there at all. When that empties
-    /// the level the ladder advances, and `WholeTeam` below it ignores absence,
-    /// so a page still has somewhere to go.
+    /// the level the ladder advances, and `WholeTeam` below it skips the away
+    /// only while someone else is left, so a page still has somewhere to go.
     pub fn everyone(
         &self,
         overrides: &[ScheduleOverride],
@@ -3585,4 +3615,145 @@ mod tests {
     }
 
     // ── The offset composed with an absence ─────────────────────────────────
+
+    /// Editing a roster never moves who holds it now, and every handover stays where it was.
+    #[test]
+    fn test_with_roster_keeps_the_holder_and_the_handover_grid() {
+        let before_first = ANCHOR - MICROS_PER_DAY;
+        // Shift index 4 of three people: `b` holds, `c` is next.
+        let mid = ANCHOR + 4 * MICROS_PER_WEEK + MICROS_PER_DAY;
+        let abc: &[&str] = &["a", "b", "c"];
+        // (case, roster before, now, roster asked for, turn order expected from now)
+        type Case<'a> = (&'a str, &'a [&'a str], i64, &'a [&'a str], &'a [&'a str]);
+        let cases: &[Case] = &[
+            (
+                "add before the first handover",
+                abc,
+                before_first,
+                &["a", "b", "c", "d"],
+                &["c", "a", "b", "d"],
+            ),
+            (
+                "add mid-rotation",
+                abc,
+                mid,
+                &["a", "b", "c", "d"],
+                &["b", "c", "a", "d"],
+            ),
+            ("remove the holder", abc, mid, &["a", "c"], &["c", "a"]),
+            ("remove the next person", abc, mid, &["a", "b"], &["b", "a"]),
+            ("remove somebody else", abc, mid, &["b", "c"], &["b", "c"]),
+            (
+                "add to a single person",
+                &["a"],
+                mid,
+                &["a", "b"],
+                &["a", "b"],
+            ),
+            (
+                "remove down to a single person",
+                &["a", "b"],
+                mid,
+                &["b"],
+                &["b"],
+            ),
+        ];
+        for (case, before, now, members, expected) in cases {
+            let rule = weekly(before);
+            let after = rule.with_roster(members.iter().map(|m| m.to_string()).collect(), *now, TZ);
+            assert_eq!(
+                after.order_at(*now, TZ),
+                expected.to_vec(),
+                "{case}: turn order from now"
+            );
+            let next = rule.next_handover(*now, TZ).unwrap();
+            assert_eq!(
+                after.shift_start(*now, TZ),
+                rule.shift_start(*now, TZ),
+                "{case}"
+            );
+            assert_eq!(after.next_handover(*now, TZ), Some(next), "{case}");
+            assert_eq!(
+                after.next_handover(next, TZ),
+                rule.next_handover(next, TZ),
+                "{case}"
+            );
+        }
+    }
+
+    /// The cases `web/src/utils/oncall.spec.ts` also runs, so preview and save cannot drift.
+    #[test]
+    fn test_with_roster_matches_the_shared_parity_cases() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            case: String,
+            timezone: String,
+            members: Vec<String>,
+            shift_micros: i64,
+            anchor_micros: i64,
+            now_micros: i64,
+            new_members: Vec<String>,
+            expected: Vec<String>,
+        }
+        let cases: Vec<Case> = serde_json::from_str(include_str!("roster_parity.json")).unwrap();
+        for c in cases {
+            let rule = ShiftRule {
+                shift_micros: c.shift_micros,
+                ..ShiftRule::weekly("Base", c.members, c.anchor_micros)
+            };
+            let tz: chrono_tz::Tz = c.timezone.parse().unwrap();
+            assert_eq!(
+                rule.with_roster(c.new_members, c.now_micros, tz).members,
+                c.expected,
+                "{}",
+                c.case
+            );
+        }
+    }
+
+    /// The holder, next holder and handovers `web/src/utils/oncall.spec.ts` also checks.
+    #[test]
+    fn test_shift_maths_matches_the_shared_parity_cases() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            case: String,
+            timezone: String,
+            members: Vec<String>,
+            shift_micros: i64,
+            anchor_micros: i64,
+            at_micros: i64,
+            holder: String,
+            next_holder: String,
+            shift_start: i64,
+            next_handover: i64,
+        }
+        let cases: Vec<Case> = serde_json::from_str(include_str!("shift_parity.json")).unwrap();
+        for c in cases {
+            let rule = ShiftRule {
+                shift_micros: c.shift_micros,
+                ..ShiftRule::weekly("Base", c.members, c.anchor_micros)
+            };
+            let tz: chrono_tz::Tz = c.timezone.parse().unwrap();
+            let at = c.at_micros;
+            assert_eq!(
+                rule.member_at(at, tz),
+                Some(c.holder.as_str()),
+                "{}",
+                c.case
+            );
+            assert_eq!(
+                rule.member_offset(at, 1, tz),
+                Some(c.next_holder.as_str()),
+                "{}",
+                c.case
+            );
+            assert_eq!(rule.shift_start(at, tz), Some(c.shift_start), "{}", c.case);
+            assert_eq!(
+                rule.next_handover(at, tz),
+                Some(c.next_handover),
+                "{}",
+                c.case
+            );
+        }
+    }
 }

@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       :frame="false"
       :loading="loading"
+      :loading-reset-key="teamId"
       pagination="client"
       :show-global-filter="false"
       table-id="oncall-team-covers"

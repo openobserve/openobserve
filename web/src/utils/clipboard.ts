@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { confirmCopy, confirmationAnchor } from "@/lib/feedback/Toast/copyConfirm";
 import { raw, type TranslateFn, type I18nText } from "@/types/i18n";
 
 export interface CopyToClipboardOptions {
@@ -8,6 +9,12 @@ export interface CopyToClipboardOptions {
   errorMessage?: I18nText;
   timeout?: number;
   silent?: boolean;
+  /** Control the "Copied" confirmation sits on; defaults to the control the user just activated. */
+  anchor?: HTMLElement | null;
+}
+
+function isShown(anchor: HTMLElement | null): anchor is HTMLElement {
+  return !!anchor?.isConnected && anchor.getClientRects().length > 0;
 }
 
 async function writeClipboard(text: string): Promise<void> {
@@ -44,6 +51,8 @@ async function writeClipboard(text: string): Promise<void> {
   const focused = document.activeElement === textarea;
   const copied = focused && document.execCommand("copy");
   container.removeChild(textarea);
+  // Removing the focused textarea drops focus to <body>, which an open popover reads as focus-outside and closes.
+  activeEl?.focus({ preventScroll: true });
 
   if (!copied) {
     throw new Error("execCommand copy failed");
@@ -56,15 +65,23 @@ export async function copyToClipboard(
   options: CopyToClipboardOptions = {},
 ): Promise<boolean> {
   const { successMessage, errorMessage, timeout = 2000, silent = false } = options;
+  // Resolved before the write, because a click made while it is pending would otherwise take the confirmation.
+  const anchor = silent ? null : confirmationAnchor(options.anchor);
 
   try {
     await writeClipboard(text);
-    if (!silent) {
+    if (silent) return true;
+    const toastSuccess = () =>
       toast({
         variant: "success",
         message: raw(successMessage || t("common.copySuccess")),
         timeout,
       });
+    if (isShown(anchor)) {
+      // A page that scrolls right after the copy closes the bubble before anyone sees it.
+      confirmCopy(anchor, raw(successMessage || t("common.copied")), toastSuccess);
+    } else {
+      toastSuccess();
     }
     return true;
   } catch {

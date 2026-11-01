@@ -351,7 +351,7 @@ test.describe('RUM Product Analytics', () => {
     const funnel = funnelParam([['p', '/web/a'], ['c', 'b-btn']]);
     await pa.goto('funnels', { app: facts.appId, period: '7d', funnel });
     await pa.expectFunnelCounts([6, 3]);
-    await pa.pickOption('rum-analytics-funnel-breakdown-select', { value: 'browser' });
+    await pa.pickBreakdown('browser');
     await expect(pa.breakdown).toBeVisible({ timeout: 30000 });
     await expect(pa.breakdown).toContainText('Chrome');
     await expect(pa.breakdown).toContainText('Firefox');
@@ -663,7 +663,7 @@ test.describe('RUM Product Analytics', () => {
       await expect(fresh.locator('[data-test="rum-analytics-funnel-saved-name"]')).toHaveText(name, { timeout: 30000 });
       await reader.expectFunnelCounts([6, 3]);
 
-      await pa.pickOption('rum-analytics-funnel-breakdown-select', { value: 'browser' });
+      await pa.pickBreakdown('browser');
       await expect(edited).toHaveText('Edited');
       const put = pa.waitForAnalyticsWrite('funnel', 'PUT');
       await page.locator('[data-test="rum-analytics-funnel-save-btn"]').click();
@@ -730,12 +730,12 @@ test.describe('RUM Product Analytics', () => {
         await p.goto('funnels', { app: facts.appId, period: '7d', sf: row.id });
         await expect(p.page.locator('[data-test="rum-analytics-funnel-saved-name"]')).toHaveText(name, { timeout: 30000 });
       }
-      await first.pickOption('rum-analytics-funnel-breakdown-select', { value: 'browser' });
+      await first.pickBreakdown('browser');
       const put = first.waitForAnalyticsWrite('funnel', 'PUT');
       await page.locator('[data-test="rum-analytics-funnel-save-btn"]').click();
       expect((await put).status).toBe(200);
 
-      await second.pickOption('rum-analytics-funnel-breakdown-select', { value: 'os' });
+      await second.pickBreakdown('os');
       const conflict = second.waitForAnalyticsWrite('funnel', 'PUT');
       await other.locator('[data-test="rum-analytics-funnel-save-btn"]').click();
       expect((await conflict).status).toBe(409);
@@ -790,7 +790,7 @@ test.describe('RUM Product Analytics', () => {
       await page.unroute(list);
 
       const unbroken = pa.query().get('funnel');
-      await pa.pickOption('rum-analytics-funnel-breakdown-select', { value: 'browser' });
+      await pa.pickBreakdown('browser');
       await expect(edited).toHaveText('Edited');
       // The URL is synced after the debounced recompute, so the edited funnel is read once it lands.
       await expect.poll(() => pa.query().get('funnel')).not.toBe(unbroken);
@@ -1034,9 +1034,9 @@ test.describe('RUM Product Analytics', () => {
     const pa = new PageManager(page).rumProductAnalyticsPage;
     await pa.goto('funnels', { app: usersApp.appId, period: '7d', funnel: funnelParam([['p', '/web/a'], ['p', '/web/c']]) });
     await pa.expectFunnelCounts([usersApp.sessionsAtA, 0]);
-    // Sessions are one window by definition, so Sessions mode shows a fixed tag, not a picker.
-    await expect(pa.funnelWindowFixed).toBeVisible();
+    // Sessions are one window by definition, so Sessions mode shows no window control.
     await expect(pa.funnelWindowTrigger).toHaveCount(0);
+    await expect(pa.funnelWindowFixed).toHaveCount(0);
 
     await pa.selectCountBy('users');
     for (const w of ['session', '1h', '1d']) {
@@ -1112,7 +1112,7 @@ test.describe('RUM Product Analytics', () => {
 
       await pa.eventCancelBtn.click();
       await expect(pa.eventDiscardDialog).toBeVisible({ timeout: 20000 });
-      await expect(pa.eventDiscardDialog).toContainText('Discard changes?');
+      await expect(pa.eventDiscardDialog).toContainText('Leave with unsaved changes?');
       await pa.eventDiscardConfirmBtn.click();
       await expect(pa.namedEventsList).toBeVisible({ timeout: 20000 });
       expect(w.writes, 'leaving the editor writes nothing').toEqual([]);

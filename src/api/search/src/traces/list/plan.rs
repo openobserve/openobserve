@@ -15,14 +15,16 @@
 
 use arrow_schema::Schema;
 use config::{
-    TIMESTAMP_COL_NAME,
+    TIMESTAMP_COL_NAME, get_config,
     meta::search::{Query, Request, SearchEventType},
     utils::time::now_micros,
 };
 use hashbrown::HashMap;
 
 use super::{
-    query::{build_llm_trace_query, build_trace_query, trace_id_list_sql},
+    query::{
+        DURATION_CANDIDATE_SELECT, build_llm_trace_query, build_trace_query, trace_id_list_sql,
+    },
     response::TraceResponseItem,
 };
 use crate::{common::utils::http::get_use_cache_from_request, traces::schema_compat};
@@ -73,7 +75,7 @@ impl TraceListPlan {
         let mut request = base_request.clone();
         request.query.sql = format!(
             "{} WHERE trace_id IN ({}) GROUP BY trace_id",
-            self.select_sql(stream_name),
+            self.select_sql(stream_name, false),
             trace_id_list_sql(trace_ids)
         );
         request.query.from = 0;
@@ -93,9 +95,9 @@ impl TraceListPlan {
     }
 
     fn sql(&self, stream_name: &str) -> String {
-        let sql = self.select_sql(stream_name);
+        let sql = self.select_sql(stream_name, self.sort.ranks_by_candidate(self.mode));
         let filter = self.filter();
-        let order = self.sort.sql();
+        let order = self.sort.sql(self.mode);
         if filter.is_empty() {
             format!("{sql} GROUP BY trace_id ORDER BY {order}")
         } else {
@@ -103,8 +105,12 @@ impl TraceListPlan {
         }
     }
 
-    fn select_sql(&self, stream_name: &str) -> String {
-        let extra_selects = self.columns.aggregate_selects();
+    // Only the streamed descending duration Q1 reads the candidate; Q2a and other sorts skip it.
+    fn select_sql(&self, stream_name: &str, with_candidate: bool) -> String {
+        let mut extra_selects = self.columns.aggregate_selects();
+        if with_candidate {
+            extra_selects = format!("{DURATION_CANDIDATE_SELECT}, {extra_selects}");
+        }
         match &self.llm_schema {
             Some(llm_schema) => build_llm_trace_query(stream_name, llm_schema, &extra_selects),
             None => build_trace_query(stream_name, &extra_selects),
@@ -154,14 +160,17 @@ impl TraceListOptions {
         if end == 0 {
             return Err("end_time is empty".to_string());
         }
+        let size = query
+            .get("size")
+            .and_then(|v| v.parse::<i64>().ok())
+            .filter(|size| *size > 0)
+            .unwrap_or_else(|| get_config().limit.query_default_limit);
         let mut options = Self {
             filter,
             from: query
                 .get("from")
                 .map_or(0, |v| v.parse::<i64>().unwrap_or(0)),
-            size: query
-                .get("size")
-                .map_or(10, |v| v.parse::<i64>().unwrap_or(10)),
+            size,
             range: (start, end),
             timeout: query
                 .get("timeout")
@@ -249,7 +258,11 @@ impl TraceSort {
         })
     }
 
-    pub fn sql(self) -> String {
+    pub fn sql(self, mode: TraceListMode) -> String {
+        if self.ranks_by_candidate(mode) {
+            // Same tiebreaker as the merge, so every page's per-partition LIMIT cuts ties alike.
+            return "zo_sql_candidate DESC, trace_id ASC".to_string();
+        }
         let field = if self.by_duration {
             "zo_sql_duration"
         } else {
@@ -257,6 +270,11 @@ impl TraceSort {
         };
         let order = if self.ascending { "ASC" } else { "DESC" };
         format!("{field} {order}")
+    }
+
+    // A crossing trace reaches the candidate (longest span or local range) in one partition.
+    pub fn ranks_by_candidate(self, mode: TraceListMode) -> bool {
+        mode == TraceListMode::Streaming && self.by_duration && !self.ascending
     }
 
     pub fn sort(self, hits: &mut [TraceResponseItem]) {
@@ -343,17 +361,43 @@ mod tests {
     }
 
     #[test]
-    fn parsing_preserves_defaults_and_unclamped_pagination() {
+    fn parsing_preserves_defaults_and_unclamped_offset() {
+        let limit = get_config().limit.query_default_limit;
         for mode in [TraceListMode::Complete, TraceListMode::Streaming] {
             let mut query = query();
             let defaults = TraceListOptions::parse(&query, mode).unwrap();
-            assert_eq!((defaults.from, defaults.size, defaults.timeout), (0, 10, 0));
+            assert_eq!(
+                (defaults.from, defaults.size, defaults.timeout),
+                (0, limit, 0)
+            );
             query.insert("from".to_string(), "-2".to_string());
             query.insert("size".to_string(), "-1".to_string());
             let options = TraceListOptions::parse(&query, mode).unwrap();
-            assert_eq!((options.from, options.size), (-2, -1));
-            query.insert("size".to_string(), "invalid".to_string());
-            assert_eq!(TraceListOptions::parse(&query, mode).unwrap().size, 10);
+            assert_eq!((options.from, options.size), (-2, limit));
+        }
+    }
+
+    #[test]
+    fn sizes_below_one_resolve_to_the_query_default_limit() {
+        let limit = get_config().limit.query_default_limit;
+        for (size, expected) in [
+            (None, limit),
+            (Some("0"), limit),
+            (Some("-1"), limit),
+            (Some("-5"), limit),
+            (Some("invalid"), limit),
+            (Some("1"), 1),
+            (Some("2"), 2),
+            (Some("2000"), 2000),
+        ] {
+            let mut query = query();
+            if let Some(size) = size {
+                query.insert("size".to_string(), size.to_string());
+            }
+            for mode in [TraceListMode::Complete, TraceListMode::Streaming] {
+                let options = TraceListOptions::parse(&query, mode).unwrap();
+                assert_eq!(options.size, expected, "{size:?} {mode:?}");
+            }
         }
     }
 
@@ -453,6 +497,65 @@ mod tests {
             assert_eq!(request.timeout, 17);
             assert_eq!(request.search_type, base.search_type);
         }
+    }
+
+    #[test]
+    fn only_the_streamed_descending_duration_sort_ranks_by_the_candidate() {
+        for (sort_order, expected) in [
+            (
+                "desc",
+                [
+                    "zo_sql_duration DESC",
+                    "zo_sql_candidate DESC, trace_id ASC",
+                ],
+            ),
+            ("asc", ["zo_sql_duration ASC", "zo_sql_duration ASC"]),
+        ] {
+            let mut query = query();
+            query.insert("sort_by".to_string(), "duration".to_string());
+            query.insert("sort_order".to_string(), sort_order.to_string());
+            let llm_schemas = [
+                None,
+                Some(schema_compat::ValidatedLlmSchema::fallback(true)),
+                Some(schema_compat::ValidatedLlmSchema::fallback(false)),
+            ];
+            let modes = [TraceListMode::Complete, TraceListMode::Streaming];
+            for ((mode, expected), llm_schema) in modes
+                .into_iter()
+                .zip(expected)
+                .flat_map(|mode| llm_schemas.clone().map(|llm| (mode, llm)))
+            {
+                let plan = TraceListPlan {
+                    options: TraceListOptions::parse(&query, mode).unwrap(),
+                    sort: TraceSort::parse(&query).unwrap(),
+                    columns: TraceColumns::default(),
+                    llm_schema,
+                    mode,
+                };
+                let sql = plan.sql("traces");
+                assert!(
+                    sql.ends_with(&format!("GROUP BY trace_id ORDER BY {expected}")),
+                    "{sql}"
+                );
+                assert_eq!(
+                    sql.contains(DURATION_CANDIDATE_SELECT),
+                    expected.starts_with("zo_sql_candidate"),
+                    "{sql}"
+                );
+                let summary =
+                    plan.summary_request("traces", &Request::default(), &["a".to_string()], (1, 2));
+                assert!(
+                    !summary.query.sql.contains("zo_sql_candidate"),
+                    "{}",
+                    summary.query.sql
+                );
+            }
+        }
+        let mut query = query();
+        query.insert("sort_by".to_string(), "start_time".to_string());
+        let sort = TraceSort::parse(&query).unwrap();
+        assert!(!sort.ranks_by_candidate(TraceListMode::Streaming));
+        assert_eq!(sort.sql(TraceListMode::Streaming), "zo_sql_timestamp DESC");
     }
 
     #[test]

@@ -20,6 +20,7 @@ import { raw, type TranslateFn } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
+import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
 import {
   DBM_CONTRIB_VERSION,
   MYSQL_DBM_CONFIG_YAML,
@@ -30,6 +31,8 @@ import {
 const USER_SQL = `CREATE USER 'otel'@'localhost' IDENTIFIED BY 'yourpassword';
 GRANT SELECT, PROCESS, REPLICATION CLIENT ON *.* TO 'otel'@'localhost';
 FLUSH PRIVILEGES;`;
+
+const MY_ERROR_LOG = "/var/log/mysql/error.log";
 
 const applyUser = (connect: string) => `${connect} -e "
 ${USER_SQL}
@@ -96,6 +99,7 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
       // blocking events into the _o2_dbm_server logs stream.
       metaBadges: [t("common.metrics"), t("common.logs")],
     },
+    setupModes: DB_SETUP_MODES,
     steps: [
       {
         id: "prepare",
@@ -128,11 +132,25 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
           },
         ],
       },
+      dbQuickInstallStep(t, subs, {
+        db: "mysql",
+        hostLabelKey: "ingestion.setupCard.mysqlHostLabel",
+        defaultPort: "3306",
+        defaultUser: "otel",
+        defaultDatabase: "mysql",
+        dbm: true,
+        dbmLogPath: {
+          default: MY_ERROR_LOG,
+          labelKey: "ingestion.setupCard.dbmMysqlLogPathLabel",
+          helpKey: "ingestion.setupCard.dbInstallerMysqlLogPathHelp",
+        },
+      }),
       // Pinned: the DBM config below needs upstream contrib >= 0.148.0 (the
       // `events:` block is an unknown key on older releases).
-      collectorInstallStep(t, DBM_CONTRIB_VERSION),
+      manualOnly(collectorInstallStep(t, DBM_CONTRIB_VERSION)),
       {
         id: "configure",
+        mode: "manual",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
         descriptionKey: "ingestion.setupCard.configureCollectorDesc",
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
@@ -159,6 +177,7 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
       },
       {
         id: "run",
+        mode: "manual",
         titleKey: "ingestion.setupCard.runCollectorTitle",
         descriptionKey: "ingestion.setupCard.runCollectorMysqlDesc",
         chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
@@ -230,6 +249,7 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
       },
       {
         id: "dbm-configure",
+        mode: "manual",
         titleKey: "ingestion.setupCard.dbmConfigureTitle",
         descriptionKey: "ingestion.setupCard.dbmConfigureMysqlDesc",
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
@@ -246,8 +266,8 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
           {
             id: "logpath",
             labelKey: "ingestion.setupCard.dbmMysqlLogPathLabel",
-            default: "/var/log/mysql/error.log",
-            placeholder: raw("/var/log/mysql/error.log"),
+            default: MY_ERROR_LOG,
+            placeholder: raw(MY_ERROR_LOG),
             helpKey: "ingestion.setupCard.dbmMysqlLogPathHelp",
           },
         ],
@@ -265,6 +285,7 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
       },
       {
         id: "dbm-run",
+        mode: "manual",
         titleKey: "ingestion.setupCard.dbmRunTitle",
         descriptionKey: "ingestion.setupCard.dbmRunMysqlDesc",
         chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
@@ -280,6 +301,7 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
       dbmVerifyStep("full", true),
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mysql", filter: "" },
+    extras: { uninstall: dbUninstallExtra() },
     docUrl: "https://openobserve.ai/blog/monitor-mysql-metrics-otel",
   };
 }

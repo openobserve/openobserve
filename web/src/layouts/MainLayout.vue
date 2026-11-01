@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="store.state.printMode !== true && !store.state.kioskMode"
         class="max-md:hidden"
         :links-list="navLinks"
+        :loading="!menuReady"
         :mini-mode="miniMode"
         @menu-hover="handleMenuHover"
       />
@@ -160,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
           >
             <div
-              v-if="isLoading"
+              v-if="isLoading && fullConfigSettled"
               :key="store.state.selectedOrganization?.identifier"
               class="o2-content-scroll h-full flex-1 overflow-y-auto"
             >
@@ -176,11 +177,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @open="firstDataNotice.open"
                 @dismiss="firstDataNotice.dismiss"
               />
+              <!-- Enter-only fade; the body's slide lives in OPageLayout so the header stays put. -->
               <router-view v-slot="{ Component }">
                 <keep-alive :include="KEPT_ALIVE_VIEWS">
-                  <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+                  <component
+                    :is="Component"
+                    :class="[ENTER_FADE, 'h-full']"
+                    @sendToAiChat="sendToAiChat"
+                  />
                 </keep-alive>
               </router-view>
+            </div>
+            <div
+              v-else
+              data-test="main-content-pending"
+              aria-busy="true"
+              class="flex h-full flex-1 flex-col gap-3 overflow-hidden p-4"
+            >
+              <OSkeleton type="text" class="h-6 w-48" />
+              <OSkeleton class="h-8 w-full" />
+              <OSkeleton v-for="n in 8" :key="n" class="h-9 w-full" />
             </div>
           </div>
         </main>
@@ -235,6 +251,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </ODialog>
+    <EditorDraftSignOutDialog
+      v-model:open="signOutDraftsOpen"
+      :count="signOutDraftCount"
+      @confirm="performSignout"
+    />
     <ConnectDataSourcePopup />
     <CommunitySlackInvite />
     <PredefinedThemes />
@@ -251,16 +272,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { configFullQuery } from "@/services/config.queries";
 import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
+import { ENTER_FADE } from "@/lib/styles/motion";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
-  useLocalCurrentUser,
   useLocalOrganization,
-  useLocalUserInfo,
   getImageURL,
-  invalidateLoginData,
   shouldPaywallRoute,
   isEmptyDataExempt,
 } from "../utils/zincutils";
@@ -301,8 +320,11 @@ import GetStarted from "@/components/login/GetStarted.vue";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import ConnectDataSourcePopup from "@/components/ConnectDataSourcePopup.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSignOutDialog.vue";
+import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -330,8 +352,8 @@ import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
-// Product Analytics hands off to RUM's Session Viewer, and Back must land on the same panels without rerunning them.
-const KEPT_ALIVE_VIEWS = ["AppAnalytics"];
+// Back from a drill-out (Analytics to Session Viewer, Traces to a trace or its logs) must land on the same results without rerunning them.
+const KEPT_ALIVE_VIEWS = ["AppAnalytics", "AppTraces"];
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -365,7 +387,9 @@ export default defineComponent({
     ODialog,
     ODrawer,
     OButton,
+    OSkeleton,
     FirstDataNotice,
+    EditorDraftSignOutDialog,
     DashboardSaveConflictDialog: defineAsyncComponent(
       () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
     ),
@@ -382,34 +406,17 @@ export default defineComponent({
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
     signout() {
-      this.closeSocket();
-
-      // AI chat streams outlive their component by design, so navigating away
-      // doesn't kill an answer. Logout has to stop them explicitly — otherwise
-      // they keep streaming and writing chat history after sign-out.
-      window.dispatchEvent(new Event("o2:abort-ai-streams"));
-
-      // Clear any open notifications so they don't carry over past logout.
-      dismissAll();
-
-      // Stop session replay recording on logout
-      if (this.store.state.zoConfig?.rum?.enabled) {
-        openobserveRum.stopSessionReplayRecording();
-        openobserveRum.clearUser();
-        openobserveRum.clearAccount();
+      // Signing out clears this user's drafts in this browser, so the user is told first, by the open editor's leave dialog when it asks anyway.
+      const count = signOutDraftsToConfirm(this.store);
+      if (count > 0) {
+        this.signOutDraftCount = count;
+        this.signOutDraftsOpen = true;
+        return;
       }
-
-      // Always call backend logout to clear auth cookies (auth_tokens, auth_ext)
-      // before clearing local state — prevents stale credentials from causing
-      // 401 errors on the next login attempt (see #10900)
-      invalidateLoginData();
-
-      this.store.dispatch("logout");
-
-      useLocalCurrentUser("", true);
-      useLocalUserInfo("", true);
-
-      this.$router.push("/logout");
+      this.performSignout();
+    },
+    performSignout() {
+      void signOutThroughLeaveGuards(this.$router, this.store);
     },
     goToHome() {
       this.$router.push({
@@ -441,6 +448,8 @@ export default defineComponent({
     // Once, here: the mixin calls inject() and onMounted(), which outside setup() warn and do nothing.
     const layoutMixin = mainLayoutMixin.setup();
     const miniMode = ref(false);
+    const signOutDraftsOpen = ref(false);
+    const signOutDraftCount = ref(0);
     const { isMobile, lgUp } = useBreakpoint();
     // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
     const isChatOverlay = computed(() => !lgUp.value);
@@ -456,7 +465,7 @@ export default defineComponent({
     );
 
     const { getStreams, resetStreams } = useStreams(t);
-    const { closeSocket } = useSearchWebSocket();
+    useSearchWebSocket();
     const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
     const { prefetchRoute } = useRoutePrefetch();
 
@@ -773,6 +782,8 @@ export default defineComponent({
     const needsFullConfig = () =>
       !Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") ||
       store.state.zoConfig.version == "";
+    // Pages read flags like ai_enabled once at setup, so they mount after the full config lands or fails.
+    const fullConfigSettled = ref(!needsFullConfig());
 
     // Which org the full config was fetched for — the response carries
     // org-scoped fields (e.g. per-user permission flags), so an org switch
@@ -1332,8 +1343,7 @@ export default defineComponent({
           selectedOrg.value.identifier != "" &&
           selectedOrg.value.identifier != undefined
         ) {
-          await getOrganizationSettings();
-          isLoading.value = true;
+          await loadOrgSettingsThenMount();
         }
       } catch (error) {
         console.error("Error in setSelectedOrganization:", error);
@@ -1362,15 +1372,18 @@ export default defineComponent({
         ai_rca_thread_tool_output: false,
       };
 
+      const org = store.state?.selectedOrganization?.identifier;
+      // Off the readiness path: only Home's pinned tab needs it, and HomeView waits for it itself.
+      void useHomeDashboard(t).load(org);
+
       try {
         //get organizations settings
         // Cached: MainLayout re-reads this on every org switch, and the
         // settings pages read it again on mount.
         const orgSettings: any = {
-          data: await queryClient.fetchQuery(
-            orgSettingsQuery(store.state?.selectedOrganization?.identifier),
-          ),
+          data: await queryClient.fetchQuery(orgSettingsQuery(org)),
         };
+        if (org !== store.state?.selectedOrganization?.identifier) return;
 
         //set settings in store
         //scrape interval will be in number
@@ -1411,10 +1424,6 @@ export default defineComponent({
             defaultSettings.ai_rca_thread_tool_output,
         });
 
-        // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
-        // settings so it's available on boot and every org switch.
-        await useHomeDashboard(t).load(store.state?.selectedOrganization?.identifier);
-
         if (
           shouldPaywallRoute(
             orgSettings?.data?.data?.free_trial_expiry,
@@ -1436,6 +1445,7 @@ export default defineComponent({
           });
         }
       } catch (error: any) {
+        if (org !== store.state?.selectedOrganization?.identifier) return;
         // Handle permission errors gracefully (403 = Forbidden)
         if (error?.response?.status === 403) {
           console.warn("Organization settings access denied (403). Using default settings.");
@@ -1448,6 +1458,13 @@ export default defineComponent({
         }
       }
       return;
+    };
+
+    // The only place that marks the page ready, so a slower answer for an org the user already left cannot mount it.
+    const loadOrgSettingsThenMount = async () => {
+      const org = store.state?.selectedOrganization?.identifier;
+      await getOrganizationSettings();
+      if (org === store.state?.selectedOrganization?.identifier) isLoading.value = true;
     };
 
     /**
@@ -1491,6 +1508,7 @@ export default defineComponent({
           initBrowserRum(res.data.rum, store.state.API_ENDPOINT);
           store.dispatch("setConfig", res.data);
           fullConfigOrg = orgIdentifier;
+          fullConfigSettled.value = true;
           await nextTick();
 
           filterMenus();
@@ -1515,6 +1533,7 @@ export default defineComponent({
           }
           // Fail open: reveal the base menu even if the config never resolves.
           menuReady.value = true;
+          fullConfigSettled.value = true;
           // A transient failure (expired session being refreshed, rolling
           // deploy) would otherwise strand the session on the bootstrap subset.
           if (attempt < FULL_CONFIG_RETRY_DELAYS_MS.length) {
@@ -1713,6 +1732,8 @@ export default defineComponent({
     }
 
     return {
+      signOutDraftsOpen,
+      signOutDraftCount,
       isDark,
       t,
       raw,
@@ -1727,6 +1748,7 @@ export default defineComponent({
       selectedLanguage,
       linksList,
       navLinks,
+      menuReady,
       selectedOrg,
       orgOptions,
       isMobile,
@@ -1736,18 +1758,20 @@ export default defineComponent({
       user,
       zoBackendUrl,
       isLoading,
+      fullConfigSettled,
       KEPT_ALIVE_VIEWS,
+      ENTER_FADE,
       getImageURL,
       updateOrganization,
       setSelectedOrganization,
       getOrganizationSettings,
+      loadOrgSettingsThenMount,
       resetStreams,
       prefetch,
       expandMenu,
       slackIcon: markRaw(SlackIcon),
       openSlack,
       settings: "settings",
-      closeSocket,
       splitterModel,
       toggleAIChat,
       closeChat,
@@ -1812,9 +1836,7 @@ export default defineComponent({
       // This ensures each org shows its own theme colors without preview colors from another org
       this.store.commit("clearTempThemeColors");
 
-      await this.getOrganizationSettings();
-
-      this.isLoading = true;
+      await this.loadOrgSettingsThenMount();
       // Find the matching organization from orgOptions
       const matchingOrg = this.orgOptions.find(
         (org) => org.identifier === this.store.state.selectedOrganization.identifier,

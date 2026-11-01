@@ -413,6 +413,14 @@ describe("FleetFlowOverview window and states", () => {
     expect(vi.mocked(fleet.getPipelines).mock.calls.length).toBe(calls + 1);
   });
 
+  it("shows no error banner when only the issue reads are forbidden", async () => {
+    serve(basePipelines());
+    vi.mocked(fleet.listCollectors).mockRejectedValue({ response: { status: 403 } });
+    vi.mocked(fleet.listRollouts).mockRejectedValue({ response: { status: 403 } });
+    await mountOverview();
+    expect(wrapper.find('[data-test="fleet-flow-overview-error"]').exists()).toBe(false);
+  });
+
   it("shows the no-fleets empty state when no fleet is readable", async () => {
     serve({ ...basePipelines(), fleets: [], pipelines: [], destinations: [] });
     await mountOverview();

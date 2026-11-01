@@ -35,6 +35,7 @@ import {
   mapChart,
   sankeyChartQuery,
 } from "@/utils/dashboard/dashboardAutoQueryBuilder";
+import { isFlowChart } from "@/utils/dashboard/chartTypeGroups";
 import { usePanelFields } from "@/composables/dashboard/usePanelFields";
 import { usePanelAggregation } from "@/composables/dashboard/usePanelAggregation";
 import {
@@ -134,6 +135,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     dashboardPanelData,
     getDefaultQueries,
     getDefaultCustomChartText,
+    getTimestampColumn: () => store?.state?.zoConfig?.timestamp_column || "_timestamp",
   });
 
   const addQuery = () => {
@@ -295,7 +297,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     // Resolving before groupedFields lands makes the caller's next makeAutoSQLQuery() a silent no-op.
     if (isUpdatingGroupedFields) {
       pendingUpdateGroupedFields = true;
-      await inFlightGroupedFields;
+      // The run this call joined predates its change; the queued run the join starts is the one that carries it.
+      while (isUpdatingGroupedFields) await inFlightGroupedFields;
       return;
     }
 
@@ -1003,9 +1006,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       }
 
       let query = "";
-      if (dashboardPanelData.data.type == "geomap") {
+      if (dashboardPanelData.data.type == "alert-list") {
+        query = "";
+      } else if (dashboardPanelData.data.type == "geomap") {
         query = geoMapChart(dashboardPanelData);
-      } else if (dashboardPanelData.data.type == "sankey") {
+      } else if (isFlowChart(dashboardPanelData.data.type)) {
         query = sankeyChartQuery(dashboardPanelData);
       } else if (dashboardPanelData.data.type == "maps") {
         query = mapChart(dashboardPanelData);
@@ -1021,10 +1026,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     }
     return;
   };
-  // Heatmap y bucketing is panel config, so every builder tab's SQL must carry it, not only the active tab's.
+  // Heatmap y bucketing and box plot raw values shape the SQL, so every builder tab must carry them, not only the active tab.
   const regenerateOtherBuilderQueries = () => {
     if (
-      dashboardPanelData.data.type !== "heatmap" ||
+      !["heatmap", "boxplot"].includes(dashboardPanelData.data.type) ||
       dashboardPanelData.data.queryType === "promql"
     ) {
       return;

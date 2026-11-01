@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="player-container flex h-full flex-col p-2">
+  <div
+    class="player-container flex h-full flex-col p-2"
+    :class="{ 'bg-surface-base fixed inset-0 z-5000': isFullscreen }"
+    data-test="video-player-root"
+  >
     <div ref="playerContainerRef" class="relative flex min-h-0 flex-1 items-center justify-center">
       <div
         v-if="showLoader"
@@ -165,6 +169,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :searchable="false"
             @update:model-value="setSpeed"
           />
+          <OButton
+            v-if="fullscreenSupported"
+            class="ms-2"
+            variant="ghost"
+            size="icon-sm"
+            :aria-label="fullscreenLabel"
+            data-test="video-player-fullscreen-btn"
+            @click="handleFullscreenToggle"
+          >
+            <template #icon-left
+              ><OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="sm"
+            /></template>
+            <OTooltip :content="fullscreenLabel" />
+          </OButton>
         </div>
       </div>
     </div>
@@ -191,9 +209,11 @@ import { useStore } from "vuex";
 import { useToast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import type { SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import ReplayLoadBand from "@/components/rum/ReplayLoadBand.vue";
@@ -328,6 +348,12 @@ const localSkipInactivity = ref(true);
 const timelineMs = ref(0);
 const hoverMs = ref<number | null>(null);
 const hoverEvent = ref<any>(null);
+const fullscreenSupported = document.fullscreenEnabled === true;
+const isFullscreen = ref(false);
+// The page-level full screen may belong to another component; only one this player requested pins it.
+let startedFullscreen = false;
+// A second click while a request is pending would reject and clear the ownership the first one set.
+let fullscreenRequestPending = false;
 
 const speedOptions = [
   {
@@ -358,6 +384,9 @@ const speedOptions = [
 
 const speedValue = computed(() => props.speed ?? localSpeed.value);
 const skipInactivityValue = computed(() => props.skipInactivity ?? localSkipInactivity.value);
+const fullscreenLabel = computed(() =>
+  isFullscreen.value ? t("rum.exitFullScreen") : t("rum.fullScreen"),
+);
 
 // Covers the replay surface until the player is built or loading settles, so its first frame never shows under the loader.
 const showLoader = computed(
@@ -433,7 +462,6 @@ const playerState = ref({
     actions: true,
     errors: true,
   },
-  fullScreen: false,
   startTime: 0,
   endTime: 0,
   totalTime: 0,
@@ -510,10 +538,12 @@ onBeforeMount(async () => {
 
 onMounted(() => {
   attachResizeObserver();
+  document.addEventListener("fullscreenchange", syncFullscreen);
 });
 
 onActivated(() => {
   attachResizeObserver();
+  document.addEventListener("fullscreenchange", syncFullscreen);
   if (player.value) {
     const { width, height } = calculatePlayerDimensions();
     if (playerRef.value) playerRef.value.style.width = `${width}px`;
@@ -524,6 +554,7 @@ onActivated(() => {
 
 onDeactivated(() => {
   detachResizeObserver();
+  leaveFullscreen();
 });
 
 const importVideoPlayer = async () => {
@@ -536,6 +567,7 @@ const importVideoPlayer = async () => {
 
 onBeforeUnmount(() => {
   detachResizeObserver();
+  leaveFullscreen();
   if (worker.value) {
     worker.value.terminate();
   }
@@ -573,6 +605,49 @@ function detachResizeObserver() {
   resizeObserver.value = null;
 }
 
+function syncFullscreen() {
+  const active = document.fullscreenElement === document.documentElement;
+  if (!active) startedFullscreen = false;
+  isFullscreen.value = active && startedFullscreen;
+}
+
+// The listener is gone before the exit's fullscreenchange arrives, so the state is reset here.
+function leaveFullscreen() {
+  document.removeEventListener("fullscreenchange", syncFullscreen);
+  if (isFullscreen.value && document.fullscreenElement) {
+    void document.exitFullscreen().catch(() => {});
+  }
+  isFullscreen.value = false;
+  startedFullscreen = false;
+}
+
+async function handleFullscreenToggle() {
+  if (fullscreenRequestPending) return;
+  if (isFullscreen.value) {
+    await document.exitFullscreen().catch(() => {});
+    return;
+  }
+  startedFullscreen = true;
+  // Re-requesting the current full-screen element may fire no fullscreenchange, so ownership is synced here.
+  if (document.fullscreenElement === document.documentElement) {
+    syncFullscreen();
+    return;
+  }
+  fullscreenRequestPending = true;
+  try {
+    await document.documentElement.requestFullscreen();
+    // Unmount or deactivation during the request cleared ownership, so no player would ever exit it.
+    if (!startedFullscreen && document.fullscreenElement === document.documentElement) {
+      void document.exitFullscreen().catch(() => {});
+    }
+  } catch {
+    // A denied request changes nothing, so this player must not claim a later full screen.
+    startedFullscreen = false;
+  } finally {
+    fullscreenRequestPending = false;
+  }
+}
+
 function calculatePlayerDimensions(): { width: number; height: number } {
   if (!playerContainerRef.value) return { width: 0, height: 0 };
 
@@ -595,7 +670,7 @@ function calculatePlayerDimensions(): { width: number; height: number } {
   return { width: playerWidth, height: playerHeight };
 }
 
-const decorateRecord = (record: any) => {
+const decorateRecord = (record: any, cssRewrites: Promise<void>[]) => {
   let segCopy = record;
   if (segCopy.type === 8) {
     segCopy = {
@@ -615,7 +690,7 @@ const decorateRecord = (record: any) => {
   ) {
     decoratedSnapshots.add(segCopy.data);
     try {
-      decorateSnapshotNode(segCopy.data.node);
+      decorateSnapshotNode(segCopy.data.node, cssRewrites);
     } catch (e) {
       console.log(e);
     }
@@ -623,7 +698,7 @@ const decorateRecord = (record: any) => {
   return segCopy;
 };
 
-const decorateSnapshotNode = (node: any) => {
+const decorateSnapshotNode = (node: any, cssRewrites: Promise<void>[]) => {
   resolveRelativeLinks(node, runPageHref);
   node.childNodes.forEach((child: any) => {
     if (child.type !== 2 || child.tagName !== "html") return;
@@ -639,9 +714,11 @@ const decorateSnapshotNode = (node: any) => {
           __child.attributes._cssText
         ) {
           workerProcessId.value++;
-          processCss(__child.attributes._cssText, workerProcessId.value).then((res: any) => {
-            __child.attributes._cssText = res.updatedCssString;
-          });
+          cssRewrites.push(
+            processCss(__child.attributes._cssText, workerProcessId.value).then((res) => {
+              __child.attributes._cssText = res.updatedCssString;
+            }),
+          );
         }
       });
     });
@@ -655,14 +732,18 @@ const syncDecoderState = (decoder: MultiViewDecoder) => {
 };
 
 // One decoder serves the whole forward-only run, so per-view converter state survives every batch.
-const convertSegments = (segments: any[], decoder: MultiViewDecoder) => {
+const convertSegments = async (segments: any[], decoder: MultiViewDecoder) => {
   decoder.setViewEnds(props.viewEnds);
   const { events, skippedRecords } = decoder.push(segments, props.watermark);
   if (skippedRecords) {
     console.warn(`Session replay: ${skippedRecords} record(s) could not be converted`);
   }
   syncDecoderState(decoder);
-  return events.map(decorateRecord);
+  const cssRewrites: Promise<void>[] = [];
+  const decorated = events.map((event: any) => decorateRecord(event, cssRewrites));
+  // The player builds a snapshot as soon as it gets it, and a snapshot built before its rewrite loads fonts cross-origin, which the browser blocks.
+  await Promise.all(cssRewrites);
+  return decorated;
 };
 
 const setupSession = async () => {
@@ -675,12 +756,12 @@ const setupSession = async () => {
 
   const decoder = createMultiViewDecoder();
   const consumed = props.segments.length;
-  session.value = convertSegments(props.segments.slice(0, consumed), decoder);
+  session.value = await convertSegments(props.segments.slice(0, consumed), decoder);
   // A push held wholly behind the watermark yields only a clock record; rrweb-player needs a snapshot, so retry on the next change with a fresh decoder.
   if (!session.value.some((event: any) => event.type === 2)) return;
 
   session.value.every((segment: any) => {
-    if (segment.data.height && segment.data.width) {
+    if (segment.data?.height && segment.data?.width) {
       sessionWidth.value = segment.data.width;
       sessionHeight.value = segment.data.height;
       return false;
@@ -742,9 +823,11 @@ const setupSession = async () => {
 const appendSegments = async (newSegments: any[], takenAfter: number) => {
   if (!player.value || !runDecoder) return;
 
-  const records = convertSegments(newSegments, runDecoder).sort(
+  const records = (await convertSegments(newSegments, runDecoder)).sort(
     (a: any, b: any) => a.timestamp - b.timestamp,
   );
+  // The component may have unmounted while the stylesheets were rewritten.
+  if (!player.value) return;
 
   // The player applies an event at or before the playhead at once, so this is a conservative proxy for its private baselineTime.
   const meta = player.value.getMetaData?.();
@@ -1019,24 +1102,34 @@ const initializeWorker = () => {
   }
 };
 
+// The session waits on these rewrites, so a missing, failed or silent worker keeps the recorded CSS instead of stalling it.
+const CSS_REWRITE_TIMEOUT_MS = 5000;
+
 const processCss = (cssString: string, id: string | number) => {
-  return new Promise((resolve, reject) => {
-    if (worker.value) {
-      const handleWorkerMessage = (event: any) => {
-        if (event.data.id === id) {
-          if (worker.value) worker.value.removeEventListener("message", handleWorkerMessage);
-          resolve(event.data);
-        }
-      };
-      worker.value.addEventListener("message", handleWorkerMessage);
-      worker.value.postMessage({
-        cssString: cssString,
-        proxyUrl: `${store.state.API_ENDPOINT}/proxy/${store.state.selectedOrganization.identifier}`,
-        id,
-      });
-    } else {
-      reject("Worker not initialized");
+  return new Promise<{ updatedCssString: string }>((resolve) => {
+    const activeWorker = worker.value;
+    if (!activeWorker) {
+      resolve({ updatedCssString: cssString });
+      return;
     }
+    const finish = (updatedCssString: string) => {
+      clearTimeout(timer);
+      activeWorker.removeEventListener("message", handleWorkerMessage);
+      activeWorker.removeEventListener("error", handleWorkerError);
+      resolve({ updatedCssString });
+    };
+    const handleWorkerMessage = (event: any) => {
+      if (event.data.id === id) finish(event.data.updatedCssString);
+    };
+    const handleWorkerError = () => finish(cssString);
+    const timer = setTimeout(() => finish(cssString), CSS_REWRITE_TIMEOUT_MS);
+    activeWorker.addEventListener("message", handleWorkerMessage);
+    activeWorker.addEventListener("error", handleWorkerError);
+    activeWorker.postMessage({
+      cssString: cssString,
+      proxyUrl: `${store.state.API_ENDPOINT}/proxy/${store.state.selectedOrganization.identifier}`,
+      id,
+    });
   });
 };
 

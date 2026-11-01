@@ -85,6 +85,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @before-show="openFilterCreator"
                 @before-hide="cancelFilterCreator"
               >
+                <template v-if="field.name !== 'duration'" #caption>
+                  <div
+                    class="text-text-secondary py-1 text-xs"
+                    data-test="traces-field-values-count-caption"
+                  >
+                    {{ t("traces.results.fieldValueCountsCaption") }}
+                  </div>
+                </template>
                 <template v-if="field.name === 'duration'" #body>
                   <div v-if="durationPercentilesLoading" class="flex justify-center py-2">
                     <OSpinner size="xs" />
