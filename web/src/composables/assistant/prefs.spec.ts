@@ -32,6 +32,7 @@ import {
   readHistoryFilter,
   readHome,
   readPlacement,
+  readWindows,
   readRecall,
   readSidebar,
   recallSelection,
@@ -45,6 +46,7 @@ import {
   writeHistoryFilter,
   writePlacement,
   writeSidebar,
+  writeWindows,
 } from "./prefs";
 
 const KEY = "uok-1";
@@ -281,15 +283,60 @@ describe("annotations", () => {
   });
 });
 
-describe("sidebar prefs", () => {
-  it("writes width and mode by read-merge-write, keeping another tab's field", () => {
-    writeSidebar(KEY, { widthRem: 26 });
-    localStorage.setItem(
-      `o2.assistant.sidebar:${KEY}`,
-      JSON.stringify({ widthRem: 26, mode: "floating" }),
+describe("floating windows", () => {
+  const geometry = { corner: "top-end", dxRem: 1, dyRem: 2, wRem: 24, hRem: 30 } as const;
+
+  it("round-trips this tab's windows and removes the key when none are left", () => {
+    writeWindows(KEY, [{ sid: "a", state: "minimised", geometry }]);
+    expect(readWindows(KEY)).toEqual([{ sid: "a", state: "minimised", geometry }]);
+    writeWindows(KEY, []);
+    expect(sessionStorage.getItem(`o2.assistant.windows:${KEY}`)).toBeNull();
+  });
+
+  it("drops malformed entries and holds the cap for a hand-edited value", () => {
+    const good = { sid: "a", state: "open", ...geometry };
+    sessionStorage.setItem(
+      `o2.assistant.windows:${KEY}`,
+      JSON.stringify([
+        good,
+        { sid: "b", corner: "middle", dxRem: 1, dyRem: 1, wRem: 1, hRem: 1 },
+        { ...good, sid: 3 },
+        { ...good, sid: "c", wRem: "wide" },
+        ...["d", "e", "f", "g"].map((sid) => ({ ...good, sid })),
+      ]),
     );
+    expect(readWindows(KEY).map((w) => w.sid)).toEqual(["a", "d", "e", "f"]);
+    sessionStorage.setItem(`o2.assistant.windows:${KEY}`, '{"not":"a list"}');
+    expect(readWindows(KEY)).toEqual([]);
+  });
+});
+
+describe("sidebar prefs", () => {
+  it("writes the width by read-merge-write", () => {
+    writeSidebar(KEY, { widthRem: 26 });
     writeSidebar(KEY, { widthRem: 30 });
-    expect(readSidebar(KEY)).toEqual({ widthRem: 30, mode: "floating" });
+    expect(readSidebar(KEY)).toEqual({ widthRem: 30 });
+  });
+
+  it("drops a stored v1 mode once and keeps the width", () => {
+    const key = `o2.assistant.sidebar:${KEY}`;
+    localStorage.setItem(key, JSON.stringify({ widthRem: 26, mode: "floating" }));
+    expect(readSidebar(KEY)).toEqual({ widthRem: 26 });
+    expect(JSON.parse(localStorage.getItem(key)!)).toEqual({ widthRem: 26 });
+  });
+
+  it("drops a stored v1 mode from a placement and its previous placement", () => {
+    sessionStorage.setItem(
+      `o2.assistant.placement:${KEY}`,
+      JSON.stringify({
+        placement: { kind: "sidebar", mode: "floating" },
+        previousPlacement: { kind: "sidebar", mode: "pinned" },
+      }),
+    );
+    expect(readPlacement(KEY)).toEqual({
+      placement: { kind: "sidebar" },
+      previousPlacement: { kind: "sidebar" },
+    });
   });
 
   it("degrades to defaults when storage throws", () => {
@@ -299,7 +346,7 @@ describe("sidebar prefs", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("blocked");
     });
-    expect(() => writeSidebar(KEY, { mode: "pinned" })).not.toThrow();
+    expect(() => writeSidebar(KEY, { widthRem: 30 })).not.toThrow();
     expect(readSidebar(KEY)).toEqual({});
     expect(readRecall(KEY)).toEqual([]);
     expect(recallSelection(KEY)).toBeNull();
@@ -345,11 +392,11 @@ describe("per-tab session keys", () => {
 
   it("stores placement and the history filter in sessionStorage", () => {
     writePlacement(KEY, {
-      placement: { kind: "sidebar", mode: "floating" },
+      placement: { kind: "sidebar" },
       previousPlacement: null,
     });
     writeHistoryFilter(KEY, { kind: "pinned", q: "" });
-    expect(readPlacement(KEY)?.placement).toEqual({ kind: "sidebar", mode: "floating" });
+    expect(readPlacement(KEY)?.placement).toEqual({ kind: "sidebar" });
     expect(readHistoryFilter(KEY)).toEqual({ kind: "pinned", q: "" });
     expect(localStorage.length).toBe(0);
   });

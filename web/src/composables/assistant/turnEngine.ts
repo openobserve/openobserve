@@ -21,7 +21,7 @@ import { gt, raw, type TranslateFn } from "@/types/i18n";
 import { epochMs } from "@/utils/assistant/explorerRoutes";
 
 import { ERROR_LEDGER, isConsentPrompt } from "./assistantErrors";
-import type { AssistantStoreInternal } from "./assistantStore";
+import { renameWindowSid, type AssistantStoreInternal } from "./assistantStore";
 import type {
   ApprovalsService,
   AssistantError,
@@ -700,6 +700,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     delete state.sessions[oldSid];
     state.recent = state.recent.map((id) => (id === oldSid ? newSid : id));
     if (state.shell.activeSid === oldSid) state.shell.activeSid = newSid;
+    renameWindowSid(state, oldSid, newSid);
     runtime.rename(oldSid, newSid);
     runner.rename(oldSid, newSid);
     rec.sid = newSid;

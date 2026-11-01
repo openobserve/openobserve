@@ -131,7 +131,7 @@ function openSession(store: any): string {
     origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     thread: "new",
   });
-  store.open({ kind: "sidebar", mode: "pinned" }, { sid, focus: "none" });
+  store.open({ kind: "sidebar" }, { sid, focus: "none" });
   return sid;
 }
 

@@ -18,7 +18,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, ref } from "vue";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
-import AssistantSidebarHost, { coveredBy } from "./AssistantSidebarHost.vue";
+import AssistantSidebarHost from "./AssistantSidebarHost.vue";
+import { tearOffRequest } from "./assistantWindowHost";
 import { closeLockedPanel, openLockedPanel, useLockedPanel } from "./lockedPanel";
 
 const { fake, lg, closers, shortcuts, track, deep } = vi.hoisted(() => ({
@@ -91,11 +92,11 @@ async function setup(path = "/logs") {
   );
   await flushPromises();
   const store = fake.current.store;
-  const open = (mode: "pinned" | "floating" = "pinned") => {
+  const open = () => {
     store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
-    store.open({ kind: "sidebar", mode }, { focus: "composer", invoker: invoker.value });
+    store.open({ kind: "sidebar" }, { focus: "composer", invoker: invoker.value });
   };
   return { wrapper, store, router, open, invoker };
 }
@@ -161,7 +162,6 @@ describe("AssistantSidebarHost", () => {
     open();
     store.setSidebarWidth(26);
     await flushPromises();
-    expect(column()!.dataset.mode).toBe("pinned");
     expect(column()!.style.getPropertyValue("--o-assistant-sidebar-width")).toBe("26");
     expect(column()!.style.width).toBe("");
   });
@@ -185,7 +185,7 @@ describe("AssistantSidebarHost", () => {
     expect(store.state.shell.sidebarWidthRem).toBe(24);
   });
 
-  it("holds a stored width too wide for the window instead of floating, and reports what it draws", async () => {
+  it("holds a stored width too wide for the window and reports what it draws", async () => {
     window.innerWidth = 1100;
     const { open, store } = await setup();
     open();
@@ -194,7 +194,6 @@ describe("AssistantSidebarHost", () => {
     const handle = column()!.querySelector<HTMLElement>(
       '[data-test="assistant-shell-resize-handle"]',
     )!;
-    expect(column()!.dataset.mode).toBe("pinned");
     expect(column()!.style.getPropertyValue("--o-assistant-sidebar-width")).toBe("31.25");
     expect(handle.getAttribute("aria-valuenow")).toBe("31.3");
     expect(Number(handle.getAttribute("aria-valuenow"))).toBeLessThanOrEqual(
@@ -225,44 +224,6 @@ describe("AssistantSidebarHost", () => {
     await flushPromises();
     expect(store.state.shell.sidebarWidthRem).toBe(28);
     expect(column()!.hasAttribute("data-dragging")).toBe(false);
-  });
-
-  it("rings the source a door opened from while its chat sits pinned beside it", async () => {
-    const { store, invoker } = await setup();
-    const sid = store.createSession({
-      origin: { entryKind: "object_verb", objectKind: "panel", container: "sidebar" },
-    });
-    store.open(
-      { kind: "sidebar", mode: "floating" },
-      { sid, focus: "none", invoker: invoker.value, forcePinned: true },
-    );
-    await flushPromises();
-    expect(invoker.value!.hasAttribute("data-assistant-source")).toBe(true);
-    expect(invoker.value!.classList.contains("ring-2")).toBe(true);
-    expect(invoker.value!.classList.contains("ring-inset")).toBe(true);
-    store.close("close");
-    await flushPromises();
-    expect(invoker.value!.hasAttribute("data-assistant-source")).toBe(false);
-    expect(invoker.value!.classList.contains("ring-focus-ring-accent")).toBe(false);
-  });
-
-  it("rings the panel a toolbar door sits in, not the door itself", async () => {
-    const { store, invoker } = await setup();
-    const panel = document.createElement("div");
-    panel.setAttribute("data-assistant-source-scope", "");
-    document.body.appendChild(panel);
-    panel.appendChild(invoker.value!);
-    const sid = store.createSession({
-      origin: { entryKind: "object_verb", objectKind: "panel", container: "sidebar" },
-    });
-    store.open(
-      { kind: "sidebar", mode: "floating" },
-      { sid, focus: "none", invoker: invoker.value, forcePinned: true },
-    );
-    await flushPromises();
-    expect(panel.hasAttribute("data-assistant-source")).toBe(true);
-    expect(panel.classList.contains("ring-2")).toBe(true);
-    expect(invoker.value!.hasAttribute("data-assistant-source")).toBe(false);
   });
 
   it("keeps the legacy expanded width once on the first revamped open", async () => {
@@ -301,7 +262,7 @@ describe("AssistantSidebarHost", () => {
     store.open({ kind: "docked", hostId: "regex" }, { focus: "none" });
     await flushPromises();
     expect(column()!.style.display).toBe("none");
-    store.moveTo({ kind: "sidebar", mode: "pinned" });
+    store.moveTo({ kind: "sidebar" });
     await router.push("/assistant");
     await flushPromises();
     expect(column()!.style.display).toBe("none");
@@ -334,50 +295,49 @@ describe("AssistantSidebarHost", () => {
     expect(column()!.style.display).toBe("none");
   });
 
-  it("pins the floating card for this open when a focused control lies even partly under it", async () => {
-    const { open, invoker } = await setup();
-    open("floating");
+  it("tears the chat off the chrome once the pointer leaves toward the page", async () => {
+    const { open, store } = await setup();
+    open();
     await flushPromises();
-    vi.spyOn(column()!, "getBoundingClientRect").mockReturnValue({
-      left: 900,
-      right: 1280,
-      top: 40,
-      bottom: 800,
-    } as DOMRect);
-    vi.spyOn(invoker.value!, "getBoundingClientRect").mockReturnValue({
-      left: 880,
-      right: 905,
-      top: 100,
-      bottom: 130,
-    } as DOMRect);
-    invoker.value!.focus();
-    await flushPromises();
-    expect(column()!.dataset.mode).toBe("pinned");
+    const sid = store.state.shell.activeSid;
+    const chrome = column()!.querySelector("[data-assistant-chrome]")!;
+    const fire = (type: string, clientX: number) =>
+      chrome.dispatchEvent(
+        new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, clientX, clientY: 20 }),
+      );
+    fire("pointerdown", 900);
+    fire("pointermove", 890);
+    expect(store.windowOf(sid)).toBeNull();
+    fire("pointermove", 880);
+    expect(store.windowOf(sid)).toMatchObject({ state: "open" });
+    expect(store.state.shell.placement.kind).toBe("hidden");
+    expect(track).toHaveBeenCalledWith("ai_window_opened", { from: "tear_off" });
+    tearOffRequest.value = null;
   });
 
-  it("pins the floating card for this open when a focused control lies entirely under it", async () => {
-    const { open, store, invoker } = await setup();
-    open("floating");
+  it("never tears off from a control in the chrome", async () => {
+    const { open, store } = await setup();
+    open();
     await flushPromises();
-    expect(column()!.dataset.mode).toBe("floating");
-    expect(document.documentElement.style.getPropertyValue("--o-assistant-inset-end")).not.toBe("");
-    vi.spyOn(column()!, "getBoundingClientRect").mockReturnValue({
-      left: 900,
-      right: 1280,
-      top: 40,
-      bottom: 800,
-    } as DOMRect);
-    vi.spyOn(invoker.value!, "getBoundingClientRect").mockReturnValue({
-      left: 1000,
-      right: 1100,
-      top: 100,
-      bottom: 130,
-    } as DOMRect);
-    invoker.value!.focus();
+    const sid = store.state.shell.activeSid;
+    const button = column()!.querySelector('[data-test="assistant-shell-close"]')!;
+    const fire = (type: string, clientX: number) =>
+      button.dispatchEvent(
+        new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, clientX, clientY: 20 }),
+      );
+    fire("pointerdown", 900);
+    fire("pointermove", 800);
+    expect(store.windowOf(sid)).toBeNull();
+  });
+
+  it("says nothing of a close when the chat floats away", async () => {
+    const { open, store } = await setup();
+    open();
     await flushPromises();
-    expect(store.sidebarForcedPinned.value).toBe(true);
-    expect(column()!.dataset.mode).toBe("pinned");
-    expect(store.state.shell.sidebarMode).toBe("pinned");
+    store.floatChat(store.state.shell.activeSid!, { focus: "none" });
+    await flushPromises();
+    const region = column()!.ownerDocument.querySelector('[data-test="assistant-status-region"]');
+    expect(region?.textContent ?? "").not.toContain("closed");
   });
 
   it("treats a move to the full view or a dock as a move, not a close", async () => {
@@ -393,7 +353,7 @@ describe("AssistantSidebarHost", () => {
     await flushPromises();
     expect(status()).not.toContain("closed");
     expect(document.activeElement).toBe(outside);
-    store.moveTo({ kind: "sidebar", mode: "pinned" });
+    store.moveTo({ kind: "sidebar" });
     await flushPromises();
     store.moveTo({ kind: "full" });
     await router.push("/assistant");
@@ -462,13 +422,5 @@ describe("AssistantSidebarHost", () => {
     await flushPromises();
     expect(status()).toContain("O2 Assistant closed.");
     expect(document.activeElement).toBe(outside);
-  });
-
-  it("counts any overlap as covered and a rect that only touches the card's edge as clear", () => {
-    const card = { left: 10, right: 20, top: 0, bottom: 50 } as DOMRect;
-    expect(coveredBy({ left: 12, right: 18, top: 5, bottom: 10 } as DOMRect, card)).toBe(true);
-    expect(coveredBy({ left: 5, right: 11, top: 5, bottom: 10 } as DOMRect, card)).toBe(true);
-    expect(coveredBy({ left: 0, right: 10, top: 5, bottom: 10 } as DOMRect, card)).toBe(false);
-    expect(coveredBy({ left: 12, right: 18, top: 50, bottom: 60 } as DOMRect, card)).toBe(false);
   });
 });

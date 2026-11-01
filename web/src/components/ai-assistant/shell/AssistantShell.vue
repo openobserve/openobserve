@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-assistant-surface
     data-dd-privacy="mask"
     :data-placement="placement"
+    :data-sid="placement === 'window' ? (sid ?? undefined) : undefined"
     :data-sheet="sheet ? '' : undefined"
     :data-state="state"
     :data-test="`assistant-shell-${placement}`"
@@ -31,12 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @keydown="recordKeydown"
   >
     <div
-      :class="[
-        'border-border-default flex shrink-0 items-center gap-2 border-b px-3',
-        placement === 'docked' ? 'h-15' : 'h-12 max-md:h-auto max-md:min-h-12 max-md:flex-wrap',
-      ]"
-      data-test="assistant-shell-chrome"
+      :class="chromeClasses"
+      data-assistant-chrome
+      :data-test="placement === 'window' ? 'assistant-window-titlebar' : 'assistant-shell-chrome'"
     >
+      <slot name="chrome-start" />
       <AssistantThreadHeader
         v-if="showTitle && state !== 'loading'"
         ref="threadHeader"
@@ -47,22 +47,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #container-actions>
           <slot name="container-actions" />
-          <AssistantIconButton
-            v-if="placement === 'sidebar' && !sheet"
-            :label="t('assistant.shell.openInFullView')"
-            :icon="assistantGlyph.openFull"
-            data-test="assistant-shell-open-in-full-view"
-            @click="openInFullView"
-          />
-          <AssistantIconButton
-            :label="t('assistant.shell.close', { product })"
-            :icon="assistantGlyph.close"
-            data-test="assistant-shell-close"
-            @click="closeContainer"
-          />
+          <template v-if="placement !== 'window'">
+            <AssistantIconButton
+              v-if="placement === 'sidebar' && !sheet"
+              :label="t('assistant.shell.openInFullView')"
+              :icon="assistantGlyph.openFull"
+              data-test="assistant-shell-open-in-full-view"
+              @click="openInFullView"
+            />
+            <AssistantIconButton
+              :label="t('assistant.shell.close', { product })"
+              :icon="assistantGlyph.close"
+              data-test="assistant-shell-close"
+              @click="closeContainer"
+            />
+          </template>
         </template>
-        <template #menu-layout>
-          <AssistantContainerMenu bare :placement="placement" :sheet="sheet" />
+        <template v-if="$slots['menu-first']" #menu-first>
+          <slot name="menu-first" />
+        </template>
+        <template v-if="placement !== 'window'" #menu-layout>
+          <AssistantLayoutMenu
+            bare
+            :placement="placement"
+            :sheet="sheet"
+            :sid="activeSid"
+            :dock-host="host?.id"
+          />
         </template>
         <template v-if="activeSid && state === 'conversation'" #share>
           <AssistantShareControl
@@ -84,20 +95,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="flex-1" />
         <div class="flex shrink-0 items-center gap-1">
           <slot name="container-actions" />
-          <AssistantIconButton
-            v-if="placement === 'sidebar' && (!sheet || state === 'gate')"
-            :label="t('assistant.shell.openInFullView')"
-            :icon="assistantGlyph.openFull"
-            data-test="assistant-shell-open-in-full-view"
-            @click="openInFullView"
-          />
-          <AssistantContainerMenu v-if="state !== 'gate'" :placement="placement" :sheet="sheet" />
-          <AssistantIconButton
-            :label="t('assistant.shell.close', { product })"
-            :icon="assistantGlyph.close"
-            data-test="assistant-shell-close"
-            @click="closeContainer"
-          />
+          <template v-if="placement !== 'window'">
+            <AssistantIconButton
+              v-if="placement === 'sidebar' && (!sheet || state === 'gate')"
+              :label="t('assistant.shell.openInFullView')"
+              :icon="assistantGlyph.openFull"
+              data-test="assistant-shell-open-in-full-view"
+              @click="openInFullView"
+            />
+            <AssistantLayoutMenu
+              v-if="state !== 'gate'"
+              :placement="placement"
+              :sheet="sheet"
+              :sid="activeSid"
+              :dock-host="host?.id"
+            >
+              <template #trigger>
+                <AssistantIconButton
+                  :label="t('assistant.shell.moreActions')"
+                  :icon="assistantGlyph.more"
+                  data-test="assistant-shell-menu"
+                />
+              </template>
+            </AssistantLayoutMenu>
+            <AssistantIconButton
+              :label="t('assistant.shell.close', { product })"
+              :icon="assistantGlyph.close"
+              data-test="assistant-shell-close"
+              @click="closeContainer"
+            />
+          </template>
         </div>
       </template>
     </div>
@@ -212,6 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       mode="panel"
       class="min-h-0 flex-1"
       :current-sid="activeSid"
+      :window-sid="scopedSid"
       :container="container"
       @opened="chatsOpen = false"
       @new="newFromChats"
@@ -602,10 +630,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import type { InjectionKey, Ref } from "vue";
 
-import type { AssistantHostAdapter } from "@/composables/assistant";
+import type { AssistantHostAdapter, Sid } from "@/composables/assistant";
 
 export interface AssistantShellProps {
-  placement: "sidebar" | "full" | "docked";
+  placement: "sidebar" | "full" | "docked" | "window";
+  /** The chat this shell shows when it is not the primary container's: a window, or the sheet's chat in front. */
+  sid?: Sid | null;
+  /** The window that holds focus; its title bar reads as the active one. */
+  focused?: boolean;
   /** Rendered inside OSheet below `lg`; changes density and the menu items only. */
   sheet?: boolean;
   host?: AssistantHostAdapter;
@@ -724,7 +756,6 @@ import {
   useTurnLock,
   type AssistantError,
   type Container,
-  type Sid,
   type GateReason,
   type Starter,
 } from "@/composables/assistant";
@@ -751,7 +782,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatCount, formatOrgIsoDay } from "@/utils/formatters";
 
-import AssistantContainerMenu from "./AssistantContainerMenu.vue";
+import AssistantLayoutMenu from "./AssistantLayoutMenu.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
 import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
 
@@ -759,12 +790,16 @@ import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
 provideAssistantSurface();
 
 const props = withDefaults(defineProps<AssistantShellProps>(), {
+  sid: undefined,
+  focused: false,
   sheet: false,
   host: undefined,
   density: "compact",
 });
 
 defineSlots<{
+  "chrome-start"?: () => unknown;
+  "menu-first"?: () => unknown;
   "container-actions"?: () => unknown;
   notice?: () => unknown;
   transcript?: () => unknown;
@@ -809,8 +844,10 @@ const openedByUser = ref(false);
 const disclosureDismissed = ref(false);
 
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
-const session = computed(() => store.state.sessions[store.state.shell.activeSid ?? ""] ?? null);
-const activeSid = computed(() => store.state.shell.activeSid);
+// A window keeps its own chat, so two chats stream side by side and neither moves the sidebar's.
+const scopedSid = computed(() => props.sid ?? null);
+const activeSid = computed(() => scopedSid.value ?? store.state.shell.activeSid);
+const session = computed(() => store.state.sessions[activeSid.value ?? ""] ?? null);
 const gateReason = computed<GateReason>(() =>
   capability.gate.value === "off_for_org" ? "off_for_org" : "no_permission",
 );
@@ -850,17 +887,37 @@ const unknownNotice = computed(() => capability.unknownNotice.value);
 
 const container = computed<Container>(() => {
   if (props.placement === "full") return "full_view";
+  if (props.placement === "window") return "window";
   if (props.sheet || !lgUp.value) return "sheet";
   return props.placement === "docked" && props.host ? `docked.${props.host.id}` : "sidebar";
 });
 
 const headerDensity = computed(() =>
-  props.placement === "docked" || props.sheet || !mdUp.value ? "dense" : "default",
+  props.placement === "docked" || props.placement === "window" || props.sheet || !mdUp.value
+    ? "dense"
+    : "default",
 );
+const chromeClasses = computed(() => {
+  const base = "border-border-default flex shrink-0 items-center border-b";
+  if (props.placement === "window")
+    return [
+      base,
+      "h-10 cursor-grab gap-1 px-2",
+      props.focused
+        ? "bg-surface-base"
+        : "bg-surface-panel [&_[data-test=assistant-thread-title]]:text-text-secondary",
+    ];
+  return [
+    base,
+    "gap-2 px-3",
+    props.placement === "docked" ? "h-15" : "h-12 max-md:h-auto max-md:min-h-12 max-md:flex-wrap",
+  ];
+});
 // The Chats view hides the chat instead of unmounting it, so its draft, scroll and stream carry on.
 const chatsOpen = ref(false);
 provide(assistantThreadHostKey, {
   newChat,
+  currentSid: () => activeSid.value,
   chats: { open: chatsOpen, set: (open: boolean) => (chatsOpen.value = open) },
 });
 
@@ -948,6 +1005,7 @@ function refreshElsewhere(): void {
 
 const visible = computed(() => {
   if (state.value === "gate") return props.placement === "sidebar" && !!lockedPanel.value;
+  if (scopedSid.value) return true;
   const kind = store.state.shell.placement.kind;
   return kind === props.placement;
 });
@@ -956,14 +1014,16 @@ const landmark = computed(() => {
   const name = t("assistant.name");
   if (props.sheet) return { tag: "div", attrs: {} };
   if (props.placement === "sidebar") return { tag: "aside", attrs: { "aria-label": name } };
+  if (props.placement === "window") return { tag: "div", attrs: {} };
   return { tag: "section", attrs: { role: "region", "aria-label": name } };
 });
 
-// Docked, the sheet and a sidebar at the 24 rem default or narrower show the collapsed tray (`40` §1.2).
+// Docked, windows, the sheet and a sidebar at the 24 rem default or narrower show the collapsed tray (`40` §1.2).
 const trayCollapsed = computed(
   () =>
     props.sheet ||
     props.placement === "docked" ||
+    props.placement === "window" ||
     (props.placement === "sidebar" && store.state.shell.sidebarWidthRem <= 24),
 );
 
@@ -1583,7 +1643,7 @@ function focusEntry(): void {
 
 function ensureSession(): string {
   return (
-    store.state.shell.activeSid ??
+    activeSid.value ??
     store.createSession({
       origin: { entryKind: "empty_state", objectKind: "none", container: container.value },
     })
@@ -1601,10 +1661,15 @@ function onStarter(starter: Starter): void {
 
 // A deleted chat shows its own state; any other failure says so instead of doing nothing.
 function onOpenChat(target: { sid: Sid } | { chatId: number }): void {
-  void store.openSession(target, { focus: true }).catch((err: { code?: string } | null) => {
+  void openChat(target).catch((err: { code?: string } | null) => {
     if (err?.code === "deleted_elsewhere") return;
     void toast({ variant: "error", message: t("assistant.history.openFailed") });
   });
+}
+
+function openChat(target: { sid: Sid } | { chatId: number }): Promise<Sid> {
+  const own = scopedSid.value;
+  return own ? store.openInWindow(own, target) : store.openSession(target, { focus: true });
 }
 
 function newFromChats(): void {
@@ -1631,16 +1696,31 @@ function newChat(): void {
   const previous = session.value;
   const { text = "", chips = [], images = [] } = previous?.composer ?? {};
   const drafted = !!text.trim() || chips.length > 0 || images.length > 0;
-  store.setActive(null);
-  const sid = ensureSession();
+  const sid = freshChat(previous?.sid ?? null);
   if (!previous || !drafted || previous.sid === sid) return;
   noteDraftCleared(sid, { token: null, from: previous.sid, at: Date.now() });
   trackAssistant("ai_composer_cleared", { reason: "new_chat", undone: false });
 }
 
+// A window swaps its own chat; the primary container's New goes through the store's active chat.
+function freshChat(previous: Sid | null): Sid {
+  const own = scopedSid.value;
+  if (!own) {
+    store.setActive(null);
+    return ensureSession();
+  }
+  if (previous && !store.state.sessions[previous]?.messages.length) return previous;
+  const sid = store.createSession({
+    origin: { entryKind: "thread_new", objectKind: "none", container: container.value },
+    detached: true,
+  });
+  store.replaceWindowChat(own, sid);
+  return sid;
+}
+
 // Under a cross-tab lock the retry is refused; the reader hears why instead of nothing happening.
 function retry(): void {
-  const sid = store.state.shell.activeSid;
+  const sid = activeSid.value;
   if (!sid) return;
   if (turnLock.value) return region.value?.announce(t(turnLockKey(turnLock.value)));
   void store.retry(sid);
@@ -1655,9 +1735,9 @@ function openInFullView(): void {
   }
   const sid = store.state.shell.activeSid;
   trackAssistant("ai_container_moved", {
-    from: store.state.shell.sidebarMode,
+    from: props.sheet ? "sheet" : "sidebar",
     to: "full",
-    turn_running: !!session.value && !isAtRest(session.value.turn.state),
+    turn_running: !!session.value && isRunning(session.value.turn),
   });
   store.moveTo({ kind: "full" });
   void router.push({ name: "assistant", params: sid ? { chatId: sid } : {} });
@@ -1666,6 +1746,7 @@ function openInFullView(): void {
 function closeContainer(): void {
   trackAssistant("ai_container_closed", { reason: "close" });
   closeLockedPanel();
+  if (scopedSid.value) return store.closeWindow(scopedSid.value);
   store.close("close");
   if (props.placement !== "full" || route.name !== "assistant") return;
   if (window.history.state?.back) router.back();
@@ -1676,15 +1757,11 @@ function onGateAction(cta: GateCta): void {
   if (cta === "learn_more") learnOpen.value = true;
 }
 
-function isAtRest(turn: string): boolean {
-  return ["idle", "done", "failed", "refused", "stopped"].includes(turn);
-}
-
 // An explicit open focuses the composer once; the sheet keeps it mounted, so this works there too.
 watch(
   () => store.focusRequest.value?.seq,
   async (seq) => {
-    if (seq === undefined || !visible.value) return;
+    if (seq === undefined || !visible.value || !servesRequest()) return;
     focusServed.set(store, seq);
     openedByUser.value = true;
     await nextTick();
@@ -1692,10 +1769,21 @@ watch(
   },
 );
 
+// A request names its window; `null` is the primary container's.
+function servesRequest(): boolean {
+  return (store.focusRequest.value?.window ?? null) === (scopedSid.value ?? null);
+}
+
 // A late request is served only while it is the latest and focus has not moved on; a rejected one is retired so no remount replays it.
 function lateRequestVerdict(seq: number): "serve" | "retire" | "skip" {
   const request = store.focusRequest.value;
-  if (!request || request.seq !== seq || focusServed.get(store) === seq || !visible.value)
+  if (
+    !request ||
+    request.seq !== seq ||
+    focusServed.get(store) === seq ||
+    !visible.value ||
+    !servesRequest()
+  )
     return "skip";
   if (request.superseded) return "retire";
   const active = document.activeElement;
@@ -1722,7 +1810,7 @@ onMounted(async () => {
   if (!takeLateRequest(seq)) return;
   openedByUser.value = true;
   focusEntry();
-  region.value?.announce(t("assistant.announce.opened", { product }));
+  if (!scopedSid.value) region.value?.announce(t("assistant.announce.opened", { product }));
 });
 
 // Only an open that asked for focus is the user's; a restore or a silent route enter says nothing.
@@ -1752,7 +1840,7 @@ watch(
 watch(
   () => store.announcement.value,
   (line) => {
-    if (!line || !visible.value || line.sid !== store.state.shell.activeSid) return;
+    if (!line || !visible.value || line.sid !== activeSid.value) return;
     announceLine(line.key, line.params ?? {});
   },
 );

@@ -48,6 +48,8 @@ import type {
   ComposerSnapshot,
   ComposerState,
   Container,
+  FloatingWindow,
+  FocusedContainer,
   HistoryRow,
   HistoryService,
   Placement,
@@ -56,6 +58,7 @@ import type {
   ShellState,
   Sid,
   TurnInput,
+  WindowGeometry,
 } from "./assistantStore.types";
 import type { ContextChip } from "./context/types";
 import { createDraftStore, type DraftPayload, type DraftStore } from "./drafts";
@@ -68,6 +71,7 @@ import {
   readPlacement,
   readRecall,
   readSidebar,
+  readWindows,
   recallSelection,
   rememberSelection,
   removeAllSessionKeys,
@@ -77,12 +81,14 @@ import {
   writeAnnotation,
   writePlacement,
   writeSidebar,
+  writeWindows,
   type RecallEntry,
 } from "./prefs";
 import type { TurnLockReason } from "./lifecycle";
 import { getAssistantRuntime } from "./runtime";
-import { MAIN_MIN_REM, NAV_RAIL_REM, SIDEBAR_MIN_REM } from "./sidebarWidth";
+import { SIDEBAR_MIN_REM } from "./sidebarWidth";
 import { isTerminal, type TurnState, type TurnTerminal } from "./turnStates";
+import { MAX_FLOATING_CHATS, cascadeGeometry, openWindowCap } from "./windows";
 
 export { MAIN_MIN_REM, NAV_RAIL_REM, SIDEBAR_MIN_REM } from "./sidebarWidth";
 
@@ -103,6 +109,9 @@ export const SIGN_OUT_STOP_WAIT_MS = 300;
 export const SIDEBAR_MAX_REM = 32;
 
 const SIDEBAR_DEFAULT_MIN_REM = 22;
+
+/** The running-chat limit until a typed 429 names the server's own (W-08). */
+const DEFAULT_RUN_CAP = 3;
 
 const ROW_KINDS: ReadonlySet<ContextChip["kind"]> = new Set(["log_row", "cell", "span"]);
 
@@ -154,6 +163,8 @@ export interface AssistantStoreIdentity {
 export interface FocusRequest {
   seq: number;
   target: "composer";
+  /** The window that serves it; `null` is the primary container. */
+  window: Sid | null;
   /** What held focus when the request was made; a container that mounts late serves it only while focus stays there. */
   from: WeakRef<Element> | null;
   /** A later open that asked for no focus voids this request for a container that has not served it yet. */
@@ -168,11 +179,22 @@ export interface AssistantAnnouncement {
   params?: Record<string, unknown>;
 }
 
+/** A window move the layer's status region speaks (`20` §6.1). */
+export interface WindowAnnouncement {
+  seq: number;
+  key: I18nKey;
+  title: I18nText | null;
+  /** The chat a pin sent to the tray, named in the same sentence. */
+  other?: I18nText | null;
+}
+
 /** `createSession`'s init; `messages` seeds a hand-off transcript on a new or reused blank session. */
 export type SessionInit = Parameters<AssistantStoreApi["createSession"]>[0] & {
   messages?: ChatMessage[];
   /** A helper or analysis session: never saved, never listed, never the shell's active chat. */
   ephemeral?: boolean;
+  /** A window's new chat: a real chat that leaves the primary container's alone. */
+  detached?: boolean;
 };
 
 /** A chat read from history: its transcript, title and record fields as the server or this browser keeps them. */
@@ -185,21 +207,37 @@ export interface AdoptInit {
   record: Partial<RecordMeta>;
 }
 
-/** `open`'s options; `forcePinned` pins this open only, without touching `placement.mode`. */
-export type OpenOptions = Parameters<AssistantStoreApi["open"]>[1] & { forcePinned?: boolean };
+/** `open`'s options; `sidebarCapRem` holds the sidebar's width for this open only. */
+export type OpenOptions = Parameters<AssistantStoreApi["open"]>[1] & { sidebarCapRem?: number };
 
 /** The store as the runtime and the doors see it: the binding API plus the seams later packages fill. */
 export interface AssistantStoreInternal extends AssistantStoreApi {
   readonly drafts: DraftStore;
   readonly headerLight: ComputedRef<HeaderLight>;
-  /** Below 20 rem beside 32 rem of `<main>` the sidebar cannot pin (`20` §2.1). */
-  readonly sidebarForcedFloating: ComputedRef<boolean>;
-  /** The open that pinned a floating sidebar so it would not cover its source (`20` §2.1). */
-  readonly sidebarForcedPinned: Readonly<Ref<boolean>>;
   /** The cross-tab lock on starting a turn in `sid` (`null` for a chat not yet created). */
   turnLockOf(sid: Sid | null): TurnLockReason | null;
   readonly focusRequest: Readonly<Ref<FocusRequest | null>>;
   readonly announcement: Readonly<Ref<AssistantAnnouncement | null>>;
+  readonly windowAnnouncement: Readonly<Ref<WindowAnnouncement | null>>;
+  /** The window a chat is in, open or in the tray. */
+  windowOf(sid: Sid | null | undefined): FloatingWindow | null;
+  /** The chat in the most recently focused visible container, where a door lands. */
+  frontSid(): Sid | null;
+  /** Any chat shows: the primary container or an open window. */
+  anyContainerVisible(): boolean;
+  /** Open windows, most recently focused first. */
+  windowsByRecency(): Sid[];
+  raiseWindow(sid: Sid): void;
+  setWindowGeometry(sid: Sid, geometry: WindowGeometry): void;
+  /** A door or the Chats view puts another chat in this window; the one it held keeps running. */
+  replaceWindowChat(windowSid: Sid, nextSid: Sid, opts?: { focus?: "composer" | "none" }): void;
+  /** Opens a chat from a window's list in that window, or raises it where it already shows. */
+  openInWindow(windowSid: Sid, target: { sid: Sid } | { chatId: number }): Promise<Sid>;
+  /** Minimises the least recent windows over this width's cap; below 1024 px the values stay. */
+  fitWindowsToViewport(): void;
+  /** Focus goes to the next visible container's composer; false when none shows. */
+  focusNextContainer(): boolean;
+  noteFocusedContainer(container: FocusedContainer): void;
   createSession(init: SessionInit): Sid;
   open(target: Placement, opts: OpenOptions): void;
   setIdentity(identity: AssistantStoreIdentity | null): void;
@@ -210,7 +248,6 @@ export interface AssistantStoreInternal extends AssistantStoreApi {
   invokerOf(sid: Sid): HTMLElement | null;
   /** When the session's last turn ended, for the 30 min thread rule. */
   lastTurnAt(sid: Sid): number | null;
-  hasStoredSidebarMode(): boolean;
   /** Post-completion data on an immutable block (`00` §4.2 rule 10). */
   annotate(sid: Sid, blockId: string, patch: BlockAnnotation): void;
   /** A save in flight keeps the session from being released until it settles. */
@@ -281,8 +318,6 @@ export interface AssistantPlacementView {
   placement: ComputedRef<Placement>;
   isVisible: ComputedRef<boolean>;
   container: ComputedRef<Container | null>;
-  sidebarForcedFloating: ComputedRef<boolean>;
-  sidebarForcedPinned: ComputedRef<boolean>;
   focusRequest: Readonly<Ref<FocusRequest | null>>;
   open: AssistantStoreInternal["open"];
   close: AssistantStoreApi["close"];
@@ -303,6 +338,8 @@ interface StoreCore {
   drafts: DraftStore;
   viewportRem(): number;
   turnLock(sid: Sid | null): TurnLockReason | null;
+  /** Set by the window slice, so the viewport and identity paths announce the same way. */
+  announceWindow(key: I18nKey, sid: Sid, other?: Sid): void;
   invokers: Map<Sid, WeakRef<HTMLElement>>;
   released: Set<Sid>;
   endedAt: Map<Sid, number>;
@@ -311,8 +348,8 @@ interface StoreCore {
   /** Drafts restored from storage this page load, until the composer announces them once. */
   restoredDrafts: Map<Sid, { imageCount: number }>;
   focusRequest: Ref<FocusRequest | null>;
-  sidebarModeStored: Ref<boolean>;
-  forcedPinned: Ref<boolean>;
+  /** Sids of this tab's windows, most recently focused first. */
+  windowRecency: Sid[];
   /** Every user+org this store was bound to, for the sign-out purge. */
   identities: Set<string>;
   signOutKeys(): Promise<string[]>;
@@ -320,8 +357,20 @@ interface StoreCore {
   writable(session: AssistantSession): boolean;
   persistDraft(session: AssistantSession): void;
   persistPlacement(): void;
+  persistWindows(): void;
   setActive(sid: Sid | null): void;
   releaseIdle(): void;
+}
+
+/** The chat a mount renders in `sid`'s place after an HA restore moves a session to a new id. */
+export function renameWindowSid(state: AssistantState, from: Sid, to: Sid): void {
+  const { shell } = state;
+  const win = shell.windows.find((w) => w.sid === from);
+  if (win) win.sid = to;
+  shell.trayOrder = shell.trayOrder.map((sid) => (sid === from ? to : sid));
+  const focused = shell.lastFocusedContainer;
+  if (focused && focused !== "sidebar" && focused.window === from)
+    shell.lastFocusedContainer = { window: to };
 }
 
 export function createAssistantStore(
@@ -338,16 +387,12 @@ export function createAssistantStore(
     headerLight: computed(() =>
       withRemoteLight(headerLightOf(state), options.remoteLight?.() ?? null),
     ),
-    // Pinned holds the width down to 20 rem first; only a window without room for even that floats.
-    sidebarForcedFloating: computed(
-      () => core.viewportRem() - NAV_RAIL_REM - SIDEBAR_MIN_REM < MAIN_MIN_REM,
-    ),
-    sidebarForcedPinned: core.forcedPinned,
     focusRequest: core.focusRequest,
     announcement: lifecycle.announcement,
     turnLockOf: (sid) => core.turnLock(sid),
     ...sessions,
     ...createPlacementSlice(core),
+    ...createWindowSlice(core),
     ...createComposerSlice(core),
     ...createTurnSlice(core),
     ...lifecycle.api,
@@ -452,12 +497,8 @@ export function useAssistantPlacement(
   const placement = computed(() => store.state.shell.placement);
   return {
     placement,
-    isVisible: computed(() => placement.value.kind !== "hidden"),
+    isVisible: computed(() => store.anyContainerVisible()),
     container: computed(() => containerOf(placement.value, lgUp.value)),
-    sidebarForcedFloating: computed(() => lgUp.value && store.sidebarForcedFloating.value),
-    sidebarForcedPinned: computed(
-      () => placement.value.kind === "sidebar" && store.sidebarForcedPinned.value,
-    ),
     focusRequest: store.focusRequest,
     open: store.open,
     close: store.close,
@@ -473,8 +514,16 @@ export function sessionView(session: AssistantSession, shell: ShellState): Sessi
     doneNotSaved: session.turn.state === "done" && session.turn.saved === "not_saved",
     needsYou: needsYou(session),
     unread: session.unread,
-    visible: shell.placement.kind !== "hidden" && shell.activeSid === session.sid,
+    visible:
+      (shell.placement.kind !== "hidden" && shell.activeSid === session.sid) ||
+      openWindowsOf(shell).some((w) => w.sid === session.sid),
   };
+}
+
+/** The windows on screen: the full view hides them all, and the tray is not visible. */
+export function openWindowsOf(shell: ShellState): FloatingWindow[] {
+  if (shell.placement.kind === "full") return [];
+  return shell.windows.filter((w) => w.state === "open");
 }
 
 /** `needs_you > working > unread > open > idle` over this tab's sessions of the current user+org. */
@@ -494,6 +543,8 @@ export function headerLightOf(state: AssistantState): HeaderLight {
   }
   if (state.shell.placement.kind !== "hidden")
     return { state: "open", sid: state.shell.activeSid, failed: false };
+  const windowed = openWindowsOf(state.shell)[0];
+  if (windowed) return { state: "open", sid: windowed.sid, failed: false };
   return { state: "idle", sid: null, failed: false };
 }
 
@@ -531,6 +582,7 @@ function createCore(
     drafts: options.drafts ?? createDraftStore(),
     viewportRem: options.viewportRem ?? windowRem,
     turnLock: (sid) => options.turnLock?.(sid) ?? null,
+    announceWindow: () => undefined,
     invokers: new Map(),
     released: new Set(),
     endedAt: new Map(),
@@ -538,8 +590,7 @@ function createCore(
     notices: reactive<Record<Sid, I18nKey>>({}),
     restoredDrafts: reactive(new Map<Sid, { imageCount: number }>()),
     focusRequest: shallowRef<FocusRequest | null>(null),
-    sidebarModeStored: ref(false),
-    forcedPinned: ref(false),
+    windowRecency: [],
     identities: new Set(),
     signOutKeys: options.signOutKeys ?? (async () => []),
     session: (sid) => (sid ? state.sessions[sid] : undefined),
@@ -566,6 +617,9 @@ function createCore(
       const { placement, previousPlacement } = state.shell;
       if (state.ready && state.userOrgKey)
         writePlacement(state.userOrgKey, { placement: { ...placement }, previousPlacement });
+    },
+    persistWindows() {
+      if (state.ready && state.userOrgKey) writeWindows(state.userOrgKey, state.shell.windows);
     },
     setActive(sid) {
       if (sid && !state.sessions[sid]) return;
@@ -615,6 +669,12 @@ function createSessionSlice(core: StoreCore) {
         state.sessions[own] = blankSession(own, state.userOrgKey, deps, init);
         return own;
       }
+      if (init.detached) {
+        const own = deps.uuid();
+        state.sessions[own] = blankSession(own, state.userOrgKey, deps, init);
+        state.recent = [own, ...state.recent];
+        return own;
+      }
       const active = core.session(state.shell.activeSid);
       if (active && active.userOrgKey === state.userOrgKey && isEmptySession(active)) {
         applyInit(active, init);
@@ -630,7 +690,13 @@ function createSessionSlice(core: StoreCore) {
         "sid" in target
           ? core.session(target.sid)
           : Object.values(state.sessions).find((s) => s.chatId === target.chatId);
+      // One chat, one container: a chat in a window comes forward there, unless the full view takes it.
+      if (known && windowOf(state.shell, known.sid) && state.shell.placement.kind !== "full") {
+        showWindow(core, known.sid, opts?.focus ? "composer" : "none");
+        return known.sid;
+      }
       if (known && !core.released.has(known.sid)) {
+        removeWindow(core, known.sid);
         core.setActive(known.sid);
         if (opts?.focus) requestFocus(core);
         return known.sid;
@@ -639,6 +705,7 @@ function createSessionSlice(core: StoreCore) {
         const sid = await deps.history.open(target);
         core.released.delete(sid);
         restoreStoredDraft(core, sid);
+        removeWindow(core, sid);
         core.setActive(sid);
         if (opts?.focus) requestFocus(core);
         return sid;
@@ -658,6 +725,7 @@ function createSessionSlice(core: StoreCore) {
       state.recent = state.recent.filter((id) => id !== sid);
       for (const map of [core.invokers, core.endedAt, core.savesPending]) map.delete(sid);
       core.released.delete(sid);
+      removeWindow(core, sid);
       if (state.shell.activeSid === sid) core.setActive(null);
       if (state.shell.invoker?.sid === sid) state.shell.invoker = null;
     },
@@ -722,27 +790,21 @@ function createPlacementSlice(core: StoreCore) {
     shell.placement = { ...target };
     const active = core.session(shell.activeSid);
     if (active && target.kind !== "hidden") active.unread = false;
+    if (target.kind === "sidebar") shell.lastFocusedContainer = "sidebar";
     core.persistPlacement();
   };
   const api: Pick<
     AssistantStoreInternal,
-    | "open"
-    | "close"
-    | "moveTo"
-    | "setSidebarWidth"
-    | "setSidebarMode"
-    | "setSheetSnap"
-    | "invokerOf"
-    | "hasStoredSidebarMode"
+    "open" | "close" | "moveTo" | "setSidebarWidth" | "setSheetSnap" | "invokerOf"
   > = {
     open(target, opts) {
       if (!state.ready) return;
       if (target.kind === "hidden") return api.close("close");
-      const wasSidebar = state.shell.placement.kind === "sidebar";
-      core.forcedPinned.value =
-        target.kind === "sidebar" &&
-        (!!opts.forcePinned || (wasSidebar && core.forcedPinned.value));
-      if (opts.sid) core.setActive(opts.sid);
+      state.shell.sidebarCapRem = target.kind === "sidebar" ? (opts.sidebarCapRem ?? null) : null;
+      if (opts.sid) {
+        removeWindow(core, opts.sid);
+        core.setActive(opts.sid);
+      }
       const sid = state.shell.activeSid;
       if (opts.invoker && sid) {
         const el = new WeakRef(opts.invoker);
@@ -770,12 +832,19 @@ function createPlacementSlice(core: StoreCore) {
       state.shell.placement =
         restore && previousPlacement ? { ...previousPlacement } : { kind: "hidden" };
       state.shell.previousPlacement = null;
-      core.forcedPinned.value = false;
+      state.shell.sidebarCapRem = null;
+      if (
+        state.shell.lastFocusedContainer === "sidebar" &&
+        state.shell.placement.kind !== "sidebar"
+      )
+        state.shell.lastFocusedContainer = null;
       core.persistPlacement();
     },
     moveTo(target) {
       if (!state.ready) return;
-      core.forcedPinned.value = false;
+      state.shell.sidebarCapRem = null;
+      if (target.kind === "full" && state.shell.activeSid)
+        removeWindow(core, state.shell.activeSid);
       apply(target);
     },
     setSidebarWidth(rem) {
@@ -784,19 +853,201 @@ function createPlacementSlice(core: StoreCore) {
       state.shell.sidebarWidthRem = widthRem;
       if (state.ready && state.userOrgKey) writeSidebar(state.userOrgKey, { widthRem });
     },
-    setSidebarMode(mode) {
-      state.shell.sidebarMode = mode;
-      core.forcedPinned.value = false;
-      core.sidebarModeStored.value = true;
-      if (state.ready && state.userOrgKey) writeSidebar(state.userOrgKey, { mode });
-    },
     setSheetSnap(snap) {
       state.shell.sheetSnap = snap;
     },
     invokerOf: (sid) => core.invokers.get(sid)?.deref() ?? null,
-    hasStoredSidebarMode: () => core.sidebarModeStored.value,
   };
   return api;
+}
+
+function createWindowSlice(core: StoreCore) {
+  const { state, deps } = core;
+  const windowAnnouncement = shallowRef<WindowAnnouncement | null>(null);
+  const announce = (key: I18nKey, sid: Sid, other?: Sid) => {
+    windowAnnouncement.value = {
+      seq: (windowAnnouncement.value?.seq ?? 0) + 1,
+      key,
+      title: core.session(sid)?.title ?? null,
+      ...(other && { other: core.session(other)?.title ?? null }),
+    };
+  };
+  core.announceWindow = announce;
+  const api: Pick<
+    AssistantStoreInternal,
+    | "floatChat"
+    | "pinChat"
+    | "minimiseWindow"
+    | "restoreWindow"
+    | "closeWindow"
+    | "raiseWindow"
+    | "setWindowGeometry"
+    | "replaceWindowChat"
+    | "openInWindow"
+    | "fitWindowsToViewport"
+    | "focusNextContainer"
+    | "noteFocusedContainer"
+    | "windowOf"
+    | "frontSid"
+    | "anyContainerVisible"
+    | "windowsByRecency"
+    | "windowAnnouncement"
+  > = {
+    windowAnnouncement,
+    floatChat(sid, opts = {}) {
+      if (!state.ready) return { ok: false, reason: "no_room" };
+      if (!core.session(sid)) return { ok: false, reason: "unknown_chat" };
+      if (windowOf(state.shell, sid)) {
+        showWindow(core, sid, opts.focus ?? "composer");
+        return { ok: true };
+      }
+      if (openWindowCap(core.viewportRem()) === 0) return { ok: false, reason: "no_room" };
+      if (state.shell.windows.length >= MAX_FLOATING_CHATS) return { ok: false, reason: "cap" };
+      const geometry = opts.geometry ?? cascadeGeometry(state.shell.windows);
+      if (state.shell.activeSid === sid) leavePrimary(core);
+      state.shell.windows.push({ sid, state: "open", geometry: { ...geometry } });
+      core.windowRecency = [sid, ...core.windowRecency];
+      makeRoom(core, sid);
+      state.shell.lastFocusedContainer = { window: sid };
+      const session = core.session(sid);
+      if (session) session.unread = false;
+      core.persistWindows();
+      announce("assistant.announce.floated", sid);
+      if ((opts.focus ?? "composer") === "composer") requestFocus(core, sid);
+      return { ok: true };
+    },
+    pinChat(sid) {
+      if (!state.ready || !windowOf(state.shell, sid)) return;
+      const shell = state.shell;
+      const displaced = shell.placement.kind === "sidebar" ? shell.activeSid : null;
+      const other = displaced && displaced !== sid ? core.session(displaced) : null;
+      // A blank chat has nothing to keep, so the swap only moves a chat that has something in it.
+      const swapped = other && !isEmptySession(other) ? other.sid : undefined;
+      const geometry = windowOf(shell, sid)?.geometry;
+      removeWindow(core, sid);
+      if (swapped && geometry) {
+        shell.windows.push({ sid: swapped, state: "minimised", geometry: { ...geometry } });
+        shell.trayOrder.push(swapped);
+      }
+      core.setActive(sid);
+      shell.previousPlacement = null;
+      shell.placement = { kind: "sidebar" };
+      shell.lastFocusedContainer = "sidebar";
+      const session = core.session(sid);
+      if (session) session.unread = false;
+      core.persistPlacement();
+      core.persistWindows();
+      announce(
+        swapped ? "assistant.announce.pinnedSwapped" : "assistant.announce.pinned",
+        sid,
+        swapped,
+      );
+      requestFocus(core);
+    },
+    minimiseWindow(sid, reason) {
+      const win = windowOf(state.shell, sid);
+      if (!win || win.state === "minimised") return;
+      trayWindow(core, win);
+      announce(
+        reason === "make_room" ? "assistant.announce.madeRoom" : "assistant.announce.minimised",
+        sid,
+      );
+      core.persistWindows();
+    },
+    restoreWindow(sid, opts = {}) {
+      const win = windowOf(state.shell, sid);
+      if (!win) return;
+      const wasMinimised = win.state === "minimised";
+      showWindow(core, sid, opts.focus ?? "composer");
+      if (wasMinimised) announce("assistant.announce.restored", sid);
+    },
+    closeWindow(sid) {
+      const session = core.session(sid);
+      if (!windowOf(state.shell, sid)) return;
+      if (session?.pendingConsent) deps.consent.cancel(sid, "container_closed");
+      const running = !!session && isRunning(session.turn);
+      announce(
+        running ? "assistant.announce.windowClosedRunning" : "assistant.announce.windowClosed",
+        sid,
+      );
+      removeWindow(core, sid);
+    },
+    raiseWindow(sid) {
+      const win = windowOf(state.shell, sid);
+      if (!win || win.state !== "open") return;
+      core.windowRecency = [sid, ...core.windowRecency.filter((id) => id !== sid)];
+      state.shell.lastFocusedContainer = { window: sid };
+    },
+    setWindowGeometry(sid, geometry) {
+      const win = windowOf(state.shell, sid);
+      if (!win) return;
+      win.geometry = { ...geometry };
+      core.persistWindows();
+    },
+    replaceWindowChat(windowSid, nextSid, opts = {}) {
+      const win = windowOf(state.shell, windowSid);
+      if (!win || !core.session(nextSid)) return;
+      if (windowSid !== nextSid) {
+        renameWindowSid(state, windowSid, nextSid);
+        core.windowRecency = core.windowRecency.map((id) => (id === windowSid ? nextSid : id));
+        core.persistWindows();
+      }
+      const session = core.session(nextSid);
+      if (session) session.unread = false;
+      if ((opts.focus ?? "composer") === "composer") requestFocus(core, nextSid);
+      else supersedeFocus(core);
+    },
+    async openInWindow(windowSid, target) {
+      const sid = await loadChat(core, target);
+      if (sid === windowSid) return sid;
+      if (windowOf(state.shell, sid)) {
+        showWindow(core, sid, "composer");
+        return sid;
+      }
+      if (state.shell.placement.kind !== "hidden" && state.shell.activeSid === sid) {
+        requestFocus(core);
+        return sid;
+      }
+      api.replaceWindowChat(windowSid, sid);
+      return sid;
+    },
+    fitWindowsToViewport() {
+      makeRoom(core, null);
+      core.persistWindows();
+    },
+    focusNextContainer() {
+      const nearest = nearestContainer(state.shell, core.windowRecency);
+      if (!nearest) return false;
+      state.shell.lastFocusedContainer = nearest;
+      requestFocus(core, nearest === "sidebar" ? null : nearest.window);
+      return true;
+    },
+    noteFocusedContainer(container) {
+      state.shell.lastFocusedContainer = container;
+    },
+    windowOf: (sid) => windowOf(state.shell, sid),
+    frontSid() {
+      const nearest = nearestContainer(state.shell, core.windowRecency);
+      return nearest && nearest !== "sidebar" ? nearest.window : state.shell.activeSid;
+    },
+    anyContainerVisible: () =>
+      state.shell.placement.kind !== "hidden" || openWindowsOf(state.shell).length > 0,
+    windowsByRecency() {
+      const open = openWindowsOf(state.shell).map((w) => w.sid);
+      const recent = core.windowRecency.filter((sid) => open.includes(sid));
+      return [...recent, ...open.filter((sid) => !recent.includes(sid))];
+    },
+  };
+  return { ...api, pickAgent: createPickAgent(core) };
+}
+
+function createPickAgent(core: StoreCore): AssistantStoreApi["pickAgent"] {
+  return (sid, agent) => {
+    const session = core.session(sid);
+    if (!session) return;
+    if (session.messages.length > 0) session.nextAgentId = agent;
+    else session.agentId = agent;
+  };
 }
 
 function createComposerSlice(core: StoreCore) {
@@ -990,7 +1241,7 @@ function createComposerSlice(core: StoreCore) {
 }
 
 function createTurnSlice(core: StoreCore) {
-  const { state, deps } = core;
+  const { deps } = core;
   const inFlight = new Map<Sid, Promise<TurnTerminal>>();
   const settle = (
     sid: Sid,
@@ -1005,7 +1256,7 @@ function createTurnSlice(core: StoreCore) {
     if (!isTerminal(session.turn) || toRaw(session.turn) === before) session.turn = terminal;
     // Completed blocks are immutable; later changes go to `annotations` (`00` §4.2 rule 10).
     session.messages = session.messages.map((message) => markRaw(toRaw(message)));
-    if (!sessionView(session, state.shell).visible) session.unread = true;
+    if (!shownNow(core, session)) session.unread = true;
     // A draft typed while the turn ran is not the one that was sent, so it stays.
     const stored = core.drafts.read(session.userOrgKey, sid);
     if (terminal.state !== "refused" && (!stored || isSentDraft(stored, sent)))
@@ -1123,13 +1374,28 @@ function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["o
   let announceSeq = 0;
   const restored = new Set<string>();
   let stopPrefsWatch: (() => void) | null = null;
+  let windowsLoaded: string | null = null;
 
   const loadSidebarPrefs = () => {
     if (!state.userOrgKey) return;
     const stored = readSidebar(state.userOrgKey);
     if (typeof stored.widthRem === "number") state.shell.sidebarWidthRem = stored.widthRem;
-    if (stored.mode) state.shell.sidebarMode = stored.mode;
-    core.sidebarModeStored.value = !!stored.mode;
+  };
+
+  // Sessions of the org switched back to are still here; only a reload needs them read again.
+  const loadWindows = (userOrgKey: string) => {
+    const stored = readWindows(userOrgKey).filter((win) => win.sid !== state.shell.activeSid);
+    state.shell.windows = stored;
+    state.shell.trayOrder = stored.filter((w) => w.state === "minimised").map((w) => w.sid);
+    core.windowRecency = stored.filter((w) => w.state === "open").map((w) => w.sid);
+    for (const { sid } of stored) {
+      if (core.session(sid)) continue;
+      void loadChat(core, { sid })
+        .catch((err: unknown) => afterOpenFailed(core, sid, err))
+        .finally(() => {
+          if (state.userOrgKey === userOrgKey && !core.session(sid)) removeWindow(core, sid);
+        });
+    }
   };
 
   const restoreTab = (userOrgKey: string) => {
@@ -1139,6 +1405,7 @@ function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["o
     // A duplicated tab starts hidden with an empty draft; only a reload restores (SH-02 AC 7).
     if (tab.duplicated) {
       core.drafts.clearAllForUser(userOrgKey);
+      writeWindows(userOrgKey, []);
       return;
     }
     const stored = readPlacement(userOrgKey);
@@ -1155,7 +1422,11 @@ function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["o
   const updateReady = () => {
     const ready = !!state.userOrgKey && !INERT_GATES.has(state.capability.gate);
     state.ready = ready;
-    if (ready && state.userOrgKey) restoreTab(state.userOrgKey);
+    if (!ready || !state.userOrgKey) return;
+    restoreTab(state.userOrgKey);
+    if (windowsLoaded === state.userOrgKey) return;
+    windowsLoaded = state.userOrgKey;
+    loadWindows(state.userOrgKey);
   };
 
   const api: Pick<
@@ -1173,6 +1444,9 @@ function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["o
       stopPrefsWatch?.();
       stopPrefsWatch = null;
       state.userOrgKey = identity?.userOrgKey ?? null;
+      // An org's windows leave with it and come back from its own stored list.
+      clearWindows(core);
+      windowsLoaded = null;
       if (identity) {
         core.identities.add(identity.userOrgKey);
         loadSidebarPrefs();
@@ -1228,7 +1502,10 @@ function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["o
         previousPlacement: null,
         activeSid: null,
         invoker: null,
+        sidebarCapRem: null,
       });
+      clearWindows(core);
+      windowsLoaded = null;
       for (const map of [core.invokers, core.endedAt, core.savesPending]) map.clear();
       core.released.clear();
     },
@@ -1246,7 +1523,10 @@ function initialState(viewportRem: () => number): AssistantState {
       previousPlacement: null,
       activeSid: null,
       sidebarWidthRem: defaultSidebarWidth(viewportRem()),
-      sidebarMode: "pinned",
+      sidebarCapRem: null,
+      windows: [],
+      trayOrder: [],
+      lastFocusedContainer: null,
       sheetSnap: "half",
       invoker: null,
     },
@@ -1258,6 +1538,7 @@ function initialState(viewportRem: () => number): AssistantState {
       hasMore: false,
       importState: "idle",
     },
+    runs: { cap: DEFAULT_RUN_CAP, cleared: [] },
   };
 }
 
@@ -1498,11 +1779,12 @@ function reviveDraft(core: StoreCore, sid: Sid): void {
   core.setActive(sid);
 }
 
-function requestFocus(core: StoreCore): void {
+function requestFocus(core: StoreCore, window: Sid | null = null): void {
   const active = typeof document === "undefined" ? null : document.activeElement;
   core.focusRequest.value = {
     seq: (core.focusRequest.value?.seq ?? 0) + 1,
     target: "composer",
+    window,
     from: active ? new WeakRef(active) : null,
     superseded: false,
   };
@@ -1514,10 +1796,129 @@ function supersedeFocus(core: StoreCore): void {
   if (request && !request.superseded) core.focusRequest.value = { ...request, superseded: true };
 }
 
+function windowOf(shell: ShellState, sid: Sid | null | undefined): FloatingWindow | null {
+  return sid ? (shell.windows.find((w) => w.sid === sid) ?? null) : null;
+}
+
+function forgetWindowRefs(core: StoreCore, sid: Sid): void {
+  const { shell } = core.state;
+  core.windowRecency = core.windowRecency.filter((id) => id !== sid);
+  const focused = shell.lastFocusedContainer;
+  if (focused && focused !== "sidebar" && focused.window === sid)
+    shell.lastFocusedContainer = nearestContainer(shell, core.windowRecency);
+}
+
+function removeWindow(core: StoreCore, sid: Sid): void {
+  const { shell } = core.state;
+  if (!windowOf(shell, sid)) return;
+  shell.windows = shell.windows.filter((w) => w.sid !== sid);
+  shell.trayOrder = shell.trayOrder.filter((id) => id !== sid);
+  forgetWindowRefs(core, sid);
+  core.persistWindows();
+}
+
+function clearWindows(core: StoreCore): void {
+  const { shell } = core.state;
+  shell.windows = [];
+  shell.trayOrder = [];
+  shell.lastFocusedContainer = null;
+  core.windowRecency = [];
+}
+
+function trayWindow(core: StoreCore, win: FloatingWindow): void {
+  const { shell } = core.state;
+  win.state = "minimised";
+  shell.trayOrder.push(win.sid);
+  forgetWindowRefs(core, win.sid);
+}
+
+// The sidebar counts when it shows; else the most recently focused open window.
+function nearestContainer(shell: ShellState, recency: readonly Sid[]): FocusedContainer {
+  const open = openWindowsOf(shell);
+  const focused = shell.lastFocusedContainer;
+  if (focused && focused !== "sidebar" && open.some((w) => w.sid === focused.window))
+    return focused;
+  if (shell.placement.kind === "sidebar") return "sidebar";
+  const recent = recency.find((sid) => open.some((w) => w.sid === sid)) ?? open[0]?.sid;
+  return recent ? { window: recent } : null;
+}
+
+function leastRecentOpen(core: StoreCore, keep: Sid | null): FloatingWindow | undefined {
+  const open = core.state.shell.windows.filter((w) => w.state === "open" && w.sid !== keep);
+  const rank = (win: FloatingWindow) => {
+    const at = core.windowRecency.indexOf(win.sid);
+    return at < 0 ? Number.POSITIVE_INFINITY : at;
+  };
+  return [...open].sort((a, b) => rank(b) - rank(a))[0];
+}
+
+// Auto-minimise never moves focus (`95` §4); below 1024 px the values stay for when the window grows.
+function makeRoom(core: StoreCore, keep: Sid | null): void {
+  const cap = openWindowCap(core.viewportRem());
+  if (cap === 0) return;
+  const { shell } = core.state;
+  while (shell.windows.filter((w) => w.state === "open").length > cap) {
+    const win = leastRecentOpen(core, keep);
+    if (!win) return;
+    trayWindow(core, win);
+    core.announceWindow("assistant.announce.madeRoom", win.sid);
+  }
+}
+
+// Raises an open window or brings one back from the tray, keeping the cap.
+function showWindow(core: StoreCore, sid: Sid, focus: "composer" | "none"): void {
+  const { shell } = core.state;
+  const win = windowOf(shell, sid);
+  if (!win) return;
+  if (win.state === "minimised") {
+    win.state = "open";
+    shell.trayOrder = shell.trayOrder.filter((id) => id !== sid);
+  }
+  core.windowRecency = [sid, ...core.windowRecency.filter((id) => id !== sid)];
+  shell.lastFocusedContainer = { window: sid };
+  makeRoom(core, sid);
+  const session = core.session(sid);
+  if (session) session.unread = false;
+  core.persistWindows();
+  if (focus === "composer") requestFocus(core, sid);
+  else supersedeFocus(core);
+}
+
+// A move out of the primary container is not a close, so no consent card is cancelled and no focus returns.
+function leavePrimary(core: StoreCore): void {
+  const { shell } = core.state;
+  shell.placement = { kind: "hidden" };
+  shell.previousPlacement = null;
+  shell.sidebarCapRem = null;
+  core.setActive(null);
+  core.persistPlacement();
+}
+
+async function loadChat(core: StoreCore, target: { sid: Sid } | { chatId: number }): Promise<Sid> {
+  const known =
+    "sid" in target
+      ? core.session(target.sid)
+      : Object.values(core.state.sessions).find((s) => s.chatId === target.chatId);
+  if (known && !core.released.has(known.sid)) return known.sid;
+  const sid = await core.deps.history.open(target);
+  core.released.delete(sid);
+  restoreStoredDraft(core, sid);
+  return sid;
+}
+
+// Below `lg` only the chat in front shows, through the sheet.
+function shownNow(core: StoreCore, session: AssistantSession): boolean {
+  const { shell } = core.state;
+  if (!sessionView(session, shell).visible) return false;
+  if (openWindowCap(core.viewportRem()) > 0 || !windowOf(shell, session.sid)) return true;
+  return shell.placement.kind === "hidden" && core.windowRecency[0] === session.sid;
+}
+
 function isIdle(core: StoreCore, session: AssistantSession): boolean {
   const { composer, turn } = session;
   return (
     session.sid !== core.state.shell.activeSid &&
+    !windowOf(core.state.shell, session.sid) &&
     !isRunning(turn) &&
     !composer.text &&
     composer.chips.length === 0 &&

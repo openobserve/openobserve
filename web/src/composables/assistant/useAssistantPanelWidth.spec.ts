@@ -81,7 +81,6 @@ describe("useAssistantPanelWidth with the revamp off", () => {
     const open = read({ isAiChatEnabled: true, isAiChatExpanded: false });
     expect(open.panelWidthRem.value).toBe(20);
     expect(open.placement.value).toBe("sidebar");
-    expect(open.floating.value).toBe(false);
     expect(read({ isAiChatEnabled: true, isAiChatExpanded: true }).panelWidthRem.value).toBe(40);
   });
 });
@@ -97,7 +96,7 @@ describe("useAssistantPanelWidth with the revamp on", () => {
     const { store } = runtime.current;
     const width = read();
     expect(width.panelWidthRem.value).toBe(0);
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     store.setSidebarWidth(24);
     expect(width.panelWidthRem.value).toBe(24);
     store.setSidebarWidth(30);
@@ -108,13 +107,15 @@ describe("useAssistantPanelWidth with the revamp on", () => {
     expect(width.panelWidthRem.value).toBe(22.5);
   });
 
-  it("reports 0 while floating, so nothing squeezes under the card", () => {
+  it("gives a too-narrow dock's fallback the cap it opened with, for that open only", () => {
     const { store } = runtime.current;
     const width = read();
-    store.setSidebarMode("floating");
-    store.open({ kind: "sidebar", mode: "floating" }, { focus: "none" });
-    expect(width.floating.value).toBe(true);
-    expect(width.panelWidthRem.value).toBe(0);
+    store.setSidebarWidth(24);
+    store.open({ kind: "sidebar" }, { focus: "none", sidebarCapRem: 20 });
+    expect(width.panelWidthRem.value).toBe(20);
+    store.close("close");
+    store.open({ kind: "sidebar" }, { focus: "none" });
+    expect(width.panelWidthRem.value).toBe(24);
   });
 
   it("reports the open dock's measured width, and 0 below lg where it is a sheet", () => {
@@ -136,7 +137,7 @@ describe("useAssistantPanelWidth with the revamp on", () => {
     window.addEventListener("resize", resized);
     const { store } = runtime.current;
     const width = read();
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     await nextTick();
     store.setSidebarWidth(26);
     await nextTick();

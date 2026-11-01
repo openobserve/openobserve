@@ -175,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="assistant-thread-menu"
             />
           </template>
+          <slot name="menu-first" />
           <template v-if="density === 'dense'">
             <ODropdownItem
               :icon-left="assistantGlyph.history"
@@ -259,8 +260,8 @@ import type { Container, Placement, Sid } from "@/composables/assistant";
 
 export interface AssistantThreadHeaderProps {
   sid: Sid | null;
-  placement: Placement["kind"] | "sheet";
-  /** Docked, sheet and below md: title and overflow only. */
+  placement: Placement["kind"] | "window" | "sheet";
+  /** Docked, window, sheet and below md: title and overflow only. */
   density: "default" | "dense";
   container: Container;
 }
@@ -268,6 +269,8 @@ export interface AssistantThreadHeaderProps {
 /** What the shell lends the header: its own New, and the in-panel Chats view that replaces its body. */
 export interface AssistantThreadHost {
   newChat(): void;
+  /** The chat this host shows, when it is not the primary container's. */
+  currentSid?(): Sid | null;
   chats?: { open: Readonly<Ref<boolean>>; set(open: boolean): void };
 }
 
@@ -317,6 +320,7 @@ const props = defineProps<AssistantThreadHeaderProps>();
 
 defineSlots<{
   "container-actions"?: () => unknown;
+  "menu-first"?: () => unknown;
   "menu-layout"?: () => unknown;
   "share-chip"?: () => unknown;
   share?: () => unknown;
@@ -468,10 +472,11 @@ function newFromList(): void {
 function askNew(): void {
   const previous = running.value ? props.sid : null;
   const title = String(titleText.value);
-  const before = store.state.shell.activeSid;
+  const shownChat = () => host?.currentSid?.() ?? store.state.shell.activeSid;
+  const before = shownChat();
   if (host) host.newChat();
   else history.create();
-  if (store.state.shell.activeSid === before) return;
+  if (shownChat() === before) return;
   history.announceText(t("assistant.thread.newAnnounce"));
   trackAssistant("ai_thread_action", { action: "new", had_running: !!previous });
   if (previous) keepsAnswering(previous, title);

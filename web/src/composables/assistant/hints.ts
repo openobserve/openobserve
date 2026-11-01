@@ -44,7 +44,7 @@ const TURN_STATUSES: ReadonlySet<string> = new Set([
   "interrupted",
 ]);
 
-const PREF_KEYS: ReadonlySet<string> = new Set(["prompt_history", "sidebar_width", "sidebar_mode"]);
+const PREF_KEYS: ReadonlySet<string> = new Set(["prompt_history", "sidebar_width"]);
 
 const HISTORY_OPS: ReadonlySet<string> = new Set(["create", "rename", "pin", "delete", "clear"]);
 

@@ -18,7 +18,6 @@ import { useStore } from "vuex";
 
 import useBreakpoint from "@/composables/useBreakpoint";
 
-import type { AssistantStoreInternal } from "./assistantStore";
 import type { Placement } from "./assistantStore.types";
 import { isAssistantV2 } from "./flags";
 import { openDockWidthRem } from "./hostAdapter";
@@ -49,11 +48,10 @@ let signalScope: EffectScope | null = null;
 let pendingSignal = false;
 
 export interface AssistantPanelWidth {
-  /** 0 when hidden, floating, a sheet or the full view; floating never squeezes a page. */
+  /** 0 when hidden, a sheet or the full view; a floating window never squeezes a page. */
   panelWidthRem: ComputedRef<number>;
   mainWidthPx: ComputedRef<number>;
   placement: ComputedRef<Placement["kind"]>;
-  floating: ComputedRef<boolean>;
 }
 
 /** The width the assistant takes from the page; the legacy flag-derived width while the revamp is off. */
@@ -65,7 +63,6 @@ export function useAssistantPanelWidth(): AssistantPanelWidth {
   // A width reader shown before any assistant surface builds the runtime, out of its own chunk.
   if (!handle.value) void ensureRuntime();
   const { lgUp } = useBreakpoint();
-  const floating = useSidebarFloating();
   const placement = computed<Placement>(
     () => handle.value?.store.state.shell.placement ?? { kind: "hidden" },
   );
@@ -74,32 +71,17 @@ export function useAssistantPanelWidth(): AssistantPanelWidth {
     const store = handle.value?.store;
     if (!lgUp.value || !store) return 0;
     if (current.kind === "docked") return openDockWidthRem();
-    if (current.kind !== "sidebar" || floating.value) return 0;
-    return sidebarWidthFor(store.state.shell.sidebarWidthRem, viewportRem(), false);
+    if (current.kind !== "sidebar") return 0;
+    const { sidebarWidthRem, sidebarCapRem } = store.state.shell;
+    return sidebarWidthFor(sidebarCapRem ?? sidebarWidthRem, viewportRem());
   });
   const width = {
     panelWidthRem,
     mainWidthPx,
     placement: computed(() => placement.value.kind),
-    floating,
   };
   watchResizeSignal(width);
   return width;
-}
-
-/** The sidebar renders as the floating card: chosen, or forced by a narrow window, unless pinned for this open. */
-export function useSidebarFloating(store?: AssistantStoreInternal): ComputedRef<boolean> {
-  const handle = runtimeHandle();
-  const { lgUp } = useBreakpoint();
-  return computed(() => {
-    const current = store ?? handle.value?.store;
-    if (!current) return false;
-    const placement = current.state.shell.placement;
-    const mode = placement.kind === "sidebar" ? placement.mode : current.state.shell.sidebarMode;
-    const forced = lgUp.value && current.sidebarForcedFloating.value;
-    const pinned = placement.kind === "sidebar" && current.sidebarForcedPinned.value;
-    return (mode === "floating" || forced) && !pinned;
-  });
 }
 
 /** Fires one window `resize` after the layout settled: on the column's `transitionend`, else the next frame. */
@@ -149,7 +131,6 @@ function legacyWidth(mainWidthPx: ComputedRef<number>): AssistantPanelWidth {
     ),
     mainWidthPx,
     placement: computed(() => (enabled.value ? "sidebar" : "hidden")),
-    floating: computed(() => false),
   };
 }
 
@@ -158,7 +139,7 @@ function watchResizeSignal(width: AssistantPanelWidth): void {
   if (signalScope) return;
   signalScope = effectScope(true);
   signalScope.run(() => {
-    watch([width.panelWidthRem, width.placement, width.floating], () => scheduleResizeSignal(), {
+    watch([width.panelWidthRem, width.placement], () => scheduleResizeSignal(), {
       flush: "post",
     });
   });

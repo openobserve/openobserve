@@ -24,15 +24,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="column"
       data-test="assistant-sidebar-host"
       :[DRAWER_INSET_ATTR]="''"
-      :data-mode="floating ? 'floating' : 'pinned'"
       :data-dragging="liveWidth !== null ? '' : undefined"
-      :class="[floating ? FLOATING_CLASSES : PINNED_CLASSES, liveWidth === null ? MOTION : '']"
+      :class="[PINNED_CLASSES, liveWidth === null ? MOTION : '']"
+      @pointerdown="onChromeDown"
+      @pointermove="onChromeMove"
+      @pointerup="endTearOff"
+      @pointercancel="endTearOff"
+      @focusin="store.noteFocusedContainer('sidebar')"
     >
       <AssistantResizeHandle
         :width-rem="shownWidthRem"
         :min-rem="SIDEBAR_MIN_REM"
         :max-rem="maxWidthRem"
-        :edge="floating ? 'inside' : 'straddle'"
+        edge="straddle"
         @resize="(rem) => (liveWidth = rem)"
         @commit="commitWidth"
         @reset="resetWidth"
@@ -64,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AssistantStatusDot v-if="peekSignal" :state="peekSignal" />
         </span>
       </template>
-      <AssistantShell placement="sidebar" sheet />
+      <AssistantShell placement="sidebar" sheet :sid="sheetWindowSid" />
     </OSheet>
   </template>
   <AssistantLifecycleDialogs />
@@ -95,25 +99,10 @@ const MOTION = "motion-safe:transition-[width] motion-safe:duration-150";
 /** A burst of key steps or a drag reports its width once it settles. */
 export const RESIZE_REPORT_MS = 600;
 
-const SOURCE_CLASSES = ["ring-2", "ring-inset", "ring-focus-ring-accent"];
-
-const FLOATING_CLASSES = [
-  "bg-surface-base border-border-default rounded-surface fixed end-2 bottom-2 z-5000 border shadow-lg",
-  "top-[calc(var(--navbar-height,2.25rem)+0.5rem)] overflow-hidden",
-  WIDTH,
-].join(" ");
-
 const LANDSCAPE_PHONE_REM = 30;
 
-/** True when any part of the focused rect lies under the floating card, so a focused control is never even partly hidden. */
-export function coveredBy(target: DOMRect, card: DOMRect): boolean {
-  return (
-    target.left < card.right &&
-    target.right > card.left &&
-    target.top < card.bottom &&
-    target.bottom > card.top
-  );
-}
+// A press on a control or the resize handle is never a tear-off.
+const NO_TEAR_OFF = "button, a, input, textarea, select, [role='button'], [role='separator']";
 </script>
 
 <script setup lang="ts">
@@ -127,6 +116,11 @@ import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateStat
 import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 import {
   SIDEBAR_MIN_REM,
+  TEAR_OFF_REM,
+  WINDOW_DEFAULT_H_REM,
+  WINDOW_DEFAULT_W_REM,
+  defaultWidthRem,
+  openWindowCap,
   readSidebar,
   registerContainerCloser,
   sidebarWidthFor,
@@ -136,7 +130,7 @@ import {
   useAssistantShortcuts,
   useAssistantStore,
   useDeepLinkDoor,
-  useSidebarFloating,
+  type WindowGeometry,
 } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -146,14 +140,12 @@ import type { SheetSnap } from "@/lib/overlay/Sheet/OSheet.types";
 import { trackAssistant, type AiEventProps } from "@/services/assistantAnalytics";
 import { useI18nTyped } from "@/types/i18n";
 
-import { defaultWidthRem } from "./AssistantContainerMenu.vue";
 import AssistantLifecycleDialogs from "./AssistantLifecycleDialogs.vue";
 import AssistantResizeHandle from "./AssistantResizeHandle.vue";
 import AssistantShell from "./AssistantShell.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
+import { tearOffRequest } from "./assistantWindowHost";
 import { closeLockedPanel, lockedPanelMoved, useLockedPanel } from "./lockedPanel";
-
-const INSET_END = "--o-assistant-inset-end";
 
 const SNAP_ORDER: SheetSnap[] = ["peek", "half", "full"];
 
@@ -187,24 +179,28 @@ const region = ref<InstanceType<typeof AssistantStatusRegion> | null>(null);
 const liveWidth = ref<number | null>(null);
 const viewportRem = ref(window.innerWidth / 16);
 let reportTimer: ReturnType<typeof setTimeout> | null = null;
-let marked: HTMLElement | null = null;
 let returnFocusTo: HTMLElement | null = null;
-let main: HTMLElement | null = null;
+let tearOff: { pointerId: number; x: number; y: number } | null = null;
+let lastShownSid: string | null = null;
 
 useAssistantShortcuts();
 
 // G0 and G1 mount no container at all, so the page holds nothing of the assistant (SH-01 AC 8).
 const mountable = computed(() => !UNMOUNTED_GATES.has(capability.gate.value));
 const onAssistantRoute = computed(() => route.name === "assistant");
+// Below `lg` there are no windows: with no sidebar chat, the sheet shows the window in front.
+const sheetWindowSid = computed(() => {
+  if (lgUp.value || placement.placement.value.kind !== "hidden") return null;
+  return store.windowsByRecency()[0] ?? null;
+});
 const visible = computed(
   () =>
     !onAssistantRoute.value &&
-    (placement.placement.value.kind === "sidebar" || !!lockedPanel.value),
+    (placement.placement.value.kind === "sidebar" || !!lockedPanel.value || !!sheetWindowSid.value),
 );
-const floating = useSidebarFloating(store);
 
 const activeSession = computed(
-  () => store.state.sessions[store.state.shell.activeSid ?? ""] ?? null,
+  () => store.state.sessions[sheetWindowSid.value ?? store.state.shell.activeSid ?? ""] ?? null,
 );
 const peekTitle = computed(() => activeSession.value?.title ?? t("assistant.thread.newChatTitle"));
 const peekSignal = computed<AssistantSignal | null>(() => {
@@ -220,6 +216,7 @@ const unregisterCloser = registerContainerCloser(() => close("escape"));
 function close(reason: "close" | "escape"): void {
   trackAssistant("ai_container_closed", { reason });
   if (lockedPanel.value) closeLockedPanel();
+  else if (sheetWindowSid.value) store.closeWindow(sheetWindowSid.value);
   else store.close(reason);
 }
 
@@ -245,7 +242,7 @@ function onOpen(): void {
   const origin = sid ? store.state.sessions[sid]?.origin.entryKind : undefined;
   trackAssistant("ai_container_opened", {
     from: store.focusRequest.value ? (ENTRY_FROM[origin ?? ""] ?? "door") : "restore",
-    placement_mode: lgUp.value ? (floating.value ? "floating" : "pinned") : "sheet",
+    placement_mode: lgUp.value ? "sidebar" : "sheet",
     turn_running: activeRunning(),
     latency_ms: 0,
   });
@@ -266,18 +263,14 @@ async function onClose(): Promise<void> {
 }
 
 // The drawn width, which the handle also reports: a stored width too wide for this window is held, never floated.
-const shownWidthRem = computed(() =>
-  sidebarWidthFor(
-    liveWidth.value ?? store.state.shell.sidebarWidthRem,
-    viewportRem.value,
-    floating.value,
-  ),
-);
+const shownWidthRem = computed(() => {
+  const { sidebarWidthRem, sidebarCapRem } = store.state.shell;
+  const wanted = liveWidth.value ?? sidebarCapRem ?? sidebarWidthRem;
+  return sidebarWidthFor(wanted, viewportRem.value);
+});
 
-// Pinned, the page keeps 32 rem beside the panel, so a drag never pushes the panel into forced floating.
-const maxWidthRem = computed(() =>
-  sidebarWidthFor(Number.POSITIVE_INFINITY, viewportRem.value, floating.value),
-);
+// The page keeps 32 rem beside the panel.
+const maxWidthRem = computed(() => sidebarWidthFor(Number.POSITIVE_INFINITY, viewportRem.value));
 
 function writeWidth(): void {
   column.value?.style.setProperty("--o-assistant-sidebar-width", String(shownWidthRem.value));
@@ -312,54 +305,68 @@ function adoptLegacyWidth(): void {
   store.setSidebarWidth(viewportRem.value / 2);
 }
 
-// The page element the chat was asked about keeps a ring while the pinned card stays beside it.
-function markSource(): void {
-  const invoker = store.state.shell.invoker;
-  const el = invoker?.el.deref() ?? null;
-  const active =
-    visible.value &&
-    placement.sidebarForcedPinned.value &&
-    !!el?.isConnected &&
-    invoker?.sid === store.state.shell.activeSid &&
-    !el.closest("[data-assistant-root]");
-  // A door inside a panel's toolbar rings the whole panel, which is what the chat explains.
-  const next = active ? (el.closest<HTMLElement>("[data-assistant-source-scope]") ?? el) : null;
-  if (marked === next) return;
-  marked?.removeAttribute("data-assistant-source");
-  marked?.classList.remove(...SOURCE_CLASSES);
-  marked = next;
-  marked?.setAttribute("data-assistant-source", "");
-  marked?.classList.add(...SOURCE_CLASSES);
-}
-
 function writeInsetEnd(): void {
   const el = column.value;
-  if (el && visible.value && floating.value)
-    document.documentElement.style.setProperty(INSET_END, String(Math.round(el.offsetWidth)));
-  else document.documentElement.style.removeProperty(INSET_END);
   // A pinned panel keeps a page drawer beside it, so a door that opens both leaves both usable.
-  setDrawerInsetEnd(
-    el && visible.value && !floating.value ? el.offsetWidth : 0,
-    el && visible.value ? el : null,
-  );
+  setDrawerInsetEnd(el && visible.value ? el.offsetWidth : 0, el && visible.value ? el : null);
 }
 
-// A focused page control even partly under the floating card pins the card for this open.
-function onMainFocus(event: FocusEvent): void {
-  const card = column.value;
-  const target = event.target;
-  if (!card || !visible.value || !floating.value || !(target instanceof Element)) return;
-  if (!coveredBy(target.getBoundingClientRect(), card.getBoundingClientRect())) return;
-  const current = placement.placement.value;
-  if (current.kind !== "sidebar") return;
-  store.open(current, { focus: "none", forcePinned: true });
+function direction(): 1 | -1 {
+  return getComputedStyle(document.documentElement).direction === "rtl" ? -1 : 1;
+}
+
+function onChromeDown(event: PointerEvent): void {
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target?.closest("[data-assistant-chrome]") || target.closest(NO_TEAR_OFF)) return;
+  if (event.button !== 0 || openWindowCap(viewportRem.value) === 0) return;
+  tearOff = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+}
+
+// The window opens under the pointer at the default size, so the same drag carries on in it.
+function tornGeometry(event: PointerEvent): WindowGeometry {
+  const main = document.querySelector("main")?.getBoundingClientRect();
+  const fromMain =
+    direction() === 1 ? event.clientX - (main?.left ?? 0) : (main?.right ?? 0) - event.clientX;
+  return {
+    corner: "top-start",
+    dxRem: Math.max(fromMain / 16 - WINDOW_DEFAULT_W_REM / 2, 0),
+    dyRem: 0,
+    wRem: WINDOW_DEFAULT_W_REM,
+    hRem: WINDOW_DEFAULT_H_REM,
+  };
+}
+
+function onChromeMove(event: PointerEvent): void {
+  if (!tearOff || event.pointerId !== tearOff.pointerId) return;
+  const towardPage = (tearOff.x - event.clientX) * direction();
+  if (towardPage <= TEAR_OFF_REM * 16) return;
+  tearOff = null;
+  const sid = store.state.shell.activeSid;
+  if (!sid) return;
+  tearOffRequest.value = {
+    sid,
+    pointerId: event.pointerId,
+    clientX: event.clientX,
+    clientY: event.clientY,
+  };
+  const floated = store.floatChat(sid, { geometry: tornGeometry(event) });
+  if (!floated.ok) tearOffRequest.value = null;
+  else trackAssistant("ai_window_opened", { from: "tear_off" });
+}
+
+function endTearOff(): void {
+  tearOff = null;
 }
 
 // A move to the full view or a dock is not a close: the new container announces and takes focus.
 watch(visible, (shown, was) => {
   if (shown && !was) onOpen();
+  const floated = !!store.windowOf(lastShownSid);
   const closed =
-    !lockedPanel.value && !lockedPanelMoved() && placement.placement.value.kind === "hidden";
+    !floated &&
+    !lockedPanel.value &&
+    !lockedPanelMoved() &&
+    placement.placement.value.kind === "hidden";
   if (!shown && was && closed) void onClose();
   void nextTick(writeInsetEnd);
 });
@@ -373,10 +380,18 @@ watch([column, shownWidthRem], writeWidth, {
   flush: "post",
 });
 // The column mounts late after a reload or a gate change, so its own arrival rewrites the inset.
-watch([column, visible, floating, () => store.state.shell.sidebarWidthRem, lgUp], writeInsetEnd, {
+watch([column, visible, () => store.state.shell.sidebarWidthRem, lgUp], writeInsetEnd, {
   immediate: true,
   flush: "post",
 });
+// The sidebar's chat clears as it floats, so the close watcher can still tell a move from a close.
+watch(
+  () => store.state.shell.activeSid,
+  (sid) => {
+    if (sid) lastShownSid = sid;
+  },
+  { immediate: true },
+);
 const columnSize =
   typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => writeInsetEnd());
 watch(column, (el, old) => {
@@ -384,37 +399,20 @@ watch(column, (el, old) => {
   if (el) columnSize?.observe(el);
 });
 watch(
-  [
-    visible,
-    () => placement.sidebarForcedPinned.value,
-    () => store.state.shell.activeSid,
-    () => store.state.shell.invoker,
-  ],
-  markSource,
-  { flush: "post" },
-);
-watch(
   () => store.state.userOrgKey,
   () => adoptLegacyWidth(),
   { immediate: true },
 );
 
 onMounted(() => {
-  main = document.querySelector("main");
-  main?.addEventListener("focusin", onMainFocus);
   window.addEventListener("resize", onViewport, { passive: true });
 });
 
 onBeforeUnmount(() => {
   unregisterCloser();
-  main?.removeEventListener("focusin", onMainFocus);
   window.removeEventListener("resize", onViewport);
-  document.documentElement.style.removeProperty(INSET_END);
   columnSize?.disconnect();
   setDrawerInsetEnd(0);
   if (reportTimer) clearTimeout(reportTimer);
-  marked?.removeAttribute("data-assistant-source");
-  marked?.classList.remove(...SOURCE_CLASSES);
-  marked = null;
 });
 </script>

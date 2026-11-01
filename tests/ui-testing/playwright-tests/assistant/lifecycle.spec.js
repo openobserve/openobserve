@@ -1,5 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-// Sign-out, org switch, two-tab prefs and the floating card's source rule with the flag on.
+// Sign-out, org switch, two-tab prefs and the door's source rule with the flag on.
 
 import { test, expect } from "@playwright/test";
 import { AssistantPage } from "../../pages/assistantPage.js";
@@ -275,7 +275,7 @@ test.describe("assistant lifecycle", () => {
     expect(fromB.some((c) => c.url.includes("stale-sid"))).toBe(false);
   });
 
-  test("SHELL-10 floating never covers the panel it explains; a left-column panel still opens floating", { tag: ["@mock", "@stack-ee"] }, async ({
+  test("SHELL-10 a panel door opens the sidebar, which pushes the page and never covers the panel it explains", { tag: ["@mock", "@stack-ee"] }, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -293,24 +293,11 @@ test.describe("assistant lifecycle", () => {
       await panel(title).locator('[data-test="ai-entry-panel-explain"]').click();
       await assistant.container().first().waitFor({ state: "visible" });
     };
-    const storedMode = () =>
-      page.evaluate(() =>
-        Object.keys(localStorage)
-          .filter((k) => k.startsWith("o2.assistant.sidebar:"))
-          .map((k) => JSON.parse(localStorage.getItem(k) || "{}").mode ?? null),
-      );
-    const host = assistant.sidebarHost();
     await explain("Right panel");
-    await expect(host).toHaveAttribute("data-mode", "pinned");
-    await expect(panel("Right panel")).toHaveAttribute("data-assistant-source", "");
-    await expect(panel("Right panel")).toHaveClass(/ring-2/);
-    // The ring is drawn, not only named: the panel's own box shadow carries it.
-    expect(await panel("Right panel").evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
-    expect((await storedMode()).filter(Boolean)).toEqual([]);
-    await assistant.close();
-    await expect(panel("Right panel")).not.toHaveAttribute("data-assistant-source", "");
-    await explain("Left panel");
-    await expect(host).toHaveAttribute("data-mode", "floating");
-    await expect(panel("Left panel")).not.toHaveAttribute("data-assistant-source", "");
+    await expect(assistant.sidebarHost()).toBeVisible();
+    const panelBox = await panel("Right panel").boundingBox();
+    const hostBox = await assistant.sidebarHost().boundingBox();
+    expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(hostBox.x);
+    await expect(page.locator('[data-test="assistant-window"]')).toHaveCount(0);
   });
 });

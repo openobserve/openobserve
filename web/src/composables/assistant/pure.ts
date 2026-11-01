@@ -75,7 +75,6 @@ export {
 export {
   scheduleResizeSignal,
   useAssistantPanelWidth,
-  useSidebarFloating,
   type AssistantPanelWidth,
 } from "./useAssistantPanelWidth";
 export { useAssistantLeaveGuard, type LeaveGuard } from "./lifecycleQuestions";

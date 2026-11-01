@@ -23,6 +23,7 @@ import type { HistoryDeps } from "@/composables/assistant/useAssistantHistory";
 import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex, hintBus } from "../__tests__/fakeAssistant";
+import { historyStubs } from "../__tests__/historyStubs";
 import AssistantShell, {
   SHELL_ROUTE_CONTEXT,
   STEP_ANNOUNCE_MS,
@@ -184,7 +185,7 @@ describe("AssistantShell states", () => {
     store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     await wrapper.get('[data-test="assistant-shell-close"]').trigger("click");
     expect(useLockedPanel().value).toBeNull();
     expect(store.state.shell.placement.kind).toBe("hidden");
@@ -322,7 +323,7 @@ describe("AssistantShell chrome and focus", () => {
     store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     const sid = store.state.shell.activeSid;
     await wrapper.get('[data-test="assistant-shell-close"]').trigger("click");
     expect(store.state.shell.placement.kind).toBe("hidden");
@@ -334,7 +335,7 @@ describe("AssistantShell chrome and focus", () => {
     store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "composer" });
+    store.open({ kind: "sidebar" }, { focus: "composer" });
     await flushPromises();
     expect(document.activeElement).toBe(root(wrapper).element);
     expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe(
@@ -347,7 +348,7 @@ describe("AssistantShell chrome and focus", () => {
     store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe("");
   });
@@ -357,7 +358,7 @@ describe("AssistantShell chrome and focus", () => {
     const sid = store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     store.announce(sid, "assistant.turn.done");
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe("Done");
@@ -380,7 +381,7 @@ describe("AssistantShell mounted after the open", () => {
   };
   const openFrom = (invoker: HTMLElement | null, focus: "composer" | "none" = "composer") => {
     invoker?.focus();
-    fake.current!.store.open({ kind: "sidebar", mode: "pinned" }, { focus });
+    fake.current!.store.open({ kind: "sidebar" }, { focus });
   };
 
   beforeEach(() => {
@@ -499,7 +500,7 @@ describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
     store.setDraft(sid, { text: "half" });
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "composer" });
+    store.open({ kind: "sidebar" }, { focus: "composer" });
     await flushPromises();
     const textarea = wrapper.get<HTMLTextAreaElement>(
       '[data-test="assistant-composer-field"]',
@@ -615,7 +616,7 @@ describe("WP-06 conversation wiring", () => {
     const sid = store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
-    store.open({ kind: "sidebar", mode: "pinned" }, { sid, focus: "none" });
+    store.open({ kind: "sidebar" }, { sid, focus: "none" });
     store.state.sessions[sid].messages.push(...(messages as never[]));
     store.state.sessions[sid].turn = turn as never;
     const wrapper = mount(AssistantShell, {
@@ -1009,7 +1010,7 @@ describe("AssistantShell decision cards", () => {
           billing_status: "eligible",
         },
       };
-    if (open) store.open({ kind: "sidebar", mode: "pinned" }, { sid, focus: "none" });
+    if (open) store.open({ kind: "sidebar" }, { sid, focus: "none" });
     const wrapper = mount(AssistantShell, {
       props: { placement: "sidebar" },
       slots: { composer: '<div data-test="assistant-composer">composer</div>' },
@@ -1128,7 +1129,7 @@ describe("AssistantShell history states", () => {
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
     store.state.sessions[sid].messages.push({ role: "user", content: raw("q") });
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     return sid;
   };
 
@@ -1140,6 +1141,61 @@ describe("AssistantShell history states", () => {
     expect(header.find('[data-test="assistant-shell-close"]').exists()).toBe(true);
     expect(header.find('[data-test="assistant-thread-menu"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-shell-menu"]').exists()).toBe(false);
+  });
+
+  it("keeps the header's actions in their order and adds no button for the Layout menu", async () => {
+    const { wrapper, store } = setup();
+    open(store);
+    await flushPromises();
+    const tests = wrapper
+      .get('[data-test="assistant-thread-header"]')
+      .findAll("[data-test]")
+      .map((el) => el.attributes("data-test"))
+      .filter((id) => /^assistant-(thread-(history|new|menu)|shell-)/.test(id ?? ""));
+    expect(tests).toEqual([
+      "assistant-thread-history",
+      "assistant-thread-new",
+      "assistant-thread-menu",
+      "assistant-shell-open-in-full-view",
+      "assistant-shell-close",
+    ]);
+  });
+
+  it("reaches Floating window from More in the sidebar header", async () => {
+    fake.current = fakeAssistant();
+    const { store } = fake.current;
+    open(store);
+    const sid = store.state.shell.activeSid;
+    const wrapper = mount(AssistantShell, {
+      props: { placement: "sidebar" },
+      global: {
+        plugins: [fakeRouter(), fakeVuex()],
+        stubs: { ...historyStubs, ODropdownGroup: { template: "<div><slot /></div>" } },
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    await wrapper.get('[data-test="assistant-shell-place-window"]').trigger("click");
+    expect(store.windowOf(sid)).toMatchObject({ state: "open" });
+    expect(store.state.shell.placement.kind).toBe("hidden");
+  });
+
+  it("shows the chat it is given and leaves the primary container's alone in a window", async () => {
+    const { wrapper, store } = setup({ placement: "window", sid: "" });
+    const pinned = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    const own = store.createSession({
+      origin: { entryKind: "thread_new", objectKind: "none", container: "window" },
+      detached: true,
+    });
+    store.state.sessions[own].messages.push({ role: "user", content: raw("q") });
+    store.floatChat(own, { focus: "none" });
+    await wrapper.setProps({ sid: own });
+    await flushPromises();
+    expect(root(wrapper).attributes("data-sid")).toBe(own);
+    expect(store.state.shell.activeSid).toBe(pinned);
+    expect(wrapper.find('[data-test="assistant-shell-close"]').exists()).toBe(false);
   });
 
   it("swaps the chat for the Chats view and back, keeping the chat mounted (D5 §3.2)", async () => {
@@ -1253,7 +1309,7 @@ describe("AssistantShell history states", () => {
 
   it("says a chat opened from the list was deleted elsewhere, but never over a transcript", async () => {
     const { wrapper, store } = setup();
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     await flushPromises();
     const notice = fake.current.history.deletedNotice as { value: unknown };
     notice.value = { sid: "gone", via: "server", opening: true };

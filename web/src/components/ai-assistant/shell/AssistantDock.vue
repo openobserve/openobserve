@@ -141,7 +141,8 @@ let focusSeen = store.focusRequest.value?.seq;
 
 async function focusIfAsked(): Promise<void> {
   const seq = store.focusRequest.value?.seq;
-  if (seq === undefined || seq === focusSeen) return;
+  // A request naming a window is that window's, even with a dock open beside it.
+  if (seq === undefined || seq === focusSeen || store.focusRequest.value?.window) return;
   focusSeen = seq;
   await nextTick();
   column.value?.querySelector<HTMLElement>("[data-assistant-composer]")?.focus();

@@ -139,14 +139,14 @@ describe("AssistantView", () => {
     store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     const sid = store.state.shell.activeSid;
     await router.push("/assistant");
     await flushPromises();
     expect(store.state.shell.placement.kind).toBe("full");
     await router.push("/logs");
     await flushPromises();
-    expect(store.state.shell.placement).toEqual({ kind: "sidebar", mode: "pinned" });
+    expect(store.state.shell.placement).toEqual({ kind: "sidebar" });
     expect(store.state.shell.activeSid).toBe(sid);
   });
 
