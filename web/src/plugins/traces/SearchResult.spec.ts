@@ -250,6 +250,11 @@ describe("SearchResult", () => {
     expect(metricsDashboard.exists()).toBe(true);
   });
 
+  it("pins the RED charts to the scroller's start edge so a sideways table scroll keeps them in view", () => {
+    const metricsDashboard = wrapper.find('[data-test="traces-metrics-dashboard"]');
+    expect(metricsDashboard.classes()).toEqual(expect.arrayContaining(["sticky", "start-0"]));
+  });
+
   it("should pass hits as a prop to TracesSearchResultList", () => {
     const list = wrapper.findComponent({ name: "TracesSearchResultList" });
     expect(list.exists()).toBe(true);

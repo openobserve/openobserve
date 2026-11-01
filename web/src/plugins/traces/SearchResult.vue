@@ -164,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="searchObj.meta.showHistogram"
             v-if="searchObj.data.stream.selectedStream.value && searchObj.searchApplied"
             ref="metricsDashboardRef"
+            class="sticky start-0 z-1"
             :streamName="searchObj.data.stream.selectedStream.value"
             :timeRange="{
               startTime: searchObj.data.datetime.startTime,
