@@ -174,8 +174,7 @@ async fn provider_active_model(provider: &Provider) -> Result<ActiveModel, error
     })
 }
 
-/// Returns the provider only when it belongs to `org_id`; a provider in another
-/// organization is reported as absent.
+/// A provider in another organization is reported as absent.
 pub async fn get(org_id: &str, id: &str) -> Result<Option<Provider>, errors::Error> {
     let client = get_orm_client_ro().await;
 
