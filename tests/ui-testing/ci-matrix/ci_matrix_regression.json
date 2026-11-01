@@ -109,7 +109,8 @@
       "traces-15189-saved-views-more-menu.spec.js",
       "traces-15222-string-replay-flag.spec.js",
       "traces-15248-llm-session-reply.spec.js",
-      "traces-15269-services-catalog-state.spec.js"
+      "traces-15269-services-catalog-state.spec.js",
+      "traces-15477-open-trace-new-tab.spec.js"
     ],
     "disabled": []
   },

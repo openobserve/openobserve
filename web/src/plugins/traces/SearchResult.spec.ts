@@ -372,6 +372,45 @@ describe("SearchResult", () => {
     });
   });
 
+  describe("Open trace in a new tab", () => {
+    const openFrom = async (row: any) => {
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const list = wrapper.findComponent({ name: "TracesSearchResultList" });
+      await list.vm.$emit("open-in-new-tab", row);
+      const call = open.mock.calls[0];
+      open.mockRestore();
+      return call;
+    };
+
+    afterEach(() => {
+      mockSearchObj.meta.searchMode = "traces";
+    });
+
+    it("opens the trace details with the row window and org in a noopener tab", async () => {
+      mockSearchObj.meta.searchMode = "traces";
+      const trace = { trace_id: "t-1", trace_start_time: 111, trace_end_time: 222 };
+      const [href, target, features] = await openFrom(trace);
+      const url = new URL(href as string, "http://localhost");
+      expect(url.searchParams.get("trace_id")).toBe("t-1");
+      expect(url.searchParams.get("from")).toBe("111");
+      expect(url.searchParams.get("to")).toBe("222");
+      expect(url.searchParams.get("org_identifier")).toBe("test-org");
+      expect(url.searchParams.has("span_id")).toBe(false);
+      expect(target).toBe("_blank");
+      expect(features).toBe("noopener");
+    });
+
+    it("includes span_id and the padded span window in spans mode", async () => {
+      mockSearchObj.meta.searchMode = "spans";
+      const span = { trace_id: "t-2", span_id: "s-9", start_time: 5_000_000, end_time: 6_000_000 };
+      const [href] = await openFrom(span);
+      const url = new URL(href as string, "http://localhost");
+      expect(url.searchParams.get("span_id")).toBe("s-9");
+      expect(url.searchParams.get("from")).toBe(String(5_000 - 60_000_000));
+      expect(url.searchParams.get("to")).toBe(String(6_000 + 3_600_000_000));
+    });
+  });
+
   describe("Time boxed search", () => {
     it("should handle time boxed search", async () => {
       const timeBoxData = { key: 1000000000 };

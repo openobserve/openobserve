@@ -203,7 +203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :ai-enabled="aiEnabled"
           :stream-doc-time-range="streamDocTimeRange"
           :query-window-us="queryWindowUs"
+          :row-href="traceDetailsHref"
           @row-click="expandRowDetail"
+          @open-in-new-tab="openTraceInNewTab"
           @page-change="(page: number) => changePage(page)"
           @cross-page="(page: number) => changePage(page, { fromCrossing: true })"
           @rows-per-page-change="changeRowsPerPage"
@@ -371,36 +373,45 @@ export default defineComponent({
       },
     );
 
-    const expandRowDetail = async (props: any) => {
-      let from: number;
-      let to: number;
-      searchObj.meta.resultGrid.navigation.lastOpenedId =
-        searchObj.meta.searchMode === "spans" ? props.span_id : props.trace_id;
-
+    const traceTimeRange = (props: any) => {
       if (searchObj.meta.searchMode === "spans") {
         // start_time / end_time are nanoseconds in raw span rows — convert to µs
         const spanStart = Math.floor((props.start_time || 0) / 1000);
         const spanEnd = Math.ceil((props.end_time || props.start_time || 0) / 1000);
-        from = spanStart - 60_000_000; // -1 min in µs
-        to = spanEnd + 3_600_000_000; // +1 hr in µs
-      } else {
-        from = props.trace_start_time;
-        to = props.trace_end_time;
+        return { from: spanStart - 60_000_000, to: spanEnd + 3_600_000_000 };
       }
+      return { from: props.trace_start_time, to: props.trace_end_time };
+    };
+
+    const traceDetailsLocation = (props: any, from: number, to: number) => ({
+      name: "traceDetails",
+      query: {
+        stream: router.currentRoute.value.query.stream,
+        trace_id: props.trace_id,
+        ...(searchObj.meta.searchMode === "spans" ? { span_id: props.span_id } : {}),
+        from,
+        to,
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+
+    const traceDetailsHref = (row: any) => {
+      const { from, to } = traceTimeRange(row);
+      return router.resolve(traceDetailsLocation(row, from, to)).href;
+    };
+
+    const openTraceInNewTab = (row: any) => {
+      window.open(traceDetailsHref(row), "_blank", "noopener");
+    };
+
+    const expandRowDetail = async (props: any) => {
+      searchObj.meta.resultGrid.navigation.lastOpenedId =
+        searchObj.meta.searchMode === "spans" ? props.span_id : props.trace_id;
+      const { from, to } = traceTimeRange(props);
 
       // The URL write is debounced; Back restores what this entry holds, so it must land before leaving.
       await patchUrlViewState();
-      router.push({
-        name: "traceDetails",
-        query: {
-          stream: router.currentRoute.value.query.stream,
-          trace_id: props.trace_id,
-          ...(searchObj.meta.searchMode === "spans" ? { span_id: props.span_id } : {}),
-          from,
-          to,
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
+      router.push(traceDetailsLocation(props, from, to));
 
       emit("get:traceDetails", props);
     };
@@ -522,6 +533,8 @@ export default defineComponent({
       metricsDashboardRef,
       scrollContainerRef,
       expandRowDetail,
+      traceDetailsHref,
+      openTraceInNewTab,
       onMetricsTimeRangeSelected,
       onMetricsEditorFilterSet,
       onMetricsEditorFilterRun,
