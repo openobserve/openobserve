@@ -1242,22 +1242,35 @@ mod tests {
 
     #[tokio::test]
     async fn with_downtimes_off_a_replicated_message_still_reaches_the_database() {
-        // The shared slot database outlives the test, so a fixed id could meet an earlier row.
+        // A fresh org isolates this row on the shared slot database and lets cleanup hard-delete
+        // it.
+        let org = format!("dt_{}", config::ider::generate());
         let replicated = Downtime {
-            id: config::ider::generate(),
+            org: org.clone(),
             ..slo_downtime()
         };
         let put = DowntimeMessage::Put {
-            org: "acme".to_string(),
+            org: org.clone(),
             downtime: Box::new(replicated.clone()),
         };
         apply(put, false).await.unwrap();
         let db = infra::db::get_orm_client_rw().await;
         assert_eq!(
-            table::downtimes::get_with(db, "acme", &replicated.id)
+            table::downtimes::get_with(db, &org, &replicated.id)
                 .await
                 .unwrap(),
-            Some(replicated)
+            Some(replicated.clone())
+        );
+
+        table::downtimes::delete_by_org_with(db, &org)
+            .await
+            .unwrap();
+        table::folders::delete_by_org(&org).await.unwrap();
+        assert_eq!(
+            table::downtimes::version_with(db, &org, &replicated.id)
+                .await
+                .unwrap(),
+            None
         );
     }
 }
