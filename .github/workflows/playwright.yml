@@ -923,7 +923,8 @@ jobs:
         uses: actions/github-script@v9
         env:
           VERDICT: ${{ steps.verdict.outcome }}
-          SMOKE: ${{ needs.check_changes.outputs.has_changes == 'true' && needs.generate_matrix.outputs.smoke_active != 'false' }}
+          SMOKE: ${{ needs.check_changes.outputs.has_changes == 'true' && needs.generate_matrix.outputs.smoke_active == 'true' }}
+          HAS_CHANGES: ${{ needs.check_changes.outputs.has_changes }}
         with:
           script: |
             if (process.env.SMOKE === 'true') {
@@ -932,6 +933,7 @@ jobs:
               if (pr.auto_merge) { core.info('Smoke run and auto-merge is on: leaving the placeholder to the full-matrix run.'); return; }
             }
             const conclusion = process.env.VERDICT === 'success' ? 'success' : 'failure';
+            const scope = process.env.HAS_CHANGES !== 'true' ? 'No Playwright changes' : process.env.SMOKE === 'true' ? 'Smoke' : 'Full matrix';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const runs = await github.paginate(github.rest.checks.listForRef, {
               ...context.repo, ref: context.payload.pull_request.head.sha, check_name: 'playwright_summary', filter: 'all', per_page: 100,
@@ -941,7 +943,7 @@ jobs:
             for (const r of placeholders) {
               await github.rest.checks.update({
                 ...context.repo, check_run_id: r.id, status: 'completed', conclusion, details_url: runUrl,
-                output: { title: `Full matrix: ${conclusion}`, summary: `Completed by the full-matrix run ${runUrl}` },
+                output: { title: `${scope}: ${conclusion}`, summary: `Completed by the ${scope} run ${runUrl}` },
               });
               core.info(`placeholder ${r.id} -> ${conclusion}`);
             }
