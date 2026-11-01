@@ -10,6 +10,30 @@
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
+const { ingestSequencedErrorSpans } = require('../../utils/trace-ingestion.js');
+const { deleteStream } = require('../../utils/traces-api.js');
+
+const SEEDED_PAIRS_9043 = 15;
+const PAGE_SIZE_9043 = 10;
+
+// Seeded spans are newest-first and alternate ok-op-NNN, err-op-NNN, so each page's operation names are known.
+const expectedOps9043 = (pageIndex) =>
+  Array.from({ length: PAGE_SIZE_9043 }, (_, k) => {
+    const row = pageIndex * PAGE_SIZE_9043 + k;
+    return `${row % 2 === 0 ? 'ok' : 'err'}-op-${String(Math.floor(row / 2)).padStart(3, '0')}`;
+  });
+
+async function readSettledPage9043(pm, pageIndex, { alreadySettled = false } = {}) {
+  const message = `Bug #9043: page ${pageIndex + 1} must show its own seeded spans, not a re-fetch of earlier rows`;
+  if (alreadySettled) expect(await pm.tracesPage.getResultOperationNames(), message).toEqual(expectedOps9043(pageIndex));
+  else await expect.poll(() => pm.tracesPage.getResultOperationNames(), { timeout: 30000, message }).toEqual(expectedOps9043(pageIndex));
+  const rowLinks = pm.tracesPage.page.locator(pm.tracesPage.searchResultList).locator('[data-test="trace-row-link"]');
+  const hrefs = await rowLinks.evaluateAll((links) => links.map((a) => a.getAttribute('href') || ''));
+  const ids = hrefs.map((href) => (href.match(/[?&]span_id=([^&#]+)/) || [])[1]);
+  expect(ids.length, 'Bug #9043 guard: every visible row must carry a trace-row-link').toBe(PAGE_SIZE_9043);
+  expect(ids.filter((id) => !id), `Bug #9043 guard: every row link must carry a span_id, got ${JSON.stringify(hrefs)}`).toEqual([]);
+  return ids;
+}
 
 test.describe("Traces Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -112,192 +136,52 @@ test.describe("Traces Regression Bugs", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Verify pagination cursor persists after trace detail navigation (Bug #9043)');
 
-    // Set a time range that will have enough traces
-    await pm.tracesPage.setTimeRange('15m');
-    testLogger.info('✓ Set time range to 15 minutes');
+    const stream = 'e2e_9043_' + Math.random().toString(36).slice(2, 7);
+    const ingest = await ingestSequencedErrorSpans(page, stream, SEEDED_PAIRS_9043);
+    expect(ingest.status, 'Precondition: seeded spans must ingest').toBe(200);
 
-    // Run trace search
-    const runBtn = pm.tracesPage.getRunQueryButton().first();
-    if (await runBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await runBtn.click();
-      testLogger.info('✓ Ran trace search');
+    try {
+      await pm.tracesPage.navigateToTracesUrlWithStream(stream);
+      await pm.tracesPage.setTimeRange('1h');
+      await pm.tracesPage.switchToSpansMode();
+      await pm.tracesPage.searchUntilResultCount(`${SEEDED_PAIRS_9043 * 2} Spans Found`);
+      await pm.tracesPage.setResultRecordsPerPage(PAGE_SIZE_9043);
+      await expect.poll(() => pm.tracesPage.getResultPageCount(), {
+        timeout: 20000,
+        message: `Setup error, not #9043: ${PAGE_SIZE_9043} rows per page did not apply (expected 3 pages)`,
+      }).toBe(3);
+
+      const pageOne = await readSettledPage9043(pm, 0);
+      await pm.tracesPage.goToResultPage(2);
+      const pageTwo = await readSettledPage9043(pm, 1);
+      expect(pageTwo.filter((id) => pageOne.includes(id)), 'page 2 must not repeat page 1').toEqual([]);
+
+      // Opening from page 2 is what makes a reset observable: from page 1, "next" lands on page 2 either way.
+      await pm.tracesPage.traceRowLinks().first().click();
+      await expect(page, 'the row link must open trace details').toHaveURL(/\/traces\/trace-details/, { timeout: 15000 });
+      const backButton = page.locator(pm.tracesPage.traceDetailsBackButton).first();
+      await expect(backButton, 'trace details must offer Back').toBeVisible({ timeout: 15000 });
+      await backButton.click();
+      await expect(page, 'Back must return to the traces list').not.toHaveURL(/\/traces\/trace-details/, { timeout: 15000 });
+
+      // The kept-alive list still shows the old rows until any re-run on activation lands, so read only once it is idle.
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.tracesPage.expectTraceListIdle();
+      expect(await readSettledPage9043(pm, 1, { alreadySettled: true }), 'Bug #9043: Back must show the same page of spans that was open').toEqual(pageTwo);
+
+      await pm.tracesPage.clickResultPaginationNext();
+      const pageThree = await readSettledPage9043(pm, 2);
+      expect(
+        pageThree.filter((id) => pageOne.includes(id) || pageTwo.includes(id)),
+        'Bug #9043: the page loaded after Back must continue past the shown rows, not re-fetch earlier ones',
+      ).toEqual([]);
+
+      const loaded = [...pageOne, ...pageTwo, ...pageThree];
+      expect(new Set(loaded).size, 'every seeded span must appear exactly once across the three pages').toBe(SEEDED_PAIRS_9043 * 2);
+      testLogger.info('PASSED: pagination continued from page 2 after Back (Bug #9043)');
+    } finally {
+      await deleteStream(page.request, stream);
     }
-
-    // Wait for traces to load
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-
-    // STEP 1: Get initial trace count and capture trace IDs before navigation
-    // Results arrive newest minute first, so traces older than a minute show 0 rows until the older slices land.
-    await expect.poll(() => pm.tracesPage.getTraceCount(), {
-      timeout: 30000,
-      message: 'Bug #9043: Should have initial traces to test pagination (no trace results available for this time range)',
-    }).toBeGreaterThan(0);
-    const initialTraceCount = await pm.tracesPage.getTraceCount();
-    testLogger.info(`Initial trace count: ${initialTraceCount}`);
-
-    // STEP 2: Click on first trace to open trace details
-    await pm.tracesPage.clickFirstTraceResult();
-    testLogger.info('✓ Clicked first trace to open details');
-
-    // Wait for trace details to load (either sidebar, dialog, or inline view)
-    const traceDetailsVisible = await pm.tracesPage.getTraceDetailsElements()
-      .first()
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-
-    if (traceDetailsVisible) {
-      testLogger.info('✓ Trace details opened successfully');
-    } else {
-      testLogger.info('Trace details may be displayed inline or differently');
-    }
-
-    // STEP 3: Navigate back from trace details
-    await pm.tracesPage.navigateBackFromTraceDetails();
-    testLogger.info('✓ Navigated back from trace details');
-
-    // Wait for traces list to be visible again
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    // STEP 4: Get trace count after navigation back with retry
-    let afterBackTraceCount = await pm.tracesPage.getTraceCount();
-    for (let retry = 0; retry < 5 && afterBackTraceCount === 0; retry++) {
-      testLogger.info(`Trace count still 0, retry ${retry + 1}/5...`);
-      await page.waitForTimeout(2000);
-      afterBackTraceCount = await pm.tracesPage.getTraceCount();
-    }
-    testLogger.info(`Trace count after navigating back: ${afterBackTraceCount}`);
-
-    // PRIMARY ASSERTION 1: Trace count should be preserved or similar after navigation
-    // It should not drop to 0 or drastically change
-    expect(afterBackTraceCount, 'Bug #9043: Trace count should be maintained after navigating back').toBeGreaterThan(0);
-    testLogger.info('✓ Trace count maintained after navigation');
-
-    // STEP 5: Check for duplicates in the trace list
-    // If pagination cursor resets, we would see the same traces loaded again
-    const afterBackTraceItems = pm.tracesPage.getTraceResultItems();
-    const afterBackCount = await afterBackTraceItems.count();
-
-    let afterBackTraceData = [];
-    for (let i = 0; i < Math.min(afterBackCount, 20); i++) {
-      const traceItem = afterBackTraceItems.nth(i);
-
-      // Try to extract trace ID from data attributes first (most reliable)
-      let traceId = await traceItem.getAttribute('data-trace-id').catch(() => null);
-
-      if (!traceId) {
-        // Fallback: look for trace_id in other data attributes
-        const allAttrs = await traceItem.evaluate(el => {
-          const attrs = {};
-          for (const attr of el.attributes) {
-            if (attr.name.includes('trace') || attr.name.includes('id')) {
-              attrs[attr.name] = attr.value;
-            }
-          }
-          return attrs;
-        }).catch(() => ({}));
-
-        // Find first attribute that looks like a trace ID (hex string 16-64 chars)
-        for (const [name, value] of Object.entries(allAttrs)) {
-          if (typeof value === 'string' && /^[a-f0-9]{16,64}$/i.test(value)) {
-            traceId = value;
-            testLogger.debug(`Found trace ID in attribute ${name}: ${value.substring(0, 16)}...`);
-            break;
-          }
-        }
-      }
-
-      // If still no trace ID, try to extract from HTML content
-      if (!traceId) {
-        const itemHTML = await traceItem.innerHTML().catch(() => '');
-        const traceIdMatch = itemHTML.match(/trace[_-]?id["\s:=]+([a-f0-9]{16,64})/i);
-        traceId = traceIdMatch ? traceIdMatch[1] : null;
-      }
-
-      // Only use traces with valid IDs for duplicate detection
-      // Text-based comparison is too unreliable for this test
-      if (traceId) {
-        afterBackTraceData.push({ index: i, id: traceId, text: traceId.substring(0, 16) + '...' });
-      } else {
-        testLogger.debug(`Trace at index ${i} has no extractable trace_id - skipping duplicate check for this entry`);
-      }
-    }
-    testLogger.info(`Captured ${afterBackTraceData.length} trace identifiers with valid IDs (out of ${afterBackCount} total)`);
-
-    // PRIMARY ASSERTION 2: No duplicate traces should be present
-    // Duplicate detection is the core validation for Bug #9043 (pagination cursor reset)
-    // If no trace IDs can be extracted, we cannot validate the bug fix - skip test to surface this in CI
-    if (afterBackTraceData.length === 0) {
-      testLogger.warn('⚠️  No trace IDs could be extracted from attributes or HTML');
-      testLogger.warn('⚠️  Cannot validate duplicate detection for Bug #9043 (text-based comparison unreliable due to dynamic timestamps/durations)');
-      testLogger.warn('⚠️  Skipping test - trace count validation alone is insufficient for Bug #9043');
-      testLogger.info('To enable validation, ensure trace elements have data-trace-id attributes or trace IDs in HTML');
-      test.skip(true, 'No extractable trace IDs - cannot validate Bug #9043 duplicate detection (core assertion)');
-    }
-
-    // Count duplicates by checking if the same trace identifier appears multiple times
-    const traceCounts = new Map();
-    afterBackTraceData.forEach(trace => {
-      traceCounts.set(trace.id, (traceCounts.get(trace.id) || 0) + 1);
-    });
-
-    const duplicates = [];
-    traceCounts.forEach((count, traceId) => {
-      if (count > 1) {
-        // Find sample trace with this ID
-        const sample = afterBackTraceData.find(t => t.id === traceId);
-        duplicates.push({
-          id: traceId.substring(0, 50) + '...',
-          count,
-          sample: sample?.text || 'N/A'
-        });
-      }
-    });
-
-    testLogger.info(`Found ${duplicates.length} duplicate trace entries`);
-    if (duplicates.length > 0) {
-      testLogger.warn('Duplicates detected (same trace ID appears multiple times):', {
-        duplicates: duplicates.slice(0, 3)
-      });
-    }
-
-    // Bug #9043 caused pagination cursor to reset, loading the same traces again
-    // Duplicates would show as same trace_id appearing multiple times in the results
-    expect(duplicates.length, 'Bug #9043: Should not have duplicate traces after navigating back (cursor should not reset)').toBe(0);
-    testLogger.info('✓ No duplicate traces detected - pagination cursor maintained correctly');
-
-    // STEP 6: Verify that scrolling/pagination works correctly after navigation
-    // Try to scroll the results container to trigger potential lazy loading
-    const resultsContainer = pm.tracesPage.getResultsContainer();
-    if (await resultsContainer.isVisible({ timeout: 3000 }).catch(() => false)) {
-      // Scroll to bottom to trigger pagination/infinite scroll if it exists
-      const scrollSuccess = await resultsContainer.evaluate(el => {
-        const prevScrollTop = el.scrollTop;
-        el.scrollTop = el.scrollHeight;
-        return el.scrollTop > prevScrollTop; // Return true if scroll actually happened
-      }).catch((error) => {
-        testLogger.warn('Could not scroll results container - may not support scrolling', { error: error.message });
-        return false;
-      });
-
-      if (scrollSuccess) {
-        testLogger.info('✓ Scrolled results container to bottom');
-
-        // Wait for potential lazy-load network response
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-        testLogger.info('✓ Waited for lazy-load response');
-
-        // Check trace count after scroll
-        const afterScrollCount = await pm.tracesPage.getTraceCount();
-        testLogger.info(`Trace count after scroll: ${afterScrollCount}`);
-
-        // If pagination is working, count should be >= the previous count
-        expect(afterScrollCount, 'Bug #9043: Trace count should not decrease after scrolling').toBeGreaterThanOrEqual(afterBackTraceCount);
-      } else {
-        testLogger.info('Container may not support scrolling - skipping scroll verification');
-      }
-    }
-
-    testLogger.info('✓ PASSED: Pagination cursor persistence test completed');
   });
 
   // ==========================================================================
