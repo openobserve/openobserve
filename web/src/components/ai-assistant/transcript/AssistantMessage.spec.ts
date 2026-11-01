@@ -71,7 +71,7 @@ describe("AssistantMessage", () => {
     document.body.innerHTML = "";
   });
 
-  it("heads an answer with its turn's agent, and the product's own without one", () => {
+  it("heads an answer with its agent only when that is not the default one", () => {
     const message = { role: "assistant", content: raw("hi") } as const;
     const handed = mount(AssistantMessage, {
       props: { message, turnId: "t1", agent: "sre", live: true },
@@ -80,9 +80,7 @@ describe("AssistantMessage", () => {
       "sre",
     );
     const plain = mount(AssistantMessage, { props: { message, turnId: "t1", live: true } });
-    expect(plain.get('[data-test="assistant-agent-identity"]').attributes("data-agent")).toBe(
-      "o2-ai",
-    );
+    expect(plain.find('[data-test="assistant-agent-identity"]').exists()).toBe(false);
   });
 
   it("says to whom only on the prompt that handed over", () => {
@@ -127,15 +125,26 @@ describe("AssistantMessage", () => {
     expect(wrapper.find("strong").exists()).toBe(false);
   });
 
-  it("shows the user's text as plain text, never Markdown, under You and the time (`30` §2.1)", () => {
+  it("keeps the range on the last turn's question line only, and no bubble", () => {
+    const last = mountMessage(user());
+    expect(last.find('[data-test="assistant-message-range"]').exists()).toBe(false);
+    expect(last.classes()).not.toContain("bg-assistant-user-bg");
+    const wrapper = mount(AssistantMessage, {
+      props: { message: user(), turnId: "t1", rangeLabel: raw("Last 1 h") },
+    });
+    expect(wrapper.get('[data-test="assistant-message-range"]').text()).toContain("Last 1 h");
+    expect(wrapper.get('[data-test="assistant-message-text"]').classes()).toContain(
+      "text-text-secondary",
+    );
+  });
+
+  it("shows the user's text as plain text, never Markdown, beside the time (`30` §2.1)", () => {
     const wrapper = mountMessage(user());
     const body = wrapper.get('[data-test="assistant-message-text"]');
     expect(body.text()).toBe("**not bold** <img src=x onerror=alert(1)>");
     expect(body.element.querySelector("strong, img")).toBeNull();
     expect(body.classes()).toContain("whitespace-pre-wrap");
-    expect(wrapper.get('[data-test="assistant-message-meta"]').text()).toMatch(
-      /^You · .*\d{2}:\d{2}/,
-    );
+    expect(wrapper.get('[data-test="assistant-message-meta"]').text()).toMatch(/\d{2}:\d{2}$/);
     expect(wrapper.attributes("data-test")).toBe("assistant-message-user");
   });
 
@@ -158,8 +167,7 @@ describe("AssistantMessage", () => {
     expect(wrapper.get('[data-test="assistant-message-meta"]').text()).toMatch(
       /^ada@example.com · /,
     );
-    const chip = wrapper.get('[data-test="assistant-message-chip-log_row"]');
-    expect(chip.text()).toContain("Log row · cart");
+    expect(wrapper.get('[data-test="assistant-message-chips"]').text()).toBe("Log row · cart");
     expect(wrapper.find('[data-test="assistant-context-chip-remove"]').exists()).toBe(false);
   });
 
@@ -203,7 +211,6 @@ describe("AssistantMessage", () => {
       ]),
     );
     expect(wrapper.attributes("data-test")).toBe("assistant-message-assistant");
-    expect(wrapper.find('[data-test="assistant-mark"]').exists()).toBe(true);
     expect(wrapper.get("h2").text()).toBe("Checkout 5xx spike");
     expect(wrapper.element.querySelector("img")).toBeNull();
     // A closed SQL fence is a runnable query block, never a code block with a Retry.
@@ -313,18 +320,18 @@ describe("AssistantMessage", () => {
       });
     };
 
-    it("puts the trail first, before the text it explains", () => {
+    it("runs no trail: the steps are rows of the queries line, after the text", () => {
       const wrapper = mountLive([
         { type: "text", text: "before" },
         ...steps,
         { type: "text", text: "after" },
       ]);
-      const order = Array.from(
-        wrapper.element.querySelectorAll(
-          '[data-test="assistant-steps"], [data-test="assistant-block-text"]',
-        ),
-      ).map((el) => el.getAttribute("data-test"));
-      expect(order).toEqual(["assistant-steps", "assistant-block-text", "assistant-block-text"]);
+      expect(wrapper.find('[data-test="assistant-steps"]').exists()).toBe(false);
+      const group = wrapper.get('[data-test="assistant-queries-group"]').element;
+      const texts = wrapper.findAll('[data-test="assistant-block-text"]');
+      expect(
+        texts.at(-1)!.element.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     });
 
     it("renders claim markers as numbered chips inside the sentence, never the raw marker", async () => {
@@ -339,13 +346,13 @@ describe("AssistantMessage", () => {
         root.querySelectorAll<HTMLElement>('[data-test^="assistant-claim-"]'),
       );
       expect(chips.map((chip) => [chip.dataset.test, chip.dataset.callId])).toEqual([
-        ["assistant-claim-1", "call_3"],
-        ["assistant-claim-1", "call_3"],
-        ["assistant-claim-2", "call_1"],
+        ["assistant-claim-2", "call_3"],
+        ["assistant-claim-2", "call_3"],
+        ["assistant-claim-1", "call_1"],
       ]);
       expect(chips.every((chip) => chip.closest("p span[data-claim]"))).toBe(true);
       expect(root.querySelector("p")?.textContent?.replace(/\s+/g, " ")).toBe(
-        "Reset by peer1 and1, see2.",
+        "Reset by peer2 and2, see1.",
       );
     });
 
@@ -400,7 +407,49 @@ describe("AssistantMessage", () => {
       expect(wrapper.find('a[href*="logout"]').exists()).toBe(false);
     });
 
-    it("adds the footer and feedback only once the turn is done", () => {
+    it("gives the first text the conclusion's weight, and leaves it to the findings when they exist", () => {
+      const plain = mountLive([{ type: "text", text: "Checkout returned 121 errors." }]);
+      expect(plain.get('[data-test="assistant-block-text"]').html()).toContain("text-text-heading");
+      const withFindings = mountLive([
+        { type: "text", text: "Some context." },
+        {
+          type: "findings",
+          findings: {
+            likelyCause: "Redis pool",
+            confidence: "low",
+            evidence: [],
+            ruledOut: [],
+            unknowns: [],
+            nextSteps: [],
+          },
+        },
+      ]);
+      expect(withFindings.get('[data-test="assistant-block-text"]').html()).not.toContain(
+        "text-text-heading",
+      );
+      const order = Array.from(
+        withFindings.element.querySelectorAll(
+          '[data-test="assistant-findings"], [data-test="assistant-block-text"]',
+        ),
+      ).map((el) => el.getAttribute("data-test"));
+      expect(order).toEqual(["assistant-findings", "assistant-block-text"]);
+    });
+
+    it("puts the live line above the text, under the question", () => {
+      const wrapper = mount(AssistantMessage, {
+        props: {
+          message: answer([{ type: "text", text: "partial" }]),
+          turnId: "t1",
+          live: true,
+        },
+        slots: { status: '<p data-test="status">live</p>' },
+      });
+      const status = wrapper.get('[data-test="status"]').element;
+      const text = wrapper.get('[data-test="assistant-block-text"]').element;
+      expect(status.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("adds the action row only once the turn is done", () => {
       const blocks = [
         ...steps,
         { type: "text" as const, text: "x" },
@@ -408,10 +457,8 @@ describe("AssistantMessage", () => {
       ];
       const done = mountLive(blocks);
       expect(done.find('[data-test="assistant-feedback"]').exists()).toBe(true);
-      expect(done.find('[data-test="assistant-turn-footer"]').exists()).toBe(true);
       const live = mountLive(blocks, { outcome: "live" });
       expect(live.find('[data-test="assistant-feedback"]').exists()).toBe(false);
-      expect(live.find('[data-test="assistant-turn-footer"]').exists()).toBe(false);
     });
   });
 });

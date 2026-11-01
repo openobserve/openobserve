@@ -67,6 +67,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
 
+  <div
+    v-else-if="!isUser"
+    role="group"
+    :aria-label="t('assistant.message.actionsName')"
+    :class="[
+      'flex shrink-0 items-center gap-1',
+      isLast
+        ? ''
+        : 'opacity-0 group-focus-within/message:opacity-100 group-hover/message:opacity-100 pointer-coarse:opacity-100',
+    ]"
+    data-test="assistant-msg-actions"
+  >
+    <AssistantIconButton
+      :label="copyAnswer.label"
+      :icon="copyAnswer.icon"
+      :data-test="copyAnswer.dataTest"
+      @click="copyAnswer.run"
+    />
+    <ODropdown align="end" privacy="mask">
+      <template #trigger>
+        <AssistantIconButton
+          :label="t('assistant.message.more')"
+          :icon="assistantGlyph.more"
+          data-test="assistant-msg-more"
+        />
+      </template>
+      <ODropdownItem
+        v-for="item in moreItems"
+        :key="item.id"
+        :disabled="item.disabled"
+        :focusable-unavailable="item.disabled"
+        :description="item.disabled ? item.reason : null"
+        :icon-left="item.icon"
+        class="max-md:min-h-11 pointer-coarse:min-h-11"
+        :data-test="item.dataTest"
+        @select="item.run"
+      >
+        {{ item.label }}
+      </ODropdownItem>
+      <ODropdownSeparator />
+      <ODropdownItem
+        icon-left="content-copy"
+        class="max-md:min-h-11 pointer-coarse:min-h-11"
+        data-test="assistant-copy-chat-id"
+        @select="copyChatId"
+      >
+        {{ t("assistant.message.copyChatId") }}
+      </ODropdownItem>
+    </ODropdown>
+  </div>
+
   <ODropdown v-else-if="!mdUp" align="end" privacy="mask">
     <template #trigger>
       <AssistantIconButton
@@ -301,6 +352,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -359,26 +411,30 @@ const running = computed(() => {
   return !!session && isRunning(session.turn);
 });
 
-const items = computed<ActionItem[]>(() => {
-  if (isUser.value)
-    return [
-      {
-        id: "edit",
-        label: t("assistant.message.edit"),
-        icon: assistantGlyph.edit,
-        dataTest: "assistant-msg-edit",
-        disabled: turnLocked.value,
-        reason: turnLockedReason.value,
-        run: () => emit("edit"),
-      },
-      copyItem("prompt", t("assistant.message.copyPrompt"), "assistant-msg-copy-prompt", () =>
-        String(props.message.content ?? ""),
-      ),
-    ];
-  const answer: ActionItem[] = [];
+const items = computed<ActionItem[]>(() => [
+  {
+    id: "edit",
+    label: t("assistant.message.edit"),
+    icon: assistantGlyph.edit,
+    dataTest: "assistant-msg-edit",
+    disabled: turnLocked.value,
+    reason: turnLockedReason.value,
+    run: () => emit("edit"),
+  },
+  copyItem("prompt", t("assistant.message.copyPrompt"), "assistant-msg-copy-prompt", () =>
+    String(props.message.content ?? ""),
+  ),
+]);
+
+const copyAnswer = computed(() =>
+  copyItem("answer", t("assistant.message.copyAnswer"), "assistant-msg-copy-answer", answerText),
+);
+
+const moreItems = computed<ActionItem[]>(() => {
+  const more: ActionItem[] = [];
   // Without B-12 a version replaces the latest answer only; an older turn would fork the chat.
   if (props.isLast && props.prompt && props.canRegenerate)
-    answer.push({
+    more.push({
       id: "regenerate",
       label: t("assistant.message.regenerate"),
       icon: assistantGlyph.regenerate,
@@ -387,11 +443,10 @@ const items = computed<ActionItem[]>(() => {
       reason: turnLockedReason.value,
       run: startRegenerate,
     });
-  answer.push(
-    copyItem("answer", t("assistant.message.copyAnswer"), "assistant-msg-copy-answer", answerText),
+  more.push(
     copyItem("markdown", t("assistant.message.copyMarkdown"), "assistant-msg-copy-md", answerMd),
   );
-  return answer;
+  return more;
 });
 
 function copyItem(
@@ -482,6 +537,18 @@ async function copy(id: string, content: string | Promise<string>): Promise<void
     });
   if (copiedTimer) clearTimeout(copiedTimer);
   copiedTimer = setTimeout(() => (copied.value = null), COPIED_MS);
+}
+
+async function copyChatId(): Promise<void> {
+  const result = await store.dispatch(props.sid, {
+    kind: "copy",
+    text: props.sid,
+    what: "chat_id",
+  });
+  announceComposer(
+    props.sid,
+    result.ok ? t("assistant.feedback.chatIdCopied") : t("assistant.client.copyManually"),
+  );
 }
 
 function startRegenerate(): void {

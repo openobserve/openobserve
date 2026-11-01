@@ -56,9 +56,9 @@ const DENIED_STATE: Record<
   ApprovalOutcome["state"]
 > = {
   deny: "declined",
-  escape: "declined",
   new_chat: "new_chat",
   reply: "replied",
+  answer: "answered",
   expired: "expired",
   withdrawn: "withdrawn",
   edited: "editing",
@@ -70,6 +70,7 @@ const OP_OF_KIND: Record<PendingApproval["kind"], ActionLedgerEntry["op"]> = {
   create: "create",
   run_command: "run_command",
   permission: "run_command",
+  question: "run_command",
 };
 
 /** What a decision came to: the record's state and, for an approve answered item by item, its rows. */
@@ -109,8 +110,11 @@ export function confirmBodyOf(
   card: Pick<
     ApprovalBlockData,
     "typed" | "grantable" | "destructive" | "kind" | "tool" | "operation"
-  >,
+  > &
+    Partial<Pick<ApprovalBlockData, "id">>,
 ): ConfirmBody {
+  if (!decision.approved && decision.reason === "answer")
+    return { id: card.id, answer: decision.answer };
   if (!decision.approved)
     return decision.reason === "reply" && decision.reply && card.typed
       ? { approved: false, reply: decision.reply }

@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`assistant-turn-${turn.turnId}`"
       :data-turn-id="turn.turnId"
       :aria-label="turnName(turn)"
-      class="flex min-w-0 flex-col gap-2"
+      class="[&+article]:border-border-subtle flex min-w-0 flex-col gap-2 [&+article]:border-t [&+article]:pt-4"
     >
       <div
         v-if="compactionOf(turn.user)"
@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :turn-id="turn.turnId"
         :readonly="readonly"
         :density="density"
+        :range-label="rangeLabelOf(turn)"
       >
         <template v-if="actionsFor(turn)" #actions>
           <AssistantMessageActions
@@ -191,10 +192,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :prompt="turn.user"
               :turn-id="turn.turnId"
               :is-last="turn.isLast"
-              :can-regenerate="!turn.outcomes.some((o) => o.record.kind === 'failed')"
+              :can-regenerate="canRegenerate(turn)"
               :prompt-number="turn.userNumber"
               :density="density"
             />
+          </template>
+          <template v-if="followUpsOf(turn).length" #follow-ups>
+            <AssistantFollowUps :sid="sid!" :items="followUpsOf(turn)" />
           </template>
         </AssistantMessage>
       </article>
@@ -338,6 +342,7 @@ import {
 } from "vue";
 
 import { announceComposer } from "@/components/ai-assistant/composer/composerUi";
+import { lastRangeText } from "@/components/ai-assistant/evidence/evidenceText";
 import AssistantTurnOutcome, {
   type OutcomeAction,
 } from "@/components/ai-assistant/turn/AssistantTurnOutcome.vue";
@@ -348,11 +353,13 @@ import {
   agentStore,
   currentAgent,
   assistantEvidenceHostKey,
+  isStaleAnswer,
   assistantSessionSourceKey,
   assistantTranscriptHostKey,
   manualRouteOf,
   outcomeError,
   promptRange,
+  stepsOf,
   turnAnnotationKey,
   useAssistantName,
 } from "@/composables/assistant/pure";
@@ -371,6 +378,8 @@ import { useTranscriptScroll } from "./useTranscriptScroll";
 
 // The bar and the inline editor act on the store, so a readonly page never loads them (constraint 29).
 const AssistantMessageActions = defineAsyncComponent(() => import("./AssistantMessageActions.vue"));
+
+const AssistantFollowUps = defineAsyncComponent(() => import("./AssistantFollowUps.vue"));
 
 const props = withDefaults(defineProps<AssistantTranscriptProps>(), {
   sid: undefined,
@@ -492,8 +501,9 @@ function compactionOf(message: ChatMessage | null | undefined): string | null {
   return block?.message ? String(block.message) : null;
 }
 
+// While a card waits the card itself is the turn's status.
 function statusShown(turn: TranscriptTurn): boolean {
-  return turn.live && !props.readonly && !!session.value;
+  return turn.live && !props.readonly && !!session.value && !session.value.pendingApproval;
 }
 
 function turnName(turn: TranscriptTurn): I18nText {
@@ -518,6 +528,29 @@ function answerActionsFor(turn: TranscriptTurn): boolean {
     (block) => block.type === "text" && !!block.text?.trim(),
   );
   return !!props.sid && !!live && !props.readonly && !running.value && !!text && !turn.live;
+}
+
+// Older turns keep the hour alone, so the last turn's range reads as the chat's current one.
+function rangeLabelOf(turn: TranscriptTurn): I18nText | null {
+  if (!turn.isLast) return null;
+  const window = promptRange(turn.user, askedWindowOf(turn.turnId));
+  return window ? lastRangeText(window, turn.user?.sentAt, t) : null;
+}
+
+// A failed turn acts through its outcome block, and a stale one has Re-run as its one path to new data.
+function canRegenerate(turn: TranscriptTurn): boolean {
+  if (turn.outcomes.some((outcome) => outcome.record.kind === "failed")) return false;
+  const steps = stepsOf(turn.answer, session.value?.org ?? "");
+  return !(turn.isLast && !!turn.user && isStaleAnswer(steps, Date.now()));
+}
+
+// At most three, and two under findings, which already fill the turn (the design's budget).
+function followUpsOf(turn: TranscriptTurn): string[] {
+  if (!turn.isLast || turn.live || props.readonly || !props.sid || !live) return [];
+  if (turn.outcomes.length) return [];
+  const blocks = turn.answer?.contentBlocks ?? [];
+  const items = blocks.find((block) => block.type === "follow_ups")?.followUps ?? [];
+  return items.slice(0, blocks.some((block) => block.type === "findings") ? 2 : 3);
 }
 
 // The picker's name is not re-read while focus stays inside it, so the switch is spoken (EB-09 AC 12).

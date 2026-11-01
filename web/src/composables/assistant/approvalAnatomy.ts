@@ -60,6 +60,12 @@ const PLACEMENT_FIELDS: ReadonlySet<string> = new Set([
 
 const ENABLED_FIELDS = ["value", "enabled", "enable"] as const;
 
+const UNTIL_FIELDS = ["paused_until", "until", "end_time", "expires_at"] as const;
+
+const SCOPE_FIELDS = ["folder_name", "folder", "team", "scope"] as const;
+
+const NOTIFY_FIELDS = ["notifies", "notify", "destinations", "channels"] as const;
+
 // Entity types with an in-app editor that opens one object by id.
 const EDITOR_ROUTES: Readonly<
   Record<string, (id: string, name: string, org: string) => RouteLocationRaw>
@@ -148,6 +154,42 @@ export function approvalEditor(
   return { type, route: open(id, approvalName(card) ?? "", org) };
 }
 
+/** When the change ends, epoch ms, from the argument that says so; `null` for a change with no end. */
+export function approvalUntil(card: Pick<Card, "args">): number | null {
+  const sources = [card.args, recordOf(card.args?.request_body)];
+  for (const source of sources)
+    for (const key of UNTIL_FIELDS) {
+      const value = source?.[key];
+      if (typeof value === "number" && value > 0) return epochMsOfWire(value);
+      const parsed = typeof value === "string" ? Date.parse(value) : Number.NaN;
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+  return null;
+}
+
+/** The folder or team the change sits in, for the card's meta; `null` when the card names none. */
+export function approvalScopeName(card: Pick<Card, "args">): string | null {
+  const sources = [card.args, recordOf(card.args?.request_body)];
+  for (const source of sources)
+    for (const key of SCOPE_FIELDS) {
+      const value = source?.[key];
+      if (typeof value === "string" && value.trim()) return value;
+    }
+  return null;
+}
+
+/** Who the change notifies, shown in Details; `null` when the card names nobody. */
+export function approvalNotifies(card: Pick<Card, "args">): string | null {
+  const sources = [card.args, recordOf(card.args?.request_body)];
+  for (const source of sources)
+    for (const key of NOTIFY_FIELDS) {
+      const value = source?.[key];
+      if (typeof value === "string" && value.trim()) return value;
+      if (Array.isArray(value) && value.length) return value.map(String).join(", ");
+    }
+  return null;
+}
+
 /** Whether a card changes something, so the scope select only shows on a batch of them. */
 export function isApprovalChange(card: Card): boolean {
   return approvalVerb(card) !== null;
@@ -165,6 +207,12 @@ function toggleOf(card: Pick<ApprovalBlockData, "tool" | "args">): { enabled: bo
     }
   }
   return null;
+}
+
+// Search times are microseconds on the wire, seconds in some tools.
+function epochMsOfWire(value: number): number {
+  if (value > 1e14) return Math.round(value / 1000);
+  return value < 1e12 ? value * 1000 : value;
 }
 
 function normalTool(tool: string): string {

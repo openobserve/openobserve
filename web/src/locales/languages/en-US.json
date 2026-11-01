@@ -9294,21 +9294,16 @@
       "askAgainPrompt": "Ask me again: {heading}",
       "askedElsewhere": "Asked in another tab",
       "cannotUndo": "Cannot be undone",
-      "change": "Change",
-      "command": "Command",
       "currentUnknown": "Current value unknown",
       "deny": "Deny",
       "details": "Details",
       "edit": "Edit then approve",
-      "editInEditor": "Edit in {editor}",
       "editor": {
-        "alert": "alert editor"
+        "alert": "Alerts"
       },
-      "effect": "Effect",
-      "escapeHint": "Esc declines",
       "expiresIn": "Expires in {time}",
       "expiringSoon": "Expires soon · {time}",
-      "gateTiming": "Approving needs a newer {product} agent. Nothing changes unless you approve; ask an admin to update the agent.",
+      "gateTiming": "Approvals aren't available on this server. Finish this in {editor}.",
       "heading": {
         "delete": "Delete {count} {entity}",
         "permission": "Allow {tool}",
@@ -9316,13 +9311,11 @@
       },
       "inOrg": "in {org}",
       "minutes": "{count} minute | {count} minutes",
-      "lastExtension": "No more time can be added.",
       "moreTargets": "and {count} more",
       "moreTime": "More time",
       "named": "{verb} {name}",
       "nameUnknown": "Couldn't load the name of {entity} {shortId}; you may not have access to it.",
       "needsOk": "Needs your OK",
-      "newValues": "New values",
       "noDecision": "No answer was recorded for this request",
       "nothingSelected": "Nothing selected",
       "open": "Open",
@@ -9333,7 +9326,6 @@
         "unknown": "error"
       },
       "reply": "Reply",
-      "replyConsequence": "Reply declines this request; the assistant can answer or ask again.",
       "result": {
         "approved": "Approved · {time}",
         "approvedNoTime": "Approved",
@@ -9344,8 +9336,6 @@
         "declined": "Declined · nothing was changed",
         "declinedElsewhere": "Denied in another tab · {time}",
         "declinedNewChat": "Declined because you started a new chat",
-        "editing": "You're editing this in the {editor}. Nothing was changed here.",
-        "deliveryFailed": "Your decision didn't reach the assistant. Nothing was changed.",
         "done": {
           "create": "Created {entity}",
           "delete": "Deleted {count} {entity}",
@@ -9353,7 +9343,6 @@
           "runCommand": "Ran the command on {toolset}",
           "update": "Updated {entity} {name}"
         },
-        "expired": "No answer in time, so the assistant didn't run this action.",
         "failed": "Nothing was changed. {reason}",
         "failedConsent": "Paid usage isn't enabled for this organization.",
         "failedCredits": "AI credits are used up for this organization.",
@@ -9363,8 +9352,6 @@
         "narrowed": "The assistant will propose these {count} again for your approval",
         "open": "Open {name} (opens in a new tab)",
         "partial": "Deleted {done} of {total} {entity} · {failed} failed",
-        "replied": "Declined · replied: “{reply}”",
-        "sendAgain": "Send again",
         "sending": "Sending your decision…",
         "stop": "Stop",
         "stopped": "Declined · you stopped the answer",
@@ -9385,6 +9372,26 @@
         "pause": "Pause {entity}",
         "resume": "Resume {entity}",
         "update": "Update {entity}"
+      },
+      "backTo": "Back to {title}",
+      "backToOrg": "Switches back to {org}",
+      "deliveryFailed": "Couldn't send your decision. The {entity} hasn't changed.",
+      "finishIn": "Finish in {editor}",
+      "gateNoEditor": "Approvals aren't available on this server.",
+      "meta": "Until {time} · {scope}",
+      "metaUntil": "Until {time}",
+      "needsOkName": "Needs your OK: {name}",
+      "notifies": "notifies",
+      "retry": "Retry",
+      "record": {
+        "denied": "Denied: {name}",
+        "expired": "Request expired. Nothing was changed.",
+        "moved": "Moved to {editor}",
+        "paused": "Paused {entity} {name}",
+        "pausedUntil": "Paused {entity} {name} until {time}",
+        "replied": "Declined with a reply",
+        "resumed": "Resumed {entity} {name}",
+        "youAt": "you · {time}"
       }
     },
     "askAdmin": {
@@ -9476,9 +9483,7 @@
     "claim": {
       "name": "Evidence {n}, {step}",
       "notAvailable": "Evidence not available in this view",
-      "peekTitle": "Evidence {n}",
-      "showInSteps": "Show in steps",
-      "stepOf": "step {i} of {total}"
+      "citation": "Citation {n}, query {n}, {rows}"
     },
     "client": {
       "copyManually": "Couldn't copy. Select the text and copy it.",
@@ -10118,8 +10123,6 @@
       "openHint": "Opens with the query loaded. Nothing runs until you choose Run query.",
       "opensNewTab": "{label} (opens in a new tab)",
       "otherOrg": "This query belongs to {org}. Switch organization to run it.",
-      "queriesCited": "{count} cited",
-      "queriesHeading": "Queries",
       "queryFailed": "Query failed: {reason}",
       "queryFailedPlain": "Query failed",
       "rangeFallback": "range: unknown · runs on the last 15 min",
@@ -10132,9 +10135,12 @@
       "runNowHint": "Opens {explorer} with this query loaded; you run it there.",
       "sawRows": "The assistant got {count} row | The assistant got {count} rows",
       "sawRowsIn": "The assistant got {count} row in {range} | The assistant got {count} rows in {range}",
-      "showMore": "Show {count} more",
       "stopped": "Stopped",
-      "windowCapped": "{window} (cut to the last 7 days)"
+      "windowCapped": "{window} (cut to the last 7 days)",
+      "askAdmin": "Ask an admin",
+      "line": "{count} query, {range} | {count} queries, {range}",
+      "noAccess": "{n} citation unavailable: no access to {stream} | {n} citations unavailable: no access to {stream}",
+      "noAccessPlain": "{n} citation unavailable | {n} citations unavailable"
     },
     "export": {
       "approved": "Approved by you at {time}",
@@ -10157,7 +10163,6 @@
       "cancel": "Cancel",
       "chatIdCopied": "Chat id copied",
       "chatIdShort": "Chat {id}",
-      "copyChatId": "Copy chat id",
       "disclosure": "Sends your rating, the reason and this chat's id. It never sends the chat text.",
       "failed": "Couldn't send feedback. Try again.",
       "groupName": "Rate this answer",
@@ -10177,52 +10182,39 @@
       "whatWentWrong": "What went wrong?"
     },
     "findings": {
-      "comment": "What was the cause? (optional)",
       "confidence": "Confidence: {level}",
-      "evidence": "Evidence",
-      "failed": "Couldn't send that. Try again.",
-      "inconclusive": "Inconclusive: the assistant couldn't confirm a cause",
       "inferred": "Inferred",
-      "invalid": "Findings could not be shown as a card",
       "level": {
         "high": "high",
         "inconclusive": "inconclusive",
         "low": "low",
         "medium": "medium"
       },
-      "likelyCause": "Likely cause",
-      "nextSteps": "Next steps",
       "no": "No",
-      "notSure": "Not sure",
-      "retry": "Try again",
       "ruledOut": "Ruled out",
-      "send": "Send",
-      "thanks": "Thanks, that helps calibrate the assistant",
-      "title": "Findings",
-      "unknown": "Unknown",
-      "verified": "Verified by query",
       "wasThisTheCause": "Was this the cause?",
-      "yes": "Yes"
+      "yes": "Yes",
+      "inferredLine": "Inferred: {text}",
+      "next": "Next: {text}",
+      "notEstablished": "Not established: {text}",
+      "ruledOutLine": "Ruled out: {text}",
+      "showRaw": "Show raw findings",
+      "unreadable": "Couldn't show findings."
     },
     "footer": {
       "credits": "{count} credit | {count} credits",
       "creditsCountedHint": "Credits are counted when a request is accepted.",
-      "emptyWindow": "Nothing in the default range, {range}.",
       "evaluated": "Evaluated {range}",
       "evaluatedMore": "Evaluated {range} and {count} other window | Evaluated {range} and {count} other windows",
       "includedCredits": "{count} included credit | {count} included credits",
-      "noQuery": "Answered without running a query",
       "notSaved": "not saved",
       "notSavedHint": "This answer was given but could not be saved to history",
       "queries": "{count} query | {count} queries",
       "refunded": "0 credits · refunded",
       "rerun": "Re-run for now",
       "rerunFor": "Re-run for {range}",
-      "stopped": "stopped",
       "tokens": "{tokens} tokens · {count} model call | {tokens} tokens · {count} model calls",
-      "tryWider": "Try the last {duration}",
-      "windowsName": "Evaluated windows",
-      "windowStep": "Step {n} · {range}"
+      "tryWider": "Try the last {duration}"
     },
     "fork": {
       "contextNote": "Your first message uses the shared chat as context.",
@@ -10660,7 +10652,8 @@
       "versionName": "Version {n} of {count}",
       "versionOf": "{n} of {count}",
       "you": "You",
-      "metaHandoff": "{meta} · to {agent}"
+      "metaHandoff": "{meta} · to {agent}",
+      "copyChatId": "Copy chat id"
     },
     "name": "O2 Assistant",
     "limit": {
@@ -11229,8 +11222,6 @@
       "outputTruncated": "Output truncated",
       "rowName": "{step}, {state}",
       "rows": "{count} row | {count} rows",
-      "showEarlier": "Show {count} earlier step | Show {count} earlier steps",
-      "soFar": "{count} step so far | {count} steps so far",
       "step": {
         "created": "Created {resource}",
         "deleted": "Deleted {resource}",
@@ -11248,7 +11239,6 @@
       "stoppedBeforeFinish": "stopped before it finished",
       "streams": "{count} stream | {count} streams",
       "summary": "Worked through {count} step | Worked through {count} steps",
-      "summaryWith": "Worked through {count} step · {detail} | Worked through {count} steps · {detail}",
       "window": "{from} → {to}",
       "windowShowing": "{from} → {to} · Showing {shown} of {total} rows"
     },
@@ -11435,7 +11425,23 @@
       "waitingApproval": "Waiting for your approval",
       "waitingConsent": "Waiting for your decision on paid usage",
       "withElapsed": "{status} · {elapsed}",
-      "writing": "Writing the answer"
+      "writing": "Writing the answer",
+      "ageDays": "{n} d",
+      "ageHours": "{n} h",
+      "connectionLost": "Connection lost. The answer above is incomplete.",
+      "confidence": {
+        "high": "High confidence",
+        "inconclusive": "Inconclusive",
+        "low": "Low confidence",
+        "medium": "Medium confidence"
+      },
+      "continueDraft": "Continue the answer above",
+      "dataAge": "Data from {age} ago",
+      "lastHours": "Last {n} h",
+      "lastMinutes": "Last {n} min",
+      "rerun": "Re-run",
+      "stoppedAfter": "Stopped after {n} step, incomplete | Stopped after {n} steps, incomplete",
+      "stoppedIncomplete": "Stopped, incomplete"
     },
     "voice": {
       "allow": {
@@ -11540,8 +11546,8 @@
         },
         "dashboard": {
           "1": "What changed on \"{dashboard}\" in the last {range}?",
-          "1Generic": "What changed on this dashboard recently?",
-          "2": "Explain the panel with the biggest change"
+          "2": "Explain the panel with the biggest change",
+          "1Generic": "What changed on this dashboard recently?"
         },
         "function": {
           "1": "Write VRL to parse JSON from the `message` field",
@@ -11565,14 +11571,14 @@
         "learn": "What can you do here?",
         "logs": {
           "1": "Why did errors spike in `{stream}` in the last {range}?",
-          "1Generic": "Why did errors spike in my logs recently?",
           "2": "Summarise what's in `{stream}` right now",
+          "1Generic": "Why did errors spike in my logs recently?",
           "2Generic": "Summarise what's in my logs right now"
         },
         "metrics": {
           "1": "Write PromQL for p95 latency of `{metric}`",
-          "1Generic": "Write PromQL for p95 latency",
-          "2": "Which metrics stopped reporting?"
+          "2": "Which metrics stopped reporting?",
+          "1Generic": "Write PromQL for p95 latency"
         },
         "recent": "Continue \"{title}\"",
         "regex": {
@@ -11667,6 +11673,17 @@
         "prompt": "Continue this investigation",
         "promptReason": "Continue this investigation: {reason}"
       }
+    },
+    "question": {
+      "needsAnswer": "Needs your answer: {question}",
+      "otherAnswer": "Other answer",
+      "record": {
+        "answered": "Answered: {choice}",
+        "expired": "Question expired. Nothing was changed."
+      }
+    },
+    "send": {
+      "unreachable": "Isn't reachable. Your message wasn't sent."
     }
   },
   "llmObservability": {

@@ -151,11 +151,11 @@ describe("AssistantApprovalResult", () => {
   });
 
   it.each([
-    ["declined", "Declined · nothing was changed"],
+    ["declined", "Denied: delete 2 alerts"],
     ["new_chat", "Declined because you started a new chat"],
     ["stopped", "Declined · you stopped the answer"],
     ["withdrawn", "This request is no longer valid. The conversation moved on."],
-    ["expired", "No answer in time, so the assistant didn't run this action."],
+    ["expired", "Request expired. Nothing was changed."],
   ] as const)("reads %s as its own record", (state, text) => {
     const { wrapper } = mountRecord({ outcome: { state, at: 1 } });
     expect(line(wrapper)).toBe(text);
@@ -169,7 +169,7 @@ describe("AssistantApprovalResult", () => {
         decision: { approved: false, reason: "reply", reply: "keep it" },
       },
     });
-    expect(line(wrapper)).toBe("Declined · replied: “keep it”");
+    expect(line(wrapper)).toBe("Declined with a reply");
   });
 
   it("says the change moved to its editor when Edit in {editor} resolved the card (PO A9)", () => {
@@ -183,18 +183,14 @@ describe("AssistantApprovalResult", () => {
       { outcome: { state: "editing", at: 1, decision: { approved: false, reason: "edited" } } },
       { blocks: [{ type: "approval", approval: pause }] },
     );
-    expect(line(wrapper)).toBe(
-      "You're editing this in the alert editor. Nothing was changed here.",
-    );
+    expect(line(wrapper)).toBe("Moved to Alerts");
     const batch = mountRecord({ outcome: { state: "editing", at: 1 } });
-    expect(line(batch.wrapper)).toBe("Declined · nothing was changed");
+    expect(line(batch.wrapper)).toBe("Denied: delete 2 alerts");
   });
 
   it("offers Send again after a lost decision, and Ask again after an expiry", async () => {
     const lost = mountRecord({ outcome: { state: "delivery_failed", at: 1 } });
-    expect(line(lost.wrapper)).toBe(
-      "Your decision didn't reach the assistant. Nothing was changed.",
-    );
+    expect(line(lost.wrapper)).toBe("Couldn't send your decision. The alert hasn't changed.");
     await lost.wrapper.get('[data-test="assistant-approval-result-send-again"]').trigger("click");
     expect(lost.host.sendAgain).toHaveBeenCalledWith(lost.evidence.sid, "c9");
     const expired = mountRecord({ outcome: { state: "expired", at: 1 } });
@@ -235,7 +231,7 @@ describe("AssistantApprovalResult", () => {
     expect(check.attributes("aria-label")).toBe("Check the list (opens in a new tab)");
   });
 
-  it("names every object it changed, and links the ones that still exist", () => {
+  it("lets a single done item be the line, and lists what failed", () => {
     const single = mountRecord({
       outcome: { state: "done", at: 1 },
       result: {
@@ -245,9 +241,7 @@ describe("AssistantApprovalResult", () => {
         resolvedAt: 1,
       },
     });
-    const row = single.wrapper.get('[data-test="assistant-approval-result-item-a1"]');
-    expect(row.text()).toBe("checkout-latency-old");
-    expect(single.wrapper.find('[data-test="assistant-approval-result-open-a1"]').exists()).toBe(
+    expect(single.wrapper.find('[data-test="assistant-approval-result-item-a1"]').exists()).toBe(
       false,
     );
     const failed = mountRecord({
@@ -259,13 +253,13 @@ describe("AssistantApprovalResult", () => {
         resolvedAt: 1,
       },
     });
-    expect(
-      failed.wrapper.get('[data-test="assistant-approval-result-open-a1"]').attributes("href"),
-    ).toContain("/alerts/a1");
+    expect(failed.wrapper.find('[data-test="assistant-approval-result-item-a1"]').exists()).toBe(
+      true,
+    );
   });
 
-  it("keeps Undo in place while it runs, and says so inline when it failed", async () => {
-    const { wrapper, evidence } = mountRecord({
+  it("draws no Undo on a record", () => {
+    const { wrapper } = mountRecord({
       outcome: { state: "done", at: 1 },
       result: {
         status: "done",
@@ -283,28 +277,48 @@ describe("AssistantApprovalResult", () => {
         resolvedAt: 1,
       },
     });
-    const session = evidence.store.state.sessions[evidence.sid];
-    const entry = {
-      id: "led-1",
-      approvalId: "c9",
-      turnId: "t1",
-      tool: "o2_delete",
-      op: "delete" as const,
-      resource: { type: "alert", name: "checkout-latency-old" },
-      status: "done" as const,
-      undoable: true,
-      at: 1,
-    };
-    session.ledger = [{ ...entry, undoing: true }];
-    await nextTick();
-    const undo = wrapper.get('[data-test="assistant-undo-led-1"]');
-    expect(undo.text()).toBe("Undoing…");
-    expect(undo.attributes("aria-disabled")).toBe("true");
-    session.ledger = [{ ...entry, undoFailed: true }];
-    await nextTick();
-    expect(wrapper.get('[data-test="assistant-approval-result-item-a1"]').text()).toContain(
-      "Undo didn't work.",
+    expect(wrapper.find('[data-test^="assistant-undo"]').exists()).toBe(false);
+  });
+
+  it("records an answered question by what was chosen, and an expired one in its own words", () => {
+    const question = approvalOf({
+      type: "confirmation_required",
+      id: "c9",
+      tool: "ask_user",
+      kind: "question",
+      message: "Which folder?",
+    });
+    const blocks: ContentBlock[] = [{ type: "approval", approval: question }];
+    const answered = mountRecord(
+      {
+        outcome: {
+          state: "answered",
+          at: 1,
+          decision: { approved: false, reason: "answer", answer: "p", answerLabel: "Payments" },
+        },
+      },
+      { blocks },
     );
+    expect(line(answered.wrapper)).toBe("Answered: Payments");
+    const expired = mountRecord({ outcome: { state: "expired", at: 1 } }, { blocks });
+    expect(line(expired.wrapper)).toBe("Question expired. Nothing was changed.");
+  });
+
+  it("reads the record of Finish in Alerts with Open, when the card has an object to open", () => {
+    const pause = approvalOf({
+      type: "confirmation_required",
+      id: "c9",
+      tool: "EnableAlert",
+      targets: [{ type: "alert", id: "a1", name: "cart" }],
+      args: { value: false },
+    });
+    const { wrapper } = mountRecord(
+      { outcome: { state: "editing", at: 1 } },
+      { blocks: [{ type: "approval", approval: pause }] },
+    );
+    expect(
+      wrapper.get('[data-test="assistant-approval-result-open"]').attributes("href"),
+    ).toContain("/alerts/a1");
   });
 
   it("stays quiet while its turn still runs elsewhere, and when the turn's own expired outcome says it", () => {
@@ -340,7 +354,7 @@ describe("AssistantApprovalResult", () => {
           ],
         }).wrapper,
       );
-    expect(ended("expired")).toBe("No answer in time, so the assistant didn't run this action.");
+    expect(ended("expired")).toBe("Request expired. Nothing was changed.");
     expect(ended("withdrawn")).toBe("This request is no longer valid. The conversation moved on.");
   });
 
@@ -350,10 +364,8 @@ describe("AssistantApprovalResult", () => {
       return mountRecord(null, { readonly: true, blocks: [{ type: "approval", approval }] });
     };
     expect(line(recorded("approved", 1_760_000_000_000).wrapper)).toMatch(/^Approved · /);
-    expect(line(recorded("denied").wrapper)).toBe("Declined · nothing was changed");
-    expect(line(recorded("expired").wrapper)).toBe(
-      "No answer in time, so the assistant didn't run this action.",
-    );
+    expect(line(recorded("denied").wrapper)).toBe("Denied: delete 2 alerts");
+    expect(line(recorded("expired").wrapper)).toBe("Request expired. Nothing was changed.");
     expect(recorded("denied").wrapper.find("button, a").exists()).toBe(false);
     expect(line(recorded("withdrawn").wrapper)).toBe(
       "This request is no longer valid. The conversation moved on.",
@@ -418,7 +430,7 @@ describe("AssistantApprovalResult", () => {
     expect(first.evidence.host.announce).toHaveBeenCalledTimes(1);
     expect(first.evidence.host.announce).toHaveBeenCalledWith(
       first.evidence.sid,
-      "Declined · nothing was changed",
+      "Denied: delete 2 alerts",
     );
     first.wrapper.unmount();
   });
@@ -427,7 +439,7 @@ describe("AssistantApprovalResult", () => {
     const fresh = mountRecord({ outcome: { state: "declined", at: Date.now() } });
     expect(fresh.evidence.host.announce).toHaveBeenCalledWith(
       fresh.evidence.sid,
-      "Declined · nothing was changed",
+      "Denied: delete 2 alerts",
     );
     const old = mountRecord({ outcome: { state: "declined", at: 1 } });
     expect(old.evidence.host.announce).not.toHaveBeenCalled();

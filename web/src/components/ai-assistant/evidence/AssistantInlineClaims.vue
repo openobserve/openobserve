@@ -22,11 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :call-id="target.callId"
       :available="available(target.callId)"
       :label="label(target.callId)"
-      :step="stepOf ? stepOf(target.callId) : null"
-      :total="total"
-      :openable="openable"
-      :sid="sid"
-      :readonly="readonly"
     />
   </Teleport>
 </template>
@@ -34,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 
-import type { Sid, StepFacts } from "@/composables/assistant/pure";
 import type { I18nText } from "@/types/i18n";
 
 import AssistantClaimChip from "./AssistantClaimChip.vue";
@@ -45,23 +39,13 @@ interface ClaimSlot {
   callId: string;
 }
 
-const props = withDefaults(
-  defineProps<{
-    /** The block's cited call ids; a slot's `data-claim` is an index into it. */
-    claims: string[];
-    numbers: Map<string, number>;
-    available: (callId: string) => boolean;
-    label: (callId: string) => I18nText;
-    /** The cited step, for the chip's evidence peek; without it the chip jumps to the trail. */
-    stepOf?: ((callId: string) => StepFacts | null) | null;
-    /** Steps in the answer's trail, for "step {i} of {total}". */
-    total?: number;
-    openable?: boolean;
-    sid?: Sid | null;
-    readonly?: boolean;
-  }>(),
-  { stepOf: null, total: 0, openable: true, sid: null, readonly: false },
-);
+const props = defineProps<{
+  /** The block's cited call ids; a slot's `data-claim` is an index into it. */
+  claims: string[];
+  numbers: Map<string, number>;
+  available: (callId: string) => boolean;
+  label: (callId: string) => I18nText;
+}>();
 
 const anchor = ref<HTMLElement | null>(null);
 const targets = shallowRef<ClaimSlot[]>([]);

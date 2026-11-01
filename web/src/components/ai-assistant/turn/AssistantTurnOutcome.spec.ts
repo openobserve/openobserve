@@ -259,7 +259,12 @@ describe("AssistantTurnOutcome", () => {
     expect(failed.classes().join(" ")).toContain("bg-banner-error-soft-bg");
     const refused = mountOutcome({ kind: "refused", error: error("offline") });
     expect(refused.classes().join(" ")).toContain("bg-banner-info-bg");
-    expect(mountOutcome({ kind: "stopped" }).classes().join(" ")).toContain("bg-banner-default-bg");
+  });
+
+  it("states a stop as a line of the answer, with Continue on it", () => {
+    const stopped = mountOutcome({ kind: "stopped", steps: 3 });
+    expect(stopped.classes().join(" ")).not.toContain("bg-banner");
+    expect(stopped.text()).toContain("Stopped after 3 steps, incomplete");
   });
 
   it("names the action by the title and says the findings line only when findings exist", () => {
@@ -270,11 +275,13 @@ describe("AssistantTurnOutcome", () => {
     expect(buttons(bare)[0].attributes("aria-describedby")).toBe(titleId);
     const partial = mountOutcome({ error: error("provider_error"), partial: true });
     expect(bodies(partial)).toEqual(["Nothing was changed.", "Findings so far are kept above."]);
+  });
+
+  it("reads a dropped stream with text above as the one connection-lost row with Retry", () => {
     const dropped = mountOutcome({ error: error("stream_dropped"), partial: true, elapsedMs: 1 });
-    expect(bodies(dropped)).toEqual([
-      "Findings so far are kept above.",
-      "The text above is incomplete.",
-    ]);
+    expect(title(dropped)).toBe("Connection lost. The answer above is incomplete.");
+    expect(bodies(dropped)).toEqual([]);
+    expect(label(dropped)).toBe("Retry");
   });
 
   it("reads Ask again with the undo line after a mutating tool, Edit and resend for an unrecoverable failure", () => {
@@ -355,11 +362,10 @@ describe("AssistantTurnOutcome", () => {
 
   it("emits its one action, Continue on a stop and Retry save only in server mode", async () => {
     const stopped = mountOutcome({ kind: "stopped", steps: 3, partial: true });
-    expect(title(stopped)).toBe("Stopped after 3 steps · findings kept");
-    expect(title(mountOutcome({ kind: "stopped", steps: 3 }))).toBe("Stopped");
+    expect(title(stopped)).toBe("Stopped after 3 steps, incomplete");
     await buttons(stopped)[0].trigger("click");
     expect(stopped.emitted("action")).toEqual([["continue"]]);
-    expect(title(mountOutcome({ kind: "stopped", steps: 0 }))).toBe("Stopped");
+    expect(title(mountOutcome({ kind: "stopped", steps: 0 }))).toBe("Stopped, incomplete");
     expect(buttons(mountOutcome({ kind: "doneNotSaved" }))).toHaveLength(0);
     const saved = mountOutcome({ kind: "doneNotSaved", persistence: true });
     expect(title(saved)).toBe("Answered, but not saved to history.");
@@ -598,14 +604,14 @@ describe("AssistantTurnOutcome: agent refusals (MULTI-AGENT-12)", () => {
     expect(member.find('[data-test="ask-admin-stub"]').exists()).toBe(true);
   });
 
-  it("offers Try again beside the fallback when the agent is down", () => {
+  it("has no Retry for a send that never left: the text is back and Send is the retry", () => {
     const w = mountOutcome({
       kind: "refused",
       sid: "s1",
       error: error("agent_unreachable", { agent: "generate-query" }),
     });
-    expect(title(w)).toBe("Query builder isn't reachable right now. Your message wasn't sent.");
-    expect(label(w)).toBe("Try again");
+    expect(title(w)).toBe("Isn't reachable. Your message wasn't sent.");
+    expect(w.find('[data-test="assistant-turn-outcome-action"]').exists()).toBe(false);
     expect(w.find(fallback).exists()).toBe(true);
   });
 

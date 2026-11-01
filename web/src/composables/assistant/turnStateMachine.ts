@@ -104,6 +104,7 @@ const QUIET_FRAMES: ReadonlySet<string> = new Set([
   "compacting",
   "query",
   "findings",
+  "follow_ups",
   "resource_changed",
   "confirmation_resolved",
   "navigation_action",
@@ -570,6 +571,8 @@ function onFrame(turn: TurnState, frame: AssistantFrame, ctx: TurnReducerCtx): S
         : same(turn);
     case "confirmation_required":
       return step({ state: "awaiting_approval", callId: frame.call_id ?? frame.id ?? frame.tool });
+    case "ask_user":
+      return step({ state: "awaiting_approval", callId: frame.request_id });
     case "error":
       return onErrorFrame(turn, frame, ctx);
     case "complete":

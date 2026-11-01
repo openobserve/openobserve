@@ -27,50 +27,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <section
       role="group"
-      :aria-labelledby="headingId"
-      :aria-describedby="describedBy"
+      :aria-label="groupName"
+      :aria-describedby="metaLine ? metaId : undefined"
       :aria-busy="sending ? 'true' : undefined"
-      class="rounded-surface bg-surface-base border-border-default flex min-w-0 flex-col gap-2 border p-3"
+      class="border-status-warning-text flex min-w-0 flex-col gap-1.5 border-s-2 py-0.5 ps-2.5"
       :data-kind="card.kind"
       data-test="assistant-approval-card"
     >
-      <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-        <OTag
-          variant="default-soft"
-          size="xs"
-          :label="t('assistant.approval.needsOk')"
-          data-test="assistant-approval-needs-ok"
-        />
+      <div class="flex min-w-0 flex-wrap items-baseline gap-x-2">
         <h3
-          :id="headingId"
-          class="text-text-heading min-w-0 text-sm leading-5 font-semibold break-words"
+          ref="headingEl"
+          tabindex="-1"
+          class="text-text-heading focus-visible:ring-assistant-focus-ring rounded-default min-w-0 flex-1 text-sm font-medium break-words outline-none focus-visible:ring-2"
           data-test="assistant-approval-heading"
         >
           {{ heading }}
         </h3>
-        <!-- Kept out of the heading's accessible name, which a screen reader would re-read every second -->
-        <OText
-          v-if="remainingMs !== null && !sending"
-          variant="meta"
-          as="span"
-          aria-hidden="true"
-          class="tabular-nums"
+        <span
+          v-if="remainingMs !== null"
+          role="timer"
+          aria-live="off"
+          :aria-label="t('assistant.approval.expiresIn', { time: clockText })"
+          :class="[
+            'text-status-warning-text text-xs whitespace-nowrap tabular-nums',
+            expiringSoon && 'font-medium',
+          ]"
           data-test="assistant-approval-countdown"
         >
-          {{
-            t(expiringSoon ? "assistant.approval.expiringSoon" : "assistant.approval.expiresIn", {
-              time: clockText,
-            })
-          }}
-        </OText>
-        <OText
-          v-if="remainingMs !== null && !sending && extendsSpent"
-          variant="meta"
-          as="span"
-          data-test="assistant-approval-last-extension"
-        >
-          {{ t("assistant.approval.lastExtension") }}
-        </OText>
+          {{ clockText }}
+        </span>
       </div>
       <OText v-if="card.askedIn === 'other_tab'" variant="meta" as="p">
         {{ t("assistant.approval.askedElsewhere") }}
@@ -85,140 +70,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ metaLine }}
       </OText>
-
       <p
-        v-if="card.question"
-        :id="questionId"
+        v-if="card.question && !question && !isApprovalChange(card)"
         class="text-text-body text-sm break-words whitespace-pre-wrap"
         data-test="assistant-approval-question"
       >
         {{ card.question }}
       </p>
-      <div v-if="card.command" class="flex min-w-0 flex-col gap-1">
-        <OText variant="label" as="p">{{ t("assistant.approval.command") }}</OText>
-        <code
-          :id="commandId"
-          class="rounded-default bg-surface-subtle text-text-body block p-2 font-mono text-xs break-all whitespace-pre-wrap"
-          data-test="assistant-approval-command"
-          >{{ card.command }}</code
-        >
-      </div>
-
-      <div v-if="targets.length && !planned" :id="targetsId" data-test="assistant-approval-targets">
-        <ul class="flex min-w-0 flex-col gap-0.5">
-          <li
-            v-for="target in firstTargets"
-            :key="target.key"
-            class="flex min-w-0 items-center gap-2"
-          >
-            <OText as="span" class="min-w-0 flex-1 break-all">{{ target.label }}</OText>
-            <OButton
-              v-if="target.href"
-              variant="ghost-primary"
-              size="xs"
-              as="a"
-              :href="target.href"
-              target="_blank"
-              rel="noopener noreferrer"
-              :icon-right="assistantGlyph.newTab"
-              :aria-label="t('assistant.approval.result.open', { name: target.label })"
-              :class="['shrink-0', TOUCH_TARGET_CLASS]"
-              :data-test="`assistant-approval-target-${target.key}`"
-            >
-              {{ t("assistant.approval.open") }}
-            </OButton>
-          </li>
-        </ul>
-        <OCollapsible
-          v-if="moreTargets.length"
-          :label="t('assistant.approval.moreTargets', { count: moreTargets.length })"
-          :trigger-class="TOUCH_TARGET_CLASS"
-          data-test="assistant-approval-more-targets"
-        >
-          <ul class="flex min-w-0 flex-col gap-0.5">
-            <li v-for="target in moreTargets" :key="target.key" class="min-w-0 break-all">
-              <OText as="span">{{ target.label }}</OText>
-            </li>
-          </ul>
-        </OCollapsible>
-      </div>
-
-      <div
-        v-if="diff"
-        :id="diffId"
-        class="flex min-w-0 flex-col gap-1"
-        data-test="assistant-approval-diff"
+      <code
+        v-if="card.command"
+        class="rounded-default bg-surface-subtle text-text-body block p-2 font-mono text-xs break-all whitespace-pre-wrap"
+        data-test="assistant-approval-command"
+        >{{ card.command }}</code
       >
-        <OText variant="label" as="p">
-          {{
-            card.kind === "create"
-              ? t("assistant.approval.newValues")
-              : t("assistant.approval.change")
-          }}
-        </OText>
-        <dl class="grid min-w-0 grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-0.5">
-          <template v-for="row in diff" :key="row.field">
-            <dt class="text-text-secondary text-xs break-all">{{ row.field }}</dt>
-            <dd class="text-text-body text-xs break-all">{{ row.value }}</dd>
-          </template>
-        </dl>
-      </div>
-
-      <div v-if="impact.length" :id="impactId" class="flex min-w-0 flex-col gap-1">
-        <OText variant="label" as="p">{{ t("assistant.approval.effect") }}</OText>
-        <ul
-          class="text-text-body flex min-w-0 list-disc flex-col gap-0.5 ps-5 text-sm"
-          data-test="assistant-approval-impact"
-        >
-          <li v-for="(line, index) in impact" :key="index" class="break-words">{{ line }}</li>
-        </ul>
-      </div>
-
-      <p
-        v-if="remainingMs !== null && !sending"
-        :id="expiryId"
-        aria-live="off"
-        class="sr-only"
-        data-test="assistant-approval-expiry"
+      <OText
+        v-if="gateLine"
+        variant="body"
+        as="p"
+        class="text-xs"
+        data-test="assistant-approval-gated"
       >
-        {{ t("assistant.approval.expiresIn", { time: clockText }) }}
-      </p>
-
-      <OSelect
-        v-if="scopeOptions.length"
-        v-model="scope"
-        :options="scopeOptions"
-        :label="t('assistant.approval.scope.label')"
-        :disabled="sending"
-        size="sm"
-        data-test="assistant-approval-scope"
-      />
+        {{ gateLine }}
+      </OText>
 
       <!-- The buttons stay while the decision is on its way, so focus stays where it was -->
-      <div class="flex min-w-0 flex-col gap-2">
-        <OText v-if="gated" variant="meta" as="p" data-test="assistant-approval-gated">
-          {{ t("assistant.approval.gateTiming", { product }) }}
-        </OText>
-        <div class="flex min-w-0 flex-wrap items-center gap-2">
+      <div class="-ms-2.5 flex min-w-0 flex-wrap items-center gap-1">
+        <template v-if="question && !replying">
           <OButton
-            v-if="mdUp || gated"
+            v-for="option in card.options ?? []"
+            :key="option.id"
+            variant="ghost"
+            size="xs"
+            :disabled="sending"
+            focusable-unavailable
+            :class="TOUCH_TARGET_CLASS"
+            :data-test="`assistant-question-option-${option.id}`"
+            @click="(event: MouseEvent) => act(event, () => choose(option))"
+          >
+            {{ raw(option.label) }}
+          </OButton>
+          <OButton
+            v-if="card.allowOther || !card.options?.length"
+            variant="ghost"
+            size="xs"
+            :disabled="sending"
+            focusable-unavailable
+            :class="TOUCH_TARGET_CLASS"
+            data-test="assistant-question-other"
+            @click="(event: MouseEvent) => act(event, () => emit('reply'))"
+          >
+            {{ t("assistant.question.otherAnswer") }}
+          </OButton>
+        </template>
+        <template v-else-if="!replying">
+          <OButton
             ref="denyButton"
-            variant="secondary"
-            size="sm"
+            variant="ghost"
+            size="xs"
             :disabled="sending"
             focusable-unavailable
             :class="TOUCH_TARGET_CLASS"
             data-test="assistant-approval-deny"
-            @click="(event: MouseEvent) => act(event, () => deny('deny'))"
+            @click="
+              (event: MouseEvent) => act(event, () => decide({ approved: false, reason: 'deny' }))
+            "
           >
             {{ t("assistant.approval.deny") }}
           </OButton>
           <OButton
             variant="ghost"
-            size="sm"
+            size="xs"
             :disabled="sending"
             focusable-unavailable
-            :aria-describedby="replyId"
             :class="TOUCH_TARGET_CLASS"
             data-test="assistant-approval-reply"
             @click="(event: MouseEvent) => act(event, () => emit('reply'))"
@@ -228,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="planned && card.editable && !gated"
             variant="ghost"
-            size="sm"
+            size="xs"
             :disabled="sending"
             focusable-unavailable
             :class="TOUCH_TARGET_CLASS"
@@ -237,120 +160,126 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("assistant.approval.edit") }}
           </OButton>
-          <OButton
-            v-if="editor && !gated"
-            variant="ghost"
-            size="sm"
-            :disabled="sending"
-            focusable-unavailable
-            :class="TOUCH_TARGET_CLASS"
-            data-test="assistant-approval-edit-in-editor"
-            @click="(event: MouseEvent) => act(event, editInEditor)"
-          >
-            {{ t("assistant.approval.editInEditor", { editor: editorLabel }) }}
-          </OButton>
-          <OButton
-            v-if="moreTime"
-            variant="ghost"
-            size="sm"
-            :disabled="sending"
-            focusable-unavailable
-            :class="TOUCH_TARGET_CLASS"
-            data-test="assistant-approval-extend"
-            @click="(event: MouseEvent) => act(event, () => emit('extend'))"
-          >
-            {{ t("assistant.approval.moreTime") }}
-          </OButton>
-          <OButton
-            v-if="mdUp && !gated"
-            :variant="card.destructive ? 'destructive' : 'primary'"
-            size="sm"
-            :disabled="sending || nothingSelected"
-            focusable-unavailable
-            :class="TOUCH_TARGET_CLASS"
-            data-test="assistant-approval-approve"
-            @click="(event: MouseEvent) => act(event, approve)"
-          >
-            {{ approveLabel }}
-            <template v-if="nothingSelected && !sending" #unavailable-reason>
-              {{ t("assistant.approval.nothingSelected") }}
-            </template>
-          </OButton>
-        </div>
-        <div v-if="!mdUp && !gated" class="flex min-w-0 gap-2">
-          <OButton
-            ref="denyButton"
-            variant="secondary"
-            size="sm"
-            :disabled="sending"
-            focusable-unavailable
-            class="min-h-11 flex-1"
-            data-test="assistant-approval-deny"
-            @click="(event: MouseEvent) => act(event, () => deny('deny'))"
-          >
-            {{ t("assistant.approval.deny") }}
-          </OButton>
-          <OButton
-            :variant="card.destructive ? 'destructive' : 'primary'"
-            size="sm"
-            :disabled="sending || nothingSelected"
-            focusable-unavailable
-            class="min-h-11 flex-1"
-            data-test="assistant-approval-approve"
-            @click="(event: MouseEvent) => act(event, approve)"
-          >
-            {{ approveLabel }}
-            <template v-if="nothingSelected && !sending" #unavailable-reason>
-              {{ t("assistant.approval.nothingSelected") }}
-            </template>
-          </OButton>
-        </div>
-        <OText :id="replyId" variant="meta" as="p" data-test="assistant-approval-reply-consequence">
-          {{ t("assistant.approval.replyConsequence") }}
-        </OText>
-        <div
-          v-if="sending"
-          class="text-text-secondary flex items-center gap-2 text-sm"
-          data-test="assistant-approval-sending"
-        >
-          <OSpinner size="xs" />
-          <span>{{ t("assistant.approval.result.sending") }}</span>
-        </div>
-        <template v-else>
-          <OText
-            v-if="nothingSelected"
-            variant="meta"
-            as="p"
-            data-test="assistant-approval-nothing"
-          >
-            {{ t("assistant.approval.nothingSelected") }}
-          </OText>
-          <OText v-if="narrowedNote" variant="meta" as="p" data-test="assistant-approval-narrowed">
-            {{ narrowedNote }}
-          </OText>
-          <OText v-if="mdUp" variant="meta" as="p">{{ t("assistant.approval.escapeHint") }}</OText>
         </template>
+        <OButton
+          v-if="moreTime"
+          variant="ghost"
+          size="xs"
+          :disabled="sending"
+          focusable-unavailable
+          :class="TOUCH_TARGET_CLASS"
+          data-test="assistant-approval-extend"
+          @click="(event: MouseEvent) => act(event, () => emit('extend'))"
+        >
+          {{ t("assistant.approval.moreTime") }}
+        </OButton>
+        <OButton
+          v-if="!question && !replying && !gated"
+          :variant="card.destructive ? 'destructive' : 'primary'"
+          size="xs"
+          :disabled="sending || nothingSelected"
+          focusable-unavailable
+          :class="['ms-auto', TOUCH_TARGET_CLASS]"
+          data-test="assistant-approval-approve"
+          @click="(event: MouseEvent) => act(event, approve)"
+        >
+          {{ approveLabel }}
+          <template v-if="nothingSelected && !sending" #unavailable-reason>
+            {{ t("assistant.approval.nothingSelected") }}
+          </template>
+        </OButton>
       </div>
+      <OText v-if="narrowedNote" variant="meta" as="p" data-test="assistant-approval-narrowed">
+        {{ narrowedNote }}
+      </OText>
 
       <OCollapsible
-        v-if="card.args"
-        :label="t('assistant.approval.details')"
-        :trigger-class="TOUCH_TARGET_CLASS"
+        v-if="hasDetails && !replying"
+        :default-open="gated"
+        :trigger-class="DETAILS_TRIGGER"
         data-test="assistant-approval-details"
       >
-        <div class="flex min-w-0 flex-col gap-2">
-          <OText variant="label" as="p">
-            {{ t("assistant.approval.arguments") }} · {{ card.tool }}
-          </OText>
+        <template #trigger="{ open }">
+          <span class="text-text-secondary flex items-center gap-1 text-xs">
+            <OIcon
+              :name="open ? assistantGlyph.collapse : assistantGlyph.expand"
+              size="xs"
+              aria-hidden="true"
+            />
+            {{ t("assistant.approval.details") }}
+          </span>
+        </template>
+        <div class="flex min-w-0 flex-col items-start gap-1.5 pt-1">
+          <ul
+            v-if="targets.length && !planned && targets.length + moreTargets > 1"
+            class="flex min-w-0 flex-col gap-0.5"
+            data-test="assistant-approval-targets"
+          >
+            <li v-for="target in targets" :key="target.key" class="min-w-0 break-all">
+              <OText as="span" class="text-xs">{{ target.label }}</OText>
+            </li>
+            <li v-if="moreTargets > 0">
+              <OText variant="meta" as="span">
+                {{ t("assistant.approval.moreTargets", { count: moreTargets }) }}
+              </OText>
+            </li>
+          </ul>
+          <dl
+            v-if="diff.length"
+            class="grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-xs"
+            data-test="assistant-approval-diff"
+          >
+            <template v-for="row in diff" :key="row.field">
+              <dt class="text-text-secondary break-all">{{ row.field }}</dt>
+              <dd class="text-text-body font-mono break-all">
+                <template v-if="row.before">
+                  <s class="text-text-secondary">{{ row.before }}</s>
+                  {{ raw("→") }}
+                </template>
+                {{ row.value }}
+              </dd>
+            </template>
+          </dl>
+          <ul
+            v-if="impact.length"
+            class="text-text-body flex min-w-0 list-disc flex-col gap-0.5 ps-4 text-xs"
+            data-test="assistant-approval-impact"
+          >
+            <li v-for="(line, index) in impact" :key="index" class="break-words">{{ line }}</li>
+          </ul>
+          <OSelect
+            v-if="scopeOptions.length"
+            v-model="scope"
+            :options="scopeOptions"
+            :label="t('assistant.approval.scope.label')"
+            :disabled="sending"
+            size="sm"
+            data-test="assistant-approval-scope"
+          />
           <OCodeBlock
+            v-if="card.args && !diff.length"
             :code="argsText"
             lang="json"
             contrast="aa"
             :scroll-label="t('assistant.approval.arguments')"
             :copy-message="t('assistant.evidence.copied')"
             :copy-button-class="TOUCH_TARGET_CLASS"
+            class="w-full"
             data-test="assistant-approval-args"
           />
+          <OButton
+            v-if="editor"
+            variant="ghost"
+            size="xs"
+            :icon-left="assistantGlyph.newTab"
+            :disabled="sending"
+            focusable-unavailable
+            :class="['-ms-2.5', TOUCH_TARGET_CLASS]"
+            data-test="assistant-approval-finish-in"
+            @click="(event: MouseEvent) => act(event, editInEditor)"
+          >
+            {{ t("assistant.approval.finishIn", { editor: editorLabel }) }}
+          </OButton>
         </div>
       </OCollapsible>
     </section>
@@ -388,33 +317,38 @@ import {
   approvalHeading,
   approvalName,
   approvalNoun,
+  approvalNotifies,
   approvalObjectId,
+  approvalScopeName,
   approvalTargetHref,
+  approvalUntil,
   approvalVerb,
   approvalVerbText,
   canAlwaysAllow,
+  isReplyingTo,
   isApprovalChange,
+  type QuestionOption,
 } from "@/composables/assistant/pure";
-import useBreakpoint from "@/composables/useBreakpoint";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { formatOrgTime } from "@/utils/formatters";
 
 import AssistantPlanBlock from "./AssistantPlanBlock.vue";
+import { lowerFirst } from "./approvalText";
 import type { ApprovalCardDecision, ApprovalCardView } from "./approvals.types";
 
-/** The first targets listed; the rest sit behind "and N more". */
+/** The first targets listed; the rest are counted. */
 const FIRST_TARGETS = 5;
 
 /** An id the name could not be resolved for is shown this short (D3-n). */
 const SHORT_ID_CHARS = 8;
 
-/** From here until a decision the tag line reads "Expires soon" (`30` §7.3). */
+/** The last minute weighs the timer and speaks once (`30` §7.3). */
 const WARN_AT_MS = 60_000;
 
 /** Past this many items the impact says it is a large batch, without blocking it. */
@@ -426,11 +360,13 @@ const CARRIED_KEY_MS = 1_000;
 /** The two warnings of every window, longest first (`30` §7.3). */
 const WARN_ATS_MS = [60_000, 20_000];
 
+const DETAILS_TRIGGER = "min-h-6 w-fit px-0 py-0 max-md:min-h-11 pointer-coarse:min-h-11";
+
 const props = withDefaults(
   defineProps<{
     card: ApprovalCardView;
     org?: string;
-    /** The decision is on its way: the buttons stay, unavailable, beside "Sending your decision…". */
+    /** The decision is on its way: the buttons stay, unavailable, under `aria-busy`. */
     sending?: boolean;
     /** The server lets the card ask for more time. */
     extendable?: boolean;
@@ -454,21 +390,11 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const { product } = useAssistantName();
 const router = useRouter();
-const { mdUp } = useBreakpoint();
 const idle = useAssistantIdleFocus();
-const uid = useId();
-const headingId = `assistant-approval-heading-${uid}`;
-const questionId = `assistant-approval-question-${uid}`;
-const commandId = `assistant-approval-command-${uid}`;
-const targetsId = `assistant-approval-targets-${uid}`;
-const impactId = `assistant-approval-impact-${uid}`;
-const expiryId = `assistant-approval-expiry-${uid}`;
-const metaId = `assistant-approval-meta-${uid}`;
-const diffId = `assistant-approval-diff-${uid}`;
-const replyId = `assistant-approval-reply-consequence-${uid}`;
+const metaId = `assistant-approval-meta-${useId()}`;
 
 const root = ref<HTMLElement | null>(null);
-const denyButton = ref<{ $el: HTMLElement } | null>(null);
+const headingEl = ref<HTMLElement | null>(null);
 const plan = ref<{ $el: HTMLElement } | null>(null);
 const now = ref(Date.now());
 const scope = ref<ApprovalScope>("once");
@@ -485,6 +411,7 @@ const gated = props.gated;
 let timer: ReturnType<typeof setInterval> | null = null;
 const offs: (() => void)[] = [];
 
+const question = computed(() => props.card.kind === "question");
 const total = computed(() => props.card.total ?? props.card.targets.length);
 const planned = computed(
   () => props.card.kind === "delete" && total.value > 1 && props.card.targets.length > 0,
@@ -493,7 +420,15 @@ const count = computed(() =>
   planned.value && props.card.editable ? selected.value.length : total.value,
 );
 const heading = computed(() => approvalHeading(t, props.card, count.value));
+const groupName = computed(() =>
+  question.value
+    ? t("assistant.question.needsAnswer", { question: heading.value })
+    : t("assistant.approval.needsOkName", { name: raw(lowerFirst(heading.value)) }),
+);
 const nothingSelected = computed(() => planned.value && count.value === 0);
+
+// The composer takes over while the reader writes a reply or their own answer.
+const replying = computed(() => isReplyingTo(props.card.sessionId, props.card.id));
 
 const remainingMs = computed(() =>
   typeof props.card.expiresAt === "number" ? Math.max(0, props.card.expiresAt - now.value) : null,
@@ -511,15 +446,15 @@ const moreTime = computed(
 );
 const expiringSoon = computed(() => remainingMs.value !== null && remainingMs.value <= WARN_AT_MS);
 
-const targets = computed(() =>
+const allTargets = computed(() =>
   props.card.targets.map((target) => ({
     key: target.id ?? target.name,
     label: raw(target.name),
     href: target.id ? approvalTargetHref(router, props.org, target) : null,
   })),
 );
-const firstTargets = computed(() => targets.value.slice(0, FIRST_TARGETS));
-const moreTargets = computed(() => targets.value.slice(FIRST_TARGETS));
+const targets = computed(() => allTargets.value.slice(0, FIRST_TARGETS));
+const moreTargets = computed(() => Math.max(0, allTargets.value.length - FIRST_TARGETS));
 
 const entity = computed(() => approvalEntity(props.card));
 
@@ -539,14 +474,17 @@ const impact = computed(() => {
 
 const diff = computed(() => {
   const changed = approvalDiff(props.card);
-  if (!changed) return null;
   const unknown = t("assistant.approval.currentUnknown");
-  return changed.rows.map((row) => {
-    const after = valueText(row.after);
-    if (props.card.kind === "create") return { field: raw(row.field), value: raw(after) };
-    const before = "before" in row ? valueText(row.before) : changed.oneSided ? unknown : "—";
-    return { field: raw(row.field), value: raw(`${before} → ${after}`) };
+  const rows = (changed?.rows ?? []).map((row) => {
+    const value = raw(valueText(row.after));
+    if (props.card.kind === "create") return { field: raw(row.field), value, before: null };
+    const before = "before" in row ? valueText(row.before) : changed?.oneSided ? unknown : null;
+    return { field: raw(row.field), value, before: before === null ? null : raw(before) };
   });
+  const notifies = approvalNotifies(props.card);
+  return notifies
+    ? [...rows, { field: t("assistant.approval.notifies"), value: raw(notifies), before: null }]
+    : rows;
 });
 
 // The name could not be resolved, so the id is said once here and never in the heading (D3-n).
@@ -561,14 +499,22 @@ const nameUnknown = computed<I18nText | null>(() => {
   });
 });
 
+const endAndScope = computed<I18nText | null>(() => {
+  const until = approvalUntil(props.card);
+  const name = approvalScopeName(props.card);
+  const time = until === null ? null : raw(formatOrgTime(until));
+  if (time && name) return t("assistant.approval.meta", { time, scope: raw(name) });
+  if (time) return t("assistant.approval.metaUntil", { time });
+  return name ? raw(name) : null;
+});
+
 const metaLine = computed<I18nText | null>(() => {
   const inOrg =
     props.multiOrg && props.orgName
       ? t("assistant.approval.inOrg", { org: raw(props.orgName) })
       : null;
-  if (nameUnknown.value && inOrg)
-    return t("assistant.turn.withElapsed", { status: nameUnknown.value, elapsed: inOrg });
-  return nameUnknown.value ?? inOrg;
+  const parts = [endAndScope.value, nameUnknown.value, inOrg].filter(Boolean);
+  return parts.length ? raw(parts.join(" · ")) : null;
 });
 
 const editor = computed(() => (planned.value ? null : approvalEditor(props.card, props.org)));
@@ -576,9 +522,18 @@ const editorLabel = computed(() =>
   editor.value ? t(`assistant.approval.editor.${editor.value.type}`) : raw(""),
 );
 
+const gateLine = computed<I18nText | null>(() => {
+  if (!gated || question.value) return null;
+  return editor.value
+    ? t("assistant.approval.gateTiming", { editor: editorLabel.value })
+    : t("assistant.approval.gateNoEditor", { product });
+});
+
 // A single change has nothing to scope: "always" would grant a write the reader saw once (D3-p).
 const scopeOptions = computed(() =>
-  canAlwaysAllow(props.card) && (!isApprovalChange(props.card) || props.card.targets.length > 1)
+  !gated &&
+  canAlwaysAllow(props.card) &&
+  (!isApprovalChange(props.card) || props.card.targets.length > 1)
     ? [
         { label: t("assistant.approval.scope.once"), value: "once" },
         { label: t("assistant.approval.scope.chat"), value: "chat" },
@@ -588,6 +543,17 @@ const scopeOptions = computed(() =>
         },
       ]
     : [],
+);
+
+const hasDetails = computed(
+  () =>
+    !question.value &&
+    (diff.value.length > 0 ||
+      impact.value.length > 0 ||
+      scopeOptions.value.length > 0 ||
+      !!editor.value ||
+      !!props.card.args ||
+      (!planned.value && allTargets.value.length > 1)),
 );
 
 const approveLabel = computed(() => {
@@ -605,21 +571,6 @@ const narrowedNote = computed(() =>
   planned.value && !props.card.typed && count.value > 0 && count.value < total.value
     ? t("assistant.approval.result.narrowed", { count: count.value })
     : null,
-);
-
-const describedBy = computed(
-  () =>
-    [
-      props.card.question ? questionId : null,
-      metaLine.value ? metaId : null,
-      props.card.command ? commandId : null,
-      targets.value.length && !planned.value ? targetsId : null,
-      diff.value ? diffId : null,
-      impact.value.length ? impactId : null,
-      remainingMs.value !== null && !props.sending ? expiryId : null,
-    ]
-      .filter(Boolean)
-      .join(" ") || undefined,
 );
 
 const argsText = computed(() => JSON.stringify(props.card.args ?? {}, null, 2));
@@ -640,10 +591,6 @@ function act(event: MouseEvent, run: () => void): void {
   run();
 }
 
-function deny(reason: "deny" | "escape"): void {
-  decide({ approved: false, reason });
-}
-
 function approve(): void {
   if (nothingSelected.value || gated) return;
   decide({
@@ -651,6 +598,10 @@ function approve(): void {
     scope: canAlwaysAllow(props.card) ? scope.value : "once",
     ...(planned.value && props.card.editable && { items: [...selected.value] }),
   });
+}
+
+function choose(option: QuestionOption): void {
+  decide({ approved: false, reason: "answer", answer: option.id, answerLabel: option.label });
 }
 
 function edit(): void {
@@ -671,7 +622,7 @@ function decide(decision: ApprovalDecision): void {
 }
 
 function focusDefault(): boolean {
-  const target = denyButton.value?.$el;
+  const target = headingEl.value;
   if (!target) return false;
   target.focus();
   return true;
@@ -716,12 +667,10 @@ onMounted(async () => {
   if (remainingMs.value !== null) timer = setInterval(tick, 1_000);
   offs.push(
     registerAssistantFocusTarget("card", focusDefault),
-    // While the decision is on its way Escape does nothing here, so it never reaches the panel's close.
+    // Escape never decides, and it stops here so it cannot close the panel on a waiting card either.
     registerEscapeRung("b", (event) => {
       const target = event.target instanceof Node ? event.target : document.activeElement;
-      if (!target || !root.value?.contains(target)) return false;
-      if (!props.sending) deny("escape");
-      return true;
+      return !!target && !!root.value?.contains(target);
     }),
   );
   await nextTick();

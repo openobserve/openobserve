@@ -190,4 +190,23 @@ describe("frame guards", () => {
     expect(isDroppableFrame(parseFrame('{"type":"status"}'))).toBe(false);
     expect(isUnknownFrame(parseFrame('{"type":"sync"}'))).toBe(false);
   });
+
+  it("parses an ask_user frame, its options optional, and drops a malformed one to unknown", () => {
+    expect(
+      parseFrame(
+        JSON.stringify({
+          type: "ask_user",
+          request_id: "r1",
+          question: "Which folder?",
+          options: [{ id: "p", label: "Payments" }],
+          allow_other: true,
+          expires_at: 1_800_000_000,
+        }),
+      ).type,
+    ).toBe("ask_user");
+    expect(
+      parseFrame(JSON.stringify({ type: "ask_user", request_id: "r1", question: "q" })).type,
+    ).toBe("ask_user");
+    expect(parseFrame(JSON.stringify({ type: "ask_user", question: "q" })).type).toBe("unknown");
+  });
 });

@@ -17,46 +17,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="message.role === 'user'"
-    class="group/message bg-assistant-user-bg rounded-surface flex min-w-0 flex-col gap-1.5 px-3 py-2"
+    class="group/message @container flex min-w-0 flex-col gap-1"
     data-test="assistant-message-user"
     data-scroll-anchor
   >
-    <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-      <!-- Metadata on the tinted bubble takes the body colour: the meta grey measures 4.3:1 there -->
-      <span
-        class="text-text-body min-w-0 flex-1 text-xs leading-5"
+    <div class="flex min-w-0 items-baseline gap-2">
+      <div class="min-w-0 flex-1">
+        <slot name="body">
+          <p
+            v-if="userText"
+            class="text-text-secondary min-w-0 text-sm break-words whitespace-pre-wrap"
+            data-test="assistant-message-text"
+          >
+            {{ userText }}
+          </p>
+        </slot>
+      </div>
+      <slot name="actions" />
+      <OText
+        variant="meta"
+        as="span"
+        class="shrink-0 whitespace-nowrap"
         data-test="assistant-message-meta"
       >
+        <span v-if="rangeLabel" class="@max-[22rem]:hidden" data-test="assistant-message-range">
+          {{ rangeLabel }} ·
+        </span>
         {{ userMeta }}
-      </span>
-      <slot name="actions" />
+      </OText>
     </div>
-    <slot name="body">
-      <p
-        v-if="userText"
-        class="text-text-body min-w-0 text-sm break-words whitespace-pre-wrap"
-        data-test="assistant-message-text"
-      >
-        {{ userText }}
-      </p>
-    </slot>
-    <ul
-      v-if="chips.length"
-      class="flex min-w-0 flex-wrap gap-1.5"
-      :aria-label="t('assistant.message.chipsName')"
+    <OText
+      v-if="sentChips.length"
+      variant="meta"
+      as="p"
+      class="flex min-w-0 items-center gap-1 break-words"
       data-test="assistant-message-chips"
     >
-      <li v-for="chip in chips" :key="chip.id" class="max-w-full min-w-0">
-        <OTag
-          type="assistantContext"
-          value="sent"
-          :label="chip.label"
-          :icon="chipGlyph[chip.kind]"
-          class="max-w-full"
-          :data-test="`assistant-message-chip-${chip.kind}`"
-        />
-      </li>
-    </ul>
+      <OIcon :name="chipGlyph[sentChips[0].kind]" size="xs" aria-hidden="true" />
+      <span class="min-w-0">{{ sentContext }}</span>
+    </OText>
     <div v-if="attachments.length" class="flex min-w-0 flex-col gap-1.5">
       <AssistantAttachmentBlock
         v-for="(block, index) in attachments"
@@ -95,14 +94,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ul>
     <p
       v-if="message.rerunFor"
-      class="text-text-body text-xs leading-5"
+      class="text-text-secondary text-xs leading-5"
       data-test="assistant-message-rerun"
     >
       {{ t("assistant.footer.rerunFor", { range: rerunRange }) }}
     </p>
     <p
       v-if="message.editedFrom"
-      class="text-text-body text-xs leading-5"
+      class="text-text-secondary text-xs leading-5"
       data-test="assistant-message-edited"
     >
       {{ t("assistant.message.editedFrom", { n: message.editedFrom }) }}
@@ -116,11 +115,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-busy="live ? 'true' : undefined"
     data-scroll-anchor
   >
-    <div v-if="hasContent || live" class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-      <AssistantAgentIdentity size="meta" :agent="agent" :time="answerTime" />
+    <div
+      v-if="agent !== DEFAULT_AGENT || $slots.versions"
+      class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
+    >
+      <AssistantAgentIdentity v-if="agent !== DEFAULT_AGENT" size="meta" :agent="agent" />
       <slot name="versions" />
-      <span class="flex-1" />
     </div>
+    <slot name="status" />
     <template v-for="item in rendered" :key="item.key">
       <!-- Inline-size containment keeps a 20k-character line from setting the transcript's width; layout and paint containment keep a filling part's repaint inside its block (Q1) -->
       <div
@@ -134,8 +136,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AssistantMarkdownPart
             v-if="part.kind !== 'code'"
             :part="part"
-            :html-class="PROSE"
-            :text-class="PLAIN"
+            :html-class="item.key === leadKey ? `${PROSE} ${LEAD_HTML}` : PROSE"
+            :text-class="item.key === leadKey ? `${PLAIN} ${LEAD_TEXT}` : PLAIN"
             :live="item.live"
           />
           <AssistantMarkdownCode
@@ -184,11 +186,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :numbers="claimMap"
           :available="claimAvailable"
           :label="claimLabel"
-          :step-of="claimStep"
-          :total="steps.length"
-          :openable="turn?.openable ?? true"
-          :sid="turn?.sid ?? null"
-          :readonly="readonly"
         />
       </div>
       <AssistantPolicyNotice
@@ -246,15 +243,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :turn="turn"
       />
     </template>
+    <AssistantAnswerMeta
+      v-if="!live && message.role === 'assistant' && !hasFindings"
+      :message="message"
+      :turn="turn"
+      :readonly="readonly"
+    />
+    <slot name="after" />
     <AssistantQueriesGroup
       v-if="!live && message.role === 'assistant'"
       :message="message"
-      :numbers="claimMap"
       :readonly="readonly"
       :turn="turn"
+      :unavailable="unavailableClaims"
     />
-    <slot name="status" />
-    <slot name="after" />
     <component
       :is="footerRenderer"
       v-if="footerRenderer && turn && !live"
@@ -270,8 +272,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
     >
       <AssistantFeedback v-if="feedbackShown" :message="message" :turn="turn" />
+      <span class="flex-1" />
       <slot name="actions" />
     </div>
+    <slot name="follow-ups" />
   </div>
 </template>
 
@@ -288,8 +292,6 @@ import type { AgentId, AssistantTurnView, PolicyBlockData } from "@/composables/
 import type { BlockKind } from "@/services/assistantAnalytics";
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 
-import AssistantStepTrail from "./AssistantStepTrail.vue";
-
 export interface AssistantMessageProps {
   message: ChatMessage;
   turnId: string;
@@ -301,11 +303,12 @@ export interface AssistantMessageProps {
   turn?: AssistantTurnView | null;
   /** The agent that answered this turn; a chat or server without agents reads as the default one. */
   agent?: AgentId;
+  /** The question line's "Last 1 h"; the last turn only, the older ones keep the hour. */
+  rangeLabel?: I18nText | null;
 }
 
 // A decision's record replaces its card in place; the pending card itself renders in the container.
 const BUILT_IN_RENDERERS: [string, Component][] = [
-  ["trail", AssistantStepTrail],
   ["findings", AssistantFindings],
   ["footer", AssistantTurnFooter],
   ["approval", AssistantApprovalResult],
@@ -314,8 +317,6 @@ const BUILT_IN_RENDERERS: [string, Component][] = [
   ["policy", AssistantPolicyNotice],
   ["consent_note", AssistantConsentNote],
 ];
-
-const TRAIL_BLOCK: ContentBlock = { type: "trail" };
 
 const FOOTER_BLOCK: ContentBlock = { type: "footer" };
 
@@ -336,7 +337,6 @@ const COUNTED_KINDS: ReadonlySet<string> = new Set<BlockKind>([
   "link",
   "policy",
   "attachment",
-  "trail",
 ]);
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -367,6 +367,11 @@ const PROSE = [
 
 const PLAIN = "text-text-body min-w-0 text-sm leading-5 break-words whitespace-pre-wrap";
 
+// The conclusion is the only heading-colour line, so a multi-turn chat scans by its answers.
+const LEAD_HTML = "[&_p:first-child]:text-text-heading [&_p:first-child]:font-medium";
+
+const LEAD_TEXT = "text-text-heading font-medium";
+
 /** Lets a later package render its block kind; replaces an earlier registration of the same kind. */
 export function registerBlockRenderer(
   kind: ContentBlock["type"] | string,
@@ -390,14 +395,16 @@ import { useRouter } from "vue-router";
 import AssistantAgentIdentity from "@/components/ai-assistant/agents/AssistantAgentIdentity.vue";
 import { chipGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
+import AssistantAnswerMeta from "@/components/ai-assistant/evidence/AssistantAnswerMeta.vue";
 import AssistantInlineClaims from "@/components/ai-assistant/evidence/AssistantInlineClaims.vue";
 import AssistantLinkCard from "@/components/ai-assistant/evidence/AssistantLinkCard.vue";
 import AssistantQueriesGroup from "@/components/ai-assistant/evidence/AssistantQueriesGroup.vue";
 import AssistantQueryBlock, {
   type QueryBlock,
 } from "@/components/ai-assistant/evidence/AssistantQueryBlock.vue";
-import { claimNumbersKey, stepCitation } from "@/components/ai-assistant/evidence/evidenceText";
+import { citationName, claimNumbersKey } from "@/components/ai-assistant/evidence/evidenceText";
 import {
+  DEFAULT_AGENT,
   agentName,
   assistantEvidenceHostKey,
   claimNumbers,
@@ -410,11 +417,10 @@ import {
   stepsOf,
   toolLinksOf,
   type LinkTarget,
-  type StepFacts,
 } from "@/composables/assistant/pure";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
@@ -452,6 +458,7 @@ const props = withDefaults(defineProps<AssistantMessageProps>(), {
   density: "compact",
   turn: null,
   agent: "o2-ai",
+  rangeLabel: null,
 });
 
 const { t } = useI18nTyped();
@@ -478,28 +485,22 @@ const attachments = computed<{ name: string; body: string; hidden?: boolean }[]>
   ...(legacyUser.value?.blocks ?? []).map((block) => ({ name: block.name, body: block.body })),
 ]);
 
-const chips = computed(() => props.message.chips ?? []);
+// The page's own context is the default, so only what the reader added is worth a line.
+const sentChips = computed(() =>
+  (props.message.chips ?? []).filter((chip) => chip.kind !== "time" && chip.provenance !== "page"),
+);
+const sentContext = computed(() => raw(sentChips.value.map((chip) => chip.label).join(" · ")));
 const images = computed<ImageAttachment[]>(() => props.message.images ?? []);
 
-const baseUserMeta = computed<I18nText>(() => {
-  const who = props.message.author ? raw(props.message.author) : t("assistant.message.you");
-  const at = props.message.sentAt;
-  if (at === undefined) return who;
-  return t("assistant.message.meta", { who, time: formatOrgTime(at, { showZone: true }) });
-});
-
+// The question line keeps the hour; another person's message also keeps who wrote it.
 const userMeta = computed<I18nText>(() => {
-  const { handoffFrom, agentId } = props.message;
-  if (!handoffFrom || !agentId) return baseUserMeta.value;
-  return t("assistant.message.metaHandoff", {
-    meta: baseUserMeta.value,
-    agent: agentName(agentId, t),
-  });
-});
-
-const answerTime = computed(() => {
   const at = props.message.sentAt;
-  return at === undefined ? undefined : raw(formatOrgTime(at, { showZone: true }));
+  const time = at === undefined ? null : raw(formatOrgTime(at));
+  const who = props.message.author ? raw(props.message.author) : null;
+  const meta = who && time ? t("assistant.message.meta", { who, time }) : (who ?? time ?? raw(""));
+  const { handoffFrom, agentId } = props.message;
+  if (!handoffFrom || !agentId) return meta;
+  return t("assistant.message.metaHandoff", { meta, agent: agentName(agentId, t) });
 });
 
 const rerunRange = computed(() => {
@@ -527,15 +528,13 @@ const permissions = computed(() => {
 const rendered = computed<Rendered[]>(() => {
   const out: Rendered[] = [];
   const links = new Set<string>();
-  const trail = renderers.get("trail");
-  if (trail && steps.value.length)
-    out.push({
-      kind: "registered",
-      key: `${props.turnId}:trail`,
-      component: trail,
-      block: TRAIL_BLOCK,
-    });
-  blocks.value.forEach((block, index) => out.push(...renderBlock(block, index, links)));
+  // The conclusion leads the answer wherever its frame landed among the text.
+  const findingsIndex = blocks.value.findIndex((block) => block.type === "findings");
+  if (findingsIndex >= 0)
+    out.push(...renderBlock(blocks.value[findingsIndex], findingsIndex, links));
+  blocks.value.forEach((block, index) => {
+    if (index !== findingsIndex) out.push(...renderBlock(block, index, links));
+  });
   toolLinksOf(props.message).forEach((action, index) => {
     const link = buildNavigationRoute(action, org.value);
     pushLink(out, links, {
@@ -551,6 +550,7 @@ const rendered = computed<Rendered[]>(() => {
 
 function renderBlock(block: ContentBlock, index: number, links: Set<string>): Rendered[] {
   const key = `${props.turnId}:${index}`;
+  if (block.type === "follow_ups") return [];
   if (block.type === "footer" || block.type === "tool_call") {
     return block.type === "tool_call" && POLICY_CODES.has(block.errorType ?? "")
       ? [{ kind: "policy", key, text: policyText(block), policy: deniedPolicy(block) }]
@@ -594,8 +594,7 @@ function renderBlock(block: ContentBlock, index: number, links: Set<string>): Re
     return out;
   }
   const custom = renderers.get(block.type);
-  if (custom && block.type !== "trail")
-    return [{ kind: "registered", key, component: custom, block }];
+  if (custom) return [{ kind: "registered", key, component: custom, block }];
   if (block.type === "text") {
     if (!block.text?.trim()) return [];
     const open = props.live && index === lastTextIndex.value;
@@ -654,8 +653,19 @@ function markdownTarget(href: string): LinkTarget | null {
   }
 }
 
+const hasFindings = computed(() => blocks.value.some((block) => block.type === "findings"));
+
+// With no findings the first text is the conclusion.
+const leadKey = computed(() => {
+  if (hasFindings.value) return null;
+  const first = rendered.value[0];
+  return first?.kind === "markdown" ? first.key : null;
+});
+
+// A citation's number is its row in the queries list; a claim on a step this view lacks comes after them.
 const claimMap = computed(() =>
   claimNumbers([
+    ...steps.value.map((step) => step.callId),
     ...rendered.value.flatMap((item) => (item.kind === "markdown" ? item.claims : [])),
     ...blocks.value.flatMap((block) =>
       (block.findings?.evidence ?? []).flatMap((item) => (item.callId ? [item.callId] : [])),
@@ -716,21 +726,26 @@ function claimAvailable(callId: string): boolean {
   return !props.turn?.hiddenByOwner && steps.value.some((step) => step.callId === callId);
 }
 
-function claimStep(callId: string): StepFacts | null {
-  if (props.turn?.hiddenByOwner) return null;
-  return steps.value.find((step) => step.callId === callId) ?? null;
-}
-
 function claimLabel(callId: string): I18nText {
   const step = steps.value.find((candidate) => candidate.callId === callId);
-  return step ? stepCitation(step, t) : t("assistant.claim.notAvailable");
+  return step
+    ? citationName(claimMap.value.get(callId) ?? step.n, step, t)
+    : t("assistant.claim.notAvailable");
 }
+
+const unavailableClaims = computed(() => {
+  const claims = [
+    ...rendered.value.flatMap((item) => (item.kind === "markdown" ? item.claims : [])),
+    ...blocks.value.flatMap((block) =>
+      (block.findings?.evidence ?? []).flatMap((item) => (item.callId ? [item.callId] : [])),
+    ),
+  ];
+  return new Set(claims.filter((callId) => !claimAvailable(callId))).size;
+});
 
 const footerRenderer = computed(() =>
   props.message.role === "assistant" ? (renderers.get("footer") ?? null) : null,
 );
-
-const hasContent = computed(() => rendered.value.length > 0);
 
 // A tool the policy blocked is a notice with the server's detail; a data-sharing block keeps its own line.
 function deniedPolicy(block: ContentBlock): PolicyBlockData | null {

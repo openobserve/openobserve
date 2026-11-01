@@ -115,7 +115,9 @@ export type {
 } from "./useEditorProposal";
 export {
   MAX_HIT_ROWS,
+  answerDataAt,
   answerQueriesAllEmpty,
+  isStaleAnswer,
   chipOpenQuery,
   claimNumbers,
   fenceQuery,
@@ -151,6 +153,10 @@ export { canAlwaysAllow } from "./actions/appliers/approval";
 export {
   approvalDiff,
   approvalEditor,
+  approvalToolEntity,
+  approvalNotifies,
+  approvalScopeName,
+  approvalUntil,
   approvalName,
   approvalObjectId,
   approvalVerb,
@@ -162,6 +168,7 @@ export {
 } from "./approvalAnatomy";
 export {
   approvalClock,
+  isReplyingTo,
   approvalDuration,
   approvalEntity,
   approvalHeading,

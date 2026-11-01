@@ -32,7 +32,7 @@ import {
   type StepResult,
 } from "./evidence";
 import { contextUsedKeys } from "./frames";
-import type { ApprovalKind, ApprovalTarget } from "./assistantStore.types";
+import type { ApprovalKind, ApprovalTarget, QuestionOption } from "./assistantStore.types";
 import type { ConfirmationRequiredFrame, ConfirmationResolvedFrame, UsageFrame } from "./frames";
 
 const STEP_STATES: ReadonlySet<string> = new Set(["running", "done", "failed", "interrupted"]);
@@ -48,12 +48,17 @@ const MAX_TOOL_CHARS = 100;
 
 const EVIDENCE_TYPES: ReadonlySet<string> = new Set(["query", "link", "findings"]);
 
+const MAX_QUESTION_OPTIONS = 8;
+
+const MAX_FOLLOW_UPS = 3;
+
 const APPROVAL_KINDS: ReadonlySet<string> = new Set<ApprovalKind>([
   "delete",
   "update",
   "create",
   "run_command",
   "permission",
+  "question",
 ]);
 
 // Model and tool output on a card is untrusted: every list and string is capped.
@@ -119,6 +124,10 @@ export interface ApprovalBlockData {
   typed: boolean;
   /** The server's own expiry, epoch ms. */
   expiresAt?: number;
+  /** A question's choices; a question sends one at once. */
+  options?: QuestionOption[];
+  /** A question also takes the user's own words. */
+  allowOther?: boolean;
   /** Replayed with no decision in the record, so it renders as a record and never as a live card. */
   noDecision?: boolean;
   /** Replayed without a resolution frame; the server's approval row says how it was answered. */
@@ -133,6 +142,8 @@ export interface ResolvedBlockData {
   at?: number;
   /** Nobody answered in time; `approved` is false. */
   expired?: boolean;
+  /** What a question was answered with elsewhere. */
+  answer?: string;
   /** The server dropped the card because the chat moved on; `approved` is false. */
   withdrawn?: boolean;
 }
@@ -725,6 +736,11 @@ function reduceTyped(state: StreamState, data: any, ctx: ReducerCtx): StreamEffe
       return typedPermissionDenied(state, data, extras);
     case "confirmation_required":
       return typedApproval(state, data, live, ctx.phase);
+    case "ask_user":
+      return typedApproval(state, askAsConfirmation(data), live, ctx.phase);
+    case "follow_ups":
+      typedFollowUps(state, data);
+      return [];
     case "confirmation_resolved":
       return typedResolved(state, data, ctx.phase);
     case "resource_changed":
@@ -1006,6 +1022,28 @@ function typedApproval(
   return effects;
 }
 
+// A question is held, extended, expired and answered as a card, so everything that watches cards counts it.
+function askAsConfirmation(data: any) {
+  return {
+    type: "confirmation_required",
+    id: data.request_id,
+    tool: "ask_user",
+    kind: "question",
+    message: data.question,
+    options: data.options,
+    allow_other: data.allow_other,
+    expires_at: data.expires_at,
+  };
+}
+
+function typedFollowUps(state: StreamState, data: any): void {
+  const followUps = (Array.isArray(data.items) ? data.items : [])
+    .filter((item: unknown): item is string => typeof item === "string" && !!item.trim())
+    .slice(0, MAX_FOLLOW_UPS)
+    .map((item: string) => item.slice(0, MAX_LINE_CHARS));
+  if (followUps.length) appendBlock(state, { type: "follow_ups", followUps });
+}
+
 function typedResolved(state: StreamState, data: any, phase: StreamPhase): StreamEffect[] {
   resolveConfirmation(state, data);
   const id = boundedId(data.id);
@@ -1017,6 +1055,7 @@ function typedResolved(state: StreamState, data: any, phase: StreamPhase): Strea
     ...(typeof data.at === "number" && { at: data.at }),
     ...(data.expired === true && { expired: true }),
     ...(data.withdrawn === true && { withdrawn: true }),
+    ...(typeof data.answer === "string" && { answer: data.answer.slice(0, MAX_LINE_CHARS) }),
   };
   appendBlock(state, { type: "approval_result", resolved });
   return phase === "live" ? [{ kind: "approval_resolved", frame: data }] : [];
@@ -1078,7 +1117,22 @@ export function approvalOf(data: any): ApprovalBlockData {
     ...(Object.keys(args).length > 0 && { args: boundedJson(args) as Record<string, unknown> }),
     typed,
     ...(expiresAt !== null && { expiresAt }),
+    ...(kind === "question" && {
+      options: questionOptions(data?.options),
+      allowOther: data?.allow_other === true,
+    }),
   };
+}
+
+function questionOptions(raw: unknown): QuestionOption[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((option) => typeof option?.id === "string" && typeof option?.label === "string")
+    .slice(0, MAX_QUESTION_OPTIONS)
+    .map((option) => ({
+      id: option.id.slice(0, MAX_TOOL_CHARS),
+      label: option.label.slice(0, MAX_LINE_CHARS),
+    }));
 }
 
 function approvalKindOf(data: any, tool: string, args: Record<string, unknown>): ApprovalKind {

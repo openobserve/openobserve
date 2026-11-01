@@ -317,7 +317,14 @@ export type OpenAssistantResult =
       reason: GateCode | "turn_running_no_autosend" | "approval_pending" | "org_changed";
     };
 
-export type ApprovalKind = "delete" | "update" | "create" | "run_command" | "permission";
+export type ApprovalKind =
+  "delete" | "update" | "create" | "run_command" | "permission" | "question";
+
+/** One choice of a question card. */
+export interface QuestionOption {
+  id: string;
+  label: string;
+}
 
 /** `tool` = always for this tool; never offered for destructive operations. */
 export type ApprovalScope = "once" | "chat" | "tool";
@@ -352,6 +359,10 @@ export interface PendingApproval {
   /** From the last extend answer; absent until the server has said. */
   userExtendsLeft?: number;
   askedIn: "here" | "other_tab";
+  /** A question's choices; empty on an approval. */
+  options?: QuestionOption[];
+  /** A question also takes the user's own words. */
+  allowOther?: boolean;
   /** False until B-05. */
   grantable: boolean;
   editable: boolean;
@@ -363,8 +374,12 @@ export type ApprovalDecision =
   | { approved: true; scope: ApprovalScope; items?: string[] }
   | {
       approved: false;
-      reason: "deny" | "escape" | "new_chat" | "reply" | "expired" | "withdrawn" | "edited";
+      reason: "deny" | "new_chat" | "reply" | "answer" | "expired" | "withdrawn" | "edited";
       reply?: string;
+      /** What `/confirm` carries for a question: a choice's id or the user's own text. */
+      answer?: string;
+      /** The words the record shows; a choice's label, or the text itself. */
+      answerLabel?: string;
     };
 
 export interface ApprovalResultItem {
@@ -400,6 +415,7 @@ export interface ApprovalOutcome {
     | "new_chat"
     | "stopped"
     | "replied"
+    | "answered"
     | "editing"
     | "narrowed"
     | "expired"

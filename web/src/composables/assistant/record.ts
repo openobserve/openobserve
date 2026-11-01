@@ -112,6 +112,8 @@ export const KNOWN_FRAME_TYPES: ReadonlySet<string> = new Set([
   "query",
   "resource_changed",
   "findings",
+  "ask_user",
+  "follow_ups",
   "sync",
   "sync_state",
 ]);

@@ -1404,7 +1404,7 @@ describe("turnEngine: outcomes", () => {
     await h.store.stop(h.current.sid);
     await run;
     h.store.continueTurn(h.current.sid);
-    expect(h.session().composer.text).toBe("Continue");
+    expect(h.session().composer.text).toBe("Continue the answer above");
     expect(h.session().composer.chips.map((c) => c.id)).toEqual(["s"]);
     expect(h.sends).toHaveLength(1);
   });
