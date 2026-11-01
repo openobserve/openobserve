@@ -238,6 +238,9 @@ const options = computed(() => {
     grid: { left: 52, right: 8, top: 8, bottom: 22 },
     tooltip: {
       trigger: "item",
+      // An overflow-hidden card ancestor clips a tooltip rendered inside the chart.
+      appendToBody: true,
+      className: "o2-echarts-tooltip",
       backgroundColor: chartColor("--color-tooltip-bg"),
       borderWidth: 0,
       textStyle: { color: chartColor("--color-tooltip-text"), fontSize: 12 },
