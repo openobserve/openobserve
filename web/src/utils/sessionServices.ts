@@ -85,6 +85,7 @@ export const expireSession = (
   useLocalUserInfo("", true);
   if (clearLocalStorage) clearLocalStorageKeepingDrafts();
   sessionStorage.clear();
+  sessionStorage.setItem('o2:session-expired-notice', '1');
   // The session is gone, so an editor's "leave site?" prompt could only keep the user on a dead page.
   silenceUnloadPrompts();
   if (toLogin) window.location.assign(`${getPath()}login`);
