@@ -207,16 +207,8 @@ export class TracesPage {
   }
 
   // Getter methods for common trace elements
-  getTraceDetailsElements() {
-    return this.page.locator('[data-test="trace-details-header"], [data-test="trace-details-tree"], [data-test="trace-details-sidebar"]');
-  }
-
   getTraceResultItems() {
     return this.page.locator(this.searchResultItem);
-  }
-
-  getResultsContainer() {
-    return this.page.locator(this.searchResultList).first();
   }
 
   async navigateToTraces() {
@@ -1104,14 +1096,6 @@ export class TracesPage {
     } catch {
       return false;
     }
-  }
-
-  /**
-   * Get trace count from results
-   * @returns {number} Number of visible traces
-   */
-  async getTraceCount() {
-    return await this.page.locator(this.searchResultItem).count();
   }
 
   /**

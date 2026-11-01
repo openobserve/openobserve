@@ -535,11 +535,22 @@ watch(searchTerm, (value) => {
   if (!inputEnabled.value) return;
   if ((props.searchDebounce ?? 0) > 0) {
     if (filterDebounceTimer.value) clearTimeout(filterDebounceTimer.value);
-    filterDebounceTimer.value = setTimeout(() => emit("search", value), props.searchDebounce);
+    filterDebounceTimer.value = setTimeout(() => {
+      filterDebounceTimer.value = null;
+      emit("search", value);
+    }, props.searchDebounce);
     return;
   }
   emit("search", value);
 });
+
+// The consumer must rebuild a header from the term the list is filtered by, or a header it drops for that term unmounts the focused action.
+function flushPendingSearch() {
+  if (!filterDebounceTimer.value) return;
+  clearTimeout(filterDebounceTimer.value);
+  filterDebounceTimer.value = null;
+  emit("search", searchTerm.value);
+}
 
 // Clear the search term whenever the popover closes so re-opening the
 // dropdown always shows the full unfiltered option list.
@@ -900,6 +911,7 @@ function handleHeaderActionKey(e: KeyboardEvent): boolean {
   if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey || (e.key === " " && e.shiftKey))
     return true;
   e.preventDefault();
+  flushPendingSearch();
   if (opt.source) emit("header-action", opt.source);
   // Runs after the filteredOptions watcher has reset the highlight.
   nextTick(() => {
@@ -913,6 +925,7 @@ function handleHeaderActionKey(e: KeyboardEvent): boolean {
 function handleHeaderAction(opt: NormalizedOption, event: MouseEvent) {
   const hadFocus =
     event.currentTarget instanceof HTMLElement && event.currentTarget === document.activeElement;
+  flushPendingSearch();
   if (opt.source) emit("header-action", opt.source);
   if (!hadFocus) return;
   nextTick(() => {

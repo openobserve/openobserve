@@ -85,7 +85,7 @@ test.describe("Traces error-filter pagination (#14317)", () => {
   }, async () => {
     await pm.tracesPage.switchToSearchView();
     // The traces badge counts with approx_distinct, so it can read a few under the seeded total.
-    await pm.tracesPage.searchUntilResultCount('Traces Found');
+    await pm.tracesPage.searchUntilResultCount('traces with a matching span');
     await pm.tracesPage.setResultRecordsPerPage(25);
     await expect.poll(() => pm.tracesPage.getResultOperationNames(), { timeout: 20000 }).toEqual(opRange(0, 25));
 
