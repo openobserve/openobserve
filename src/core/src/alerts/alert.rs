@@ -4345,8 +4345,20 @@ async fn build_notification_context(
             _ => {}
         };
         // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
-        format!(
-            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}&type={}&show_histogram=false",
+        if alert.stream_type == StreamType::Traces {
+            format!(
+                "{}{}/web/traces?stream={}&from={}&to={}&org_identifier={}&tab=spans&type={}",
+                cfg.common.web_url,
+                cfg.common.base_uri,
+                alert.stream_name,
+                alert_start_time,
+                alert_end_time,
+                alert.org_id,
+                SearchEventType::Alerts
+            )
+        } else {
+            format!(
+                "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}&type={}&show_histogram=false",
             cfg.common.web_url,
             cfg.common.base_uri,
             alert.stream_type,
