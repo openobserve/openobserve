@@ -1,4 +1,5 @@
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const { randomUUID } = require('crypto');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
 const { getAuthHeaders } = require('../../utils/cloud-auth.js');
@@ -56,7 +57,8 @@ test.describe('On-call P2 fixes (o2-enterprise#3160)', {
 
       made.tag = uniqueName(`e2e_ent3160_w${testInfo.workerIndex}`);
       const user = oncallUserEmail(made.tag, 'peer');
-      await createOrgUser(page, { email: user });
+      // Never logged in as, so a throwaway password means a crashed run leaves no usable admin behind.
+      await createOrgUser(page, { email: user, password: `${randomUUID()}Aa1#` });
       made.user = user;
       made.team = await createTeam(page, { name: `${made.tag}_team` });
       await addTeamMembers(page, made.team.id, [ROOT_EMAIL, user]);
