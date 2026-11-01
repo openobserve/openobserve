@@ -31,6 +31,7 @@ document.body.appendChild(node);
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
     searchObj: mockSearchObj,
+    tracesParser: { value: null },
     updatedLocalLogFilterField: vi.fn(),
   }),
   DEFAULT_TRACE_COLUMNS: {
@@ -49,6 +50,14 @@ vi.mock("@/services/stream", async (importOriginal) => {
     },
   });
 });
+
+const mockFetchStream = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: mockFetchStream,
+    cancelStreamQueryBasedOnRequestId: vi.fn(),
+  }),
+}));
 
 // Mock SQL parser
 vi.mock("@/composables/useParser", () => ({
@@ -789,6 +798,29 @@ describe("IndexList Component", () => {
       wrapper.vm.handleAddMultipleSearchTerms("service_name", ["o'brien", "plain"], "include");
       expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(
         "(service_name='o''brien' or service_name='plain')",
+      );
+    });
+  });
+
+  describe("field-values where clause with AND inside a quoted value (issue 11966)", () => {
+    const valuesSql = async (editorValue: string, field: string) => {
+      mockSearchObj.data.editorValue = editorValue;
+      mockFetchStream.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: field });
+      await flushPromises();
+      return atob(mockFetchStream.mock.calls[0][0].queryReq.sql);
+    };
+    const clause = "service_name = 'x and y' AND status = '1'";
+
+    it("keeps a remaining condition whose value contains AND", async () => {
+      expect(await valuesSql(clause, "status")).toBe(
+        `SELECT * FROM "test_stream" WHERE service_name = 'x and y'`,
+      );
+    });
+
+    it("does not rewrite a quoted value when removing the other field", async () => {
+      expect(await valuesSql(clause, "service_name")).toBe(
+        `SELECT * FROM "test_stream" WHERE status = '1'`,
       );
     });
   });

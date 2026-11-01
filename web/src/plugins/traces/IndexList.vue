@@ -208,6 +208,7 @@ import useDurationPercentiles, {
 import { SPAN_KIND_MAP, parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
+import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -410,7 +411,7 @@ export default defineComponent({
       const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const fieldPattern = new RegExp(`^"?${escaped}"?\\s*[=!<>]`, "i");
       const multiPattern = new RegExp(`^\\(\\s*"?${escaped}"?\\s*[=!<>]`, "i");
-      const remaining = whereClause.split(/\s+AND\s+/i).filter((cond) => {
+      const remaining = splitOnAnd(whereClause).filter((cond) => {
         const trimmed = cond.trim();
         return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
       });
