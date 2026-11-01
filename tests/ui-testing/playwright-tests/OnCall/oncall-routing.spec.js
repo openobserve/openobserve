@@ -5,7 +5,8 @@
  *   "Routing rule permanently shadowed: surfaced above the table, not only as a
  *    per-row pill."
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * SHADOWING IS THE SERVER'S VERDICT. Deciding that rule A is shadowed means
  * comparing every rule against every other, including rules a team-scoped
@@ -596,18 +597,23 @@ test.describe('On-call routing rules', {
   test.describe.serial('org default team', () => {
     let releaseLock = null;
     let priorDefault = null;
+    let restoreDefault = false;
 
     test.beforeEach(async ({ page }, testInfo) => {
       releaseLock = await acquireOrgLock(DEFAULT_TEAM_LOCK, { testInfo });
       priorDefault = (await getRoutingConfig(page))?.default_team_id ?? null;
+      restoreDefault = true;
     });
 
     // Restored even when the test fails: a leaked nomination routes every other worker's unmatched page.
     test.afterEach(async ({ page }) => {
       try {
-        await setDefaultTeam(page, priorDefault);
+        // afterEach still runs when the outer beforeEach skipped, and then there is nothing to restore.
+        if (restoreDefault) await setDefaultTeam(page, priorDefault);
       } finally {
         releaseLock?.();
+        releaseLock = null;
+        restoreDefault = false;
       }
     });
 

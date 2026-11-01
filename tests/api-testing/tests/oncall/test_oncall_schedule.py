@@ -299,7 +299,7 @@ def test_a_preview_whose_ladder_can_reach_nobody_says_so(
         team = oncall.staffed_team([member], name=uniq("oncall_pt_nowhere"))
         cause = "uses a domain reserved for documentation"
     else:
-        team, member, cause = rota_team, rota_member, "no SMTP transport configured"
+        team, member, cause = rota_team, rota_member, "no SMTP transport"
 
     assert oncall.set_policy(
         team, [ladder([user_target(member)], channels=["email"])]

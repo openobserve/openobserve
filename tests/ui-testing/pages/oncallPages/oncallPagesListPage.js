@@ -162,6 +162,16 @@ export class OnCallPagesListPage {
     return await el.getAttribute('data-state');
   }
 
+  /** Both the checklist and the table's loading flag wait on `setupLoaded`, so either settling means the setup context is in. */
+  async waitForSetupContext() {
+    const settled = this.page.locator([
+      this.locators.setupChecklist,
+      this.locators.setupBanner,
+      `${this.locators.table} [data-test="o2-table"][data-test-loading="false"]`,
+    ].join(', ')).first();
+    await expect(settled).toBeVisible({ timeout: 30000 });
+  }
+
   /** Open the checklist if it is sitting collapsed behind its banner. */
   async expandSetupChecklist() {
     if (await this.getSetupBanner().count()) {

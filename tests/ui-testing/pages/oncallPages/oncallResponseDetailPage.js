@@ -39,6 +39,10 @@ function part(selector, suffix) {
   return selector.replace(/"\]$/, `-${suffix}"]`);
 }
 
+/** A 404 on this record's agent report is the designed "no agent ran" answer (request/oncall/mod.rs get_response_report). */
+export const isNoReportYet = (url, org, responseId) =>
+  new URL(url).pathname === `/api/${org}/oncall/responses/${responseId}/report`;
+
 export class OnCallResponseDetailPage {
   constructor(page) {
     this.page = page;
