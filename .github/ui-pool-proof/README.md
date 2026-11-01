@@ -1,6 +1,6 @@
 # Isolated pool screen
 
-One public-repository standard-8 job compares forks7, threads7, threads7, forks7 on the same pinned source and76-file cohort. It runs only for the dedicated benchmark branch/path push. It does not modify or run the production PR workflow.
+One public-repository standard-8 job compares forks7, threads7, threads7, forks7 on the same pinned source and76-file cohort. It runs only for the dedicated benchmark branch/path push. It does not modify or run the production PR workflow. A depth-one checkout is sufficient: HEAD:web must match the complete frozen web-tree hash and tracked/index/working bytes must match HEAD. No ancestor commit fetch is needed. Preflight and final evidence record the reference revision, actual checkout/harness identities and script/cohort hashes.
 
 Each trial uses a fresh Vitest process and independent optimizer/report directories. It retains production project order, setup, isolation and full source coverage. Full-suite coverage thresholds are disabled symmetrically for this diagnostic subset; exact maps, denominators and positive covered locations must match in both directions and in baseline/candidate repeats. The first successful forks trial freezes the complete case names, projects, modes and states before either threads trial.
 

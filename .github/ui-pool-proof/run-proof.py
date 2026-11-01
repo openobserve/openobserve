@@ -79,8 +79,22 @@ def validate_report(report, sample, runtime, cache, pool, expected_cases=None):
             and options["coverage"]["provider"] == "v8" and options["coverage"]["thresholds"] is None)
 
 
-def web_matches(web, commit):
-    subprocess.run(["git", "diff", "--quiet", commit, "--", "."], cwd=web, check=True, timeout=15)
+def web_matches(web):
+    assert capture(["git", "rev-parse", "HEAD:web"], web).decode().strip() == WEB_TREE, "Frozen web tree changed"
+    subprocess.run(["git", "diff", "--quiet", "HEAD", "--", "."], cwd=web, check=True, timeout=15)
+
+
+def verify_source(web):
+    web_matches(web)
+    assert not capture(["git", "status", "--porcelain", "--", "."], web).strip(), "Dirty web tree"
+    raw = Path(__file__).with_name("sample.json").read_bytes()
+    assert digest(raw) == SAMPLE_DIGEST, "Cohort changed"
+    sample = json.loads(raw)
+    assert sample["sourceCommit"] == SOURCE and sample["webTree"] == WEB_TREE
+    return {"referenceCommit": SOURCE, "webTree": WEB_TREE, "referenceCommitObjectRequired": False,
+            "checkoutCommit": capture(["git", "rev-parse", "HEAD"], web).decode().strip(),
+            "checkoutHarnessTree": capture(["git", "rev-parse", "HEAD:.github/ui-pool-proof"], web).decode().strip(),
+            "proofScriptSha256": digest(Path(__file__).read_bytes()), "cohortSha256": digest(raw)}
 
 
 def coverage_difference(a, b, sa, sb):
@@ -164,9 +178,15 @@ def assess_performance(trials, correctness):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--web", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--verify-source", action="store_true")
     parser.add_argument("--overall-timeout", type=int, default=540)
     args = parser.parse_args()
+    if args.verify_source:
+        print(json.dumps(verify_source(args.web.resolve()), indent=2), flush=True)
+        return 0
+    if args.output is None:
+        parser.error("--output is required for trials")
     if not 30 < args.overall_timeout <= 540:
         parser.error("Overall budget must be31..540 seconds")
     started = time.monotonic()
@@ -185,9 +205,7 @@ def main():
         assert len(sample["files"]) == len({f["file"] for f in sample["files"]}) == 76
         assert sum(f["project"] == "node" for f in sample["files"]) == 4
         assert sum(f["project"] == "jsdom" for f in sample["files"]) == 72
-        web_matches(web, SOURCE)
-        assert not capture(["git", "status", "--porcelain", "--", "."], web).strip(), "Dirty initial web tree"
-        assert capture(["git", "rev-parse", "HEAD:web"], web).decode().strip() == WEB_TREE
+        provenance = verify_source(web)
         for entry in sample["files"]:
             file = entry["file"]
             assert not Path(file).is_absolute() and ".." not in Path(file).parts and file.startswith("src/")
@@ -206,7 +224,7 @@ def main():
              "trialLimitSeconds": 150, "executionLimitSeconds": 144, "cleanupReserveSeconds": 20,
              "memoryMetric": "Diagnostic only: summed RSS counts shared pages repeatedly across forks; GNUtime maxRSS is per-process. Neither establishes comparable physical memory usage.",
              "memoryRegressionAssurance": "unverified", "nodeExecutableSha256": digest(Path(node).read_bytes())})
-        save(output / "source-inventory.json", {"sourceCommit": SOURCE, "webTree": WEB_TREE, "files": sample["files"]})
+        save(output / "source-inventory.json", {**provenance, "files": sample["files"]})
         save(output / "sample.json", sample)
         frozen_options, expected_cases = None, None
         with tempfile.TemporaryDirectory(prefix=".pool-proof-", dir=web) as temporary:
@@ -219,7 +237,7 @@ def main():
             shutil.copyfile(reporter, output / "effective-reporter.mjs")
             for name, pool in TRIALS:
                 assert time.monotonic() < process.DEADLINE, "Overall trial budget exhausted"
-                web_matches(web, SOURCE)
+                web_matches(web)
                 cache = temporary / "cache" / name
                 assert not cache.exists()
                 trial_env = env | {"BENCH_POOL": pool, "BENCH_CACHE": str(cache), "BENCH_REPORT": str(output / (name + ".json")),
@@ -230,7 +248,7 @@ def main():
                 trial = {"name": name, "pool": pool, "sourceCommit": SOURCE, "run": run, "reportVerified": False}
                 trials.append(trial)
                 save(output / "trials.json", trials)
-                web_matches(web, SOURCE)
+                web_matches(web)
                 assert run["exit"] == 0 and not run["remainingOwnedProcesses"] and run["wallSeconds"] <= 150, "Trial failed or exceeded budget"
                 assert run["processGroupPeakRssKiB"] > 0 and not run["memorySamplingErrors"], "Memory measurement failed"
                 report = json.loads((output / (name + ".json")).read_text())
@@ -256,8 +274,7 @@ def main():
         result["error"] = repr(error)
     finally:
         try:
-            web_matches(web, SOURCE)
-            assert not capture(["git", "status", "--porcelain", "--", "."], web).strip()
+            result["sourceVerification"] = verify_source(web)
             result["sourceUnchangedAndWebClean"] = True
         except BaseException as error:
             result["sourceUnchangedAndWebClean"] = False

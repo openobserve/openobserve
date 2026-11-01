@@ -24,12 +24,11 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
-      - name: Fetch pinned sources
+      - name: Verify pinned web tree
         timeout-minutes: 1
         shell: bash
         run: |
-          timeout 50s git fetch --no-tags origin e6d910ca91cb50a90724c41235ac6ec6bdd9d8fd
-          git diff --exit-code e6d910ca91cb50a90724c41235ac6ec6bdd9d8fd -- web
+          python3 .github/ui-pool-proof/run-proof.py --web "$GITHUB_WORKSPACE/web" --verify-source > "$RUNNER_TEMP/pool-evidence/source-verification.json"
           uname -a > "$RUNNER_TEMP/pool-evidence/host.txt"
           lscpu >> "$RUNNER_TEMP/pool-evidence/host.txt"
           free -m >> "$RUNNER_TEMP/pool-evidence/host.txt"
@@ -67,8 +66,7 @@ jobs:
           data = {'elapsedSecondsBeforePackaging': time.time() - int(os.environ['PROOF_JOB_STARTED']), 'configuredRunner': 'ubicloud-standard-8', 'actualVmFamily': 'Requires Set up job log review; label alone is insufficient'}
           (Path(os.environ['RUNNER_TEMP']) / 'pool-evidence/job-timing.json').write_text(json.dumps(data, indent=2) + '\n')
           PY
-          git diff --exit-code e6d910ca91cb50a90724c41235ac6ec6bdd9d8fd -- web
-          test -z "$(git status --porcelain -- web)"
+          python3 .github/ui-pool-proof/run-proof.py --web "$GITHUB_WORKSPACE/web" --verify-source > "$RUNNER_TEMP/pool-evidence/final-source-verification.json"
       - name: Package bounded evidence
         if: always()
         timeout-minutes: 1

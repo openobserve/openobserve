@@ -23,7 +23,7 @@ def diagnostic_paths():
         ))
     paths.extend(("host.txt", "install.resources.txt", "install.log",
                   "proof-driver.log", "final-web-diff.txt", "proof/source-inventory.json",
-                  "proof/effective-config.mts", "proof/effective-reporter.mjs", "job-timing.json"))
+                  "proof/effective-config.mts", "proof/effective-reporter.mjs", "job-timing.json", "source-verification.json", "final-source-verification.json"))
     paths.extend("proof/" + a + "--" + b + "-differences.json" for a, b in (("original-first", "candidate-first"), ("original-last", "candidate-second"), ("original-first", "original-last"), ("candidate-first", "candidate-second")))
     return paths
 

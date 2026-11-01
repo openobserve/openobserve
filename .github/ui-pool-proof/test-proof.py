@@ -1,3 +1,6 @@
+import hashlib
+import zlib
+import subprocess
 import copy
 import json
 import os
@@ -111,6 +114,64 @@ class InventoryGuards(unittest.TestCase):
                 if mutation == "cache": self.report["options"]["projects"][0]["cacheDir"] = "/shared"
                 if mutation == "errors": self.report["errors"] = ["failure"]
                 self.assertFalse(self.valid())
+
+
+class ShallowSourceGuards(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.web = self.root / "web"
+        self.web.mkdir()
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        data = b"frozen source\n"
+        (self.web / "fixture.ts").write_bytes(data)
+        blob = self.object("blob", data)
+        self.web_tree = self.object("tree", b"100644 fixture.ts\x00" + bytes.fromhex(blob))
+        harness = self.root / ".github/ui-pool-proof"
+        harness.mkdir(parents=True)
+        (harness / "fixture.ts").write_bytes(data)
+        github_tree = self.object("tree", b"40000 ui-pool-proof\x00" + bytes.fromhex(self.web_tree))
+        root_tree = self.object("tree", b"40000 .github\x00" + bytes.fromhex(github_tree) + b"40000 web\x00" + bytes.fromhex(self.web_tree))
+        commit = self.object("commit", ("tree " + root_tree + "\nparent " + proof.SOURCE + "\nauthor Guard <guard@example.invalid> 1 +0000\ncommitter Guard <guard@example.invalid> 1 +0000\n\nshallow fixture\n").encode())
+        (self.root / ".git/HEAD").write_text(commit + "\n")
+        (self.root / ".git/shallow").write_text(commit + "\n")
+        subprocess.run(["git", "read-tree", "HEAD"], cwd=self.root, check=True)
+
+    def object(self, kind, content):
+        data = kind.encode() + b" " + str(len(content)).encode() + b"\x00" + content
+        oid = hashlib.sha1(data).hexdigest()
+        path = self.root / ".git/objects" / oid[:2] / oid[2:]
+        path.parent.mkdir(exist_ok=True)
+        path.write_bytes(zlib.compress(data))
+        return oid
+
+    def test_shallow_source_verification_needs_no_ancestor(self):
+        self.assertEqual(subprocess.check_output(["git", "rev-parse", "--is-shallow-repository"], cwd=self.root).strip(), b"true")
+        self.assertNotEqual(subprocess.run(["git", "cat-file", "-e", proof.SOURCE], cwd=self.root, stderr=subprocess.DEVNULL).returncode, 0)
+        with patch.object(proof, "WEB_TREE", self.web_tree):
+            proof.web_matches(self.web)
+
+    def test_changed_tree_and_dirty_tracked_source_are_rejected(self):
+        with patch.object(proof, "WEB_TREE", "0" * 40):
+            with self.assertRaises(AssertionError): proof.web_matches(self.web)
+        with patch.object(proof, "WEB_TREE", self.web_tree):
+            (self.web / "fixture.ts").write_text("changed")
+            with self.assertRaises(subprocess.CalledProcessError): proof.web_matches(self.web)
+
+    def test_source_mode_records_provenance_and_rejects_untracked_files(self):
+        sample = {"sourceCommit": proof.SOURCE, "webTree": self.web_tree}
+        raw = json.dumps(sample).encode()
+        original_read = Path.read_bytes
+        def read(path):
+            return raw if path.name == "sample.json" else original_read(path)
+        with patch.object(proof, "WEB_TREE", self.web_tree), patch.object(proof, "SAMPLE_DIGEST", proof.digest(raw)), patch.object(Path, "read_bytes", read):
+            result = proof.verify_source(self.web)
+            self.assertFalse(result["referenceCommitObjectRequired"])
+            self.assertEqual(result["webTree"], self.web_tree)
+            self.assertEqual(result["proofScriptSha256"], proof.digest(Path(proof.__file__).read_bytes()))
+            (self.web / "untracked.ts").write_text("not frozen")
+            with self.assertRaises(AssertionError): proof.verify_source(self.web)
 
 
 class ProcessGuards(unittest.TestCase):
