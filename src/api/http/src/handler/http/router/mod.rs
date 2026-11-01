@@ -3842,12 +3842,17 @@ mod tests {
             "the editors need the suggest mode before the authenticated config arrives"
         );
 
-        // build_type (enterprise/cloud/opensource) is not sensitive and the o2
-        // CLI + o2-operator read it from this unauthenticated endpoint to gate
-        // enterprise commands — it must stay a real build-type token.
+        // The o2 CLI and o2-operator gate enterprise commands on this unauthenticated field.
+        let expected_build_type = if cfg!(feature = "cloud") {
+            "cloud"
+        } else if cfg!(feature = "enterprise") {
+            "enterprise"
+        } else {
+            "opensource"
+        };
         assert_eq!(
             payload.get("build_type").and_then(Value::as_str),
-            Some("opensource"),
+            Some(expected_build_type),
             "bootstrap build_type must carry the real build kind"
         );
 

@@ -35,6 +35,18 @@ export class NavRailPage {
     await this.page.waitForTimeout(1000);
   }
 
+  // A menu opened while the home view is still loading can end with focus on <body>, so arrows go nowhere.
+  async waitForHomeLoaded() {
+    await expect(this.page.locator('[data-test="home-page"]')).toBeVisible();
+    await expect(this.page.locator('[data-test="home-view-skeleton-tile"]')).toHaveCount(0);
+  }
+
+  async expectFocusInMenu() {
+    await expect
+      .poll(() => this.page.evaluate(() => !!document.activeElement?.closest('[role="menu"]')))
+      .toBe(true);
+  }
+
   async setDir(dir) {
     await this.page.evaluate((d) => {
       document.documentElement.dir = d;

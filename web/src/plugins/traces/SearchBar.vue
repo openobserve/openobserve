@@ -296,6 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="flex items-center gap-1.5 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
         >
+          <OPageHeaderStatus />
           <DateTime
             ref="dateTimeRef"
             auto-apply
@@ -442,6 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
         <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ms-auto max-lg:ms-0">
           <div class="flex items-center gap-2 max-lg:w-full max-lg:justify-end max-lg:gap-1.5">
+            <OPageHeaderStatus />
             <DateTime
               ref="dateTimeRef"
               auto-apply
@@ -495,6 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Services Catalog right toolbar: DateTime, Refresh -->
         <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ms-auto">
           <div class="flex items-center gap-2">
+            <OPageHeaderStatus />
             <DateTime
               ref="dateTimeRef"
               auto-apply
@@ -616,6 +619,7 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -686,6 +690,7 @@ import {
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OPageHeaderStatus,
     OSeparator,
     DateTime,
     ShareButton,

@@ -18,5 +18,7 @@ import "vue-router";
 declare module "vue-router" {
   interface RouteMeta {
     allowOnEmptyData?: boolean;
+    /** Resource key of this route's main list; a 403 on it replaces the page with the no-access state. */
+    accessResource?: string;
   }
 }

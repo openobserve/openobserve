@@ -106,20 +106,22 @@ test.describe(
       await pm.workflowsPage.goToAdd('incident_event');
       await pm.workflowsPage.openTriggerConfig();
 
+      const payload = () => pm.workflowsPage.triggerPayloadText();
+
       // severity_upgrade carries old/new severity on top of the common fields.
       await pm.workflowsPage.selectTriggerVariant('severity_upgrade');
-      const upgrade = await pm.workflowsPage.triggerPayloadText();
-      expect(upgrade).toContain('old_severity');
-      expect(upgrade).toContain('new_severity');
+      await expect.poll(payload).toContain('old_severity');
+      await expect.poll(payload).toContain('new_severity');
+      const upgrade = await payload();
 
       // created adds nothing, so those event-specific fields must disappear.
       await pm.workflowsPage.selectTriggerVariant('created');
-      const created = await pm.workflowsPage.triggerPayloadText();
-      expect(created).not.toContain('old_severity');
+      await expect.poll(payload).not.toContain('old_severity');
 
       // The common baseline is present for every event type.
-      expect(created).toContain('incident_id');
-      expect(created).toContain('event_type');
+      await expect.poll(payload).toContain('incident_id');
+      await expect.poll(payload).toContain('event_type');
+      const created = await payload();
       testLogger.info('payload tracked the selected event type', {
         upgradeLen: upgrade.length,
         createdLen: created.length,

@@ -62,7 +62,7 @@ import {
 } from "./kubernetesColumns";
 import type { DetailsRef, K8sUrlState } from "./kubernetesUrlState";
 
-type ListView = Exclude<View, "cluster" | "map" | "workloads">;
+type ListView = Exclude<View, "cluster" | "map" | "dependencies" | "workloads">;
 
 const props = withDefaults(
   defineProps<{

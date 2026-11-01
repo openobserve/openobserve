@@ -841,6 +841,9 @@ const useRoutes = () => {
           path: "pipelines",
           name: "pipelines",
           component: PipelinesList,
+          meta: {
+            accessResource: "pipelines",
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

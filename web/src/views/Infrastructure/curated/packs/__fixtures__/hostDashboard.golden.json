@@ -29,7 +29,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "100 * (1 - avg(irate(system_cpu_time{state=\"idle\",host_name=\"host-1\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"}[5m])))",
+              "query": "100 * (1 - sum(irate(system_cpu_time{state=\"idle\",host_name=\"host-1\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"}[5m])) / sum(irate(system_cpu_time{host_name=\"host-1\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"}[5m])))",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -73,7 +73,7 @@
           "queryType": "promql",
           "queries": [
             {
-              "query": "avg by (state)(irate(system_cpu_time{host_name=\"host-1\",state!=\"idle\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"}[5m]))",
+              "query": "sum by (state)(irate(system_cpu_time{host_name=\"host-1\",state!=\"idle\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"}[5m])) / scalar(sum(irate(system_cpu_time{host_name=\"host-1\",instrumentation_library_name!~\".*instrumentation.system_metrics.*\"}[5m])))",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {

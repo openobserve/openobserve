@@ -190,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
 
+        <OPageHeaderStatus fallback />
         <!-- EDITION BADGE / UPGRADE BUTTON -->
         <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
         <!-- Open Source: primary CTA to drive upgrades -->
@@ -513,6 +514,7 @@ import OrganizationSelector from "./OrganizationSelector.vue";
 import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
@@ -528,6 +530,7 @@ import { chartColor } from "@/utils/chartTheme";
 export default defineComponent({
   name: "HeaderComponent",
   components: {
+    OPageHeaderStatus,
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OrganizationSelector,

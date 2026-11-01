@@ -822,7 +822,6 @@ export default defineComponent({
       { immediate: true },
     );
     watch(incidentsList.error, (error: any) => {
-      // The grouped access toast already reports a 403; a second red toast adds nothing.
       if (!error || forbidden.value) return;
       toast({ variant: "error", message: t("alerts.incidents.errorLoading") });
       console.error("Failed to load incidents:", error);

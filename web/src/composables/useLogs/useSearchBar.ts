@@ -111,6 +111,7 @@ export const useSearchBar = (t: TranslateFn) => {
       });
       return;
     } catch (e) {
+      if ((e as { response?: { status?: number } })?.response?.status === 403) return;
       showErrorNotification(t("toastMessages.useLogs.errorWhileFetchingFunctions"));
     }
   };

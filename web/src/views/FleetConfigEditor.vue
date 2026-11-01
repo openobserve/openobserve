@@ -202,10 +202,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="relative min-h-0 min-w-0 flex-1">
-        <OEmptyState
+        <OAccessLock
           v-if="!loaded && loadForbidden"
-          size="block"
-          preset="no-access"
+          :denials="loadDenials"
           data-test="fleet-config-editor-forbidden"
         />
         <OEmptyState
@@ -420,6 +419,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OAccessLock from "@/components/access/OAccessLock.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -463,6 +463,7 @@ import {
   useFleetConfigVersion,
 } from "@/components/fleet/useFleetApi";
 import { useOrgId } from "@/composables/query/useOrgId";
+import { failedRequests, viewDenial } from "@/composables/useAccessStore";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -543,6 +544,13 @@ const loaded = computed(() => isNew.value || loadedFor.value === id.value);
 const loadForbidden = computed(
   () => isForbidden(config.error.value) || isForbidden(savedVersion.error.value),
 );
+const loadDenials = computed(() => [
+  viewDenial(
+    "fleet_configs",
+    "get",
+    failedRequests(...[config.error.value, savedVersion.error.value].filter(isForbidden)),
+  ),
+]);
 // A failed background refetch keeps the config that already loaded.
 const loadFailed = computed(
   () =>
