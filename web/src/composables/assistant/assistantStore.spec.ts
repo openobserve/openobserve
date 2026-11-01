@@ -27,6 +27,8 @@ import {
   UNDO_WINDOW_MS,
   createAssistantStore,
   headerLightOf,
+  openWindowsOf,
+  renameWindowSid,
   withRemoteLight,
   inertAssistantDeps,
   sessionView,
@@ -268,8 +270,8 @@ describe("placement", () => {
     const { store } = makeStore();
     const sid = newSession(store);
     const button = document.createElement("button");
-    store.open({ kind: "sidebar", mode: "pinned" }, { sid, focus: "composer", invoker: button });
-    expect(store.state.shell.placement).toEqual({ kind: "sidebar", mode: "pinned" });
+    store.open({ kind: "sidebar" }, { sid, focus: "composer", invoker: button });
+    expect(store.state.shell.placement).toEqual({ kind: "sidebar" });
     expect(store.invokerOf(sid)).toBe(button);
     expect(isReactive(store.state.shell.invoker)).toBe(false);
     expect(store.focusRequest.value).toMatchObject({ target: "composer" });
@@ -280,22 +282,22 @@ describe("placement", () => {
   it("restores the previous placement when a docked host closes", () => {
     const { store } = makeStore();
     newSession(store);
-    store.open({ kind: "sidebar", mode: "floating" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     store.open({ kind: "docked", hostId: "alert_query" }, { focus: "composer" });
-    expect(store.state.shell.previousPlacement).toEqual({ kind: "sidebar", mode: "floating" });
+    expect(store.state.shell.previousPlacement).toEqual({ kind: "sidebar" });
     store.open({ kind: "docked", hostId: "regex" }, { focus: "composer" });
-    expect(store.state.shell.previousPlacement).toEqual({ kind: "sidebar", mode: "floating" });
+    expect(store.state.shell.previousPlacement).toEqual({ kind: "sidebar" });
     store.close("host_closed");
-    expect(store.state.shell.placement).toEqual({ kind: "sidebar", mode: "floating" });
+    expect(store.state.shell.placement).toEqual({ kind: "sidebar" });
     expect(store.state.shell.previousPlacement).toBeNull();
   });
 
   it("returns from the full view to the previous placement only when the route is left", () => {
     const { store } = makeStore();
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     store.moveTo({ kind: "full" });
     store.close("route");
-    expect(store.state.shell.placement).toEqual({ kind: "sidebar", mode: "pinned" });
+    expect(store.state.shell.placement).toEqual({ kind: "sidebar" });
     store.moveTo({ kind: "full" });
     store.close("close");
     expect(store.state.shell.placement).toEqual({ kind: "hidden" });
@@ -303,20 +305,20 @@ describe("placement", () => {
 
   it("writes the placement per tab and restores it on reload", () => {
     const { store } = makeStore();
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     expect(JSON.parse(sessionStorage.getItem("o2.assistant.placement:k1")!)).toMatchObject({
-      placement: { kind: "sidebar", mode: "pinned" },
+      placement: { kind: "sidebar" },
     });
     window.dispatchEvent(new Event("pagehide"));
     resetPrefsForTests();
     const reloaded = makeStore().store;
-    expect(reloaded.state.shell.placement).toEqual({ kind: "sidebar", mode: "pinned" });
+    expect(reloaded.state.shell.placement).toEqual({ kind: "sidebar" });
   });
 
   it("starts a duplicated tab hidden with an empty draft", () => {
     const { store } = makeStore();
     const sid = newSession(store);
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     sessionStorage.setItem(`o2.assistant.draft:k1:${sid}`, JSON.stringify({ text: "copied" }));
     // The duplicate is a new page load over a copy of this tab's sessionStorage.
     resetPrefsForTests();
@@ -342,19 +344,14 @@ describe("placement", () => {
     expect(sessionStorage.getItem(`o2.assistant.draft:k1:${sid}`)).toContain("half typed");
   });
 
-  it("stores sidebar width and mode by user+org and clamps the width", () => {
+  it("stores the sidebar width by user+org and clamps it", () => {
     const { store } = makeStore();
     store.setSidebarWidth(10);
     expect(store.state.shell.sidebarWidthRem).toBe(20);
     store.setSidebarWidth(70);
     expect(store.state.shell.sidebarWidthRem).toBe(40);
-    store.setSidebarMode("floating");
     store.setSheetSnap("full");
-    expect(JSON.parse(localStorage.getItem("o2.assistant.sidebar:k1")!)).toEqual({
-      widthRem: 40,
-      mode: "floating",
-    });
-    expect(store.hasStoredSidebarMode()).toBe(true);
+    expect(JSON.parse(localStorage.getItem("o2.assistant.sidebar:k1")!)).toEqual({ widthRem: 40 });
     expect(store.state.shell.sheetSnap).toBe("full");
   });
 
@@ -372,7 +369,6 @@ describe("placement", () => {
     store.open({ kind: "docked", hostId: "function" }, { focus: "none" });
     expect(view.container.value).toBe("docked.function");
     expect(view.isVisible.value).toBe(true);
-    expect(view.sidebarForcedFloating.value).toBe(false);
   });
 
   it("refuses every turn start in a chat under the cross-tab lock, naming why", async () => {
@@ -398,35 +394,10 @@ describe("placement", () => {
     expect(store.turnLockOf(sid)).toBe("signed_out");
   });
 
-  it("holds a wide stored width instead of floating, and floats only where 20 rem cannot sit beside <main>", () => {
-    const viewportPx = ref(1024);
-    const { store } = makeStore({}, "available", { viewportRem: () => viewportPx.value / 16 });
-    const view = useAssistantPlacement(store);
+  it("holds a wide stored width to what leaves <main> 32 rem", () => {
+    const { store } = makeStore({}, "available", { viewportRem: () => 64 });
     store.setSidebarWidth(32);
-    expect(view.sidebarForcedFloating.value).toBe(false);
-    expect(sidebarWidthFor(store.state.shell.sidebarWidthRem, 64, false)).toBe(26.5);
-    viewportPx.value = 900;
-    expect(view.sidebarForcedFloating.value).toBe(true);
-    viewportPx.value = 1100;
-    expect(view.sidebarForcedFloating.value).toBe(false);
-  });
-
-  it("pins for one open without writing pinned into the stored placement", () => {
-    const { store } = makeStore();
-    const view = useAssistantPlacement(store);
-    store.open({ kind: "sidebar", mode: "floating" }, { focus: "none", forcePinned: true });
-    expect(view.sidebarForcedPinned.value).toBe(true);
-    expect(store.state.shell.placement).toEqual({ kind: "sidebar", mode: "floating" });
-    expect(JSON.parse(sessionStorage.getItem("o2.assistant.placement:k1")!).placement).toEqual({
-      kind: "sidebar",
-      mode: "floating",
-    });
-    store.open({ kind: "sidebar", mode: "floating" }, { focus: "composer" });
-    expect(view.sidebarForcedPinned.value).toBe(true);
-    store.close("close");
-    expect(view.sidebarForcedPinned.value).toBe(false);
-    store.open({ kind: "sidebar", mode: "floating" }, { focus: "none" });
-    expect(view.sidebarForcedPinned.value).toBe(false);
+    expect(sidebarWidthFor(store.state.shell.sidebarWidthRem, 64)).toBe(26.5);
   });
 });
 
@@ -945,7 +916,7 @@ describe("derived views", () => {
     const { store } = makeStore();
     const first = newSession(store);
     expect(headerLightOf(store.state).state).toBe("idle");
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     expect(headerLightOf(store.state).state).toBe("open");
     store.setDraft(first, { text: "x" });
     const second = newSession(store);
@@ -1031,9 +1002,8 @@ describe("gates and isolation", () => {
       const { store } = makeStore({}, gate);
       expect(store.state.ready).toBe(false);
       expect(() => newSession(store)).toThrow();
-      store.open({ kind: "sidebar", mode: "pinned" }, { focus: "composer" });
+      store.open({ kind: "sidebar" }, { focus: "composer" });
       store.setSidebarWidth(30);
-      store.setSidebarMode("floating");
       store.setActive(null);
       expect(store.state.shell.placement).toEqual({ kind: "hidden" });
       expect(localStorage.length).toBe(0);
@@ -1074,7 +1044,7 @@ describe("lifecycle seams", () => {
     const rebind = vi.fn();
     const { store } = makeStore({ hints: { ...inertAssistantDeps().hints, rebind } });
     const sid = newSession(store);
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     await expect(store.onOrgSwitch({ org: "org2", userOrgKey: "k2" })).resolves.toBe("proceed");
     expect(store.state.shell.activeSid).toBeNull();
     expect(store.state.shell.placement.kind).toBe("sidebar");
@@ -1088,7 +1058,7 @@ describe("lifecycle seams", () => {
     const sid = newSession(store);
     store.setDraft(sid, { text: "secret" });
     await store.send(sid);
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     await expect(store.onSignOut()).resolves.toBe("proceed");
     expect(Object.keys(sessionStorage).filter((k) => k.includes(":k1"))).toEqual([]);
     expect(localStorage.getItem("o2.assistant.recall:k1")).toBeNull();
@@ -1141,7 +1111,7 @@ describe("lifecycle seams", () => {
     store.setIdentity({ userOrgKey: "k2", org: "org2" });
     const second = newSession(store);
     store.setDraft(second, { text: "org 2 draft" });
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     markTabAlive("k4");
     sessionStorage.setItem("o2.assistant.selected:k4", "sid-4");
     for (const key of ["k1", "k2", "k3"]) pushRecall(key, { text: "secret", chips: [], at: 1 });
@@ -1193,9 +1163,213 @@ describe("lifecycle seams", () => {
       sid: "s1",
       key: "assistant.entry.open",
     });
-    localStorage.setItem("o2.assistant.sidebar:k1", JSON.stringify({ mode: "floating" }));
-    store.applyHint({ v: 1, type: "prefs_changed", key: "sidebar_mode", at: 1 });
-    expect(store.state.shell.sidebarMode).toBe("floating");
+    localStorage.setItem("o2.assistant.sidebar:k1", JSON.stringify({ widthRem: 28 }));
+    store.applyHint({ v: 1, type: "prefs_changed", key: "sidebar_width", at: 1 });
+    expect(store.state.shell.sidebarWidthRem).toBe(28);
+  });
+});
+
+describe("floating windows (WP-32)", () => {
+  const floated = (store: AssistantStoreInternal, sid = newDetached(store)) => {
+    store.floatChat(sid, { focus: "none" });
+    return sid;
+  };
+  const newDetached = (store: AssistantStoreInternal) =>
+    store.createSession({ origin: ORIGIN, detached: true });
+  const openSids = (store: AssistantStoreInternal) =>
+    store.state.shell.windows.filter((w) => w.state === "open").map((w) => w.sid);
+  const atWidth = (px: number) => {
+    const width = ref(px);
+    return { width, ...makeStore({}, "available", { viewportRem: () => width.value / 16 }) };
+  };
+
+  it("floats the sidebar's chat: the sidebar closes and the window takes focus", () => {
+    const { store } = makeStore();
+    const sid = newSession(store);
+    store.open({ kind: "sidebar" }, { sid, focus: "none" });
+    expect(store.floatChat(sid)).toEqual({ ok: true });
+    expect(store.state.shell.placement.kind).toBe("hidden");
+    expect(store.state.shell.activeSid).toBeNull();
+    expect(store.windowOf(sid)?.state).toBe("open");
+    expect(store.focusRequest.value).toMatchObject({ window: sid });
+    expect(store.windowAnnouncement.value?.key).toBe("assistant.announce.floated");
+  });
+
+  it("holds 2 open at 1280 and up, and sends the least recent to the tray with no focus move", () => {
+    const { store } = atWidth(1280);
+    const [a, b] = [floated(store), floated(store)];
+    store.raiseWindow(a);
+    const c = floated(store);
+    expect(openSids(store).sort()).toEqual([a, c].sort());
+    expect(store.windowOf(b)?.state).toBe("minimised");
+    expect(store.state.shell.trayOrder).toEqual([b]);
+    expect(store.windowAnnouncement.value?.key).toBe("assistant.announce.floated");
+  });
+
+  it("holds 1 open at 1024–1279 and none below", () => {
+    const { store, width } = atWidth(1100);
+    const a = floated(store);
+    const b = floated(store);
+    expect(openSids(store)).toEqual([b]);
+    expect(store.windowOf(a)?.state).toBe("minimised");
+    width.value = 900;
+    expect(store.floatChat(newDetached(store))).toEqual({ ok: false, reason: "no_room" });
+  });
+
+  it("refuses a fifth floating chat and takes an unknown one for nothing", () => {
+    const { store } = makeStore();
+    for (let i = 0; i < 4; i += 1) floated(store);
+    expect(store.floatChat(newDetached(store))).toEqual({ ok: false, reason: "cap" });
+    expect(store.floatChat("nope")).toEqual({ ok: false, reason: "unknown_chat" });
+    expect(store.state.shell.windows).toHaveLength(4);
+  });
+
+  it("never shows a chat twice: floating it again raises it", () => {
+    const { store } = makeStore();
+    const a = floated(store);
+    store.minimiseWindow(a, "button");
+    expect(store.floatChat(a)).toEqual({ ok: true });
+    expect(store.state.shell.windows).toHaveLength(1);
+    expect(store.windowOf(a)?.state).toBe("open");
+    expect(store.state.shell.trayOrder).toEqual([]);
+  });
+
+  it("restores at the cap by sending the least recent open window to the tray", () => {
+    const { store } = makeStore();
+    const [a, b, c] = [floated(store), floated(store), floated(store)];
+    expect(store.windowOf(a)?.state).toBe("minimised");
+    store.raiseWindow(b);
+    store.restoreWindow(a);
+    expect(store.windowOf(c)?.state).toBe("minimised");
+    expect(openSids(store).sort()).toEqual([a, b].sort());
+    expect(store.windowAnnouncement.value?.key).toBe("assistant.announce.restored");
+  });
+
+  it("sends the less recent of two windows to the tray when the viewport shrinks, and keeps the values below 1024", () => {
+    const { store, width } = atWidth(1400);
+    const [a, b] = [floated(store), floated(store)];
+    width.value = 1100;
+    store.fitWindowsToViewport();
+    expect(store.windowOf(a)?.state).toBe("minimised");
+    width.value = 900;
+    store.fitWindowsToViewport();
+    expect(store.windowOf(b)?.state).toBe("open");
+  });
+
+  it("pins a window and swaps a chat with content out to the tray at the same geometry", () => {
+    const { store } = makeStore();
+    const pinned = newSession(store);
+    store.state.sessions[pinned].messages.push({ role: "user", content: raw("hi") });
+    store.open({ kind: "sidebar" }, { sid: pinned, focus: "none" });
+    const win = floated(store);
+    const geometry = store.windowOf(win)?.geometry;
+    store.pinChat(win);
+    expect(store.state.shell.activeSid).toBe(win);
+    expect(store.state.shell.lastFocusedContainer).toBe("sidebar");
+    expect(store.windowOf(win)).toBeNull();
+    expect(store.windowOf(pinned)).toMatchObject({ state: "minimised", geometry });
+    expect(store.windowAnnouncement.value?.key).toBe("assistant.announce.pinnedSwapped");
+  });
+
+  it("pins over a blank sidebar chat with nothing to keep", () => {
+    const { store } = makeStore();
+    const blank = newSession(store);
+    store.open({ kind: "sidebar" }, { sid: blank, focus: "none" });
+    const win = floated(store);
+    store.pinChat(win);
+    expect(store.windowOf(blank)).toBeNull();
+    expect(store.windowAnnouncement.value?.key).toBe("assistant.announce.pinned");
+  });
+
+  it("closes a window with the answer still running and says so", () => {
+    const { store } = makeStore();
+    const sid = floated(store);
+    store.state.sessions[sid].turn = { state: "streaming" } as never;
+    store.closeWindow(sid);
+    expect(store.windowOf(sid)).toBeNull();
+    expect(store.state.sessions[sid]).toBeDefined();
+    expect(store.windowAnnouncement.value?.key).toBe("assistant.announce.windowClosedRunning");
+  });
+
+  it("keeps each window's chat in its own session while the sidebar shows another", () => {
+    const { store } = makeStore();
+    const pinned = newSession(store);
+    store.open({ kind: "sidebar" }, { sid: pinned, focus: "none" });
+    const [a, b] = [floated(store), floated(store)];
+    store.setDraft(a, { text: "first" });
+    store.setDraft(b, { text: "second" });
+    expect(store.state.sessions[a].composer.text).toBe("first");
+    expect(store.state.sessions[b].composer.text).toBe("second");
+    expect(store.state.shell.activeSid).toBe(pinned);
+  });
+
+  it("names the front chat by focus: the window, else the sidebar", () => {
+    const { store } = makeStore();
+    const pinned = newSession(store);
+    store.open({ kind: "sidebar" }, { sid: pinned, focus: "none" });
+    const win = floated(store);
+    expect(store.frontSid()).toBe(win);
+    store.noteFocusedContainer("sidebar");
+    expect(store.frontSid()).toBe(pinned);
+  });
+
+  it("hides windows in the full view without changing them", () => {
+    const { store } = makeStore();
+    const win = floated(store);
+    store.open({ kind: "full" }, { focus: "none" });
+    expect(openWindowsOf(store.state.shell)).toEqual([]);
+    expect(store.windowOf(win)?.state).toBe("open");
+    store.close("close");
+    expect(openWindowsOf(store.state.shell).map((w) => w.sid)).toEqual([win]);
+  });
+
+  it("does not count a minimised chat as visible, so its end marks it unread", () => {
+    const { store } = makeStore();
+    const sid = floated(store);
+    expect(sessionView(store.state.sessions[sid], store.state.shell).visible).toBe(true);
+    store.minimiseWindow(sid, "button");
+    expect(sessionView(store.state.sessions[sid], store.state.shell).visible).toBe(false);
+  });
+
+  it("stores windows per tab and drops a window whose session is gone", () => {
+    const { store } = makeStore();
+    const sid = floated(store);
+    const stored = JSON.parse(sessionStorage.getItem("o2.assistant.windows:k1")!);
+    expect(stored).toEqual([expect.objectContaining({ sid, state: "open", corner: "bottom-end" })]);
+    store.dropSession(sid, "deleted_elsewhere");
+    expect(store.windowOf(sid)).toBeNull();
+    expect(sessionStorage.getItem("o2.assistant.windows:k1")).toBeNull();
+  });
+
+  it("closes an org's windows on a switch and brings them back on the way home", () => {
+    const { store } = makeStore();
+    const sid = floated(store);
+    store.setIdentity({ userOrgKey: "k2", org: "org2" });
+    store.syncCapability(capability("available"));
+    expect(store.state.shell.windows).toEqual([]);
+    store.setIdentity({ userOrgKey: "k1", org: "org1" });
+    store.syncCapability(capability("available"));
+    expect(store.windowOf(sid)?.state).toBe("open");
+  });
+
+  it("carries a window, the tray and the focus mark across a session rename", () => {
+    const { store } = makeStore();
+    const sid = floated(store);
+    store.minimiseWindow(sid, "button");
+    renameWindowSid(store.state, sid, "renamed");
+    expect(store.state.shell.windows[0].sid).toBe("renamed");
+    expect(store.state.shell.trayOrder).toEqual(["renamed"]);
+  });
+
+  it("sets the agent of a new chat, and the next agent of one with turns (stub)", () => {
+    const { store } = makeStore();
+    const sid = newSession(store);
+    store.pickAgent(sid, "sre", "picker");
+    expect(store.state.sessions[sid].agentId).toBe("sre");
+    store.state.sessions[sid].messages.push({ role: "user", content: raw("hi") });
+    store.pickAgent(sid, "generate-query", "picker");
+    expect(store.state.sessions[sid].agentId).toBe("sre");
+    expect(store.state.sessions[sid].nextAgentId).toBe("generate-query");
   });
 });
 

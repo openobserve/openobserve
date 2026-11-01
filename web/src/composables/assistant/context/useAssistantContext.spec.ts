@@ -95,7 +95,7 @@ describe("useAssistantContext", () => {
   it("follows the page until the user overrides the time, then keeps custom (CT-01 AC 4–5)", async () => {
     vi.useFakeTimers();
     let page: PageContext = PAGE_CONTEXTS.logs;
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     const view = mountContext(async () => page);
     await flushPromises();
     page = {
@@ -243,7 +243,7 @@ describe("useAssistantContext", () => {
     await flushPromises();
     first.stop();
     const before = read.mock.calls.length;
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     await vi.advanceTimersByTimeAsync(PAGE_POLL_MS * 2);
     expect(read.mock.calls.length).toBeGreaterThan(before + 1);
     store.close("close");

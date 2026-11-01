@@ -226,6 +226,7 @@ import DashboardCustomizeIcon from "~icons/material-symbols/dashboard-customize-
 import DataUsageIcon from "~icons/material-symbols/data-usage";
 import DeleteSweepIcon from "~icons/material-symbols/delete-sweep-outline";
 import DevicesIcon from "~icons/material-symbols/devices-outline";
+import DockToRightIcon from "~icons/material-symbols/dock-to-right";
 import DragIndicatorIcon from "~icons/material-symbols/drag-indicator";
 import EventNoteIcon from "~icons/material-symbols/event-note-outline";
 import ExitToAppIcon from "~icons/material-symbols/exit-to-app";
@@ -615,6 +616,7 @@ export const iconRegistry = {
   "delete-outline": Delete,
   "delete-sweep": DeleteSweepIcon,
   devices: DevicesIcon,
+  "dock-to-right": DockToRightIcon,
   "drag-indicator": DragIndicatorIcon,
   "event-note": EventNoteIcon,
   "exit-to-app": ExitToAppIcon,

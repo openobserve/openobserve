@@ -224,7 +224,7 @@ describe("AssistantLauncher", () => {
   it("hides its Suggestions while the sidebar shows its own welcome (D5 decision 10)", async () => {
     const { wrapper, store } = setup();
     expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(true);
-    store.state.shell.placement = { kind: "sidebar", mode: "pinned" };
+    store.state.shell.placement = { kind: "sidebar" };
     await flushPromises();
     expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-launcher-your-chats"]').exists()).toBe(true);

@@ -130,7 +130,7 @@ describe("useAssistantDockHost", () => {
 
   it("opens docked with the object's title and restores the previous placement when the host goes", async () => {
     const rt = build();
-    rt.store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    rt.store.open({ kind: "sidebar" }, { focus: "none" });
     const { wrapper, dock } = mountHost(adapter());
     const result = await dock.open();
     expect(result).toMatchObject({ ok: true, container: "docked.alert_query" });
@@ -139,7 +139,7 @@ describe("useAssistantDockHost", () => {
     const sid = rt.store.state.shell.activeSid!;
     expect(String(rt.store.state.sessions[sid].title)).toBe("Alert · checkout");
     wrapper.unmount();
-    expect(rt.store.state.shell.placement).toEqual({ kind: "sidebar", mode: "pinned" });
+    expect(rt.store.state.shell.placement).toEqual({ kind: "sidebar" });
     expect(track).toHaveBeenCalledWith("ai_container_closed", { reason: "host_closed" });
   });
 

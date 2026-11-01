@@ -57,14 +57,20 @@ const SAMPLES: { [N in AiEventName]: AiEventProps[N] } = {
   ai_gate_blocked: { reason: "no_permission", cta: "ask_admin" },
   ai_container_opened: {
     from: "door",
-    placement_mode: "pinned",
+    placement_mode: "sidebar",
     turn_running: false,
     latency_ms: 42,
   },
-  ai_container_moved: { from: "pinned", to: "full", turn_running: true },
+  ai_container_moved: { from: "sidebar", to: "full", turn_running: true },
   ai_container_closed: { reason: "escape" },
   ai_panel_resized: { width_rem: 24, viewport: "desktop" },
-  ai_panel_mode_changed: { mode: "floating", forced: false },
+  ai_window_opened: { from: "layout" },
+  ai_window_moved: { snap: "corner" },
+  ai_window_resized: {},
+  ai_window_minimised: { reason: "button" },
+  ai_window_restored: {},
+  ai_window_closed: {},
+  ai_window_cap_reached: {},
   ai_sheet_snap: { snap: "half" },
   ai_toast: { kind: "ready", action: "open" },
   ai_turn_busy: {},
@@ -190,7 +196,13 @@ const CATALOGUE: Record<AiEventName, string[]> = {
   ai_container_moved: ["from", "to", "turn_running"],
   ai_container_closed: ["reason"],
   ai_panel_resized: ["width_rem", "viewport"],
-  ai_panel_mode_changed: ["mode", "forced"],
+  ai_window_opened: ["from"],
+  ai_window_moved: ["snap"],
+  ai_window_resized: [],
+  ai_window_minimised: ["reason"],
+  ai_window_restored: [],
+  ai_window_closed: [],
+  ai_window_cap_reached: [],
   ai_sheet_snap: ["snap"],
   ai_toast: ["kind", "action"],
   ai_turn_busy: [],
@@ -306,7 +318,7 @@ afterEach(() => {
 describe("event catalogue", () => {
   it("pins every event name of 99 §3.3", () => {
     expect([...AI_EVENT_NAMES].sort()).toEqual(Object.keys(CATALOGUE).sort());
-    expect(AI_EVENT_NAMES).toHaveLength(56);
+    expect(AI_EVENT_NAMES).toHaveLength(62);
   });
 
   it.each(AI_EVENT_NAMES)("%s carries exactly its catalogue properties", (name) => {

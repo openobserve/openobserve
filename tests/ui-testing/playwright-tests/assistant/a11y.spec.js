@@ -638,7 +638,7 @@ test.describe("assistant accessibility", () => {
     expect(await obscuredWhileTabbing(page, '[data-test="assistant-shell-sheet"]')).toEqual([]);
   });
 
-  test("A11Y-09 again at 1280: the floating sidebar never covers a focused dashboard control", { tag: ["@mock"] }, async ({ context, page }) => {
+  test("A11Y-09 again at 1280: a floating window never covers a focused dashboard control", { tag: ["@mock"] }, async ({ context, page }) => {
     test.setTimeout(120_000);
     await start(context, page);
     const id = await harness.createTwoColumnDashboard(`a11y floating ${Date.now()}`);
@@ -648,11 +648,10 @@ test.describe("assistant accessibility", () => {
       await settled(page);
       await assistant.open("header");
       await assistant.container().locator('[data-test="assistant-thread-menu"]').click();
-      await page.locator('[data-test="assistant-shell-mode-floating"]').click();
-      const host = page.locator('[data-test="assistant-sidebar-host"]');
-      await expect(host).toHaveAttribute("data-mode", "floating");
+      await page.locator('[data-test="assistant-shell-place-window"]').click();
+      await expect(page.locator('[data-test="assistant-window"]')).toBeVisible();
       await page.locator('[data-test="main-content"]').evaluate((el) => el.querySelector("button, a[href], input, [tabindex='0']")?.focus());
-      const hits = await obscuredWhileTabbing(page, '[data-test="assistant-sidebar-host"][data-mode="floating"]', 60);
+      const hits = await obscuredWhileTabbing(page, '[data-test="assistant-window"]', 60);
       expect(hits).toEqual([]);
     } finally {
       await harness.deleteDashboard(id);

@@ -244,7 +244,7 @@ function start(store: AssistantStoreInternal): void {
     watch(contextRegistry.version, () => void readPage());
     watch(route, () => void readPage());
     watch(
-      () => store.state.shell.placement.kind !== "hidden",
+      () => store.anyContainerVisible(),
       (shown) => (shown ? startPolling() : stopPolling()),
       { immediate: true },
     );

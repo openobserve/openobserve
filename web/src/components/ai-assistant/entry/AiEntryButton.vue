@@ -563,7 +563,7 @@ const touch = computed(() => coarse.value || !mdUp.value);
 
 // The session an Add to chat or a degraded send lands in: the one the open container shows.
 const target = computed(() => {
-  const sid = store.state.shell.activeSid;
+  const sid = store.frontSid();
   const session = sid ? store.state.sessions[sid] : undefined;
   return session && session.userOrgKey === store.state.userOrgKey ? session : null;
 });
@@ -760,7 +760,7 @@ function threadFor(): "new" | "current" | "auto" {
   if (props.entryKind !== "empty_state") return "new";
   const last = emptyStateThreads.get(routeKey());
   const fresh = !!last && Date.now() - last.at < EMPTY_STATE_THREAD_MS;
-  return fresh && last.sid === store.state.shell.activeSid ? "current" : "new";
+  return fresh && last.sid === store.frontSid() ? "current" : "new";
 }
 
 function rememberEmptyState(sid: string): void {

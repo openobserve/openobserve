@@ -46,7 +46,13 @@ export const AI_EVENT_NAMES = [
   "ai_container_moved",
   "ai_container_closed",
   "ai_panel_resized",
-  "ai_panel_mode_changed",
+  "ai_window_opened",
+  "ai_window_moved",
+  "ai_window_resized",
+  "ai_window_minimised",
+  "ai_window_restored",
+  "ai_window_closed",
+  "ai_window_cap_reached",
   "ai_sheet_snap",
   "ai_toast",
   "ai_turn_busy",
@@ -202,7 +208,7 @@ export type Viewport = "mobile" | "tablet" | "desktop";
 
 export type TelemetryRole = "admin" | "editor" | "viewer" | "custom" | "unknown";
 
-export type PlacementMode = "pinned" | "floating" | "sheet" | "docked" | "full";
+export type PlacementMode = "sidebar" | "window" | "sheet" | "docked" | "full";
 
 export type LengthBucket = "0" | "1_20" | "21_100" | "101_500" | "500_plus";
 
@@ -264,7 +270,13 @@ export interface AiEventProps {
   ai_container_moved: { from: PlacementMode; to: PlacementMode; turn_running: boolean };
   ai_container_closed: { reason: "close" | "escape" | "host_closed" | "route" };
   ai_panel_resized: { width_rem: number; viewport: Viewport };
-  ai_panel_mode_changed: { mode: "pinned" | "floating"; forced: boolean };
+  ai_window_opened: { from: "layout" | "tear_off" | "list" };
+  ai_window_moved: { snap: "corner" | "edge" | "none" };
+  ai_window_resized: Record<string, never>;
+  ai_window_minimised: { reason: "button" | "escape" | "drop" | "make_room" };
+  ai_window_restored: Record<string, never>;
+  ai_window_closed: Record<string, never>;
+  ai_window_cap_reached: Record<string, never>;
   ai_sheet_snap: { snap: "peek" | "half" | "full" };
   ai_toast: { kind: "ready" | "needs_you"; action: "open" | "dismiss" };
   ai_turn_busy: Record<string, never>;

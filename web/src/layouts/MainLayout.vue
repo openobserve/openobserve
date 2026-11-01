@@ -176,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </main>
         <AssistantSidebarHost v-if="!store.state.kioskMode" />
+        <AssistantWindowLayer v-if="!store.state.kioskMode && store.state.printMode !== true" />
       </div>
       <div v-else class="flex h-full min-h-0 min-w-0 flex-1">
         <!-- Main Panel -->
@@ -430,6 +431,9 @@ export default defineComponent({
     // Async, so the flag-off build never loads the assistant chunk.
     AssistantSidebarHost: defineAsyncComponent(
       () => import("@/components/ai-assistant/shell/AssistantSidebarHost.vue"),
+    ),
+    AssistantWindowLayer: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantWindowLayer.vue"),
     ),
     AssistantSkipLink: defineAsyncComponent(
       () => import("@/components/ai-assistant/shell/AssistantSkipLink.vue"),

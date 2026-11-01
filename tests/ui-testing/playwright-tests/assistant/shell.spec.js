@@ -161,7 +161,7 @@ test.describe("assistant shell", () => {
     await expect(landmarks.filter({ visible: true })).toHaveCount(1);
     await expect(assistant.headerButton).toHaveAttribute("data-state", "open");
     await assistant.full.locator('[data-test="assistant-thread-menu"]').click();
-    await page.locator('[data-test="assistant-shell-open-in-sidebar"]').click();
+    await page.locator('[data-test="assistant-shell-place-sidebar"]').click();
     await expect(page).toHaveURL(/\/logs/);
     await expect(assistant.sidebar).toBeVisible();
   });

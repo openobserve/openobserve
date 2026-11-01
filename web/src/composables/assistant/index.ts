@@ -39,6 +39,12 @@ export { starterPayload, widerPeriodText } from "./starterPayload";
 export { useAssistantStarters } from "./useAssistantStarters";
 export { groupOf, originOf, useAssistantHistory } from "./useAssistantHistory";
 export type {
+  FloatingWindow,
+  MinimiseReason,
+  WindowCorner,
+  WindowGeometry,
+} from "./assistantStore.types";
+export type {
   AssistantHistory,
   DeletedNotice,
   HistoryAnnouncement,
@@ -60,6 +66,7 @@ export {
   runEscapeLadder,
   runHistoryTarget,
   stopLadderEscape,
+  windowRootSelector,
   useAssistantOpenChord,
   useAssistantShortcuts,
 } from "./shortcuts";
@@ -107,8 +114,35 @@ export {
   SIDEBAR_MIN_REM,
   UNDO_WINDOW_MS,
   isRunning,
+  openWindowsOf,
+  sessionView,
 } from "./assistantStore";
-export { sidebarWidthFor } from "./sidebarWidth";
+export { defaultWidthRem, sidebarWidthFor } from "./sidebarWidth";
+export {
+  MAX_FLOATING_CHATS,
+  TEAR_OFF_REM,
+  TRAY_FOOTPRINT_REM,
+  WINDOW_DEFAULT_H_REM,
+  WINDOW_DEFAULT_W_REM,
+  WINDOW_MIN_H_REM,
+  WINDOW_MIN_W_REM,
+  WINDOW_NARROW_REM,
+  WINDOW_STEP_REM,
+  atCorner,
+  clampRect,
+  coversFully,
+  defaultGeometry,
+  dropTargetAt,
+  geometryOf,
+  intersects,
+  openWindowCap,
+  otherCorners,
+  rectOf,
+  resizeRect,
+  sizeLimits,
+  snapRect,
+} from "./windows";
+export type { DropTarget, PageArea, ResizeEdge, WindowRect } from "./windows";
 export { readRecall, readHints, readSidebar, markHintSeen, migrateHome, writeHome } from "./prefs";
 export { assistantDashboardDraft, clearDashboardDraft } from "./actions/appliers/drafts";
 export {
@@ -116,17 +150,14 @@ export {
   focusDockComposer,
   hostRegistry,
   isDockOpen,
+  isPageHost,
   queueDockStage,
   reportDockWidth,
   useAssistantDockHost,
   useAssistantDockToggle,
   useDockedEditor,
 } from "./hostAdapter";
-export {
-  scheduleResizeSignal,
-  useAssistantPanelWidth,
-  useSidebarFloating,
-} from "./useAssistantPanelWidth";
+export { scheduleResizeSignal, useAssistantPanelWidth } from "./useAssistantPanelWidth";
 export {
   PROPOSAL_LANGUAGE_NAMES,
   proposalFor,

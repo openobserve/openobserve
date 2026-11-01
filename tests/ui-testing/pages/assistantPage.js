@@ -240,7 +240,7 @@ export class AssistantPage {
     return this.page.locator('[data-test="assistant-shell-resize-handle"]').filter({ visible: true });
   }
 
-  /** The column or card around the sidebar shell, which carries `data-mode` and the width variable. */
+  /** The column around the sidebar shell, which carries the width variable. */
   sidebarHost() {
     return this.page.locator('[data-test="assistant-sidebar-host"]');
   }

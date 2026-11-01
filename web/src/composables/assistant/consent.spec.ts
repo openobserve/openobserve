@@ -269,7 +269,7 @@ describe("consent", () => {
     const { store, sid } = setup();
     const cancel = vi.fn();
     const stop = cancelConsentOnClose(() => store.state, { cancel });
-    store.open({ kind: "sidebar", mode: "pinned" }, { sid, focus: "none" });
+    store.open({ kind: "sidebar" }, { sid, focus: "none" });
     await nextTick();
     store.moveTo({ kind: "full" });
     await nextTick();
@@ -291,7 +291,7 @@ describe("consent", () => {
     });
     store.state.sessions[sid].pendingConsent = setup().pending;
     const stop = cancelConsentOnClose(() => store.state, { cancel });
-    store.open({ kind: "sidebar", mode: "pinned" }, { sid, focus: "none" });
+    store.open({ kind: "sidebar" }, { sid, focus: "none" });
     store.moveTo({ kind: "docked", hostId: "alert-editor" } as never);
     await nextTick();
     store.moveTo({ kind: "full" });

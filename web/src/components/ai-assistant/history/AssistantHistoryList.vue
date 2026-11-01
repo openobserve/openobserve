@@ -330,6 +330,8 @@ export interface AssistantHistoryListProps {
   /** `panel` replaces a container's chat (D5 §3.2); `rail` sits beside the full view's chat. */
   mode: "panel" | "rail";
   currentSid: Sid | null;
+  /** The window this list sits in: a row opens there, never in the primary container. */
+  windowSid?: Sid | null;
   /** Where a row opens: the rail routes to the full view, the others open in their container. */
   container: Container;
 }
@@ -627,7 +629,11 @@ async function openRow(sid: Sid): Promise<void> {
     return;
   }
   emit("opened", sid);
-  await store.openSession({ sid }, { focus: true }).catch(() => undefined);
+  const windowSid = props.windowSid;
+  const opening = windowSid
+    ? store.openInWindow(windowSid, { sid })
+    : store.openSession({ sid }, { focus: true });
+  await opening.catch(() => undefined);
 }
 
 function askDelete(sid: Sid): void {

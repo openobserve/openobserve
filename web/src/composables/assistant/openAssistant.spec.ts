@@ -160,15 +160,13 @@ function setup(options: Setup = {}) {
     capability: () => ({ ...capability, gate }),
     hosts,
     routeName: () => options.route ?? "logs",
-    routePrefersFloating: () => options.prefersFloating ?? false,
     pushRoute,
     lgUp: () => options.lgUp ?? true,
-    viewportPx: () => 1280,
     currentOrg: () => "org1",
     now: () => clock.now,
     notify,
   };
-  return { store, open: createOpenAssistant(env), send, notify, pushRoute, clock };
+  return { store, env, open: createOpenAssistant(env), send, notify, pushRoute, clock };
 }
 
 const events = () => window.__o2telemetry ?? [];
@@ -476,7 +474,7 @@ describe("container resolution (10 §3.3)", () => {
     const result = ok(await open({ ...headerOpen, entryKind: "editor_toggle", dockHost: "regex" }));
     expect(result.container).toBe("sidebar");
     expect(store.state.shell.placement.kind).toBe("sidebar");
-    expect(notify).toHaveBeenCalledWith("assistant.editor.tooNarrow", undefined);
+    expect(notify).toHaveBeenCalledWith("assistant.shell.dockTooNarrow", undefined);
   });
 
   it("docks when the row gives both, and a phone never refuses because the dock is a sheet", async () => {
@@ -532,32 +530,52 @@ describe("container resolution (10 §3.3)", () => {
     expect(store.state.shell.placement.kind).toBe("sidebar");
   });
 
-  it("opens floating on a prefers-floating route but pinned when floating would cover the source", async () => {
-    const { open, store } = setup({ prefersFloating: true });
-    const rect = (left: number, right: number, top: number, bottom: number) =>
-      ({ left, right, top, bottom }) as DOMRect;
-    const leftPanel = document.createElement("div");
-    leftPanel.getBoundingClientRect = () => rect(100, 400, 200, 400);
-    ok(await open({ ...headerOpen, invoker: leftPanel }));
-    expect(store.state.shell.placement).toEqual({ kind: "sidebar", mode: "floating" });
-    store.close("close");
-    // The header's own button sits above the card's top, so it is not covered either.
-    const headerButton = document.createElement("button");
-    headerButton.getBoundingClientRect = () => rect(1180, 1210, 4, 32);
-    ok(await open({ ...headerOpen, invoker: headerButton }));
-    expect(store.sidebarForcedPinned.value).toBe(false);
-    store.close("close");
-    const right = document.createElement("div");
-    right.getBoundingClientRect = () => rect(900, 1200, 200, 400);
-    ok(await open({ ...headerOpen, invoker: right }));
-    expect(store.sidebarForcedPinned.value).toBe(true);
-    expect(store.state.shell.placement).toEqual({ kind: "sidebar", mode: "floating" });
-    expect(JSON.parse(sessionStorage.getItem("o2.assistant.placement:k1")!).placement).toEqual({
-      kind: "sidebar",
-      mode: "floating",
+  it("opens the sidebar and never creates a window on its own (decision 4)", async () => {
+    const { open, store } = setup();
+    expect(ok(await open(headerOpen)).container).toBe("sidebar");
+    expect(store.state.shell.windows).toEqual([]);
+  });
+
+  it("lands in the most recently focused window, replacing its chat in place", async () => {
+    const { open, store } = setup();
+    const win = store.createSession({
+      origin: { entryKind: "thread_new", objectKind: "none", container: "window" },
+      detached: true,
     });
-    expect(store.state.shell.sidebarMode).toBe("pinned");
-    expect(store.hasStoredSidebarMode()).toBe(false);
+    store.floatChat(win, { focus: "none" });
+    const result = ok(await open({ ...headerOpen, thread: "new" }));
+    expect(result.container).toBe("window");
+    expect(store.state.shell.placement.kind).toBe("hidden");
+    expect(store.state.shell.windows).toHaveLength(1);
+  });
+
+  it("uses the sidebar when the target window covers the door's source", async () => {
+    const { open, store, env } = setup();
+    const win = store.createSession({
+      origin: { entryKind: "thread_new", objectKind: "none", container: "window" },
+      detached: true,
+    });
+    store.floatChat(win, { focus: "none" });
+    env.windowRect = () => ({ left: 100, right: 500, top: 100, bottom: 500 }) as DOMRect;
+    const covered = document.createElement("div");
+    covered.getBoundingClientRect = () =>
+      ({ left: 200, right: 300, top: 200, bottom: 300 }) as DOMRect;
+    expect(ok(await open({ ...headerOpen, invoker: covered })).container).toBe("sidebar");
+    expect(store.windowOf(win)?.state).toBe("open");
+  });
+
+  it("goes to the sidebar below lg, where no window shows", async () => {
+    const { open, store } = setup({ lgUp: false });
+    const win = store.createSession({
+      origin: { entryKind: "thread_new", objectKind: "none", container: "window" },
+      detached: true,
+    });
+    store.state.shell.windows.push({
+      sid: win,
+      state: "open",
+      geometry: { corner: "bottom-end", dxRem: 1, dyRem: 1, wRem: 24, hRem: 36 },
+    });
+    expect(ok(await open(headerOpen)).container).toBe("sheet");
   });
 
   it("moves focus to the composer, except for a send into a visible container", async () => {

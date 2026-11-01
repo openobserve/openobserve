@@ -20,11 +20,14 @@ import type {
   ApprovalResult,
   ApprovalResultItem,
   BlockAnnotation,
+  FloatingWindow,
   HistoryFilter,
   Placement,
   Sid,
+  WindowCorner,
 } from "./assistantStore.types";
 import type { ContextChip } from "./context/types";
+import { MAX_FLOATING_CHATS } from "./windows";
 
 export const RECALL_CAP = 10;
 
@@ -35,6 +38,13 @@ export const TAB_HEARTBEAT_MS = 5_000;
 export const TAB_STALE_MS = 15_000;
 
 const SESSION_PREFIX = "o2.assistant.";
+
+const WINDOW_CORNERS: ReadonlySet<unknown> = new Set<WindowCorner>([
+  "top-start",
+  "top-end",
+  "bottom-start",
+  "bottom-end",
+]);
 
 const LEGACY_HOME_ORDER = "o2_home_tab_order";
 
@@ -111,6 +121,7 @@ const FEEDBACK_REASONS: ReadonlySet<unknown> = new Set([
 const SESSION_KEYS = {
   selected: (k: string) => `o2.assistant.selected:${k}`,
   placement: (k: string) => `o2.assistant.placement:${k}`,
+  windows: (k: string) => `o2.assistant.windows:${k}`,
   historyFilter: (k: string) => `o2.assistant.historyFilter:${k}`,
   tab: (k: string) => `o2.assistant.tab:${k}`,
 };
@@ -134,7 +145,6 @@ export interface RecallEntry {
 
 export interface SidebarPrefs {
   widthRem?: number;
-  mode?: "pinned" | "floating";
 }
 
 export interface HomePrefs {
@@ -229,8 +239,15 @@ export function removeAnnotations(userOrgKey: string): void {
   removeKey("local", LOCAL_KEYS.annotations(userOrgKey));
 }
 
+/** A stored v1 `mode` is dropped once; the sidebar has no modes. */
 export function readSidebar(userOrgKey: string): SidebarPrefs {
-  return readJson<SidebarPrefs>("local", LOCAL_KEYS.sidebar(userOrgKey)) ?? {};
+  const key = LOCAL_KEYS.sidebar(userOrgKey);
+  const stored = readJson<SidebarPrefs & { mode?: unknown }>("local", key);
+  if (!stored) return {};
+  if (!("mode" in stored)) return stored;
+  const { mode: _mode, ...rest } = stored;
+  writeJson("local", key, rest);
+  return rest;
 }
 
 export function writeSidebar(userOrgKey: string, delta: SidebarPrefs): void {
@@ -345,12 +362,35 @@ export function rememberSelection(userOrgKey: string, sid: Sid | null): void {
   else writeRaw("session", SESSION_KEYS.selected(userOrgKey), sid);
 }
 
+/** A placement stored by v1 carries `mode`; the shape returned never does. */
 export function readPlacement(userOrgKey: string): PlacementPrefs | null {
-  return readJson<PlacementPrefs>("session", SESSION_KEYS.placement(userOrgKey));
+  const stored = readJson<PlacementPrefs>("session", SESSION_KEYS.placement(userOrgKey));
+  if (!stored) return null;
+  return {
+    placement: withoutMode(stored.placement),
+    previousPlacement: stored.previousPlacement ? withoutMode(stored.previousPlacement) : null,
+  };
 }
 
 export function writePlacement(userOrgKey: string, value: PlacementPrefs): void {
   writeJson("session", SESSION_KEYS.placement(userOrgKey), value);
+}
+
+/** This tab's floating chats; malformed entries are dropped and the cap holds for a hand-edited value. */
+export function readWindows(userOrgKey: string): FloatingWindow[] {
+  const stored = readJson<unknown>("session", SESSION_KEYS.windows(userOrgKey));
+  if (!Array.isArray(stored)) return [];
+  return stored.flatMap(toFloatingWindow).slice(0, MAX_FLOATING_CHATS);
+}
+
+export function writeWindows(userOrgKey: string, windows: readonly FloatingWindow[]): void {
+  const key = SESSION_KEYS.windows(userOrgKey);
+  if (windows.length === 0) return removeKey("session", key);
+  writeJson(
+    "session",
+    key,
+    windows.map(({ sid, state, geometry }) => ({ sid, state, ...geometry })),
+  );
 }
 
 export function readHistoryFilter(userOrgKey: string): HistoryFilter | null {
@@ -587,6 +627,30 @@ function toRecallEntry(item: unknown): RecallEntry[] {
   if (typeof text !== "string" || !text.trim()) return [];
   const valid = Array.isArray(chips) ? chips.filter(isChip) : [];
   return [{ text, chips: valid, at: typeof at === "number" ? at : 0 }];
+}
+
+function withoutMode(placement: Placement): Placement {
+  return placement.kind === "sidebar" ? { kind: "sidebar" } : placement;
+}
+
+function toFloatingWindow(item: unknown): FloatingWindow[] {
+  const value = item as Record<string, unknown> | null;
+  if (!value || typeof value.sid !== "string" || !WINDOW_CORNERS.has(value.corner)) return [];
+  const { dxRem, dyRem, wRem, hRem } = value;
+  if (![dxRem, dyRem, wRem, hRem].every(isNumber)) return [];
+  return [
+    {
+      sid: value.sid,
+      state: value.state === "minimised" ? "minimised" : "open",
+      geometry: {
+        corner: value.corner as WindowCorner,
+        dxRem: dxRem as number,
+        dyRem: dyRem as number,
+        wRem: wRem as number,
+        hRem: hRem as number,
+      },
+    },
+  ];
 }
 
 function isChip(value: unknown): value is ContextChip {

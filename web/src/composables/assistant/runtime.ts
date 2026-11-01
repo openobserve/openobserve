@@ -28,7 +28,7 @@ import {
   type QueryObserverOptions,
   type QueryObserverResult,
 } from "@tanstack/vue-query";
-import type { RouteLocationNormalizedLoaded, Router } from "vue-router";
+import type { Router } from "vue-router";
 
 import config from "@/aws-exports";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
@@ -296,13 +296,15 @@ function buildRuntime(): AssistantRuntime {
       capability: () => capability.capability.value,
       hosts,
       routeName: () => String(context.value?.router?.currentRoute.value.name ?? ""),
-      routePrefersFloating: () => prefersFloating(context.value?.router?.currentRoute.value),
       pushRoute: (to) => void context.value?.router?.push(to).catch(() => undefined),
       lgUp: () => lgUp.value,
-      viewportPx: () => window.innerWidth,
-      viewportHeightPx: () => window.innerHeight,
       currentOrg: () => context.value?.getOrg()?.identifier ?? null,
       now: deps.now,
+      windowRect: (sid) =>
+        document
+          .querySelector(`[data-assistant-window="${CSS.escape(sid)}"]`)
+          ?.getBoundingClientRect() ?? null,
+      historyRows: () => history.rows.value,
     });
     return {
       store,
@@ -601,14 +603,6 @@ function watchIdentity(
     (email) => void hints.bindUser(email),
     { immediate: true },
   );
-}
-
-// A route asks for the floating panel by meta, or by a predicate when only some of its tabs need the width.
-function prefersFloating(route: RouteLocationNormalizedLoaded | undefined): boolean {
-  const wanted = route?.meta?.assistantPrefersFloating;
-  return typeof wanted === "function"
-    ? wanted(route as RouteLocationNormalizedLoaded)
-    : wanted === true;
 }
 
 function createHostRegistry(): HostRegistry {

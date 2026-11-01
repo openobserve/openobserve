@@ -210,6 +210,7 @@ import AssistantGateState, {
 } from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import {
   openAssistant,
+  sessionView,
   useAssistantCapability,
   useAssistantHistory,
   useAssistantName,
@@ -430,6 +431,8 @@ function onClick(): void {
 function openOnLitSession(invoker: HTMLElement | null, sid?: string): void {
   const light = store.headerLight.value;
   const target = sid ?? (light.state !== "open" && light.state !== "idle" ? light.sid : null);
+  // A lit chat in a window opens where it lives: raised, or back from the tray.
+  if (store.windowOf(target)) return store.restoreWindow(target as string);
   if (target && store.state.sessions[target]) store.setActive(target);
   void openAssistant({
     entryKind: sid ? "toast" : "header_button",
@@ -475,7 +478,8 @@ function lightName(): AiEventProps["ai_status_light"]["state"] {
 }
 
 function isShown(sid: string): boolean {
-  return placement.isVisible.value && store.state.shell.activeSid === sid;
+  const session = store.state.sessions[sid];
+  return !!session && sessionView(session, store.state.shell).visible;
 }
 
 function announceLight(): void {

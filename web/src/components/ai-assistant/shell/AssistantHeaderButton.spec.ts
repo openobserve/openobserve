@@ -236,7 +236,7 @@ describe("AssistantHeaderButton light", () => {
   it("shows open with the neutral pressed border while a container is visible", async () => {
     const { wrapper, store } = setup();
     session(store, "Checkout");
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     await flushPromises();
     const el = button(wrapper);
     expect(el.attributes("data-state")).toBe("open");
@@ -386,7 +386,7 @@ describe("AssistantHeaderButton announcements and toasts", () => {
     document.body.innerHTML = "";
     const shown = setup();
     const b = session(shown.store, "Shown");
-    shown.store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    shown.store.open({ kind: "sidebar" }, { focus: "none" });
     shown.store.state.sessions[b].turn = { state: "awaiting_approval", callId: "c" };
     await flushPromises();
     expect(region(shown.wrapper)).toBe("");
@@ -431,7 +431,7 @@ describe("AssistantHeaderButton announcements and toasts", () => {
   it("raises no toast for the session a container shows", async () => {
     const { store } = setup();
     const a = session(store, "Visible");
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     store.state.sessions[a].turn = { state: "awaiting_approval", callId: "c" };
     await flushPromises();
     expect(toast).not.toHaveBeenCalled();

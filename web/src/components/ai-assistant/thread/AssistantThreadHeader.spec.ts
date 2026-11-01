@@ -295,6 +295,13 @@ describe("AssistantThreadHeader", () => {
     expect(chats.set).toHaveBeenCalledWith(true);
   });
 
+  it("keeps Chats and New direct at the default density whatever the container's width", async () => {
+    const { wrapper } = await setup({ density: "default", placement: "sidebar" });
+    expect(wrapper.find('[data-test="assistant-thread-history"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-thread-new"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-thread-menu-new"]').exists()).toBe(false);
+  });
+
   it("describes the heading by the not-saved tag", async () => {
     const { wrapper, store, sid } = await setup();
     store.state.sessions[sid].turn = { state: "done", saved: "not_saved" };

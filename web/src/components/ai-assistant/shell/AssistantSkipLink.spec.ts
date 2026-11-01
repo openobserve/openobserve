@@ -66,7 +66,7 @@ describe("AssistantSkipLink", () => {
     store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-skip-link"]').text()).toBe("Skip to O2 Assistant");
     expect(
@@ -92,7 +92,7 @@ describe("AssistantSkipLink", () => {
     store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
-    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    store.open({ kind: "sidebar" }, { focus: "none" });
     await flushPromises();
     await wrapper.get('[data-test="assistant-skip-link"]').trigger("click");
     expect(document.activeElement?.tagName).toBe("TEXTAREA");

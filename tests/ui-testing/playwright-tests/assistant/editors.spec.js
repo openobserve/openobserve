@@ -189,15 +189,13 @@ test.describe("assistant editors and width", () => {
     expect(closed.map((e) => e.properties.reason)).toContain("host_closed");
   });
 
-  test("SHELL-07 the drag handle stores a width that survives a reload; a page that needs its width opens floating", { tag: ["@mock"] }, async ({
+  test("SHELL-07 the drag handle stores a width that survives a reload; a page that needs its width hints at a floating window", { tag: ["@mock"] }, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(url("/logs"), { waitUntil: "domcontentloaded" });
     await ready(page);
     await assistant.open("header");
-    const host = assistant.sidebarHost();
-    await expect(host).toHaveAttribute("data-mode", "pinned");
     const mainBefore = await page.locator('main[data-test="main-content"]').evaluate((m) => m.getBoundingClientRect().width);
     const handle = assistant.resizeHandle();
     const box = await handle.boundingBox();
@@ -223,7 +221,6 @@ test.describe("assistant editors and width", () => {
       .toBeGreaterThan(0);
     await page.reload({ waitUntil: "domcontentloaded" });
     await ready(page);
-    await expect(host).toHaveAttribute("data-mode", "pinned");
     await expect(assistant.resizeHandle()).toHaveAttribute("aria-valuenow", "30");
     await assistant.close();
     await page.evaluate(() => {
@@ -234,9 +231,9 @@ test.describe("assistant editors and width", () => {
       waitUntil: "domcontentloaded",
     });
     await ready(page);
-    // The header door sits above the floating card, so it opens floating like any other door here.
     await assistant.open("header");
-    await expect(host).toHaveAttribute("data-mode", "floating");
+    await assistant.container().locator('[data-test="assistant-thread-menu"]').click();
+    await expect(page.locator('[data-test="assistant-shell-prefers-window-hint"]')).toBeVisible();
   });
 
   test("DOOR-07 a log field's regex hand-off opens one assistant: the regex drawer's dock, prefilled", { tag: ["@mock"] }, async ({

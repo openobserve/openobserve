@@ -288,6 +288,11 @@ export function focusDockComposer(hostId: ProposalHostId): boolean {
   return !!composer;
 }
 
+/** A dock inside a dialog or drawer is the only container that can be seen there, so its chat never floats (PO A8). */
+export function isPageHost(adapter: AssistantHostAdapter | undefined): boolean {
+  return !!adapter && !adapter.dockSlot.value?.closest('[role="dialog"]');
+}
+
 /** The dock reports its measured width, so the host's reflow and the width readers follow it. */
 export function reportDockWidth(hostId: DockHostId, rem: number): void {
   if (rem > 0) dockWidths.set(hostId, rem);

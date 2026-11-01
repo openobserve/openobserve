@@ -43,7 +43,14 @@ const { placement, openAssistant, storeClose } = vi.hoisted(() => ({
 }));
 
 vi.mock("./runtime", () => ({
-  getAssistantRuntime: () => ({ store: { state: { shell: { placement } }, close: storeClose } }),
+  getAssistantRuntime: () => ({
+    store: {
+      state: { shell: { placement } },
+      close: storeClose,
+      anyContainerVisible: () => placement.kind !== "hidden",
+      windowsByRecency: () => [],
+    },
+  }),
 }));
 
 vi.mock("./openAssistant", () => ({ openAssistant }));

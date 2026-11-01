@@ -26,15 +26,18 @@ import {
 import { useShortcuts } from "@/lib/vue-shortcut-manager/composables";
 import { trackAssistant } from "@/services/assistantAnalytics";
 
-import type { GateCode } from "./assistantStore.types";
+import type { AssistantStoreInternal } from "./assistantStore";
+import type { GateCode, Sid } from "./assistantStore.types";
 import { openAssistant } from "./openAssistant";
 import { getAssistantRuntime } from "./runtime";
 
-/** The Escape ladder's rungs, innermost first (`10` §6.3); `e` is retired and never asked. */
-export const ESCAPE_RUNGS = ["a", "b", "c", "d", "f", "g", "h"] as const;
+/** The Escape ladder's rungs, innermost first (`10` §6.3). */
+export const ESCAPE_RUNGS = ["a", "b", "c", "d", "e", "f", "g", "h", "i"] as const;
 
 /** The assistant's focus scope: `assistantClose` is bound only while focus is inside it. */
 export const ASSISTANT_ROOT_SELECTOR = "[data-assistant-root]";
+
+const COMPOSER_SELECTOR = "[data-assistant-composer]";
 
 // No chord on these gates (constraint 36; SH-01 AC 8).
 const UNREGISTERED_GATES: ReadonlySet<GateCode> = new Set([
@@ -176,6 +179,11 @@ export function runHistoryTarget(): boolean {
   return true;
 }
 
+/** The shell root of the window that shows `sid`. */
+export function windowRootSelector(sid: Sid): string {
+  return `[data-assistant-root][data-placement="window"][data-sid="${CSS.escape(sid)}"]`;
+}
+
 /** A component that owns a ladder rung registers it while mounted; returns the unregister. */
 export function registerEscapeRung(
   rung: EscapeRung,
@@ -231,14 +239,13 @@ export function assistantGoToAnswer(): boolean {
 
 /** Focuses the pending card of the visible container, as leaving Reply mode does. */
 export function assistantFocusCard(): boolean {
-  for (const focus of focusTargets.get("card") ?? []) if (focus()) return true;
-  return false;
+  return focusCard();
 }
 
 /** Opens or focuses; the chord never closes (`10` §6.2). */
 export function onAssistantOpen(): void {
   const { store } = getAssistantRuntime();
-  if (store.state.shell.placement.kind !== "hidden" && focusFirst()) {
+  if (store.anyContainerVisible() && (focusCard() || cycleComposers(store) || focusFirst())) {
     trackAssistant("ai_shortcut", { shortcut_id: "assistantOpen", effect: "focus" });
     return;
   }
@@ -263,7 +270,7 @@ export function resetAssistantShortcutsForTests(): void {
   openChordOwner().value = undefined;
 }
 
-// Rung a lets an open overlay take the key; rung f closes the sidebar or sheet (the turn keeps running); rung g closes only a docked chat, never its host; rung h keeps the full view.
+// Rung a lets an open overlay take the key; rung f closes the sidebar or sheet (the turn keeps running); rung h closes only a docked chat, never its host; rung i keeps the full view. Windows own rungs e and g.
 function registerContainerRungs(): () => void {
   const off = [
     // Reka closes the overlay on the same keydown; the DOM still shows it open while the ladder runs.
@@ -273,7 +280,7 @@ function registerContainerRungs(): () => void {
       for (const close of closers) close();
       return true;
     }),
-    registerEscapeRung("g", (event) => {
+    registerEscapeRung("h", (event) => {
       if (focusedPlacement(event) !== "docked") return false;
       const { store } = getAssistantRuntime();
       if (store.state.shell.placement.kind !== "docked") return true;
@@ -281,7 +288,7 @@ function registerContainerRungs(): () => void {
       store.close("escape");
       return true;
     }),
-    registerEscapeRung("h", (event) => focusedPlacement(event) === "full"),
+    registerEscapeRung("i", (event) => focusedPlacement(event) === "full"),
   ];
   return () => off.forEach((unregister) => unregister());
 }
@@ -311,6 +318,29 @@ function owner(): ShallowRef<symbol | undefined> {
 function openChordOwner(): ShallowRef<symbol | undefined> {
   openChordOwnerRef ??= shallowRef<symbol | undefined>(undefined);
   return openChordOwnerRef;
+}
+
+function focusCard(): boolean {
+  for (const focus of focusTargets.get("card") ?? []) if (focus()) return true;
+  return false;
+}
+
+// From a composer the chord steps to the next visible one: the sidebar, then windows by recency.
+function cycleComposers(store: AssistantStoreInternal): boolean {
+  const active = document.activeElement;
+  if (!active?.closest(COMPOSER_SELECTOR)) return false;
+  const roots = [
+    '[data-assistant-root][data-placement="sidebar"]',
+    ...store.windowsByRecency().map((sid) => windowRootSelector(sid)),
+  ];
+  const composers = roots.flatMap((root) => {
+    const found = document.querySelector<HTMLElement>(`${root} ${COMPOSER_SELECTOR}`);
+    return found ? [found] : [];
+  });
+  if (composers.length < 2) return false;
+  const at = composers.findIndex((composer) => composer.contains(active));
+  composers[(at + 1) % composers.length].focus();
+  return true;
 }
 
 function focusFirst(): boolean {

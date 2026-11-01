@@ -37,16 +37,46 @@ export type ProposalHostId = DockHostId | InlineHostId;
 
 export type Placement =
   | { kind: "hidden" }
-  | { kind: "sidebar"; mode: "pinned" | "floating" }
+  | { kind: "sidebar" }
   | { kind: "full" }
   | { kind: "docked"; hostId: DockHostId };
 
 /** Telemetry and the `context.client` envelope name containers with this enum (gap-2 §3.2). */
 export type Container =
-  "sidebar" | "full_view" | "sheet" | `docked.${DockHostId}` | "nl_bar" | "rca" | "shared_page";
+  | "sidebar"
+  | "window"
+  | "full_view"
+  | "sheet"
+  | `docked.${DockHostId}`
+  | "nl_bar"
+  | "rca"
+  | "shared_page";
 
 /** The telemetry envelope also names surfaces that host no session (`99` §3.2). */
 export type TelemetryContainer = Container | "home" | "settings" | "billing";
+
+/** Wire ids of the pickable agents (W-01). */
+export type AgentId = "o2-ai" | "sre" | "generate-query";
+
+export type WindowCorner = "top-start" | "top-end" | "bottom-start" | "bottom-end";
+
+/** Offsets from the nearest corner, so a browser resize keeps the window in its corner. */
+export interface WindowGeometry {
+  corner: WindowCorner;
+  dxRem: number;
+  dyRem: number;
+  wRem: number;
+  hRem: number;
+}
+
+/** One window per chat; `minimised` is a tray bar. */
+export interface FloatingWindow {
+  sid: Sid;
+  state: "open" | "minimised";
+  geometry: WindowGeometry;
+}
+
+export type FocusedContainer = "sidebar" | { window: Sid } | null;
 
 export interface ShellState {
   placement: Placement;
@@ -55,7 +85,14 @@ export interface ShellState {
   activeSid: Sid | null;
   /** clamp(22rem, 30vw, 32rem) by default; persisted by `prefs.ts`. */
   sidebarWidthRem: number;
-  sidebarMode: "pinned" | "floating";
+  /** Set by a too-narrow dock fallback for that open, so the sidebar leaves the host's toolbar room. */
+  sidebarCapRem: number | null;
+  /** Per tab; at most 2 open at 1280 px and up, 1 at 1024–1279, none below, 4 in all. */
+  windows: FloatingWindow[];
+  /** Minimised windows, oldest first. */
+  trayOrder: Sid[];
+  /** A door's target: the most recently focused visible container. */
+  lastFocusedContainer: FocusedContainer;
   sheetSnap: "peek" | "half" | "full";
   /** Focus returns here on close (IW-09). */
   invoker: { el: WeakRef<HTMLElement>; sid: Sid } | null;
@@ -575,6 +612,10 @@ export interface AssistantSession {
   ledger: ActionLedgerEntry[];
   /** Set when a turn ends while no container shows the session. */
   unread: boolean;
+  /** Absent means the default agent, the only one until the roster ships (WP-37). */
+  agentId?: AgentId;
+  /** A chat with turns changes agent on its next send. */
+  nextAgentId?: AgentId;
 }
 
 export interface AssistantState {
@@ -593,6 +634,8 @@ export interface AssistantState {
     hasMore: boolean;
     importState: ImportState;
   };
+  /** `cap` is the per-member limit on running chats; `cleared` the chats opened in this browser. */
+  runs: { cap: number; cleared: Sid[] };
 }
 
 /** Ids, enums and timestamps only; a receiver re-reads and never applies the payload as state. */
@@ -633,7 +676,7 @@ export type AssistantHint =
   | {
       v: 1;
       type: "prefs_changed";
-      key: "prompt_history" | "sidebar_width" | "sidebar_mode";
+      key: "prompt_history" | "sidebar_width";
       at: number;
     }
   | {
@@ -668,8 +711,18 @@ export interface AssistantStoreApi {
   close(reason: "close" | "escape" | "host_closed" | "route"): void;
   moveTo(target: Placement): void;
   setSidebarWidth(rem: number): void;
-  setSidebarMode(mode: "pinned" | "floating"): void;
   setSheetSnap(snap: "peek" | "half" | "full"): void;
+
+  /** Only a user action floats a chat; refused over the cap of 4 or below 1024 px. */
+  floatChat(sid: Sid, opts?: FloatOptions): FloatResult;
+  /** Moves a window's chat to the sidebar; a chat already there goes to the tray. */
+  pinChat(sid: Sid): void;
+  minimiseWindow(sid: Sid, reason: MinimiseReason): void;
+  restoreWindow(sid: Sid, opts?: { focus?: "composer" | "none" }): void;
+  /** The chat leaves the screen; a running answer keeps running. */
+  closeWindow(sid: Sid): void;
+  /** Sets the agent of a new chat, or of the next send of a chat with turns; never sends. */
+  pickAgent(sid: Sid, agent: AgentId, via: "picker" | "mention" | "suggestion" | "fallback"): void;
 
   stage(
     sid: Sid,
@@ -739,6 +792,16 @@ export interface AssistantStoreApi {
   onSignOut(): Promise<"proceed" | "cancel">;
   reset(): void;
 }
+
+export type MinimiseReason = "button" | "escape" | "drop" | "make_room";
+
+export interface FloatOptions {
+  focus?: "composer" | "none";
+  /** The tear-off places the window under the pointer. */
+  geometry?: WindowGeometry;
+}
+
+export type FloatResult = { ok: true } | { ok: false; reason: "cap" | "no_room" | "unknown_chat" };
 
 export interface AssistantHostAdapter {
   id: DockHostId;
