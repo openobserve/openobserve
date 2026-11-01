@@ -53,6 +53,8 @@ export const AI_EVENT_NAMES = [
   "ai_leave_guard",
   "ai_status_light",
   "ai_context_changed",
+  "ai_agent_picked",
+  "ai_handoff",
   "ai_context_inspected",
   "ai_composer_recall",
   "ai_composer_cap_hit",
@@ -276,6 +278,11 @@ export interface AiEventProps {
     count: number;
     bytes: number;
   };
+  ai_agent_picked: {
+    via: "picker" | "mention" | "suggestion" | "fallback";
+    agent: "o2-ai" | "sre" | "generate-query";
+  };
+  ai_handoff: { step: "sent" | "failed" | "accepted" | "dismissed" };
   ai_context_inspected: { target: "sees" | "chip" | "add_context"; kind?: ChipKind };
   ai_composer_recall: { direction: "older" | "newer"; index: number };
   ai_composer_cap_hit: { cap: "images" | "rows" | "bytes" | "type" | "size" };

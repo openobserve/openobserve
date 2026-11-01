@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { trackAssistant, trackAssistantAdmitted } from "@/services/assistantAnalytics";
 import { raw } from "@/types/i18n";
 
+import { currentAgent } from "./agents";
 import { toAssistantError } from "./assistantErrors";
 import { pastedTextChip } from "./context/contextChips";
 import {
@@ -29,6 +30,7 @@ import type {
   ApprovalsService,
   AssistantCapability,
   AssistantSession,
+  CapabilityAgent,
   TurnEngine,
 } from "./assistantStore.types";
 import { createDraftStore } from "./drafts";
@@ -2191,5 +2193,122 @@ describe("turn engine: approval cards", () => {
     );
     await settle();
     expect(h.last().req.replyToApproval).toBe("c9");
+  });
+});
+
+describe("turnEngine: agents (MULTI-AGENT-04, 05, 12)", () => {
+  const ROSTER: CapabilityAgent[] = [
+    { id: "o2-ai", pickable: true, available: true },
+    { id: "sre", pickable: true, available: true },
+  ];
+
+  async function withRoster() {
+    const h = setup();
+    Object.assign(h.capability, { agents: () => ROSTER });
+    h.type("first");
+    void h.store.send(h.current.sid);
+    await settle();
+    h.feed({ type: "turn_started", agent_type: "o2-ai" } as AssistantFrame);
+    h.feed({ type: "complete" } as AssistantFrame);
+    h.end();
+    await settle();
+    return h;
+  }
+
+  it("sends no agent field while the server offers no roster", async () => {
+    const h = setup();
+    h.type("hello");
+    void h.store.send(h.current.sid);
+    await settle();
+    expect(h.last().req.agent).toBeUndefined();
+    expect(h.last().req.handoffFrom).toBeUndefined();
+  });
+
+  it("carries the hand-off on the send and commits it only on the echo", async () => {
+    const h = await withRoster();
+    h.store.pickAgent(h.current.sid, "sre", "picker");
+    h.type("second");
+    void h.store.send(h.current.sid);
+    await settle();
+    expect(h.last().req).toMatchObject({ agent: "sre", handoffFrom: "o2-ai" });
+    expect(h.session().nextAgentId).toBe("sre");
+    expect(h.session().messages.some((m) => m.handoffFrom)).toBe(false);
+    h.feed({ type: "turn_started", agent_type: "sre" } as AssistantFrame);
+    expect(h.session().agentId).toBe("sre");
+    expect(h.session().nextAgentId).toBeUndefined();
+    const prompt = h
+      .session()
+      .messages.filter((m) => m.role === "user")
+      .pop();
+    expect(prompt).toMatchObject({ agentId: "sre", handoffFrom: "o2-ai" });
+  });
+
+  it("commits nothing on a refusal: Next and the draft stay, and the agent is marked", async () => {
+    const h = await withRoster();
+    h.store.pickAgent(h.current.sid, "sre", "picker");
+    h.type("second");
+    h.results.push(refusal(403, { code: "agent_not_permitted", agent: "sre" }));
+    const terminal = h.store.send(h.current.sid);
+    await settle();
+    expect((await terminal).state).toBe("refused");
+    expect(h.session().agentId).toBeUndefined();
+    expect(currentAgent(h.session())).toBe("o2-ai");
+    expect(h.session().nextAgentId).toBe("sre");
+    expect(h.session().composer.text).toBe("second");
+    expect(h.store.agentRefusal("sre")).toBe("agent_not_permitted");
+  });
+
+  it("names a card the send withdrew as not carried on the hand-off", async () => {
+    const h = await withRoster();
+    h.store.pickAgent(h.current.sid, "sre", "picker");
+    h.session().pendingApproval = { id: "c1" } as never;
+    h.type("second");
+    void h.store.send(h.current.sid);
+    await settle();
+    h.feed({ type: "turn_started", agent_type: "sre" } as AssistantFrame);
+    const prompt = h
+      .session()
+      .messages.filter((m) => m.role === "user")
+      .pop();
+    expect(prompt?.handoffWithdrewApproval).toBe(true);
+  });
+
+  it("gives the chat back when the hand-off fails before its first byte", async () => {
+    const h = await withRoster();
+    h.store.pickAgent(h.current.sid, "sre", "picker");
+    h.type("second");
+    void h.store.send(h.current.sid);
+    await settle();
+    h.feed({ type: "turn_started", agent_type: "sre" } as AssistantFrame);
+    h.feed({ type: "error", code: "handoff_failed", error_code: "handoff_failed" } as never);
+    h.end();
+    await settle();
+    expect(h.session().turn.state).toBe("failed");
+    expect(h.session().agentId).toBe("o2-ai");
+    expect(h.session().nextAgentId).toBe("sre");
+    const prompt = h
+      .session()
+      .messages.filter((m) => m.role === "user")
+      .pop();
+    expect(prompt?.handoffFailed).toEqual({ from: "o2-ai", to: "sre" });
+  });
+
+  it("holds a suggestion on the turn, never switches, and a new turn drops it", async () => {
+    const h = setup();
+    Object.assign(h.capability, { agents: () => ROSTER });
+    h.type("first");
+    void h.store.send(h.current.sid);
+    await settle();
+    h.feed({ type: "turn_started", agent_type: "o2-ai" } as AssistantFrame);
+    h.feed({ type: "handoff_suggested", agent: "sre", reason: "root cause" } as AssistantFrame);
+    h.feed({ type: "complete" } as AssistantFrame);
+    h.end();
+    await settle();
+    expect(h.session().turnMeta.handoffSuggestion).toEqual({ agent: "sre", reason: "root cause" });
+    expect(h.session().nextAgentId).toBeUndefined();
+    h.type("next");
+    void h.store.send(h.current.sid);
+    await settle();
+    expect(h.session().turnMeta.handoffSuggestion).toBeUndefined();
   });
 });

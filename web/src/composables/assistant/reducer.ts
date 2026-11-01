@@ -213,6 +213,8 @@ export interface StreamExtras {
   compacted: boolean;
   toolCalls: number;
   toolErrors: number;
+  /** Validated against the roster by the engine; any text of the answer is never read for one. */
+  handoffSuggested?: { agent: string; reason: string };
 }
 
 export type StreamEffect =
@@ -755,6 +757,9 @@ function reduceExtras(extras: StreamExtras, data: any): boolean {
       return true;
     case "usage":
       extras.usage = data.usage;
+      return true;
+    case "handoff_suggested":
+      extras.handoffSuggested = { agent: String(data.agent), reason: String(data.reason ?? "") };
       return true;
     case "step":
     case "retrying":

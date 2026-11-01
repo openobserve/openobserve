@@ -140,6 +140,17 @@ export interface ChatMessage {
   rerunFor?: { from: number; to: number };
   /** The page's absolute time window when the prompt was sent, epoch ms. */
   sentWindow?: { from: number; to: number };
+  /** On a user message: the agent that answered its turn, as `turn_started` or the stored turn names it. */
+  agentId?: "o2-ai" | "sre" | "generate-query";
+  /** On a user message: the agent this turn took the chat from; the transcript writes the marker from it. */
+  handoffFrom?: "o2-ai" | "sre" | "generate-query";
+  /** On a user message: the hand-off this turn asked for did not happen. */
+  handoffFailed?: {
+    from: "o2-ai" | "sre" | "generate-query";
+    to: "o2-ai" | "sre" | "generate-query";
+  };
+  /** On a user message: a pending card was withdrawn before this hand-off went out. */
+  handoffWithdrewApproval?: boolean;
 }
 
 /** Where one stored turn's messages sit in a folded message list, for incremental merges. */

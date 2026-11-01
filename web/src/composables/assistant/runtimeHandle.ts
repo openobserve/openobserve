@@ -71,6 +71,11 @@ export function useTurnLock(sid: () => string | null): ComputedRef<TurnLockReaso
   return computed(() => current.value?.lifecycle.turnLock(sid()) ?? null);
 }
 
+/** A readonly page never builds the runtime, so its outcome and hand-off rows act on nothing. */
+export function agentStore(): AssistantRuntime["store"] | null {
+  return current.value?.store ?? null;
+}
+
 /** The line every locked control and door shows for a lock reason. */
 export function turnLockKey(reason: TurnLockReason): I18nKey {
   if (reason === "account_changed") return "assistant.shell.otherAccount";

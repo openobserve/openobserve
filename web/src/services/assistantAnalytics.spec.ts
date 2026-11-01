@@ -71,6 +71,8 @@ const SAMPLES: { [N in AiEventName]: AiEventProps[N] } = {
   ai_leave_guard: { host: "alert_query", choice: "keep" },
   ai_status_light: { state: "working" },
   ai_context_changed: { action: "add", kind: "log_row", count: 1, bytes: 512 },
+  ai_agent_picked: { via: "picker", agent: "sre" },
+  ai_handoff: { step: "sent" },
   ai_context_inspected: { target: "chip", kind: "stream" },
   ai_composer_recall: { direction: "older", index: 0 },
   ai_composer_cap_hit: { cap: "rows" },
@@ -197,6 +199,8 @@ const CATALOGUE: Record<AiEventName, string[]> = {
   ai_leave_guard: ["host", "choice"],
   ai_status_light: ["state"],
   ai_context_changed: ["action", "kind", "count", "bytes"],
+  ai_agent_picked: ["via", "agent"],
+  ai_handoff: ["step"],
   ai_context_inspected: ["target", "kind"],
   ai_composer_recall: ["direction", "index"],
   ai_composer_cap_hit: ["cap"],
@@ -306,7 +310,7 @@ afterEach(() => {
 describe("event catalogue", () => {
   it("pins every event name of 99 §3.3", () => {
     expect([...AI_EVENT_NAMES].sort()).toEqual(Object.keys(CATALOGUE).sort());
-    expect(AI_EVENT_NAMES).toHaveLength(56);
+    expect(AI_EVENT_NAMES).toHaveLength(58);
   });
 
   it.each(AI_EVENT_NAMES)("%s carries exactly its catalogue properties", (name) => {

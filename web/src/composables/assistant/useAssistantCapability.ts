@@ -18,6 +18,7 @@ import { computed, effectScope, ref, shallowRef, watch, type ComputedRef, type R
 import type { AssistantCapabilitiesResponse } from "@/services/assistant";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
+import { rosterOf } from "./agents";
 import type { AssistantCapability, CreditMode, GateCode, Tri } from "./assistantStore.types";
 import { getAssistantRuntime } from "./runtime";
 
@@ -113,6 +114,7 @@ interface CapabilityInput {
   access: AccessState | null;
   health: AssistantCapability["health"];
   creditMode: CreditMode | null;
+  agents: AssistantCapability["agents"];
 }
 
 /** The capability of this tab's runtime; reactive, shared by every caller. */
@@ -185,6 +187,8 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
   };
 
   const handle = scope.run(() => {
+    // One array per capabilities read, so a refusal noted against it lasts until the next read.
+    const agents = computed(() => rosterOf(b06.value?.agents));
     const input = computed<CapabilityInput>(() => ({
       config: deps.getConfig(),
       edition: deps.getEdition(),
@@ -196,6 +200,7 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
       access: access.value,
       health: health.value,
       creditMode: creditMode.value,
+      agents: agents.value,
     }));
     const capability = computed(() => resolveCapability(input.value));
     const gate = computed(() => capability.value.gate);
@@ -354,6 +359,7 @@ function resolveCapability(input: CapabilityInput): AssistantCapability {
   if (input.b06?.turn_versions === true) capability.turnVersions = true;
   if (input.b06?.feedback_stored === true) capability.feedbackStored = true;
   if (input.b06?.rca_chat_mode === true) capability.rcaChatMode = true;
+  if (input.agents) capability.agents = input.agents;
   if (gate !== "available") return capability;
   if (!persistence) capability.reasonCode = "local_only";
   else if (canShare === "no") capability.reasonCode = "no_share";

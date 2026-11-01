@@ -9378,7 +9378,8 @@
         "enable": "Could you turn {product} on for {org}? Settings › Assistant › Access: {link}",
         "settings": "Could you change the {product} settings for {org} in Settings › Assistant?",
         "share_read": "Could you grant me chat sharing access ({whereToGrant}, Chat sharing) in {org}?",
-        "tool_policy": "The assistant wasn't allowed to run {tool} in {org}. Could you review the assistant's permissions in Settings › Assistant › Permissions?"
+        "tool_policy": "The assistant wasn't allowed to run {tool} in {org}. Could you review the assistant's permissions in Settings › Assistant › Permissions?",
+        "agent_access": "Could you let me use {agent} in {product} for {org}? Settings › Assistant › Agents: {link}"
       },
       "messageLabel": "Message",
       "subject": {
@@ -9388,7 +9389,8 @@
         "enable": "Turn on {product} for {org}",
         "settings": "{product} settings for {org}",
         "share_read": "Chat sharing access for {org}",
-        "tool_policy": "{product} permissions for {org}"
+        "tool_policy": "{product} permissions for {org}",
+        "agent_access": "{agent} access for {org}"
       },
       "title": "Ask an admin",
       "withPrompt": "{message} My question starts with: \"{prompt}\""
@@ -9482,7 +9484,8 @@
           "dashboards": "Dashboards",
           "pipelines": "Pipelines",
           "streams": "Streams",
-          "time": "Time range"
+          "time": "Time range",
+          "agents": "Agents"
         },
         "kind": {
           "alerts": "alerts",
@@ -10038,6 +10041,26 @@
       "unreachable": {
         "action": "Retry",
         "title": "Couldn't reach OpenObserve. Your message wasn't sent."
+      },
+      "agent_disabled": {
+        "title": "{agent} is off for {org}. Your message wasn't sent.",
+        "action": "Open agent settings",
+        "actionAdmin": "Open agent settings",
+        "actionMember": "Ask an admin"
+      },
+      "agent_not_permitted": {
+        "title": "Your role can't use {agent}. Your message wasn't sent.",
+        "body": "An admin can grant it in Settings › Assistant › Agents.",
+        "action": "Ask an admin"
+      },
+      "agent_unreachable": {
+        "title": "{agent} isn't reachable right now. Your message wasn't sent.",
+        "action": "Try again"
+      },
+      "handoff_failed": {
+        "title": "Couldn't hand this chat to {agent}. {fromAgent} kept it.",
+        "body": "Your message is still in this chat.",
+        "action": "Try again"
       }
     },
     "errorDetails": {
@@ -10605,7 +10628,8 @@
       "tableName": "Table",
       "versionName": "Version {n} of {count}",
       "versionOf": "{n} of {count}",
-      "you": "You"
+      "you": "You",
+      "metaHandoff": "{meta} · to {agent}"
     },
     "name": "O2 Assistant",
     "outcome": {
@@ -10635,7 +10659,9 @@
       "signedIn": "Signed in. You can retry.",
       "stopItFailed": "Couldn't stop the other answer. Try again.",
       "stopItSent": "Asked the other answer to stop.",
-      "tryLater": "Try again later"
+      "tryLater": "Try again later",
+      "useAgentInstead": "Use {agent} instead",
+      "keepGoingWith": "Keep going with {agent}"
     },
     "plan": {
       "deselectHint": "Untick anything you want to keep.",
@@ -11228,7 +11254,7 @@
       "viewOnly": "You can view toolsets. Editing needs the Toolsets permission in IAM › Roles."
     },
     "transcript": {
-      "answerName": "Answer to {prompt}",
+      "answerName": "{agent}, answer to {prompt}",
       "earlierCount": "{count} earlier message | {count} earlier messages",
       "name": "Conversation with {product}",
       "showEarlier": "Show earlier messages",
@@ -11392,6 +11418,62 @@
     "autoobserve": {
       "askChip": "AutoObserve ask · {name}",
       "continueTooltip": "Opens {product} with this ask attached"
+    },
+    "agent": {
+      "o2": {
+        "name": "{product}",
+        "purpose": "Answers questions and helps with tasks"
+      },
+      "investigator": {
+        "name": "Investigator",
+        "purpose": "Finds the likely cause of a problem, with evidence"
+      },
+      "queryBuilder": {
+        "name": "Query builder",
+        "purpose": "Writes one SQL or PromQL query for you to run or insert"
+      },
+      "policy": {
+        "readOnly": "Read-only",
+        "asks": "Asks before changing anything"
+      },
+      "picker": {
+        "label": "Agent: {agent}. Change agent",
+        "heading": "Who answers",
+        "note": "Type {'@'} and a name while writing to switch. Switching later hands this chat over; earlier answers stay as they are.",
+        "next": "Next: {agent}"
+      },
+      "unavailable": {
+        "role": "Not available to your role",
+        "disabled": "Turned off for this organization",
+        "unreachable": "Not reachable right now · checked {time}",
+        "unreachableNow": "Not reachable right now"
+      },
+      "announceChosen": "{agent} will answer."
+    },
+    "handoff": {
+      "marker": "Handed to {agent} by you · {time}",
+      "markerUntimed": "Handed to {agent} by you",
+      "given": "What it was given",
+      "givenTurns": "This chat so far: {questions} questions, {answers} answers",
+      "givenContext": "Context: {chips}",
+      "notCarried": "Not carried: {items}",
+      "notCarriedApproval": "the pending approval",
+      "announce": "Handed to {agent}.",
+      "suggest": {
+        "title": {
+          "o2": "{agent} can take this from here",
+          "investigator": "{agent} can look for the cause",
+          "queryBuilder": "{agent} can write this query"
+        },
+        "body": "It gets this chat and its context. It can take a few minutes.",
+        "bodyMetered": "It gets this chat and its context. It can take a few minutes. · Uses AI credits",
+        "accept": "Hand off to {agent}",
+        "dismiss": "Not now",
+        "collapsed": "{agent} was suggested",
+        "handoff": "Hand off",
+        "prompt": "Continue this investigation",
+        "promptReason": "Continue this investigation: {reason}"
+      }
     }
   },
   "llmObservability": {

@@ -18,15 +18,27 @@ import { toRaw } from "vue";
 import type { PageContext } from "@/composables/contextProviders/types";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import { gt, raw, type TranslateFn } from "@/types/i18n";
+import { trackAssistant } from "@/services/assistantAnalytics";
 import { epochMs } from "@/utils/assistant/explorerRoutes";
 
+import {
+  agentIdOf,
+  agentName,
+  agentRequestOf,
+  commitTurnAgent,
+  revertHandoff,
+  suggestionFor,
+} from "./agents";
 import { ERROR_LEDGER, isConsentPrompt } from "./assistantErrors";
 import type { AssistantStoreInternal } from "./assistantStore";
 import type {
+  AgentId,
   ApprovalsService,
   AssistantError,
+  AssistantErrorCode,
   AssistantSession,
   AssistantState,
+  CapabilityAgent,
   ComposerSnapshot,
   HistoryService,
   RequestBuilder,
@@ -91,6 +103,12 @@ const MAX_ID_SENDS = 2;
 
 const MAX_TIMER_MS = 2 ** 31 - 1;
 
+const AGENT_REFUSALS: ReadonlySet<AssistantErrorCode> = new Set([
+  "agent_disabled",
+  "agent_not_permitted",
+  "agent_unreachable",
+]);
+
 // The card's own expiry declines it on the server first; the turn's timer ends the turn only after that had its chance.
 const APPROVAL_GRACE_MS = 1_000;
 
@@ -124,6 +142,8 @@ export interface EngineCapability {
   attachments?(): boolean;
   /** The server routes an explicit `mode: "chat"` past an incident's RCA default. */
   rcaChatMode?(): boolean;
+  /** `capability.agents`; a spec's fake without it has no roster. */
+  agents?(): CapabilityAgent[] | undefined;
 }
 
 export interface TurnEngineDeps {
@@ -178,6 +198,11 @@ interface TurnRecord {
   consentRetried: boolean;
   /** The approval card this turn's prompt answers (Reply, Ask again). */
   replyToApproval?: string;
+  /** Fixed at the send, so a pick during the turn applies to the next one. */
+  agent: { agent?: AgentId; handoffFrom?: AgentId };
+  /** `turn_started` was read; a replayed one on a reconnect commits nothing twice. */
+  agentCommitted: boolean;
+  withdrewApproval: boolean;
   notSaved: boolean;
   streamEnded: boolean;
   /** Frames applied up to the resume cursor `turnMeta.lastSeq`: what a tail from the cursor builds on (WP-18). */
@@ -253,6 +278,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       const { turn, effects } = turnReducer(session.turn, event, reducerCtx(rec));
       session.turn = askAgainIfMutated(turn, rec.stream);
       noteOutcome(session, rec, before);
+      noteHandoffFailed(session, rec);
       if (session.turn.state !== "awaiting_approval") clearApproval(rec);
       // HT-05 AC 4: whatever ended the turn, a step without its result is interrupted.
       if (isTerminal(session.turn)) interruptSteps(rec.stream);
@@ -273,6 +299,32 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     });
     if (record) appendToAnswer(session, rec, { type: "turn_outcome", outcome: record });
     stampDuration(session, rec, elapsedMs(session.turnMeta, now));
+  };
+
+  const noteTurnAgent = (session: AssistantSession, rec: TurnRecord, echoed: unknown) => {
+    if (rec.agentCommitted) return;
+    rec.agentCommitted = true;
+    const result = commitTurnAgent(session, rec.agent, echoed, rec.userIndex, rec.withdrewApproval);
+    const agent = rec.agent.agent;
+    if (result === "none" || !agent) return;
+    trackAssistant("ai_handoff", { step: result === "handed" ? "sent" : "failed" });
+    if (result === "handed")
+      deps.store().announce(rec.sid, "assistant.handoff.announce", { agent: agentName(agent, t) });
+  };
+
+  // B5: the target failed before its first byte; a later failure keeps its ordinary code.
+  const noteHandoffFailed = (session: AssistantSession, rec: TurnRecord) => {
+    const turn = session.turn;
+    if (turn.state !== "failed" || turn.error.code !== "handoff_failed") return;
+    revertHandoff(session, rec.agent, rec.userIndex);
+    trackAssistant("ai_handoff", { step: "failed" });
+  };
+
+  const noteSuggestion = (session: AssistantSession, rec: TurnRecord) => {
+    if (session.turnMeta.handoffSuggestion) return;
+    const raw = rec.stream.extras?.handoffSuggested;
+    const suggestion = suggestionFor(raw, session, deps.capability().agents?.());
+    if (suggestion) session.turnMeta.handoffSuggestion = suggestion;
   };
 
   const invalidFindingsWork =
@@ -317,6 +369,8 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
           else out.stream.push(effect);
         }
         mirrorExtras(session.turnMeta, rec.stream);
+        noteSuggestion(session, rec);
+        if (frame.type === "turn_started") noteTurnAgent(session, rec, frame.agent_type);
       }
       if (frame.type === "complete") {
         const used = contextUsedOf(frame);
@@ -328,6 +382,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       const next = turnReducer(session.turn, event, reducerCtx(rec));
       session.turn = askAgainIfMutated(next.turn, rec.stream);
       noteOutcome(session, rec, before);
+      noteHandoffFailed(session, rec);
       out.turn.push(...next.effects);
       if (session.turn.state !== "awaiting_approval") clearApproval(rec);
       else if (frame.type === "confirmation_required")
@@ -549,12 +604,10 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     const session = sessionOf(rec.sid);
     if (!entry || !session || rec.settled) return;
     try {
-      const request = builder(
-        session,
-        rec.snapshot,
-        rec.client,
-        requestTurnOf(rec, deps),
-      ) as ClientSendRequest;
+      const request = {
+        ...builder(session, rec.snapshot, rec.client, requestTurnOf(rec, deps)),
+        ...rec.agent,
+      } as ClientSendRequest;
       rec.streamEnded = false;
       rec.idSends += 1;
       const sink = sinkFor(rec);
@@ -605,6 +658,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
   // The 412 is the consent prompt the first time and a refusal on the same-turn retry (`80` §1.3).
   const refusalOf = (rec: TurnRecord, result: Extract<SendResult, { ok: false }>) => {
     const { error } = result;
+    if (AGENT_REFUSALS.has(error.code)) return agentRefusalOf(rec, error);
     if (!isConsentPrompt(error.httpStatus, result.body)) return error;
     if (rec.consentRetried)
       return {
@@ -624,6 +678,12 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       };
     }
     return error;
+  };
+
+  const agentRefusalOf = (rec: TurnRecord, error: AssistantError): AssistantError => {
+    const agent = agentIdOf(error.agent) ?? rec.agent.agent;
+    if (agent) deps.store().noteAgentRefused(agent, error.code);
+    return agent ? { ...error, agent } : error;
   };
 
   const onEngineEffect = (sid: Sid, effect: TurnEffect) => {
@@ -752,6 +812,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     if (!snapshot || (!snapshot.text.trim() && !snapshot.chips.length && !snapshot.images.length))
       return refusedUnknown();
     const rec = newRecord(session, opts, snapshot, source, deps);
+    if (rec.agent.agent === "generate-query") rec.mode ??= "generate_query";
     const previous = last.get(sid);
     if (previous && previous.turnId === rec.turnId) rec.idSends = previous.idSends;
     runtime.set(sid, { controller: new AbortController(), turn: rec });
@@ -1019,6 +1080,10 @@ function newRecord(
     restoring: false,
     consentRetried: false,
     ...(opts.replyToApproval && { replyToApproval: opts.replyToApproval }),
+    // A helper or analysis turn answers in its own surface and never joins a chat's agent.
+    agent: session.record.ephemeral ? {} : agentRequestOf(session, deps.capability().agents?.()),
+    agentCommitted: false,
+    withdrewApproval: session.turnMeta.withdrewApproval === true,
     notSaved: false,
     streamEnded: false,
     throughSeq: [],

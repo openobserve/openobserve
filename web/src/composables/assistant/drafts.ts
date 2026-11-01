@@ -15,7 +15,8 @@
 
 import { ref, type Ref } from "vue";
 
-import type { ComposerState, Sid } from "./assistantStore.types";
+import { agentIdOf } from "./agents";
+import type { AgentId, ComposerState, Sid } from "./assistantStore.types";
 
 export const DRAFT_DEBOUNCE_MS = 250;
 
@@ -27,6 +28,8 @@ export type DraftPayload = Pick<
   "text" | "chips" | "timeOverride" | "removedPageKeys" | "homeStarter"
 > & {
   imageCount?: number;
+  /** The pending picker choice (`00` §10.4). */
+  agentId?: AgentId;
 };
 
 export interface DraftStoreOptions {
@@ -158,6 +161,7 @@ function toPayload(draft: DraftPayload): DraftPayload {
     ...(draft.homeStarter === true && { homeStarter: true }),
     ...(typeof draft.imageCount === "number" &&
       draft.imageCount > 0 && { imageCount: draft.imageCount }),
+    ...(agentIdOf(draft.agentId) && { agentId: agentIdOf(draft.agentId)! }),
   };
 }
 

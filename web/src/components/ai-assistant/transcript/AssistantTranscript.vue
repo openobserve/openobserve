@@ -70,6 +70,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OText>
         <OSeparator class="min-w-4 flex-1" />
       </div>
+      <AssistantHandoffMarker
+        v-if="turn.user?.handoffFrom && turn.user.agentId"
+        :agent="turn.user.agentId"
+        :at="turn.user.sentAt"
+        :questions="carried(turn).questions"
+        :answers="carried(turn).answers"
+        :chips="(turn.user.chips ?? []).map((chip) => String(chip.label))"
+        :withdrew-approval="turn.user.handoffWithdrewApproval"
+      />
+      <AssistantTurnOutcome
+        v-if="turn.user?.handoffFailed"
+        kind="failed"
+        :error="handoffError(turn.user.handoffFailed)"
+        :role="isAdmin ? 'admin' : 'member'"
+        :readonly="readonly || !handoffOpen(turn)"
+        :retry-snapshot-available="handoffOpen(turn)"
+        :sid="sid ?? undefined"
+        :online="online"
+        @action="(action) => onHandoffAction(action, turn)"
+      />
       <AssistantMessage
         v-if="turn.user"
         :message="turn.user"
@@ -103,7 +123,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </AssistantMessage>
       <article
         v-if="turn.answer || statusShown(turn)"
-        :aria-label="t('assistant.transcript.answerName', { prompt: turn.firstLine })"
+        :aria-label="
+          t('assistant.transcript.answerName', {
+            agent: agentName(turnAgent(turn), t),
+            prompt: turn.firstLine,
+          })
+        "
         tabindex="-1"
         data-answer
         :data-test="`assistant-answer-${turn.turnId}`"
@@ -116,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :readonly="readonly"
           :density="density"
           :turn="views.get(turn.turnId)"
+          :agent="turnAgent(turn)"
         >
           <template v-if="turn.version.count > 1" #versions>
             <AssistantVersionPicker
@@ -137,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <AssistantTurnOutcome
-              v-for="outcome in turn.outcomes"
+              v-for="outcome in outcomesOf(turn)"
               :key="outcome.key"
               :kind="outcome.record.kind"
               :error="outcome.error"
@@ -172,6 +198,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </AssistantMessage>
       </article>
+      <AssistantHandoffSuggestion
+        v-if="suggestionOf(turn)"
+        :agent="suggestionOf(turn)!.agent"
+        :collapsed="suggestionOf(turn)!.collapsed"
+        :metered="metered"
+        @accept="acceptSuggestion(suggestionOf(turn)!.reason)"
+        @dismiss="agentStore()?.dismissHandoff(sid!)"
+      />
     </article>
     <slot name="cards" />
   </section>
@@ -179,9 +213,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import type {
+  AgentId,
   AssistantError,
   AssistantSession,
   AssistantTurnView,
+  HandoffSuggestion,
   QueryRef,
   Sid,
 } from "@/composables/assistant/pure";
@@ -307,6 +343,10 @@ import AssistantTurnOutcome, {
 } from "@/components/ai-assistant/turn/AssistantTurnOutcome.vue";
 import AssistantTurnStatus from "@/components/ai-assistant/turn/AssistantTurnStatus.vue";
 import {
+  ERROR_LEDGER,
+  agentName,
+  agentStore,
+  currentAgent,
   assistantEvidenceHostKey,
   assistantSessionSourceKey,
   assistantTranscriptHostKey,
@@ -323,6 +363,8 @@ import OText from "@/lib/core/Typography/OText.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 
+import AssistantHandoffMarker from "./AssistantHandoffMarker.vue";
+import AssistantHandoffSuggestion from "./AssistantHandoffSuggestion.vue";
 import AssistantMessage from "./AssistantMessage.vue";
 import AssistantVersionPicker from "./AssistantVersionPicker.vue";
 import { useTranscriptScroll } from "./useTranscriptScroll";
@@ -365,6 +407,7 @@ const isAdmin = computed(() => live?.isAdmin() ?? false);
 const online = computed(() => live?.online() ?? true);
 const persistence = computed(() => live?.persistence() ?? false);
 const canRetry = computed(() => (props.sid && live ? live.canRetry(props.sid) : false));
+const metered = computed(() => agentStore()?.state.capability.edition === "cloud");
 
 const turns = computed<TranscriptTurn[]>(() => {
   const groups = groupTurns(messages.value);
@@ -535,6 +578,65 @@ async function onManualRoute(query: QueryRef, turnId: string): Promise<void> {
     { action: "manual_route", succeeded: result.ok },
     { sid, turnId },
   );
+}
+
+function turnAgent(turn: TranscriptTurn): AgentId {
+  return turn.user?.agentId ?? currentAgent(session.value ?? { messages: messages.value });
+}
+
+// A refused pick is on the composer; a failed hand-off is one row, at the marker's place.
+function outcomesOf(turn: TranscriptTurn): TranscriptTurn["outcomes"] {
+  if (!turn.user?.handoffFailed) return turn.outcomes;
+  return turn.outcomes.filter((outcome) => outcome.record.code !== "handoff_failed");
+}
+
+function carried(turn: TranscriptTurn): { questions: number; answers: number } {
+  const before = turns.value.slice(0, turn.number - 1);
+  return {
+    questions: before.filter((entry) => entry.user).length,
+    answers: before.filter((entry) => entry.answer).length,
+  };
+}
+
+function handoffError(failed: { from: AgentId; to: AgentId }): AssistantError {
+  return {
+    ...ERROR_LEDGER.handoff_failed,
+    code: "handoff_failed",
+    agent: failed.to,
+    handoffFrom: failed.from,
+  };
+}
+
+// Actions stay while the pick is still pending on the newest turn; a later send or Keep going settles it.
+function handoffOpen(turn: TranscriptTurn): boolean {
+  return (
+    turn.isLast &&
+    !running.value &&
+    !!turn.user?.handoffFailed &&
+    session.value?.nextAgentId === turn.user.handoffFailed.to
+  );
+}
+
+function onHandoffAction(action: OutcomeAction, turn: TranscriptTurn): void {
+  if (action !== "retry" || !props.sid) return;
+  const failed = turn.outcomes.find((outcome) => outcome.record.code === "handoff_failed");
+  if (failed) return onOutcome("retry", failed.record);
+  const text = String(turn.user?.content ?? "");
+  const snapshot = { text, chips: [], images: [], mentions: [], timeOverride: null };
+  void agentStore()?.resend(props.sid, snapshot, "continue");
+}
+
+function suggestionOf(turn: TranscriptTurn): HandoffSuggestion | null {
+  if (!turn.isLast || running.value || props.readonly) return null;
+  return session.value?.turnMeta.handoffSuggestion ?? null;
+}
+
+function acceptSuggestion(reason: string): void {
+  if (!props.sid) return;
+  const prompt = reason
+    ? t("assistant.handoff.suggest.promptReason", { reason: raw(reason) })
+    : t("assistant.handoff.suggest.prompt");
+  void agentStore()?.acceptHandoff(props.sid, String(prompt));
 }
 
 function onOutcome(action: OutcomeAction, record: TurnOutcomeRecord): void {

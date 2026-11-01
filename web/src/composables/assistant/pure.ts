@@ -45,6 +45,19 @@ export {
   projectRecord,
 } from "./record";
 export type { ProjectRecordOptions, RecordAudience, StoredTurn } from "./record";
+export {
+  DEFAULT_AGENT,
+  agentIdOf,
+  agentMatches,
+  agentName,
+  agentPolicy,
+  agentPurpose,
+  agentReason,
+  agentSuggestTitle,
+  currentAgent,
+  nextAgent,
+  rosterOffersChoice,
+} from "./agents";
 export { ERROR_LEDGER } from "./assistantErrors";
 export {
   elapsedMs,
@@ -87,6 +100,7 @@ export {
   useSignedOutElsewhere,
   turnLockKey,
   useTurnLock,
+  agentStore,
 } from "./runtimeHandle";
 export type { InsertOutcome } from "./actions/appliers/editor";
 export { PROPOSAL_LANGUAGE_NAMES, proposalFor, useEditorProposal } from "./useEditorProposal";

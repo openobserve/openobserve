@@ -153,7 +153,7 @@ describe("AssistantTranscript", () => {
     expect(turns[0].attributes("aria-label")).toBe("Turn 1: why 5xx?");
     const answer = wrapper.get('[data-test="assistant-answer-t1"]');
     expect(answer.attributes("tabindex")).toBe("-1");
-    expect(answer.attributes("aria-label")).toBe("Answer to why 5xx?");
+    expect(answer.attributes("aria-label")).toBe("O2 Assistant, answer to why 5xx?");
     expect((wrapper.vm as unknown as { focusLatestAnswer(): boolean }).focusLatestAnswer()).toBe(
       true,
     );
@@ -416,5 +416,97 @@ describe("AssistantTranscript", () => {
     await wrapper.get('[data-test="assistant-transcript-earlier"]').trigger("click");
     await flushPromises();
     expect(wrapper.findAll("article[data-turn-id]")).toHaveLength(80);
+  });
+});
+
+describe("AssistantTranscript: agents (MULTI-AGENT-03, 04, 05)", () => {
+  const handedPrompt = (over: Partial<ChatMessage> = {}): ChatMessage => ({
+    ...prompt("look deeper", "t2"),
+    agentId: "sre",
+    handoffFrom: "o2-ai",
+    ...over,
+  });
+
+  it("names each answer by its own turn's agent", () => {
+    const session = liveSession([
+      { ...prompt("first", "t1"), agentId: "o2-ai" },
+      reply("one"),
+      handedPrompt(),
+      reply("two"),
+    ]);
+    const { wrapper } = mountLive(session);
+    const metas = wrapper.findAll('[data-test="assistant-agent-identity"]');
+    expect(metas.map((meta) => meta.attributes("data-agent"))).toEqual(["o2-ai", "sre"]);
+    expect(wrapper.get('[data-test="assistant-answer-t2"]').attributes("aria-label")).toBe(
+      "Investigator, answer to look deeper",
+    );
+  });
+
+  it("writes the marker before the handed turn with what was carried, and says to whom once", () => {
+    const session = liveSession([
+      prompt("first", "t1"),
+      reply("one"),
+      handedPrompt(),
+      reply("two"),
+    ]);
+    const { wrapper } = mountLive(session);
+    const turn = wrapper.get('[data-test="assistant-turn-t2"]');
+    expect(turn.element.firstElementChild?.getAttribute("data-test")).toBe(
+      "assistant-handoff-marker",
+    );
+    expect(wrapper.findAll('[data-test="assistant-handoff-marker"]')).toHaveLength(1);
+    expect(turn.get('[data-test="assistant-handoff-given-panel"]').text()).toContain(
+      "1 questions, 1 answers",
+    );
+    expect(turn.get('[data-test="assistant-message-meta"]').text()).toContain("· to Investigator");
+  });
+
+  it("renders no marker without the echo", () => {
+    const session = liveSession([prompt("first", "t1"), reply("one")]);
+    const { wrapper } = mountLive(session);
+    expect(wrapper.find('[data-test="assistant-handoff-marker"]').exists()).toBe(false);
+  });
+
+  it("shows one failed row for a failed hand-off, in the marker's place", () => {
+    const failed = handedPrompt({
+      handoffFrom: undefined,
+      agentId: "o2-ai",
+      handoffFailed: { from: "o2-ai", to: "sre" },
+    });
+    const session = liveSession([prompt("first", "t1"), reply("one"), failed, reply("two")]);
+    session.nextAgentId = "sre";
+    const { wrapper } = mountLive(session);
+    expect(wrapper.find('[data-test="assistant-handoff-marker"]').exists()).toBe(false);
+    const row = wrapper.get('[data-code="handoff_failed"]');
+    expect(row.text()).toContain("Couldn't hand this chat to Investigator.");
+    expect(row.get('[data-test="assistant-turn-outcome-action"]').text()).toBe("Try again");
+    expect(row.find('[data-test="assistant-turn-outcome-agent-fallback"]').exists()).toBe(true);
+  });
+
+  it("settles the failed row once Next is gone", () => {
+    const failed = handedPrompt({
+      handoffFrom: undefined,
+      agentId: "o2-ai",
+      handoffFailed: { from: "o2-ai", to: "sre" },
+    });
+    const session = liveSession([failed, reply("two")]);
+    const { wrapper } = mountLive(session);
+    expect(wrapper.get('[data-code="handoff_failed"]').attributes("data-readonly")).toBe("");
+  });
+
+  it("shows a live suggestion after the last answer only, and never on a readonly page", () => {
+    const session = liveSession([prompt("first", "t1"), reply("one")]);
+    session.turnMeta.handoffSuggestion = { agent: "sre", reason: "root cause" };
+    const { wrapper } = mountLive(session);
+    expect(
+      wrapper
+        .get('[data-test="assistant-turn-t1"]')
+        .find('[data-test="assistant-handoff-suggestion"]')
+        .exists(),
+    ).toBe(true);
+    const readonly = mount(AssistantTranscript, {
+      props: { readonly: true, messages: session.messages },
+    });
+    expect(readonly.find('[data-test="assistant-handoff-suggestion"]').exists()).toBe(false);
   });
 });

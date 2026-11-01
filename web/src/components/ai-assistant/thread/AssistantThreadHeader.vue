@@ -114,6 +114,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="shrink-0"
           data-test="assistant-thread-origin"
         />
+        <AssistantAgentIdentity
+          v-if="agentShown && session"
+          size="header"
+          :agent="agent"
+          class="shrink-[2]"
+        >
+          <template #status>
+            <AssistantRunStatus :turn="session.turn" :meta="session.turnMeta" />
+          </template>
+        </AssistantAgentIdentity>
         <slot name="tags" />
         <span v-if="$slots['share-chip']" :id="shareChipId" class="contents">
           <slot name="share-chip" />
@@ -283,6 +293,8 @@ const HEADER_PRIORITY = 1;
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, useId } from "vue";
 import { useStore } from "vuex";
 
+import AssistantAgentIdentity from "@/components/ai-assistant/agents/AssistantAgentIdentity.vue";
+import AssistantRunStatus from "@/components/ai-assistant/agents/AssistantRunStatus.vue";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
@@ -299,6 +311,7 @@ import {
   useAssistantStore,
   useChatExport,
 } from "@/composables/assistant";
+import { DEFAULT_AGENT, currentAgent, rosterOffersChoice } from "@/composables/assistant/pure";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -360,6 +373,11 @@ const running = computed(
   () => !!session.value && (isRunning(session.value.turn) || !!session.value.pendingApproval),
 );
 const notSavedHere = computed(() => history.notSaved(props.sid));
+const agent = computed(() => currentAgent(session.value));
+// Without a roster, and with the default agent, the header stays as it is today.
+const agentShown = computed(
+  () => rosterOffersChoice(capability.value.agents) || agent.value !== DEFAULT_AGENT,
+);
 // An analysis chat keeps saying what it was about once reopened outside its incident.
 const originTag = computed(() =>
   session.value && originOf(session.value.origin) === "incident" ? "incident" : null,

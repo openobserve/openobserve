@@ -538,3 +538,74 @@ describe("AssistantTurnOutcome", () => {
     });
   });
 });
+
+describe("AssistantTurnOutcome: agent refusals (MULTI-AGENT-12)", () => {
+  const fallback = '[data-test="assistant-turn-outcome-agent-fallback"]';
+
+  it("names the agent in the title and offers the fallback, for each refusal", async () => {
+    const w = mountOutcome({
+      kind: "refused",
+      role: "member",
+      sid: "s1",
+      error: error("agent_not_permitted", { agent: "sre" }),
+    });
+    await flushPromises();
+    expect(title(w)).toBe("Your role can't use Investigator. Your message wasn't sent.");
+    expect(w.get('[data-test="ask-admin-stub"]').exists()).toBe(true);
+    expect(w.get(fallback).text()).toMatch(/^Use .* instead$/);
+  });
+
+  it("splits agent_disabled by role", async () => {
+    const refused = (role: "admin" | "member") =>
+      mountOutcome({
+        kind: "refused",
+        role,
+        sid: "s1",
+        error: error("agent_disabled", { agent: "sre" }),
+      });
+    const admin = refused("admin");
+    const member = refused("member");
+    await flushPromises();
+    expect(admin.find('[data-test="ask-admin-stub"]').exists()).toBe(false);
+    expect(label(admin)).toBe("Open agent settings");
+    expect(member.find('[data-test="ask-admin-stub"]').exists()).toBe(true);
+  });
+
+  it("offers Try again beside the fallback when the agent is down", () => {
+    const w = mountOutcome({
+      kind: "refused",
+      sid: "s1",
+      error: error("agent_unreachable", { agent: "generate-query" }),
+    });
+    expect(title(w)).toBe("Query builder isn't reachable right now. Your message wasn't sent.");
+    expect(label(w)).toBe("Try again");
+    expect(w.find(fallback).exists()).toBe(true);
+  });
+
+  it("has no fallback from the fallback agent, or on a readonly page", () => {
+    const own = mountOutcome({
+      kind: "refused",
+      sid: "s1",
+      error: error("agent_unreachable", { agent: "o2-ai" }),
+    });
+    expect(own.find(fallback).exists()).toBe(false);
+    const shared = mountOutcome({
+      kind: "refused",
+      readonly: true,
+      sid: "s1",
+      error: error("agent_disabled", { agent: "sre" }),
+    });
+    expect(shared.find(fallback).exists()).toBe(false);
+  });
+
+  it("words a failed hand-off and offers to keep going with the agent that kept the chat", () => {
+    const w = mountOutcome({
+      kind: "failed",
+      sid: "s1",
+      error: error("handoff_failed", { agent: "sre", handoffFrom: "generate-query" }),
+    });
+    expect(title(w)).toBe("Couldn't hand this chat to Investigator. Query builder kept it.");
+    expect(label(w)).toBe("Try again");
+    expect(w.get(fallback).text()).toBe("Keep going with Query builder");
+  });
+});

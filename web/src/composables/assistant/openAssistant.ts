@@ -23,6 +23,7 @@ import {
 } from "@/services/assistantAnalytics";
 import { gt, raw, type I18nKey } from "@/types/i18n";
 
+import { defaultAgentFor, rosterOffersChoice } from "./agents";
 import {
   MAIN_MIN_REM,
   SIDEBAR_MIN_REM,
@@ -190,6 +191,7 @@ function runDoor(env: OpenAssistantEnv, args: OpenAssistantCall): OpenAssistantR
   // A door names only a thread it starts; staging into a chat already in use keeps that chat's title.
   const fresh = !plan.session || isBlank(plan.session);
   const sid = plan.session?.sid ?? createSession(store, args, container);
+  applyDoorAgent(store, sid, args);
   const staged = stagePayload(store, sid, args, plan, fresh);
   const wasVisible = store.state.shell.placement.kind !== "hidden";
   // Add to chat is non-destructive: it never opens a hidden container over the page; the door offers Open.
@@ -348,6 +350,15 @@ function sameContainer(current: Placement, target: Placement): boolean {
 
 function dockOf(session: AssistantSession): string | null {
   return session.origin.container.startsWith("docked.") ? session.origin.container : null;
+}
+
+// A door picks only for a chat nobody has spoken in or picked for; without a roster the server keeps routing.
+function applyDoorAgent(store: OpenAssistantEnv["store"], sid: Sid, args: OpenAssistantArgs): void {
+  const session = store.state.sessions[sid];
+  if (!session || session.agentId || session.messages.length > 0) return;
+  if (!rosterOffersChoice(store.state.capability.agents)) return;
+  const agent = args.agent ?? defaultAgentFor(args);
+  if (agent) store.pickAgent(sid, agent, "door");
 }
 
 function defaultThread(verb: OpenAssistantArgs["entryVerb"]): "new" | "current" | "auto" {
