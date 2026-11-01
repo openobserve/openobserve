@@ -14,7 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { sqlLiteral, sqlEquals, sqlIn, sqlLike, sqlIsNull } from "./sqlFilterBuilder";
+import {
+  sqlLiteral,
+  sqlEquals,
+  sqlIn,
+  sqlLike,
+  sqlIsNull,
+  unescapeSqlLiteral,
+  splitOnAnd,
+} from "./sqlFilterBuilder";
 
 // Values here are arbitrary log/trace field data. The backend's PostgreSqlDialect
 // parser (sqlparser-rs) does not support backslash string-literal escapes, so only
@@ -106,5 +114,49 @@ describe("sqlIsNull", () => {
 
   it("builds IS NOT NULL when negated", () => {
     expect(sqlIsNull("brand", true)).toBe("brand IS NOT NULL");
+  });
+});
+
+describe("unescapeSqlLiteral", () => {
+  it("undoubles embedded quotes and round-trips sqlLiteral", () => {
+    const raw = "it's a 'test'";
+    expect(unescapeSqlLiteral(sqlLiteral(raw).slice(1, -1))).toBe(raw);
+  });
+
+  it("leaves plain and non-string values alone", () => {
+    expect(unescapeSqlLiteral("plain")).toBe("plain");
+    expect(unescapeSqlLiteral(5)).toBe("5");
+  });
+});
+
+describe("splitOnAnd", () => {
+  it.each([
+    [
+      "splits on AND outside quotes only",
+      "a = 'x and y' AND b = '1' and c = 2",
+      ["a = 'x and y'", "b = '1'", "c = 2"],
+    ],
+    [
+      "keeps a doubled quote inside the literal",
+      "a = 'it''s and ok' AND b = 1",
+      ["a = 'it''s and ok'", "b = 1"],
+    ],
+    [
+      "ignores an apostrophe in a comment line",
+      "-- don't page\nservice = 'api' AND level = 'error'",
+      ["-- don't page\nservice = 'api'", "level = 'error'"],
+    ],
+    [
+      "ignores apostrophes in several comment lines",
+      "-- it's noisy\nservice = 'api' AND level = 'error'\n-- that's all",
+      ["-- it's noisy\nservice = 'api'", "level = 'error'\n-- that's all"],
+    ],
+    [
+      "falls back to a plain AND split when a quote is left unbalanced",
+      "a = 'x AND b = 1",
+      ["a = 'x", "b = 1"],
+    ],
+  ])("%s", (_name, query, expected) => {
+    expect(splitOnAnd(query)).toEqual(expected);
   });
 });

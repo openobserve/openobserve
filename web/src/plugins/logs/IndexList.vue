@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="fieldListRef"
         :fields="streamFieldsRows"
         :search="searchObj.data.stream.filterField"
-        :loading="searchObj.loadingStream"
+        :loading="showFieldListSkeleton"
         :theme="store.state.theme"
         :show-pagination="true"
         :page-size="pagination.rowsPerPage"
@@ -274,16 +274,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  type Ref,
-  watch,
-  computed,
-  nextTick,
-  defineAsyncComponent,
-  onUnmounted,
-} from "vue";
+import { unescapeSqlLiteral } from "@/utils/query/sqlFilterBuilder";
+import { defineComponent, ref, type Ref, watch, computed, nextTick, onUnmounted } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -314,6 +306,10 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import GroupedFieldList from "@/components/common/GroupedFieldList.vue";
+import FieldRow from "@/components/common/FieldRow.vue";
+import FieldExpansion from "@/components/common/FieldExpansion.vue";
+import GroupedFieldListPagination from "@/components/common/FieldListPagination.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelectHeaderRow from "@/lib/forms/Select/OSelectHeaderRow.vue";
 import { useStreamPickerOptions, type PickerStream } from "@/composables/useStreamPickerOptions";
@@ -338,14 +334,10 @@ export default defineComponent({
     },
   },
   components: {
-    GroupedFieldList: defineAsyncComponent(
-      () => import("@/components/common/GroupedFieldList.vue"),
-    ),
-    FieldRow: defineAsyncComponent(() => import("@/components/common/FieldRow.vue")),
-    FieldExpansion: defineAsyncComponent(() => import("@/components/common/FieldExpansion.vue")),
-    GroupedFieldListPagination: defineAsyncComponent(
-      () => import("@/components/common/FieldListPagination.vue"),
-    ),
+    GroupedFieldList,
+    FieldRow,
+    FieldExpansion,
+    GroupedFieldListPagination,
     OButton,
     OSelect,
     OIcon,
@@ -649,7 +641,7 @@ export default defineComponent({
             if (node.left?.type === "column_ref") {
               const colName = extractColName(node.left.column);
               if (colName && node.right?.value != null) {
-                const val = String(node.right.value);
+                const val = unescapeSqlLiteral(node.right.value);
                 if (!result[colName]) result[colName] = [];
                 if (!result[colName].includes(val)) result[colName].push(val);
               }
@@ -700,7 +692,7 @@ export default defineComponent({
             if (node.left?.type === "column_ref") {
               const colName = extractColName(node.left.column);
               if (colName && node.right?.value != null) {
-                const val = String(node.right.value);
+                const val = unescapeSqlLiteral(node.right.value);
                 if (!result[colName]) result[colName] = [];
                 if (!result[colName].includes(val)) result[colName].push(val);
               }
@@ -732,6 +724,29 @@ export default defineComponent({
         streamOptions.value = options;
       },
       { immediate: true },
+    );
+
+    // A re-run refetches the schema of the same streams, so their fields stay up instead of flashing to the skeleton.
+    const streamsKey = () =>
+      `${searchObj.data.stream.streamType}:${searchObj.data.stream.selectedStream.join(",")}`;
+    const fieldsStreamsKey = ref("");
+    // A stream switch first assigns the raw schema, then the grouped list; only the settled list belongs to the streams.
+    watch(
+      () =>
+        [
+          searchObj.data.stream.selectedStreamFields,
+          searchObj.loadingStream || searchObj.loadingFieldGroups,
+        ] as const,
+      ([fields, loading]) => {
+        if (fields?.length && !loading) fieldsStreamsKey.value = streamsKey();
+      },
+      { immediate: true },
+    );
+    const showFieldListSkeleton = computed(
+      () =>
+        (searchObj.loadingStream || searchObj.loadingFieldGroups) &&
+        (!searchObj.data.stream.selectedStreamFields?.length ||
+          fieldsStreamsKey.value !== streamsKey()),
     );
 
     const resetFields = async () => {
@@ -1983,6 +1998,7 @@ export default defineComponent({
       toggleInterestingFields,
       fieldListRef,
       streamSelect,
+      showFieldListSkeleton,
       toggleFieldGroup,
       streamFieldsRows: computed(() => {
         const source = showOnlyInterestingFields.value

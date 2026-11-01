@@ -40,9 +40,17 @@ import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { raw, useI18nTyped, type I18nKey, type TranslateFn } from "@/types/i18n";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import {
+  SPAN_ERROR_COLUMN_ID,
+  SPAN_EVENTS_COLUMN_ID,
+  spanResultCellsFor,
+} from "@/plugins/traces/components/spanResultCells";
 
 /** IDs of LLM columns injected at runtime — never stored in selectedFields. */
 export const LLM_COLUMN_IDS = new Set(["input_tokens", "output_tokens", "cost"]);
+
+/** IDs of the Spans-view columns derived per row — never stored in selectedFields. */
+export const SPAN_DERIVED_COLUMN_IDS = new Set([SPAN_ERROR_COLUMN_ID, SPAN_EVENTS_COLUMN_ID]);
 
 /**
  * Known column metadata. Any field name NOT in this map gets a generic
@@ -55,6 +63,7 @@ const KNOWN_COLUMN_META: Record<
   string,
   {
     headerKey: I18nKey;
+    headerTooltipKey?: I18nKey;
     size: number;
     meta: Record<string, unknown>;
     accessorFn?: (row: any) => any;
@@ -81,6 +90,7 @@ const KNOWN_COLUMN_META: Record<
   },
   spans: {
     headerKey: "traces.tableColumns.spans",
+    headerTooltipKey: "traces.results.spansColumnTooltip",
     size: 100,
     meta: {
       align: "right",
@@ -138,7 +148,10 @@ function toColumnDef(
       id: fieldName,
       header: t(known.headerKey),
       size: known.size,
-      meta: { ...known.meta },
+      meta: {
+        ...known.meta,
+        ...(known.headerTooltipKey ? { headerTooltip: t(known.headerTooltipKey) } : {}),
+      },
       ...(known.accessorFn ? { accessorFn: known.accessorFn } : {}),
       ...(known.sortable ? { sortable: known.sortable } : {}),
     };
@@ -152,6 +165,31 @@ function toColumnDef(
     meta: { closable: true },
     accessorFn: (row: any) => row[fieldName],
   };
+}
+
+function spanDerivedColumns(
+  t: TranslateFn,
+  timestampField: string,
+): OTableColumnDef<Record<string, any>>[] {
+  return [
+    {
+      id: SPAN_ERROR_COLUMN_ID,
+      header: t("traces.results.errorColumn"),
+      size: 240,
+      meta: { align: "left", disableCellAction: true, cellOverflowTooltip: false },
+      accessorFn: (row: any) => {
+        const error = spanResultCellsFor(row, timestampField).error;
+        return error ? [error.code, error.message].filter(Boolean).join(" ") : "";
+      },
+    },
+    {
+      id: SPAN_EVENTS_COLUMN_ID,
+      header: t("traces.results.eventsColumn"),
+      size: 150,
+      meta: { align: "left", disableCellAction: true, cellOverflowTooltip: false },
+      accessorFn: (row: any) => spanResultCellsFor(row, timestampField).events.total,
+    },
+  ];
 }
 
 export function useTracesTableColumns() {
@@ -168,9 +206,9 @@ export function useTracesTableColumns() {
     searchMode: "traces" | "spans",
     selectedFields: string[],
   ): OTableColumnDef<Record<string, any>>[] => {
-    const cols: OTableColumnDef<Record<string, any>>[] = selectedFields.map((field) =>
-      toColumnDef(field, t, searchMode),
-    );
+    const cols: OTableColumnDef<Record<string, any>>[] = selectedFields
+      .filter((field) => !SPAN_DERIVED_COLUMN_IDS.has(field))
+      .map((field) => toColumnDef(field, t, searchMode));
 
     const timestampCol = store?.state?.zoConfig?.timestamp_column || "_timestamp";
     if (!selectedFields.find((col) => col === timestampCol))
@@ -217,6 +255,11 @@ export function useTracesTableColumns() {
           (col.meta as Record<string, unknown>).sortable = true;
         }
       });
+
+      const statusIdx = cols.findIndex((c) => c.id === "span_status");
+      const derived = spanDerivedColumns(t, timestampCol);
+      if (statusIdx === -1) cols.push(...derived);
+      else cols.splice(statusIdx + 1, 0, ...derived);
     }
 
     columns.value = cols;

@@ -1,5 +1,6 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { resetListViewState } from "@/composables/useListViewState";
 import { createRouter, createMemoryHistory } from "vue-router";
 import i18n from "@/locales";
 import ListOrganizations from "./ListOrganizations.vue";
@@ -129,6 +130,20 @@ describe("ListOrganizations", () => {
   afterEach(() => {
     vi.clearAllMocks();
     wrapper.unmount();
+    resetListViewState();
+  });
+
+  it("keeps the search text when the user comes back to the list", async () => {
+    wrapper.vm.filterQuery = "acme";
+    const again = mount(ListOrganizations, {
+      global: {
+        plugins: [i18n, router],
+        provide: { store: mockStore },
+        stubs: { AddUpdateOrganization: true, NoData: true, OTable: true },
+      },
+    });
+    expect(again.vm.filterQuery).toBe("acme");
+    again.unmount();
   });
 
   describe("Component Initialization", () => {

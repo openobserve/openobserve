@@ -323,6 +323,26 @@ describe("SourceMaps.vue", () => {
       w.unmount();
     });
 
+    it("keeps the table loading, not empty, while the filter values are still pending", async () => {
+      getSourceMapsValuesMock.mockReturnValue(new Promise(() => {}));
+      listSourceMapsMock.mockReturnValue(new Promise(() => {}));
+      wrapper = await mountComponent();
+
+      expect(listSourceMapsMock).toHaveBeenCalledTimes(1);
+      expect(wrapper.findComponent({ name: "OTable" }).props("loading")).toBe(true);
+    });
+
+    it("drops the loading state once the list settles empty, whatever the filter values do", async () => {
+      getSourceMapsValuesMock.mockReturnValue(new Promise(() => {}));
+      listSourceMapsMock.mockResolvedValueOnce({ data: [] });
+      wrapper = await mountComponent();
+
+      expect(wrapper.findComponent({ name: "OTable" }).props("loading")).toBe(false);
+      expect(wrapper.find('[data-test-stub="o-table"]').text()).toContain(
+        "No source maps uploaded",
+      );
+    });
+
     it("shows the empty state when no source maps exist and not loading", async () => {
       listSourceMapsMock.mockResolvedValueOnce({ data: [] });
 

@@ -290,6 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 // @ts-nocheck
+import { unescapeSqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import {
   ref,
@@ -316,6 +317,7 @@ import {
   generateTraceContext,
 } from "@/utils/zincutils";
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
+import { tracesRunIsStaged, tracesSearchRunSignature } from "./tracesSearchBar.utils";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import analytics from "@/services/product_analytics";
@@ -381,6 +383,8 @@ interface TracesSavedView {
   selectedFields?: string[];
 }
 
+defineOptions({ name: "AppTraces" });
+
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
 const SearchResult = defineAsyncComponent(() => import("./SearchResult.vue"));
@@ -405,6 +409,8 @@ const {
   searchObj,
   resetSearchObj,
   getUrlQueryParams,
+  applyUrlListState,
+  syncUrlViewState,
   copyTracesUrl,
   formatTracesMetaData,
   setServiceColors,
@@ -493,10 +499,21 @@ const { buildColumns } = useTracesTableColumns();
 let currentSearchTraceId: string | null = null;
 // Track the count query stream so it can be cancelled independently
 let currentCountTraceId: string | null = null;
+// Bumped when the page leaves, so a load still awaiting the parser or stream list drops its results.
+let pageGeneration = 0;
+let pageLoaded = false;
+// A landing claimed by a load the page left mid-way, replayed by the next load.
+let pendingLanding: { run: boolean } | null = null;
+// A relative range drifts while the page sits in the keep-alive cache, so Back re-runs results older than this.
+const STALE_RESULTS_MS = 60_000;
+let lastSearchCompletedAt = 0;
 // The processed WHERE clause from the last buildSearch() call — used for the count query
 let builtWhereClause = "";
 // Paging must keep page 1's filter, so later editor edits never mix into it.
 let submittedFilter = "";
+// A link's page applies to the first search after it is read; any later Run starts at page 1.
+let pendingUrlPage: number | null = null;
+let stopUrlSync = syncUrlViewState();
 // A page's stream can open with an empty batch, so only an actual write may end the replace phase.
 const tracesRequestState: Record<string, { hasWritten: boolean }> = {};
 
@@ -529,9 +546,11 @@ function getQueryTransform() {
 }
 
 async function getStreamList() {
+  const generation = pageGeneration;
   try {
     return getStreams("traces", false)
       .then(async (res) => {
+        if (generation !== pageGeneration) return;
         searchObj.data.streamResults = res;
 
         if (res.list.length > 0) {
@@ -556,6 +575,7 @@ async function getStreamList() {
         }
 
         await extractFields();
+        if (generation !== pageGeneration) return;
         correlationFilters.restore();
 
         // Restore filter chips from the editor value. The single mount search is
@@ -567,6 +587,7 @@ async function getStreamList() {
           });
       })
       .catch((e) => {
+        if (generation !== pageGeneration) return;
         searchObj.loadingStream = false;
         toast({
           variant: "error",
@@ -574,7 +595,7 @@ async function getStreamList() {
         });
       })
       .finally(() => {
-        searchObj.loadingStream = false;
+        if (generation === pageGeneration) searchObj.loadingStream = false;
       });
   } catch (e) {
     searchObj.loadingStream = false;
@@ -737,7 +758,11 @@ function buildSearch(reuseLastWindow = false) {
 
 function fetchTracesCount() {
   const queryReq = searchObj.data.queryPayload;
-  if (!queryReq || !selectedStreamName.value) return;
+  const results = searchObj.data.queryResults;
+  if (!queryReq || !selectedStreamName.value) {
+    results.countPending = false;
+    return;
+  }
 
   const streamName = selectedStreamName.value;
   const whereClause = builtWhereClause ? ` WHERE ${builtWhereClause}` : "";
@@ -753,7 +778,13 @@ function fetchTracesCount() {
       org_id: searchObj.organizationIdentifier,
     });
   }
-  currentCountTraceId = generateTraceContext().traceId;
+  const countTraceId = generateTraceContext().traceId;
+  currentCountTraceId = countTraceId;
+  // A newer search replaces queryResults, so a late count must not land on it.
+  const settle = () => {
+    if (currentCountTraceId === countTraceId) currentCountTraceId = null;
+    results.countPending = false;
+  };
 
   fetchQueryDataWithHttpStream(
     {
@@ -770,26 +801,27 @@ function fetchTracesCount() {
       type: "search",
       pageType: "traces",
       searchType: "ui",
-      traceId: currentCountTraceId,
+      traceId: countTraceId,
       org_id: searchObj.organizationIdentifier,
     },
     {
       data: (_payload: any, response: any) => {
+        if (searchObj.data.queryResults !== results) return;
         const hits: any[] = response.content?.results?.hits || [];
         if (hits.length > 0) {
           const count = isSpansMode ? (hits[0]?.span_count ?? 0) : (hits[0]?.trace_count ?? 0);
-          searchObj.data.queryResults.total = count;
-          searchObj.data.queryResults.errorCount = hits[0]?.error_count ?? 0;
+          results.total = count;
+          results.errorCount = hits[0]?.error_count ?? 0;
           searchObj.meta.resultGrid.showPagination = count > 0;
         }
       },
       error: (_payload: any, err: any) => {
         // The count is a best-effort badge; the main search reports its own failures.
         console.warn("Failed to fetch traces count", err);
-        currentCountTraceId = null;
+        settle();
       },
       complete: (_payload: any) => {
-        currentCountTraceId = null;
+        settle();
       },
       reset: (_payload: any) => {},
     },
@@ -877,10 +909,12 @@ async function getQueryData(
     if (!isPagination) {
       queryReq = buildSearch(isSort);
       searchObj.data.queryPayload = queryReq;
+      lastSearchCompletedAt = 0;
       // Reset hits for a fresh search
       searchObj.data.queryResults = {
         hits: [],
-        total: 0,
+        total: null,
+        countPending: true,
         from: 0,
         size: queryReq.query.size,
         took: 0,
@@ -905,6 +939,7 @@ async function getQueryData(
       submittedFilter = buildEditorFilter();
       searchObj.data.appliedEditorValue = String(searchObj.data.editorValue ?? "");
       dropStaleSelection();
+      searchObj.meta.lastRunSignature = tracesSearchRunSignature(searchObj);
     }
     const combinedFilter = submittedFilter;
     const historyRun = recordRun && !isPagination ? tracesHistoryRun(queryReq) : null;
@@ -1067,6 +1102,7 @@ async function getQueryData(
           if (!tracesRequestState[searchTraceId]) return;
 
           searchObj.loading = false;
+          if (!isPagination) searchObj.data.queryResults.countPending = false;
           if (isPagination) noteTracesPageLoad(searchTraceId, "error");
 
           const errData = err?.content || err;
@@ -1124,6 +1160,7 @@ async function getQueryData(
           delete tracesRequestState[searchTraceId];
           if (isPagination) noteTracesPageLoad(searchTraceId, "done");
           if (!isPagination) {
+            lastSearchCompletedAt = Date.now();
             analytics.track("traces_search_completed", {
               hits: searchObj.data.queryResults?.hits?.length ?? 0,
             });
@@ -1182,6 +1219,11 @@ const rebuildColumns = () => {
 const cancelSearch = () => {
   // Cancel dashboard panel queries (RenderDashboardCharts via usePanelDataLoader)
   window.dispatchEvent(new Event("cancelQuery"));
+  if (currentSearchTraceId) searchObj.data.queryResults.countPending = false;
+  cancelMainSearch();
+};
+
+function cancelMainSearch() {
   if (!currentSearchTraceId) return;
   cancelStreamQueryBasedOnRequestId({
     trace_id: currentSearchTraceId,
@@ -1194,9 +1236,10 @@ const cancelSearch = () => {
   }
   currentSearchTraceId = null;
   searchObj.loading = false;
-};
+}
 
 async function extractFields() {
+  const generation = pageGeneration;
   try {
     searchObj.data.stream.selectedStreamFields = [];
     // Cleared here so a stream with no stats doesn't inherit the previous one's.
@@ -1214,6 +1257,7 @@ async function extractFields() {
       let ftsKeys;
 
       const stream = await getStream(searchObj.data.stream.selectedStream.value, "traces", true);
+      if (generation !== pageGeneration) return;
       // Mirror the real stats (doc_time_min/max) into streamResults so that
       // TracesNoEventsState can compute streamDocTimeRange correctly.
       const streamResultEntry = searchObj.data.streamResults.list?.find(
@@ -1308,6 +1352,7 @@ async function extractFields() {
           loadKeyFields(),
           loadFieldGrouping(),
         ]);
+        if (generation !== pageGeneration) return;
         const grouping = (fieldGrouping as FieldGroupingConfig).prefix_aliases
           ? (fieldGrouping as FieldGroupingConfig)
           : null;
@@ -1403,9 +1448,13 @@ function generateHistogramData() {
 const isAutoRunOff = () => !!store.state.zoConfig?.auto_query_enabled && !searchObj.meta.liveMode;
 
 async function loadPageData() {
+  const generation = pageGeneration;
+  pageLoaded = false;
   const streamFromUrl = typeof router.currentRoute.value.query.stream === "string";
   // Claimed before any early return, so a restore that finds no stream is not left for a later landing.
-  const landing = takeRecentLanding("traces");
+  // A newer restore wins over one a left load never acted on.
+  const landing = takeRecentLanding("traces") ?? pendingLanding;
+  pendingLanding = landing;
   searchObj.loadingStream = true;
   if (!searchObj.data?.queryResults?.hits?.length) searchObj.data.resultGrid.currentPage = 0;
 
@@ -1416,42 +1465,118 @@ async function loadPageData() {
 
   //get stream list
   await getStreamList();
-  if (!searchObj.data.stream.selectedStream.value) return;
-  // Only a restore from recent searches is a user run; any other landing runs without recording.
-  if (landing) {
-    if (landing.run) searchData();
-    return;
+  if (generation !== pageGeneration) return;
+  const forcedRun = await consumeRunQueryFlag();
+  if (generation !== pageGeneration) return;
+  pageLoaded = true;
+  pendingLanding = null;
+  if (searchObj.data.stream.selectedStream.value) {
+    // Only a restore from recent searches is a user run; any other landing runs without recording.
+    if (landing) {
+      if (landing.run) searchData();
+    } else if ((streamFromUrl || !isAutoRunOff()) && (forcedRun || !reopensStagedEdit())) {
+      searchData(false);
+    }
   }
-  if (streamFromUrl || !isAutoRunOff()) searchData(false);
+  pendingUrlPage = null;
 }
 
-onBeforeMount(async () => {
+// run-query is one-shot; left in the entry, Back to it would run whatever edit was staged there later.
+const consumeRunQueryFlag = async () => {
+  const query = { ...router.currentRoute.value.query };
+  if (!("run-query" in query)) return false;
+  const forced = query["run-query"] === "true";
+  delete query["run-query"];
+  await router.replace({ query });
+  return forced;
+};
+
+// Back from a trace remounts this page over the results it left; a staged edit comes back staged, not run.
+const reopensStagedEdit = () =>
+  !!searchObj.data.queryResults?.hits?.length &&
+  tracesRunIsStaged(searchObj, store.state.zoConfig?.auto_query_enabled);
+
+const pageActive = ref(true);
+let activatedBefore = false;
+let shownQueryKey = "";
+let searchInterrupted = false;
+let countInterrupted = false;
+
+const routeQueryKey = () => JSON.stringify(router.currentRoute.value.query ?? {});
+
+// The cached page compares this with the URL it returns to, to decide whether its results still apply.
+watch(
+  () => router.currentRoute.value,
+  (route) => {
+    if (pageActive.value && route?.name === "traces") shownQueryKey = routeQueryKey();
+  },
+  { immediate: true },
+);
+
+// A page left in the cache must not keep streaming into shared state, or into another org's view.
+function stopInFlightRequests() {
+  pageGeneration++;
+  if (currentSearchTraceId) {
+    searchInterrupted = true;
+    cancelMainSearch();
+  }
+  if (currentCountTraceId) {
+    countInterrupted = true;
+    cancelStreamQueryBasedOnRequestId({
+      trace_id: currentCountTraceId,
+      org_id: searchObj.organizationIdentifier,
+    });
+    currentCountTraceId = null;
+  }
+}
+
+async function initializePage() {
+  const generation = pageGeneration;
+  pageLoaded = false;
   if (
     searchObj.organizationIdentifier &&
     searchObj.organizationIdentifier !== store.state.selectedOrganization.identifier
   ) {
     resetSearchObj();
   }
-  setupContextProvider();
   restoreUrlQueryParams();
   // A handoff URL from Service Graph / Services Catalog (or a bookmark of one)
   // carries a prebuilt filter; apply it before the first query runs.
   applyHandoffFilter();
-  await loadTracesParser();
+  // Until the stream list answers, an empty list means "not loaded yet", not "no trace streams".
+  searchObj.loadingStream = true;
+  await loadTracesParser().catch((e) => console.error("Failed to load the traces parser", e));
+  if (generation !== pageGeneration) return;
   if (!searchObj.loading) {
     await loadPageData();
+  } else {
+    searchObj.loadingStream = false;
+    pendingUrlPage = null;
+    pageLoaded = true;
   }
+}
+
+onBeforeMount(async () => {
+  setupContextProvider();
+  await initializePage();
 });
 
 onDeactivated(() => {
+  pageActive.value = false;
+  // A cached page's state can still change; a write queued then would land on the URL it returns to.
+  stopUrlSync();
+  stopInFlightRequests();
   cleanupContextProvider();
 });
 
 onUnmounted(() => {
+  stopUrlSync();
+  stopInFlightRequests();
   cleanupContextProvider();
 });
 
 onActivated(async () => {
+  pageActive.value = true;
   setupContextProvider();
 
   const savedAutoRun = localStorage.getItem("oo_toggle_auto_run");
@@ -1459,35 +1584,82 @@ onActivated(async () => {
     searchObj.meta.liveMode = savedAutoRun === "true";
   }
 
+  // Vue also fires this right after the first mount, whose load onBeforeMount owns.
+  if (!activatedBefore) {
+    activatedBefore = true;
+    return;
+  }
+  stopUrlSync = syncUrlViewState();
+
+  // Leaving during an await below bumps the generation; the rest of this activation must not run.
+  const generation = pageGeneration;
+  const left = () => generation !== pageGeneration || !pageActive.value;
+  const queryChanged = routeQueryKey() !== shownQueryKey;
+  shownQueryKey = routeQueryKey();
+  const rerunSearch = searchInterrupted;
+  const rerunCount = countInterrupted;
+  searchInterrupted = false;
+  countInterrupted = false;
+  let reloaded = false;
+
+  if (!pageLoaded) {
+    await initializePage();
+    return;
+  }
+
   const params = router.currentRoute.value.query;
-  if (params.reload === "true") {
+  if (queryChanged && params.reload === "true") {
     restoreUrlQueryParams();
     await loadPageData();
+    if (left()) return;
+    reloaded = true;
   }
 
   if (searchObj.organizationIdentifier != store.state.selectedOrganization.identifier) {
     resetSearchObj();
     restoreUrlQueryParams();
     await loadPageData();
+    if (left()) return;
+    reloaded = true;
   }
 
   // Arriving from Service Graph / Services Catalog / RCA evidence: this view is
   // keep-alive, so a handoff navigation re-activates it without remounting. Apply
   // the incoming stream/time/filter and run the query. An empty `filter` is an
   // unfiltered handoff (stream + range only) and still clears and runs.
-  if (typeof params.filter === "string") {
+  if (queryChanged && typeof params.filter === "string") {
     restoreUrlQueryParams();
     if (applyHandoffFilter()) {
       await loadPageData();
       await nextTick();
+      if (left()) return;
       runQueryFn(false);
+      reloaded = true;
     }
+  }
+
+  if (reloaded) return;
+  const staleRelativeRange =
+    searchObj.data.datetime?.type === "relative" &&
+    lastSearchCompletedAt > 0 &&
+    Date.now() - lastSearchCompletedAt > STALE_RESULTS_MS &&
+    !isAutoRunOff();
+  if (queryChanged) {
+    restoreUrlQueryParams();
+    await loadPageData();
+  } else if (rerunSearch || staleRelativeRange) {
+    // Back must show the page the user left, as a remount would from the URL.
+    pendingUrlPage = searchObj.data.resultGrid.currentPage;
+    runQueryFn(false);
+  } else if (rerunCount) {
+    fetchTracesCount();
   }
 });
 
 /** Runs the search; `record` is false for runs no user asked for, such as a page landing. */
 const runQueryFn = (record = true) => {
-  searchObj.data.resultGrid.currentPage = 0;
+  searchObj.data.resultGrid.currentPage = pendingUrlPage ?? 0;
+  pendingUrlPage = null;
   searchObj.runQuery = false;
   getQueryData(false, false, record);
 };
@@ -1509,6 +1681,7 @@ function tracesHistoryRun(queryReq: { query: { start_time: number; end_time: num
 }
 
 const runQueryOnSort = () => {
+  pendingUrlPage = null;
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.runQuery = false;
   getQueryData(false, true);
@@ -1540,6 +1713,8 @@ function restoreUrlQueryParams() {
       value: queryParams.stream,
     };
   }
+
+  pendingUrlPage = applyUrlListState(queryParams).currentPage;
 }
 
 const onSplitterUpdate = () => {
@@ -1559,7 +1734,9 @@ const restoreFiltersFromQuery = (node: any) => {
     if (node.left.column) {
       let values = [];
       if (node.operator === "IN") {
-        values = node.right.value.map((_value: { value: string }) => _value.value);
+        values = node.right.value.map((_value: { value: string }) =>
+          unescapeSqlLiteral(_value.value),
+        );
       }
       if (searchObj.data.stream.fieldValues?.[node?.left?.column]?.selectedValues)
         searchObj.data.stream.fieldValues[node.left.column].selectedValues = values;
@@ -1600,11 +1777,11 @@ const onMetricsEditorFilterSet = (text: string) => {
   if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
-// A comparison filter is an explicit apply from a page the search closes, so it searches in manual mode too.
+// With auto-run off the comparison filter stays staged like any other edit; Run applies it and closes Drill down.
 const onMetricsEditorFilterRun = (text: string) => {
   searchObj.data.editorValue = text;
   searchBarRef.value?.setEditorValue?.(text);
-  searchData();
+  if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
 // Handler for Error Only toggle — only adds/removes span_status condition,
@@ -1643,7 +1820,8 @@ const onSearchModeChange = (mode: TraceSearchMode) => {
 watch(
   () => [router.currentRoute.value.name, router.currentRoute.value.query.tab] as const,
   ([routeName, tab]) => {
-    if (routeName !== "traces") return;
+    // A cached page applies the URL it returns to on activation, not while it sits in the cache.
+    if (routeName !== "traces" || !pageActive.value) return;
     const mode = supportedTraceSearchMode(tab);
     if (mode !== searchObj.meta.searchMode) {
       onSearchModeChange(mode);
@@ -1900,7 +2078,7 @@ const activeIncludeFilterValues = computed((): Record<string, string[]> => {
         if (node.left?.type === "column_ref") {
           const colName = extractTracesColName(node.left.column);
           if (colName && node.right?.value != null) {
-            const val = String(node.right.value);
+            const val = unescapeSqlLiteral(node.right.value);
             if (!result[colName]) result[colName] = [];
             if (!result[colName].includes(val)) result[colName].push(val);
           }
@@ -1949,7 +2127,7 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
         if (node.left?.type === "column_ref") {
           const colName = extractTracesColName(node.left.column);
           if (colName && node.right?.value != null) {
-            const val = String(node.right.value);
+            const val = unescapeSqlLiteral(node.right.value);
             if (!result[colName]) result[colName] = [];
             if (!result[colName].includes(val)) result[colName].push(val);
           }
@@ -2004,6 +2182,11 @@ const getMoreData = () => {
 
 const onChangeStream = async () => {
   await extractFields();
+  // Swap in the new stream's columns now, or the URL sync writes the old stream's columns into its URL.
+  if (searchObj.meta.searchMode === "spans" || searchObj.meta.searchMode === "traces") {
+    loadLocalLogFilterField(searchObj.meta.searchMode);
+    rebuildColumns();
+  }
   if (!isAutoRunOff()) runQueryFn();
 };
 
@@ -2296,7 +2479,7 @@ watch(
 );
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
-useShortcuts([
+const tracesShortcuts = [
   {
     id: "tracesSearch",
     handler: () => runQueryFn(),
@@ -2334,7 +2517,8 @@ useShortcuts([
       if (activeTab.value === "search") searchResultRef.value?.stepTraceRow?.(-1, !!e?.repeat);
     },
   },
-]);
+];
+useShortcuts(tracesShortcuts, undefined, { active: pageActive });
 </script>
 
 <style scoped>

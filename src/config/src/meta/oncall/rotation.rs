@@ -897,8 +897,8 @@ impl Rotation {
     ///
     /// The away are removed, which is a different judgement: a cover is a night
     /// off from a shift, an absence is not being there at all. When that empties
-    /// the level the ladder advances, and `WholeTeam` below it ignores absence,
-    /// so a page still has somewhere to go.
+    /// the level the ladder advances, and `WholeTeam` below it skips the away
+    /// only while someone else is left, so a page still has somewhere to go.
     /// The cover holder is never removed: a cover outranks an absence, as in [`Rotation::on_call`].
     pub fn everyone(
         &self,

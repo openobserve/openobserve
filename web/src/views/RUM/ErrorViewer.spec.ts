@@ -333,11 +333,18 @@ describe("ErrorViewer.vue", () => {
       await seedErrorDetails({
         error_id: "err-1",
         _timestamp: 1640995200000000,
+        context_url: "https://example.com/api/items",
+        context_method: "POST",
+        context_responsestatus: "500",
         events: [
           { type: "action", action_type: "click" },
           {
             type: "resource",
             resource_type: "xhr",
+            resource_url: "https://example.com/api/items",
+            resource_method: "POST",
+            resource_status_code: 500,
+            _timestamp: 1640995200000100,
             _oo_trace_id: "0badc0ffee0ddf00dd15ea5eba5eba11",
           },
         ],
@@ -346,6 +353,53 @@ describe("ErrorViewer.vue", () => {
       const card = wrapper.findComponent({ name: "TraceCorrelationCard" });
       expect(card.exists()).toBe(true);
       expect(card.props("traceId")).toBe("0badc0ffee0ddf00dd15ea5eba5eba11");
+    });
+
+    it("links the failed request instead of an earlier successful request in the session", async () => {
+      await seedErrorDetails({
+        error_id: "request-error",
+        _timestamp: 1640995200000000,
+        context_url: "https://example.com/api/items/query",
+        context_method: "POST",
+        context_responsestatus: "500",
+        events: [
+          {
+            type: "resource",
+            resource_type: "xhr",
+            resource_method: "GET",
+            resource_url: "https://example.com/api/items",
+            resource_status_code: 200,
+            _timestamp: 1640995190000000,
+            _o2_trace_id: "00000000000000000000000000000001",
+          },
+          {
+            type: "resource",
+            resource_type: "xhr",
+            resource_method: "POST",
+            resource_url: "https://example.com/api/items/query",
+            resource_status_code: 500,
+            _timestamp: 1640995200000100,
+            _o2_trace_id: "00000000000000000000000000000002",
+          },
+        ],
+      });
+      const card = wrapper.findComponent({ name: "TraceCorrelationCard" });
+      expect(card.props("traceId")).toBe("00000000000000000000000000000002");
+    });
+
+    it("does not attach an unrelated request trace to a JavaScript error", async () => {
+      await seedErrorDetails({
+        error_id: "javascript-error",
+        _timestamp: 1640995200000000,
+        events: [
+          {
+            type: "resource",
+            resource_type: "xhr",
+            _o2_trace_id: "00000000000000000000000000000001",
+          },
+        ],
+      });
+      expect(wrapper.findComponent({ name: "TraceCorrelationCard" }).exists()).toBe(false);
     });
 
     it("hides the card when the stored trace id is not plausible hex", async () => {

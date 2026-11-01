@@ -95,8 +95,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
 
+      <div
+        v-if="loading && !facets.length"
+        class="flex flex-col gap-3 px-2 py-1"
+        aria-busy="true"
+        :data-test="`metrics-explorer-${mode}-loading`"
+      >
+        <OSkeleton v-for="i in 6" :key="i" type="text" />
+      </div>
       <OEmptyState
-        v-if="!visibleFacets.length"
+        v-else-if="!visibleFacets.length"
         size="inline"
         icon="search-off"
         :title="emptyLabel"
@@ -115,6 +123,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
 /** A rail facet. Counts are recomputed by the caller against the OTHER active
  *  filters, so this component only ever renders them. */
@@ -130,6 +139,8 @@ const props = defineProps<{
   selected: Set<string>;
   /** Whether this facet has any selection — drives the "Clear filters" row. */
   hasSelection?: boolean;
+  /** The metric list is still loading, so an empty facet list is not "no match" yet. */
+  loading?: boolean;
 }>();
 
 const emit = defineEmits<{

@@ -1,3 +1,5 @@
+import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
+
 /**
  * Shared filter utilities for the Traces feature.
  * Canonical source — imported by SearchBar.vue and useTraces.ts.
@@ -26,26 +28,26 @@ export const replaceExistingFieldCondition = (
   newExpression: string,
 ): string | null => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|>=|<=|>|<|is(?:\\s+not)?)`;
   const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
   const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
   if (multiRegex.test(queryStr)) {
-    return queryStr.replace(multiRegex, newExpression);
+    return queryStr.replace(multiRegex, () => newExpression);
   }
 
   // Try range condition: field >= val AND field <= val (e.g. duration filters)
   const rangeRegex = new RegExp(`${condPat}\\s+(?:and|AND)\\s+${condPat}`, "gi");
   if (rangeRegex.test(queryStr)) {
-    return queryStr.replace(rangeRegex, newExpression);
+    return queryStr.replace(rangeRegex, () => newExpression);
   }
 
   // Try single condition
   const singleRegex = new RegExp(condPat, "gi");
   if (singleRegex.test(queryStr)) {
-    return queryStr.replace(singleRegex, newExpression);
+    return queryStr.replace(singleRegex, () => newExpression);
   }
 
   return null;
@@ -66,13 +68,10 @@ export const removeFieldCondition = (queryStr: string, fieldName: string): strin
   const multiPattern = new RegExp(`^\\(\\s*"?${esc}"?\\s*${op}`, "i");
 
   const removeFromClause = (clause: string): string => {
-    const remaining = clause
-      .trim()
-      .split(/\s+AND\s+/i)
-      .filter((cond) => {
-        const trimmed = cond.trim();
-        return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
-      });
+    const remaining = splitOnAnd(clause.trim()).filter((cond) => {
+      const trimmed = cond.trim();
+      return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
+    });
     return remaining.join(" AND ");
   };
 

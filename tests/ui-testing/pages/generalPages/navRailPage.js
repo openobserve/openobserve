@@ -1,5 +1,7 @@
 // Page object for the left rail, its hover flyouts and the mobile drawer nav.
 
+import { expect } from '@playwright/test';
+
 const FRAME_MS = 16;
 // Minimum-jerk profile: the bell-shaped velocity of a real aimed hand movement.
 const ease = (t) => 10 * t ** 3 - 15 * t ** 4 + 6 * t ** 5;
@@ -31,6 +33,18 @@ export class NavRailPage {
     await this.nav.locator('.nav-menu-item--active').first().waitFor({ state: 'attached', timeout: 60000 });
     // Config-driven tiles settle a beat after the first paint.
     await this.page.waitForTimeout(1000);
+  }
+
+  // A menu opened while the home view is still loading can end with focus on <body>, so arrows go nowhere.
+  async waitForHomeLoaded() {
+    await expect(this.page.locator('[data-test="home-page"]')).toBeVisible();
+    await expect(this.page.locator('[data-test="home-view-skeleton-tile"]')).toHaveCount(0);
+  }
+
+  async expectFocusInMenu() {
+    await expect
+      .poll(() => this.page.evaluate(() => !!document.activeElement?.closest('[role="menu"]')))
+      .toBe(true);
   }
 
   async setDir(dir) {
@@ -148,6 +162,44 @@ export class NavRailPage {
       const el = document.activeElement;
       return el ? { tag: el.tagName, dataTest: el.getAttribute('data-test'), inContent: !!el.closest('.o2-content-scroll') } : null;
     });
+  }
+
+  // ODropdownItem animates its colours over 150 ms; read once its transitions have finished.
+  async settledBackground(locator) {
+    await expect.poll(() => locator.evaluate((el) => el.getAnimations().length)).toBe(0);
+    return locator.evaluate((el) => getComputedStyle(el).backgroundColor);
+  }
+
+  async focusedMenuRow() {
+    return this.page.evaluate(() => {
+      const el = document.activeElement;
+      return el && el.closest('[role="menu"]') ? el.getAttribute('data-test') || el.textContent.trim() : null;
+    });
+  }
+
+  // Holds the org's full /api/{org}/config (not the bootstrap /config) until release(), then serves it with patch applied.
+  async holdOrgConfig(patch) {
+    const path = `/api/${process.env.ORGNAME || 'default'}/config`;
+    let release;
+    const released = new Promise((resolve) => (release = resolve));
+    await this.page.route(
+      (url) => url.pathname.endsWith(path),
+      async (route) => {
+        await released;
+        const response = await route.fetch();
+        await route.fulfill({ response, json: { ...(await response.json()), ...patch } });
+      },
+    );
+    return { release };
+  }
+
+  // The response arriving is not enough: components only react once the store holds the values.
+  async waitForStoreConfig(patch) {
+    await this.page.waitForFunction((expected) => {
+      const store = document.querySelector('#app')?.__vue_app__?.config.globalProperties.$store;
+      const zoConfig = store?.state.zoConfig ?? {};
+      return Object.entries(expected).every(([key, value]) => zoConfig[key] === value);
+    }, patch);
   }
 
   async openDrawer() {

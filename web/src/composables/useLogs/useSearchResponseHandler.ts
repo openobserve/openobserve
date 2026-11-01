@@ -597,8 +597,11 @@ export const useSearchResponseHandler = () => {
       searchObj.data.histogram.errorCode = code || 0;
       searchObj.data.histogram.errorDetail = error_detail || "";
       notificationMsg.value = errorMsg;
+      searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
     } else {
-      searchObj.data.errorDetail = error_detail || "";
+      // Known codes swap the message for generic text; keep the original, it names the stream or field.
+      searchObj.data.errorDetail =
+        error_detail || (logsErrorMessage(code || 0) && message ? message : "");
       searchObj.data.errorMsg = errorMsg;
       notificationMsg.value = errorMsg;
 

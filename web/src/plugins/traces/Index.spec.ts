@@ -25,6 +25,7 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
+import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
 import analytics from "@/services/product_analytics";
 import queryHistory from "@/services/query_history";
 import type { QueryHistoryEntry } from "@/services/query_history";
@@ -178,6 +179,7 @@ const mockSearchObj = {
       },
     },
     liveMode: false,
+    lastRunSignature: null as string | null,
     serviceColors: {},
     metricsRangeFilters: new Map(),
   }),
@@ -228,10 +230,12 @@ vi.mock("@/composables/useTraces", () => ({
     searchObj: mockSearchObj,
     resetSearchObj: mockResetSearchObj,
     getUrlQueryParams: vi.fn(() => ({})),
+    applyUrlListState: mockApplyUrlListState,
+    syncUrlViewState: mockSyncUrlViewState,
     copyTracesUrl: vi.fn(),
     formatTracesMetaData: vi.fn((hits) => hits),
     setServiceColors: mockSetServiceColors,
-    loadLocalLogFilterField: vi.fn(),
+    loadLocalLogFilterField: mockLoadLocalLogFilterField,
     updatedLocalLogFilterField: mockUpdatedLocalLogFilterField,
     loadTracesParser: vi.fn().mockResolvedValue(undefined),
     tracesParser: { value: trackTracesParser({ astify: vi.fn(() => ({ where: null })) }) },
@@ -250,10 +254,22 @@ const { mockGetStreams, mockGetStream, mockSetServiceColors } = vi.hoisted(() =>
   mockSetServiceColors: vi.fn(),
 }));
 
-const { mockUpdatedLocalLogFilterField, mockToast } = vi.hoisted(() => ({
-  mockUpdatedLocalLogFilterField: vi.fn(),
-  mockToast: vi.fn(),
-}));
+const { mockApplyUrlListState, mockSyncUrlViewState, mockStopUrlSync } = vi.hoisted(() => {
+  const mockStopUrlSync = vi.fn();
+  return {
+    mockApplyUrlListState: vi.fn((): { currentPage: number | null } => ({ currentPage: null })),
+    mockSyncUrlViewState: vi.fn(() => mockStopUrlSync),
+    mockStopUrlSync,
+  };
+});
+
+const { mockUpdatedLocalLogFilterField, mockLoadLocalLogFilterField, mockToast } = vi.hoisted(
+  () => ({
+    mockUpdatedLocalLogFilterField: vi.fn(),
+    mockLoadLocalLogFilterField: vi.fn(),
+    mockToast: vi.fn(),
+  }),
+);
 
 vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   ...((await importOriginal()) as any),
@@ -949,6 +965,8 @@ describe("Index.vue (Main Traces Page)", () => {
     it("should show no stream selected message when no stream is selected", async () => {
       mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
       mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
+      // An in-flight search owns the load, so the mount keeps this stream state as is.
+      mockSearchObj.loading = true;
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -967,6 +985,9 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
       await flushPromises();
+      // The mock is not reactive, so re-render the slotted results once the mount has settled.
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
 
       expect(wrapper.find('[data-test="traces-no-stream-selected-text"]').exists()).toBe(true);
     });
@@ -984,6 +1005,8 @@ describe("Index.vue (Main Traces Page)", () => {
     it("should show apply search message when no search is applied", async () => {
       mockSearchObj.searchApplied = false;
       mockSearchObj.data.queryResults = { hits: [] };
+      // An in-flight search owns the load, so the mount does not auto-run another.
+      mockSearchObj.loading = true;
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -1002,6 +1025,9 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
       await flushPromises();
+      // The mock is not reactive, so re-render the slotted results once the mount has settled.
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
 
       expect(wrapper.find('[data-test="traces-search-not-started-text"]').exists()).toBe(true);
     });
@@ -1226,22 +1252,71 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockClearOriginalTimeRange).toHaveBeenCalled();
     });
 
-    it("runs exactly one search for a comparison filter, with live mode off", async () => {
+    it("stages a comparison filter without searching while auto-run is off", async () => {
       await mountPage();
       mockSearchObj.meta.liveMode = false;
       mockSearchObj.meta.searchMode = "spans";
       mockFetchQueryDataWithHttpStream.mockClear();
       vi.mocked(analytics.track).mockClear();
+      const setEditorValue = vi.spyOn(wrapper.vm.searchBarRef, "setEditorValue");
 
       wrapper.vm.onMetricsEditorFilterRun("(service_name = 'a') and http_method = 'GET'");
       await flushPromises();
 
       expect(mockSearchObj.data.editorValue).toBe("(service_name = 'a') and http_method = 'GET'");
+      expect(setEditorValue).toHaveBeenCalledWith("(service_name = 'a') and http_method = 'GET'");
       const runs = vi
         .mocked(analytics.track)
         .mock.calls.filter(([event]: any[]) => event === "traces_search_run");
-      expect(runs).toHaveLength(1);
-      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      expect(runs).toHaveLength(0);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    it("runs exactly one search for a comparison filter with auto-run on", async () => {
+      await mountPage();
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = true;
+      mockSearchObj.meta.searchMode = "spans";
+      mockFetchQueryDataWithHttpStream.mockClear();
+      vi.mocked(analytics.track).mockClear();
+
+      try {
+        wrapper.vm.onMetricsEditorFilterRun("(service_name = 'a') and http_method = 'GET'");
+        await flushPromises();
+
+        const runs = vi
+          .mocked(analytics.track)
+          .mock.calls.filter(([event]: any[]) => event === "traces_search_run");
+        expect(runs).toHaveLength(1);
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      } finally {
+        delete store.state.zoConfig.auto_query_enabled;
+        mockSearchObj.meta.liveMode = false;
+      }
+    });
+
+    it("records the staged state a Run applied, so the pending state clears", async () => {
+      await mountPage();
+      mockSearchObj.meta.lastRunSignature = null;
+      mockSearchObj.data.editorValue = "service_name = 'checkout'";
+
+      wrapper.vm.searchData();
+      await flushPromises();
+
+      expect(mockSearchObj.meta.lastRunSignature).toBe(tracesSearchRunSignature(mockSearchObj));
+    });
+
+    it("keeps the last Run's state when a page of more rows loads", async () => {
+      await mountPage();
+      wrapper.vm.searchData();
+      await flushPromises();
+      const ran = mockSearchObj.meta.lastRunSignature;
+      mockSearchObj.data.editorValue = "service_name = 'staged'";
+
+      wrapper.vm.getMoreData();
+      await flushPromises();
+
+      expect(mockSearchObj.meta.lastRunSignature).toBe(ran);
     });
 
     it("drops an entry made stale by an unsearched filter edit on a sort", async () => {
@@ -1375,9 +1450,7 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
       expect(errorState().exists()).toBe(true);
-      expect(wrapper.find('[data-test="error-detail-summary"]').text()).toContain(
-        "Search SQL execute error",
-      );
+      expect(wrapper.text()).toContain('This stream has no field named "foo"');
       expect(wrapper.find('[data-test="error-detail-body"]').exists()).toBe(false);
       expect(wrapper.text()).not.toContain("Error during planning");
       expect(wrapper.findComponent(QueryErrorState).props("errorCode")).toBe(0);
@@ -3482,6 +3555,143 @@ describe("Index.vue (Main Traces Page)", () => {
       );
     });
 
+    it("opens a link on the page it carries, then a new Run starts from the first page", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { stream: "default", page: "3" }, name: "traces", path: "/traces" },
+      } as any);
+      mockApplyUrlListState.mockReturnValueOnce({ currentPage: 2 });
+
+      wrapper = mountIndexStubbed();
+
+      await vi.waitFor(() => expect(mockSearchObj.searchApplied).toBe(true), { timeout: 2000 });
+      expect(mockApplyUrlListState).toHaveBeenCalledWith(
+        expect.objectContaining({ stream: "default", page: "3" }),
+      );
+      expect(mockSearchObj.data.queryPayload.query.from).toBe(
+        2 * mockSearchObj.meta.resultGrid.rowsPerPage,
+      );
+
+      wrapper.vm.runQueryFn();
+      await flushPromises();
+      expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
+    });
+
+    it("drops a link's page when the load-time search is skipped, so a later Run starts at page 1", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { stream: "default", page: "3" }, name: "traces", path: "/traces" },
+      } as any);
+      mockApplyUrlListState.mockReturnValueOnce({ currentPage: 2 });
+      mockSearchObj.loading = true;
+      try {
+        wrapper = mountIndexStubbed();
+        await flushPromises();
+      } finally {
+        mockSearchObj.loading = false;
+      }
+
+      wrapper.vm.runQueryOnSort();
+      wrapper.vm.runQueryFn();
+      expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
+    });
+
+    it("Back from a trace brings a staged edit back staged over the results it left", async () => {
+      const ranFilter = "service_name = 'a'";
+      const stagedFilter = "service_name = 'b'";
+      store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: false };
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.editorValue = ranFilter;
+      mockSearchObj.meta.lastRunSignature = tracesSearchRunSignature(mockSearchObj);
+      mockSearchObj.data.queryResults = { hits: [{ trace_id: "t1" }] };
+      mockSearchObj.searchApplied = false;
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { stream: "default", period: "15m", query: btoa(stagedFilter) },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+      mockApplyUrlListState.mockReturnValueOnce({ currentPage: 2 });
+
+      try {
+        wrapper = mountIndexStubbed();
+        await vi.waitFor(
+          () => expect(mockSearchObj.data.stream.streamLists.length).toBeGreaterThan(0),
+          { timeout: 2000 },
+        );
+        await flushPromises();
+        await new Promise((r) => setTimeout(r, 300));
+
+        expect(mockSearchObj.searchApplied).toBe(false);
+        expect(mockSearchObj.data.editorValue).toBe(stagedFilter);
+        expect(mockSearchObj.data.queryResults.hits).toHaveLength(1);
+
+        // The link's page was for a load-time search that did not happen; Run starts at page 1.
+        wrapper.vm.runQueryFn();
+        expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
+      } finally {
+        mockSearchObj.meta.lastRunSignature = null;
+      }
+    });
+
+    it("runs an apply-and-view link from a trace over a staged edit with auto-run off", async () => {
+      const ranFilter = "service_name = 'a'";
+      const appliedFilter = "service_name = 'a' and status_code = '500'";
+      store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: false };
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.editorValue = ranFilter;
+      mockSearchObj.meta.lastRunSignature = tracesSearchRunSignature(mockSearchObj);
+      mockSearchObj.data.queryResults = { hits: [{ trace_id: "t1" }] };
+      mockSearchObj.searchApplied = false;
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: {
+            stream: "default",
+            period: "15m",
+            query: btoa(appliedFilter),
+            "run-query": "true",
+          },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+
+      try {
+        wrapper = mountIndexStubbed();
+        await vi.waitFor(() => expect(mockSearchObj.searchApplied).toBe(true), { timeout: 2000 });
+        expect(mockSearchObj.data.editorValue).toBe(appliedFilter);
+      } finally {
+        mockSearchObj.meta.lastRunSignature = null;
+      }
+    });
+
+    it("drops run-query from the entry it honoured, before the search pushes a new one", async () => {
+      const appliedFilter = "service_name = 'a'";
+      store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: false };
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.searchApplied = false;
+      const query = { stream: "default", period: "15m", query: btoa(appliedFilter) };
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { ...query, "run-query": "true" }, name: "traces", path: "/traces" },
+      } as any);
+      routerReplaceSpy.mockClear();
+      routerPushSpy.mockClear();
+
+      wrapper = mountIndexStubbed();
+      await vi.waitFor(() => expect(mockSearchObj.searchApplied).toBe(true), { timeout: 2000 });
+      expect(routerReplaceSpy).toHaveBeenCalledWith({ query });
+      const replacedAt = routerReplaceSpy.mock.invocationCallOrder[0];
+      expect(routerPushSpy.mock.invocationCallOrder.every((at) => at > replacedAt)).toBe(true);
+    });
+
+    it("mirrors list changes into the URL while mounted and stops on unmount", async () => {
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+      expect(mockSyncUrlViewState).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+      expect(mockStopUrlSync).toHaveBeenCalled();
+      wrapper = undefined as any;
+    });
+
     it("should NOT call searchData (getQueryData) after loadPageData when no stream resolves", async () => {
       // No URL stream, no previously selected, auto_query disabled → no stream selected.
       mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
@@ -3643,6 +3853,21 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.stream.selectedStream.label).toBe("target-stream");
       expect(mockSearchObj.data.editorValue).toBe("");
       expect(wrapper.vm.streamChangeDialog.show).toBe(false);
+    });
+
+    it("loads the new stream's own columns on a stream change, before any search", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: true };
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+      mockSearchObj.meta.liveMode = false;
+      mockSearchObj.meta.searchMode = "traces";
+      mockLoadLocalLogFilterField.mockClear();
+
+      await wrapper.vm.applyStreamChange("target-stream");
+      await flushPromises();
+
+      expect(mockLoadLocalLogFilterField).toHaveBeenCalledWith("traces");
+      delete store.state.zoConfig.auto_query_enabled;
     });
 
     it("should close dialog and leave stream unchanged when secondary button sets show to false", async () => {

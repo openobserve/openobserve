@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { reactive } from "vue";
+import { defineComponent, h, KeepAlive, reactive, ref } from "vue";
 import SearchResult from "@/plugins/traces/SearchResult.vue";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
@@ -128,10 +128,15 @@ const mockSearchObj = reactive({
   organizationIdentifier: "test-org",
 });
 
+const { mockPatchUrlViewState } = vi.hoisted(() => ({
+  mockPatchUrlViewState: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
     searchObj: mockSearchObj,
     updatedLocalLogFilterField: vi.fn(),
+    patchUrlViewState: mockPatchUrlViewState,
   }),
 }));
 
@@ -196,6 +201,31 @@ describe("SearchResult", () => {
       wrapper.unmount();
     }
     vi.clearAllMocks();
+  });
+
+  describe("result count header", () => {
+    const countText = () => wrapper.find('[data-test="traces-count-badge"]').text();
+
+    afterEach(() => {
+      mockSearchObj.data.queryResults.total = 2;
+      (mockSearchObj.meta as any).searchMode = undefined;
+    });
+
+    it("names the unit as traces with a matching span", () => {
+      expect(countText()).toBe("2 traces with a matching span");
+    });
+
+    it("uses the singular for one trace", async () => {
+      mockSearchObj.data.queryResults.total = 1;
+      await flushPromises();
+      expect(countText()).toBe("1 trace with a matching span");
+    });
+
+    it("keeps the spans wording in the Spans view", async () => {
+      (mockSearchObj.meta as any).searchMode = "spans";
+      await flushPromises();
+      expect(countText()).toContain("Spans Found");
+    });
   });
 
   it("should mount SearchResult component", () => {
@@ -307,11 +337,28 @@ describe("SearchResult", () => {
       expect(typeof wrapper.vm.expandRowDetail).toBe("function");
     });
 
+    it("writes the list's pending URL state before opening a trace, so Back returns to it", async () => {
+      const order: string[] = [];
+      mockPatchUrlViewState.mockImplementationOnce(() => {
+        order.push("patch");
+        return Promise.resolve();
+      });
+      const push = vi.spyOn(router, "push").mockImplementation(async () => {
+        order.push("push");
+        return undefined as any;
+      });
+
+      await wrapper.vm.expandRowDetail(mockSearchObj.data.queryResults.hits[0]);
+
+      expect(order).toEqual(["patch", "push"]);
+      push.mockRestore();
+    });
+
     it("uses the exact aggregated trace range without padding", async () => {
       const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
       const trace = mockSearchObj.data.queryResults.hits[0];
 
-      wrapper.vm.expandRowDetail(trace);
+      await wrapper.vm.expandRowDetail(trace);
 
       expect(push).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -322,6 +369,45 @@ describe("SearchResult", () => {
         }),
       );
       push.mockRestore();
+    });
+  });
+
+  describe("Open trace in a new tab", () => {
+    const openFrom = async (row: any) => {
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const list = wrapper.findComponent({ name: "TracesSearchResultList" });
+      await list.vm.$emit("open-in-new-tab", row);
+      const call = open.mock.calls[0];
+      open.mockRestore();
+      return call;
+    };
+
+    afterEach(() => {
+      mockSearchObj.meta.searchMode = "traces";
+    });
+
+    it("opens the trace details with the row window and org in a noopener tab", async () => {
+      mockSearchObj.meta.searchMode = "traces";
+      const trace = { trace_id: "t-1", trace_start_time: 111, trace_end_time: 222 };
+      const [href, target, features] = await openFrom(trace);
+      const url = new URL(href as string, "http://localhost");
+      expect(url.searchParams.get("trace_id")).toBe("t-1");
+      expect(url.searchParams.get("from")).toBe("111");
+      expect(url.searchParams.get("to")).toBe("222");
+      expect(url.searchParams.get("org_identifier")).toBe("test-org");
+      expect(url.searchParams.has("span_id")).toBe(false);
+      expect(target).toBe("_blank");
+      expect(features).toBe("noopener");
+    });
+
+    it("includes span_id and the padded span window in spans mode", async () => {
+      mockSearchObj.meta.searchMode = "spans";
+      const span = { trace_id: "t-2", span_id: "s-9", start_time: 5_000_000, end_time: 6_000_000 };
+      const [href] = await openFrom(span);
+      const url = new URL(href as string, "http://localhost");
+      expect(url.searchParams.get("span_id")).toBe("s-9");
+      expect(url.searchParams.get("from")).toBe(String(5_000 - 60_000_000));
+      expect(url.searchParams.get("to")).toBe(String(6_000 + 3_600_000_000));
     });
   });
 
@@ -464,5 +550,85 @@ describe("SearchResult", () => {
       wrapper.vm.expandRowDetail({ trace_id: "abc", trace_start_time: 1, trace_end_time: 2 });
       expect(navigation().lastOpenedId).toBe("abc");
     });
+  });
+});
+
+describe("SearchResult count chip", () => {
+  let wrapper: any;
+  const badge = () => wrapper.find('[data-test="traces-count-badge"]');
+
+  afterEach(() => {
+    wrapper?.unmount();
+    mockSearchObj.data.queryResults.total = 2;
+    delete (mockSearchObj.data.queryResults as any).countPending;
+  });
+
+  it("shows a pending count instead of 0 while the count query runs", async () => {
+    Object.assign(mockSearchObj.data.queryResults, { total: null, countPending: true });
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+
+    expect(badge().find('[data-test="traces-count-pending"]').exists()).toBe(true);
+    expect(badge().attributes("aria-busy")).toBe("true");
+    expect(badge().text()).not.toMatch(/\d/);
+    expect(badge().text()).toBe("— traces with a matching span");
+  });
+
+  it("shows the counted total once the count settles", async () => {
+    Object.assign(mockSearchObj.data.queryResults, { total: 662900, countPending: false });
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+
+    expect(badge().find('[data-test="traces-count-pending"]').exists()).toBe(false);
+    expect(badge().text()).toContain("662.9K");
+  });
+
+  it("falls back to the rows on the page when the count gave no total", async () => {
+    Object.assign(mockSearchObj.data.queryResults, { total: null, countPending: false });
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+
+    expect(badge().text()).toMatch(/^2\s/);
+  });
+});
+
+describe("SearchResult in a kept-alive page", () => {
+  it("restores the results scroll position when the page returns from the cache", async () => {
+    const show = ref(true);
+    const Parent = defineComponent({
+      setup: () => () =>
+        h(KeepAlive, null, { default: () => (show.value ? h(SearchResult) : h("div")) }),
+    });
+    const parent = mount(Parent, { global: globalOptions, attachTo: document.body });
+    await flushPromises();
+    const scroller = parent.find('[data-test="traces-search-result"] .overflow-auto')
+      .element as HTMLElement;
+    // Like a browser: a detached element reads 0 and comes back scrolled to the top.
+    let offset = 0;
+    Object.defineProperty(scroller, "scrollTop", {
+      configurable: true,
+      get: () => (scroller.isConnected ? offset : (offset = 0)),
+      set: (value: number) => {
+        if (scroller.isConnected) offset = value;
+      },
+    });
+    const frames: FrameRequestCallback[] = [];
+    const raf = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback: FrameRequestCallback) => frames.push(callback));
+    scroller.scrollTop = 480;
+    scroller.dispatchEvent(new Event("scroll"));
+
+    show.value = false;
+    await flushPromises();
+    expect(scroller.scrollTop).toBe(0);
+    show.value = true;
+    await flushPromises();
+    expect(scroller.scrollTop).toBe(0);
+    frames.splice(0).forEach((callback) => callback(0));
+
+    expect(scroller.scrollTop).toBe(480);
+    raf.mockRestore();
+    parent.unmount();
   });
 });

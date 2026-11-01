@@ -64,10 +64,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="logsResultChip"
           value="neutral"
           class="me-[0.6rem]"
-          >{{
-            `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === "spans" ? t("traces.spansFound") : t("traces.tracesFound")}`
-          }}</OTag
+          :aria-busy="countPending"
         >
+          <OSpinner v-if="countPending" size="xs" data-test="traces-count-pending" />
+          {{ countLabel }}
+        </OTag>
         <OTag
           v-if="
             searchObj.data.queryResults.errorCount != null &&
@@ -145,7 +146,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Combined scroll area: RED metrics + trace list scroll together.
            This is the single vertical scroller — the trace table delegates its
            virtualizer here (via :scroll-el) so it doesn't add a nested one. -->
-      <div ref="scrollContainerRef" class="bg-card-glass-solid flex-1 overflow-auto">
+      <div
+        ref="scrollContainerRef"
+        class="bg-card-glass-solid flex-1 overflow-auto"
+        @scroll.passive="rememberScrollTop"
+      >
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <transition
           enter-active-class="transition-all duration-300 ease-in-out"
@@ -198,7 +203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :ai-enabled="aiEnabled"
           :stream-doc-time-range="streamDocTimeRange"
           :query-window-us="queryWindowUs"
+          :row-href="traceDetailsHref"
           @row-click="expandRowDetail"
+          @open-in-new-tab="openTraceInNewTab"
           @page-change="(page: number) => changePage(page)"
           @cross-page="(page: number) => changePage(page, { fromCrossing: true })"
           @rows-per-page-change="changeRowsPerPage"
@@ -218,6 +225,9 @@ import {
   computed,
   defineAsyncComponent,
   defineComponent,
+  nextTick,
+  onActivated,
+  onDeactivated,
   onMounted,
   ref,
   watch,
@@ -240,6 +250,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -250,6 +261,7 @@ export default defineComponent({
     OSelect,
     OPagination,
     OTag,
+    OSpinner,
     TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
@@ -317,7 +329,7 @@ export default defineComponent({
     const router = useRouter();
     const { isMobile } = useBreakpoint();
 
-    const { searchObj, updatedLocalLogFilterField } = useTraces();
+    const { searchObj, updatedLocalLogFilterField, patchUrlViewState } = useTraces();
 
     const metricsDashboardRef: any = ref(null);
 
@@ -325,6 +337,26 @@ export default defineComponent({
     // trace table's virtualizer (:scroll-el) so the table doesn't render its own
     // nested scrollbar — fixes the double-scrollbar on the traces page.
     const scrollContainerRef = ref<HTMLElement | null>(null);
+
+    // Keep-alive detaches the DOM before onDeactivated runs, and a detached element reads scrollTop 0.
+    let savedScrollTop = 0;
+    let restoringScroll = false;
+    const rememberScrollTop = () => {
+      if (!restoringScroll && scrollContainerRef.value?.isConnected) {
+        savedScrollTop = scrollContainerRef.value.scrollTop;
+      }
+    };
+    onDeactivated(() => {
+      restoringScroll = true;
+    });
+    onActivated(async () => {
+      await nextTick();
+      // The virtualized rows lay out in the next frame; before that the offset would clamp short.
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.value) scrollContainerRef.value.scrollTop = savedScrollTop;
+        restoringScroll = false;
+      });
+    });
 
     onMounted(() => {
       // Restore the wrap choice: a preference that resets on every reload is
@@ -341,34 +373,45 @@ export default defineComponent({
       },
     );
 
-    const expandRowDetail = (props: any) => {
-      let from: number;
-      let to: number;
-      searchObj.meta.resultGrid.navigation.lastOpenedId =
-        searchObj.meta.searchMode === "spans" ? props.span_id : props.trace_id;
-
+    const traceTimeRange = (props: any) => {
       if (searchObj.meta.searchMode === "spans") {
         // start_time / end_time are nanoseconds in raw span rows — convert to µs
         const spanStart = Math.floor((props.start_time || 0) / 1000);
         const spanEnd = Math.ceil((props.end_time || props.start_time || 0) / 1000);
-        from = spanStart - 60_000_000; // -1 min in µs
-        to = spanEnd + 3_600_000_000; // +1 hr in µs
-      } else {
-        from = props.trace_start_time;
-        to = props.trace_end_time;
+        return { from: spanStart - 60_000_000, to: spanEnd + 3_600_000_000 };
       }
+      return { from: props.trace_start_time, to: props.trace_end_time };
+    };
 
-      router.push({
-        name: "traceDetails",
-        query: {
-          stream: router.currentRoute.value.query.stream,
-          trace_id: props.trace_id,
-          ...(searchObj.meta.searchMode === "spans" ? { span_id: props.span_id } : {}),
-          from,
-          to,
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
+    const traceDetailsLocation = (props: any, from: number, to: number) => ({
+      name: "traceDetails",
+      query: {
+        stream: router.currentRoute.value.query.stream,
+        trace_id: props.trace_id,
+        ...(searchObj.meta.searchMode === "spans" ? { span_id: props.span_id } : {}),
+        from,
+        to,
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+
+    const traceDetailsHref = (row: any) => {
+      const { from, to } = traceTimeRange(row);
+      return router.resolve(traceDetailsLocation(row, from, to)).href;
+    };
+
+    const openTraceInNewTab = (row: any) => {
+      window.open(traceDetailsHref(row), "_blank", "noopener");
+    };
+
+    const expandRowDetail = async (props: any) => {
+      searchObj.meta.resultGrid.navigation.lastOpenedId =
+        searchObj.meta.searchMode === "spans" ? props.span_id : props.trace_id;
+      const { from, to } = traceTimeRange(props);
+
+      // The URL write is debounced; Back restores what this entry holds, so it must land before leaving.
+      await patchUrlViewState();
+      router.push(traceDetailsLocation(props, from, to));
 
       emit("get:traceDetails", props);
     };
@@ -397,11 +440,28 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     const hits = computed<any[]>(() => searchObj.data.queryResults?.hits ?? []);
 
+    const resultTotal = computed<number>(() =>
+      Number(searchObj.data.queryResults?.total ?? hits.value.length),
+    );
+
     const searchPerformed = computed(() =>
       Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "total"),
     );
 
     const rowsPerPageOptions = [10, 25, 50, 100];
+
+    // The count runs after the rows, so until it answers there is no total to show.
+    const countPending = computed(() => searchObj.data.queryResults?.countPending === true);
+    const countLabel = computed(() => {
+      const shown = countPending.value ? "—" : formatLargeNumber(resultTotal.value);
+      return searchObj.meta.searchMode === "spans"
+        ? `${shown} ${t("traces.spansFound")}`
+        : t(
+            "traces.results.tracesWithMatchingSpan",
+            { count: shown },
+            countPending.value ? 2 : resultTotal.value,
+          );
+    });
 
     const totalPages = computed(() =>
       searchObj.data.queryResults.total && searchObj.meta.resultGrid.rowsPerPage
@@ -466,18 +526,24 @@ export default defineComponent({
     return {
       t,
       store,
+      resultTotal,
       isMobile,
       searchObj,
       updatedLocalLogFilterField,
       metricsDashboardRef,
       scrollContainerRef,
       expandRowDetail,
+      traceDetailsHref,
+      openTraceInNewTab,
       onMetricsTimeRangeSelected,
       onMetricsEditorFilterSet,
       onMetricsEditorFilterRun,
       getDashboardData,
       hits,
       searchPerformed,
+      countPending,
+      countLabel,
+      rememberScrollTop,
       changePage,
       changeRowsPerPage,
       changeSortBy,

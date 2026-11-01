@@ -807,6 +807,59 @@ describe("SearchResult Component", () => {
       expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
     });
 
+    it("gives the first rows of a search their FTS default columns before they render", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.queryResults = {};
+      wrapper.vm.searchObj.loading = true;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.searchObj.data.queryResults.hits = [{ message: "hello", kubernetes_pod_id: "p" }];
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["message"]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
+      expect(wrapper.vm.searchObj.data.resultGrid.columns.map((c: any) => c.id)).toContain(
+        "message",
+      );
+    });
+
+    it("leaves a prior system pick to the end of the search", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = ["log"];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = true;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "log", ftsKey: true },
+      ];
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.queryResults = {};
+      wrapper.vm.searchObj.loading = true;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.searchObj.data.queryResults.hits = [{ message: "hello", log: "" }];
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["log"]);
+    });
+
+    it("does not pick FTS columns for the first rows in SQL mode", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "message", ftsKey: true }];
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      wrapper.vm.searchObj.data.queryResults = {};
+      wrapper.vm.searchObj.loading = true;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.searchObj.data.queryResults.hits = [{ message: "hello" }];
+
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+      wrapper.vm.searchObj.meta.sqlMode = false;
+    });
+
     it("should handle updateTitle changes", async () => {
       const title = "New Title";
       wrapper.vm.searchObj.data.histogram.chartParams.title = title;
@@ -1248,6 +1301,7 @@ describe("SearchResult Component", () => {
     const table = () => wrapper.findComponent({ name: "OTable" });
 
     it("shows the skeleton on first paint: loading with no rows", async () => {
+      await setState(false, []);
       await setState(true, []);
       expect(table().props("loading")).toBe(true);
       expect(table().props("streaming")).toBe(false);
@@ -1291,10 +1345,13 @@ describe("SearchResult Component", () => {
       expect(table().vm.$.uid).toBe(uid);
     });
 
-    it("returns streaming to false when the hits are emptied mid-search", async () => {
+    it("keeps the emptied rows up as stale until the search settles", async () => {
       await setState(true, hits(3));
-      expect(table().props("streaming")).toBe(true);
       await setState(true, []);
+      expect(table().props("data").length).toBe(3);
+      expect(table().attributes("data-stale-rows")).toBe("true");
+      await setState(false, []);
+      expect(table().props("data").length).toBe(0);
       expect(table().props("streaming")).toBe(false);
     });
 
@@ -1369,6 +1426,120 @@ describe("SearchResult Component", () => {
     });
   });
 
+  describe("status row settles with the chart's first paint", () => {
+    const parts = { start: 1, end: 50, total: "3.8M", took: 120 };
+    const landed = () => ({
+      xData: [1, 2, 3],
+      yData: [10, 20, 30],
+      chartParams: { title: "", timezone: "UTC", titleParts: parts },
+      errorMsg: "",
+      errorCode: 0,
+      errorDetail: "",
+    });
+    const chart = () => wrapper.findComponent('[data-test="logs-search-result-bar-chart"]');
+    let saved: any;
+
+    const runUntilHistogramLands = async (histogram: any) => {
+      wrapper.vm.searchObj.loading = true;
+      wrapper.vm.searchObj.loadingHistogram = true;
+      await flushPromises();
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ _timestamp: 1 }] };
+      wrapper.vm.searchObj.loading = false;
+      await flushPromises();
+      wrapper.vm.searchObj.data.histogram = histogram;
+      wrapper.vm.searchObj.loadingHistogram = false;
+      await flushPromises();
+    };
+
+    beforeEach(() => {
+      saved = {
+        histogram: wrapper.vm.searchObj.data.histogram,
+        showHistogram: wrapper.vm.searchObj.meta.showHistogram,
+        toggle: wrapper.vm.searchObj.meta.logsVisualizeToggle,
+        queryResults: wrapper.vm.searchObj.data.queryResults,
+      };
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.meta.showHistogram = true;
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+      wrapper.vm.searchObj.meta.refreshInterval = 0;
+      wrapper.vm.searchObj.meta.lastRunAt = 1;
+    });
+
+    afterEach(async () => {
+      vi.useRealTimers();
+      wrapper.vm.searchObj.data.histogram = saved.histogram;
+      wrapper.vm.searchObj.meta.showHistogram = saved.showHistogram;
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = saved.toggle;
+      wrapper.vm.searchObj.data.queryResults = saved.queryResults;
+      wrapper.vm.searchObj.data.searchAround.indexTimestamp = -1;
+      await flushPromises();
+    });
+
+    it("keeps the chips, refresh stamp and bar busy until the new chart has painted", async () => {
+      await runUntilHistogramLands(landed());
+      expect(chart().exists()).toBe(true);
+      expect(wrapper.vm.summaryView.updating).toBe(true);
+      expect(wrapper.vm.searchObj.meta.lastRunAt).toBe(1);
+
+      chart().vm.$emit("finished");
+      await flushPromises();
+      expect(wrapper.vm.summaryView.updating).toBe(false);
+      expect(wrapper.vm.summaryView.parts).toEqual(parts);
+      expect(wrapper.vm.searchObj.meta.lastRunAt).toBeGreaterThan(1);
+    });
+
+    it("keeps the previous chart dimmed until the re-run's chart has painted", async () => {
+      await runUntilHistogramLands(landed());
+      chart().vm.$emit("finished");
+      await flushPromises();
+
+      await runUntilHistogramLands(landed());
+      expect(wrapper.find(".histogram-chart").classes()).toContain("opacity-50");
+      expect(wrapper.vm.summaryView.updating).toBe(true);
+
+      chart().vm.$emit("finished");
+      await flushPromises();
+      expect(wrapper.find(".histogram-chart").classes()).not.toContain("opacity-50");
+      expect(wrapper.vm.summaryView.updating).toBe(false);
+    });
+
+    it("settles at once when the histogram is hidden or failed", async () => {
+      wrapper.vm.searchObj.meta.showHistogram = false;
+      await runUntilHistogramLands(landed());
+      expect(wrapper.vm.summaryView.updating).toBe(false);
+
+      wrapper.vm.searchObj.meta.showHistogram = true;
+      await runUntilHistogramLands({ ...landed(), errorMsg: "Internal Server Error" });
+      expect(chart().exists()).toBe(false);
+      expect(wrapper.vm.summaryView.updating).toBe(false);
+    });
+
+    it("settles without chips after search-around instead of staying dimmed", async () => {
+      await runUntilHistogramLands(landed());
+      chart().vm.$emit("finished");
+      await flushPromises();
+
+      wrapper.vm.searchObj.data.searchAround.indexTimestamp = 1_700_000_000_000_000;
+      wrapper.vm.searchObj.loading = true;
+      await flushPromises();
+      wrapper.vm.searchObj.data.histogram.chartParams.titleParts = null;
+      wrapper.vm.searchObj.data.queryResults = { hits: [{ _timestamp: 1 }, { _timestamp: 2 }] };
+      wrapper.vm.searchObj.meta.showHistogram = false;
+      wrapper.vm.searchObj.loading = false;
+      await flushPromises();
+
+      expect(wrapper.vm.summaryView).toMatchObject({ parts: null, updating: false });
+    });
+
+    it("settles after a bounded wait when the chart never reports a paint", async () => {
+      vi.useFakeTimers();
+      await runUntilHistogramLands(landed());
+      expect(wrapper.vm.summaryView.updating).toBe(true);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(wrapper.vm.summaryView.updating).toBe(false);
+    });
+  });
+
   describe("results progress line (#14303)", () => {
     const line = () => wrapper.find('[data-test="logs-results-progress"] [role="progressbar"]');
 
@@ -1389,6 +1560,9 @@ describe("SearchResult Component", () => {
     };
 
     afterEach(() => {
+      // A histogram left loading arms the chart-paint fallback, which fake timers would never fire.
+      wrapper.vm.searchObj.loadingHistogram = false;
+      if (vi.isFakeTimers()) vi.runOnlyPendingTimers();
       vi.useRealTimers();
     });
 
@@ -1432,8 +1606,11 @@ describe("SearchResult Component", () => {
       expect(line().attributes("style")).toContain("width: 42%");
     });
 
-    it("shows the size a fresh run has scanned so far, in place of the scan chip", async () => {
+    it("keeps the scan chip and shows the size scanned so far on the line until the row settles", async () => {
+      const showHistogram = wrapper.vm.searchObj.meta.showHistogram;
       wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+      wrapper.vm.searchObj.meta.refreshInterval = 0;
+      wrapper.vm.searchObj.meta.showHistogram = true;
       wrapper.vm.searchObj.data.histogram.chartParams.titleParts = {
         start: 1,
         end: 10,
@@ -1443,16 +1620,89 @@ describe("SearchResult Component", () => {
         scanSize: "300.00 MB",
       };
       await startQuery(10);
+      wrapper.vm.searchObj.loadingHistogram = true;
       wrapper.vm.searchObj.data.queryResults = { hits: [], scan_size: 1536 };
       await passDelay();
-      expect(wrapper.find('[data-test="logs-result-scan-progress"]').text()).toBe(
-        "Scanned 1.50 GB",
-      );
-      expect(wrapper.find('[data-test="logs-result-scan-chip"]').exists()).toBe(false);
+      const progress = () =>
+        wrapper.find('[data-test="logs-results-progress"] [data-test="logs-result-scan-progress"]');
+      const chip = () => wrapper.find('[data-test="logs-result-scan-chip"]');
+      const title = () => wrapper.find('[data-test="logs-search-result-title"]');
+      expect(progress().text()).toBe("Scanned 1.50 GB");
+      expect(title().find('[data-test="logs-result-scan-progress"]').exists()).toBe(false);
+      expect(chip().text()).toBe("Scan Size: 300.00 MB");
+
       wrapper.vm.searchObj.loading = false;
       await nextTick();
-      expect(wrapper.find('[data-test="logs-result-scan-progress"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="logs-result-scan-chip"]').exists()).toBe(true);
+      expect(progress().text()).toBe("Scanned 1.50 GB");
+      expect(chip().text()).toBe("Scan Size: 300.00 MB");
+
+      wrapper.vm.searchObj.loadingHistogram = false;
+      vi.advanceTimersByTime(1500);
+      await nextTick();
+      expect(progress().exists()).toBe(false);
+      expect(chip().exists()).toBe(true);
+      wrapper.vm.searchObj.meta.showHistogram = showHistogram;
+    });
+
+    it("runs one line from the rows through the histogram, held full in between", async () => {
+      wrapper.vm.searchObj.loading = false;
+      await nextTick();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      wrapper.vm.searchObj.loadingProgressPercentage = 40;
+      wrapper.vm.searchObj.loading = true;
+      wrapper.vm.searchObj.loadingHistogram = true;
+      wrapper.vm.searchObj.loadingHistogramProgressPercentage = 20;
+      await nextTick();
+      vi.advanceTimersByTime(300);
+      await nextTick();
+      wrapper.vm.searchObj.loading = false;
+      await nextTick();
+      expect(line().attributes("style")).toContain("width: 100%");
+      wrapper.vm.searchObj.loadingHistogram = false;
+      wrapper.vm.searchObj.meta.showHistogram = false;
+      await nextTick();
+    });
+  });
+
+  describe("status row and pager once the rows land", () => {
+    const setProgress = async (loading: boolean, percentage: number | undefined) => {
+      wrapper.vm.searchObj.loading = loading;
+      wrapper.vm.searchObj.loadingProgressPercentage = percentage;
+      wrapper.vm.searchObj.loadingHistogram = false;
+      wrapper.vm.searchObj.loadingHistogramProgressPercentage = 0;
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+    };
+
+    it("stamps the refresh time and enables the pager only once the histogram has landed", async () => {
+      wrapper.vm.searchObj.meta.searchApplied = true;
+      wrapper.vm.searchObj.meta.lastRunAt = 1;
+      await setProgress(true, 40);
+      wrapper.vm.searchObj.loadingHistogram = true;
+      await flushPromises();
+      wrapper.vm.searchObj.loading = false;
+      await flushPromises();
+      expect(wrapper.vm.searchObj.meta.lastRunAt).toBe(1);
+      expect(wrapper.vm.summaryView.updating).toBe(true);
+
+      wrapper.vm.searchObj.loadingHistogram = false;
+      await flushPromises();
+      wrapper.vm.onHistogramFinished();
+      await flushPromises();
+      expect(wrapper.vm.searchObj.meta.lastRunAt).toBeGreaterThan(1);
+    });
+
+    it("enables page size with the rows, without waiting for the histogram", async () => {
+      wrapper.vm.searchObj.meta.resultGrid.showPagination = true;
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+      await setProgress(true, 40);
+      const pageSize = () =>
+        wrapper.findComponent('[data-test="logs-search-result-records-per-page"]');
+      expect(pageSize().props("disabled")).toBe(true);
+      wrapper.vm.searchObj.loadingHistogram = true;
+      wrapper.vm.searchObj.loading = false;
+      await flushPromises();
+      expect(pageSize().props("disabled")).toBe(false);
     });
   });
 
@@ -1463,5 +1713,122 @@ describe("SearchResult Component", () => {
       expect(bar.classList.contains("min-h-9")).toBe(true);
       expect(bar.classList.contains("h-9")).toBe(false);
     });
+  });
+});
+
+describe("SearchResult rows while a search re-runs", () => {
+  let wrapper: any;
+  const table = () => wrapper.findComponent({ name: "OTable" });
+  const rows = [
+    { _timestamp: 2, message: "b" },
+    { _timestamp: 1, message: "a" },
+  ];
+
+  beforeEach(async () => {
+    resetLogsAutoRunForTests();
+    HTMLElement.prototype.scrollTo = vi.fn();
+    store.state.zoConfig = { ...store.state.zoConfig, timestamp_column: "_timestamp" };
+    store.state.selectedOrganization = { identifier: "test-org" };
+    wrapper = mount(SearchResult, {
+      attachTo: document.body,
+      global: {
+        provide: { store },
+        plugins: [i18n],
+        stubs: {
+          DetailTable: true,
+          ChartRenderer: true,
+          SanitizedHtmlRenderer: true,
+          CellActions: true,
+          O2AIContextAddBtn: true,
+          PatternDetailsDialog: true,
+          ODrawer: oDrawerStub,
+        },
+      },
+      props: { expandedLogs: [] },
+    });
+    await flushPromises();
+    wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+    wrapper.vm.searchObj.data.stream.streamType = "logs";
+    wrapper.vm.searchObj.data.stream.selectedStream = ["app"];
+    wrapper.vm.searchObj.loading = false;
+    wrapper.vm.searchObj.data.queryResults = { hits: [...rows] };
+    await nextTick();
+  });
+
+  afterEach(() => {
+    wrapper.vm.searchObj.loading = false;
+    wrapper.unmount();
+  });
+
+  const rerun = async () => {
+    wrapper.vm.searchObj.loading = true;
+    wrapper.vm.searchObj.data.queryResults = {};
+    await nextTick();
+  };
+
+  it("keeps the previous rows on screen, marked as refreshing, until new rows arrive", async () => {
+    await rerun();
+
+    expect(table().props("data")).toHaveLength(2);
+    expect(table().props("loading")).toBe(false);
+    expect(table().attributes("data-stale-rows")).toBe("true");
+
+    wrapper.vm.searchObj.data.queryResults.hits = [{ _timestamp: 3, message: "c" }];
+    await nextTick();
+
+    expect(table().props("data")).toEqual([{ _timestamp: 3, message: "c" }]);
+    expect(table().attributes("data-stale-rows")).toBeUndefined();
+  });
+
+  it("keeps the columns the previous rows were drawn with", async () => {
+    const drawn = [{ id: "_timestamp" }, { id: "message" }];
+    wrapper.vm.searchObj.data.resultGrid.columns = drawn;
+    await nextTick();
+    await rerun();
+    wrapper.vm.searchObj.data.resultGrid.columns = [{ id: "_timestamp" }];
+    await nextTick();
+
+    expect(
+      table()
+        .props("columns")
+        .map((c: any) => c.id),
+    ).toEqual(["_timestamp", "message"]);
+  });
+
+  it("draws stale rows from their own values, not the highlight cache of the new search", async () => {
+    await rerun();
+    expect(wrapper.vm.logsCellHtml("message", rows[0])).toBeNull();
+  });
+
+  it("drops the previous rows when the new search finds nothing", async () => {
+    await rerun();
+    wrapper.vm.searchObj.loading = false;
+    await nextTick();
+
+    expect(table().props("data")).toHaveLength(0);
+    wrapper.vm.searchObj.loading = true;
+    await nextTick();
+    expect(table().props("data")).toHaveLength(0);
+  });
+
+  it("draws skeleton rows while a first search has no columns yet", async () => {
+    wrapper.vm.searchObj.data.resultGrid.columns = [];
+    wrapper.vm.searchObj.data.stream.selectedStream = ["fresh"];
+    await rerun();
+    expect(wrapper.find('[data-test="logs-search-result-table-skeleton"]').exists()).toBe(true);
+    expect(table().isVisible()).toBe(false);
+
+    wrapper.vm.searchObj.data.queryResults.hits = [{ _timestamp: 3, message: "c" }];
+    await nextTick();
+    expect(wrapper.find('[data-test="logs-search-result-table-skeleton"]').exists()).toBe(false);
+    expect(table().isVisible()).toBe(true);
+  });
+
+  it("does not carry rows over to another stream", async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = ["other"];
+    await rerun();
+
+    expect(table().props("data")).toHaveLength(0);
+    expect(table().props("loading")).toBe(true);
   });
 });

@@ -444,6 +444,28 @@ mod tests {
 
     #[tokio::test]
     async fn a_switched_off_deployment_never_reads_the_config() {
+        // Enterprise switches calibration on by default, so the test has to turn it off.
+        #[cfg(feature = "enterprise")]
+        let _restore = {
+            struct RestoreKnob(Option<std::ffi::OsString>);
+            impl Drop for RestoreKnob {
+                fn drop(&mut self) {
+                    match self.0.take() {
+                        Some(previous) => unsafe {
+                            std::env::set_var("O2_ALERT_CALIBRATION_ENABLED", previous)
+                        },
+                        None => unsafe { std::env::remove_var("O2_ALERT_CALIBRATION_ENABLED") },
+                    }
+                    // Panicking in a drop that runs during unwinding aborts the test binary.
+                    let _ = o2_enterprise::enterprise::common::config::refresh_config();
+                }
+            }
+            let restore = RestoreKnob(std::env::var_os("O2_ALERT_CALIBRATION_ENABLED"));
+            unsafe { std::env::set_var("O2_ALERT_CALIBRATION_ENABLED", "false") };
+            o2_enterprise::enterprise::common::config::refresh_config().unwrap();
+            restore
+        };
+        assert!(!deployment_enabled());
         assert!(read_config(&Trigger::default()).await.is_none());
     }
 

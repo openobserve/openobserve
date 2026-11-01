@@ -304,6 +304,40 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       );
     });
 
+    it("shows the loading state, not the no-data state, before the first load settles", async () => {
+      wrapper = createWrapper();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="service-graph-loading"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-no-data-state"]').exists()).toBe(false);
+    });
+
+    it("shows no entity count until the first load settles", async () => {
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [] },
+      } as any);
+      wrapper = createWrapper();
+      await nextTick();
+      const count = () => wrapper.find('[data-test="service-graph-entity-count"]').text();
+
+      expect(count()).not.toMatch(/\d/);
+
+      await flushPromises();
+      expect(count()).toMatch(/^0/);
+    });
+
+    it("shows the no-data state once the first load settles empty, after loading once", async () => {
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [] },
+      } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-test="service-graph-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="service-graph-no-data-state"]').exists()).toBe(true);
+    });
+
     it("should set initial chartKey to 0", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.chartKey).toBe(0);
