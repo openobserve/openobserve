@@ -139,6 +139,21 @@ describe("useSearchHistogramManager", () => {
     });
   });
 
+  describe("EXPLAIN statements", () => {
+    beforeEach(() => {
+      mockState.searchObj.data.stream.selectedStream = ["stream1"];
+      mockState.searchObj.meta.sqlMode = true;
+      mockState.searchObj.data.query = 'explain analyze select * from "stream1"';
+    });
+
+    it("shows no histogram and requests no page count", () => {
+      expect(histogramManager.shouldShowHistogram({})).toBe(false);
+      expect(histogramManager.shouldGetPageCount({ query: { from: 0, size: 100 } }, {})).toBe(
+        false,
+      );
+    });
+  });
+
   describe("shouldGetPageCount", () => {
     it("should return false when histogram should be shown", () => {
       const queryReq = { query: { from: 0, size: 100 } };

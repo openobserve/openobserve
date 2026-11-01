@@ -1083,6 +1083,12 @@ describe("ClickHeatmap", () => {
       return { wrapper, scroller, scrollTo };
     };
     const wait = (ms = 250) => new Promise((r) => setTimeout(r, ms));
+    // refit lands two animation frames after the trigger; a wall-clock wait loses that race whenever the event loop stalls.
+    const frames = (n = 2): Promise<void> =>
+      new Promise((r) => {
+        const step = (left: number) => (left ? requestAnimationFrame(() => step(left - 1)) : r());
+        step(n);
+      });
     const scale = (1200 - 32) / 1440;
 
     beforeEach(() => {
@@ -1121,7 +1127,7 @@ describe("ClickHeatmap", () => {
 
       paneWidth = 1200;
       window.dispatchEvent(new Event("resize"));
-      await wait(300);
+      await frames();
 
       expect(stage.style.transform).toBe(`scale(${scale})`);
       wrapper.unmount();
@@ -1138,7 +1144,7 @@ describe("ClickHeatmap", () => {
 
       paneWidth = 1900;
       await toggle.trigger("click");
-      await wait(300);
+      await frames();
       expect(stage.style.transform).toBe("scale(1)");
       expect(fit.style.height).toBe("6000px");
       expect(scroller.scrollTop).toBe(0);
@@ -1146,7 +1152,7 @@ describe("ClickHeatmap", () => {
       paneWidth = 1200;
       scroller.scrollTop = 900;
       await toggle.trigger("click");
-      await wait(300);
+      await frames();
       expect(stage.style.transform).toBe(`scale(${scale})`);
       expect(fit.style.width).toBe(`${1440 * scale}px`);
       expect(fit.style.height).toBe(`${6000 * scale}px`);

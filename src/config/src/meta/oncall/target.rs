@@ -30,6 +30,7 @@ pub enum RotationMode {
     #[default]
     OnCall,
     /// Everyone on the rotation's winning shift rule, on shift or not, minus the away.
+    /// The cover holder is kept even when marked away, because a cover outranks an absence.
     All,
 }
 
