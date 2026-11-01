@@ -254,7 +254,9 @@ const ports = computed(() => {
     add(`${e.target}|${targetSide}`, {
       id: e.id,
       end: "to",
-      ...(loop ? bow(e.target, e.source) : { tier: 0, toward: slots.at(-1)?.y ?? middle(e.source) }),
+      ...(loop
+        ? bow(e.target, e.source)
+        : { tier: 0, toward: slots.at(-1)?.y ?? middle(e.source) }),
     });
   }
   const out = new Map<string, { from?: number; to?: number }>();

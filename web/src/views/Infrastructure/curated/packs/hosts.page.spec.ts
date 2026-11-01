@@ -247,7 +247,9 @@ describe("queries carry tokens, not literals", () => {
 
   it("takes CPU busy as idle over all CPU time, so a collector summing idle across cores stays in 0-100", () => {
     const query = panel("hd_cpu_busy").variants[0].queries[0].query;
-    expect(query).toMatch(/^100 \* \(1 - sum\(irate\(system_cpu_time\{state="idle",.*\/ sum\(irate\(system_cpu_time\{\$\{scope:host\}/);
+    expect(query).toMatch(
+      /^100 \* \(1 - sum\(irate\(system_cpu_time\{state="idle",.*\/ sum\(irate\(system_cpu_time\{\$\{scope:host\}/,
+    );
     expect(query).not.toContain("avg(");
     // The divisor is every state's time; a state matcher there would turn the ratio into nonsense.
     expect(query.split(" / ")[1]).not.toContain("state");
@@ -255,7 +257,9 @@ describe("queries carry tokens, not literals", () => {
 
   it("takes each CPU state over all CPU time, so the states of a multi-core host stay within 100%", () => {
     const query = panel("hd_cpu_by_state").variants[0].queries[0].query;
-    expect(query).toMatch(/^sum by \(state\)\(irate\(system_cpu_time\{.*\/ scalar\(sum\(irate\(system_cpu_time\{\$\{scope:host\}/);
+    expect(query).toMatch(
+      /^sum by \(state\)\(irate\(system_cpu_time\{.*\/ scalar\(sum\(irate\(system_cpu_time\{\$\{scope:host\}/,
+    );
     expect(query).not.toContain("avg");
     expect(query.split(" / ")[1]).not.toContain("state");
   });

@@ -134,7 +134,9 @@ function hasNodeColumn(orgId: string): Promise<boolean> {
   const has = streamService
     .schema(orgId, "system_cpu_load_average_15m", "metrics")
     .then((res: any) =>
-      ((res?.data?.schema ?? []) as Array<{ name: string }>).some((f) => f.name === "k8s_node_name"),
+      ((res?.data?.schema ?? []) as Array<{ name: string }>).some(
+        (f) => f.name === "k8s_node_name",
+      ),
     )
     .catch(() => {
       nodeColumn.delete(orgId);

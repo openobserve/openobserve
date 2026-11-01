@@ -188,8 +188,7 @@ export function placeLabels(
           other !== id &&
           overlaps(near, bounds) &&
           points.some(
-            (p) =>
-              p.x > near.x && p.x < near.x + near.w && p.y > near.y && p.y < near.y + near.h,
+            (p) => p.x > near.x && p.x < near.x + near.w && p.y > near.y && p.y < near.y + near.h,
           ),
       );
     };
