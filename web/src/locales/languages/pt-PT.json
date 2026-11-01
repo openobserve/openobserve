@@ -15142,6 +15142,7 @@
       "noStreamsDetected": "Nenhum stream detetado. Certifique-se de que as métricas do gráfico de serviço incluam rótulos stream_name.",
       "borderColor": "Cor da borda",
       "borderColorMetric": "Erros",
+      "dashedRingInferred": "Anel tracejado: dependência inferida",
       "nodeSize": "Tamanho do nó",
       "nodeSizeMetric": "Pedidos",
       "sizeLow": "Baixo",

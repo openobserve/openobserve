@@ -83,6 +83,18 @@
           </div>
         </div>
         <OSeparator vertical class="mx-1 self-stretch max-md:hidden" />
+        <div
+          class="flex flex-none flex-row items-center gap-1.5"
+          data-test="sg-legend-inferred-dependency"
+        >
+          <span
+            class="border-text-secondary h-3 w-3 flex-none rounded-full border-2 border-dashed bg-transparent"
+          />
+          <div class="text-text-secondary! text-left text-xs font-semibold">
+            {{ t("traces.serviceGraph.dashedRingInferred") }}
+          </div>
+        </div>
+        <OSeparator vertical class="mx-1 self-stretch max-md:hidden" />
         <!-- Inventory chip: total entity count. Click to expand the per-kind
              distribution (read-only; the show/hide toggles live in "Show types"). -->
         <ODropdown side="bottom" align="start">

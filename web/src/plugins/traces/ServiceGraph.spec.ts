@@ -386,6 +386,16 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(legends.classes()).not.toContain("flex-col");
     });
 
+    it("explains the dashed ring on inferred dependency nodes in the legend", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const row = wrapper.find('[data-test="sg-legend-inferred-dependency"]');
+      expect(row.exists()).toBe(true);
+      expect(row.text()).toBe("Dashed ring: inferred dependency");
+      expect(row.find("span").classes()).toContain("border-dashed");
+    });
+
     it("should not render a date-time-picker inside ServiceGraph", () => {
       wrapper = createWrapper();
       // ServiceGraph no longer owns a date-time picker — time range is controlled
