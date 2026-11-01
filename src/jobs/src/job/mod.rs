@@ -31,6 +31,7 @@ use crate::common::meta::user::{UserOrgRole, UserRequest};
 
 #[cfg(feature = "enterprise")]
 mod agent_signals;
+mod ai_actions_reaper;
 #[cfg(feature = "enterprise")]
 mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
@@ -1519,6 +1520,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     alert_eval_ledger_reaper::run();
     query_history_reaper::run();
     public_dashboards_outbox::run();
+    ai_actions_reaper::run();
     // Reconciliation is what makes the rolling window actually roll: the
     // ingest pass only ever ADDS, so without this a 7-day SLO's covered_slices
     // climbs past what its window can hold. Also releases expired budget

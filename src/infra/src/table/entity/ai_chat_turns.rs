@@ -19,6 +19,19 @@ pub struct Model {
     pub end_seq: Option<i64>,
     pub started_at: i64,
     pub ended_at: Option<i64>,
+    /// When the turn's first o2-ai event was forwarded (micros); NULL until then.
+    pub first_event_at: Option<i64>,
+    /// The turn this one regenerates or edits; NULL on an original turn.
+    pub version_of: Option<String>,
+    /// JSON array of the approval decisions answered during the turn.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub decisions: Option<String>,
+    /// The agent that answered; NULL on a turn an older node admitted, read as the chat's agent.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub agent_type: Option<String>,
+    /// The agent this turn took the chat over from; NULL unless it is a hand-off.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub handoff_from: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

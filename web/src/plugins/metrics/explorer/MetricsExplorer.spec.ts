@@ -21,6 +21,7 @@ import {
   encodeMetricsConfig,
   decodeMetricsConfig,
 } from "@/composables/metrics/metricsUrlState";
+import { b64EncodeUnicode } from "@/utils/formatters";
 
 /**
  * These test the EXPLORER'S WIRING, not the grid's logic.
@@ -149,6 +150,11 @@ vi.mock("vue-router", () => ({
     name: "metrics",
     fullPath: "/metrics",
   }),
+}));
+const assistantFlag = vi.hoisted(() => ({ on: false }));
+vi.mock("@/composables/assistant/flags", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
+  isAssistantV2: () => assistantFlag.on,
 }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
 const showErrorNotification = vi.hoisted(() => vi.fn());
@@ -1123,6 +1129,69 @@ describe("MetricsExplorer wiring", () => {
 
         expect(routerState.replace).toHaveBeenCalled();
         expect(routerState.push).not.toHaveBeenCalled();
+      });
+
+      describe("assistant links", () => {
+        const link = {
+          type: "ai_chat_query",
+          t: "1",
+          query_type: "promql",
+          query: b64EncodeUnicode("rate(x[5m])"),
+          period: "15m",
+        };
+
+        beforeEach(() => {
+          assistantFlag.on = true;
+          routerState.replace.mockClear();
+        });
+        afterEach(() => {
+          assistantFlag.on = false;
+        });
+
+        it("translates a link opened on the page into Visualize", () => {
+          routerState.query = {};
+          const vm = mountExplorer().vm as any;
+
+          routerState.query = link;
+          vm.onRouteQueryChange();
+
+          const { query } = routerState.replace.mock.calls.at(-1)![0];
+          expect(query).toMatchObject({ mode: "visualize", type: "ai_chat_query", period: "15m" });
+          expect(query).not.toHaveProperty("query");
+          expect(decodeMetricsConfig(query.metrics_data)?.data?.queries[0].query).toBe(
+            "rate(x[5m])",
+          );
+        });
+
+        it("holds only the seed a link brought", () => {
+          routerState.query = {
+            mode: "visualize",
+            type: "ai_chat_query",
+            metrics_data: encodeMetricsConfig(
+              getMetricsConfig({ data: { type: "line", queries: [{ query: "up", fields: {} }] } }),
+            ),
+          };
+          const vm = mountExplorer().vm as any;
+          expect(vm.visualizeSeedHeld).toBe(true);
+
+          vm.onVisualizeSeedConsumed();
+          expect(vm.visualizeSeed).toBeNull();
+          expect(vm.visualizeSeedHeld).toBe(false);
+        });
+
+        it("leaves a link alone with the flag off", () => {
+          assistantFlag.on = false;
+          routerState.query = {};
+          const vm = mountExplorer().vm as any;
+          routerState.replace.mockClear();
+
+          routerState.query = link;
+          vm.onRouteQueryChange();
+
+          expect(routerState.replace.mock.calls.some(([r]: any[]) => r.query?.metrics_data)).toBe(
+            false,
+          );
+        });
       });
 
       it("remounts Visualize on the URL's chart when Back/Forward moves between two blobs", async () => {

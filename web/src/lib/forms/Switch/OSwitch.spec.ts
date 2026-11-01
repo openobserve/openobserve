@@ -143,4 +143,10 @@ describe("OSwitch", () => {
     await wrapper.trigger("click");
     expect(wrapper.emitted("update:modelValue")![0][0]).toBe(true);
   });
+
+  it("puts aria-describedby on the switch control, not the wrapper", () => {
+    wrapper = mount(OSwitch, { attrs: { "aria-describedby": "help-1" } });
+    expect(wrapper.find('[role="switch"]').attributes("aria-describedby")).toBe("help-1");
+    expect(wrapper.attributes("aria-describedby")).toBeUndefined();
+  });
 });

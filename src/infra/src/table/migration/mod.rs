@@ -225,15 +225,28 @@ mod m20261012_000001_create_alert_calibration_configs;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
+mod m20261016_000001_add_first_event_at_to_ai_chat_turns;
 mod m20261016_000001_create_rca_runs;
 mod m20261016_000001_create_rum_pa_app_settings;
 mod m20261017_000001_add_rca_run_progress_columns;
 mod m20261018_000001_create_rca_steering;
 mod m20261018_000001_create_slack_tables;
+mod m20261020_000001_add_health_to_org_ai_toolsets;
 mod m20261020_000001_create_eval_job_states_tables;
+mod m20261020_000002_create_ai_grants;
+mod m20261020_000003_create_ai_actions;
+mod m20261020_000004_create_ai_access_requests;
+mod m20261020_000005_create_ai_turn_marks;
+mod m20261021_000001_add_history_to_ai_chat_sessions;
 mod m20261021_000001_create_public_dashboards;
 mod m20261021_000001_status_pages_add_favicon_img;
 mod m20261021_000002_add_search_type_to_search_queue;
+mod m20261021_000002_add_versions_to_ai_chat_turns;
+mod m20261021_000003_add_hide_attachments_to_ai_chat_shares;
+mod m20261021_000004_create_ai_chat_feedback;
+mod m20261021_000005_create_ai_chat_imports;
+mod m20261021_000006_create_paid_overage_attribution;
+mod m20261021_000007_create_ai_approvals;
 mod m20261024_000001_add_lease_to_org_cleanup_tasks;
 mod m20261025_000001_add_firing_started_at_to_alert_states;
 mod m20261025_000002_create_alert_acks;
@@ -244,6 +257,7 @@ mod m20261026_000001_backfill_v1_rca_pointer;
 mod m20261027_000001_alter_query_history;
 mod m20261028_000001_add_group_label_set_to_alert_states;
 mod m20261029_000001_widen_alert_dedup_fingerprint;
+mod m20261030_000001_add_agent_to_ai_chat_turns;
 mod m20261030_000001_add_suppress_repeats_to_alerts;
 mod m20261030_000001_create_org_domain_ownership_table;
 mod m20261030_000002_create_org_domain_ownership_req_table;
@@ -757,6 +771,20 @@ impl MigratorTrait for Migrator {
             Box::new(m20261030_000001_add_suppress_repeats_to_alerts::Migration),
             Box::new(m20261030_000001_create_org_domain_ownership_table::Migration),
             Box::new(m20261030_000002_create_org_domain_ownership_req_table::Migration),
+            Box::new(m20261030_000001_add_agent_to_ai_chat_turns::Migration),
+            Box::new(m20261016_000001_add_first_event_at_to_ai_chat_turns::Migration),
+            Box::new(m20261020_000001_add_health_to_org_ai_toolsets::Migration),
+            Box::new(m20261020_000002_create_ai_grants::Migration),
+            Box::new(m20261020_000003_create_ai_actions::Migration),
+            Box::new(m20261020_000004_create_ai_access_requests::Migration),
+            Box::new(m20261020_000005_create_ai_turn_marks::Migration),
+            Box::new(m20261021_000001_add_history_to_ai_chat_sessions::Migration),
+            Box::new(m20261021_000002_add_versions_to_ai_chat_turns::Migration),
+            Box::new(m20261021_000003_add_hide_attachments_to_ai_chat_shares::Migration),
+            Box::new(m20261021_000004_create_ai_chat_feedback::Migration),
+            Box::new(m20261021_000005_create_ai_chat_imports::Migration),
+            Box::new(m20261021_000006_create_paid_overage_attribution::Migration),
+            Box::new(m20261021_000007_create_ai_approvals::Migration),
         ]
     }
 }
@@ -856,6 +884,12 @@ mod tests {
             131,
             "m20261030_000002_create_org_domain_ownership_req_table",
         ),
+        (132, "m20261016_000001_add_first_event_at_to_ai_chat_turns"),
+        (133, "m20261020_000005_create_ai_turn_marks"),
+        (134, "m20261021_000005_create_ai_chat_imports"),
+        (135, "m20261021_000006_create_paid_overage_attribution"),
+        (136, "m20261021_000007_create_ai_approvals"),
+        (137, "m20261030_000001_add_agent_to_ai_chat_turns"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -991,6 +1025,10 @@ mod tests {
                 "m20261006_000001_create_ai_chat_shares",
             ),
             (
+                "m20261007_000001_create_ai_chat_turns",
+                "m20261030_000001_add_agent_to_ai_chat_turns",
+            ),
+            (
                 "m20261006_000001_create_ai_chat_shares",
                 "m20261007_000002_add_redact_tools_to_ai_chat_shares",
             ),
@@ -1025,6 +1063,26 @@ mod tests {
             (
                 "m20261018_000001_create_slack_tables",
                 "m20261025_000005_add_held_action_to_slack_link_requests",
+            ),
+            (
+                "m20261007_000001_create_ai_chat_turns",
+                "m20261016_000001_add_first_event_at_to_ai_chat_turns",
+            ),
+            (
+                "m20260414_000002_create_org_ai_toolsets",
+                "m20261020_000001_add_health_to_org_ai_toolsets",
+            ),
+            (
+                "m20261007_000001_create_ai_chat_turns",
+                "m20261021_000002_add_versions_to_ai_chat_turns",
+            ),
+            (
+                "m20261007_000002_add_redact_tools_to_ai_chat_shares",
+                "m20261021_000003_add_hide_attachments_to_ai_chat_shares",
+            ),
+            (
+                "m20260923_000001_create_ai_chat_sessions",
+                "m20261021_000001_add_history_to_ai_chat_sessions",
             ),
         ] {
             assert!(

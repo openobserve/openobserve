@@ -17,6 +17,7 @@
 //! new epoch.
 
 use infra::table::{
+    ai_approvals,
     ai_chat_sessions::{self, Model, STATUS_ACTIVE},
     ai_chat_turns::{self, Admission, TURN_FAILED},
 };
@@ -24,16 +25,19 @@ use o2_enterprise::enterprise::{
     ai::{
         chat::{
             lease::{self, LeaseError, TurnLease},
-            registry::{self, Registration, TurnCaps},
+            registry::{self, Registration, TurnCaps, TurnOwner, TurnRefusal, WaitingApproval},
         },
         client::{QueryRequest, RCA_AGENT_TYPE},
     },
     common::config::get_config as get_o2_config,
 };
 use sea_orm::prelude::Uuid;
+use version_compare::Version;
 
 /// Turn result label and error code of a turn refused by an active-turn cap.
 pub const TURN_LIMIT: &str = "turn_limit";
+/// The first release that understands per-turn agents and run limits (PO B62).
+const V2_RELEASE: &str = "0.94.0";
 const EPOCH_CONFLICT: &str = "epoch_conflict";
 const PROMPT_TITLE_CHARS: usize = 80;
 const PERSISTENCE_UNAVAILABLE: &str = "Chat persistence is unavailable; please retry";
@@ -49,12 +53,25 @@ pub enum AdmitError {
     NotFound(&'static str),
     /// Another turn holds the chat's lease.
     Busy,
-    /// An active-turn cap is reached; the scope is `user`, `org` or `node`.
-    TurnLimit(&'static str),
+    /// An active-turn cap is reached.
+    TurnLimit(TurnRefusal),
     /// This turn id already ran.
     AlreadySubmitted,
     /// The session index or the lease backend failed.
     Unavailable(&'static str),
+}
+
+/// Where a turn came from, past its user; the default is a turn with no browser behind it.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TurnOrigin<'a> {
+    /// The browser login, which scopes its registration.
+    pub auth_session_id: Option<&'a str>,
+    /// The tab that sent it.
+    pub client_id: Option<&'a str>,
+    /// The agent the chat is handed over from.
+    pub handoff_from: Option<&'a str>,
+    /// The caller named the agent, so a different one is a hand-off.
+    pub agent_chosen: bool,
 }
 
 /// Everything a persisted turn needs once admitted.
@@ -67,6 +84,15 @@ pub struct AdmittedTurn {
     pub registration: Registration,
 }
 
+/// The identity of a turn taking a slot.
+#[derive(Debug, Clone, Copy)]
+pub struct TurnKey<'a> {
+    pub org_id: &'a str,
+    /// The chat, or a stand-in for a turn that has none.
+    pub session_id: &'a str,
+    pub turn_id: &'a str,
+}
+
 /// The request [`admit_under_lease`] records.
 struct NewTurn<'a> {
     org_id: &'a str,
@@ -75,6 +101,8 @@ struct NewTurn<'a> {
     owner: &'a str,
     user_email: &'a str,
     agent_type: &'a str,
+    handoff_from: Option<&'a str>,
+    agent_chosen: bool,
     prompt: &'a str,
     trace_id: &'a str,
 }
@@ -134,6 +162,69 @@ pub async fn admit_turn(
     trace_id: &str,
     caps: TurnCaps,
 ) -> Result<AdmittedTurn, AdmitError> {
+    admit_signed_in_turn(
+        org_id,
+        session_id,
+        turn_id,
+        user_email,
+        TurnOrigin::default(),
+        agent_type,
+        prompt,
+        trace_id,
+        caps,
+    )
+    .await
+}
+
+/// Takes a turn's slot under the caps, its cards undecided past their turns counted as running.
+pub async fn register_turn(
+    turn: TurnKey<'_>,
+    user_email: &str,
+    user_id: &str,
+    owner: TurnOwner<'_>,
+    caps: TurnCaps,
+) -> Result<Registration, TurnRefusal> {
+    let TurnKey {
+        org_id,
+        session_id,
+        turn_id,
+    } = turn;
+    let now = config::utils::time::now_micros();
+    // Cards are only an addition to the running turns, so an unreadable table costs no admission.
+    let cards = ai_approvals::list_waiting(org_id, now)
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("[AI-CHAT] cannot read the waiting approvals of {org_id}: {e}");
+            Vec::new()
+        });
+    let waiting = waiting_chats(&cards, user_email);
+    registry::register_in_cluster(org_id, session_id, turn_id, user_id, owner, caps, &waiting).await
+}
+
+/// Whether the cluster runs only v2 nodes, which a chat's first hand-off and `agents[]` wait for.
+pub async fn v2_gate_open() -> bool {
+    if config::get_config().common.local_mode {
+        return true;
+    }
+    let nodes = infra::cluster::get_cached_nodes(|_| true).await;
+    nodes.is_some_and(|nodes| {
+        !nodes.is_empty() && nodes.iter().all(|n| at_v2(&n.version, config::VERSION))
+    })
+}
+
+/// [`admit_turn`] for a turn a browser sign-in started.
+#[allow(clippy::too_many_arguments)]
+pub async fn admit_signed_in_turn(
+    org_id: &str,
+    session_id: Option<&str>,
+    turn_id: Option<&str>,
+    user_email: &str,
+    origin: TurnOrigin<'_>,
+    agent_type: &str,
+    prompt: &str,
+    trace_id: &str,
+    caps: TurnCaps,
+) -> Result<AdmittedTurn, AdmitError> {
     let Some(session_id) = session_id.and_then(normalize_uuid) else {
         return Err(AdmitError::InvalidSession(
             "A valid session id is required while chat persistence is enabled",
@@ -158,18 +249,28 @@ pub async fn admit_turn(
         check_turn_owner(&row, &owner, user_email, trace_id)?;
     }
     let lease = acquire_lease(org_id, session_id, trace_id).await?;
-    let registration = match registry::register_capped(org_id, session_id, &turn_id, &owner, caps) {
+    let turn_owner = TurnOwner {
+        auth_session_id: origin.auth_session_id,
+        client_id: origin.client_id,
+    };
+    let turn = TurnKey {
+        org_id,
+        session_id,
+        turn_id: &turn_id,
+    };
+    let registration = match register_turn(turn, user_email, &owner, turn_owner, caps).await {
         Ok(registration) => registration,
-        Err(scope) => {
+        Err(refusal) => {
             lease.release().await;
             config::metrics::AI_CHAT_TURN_RESULT_TOTAL
                 .with_label_values(&[org_id, TURN_LIMIT])
                 .inc();
             log::warn!(
-                "[AI-CHAT] [trace_id:{trace_id}] {org_id}/{session_id} refused: {scope} \
-                 active-turn limit reached"
+                "[AI-CHAT] [trace_id:{trace_id}] {org_id}/{session_id} refused: {} \
+                 active-turn limit reached",
+                refusal.scope
             );
-            return Err(AdmitError::TurnLimit(scope));
+            return Err(AdmitError::TurnLimit(refusal));
         }
     };
     let new_turn = NewTurn {
@@ -179,6 +280,8 @@ pub async fn admit_turn(
         owner: &owner,
         user_email,
         agent_type,
+        handoff_from: origin.handoff_from,
+        agent_chosen: origin.agent_chosen,
         prompt,
         trace_id,
     };
@@ -288,6 +391,14 @@ async fn admit_under_lease(turn: &NewTurn<'_>) -> Result<Model, AdmitError> {
     if let Err(e) = ai_chat_sessions::begin_turn(org_id, session_id, turn_id, now).await {
         log::warn!("[AI-CHAT] cannot record the last turn of {session_id}: {e}");
     }
+    record_turn_agent(turn, &row).await;
+    let (typed, _) = crate::ai_chat::projection::split_attachment_blocks(turn.prompt);
+    if !typed.is_empty()
+        && let Err(e) = ai_chat_sessions::append_search_text(org_id, session_id, &typed).await
+    {
+        // Search misses this prompt; the title still matches.
+        log::warn!("[AI-CHAT] cannot index the prompt of {session_id}: {e}");
+    }
     if row.title_source.is_empty()
         && let Some(title) = initial_title(turn.agent_type, turn.user_email, turn.prompt)
         && let Err(e) = ai_chat_sessions::set_prompt_title(org_id, session_id, &title, now).await
@@ -299,6 +410,56 @@ async fn admit_under_lease(turn: &NewTurn<'_>) -> Result<Model, AdmitError> {
         session_epoch: epoch,
         ..row
     })
+}
+
+/// Stores who answers the turn; the chat itself moves only once o2-ai starts it.
+async fn record_turn_agent(turn: &NewTurn<'_>, row: &Model) {
+    let NewTurn {
+        org_id,
+        session_id,
+        turn_id,
+        agent_type,
+        handoff_from,
+        agent_chosen,
+        ..
+    } = *turn;
+    let hands_off = agent_chosen && row.agent_type != agent_type;
+    let handoff_from = handoff_from.or(hands_off.then_some(row.agent_type.as_str()));
+    // A turn left unlabelled reads as the chat's agent, so a failed write loses no turn.
+    if let Err(e) =
+        ai_chat_turns::set_agent(org_id, session_id, turn_id, agent_type, handoff_from).await
+    {
+        log::warn!("[AI-CHAT] cannot record the agent of turn {turn_id}: {e}");
+    }
+}
+
+fn waiting_chats<'a>(
+    cards: &'a [ai_approvals::Model],
+    user_email: &str,
+) -> Vec<WaitingApproval<'a>> {
+    cards
+        .iter()
+        .map(|card| WaitingApproval {
+            session_id: &card.session_id,
+            mine: card.user_email == user_email,
+        })
+        .collect()
+}
+
+/// A node at this build's own version is as new as this one, so unversioned dev builds pass.
+fn at_v2(version: &str, own: &str) -> bool {
+    if version == own {
+        return true;
+    }
+    let release = |v: &str| {
+        let bare = v.trim_start_matches('v');
+        bare.split('-').next().unwrap_or(bare).to_string()
+    };
+    let (node, first) = (release(version), release(V2_RELEASE));
+    match (Version::from(&node), Version::from(&first)) {
+        (Some(node), Some(first)) => node >= first,
+        _ => false,
+    }
 }
 
 async fn fail_turn(org_id: &str, session_id: &str, turn_id: &str, error_code: &str) {
@@ -397,6 +558,8 @@ mod tests {
             owner: "owner-1",
             user_email,
             agent_type,
+            handoff_from: None,
+            agent_chosen: false,
             prompt,
             trace_id: "trace",
         };
@@ -406,6 +569,123 @@ mod tests {
             .unwrap()
             .expect("the session row exists")
             .title
+    }
+
+    /// Each turn keeps who answered it; a hand-off names the agent it left without being told.
+    #[tokio::test]
+    async fn a_hand_off_is_kept_on_the_turn_and_moves_the_chat() {
+        let _db = crate::alerts::rca_runs::tests::db().await;
+        let org_id = format!(
+            "adm_{}",
+            infra::table::rca_runs::new_run_id().to_lowercase()
+        );
+        let session_id = config::ider::uuid();
+        let turn = |turn_id: &'static str, agent, handoff_from, agent_chosen| NewTurn {
+            org_id: "",
+            session_id: "",
+            turn_id,
+            owner: "owner-1",
+            user_email: "dana@acme.io",
+            agent_type: agent,
+            handoff_from,
+            agent_chosen,
+            prompt: "why?",
+            trace_id: "trace",
+        };
+        let first = NewTurn {
+            org_id: &org_id,
+            session_id: &session_id,
+            ..turn("t-1", "o2-ai", None, false)
+        };
+        let row = admit_under_lease(&first).await.unwrap();
+        assert_eq!(row.agent_type, "o2-ai");
+
+        let handoff = NewTurn {
+            org_id: &org_id,
+            session_id: &session_id,
+            ..turn("t-2", "sre", Some("o2-ai"), true)
+        };
+        let row = admit_under_lease(&handoff).await.unwrap();
+        assert_eq!(row.agent_type, "o2-ai", "admission alone moves nothing");
+        ai_chat_sessions::hand_off(&org_id, &session_id, "sre")
+            .await
+            .unwrap();
+
+        let inferred = NewTurn {
+            org_id: &org_id,
+            session_id: &session_id,
+            ..turn("t-3", "o2-ai", None, false)
+        };
+        let row = admit_under_lease(&inferred).await.unwrap();
+        assert_eq!(
+            row.agent_type, "sre",
+            "the chat moved once the turn started"
+        );
+
+        let unnamed = NewTurn {
+            org_id: &org_id,
+            session_id: &session_id,
+            ..turn("t-4", "o2-ai", None, true)
+        };
+        admit_under_lease(&unnamed).await.unwrap();
+
+        let records = ai_chat_turns::list_for_session(&org_id, &session_id)
+            .await
+            .unwrap();
+        let labels: Vec<_> = records
+            .iter()
+            .map(|r| (r.agent_type.as_deref(), r.handoff_from.as_deref()))
+            .collect();
+        assert_eq!(
+            labels,
+            [
+                (Some("o2-ai"), None),
+                (Some("sre"), Some("o2-ai")),
+                (Some("o2-ai"), None),
+                (Some("o2-ai"), Some("sre")),
+            ]
+        );
+    }
+
+    #[test]
+    fn the_gate_waits_for_every_node_at_the_first_v2_release() {
+        assert!(at_v2("0.94.0", "x"));
+        assert!(at_v2("v0.94.1-rc2-3-gabcdef", "x"));
+        assert!(at_v2("1.0.0", "x"));
+        assert!(!at_v2("v0.93.0", "x"));
+        assert!(!at_v2("", "x"), "a node that reports nothing is old");
+        assert!(
+            at_v2("dev-build", "dev-build"),
+            "the same build as this one"
+        );
+        assert!(!at_v2("dev-build", "other"));
+    }
+
+    #[test]
+    fn a_waiting_card_is_the_member_s_only_when_it_is_theirs() {
+        let card = |session_id: &str, user_email: &str| ai_approvals::Model {
+            id: session_id.to_string(),
+            org_id: "o".to_string(),
+            session_id: session_id.to_string(),
+            user_email: user_email.to_string(),
+            tool: None,
+            status: ai_approvals::STATUS_PENDING.to_string(),
+            scope: None,
+            card: "{}".to_string(),
+            resolved: None,
+            expires_at: 1,
+            created_at: 0,
+            decided_at: None,
+        };
+        let cards = [card("s1", "dana@acme.io"), card("s2", "ari@acme.io")];
+        let waiting = waiting_chats(&cards, "dana@acme.io");
+        assert_eq!(
+            waiting
+                .iter()
+                .map(|w| (w.session_id, w.mine))
+                .collect::<Vec<_>>(),
+            [("s1", true), ("s2", false)]
+        );
     }
 
     /// An RCA run's session title is its whole rendered prompt, trimmed; any chat's is the bounded

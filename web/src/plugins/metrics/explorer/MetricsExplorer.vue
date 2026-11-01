@@ -733,7 +733,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="min-h-0 flex-1"
       :selected-date-time="visualizeDateTime"
       :seed="visualizeSeed"
-      @seed-consumed="visualizeSeed = null"
+      :hold-seed="visualizeSeedHeld"
+      @seed-consumed="onVisualizeSeedConsumed"
       @update:time-range="onVisualizeTimeRange"
       @run="onVisualizeRun"
     />
@@ -821,7 +822,11 @@ import {
   getMetricsConfig,
   encodeMetricsConfig,
   decodeMetricsConfig,
+  legacyLinkToVisualizeQuery,
 } from "@/composables/metrics/metricsUrlState";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { AI_CHAT_QUERY } from "@/utils/assistant/explorerRoutes";
+import { hasMetricsOverrideParams } from "@/utils/metrics/metricsEditorParams";
 import { PANEL_PERCENTILE_WINDOW, PANEL_RATE_WINDOW } from "@/utils/metrics/metricDefaults";
 import { BADGE_LABEL_KEYS, cardColorForIndex } from "@/utils/metrics/metricPalette";
 import {
@@ -1462,11 +1467,20 @@ export default defineComponent({
     // on the card's own query.
     // Consumed once by MetricsVisualize, then cleared.
     const visualizeSeed = ref<Record<string, any> | null>(null);
+    const visualizeSeedHeld = ref(false);
     const visualizeMount = ref(0);
+    // An assistant link applies its query and window but never runs them.
+    const isAssistantLink = (q: Record<string, any>) => isAssistantV2() && q.type === AI_CHAT_QUERY;
     const seedVisualizeFromUrl = (q: Record<string, any>) => {
       if (!q.metrics_data) return;
       const blob = decodeMetricsConfig(q.metrics_data);
-      if (blob?.data) visualizeSeed.value = blob.data;
+      if (!blob?.data) return;
+      visualizeSeed.value = blob.data;
+      visualizeSeedHeld.value = isAssistantLink(q);
+    };
+    const onVisualizeSeedConsumed = () => {
+      visualizeSeed.value = null;
+      visualizeSeedHeld.value = false;
     };
 
     // The mounted Visualize pane — the toolbar's refresh drives its runQuery in
@@ -1961,6 +1975,12 @@ export default defineComponent({
     const onRouteQueryChange = () => {
       // Leaving the page fires this once with the next route's query.
       if (route.name !== "metrics") return;
+
+      // The `/metrics` guard runs only on entry, so an assistant link opened from this page is translated here.
+      if (isAssistantLink(route.query) && hasMetricsOverrideParams(route.query)) {
+        router.replace({ query: legacyLinkToVisualizeQuery(route.query), hash: route.hash });
+        return;
+      }
 
       // Visualize seeds only on mount, so another link's chart (or Back/Forward) remounts it.
       const blobIn = String(route.query.metrics_data ?? "");
@@ -2487,6 +2507,8 @@ export default defineComponent({
       onDetailOpenVisualize,
       onRouteQueryChange,
       visualizeSeed,
+      visualizeSeedHeld,
+      onVisualizeSeedConsumed,
       visualizeMount,
       visualizeRef,
       isVisualizePending,

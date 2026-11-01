@@ -1,0 +1,19 @@
+{
+  "_source": "EB-A2 findings frame (00 §18)",
+  "_item": "EB-A2",
+  "frame": {
+    "type": "findings",
+    "likely_cause": "payments connection pool exhausted",
+    "confidence": "medium",
+    "evidence": [
+      {
+        "text": "92% of errors are connection resets from payments",
+        "call_id": "call_3",
+        "kind": "verified"
+      }
+    ],
+    "ruled_out": ["recent deploy"],
+    "unknowns": ["payments pool metrics"],
+    "next_steps": ["check the payments max-connections setting"]
+  }
+}

@@ -70,6 +70,8 @@ export interface BadgeValueConfig {
   /** Per-value size override (wins over the group `size`). For groups whose
    *  values legitimately render at different sizes (e.g. a sm chip vs an md one). */
   size?: BadgeSize;
+  /** Extra utility classes for this value only, merged after the group `class`. */
+  class?: string;
 }
 
 export interface BadgeGroupConfig {
@@ -2059,6 +2061,118 @@ export const BADGE_GROUPS = {
     },
     fallback: { variant: "default-soft" },
   },
+  // O2 Assistant context chips, keyed by chip state; the kind passes `label` and `icon` (`40` §2.2).
+  assistantContext: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      sent: { variant: "default-soft" },
+      notread: {
+        variant: "default-outline",
+        class: "ring-0 border border-dotted border-badge-default-ol-border",
+      },
+      custom: { variant: "default-soft" },
+      truncated: { variant: "default-soft" },
+      ghost: {
+        variant: "default-outline",
+        class: "ring-0 border border-dashed border-badge-default-ol-border",
+      },
+      inchat: { variant: "default-soft" },
+      used: { variant: "default-outline" },
+      hidden: { variant: "default-outline" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // O2 Assistant query blocks: the language as written everywhere (spec tokens, no labelKey).
+  assistantQueryLanguage: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      sql: { variant: "default-soft", label: raw("SQL") },
+      promql: { variant: "default-soft", label: raw("PromQL") },
+      vrl: { variant: "default-soft", label: raw("VRL") },
+      regex: { variant: "default-soft", label: raw("Regex") },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // O2 Assistant share chip and link tags.
+  assistantShare: {
+    mode: "plain",
+    shape: "rounded",
+    size: "xs",
+    values: {
+      org: { variant: "default-soft" },
+      public: { variant: "default-soft" },
+      expiring: { variant: "warning-quiet" },
+      mode: { variant: "default-soft" },
+      tools: { variant: "default-outline" },
+      attachments: { variant: "default-outline" },
+      outofdate: { variant: "default-outline" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // O2 Assistant claim chips: the number is the caller's `label`; muted when the step is not in view.
+  assistantClaim: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      available: { variant: "default-outline" },
+      muted: { variant: "default-soft", class: "text-text-muted" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // O2 Assistant findings confidence; inconclusive is stated, never coloured as a failure (Calm Signal).
+  assistantConfidence: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      high: { variant: "default-soft", labelKey: "assistant.findings.level.high" },
+      medium: { variant: "default-soft", labelKey: "assistant.findings.level.medium" },
+      low: { variant: "default-soft", labelKey: "assistant.findings.level.low" },
+      inconclusive: {
+        variant: "default-outline",
+        labelKey: "assistant.findings.level.inconclusive",
+      },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Where an O2 Assistant chat started; quiet, never a status colour.
+  assistantOrigin: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      editor: { variant: "default-soft", labelKey: "assistant.history.origin.editor" },
+      alert: { variant: "default-soft", labelKey: "assistant.history.origin.alert" },
+      incident: { variant: "default-soft", labelKey: "assistant.history.origin.incident" },
+      browser: { variant: "default-outline", labelKey: "assistant.history.origin.browser" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // An O2 Assistant chat this browser could not save, or whose history could not load.
+  assistantSave: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      notsaved: { variant: "default-outline", labelKey: "assistant.thread.notSaved" },
+      historyunavailable: {
+        variant: "default-outline",
+        labelKey: "assistant.thread.historyUnavailable",
+      },
+    },
+    fallback: { variant: "default-outline" },
+  },
 } satisfies Record<string, BadgeGroupConfig>;
 
 export type BadgeGroupName = keyof typeof BADGE_GROUPS;
@@ -2123,7 +2237,7 @@ export function resolveBadge(
     // Per-value size wins over group size; both may be undefined → caller default.
     size: entry.size ?? cfg.size,
     shape: cfg.shape,
-    class: cfg.class,
+    class: [cfg.class, entry.class].filter(Boolean).join(" ") || undefined,
   };
 }
 

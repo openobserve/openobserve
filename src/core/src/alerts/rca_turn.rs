@@ -3965,6 +3965,11 @@ mod tests {
             end_seq: None,
             started_at,
             ended_at,
+            first_event_at: None,
+            version_of: None,
+            decisions: None,
+            agent_type: None,
+            handoff_from: None,
         }
     }
 

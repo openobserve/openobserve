@@ -136,7 +136,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </ODrawer>
 
-      <div class="flex h-full min-h-0 min-w-0 flex-1">
+      <div v-if="assistantV2" class="flex h-full min-h-0 min-w-0 flex-1">
+        <AssistantSkipLink />
+        <main
+          data-test="main-content"
+          tabindex="-1"
+          class="bg-surface-chrome-deeper flex min-h-0 min-w-0 flex-1 flex-col outline-none"
+          :class="store.state.kioskMode ? '' : 'pe-2 pb-2 max-md:pe-0'"
+        >
+          <div
+            class="bg-surface-base flex min-h-0 flex-1 flex-col overflow-hidden"
+            :class="[
+              store.state.kioskMode ? '' : 'rounded-surface border shadow-md',
+              isDark ? 'border-border-default' : 'border-transparent',
+            ]"
+          >
+            <div
+              v-if="isLoading"
+              :key="store.state.selectedOrganization?.identifier"
+              :class="['o2-content-scroll h-full flex-1 overflow-y-auto', ASSISTANT_INSET_CLASSES]"
+            >
+              <FirstDataNotice
+                v-if="
+                  firstDataNotice.visible.value &&
+                  router.currentRoute.value.name !== 'home' &&
+                  !store.state.kioskMode
+                "
+                class="mx-3 mt-3"
+                :stream="firstDataNotice.stream.value"
+                :arrived-at="firstDataNotice.arrivedAt.value"
+                @open="firstDataNotice.open"
+                @dismiss="firstDataNotice.dismiss"
+              />
+              <router-view v-slot="{ Component }">
+                <keep-alive :include="KEPT_ALIVE_VIEWS">
+                  <component :is="Component" class="h-full" @sendToAiChat="sendToAssistant" />
+                </keep-alive>
+              </router-view>
+            </div>
+          </div>
+        </main>
+        <AssistantSidebarHost v-if="!store.state.kioskMode" />
+        <AssistantWindowLayer v-if="!store.state.kioskMode && store.state.printMode !== true" />
+      </div>
+      <div v-else class="flex h-full min-h-0 min-w-0 flex-1">
         <!-- Main Panel -->
         <main
           data-test="main-content"
@@ -262,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommunitySlackInvite />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
-    <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
+    <PaidOverageConsentDialog v-if="assistantV2 ? canBill : config.isCloud == 'true'" />
     <DashboardSaveConflictDialog
       v-if="dashboardSaveConflict.mounted"
       :key="dashboardSaveConflict.openSeq"
@@ -314,6 +357,7 @@ import config from "../aws-exports";
 import { setLanguage } from "../utils/cookies";
 import { getLocale } from "../locales";
 
+import { assistantSignOut } from "@/utils/assistant/assistantSignOut";
 import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
@@ -355,9 +399,19 @@ import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { isAutoObserveEnabled } from "@/components/autoobserve/autoObserveGate";
 
 // Back from a drill-out (Analytics to Session Viewer, Traces to a trace or its logs) must land on the same results without rerunning them.
 const KEPT_ALIVE_VIEWS = ["AppAnalytics", "AppTraces"];
+
+// The assistant's sheet and floating card write their footprint here, so Tab never lands under them (`95` §6).
+const ASSISTANT_INSET_CLASSES = [
+  // eslint-disable-next-line local/no-hardcoded-px -- unit conversion of the unitless inset the sheet writes
+  "max-lg:pb-[calc(var(--o-assistant-inset-bottom,0)*1px)] max-lg:scroll-pb-[calc(var(--o-assistant-inset-bottom,0)*1px)]",
+  // eslint-disable-next-line local/no-hardcoded-px -- unit conversion of the unitless inset the floating card writes
+  "lg:scroll-pe-[calc(var(--o-assistant-inset-end,0)*1px)]",
+];
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -398,6 +452,16 @@ export default defineComponent({
     DashboardSaveConflictDialog: defineAsyncComponent(
       () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
     ),
+    // Async, so the flag-off build never loads the assistant chunk.
+    AssistantSidebarHost: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantSidebarHost.vue"),
+    ),
+    AssistantWindowLayer: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantWindowLayer.vue"),
+    ),
+    AssistantSkipLink: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantSkipLink.vue"),
+    ),
   },
   methods: {
     navigateToDocs() {
@@ -420,7 +484,11 @@ export default defineComponent({
       }
       this.performSignout();
     },
-    performSignout() {
+    async performSignout() {
+      const invoker = document.querySelector<HTMLElement>(
+        '[data-test="header-my-account-profile-icon"]',
+      );
+      if ((await assistantSignOut({ invoker })) === "cancel") return;
       void signOutThroughLeaveGuards(this.$router, this.store);
     },
     goToHome() {
@@ -458,6 +526,11 @@ export default defineComponent({
     const { isMobile, lgUp } = useBreakpoint();
     // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
     const isChatOverlay = computed(() => !lgUp.value);
+    const assistantV2 = isAssistantV2();
+    // Any edition that can bill hosts the dialog for Billing and the legacy NL bar.
+    const canBill = computed(
+      () => config.isCloud == "true" || store.state.zoConfig?.billing_enabled === true,
+    );
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
 
@@ -908,7 +981,10 @@ export default defineComponent({
 
     const updateAutoObserveMenu = () => {
       const existingIndex = linksList.value.findIndex((link) => link.name === "autoobserve");
-      if (config.isEnterprise != "true" || !isExperimentalEnabled.value) {
+      const enabled = assistantV2
+        ? isAutoObserveEnabled(config.isEnterprise, store.state.zoConfig)
+        : config.isEnterprise == "true" && isExperimentalEnabled.value;
+      if (!enabled) {
         if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
         return;
       }
@@ -978,9 +1054,10 @@ export default defineComponent({
           (link: any) => link.name === "profiles" || link.name === "traces",
         );
         const insertAt = anchorIndex === -1 ? linksList.value.length : anchorIndex + 1;
+        // The assistant owns the sparkle glyph, so this LLM tooling entry gets its own name and icon.
         linksList.value.splice(insertAt, 0, {
-          title: t("menu.aiObservability"),
-          icon: "auto-awesome",
+          title: assistantV2 ? t("menu.llmObservability") : t("menu.aiObservability"),
+          icon: assistantV2 ? "insights" : "auto-awesome",
           link: "/ai",
           name: "aiObservability",
         });
@@ -1102,6 +1179,11 @@ export default defineComponent({
     }
 
     const updateOrganization = async () => {
+      // The revamped assistant settles running answers first; Cancel keeps the current org.
+      if (assistantV2 && (await assistantOrgSwitch()) === "cancel") {
+        selectedOrg.value = store.state.selectedOrganization;
+        return;
+      }
       resetStreams();
       store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
@@ -1146,6 +1228,27 @@ export default defineComponent({
         store.state.organizationData.isDataIngested == false
       ) {
         await verifyStreamExist(selectedOrg.value);
+      }
+    };
+
+    const assistantOrgSwitch = async (): Promise<"proceed" | "cancel"> => {
+      const next = selectedOrg.value?.identifier;
+      const email = store.state.userInfo?.email;
+      if (!next || next === store.state.selectedOrganization?.identifier || !email)
+        return "proceed";
+      // A chunk that fails to load after a deploy must not strand the selector on an org the store never took.
+      try {
+        const [{ assistantLifecycle }, { computeUserOrgKey }] = await Promise.all([
+          import("@/composables/assistant"),
+          import("@/utils/userOrgKey"),
+        ]);
+        const userOrgKey = await computeUserOrgKey(email, next);
+        const invoker = document.querySelector<HTMLElement>(
+          '[data-test="navbar-organizations-select-trigger"]',
+        );
+        return await assistantLifecycle.onOrgSwitch({ org: next, userOrgKey }, { invoker });
+      } catch {
+        return "proceed";
       }
     };
 
@@ -1692,6 +1795,12 @@ export default defineComponent({
       });
     };
 
+    // Flag on: a legacy page's payload goes through the one door as chips and text (deleted in WP-15).
+    const sendToAssistant = (value: unknown, _append = true, autoSend = false) =>
+      void import("@/composables/assistant").then((m) =>
+        m.openAssistant(m.legacyRelayArgs(value, autoSend)),
+      );
+
     const openPredefinedThemes = () => {
       toggleThemes();
     };
@@ -1732,13 +1841,16 @@ export default defineComponent({
 
     // ── Global shortcuts: AI Chat ─────────────────────────────────────────
     // O2 AI is enterprise-only: on OSS the Ctrl+B binding must not exist at all.
-    if (config.isEnterprise == "true") {
+    if (config.isEnterprise == "true" && !assistantV2) {
       useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
     }
 
     return {
       signOutDraftsOpen,
       signOutDraftCount,
+      assistantV2,
+      canBill,
+      ASSISTANT_INSET_CLASSES,
       isDark,
       t,
       raw,
@@ -1785,6 +1897,7 @@ export default defineComponent({
       showGetStarted,
       removeFirstTimeLogin,
       sendToAiChat,
+      sendToAssistant,
       aiChatInputContext,
       aiChatAppendMode,
       aiChatPayload,

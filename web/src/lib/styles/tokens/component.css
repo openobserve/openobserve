@@ -513,8 +513,9 @@
   /* shared foreground */
   --color-toast-fg: var(--color-text-heading);
   --color-toast-fg-secondary: var(--color-text-secondary);
-  --color-toast-action-text: var(--color-primary-600);
-  --color-toast-action-hover: var(--color-primary-700);
+  --color-toast-action-bg: var(--color-primary-700);
+  --color-toast-action-bg-hover: var(--color-primary-800);
+  --color-toast-action-fg: var(--color-white);
   --shadow-toast: var(--shadow-lg);
 
   /* Spinner */
@@ -982,15 +983,6 @@
      which already passes there. */
   --color-status-flaky-text: #cd4d0b;
 
-  /* User chat bubble in the trace thread view — border paired with the
-     --color-chat-bubble-user gradient fill. */
-  --color-chat-bubble-user-border: var(--color-indigo-100);
-
-  /* Thread view AI accents: the avatar wash, and the stronger accent the
-     thread chips/system rows switch to under `dark:`. */
-  --color-thread-avatar-bg: var(--color-purple-100);
-  --color-thread-accent-strong: var(--color-purple-400);
-
   /* Notification count badge ring on the nav rail — a fixed dark ring that
      separates the badge from whatever it overlaps. */
   --color-menu-badge-ring: var(--color-grey-900);
@@ -1335,9 +1327,6 @@
   --color-splitter-hover: var(--color-splitter-hover);
   --color-status-flaky: var(--color-status-flaky);
   --color-status-flaky-text: var(--color-status-flaky-text);
-  --color-chat-bubble-user-border: var(--color-chat-bubble-user-border);
-  --color-thread-avatar-bg: var(--color-thread-avatar-bg);
-  --color-thread-accent-strong: var(--color-thread-accent-strong);
   --color-menu-badge-ring: var(--color-menu-badge-ring);
   --color-nav-label-accent: var(--color-nav-label-accent);
   --color-progress-track-fill: var(--color-progress-track-fill);
@@ -1925,8 +1914,9 @@
   --color-toast-default-border: var(--color-toast-default-border);
   --color-toast-fg: var(--color-toast-fg);
   --color-toast-fg-secondary: var(--color-toast-fg-secondary);
-  --color-toast-action-text: var(--color-toast-action-text);
-  --color-toast-action-hover: var(--color-toast-action-hover);
+  --color-toast-action-bg: var(--color-toast-action-bg);
+  --color-toast-action-bg-hover: var(--color-toast-action-bg-hover);
+  --color-toast-action-fg: var(--color-toast-action-fg);
   --shadow-toast: var(--shadow-toast);
 
   /* Stepper */
@@ -2423,4 +2413,66 @@
   --color-theme-menu-gradient-start: var(--color-theme-menu-gradient-start);
   --color-theme-tab-bg-inactive: var(--color-theme-tab-bg-inactive);
   --color-theme-table-header-bg: var(--color-theme-table-header-bg);
+}
+
+/* ── O2 Assistant signal and identity (90 §2.2): every value points at a token that already flips in dark.css ── */
+:root {
+  --color-assistant-signal-working: var(--color-ai-accent);
+  --color-assistant-signal-attention: var(--color-status-warning-text);
+  --color-assistant-signal-failed: var(--color-status-negative);
+  --color-assistant-signal-unread: var(--color-text-secondary);
+  --color-assistant-user-bg: var(--color-surface-subtle);
+  --color-assistant-mark-bg: var(--color-surface-subtle);
+  --color-assistant-mark-fg: var(--color-text-secondary);
+  /* Assistant link and primary roles (PO A10): a darker existing shade, since light primary-600 is under 4.5:1 on white. */
+  --color-assistant-link: var(--color-primary-700);
+  --color-assistant-link-hover: var(--color-primary-800);
+  --color-assistant-primary: var(--color-primary-700);
+  --color-assistant-primary-hover: var(--color-primary-800);
+  --color-assistant-primary-foreground: var(--color-button-primary-foreground);
+  --color-assistant-focus-ring: var(--color-focus-ring-accent);
+}
+
+/* Every assistant-owned root carries data-assistant-surface; nothing outside it changes (PO A10, A16). */
+[data-assistant-surface] {
+  --color-button-primary: var(--color-assistant-primary);
+  --color-button-primary-hover: var(--color-assistant-primary-hover);
+  --color-button-primary-foreground: var(--color-assistant-primary-foreground);
+  --color-button-ghost-primary-text: var(--color-assistant-link);
+  --color-text-link: var(--color-assistant-link);
+  --color-text-link-hover: var(--color-assistant-link-hover);
+  --color-focus-ring-accent: var(--color-assistant-focus-ring);
+  --color-button-outline-hover-border: var(--color-assistant-focus-ring);
+  --color-kbd-text: var(--color-text-body);
+}
+
+/* ── Trace thread view (LLM observability) owns its colours so the assistant's tokens can change alone ── */
+:root {
+  --color-trace-thread-model: #7b61ff;
+  --color-trace-thread-model-strong: var(--color-purple-400);
+  --color-trace-thread-avatar-wash: var(--color-purple-100);
+  --color-trace-thread-user-border: var(--color-indigo-100);
+  /* Gradients are background-images: utilities.css carries their bg-trace-thread-* utilities. */
+  --color-trace-thread-user-bg: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+  --color-trace-thread-user-avatar-bg: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+}
+
+@theme inline {
+  --color-assistant-signal-working: var(--color-assistant-signal-working);
+  --color-assistant-signal-attention: var(--color-assistant-signal-attention);
+  --color-assistant-signal-failed: var(--color-assistant-signal-failed);
+  --color-assistant-signal-unread: var(--color-assistant-signal-unread);
+  --color-assistant-user-bg: var(--color-assistant-user-bg);
+  --color-assistant-mark-bg: var(--color-assistant-mark-bg);
+  --color-assistant-mark-fg: var(--color-assistant-mark-fg);
+  --color-assistant-link: var(--color-assistant-link);
+  --color-assistant-link-hover: var(--color-assistant-link-hover);
+  --color-assistant-primary: var(--color-assistant-primary);
+  --color-assistant-primary-hover: var(--color-assistant-primary-hover);
+  --color-assistant-primary-foreground: var(--color-assistant-primary-foreground);
+  --color-assistant-focus-ring: var(--color-assistant-focus-ring);
+  --color-trace-thread-model: var(--color-trace-thread-model);
+  --color-trace-thread-model-strong: var(--color-trace-thread-model-strong);
+  --color-trace-thread-avatar-wash: var(--color-trace-thread-avatar-wash);
+  --color-trace-thread-user-border: var(--color-trace-thread-user-border);
 }

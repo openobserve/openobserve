@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent, h, KeepAlive, nextTick, reactive, ref } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
@@ -893,6 +894,158 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper = mountTraces();
       await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled(), {
         timeout: 3000,
+      });
+    });
+  });
+
+  describe("assistant links", () => {
+    afterEach(() => {
+      delete window.__O2_ASSISTANT_V2__;
+      resetAssistantV2ForTests();
+      delete store.state.zoConfig.auto_query_enabled;
+    });
+
+    it("applies an assistant link's stream and window without running it", async () => {
+      window.__O2_ASSISTANT_V2__ = true;
+      resetAssistantV2ForTests();
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { stream: "default", type: "ai_chat_query", t: "1", from: "1", to: "2" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    it("re-applies a second assistant link on the open page from its nonce, still without running", async () => {
+      window.__O2_ASSISTANT_V2__ = true;
+      resetAssistantV2ForTests();
+      mockSearchObj.meta.liveMode = false;
+      const current = ref({
+        query: { stream: "default", type: "ai_chat_query", t: "1", from: "1", to: "2" } as Record<
+          string,
+          string
+        >,
+        name: "traces",
+        path: "/traces",
+      });
+      routerCurrentRouteSpy.mockReturnValue(current as any);
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      current.value = {
+        ...current.value,
+        query: { ...current.value.query, t: "2", from: "5", to: "9", query: btoa("duration > 10") },
+      };
+      await vi.waitFor(() => expect(mockSearchObj.data.editorValue).toBe("duration > 10"));
+      expect(mockSearchObj.data.datetime).toMatchObject({ startTime: 5, endTime: 9 });
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    describe("with the page kept alive", () => {
+      const assistantRoute = (name: string, t: string) => ({
+        query: { stream: "default", type: "ai_chat_query", t } as Record<string, string>,
+        name,
+        path: `/${name}`,
+      });
+
+      async function mountCached() {
+        window.__O2_ASSISTANT_V2__ = true;
+        resetAssistantV2ForTests();
+        mockSearchObj.meta.liveMode = false;
+        const current = ref(assistantRoute("traces", "1"));
+        routerCurrentRouteSpy.mockReturnValue(current as any);
+        const show = ref(true);
+        const Parent = defineComponent({
+          setup: () => () =>
+            h(KeepAlive, null, {
+              default: () => (show.value ? h(Index) : h("div", { key: "placeholder" })),
+            }),
+        });
+        wrapper = mount(Parent, {
+          attachTo: node,
+          global: {
+            plugins: [i18n, router],
+            provide: { store: store },
+            stubs: {
+              "search-bar": true,
+              "index-list": true,
+              "search-result": true,
+              "service-graph": true,
+              "services-catalog": true,
+              SanitizedHtmlRenderer: true,
+            },
+          },
+        });
+        await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+        await flushPromises();
+        return { current, show };
+      }
+
+      it("leaves the hidden page alone on a link to another page", async () => {
+        const { current, show } = await mountCached();
+        show.value = false;
+        await flushPromises();
+        mockGetStreams.mockClear();
+        current.value = assistantRoute("logs", "2");
+        await flushPromises();
+        expect(mockGetStreams).not.toHaveBeenCalled();
+      });
+
+      it("leaves the page alone on a link away that lands before it deactivates", async () => {
+        const { current } = await mountCached();
+        mockGetStreams.mockClear();
+        current.value = assistantRoute("logs", "2");
+        await flushPromises();
+        expect(mockGetStreams).not.toHaveBeenCalled();
+      });
+
+      it("loads a link to the hidden page once, on activation", async () => {
+        const { current, show } = await mountCached();
+        show.value = false;
+        await flushPromises();
+        mockGetStreams.mockClear();
+        current.value = assistantRoute("traces", "2");
+        await flushPromises();
+        expect(mockGetStreams).not.toHaveBeenCalled();
+        show.value = true;
+        await flushPromises();
+        expect(mockGetStreams).toHaveBeenCalledTimes(1);
       });
     });
   });

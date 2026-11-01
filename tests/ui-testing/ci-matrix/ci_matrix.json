@@ -652,5 +652,40 @@
       "profiles-states-edge.spec.js"
     ],
     "disabled": []
+  },
+  {
+    "testfolder": "Assistant",
+    "_comment": "O2 Assistant mocked harness on the production bundle the binary embeds. Every assistant WP appends its spec files here in the PR that creates them; @edition flows skip here and run in the assistant_editions job.",
+    "actual_folder": "assistant",
+    "browser": "chrome",
+    "run_files": [
+      "legacy-smoke.spec.js",
+      "shell.spec.js",
+      "gates.spec.js",
+      "context.spec.js",
+      "turns.spec.js",
+      "refusals.spec.js",
+      "home.spec.js",
+      "perf.spec.js",
+      "security.spec.js",
+      "doors.spec.js",
+      "evidence.spec.js",
+      "editors.spec.js",
+      "lifecycle.spec.js",
+      "approvals.spec.js",
+      "consent.spec.js",
+      "credits.spec.js",
+      "history.spec.js",
+      "xtab.spec.js",
+      "sharing.spec.js",
+      "helper.spec.js",
+      "rca.spec.js",
+      "admin.spec.js",
+      "admin-tools.spec.js",
+      "billing.spec.js",
+      "a11y.spec.js",
+      "stack.spec.js"
+    ],
+    "disabled": []
   }
 ]

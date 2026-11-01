@@ -311,6 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Cell explorer drawer -->
     <ODrawer
       v-model:open="cellDrawer.open"
+      :inset-beside="assistantV2"
       side="right"
       :width="85"
       bleed
@@ -327,6 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :start-time="cellDrawer.startTime"
         :end-time="cellDrawer.endTime"
         :base-where="cellDrawer.baseWhere"
+        :panel-title="panelSchema?.title"
         @send-to-ai-chat="onCellSendToAiChat"
       />
     </ODrawer>
@@ -348,6 +350,7 @@ import {
   onUnmounted,
   type PropType,
 } from "vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { chartColor } from "@/utils/chartTheme";
@@ -2427,6 +2430,8 @@ export default defineComponent({
       return { options: { backgroundColor: "transparent" } };
     });
 
+    // Only the assistant's doors need the panel usable beside this drawer; without them it stays the base modal.
+    const assistantV2 = isAssistantV2();
     const cellDrawer = ref<{
       open: boolean;
       field: string;
@@ -2703,6 +2708,7 @@ export default defineComponent({
       hideContextMenu,
       handleCreateAlert,
       cellDrawer,
+      assistantV2,
       onCellSendToAiChat,
       exploreCellInLogs,
       onCellDrawerOpenChange,

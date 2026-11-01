@@ -1,0 +1,7 @@
+{
+  "_source": "o2-ai src/server/app.py cancelled frame",
+  "_item": "today",
+  "frame": {
+    "type": "cancelled"
+  }
+}

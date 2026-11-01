@@ -149,7 +149,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Beside the statement, not in the page actions: the question is
                about THIS query, and the button has to sit where the artifact is
                for that to be obvious. -->
+          <AiEntryButton v-if="assistantV2" v-bind="queryFixDoor" />
           <DbmSuggestFixButton
+            v-else
             :label="t('dbm.ai.suggestFix')"
             :tooltip="t('dbm.ai.suggestFixHint')"
             data-test="dbm-detail-suggest-fix"
@@ -1243,6 +1245,9 @@ import {
   DBM_CONTEXT_KEY,
 } from "@/composables/contextProviders";
 import { buildQueryFixPrompt } from "@/utils/dbm/aiPrompts";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { dbmFixDoor } from "@/components/dbm/dbmDoors";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import { DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import {
   planDriftLevel,
@@ -3187,30 +3192,51 @@ const onDateChange = (value: DbmDateChange) => {
  * so the assistant answers about THIS query rather than asking the user to
  * describe it. Sent with `autoSend` so the click is the whole interaction.
  */
-const askAiForFix = () => {
+const queryFixInput = () => {
   const current = row.value;
-  emit("sendToAiChat", {
-    query: buildQueryFixPrompt({
-      queryNorm: current?.query_norm || queryText.value,
-      dbSystem: current?.db_system,
-      dbInstance: current?.db_instance,
-      p50Ns: current?.p50_ns,
-      p95Ns: current?.p95_ns,
-      p99Ns: current?.p99_ns,
-      maxNs: current?.max_ns,
-      totalTimeNs: current?.total_time_ns,
-      calls: current?.calls,
-      errors: current?.errors,
-      callsPerTrace: callsPerTrace.value,
-      endpoints: endpoints.value.map((endpoint) => ({
-        service: endpoint.service_name,
-        endpoint: endpoint.endpoint,
-        calls: endpoint.calls,
-      })),
-    }),
-    autoSend: true,
-  });
+  return {
+    queryNorm: current?.query_norm || queryText.value,
+    dbSystem: current?.db_system,
+    dbInstance: current?.db_instance,
+    p50Ns: current?.p50_ns,
+    p95Ns: current?.p95_ns,
+    p99Ns: current?.p99_ns,
+    maxNs: current?.max_ns,
+    totalTimeNs: current?.total_time_ns,
+    calls: current?.calls,
+    errors: current?.errors,
+    callsPerTrace: callsPerTrace.value,
+    endpoints: endpoints.value.map((endpoint) => ({
+      service: endpoint.service_name,
+      endpoint: endpoint.endpoint,
+      calls: endpoint.calls,
+    })),
+  };
 };
+
+const askAiForFix = () => {
+  emit("sendToAiChat", { query: buildQueryFixPrompt(queryFixInput()), autoSend: true });
+};
+
+const assistantV2 = isAssistantV2();
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+// The org the rows were loaded under, so a door left on screen after an org switch is refused.
+const loadedOrg = assistantV2
+  ? useLoadedOrg(
+      () => row.value,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    )
+  : null;
+const queryFixDoor = computed(() =>
+  dbmFixDoor(
+    { label: t("dbm.ai.suggestFix"), tooltip: t("dbm.ai.suggestFixHint") },
+    () => ({ kind: "query", input: queryFixInput() }),
+    store.state,
+    loadedOrg?.value,
+  ),
+);
 
 /**
  * How many times this statement runs per request. The endpoint rollup does not

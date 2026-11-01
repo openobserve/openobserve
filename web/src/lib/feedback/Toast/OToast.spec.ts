@@ -154,4 +154,32 @@ describe("OToast", () => {
     await vueNextTick();
     expect(document.body.querySelector('[role="status"]')).not.toBeNull();
   });
+
+  it("masks the toast root for session replay only when asked", async () => {
+    mountToast({ id: "1", open: true, message: "Answer ready", mask: true });
+    await vueNextTick();
+    expect(
+      document.body.querySelector('[data-test="o-toast-1"]')?.getAttribute("data-dd-privacy"),
+    ).toBe("mask");
+    document.body.innerHTML = "";
+    mountToast({ id: "2", open: true, message: "Saved" });
+    await vueNextTick();
+    expect(
+      document.body.querySelector('[data-test="o-toast-2"]')?.hasAttribute("data-dd-privacy"),
+    ).toBe(false);
+  });
+
+  it("sets aria-live from live and leaves it unset by default", async () => {
+    mountToast({ id: "1", open: true, message: "Answer ready", live: "off" });
+    await vueNextTick();
+    const silent = document.body.querySelector('[data-test="o-toast-1"]');
+    expect(silent?.getAttribute("aria-live")).toBe("off");
+    expect(silent?.querySelector(".shadow-toast[data-reka-toast-announce-exclude]")).not.toBeNull();
+    document.body.innerHTML = "";
+    mountToast({ id: "2", open: true, message: "Saved", variant: "success" });
+    await vueNextTick();
+    const spoken = document.body.querySelector('[data-test="o-toast-2"]');
+    expect(spoken?.hasAttribute("aria-live")).toBe(false);
+    expect(spoken?.querySelector(".shadow-toast[data-reka-toast-announce-exclude]")).toBeNull();
+  });
 });

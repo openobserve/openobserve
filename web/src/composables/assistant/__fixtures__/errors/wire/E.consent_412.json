@@ -1,0 +1,21 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chat.rs:228-237 (cloud) ai_authorization_error_response",
+  "shape": "E",
+  "status": 412,
+  "body": {
+    "code": 412,
+    "message": "Paid usage requires organization consent.",
+    "error_type": "paid_overage_consent_required",
+    "consent": {
+      "feature": "ai_credits",
+      "organization": {
+        "org_id": "default",
+        "enabled": false,
+        "can_manage": true
+      },
+      "payer": null,
+      "effective": false,
+      "billing_status": "eligible"
+    }
+  }
+}

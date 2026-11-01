@@ -114,7 +114,7 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "SC 1.4.11 decorative: a container hairline, not information required to identify a component or its state",
   },
   {
-    fg: "--color-chat-bubble-user-border",
+    fg: "--color-trace-thread-user-border",
     category: "exempt",
     why: "SC 1.4.11 decorative: a container hairline, not information required to identify a component or its state",
   },
@@ -1432,5 +1432,11 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     bg: "--color-button-primary",
     category: "text",
     why: "the inverse foreground exists for filled controls, and the primary button is the fill it is sized against",
+  },
+  {
+    fg: "--color-toast-action-fg",
+    bg: "--color-toast-action-bg",
+    category: "text",
+    why: "the toast action button paints its label on its own solid fill, never on the page",
   },
 ];

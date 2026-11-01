@@ -9797,6 +9797,32 @@
       }
     }
   },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "analyzing": "Analyse en cours...",
+        "thinking": "Réflexion en cours...",
+        "processing": "Traitement en cours...",
+        "examiningData": "Examen des données...",
+        "reviewingContext": "Examen du contexte...",
+        "formulatingResponse": "Formulation de la réponse...",
+        "checkingDetails": "Vérification des détails...",
+        "gatheringInsights": "Collecte d'informations...",
+        "evaluatingOptions": "Évaluation des options...",
+        "synthesizingInformation": "Synthèse des informations...",
+        "workingOnIt": "Travail en cours...",
+        "almostThere": "Presque terminé...",
+        "divingDeeper": "Approfondissement...",
+        "connectingTheDots": "Connexion des informations...",
+        "crunchingNumbers": "Calcul des chiffres...",
+        "exploringPossibilities": "Exploration des possibilités...",
+        "refiningAnswer": "Affinage de la réponse...",
+        "stillThinking": "Toujours en réflexion...",
+        "makingProgress": "Progression en cours...",
+        "piecingTogether": "Assemblage des éléments..."
+      }
+    }
+  },
   "billing": {
     "trialStrip": {
       "title": "Période d'essai",
@@ -21563,7 +21589,10 @@
     "pagination": {
       "pagination": "Pagination",
       "previousPage": "Page précédente",
-      "nextPage": "Page suivante"
+      "nextPage": "Page suivante",
+      "firstPage": "Première page",
+      "lastPage": "Dernière page",
+      "recordsPerPage": "Enregistrements par page"
     },
     "select": {
       "more": "plus",

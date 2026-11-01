@@ -16,6 +16,21 @@ describe("OTextarea", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
+  it("renders the header and footer slots inside the bordered frame, around the text", () => {
+    wrapper = mount(OTextarea, {
+      slots: { header: '<p data-testid="head">h</p>', footer: '<p data-testid="foot">f</p>' },
+    });
+    const frame = wrapper.find("textarea").element.parentElement!;
+    expect(frame.className).toContain("border");
+    expect(frame.className).toContain("flex-col");
+    expect([...frame.children].map((el) => el.tagName)).toEqual(["P", "TEXTAREA", "P"]);
+  });
+
+  it("keeps the row layout when no frame slot is given", () => {
+    wrapper = mount(OTextarea);
+    expect(wrapper.find("textarea").element.parentElement!.className).not.toContain("flex-col");
+  });
+
   it("renders a textarea element", () => {
     wrapper = mount(OTextarea);
     expect(wrapper.find("textarea").exists()).toBe(true);
@@ -58,5 +73,30 @@ describe("OTextarea", () => {
       props: { maxlength: 200, modelValue: "hello" },
     });
     expect(wrapper.text()).toContain("5/200");
+  });
+
+  it("puts inputAttrs on the textarea itself and exposes focus and the element", async () => {
+    wrapper = mount(OTextarea, {
+      props: { inputAttrs: { "aria-label": "Message", "data-x": "1" } },
+      attrs: { "data-test": "box" },
+      attachTo: document.body,
+    });
+    const textarea = wrapper.get("textarea");
+    expect(textarea.attributes("aria-label")).toBe("Message");
+    expect(textarea.attributes("data-x")).toBe("1");
+    expect(wrapper.get('[data-test="box"]').attributes("aria-label")).toBeUndefined();
+    const vm = wrapper.vm as unknown as { focus(): void; textarea: HTMLTextAreaElement | null };
+    vm.focus();
+    expect(document.activeElement).toBe(textarea.element);
+    expect(vm.textarea).toBe(textarea.element);
+  });
+
+  it("gives an informative placeholder secondary-text contrast with placeholderTone strong", () => {
+    wrapper = mount(OTextarea, {
+      props: { placeholderTone: "strong", placeholder: "Ask" as never },
+    });
+    expect(wrapper.get("textarea").classes()).toContain("placeholder:text-text-secondary");
+    wrapper = mount(OTextarea, { props: { placeholder: "Ask" as never } });
+    expect(wrapper.get("textarea").classes()).toContain("placeholder:text-input-placeholder");
   });
 });

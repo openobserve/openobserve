@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="splitterModel"
         :horizontal="true"
         unit="px"
-        :limits="[85, 400]"
+        :limits="[85, 400 + helperSpace]"
         :separatorStyle="{
           height: '0.625rem',
           marginTop: '-0.3125rem',
@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @on-auto-interval-trigger="onAutoIntervalTrigger"
               @showSearchHistory="showSearchHistoryfn"
               @extractPatterns="extractPatternsForCurrentQuery"
+              @helper-space="onHelperSpace"
               @buildModeToggle="onBuildModeToggle"
               @sendToAiChat="sendToAiChat"
             />
@@ -143,6 +144,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <template v-if="layout === 'status'" #status>
                             <component :is="statusLine" />
                           </template>
+                          <template v-if="assistantV2" #ai-door>
+                            <AiEntryButton v-bind="noStreamDoor" appearance="chip" />
+                          </template>
                         </LogsNoDataState>
                       </FirstDataPanel>
                     </div>
@@ -204,7 +208,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @fix-query="onFixQuery"
                         @configure-stream="onConfigureStream"
                         @widen-range="onWidenRange"
-                      />
+                      >
+                        <template v-if="assistantV2" #ai-door>
+                          <AiEntryButton v-bind="queryErrorDoor" appearance="chip" />
+                        </template>
+                      </LogsErrorState>
                     </div>
                     <div
                       v-else-if="searchObj.data.freeTextBlocked && searchObj.loading === false"
@@ -258,7 +266,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @widen-range="onWidenRange"
                         @search-text="onSearchText"
                         @run-suggestion="onRunSuggestion"
-                      />
+                      >
+                        <template v-if="assistantV2" #ai-door>
+                          <AiEntryButton v-bind="queryErrorDoor" appearance="chip" />
+                        </template>
+                      </LogsErrorState>
                     </div>
                     <div v-else-if="showGuardEmptyState" class="h-full max-lg:overflow-y-auto">
                       <LogsPermalinkBanner
@@ -337,7 +349,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @jump-to-stream-data="onJumpToStreamData"
                         @open-history="openSearchHistory"
                         @ask-ai="onAskAiFixQuery"
-                      />
+                      >
+                        <template v-if="assistantV2" #ai-door>
+                          <AiEntryButton v-bind="emptyResultDoor" appearance="chip" />
+                        </template>
+                      </LogsNoEventsState>
                     </div>
                     <SearchResultSkeleton
                       v-else-if="
@@ -526,7 +542,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @fix-query="onFixQuery"
               @configure-stream="onConfigureStream"
               @widen-range="onWidenRange"
-            />
+            >
+              <template v-if="assistantV2" #ai-door>
+                <AiEntryButton v-bind="queryErrorDoor" appearance="chip" />
+              </template>
+            </LogsErrorState>
             <LogsErrorState
               v-else-if="searchObj.data.errorMsg !== '' && searchObj.loading == false"
               data-test="logs-drill-down-error-state"
@@ -539,7 +559,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @fix-query="onFixQuery"
               @configure-stream="onConfigureStream"
               @widen-range="onWidenRange"
-            />
+            >
+              <template v-if="assistantV2" #ai-door>
+                <AiEntryButton v-bind="queryErrorDoor" appearance="chip" />
+              </template>
+            </LogsErrorState>
             <div v-else-if="searchObj.loading" class="flex h-full items-center justify-center">
               <OSpinner size="lg" />
             </div>
@@ -585,7 +609,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @jump-to-stream-data="onJumpToStreamData"
               @open-history="openSearchHistory"
               @ask-ai="onAskAiFixQuery"
-            />
+            >
+              <template v-if="assistantV2" #ai-door>
+                <AiEntryButton v-bind="emptyResultDoor" appearance="chip" />
+              </template>
+            </LogsNoEventsState>
             <OEmptyState
               v-else
               preset="no-query-applied"
@@ -796,6 +824,14 @@ import {
   resetRowSelection,
 } from "@/composables/useLogs/logsRowNav";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useAssistantPanelWidth } from "@/composables/assistant/pure";
+import {
+  emptyResultBuild,
+  logsDoorBase,
+  noStreamBuild,
+  queryErrorBuild,
+} from "@/plugins/logs/logsDoors";
 
 export default defineComponent({
   name: "PageSearch",
@@ -814,6 +850,9 @@ export default defineComponent({
     LogsPermalinkBanner,
     SearchResultSkeleton,
     LogsPermalinkDrawer,
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
     TracesAnalysisDashboard: defineAsyncComponent(
       () => import("@/plugins/traces/metrics/TracesAnalysisDashboard.vue"),
     ),
@@ -1213,9 +1252,14 @@ export default defineComponent({
         }
       },
     );
-    // Two primitive sources, so other route changes never re-apply; a recent-searches restore bumps seq to restore one row twice.
+    // The assistant's nonce `t` re-applies a second link whose `type` did not change.
+    // Primitive sources, so other route changes never re-apply; a recent-searches restore bumps seq to restore one row twice.
     watch(
-      [() => router.currentRoute.value.query.type, () => logsReapplyRequest.value.seq],
+      [
+        () => router.currentRoute.value.query.type,
+        () => logsReapplyRequest.value.seq,
+        () => (isAssistantV2() ? router.currentRoute.value.query.t : undefined),
+      ],
       async ([type, seq], [, prevSeq]) => {
         const requested = seq !== prevSeq;
         const runRequested = requested && logsReapplyRequest.value.run;
@@ -2076,6 +2120,43 @@ export default defineComponent({
     const isAiEnabled = computed(
       () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
     );
+
+    // Empty and error states get their own honest door; the legacy Ask AI stays in v-else.
+    const assistantV2 = isAssistantV2();
+    const doorBase = () => logsDoorBase(searchObj, store.state);
+    const doorStreams = () => [...(searchObj.data.stream.selectedStream ?? [])];
+    const noStreamDoor = computed(() => ({
+      verb: "troubleshoot" as const,
+      entryKind: "empty_state" as const,
+      objectKind: "empty_result" as const,
+      label: t("assistant.entry.setUpIngestion"),
+      tooltip: t("assistant.entry.tooltip.noStream"),
+      dataTest: "ai-entry-no-stream-troubleshoot" as const,
+      build: noStreamBuild(
+        () => store.state.selectedOrganization?.identifier ?? "",
+        () => searchObj.data.stream.streamType || "logs",
+      ),
+    }));
+    const emptyResultDoor = computed(() => ({
+      verb: "troubleshoot" as const,
+      entryKind: "empty_state" as const,
+      objectKind: "empty_result" as const,
+      label: t("assistant.entry.troubleshootNoResults"),
+      tooltip: t("assistant.entry.tooltip.emptyResult"),
+      dataTest: "ai-entry-empty-result-troubleshoot" as const,
+      build: emptyResultBuild(doorBase, doorStreams),
+    }));
+    const queryErrorDoor = computed(() => ({
+      verb: "troubleshoot" as const,
+      entryKind: "empty_state" as const,
+      objectKind: "query_error" as const,
+      label: t("assistant.entry.troubleshootQuery"),
+      tooltip: t("assistant.entry.tooltip.troubleshootQuery"),
+      dataTest: "ai-entry-query-error-troubleshoot" as const,
+      build: queryErrorBuild(doorBase, doorStreams, () =>
+        String(searchObj.data.errorMsg || searchObj.data.filterErrMsg || ""),
+      ),
+    }));
 
     const onWidenRange = (period: string) => {
       searchBarRef.value?.dateTimeRef?.setRelativeTime(period);
@@ -3044,6 +3125,14 @@ export default defineComponent({
       },
     );
 
+    // Rows the inline query helper adds to the search bar; the pane grows by them so the editor keeps its lines.
+    const helperSpace = ref(0);
+    const onHelperSpace = (px: number) => {
+      const delta = px - helperSpace.value;
+      helperSpace.value = px;
+      splitterModel.value = Math.min(400 + px, Math.max(85, splitterModel.value + delta));
+    };
+
     // Auto-expand the splitter when either editor has >2 lines; never overrides a larger user-set value.
     watch(
       [() => searchObj.data.editorValue, () => searchObj.data.tempFunctionContent, isMobile],
@@ -3051,8 +3140,8 @@ export default defineComponent({
         const queryLines = (queryValue || "").split("\n").length;
         const fnLines = (fnValue || "").split("\n").length;
         const hasMoreThanTwoLines = queryLines > 2 || fnLines > 2;
-        const baseHeight = mobile ? 165 : 83;
-        const expandedHeight = mobile ? 205 : 130;
+        const baseHeight = (mobile ? 165 : 83) + helperSpace.value;
+        const expandedHeight = (mobile ? 205 : 130) + helperSpace.value;
 
         if (hasMoreThanTwoLines && splitterModel.value < expandedHeight) {
           splitterModel.value = expandedHeight;
@@ -3126,8 +3215,9 @@ export default defineComponent({
 
     // Watch AI chat state and adjust splitter to give more space when chat is open
     const originalSplitterValue = ref(searchObj.config.splitterModel);
+    const { panelWidthRem: assistantPanelRem } = useAssistantPanelWidth();
     watch(
-      () => store.state.isAiChatEnabled,
+      () => assistantPanelRem.value > 0,
       (isEnabled) => {
         // Only adjust splitter if field list is shown
         if (searchObj.meta.showFields) {
@@ -4155,6 +4245,8 @@ export default defineComponent({
       expandedLogs,
       fieldValues,
       onSplitterUpdate,
+      onHelperSpace,
+      helperSpace,
       updateGridColumns,
       updateUrlQueryParams,
       patchUrlViewState,
@@ -4170,6 +4262,10 @@ export default defineComponent({
       showSearchHistoryfn,
       openSearchHistory,
       isAiEnabled,
+      assistantV2,
+      noStreamDoor,
+      emptyResultDoor,
+      queryErrorDoor,
       onSelectStream,
       onPickStream,
       onWidenRange,

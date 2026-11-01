@@ -42,6 +42,11 @@ function mountToggle(defaults?: Record<string, boolean>) {
   });
 }
 
+const toggleColumns = [
+  { id: "name", header: "Name", hideable: true },
+  { id: "kind", header: "Kind", hideable: true },
+] as OTableColumnDef[];
+
 describe("OTableColumnToggle", () => {
   it("resets to the table's defaults, keeping hidden-by-default columns hidden", async () => {
     const wrapper = mountToggle({ arch: false, from: false });
@@ -57,5 +62,19 @@ describe("OTableColumnToggle", () => {
     expect(wrapper.emitted("update:columnVisibility")?.[0]).toEqual([
       { name: true, arch: true, from: true },
     ]);
+  });
+
+  it("makes the button itself the menu trigger, with the hidden-count badge inside it", () => {
+    const wrapper = mount(OTableColumnToggle, {
+      props: { columns: toggleColumns, columnVisibility: { kind: false } },
+      attachTo: document.body,
+    });
+    const button = wrapper.get('[data-test="o2-table-column-toggle-btn"]');
+    expect(button.element.tagName).toBe("BUTTON");
+    expect(button.attributes("aria-haspopup")).toBe("menu");
+    expect(button.attributes("aria-label")).toBe("Manage columns, 1 hidden");
+    expect(button.find('[data-test="o2-table-column-toggle-hidden-badge"]').text()).toBe("1");
+    expect(wrapper.find("div[aria-expanded]").exists()).toBe(false);
+    wrapper.unmount();
   });
 });

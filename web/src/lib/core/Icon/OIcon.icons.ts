@@ -161,6 +161,8 @@ import Public from "~icons/material-symbols/public";
 import Mail from "~icons/material-symbols/mail-outline";
 import ManageSearch from "~icons/material-symbols/manage-search";
 import Merge from "~icons/material-symbols/merge";
+import Mic from "~icons/material-symbols/mic-outline";
+import MicOff from "~icons/material-symbols/mic-off-outline";
 import MoreHoriz from "~icons/material-symbols/more-horiz";
 import NavigationIcon from "~icons/material-symbols/navigation-outline";
 import Notifications from "~icons/material-symbols/notifications-outline";
@@ -229,6 +231,7 @@ import DashboardCustomizeIcon from "~icons/material-symbols/dashboard-customize-
 import DataUsageIcon from "~icons/material-symbols/data-usage";
 import DeleteSweepIcon from "~icons/material-symbols/delete-sweep-outline";
 import DevicesIcon from "~icons/material-symbols/devices-outline";
+import DockToRightIcon from "~icons/material-symbols/dock-to-right";
 import DragIndicatorIcon from "~icons/material-symbols/drag-indicator";
 import EventNoteIcon from "~icons/material-symbols/event-note-outline";
 import ExitToAppIcon from "~icons/material-symbols/exit-to-app";
@@ -284,6 +287,10 @@ import SearchOffIcon from "~icons/material-symbols/search-off";
 import SensorsOff from "~icons/material-symbols/sensors-off-outline";
 import NotificationsPaused from "~icons/material-symbols/notifications-paused-outline";
 import RepeatIcon from "~icons/material-symbols/repeat";
+import AddCommentIcon from "~icons/material-symbols/add-comment-outline";
+import AutoFixHighIcon from "~icons/material-symbols/auto-fix-high";
+import RemoveCircleOutlineIcon from "~icons/material-symbols/do-not-disturb-on-outline";
+import PushPinIcon from "~icons/material-symbols/push-pin-outline";
 import SecurityIcon from "~icons/material-symbols/shield-outline";
 import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad-outline";
 import AddReactionIcon from "~icons/material-symbols/add-reaction-outline";
@@ -553,6 +560,8 @@ export const iconRegistry = {
   mail: Mail,
   "manage-search": ManageSearch,
   merge: Merge,
+  mic: Mic,
+  "mic-off": MicOff,
   "more-horiz": MoreHoriz,
   navigation: NavigationIcon,
   notifications: Notifications,
@@ -618,6 +627,7 @@ export const iconRegistry = {
   "delete-outline": Delete,
   "delete-sweep": DeleteSweepIcon,
   devices: DevicesIcon,
+  "dock-to-right": DockToRightIcon,
   "drag-indicator": DragIndicatorIcon,
   "event-note": EventNoteIcon,
   "exit-to-app": ExitToAppIcon,
@@ -739,6 +749,12 @@ export const iconRegistry = {
   // Batch 5: Downtimes (2026-09-24)
   "notifications-paused": NotificationsPaused,
   repeat: RepeatIcon,
+
+  // Batch 6: O2 Assistant glyphs (2026-10-16); Material Symbols has no remove-circle-outline, do-not-disturb-on-outline is its glyph.
+  "add-comment": AddCommentIcon,
+  "auto-fix-high": AutoFixHighIcon,
+  "remove-circle-outline": RemoveCircleOutlineIcon,
+  "push-pin": PushPinIcon,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

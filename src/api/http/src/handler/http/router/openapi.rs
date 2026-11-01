@@ -23,6 +23,7 @@ use openobserve_api_management::request::{
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::search::patterns;
+use openobserve_mcp::tools::{McpExtension, ToolClass};
 use utoipa::{
     Modify, OpenApi,
     openapi::security::{Http, HttpAuthScheme, SecurityScheme},
@@ -32,6 +33,24 @@ use crate::{
     common::meta,
     handler::http::request::{mcp, ratelimit},
 };
+
+// The assistant never changes these from chat (IAM, billing, org-wide access, its own policy).
+const MCP_OPT_OUT_TAGS: [&str; 12] = [
+    "Roles",
+    "Groups",
+    "Users",
+    "ServiceAccounts",
+    "Billings",
+    "Marketing",
+    "AWS Marketplace",
+    "Azure Marketplace",
+    "Organizations",
+    "AI",
+    "Domain Management",
+    "GenAI Settings",
+];
+const MCP_OPT_OUT_SEGMENTS: [&str; 4] = ["billings", "billing_group", "quota", "retention"];
+const MCP_OPT_OUT_CATEGORIES: [&str; 2] = ["authorization", "users"];
 
 #[derive(OpenApi)]
 #[openapi(
@@ -1005,9 +1024,51 @@ pub struct ApiDoc;
     openobserve_api_management::request::workflows::enable_workflow,
     openobserve_api_management::request::workflows::get_workflow_history,
     openobserve_api_management::request::workflows::promote_draft,
+    openobserve_api_management::request::ai::chats::stream_turn,
+    openobserve_api_management::request::ai::chats::import,
+    openobserve_api_management::request::ai::capabilities::get_capabilities,
+    openobserve_api_management::request::ai::capabilities::test_capabilities,
+    openobserve_api_management::request::ai::settings::get_settings,
+    openobserve_api_management::request::ai::settings::put_settings,
+    openobserve_api_management::request::ai::grants::list_grants,
+    openobserve_api_management::request::ai::grants::delete_grant,
+    openobserve_api_management::request::ai::activity::list_activity,
+    openobserve_api_management::request::ai::activity::undo_action,
+    openobserve_api_management::request::ai::access_requests::create_access_request,
+    openobserve_api_management::request::ai::toolsets::list,
+    openobserve_api_management::request::ai::toolsets::create,
+    openobserve_api_management::request::ai::toolsets::get,
+    openobserve_api_management::request::ai::toolsets::update,
+    openobserve_api_management::request::ai::toolsets::patch,
+    openobserve_api_management::request::ai::toolsets::delete,
+    openobserve_api_management::request::ai::toolsets::test,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
+    o2_enterprise::enterprise::ai::toolsets::ToolsetResponse,
+    o2_enterprise::enterprise::ai::toolsets::ToolsetListResponse,
+    o2_enterprise::enterprise::ai::toolsets::ToolsetStatus,
+    o2_enterprise::enterprise::ai::toolsets::ToolsetState,
+    o2_enterprise::enterprise::ai::toolsets::ToolsetKind,
+    openobserve_api_management::request::ai::toolsets::ToolsetPatch,
+    openobserve_api_management::request::ai::toolsets::ToolsetTestResult,
+    openobserve_api_management::request::ai::toolsets::ToolsetTestError,
+    openobserve_api_management::request::ai::settings::SettingsView,
+    openobserve_api_management::request::ai::settings::Enforced,
+    openobserve_api_management::request::ai::settings::MemberSettingsView,
+    openobserve_api_management::request::ai::settings::SettingsUpdate,
+    common::meta::organization::AiPermissionTier,
+    common::meta::organization::AiDataSharingLevel,
+    openobserve_api_management::request::ai::grants::GrantView,
+    openobserve_api_management::request::ai::activity::ActivityPage,
+    openobserve_api_management::request::ai::activity::ActivityRow,
+    openobserve_api_management::request::ai::activity::Target,
+    openobserve_api_management::request::ai::activity::Approval,
+    openobserve_api_management::request::ai::activity::ActionResult,
+    openobserve_api_management::request::ai::activity::Undo,
+    openobserve_api_management::request::ai::activity::UndoResponse,
+    openobserve_api_management::request::ai::access_requests::AccessRequestBody,
+    openobserve_api_management::request::ai::access_requests::AccessRequestAccepted,
     o2_enterprise::enterprise::password_policy::lockout::LockoutState,
     openobserve_api_management::request::users::UserDetailsResponse,
     openobserve_api_management::request::alerts::incidents::RcaResumedResponse,
@@ -1049,6 +1110,7 @@ impl Modify for SecurityAddon {
                 components.responses.extend(cloud_components.responses);
             }
         }
+        opt_out_of_mcp(openapi);
         let cfg = get_config();
         if !cfg.common.base_uri.is_empty() {
             openapi.servers = Some(vec![utoipa::openapi::Server::new(&cfg.common.base_uri)]);
@@ -1134,6 +1196,60 @@ pub async fn openapi_info() -> OpenapiInfo {
     }
 
     tag_operations
+}
+
+/// Marks every change the assistant may not make `x-o2-mcp: {"enabled": false}`.
+fn opt_out_of_mcp(openapi: &mut utoipa::openapi::OpenApi) {
+    for (path, path_item) in openapi.paths.paths.iter_mut() {
+        for (method, operation) in [
+            ("GET", path_item.get.as_mut()),
+            ("POST", path_item.post.as_mut()),
+            ("PUT", path_item.put.as_mut()),
+            ("DELETE", path_item.delete.as_mut()),
+            ("PATCH", path_item.patch.as_mut()),
+        ] {
+            let Some(operation) = operation else {
+                continue;
+            };
+            if opted_out_of_mcp(method, path, operation) {
+                operation
+                    .extensions
+                    .get_or_insert_with(Default::default)
+                    .insert(
+                        "x-o2-mcp".to_string(),
+                        serde_json::json!({"enabled": false}),
+                    );
+            }
+        }
+    }
+}
+
+/// A change (never a read) whose tag, route or MCP category is one the assistant stays out of.
+fn opted_out_of_mcp(
+    method: &str,
+    path: &str,
+    operation: &utoipa::openapi::path::Operation,
+) -> bool {
+    let extension = operation
+        .extensions
+        .as_ref()
+        .and_then(|extensions| extensions.get("x-o2-mcp"))
+        .and_then(|value| serde_json::from_value::<McpExtension>(value.clone()).ok());
+    if ToolClass::of(method, path, extension.as_ref()).read_only {
+        return false;
+    }
+    let tagged = operation
+        .tags
+        .iter()
+        .flatten()
+        .any(|tag| MCP_OPT_OUT_TAGS.contains(&tag.as_str()));
+    let routed = path
+        .split('/')
+        .any(|segment| MCP_OPT_OUT_SEGMENTS.contains(&segment) || segment.ends_with("settings"));
+    let categorized = extension
+        .and_then(|e| e.category)
+        .is_some_and(|category| MCP_OPT_OUT_CATEGORIES.contains(&category.as_str()));
+    tagged || routed || categorized
 }
 
 #[cfg(all(test, feature = "enterprise"))]
@@ -1232,6 +1348,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     use std::collections::BTreeSet;
 
+    use openobserve_mcp::tools::{McpExtension, ToolClass};
     use utoipa::OpenApi;
 
     use super::ApiDoc;
@@ -1581,6 +1698,127 @@ mod tests {
         assert!(wrong.is_empty(), "{wrong:#?}");
     }
 
+    // Writes the rule must keep out of MCP; some only exist in enterprise or cloud builds.
+    const MUST_OPT_OUT: [&str; 39] = [
+        "SetPaidOverageStatus",
+        "SetQuotaUsageLimit",
+        "CreateRoles",
+        "UpdateRoles",
+        "DeleteRole",
+        "CreateGroup",
+        "UpdateGroup",
+        "DeleteGroup",
+        "UserSave",
+        "UserUpdate",
+        "AddUserToOrg",
+        "RemoveUserFromOrg",
+        "BulkRemoveUserFromOrg",
+        "InviteOrganizationMembers",
+        "RemoveOrganizationInvite",
+        "ServiceAccountSave",
+        "ServiceAccountUpdate",
+        "RemoveServiceAccount",
+        "RemoveServiceAccountBulk",
+        "AssumeServiceAccount",
+        "SetPasswordPolicy",
+        "RenameOrganization",
+        "UpdateStreamSettings",
+        "OrganizationSettingCreate",
+        "UpdateAiSettings",
+        "SaveGenAiAgentMapping",
+        "DeleteGroupBulk",
+        "DeleteRoleBulk",
+        "LeaveBillingGroup",
+        "RejectBillingGroupInvite",
+        "RemoveBillingGroupMember",
+        "AcceptBillingGroupInvite",
+        "BillingGroupInvite",
+        "LinkAwsMarketplaceSubscription",
+        "LinkAzureMarketplaceSubscription",
+        "HandleUserAttributionEvent",
+        "AcceptOrganizationInvite",
+        "CreateOrganization",
+        "UpdateOrganizationUserIngestToken",
+    ];
+    // Present in every build, so their absence means the rule or the spec changed.
+    const OSS_OPT_OUT: [&str; 6] = [
+        "UserSave",
+        "AddUserToOrg",
+        "CreateRoles",
+        "ServiceAccountSave",
+        "UpdateStreamSettings",
+        "OrganizationSettingCreate",
+    ];
+
+    // (operation id, operation), each operation carrying its `method` and `path`.
+    fn operations() -> Vec<(String, serde_json::Value)> {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let mut operations = Vec::new();
+        for (path, item) in spec["paths"].as_object().unwrap() {
+            for (method, operation) in item.as_object().unwrap() {
+                if let Some(id) = operation["operationId"].as_str() {
+                    let mut operation = operation.clone();
+                    operation["method"] = method.as_str().into();
+                    operation["path"] = path.as_str().into();
+                    operations.push((id.to_string(), operation));
+                }
+            }
+        }
+        operations
+    }
+
+    fn enabled(operation: &serde_json::Value) -> bool {
+        operation["x-o2-mcp"]["enabled"] != false
+    }
+
+    #[test]
+    fn billing_iam_and_policy_writes_are_not_mcp_tools() {
+        let operations = operations();
+        let ids: Vec<&str> = operations.iter().map(|(id, _)| id.as_str()).collect();
+        for id in OSS_OPT_OUT {
+            assert!(ids.contains(&id), "{id} is missing from the ApiDoc");
+        }
+        for (id, operation) in &operations {
+            if MUST_OPT_OUT.contains(&id.as_str()) {
+                assert!(!enabled(operation), "{id} is still an MCP tool");
+            }
+        }
+    }
+
+    #[test]
+    fn reads_under_an_opted_out_tag_stay_mcp_tools() {
+        let operations = operations();
+        let user_list = operations
+            .iter()
+            .find(|(id, _)| id == "UserList")
+            .expect("UserList is documented");
+        assert!(enabled(&user_list.1));
+    }
+
+    #[test]
+    fn post_reads_are_announced_as_reads() {
+        let operations = operations();
+        for id in [
+            "GenerateSql",
+            "ExtractPatterns",
+            "ProfilesMerge",
+            "DowntimeValues",
+        ] {
+            let (_, operation) = operations
+                .iter()
+                .find(|(op, _)| op == id)
+                .unwrap_or_else(|| panic!("{id} is documented"));
+            let extension =
+                serde_json::from_value::<McpExtension>(operation["x-o2-mcp"].clone()).ok();
+            let class = ToolClass::of(
+                operation["method"].as_str().unwrap(),
+                operation["path"].as_str().unwrap(),
+                extension.as_ref(),
+            );
+            assert!(class.read_only && enabled(operation), "{id}");
+        }
+    }
+
     // Folder-destination checks must advertise their 403, or clients cannot tell it from a bug.
     #[test]
     fn folder_scoped_writes_document_forbidden() {
@@ -1633,6 +1871,38 @@ mod tests {
                 .unwrap_or_else(|| panic!("{method} {path} is not documented"));
             assert_eq!(op["x-o2-ratelimit"]["module"], "Query History");
             assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn assistant_administration_is_documented_and_never_an_mcp_tool() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = &spec["paths"];
+        for (path, method) in [
+            ("/api/{org_id}/ai/settings", "get"),
+            ("/api/{org_id}/ai/settings", "put"),
+            ("/api/{org_id}/ai/grants", "get"),
+            ("/api/{org_id}/ai/grants/{id}", "delete"),
+            ("/api/{org_id}/ai/activity", "get"),
+            ("/api/{org_id}/ai/activity/{id}/undo", "post"),
+            ("/api/{org_id}/ai/access_requests", "post"),
+            ("/api/{org_id}/ai/toolsets/{id}", "patch"),
+            ("/api/{org_id}/ai/toolsets/{id}/test", "post"),
+        ] {
+            let op = &paths[path][method];
+            assert!(op.is_object(), "{method} {path} is not documented");
+            assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "ToolsetResponse",
+            "ToolsetStatus",
+            "ToolsetState",
+            "SettingsView",
+            "ActivityRow",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
         }
     }
 

@@ -35,6 +35,7 @@ import { queryClient, setMutationNotifier } from "./composables/query/queryClien
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
@@ -42,6 +43,15 @@ bootstrapTheme();
 
 const activeLocale = getLocale();
 applyDocumentLocale(activeLocale);
+
+// Only the assistant's sheet needs the keyboard to resize the layout; with the flag off every page keeps the default viewport.
+if (isAssistantV2())
+  document
+    .querySelector('meta[name="viewport"]')
+    ?.setAttribute(
+      "content",
+      "width=device-width, initial-scale=1.0, interactive-widget=resizes-content",
+    );
 
 const app = createApp(App);
 const router = createRouter(store);
@@ -97,8 +107,69 @@ const getConfig = async () => {
     if (res.data.commit_hash) {
       buildVersionChecker.setInitialVersion(res.data.commit_hash);
     }
+    startAssistantOffPublicShare(res.data.commit_hash?.slice(0, 12) ?? "unknown");
   });
 };
+
+const PUBLIC_SHARE_PATH = /(?:^|\/)ai\/public\//;
+
+let assistantStarted = false;
+
+// A public shared page never loads the runtime; leaving it for the app starts it then.
+function startAssistantOffPublicShare(uiVersion: string) {
+  if (!isAssistantV2()) return;
+  const start = () => {
+    if (assistantStarted) return;
+    assistantStarted = true;
+    // A failed chunk load leaves the assistant off; the rest of the app is unaffected.
+    initAssistant(uiVersion).catch((err) => console.error("Assistant runtime failed to load", err));
+  };
+  if (!PUBLIC_SHARE_PATH.test(window.location.pathname)) return start();
+  const stop = router.afterEach((to) => {
+    if (PUBLIC_SHARE_PATH.test(to.path)) return;
+    stop();
+    start();
+  });
+}
+
+// Dynamic imports only: with the flag off nothing of the assistant runtime is loaded.
+async function initAssistant(uiVersion: string) {
+  const [{ assistantStore }, { setAssistantTelemetryContext }, share] = await Promise.all([
+    import("@/composables/assistant"),
+    import("@/services/assistantAnalytics"),
+    import("@/components/ai-assistant/share/chatShare"),
+  ]);
+  assistantStore.init({
+    getOrg: () => {
+      const org = store.state.selectedOrganization;
+      return org?.identifier ? { identifier: org.identifier, name: org.label ?? "" } : null;
+    },
+    getUser: () => {
+      const email = (store.state.userInfo as { email?: string })?.email;
+      const role = (store.state.currentuser as { role?: string })?.role ?? "";
+      return email ? { email, role } : null;
+    },
+    getConfig: () => {
+      const zo = store.state.zoConfig;
+      if (typeof zo?.ai_enabled !== "boolean") return null;
+      return {
+        aiEnabled: zo.ai_enabled,
+        rbacEnabled: zo.rbac_enabled !== false,
+        persistence: share.isChatPersistenceEnabled(zo),
+        publicLinks: share.isPublicChatEnabled(zo),
+        publicMaxExpiryDays: share.publicMaxExpirySecs(zo) / 86_400,
+        rcaEnabled: zo.rca_enabled === true,
+      };
+    },
+    isOrgAdmin: () => share.orgAdminFlag(store.state),
+    getOrganizations: () =>
+      (store.state.organizations as { identifier?: string }[])
+        .map((org) => org.identifier)
+        .filter((id): id is string => !!id),
+    router,
+  });
+  setAssistantTelemetryContext(assistantStore.telemetryContext(uiVersion));
+}
 
 getConfig();
 

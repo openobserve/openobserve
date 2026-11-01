@@ -660,6 +660,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     if get_o2_config().common.audit_enabled
         && !(after_org.ends_with("_stream")
             || path.ends_with("ai/chat_stream")
+            // The handler writes its own record: the body is the prompt, its images and context.
+            || path.ends_with("ai/chat")
             || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
@@ -772,6 +774,54 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     response.headers_mut().remove(ERROR_HEADER);
     response
+}
+
+/// `/{org}/ai/...` routes are the assistant's own controls and `/{org}/mcp` checks each tool call.
+fn assistant_approval_exempt(path: &str) -> bool {
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    matches!(segments.as_slice(), [_org, "mcp"] | [_org, "ai", ..])
+}
+
+/// The assistant's REST changes (its approved deletes) run only with o2-ai's signed approval.
+pub async fn assistant_approval_middleware(request: Request, next: Next) -> Response {
+    let method = request.method().clone();
+    let changes = matches!(
+        method,
+        Method::POST | Method::PUT | Method::PATCH | Method::DELETE
+    );
+    let path = request.uri().path();
+    let exempt = assistant_approval_exempt(path);
+    if !changes || exempt || !request.headers().contains_key(X_O2_ASSISTANT_SESSION_ID) {
+        return next.run(request).await;
+    }
+    let origin = match openobserve_mcp::ledger::Origin::checked(request.headers()) {
+        Ok(origin) => origin,
+        Err(problem) => return common::meta::http::HttpResponse::bad_request(problem),
+    };
+    let target = format!(
+        "/api{}",
+        request
+            .uri()
+            .path_and_query()
+            .map_or(path, |target| target.as_str())
+    );
+    let mut segments = path.split('/').filter(|segment| !segment.is_empty());
+    let org_id = match segments.next() {
+        Some("v2") => segments.next(),
+        first => first,
+    }
+    .unwrap_or_default()
+    .to_string();
+    let checked =
+        openobserve_mcp::approval::check_rest(&org_id, method.as_str(), &target, origin.as_ref())
+            .await;
+    match checked {
+        Ok(()) => next.run(request).await,
+        Err(refused) => {
+            log::warn!("[ai] refused assistant {method} {target}: {refused}");
+            common::meta::http::HttpResponse::forbidden(refused.to_string())
+        }
+    }
 }
 
 /// Handler for /metrics endpoint
@@ -1119,6 +1169,14 @@ pub fn config_routes() -> Router {
 #[cfg(feature = "enterprise")]
 fn ai_chat_routes(router: Router) -> Router {
     router
+        .route(
+            "/{org_id}/ai/capabilities",
+            get(ai::capabilities::get_capabilities),
+        )
+        .route(
+            "/{org_id}/ai/capabilities/test",
+            post(ai::capabilities::test_capabilities),
+        )
         .route("/{org_id}/ai/chat", post(ai::chat::chat))
         .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
         .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
@@ -1130,6 +1188,7 @@ fn ai_chat_routes(router: Router) -> Router {
             "/{org_id}/ai/chats",
             get(ai::chats::list).delete(ai::chats::delete_all),
         )
+        .route("/{org_id}/ai/chats/import", post(ai::chats::import))
         .route(
             "/{org_id}/ai/chats/{session_id}",
             get(ai::chats::get)
@@ -1139,6 +1198,10 @@ fn ai_chat_routes(router: Router) -> Router {
         .route(
             "/{org_id}/ai/chats/{session_id}/cancel",
             post(ai::chat::cancel),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}/turns/{turn_id}/stream",
+            get(ai::chats::stream_turn),
         )
         .route(
             "/{org_id}/ai/chats/{session_id}/shares",
@@ -1151,6 +1214,21 @@ fn ai_chat_routes(router: Router) -> Router {
         )
         .route("/{org_id}/ai/shared/{token}", get(ai::shares::get_shared))
         .route("/{org_id}/ai/shared/{token}/fork", post(ai::shares::fork))
+        .route(
+            "/{org_id}/ai/settings",
+            get(ai::settings::get_settings).put(ai::settings::put_settings),
+        )
+        .route("/{org_id}/ai/grants", get(ai::grants::list_grants))
+        .route("/{org_id}/ai/grants/{id}", delete(ai::grants::delete_grant))
+        .route("/{org_id}/ai/activity", get(ai::activity::list_activity))
+        .route(
+            "/{org_id}/ai/activity/{id}/undo",
+            post(ai::activity::undo_action),
+        )
+        .route(
+            "/{org_id}/ai/access_requests",
+            post(ai::access_requests::create_access_request),
+        )
 }
 
 #[cfg(feature = "enterprise")]
@@ -1840,7 +1918,8 @@ pub fn service_routes() -> Router {
 
             // AI
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
-            .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
+            .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).patch(ai::toolsets::patch).delete(ai::toolsets::delete))
+            .route("/{org_id}/ai/toolsets/{id}/test", post(ai::toolsets::test))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))
@@ -2198,6 +2277,7 @@ pub fn service_routes() -> Router {
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
+        .layer(middleware::from_fn(assistant_approval_middleware))
         // Between auth and audit: it needs the email authentication resolves, and a request it
         // refuses never reached a handler, so there is nothing for the audit trail to record.
         .layer(middleware::from_fn(password_policy_middleware))
@@ -4630,6 +4710,42 @@ mod tests {
             assert!(
                 allowed.split(',').any(|h| h.trim() == name),
                 "{name} missing from access-control-allow-headers: {allowed}"
+            );
+        }
+    }
+
+    #[test]
+    fn assistant_approval_exempts_only_the_ai_and_mcp_routes() {
+        for path in [
+            "/default/ai/chat",
+            "/default/ai/confirm/s1",
+            "/ai/ai/settings",
+            "/mcp/ai/chat",
+            "/default/mcp",
+            "/default/mcp/",
+            "/ai/mcp",
+            "/v2/ai/chat",
+        ] {
+            assert!(assistant_approval_exempt(path), "{path} should be exempt");
+        }
+        for path in [
+            "/default/streams/ai/data_by_time_range",
+            "/default/streams/ai/delete_fields",
+            "/default/streams/ai/settings",
+            "/default/streams/mcp",
+            "/default/functions/mcp",
+            "/ai/streams/logs/settings",
+            "/ai/alerts/a1",
+            "/mcp/streams/logs",
+            "/v2/default/ai/chat",
+            "/v2/streams/ai/settings",
+            "/v2/default/alerts/a1",
+            "/default/mcp/extra",
+            "/",
+        ] {
+            assert!(
+                !assistant_approval_exempt(path),
+                "{path} must need approval"
             );
         }
     }

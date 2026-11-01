@@ -9797,6 +9797,32 @@
       }
     }
   },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "analyzing": "分析中...",
+        "thinking": "考え中...",
+        "processing": "処理中...",
+        "examiningData": "データを調査中...",
+        "reviewingContext": "コンテキストを確認中...",
+        "formulatingResponse": "回答を作成中...",
+        "checkingDetails": "詳細を確認中...",
+        "gatheringInsights": "インサイトを収集中...",
+        "evaluatingOptions": "選択肢を評価中...",
+        "synthesizingInformation": "情報を統合中...",
+        "workingOnIt": "対応中...",
+        "almostThere": "もうすぐです...",
+        "divingDeeper": "さらに深掘り中...",
+        "connectingTheDots": "関連性を分析中...",
+        "crunchingNumbers": "数値を計算中...",
+        "exploringPossibilities": "可能性を模索中...",
+        "refiningAnswer": "回答を洗練中...",
+        "stillThinking": "まだ考え中...",
+        "makingProgress": "作業を進め中...",
+        "piecingTogether": "情報を組み立て中..."
+      }
+    }
+  },
   "billing": {
     "trialStrip": {
       "title": "トライアル期間",
@@ -21563,7 +21589,10 @@
     "pagination": {
       "pagination": "ページネーション",
       "previousPage": "前のページ",
-      "nextPage": "次のページ"
+      "nextPage": "次のページ",
+      "firstPage": "最初のページ",
+      "lastPage": "最後のページ",
+      "recordsPerPage": "1 ページあたりのレコード数"
     },
     "select": {
       "more": "もっと",

@@ -18,7 +18,7 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::{Ok, Result};
 use config::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build};
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 use tantivy::{
     Index, IndexWriter, TantivyDocument,
     collector::TopDocs,
@@ -60,6 +60,12 @@ pub struct McpExtension {
     pub category: Option<String>,
     /// Whether this tool requires user confirmation before execution (destructive ops)
     pub requires_confirmation: Option<bool>,
+    /// The tool only reads, whatever its HTTP method says (MCP `readOnlyHint`).
+    #[serde(rename = "readOnlyHint")]
+    pub read_only: Option<bool>,
+    /// The tool removes something or cannot be undone (MCP `destructiveHint`).
+    #[serde(rename = "destructiveHint")]
+    pub destructive: Option<bool>,
     /// Declarative summary field configuration for response filtering
     pub summary_fields: Option<SummaryFieldsConfig>,
     /// Whether this tool is pinned — always included in tools/list without needing tool_search.
@@ -69,12 +75,67 @@ pub struct McpExtension {
     pub pinned: bool,
 }
 
+/// What a tool does, announced to MCP clients in its `annotations` and `_meta`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ToolClass {
+    pub read_only: bool,
+    pub destructive: bool,
+    /// `read`, `create`, `update` or `delete`.
+    pub operation: &'static str,
+    /// A read that returns telemetry (logs, metrics, traces, profiles) rather than configuration.
+    pub telemetry: bool,
+}
+
+impl ToolClass {
+    /// Explicit `x-o2-mcp` hints win; otherwise the HTTP method and route decide.
+    pub fn of(method: &str, path: &str, ext: Option<&McpExtension>) -> Self {
+        let method = method.to_ascii_uppercase();
+        let read_only = ext
+            .and_then(|e| e.read_only)
+            .unwrap_or_else(|| !super::ledger::is_mutating(&method, path));
+        let operation = match super::ledger::operation_of(&method, path) {
+            _ if read_only => "read",
+            "read" if method == "POST" => "create",
+            "read" => "update",
+            operation => operation,
+        };
+        let destructive = !read_only
+            && ext
+                .and_then(|e| e.destructive)
+                .unwrap_or(operation == "delete");
+        Self {
+            read_only,
+            destructive,
+            operation,
+            telemetry: read_only && is_telemetry_route(path),
+        }
+    }
+
+    pub fn annotations(self) -> Value {
+        json!({"readOnlyHint": self.read_only, "destructiveHint": self.destructive})
+    }
+
+    pub fn meta(self) -> Value {
+        json!({"o2/operation": self.operation, "o2/telemetry": self.telemetry})
+    }
+}
+
 fn default_enabled() -> bool {
     true
 }
 
 /// Extension key for MCP configuration
 const MCP_EXTENSION_KEY: &str = "x-o2-mcp";
+// A read under one of these route segments returns telemetry rows.
+const TELEMETRY_SEGMENTS: [&str; 6] = [
+    "prometheus",
+    "traces",
+    "profiles",
+    "patterns",
+    "values",
+    "resources",
+];
+const TELEMETRY_PREFIXES: [&str; 4] = ["_search", "_around", "_values", "_correlate"];
 
 /// Build the schema exposed to MCP clients from the schema retained for HTTP execution.
 fn public_tool_schema(http_path: &str, mut execution_schema: Value) -> Value {
@@ -101,6 +162,13 @@ fn public_tool_schema(http_path: &str, mut execution_schema: Value) -> Value {
     }
 
     execution_schema
+}
+
+fn is_telemetry_route(path: &str) -> bool {
+    path.split('/').any(|segment| {
+        TELEMETRY_SEGMENTS.contains(&segment)
+            || TELEMETRY_PREFIXES.iter().any(|p| segment.starts_with(p))
+    })
 }
 
 /// Extract MCP extensions from OpenAPI spec
@@ -162,6 +230,8 @@ static SHARED_HTTP_CLIENT: OnceCell<rmcp_openapi::HttpClient> = OnceCell::const_
 static TOOL_SEARCH_INDEX: OnceCell<ToolSearchIndex> = OnceCell::const_new();
 /// Summary field configurations extracted from x-o2-mcp extensions, keyed by tool name
 static SUMMARY_CONFIG_CACHE: OnceCell<HashMap<String, SummaryFieldsConfig>> = OnceCell::const_new();
+/// Each tool's class and whether it needs approval, by name.
+static TOOL_CLASS_CACHE: OnceCell<HashMap<String, (ToolClass, bool)>> = OnceCell::const_new();
 
 /// In-memory tantivy search index for tool discovery
 struct ToolSearchIndex {
@@ -393,35 +463,11 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
     let api_json = serde_json::to_value(api)?;
     let spec = rmcp_openapi::Spec::from_value(api_json)?;
 
-    let zo_config = config::get_config();
-    // Include ZO_BASE_URI so tool calls hit the routes actually mounted under it
-    let base_url = url::Url::parse(&format!(
-        "{}://localhost:{}{}",
-        config::cluster::get_http_schema(),
-        zo_config.http.port,
-        zo_config.common.base_uri
-    ))
-    .map_err(|e| anyhow::anyhow!("Invalid base URL: {e}"))?;
-
-    let mut mcp_marker =
-        reqwest::header::HeaderValue::from_str(&config::cluster::MCP_LOOPBACK_SECRET)?;
-    mcp_marker.set_sensitive(true);
-    let mut default_headers = reqwest::header::HeaderMap::new();
-    default_headers.insert("x-o2-mcp", mcp_marker);
-
-    let mut client_builder = reqwest::Client::builder()
-        .user_agent(format!("openobserve/{}", config::VERSION))
-        .timeout(std::time::Duration::from_secs(30))
-        .redirect(reqwest::redirect::Policy::none());
-    if zo_config.http.tls_enabled {
-        // Loopback to our own listener, whose cert is issued for the service name, not localhost
-        client_builder = client_builder.danger_accept_invalid_certs(true);
-    }
+    let (client_builder, base_url) = loopback_client_builder()?;
 
     // Create a single shared HTTP client instead of 200+ clients
-    let shared_client = rmcp_openapi::HttpClient::with_client(client_builder.build()?)
-        .with_base_url(base_url)?
-        .with_default_headers(default_headers);
+    let shared_client =
+        rmcp_openapi::HttpClient::with_client(client_builder.build()?).with_base_url(base_url)?;
 
     // Only extract metadata - this is fast (~186ms for 209 tools)
     // We skip generate_openapi_tools which creates 200+ HTTP clients (~19.5s)
@@ -432,6 +478,8 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
         HashMap::with_capacity(tools_metadata.len());
 
     let mut summary_configs: HashMap<String, SummaryFieldsConfig> = HashMap::new();
+    let mut classes: HashMap<String, (ToolClass, bool)> =
+        HashMap::with_capacity(tools_metadata.len());
     let mut excluded_count = 0;
     let mut custom_desc_count = 0;
 
@@ -477,11 +525,16 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
             .get(&metadata.name)
             .and_then(|ext| ext.category.clone());
 
-        // Get requires_confirmation from x-o2-mcp extension
+        let class = ToolClass::of(
+            &metadata.method,
+            &metadata.path,
+            mcp_extensions.get(&metadata.name),
+        );
         let requires_confirmation = mcp_extensions
             .get(&metadata.name)
             .and_then(|ext| ext.requires_confirmation)
-            .unwrap_or(false);
+            .unwrap_or(!class.read_only);
+        classes.insert(metadata.name.clone(), (class, requires_confirmation));
 
         // Get pinned from x-o2-mcp extension
         let pinned = mcp_extensions
@@ -502,7 +555,8 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
             description,
             input_schema: input_schema.clone(),
             output_schema: None,
-            annotations: None,
+            annotations: Some(class.annotations()),
+            meta: Some(class.meta()),
             http_method: metadata.method.clone(),
             http_path: metadata.path.clone(),
             category,
@@ -572,6 +626,9 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
     SUMMARY_CONFIG_CACHE
         .set(summary_configs)
         .map_err(|_| anyhow::anyhow!("Summary config cache should've been empty at this point"))?;
+    TOOL_CLASS_CACHE
+        .set(classes)
+        .map_err(|_| anyhow::anyhow!("Tool class cache should've been empty at this point"))?;
 
     Ok(())
 }
@@ -602,6 +659,31 @@ pub fn get_tool_metadata(name: &str) -> Option<rmcp_openapi::ToolMetadata> {
         .cloned()
 }
 
+/// Whether the registered tool `name` needs the user's approval before it runs.
+pub fn requires_confirmation(metadata: &rmcp_openapi::ToolMetadata) -> bool {
+    TOOL_CLASS_CACHE
+        .get()
+        .and_then(|classes| classes.get(&metadata.name))
+        .map_or_else(
+            || !ToolClass::of(&metadata.method, &metadata.path, None).read_only,
+            |(_, requires)| *requires,
+        )
+}
+
+/// What the registered tool `name` does; `None` for a tool the server lacks.
+pub fn tool_class(name: &str) -> Option<ToolClass> {
+    if let Some((class, _)) = TOOL_CLASS_CACHE.get().and_then(|classes| classes.get(name)) {
+        return Some(*class);
+    }
+    let metadata = find_tool_metadata(name)?;
+    Some(ToolClass::of(&metadata.method, &metadata.path, None))
+}
+
+/// [`get_tool_metadata`] that answers `None` while MCP tools are not initialized.
+pub fn find_tool_metadata(name: &str) -> Option<rmcp_openapi::ToolMetadata> {
+    TOOL_METADATA_CACHE.get()?.get(name).cloned()
+}
+
 /// Get the summary fields config for a tool (if configured via x-o2-mcp extension)
 pub fn get_summary_config(tool_name: &str) -> Option<SummaryFieldsConfig> {
     SUMMARY_CONFIG_CACHE
@@ -612,6 +694,36 @@ pub fn get_summary_config(tool_name: &str) -> Option<SummaryFieldsConfig> {
 /// Register summary field configs for testing (safe to call multiple times).
 pub fn register_summary_configs(configs: HashMap<String, SummaryFieldsConfig>) {
     let _ = SUMMARY_CONFIG_CACHE.set(configs);
+}
+
+/// A client for this node's own API: base URL with `ZO_BASE_URI`, the MCP marker, no redirects.
+pub(crate) fn loopback_client_builder() -> Result<(reqwest::ClientBuilder, url::Url)> {
+    let zo_config = config::get_config();
+    // Include ZO_BASE_URI so tool calls hit the routes actually mounted under it
+    let base_url = url::Url::parse(&format!(
+        "{}://localhost:{}{}",
+        config::cluster::get_http_schema(),
+        zo_config.http.port,
+        zo_config.common.base_uri
+    ))
+    .map_err(|e| anyhow::anyhow!("Invalid base URL: {e}"))?;
+
+    let mut mcp_marker =
+        reqwest::header::HeaderValue::from_str(&config::cluster::MCP_LOOPBACK_SECRET)?;
+    mcp_marker.set_sensitive(true);
+    let mut default_headers = reqwest::header::HeaderMap::new();
+    default_headers.insert("x-o2-mcp", mcp_marker);
+
+    let mut client_builder = reqwest::Client::builder()
+        .user_agent(format!("openobserve/{}", config::VERSION))
+        .timeout(std::time::Duration::from_secs(30))
+        .redirect(reqwest::redirect::Policy::none())
+        .default_headers(default_headers);
+    if zo_config.http.tls_enabled {
+        // Loopback to our own listener, whose cert is issued for the service name, not localhost
+        client_builder = client_builder.danger_accept_invalid_certs(true);
+    }
+    Ok((client_builder, base_url))
 }
 
 /// Get the shared HTTP client for tool execution
@@ -649,6 +761,7 @@ pub async fn init_test_tools() {
                         input_schema,
                         output_schema: None,
                         annotations: None,
+                        meta: None,
                         http_method: metadata.method,
                         http_path: metadata.path,
                         category: None,
@@ -735,7 +848,58 @@ pub async fn init_test_tools() {
 mod tests {
     use serde_json::json;
 
-    use super::public_tool_schema;
+    use super::{McpExtension, ToolClass, public_tool_schema};
+
+    #[test]
+    fn the_method_and_route_classify_a_tool_without_hints() {
+        let class = |method: &str, path: &str| ToolClass::of(method, path, None);
+        assert!(class("get", "/api/{org_id}/alerts").read_only);
+        assert!(class("post", "/api/{org_id}/_search").telemetry);
+        assert!(class("post", "/api/{org_id}/alerts/destinations/test").read_only);
+        assert_eq!(class("post", "/api/{org_id}/alerts").operation, "create");
+        assert_eq!(
+            class("put", "/api/{org_id}/alerts/{alert_id}").operation,
+            "update"
+        );
+        let delete = class("delete", "/api/{org_id}/alerts/{alert_id}");
+        assert!(delete.destructive && delete.operation == "delete");
+        assert!(!class("get", "/api/{org_id}/alerts").telemetry);
+        assert!(class("get", "/api/{org_id}/prometheus/api/v1/query").telemetry);
+    }
+
+    #[test]
+    fn generate_sql_reads_without_an_x_o2_mcp_hint() {
+        let class = ToolClass::of("post", "/api/{org_id}/alerts/generate_sql", None);
+        assert!(class.read_only && class.operation == "read" && !class.destructive);
+    }
+
+    #[test]
+    fn x_o2_mcp_hints_win_over_the_method() {
+        let read = McpExtension {
+            read_only: Some(true),
+            ..Default::default()
+        };
+        let post_read = ToolClass::of("post", "/api/{org_id}/alerts/generate_sql", Some(&read));
+        assert!(post_read.read_only && post_read.operation == "read");
+        let destructive = McpExtension {
+            destructive: Some(true),
+            ..Default::default()
+        };
+        let put = ToolClass::of(
+            "put",
+            "/api/{org_id}/streams/{s}/settings",
+            Some(&destructive),
+        );
+        assert!(put.destructive && put.operation == "update");
+        assert_eq!(
+            put.annotations(),
+            json!({"readOnlyHint": false, "destructiveHint": true})
+        );
+        assert_eq!(
+            put.meta(),
+            json!({"o2/operation": "update", "o2/telemetry": false})
+        );
+    }
 
     #[test]
     fn organization_path_parameter_is_private() {

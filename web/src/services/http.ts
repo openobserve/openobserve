@@ -32,6 +32,10 @@ declare module "axios" {
     skipAccessToast?: boolean;
     /** The caller handles the refusal itself, so the access boundary does not record the 403. */
     silentForbidden?: boolean;
+    /** An assistant request that handles 401 itself, so it never takes the logout-and-reload branch. */
+    assistantManaged?: boolean;
+    /** Set on the one retry of an assistant request after an SSO refresh. */
+    assistantRetried?: boolean;
     /** Route the request started on, so a late 403 is not pinned on the page the user moved to. */
     accessRouteKey?: string;
   }
@@ -41,6 +45,36 @@ declare module "axios" {
 // at a time across all axios instances and streaming fetch requests. All
 // concurrent 401s wait on the same Promise and retry once it resolves.
 let refreshPromise: Promise<void> | null = null;
+
+// The one dex_refresh request in flight; assistant 401s share it without the logout-on-failure wrapper.
+let dexRefreshPromise: Promise<void> | null = null;
+
+const sharedDexRefresh = (): Promise<void> => {
+  dexRefreshPromise ??= axios
+    .create({ withCredentials: true, baseURL: store.state.API_ENDPOINT })
+    .get("/config/dex_refresh")
+    .then((res) => {
+      if (res.status !== 200) return Promise.reject(new Error("Refresh returned non-200"));
+      return undefined;
+    })
+    .finally(() => {
+      dexRefreshPromise = null;
+    });
+  return dexRefreshPromise;
+};
+
+/** Refreshes the session for an assistant call; never logs out, clears storage or reloads (`00` §5.1). */
+export const refreshSession = (): Promise<"refreshed" | "expired"> => {
+  const sso =
+    config.isCloud != "true" &&
+    config.isEnterprise == "true" &&
+    (store.state as any).zoConfig?.sso_enabled;
+  if (!sso) return Promise.resolve("expired");
+  return (refreshPromise ?? sharedDexRefresh()).then(
+    () => "refreshed" as const,
+    () => "expired" as const,
+  );
+};
 
 // Exported so streaming (fetch-based) requests that bypass the axios interceptor
 // can participate in the same token-refresh flow.
@@ -65,14 +99,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
         withCredentials: true,
         baseURL: store.state.API_ENDPOINT,
       });
-      refreshPromise = refreshInstance
-        .get("/config/dex_refresh")
-        .then((res) => {
-          if (res.status !== 200) {
-            return Promise.reject(new Error("Refresh returned non-200"));
-          }
-          return undefined;
-        })
+      refreshPromise = sharedDexRefresh()
         .catch(() => {
           return refreshInstance
             .get("/config/logout")
@@ -89,6 +116,17 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
   // Not enterprise SSO — standard logout
   expireSession(store);
   return Promise.reject(new Error("Not SSO: cannot refresh"));
+};
+
+// An assistant 401 keeps the SSO refresh and its one retry, but never the logout-and-reload branches (`00` §12.3).
+const retryAssistantAfterRefresh = (instance: AxiosInstance, error: any): Promise<unknown> => {
+  const sso = config.isEnterprise == "true" && (store.state as any).zoConfig.sso_enabled;
+  if (!sso || error.config.assistantRetried) return Promise.reject(error);
+  // A failed refresh rejects with the original 401; the retry settles with its own result.
+  return sharedDexRefresh().then(
+    () => instance.request({ ...error.config, assistantRetried: true }),
+    () => Promise.reject(error),
+  );
 };
 
 const http = ({ headers } = {} as any) => {
@@ -132,6 +170,7 @@ const http = ({ headers } = {} as any) => {
           case 400:
             break;
           case 401:
+            if (error.config?.assistantManaged) return retryAssistantAfterRefresh(instance, error);
             if (config.isCloud == "true" && !error.request.responseURL.includes("/auth/login")) {
               expireSession(store);
             }

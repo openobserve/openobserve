@@ -95,8 +95,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           {{ raw("Node.js") }}
         </EmptyStateIngestionChip>
+        <AiEntryButton v-if="assistantV2" v-bind="setupDoor" appearance="chip" />
         <EmptyStateIngestionChip
-          v-if="aiEnabled"
+          v-else-if="aiEnabled"
           variant="ai"
           data-test="traces-no-data-ask-ai-btn"
           @click="emit('ask-ai')"
@@ -110,8 +111,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isAssistantV2 } from "@/composables/assistant/flags";
+import { tracingSetupBuild } from "@/plugins/traces/tracesDoors";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -136,6 +139,20 @@ const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 const { aiIconSrc } = useAiIcon();
+
+const assistantV2 = isAssistantV2();
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+const setupDoor = computed(() => ({
+  verb: "troubleshoot" as const,
+  entryKind: "empty_state" as const,
+  objectKind: "empty_result" as const,
+  label: t("assistant.entry.setUpTracing"),
+  tooltip: t("assistant.entry.tooltip.noStream"),
+  dataTest: "ai-entry-trace-no-stream-troubleshoot" as const,
+  build: tracingSetupBuild(),
+}));
 
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization?.identifier,

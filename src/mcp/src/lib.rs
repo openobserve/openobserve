@@ -18,7 +18,9 @@
 //! Provides MCP server capabilities for exposing OpenObserve APIs
 //! to AI assistants and other MCP clients.
 
+pub mod approval;
 pub mod handler;
+pub mod ledger;
 pub mod protocol;
 pub mod response_filter;
 pub mod schema;

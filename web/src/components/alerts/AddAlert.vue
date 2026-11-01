@@ -425,6 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :config="anomalyConfig"
                   :preview-sql="anomalyPreviewSql"
                   :stored-intervals="anomalyStoredIntervals"
+                  @run-preview="($refs.anomalyPreviewRef as any)?.loadPreview?.()"
                 />
               </div>
 
@@ -504,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="min-h-0 flex-1 overflow-hidden">
               <template v-if="isAnomalyMode">
-                <AnomalyDataPreview :config="anomalyConfig" />
+                <AnomalyDataPreview ref="anomalyPreviewRef" :config="anomalyConfig" />
               </template>
               <template v-else>
                 <div
@@ -571,6 +572,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('alerts.editJson')"
     persistent
   >
+    <template v-if="jsonDock" #header-right>
+      <AiEntryButton
+        appearance="toggle"
+        verb="ask"
+        entry-kind="editor_toggle"
+        object-kind="alert"
+        thread="current"
+        dock-host="json_editor"
+        :label="t('assistant.entry.assistant')"
+        :tooltip="t('assistant.entry.tooltip.dockedAsk')"
+        :pressed="jsonDock.pressed.value"
+        :build="jsonDock.build"
+        data-test="ai-entry-json-editor-ask"
+        @closed="jsonDock.close"
+      />
+    </template>
     <JsonEditor
       :data="jsonEditorData"
       :title="t('alerts.editJson')"
@@ -628,7 +645,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { raw } from "@/types/i18n";
-import { defineComponent, computed, watch, provide, ref, onMounted } from "vue";
+import {
+  defineAsyncComponent,
+  defineComponent,
+  computed,
+  watch,
+  provide,
+  ref,
+  onMounted,
+} from "vue";
 import { useStore } from "vuex";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
@@ -668,6 +693,12 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
 import alertsService from "@/services/alerts";
+import {
+  assistantObjectNameKey,
+  isAssistantV2,
+  useAssistantDockToggle,
+  useAssistantLeaveGuard,
+} from "@/composables/assistant/pure";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -724,15 +755,25 @@ export default defineComponent({
     OTruncatedText,
     CompositeAlertForm,
     EditorDraftDialogs,
+    // The assistant's door loads only where the revamp renders it, never in the flag-off chunk.
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
   },
   setup(props, { emit }) {
     const store = useStore();
+    const assistantV2 = isAssistantV2();
+    let saved = false;
     // Bound once the draft exists; a save reports to the draft first, which decides whether the host navigates.
     let onFormSaved: ((folderId?: string) => void) | null = null;
     const formEmit = ((event: string, ...args: unknown[]) => {
-      if (event === "update:list" && onFormSaved) {
-        onFormSaved(args[0] as string | undefined);
-        return;
+      if (event === "update:list") {
+        // A save leaves the form on purpose, so the leave guard lets that navigation through.
+        saved = true;
+        if (onFormSaved) {
+          onFormSaved(args[0] as string | undefined);
+          return;
+        }
       }
       emit(event as Parameters<typeof emit>[0], ...args);
     }) as AlertFormEmit;
@@ -748,6 +789,20 @@ export default defineComponent({
     const cancelEditor = async () => {
       if (await alertEditorDraft.draft.confirmLeave()) emit("cancel:hideform");
     };
+    const jsonDock = assistantV2 ? useAssistantDockToggle("json_editor") : null;
+    if (assistantV2) {
+      const userEdited = alertForm.form.useStore((s: { isDirty: boolean }) => s.isDirty);
+      const alertName = computed(() => String(alertForm.formData.value?.name ?? ""));
+      provide(assistantObjectNameKey, alertName);
+      useAssistantLeaveGuard({
+        host: "alert",
+        isDirty: () => !saved && !!userEdited.value,
+        name: () =>
+          alertName.value
+            ? raw(alertName.value)
+            : alertForm.t("assistant.shell.leaveGuardThisAlert"),
+      });
+    }
 
     // Share server SQL-validation squiggle ranges with the descendant query
     // editors (QueryEditorDialog / QueryConfig) via inject.
@@ -1041,6 +1096,7 @@ export default defineComponent({
       alertDraft: alertEditorDraft.draft,
       draftFormKey: alertEditorDraft.formKey,
       cancelEditor,
+      jsonDock,
       alertAutoName,
       headerModeLabel,
       isAnomalyDetectionEnabled,
