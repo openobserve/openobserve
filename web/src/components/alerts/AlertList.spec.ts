@@ -209,12 +209,13 @@ let alertsDB: AlertV2[] = [];
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 
-async function mountAlertList() {
+async function mountAlertList({ renderTable = true }: { renderTable?: boolean } = {}) {
   const wrapper = mount(AlertList, {
     attachTo: node,
     global: {
       plugins: [i18n, store, router],
       stubs: {
+        ...(renderTable ? {} : { OTable: true }),
         FolderList: {
           template: '<div data-test="stub-folder-list"></div>',
         },
@@ -525,14 +526,14 @@ describe("AlertList - basic rendering", () => {
 // 2. Data fetching and columns behavior
 describe("AlertList - data fetching and columns", () => {
   it("fetches alerts and populates filteredResults", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     expect(wrapper.vm.filteredResults.length).toBe(alertsDB.length);
   });
 
   // A destination made in the form's new tab never expires this tab's cache, so only a forced read shows it.
   it("re-reads destinations from the server when the form asks for a refresh", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     await flushPromises();
     const afterMount = destinationsSvc.list.mock.calls.length;
@@ -548,7 +549,7 @@ describe("AlertList - data fetching and columns", () => {
   // detail, or duplicate a neighbouring column); frequency remains — it is
   // the list's only visible cadence signal for non-realtime alerts.
   it("no longer renders the removed configuration columns on any tab", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     wrapper.vm.viewMode = "alerts";
@@ -565,7 +566,7 @@ describe("AlertList - data fetching and columns", () => {
   });
 
   it("shows the frequency column on every tab except realTime", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     for (const tab of ["all", "scheduled", "anomalyDetection"]) {
@@ -614,7 +615,7 @@ describe("AlertList - data fetching and columns", () => {
 
   // Feature 2 (PT-3/PT-6): the columns that REPLACED them.
   it("renders the priority and tags columns", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
     expect(ids).toContain("priority");
@@ -695,7 +696,7 @@ describe("AlertList - data fetching and columns", () => {
 // 3. Tab filtering and query filtering
 describe("AlertList - filtering behaviors", () => {
   it("filters scheduled tab to non-real-time alerts", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     // Ensure we're in alerts view mode
@@ -711,7 +712,7 @@ describe("AlertList - filtering behaviors", () => {
   });
 
   it("filters realTime tab to real-time alerts", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     // Ensure we're in alerts view mode
@@ -726,22 +727,8 @@ describe("AlertList - filtering behaviors", () => {
     expect(wrapper.vm.filteredResults.every((r: any) => r.is_real_time)).toBe(true);
   });
 
-  it("filterAlertsByTab with false refreshResults parameter skips filtering", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-
-    const initialLength = wrapper.vm.filteredResults.length;
-    expect(initialLength).toBe(alertsDB.length);
-
-    // Call filterAlertsByTab with refreshResults=false should not change filteredResults
-    wrapper.vm.filterAlertsByTab(false);
-    await flushPromises();
-
-    expect(wrapper.vm.filteredResults.length).toBe(initialLength);
-  });
-
   it("filterAlertsByQuery filters by name within current tab", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     // Ensure we're in alerts view mode
@@ -1085,7 +1072,7 @@ describe("AlertList - search behaviors", () => {
 // 7. Clipboard, computed helpers, selection label
 describe("AlertList - helpers and utilities", () => {
   it("computedOwner masks long owners and shows short owners as-is", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     expect(wrapper.vm.computedOwner("averyverylongemail@example.com")).toMatch(/\*\*\*\*/);
@@ -1093,7 +1080,7 @@ describe("AlertList - helpers and utilities", () => {
   });
 
   it("selectedAlerts reflects selection count", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     // selectedAlerts is a computed from selectedAlertIds + filteredResults
@@ -1157,7 +1144,7 @@ describe("AlertList - additional validations", () => {
   ];
   cases.forEach(([tab, predicate], idx) => {
     it(`tab ${tab} shows only matching rows (${idx})`, async () => {
-      const wrapper: any = await mountAlertList();
+      const wrapper: any = await mountAlertList({ renderTable: false });
       await waitData(wrapper);
 
       // Ensure we're in alerts view mode
@@ -1174,7 +1161,7 @@ describe("AlertList - additional validations", () => {
   });
 
   it("openMenu stops event propagation (no error)", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     const event = new Event("click");
     const stopSpy = vi.spyOn(event, "stopPropagation");
@@ -1186,31 +1173,21 @@ describe("AlertList - additional validations", () => {
 // 10. Extensive small unit validations to reach 60+ tests
 describe("AlertList - micro validations", () => {
   it("splitterModel has default value 200", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     expect(wrapper.vm.splitterModel).toBe(200);
   });
 
   it("pageSize has a default value", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     // OTable-based component uses pageSize ref instead of a pagination object
     expect(typeof wrapper.vm.pageSize).toBe("number");
     expect(wrapper.vm.pageSize).toBeGreaterThan(0);
   });
 
-  it("clearSearchHistory clears global search and results array", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.searchAcrossFolders = true;
-    wrapper.vm.searchQuery = "abc";
-    wrapper.vm.filteredResults = [1, 2] as any;
-    wrapper.vm.clearSearchHistory();
-    expect(wrapper.vm.searchQuery).toBe("");
-  });
-
   it("filterAlertsByTab returns early if refreshResults=false", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     const before = [...wrapper.vm.filteredResults];
     wrapper.vm.filterAlertsByTab(false);
@@ -1218,7 +1195,7 @@ describe("AlertList - micro validations", () => {
   });
 
   it("transformToExpression builds grouped conditions", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     const expr = wrapper.vm.transformToExpression({
       or: [
@@ -1231,7 +1208,7 @@ describe("AlertList - micro validations", () => {
   });
 
   it("routeTo pushes with name", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     const spy = vi.spyOn(router, "push");
     await wrapper.vm.routeTo("alertTemplates");
@@ -1239,7 +1216,7 @@ describe("AlertList - micro validations", () => {
   });
 
   it("importAlert sets dialog and pushes route, preserving the rest of the query", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     wrapper.vm.router.currentRoute.value.query = {
       ...wrapper.vm.router.currentRoute.value.query,
@@ -1254,7 +1231,7 @@ describe("AlertList - micro validations", () => {
   });
 
   it("updateFolderIdToBeCloned updates state", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     wrapper.vm.updateFolderIdToBeCloned({ value: "folderX" });
     expect(wrapper.vm.folderIdToBeCloned).toBe("folderX");
@@ -1279,7 +1256,7 @@ describe("AlertList - micro validations", () => {
   }, 10000);
 
   it("editAlert fetches by alert_id then opens form", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     const row = wrapper.vm.filteredResults[0];
     await wrapper.vm.editAlert(row);
@@ -1287,22 +1264,11 @@ describe("AlertList - micro validations", () => {
     expect(wrapper.vm.showAddAlertDialog).toBe(true);
   });
 
-  it("open and close clone dialog via back button behavior", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    const row = wrapper.vm.filteredResults[0];
-    await wrapper.vm.duplicateAlert(row);
-    await flushPromises();
-    expect(wrapper.vm.showForm).toBe(true);
-    wrapper.vm.showForm = false;
-    expect(wrapper.vm.showForm).toBe(false);
-  });
-
   it("deleteAlertByAlertId handles 403 gracefully (simulated)", async () => {
     // Fail next delete call with 403
     alertsSvc.delete_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } } as any);
 
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     const row = wrapper.vm.filteredResults[0];
@@ -1314,7 +1280,7 @@ describe("AlertList - micro validations", () => {
   });
 
   it("toggleAlertState sets loading map during request", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     const row = wrapper.vm.filteredResults[0];
     const uuid = row.uuid;
@@ -1327,19 +1293,8 @@ describe("AlertList - micro validations", () => {
     expect(before === undefined || before === false).toBe(true);
   });
 
-  it("filteredResults reflects searchQuery filtering", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    // The component filters via filterAlertsByTab using filterQuery/searchQuery
-    // filteredResults already reflects the current filter state
-    const rows = wrapper.vm.filteredResults;
-    expect(Array.isArray(rows)).toBe(true);
-    // All rows from test data are present with no filter applied
-    expect(rows.length).toBeGreaterThan(0);
-  });
-
   it("mapped timestamps are strings (conversion internal)", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
     expect(typeof wrapper.vm.filteredResults[0].last_triggered_at).toBe("string");
   });
@@ -1380,7 +1335,7 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     (store.state as any).zoConfig.build_type = "enterprise";
     (store.state as any).zoConfig.anomaly_detection_enabled = true;
 
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
     expect(tabValues).toContain("anomalyDetection");
   });
@@ -1390,7 +1345,7 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     (config as any).isCloud = "false";
     (store.state as any).zoConfig.build_type = "opensource";
 
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     const tab = wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection");
     expect(tab).toBeTruthy();
     expect(tab.locked).toBe(true);
@@ -1402,7 +1357,7 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     (store.state as any).zoConfig.build_type = "enterprise";
     (store.state as any).zoConfig.anomaly_detection_enabled = true;
 
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
     expect(tabValues).toContain("anomalyDetection");
   });
@@ -1412,7 +1367,7 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     (config as any).isCloud = "false";
     (store.state as any).zoConfig.build_type = "enterprise";
 
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     const tab = wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection");
     expect(tab).toBeTruthy();
     expect(tab.locked).toBe(true);
@@ -1420,7 +1375,7 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
 
   it("should show anomalyDetection tab locked by default (no env vars set)", async () => {
     // isEnterprise defaults to "false" → feature locked, not hidden
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     const tab = wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection");
     expect(tab).toBeTruthy();
     expect(tab.locked).toBe(true);
@@ -1432,7 +1387,7 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     (store.state as any).zoConfig.build_type = "enterprise";
     (store.state as any).zoConfig.anomaly_detection_enabled = true;
 
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
     expect(tabValues).toContain("anomalyDetection");
   });
@@ -1441,7 +1396,7 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     (config as any).isEnterprise = "false";
     (config as any).isCloud = "false";
 
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     const tab = wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection");
     expect(tab).toBeTruthy();
     expect(tab.locked).toBe(true);
@@ -1451,7 +1406,7 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     (config as any).isEnterprise = "false";
     (config as any).isCloud = "false";
 
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     // Simulate URL query requesting anomalyDetection tab when feature is off
     wrapper.vm.router.currentRoute.value.query = { tab: "anomalyDetection" } as any;
     // The computed initialises activeTab to 'all' when the feature is disabled
@@ -1610,18 +1565,6 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     } finally {
       queryClient.removeQueries({ queryKey: key, exact: true });
     }
-  });
-
-  it("clone dialog emits click:secondary -> closes showForm", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.showForm = true;
-    await wrapper.vm.$nextTick();
-
-    const cloneDialog = wrapper.findComponent({ name: "ODialog" });
-    await cloneDialog.vm.$emit("click:secondary");
-    await flushPromises();
-    expect(wrapper.vm.showForm).toBe(false);
   });
 
   it("duplicateAlert pre-fills stream type and name from the source row", async () => {

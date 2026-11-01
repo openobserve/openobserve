@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import VariablesValueSelector from "./VariablesValueSelector.vue";
 
@@ -196,6 +196,13 @@ describe("VariablesValueSelector", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    const { buildVariablesDependencyGraph } =
+      await import("@/utils/dashboard/variables/variablesDependencyUtils");
+    vi.mocked(buildVariablesDependencyGraph).mockReset();
+    mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation((payload, handlers) => {
+      handlers.data(payload, { type: "end" });
+      handlers.complete(payload, { type: "end" });
+    });
 
     const streamService = await getStreamService();
     streamService.fieldValues.mockResolvedValue({
@@ -248,20 +255,10 @@ describe("VariablesValueSelector", () => {
       wrapper = createWrapper();
       await nextTick();
 
-      // Wait for async initialization to complete
       const vm = wrapper.vm as any;
 
-      // Poll until loading completes or timeout
-      let attempts = 0;
-      while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        attempts++;
-      }
-
-      // If still loading after timeout, manually set to false for test
-      if (vm.variablesData.isVariablesLoading) {
-        vm.variablesData.isVariablesLoading = false;
-      }
+      await flushPromises();
+      expect(vm.variablesData.isVariablesLoading).toBe(false);
 
       expect(vm.variablesData.values).toHaveLength(4);
       expect(vm.variablesData.isVariablesLoading).toBe(false);
@@ -311,18 +308,9 @@ describe("VariablesValueSelector", () => {
       wrapper = createWrapper();
       await nextTick();
 
-      // Wait for async initialization to complete
       const vm = wrapper.vm as any;
-      let attempts = 0;
-      while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        attempts++;
-      }
-
-      // Force loading to false if timeout
-      if (vm.variablesData.isVariablesLoading) {
-        vm.variablesData.isVariablesLoading = false;
-      }
+      await flushPromises();
+      expect(vm.variablesData.isVariablesLoading).toBe(false);
     });
 
     it("should render query_values variable correctly", () => {
@@ -530,15 +518,8 @@ describe("VariablesValueSelector", () => {
 
       const vm = wrapper.vm as any;
 
-      // Wait for initialization
-      let attempts = 0;
-      while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        attempts++;
-      }
-      if (vm.variablesData.isVariablesLoading) {
-        vm.variablesData.isVariablesLoading = false;
-      }
+      await flushPromises();
+      expect(vm.variablesData.isVariablesLoading).toBe(false);
 
       const testVariable = vm.variablesData.values.find((v: any) => v.name === "test");
 
@@ -558,24 +539,12 @@ describe("VariablesValueSelector", () => {
 
   describe("Data Loading and API Integration", () => {
     beforeEach(async () => {
-      // Re-setup the streaming mock after clearAllMocks
-      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(() => {});
-
       wrapper = createWrapper();
       await nextTick();
 
-      // Wait for async initialization to complete
       const vm = wrapper.vm as any;
-      let attempts = 0;
-      while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        attempts++;
-      }
-
-      // Force loading to false if timeout
-      if (vm.variablesData.isVariablesLoading) {
-        vm.variablesData.isVariablesLoading = false;
-      }
+      await flushPromises();
+      expect(vm.variablesData.isVariablesLoading).toBe(false);
     });
 
     it("should load variable options using REST API by default", async () => {
@@ -873,6 +842,41 @@ describe("VariablesValueSelector", () => {
     });
   });
 
+  it("keeps independent values usable when the dependency graph omits an entry", async () => {
+    const { buildVariablesDependencyGraph } =
+      await import("@/utils/dashboard/variables/variablesDependencyUtils");
+    vi.mocked(buildVariablesDependencyGraph).mockReturnValue({
+      region: { parentVariables: [], childVariables: [] },
+    });
+
+    wrapper = createWrapper();
+    await flushPromises();
+
+    const vm = wrapper.vm as InstanceType<typeof VariablesValueSelector>;
+    expect(vm.variablesData.isVariablesLoading).toBe(false);
+    const statusIndex = vm.variablesData.values.findIndex((variable) => variable.name === "status");
+    vm.variablesData.values[statusIndex].value = ["inactive"];
+    await vm.onVariablesValueUpdated(statusIndex);
+    await flushPromises();
+
+    const values = Object.fromEntries(
+      vm.variablesData.values.map((variable) => [variable.name, variable.value]),
+    );
+    expect(values).toEqual({
+      region: "us-east-1",
+      environment: "production",
+      service: "api-service",
+      status: ["inactive"],
+    });
+    expect(vm.variablesData.isVariablesLoading).toBe(false);
+    expect(wrapper.emitted("variablesData")?.at(-1)?.[0]).toMatchObject({
+      isVariablesLoading: false,
+      values: expect.arrayContaining([
+        expect.objectContaining({ name: "status", value: ["inactive"] }),
+      ]),
+    });
+  });
+
   describe("Variable Dependencies", () => {
     const dependentVariablesConfig = {
       list: [
@@ -897,6 +901,15 @@ describe("VariablesValueSelector", () => {
       ],
     };
 
+    beforeEach(async () => {
+      const { buildVariablesDependencyGraph } =
+        await import("@/utils/dashboard/variables/variablesDependencyUtils");
+      vi.mocked(buildVariablesDependencyGraph).mockReturnValue({
+        region: { parentVariables: [], childVariables: ["service"] },
+        service: { parentVariables: ["region"], childVariables: [] },
+      });
+    });
+
     it("should handle parent-child variable relationships", async () => {
       wrapper = createWrapper({ variablesConfig: dependentVariablesConfig });
       await nextTick();
@@ -907,15 +920,6 @@ describe("VariablesValueSelector", () => {
     });
 
     it("should check parent variable readiness before loading child", async () => {
-      // Mock dependency graph to show service depends on region
-      const mockBuildGraph = vi.mocked(
-        await import("@/utils/dashboard/variables/variablesDependencyUtils"),
-      ).buildVariablesDependencyGraph;
-      mockBuildGraph.mockReturnValue({
-        region: { parentVariables: [], childVariables: ["service"] },
-        service: { parentVariables: ["region"], childVariables: [] },
-      });
-
       wrapper = createWrapper({ variablesConfig: dependentVariablesConfig });
       await nextTick();
 
@@ -945,18 +949,12 @@ describe("VariablesValueSelector", () => {
 
       const vm = wrapper.vm as any;
 
-      // Wait for initialization
-      let attempts = 0;
-      while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        attempts++;
-      }
-      if (vm.variablesData.isVariablesLoading) {
-        vm.variablesData.isVariablesLoading = false;
-      }
-
+      await flushPromises();
       const regionVariable = vm.variablesData.values.find((v: any) => v.name === "region");
       const serviceVariable = vm.variablesData.values.find((v: any) => v.name === "service");
+      await vm.loadVariableOptions(serviceVariable);
+      await flushPromises();
+      expect(vm.variablesData.isVariablesLoading).toBe(false);
 
       // Ensure region is in a fully loaded state
       regionVariable.isLoading = false;
@@ -1003,6 +1001,8 @@ describe("VariablesValueSelector", () => {
       serviceVariable.value = "old-service";
       serviceVariable.options = [{ label: "old-service", value: "old-service" }];
 
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(() => {});
+
       // Change parent value
       regionVariable.value = "new-region";
       await vm.onVariablesValueUpdated(0);
@@ -1021,18 +1021,9 @@ describe("VariablesValueSelector", () => {
       wrapper = createWrapper();
       await nextTick();
 
-      // Wait for async initialization to complete
       const vm = wrapper.vm as any;
-      let attempts = 0;
-      while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        attempts++;
-      }
-
-      // Force loading to false if timeout
-      if (vm.variablesData.isVariablesLoading) {
-        vm.variablesData.isVariablesLoading = false;
-      }
+      await flushPromises();
+      expect(vm.variablesData.isVariablesLoading).toBe(false);
     });
 
     it("should handle variable search", async () => {
@@ -2284,43 +2275,47 @@ describe("VariablesValueSelector", () => {
 
     it("should clear options when API returns empty hits", async () => {
       wrapper = createWrapper();
-      await nextTick();
+      await flushPromises();
 
       const vm = wrapper.vm as any;
       const regionVariable = vm.variablesData.values.find((v: any) => v.name === "region");
-
-      // Pre-set options and value to simulate stale state
       regionVariable.options = [{ label: "stale_value", value: "stale_value" }];
       regionVariable.value = "stale_value";
-      regionVariable.isVariablePartialLoaded = false; // Reset to ensure it processes the response
 
-      // Mock streaming with empty hits
-      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
-        (payload: any, handlers: any) => {
-          // Simulate empty response
-          const mockResponse = {
+      const emptyResponse = {
+        type: "search_response",
+        content: { results: { hits: [] } },
+      };
+      mockStreamingComposable.fetchQueryDataWithHttpStream
+        .mockImplementationOnce((payload: any, handlers: any) => {
+          handlers.data(payload, {
             type: "search_response",
             content: {
               results: {
-                hits: [], // Empty hits
+                hits: [{ field: "region", values: [{ zo_sql_key: "stale_value" }] }],
               },
             },
-          };
-
-          // Call the data handler
-          handlers.data(payload, mockResponse);
-
-          // Call the complete handler
+          });
+          handlers.data(payload, emptyResponse);
+          handlers.data(payload, { type: "end" });
           handlers.complete(payload, { type: "end" });
-        },
-      );
+        })
+        .mockImplementation((payload: any, handlers: any) => {
+          handlers.data(payload, emptyResponse);
+          handlers.data(payload, { type: "end" });
+          handlers.complete(payload, { type: "end" });
+        });
 
       await vm.loadVariableOptions(regionVariable);
-      await nextTick();
+      await flushPromises();
 
-      // Options should be cleared
+      expect(regionVariable.options).toEqual([{ label: "stale_value", value: "stale_value" }]);
+      expect(regionVariable.value).toBe("stale_value");
+
+      await vm.loadVariableOptions(regionVariable);
+      await flushPromises();
+
       expect(regionVariable.options).toEqual([]);
-      // Value should be reset (null for single select)
       expect(regionVariable.value).toBeNull();
     });
   });
@@ -2362,6 +2357,7 @@ describe("VariablesValueSelector", () => {
       mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
         (payload: any, handlers: any) => {
           capturedPayload = payload;
+          handlers.data(payload, { type: "end" });
           handlers.complete(payload, { type: "end" });
         },
       );
@@ -2380,15 +2376,8 @@ describe("VariablesValueSelector", () => {
 
       const vm = wrapper.vm as any;
 
-      // Wait for initialization
-      let attempts = 0;
-      while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        attempts++;
-      }
-      if (vm.variablesData.isVariablesLoading) {
-        vm.variablesData.isVariablesLoading = false;
-      }
+      await flushPromises();
+      expect(vm.variablesData.isVariablesLoading).toBe(false);
 
       const dynamicQueryVar = vm.variablesData.values.find((v: any) => v.name === "dynamicQuery");
       expect(dynamicQueryVar).toBeDefined();
@@ -2529,6 +2518,7 @@ describe("VariablesValueSelector", () => {
       mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
         (payload: any, handlers: any) => {
           capturedPayload = payload;
+          handlers.data(payload, { type: "end" });
           handlers.complete(payload, { type: "end" });
         },
       );
@@ -2541,15 +2531,8 @@ describe("VariablesValueSelector", () => {
 
       const vm = wrapper.vm as any;
 
-      // Wait for initialization
-      let attempts = 0;
-      while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        attempts++;
-      }
-      if (vm.variablesData.isVariablesLoading) {
-        vm.variablesData.isVariablesLoading = false;
-      }
+      await flushPromises();
+      expect(vm.variablesData.isVariablesLoading).toBe(false);
 
       const plainVar = vm.variablesData.values.find((v: any) => v.name === "plainQueryVar");
 
@@ -2617,6 +2600,7 @@ describe("VariablesValueSelector", () => {
             },
           };
           handlers.data(payload, mockResponse);
+          handlers.data(payload, { type: "end" });
           handlers.complete(payload, { type: "end" });
         },
       );
@@ -2634,15 +2618,8 @@ describe("VariablesValueSelector", () => {
 
       const vm = wrapper.vm as any;
 
-      // Wait for initialization
-      let attempts = 0;
-      while (vm.variablesData.isVariablesLoading && attempts < 20) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        attempts++;
-      }
-      if (vm.variablesData.isVariablesLoading) {
-        vm.variablesData.isVariablesLoading = false;
-      }
+      await flushPromises();
+      expect(vm.variablesData.isVariablesLoading).toBe(false);
 
       const queryWithRef = vm.variablesData.values.find((v: any) => v.name === "queryWithRef");
 

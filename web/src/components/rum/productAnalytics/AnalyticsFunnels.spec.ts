@@ -172,8 +172,8 @@ const sqls = () =>
   vi.mocked(searchService.search).mock.calls.map((c) => c[0].query.query.sql as string);
 const funnelSqls = () => sqls().filter((s) => /FROM (ps|pu) LIMIT 1|SELECT dim, /.test(s));
 const settle = async () => {
-  await new Promise((r) => setTimeout(r, 350));
   await flushPromises();
+  await vi.advanceTimersByTimeAsync(350);
   await flushPromises();
 };
 
@@ -306,6 +306,7 @@ describe("AnalyticsFunnels", () => {
   };
 
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     resetProductAnalytics();
     resetNamedEvents();
     resetSavedFunnels();
@@ -328,6 +329,7 @@ describe("AnalyticsFunnels", () => {
     wrapper?.unmount();
     wrapper = null;
     document.body.innerHTML = "";
+    vi.useRealTimers();
   });
 
   it("a cold tab offers the top entry pages and starts a funnel in one click (AC-58)", async () => {
