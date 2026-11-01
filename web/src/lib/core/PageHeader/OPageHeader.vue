@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        border-b on a wrapper — that adds a second 1px line and makes the header
        61px on some pages and 60px on others. -->
   <header
+    ref="headerEl"
     class="app-page-header px-page-edge border-border-default shrink-0 border-b"
     :data-drawer-anchor="ownsSidebarTrigger ? 'page-layout-sidebar' : undefined"
     :class="[tabsBelow ? 'flex flex-col' : ROW_CLASS]"
@@ -170,9 +171,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- max-w-full + shrink let the group wrap within its row (shrink-0 alone runs it off-screen); phone date pickers go icon-only to share the title row. -->
       <div
-        v-if="hasActions() || hasActionsOverflow()"
+        v-if="statusComponent || hasActions() || hasActionsOverflow()"
         class="flex shrink-0 items-center gap-2 max-lg:ms-auto max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end @max-4xl/page:ms-auto @max-4xl/page:max-w-full @max-4xl/page:shrink @max-4xl/page:flex-wrap @max-4xl/page:justify-end max-md:[&_.date-time-label]:hidden"
       >
+        <component :is="statusComponent" v-if="statusComponent" />
         <slot v-if="hasActionsOverflow() && !isMobile && overflowFirst" name="actions-overflow" />
         <slot name="actions" />
 
@@ -220,6 +222,7 @@ import {
   onBeforeUnmount,
   onDeactivated,
   onMounted,
+  ref,
   useSlots,
 } from "vue";
 import { useRouter } from "vue-router";
@@ -230,6 +233,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { PAGE_LAYOUT_SIDEBAR_KEY } from "@/lib/core/PageLayout/pageLayoutSidebar";
+import { usePageHeaderStatusHost } from "@/lib/core/PageHeader/pageHeaderStatus";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
@@ -298,6 +302,9 @@ onDeactivated(releaseSidebarTrigger);
 const ownsSidebarTrigger = computed(
   () => isMobile.value && layoutSidebar?.owner.value === sidebarClaim,
 );
+
+const headerEl = ref<HTMLElement | null>(null);
+const statusComponent = usePageHeaderStatusHost(headerEl);
 
 // A slot passed with an always-present <template> but a falsy inner v-if still
 // yields a comment placeholder node — so checking `$slots.x` is truthy even

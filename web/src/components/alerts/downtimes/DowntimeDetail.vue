@@ -106,7 +106,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OContent class="flex min-h-0 flex-1 flex-col gap-4 overflow-auto py-3">
       <div v-if="!downtime" class="relative min-h-40" data-test="downtime-detail-loading">
-        <OEmptyState v-if="forbidden" preset="no-access" size="block" />
+        <OAccessLock
+          v-if="forbidden"
+          :denials="detailDenials"
+          data-test="downtime-detail-forbidden"
+        />
         <OEmptyState
           v-else-if="notFound"
           size="block"
@@ -379,6 +383,8 @@ import type {
   TargetModule,
 } from "@/services/downtimes";
 import { destinationsQuery } from "@/services/alert_destination.queries";
+import { failedRequests, viewDenial } from "@/composables/useAccessStore";
+import OAccessLock from "@/components/access/OAccessLock.vue";
 import { sendDowntimeTestMutation } from "@/services/downtimes.queries";
 import { notifySentence } from "@/utils/downtimes/summary";
 import type { TestDestination } from "@/utils/downtimes/notifyTest";
@@ -461,6 +467,9 @@ const errorStatus = computed(() => {
   return e?.response?.status ?? e?.status;
 });
 const forbidden = computed(() => errorStatus.value === 403);
+const detailDenials = computed(() => [
+  viewDenial("downtimes", "get", failedRequests(detailQuery.error.value)),
+]);
 const notFound = computed(() => errorStatus.value === 404);
 
 const downtimeFolders = useQuery(() =>
