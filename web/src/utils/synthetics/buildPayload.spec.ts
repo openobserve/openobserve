@@ -20,6 +20,7 @@ import {
   buildCreateProtocolCheckPayload,
   mapResponseToBrowserCheck,
 } from "./buildPayload";
+import { useLocalTimezone } from "../storage";
 
 function journey(): BrowserStep[] {
   return [
@@ -116,6 +117,21 @@ describe("cron schedule timezone", () => {
     const payload = buildCreateBrowserTestPayload({ ...loaded, name: "renamed" });
 
     expect((payload.frequency as Record<string, unknown>).timezone).toBe(zone);
+  });
+
+  it("gives a zone-less cron the browser zone on create and edit", () => {
+    const browserZone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const created = buildCreateBrowserTestPayload(
+      check({ schedule: { type: "cron", cron: "0 0 9 * * *" } }),
+    );
+    expect((created.frequency as Record<string, unknown>).timezone).toBe(browserZone);
+
+    const loaded = mapResponseToBrowserCheck({
+      ...storedCron,
+      frequency: { type: "cron", cron: "0 0 9 * * *" },
+    });
+    const edited = buildCreateBrowserTestPayload({ ...loaded, name: "renamed" });
+    expect((edited.frequency as Record<string, unknown>).timezone).toBe(browserZone);
   });
 
   it("keeps the chosen zone on a protocol create and edit", () => {

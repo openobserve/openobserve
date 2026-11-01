@@ -1550,10 +1550,15 @@ mod tests {
             init_ofga_test();
             let resp =
                 get_users_with_role(Path(("test_org".to_string(), "test_role".to_string()))).await;
-            assert_eq!(
-                extract_status_code(&resp),
-                StatusCode::INTERNAL_SERVER_ERROR
-            );
+            if o2_openfga::config::get_config().enabled {
+                assert_eq!(
+                    extract_status_code(&resp),
+                    StatusCode::INTERNAL_SERVER_ERROR
+                );
+            } else {
+                assert_eq!(extract_status_code(&resp), StatusCode::OK);
+                assert_eq!(response_json(resp).await, serde_json::json!([]));
+            }
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1574,11 +1579,16 @@ mod tests {
                 "test@example.com".to_string(),
             )))
             .await;
-            // A failed lookup must not read as a user with no roles.
-            assert_eq!(
-                extract_status_code(&resp),
-                StatusCode::INTERNAL_SERVER_ERROR
-            );
+            // Disabled OpenFGA has no roles to report; an enabled one that cannot be read is a 500.
+            if o2_openfga::config::get_config().enabled {
+                assert_eq!(
+                    extract_status_code(&resp),
+                    StatusCode::INTERNAL_SERVER_ERROR
+                );
+            } else {
+                assert_eq!(extract_status_code(&resp), StatusCode::OK);
+                assert_eq!(response_json(resp).await, serde_json::json!([]));
+            }
         }
 
         #[cfg(not(feature = "enterprise"))]

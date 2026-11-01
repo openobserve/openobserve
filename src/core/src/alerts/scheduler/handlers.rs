@@ -20,7 +20,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        alerts::{TriggerCondition, level::DeliveryDecision, next_cron_after},
+        alerts::{TriggerCondition, cron_fires_between, level::DeliveryDecision, next_cron_after},
         dashboards::reports::{ReportFrequency, ReportFrequencyType},
         pipeline::components::{DerivedStream, NodeData, PipelineSource},
         self_reporting::{
@@ -2248,17 +2248,11 @@ fn skipped_cron_timestamps(
     delay: i64,
 ) -> Option<(Vec<i64>, i64)> {
     let cron = Schedule::from_str(cron).ok()?;
-    let next_after = |ts: i64| {
-        let after = DateTime::from_timestamp_micros(ts)?;
-        next_cron_after(&cron, timezone, tz_offset, after).map(|next| next.timestamp_micros())
-    };
-    let mut skipped = Vec::new();
-    let mut next_run_at = next_after(supposed_to_run_at)?;
-    while next_run_at <= supposed_to_run_at + delay {
-        skipped.push(next_run_at);
-        next_run_at = next_after(next_run_at)?;
-    }
-    Some((skipped, next_run_at))
+    let after = DateTime::from_timestamp_micros(supposed_to_run_at)?;
+    let until = DateTime::from_timestamp_micros(supposed_to_run_at.saturating_add(delay))?;
+    let (fires, next) = cron_fires_between(&cron, timezone, tz_offset, after, until)?;
+    let skipped = fires.iter().map(|t| t.timestamp_micros()).collect();
+    Some((skipped, next.timestamp_micros()))
 }
 
 /// Returns maximum considerable delay in microseconds - minimum of 1 hour or 20% of the frequency.
