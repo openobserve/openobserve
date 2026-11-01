@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip v-if="!open" side="bottom" :content="name" />
         </OButton>
       </template>
-      <AssistantRunsMenu v-if="open && mdUp" @close="setOpen(false)" />
+      <AssistantRunsMenu v-if="open && mdUp" :sid="ownSid" @close="setOpen(false)" />
     </OPopover>
     <OSheet
       v-if="!mdUp"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </template>
-      <AssistantRunsMenu v-if="open" @close="setOpen(false)" />
+      <AssistantRunsMenu v-if="open" :sid="ownSid" @close="setOpen(false)" />
     </OSheet>
   </template>
   <AssistantStatusRegion ref="region" data-test="assistant-runs-status-region" />
@@ -81,7 +81,7 @@ import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatus
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantStatusRegion from "@/components/ai-assistant/shell/AssistantStatusRegion.vue";
-import { runsCounts, useAssistantRuns, useAssistantStore } from "@/composables/assistant";
+import { runsCounts, useAssistantRuns, useAssistantStore, type Sid } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSheet from "@/lib/overlay/Sheet/OSheet.vue";
@@ -97,6 +97,11 @@ import { runSignal, runsSummary } from "./runsText";
 provideAssistantSurface();
 
 const { t } = useI18nTyped();
+const props = defineProps<{
+  /** The chat of the container this button sits in; a window's chat is never the store's active one. */
+  sid?: Sid | null;
+}>();
+
 const store = useAssistantStore();
 const runs = useAssistantRuns();
 const { mdUp } = useBreakpoint();
@@ -107,13 +112,11 @@ const snap = ref<SheetSnap>("full");
 let freedFor: string | null = null;
 let openAtPress: boolean | null = null;
 
-const activeSession = computed(() => {
-  const sid = store.state.shell.activeSid;
-  return sid ? store.state.sessions[sid] : undefined;
-});
-const others = computed(() =>
-  runs.rows.value.filter((row) => row.sid !== store.state.shell.activeSid),
+const ownSid = computed(() => props.sid ?? store.state.shell.activeSid);
+const activeSession = computed(() =>
+  ownSid.value ? store.state.sessions[ownSid.value] : undefined,
 );
+const others = computed(() => runs.rows.value.filter((row) => row.sid !== ownSid.value));
 const counts = computed(() => runsCounts(others.value));
 const signal = computed(() => runSignal(counts.value));
 const name = computed(() =>

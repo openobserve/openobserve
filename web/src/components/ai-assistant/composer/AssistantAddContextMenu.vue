@@ -95,7 +95,7 @@ import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 import { useVoiceAvailability } from "./useAssistantVoice";
 
@@ -111,7 +111,14 @@ const menu = ref<InstanceType<typeof AssistantMentionMenu> | null>(null);
 const listboxId = `assistant-add-context-${useId()}`;
 const voice = useVoiceAvailability();
 
-const voiceRow = computed(() => {
+interface KeyRow {
+  id: string;
+  label: I18nText;
+  shortcut?: boolean;
+  keys?: I18nText;
+}
+
+const voiceRow = computed((): KeyRow => {
   if (voice.status.value === "ready")
     return {
       id: "assistantComposerDictate",
@@ -129,7 +136,7 @@ const voiceRow = computed(() => {
 });
 
 // The keys the retired hints popover listed, plus the `@` that opens this same menu from the textbox.
-const keyRows = computed(() => [
+const keyRows = computed((): KeyRow[] => [
   { id: "mention", label: t("assistant.composer.mention.title"), keys: raw("@") },
   {
     id: "assistantComposerRecall",

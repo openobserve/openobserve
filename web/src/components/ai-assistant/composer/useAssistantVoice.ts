@@ -34,6 +34,7 @@ import {
   writeVoiceOptIn,
   type Sid,
 } from "@/composables/assistant";
+import { HOLD_MS } from "@/composables/assistant/shortcuts";
 import { getIntlLocale } from "@/locales";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { isMacOS } from "@/utils/keyboardShortcuts";
@@ -50,8 +51,7 @@ import {
   type VoiceSession,
 } from "./voiceEngine";
 
-/** How long Ctrl+I / ⌘I must stay down before it dictates (`40` §1.8.6). */
-export const HOLD_MS = 350;
+export { HOLD_MS };
 
 /** One dictation's limit (`40` §1.8.4). */
 export const VOICE_LIMIT_MS = 120_000;
@@ -513,8 +513,8 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
 
   function listenWindow(on: boolean): void {
     const method = on ? "addEventListener" : "removeEventListener";
-    document[method]("keydown", onKeydown, true);
-    document[method]("keyup", onKeyup, true);
+    document[method]("keydown", onKeydown as EventListener, true);
+    document[method]("keyup", onKeyup as EventListener, true);
     document[method]("visibilitychange", onVisibility);
     window[method]("blur", onWindowLeft);
     window[method]("online", onConnectivity);

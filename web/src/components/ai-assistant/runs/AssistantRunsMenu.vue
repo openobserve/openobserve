@@ -169,6 +169,7 @@ import {
   useAssistantRuns,
   useAssistantStore,
   type RunRow,
+  type Sid,
 } from "@/composables/assistant";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -181,6 +182,7 @@ import { rowSignal, runAgent, runStatus, runsSummary, runTitle } from "./runsTex
 
 const ELAPSED_TICK_MS = 1_000;
 
+const props = defineProps<{ sid?: Sid | null }>();
 const emit = defineEmits<{ close: [] }>();
 
 const { t } = useI18nTyped();
@@ -196,7 +198,7 @@ const focused = ref<string | null>(null);
 const spokenAt = ref(Date.now());
 const timer = setInterval(() => (now.value = Date.now()), ELAPSED_TICK_MS);
 
-const activeSid = computed(() => store.state.shell.activeSid);
+const activeSid = computed(() => props.sid ?? store.state.shell.activeSid);
 const ownRows = computed(() => runs.rows.value.filter((row) => !row.otherOrg));
 const focusSid = computed(() =>
   ownRows.value.some((row) => row.sid === focused.value)

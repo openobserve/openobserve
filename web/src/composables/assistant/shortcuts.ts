@@ -34,6 +34,9 @@ import { getAssistantRuntime } from "./runtime";
 /** The Escape ladder's rungs, innermost first (`10` §6.3). */
 export const ESCAPE_RUNGS = ["a", "a2", "b", "c", "d", "e", "f", "g", "h", "i"] as const;
 
+/** How long Ctrl+I / ⌘I must stay down before it dictates (`40` §1.8.6). */
+export const HOLD_MS = 350;
+
 /** The assistant's focus scope: `assistantClose` is bound only while focus is inside it. */
 export const ASSISTANT_ROOT_SELECTOR = "[data-assistant-root]";
 
@@ -53,8 +56,6 @@ const OPEN_OVERLAY_SELECTOR =
 /** The trigger of an open select, menu or popover; focus stays on it while its popup is open. */
 const EXPANDED_TRIGGER_SELECTOR =
   "[role='combobox'][aria-expanded='true'], [aria-haspopup]:not([aria-haspopup='false'])[aria-expanded='true']";
-
-const COMPOSER_FIELD_SELECTOR = "[data-assistant-composer]";
 
 // Rung handlers return true when they handled the key, which stops the ladder there.
 const rungs = new Map<EscapeRung, Set<(event: KeyboardEvent) => boolean>>();
@@ -248,9 +249,12 @@ export function assistantFocusCard(): boolean {
 export function onAssistantOpen(event?: KeyboardEvent): void {
   // MS-IME converts on Ctrl+I, and a hold in the textbox dictates at the caret, which a refocus would move.
   if (event?.isComposing || event?.keyCode === 229) return;
-  if (document.activeElement?.matches(COMPOSER_FIELD_SELECTOR) && !assistantFocusCard()) return;
   const { store } = getAssistantRuntime();
-  if (store.anyContainerVisible() && (focusCard() || cycleComposers(store) || focusFirst())) {
+  if (document.activeElement?.matches(COMPOSER_SELECTOR) && !assistantFocusCard()) {
+    cycleComposersOnTap(store, event);
+    return;
+  }
+  if (store.anyContainerVisible() && (focusCard() || focusFirst())) {
     trackAssistant("ai_shortcut", { shortcut_id: "assistantOpen", effect: "focus" });
     return;
   }
@@ -346,6 +350,22 @@ function cycleComposers(store: AssistantStoreInternal): boolean {
   const at = composers.findIndex((composer) => composer.contains(active));
   composers[(at + 1) % composers.length].focus();
   return true;
+}
+
+// A hold dictates at the caret, so the step waits for a release that comes before the hold fires.
+function cycleComposersOnTap(store: AssistantStoreInternal, event?: KeyboardEvent): void {
+  const step = () => {
+    if (cycleComposers(store))
+      trackAssistant("ai_shortcut", { shortcut_id: "assistantOpen", effect: "focus" });
+  };
+  if (!event) return step();
+  if (event.repeat) return;
+  const release = (up: KeyboardEvent) => {
+    if (!["i", "control", "meta"].includes(up.key.toLowerCase())) return;
+    document.removeEventListener("keyup", release, true);
+    if (up.timeStamp - event.timeStamp < HOLD_MS) step();
+  };
+  document.addEventListener("keyup", release, true);
 }
 
 function focusFirst(): boolean {

@@ -18,7 +18,7 @@ import { computed, nextTick, ref, shallowRef, watch, type ComputedRef, type Ref 
 import assistantService, { type ChatSummaryWire } from "@/services/assistant";
 import { raw, type I18nText } from "@/types/i18n";
 
-import { isRunning, type AssistantStoreInternal } from "./assistantStore";
+import { isRunning, openWindowsOf, type AssistantStoreInternal } from "./assistantStore";
 import type { AssistantSession, AssistantState, HintChannel, Sid } from "./assistantStore.types";
 import { isHelperChat } from "./historyContext";
 import { HEARTBEAT_TRUST_MS } from "./historyElsewhere";
@@ -217,9 +217,7 @@ export function runsCounts(rows: readonly RunRow[]): RunsCounts {
 export function shownSids(state: Pick<AssistantState, "shell">): Sid[] {
   const { shell } = state;
   const active = shell.placement.kind !== "hidden" && shell.activeSid ? [shell.activeSid] : [];
-  // The floating windows land with their own lane; an open one counts as visible here.
-  const windows = (shell as { windows?: { sid: Sid; state: string }[] }).windows ?? [];
-  return [...active, ...windows.filter((w) => w.state === "open").map((w) => w.sid)];
+  return [...active, ...openWindowsOf(shell).map((w) => w.sid)];
 }
 
 /** The display name of a wire agent id; `sre-rca` runs show as Investigator (D2 §4). */
@@ -321,12 +319,13 @@ export function createRuns(deps: RunsDeps): AssistantRuns {
   // A 429 names the real cap, which an admin may have changed from the default.
   const stopLimit = watch(
     () => {
-      const turn = state().shell.activeSid
-        ? state().sessions[state().shell.activeSid as Sid]?.turn
-        : undefined;
-      return turn?.state === "refused" && turn.error.code === "run_limit_member"
-        ? (turn.error.limit ?? null)
-        : null;
+      const { shell, sessions } = state();
+      for (const sid of [shell.activeSid, ...openWindowsOf(shell).map((w) => w.sid)]) {
+        const turn = sid ? sessions[sid]?.turn : undefined;
+        if (turn?.state === "refused" && turn.error.code === "run_limit_member")
+          return turn.error.limit ?? null;
+      }
+      return null;
     },
     (value) => {
       if (value !== null) limit.value = value;

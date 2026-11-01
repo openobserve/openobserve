@@ -268,7 +268,7 @@ describe("small helpers", () => {
   });
 
   it("counts a floating window that is open as visible, and a tray bar or a hidden shell as not", () => {
-    const shell = (kind: string, windows?: unknown) =>
+    const shell = (kind: string, windows: unknown = []) =>
       ({ shell: { placement: { kind }, activeSid: "a", windows } }) as never;
     expect(shownSids(shell("sidebar"))).toEqual(["a"]);
     expect(shownSids(shell("hidden"))).toEqual([]);

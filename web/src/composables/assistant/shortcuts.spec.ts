@@ -35,10 +35,12 @@ import {
   runEscapeLadder,
   useAssistantOpenChord,
   useAssistantShortcuts,
+  HOLD_MS,
 } from "./shortcuts";
 
-const { placement, openAssistant, storeClose } = vi.hoisted(() => ({
+const { placement, recency, openAssistant, storeClose } = vi.hoisted(() => ({
   placement: { kind: "hidden" } as { kind: string },
+  recency: [] as string[],
   openAssistant: vi.fn(),
   storeClose: vi.fn(),
 }));
@@ -49,7 +51,7 @@ vi.mock("./runtime", () => ({
       state: { shell: { placement } },
       close: storeClose,
       anyContainerVisible: () => placement.kind !== "hidden",
-      windowsByRecency: () => [],
+      windowsByRecency: () => recency,
     },
   }),
 }));
@@ -397,8 +399,60 @@ describe("assistantOpen beside dictation (`40` §1.8.6)", () => {
     const off = registerAssistantFocusTarget("composer", refocus);
     onAssistantOpen(new KeyboardEvent("keydown", { key: "i", ctrlKey: true }));
     expect(refocus).not.toHaveBeenCalled();
+    document.dispatchEvent(new KeyboardEvent("keyup", { key: "i" }));
     off();
     field.remove();
+  });
+
+  describe("between two composers", () => {
+    const composerIn = (attrs: Record<string, string>) => {
+      const root = document.createElement("div");
+      root.setAttribute("data-assistant-root", "");
+      for (const [name, value] of Object.entries(attrs)) root.setAttribute(name, value);
+      const field = document.createElement("textarea");
+      field.setAttribute("data-assistant-composer", "");
+      root.appendChild(field);
+      document.body.appendChild(root);
+      return field;
+    };
+    const chord = () => new KeyboardEvent("keydown", { key: "i", ctrlKey: true });
+    const releaseAfter = (down: KeyboardEvent, ms: number) => {
+      const up = new KeyboardEvent("keyup", { key: "i" });
+      Object.defineProperty(up, "timeStamp", { value: down.timeStamp + ms });
+      document.dispatchEvent(up);
+    };
+    let sidebar: HTMLTextAreaElement;
+    let floating: HTMLTextAreaElement;
+
+    beforeEach(() => {
+      vi.stubGlobal("CSS", { escape: (value: string) => value });
+      recency.splice(0, recency.length, "w1");
+      sidebar = composerIn({ "data-placement": "sidebar" });
+      floating = composerIn({ "data-placement": "window", "data-sid": "w1" });
+      sidebar.focus();
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      recency.length = 0;
+      sidebar.parentElement?.remove();
+      floating.parentElement?.remove();
+    });
+
+    it("steps to the next composer on a tap's release, not on the press", () => {
+      const down = chord();
+      onAssistantOpen(down);
+      expect(document.activeElement).toBe(sidebar);
+      releaseAfter(down, HOLD_MS - 1);
+      expect(document.activeElement).toBe(floating);
+    });
+
+    it("stays put on a hold, so dictation keeps its caret", () => {
+      const down = chord();
+      onAssistantOpen(down);
+      releaseAfter(down, HOLD_MS);
+      expect(document.activeElement).toBe(sidebar);
+    });
   });
 
   it("ignores the chord during an IME composition", () => {

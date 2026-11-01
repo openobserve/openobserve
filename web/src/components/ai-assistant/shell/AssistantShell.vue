@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :container="container"
       >
         <template #container-actions>
-          <AssistantRunsButton />
+          <AssistantRunsButton :sid="activeSid" />
           <slot name="container-actions" />
           <template v-if="placement !== 'window'">
             <AssistantIconButton
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSkeleton v-if="state === 'loading'" type="text" class="w-40" />
         <span class="flex-1" />
         <div class="flex shrink-0 items-center gap-1">
-          <AssistantRunsButton v-if="state !== 'gate'" />
+          <AssistantRunsButton v-if="state !== 'gate'" :sid="activeSid" />
           <slot name="container-actions" />
           <template v-if="placement !== 'window'">
             <AssistantIconButton

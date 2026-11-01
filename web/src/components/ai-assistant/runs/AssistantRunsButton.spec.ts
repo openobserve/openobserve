@@ -100,6 +100,13 @@ describe("AssistantRunsButton", () => {
     expect(button(wrapper).attributes("aria-expanded")).toBe("false");
   });
 
+  it("takes a window's chat as its own, which the store's active chat is not", async () => {
+    const { wrapper, store } = setup();
+    store.state.shell.activeSid = "b";
+    await wrapper.setProps({ sid: "a" });
+    expect(button(wrapper).attributes("aria-label")).toBe("1 other chat: 1 needs you");
+  });
+
   it("opens the list and reports it expanded", async () => {
     const { wrapper } = setup();
     await button(wrapper).trigger("click");
