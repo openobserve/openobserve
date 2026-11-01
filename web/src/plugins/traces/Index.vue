@@ -511,9 +511,6 @@ let pageGeneration = 0;
 let pageLoaded = false;
 // A landing claimed by a load the page left mid-way, replayed by the next load.
 let pendingLanding: { run: boolean } | null = null;
-// A relative range drifts while the page sits in the keep-alive cache, so Back re-runs results older than this.
-const STALE_RESULTS_MS = 60_000;
-let lastSearchCompletedAt = 0;
 // The processed WHERE clause from the last buildSearch() call — used for the count query
 let builtWhereClause = "";
 // Paging must keep page 1's filter, so later editor edits never mix into it.
@@ -935,7 +932,6 @@ async function getQueryData(
       const sameDataset = dataset === countedDataset;
       countedDataset = dataset;
       if (!sameDataset) searchObj.meta.resultGrid.showPagination = false;
-      lastSearchCompletedAt = 0;
       // Reset hits for a fresh search
       searchObj.data.queryResults = {
         hits: [],
@@ -1186,7 +1182,6 @@ async function getQueryData(
           delete tracesRequestState[searchTraceId];
           if (isPagination) noteTracesPageLoad(searchTraceId, "done");
           if (!isPagination) {
-            lastSearchCompletedAt = Date.now();
             analytics.track("traces_search_completed", {
               hits: searchObj.data.queryResults?.hits?.length ?? 0,
             });
@@ -1670,15 +1665,10 @@ onActivated(async () => {
   }
 
   if (reloaded) return;
-  const staleRelativeRange =
-    searchObj.data.datetime?.type === "relative" &&
-    lastSearchCompletedAt > 0 &&
-    Date.now() - lastSearchCompletedAt > STALE_RESULTS_MS &&
-    !isAutoRunOff();
   if (queryChanged) {
     restoreUrlQueryParams();
     await loadPageData();
-  } else if (rerunSearch || staleRelativeRange) {
+  } else if (rerunSearch) {
     // Back must show the page the user left, as a remount would from the URL.
     pendingUrlPage = searchObj.data.resultGrid.currentPage;
     runQueryFn(false);
