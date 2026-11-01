@@ -152,21 +152,29 @@ pub(crate) fn next_cron_in_zone(
     next_cron_across_clock_change(schedule, tz, after)
 }
 
-/// Next cron fire strictly after `after` in the named zone when it parses, else at `tz_offset`
-/// minutes.
+/// Next cron fire after `after` in the named zone when it parses, else at `tz_offset` minutes.
 pub fn next_cron_after(
     schedule: &Schedule,
     timezone: Option<&str>,
     tz_offset: i32,
     after: chrono::DateTime<Utc>,
 ) -> Option<chrono::DateTime<Utc>> {
-    match timezone.and_then(|name| name.parse::<Tz>().ok()) {
+    match timezone.and_then(|name| unwrap_browser_time(name).parse::<Tz>().ok()) {
         Some(tz) => next_cron_in_zone(schedule, &tz, after),
         None => schedule
             .after(&after.with_timezone(&fixed_offset(tz_offset)?))
             .next()
             .map(|t| t.with_timezone(&Utc)),
     }
+}
+
+/// The zone inside the UI's `Browser Time (<zone>)` option, else `name` unchanged.
+fn unwrap_browser_time(name: &str) -> &str {
+    name.get(..12)
+        .filter(|prefix| prefix.eq_ignore_ascii_case("browser time"))
+        .and_then(|_| name[12..].trim().strip_prefix('('))
+        .and_then(|zone| zone.strip_suffix(')'))
+        .map_or(name, str::trim)
 }
 
 fn next_cron_across_clock_change(
@@ -2061,6 +2069,31 @@ mod test {
             ny.group_resolve_threshold_micros(last_edt_run.timestamp_micros(), 1, -240),
             25 * hour
         );
+    }
+
+    #[test]
+    fn next_cron_after_reads_the_zone_inside_browser_time() {
+        use chrono::TimeZone;
+
+        let nine_am = Schedule::from_str("0 0 9 * * *").unwrap();
+        let utc = |m, d, h| Utc.with_ymd_and_hms(2026, m, d, h, 0, 0).unwrap();
+        for wrapped in [
+            "Browser Time (America/New_York)",
+            "browser time (America/New_York)",
+        ] {
+            assert_eq!(
+                next_cron_after(&nine_am, Some(wrapped), -240, utc(11, 1, 12)),
+                Some(utc(11, 1, 14)),
+                "{wrapped}"
+            );
+            assert_eq!(
+                next_cron_after(&nine_am, Some(wrapped), -300, utc(3, 8, 12)),
+                Some(utc(3, 8, 13)),
+                "{wrapped}"
+            );
+        }
+        assert_eq!(unwrap_browser_time("Browser Time"), "Browser Time");
+        assert_eq!(unwrap_browser_time("Asia/Kolkata"), "Asia/Kolkata");
     }
 
     #[test]

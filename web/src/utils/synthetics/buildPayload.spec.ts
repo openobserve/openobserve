@@ -87,6 +87,54 @@ describe("buildCreateBrowserTestPayload", () => {
   });
 });
 
+describe("cron schedule timezone", () => {
+  // Not the runner's zone, so a browser-zone overwrite cannot pass by coincidence.
+  const zone = "Pacific/Chatham";
+  const cronSchedule = (): BrowserCheck["schedule"] => ({
+    type: "cron",
+    cron: "0 0 9 * * *",
+    timezone: zone,
+  });
+  const storedCron = {
+    name: "cron check",
+    target: "https://app.test",
+    enabled: true,
+    tags: [],
+    locations: ["us-east"],
+    frequency: { type: "cron", cron: "0 0 9 * * *", timezone: zone },
+    config: { steps: [] },
+  };
+
+  it("keeps the chosen zone on a scheduled-now browser create", () => {
+    const payload = buildCreateBrowserTestPayload(check({ schedule: cronSchedule() }));
+
+    expect(payload.frequency).toEqual({ type: "cron", cron: "0 0 9 * * *", timezone: zone });
+  });
+
+  it("keeps the stored zone when a browser cron check is edited", () => {
+    const loaded = mapResponseToBrowserCheck(storedCron);
+    const payload = buildCreateBrowserTestPayload({ ...loaded, name: "renamed" });
+
+    expect((payload.frequency as Record<string, unknown>).timezone).toBe(zone);
+  });
+
+  it("keeps the chosen zone on a protocol create and edit", () => {
+    const protocolCheck = {
+      ...check({ schedule: cronSchedule() }),
+      checkType: "tcp",
+      tcp: { port: 443, timeout_ms: 10000, response_contains: "" },
+    } as unknown as ProtocolCheck;
+    const created = buildCreateProtocolCheckPayload(protocolCheck);
+    expect((created.frequency as Record<string, unknown>).timezone).toBe(zone);
+
+    const edited = buildCreateProtocolCheckPayload({
+      ...protocolCheck,
+      schedule: mapResponseToBrowserCheck(storedCron).schedule,
+    });
+    expect((edited.frequency as Record<string, unknown>).timezone).toBe(zone);
+  });
+});
+
 describe("environments round-trip", () => {
   it("carries environments through the browser payload", () => {
     const payload = buildCreateBrowserTestPayload(check({ environments: ["env-1"] }));

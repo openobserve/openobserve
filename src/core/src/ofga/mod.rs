@@ -966,7 +966,13 @@ mod tests {
             keys.dedup();
             assert_eq!(keys, expected, "{existing}");
         }
-        assert!(expected.iter().all(|key| OFGA_MODELS.contains_key(*key)));
+        // `get_ownership_all_org_tuple` also takes a model type name, e.g. `status_page`.
+        let model_types: HashSet<&str> = OFGA_MODELS.values().map(|model| model.key).collect();
+        let unknown: Vec<_> = expected
+            .iter()
+            .filter(|key| !OFGA_MODELS.contains_key(**key) && !model_types.contains(**key))
+            .collect();
+        assert!(unknown.is_empty(), "{unknown:?}");
         // No DB sweep may ride along: only the ownership tuples are re-written.
         let pending = pending_migrations("0.0.63", "0.0.62");
         assert!(!pending.alert_folders && !pending.report_folders && !pending.pipeline);
