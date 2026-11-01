@@ -155,8 +155,10 @@ pub async fn get_latest_users(
     )
     .await;
     let mut range_error = String::new();
-    if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
-        start_time = end_time - max_query_range * 3600 * 1_000_000;
+    if let Some(clamped) =
+        config::utils::query_range::clamp_start_time(start_time, end_time, max_query_range)
+    {
+        start_time = clamped;
         range_error = format!(
             "Query duration is modified due to query range restriction of {max_query_range} hours"
         );

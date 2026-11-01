@@ -226,7 +226,8 @@ pub async fn handle_cache_responses_and_deltas(
     let cache_start_time = all_timestamps.iter().min().copied().unwrap_or_default();
     let cache_end_time = all_timestamps.iter().max().copied().unwrap_or_default();
     let cache_duration = cache_end_time - cache_start_time; // microseconds
-    let cached_search_duration = cache_duration + (max_query_range * 3600 * 1_000_000); // microseconds
+    let cached_search_duration =
+        cache_duration.saturating_add(max_query_range.saturating_mul(3600 * 1_000_000)); // microseconds
 
     log::info!(
         "[HTTP2_STREAM trace_id {trace_id}] Handling cache response and deltas, curr_res_size: {curr_res_size}, cached_search_duration: {cached_search_duration}, remaining_query_duration: {remaining_query_range}, deltas_len: {}, cache_start_time: {cache_start_time}, cache_end_time: {cache_end_time}",
