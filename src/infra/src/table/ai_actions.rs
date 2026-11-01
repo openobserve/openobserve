@@ -288,7 +288,7 @@ pub async fn stamp_approval(
     target: (&str, &str),
     approval: (&str, &str),
     since: i64,
-) -> Result<bool, errors::Error> {
+) -> Result<Option<Model>, errors::Error> {
     stamp_approval_with(
         get_orm_client_rw().await,
         org_id,
@@ -307,7 +307,7 @@ pub async fn stamp_approval_with<C: ConnectionTrait>(
     (resource_type, resource_id): (&str, &str),
     (approval_id, approved_by): (&str, &str),
     since: i64,
-) -> Result<bool, errors::Error> {
+) -> Result<Option<Model>, errors::Error> {
     let Some(row) = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::SessionId.eq(session_id))
@@ -321,17 +321,17 @@ pub async fn stamp_approval_with<C: ConnectionTrait>(
         .await
         .map_err(db_err)?
     else {
-        return Ok(false);
+        return Ok(None);
     };
     Entity::update_many()
         .col_expr(Column::ApprovalId, Expr::value(fit(approval_id, 128)))
         .col_expr(Column::ApprovalKind, Expr::value(APPROVAL_APPROVED))
         .col_expr(Column::ApprovedBy, Expr::value(fit(approved_by, 256)))
-        .filter(Column::Id.eq(row.id))
+        .filter(Column::Id.eq(row.id.clone()))
         .exec(conn)
         .await
         .map_err(db_err)?;
-    Ok(true)
+    Ok(Some(row))
 }
 
 /// Remove every row of `org_id`, for the org's deletion; returns how many.
@@ -442,7 +442,7 @@ mod tests {
         let stamped = stamp_approval_with(&db, "o", "s", ("alert", "a1"), ("ap1", "a@x"), 2)
             .await
             .unwrap();
-        assert!(stamped);
+        assert_eq!(stamped.map(|row| row.id), Some(new.id.clone()));
         let new = get_with(&db, "o", &new.id).await.unwrap().unwrap();
         assert_eq!(new.approval_kind, APPROVAL_APPROVED);
         assert_eq!(new.approval_id.as_deref(), Some("ap1"));
@@ -451,7 +451,7 @@ mod tests {
         let none = stamp_approval_with(&db, "o", "s", ("alert", "zz"), ("ap2", "a@x"), 0)
             .await
             .unwrap();
-        assert!(!none);
+        assert!(none.is_none());
     }
 
     #[tokio::test]

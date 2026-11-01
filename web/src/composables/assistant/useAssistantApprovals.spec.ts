@@ -28,6 +28,7 @@ import { makeEnv, t } from "./actions/__tests__/actionEnv";
 import { createActionDispatcher } from "./actions/registry";
 import type { AssistantHint } from "./assistantStore.types";
 import type { ConfirmationRequiredFrame } from "./frames";
+import { serverCardOf } from "./historyRecords";
 import { approvalOf, reduce, type ReducerCtx, type StreamState } from "./reducer";
 import { foldTurns } from "./record";
 import {
@@ -95,7 +96,11 @@ function cardMessage(frame: ConfirmationRequiredFrame): ChatMessage {
   };
 }
 
-function setup(frame: ConfirmationRequiredFrame = DELETE, extendable = false) {
+function setup(
+  frame: ConfirmationRequiredFrame = DELETE,
+  extendable = false,
+  detail?: () => Parameters<typeof serverCardOf>[0],
+) {
   const block = approvalOf(frame);
   const messages: ChatMessage[] = [{ role: "user", content: raw("clean up") }, cardMessage(frame)];
   const ctx = makeEnv({ messages, deps: { now: () => now } });
@@ -117,6 +122,7 @@ function setup(frame: ConfirmationRequiredFrame = DELETE, extendable = false) {
     extend,
     extendable: () => extendable,
     changed,
+    readCard: async (_org, _sid, turnId, id, kind) => serverCardOf(detail!(), turnId, id, kind),
     hints: {
       on: (type, handler) => {
         handlers.set(type, handler as (hint: AssistantHint) => void);
@@ -396,6 +402,32 @@ describe("useAssistantApprovals", () => {
     expect(session.pendingApproval?.expiresAt).toBe(now + 300_000);
   });
 
+  it("reads the budget's end from the Rust refusal envelope, which carries it as `reason`", async () => {
+    const { sid, approvals, extend, session } = setup(PERMISSION, true);
+    const refusal = {
+      response: {
+        status: 409,
+        data: { code: "already_submitted", reason: "extend_limit", by: "user" },
+      },
+    };
+    extend.mockRejectedValueOnce(refusal);
+    await approvals.extend(sid);
+    expect(session.pendingApproval?.userExtendsLeft).toBe(0);
+    extend.mockRejectedValueOnce(refusal);
+    await expect(approvals.extendInBackground(sid, held(sid)!)).resolves.toBe("spent");
+  });
+
+  it("takes a stored row's expiry in microseconds on a reconcile", async () => {
+    const expires_at = (now + 120_000) * 1000;
+    const { sid, approvals, session } = setup(PERMISSION, false, () => ({
+      active_turn: true,
+      pending_approval: true,
+      approvals: [{ id: session.pendingApproval!.id, status: "pending", expires_at }],
+    }));
+    await approvals.reconcile(sid);
+    expect(session.pendingApproval?.expiresAt).toBe(now + 120_000);
+  });
+
   it("extends out of view from the background budget and reports what came of it", async () => {
     const { sid, approvals, extend, session } = setup(PERMISSION, true);
     const id = held(sid)!;
@@ -455,6 +487,22 @@ describe("useAssistantApprovals", () => {
       options: [{ id: "payments", label: "Payments" }],
       allow_other: true,
     } as ConfirmationRequiredFrame;
+
+    it("survives a reconcile while its turn runs, which no chat read can represent", async () => {
+      let active_turn = true;
+      const { sid, approvals, session, engine } = setup(QUESTION, false, () => ({
+        active_turn,
+        pending_approval: false,
+        approvals: [],
+      }));
+      await approvals.reconcile(sid);
+      expect(session.pendingApproval?.id).toBe("q1");
+      expect(engine.approvalDecided).not.toHaveBeenCalled();
+
+      active_turn = false;
+      await approvals.reconcile(sid);
+      expect(session.pendingApproval).toBeNull();
+    });
 
     it("posts a choice with { answer } on the request id, and records its label", async () => {
       const { sid, env, approvals, session } = setup(QUESTION);

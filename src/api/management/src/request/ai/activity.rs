@@ -338,36 +338,72 @@ pub(crate) async fn record_confirm(
     user_id: &str,
     request: &[u8],
     response: &Value,
-) {
+) -> Vec<Option<ai_actions::Model>> {
     if user_id.is_empty() {
-        return;
+        return Vec::new();
     }
     let approval_id = confirmed_id(request, response).unwrap_or_else(|| "confirm".to_string());
     let Some(items) = response.get("items").and_then(Value::as_array) else {
-        return;
+        return Vec::new();
     };
     let since = now_micros() - CONFIRM_MATCH_WINDOW_MICROS;
+    let mut rows = Vec::with_capacity(items.len());
     for item in items {
-        let (Some(kind), Some(id)) = (text(item, "type"), text(item, "id")) else {
-            continue;
-        };
-        let stamped = ai_actions::stamp_approval(
-            org_id,
-            session_id,
-            (&kind, &id),
-            (&approval_id, user_id),
-            since,
-        )
-        .await;
-        match stamped {
-            Ok(true) => {}
-            Ok(false) => {
-                let row = confirmed_row(org_id, session_id, user_id, &approval_id, item);
-                if let Err(e) = ai_actions::insert(row).await {
+        let approval = (approval_id.as_str(), user_id);
+        rows.push(confirmed_action(org_id, session_id, approval, item, since).await);
+    }
+    rows
+}
+
+/// Names the undoable changes' ledger rows on `results`, which match `items` one to one.
+pub(crate) fn with_ledger_ids(response: &mut Value, rows: &[Option<ai_actions::Model>]) {
+    let Some(results) = response.get_mut("results").and_then(Value::as_array_mut) else {
+        return;
+    };
+    if results.len() != rows.len() {
+        return;
+    }
+    for (result, row) in results.iter_mut().zip(rows) {
+        if let (Some(result), Some(row)) = (result.as_object_mut(), row)
+            && row.undoable
+        {
+            result.insert("ledger_id".to_string(), row.id.clone().into());
+            result.insert("undoable".to_string(), true.into());
+        }
+    }
+}
+
+/// The ledger row of one confirmed item: the executor's, stamped, else a new one.
+async fn confirmed_action(
+    org_id: &str,
+    session_id: &str,
+    (approval_id, user_id): (&str, &str),
+    item: &Value,
+    since: i64,
+) -> Option<ai_actions::Model> {
+    let (kind, id) = (text(item, "type")?, text(item, "id")?);
+    let stamped = ai_actions::stamp_approval(
+        org_id,
+        session_id,
+        (&kind, &id),
+        (approval_id, user_id),
+        since,
+    )
+    .await;
+    match stamped {
+        Ok(Some(row)) => Some(row),
+        Ok(None) => {
+            let row = confirmed_row(org_id, session_id, user_id, approval_id, item);
+            ai_actions::insert(row)
+                .await
+                .inspect_err(|e| {
                     log::error!("[org_id:{org_id}] cannot store a confirmed action: {e}");
-                }
-            }
-            Err(e) => log::error!("[org_id:{org_id}] cannot stamp a confirmed action: {e}"),
+                })
+                .ok()
+        }
+        Err(e) => {
+            log::error!("[org_id:{org_id}] cannot stamp a confirmed action: {e}");
+            None
         }
     }
 }
@@ -802,6 +838,29 @@ mod tests {
         );
         let standing = ledger_row(action(), true, NOW);
         assert_eq!(standing.approval_kind, APPROVAL_STANDING);
+    }
+
+    #[test]
+    fn only_an_undoable_change_names_its_ledger_row_on_its_result() {
+        let undoable = ai_actions::Model {
+            id: "row-1".into(),
+            ..ledger_row(action(), false, NOW)
+        };
+        let fixed = ai_actions::Model {
+            undoable: false,
+            ..undoable.clone()
+        };
+        let mut answer =
+            json!({"results": [{"resource": "a"}, {"resource": "b"}, {"resource": "c"}]});
+        with_ledger_ids(&mut answer, &[Some(undoable.clone()), Some(fixed), None]);
+        assert_eq!(answer["results"][0]["ledger_id"], "row-1");
+        assert_eq!(answer["results"][0]["undoable"], true);
+        assert_eq!(answer["results"][1], json!({"resource": "b"}));
+        assert_eq!(answer["results"][2], json!({"resource": "c"}));
+
+        let mut uneven = json!({"results": [{"resource": "a"}, {"resource": "b"}]});
+        with_ledger_ids(&mut uneven, &[Some(undoable)]);
+        assert_eq!(uneven["results"][0], json!({"resource": "a"}));
     }
 
     #[test]

@@ -73,7 +73,7 @@ describe("undo applier", () => {
 
   it("restores through the server and records the entry as undone, with the restored id", async () => {
     const { sid, env, store, dispatcher } = setup([entry()]);
-    env.undo.mockResolvedValue({ id: "a1-restored" });
+    env.undo.mockResolvedValue({ id: "ledger-row", target: { id: "a1-restored" } });
     await expect(
       dispatcher.approvals(sid, { kind: "undo", ledgerId: "c9:0" }),
     ).resolves.toMatchObject({ ok: true });

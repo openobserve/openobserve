@@ -189,7 +189,7 @@ describe("listActiveChats", () => {
             last_turn_status: "completed",
             last_turn_ended_at: 2,
             seen: false,
-            owner_client_id: "c1",
+            active_turn_client_id: "c1",
           },
         ],
       },
@@ -204,8 +204,53 @@ describe("listActiveChats", () => {
       last_turn_status: "completed",
       last_turn_ended_at: 2,
       seen: false,
-      owner_client_id: "c1",
+      active_turn_client_id: "c1",
     });
+  });
+});
+
+describe("listActiveChats pages", () => {
+  const live = (session_id: string) => ({ session_id, active_turn: true });
+
+  it("follows every cursor, through an empty page, to a chat past the first page", async () => {
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce({ data: { chats: [live("s1")], next_cursor: "c1" } })
+      .mockResolvedValueOnce({ data: { chats: [], next_cursor: "c2" } })
+      .mockResolvedValueOnce({ data: { chats: [live("s3")] } });
+    (http as any).mockReturnValue({ get });
+    const page = await assistant.listActiveChats("o");
+    expect(page.chats.map((chat) => chat.session_id)).toEqual(["s1", "s3"]);
+    expect(get.mock.calls.map(([, config]) => config.params.cursor)).toEqual([
+      undefined,
+      "c1",
+      "c2",
+    ]);
+  });
+
+  it("stops after the plain first page of a server that ignores `state`", async () => {
+    const get = vi.fn(async () => ({
+      data: { chats: [{ session_id: "s1" }], next_cursor: "c1" },
+    }));
+    (http as any).mockReturnValue({ get });
+    await assistant.listActiveChats("o");
+    expect(get).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops at its page budget", async () => {
+    const get = vi.fn(async () => ({ data: { chats: [], next_cursor: "c" } }));
+    (http as any).mockReturnValue({ get });
+    await assistant.listActiveChats("o");
+    expect(get).toHaveBeenCalledTimes(10);
+  });
+});
+
+describe("undo", () => {
+  it("posts the activity row's id to the route the server has", async () => {
+    const post = vi.fn(async () => ({ data: { id: "u1" } }));
+    (http as any).mockReturnValue({ post });
+    await expect(assistant.undo("o", "a b")).resolves.toEqual({ id: "u1" });
+    expect(post.mock.calls[0][0]).toBe("/api/o/ai/activity/a%20b/undo");
   });
 });
 

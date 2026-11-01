@@ -15,13 +15,13 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
+import { isAssistantV2, resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 import {
   SHORTCUT_REGISTRY,
   getShortcutDef,
   getShortcutDisplay,
-  isHoldShortcut,
+  setDictationReady,
   resolveShortcutKeys,
   type ShortcutCapabilities,
 } from "../shortcutRegistry";
@@ -99,7 +99,16 @@ describe("shortcut conflict audit (10 §6.4)", () => {
     expect(getShortcutDef("assistantComposerDictate")).toBeUndefined();
     expect(getShortcutDisplay("assistantComposerDictate")).toBe("ctrl+i");
     expect(getShortcutDisplay("assistantOpen")).toBe("ctrl+i");
-    expect(isHoldShortcut("assistantComposerDictate")).toBe(true);
+  });
+
+  it("lists the dictate chord only while the assistant says dictation is ready", () => {
+    const entry = SHORTCUT_REGISTRY.flatMap((group) => group.shortcuts).find(
+      (shortcut) => shortcut.id === "assistantComposerDictate",
+    )!;
+    expect(entry.visible!(ALL_ON)).toBe(false);
+    setDictationReady(true);
+    expect(entry.visible!(ALL_ON)).toBe(isAssistantV2());
+    setDictationReady(false);
   });
 
   it("never binds the palette chord to the assistant", () => {

@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { shallowRef } from "vue";
+
 import { isAssistantV2 } from "@/composables/assistant/flags";
 import type { I18nKey } from "@/types/i18n";
 /**
@@ -47,8 +49,6 @@ export interface ShortcutEntry {
   skipInInput?: boolean;
   /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
   visible?: (caps: ShortcutCapabilities) => boolean;
-  /** Pressed and held, not tapped: the cheatsheet and `OShortcut` render "Hold" before the keycaps. */
-  hold?: boolean;
 }
 
 export interface ShortcutGroup {
@@ -74,8 +74,6 @@ export interface ShortcutCapabilities {
   downtimesEnabled: boolean;
   /** `useAssistantCapability().assistantCanChat` with the v2 flag on, else false. */
   assistantCanChat: boolean;
-  /** This browser and org can dictate into the assistant. */
-  voiceAvailable?: boolean;
 }
 
 export interface ShortcutModule {
@@ -104,6 +102,7 @@ const downtimes = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.downtim
 // Every assistant row is gated on the flag too, so the cheatsheet is unchanged with it off.
 const assistantChat = (c: ShortcutCapabilities) =>
   isAssistantV2() && c.aiEnabled && c.assistantCanChat;
+const dictationReady = shallowRef(false);
 // Cluster-scoped admin surfaces only render inside the _meta org.
 const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
 const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
@@ -308,8 +307,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "assistantComposerDictate",
         display: "ctrl+i",
         descriptionKey: "shortcuts.actions.assistantComposerDictate",
-        hold: true,
-        visible: (caps) => assistantChat(caps) && !!caps.voiceAvailable,
+        visible: (caps) => assistantChat(caps) && dictationReady.value,
       },
       {
         id: "assistantGoToAnswer",
@@ -1434,9 +1432,9 @@ const ENTRIES: Map<string, ShortcutEntry> = (() => {
   return map;
 })();
 
-/** True for a chord that is held, not tapped. */
-export function isHoldShortcut(id: string): boolean {
-  return ENTRIES.get(id)?.hold === true;
+/** Lists the assistant's dictation chord in the cheatsheet; a ref, so an open cheatsheet follows it. */
+export function setDictationReady(ready: boolean): void {
+  dictationReady.value = ready;
 }
 
 /**

@@ -43,6 +43,7 @@ describe("parseFrame", () => {
         "confirmation_resolved",
         "error",
         "findings",
+        "follow_ups",
         "handoff_suggested",
         "message",
         "message_delta",

@@ -79,7 +79,7 @@ export function createHistoryCrossTab(ctx: HistoryCtx, records: HistoryRecords) 
         running: !!detail.active_turn,
         approval: detail.pending_approval === true,
         turnId: detail.active_turn_id ?? null,
-        ownerClientId: detail.owner_client_id ?? null,
+        ownerClientId: detail.active_turn_client_id ?? null,
       };
     },
     ended: (sid) => void endElsewhere(sid),
@@ -158,7 +158,7 @@ export function createHistoryCrossTab(ctx: HistoryCtx, records: HistoryRecords) 
   ) => {
     const kept = restored.get(sid);
     if (!kept) return;
-    const ending = cardEnding(detail, kept.turnId, kept.card.id);
+    const ending = cardEnding(detail, kept.turnId, kept.card.id, kept.card.kind);
     if (ending) deps.approvals?.()?.release(sid, kept.card.id, ending);
   };
 

@@ -15,7 +15,13 @@
 
 import { toRaw } from "vue";
 
-import type { ChatApproval, ChatDetail, ChatsPage, ChatSummaryWire } from "@/services/assistant";
+import type {
+  ChatApproval,
+  ChatDetail,
+  ChatsPage,
+  ChatSummaryWire,
+  ConfirmResponse,
+} from "@/services/assistant";
 import {
   assistantChatQuery,
   assistantChatsQuery,
@@ -158,7 +164,7 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
       elsewhereHooks.mark?.(sid, {
         turnId: detail.active_turn_id ?? (card ? turnId : null),
         approval: detail.pending_approval === true,
-        ownerClientId: detail.owner_client_id ?? null,
+        ownerClientId: detail.active_turn_client_id ?? null,
         ...(card && { card }),
       });
     return sid;
@@ -270,11 +276,29 @@ export function cardEnding(
   detail: Pick<ChatDetail, "active_turn" | "pending_approval" | "approvals" | "turns">,
   turnId: string,
   cardId: string,
+  kind?: ApprovalBlockData["kind"],
 ): CardEnding | null {
   const known = decisionOf(detail, turnId, cardId);
   if (known !== undefined) return known;
-  if (!detail.active_turn || detail.pending_approval === false) return "withdrawn";
+  if (!detail.active_turn) return "withdrawn";
+  // A question is never stored or marked pending, so only its turn's end can say it is over.
+  if (kind !== "question" && detail.pending_approval === false) return "withdrawn";
   return null;
+}
+
+/** What a chat read says of one pending card, with the stored row's microseconds as the milliseconds `/confirm` answers in. */
+export function serverCardOf(
+  detail: Pick<ChatDetail, "active_turn" | "pending_approval" | "approvals" | "turns">,
+  turnId: string,
+  id: string,
+  kind?: ApprovalBlockData["kind"],
+): Pick<ConfirmResponse, "expires_at" | "user_extends_left"> & { ending: CardEnding | null } {
+  const row = detail.approvals?.find((approval) => approval.id === id);
+  return {
+    ending: cardEnding(detail, turnId, id, kind),
+    expires_at: row?.expires_at === undefined ? undefined : Math.floor(row.expires_at / 1000),
+    user_extends_left: row?.user_extends_left,
+  };
 }
 
 /** The card the running turn still waits on, from the record or this browser's copy; `null` once answered, decided here or past its own expiry. */
@@ -290,7 +314,7 @@ export function waitingCardOf(
   const card =
     openCardOf(answerOfTurn(messages, turnId)) ?? openCardOf(answerOfTurn(cached ?? [], turnId));
   if (!card || typeof card.expiresAt !== "number" || card.expiresAt <= now) return null;
-  if (cardEnding(detail, turnId, card.id) !== null) return null;
+  if (cardEnding(detail, turnId, card.id, card.kind) !== null) return null;
   if (annotations[approvalAnnotationKey(card.id)]?.approvalOutcome) return null;
   const open: ApprovalBlockData = { ...card };
   delete open.noDecision;

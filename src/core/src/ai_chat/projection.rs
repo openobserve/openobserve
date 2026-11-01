@@ -43,9 +43,12 @@ const STREAM_HOLDBACK: usize = 48;
 // Blocks o2-ai's live stream holds out of the answer; only at the start of a line.
 const FINDINGS_FENCE: &str = "```findings";
 const HANDOFF_FENCE: &str = "```handoff";
+const FOLLOW_UPS_FENCE: &str = "```follow_ups";
 const FENCE_CLOSE: &str = "\n```";
 const CODE_FENCE: &str = "```";
 const FINDINGS_FRAME: &str = "findings";
+const FOLLOW_UPS_MAX: usize = 3;
+const FOLLOW_UP_CHARS_MAX: usize = 200;
 const FINDINGS_SCHEMA_JSON: &str = include_str!("findings.schema.json");
 const QUERY_AGENT: &str = "generate-query";
 // A model's `[^N]` step reference is its position among the turn's calls.
@@ -265,12 +268,14 @@ struct StreamState {
     shown_tail: Option<char>,
     /// The body of the turn's last findings block that made a valid frame.
     findings_raw: Option<String>,
+    /// The next questions of the turn's last follow-ups block.
+    follow_ups: Vec<String>,
     turn_call_ids: Vec<String>,
     step_call_ids: HashSet<String>,
 }
 
 impl StreamState {
-    /// What a text part shows: findings and hand-off blocks stay out, as on the live stream.
+    /// What a text part shows: the held-out blocks stay out, as on the live stream.
     fn shape_text(&mut self, text: &str) -> String {
         let mut shown = String::new();
         let mut rest = text;
@@ -284,6 +289,8 @@ impl StreamState {
             rest = after;
             if fence == FINDINGS_FENCE {
                 shown.push_str(&self.settle_findings(block, closed));
+            } else if fence == FOLLOW_UPS_FENCE {
+                self.follow_ups = follow_ups_of(block);
             }
         }
         shown.push_str(rest);
@@ -294,7 +301,7 @@ impl StreamState {
     }
 
     fn next_fence(&self, text: &str) -> Option<(usize, &'static str)> {
-        [FINDINGS_FENCE, HANDOFF_FENCE]
+        [FINDINGS_FENCE, HANDOFF_FENCE, FOLLOW_UPS_FENCE]
             .into_iter()
             .filter_map(|fence| Some((fence_start(text, self.shown_tail, fence)?, fence)))
             .min_by_key(|(start, _)| *start)
@@ -647,11 +654,13 @@ impl Turn {
         if let Some(error) = &self.error {
             self.frames
                 .push(json!({"type": "error", "error": error, "recoverable": false}));
-        } else if !self.aborted
-            && !self.query_mode
-            && let Some(findings) = self.state.findings_frame()
-        {
-            self.frames.push(findings);
+        } else if !self.aborted && !self.query_mode {
+            self.frames.extend(self.state.findings_frame());
+            if !self.state.follow_ups.is_empty() {
+                let items = std::mem::take(&mut self.state.follow_ups);
+                self.frames
+                    .push(json!({"type": "follow_ups", "items": items}));
+            }
         }
         let terminal = if self.aborted {
             "cancelled"
@@ -1265,6 +1274,25 @@ fn fence_start(text: &str, before: Option<char>, fence: &str) -> Option<usize> {
             .or(before)
             .is_none_or(|previous| previous == '\n')
     })
+}
+
+/// A follow-ups block's next questions, cleaned as o2-ai's `follow_ups_frame` cleans them.
+fn follow_ups_of(block: &str) -> Vec<String> {
+    let text = py_strip(block);
+    let text = text.strip_suffix(CODE_FENCE).unwrap_or(text);
+    let Ok(Value::Array(body)) = config::utils::json::from_str::<Value>(text) else {
+        return Vec::new();
+    };
+    let mut items: Vec<String> = Vec::new();
+    for item in body.iter().filter_map(Value::as_str) {
+        let words = item.split_whitespace().collect::<Vec<_>>().join(" ");
+        let text: String = words.chars().take(FOLLOW_UP_CHARS_MAX).collect();
+        if !text.is_empty() && !items.contains(&text) {
+            items.push(text);
+        }
+    }
+    items.truncate(FOLLOW_UPS_MAX);
+    items
 }
 
 /// A findings block as its frame, only when it passes the schema the web client validates.
@@ -3071,6 +3099,21 @@ mod tests {
             evidence[1],
             json!({"text": "beyond the calls of this turn", "kind": "inferred"})
         );
+    }
+
+    #[test]
+    fn a_follow_ups_block_stays_hidden_and_comes_back_as_its_frame() {
+        let answer =
+            "Done.\n```follow_ups\n[\"Why?\", \"Why?\", \"a\\n  b\", 3, \"c\", \"d\"]\n```\n";
+        let frames = last_frames(&session_answering(answer, "o2-ai", Value::Null));
+        assert!(answer_text(&frames).ends_with("Done.\n\n"));
+        let frame = frames.iter().find(|f| f["type"] == "follow_ups").unwrap();
+        assert_eq!(frame["items"], json!(["Why?", "a b", "c"]));
+
+        let bad = "Done.\n```follow_ups\nnot json\n```\n";
+        let frames = last_frames(&session_answering(bad, "o2-ai", Value::Null));
+        assert!(answer_text(&frames).ends_with("Done.\n\n"));
+        assert!(frames.iter().all(|f| f["type"] != "follow_ups"));
     }
 
     #[test]

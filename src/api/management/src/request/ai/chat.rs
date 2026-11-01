@@ -1789,7 +1789,7 @@ async fn replaced_turn(
     }
 }
 
-/// A decision o2-ai accepted: record it, then relay the answer unchanged; `extend` decides nothing.
+/// A decision o2-ai accepted: record it and relay it with its ledger ids; `extend` decides nothing.
 #[cfg(feature = "enterprise")]
 async fn relay_confirm_answer(answered: &Answered<'_>, response_body: &str) -> Response {
     let Answered {
@@ -1799,7 +1799,7 @@ async fn relay_confirm_answer(answered: &Answered<'_>, response_body: &str) -> R
         request,
         stored,
     } = *answered;
-    let answer = serde_json::from_str::<Value>(response_body)
+    let mut answer = serde_json::from_str::<Value>(response_body)
         .unwrap_or_else(|_| serde_json::json!({"ok": true}));
     if answers_question(request) {
         return (StatusCode::OK, axum::Json(answer)).into_response();
@@ -1811,7 +1811,9 @@ async fn relay_confirm_answer(answered: &Answered<'_>, response_body: &str) -> R
             .or_else(|| stored.and_then(|row| row.tool.as_deref()));
         record_decision(org_id, resolved).await;
         super::grants::record_from_confirm(org_id, session_id, caller, resolved, tool).await;
-        super::activity::record_confirm(org_id, session_id, caller, request, &answer).await;
+        let rows =
+            super::activity::record_confirm(org_id, session_id, caller, request, &answer).await;
+        super::activity::with_ledger_ids(&mut answer, &rows);
         // The chat index stops reporting the confirmation as pending.
         super::turn_marks::mark_answered(org_id, session_id, caller).await;
         record_turn_decision(org_id, session_id, caller, request).await;

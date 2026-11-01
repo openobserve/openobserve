@@ -86,11 +86,12 @@ import { createHintChannel, type AssistantHintChannel } from "./hints";
 import { isAssistantV2 } from "./flags";
 import { createIndexedDbHistory } from "./historyDb";
 import { assistantClientId } from "./historyElsewhere";
-import { cardEnding } from "./historyRecords";
+import { serverCardOf } from "./historyRecords";
 import { createLifecycle, type AssistantLifecycleRuntime } from "./lifecycle";
 import { forgetHistoryKeys, historyKeysOf, markKeptOnSignOut, readClearOnSignOut } from "./prefs";
 import { createOpenAssistant, type OpenAssistantCall } from "./openAssistant";
 import { openTabWithoutOpener } from "./openTab";
+import type { ApprovalBlockData } from "./reducer";
 import { createRuns, shownSids, type AssistantRuns, type RunsDeps } from "./runs";
 import { setRuntimeHandle } from "./runtimeHandle";
 import { assistantFocusCard } from "./shortcuts";
@@ -394,14 +395,14 @@ function onReturn(cb: () => void): () => void {
   };
 }
 
-async function readCard(org: string, sid: string, turnId: string, id: string) {
-  const detail = await assistantService.getChat(org, sid);
-  const row = detail.approvals?.find((approval) => approval.id === id);
-  return {
-    ending: cardEnding(detail, turnId, id),
-    expires_at: row?.expires_at,
-    user_extends_left: row?.user_extends_left,
-  };
+async function readCard(
+  org: string,
+  sid: string,
+  turnId: string,
+  id: string,
+  kind: ApprovalBlockData["kind"],
+) {
+  return serverCardOf(await assistantService.getChat(org, sid), turnId, id, kind);
 }
 
 // The runtime outlives every container, so the list follows the active read on its own observer.

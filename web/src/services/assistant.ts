@@ -110,7 +110,9 @@ export interface ConfirmResponse {
 
 /** The restored object, when the server's action ledger can undo an entry. */
 export interface UndoResponse {
+  /** The undo's own ledger row, not the object: that is `target.id`. */
   id?: string;
+  target?: { id?: string | null };
 }
 
 /** `POST /ai/feedback`; `trace_id` ties the rating to the turn's workflow trace. */
@@ -147,7 +149,7 @@ export interface ChatSummaryWire {
   last_turn_ended_at?: number | null;
   seen?: boolean;
   /** The `x-o2-assistant-client-id` of the tab that runs the active turn. */
-  owner_client_id?: string | null;
+  active_turn_client_id?: string | null;
 }
 
 export interface ChatsPage {
@@ -224,6 +226,12 @@ const enc = encodeURIComponent;
 
 // The server's own page size (`chats.rs` default), so Load older and the client search see the same pages.
 const CHATS_PAGE = 50;
+// The server's largest page (`chats.rs` `MAX_PAGE`); `state=active` reads only the last day's chats, which this many pages cover.
+const ACTIVE_CHATS_PAGE = 200;
+const MAX_ACTIVE_PAGES = 10;
+
+const inProgress = (chat: ChatSummaryWire) =>
+  !!chat.active_turn || !!chat.pending_approval || chat.seen === false;
 
 const statusOf = (err: unknown): number | undefined =>
   (err as { response?: { status?: number } })?.response?.status;
@@ -287,7 +295,7 @@ const chatSummarySchema = z.object({
   last_turn_status: z.string().max(32).nullable().optional().catch(undefined),
   last_turn_ended_at: z.number().nullable().optional().catch(undefined),
   seen: z.boolean().optional().catch(undefined),
-  owner_client_id: z.string().max(128).nullable().optional().catch(undefined),
+  active_turn_client_id: z.string().max(128).nullable().optional().catch(undefined),
 });
 
 const chatApprovalSchema = z.object({
@@ -497,7 +505,7 @@ const assistant = {
   /** Undoes one entry of the server's action ledger. */
   undo: async (org: string, ledgerId: string): Promise<UndoResponse> => {
     const res = await http().post<UndoResponse>(
-      `/api/${enc(org)}/ai/actions/${enc(ledgerId)}/undo`,
+      `/api/${enc(org)}/ai/activity/${enc(ledgerId)}/undo`,
       {},
       { ...ASSISTANT_REQUEST, timeout: UNDO_TIMEOUT_MS },
     );
@@ -515,13 +523,22 @@ const assistant = {
     return parseChatsPage(res.data);
   },
 
-  /** Running, waiting and recently finished chats; a server without `state` answers its plain first page. */
+  /** Running, waiting and recently finished chats, every page of them; a server without `state` answers its plain first page. */
   listActiveChats: async (org: string): Promise<ChatsPage> => {
-    const res = await http().get<ChatsPage>(`/api/${enc(org)}/ai/chats`, {
-      ...ASSISTANT_REQUEST,
-      params: { limit: String(CHATS_PAGE), state: "active" },
-    });
-    return parseChatsPage(res.data);
+    const chats: ChatSummaryWire[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < MAX_ACTIVE_PAGES; page += 1) {
+      const res = await http().get<ChatsPage>(`/api/${enc(org)}/ai/chats`, {
+        ...ASSISTANT_REQUEST,
+        params: { limit: String(ACTIVE_CHATS_PAGE), state: "active", ...(cursor && { cursor }) },
+      });
+      const parsed = parseChatsPage(res.data);
+      chats.push(...parsed.chats);
+      // The server pages its recent rows before it filters them, so an empty page can still have a next one.
+      cursor = parsed.next_cursor ?? undefined;
+      if (!cursor || !parsed.chats.every(inProgress)) break;
+    }
+    return { chats };
   },
 
   /** With `known`, an unchanged chat answers `not_modified` and a stale one only its newer turns. */

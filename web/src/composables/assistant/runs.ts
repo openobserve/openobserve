@@ -497,7 +497,7 @@ function hasEvidence(
 ): boolean {
   const beatAt = input.remote.find((turn) => turn.sid === session.sid)?.beatAt;
   if (beatAt && input.now - beatAt < HEARTBEAT_TRUST_MS) return true;
-  return !!chat?.owner_client_id && chat.owner_client_id !== input.clientId;
+  return !!chat?.active_turn_client_id && chat.active_turn_client_id !== input.clientId;
 }
 
 function sessionRow(session: AssistantSession, input: RunsInput): RunRow | null {
@@ -560,7 +560,7 @@ function remoteRow(turn: RemoteTurn, input: RunsInput): RunRow | null {
   if (session?.record.ephemeral) return null;
   const chat = input.chats.find((candidate) => candidate.session_id === turn.sid);
   const fresh = !!turn.beatAt && input.now - turn.beatAt < HEARTBEAT_TRUST_MS;
-  const owned = !!chat?.owner_client_id && chat.owner_client_id !== input.clientId;
+  const owned = !!chat?.active_turn_client_id && chat.active_turn_client_id !== input.clientId;
   const needs = turn.state === "needs_you";
   return {
     ...baseRow(turn.sid, input.org, input.now),
@@ -595,7 +595,7 @@ function serverRow(
   if (chat.pending_approval)
     return { ...base, group: "needs_you", status: "needsApproval", request: chat.session_id };
   if (chat.active_turn) {
-    const other = !!chat.owner_client_id && chat.owner_client_id !== input.clientId;
+    const other = !!chat.active_turn_client_id && chat.active_turn_client_id !== input.clientId;
     return { ...base, status: other ? "elsewhere" : "reconnecting" };
   }
   // A chat this tab has open was seen here; `seen` absent means a server that cannot say, so nothing is claimed.

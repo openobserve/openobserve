@@ -184,6 +184,22 @@ describe("one microphone", () => {
     expect(controller.state.phase).toBe("waiting");
   });
 
+  it("cancels a waiting run when the tab hides, and a late grant never starts listening", async () => {
+    engine.holdPrompt = true;
+    const target = fakeVoiceTarget();
+    detach.push(controller.attach(target));
+    const started = controller.start(target, "mic");
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    visibility.mockRestore();
+
+    expect(controller.state.phase).toBe("idle");
+    expect(target.ends).toEqual([{ kind: "cancelled" }]);
+    engine.grant!();
+    await started;
+    expect(engine.handlers).toBeNull();
+  });
+
   it("stops when the target detaches", async () => {
     const target = fakeVoiceTarget();
     const off = controller.attach(target);

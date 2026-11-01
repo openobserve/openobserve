@@ -35,6 +35,7 @@ import {
   writeVoiceOptIn,
   type Sid,
 } from "@/composables/assistant";
+import { setDictationReady } from "@/lib/vue-shortcut-manager/shortcutRegistry";
 import { getIntlLocale } from "@/locales";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { isMacOS } from "@/utils/keyboardShortcuts";
@@ -509,7 +510,10 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
   }
 
   function onVisibility(): void {
-    if (document.visibilityState === "hidden") onWindowLeft();
+    if (document.visibilityState !== "hidden") return;
+    onWindowLeft();
+    // Unlike blur, a permission prompt never hides the tab, so a run still waiting ends with it.
+    if (state.phase === "waiting") stop("other");
   }
 
   function onConnectivity(): void {
@@ -636,6 +640,7 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
   const listening = computed(() => mine.value && state.phase === "listening");
   const waiting = computed(() => mine.value && state.phase === "waiting");
   const status = availability.status;
+  watch(status, (current) => setDictationReady(current === "ready"), { immediate: true });
   const offline = computed(() => !state.online && !state.onDevice);
   const mic = computed<VoiceMic>(() => {
     if (options.touch() || status.value === "unsupported") return "none";

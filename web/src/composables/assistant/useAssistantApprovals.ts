@@ -107,7 +107,13 @@ export interface ApprovalsDeps {
   extend(org: string, sid: Sid, id: string, by: ExtendBudget): Promise<ConfirmResponse>;
   extendable(): boolean;
   /** The server's view of a card, read fresh; absent or `null` where it keeps no record. */
-  readCard?(org: string, sid: Sid, turnId: string, id: string): Promise<ServerCard | null>;
+  readCard?(
+    org: string,
+    sid: Sid,
+    turnId: string,
+    id: string,
+    kind: ApprovalBlockData["kind"],
+  ): Promise<ServerCard | null>;
   /** An approve or an undo changed objects of these types, so their open lists refresh. */
   changed?(types: string[]): void;
   hints: Pick<HintChannel, "on">;
@@ -473,7 +479,7 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
       if (!session || !pending || !deps.readCard) return;
       if (inFlight.has(keyOf(sid, pending.id))) return;
       const card = await deps
-        .readCard(session.org, sid, pending.turnId, pending.id)
+        .readCard(session.org, sid, pending.turnId, pending.id, pending.kind)
         .catch(() => null);
       if (!card || sessionOf(sid)?.pendingApproval?.id !== pending.id) return;
       if (!card.ending) return void adopt(sid, pending.id, card);
@@ -819,10 +825,16 @@ function changedTypes(card: ApprovalBlockData, detail: ApprovalDetail | undefine
 // A refused extend names the budget it spent; only `approval_expired` and a card the server no longer holds end it here.
 function extendRefusal(err: unknown): Exclude<BackgroundExtend, "extended"> {
   const response = (err as { response?: { status?: number; data?: unknown } } | null)?.response;
-  const body = (response?.data ?? {}) as { code?: unknown; error_code?: unknown; error?: unknown };
-  const code = [body.code, body.error_code, body.error].find((v) => typeof v === "string");
-  if (code === "extend_limit") return "spent";
-  if (code === "approval_expired" || response?.status === 404 || response?.status === 410)
+  const body = (response?.data ?? {}) as {
+    reason?: unknown;
+    code?: unknown;
+    error_code?: unknown;
+    error?: unknown;
+  };
+  // The Rust envelope's `code` is its own ledger's; o2-ai's refusal travels as `reason`.
+  const codes = [body.reason, body.code, body.error_code, body.error];
+  if (codes.includes("extend_limit")) return "spent";
+  if (codes.includes("approval_expired") || response?.status === 404 || response?.status === 410)
     return "expired";
   return "failed";
 }

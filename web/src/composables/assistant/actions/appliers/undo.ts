@@ -53,15 +53,15 @@ async function undoApplier(
   };
   update({ undoing: true, undoFailed: false });
   try {
-    const restored = await env.undo(session.org, entry.id);
+    const restoredId = (await env.undo(session.org, entry.id)).target?.id;
     update({
       status: "undone",
       undoing: false,
       undoneAt: env.now(),
-      ...(restored.id && { resource: { ...entry.resource, id: restored.id } }),
+      ...(restoredId && { resource: { ...entry.resource, id: restoredId } }),
     });
     trackAssistant("ai_undo", { op, resource_kind: entry.resource.type, succeeded: true });
-    return { ok: true, detail: { restoredId: restored.id ?? null } };
+    return { ok: true, detail: { restoredId: restoredId ?? null } };
   } catch (err) {
     const answered =
       typeof (err as { response?: { status?: unknown } })?.response?.status === "number";

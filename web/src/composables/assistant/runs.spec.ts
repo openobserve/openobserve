@@ -152,7 +152,7 @@ describe("runsList", () => {
     const owned = runsList(
       input({
         sessions: [answering("s", follower)],
-        chats: [chat("s", { active_turn: true, owner_client_id: "other" })],
+        chats: [chat("s", { active_turn: true, active_turn_client_id: "other" })],
       }),
     );
     expect(owned[0].status).toBe("elsewhere");
@@ -160,7 +160,7 @@ describe("runsList", () => {
 
   it("never claims a turn the server says this very client owns", () => {
     const rows = runsList(
-      input({ chats: [chat("s", { active_turn: true, owner_client_id: "me" })] }),
+      input({ chats: [chat("s", { active_turn: true, active_turn_client_id: "me" })] }),
     );
     expect(rows[0].status).toBe("reconnecting");
   });
