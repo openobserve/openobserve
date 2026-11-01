@@ -61,8 +61,9 @@ vi.mock("@/components/ai-assistant/gate/AssistantGateState.vue", () => ({
   },
 }));
 
-function setup(gate: GateCode = "available") {
+function setup(gate: GateCode = "available", history: Record<string, unknown> = {}) {
   fake.current = fakeAssistant(gate);
+  fake.current.history = Object.assign(fake.current.history, history);
   const router = fakeRouter([
     { path: "/billings/plans", name: "plans", component: { render: () => null } },
   ]);
@@ -221,21 +222,43 @@ describe("AssistantLauncher", () => {
     expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(false);
   });
 
-  it("hides its Suggestions while the sidebar shows its own welcome (D5 decision 10)", async () => {
+  it("folds to its header while the sidebar is open (D5 decision 10)", async () => {
     const { wrapper, store } = setup();
     expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(true);
     store.state.shell.placement = { kind: "sidebar" };
     await flushPromises();
     expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="assistant-launcher-your-chats"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-launcher-your-chats"]').exists()).toBe(false);
+    expect(wrapper.find("input").exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-launcher-open"]').exists()).toBe(true);
   });
 
-  it("names the default window in the disclosure and opens the full view in place", () => {
+  it("holds the time prefix and the i inside the input, and opens the full view in place", () => {
     const { wrapper } = setup();
-    expect(wrapper.get('[data-test="assistant-launcher-disclosure"]').text()).toMatch(
-      /^Sends with the default time range, \S/,
-    );
+    const field = wrapper.get('[data-test="assistant-launcher-input"]');
+    expect(field.find('[data-test="assistant-context-chip-time"]').text()).toBe("Last 15 min");
+    expect(field.find('[data-test="assistant-launcher-sees"]').exists()).toBe(true);
     expect(wrapper.get('[data-test="assistant-launcher-open"]').text()).toBe("Open full view");
+    expect(input(wrapper).attributes("placeholder")).toBe("Ask about your data");
+  });
+
+  it("turns Ask on only with text", async () => {
+    const { wrapper } = setup();
+    const ask = () => wrapper.get('[data-test="assistant-launcher-ask"]');
+    expect(ask().attributes("disabled")).toBeDefined();
+    await input(wrapper).setValue("why?");
+    expect(ask().attributes("disabled")).toBeUndefined();
+  });
+
+  it("states a failed list with the same words as the title menu, and retries", async () => {
+    const retry = vi.fn();
+    const listState = computed(() => ({ status: "error", offline: false }));
+    const { wrapper } = setup("available", { listState, retry });
+    await flushPromises();
+    const row = wrapper.get('[data-test="assistant-launcher-recent-failed"]');
+    expect(row.text()).toContain("Couldn't load your chats");
+    await wrapper.get('[data-test="assistant-launcher-recent-retry"]').trigger("click");
+    expect(retry).toHaveBeenCalled();
   });
 
   it("opens What the assistant sees from a named icon that takes no text width (PO A34)", () => {
@@ -248,10 +271,7 @@ describe("AssistantLauncher", () => {
   it("shows at most three suggestions and no other suggestion group (PO A34)", () => {
     const { wrapper } = setup();
     expect(wrapper.findAll('[data-test^="assistant-launcher-starter-"]')).toHaveLength(3);
-    expect(wrapper.findAll("h3").map((heading) => heading.text())).toEqual([
-      "Suggestions",
-      "Your chats",
-    ]);
+    expect(wrapper.findAll("h3").map((heading) => heading.text())).toEqual(["Recent"]);
   });
 
   it("shows skeleton rows while the starters load", () => {

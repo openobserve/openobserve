@@ -85,10 +85,10 @@ async function openPopover(shared = false) {
 }
 
 describe("AssistantContextSeesPopover", () => {
-  it("lists Sent with your message and Not read by the assistant yet from the table (CT-04 AC 1–2)", async () => {
+  it("lists what is sent, untitled, and Not read by the assistant yet from the table (CT-04 AC 1–2)", async () => {
     const { panel } = await openPopover();
     const sent = panel()!.querySelector('[data-test="assistant-context-sees-sent"]')!;
-    expect(sent.textContent).toContain("Sent with your message");
+    expect(sent.textContent).not.toContain("Sent with your message");
     expect(sent.textContent).toContain("Streams");
     expect(sent.textContent).toContain("default (traces)");
     const notRead = panel()!.querySelector('[data-test="assistant-context-sees-not_read"]')!;
@@ -114,7 +114,7 @@ describe("AssistantContextSeesPopover", () => {
     const plain = await openPopover();
     expect(
       plain.panel()!.querySelector('[data-test="assistant-context-sees-disclosure"]')?.textContent,
-    ).toBe("Attached data is sent to the assistant and saved with this chat.");
+    ).toBe("Sent to the assistant and saved with this chat.");
     document.body.innerHTML = "";
     const shared = await openPopover(true);
     expect(

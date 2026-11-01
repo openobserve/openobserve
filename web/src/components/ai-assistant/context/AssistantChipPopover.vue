@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     privacy="mask"
     side="top"
     align="start"
-    :aria-label="chip.kind === 'time' ? t('assistant.context.time.swap') : chip.label"
+    :aria-label="chip.label"
     content-class="flex w-[min(28rem,calc(100vw-1.5rem))] max-h-[min(32rem,70vh)] flex-col gap-3 overflow-y-auto p-3"
     @update:open="(value) => emit('update:open', value)"
   >
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       ref="body"
-      :data-test="chip.kind === 'time' ? 'assistant-context-time-picker' : 'assistant-chip-popover'"
+      data-test="assistant-chip-popover"
       data-dd-privacy="mask"
       class="flex min-w-0 flex-col gap-3"
     >
@@ -42,48 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </header>
 
-      <template v-if="chip.kind === 'time'">
-        <OText
-          v-if="window?.source === 'default'"
-          variant="meta"
-          data-test="assistant-context-time-default-note"
-        >
-          {{ t("assistant.context.time.defaultNote") }}
-        </OText>
-        <ODateTimeRange
-          v-bind="pickerValue"
-          :timezone="timezone"
-          show-timezone
-          :auto-apply="false"
-          tabindex="0"
-          data-test="assistant-context-time-range"
-          @change="onPick"
-        />
-        <div class="flex flex-wrap justify-end gap-2">
-          <OButton
-            variant="ghost"
-            size="sm"
-            class="max-md:min-h-11 pointer-coarse:min-h-11"
-            :disabled="window?.source !== 'custom'"
-            data-test="assistant-context-time-page"
-            @click="emit('apply-time', null)"
-          >
-            {{ t("assistant.context.time.usePage") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm"
-            class="max-md:min-h-11 pointer-coarse:min-h-11"
-            :disabled="!picked"
-            data-test="assistant-context-time-apply"
-            @click="picked && emit('apply-time', picked)"
-          >
-            {{ t("assistant.context.time.apply") }}
-          </OButton>
-        </div>
-      </template>
-
-      <template v-else>
+      <template v-if="chip.kind !== 'time'">
         <img
           v-if="chip.kind === 'image' && imageSrc"
           :src="imageSrc"
@@ -176,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import type { ComposerState, ContextChip, TimeWindow } from "@/composables/assistant";
+import type { ContextChip } from "@/composables/assistant";
 
 export interface AssistantChipPopoverProps {
   chip: ContextChip;
@@ -184,8 +143,6 @@ export interface AssistantChipPopoverProps {
   readonly?: boolean;
   /** `data:` URL of an image chip. */
   imageSrc?: string;
-  window?: TimeWindow;
-  timezone?: string;
   /** "Open in Logs": shown when the chip names something the explorer can open. */
   openLabel?: I18nText | null;
 }
@@ -196,8 +153,6 @@ export interface AssistantChipPopoverEmits {
   (e: "remove-row", index: number): void;
   /** `true` sends `_o2_id` and `_original` too. */
   (e: "trim", includeInternal: boolean): void;
-  /** `null` goes back to the page's time. */
-  (e: "apply-time", range: ComposerState["timeOverride"]): void;
   /** Tab past the last control: the tray moves focus to the control after the chip. */
   (e: "tab-out"): void;
   /** Open in {page}: the tray opens it through the explorer applier. */
@@ -211,51 +166,25 @@ export interface AssistantChipPopoverEmits {
 import { computed, nextTick, ref, watch } from "vue";
 
 import { assistantGlyph, chipGlyph } from "@/components/ai-assistant/common/glyphs";
-import { INTERNAL_FIELDS, periodMs } from "@/composables/assistant";
+import { INTERNAL_FIELDS } from "@/composables/assistant";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
-import type {
-  DateTimeRangeValue,
-  RelativeUnit,
-} from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { convertDateToTimestamp, formatTimestampInTimezone } from "@/utils/date";
 import { formatCount, formatOrgTime } from "@/utils/formatters";
 
 import AssistantFieldList from "./AssistantFieldList.vue";
 
-const UNIT_OF: Record<string, RelativeUnit> = {
-  s: "seconds",
-  m: "minutes",
-  h: "hours",
-  d: "days",
-  w: "weeks",
-  M: "months",
-};
-
 const TABBABLE =
   "button:not([disabled]), [href], input:not([disabled]), [role='switch'], [tabindex='0']";
-
-const LETTER_OF: Record<RelativeUnit, string> = {
-  seconds: "s",
-  minutes: "m",
-  hours: "h",
-  days: "d",
-  weeks: "w",
-  months: "M",
-};
 
 const props = withDefaults(defineProps<AssistantChipPopoverProps>(), {
   readonly: false,
   imageSrc: undefined,
-  window: undefined,
-  timezone: "UTC",
   openLabel: null,
 });
 
@@ -264,27 +193,16 @@ const emit = defineEmits<AssistantChipPopoverEmits>();
 defineSlots<{ anchor: () => unknown }>();
 
 const { t } = useI18nTyped();
-const picked = ref<ComposerState["timeOverride"]>(null);
-
 const body = ref<HTMLElement | null>(null);
 
-watch(
-  () => props.open,
-  (open) => {
-    if (open) picked.value = null;
-  },
-);
-
-// The body mounts with the open popover; focus then lands on the first action (the picker for the time chip), not a scroll box (CT-03 AC 5).
+// The body mounts with the open popover; focus then lands on the first action, not a scroll box.
 watch(body, async (el, _old, onCleanup) => {
   if (!el) return;
   el.addEventListener("keydown", onTab);
   onCleanup(() => el.removeEventListener("keydown", onTab));
   await nextTick();
   const first =
-    el.querySelector<HTMLElement>('[data-test="datetimerange-trigger"]') ??
-    el.querySelector("[data-chip-actions]")?.querySelector<HTMLElement>(TABBABLE) ??
-    tabbables()[0];
+    el.querySelector("[data-chip-actions]")?.querySelector<HTMLElement>(TABBABLE) ?? tabbables()[0];
   first?.focus();
 });
 
@@ -345,52 +263,6 @@ const provenance = computed<I18nText>(() => {
     );
   return raw(parts.join(" · "));
 });
-
-// The picker opens on the window the chip shows: relative stays relative, a range shows its ends in the org zone.
-const pickerValue = computed(() => {
-  const window = props.window;
-  const match = window?.period ? /^(\d+)([smhdwM])$/.exec(window.period) : null;
-  if (window && match)
-    return {
-      mode: "relative" as const,
-      relativeAmount: Number(match[1]),
-      relativeUnit: UNIT_OF[match[2]],
-    };
-  if (!window)
-    return { mode: "relative" as const, relativeAmount: 15, relativeUnit: "minutes" as const };
-  const at = (ms: number, format: string) =>
-    formatTimestampInTimezone(ms * 1000, format, props.timezone);
-  return {
-    mode: "absolute" as const,
-    startDate: at(window.from, "YYYY-MM-DD"),
-    startTime: at(window.from, "HH:mm"),
-    endDate: at(window.to, "YYYY-MM-DD"),
-    endTime: at(window.to, "HH:mm"),
-  };
-});
-
-function onPick(value: DateTimeRangeValue): void {
-  if (value.type === "relative") {
-    const period = `${value.amount}${LETTER_OF[value.unit]}`;
-    const to = Date.now();
-    const from = to - periodMs(period);
-    picked.value = { from, to, period };
-    return;
-  }
-  const ms = (date: string, time: string) => {
-    const [year, month, day] = date.split("-");
-    return (
-      convertDateToTimestamp(
-        `${day}-${month}-${year}`,
-        time || "00:00",
-        value.timezone || props.timezone,
-      ).timestamp / 1000
-    );
-  };
-  const from = ms(value.startDate, value.startTime);
-  const to = ms(value.endDate, value.endTime);
-  picked.value = from > 0 && to > from ? { from, to } : null;
-}
 
 // Characters of the attached value as the assistant reads it, not its UTF-8 bytes.
 function characterCount(data: unknown): number {

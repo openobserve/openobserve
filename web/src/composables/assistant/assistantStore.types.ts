@@ -292,6 +292,7 @@ export interface OpenAssistantArgs {
   /** `send` only for explain | troubleshoot | fix and the launcher's typed line (`10` §3). */
   intent: "open" | "stage" | "send";
   payload?: {
+    timeOverride?: ComposerState["timeOverride"];
     chips: ContextChip[];
     text?: string;
     title?: I18nText;

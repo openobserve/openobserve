@@ -140,47 +140,6 @@ describe("AssistantChipPopover", () => {
     expect(img.className).toContain("max-h-80");
   });
 
-  it("offers Use page time only once the time is custom, and Apply only after a pick (CT-01 AC 4–5)", async () => {
-    const time: ContextChip = {
-      ...ROW,
-      kind: "time",
-      label: raw("Time · last 15 min"),
-      data: undefined,
-      provenance: "page",
-    };
-    const { wrapper } = await open({
-      chip: time,
-      window: { from: 0, to: 900_000, period: "15m", source: "page" },
-    });
-    const picker = () =>
-      document.body.querySelector('[data-test="assistant-context-time-picker"]')!;
-    expect(
-      picker().querySelector<HTMLButtonElement>('[data-test="assistant-context-time-page"]')!
-        .disabled,
-    ).toBe(true);
-    expect(
-      picker().querySelector<HTMLButtonElement>('[data-test="assistant-context-time-apply"]')!
-        .disabled,
-    ).toBe(true);
-    await wrapper.setProps({ window: { from: 0, to: 3_600_000, period: "1h", source: "custom" } });
-    picker().querySelector<HTMLElement>('[data-test="assistant-context-time-page"]')!.click();
-    expect(wrapper.emitted("apply-time")).toEqual([[null]]);
-  });
-
-  it("says why the default applies on a page without a range (CT-01 AC 2)", async () => {
-    const time: ContextChip = {
-      ...ROW,
-      kind: "time",
-      label: raw("Time · last 15 min · default"),
-      data: undefined,
-      provenance: "page",
-    };
-    await open({ chip: time, window: { from: 0, to: 900_000, period: "15m", source: "default" } });
-    expect(
-      document.body.querySelector('[data-test="assistant-context-time-default-note"]')?.textContent,
-    ).toContain("this page has no time range");
-  });
-
   it("opens on its first action, and Tab at either edge hands focus back to the tray (CT-03 AC 5, U3)", async () => {
     const big = { ...ROW, data: { message: "z".repeat(2_000), _o2_id: "1" } };
     const { wrapper } = await open({ chip: big });

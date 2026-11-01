@@ -17,17 +17,13 @@ import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ContextChip } from "@/composables/assistant";
-import {
-  refreshPageContext,
-  resetAssistantContextForTests,
-} from "@/composables/assistant/context/useAssistantContext";
 import { contextRegistry } from "@/composables/contextProviders/registry";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
-import { composerUi, noteCap, resetComposerUiForTests } from "../composer/composerUi";
-import AssistantContextTray from "./AssistantContextTray.vue";
+import { composerUi, resetComposerUiForTests } from "../composer/composerUi";
+import AssistantContextTray, { trayChipLimit } from "./AssistantContextTray.vue";
 
 const { fake, breakpoint } = vi.hoisted(() => ({
   fake: { current: null as any },
@@ -108,26 +104,6 @@ afterEach(() => {
 });
 
 describe("AssistantContextTray", () => {
-  it("carries the agent picker while the roster offers a choice", async () => {
-    const { wrapper } = await setup();
-    const picker = '[data-test="assistant-agent-picker"]';
-    expect(wrapper.find(picker).exists()).toBe(false);
-    fake.current.capability.value = {
-      ...fake.current.capability.value,
-      agents: [
-        { id: "o2-ai", pickable: true, available: true },
-        { id: "sre", pickable: true, available: true },
-      ],
-    };
-    await flushPromises();
-    expect(wrapper.find(picker).exists()).toBe(true);
-  });
-
-  it("drops its own padding inside the composer frame", async () => {
-    const { wrapper } = await setup({ framed: true });
-    expect(wrapper.get('[data-test="assistant-context-tray"]').classes()).not.toContain("px-3");
-  });
-
   it("puts a pasted text chip back into the draft from its popover (D4 §3.9)", async () => {
     const { wrapper, store, sid } = await setup();
     store.setDraft(sid, { text: "why" });
@@ -150,40 +126,28 @@ describe("AssistantContextTray", () => {
     expect(store.state.sessions[sid].composer.chips).toEqual([]);
   });
 
-  it("is a named group: time first, then page chips, then staged chips, then ghosts (`40` §2.1)", async () => {
+  it("is a named group: time first, then only the chips the user added (§1)", async () => {
     const { wrapper, store, sid, labels } = await setup();
     const group = wrapper.get('[data-test="assistant-context-tray"]');
     expect(group.attributes()).toMatchObject({
       role: "group",
       "aria-label": "Context for your next message",
     });
+    expect(labels()).toEqual([]);
+    expect(wrapper.get('[data-test="assistant-context-chip-time"]').text()).toBe("Last 15 min");
+    expect(wrapper.get('[data-test="assistant-context-chip-time"]').attributes("aria-label")).toBe(
+      "Time range, Last 15 min, from this page",
+    );
     store.addChip(sid, ROW);
-    store.setDraft(sid, { removedPageKeys: ["currentSQLQuery"] });
     await flushPromises();
-    expect(labels()).toEqual([
-      "Time · last 15 min · page",
-      "Stream · default · logs",
-      "Log row · cart · 13:57",
-      "SQL · default · Add back",
-    ]);
+    expect(labels()).toEqual(["Log row · cart · 13:57"]);
   });
 
-  it("removes a page chip into a ghost, announces it and fires the event (CT-01 AC 7)", async () => {
-    const { wrapper, store, sid } = await setup();
-    const removes = wrapper.findAll('[data-test="assistant-context-chip-remove"]');
-    await removes[0].trigger("click");
-    await flushPromises();
-    expect(store.state.sessions[sid].composer.removedPageKeys).toEqual(["selectedStreams"]);
-    expect(composerUi(sid).status?.text).toBe("Stream · default removed from context");
-    expect(trackAssistant).toHaveBeenCalledWith("ai_context_changed", {
-      action: "remove",
-      kind: "stream",
-      count: 1,
-      bytes: expect.any(Number),
-    });
-    const ghost = wrapper.findAll('[data-test="assistant-context-chip-button"]').at(-1)!;
-    await ghost.trigger("click");
-    expect(store.state.sessions[sid].composer.removedPageKeys).toEqual([]);
+  it("lands on no shell prop as a DOM attribute", async () => {
+    const { wrapper } = await setup({ collapsed: true, framed: true, visible: true });
+    const root = wrapper.get('[data-test="assistant-context-tray"]');
+    expect(root.attributes("framed")).toBeUndefined();
+    expect(root.attributes("visible")).toBeUndefined();
   });
 
   it("removes a staged chip with Delete and moves focus to the next chip (CT-08 AC 4)", async () => {
@@ -192,7 +156,8 @@ describe("AssistantContextTray", () => {
     store.addChip(sid, { ...ROW, id: "row-2", label: raw("Log row · cart · 13:58") });
     await flushPromises();
     const buttons = () => wrapper.findAll('[data-test="assistant-context-chip-button"]');
-    await buttons()[3].trigger("keydown", { key: "Delete" });
+    await wrapper.get('[data-test="assistant-context-more"]').trigger("click");
+    await buttons()[0].trigger("keydown", { key: "Delete" });
     await flushPromises();
     expect(store.state.sessions[sid].composer.chips.map((c: ContextChip) => c.id)).toEqual([
       "row-2",
@@ -200,79 +165,33 @@ describe("AssistantContextTray", () => {
     expect(document.activeElement?.textContent).toContain("13:58");
   });
 
-  it("collapses to Time + 1 + more below md and expands in place (CT-01 AC 9)", async () => {
-    breakpoint.md = false;
+  it("shows one chip then +N at 27 rem, all behind +N when narrow, and expands in place", async () => {
     const { wrapper, store, sid, labels } = await setup();
     store.addChip(sid, ROW);
+    store.addChip(sid, { ...ROW, id: "row-2", label: raw("Log row · cart · 13:58") });
     await flushPromises();
-    expect(labels()).toHaveLength(2);
+    expect(labels()).toEqual(["Log row · cart · 13:57"]);
     const more = wrapper.get('[data-test="assistant-context-more"]');
-    expect(more.text()).toBe("+2");
+    expect(more.text()).toBe("+1");
     expect(more.attributes("aria-expanded")).toBe("false");
     await more.trigger("click");
-    expect(labels()).toHaveLength(4);
-    expect(wrapper.get('[data-test="assistant-context-more"]').attributes("aria-expanded")).toBe(
-      "true",
-    );
+    expect(labels()).toHaveLength(2);
+    const fewer = wrapper.get('[data-test="assistant-context-more"]');
+    expect(fewer.attributes("aria-expanded")).toBe("true");
+    expect(fewer.attributes("aria-label")).toBe("Show fewer context chips");
+    expect(trayChipLimit({ narrow: true, wide: false })).toBe(0);
+    expect(trayChipLimit({ narrow: false, wide: true })).toBe(3);
   });
 
-  it("states a cap under the tray, never as a toast (CT-02 AC 7)", async () => {
-    const { wrapper, sid } = await setup();
-    noteCap(sid, raw("Up to 20 rows or 32 KB of attached data per message"));
-    await flushPromises();
-    expect(wrapper.get('[data-test="assistant-context-cap"]').text()).toBe(
-      "Up to 20 rows or 32 KB of attached data per message",
-    );
-  });
-
-  it("offers a fresh chat when a door staged into a recent thread, moving the whole staged payload (`40` §2.4, S8)", async () => {
-    const { wrapper, store, sid } = await setup();
-    store.setTitle(sid, raw("Checkout 5xx"), "renamed");
-    store.state.sessions[sid].messages.push({ role: "user", content: raw("hi") });
-    store.state.sessions[sid].turnMeta.startedAt = Date.now();
-    store.addChip(sid, ROW);
-    store.addImage(sid, { data: "aGk=", mimeType: "image/png", filename: "shot.png", size: 2 });
-    store.setDraft(sid, {
-      timeOverride: { from: 0, to: 1, period: "7d" },
-      removedPageKeys: ["sqlQuery"],
-    });
-    await wrapper.setProps({ sid: null });
-    await wrapper.setProps({ sid });
-    await flushPromises();
-    expect(wrapper.get('[data-test="assistant-context-thread"]').text()).toContain(
-      "In: Checkout 5xx",
-    );
-    await wrapper.get('[data-test="assistant-context-start-new"]').trigger("click");
-    const fresh = store.state.shell.activeSid;
-    expect(fresh).not.toBe(sid);
-    expect(store.state.sessions[fresh].composer.chips.map((c: ContextChip) => c.id)).toEqual([
-      "row-1",
-    ]);
-    expect(store.state.sessions[fresh].composer).toMatchObject({
-      timeOverride: { period: "7d" },
-      removedPageKeys: ["sqlQuery"],
-    });
-    expect(store.state.sessions[fresh].composer.images.map((i) => i.filename)).toEqual([
-      "shot.png",
-    ]);
-    expect(store.state.sessions[sid].composer).toMatchObject({
-      chips: [],
-      images: [],
-      timeOverride: null,
-      removedPageKeys: [],
-    });
-  });
-
-  it("has the What the assistant sees trigger at its trailing edge (`40` §3)", async () => {
-    const { wrapper } = await setup();
-    expect(wrapper.find('[data-test="assistant-context-sees"]').exists()).toBe(true);
-  });
-
-  it("never shows images in the tray; the composer strip is their one surface (U1)", async () => {
-    const { store, sid, labels } = await setup();
+  it("carries images as chips, removed like any other (U1)", async () => {
+    const { store, sid, labels, wrapper } = await setup();
     store.addImage(sid, { data: "aGk=", mimeType: "image/png", filename: "shot.png", size: 2 });
     await flushPromises();
-    expect(labels().some((label) => label.includes("shot.png"))).toBe(false);
+    expect(labels()).toEqual(["shot.png"]);
+    await wrapper.get('[data-test="assistant-context-chip-remove"]').trigger("click");
+    await flushPromises();
+    expect(store.state.sessions[sid].composer.images).toEqual([]);
+    expect(composerUi(sid).status?.text).toBe("shot.png removed from context");
   });
 
   it("recounts a log rows chip's label when a row is removed", async () => {
@@ -298,7 +217,7 @@ describe("AssistantContextTray", () => {
     expect(String(chip?.label)).toBe("Log rows · 2 · cart");
   });
 
-  it("returns focus to the chip when its popover closes by Escape, and after Add back (U2)", async () => {
+  it("returns focus to the chip when its popover closes by Escape (U2)", async () => {
     const { wrapper, store, sid } = await setup();
     store.addChip(sid, ROW);
     await flushPromises();
@@ -320,95 +239,6 @@ describe("AssistantContextTray", () => {
     );
     await flushPromises();
     expect(document.activeElement).toBe(rowChip().element);
-    await wrapper.findAll('[data-test="assistant-context-chip-remove"]')[0].trigger("click");
-    await flushPromises();
-    const ghost = wrapper.findAll('[data-test="assistant-context-chip-button"]').at(-1)!;
-    expect(ghost.attributes("aria-haspopup")).toBeUndefined();
-    await ghost.trigger("click");
-    await flushPromises();
-    expect(document.activeElement?.textContent).toContain("Stream · default");
-  });
-
-  it("keeps the phone tray to one row: the icon names the kind, the full name stays accessible, names wrap, Fewer chips only when it hides something (U4, U13, V5)", async () => {
-    breakpoint.md = false;
-    const { wrapper, store, sid, labels } = await setup();
-    expect(labels()).toEqual(["15 min", "default"]);
-    const buttons = wrapper.findAll('[data-test="assistant-context-chip-button"]');
-    expect(buttons[0].attributes("aria-label")).toContain("Time · 15 min");
-    expect(buttons[1].attributes("aria-label")).toContain("default");
-    expect(
-      wrapper.find('[data-test="assistant-context-chip-stream"] .whitespace-normal').exists(),
-    ).toBe(true);
-    store.setDraft(sid, { removedPageKeys: ["currentSQLQuery", "selectedStreams"] });
-    await flushPromises();
-    expect(wrapper.find('[data-test="assistant-context-more"]').text()).toBe("+2");
-    store.setDraft(sid, { removedPageKeys: [] });
-    store.addChip(sid, ROW);
-    await flushPromises();
-    const more = wrapper.get('[data-test="assistant-context-more"]');
-    expect(more.classes()).toContain("pointer-coarse:min-w-11");
-    await more.trigger("click");
-    const fewer = wrapper.get('[data-test="assistant-context-more"]');
-    expect(fewer.text()).toBe("Fewer chips");
-    expect(fewer.attributes("aria-label")).toBe("Show fewer context chips");
-  });
-
-  it("shows below md a name that sits inside the chip's name, never an id or the query (F12)", async () => {
-    breakpoint.md = false;
-    const { wrapper, store, sid } = await setup();
-    const mention = (kind: ContextChip["kind"], id: string, label: string, short: string) =>
-      store.addChip(sid, {
-        id: `mention:${kind}:${id}`,
-        kind,
-        label: raw(label),
-        short: raw(short),
-        ref: { type: kind, id, org: "default" },
-        sizeBytes: 1,
-        provenance: "mention",
-        sent: "whitelist",
-      });
-    mention("alert", "a1", "Alert · checkout-latency", "checkout-latency");
-    mention("panel", "d1", "Dashboard · Checkout", "Checkout");
-    store.addChip(sid, ROW);
-    await flushPromises();
-    await wrapper.get('[data-test="assistant-context-more"]').trigger("click");
-    const shown = wrapper.findAll('[data-test="assistant-context-chip-button"]').map((button) => ({
-      text: button.text().trim(),
-      name: button.attributes("aria-label") ?? "",
-    }));
-    expect(shown.map((chip) => chip.text)).toEqual([
-      "15 min",
-      "default",
-      "default",
-      "checkout-latency",
-      "Checkout",
-      "Log row · cart · 13:57",
-    ]);
-    for (const chip of shown) expect(chip.name).toContain(chip.text);
-    expect(shown.some((chip) => /SELECT|\ba1\b|\bd1\b/.test(chip.text))).toBe(false);
-  });
-
-  it("never announces the page filling in its own fields as it loads, only later changes (CT-01 AC 12)", async () => {
-    resetAssistantContextForTests();
-    let page: Record<string, unknown> = { ...LOGS, selectedStreams: [] };
-    contextRegistry.register("logs", { getContext: () => page });
-    const now = vi.spyOn(Date, "now");
-    try {
-      const start = 1_800_000_000_000;
-      now.mockReturnValue(start);
-      const { sid } = await setup();
-      page = { ...LOGS };
-      refreshPageContext();
-      await flushPromises();
-      expect(composerUi(sid).status).toBeNull();
-      now.mockReturnValue(start + 3_500);
-      page = { ...LOGS, selectedStreams: ["default"], currentVRLQuery: ".x = 1" };
-      refreshPageContext();
-      await flushPromises();
-      expect(String(composerUi(sid).status?.text)).toBe("VRL · 1 line added to context");
-    } finally {
-      now.mockRestore();
-    }
   });
 
   describe("Run analysis on an incident chip", () => {

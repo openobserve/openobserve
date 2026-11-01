@@ -447,6 +447,7 @@ function stagePayload(
     mode: empty ? "replace" : "append",
     ...(payload.homeStarter && { homeStarter: true }),
   });
+  if (payload.timeOverride) store.setTimeOverride(sid, payload.timeOverride);
   if (payload.title && fresh) store.setTitle(sid, payload.title, "object");
   const staged = store.state.sessions[sid].composer.chips.length - before;
   // A repeated prompt the store skipped adds nothing, so the helper line would claim a change that did not happen.

@@ -15,142 +15,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <span
-    v-if="shown"
-    class="flex min-w-0 items-center gap-1.5"
-    data-test="assistant-agent-picker-root"
-  >
-    <template v-if="isMobile">
-      <OButton
-        v-bind="triggerAttrs"
-        variant="ghost"
-        size="xs"
-        class="min-h-11"
-        @click="sheetOpen = true"
-      >
-        <OIcon :name="agentGlyph[shownAgent]" size="xs" />
-        {{ shownName }}
-        <template #icon-right><OIcon :name="assistantGlyph.expand" size="xs" /></template>
-      </OButton>
-      <OSheet
-        v-model:open="sheetOpen"
-        v-model:snap="sheetSnap"
-        :ariaLabel="String(t('assistant.agent.picker.heading'))"
-        :expand-label="t('assistant.shell.sheetExpand')"
-        :collapse-label="t('assistant.shell.sheetPeek')"
-        data-test="assistant-agent-sheet"
-        privacy="mask"
-      >
-        <template #header>
-          <p class="text-text-heading px-4 text-sm font-medium">
-            {{ t("assistant.agent.picker.heading") }}
-          </p>
-        </template>
-        <div class="flex flex-col gap-1 p-2" role="radiogroup">
-          <div v-for="row in rows" :key="row.id" class="flex flex-col">
-            <OButton
-              variant="ghost"
-              size="sm"
-              role="radio"
-              :aria-checked="row.id === shownAgent"
-              :aria-disabled="row.reason ? 'true' : undefined"
-              class="h-auto! min-h-14 w-full justify-start! text-start"
-              :data-test="`assistant-agent-option-${row.id}`"
-              @click="choose(row)"
-            >
-              <AssistantMark
-                size="md"
-                class="size-8!"
-                :glyph="row.reason ? assistantGlyph.locked : agentGlyph[row.id]"
-              />
-              <span class="flex min-w-0 flex-1 flex-col">
-                <span :class="row.reason ? 'text-text-secondary' : 'text-text-heading'">{{
-                  row.name
-                }}</span>
-                <span class="text-text-secondary text-xs whitespace-normal">{{
-                  row.reason ?? row.purpose
-                }}</span>
-              </span>
-              <template v-if="row.id === shownAgent" #icon-right>
-                <OIcon :name="assistantGlyph.done" size="sm" />
-              </template>
-            </OButton>
-            <AssistantAskAdminPopover
-              v-if="row.askAdmin"
-              kind="agent_access"
-              :org="org"
-              :agent="String(row.name)"
-            >
-              <template #trigger>
-                <OButton
-                  variant="ghost-primary"
-                  size="xs"
-                  class="min-h-11"
-                  data-test="assistant-agent-ask-admin"
-                >
-                  {{ t("assistant.outcome.actions.askAdmin") }}
-                </OButton>
-              </template>
-            </AssistantAskAdminPopover>
-          </div>
-        </div>
-        <p class="text-text-secondary px-4 pb-3 text-xs">{{ t("assistant.agent.picker.note") }}</p>
-      </OSheet>
-    </template>
+  <span v-if="shown" class="flex shrink-0 items-center" data-test="assistant-agent-picker-root">
     <ODropdown
-      v-else
       v-model:open="menuOpen"
       side="top"
-      align="start"
+      align="end"
       privacy="mask"
-      content-class="w-[min(24rem,calc(100vw-1.5rem))]"
+      :content-class="composerPopoverClass(layout.tight)"
     >
       <template #trigger>
         <OButton
-          v-bind="triggerAttrs"
           variant="ghost"
-          size="xs"
+          size="icon-xs-sq"
+          :aria-label="name"
+          :data-pending="pending ? '' : undefined"
+          :class="[
+            'text-text-secondary w-9! gap-0.5',
+            pending ? 'bg-surface-accent-hover ring-border-focus ring-1' : '',
+            TOUCH_TARGET_CLASS,
+          ]"
+          data-test="assistant-agent-picker"
           @keydown.up.prevent="menuOpen = true"
         >
           <OIcon :name="agentGlyph[shownAgent]" size="xs" />
-          {{ shownName }}
-          <template #icon-right><OIcon :name="assistantGlyph.expand" size="xs" /></template>
+          <OIcon :name="assistantGlyph.expand" size="xs" />
+          <OTooltip v-if="!menuOpen" :content="tooltip" />
         </OButton>
       </template>
       <ODropdownGroup :label="t('assistant.agent.picker.heading')">
         <template v-for="row in rows" :key="row.id">
           <ODropdownItem
-            role="menuitemradio"
-            :aria-checked="row.id === shownAgent"
+            role="option"
+            :aria-selected="row.id === shownAgent"
             :disabled="!!row.reason"
             focusable-unavailable
             :text-value="row.name"
-            :description="row.reason"
+            :class="['min-h-8', row.id === shownAgent ? 'bg-dropdown-item-hover-bg' : '']"
             :data-test="`assistant-agent-option-${row.id}`"
             @select="choose(row)"
           >
             <template #icon-left>
-              <AssistantMark
-                size="sm"
-                :glyph="row.reason ? assistantGlyph.locked : agentGlyph[row.id]"
+              <OIcon
+                :name="row.reason ? assistantGlyph.locked : agentGlyph[row.id]"
+                size="xs"
+                class="text-text-secondary"
               />
             </template>
-            <span class="flex min-w-0 flex-col">
+            <span class="flex min-w-0 items-center gap-2">
               <span
-                :class="['text-sm font-medium', row.reason ? 'text-text-secondary' : '']"
+                :class="['shrink-0 text-sm', row.reason ? 'text-text-secondary' : '']"
                 data-test="assistant-agent-option-name"
                 >{{ row.name }}</span
               >
-              <span v-if="!row.reason" class="text-text-secondary text-xs whitespace-normal">{{
-                row.purpose
+              <span class="text-text-secondary ms-auto min-w-0 text-end text-xs">{{
+                row.askAdmin ? t("assistant.agent.unavailable.short") : (row.reason ?? row.clause)
               }}</span>
-              <span class="text-text-secondary text-xs">{{ row.policy }}</span>
             </span>
-            <template v-if="row.id === shownAgent" #icon-right>
-              <OIcon :name="assistantGlyph.done" size="sm" />
-            </template>
           </ODropdownItem>
-          <div v-if="row.askAdmin" class="px-3 pb-1">
+          <div v-if="row.askAdmin" class="flex justify-end px-3 pb-1">
             <AssistantAskAdminPopover kind="agent_access" :org="org" :agent="String(row.name)">
               <template #trigger>
                 <OButton variant="ghost-primary" size="xs" data-test="assistant-agent-ask-admin">
@@ -161,14 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </ODropdownGroup>
-      <ODropdownSeparator />
-      <p class="text-text-secondary px-3 py-1.5 text-xs" data-test="assistant-agent-picker-note">
-        {{ t("assistant.agent.picker.note") }}
-      </p>
     </ODropdown>
-    <OText v-if="nextName" variant="meta" class="truncate" data-test="assistant-agent-picker-next">
-      {{ t("assistant.agent.picker.next", { agent: nextName }) }}
-    </OText>
   </span>
 </template>
 
@@ -176,10 +91,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
 
-import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import { agentGlyph, assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import AssistantAskAdminPopover from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";
-import { announceComposer } from "@/components/ai-assistant/composer/composerUi";
+import {
+  announceComposer,
+  composerPopoverClass,
+  useComposerLayout,
+} from "@/components/ai-assistant/composer/composerUi";
 import {
   useAssistantCapability,
   useAssistantPlacement,
@@ -190,30 +109,25 @@ import {
 } from "@/composables/assistant";
 import {
   agentName,
-  agentPolicy,
-  agentPurpose,
   agentReason,
   currentAgent,
   nextAgent,
   rosterOffersChoice,
 } from "@/composables/assistant/pure";
-import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import OSheet from "@/lib/overlay/Sheet/OSheet.vue";
-import type { SheetSnap } from "@/lib/overlay/Sheet/OSheet.types";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
+
+import { agentClause } from "./agentClause";
 
 interface Row {
   id: AgentId;
   name: I18nText;
-  purpose: I18nText;
-  policy: I18nText;
+  clause: I18nText;
   reason: I18nText | null;
   askAdmin: boolean;
 }
@@ -225,11 +139,8 @@ const store = useAssistantStore();
 const vuex = useStore();
 const capability = useAssistantCapability();
 const placement = useAssistantPlacement();
-const { mdUp } = useBreakpoint();
-const isMobile = computed(() => !mdUp.value);
+const layout = useComposerLayout();
 const menuOpen = ref(false);
-const sheetOpen = ref(false);
-const sheetSnap = ref<SheetSnap>("half");
 
 const roster = computed(() => capability.value.agents);
 const shown = computed(() => rosterOffersChoice(roster.value));
@@ -237,14 +148,22 @@ const session = computed(() => (props.sid ? (store.state.sessions[props.sid] ?? 
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
 const shownAgent = computed(() => nextAgent(session.value));
 const shownName = computed(() => agentName(shownAgent.value, t));
-const nextName = computed(() => {
+const pending = computed(() => {
   const next = session.value?.nextAgentId;
-  return next && next !== currentAgent(session.value) ? agentName(next, t) : null;
+  return !!next && next !== currentAgent(session.value);
 });
-const triggerAttrs = computed(() => ({
-  "aria-label": t("assistant.agent.picker.label", { agent: shownName.value }),
-  "data-test": "assistant-agent-picker",
-}));
+const shownClause = computed(() =>
+  agentClause(
+    roster.value?.find((agent) => agent.id === shownAgent.value),
+    t,
+  ),
+);
+const name = computed(() =>
+  t("assistant.agent.picker.label", { agent: shownName.value, clause: shownClause.value }),
+);
+const tooltip = computed(() =>
+  t("assistant.agent.picker.tooltip", { agent: shownName.value, clause: shownClause.value }),
+);
 
 const rows = computed<Row[]>(() =>
   (roster.value ?? []).map((agent) => {
@@ -252,8 +171,7 @@ const rows = computed<Row[]>(() =>
     return {
       id: agent.id,
       name: agentName(agent.id, t),
-      purpose: agentPurpose(agent.id, t),
-      policy: agentPolicy(agent, t),
+      clause: agentClause(agent, t),
       reason: agentReason(agent, refusal, t),
       askAdmin: refusal ? refusal === "agent_not_permitted" : isRoleLocked(agent),
     };
@@ -283,7 +201,6 @@ function choose(row: Row): void {
   if (!sid) return;
   store.pickAgent(sid, row.id, "picker");
   announceComposer(sid, t("assistant.agent.announceChosen", { agent: row.name }));
-  sheetOpen.value = false;
 }
 
 function announce(line: I18nText): void {

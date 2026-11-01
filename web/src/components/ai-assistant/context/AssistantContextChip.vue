@@ -35,10 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="onClick"
       @keydown="onKeydown"
     >
-      <span v-if="compact" class="min-w-0 text-start break-words whitespace-normal">{{
-        shortLabel ?? label
-      }}</span>
-      <OTruncatedText v-else class="min-w-0">{{ label }}</OTruncatedText>
+      <OTruncatedText class="min-w-0">{{ compact ? (shortLabel ?? label) : label }}</OTruncatedText>
       <span v-if="secondary && !compact" class="shrink-0 font-normal" aria-hidden="true"
         >{{ dot }} {{ secondary }}</span
       >
@@ -46,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       v-if="removable"
       variant="ghost"
-      size="icon-xs"
+      size="icon-chip"
       class="max-md:size-11 pointer-coarse:size-11"
       :aria-label="t('assistant.context.remove', { label })"
       data-test="assistant-context-chip-remove"
@@ -69,7 +66,7 @@ export interface AssistantContextChipProps {
   readonly?: boolean;
   /** Non-interactive (a share, a disabled surface). */
   inert?: boolean;
-  /** Below md: the secondary goes to the name only, so the chip fits a phone row. */
+  /** In the control row: the secondary goes to the name only, so the chip fits one line. */
   compact?: boolean;
   /** Compact text only (the range, the stream name); the icon says the kind and the name keeps the full label (CT-01 AC 9). */
   shortLabel?: I18nText;

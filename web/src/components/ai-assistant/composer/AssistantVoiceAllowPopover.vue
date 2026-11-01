@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPopover
     side="top"
     align="start"
-    :aria-label="t('assistant.voice.allow.title')"
-    content-class="flex w-[min(20rem,calc(100vw-1.5rem))] flex-col gap-2 p-3"
+    :aria-label="t('assistant.voice.allowTitle')"
+    :content-class="`${composerPopoverClass(layout.tight)} flex flex-col gap-2 p-3`"
   >
     <template #trigger>
       <OButton
@@ -32,21 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
     <section class="flex flex-col gap-2" data-test="assistant-dictate-how-popover">
-      <OText variant="card-title" as="h2">{{ t("assistant.voice.allow.title") }}</OText>
-      <OText variant="meta" as="p">{{ steps }}</OText>
-      <OText variant="meta" as="p">{{ t("assistant.voice.allow.headphones") }}</OText>
+      <OText variant="card-title" as="h2">{{ t("assistant.voice.allowTitle") }}</OText>
+      <OText variant="meta" as="p">{{ t("assistant.voice.allowBody") }}</OText>
     </section>
   </OPopover>
 </template>
-
-<script lang="ts">
-import type { I18nText } from "@/types/i18n";
-
-export interface AssistantVoiceAllowPopoverProps {
-  /** This browser's site-settings steps (B17). */
-  steps: I18nText;
-}
-</script>
 
 <script setup lang="ts">
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
@@ -55,7 +45,8 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { useI18nTyped } from "@/types/i18n";
 
-defineProps<AssistantVoiceAllowPopoverProps>();
+import { composerPopoverClass, useComposerLayout } from "./composerUi";
 
 const { t } = useI18nTyped();
+const layout = useComposerLayout();
 </script>

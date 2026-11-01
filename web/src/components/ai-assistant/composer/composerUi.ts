@@ -13,13 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, toRaw } from "vue";
+import { computed, inject, reactive, toRaw, type ComputedRef, type InjectionKey } from "vue";
 
 import type { useAssistantStore } from "@/composables/assistant";
 import type { I18nText } from "@/types/i18n";
 
 /** How long a cap sentence stays under the tray (`40` §2.6). */
 export const CAP_NOTICE_MS = 6_000;
+
+/** At and below this width the composer always takes two rows and chips sit behind `+N`. */
+export const COMPOSER_NARROW_REM = 24;
+
+/** The narrowest window; popovers take its width less 3 px a side. */
+export const COMPOSER_TIGHT_REM = 20;
+
+/** Chips shown before `+N` by width: none when narrow, one at 27 rem, three in a full view. */
+export const COMPOSER_WIDE_REM = 40;
 
 /** A cleared draft's notice; `token` is `null` across orgs, where no Undo is offered (`40` §9). */
 export interface ClearedNotice {
@@ -40,9 +49,56 @@ export interface ComposerUi {
   cleared: ClearedNotice | null;
 }
 
+/** What a control inside the composer needs to know about the composer's own width. */
+export interface ComposerLayout {
+  narrow: boolean;
+  tight: boolean;
+  wide: boolean;
+  /** Dictation at 20 rem takes the room of `+N` and the chips. */
+  yieldChips: boolean;
+}
+
+/** The inputs of the one-row decision; widths in px, 0 when not measured yet. */
+export interface ComposerRowInput {
+  narrow: boolean;
+  /** Chips, images, a meter or anything else the control row must show beyond time. */
+  extras: boolean;
+  text: string;
+  textWidth: number;
+  frameWidth: number;
+  controlsWidth: number;
+}
+
+export const composerLayoutKey: InjectionKey<ComputedRef<ComposerLayout>> =
+  Symbol("assistantComposerLayout");
+
 const states = reactive(new Map<string, ComposerUi>());
 
 let seq = 0;
+
+// The frame's 12 px text inset and the 8 px the text keeps from the first control.
+const TEXT_INSET_PX = 20;
+
+/** One row holds while the draft fits a line beside the controls and nothing else needs showing. */
+export function composerFitsOneRow(input: ComposerRowInput): boolean {
+  if (input.narrow || input.extras || input.text.includes("\n")) return false;
+  if (!input.text || input.frameWidth === 0) return true;
+  return input.textWidth + TEXT_INSET_PX + input.controlsWidth <= input.frameWidth;
+}
+
+/** The composer's layout for a control inside it; outside a composer nothing is narrow. */
+export function useComposerLayout(): ComputedRef<ComposerLayout> {
+  return inject(
+    composerLayoutKey,
+    computed(() => ({ narrow: false, tight: false, wide: false, yieldChips: false })),
+    false,
+  );
+}
+
+/** One popover width on every board; 3 px a side short of a 20 rem window. */
+export function composerPopoverClass(tight: boolean): string {
+  return tight ? "w-[calc(20rem-0.375rem)]" : "w-[min(20rem,calc(100vw-0.375rem))]";
+}
 
 /** The per-session view state the composer, the tray and the shell share. */
 export function composerUi(sid: string): ComposerUi {

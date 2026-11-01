@@ -185,7 +185,7 @@ describe("useAssistantStarters", () => {
     dashboard.page$.value = "home";
     await flushPromises();
     expect(labels(dashboard.starters)).toEqual([
-      "What needs attention in `default` right now?",
+      "What needs attention right now?",
       "What can you do here?",
     ]);
     expect(dashboard.starters.value.every((starter) => starter.home === true)).toBe(true);
@@ -194,10 +194,7 @@ describe("useAssistantStarters", () => {
   it("offers learn and org health off the page table, never the removed alerts starter", async () => {
     const { starters } = setup("assistant", { currentPage: "assistant" });
     await flushPromises();
-    expect(labels(starters)).toEqual([
-      "What can you do here?",
-      "What needs attention in `default` right now?",
-    ]);
+    expect(labels(starters)).toEqual(["What can you do here?", "What needs attention right now?"]);
   });
 
   it("grounds Home on streams the org has, skips internal ones and stages the hour it names", async () => {
@@ -206,8 +203,8 @@ describe("useAssistantStarters", () => {
     const { starters } = setup("home", null);
     await flushPromises();
     expect(labels(starters)).toEqual([
-      "What needs attention in `default` right now?",
-      "Summarise errors in `k8s` over the last hour",
+      "What needs attention right now?",
+      "Summarise errors in `k8s`",
       "Which services had the slowest spans in the last hour?",
     ]);
     expect(starters.value[1].period).toBe("1h");
@@ -265,7 +262,7 @@ describe("useAssistantStarters", () => {
     });
     const acme = effectScope().run(() => useAssistantStarters({ page: "home" }))!;
     await flushPromises();
-    expect(labels(acme.starters)[0]).toBe("What needs attention in `Acme` right now?");
+    expect(labels(acme.starters)[0]).toBe("What needs attention right now?");
     expect(acme.scope.value).toMatchObject({ org: "a1b2c3", orgName: "Acme" });
   });
 
