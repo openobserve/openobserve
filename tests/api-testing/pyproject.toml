@@ -64,6 +64,7 @@ markers = [
     "framework: self-tests for the support/ framework (Phase 2)",
     "enterprise: needs an enterprise build with the feature flag on (on-call). Run with -m enterprise.",
     "slow: long-running test (e.g. profiles 100k-stack ingest); runs in the normal suite. Deselect with -m \"not slow\".",
+    "serial: reads or mutates server-wide state, so CI runs it after the parallel (xdist) pass, alone.",
 ]
 
 [tool.ruff]

@@ -9,6 +9,9 @@ Tests for Organization Passcode/Ingestion Token operations:
 import logging
 import pytest
 
+# Rotating root's passcode breaks any concurrent test that authenticates with it.
+pytestmark = pytest.mark.serial
+
 logger = logging.getLogger(__name__)
 
 
