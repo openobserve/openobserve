@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
+  isExplainQuery,
   isSqlQuery,
   buildSqlQuery,
   convertQueryIntoSingleLine,
@@ -57,6 +58,31 @@ vi.mock("@/composables/useParser", () => ({
   }),
 }));
 
+describe("isExplainQuery", () => {
+  it("is true only for an EXPLAIN statement", () => {
+    expect(isExplainQuery("explain analyze select 1 from s")).toBe(true);
+    expect(isExplainQuery("select 1 from s")).toBe(false);
+    expect(isExplainQuery("explain = 'x'")).toBe(false);
+    expect(isExplainQuery("")).toBe(false);
+    expect(isExplainQuery("-- why slow\nexplain analyze select 1 from s")).toBe(true);
+    expect(isExplainQuery("/* c */ EXPLAIN FORMAT tree SELECT * FROM s")).toBe(true);
+  });
+
+  it("skips any mix of leading whitespace, line and block comments", () => {
+    expect(isExplainQuery("/* a */ -- b\n /* c */\n\tEXPLAIN ANALYZE SELECT 1 FROM s")).toBe(true);
+    expect(isExplainQuery("-- only a comment")).toBe(false);
+    expect(isExplainQuery("/* unterminated EXPLAIN SELECT 1 FROM s")).toBe(false);
+    expect(isExplainQuery("/* c */ SELECT 1 FROM s -- EXPLAIN SELECT")).toBe(false);
+  });
+
+  it("stays linear on a long run of block-comment openers and closers", () => {
+    const hostile = `/*${"*//*".repeat(5000)}`;
+    const start = Date.now();
+    expect(isExplainQuery(hostile)).toBe(false);
+    expect(Date.now() - start).toBeLessThan(200);
+  });
+});
+
 describe("isSqlQuery", () => {
   describe("returns true for full SQL statements", () => {
     it("detects SELECT * FROM", () => {
@@ -81,6 +107,33 @@ describe("isSqlQuery", () => {
     it("handles leading whitespace and newlines", () => {
       expect(isSqlQuery('  SELECT * FROM "stream"')).toBe(true);
       expect(isSqlQuery('\n\nSELECT * FROM "stream"')).toBe(true);
+    });
+  });
+
+  describe("returns true for EXPLAIN statements", () => {
+    it("detects EXPLAIN", () => {
+      expect(isSqlQuery('EXPLAIN SELECT * FROM "stream"')).toBe(true);
+    });
+
+    it("detects EXPLAIN ANALYZE", () => {
+      expect(isSqlQuery('explain analyze select * from "stream"')).toBe(true);
+    });
+
+    it("detects EXPLAIN ANALYZE VERBOSE with aggregation", () => {
+      expect(
+        isSqlQuery(
+          "explain analyze verbose select stream_name,sum(size) as total from usage WHERE event = 'Ingestion' group by stream_name ORDER BY total DESC limit 10",
+        ),
+      ).toBe(true);
+    });
+
+    it("handles leading whitespace and mixed case", () => {
+      expect(isSqlQuery('\n  Explain Analyze SELECT 1 FROM "s"')).toBe(true);
+    });
+
+    it("rejects field names that start with 'explain'", () => {
+      expect(isSqlQuery("explain_count > 5")).toBe(false);
+      expect(isSqlQuery("explain = 'true'")).toBe(false);
     });
   });
 
