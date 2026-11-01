@@ -1,3 +1,5 @@
+import fcntl
+import json
 import requests
 import pytest
 import os
@@ -70,62 +72,40 @@ def org_id():
 
 
 @pytest.fixture(scope="session", autouse=True)
-def ingest_data():
-    """Ingest data into the openobserve running instance.
+def ingest_data(tmp_path_factory):
+    """Ingest the shared seed data once per server (xdist workers included); re-ingest once the last copy is over 1 hour old."""
+    # The basetemp parent is shared by every xdist worker of a run, so the lock serialises them.
+    lock_path = tmp_path_factory.getbasetemp().parent / "ingest_data.lock"
+    with open(lock_path, "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        _ingest_seed_data_once()
+    return True
 
-    Replaces blind `time.sleep(N)` waits with a wait_until predicate that
-    polls the search endpoint until the ingested rows are visible.
-    """
+
+def _ingest_seed_data_once():
+    from datetime import UTC, datetime, timedelta
+
     from support.wait import wait_until
 
     # Use v2 session for consistent auth header
     session = _create_session_inner_v2()
-
-    # Ingest main test data
-    with open(root_dir / "test-data/logs_data.json") as f:
-        data = f.read()
-
     stream_name = "stream_pytest_data"
     org = DEFAULT_ORG_ID
     base_url_with_slash = BASE_URL if BASE_URL.endswith('/') else BASE_URL + '/'
-    url = f"{base_url_with_slash}api/{org}/{stream_name}/_json"
-    resp1 = session.post(url, data=data, headers={"Content-Type": "application/json"})
-    logging.info("Main data ingested successfully, status code: %s", resp1.status_code)
-    assert resp1.status_code == 200, \
-        f"Failed to ingest main test data: {resp1.status_code} - {resp1.text[:500]}"
 
-    # Ingest camel case test data
+    with open(root_dir / "test-data/logs_data.json") as f:
+        data = f.read()
     with open(root_dir / "test-data/match_all.json") as f:
         camel_data = f.read()
+    # A row count short of both files means a partial earlier ingest, which must not count as seeded.
+    expected_rows = len(json.loads(data)) + len(json.loads(camel_data))
 
-    resp2 = session.post(url, data=camel_data, headers={"Content-Type": "application/json"})
-    logging.info("Camel case data ingested successfully, status code: %s", resp2.status_code)
-    assert resp2.status_code == 200, \
-        f"Failed to ingest camel case test data: {resp2.status_code} - {resp2.text[:500]}"
-
-    # Flush data to ensure it's indexed (no-op in local mode; returns 404)
-    flush_url = f"{base_url_with_slash}node/flush"
-    logging.info("Flushing data to ensure indexing...")
-    flush_resp = session.put(flush_url)
-    if flush_resp.status_code == 200:
-        logging.info("Data flushed successfully")
-    elif flush_resp.status_code == 404:
-        logging.info("Flush not needed (local mode), polling for auto-indexing...")
-    else:
-        logging.warning("Flush request returned status %s: %s", flush_resp.status_code, flush_resp.text[:200])
-
-    # Poll the search endpoint until ingested data is visible — replaces the
-    # combined 5s of `time.sleep` with a deterministic check that exits as
-    # soon as the data is queryable (typically <1s on local, may take longer
-    # on slow CI runners).
     def _data_is_searchable():
-        # Use the same auth/session shape that tests use.
         search_url = f"{base_url_with_slash}api/{org}/_search?type=logs"
-        # Wide window: data fixtures may have older timestamps.
-        from datetime import datetime, timedelta, timezone
-        now = datetime.now(timezone.utc)
+        # Seed rows are stamped at ingest; this fixture treats copies older than 1h as stale and re-ingests.
+        now = datetime.now(UTC)
         end_us = int(now.timestamp() * 1_000_000)
-        start_us = int((now - timedelta(weeks=2)).timestamp() * 1_000_000)
+        start_us = int((now - timedelta(hours=1)).timestamp() * 1_000_000)
         payload = {
             "query": {
                 "sql": f'SELECT COUNT(*) AS c FROM "{stream_name}"',
@@ -139,9 +119,32 @@ def ingest_data():
         if r.status_code != 200:
             return False
         hits = r.json().get("hits", [])
-        return bool(hits and hits[0].get("c", 0) > 0)
+        return bool(hits and hits[0].get("c", 0) >= expected_rows)
+
+    # A second ingest would double every count that tests assert on this stream.
+    if _data_is_searchable():
+        logging.info("Seed data already present in %s", stream_name)
+        return
+
+    url = f"{base_url_with_slash}api/{org}/{stream_name}/_json"
+    resp1 = session.post(url, data=data, headers={"Content-Type": "application/json"})
+    logging.info("Main data ingested successfully, status code: %s", resp1.status_code)
+    assert resp1.status_code == 200, \
+        f"Failed to ingest main test data: {resp1.status_code} - {resp1.text[:500]}"
+
+    resp2 = session.post(url, data=camel_data, headers={"Content-Type": "application/json"})
+    logging.info("Camel case data ingested successfully, status code: %s", resp2.status_code)
+    assert resp2.status_code == 200, \
+        f"Failed to ingest camel case test data: {resp2.status_code} - {resp2.text[:500]}"
+
+    # Flush data to ensure it's indexed (no-op in local mode; returns 404)
+    flush_resp = session.put(f"{base_url_with_slash}node/flush")
+    if flush_resp.status_code == 200:
+        logging.info("Data flushed successfully")
+    elif flush_resp.status_code == 404:
+        logging.info("Flush not needed (local mode), polling for auto-indexing...")
+    else:
+        logging.warning("Flush request returned status %s: %s", flush_resp.status_code, flush_resp.text[:200])
 
     wait_until(_data_is_searchable, timeout=30, interval=0.5, msg="ingested data not searchable")
     logging.info("Ingested data is searchable")
-
-    return True

@@ -599,8 +599,14 @@ describe("SearchResult in a kept-alive page", () => {
       setup: () => () =>
         h(KeepAlive, null, { default: () => (show.value ? h(SearchResult) : h("div")) }),
     });
+    // Spied before mount: the first activation queues a restore frame too, and a real one can land after re-attach.
+    const frames: FrameRequestCallback[] = [];
+    const raf = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback: FrameRequestCallback) => frames.push(callback));
     const parent = mount(Parent, { global: globalOptions, attachTo: document.body });
     await flushPromises();
+    frames.splice(0).forEach((callback) => callback(0));
     const scroller = parent.find('[data-test="traces-search-result"] .overflow-auto')
       .element as HTMLElement;
     // Like a browser: a detached element reads 0 and comes back scrolled to the top.
@@ -612,10 +618,6 @@ describe("SearchResult in a kept-alive page", () => {
         if (scroller.isConnected) offset = value;
       },
     });
-    const frames: FrameRequestCallback[] = [];
-    const raf = vi
-      .spyOn(window, "requestAnimationFrame")
-      .mockImplementation((callback: FrameRequestCallback) => frames.push(callback));
     scroller.scrollTop = 480;
     scroller.dispatchEvent(new Event("scroll"));
 
