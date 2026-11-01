@@ -77,7 +77,7 @@ export default {
       if (document.visibilityState !== "visible") return;
       const now = Date.now();
       lastInteraction = now;
-      if (!store.state.loginState || heartbeatPending ||
+      if (!store.state.loggedIn || heartbeatPending ||
           now - lastHeartbeat < heartbeatIntervalMs) return;
       lastHeartbeat = now;
       heartbeatPending = true;
@@ -93,7 +93,7 @@ export default {
         window.addEventListener(event, markInteraction, { passive: true }),
       );
       idleCheck = setInterval(() => {
-        if (store.state.loginState && Date.now() - lastInteraction >= idleLimitMs) {
+        if (store.state.loggedIn && Date.now() - lastInteraction >= idleLimitMs) {
           expireSession(store);
         }
       }, 15_000);
