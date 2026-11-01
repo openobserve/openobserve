@@ -16,6 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import i18n from "@/locales";
 
 import CellActions from "./CellActions.vue";
@@ -25,6 +26,7 @@ const store = vi.hoisted(() => ({
 }));
 vi.mock("vuex", () => ({ useStore: () => store }));
 vi.mock("@/composables/assistant/flags", () => ({ isAssistantV2: () => true }));
+vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn().mockResolvedValue(true) }));
 vi.mock("@/composables/useLogs/searchState", () => ({
   searchState: () => ({ searchObj: { data: { stream: {}, datetime: {} }, meta: {} } }),
 }));
@@ -58,5 +60,29 @@ describe("CellActions field doors", () => {
     await flushPromises();
     expect(doors.props.length).toBeGreaterThan(0);
     expect(doors.props.every((p) => p.boundOrg === "org-a")).toBe(true);
+  });
+});
+
+describe("CellActions copy with the assistant on", () => {
+  it("confirms an in-place copy on the button", async () => {
+    const wrapper = mount(CellActions, {
+      global: { plugins: [i18n] },
+      props: {
+        copyInPlace: true,
+        column: { id: "status" },
+        row: { status: "200" },
+        selectedStreamFields: [],
+      },
+    });
+    const button = wrapper.get('[data-test="logs-cell-actions-copy-btn"]');
+    const icon = button.findComponent(OIcon);
+    expect(button.attributes("aria-label")).toBe(i18n.global.t("logs.cellActions.copy"));
+    expect(icon.props("name")).toBe("content-copy");
+    await button.trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("copy")).toBeUndefined();
+    expect(button.attributes("aria-label")).toBe(i18n.global.t("common.copied"));
+    expect(icon.props("name")).toBe("check");
+    wrapper.unmount();
   });
 });

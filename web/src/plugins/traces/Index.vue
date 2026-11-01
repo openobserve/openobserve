@@ -1460,7 +1460,9 @@ const fromAssistant = () => assistantV2 && router.currentRoute.value.query.type 
 watch(
   () => router.currentRoute.value.query.t,
   async (nonce, previous) => {
-    if (!nonce || nonce === previous || !fromAssistant()) return;
+    // A link to another page lands here before onDeactivated; a hidden page loads on activation.
+    if (router.currentRoute.value.name !== "traces") return;
+    if (!pageActive.value || !nonce || nonce === previous || !fromAssistant()) return;
     restoreUrlQueryParams();
     await loadPageData();
   },

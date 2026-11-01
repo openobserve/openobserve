@@ -272,6 +272,24 @@ describe("AssistantHistoryList", () => {
     expect(history.filter.value.kind).toBe("all");
   });
 
+  it("takes a window's width from its geometry, not its measured 382 px, and still measures elsewhere", async () => {
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ width: 382 } as DOMRect);
+    const inWindow = await setup({ container: "window" });
+    inWindow.history.setFilter({ kind: "pinned" });
+    await flushPromises();
+    expect(inWindow.wrapper.get('[data-test="assistant-history-filter"]').text()).toBe(
+      "Filter · 1",
+    );
+    inWindow.wrapper.unmount();
+    const inSidebar = await setup({ container: "sidebar" });
+    inSidebar.history.setFilter({ kind: "pinned" });
+    await flushPromises();
+    expect(inSidebar.wrapper.get('[data-test="assistant-history-filter"]').text()).toBe("");
+    rect.mockRestore();
+  });
+
   it("shows Filter from 8 chats or while one is active, and counts what the chips leave", async () => {
     const { wrapper, history } = await setup();
     expect(wrapper.find('[data-test="assistant-history-filter"]').exists()).toBe(false);

@@ -976,6 +976,78 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.datetime).toMatchObject({ startTime: 5, endTime: 9 });
       expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
     });
+
+    describe("with the page kept alive", () => {
+      const assistantRoute = (name: string, t: string) => ({
+        query: { stream: "default", type: "ai_chat_query", t } as Record<string, string>,
+        name,
+        path: `/${name}`,
+      });
+
+      async function mountCached() {
+        window.__O2_ASSISTANT_V2__ = true;
+        resetAssistantV2ForTests();
+        mockSearchObj.meta.liveMode = false;
+        const current = ref(assistantRoute("traces", "1"));
+        routerCurrentRouteSpy.mockReturnValue(current as any);
+        const show = ref(true);
+        const Parent = defineComponent({
+          setup: () => () =>
+            h(KeepAlive, null, {
+              default: () => (show.value ? h(Index) : h("div", { key: "placeholder" })),
+            }),
+        });
+        wrapper = mount(Parent, {
+          attachTo: node,
+          global: {
+            plugins: [i18n, router],
+            provide: { store: store },
+            stubs: {
+              "search-bar": true,
+              "index-list": true,
+              "search-result": true,
+              "service-graph": true,
+              "services-catalog": true,
+              SanitizedHtmlRenderer: true,
+            },
+          },
+        });
+        await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+        await flushPromises();
+        return { current, show };
+      }
+
+      it("leaves the hidden page alone on a link to another page", async () => {
+        const { current, show } = await mountCached();
+        show.value = false;
+        await flushPromises();
+        mockGetStreams.mockClear();
+        current.value = assistantRoute("logs", "2");
+        await flushPromises();
+        expect(mockGetStreams).not.toHaveBeenCalled();
+      });
+
+      it("leaves the page alone on a link away that lands before it deactivates", async () => {
+        const { current } = await mountCached();
+        mockGetStreams.mockClear();
+        current.value = assistantRoute("logs", "2");
+        await flushPromises();
+        expect(mockGetStreams).not.toHaveBeenCalled();
+      });
+
+      it("loads a link to the hidden page once, on activation", async () => {
+        const { current, show } = await mountCached();
+        show.value = false;
+        await flushPromises();
+        mockGetStreams.mockClear();
+        current.value = assistantRoute("traces", "2");
+        await flushPromises();
+        expect(mockGetStreams).not.toHaveBeenCalled();
+        show.value = true;
+        await flushPromises();
+        expect(mockGetStreams).toHaveBeenCalledTimes(1);
+      });
+    });
   });
 
   describe("Stream Selection", () => {

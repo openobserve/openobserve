@@ -434,20 +434,18 @@ export default defineComponent({
         ? savedActiveTab
         : tabOrder.value[0].id,
     );
-    if (pinnedTabPending.value) {
-      const stopHold = watch(
-        () => [
-          isAvailableTab(activeHomeTab.value),
-          isLoadedFor(store.state.selectedOrganization?.identifier),
-        ],
-        ([available, loaded]) => {
-          if (!available && !loaded) return;
-          pinnedTabPending.value = false;
-          if (!available) activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
-          stopHold();
-        },
-      );
-    }
+    watch(
+      () => [
+        pinnedTabPending.value,
+        isAvailableTab(activeHomeTab.value),
+        isLoadedFor(store.state.selectedOrganization?.identifier),
+      ],
+      ([pending, available, loaded]) => {
+        if (!pending || (!available && !loaded)) return;
+        pinnedTabPending.value = false;
+        if (!available) activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
+      },
+    );
 
     watch(activeHomeTab, (val) => {
       if (assistantV2) homePrefs.save({ active: val });
@@ -507,8 +505,15 @@ export default defineComponent({
             tabOrder.value = ordered;
           }
           const active = prefs.active;
-          if (active && DEFAULT_TABS.value.find((tab) => tab.id === active))
+          if (active && isAvailableTab(active)) {
             activeHomeTab.value = active;
+          } else if (
+            active?.startsWith("dash:") &&
+            !isLoadedFor(store.state.selectedOrganization?.identifier)
+          ) {
+            activeHomeTab.value = active;
+            pinnedTabPending.value = true;
+          }
         })
       : { ready: ref(true), save: () => undefined };
     const homePrefsReady = homePrefs.ready;

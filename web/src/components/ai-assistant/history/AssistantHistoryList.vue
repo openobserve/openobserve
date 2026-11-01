@@ -437,6 +437,8 @@ export interface AssistantHistoryListProps {
   windowSid?: Sid | null;
   /** Where a row opens: the rail routes to the full view, the others open in their container. */
   container: Container;
+  /** A window's own verdict from its geometry; its 2 px of borders would read 24 rem as narrower. */
+  narrow?: boolean;
 }
 
 /** Filter joins the tools from this many chats, or while one is active. */
@@ -587,7 +589,10 @@ watch(
   { immediate: true },
 );
 
-const narrow = computed(() => props.mode === "panel" && widthRem.value < NARROW_REM);
+const narrow = computed(() => {
+  if (props.mode !== "panel") return false;
+  return props.container === "window" ? props.narrow : widthRem.value < NARROW_REM;
+});
 const query = computed(() => history.filter.value.q.trim());
 const titlesOnly = computed(() => history.searchPartial.value);
 // The end line carries Load older while a title search has more to read.

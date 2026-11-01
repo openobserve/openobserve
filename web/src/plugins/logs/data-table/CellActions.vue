@@ -7,12 +7,17 @@
     <OButton
       variant="ghost"
       size="icon-xs-circle"
-      :aria-label="t('logs.cellActions.copy')"
+      :aria-label="copied ? t('common.copied') : t('logs.cellActions.copy')"
       class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+      data-test="logs-cell-actions-copy-btn"
       @click.prevent.stop="copyLogToClipboard(cellValue)"
     >
-      <OIcon name="content-copy" size="xs" />
-      <OTooltip :content="t('logs.cellActions.copy')" />
+      <OIcon
+        :name="copied ? 'check' : 'content-copy'"
+        size="xs"
+        :class="copied ? 'text-status-success-text' : ''"
+      />
+      <OTooltip :content="copied ? t('common.copied') : t('logs.cellActions.copy')" />
     </OButton>
     <template v-if="isStreamField && !hideSearchTermActions">
       <OButton

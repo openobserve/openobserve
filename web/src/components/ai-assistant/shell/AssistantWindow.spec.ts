@@ -190,6 +190,16 @@ describe("AssistantWindow", () => {
     expect(store.state.shell.lastFocusedContainer).toEqual({ window: sid });
   });
 
+  it("keeps Layout on a default window's bar, which its borders leave 2 px under 24 rem", async () => {
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ width: 382 } as DOMRect);
+    const { wrapper } = setup();
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-layout-button"]').exists()).toBe(true);
+    rect.mockRestore();
+  });
+
   it("folds Layout into the title menu below 24 rem and keeps Minimise and Close direct (PO A15)", async () => {
     const wide = setup();
     expect(wide.wrapper.find('[data-test="assistant-layout-button"]').exists()).toBe(true);

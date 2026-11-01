@@ -255,6 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :current-sid="activeSid"
       :window-sid="scopedSid"
       :container="container"
+      :narrow="narrow"
       @opened="chatsOpen = false"
       @close="closeChats"
       @shared-links="shareManagerOpen = true"

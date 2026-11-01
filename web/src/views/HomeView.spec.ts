@@ -18,6 +18,7 @@ import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
+import { reactive } from "vue";
 
 // the panel's own layout rules are FirstDataPanel.spec's; here only HomeView's reading of them is pinned
 const panel = vi.hoisted(() => ({ layout: "none" as string }));
@@ -58,6 +59,25 @@ vi.mock("@/components/ai-assistant/welcome/AssistantLauncher.vue", () => ({
   default: { name: "AssistantLauncher", template: '<div data-test="assistant-launcher-stub" />' },
 }));
 const assistant = vi.hoisted(() => ({ userOrgKey: null as string | null }));
+const pinRead = vi.hoisted(() => ({ controlled: false, answered: false }));
+vi.mock("@/composables/useHomeDashboard", async (importOriginal) => {
+  const { reactive } = await import("vue");
+  const actual = await importOriginal<typeof import("@/composables/useHomeDashboard")>();
+  const read = reactive(pinRead);
+  return {
+    ...actual,
+    useHomeDashboard: (t: Parameters<typeof actual.useHomeDashboard>[0]) => {
+      const real = actual.useHomeDashboard(t);
+      return {
+        ...real,
+        isLoadedFor: (org: string | undefined) =>
+          read.controlled ? read.answered : real.isLoadedFor(org),
+        load: (org: string, force?: boolean) =>
+          read.controlled ? Promise.resolve() : real.load(org, force),
+      };
+    },
+  };
+});
 const homeReads = vi.hoisted(() => ({ count: 0 }));
 vi.mock("@/composables/assistant", async () => {
   const { reactive } = await import("vue");
@@ -98,6 +118,7 @@ vi.mock("@/components/shared/HomeViewSkeleton.vue", () => ({
 import config from "@/aws-exports";
 import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import { readHome, resetPrefsForTests } from "@/composables/assistant/prefs";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import HomeView from "./HomeView.vue";
 
 const mountHome = () =>
@@ -356,6 +377,47 @@ describe("HomeView", () => {
         .findAll('[data-test="home-tab-bar"] [data-test^="home-tab-"]')
         .map((tab) => tab.attributes("data-test"))
         .filter((id) => !id?.startsWith("home-tab-close"));
+
+    describe("a saved pinned tab", () => {
+      const PINNED = "dash:default:abc";
+      const activeTab = () => (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab;
+      const { homeDashboard } = useHomeDashboard((key: string) => key);
+
+      beforeEach(() => {
+        flagged(true);
+        localStorage.setItem(
+          "o2.assistant.home:k1",
+          JSON.stringify({ active: PINNED, migratedFromUnscoped: true }),
+        );
+        pinRead.controlled = true;
+        pinRead.answered = false;
+      });
+
+      afterEach(() => {
+        pinRead.controlled = false;
+        homeDashboard.value = null;
+      });
+
+      it("stays held behind the skeleton until the pin arrives", async () => {
+        wrapper = mountHome();
+        await resolveKey("k1");
+        expect(activeTab()).toBe(PINNED);
+        expect(has("home-skeleton-stub")).toBe(true);
+        homeDashboard.value = { dashboardId: "abc", folderId: "default", label: "Pinned" };
+        await flushPromises();
+        expect(activeTab()).toBe(PINNED);
+        expect(has("home-skeleton-stub")).toBe(false);
+      });
+
+      it("falls back to the first tab when the read finds no pin", async () => {
+        wrapper = mountHome();
+        await resolveKey("k1");
+        reactive(pinRead).answered = true;
+        await flushPromises();
+        expect(activeTab()).toBe("overview");
+        expect(has("home-skeleton-stub")).toBe(false);
+      });
+    });
 
     it("holds the tabs and body behind the skeleton until the saved order applies (IW-07 AC 1)", async () => {
       flagged(true);
