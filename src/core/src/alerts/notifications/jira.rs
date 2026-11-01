@@ -772,8 +772,14 @@ fn evaluated_threshold(ctx: &NotificationContext) -> (&str, &str) {
     (operator, threshold)
 }
 
+/// Drops the characters that start Jira wiki links, mentions, images and macros.
+fn plain(text: &str) -> String {
+    text.replace(['[', ']', '{', '}', '!', '|'], "")
+}
+
 fn description(ctx: &NotificationContext) -> String {
     let line = |label: &str, value: &str| (!value.is_empty()).then(|| format!("{label}: {value}"));
+    let text_line = |label: &str, value: &str| line(label, &plain(value));
     let stream = match ctx.stream_type.as_str() {
         _ if ctx.stream_name.is_empty() => String::new(),
         "" => ctx.stream_name.clone(),
@@ -792,13 +798,13 @@ fn description(ctx: &NotificationContext) -> String {
         .and_then(chrono::DateTime::from_timestamp_millis))
     .unwrap_or_default();
     let head = [
-        line("Alert", &ctx.alert_name),
-        line("Priority", &ctx.alert_priority),
-        line("Stream", &stream),
-        line("Condition", &condition),
-        line("Current value", &ctx.alert_agg_value),
+        text_line("Alert", &ctx.alert_name),
+        text_line("Priority", &ctx.alert_priority),
+        text_line("Stream", &stream),
+        text_line("Condition", &condition),
+        text_line("Current value", &ctx.alert_agg_value),
         line("Started", &started),
-        line("Alert description", &ctx.alert_description),
+        text_line("Alert description", &ctx.alert_description),
         line("View in OpenObserve", &ctx.alert_url),
     ];
     let head = cut(
@@ -864,14 +870,14 @@ fn comment(ctx: &NotificationContext) -> String {
         let severity = context_value(ctx, "incident_severity").unwrap_or_default();
         let what = match (event, severity) {
             ("new_alert_correlated", _) if !ctx.alert_name.is_empty() => {
-                format!("New alert joined: {}.", ctx.alert_name)
+                format!("New alert joined: {}.", plain(&ctx.alert_name))
             }
             ("new_alert_correlated", _) => "New alert joined.".to_string(),
             ("severity_escalated" | "severity_changed", "") => "Severity changed.".to_string(),
             ("severity_escalated" | "severity_changed", severity) => {
-                format!("Severity changed to {severity}.")
+                format!("Severity changed to {}.", plain(severity))
             }
-            (other, _) => format!("{}.", sentence_case(other)),
+            (other, _) => format!("{}.", plain(&sentence_case(other))),
         };
         return format!("[OpenObserve] {what}{}", link("View incident"));
     }
@@ -887,8 +893,9 @@ fn comment(ctx: &NotificationContext) -> String {
             link("View in OpenObserve")
         );
     }
-    let value = &ctx.alert_agg_value;
+    let value = &plain(&ctx.alert_agg_value);
     let (operator, threshold) = evaluated_threshold(ctx);
+    let (operator, threshold) = (&plain(operator), &plain(threshold));
     let measure = match (value.is_empty(), threshold.is_empty()) {
         (false, false) => format!(" Value {value}, threshold {operator} {threshold}."),
         (false, true) => format!(" Value {value}."),
@@ -989,6 +996,22 @@ mod tests {
             assert!(text.contains(&format!("\n{kept}\n")), "{text}");
             assert!(text.ends_with("See all rows in OpenObserve: https://o2.example.com/s/abc"));
         }
+    }
+
+    #[test]
+    fn text_fields_cannot_add_jira_wiki_markup() {
+        let evil = "[~accountid:5b10a2] !http://evil.example/x.png! [click|http://evil.example] {noformat}";
+        let mut ctx = incident_ctx("new_alert_correlated");
+        ctx.alert_name = evil.into();
+        ctx.alert_description = evil.into();
+        let strip = |t: &str| t.replace("{noformat}", "");
+        let bad = ['[', ']', '{', '}', '!', '|'];
+        let joined = comment(&ctx).replace("[OpenObserve]", "");
+        assert!(joined.contains("New alert joined"));
+        assert!(!strip(&joined).contains(bad));
+        let text = description(&ctx);
+        assert!(text.contains("Alert: ~accountid:5b10a2"));
+        assert!(!strip(&text).contains(bad));
     }
 
     #[test]
