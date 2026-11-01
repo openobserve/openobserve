@@ -3546,9 +3546,12 @@ export default defineComponent({
       clearColumnsFromUrl();
       searchObj.shouldIgnoreWatcher = true;
       searchObj.meta.sqlMode = false;
+      const viewOrg = store.state.selectedOrganization.identifier;
+      const leftViewOrg = () => store.state.selectedOrganization.identifier !== viewOrg;
       savedviewsService
-        .getViewDetail(store.state.selectedOrganization.identifier, item.view_id)
+        .getViewDetail(viewOrg, item.view_id)
         .then(async (res) => {
+          if (leftViewOrg()) return;
           if (res.status == 200) {
             store.dispatch("setSavedViewFlag", true);
             const extractedObj = res.data.data;
@@ -3698,6 +3701,7 @@ export default defineComponent({
 
                 try {
                   const streamDataList = await Promise.all(streamDataPromises);
+                  if (leftViewOrg()) return;
 
                   // Extract max_query_range from each stream's settings
                   const streamMaxQueryRanges = streamDataList
@@ -3784,6 +3788,7 @@ export default defineComponent({
                 await updatedLocalLogFilterField();
               }
               await getStreams("logs", true);
+              if (leftViewOrg()) return;
             } else {
               // ----- Here we are explicitly handling stream change -----
               resetStreamData();
@@ -3843,6 +3848,7 @@ export default defineComponent({
               await restoreBuildData(extractedObj.data.buildData ?? null);
 
               const streamData = await getStreams(searchObj.data.stream.streamType, true);
+              if (leftViewOrg()) return;
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
               searchObj.data.stream.selectedStream = [selectedStreams];
@@ -3911,6 +3917,7 @@ export default defineComponent({
             });
             markSavedViewApplied(item.view_id);
             setTimeout(async () => {
+              if (leftViewOrg()) return;
               try {
                 searchObj.loadingHistogram = false;
                 searchObj.meta.refreshHistogram = true;
@@ -3962,6 +3969,7 @@ export default defineComponent({
           }
         })
         .catch((err) => {
+          if (leftViewOrg()) return;
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
           toast({
