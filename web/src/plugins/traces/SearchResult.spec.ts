@@ -595,12 +595,18 @@ describe("SearchResult count chip", () => {
 describe("SearchResult in a kept-alive page", () => {
   it("restores the results scroll position when the page returns from the cache", async () => {
     const show = ref(true);
+    // KeepAlive also fires onActivated on first mount, so its frame must be captured too.
+    const frames: FrameRequestCallback[] = [];
+    const raf = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback: FrameRequestCallback) => frames.push(callback));
     const Parent = defineComponent({
       setup: () => () =>
         h(KeepAlive, null, { default: () => (show.value ? h(SearchResult) : h("div")) }),
     });
     const parent = mount(Parent, { global: globalOptions, attachTo: document.body });
     await flushPromises();
+    frames.splice(0).forEach((callback) => callback(0));
     const scroller = parent.find('[data-test="traces-search-result"] .overflow-auto')
       .element as HTMLElement;
     // Like a browser: a detached element reads 0 and comes back scrolled to the top.
@@ -612,10 +618,6 @@ describe("SearchResult in a kept-alive page", () => {
         if (scroller.isConnected) offset = value;
       },
     });
-    const frames: FrameRequestCallback[] = [];
-    const raf = vi
-      .spyOn(window, "requestAnimationFrame")
-      .mockImplementation((callback: FrameRequestCallback) => frames.push(callback));
     scroller.scrollTop = 480;
     scroller.dispatchEvent(new Event("scroll"));
 
