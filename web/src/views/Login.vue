@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { configQuery } from "@/services/config.queries";
+import { configQuery, isFullConfigLoaded } from "@/services/config.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, onBeforeMount, ref } from "vue";
 import { useRouter } from "vue-router";
@@ -121,7 +121,7 @@ export default defineComponent({
           .then(async (data: any) => {
             // Never replace an already-loaded full config with the bootstrap
             // subset (e.g. a logged-in user navigating to /login).
-            if (!store.state.zoConfig?.version) {
+            if (!isFullConfigLoaded(store.state.zoConfig)) {
               store.commit("setConfig", data);
             }
           })
@@ -353,7 +353,7 @@ export default defineComponent({
           // "setZoConfig" never existed as a mutation, so this fetch stored
           // nothing; commit through the real mutation, with the same
           // don't-clobber-the-full-config guard as everywhere else.
-          if (!this.store.state.zoConfig?.version) {
+          if (!isFullConfigLoaded(this.store.state.zoConfig)) {
             this.store.commit("setConfig", data);
           }
           const token = getUserInfo(this.$route.hash);
