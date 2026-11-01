@@ -109,12 +109,6 @@
         />
       </template>
 
-      <!-- Domain -> organization mappings: cloud-only, and stored on the meta org. -->
-      <template v-if="showDomainOrgMappings">
-        <OSeparator class="mt-6 mb-4" />
-        <DomainOrgMappings v-model="domainOrgMappings" @change="formDirty = true" />
-      </template>
-
       <div class="mt-3 flex gap-2">
         <!-- <OButton
         data-test="add-alert-cancel-btn"
@@ -143,9 +137,6 @@ import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import { useStore } from "vuex";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
-import DomainOrgMappings from "./DomainOrgMappings.vue";
-import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import type { DomainOrgMapping } from "./DomainOrgMappings.schema";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -174,14 +165,7 @@ const organizationSettingsSchema = makeOrganizationSettingsSchema(t);
 const crossLinks = ref(store.state?.organizationData?.organizationSettings?.cross_links || []);
 const formDirty = ref(false);
 
-// Domain mappings are read and written on the meta org only, and the backend
-// ignores the field outside cloud — so the section renders under both conditions.
-const { isMetaOrg } = useIsMetaOrg();
-const showDomainOrgMappings = computed(() => config.isCloud === "true" && isMetaOrg.value);
 const showRedInsights = config.isEnterprise == "true";
-const domainOrgMappings = ref<DomainOrgMapping[]>(
-  store.state?.organizationData?.organizationSettings?.domain_org_mappings || [],
-);
 
 // Dynamic defaults (edit-prefill from the store) → a typed computed. The trace/
 // span/toggle values are form-owned (OFormInput / OFormSwitch).
@@ -206,15 +190,6 @@ watch(
   },
 );
 
-watch(
-  () => store.state?.organizationData?.organizationSettings?.domain_org_mappings,
-  (newVal) => {
-    if (!formDirty.value) {
-      domainOrgMappings.value = newVal || [];
-    }
-  },
-);
-
 // @submit fires only once the schema passes (both field names required + regex),
 // so the old validateOrgSettings()/error refs are gone. Awaited by OForm so the
 // inline Save button's spinner spans the POST.
@@ -228,12 +203,7 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       usage_stream_enabled: value.usageStreamEnabled,
     };
 
-    // Only sent when the section rendered: an org that never showed it must not
-    // post an empty list and wipe mappings another admin saved.
-    if (showDomainOrgMappings.value) {
-      payload.domain_org_mappings = domainOrgMappings.value;
-    }
-    // Same rule for the enterprise-only switch: a hidden field must not overwrite the stored one.
+    // A hidden enterprise-only field must not overwrite the stored one.
     if (showRedInsights) {
       payload.red_insights_enabled = value.redInsightsEnabled;
       payload.ai_rca_thread_tool_output = value.aiRcaThreadToolOutput;
@@ -253,7 +223,6 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       toggle_ingestion_logs: value.toggleIngestionLogs,
       cross_links: crossLinks.value,
       usage_stream_enabled: value.usageStreamEnabled,
-      ...(showDomainOrgMappings.value ? { domain_org_mappings: domainOrgMappings.value } : {}),
       ...(showRedInsights
         ? {
             red_insights_enabled: value.redInsightsEnabled,
@@ -284,8 +253,6 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
 // Exposed for unit tests that exercise the submit handler directly.
 defineExpose({
   crossLinks,
-  domainOrgMappings,
-  showDomainOrgMappings,
   formDirty,
   saveOrgSettings,
   organizationSettingsSchema,

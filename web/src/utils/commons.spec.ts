@@ -2009,4 +2009,28 @@ describe("Commons Utility Functions", () => {
       );
     });
   });
+
+  describe("getDashboard — prototype keys", () => {
+    it.each(["__proto__", "constructor", "prototype"])(
+      "never hands back the object behind %s",
+      async (id) => {
+        const result = await getDashboard(mockStore, id, "default");
+
+        expect(result).toEqual({});
+        expect(result).not.toBe(Object.prototype);
+        expect(({} as any).variables).toBeUndefined();
+      },
+    );
+
+    it.each(["toString", "hasOwnProperty"])(
+      "fetches %s instead of reading it off the prototype",
+      async (id) => {
+        vi.mocked(dashboardService.get_Dashboard).mockRejectedValueOnce(new Error("404"));
+
+        await expect(getDashboard(mockStore, id, "default")).rejects.toThrow("404");
+        expect(dashboardService.get_Dashboard).toHaveBeenCalledTimes(1);
+        expect((Object.prototype.toString as any).variables).toBeUndefined();
+      },
+    );
+  });
 });

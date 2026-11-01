@@ -58,43 +58,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
 
-        <!-- Left: count chips -->
-        <OTag
-          data-test="traces-count-badge"
-          type="logsResultChip"
-          value="neutral"
-          class="me-[0.6rem]"
-          >{{
-            `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === "spans" ? t("traces.spansFound") : t("traces.tracesFound")}`
-          }}</OTag
+        <div
+          data-test="traces-count-chips"
+          class="flex items-center transition-opacity"
+          :class="{ 'opacity-60': countPending }"
         >
-        <OTag
-          v-if="
-            searchObj.data.queryResults.errorCount != null &&
-            searchObj.data.queryResults.errorCount > 0
-          "
-          data-test="traces-error-count-badge"
-          variant="error"
-          :clickable="true"
-          class="rounded-default! px-2.5! py-[0.4rem]! text-xs text-xs!"
-          :class="
-            showErrorOnly
-              ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
-              : 'bg-error-tag-bg! text-error-tag-text!'
-          "
-          @click="toggleErrorOnly"
-        >
-          {{
-            `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === "traces" ? t("traces.errorTraces") : t("traces.errorSpans")}`
-          }}
-          <OTooltip
-            :content="showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
-            side="bottom"
+          <OTag
+            data-test="traces-count-badge"
+            type="logsResultChip"
+            value="neutral"
+            class="me-[0.6rem] tabular-nums"
+            :aria-busy="countPending"
+          >
+            <template v-if="searchObj.meta.searchMode === 'spans'">
+              <OSkeleton
+                v-if="shownTotal == null"
+                type="text"
+                animation="pulse"
+                class="me-1 h-3 w-8 shrink-0"
+              />
+              {{ spansLabel }}
+            </template>
+            <i18n-t
+              v-else
+              keypath="traces.results.tracesWithMatchingSpan"
+              :plural="shownTotal ?? 2"
+              tag="span"
+              class="inline-flex items-center whitespace-pre"
+            >
+              <template #count>
+                <OSkeleton
+                  v-if="shownTotal == null"
+                  type="text"
+                  animation="pulse"
+                  class="h-3 w-8 shrink-0"
+                />
+                <template v-else>{{ formatLargeNumber(shownTotal) }}</template>
+              </template>
+            </i18n-t>
+          </OTag>
+          <OTag
+            v-if="
+              searchObj.data.queryResults.errorCount != null &&
+              searchObj.data.queryResults.errorCount > 0
+            "
+            data-test="traces-error-count-badge"
+            variant="error"
+            :clickable="true"
+            :disabled="countPending"
+            :aria-busy="countPending"
+            class="rounded-default! px-2.5! py-[0.4rem]! text-xs text-xs! tabular-nums"
+            :class="[
+              showErrorOnly
+                ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
+                : 'bg-error-tag-bg! text-error-tag-text!',
+              { 'opacity-100!': countPending },
+            ]"
+            @click="toggleErrorOnly"
+          >
+            {{
+              `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === "traces" ? t("traces.errorTraces") : t("traces.errorSpans")}`
+            }}
+            <OTooltip
+              :content="showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
+              side="bottom"
+            />
+            <template #trailing>
+              <OIcon name="filter-alt" size="xs" class="shrink-0" />
+            </template>
+          </OTag>
+          <OSpinner
+            v-if="countPending"
+            size="xs"
+            class="ms-1.5"
+            :aria-label="t('traces.updatingResults')"
+            data-test="traces-count-pending"
           />
-          <template #trailing>
-            <OIcon name="filter-alt" size="xs" class="shrink-0" />
-          </template>
-        </OTag>
+        </div>
 
         <div class="flex-1" />
 
@@ -128,11 +168,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="select-pagination ms-1 me-1 mt-0!"
             size="sm"
             :searchable="false"
+            :disabled="searchObj.loading || countPending"
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
           />
           <OPagination
-            :disable="searchObj.loading"
+            :disable="searchObj.loading || countPending"
             :model-value="searchObj.data.resultGrid.currentPage + 1"
             :max="totalPages"
             class="paginator-section float-right mt-0!"
@@ -145,7 +186,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Combined scroll area: RED metrics + trace list scroll together.
            This is the single vertical scroller — the trace table delegates its
            virtualizer here (via :scroll-el) so it doesn't add a nested one. -->
-      <div ref="scrollContainerRef" class="bg-card-glass-solid flex-1 overflow-auto">
+      <div
+        ref="scrollContainerRef"
+        class="bg-card-glass-solid flex-1 overflow-auto"
+        @scroll.passive="rememberScrollTop"
+      >
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <transition
           enter-active-class="transition-all duration-300 ease-in-out"
@@ -159,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="searchObj.meta.showHistogram"
             v-if="searchObj.data.stream.selectedStream.value && searchObj.searchApplied"
             ref="metricsDashboardRef"
+            class="sticky start-0 z-1"
             :streamName="searchObj.data.stream.selectedStream.value"
             :timeRange="{
               startTime: searchObj.data.datetime.startTime,
@@ -167,9 +213,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :filter="searchObj.data.editorValue"
             :streamFields="searchObj.data.stream.selectedStreamFields"
             :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
+            :ai-enabled="aiEnabled"
             @time-range-selected="onMetricsTimeRangeSelected"
             @editor-filter-set="onMetricsEditorFilterSet"
             @editor-filter-run="onMetricsEditorFilterRun"
+            @send-to-ai-chat="(v) => $emit('send-to-ai-chat', v)"
           />
         </transition>
 
@@ -191,14 +239,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :current-page="searchObj.data.resultGrid.currentPage + 1"
           :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
-          :show-pagination="searchObj.meta.resultGrid.showPagination"
+          :show-pagination="searchObj.meta.resultGrid.showPagination && !countPending"
           :sort-by="searchObj.meta.resultGrid.sortBy"
           :sort-order="searchObj.meta.resultGrid.sortOrder"
           :search-mode="searchObj.meta.searchMode"
           :ai-enabled="aiEnabled"
           :stream-doc-time-range="streamDocTimeRange"
           :query-window-us="queryWindowUs"
+          :row-href="traceDetailsHref"
           @row-click="expandRowDetail"
+          @open-in-new-tab="openTraceInNewTab"
           @page-change="(page: number) => changePage(page)"
           @cross-page="(page: number) => changePage(page, { fromCrossing: true })"
           @rows-per-page-change="changeRowsPerPage"
@@ -218,6 +268,9 @@ import {
   computed,
   defineAsyncComponent,
   defineComponent,
+  nextTick,
+  onActivated,
+  onDeactivated,
   onMounted,
   ref,
   watch,
@@ -240,6 +293,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -250,6 +305,8 @@ export default defineComponent({
     OSelect,
     OPagination,
     OTag,
+    OSpinner,
+    OSkeleton,
     TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
@@ -317,7 +374,7 @@ export default defineComponent({
     const router = useRouter();
     const { isMobile } = useBreakpoint();
 
-    const { searchObj, updatedLocalLogFilterField } = useTraces();
+    const { searchObj, updatedLocalLogFilterField, patchUrlViewState } = useTraces();
 
     const metricsDashboardRef: any = ref(null);
 
@@ -325,6 +382,26 @@ export default defineComponent({
     // trace table's virtualizer (:scroll-el) so the table doesn't render its own
     // nested scrollbar — fixes the double-scrollbar on the traces page.
     const scrollContainerRef = ref<HTMLElement | null>(null);
+
+    // Keep-alive detaches the DOM before onDeactivated runs, and a detached element reads scrollTop 0.
+    let savedScrollTop = 0;
+    let restoringScroll = false;
+    const rememberScrollTop = () => {
+      if (!restoringScroll && scrollContainerRef.value?.isConnected) {
+        savedScrollTop = scrollContainerRef.value.scrollTop;
+      }
+    };
+    onDeactivated(() => {
+      restoringScroll = true;
+    });
+    onActivated(async () => {
+      await nextTick();
+      // The virtualized rows lay out in the next frame; before that the offset would clamp short.
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.value) scrollContainerRef.value.scrollTop = savedScrollTop;
+        restoringScroll = false;
+      });
+    });
 
     onMounted(() => {
       // Restore the wrap choice: a preference that resets on every reload is
@@ -341,34 +418,45 @@ export default defineComponent({
       },
     );
 
-    const expandRowDetail = (props: any) => {
-      let from: number;
-      let to: number;
-      searchObj.meta.resultGrid.navigation.lastOpenedId =
-        searchObj.meta.searchMode === "spans" ? props.span_id : props.trace_id;
-
+    const traceTimeRange = (props: any) => {
       if (searchObj.meta.searchMode === "spans") {
         // start_time / end_time are nanoseconds in raw span rows — convert to µs
         const spanStart = Math.floor((props.start_time || 0) / 1000);
         const spanEnd = Math.ceil((props.end_time || props.start_time || 0) / 1000);
-        from = spanStart - 60_000_000; // -1 min in µs
-        to = spanEnd + 3_600_000_000; // +1 hr in µs
-      } else {
-        from = props.trace_start_time;
-        to = props.trace_end_time;
+        return { from: spanStart - 60_000_000, to: spanEnd + 3_600_000_000 };
       }
+      return { from: props.trace_start_time, to: props.trace_end_time };
+    };
 
-      router.push({
-        name: "traceDetails",
-        query: {
-          stream: router.currentRoute.value.query.stream,
-          trace_id: props.trace_id,
-          ...(searchObj.meta.searchMode === "spans" ? { span_id: props.span_id } : {}),
-          from,
-          to,
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
+    const traceDetailsLocation = (props: any, from: number, to: number) => ({
+      name: "traceDetails",
+      query: {
+        stream: router.currentRoute.value.query.stream,
+        trace_id: props.trace_id,
+        ...(searchObj.meta.searchMode === "spans" ? { span_id: props.span_id } : {}),
+        from,
+        to,
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+
+    const traceDetailsHref = (row: any) => {
+      const { from, to } = traceTimeRange(row);
+      return router.resolve(traceDetailsLocation(row, from, to)).href;
+    };
+
+    const openTraceInNewTab = (row: any) => {
+      window.open(traceDetailsHref(row), "_blank", "noopener");
+    };
+
+    const expandRowDetail = async (props: any) => {
+      searchObj.meta.resultGrid.navigation.lastOpenedId =
+        searchObj.meta.searchMode === "spans" ? props.span_id : props.trace_id;
+      const { from, to } = traceTimeRange(props);
+
+      // The URL write is debounced; Back restores what this entry holds, so it must land before leaving.
+      await patchUrlViewState();
+      router.push(traceDetailsLocation(props, from, to));
 
       emit("get:traceDetails", props);
     };
@@ -397,18 +485,42 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     const hits = computed<any[]>(() => searchObj.data.queryResults?.hits ?? []);
 
+    const resultTotal = computed<number>(() =>
+      Number(searchObj.data.queryResults?.total ?? hits.value.length),
+    );
+
     const searchPerformed = computed(() =>
       Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "total"),
     );
 
     const rowsPerPageOptions = [10, 25, 50, 100];
 
+    // The count runs after the rows, so until it answers there is no total to show.
+    const countPending = computed(() => searchObj.data.queryResults?.countPending === true);
+
+    // A re-run has no total until its count lands; the pager keeps the last one meanwhile.
+    const pagerTotal = ref<number | null>(
+      countPending.value ? null : Number(searchObj.data.queryResults?.total) || 0,
+    );
+    watch(
+      () => [searchObj.data.queryResults?.total, countPending.value] as const,
+      ([total, pending]) => {
+        if (!pending) pagerTotal.value = Number(total) || 0;
+      },
+    );
+    // Index.vue clears errorCount when a run changes dataset or its count fails, so no kept total then.
+    const shownTotal = computed<number | null>(() => {
+      if (!countPending.value) return resultTotal.value;
+      return searchObj.data.queryResults?.errorCount != null ? pagerTotal.value : null;
+    });
+    const spansLabel = computed(() =>
+      shownTotal.value == null
+        ? t("traces.spansFound")
+        : `${formatLargeNumber(shownTotal.value)} ${t("traces.spansFound")}`,
+    );
     const totalPages = computed(() =>
-      searchObj.data.queryResults.total && searchObj.meta.resultGrid.rowsPerPage
-        ? Math.max(
-            1,
-            Math.ceil(searchObj.data.queryResults.total / searchObj.meta.resultGrid.rowsPerPage),
-          )
+      pagerTotal.value && searchObj.meta.resultGrid.rowsPerPage
+        ? Math.max(1, Math.ceil(pagerTotal.value / searchObj.meta.resultGrid.rowsPerPage))
         : 1,
     );
 
@@ -466,18 +578,25 @@ export default defineComponent({
     return {
       t,
       store,
+      resultTotal,
       isMobile,
       searchObj,
       updatedLocalLogFilterField,
       metricsDashboardRef,
       scrollContainerRef,
       expandRowDetail,
+      traceDetailsHref,
+      openTraceInNewTab,
       onMetricsTimeRangeSelected,
       onMetricsEditorFilterSet,
       onMetricsEditorFilterRun,
       getDashboardData,
       hits,
       searchPerformed,
+      countPending,
+      shownTotal,
+      spansLabel,
+      rememberScrollTop,
       changePage,
       changeRowsPerPage,
       changeSortBy,

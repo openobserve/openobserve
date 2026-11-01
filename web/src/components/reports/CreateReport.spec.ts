@@ -600,6 +600,111 @@ describe("CreateReport", () => {
     });
   });
 
+  describe("create-mode seeding after the folder fetches", () => {
+    const deferFolders = () => {
+      let release!: () => void;
+      vi.mocked(dashboardService.list_Folders).mockReturnValue(
+        new Promise((resolve) => {
+          release = () => resolve({ data: { list: MOCK_FOLDERS } } as any);
+        }) as any,
+      );
+      return () => release();
+    };
+
+    it("keeps a name typed before the folder fetches resolve", async () => {
+      const release = deferFolders();
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+
+      setField(wrapper, "name", "typed-early");
+      release();
+      await flushPromises();
+
+      expect((wrapper.vm as any).form.state.values.name).toBe("typed-early");
+    });
+
+    it("applies the query-derived dashboard folder without wiping a typed name", async () => {
+      const release = deferFolders();
+      ({ wrapper } = mountComponent({ folderId: "folder-1", type: "cached" }));
+      await flushPromises();
+
+      setField(wrapper, "name", "typed-early");
+      release();
+      await flushPromises();
+
+      const values = (wrapper.vm as any).form.state.values;
+      expect(values.name).toBe("typed-early");
+      expect(values.isCachedReport).toBe(true);
+      expect(values.dashboards[0].folder).toBe("folder-1");
+    });
+
+    it("keeps the cached switch the user turned off while the folders were loading", async () => {
+      const release = deferFolders();
+      ({ wrapper } = mountComponent({ type: "cached" }));
+      await flushPromises();
+
+      setField(wrapper, "isCachedReport", false);
+      release();
+      await flushPromises();
+
+      expect((wrapper.vm as any).form.state.values.isCachedReport).toBe(false);
+    });
+
+    it("offers only the latest picked folder's dashboards when an older request resolves last", async () => {
+      const pending: Record<string, () => void> = {};
+      vi.mocked(dashboardService.list).mockImplementation(
+        (...args: any[]) =>
+          new Promise((resolve) => {
+            const folder = args[6];
+            pending[folder] = () =>
+              resolve({
+                data: {
+                  dashboards: [
+                    { v1: { title: folder, dashboardId: `dash-${folder}`, tabs: [], version: 1 } },
+                  ],
+                },
+              } as any);
+          }) as any,
+      );
+      ({ wrapper } = mountComponent({ folderId: "folder-1" }));
+      await flushPromises();
+
+      await pickFromSelect(wrapper, "dashboards[0].folder", "folder-2");
+      pending["folder-2"]();
+      await flushPromises();
+      pending["folder-1"]();
+      await flushPromises();
+
+      expect((wrapper.vm as any).dashboardOptions.map((o: any) => o.value)).toEqual([
+        "dash-folder-2",
+      ]);
+    });
+
+    it("keeps a folder the user picked while the query folder's dashboards were loading", async () => {
+      let release!: () => void;
+      vi.mocked(dashboardService.list).mockReturnValue(
+        new Promise((resolve) => {
+          release = () => resolve({ data: { dashboards: MOCK_DASHBOARDS } } as any);
+        }) as any,
+      );
+      ({ wrapper } = mountComponent({
+        folderId: "folder-1",
+        dashboardId: "dash-1",
+        tabId: "tab-1",
+      }));
+      await flushPromises();
+
+      await pickFromSelect(wrapper, "dashboards[0].folder", "folder-2");
+      release();
+      await flushPromises();
+
+      const row = (wrapper.vm as any).form.state.values.dashboards[0];
+      expect(row.folder).toBe("folder-2");
+      expect(row.dashboard).toBe("");
+      expect(row.tabs).toBe("");
+    });
+  });
+
   // ── Edit mode ────────────────────────────────────────────────────────────
 
   describe("edit mode (route has name query param)", () => {

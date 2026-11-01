@@ -102,9 +102,18 @@ const FILTERS = [
   { label: "zone", value: "us-.*", operator: "!~" },
 ];
 
+/** Base AND (a group OR a negated group): three branches the queries must union identically. */
+const GROUPED = [
+  { label: "job", value: "api", operator: "=" },
+  { label: "pod", value: "web-.*", operator: "=~", group: 1 },
+  { label: "zone", value: "us", operator: "=", group: 2, negate: true },
+  { label: "instance", value: "a", operator: "=", group: 2, negate: true },
+];
+
 describe("every variant's builder state renders back to its preview query", () => {
-  for (const filters of [undefined, FILTERS]) {
-    const withFilters = filters ? "with label filters" : "unfiltered";
+  for (const filters of [undefined, FILTERS, GROUPED]) {
+    const withFilters =
+      filters === GROUPED ? "with OR groups" : filters ? "with label filters" : "unfiltered";
 
     for (const fixture of FIXTURES) {
       it(`${fixture.what}, ${withFilters}`, () => {

@@ -592,6 +592,28 @@ describe("VideoPlayer", () => {
 
       localWrapper.unmount();
     });
+
+    it("should hand the replay a placeholder rule for canvases, which are never recorded", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+
+      const localWrapper = mountComponent({ segments: [] });
+      await flushPromises();
+
+      await localWrapper.setProps({ segments: mockSegments });
+      await flushPromises();
+      await localWrapper.vm.$nextTick();
+
+      expect(rrwebPlayerMock).toHaveBeenCalled();
+      const { props } = (rrwebPlayerMock as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(props.UNSAFE_replayCanvas).toBe(false);
+      expect(props.insertStyleRules).toHaveLength(1);
+      const [rule] = props.insertStyleRules;
+      expect(rule.startsWith("canvas {")).toBe(true);
+      expect(rule).toContain(encodeURIComponent("Canvas content not recorded"));
+
+      localWrapper.unmount();
+    });
   });
 
   // ==========================================================================
@@ -689,6 +711,181 @@ describe("VideoPlayer", () => {
       (localWrapper.vm as any).worker = null;
 
       expect(() => localWrapper.unmount()).not.toThrow();
+    });
+  });
+
+  // ==========================================================================
+  // Stylesheet proxy rewrite
+  // ==========================================================================
+
+  describe("Stylesheet proxy rewrite", () => {
+    const fontUrl = "https://cdn.example.com/assets/icons.woff2";
+    const proxiedFontUrl = `https://api.test.com/proxy/test-org/${fontUrl}`;
+
+    // Answers only when the test says so, like a real worker that is still starting or busy.
+    class HeldWorker {
+      static last: HeldWorker | null = null;
+      listeners: Record<string, ((event: any) => void)[]> = {};
+      posted: any[] = [];
+      constructor() {
+        HeldWorker.last = this;
+      }
+      addEventListener(name: string, fn: (event: any) => void) {
+        (this.listeners[name] ??= []).push(fn);
+      }
+      removeEventListener(name: string, fn: (event: any) => void) {
+        this.listeners[name] = (this.listeners[name] ?? []).filter((f) => f !== fn);
+      }
+      postMessage(data: any) {
+        this.posted.push(data);
+      }
+      terminate() {}
+      answer() {
+        for (const { cssString, proxyUrl, id } of this.posted.splice(0)) {
+          const updatedCssString = cssString.replace(
+            /url\((https?:\/\/[^)]+)\)/g,
+            `url("${proxyUrl}/$1")`,
+          );
+          (this.listeners.message ?? []).forEach((fn) => fn({ data: { updatedCssString, id } }));
+        }
+      }
+      fail() {
+        (this.listeners.error ?? []).forEach((fn) => fn({}));
+      }
+    }
+
+    // Fresh objects per call: the player rewrites the link's _cssText in place.
+    const snapshotWithStylesheet = (timestamp: number) => ({
+      type: 2,
+      timestamp,
+      data: {
+        width: 1920,
+        height: 1080,
+        node: {
+          type: 0,
+          childNodes: [
+            {
+              type: 2,
+              tagName: "html",
+              attributes: {},
+              childNodes: [
+                {
+                  type: 2,
+                  tagName: "head",
+                  attributes: {},
+                  childNodes: [
+                    {
+                      type: 2,
+                      tagName: "link",
+                      attributes: {
+                        rel: "stylesheet",
+                        href: "https://app.example.com/assets/index.css",
+                        _cssText: `@font-face{font-family:Icons;src:url(${fontUrl})}`,
+                      },
+                      childNodes: [],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    const linkCss = (record: any) =>
+      record.data.node.childNodes[0].childNodes[0].childNodes[0].attributes._cssText;
+
+    beforeEach(() => {
+      HeldWorker.last = null;
+      global.Worker = HeldWorker as any;
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      global.Worker = MockWorker as any;
+    });
+
+    it("should build the player only after the stylesheet URLs point at the proxy", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+
+      const { parent, segments } = mountWithShallowSegments([]);
+      await flushPromises();
+      segments.value = [{ records: [snapshotWithStylesheet(1704110400000)] }];
+      await flushPromises();
+
+      expect(rrwebPlayerMock).not.toHaveBeenCalled();
+
+      HeldWorker.last!.answer();
+      await flushPromises();
+
+      expect(rrwebPlayerMock).toHaveBeenCalledTimes(1);
+      const events = (rrwebPlayerMock as ReturnType<typeof vi.fn>).mock.calls[0][0].props.events;
+      expect(linkCss(events.find((e: any) => e.type === 2))).toContain(`url("${proxiedFontUrl}")`);
+
+      parent.unmount();
+    });
+
+    it("should append a later snapshot only after its stylesheet URLs point at the proxy", async () => {
+      playerSpies.addEvent.mockClear();
+
+      const { parent, segments } = mountWithShallowSegments([]);
+      await flushPromises();
+      segments.value = [...mockSegments];
+      await flushPromises();
+
+      segments.value = [...segments.value, { records: [snapshotWithStylesheet(1704110500000)] }];
+      await flushPromises();
+
+      expect(playerSpies.addEvent).not.toHaveBeenCalled();
+
+      HeldWorker.last!.answer();
+      await flushPromises();
+
+      expect(playerSpies.addEvent).toHaveBeenCalledTimes(1);
+      expect(linkCss(playerSpies.addEvent.mock.calls[0][0])).toContain(`url("${proxiedFontUrl}")`);
+
+      parent.unmount();
+    });
+
+    it("should keep the recorded CSS when the worker fails", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+
+      const { parent, segments } = mountWithShallowSegments([]);
+      await flushPromises();
+      segments.value = [{ records: [snapshotWithStylesheet(1704110400000)] }];
+      await flushPromises();
+
+      HeldWorker.last!.fail();
+      await flushPromises();
+
+      expect(rrwebPlayerMock).toHaveBeenCalledTimes(1);
+      const events = (rrwebPlayerMock as ReturnType<typeof vi.fn>).mock.calls[0][0].props.events;
+      expect(linkCss(events.find((e: any) => e.type === 2))).toContain(`url(${fontUrl})`);
+
+      parent.unmount();
+    });
+
+    it("should not wait more than five seconds for a worker that never answers", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+
+      const { parent, segments } = mountWithShallowSegments([]);
+      await flushPromises();
+      segments.value = [{ records: [snapshotWithStylesheet(1704110400000)] }];
+      await flushPromises();
+
+      await vi.advanceTimersByTimeAsync(4900);
+      expect(rrwebPlayerMock).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(200);
+      await flushPromises();
+      expect(rrwebPlayerMock).toHaveBeenCalledTimes(1);
+
+      parent.unmount();
     });
   });
 

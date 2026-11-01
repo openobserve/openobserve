@@ -232,6 +232,34 @@ describe("buildNavigationRoute", () => {
     expect(decode(route.query.query)).toBe("SELECT 1");
   });
 
+  it.each(["traces", "metrics"] as const)("sends %s SQL searches to the logs page", (signal) => {
+    const route = buildNavigationRoute(
+      {
+        resource_type: signal,
+        action: "load_query",
+        label: raw("l"),
+        target: { query: "SELECT 1", sql_mode: true, from: 1, to: 2, stream: ["a"] },
+      },
+      "org1",
+    )!;
+    expect(route.path).toBe("/logs");
+    expect(route.query.stream_type).toBe(signal);
+    expect(decode(route.query.query)).toBe("SELECT 1");
+  });
+
+  it("keeps the traces page for a non-SQL traces filter", () => {
+    const route = buildNavigationRoute(
+      {
+        resource_type: "traces",
+        action: "load_query",
+        label: raw("l"),
+        target: { query: "service_name='a'", sql_mode: false, from: 1, to: 2, stream: ["a"] },
+      },
+      "org1",
+    )!;
+    expect(route.path).toBe("/traces");
+  });
+
   it("uses period when no absolute range is given", () => {
     const route = buildNavigationRoute(
       { resource_type: "logs", action: "load_query", label: raw("l"), target: { period: "15m" } },

@@ -221,7 +221,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardSetting.openVariables();
 
     // Create chain: A -> B -> C -> D
-    const fields = ["kubernetes_namespace_name", "kubernetes_container_name", "_timestamp", "log"];
+    // Not _timestamp: its values are ingest times, so a mid-chain timestamp level often returns none and stalls the cascade.
+    const fields = ["kubernetes_namespace_name", "kubernetes_container_name", "kubernetes_container_image", "log"];
     for (let i = 0; i < vars.length; i++) {
       await scopedVars.addScopedVariable(
         vars[i],
@@ -322,7 +323,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
       "kubernetes_namespace_name",
       "kubernetes_container_name",
       "kubernetes_pod_name",
-      "_timestamp",
+      // Not _timestamp: its values are ingest times, so a mid-chain timestamp level often returns none and stalls the cascade.
+      "kubernetes_container_image",
       "log",
       "code"
     ];

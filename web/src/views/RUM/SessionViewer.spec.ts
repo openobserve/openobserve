@@ -51,6 +51,14 @@ const queryPayload = vi.hoisted(() => ({
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
+const heatmapOpen = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/rum/useSessionHeatmap", async () => {
+  const { ref } = await import("vue");
+  return {
+    default: () => ({ openSessionHeatmap: heatmapOpen, opening: ref(false) }),
+  };
+});
+
 vi.mock("@/composables/useQuery", () => ({
   default: () => ({
     buildQueryPayload: (queryPayload.build ??= vi.fn(() => ({ query: { sql: "" }, aggs: {} }))),
@@ -278,6 +286,7 @@ function mountSessionViewer(router = createTestRouter()) {
             "endTime",
             "rumWindowUs",
             "markedTimestamps",
+            "loading",
           ],
         },
         EventDetailDrawer: {
@@ -861,6 +870,38 @@ describe("SessionViewer.vue — session id with an embedded single quote", () =>
     for (const sql of sqlCalls) {
       expect(sql).toContain("session_id='session''x'");
     }
+
+    wrapper.unmount();
+  });
+});
+
+describe("SessionViewer.vue — geo columns in the session lookup", () => {
+  const savedFields = replaySchema.fields;
+
+  afterEach(() => {
+    replaySchema.fields = savedFields;
+  });
+
+  it.each([
+    ["geo_info_country", "min(geo_info_country) as country", "geo_info_city"],
+    ["geo_info_city", "min(geo_info_city) as city", "geo_info_country"],
+  ])("selects %s only, when the stream has no other geo column", async (column, select, absent) => {
+    vi.clearAllMocks();
+    replaySchema.fields = { [column]: true };
+    const router = createTestRouter();
+    await router.push({
+      path: "/rum/sessions/session-abc",
+      query: { start_time: "1692884313968000", end_time: "1692884769270000" },
+    });
+    const wrapper = mountSessionViewer(router);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const lookup = vi
+      .mocked(searchService.search)
+      .mock.calls.map((call) => (call[0] as any).query.query.sql as string)
+      .find((sql) => sql.includes("min(start)"));
+    expect(lookup).toContain(select);
+    expect(lookup).not.toContain(absent);
 
     wrapper.unmount();
   });
@@ -2056,7 +2097,7 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
   const NOW = 1_750_000_000_000;
   const L = NOW - 10 * 60_000;
   const maxTs = (NOW - 30_000) * 1000;
-  const server = { rows: [] as any[], rum: [] as any[], logs: [] as any[] };
+  const server = { rows: [] as any[], rum: [] as any[], logs: [] as any[], failed: [] as any[] };
   let originalSearch: any;
 
   // Every row arrives at the open's upper bound unless a test says otherwise, so each poll window re-returns it.
@@ -2105,9 +2146,11 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
       if (sql.includes("min(start)")) return { data: { hits: [lookupRow(endTime)] } } as any;
       const rows = sql.includes("_rumlog")
         ? server.logs
-        : sql.includes("_rumdata")
-          ? server.rum
-          : [];
+        : sql.includes("type='resource'")
+          ? server.failed
+          : sql.includes("_rumdata")
+            ? server.rum
+            : [];
       return { data: { hits: rows.slice(from, from + size) } } as any;
     });
   }
@@ -2148,11 +2191,14 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     server.rows = [liveRow(0), liveRow(1), liveRow(2)];
     server.rum = [];
     server.logs = [];
+    server.failed = [];
     replayStart = undefined;
     resetStreaming(liveResponder);
+    streamsMock.getStream = async () => ({ name: "_rumdata", schema: [{ name: "source" }] });
   });
 
   afterEach(() => {
+    streamsMock.getStream = null;
     vi.useRealTimers();
     vi.mocked(searchService.search).mockImplementation(originalSearch);
     setVisibility("visible");
@@ -2422,6 +2468,34 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     expect(views).toHaveLength(1);
     expect(views[0].name).toBe("initial_load : /b");
     expect(vm.segmentEvents.filter((event: any) => event.id === "a1")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("picks up failed requests from the live tail", async () => {
+    streamsMock.getStream = async () => ({
+      name: "_rumdata",
+      schema: [{ name: "resource_type" }, { name: "resource_status_code" }],
+    });
+    const wrapper = await mountLive();
+    const vm = wrapper.vm as any;
+    expect(vm.segmentEvents).toHaveLength(0);
+
+    server.failed = [
+      {
+        type: "resource",
+        resource_id: "r1",
+        resource_type: "xhr",
+        resource_url: "https://api.test/live",
+        resource_status_code: 0,
+        date: L + 50,
+        _timestamp: (L + 50) * 1000,
+      },
+    ];
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(vm.segmentEvents.map((event: any) => event.name)).toEqual([
+      "No response GET https://api.test/live",
+    ]);
     wrapper.unmount();
   });
 
@@ -2773,6 +2847,207 @@ describe("SessionViewer.vue — opened from a funnel (AC-18)", () => {
   it("drops an oversize or unknown-kind label instead of rendering it", async () => {
     const { wrapper } = await mountFromFunnel({ af_kind: "x" });
     expect(wrapper.find('[data-test="session-viewer-analytics-context"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+describe("SessionViewer.vue — the breadcrumbs wait for the events", () => {
+  const savedFields = replaySchema.fields;
+  const sidebarLoading = (wrapper: VueWrapper) =>
+    wrapper.findComponent({ name: "PlayerEventsSidebar" }).props("loading");
+  const answer = (sql: string) => ({
+    data: { hits: sql.includes("min(start)") ? [sessionLookupRow] : [] },
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetStreaming(rowsResponder(fixtureRows));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    streamsMock.getStream = null;
+    replaySchema.fields = savedFields;
+    vi.mocked(searchService.search).mockImplementation((async (params: any) =>
+      answer(params?.query?.query?.sql ?? "")) as any);
+  });
+
+  it("passes loading to the sidebar until the events request settles", async () => {
+    let release: (v: unknown) => void = () => {};
+    vi.mocked(searchService.search).mockImplementation(((params: any) => {
+      const sql: string = params?.query?.query?.sql ?? "";
+      if (sql.includes('"_rumdata"') && sql.includes("type='error'"))
+        return new Promise((resolve) => (release = resolve));
+      return Promise.resolve(answer(sql));
+    }) as any);
+    const wrapper = mountSessionViewer(await pushRoute());
+    await flushMany();
+    expect(sidebarLoading(wrapper)).toBe(true);
+
+    release({ data: { hits: [] } });
+    await flushMany();
+    expect(sidebarLoading(wrapper)).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("stops loading when the replay schema lookup fails", async () => {
+    replaySchema.fields = undefined as never;
+    streamsMock.getStream = async () => {
+      throw new Error("network down");
+    };
+    const wrapper = mountSessionViewer(await pushRoute());
+    await flushMany();
+    expect((wrapper.vm as any).loadState).toBe("error");
+    expect(sidebarLoading(wrapper)).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("stops loading when the session lookup fails", async () => {
+    vi.useFakeTimers();
+    vi.mocked(searchService.search).mockRejectedValue({ response: { status: 503 } });
+    const wrapper = mountSessionViewer(await pushRoute());
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect((wrapper.vm as any).loadState).toBe("error");
+    expect(sidebarLoading(wrapper)).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+describe("SessionViewer.vue — failed requests in the events list", () => {
+  const start = 1692884313968;
+  const columns = [{ name: "source" }, { name: "resource_type" }, { name: "resource_status_code" }];
+  const action = {
+    type: "action",
+    action_id: "a1",
+    action_type: "click",
+    action_target_name: "Save",
+    date: start + 1000,
+  };
+  const view = {
+    type: "view",
+    view_id: "v1",
+    view_url: "https://app.test/page",
+    view_loading_type: "initial_load",
+    date: start + 500,
+  };
+  const error = { type: "error", error_id: "e1", error_message: "boom", date: start + 2000 };
+  const resource = (id: string, status: number, date: number, method = "get") => ({
+    type: "resource",
+    resource_id: id,
+    resource_type: "fetch",
+    resource_method: method,
+    resource_url: `https://api.test/${id}`,
+    resource_status_code: status,
+    date,
+  });
+  let sqls: string[];
+  let failedSqlResponse: () => any;
+
+  async function mountWithEvents(schema: unknown[] = columns) {
+    vi.clearAllMocks();
+    sqls = [];
+    streamsMock.getStream = async () => ({ name: "_rumdata", schema });
+    vi.mocked(searchService.search).mockImplementation((async (params: any) => {
+      const sql: string = params?.query?.query?.sql ?? "";
+      sqls.push(sql);
+      if (sql.includes("min(start)")) return { data: { hits: [] } };
+      if (sql.includes("MIN(date) AS start_time")) {
+        return {
+          data: { hits: [{ start_time: start, end_time: start + 60_000, source: "browser" }] },
+        };
+      }
+      if (sql.includes("type='resource'")) return failedSqlResponse();
+      if (sql.includes('"_rumdata"')) return { data: { hits: [view, action, error] } };
+      if (sql.includes('"_rumlog"')) return { data: { hits: [] } };
+      return { data: { hits: [] } };
+    }) as any);
+    const router = createTestRouter();
+    await router.push({
+      path: "/rum/sessions/session-events",
+      query: {
+        start_time: String(start * 1000),
+        end_time: String((start + 60_000) * 1000),
+        event_time: String(start),
+        from: "analytics",
+      },
+    });
+    const wrapper = mountSessionViewer(router);
+    for (let i = 0; i < 8; i++) await flush();
+    return wrapper;
+  }
+
+  beforeEach(() => {
+    failedSqlResponse = () => ({
+      data: {
+        hits: [resource("a", 403, start + 3000), resource("b", 0, start + 4000, "post")],
+      },
+    });
+  });
+
+  afterEach(() => {
+    streamsMock.getStream = null;
+  });
+
+  it("issues the failed-request query, covering status 0 and the 4xx/5xx range", async () => {
+    const wrapper = await mountWithEvents();
+    const sql = sqls.find((q) => q.includes("type='resource'"));
+    expect(sql).toContain('from "_rumdata"');
+    expect(sql).toContain("resource_type in ('fetch','xhr')");
+    expect(sql).toContain("(resource_status_code >= 400 or resource_status_code = 0)");
+    expect(sql).toContain("order by date asc");
+    wrapper.unmount();
+  });
+
+  it("lists a 403 and a no-response request as failed_request events, in time order", async () => {
+    const wrapper = await mountWithEvents();
+    const events = (wrapper.vm as any).segmentEvents;
+    expect(events.map((e: any) => e.type)).toEqual([
+      "view",
+      "action",
+      "error",
+      "failed_request",
+      "failed_request",
+    ]);
+    expect(events.filter((e: any) => e.type === "failed_request").map((e: any) => e.name)).toEqual([
+      "403 GET https://api.test/a",
+      "No response POST https://api.test/b",
+    ]);
+    // The detail drawer reads the stored row, so it must be reachable by the event id.
+    expect((wrapper.vm as any).rawEventsMap.get("a").resource_status_code).toBe(403);
+    wrapper.unmount();
+  });
+
+  it("keeps the other events when the failed-request query fails", async () => {
+    failedSqlResponse = () => {
+      throw { response: { status: 400, data: { message: "no such column" } } };
+    };
+    const wrapper = await mountWithEvents();
+    const events = (wrapper.vm as any).segmentEvents;
+    expect(events.map((e: any) => e.type)).toEqual(["view", "action", "error"]);
+    wrapper.unmount();
+  });
+
+  it("does not issue the query when the stream has no resource columns", async () => {
+    const wrapper = await mountWithEvents([{ name: "source" }]);
+    expect(sqls.some((q) => q.includes("type='resource'"))).toBe(false);
+    expect((wrapper.vm as any).segmentEvents.map((e: any) => e.type)).toEqual([
+      "view",
+      "action",
+      "error",
+    ]);
+    wrapper.unmount();
+  });
+
+  it("shows a resource row once even when it is returned again", async () => {
+    failedSqlResponse = () => ({
+      data: { hits: [resource("a", 500, start + 3000), resource("a", 500, start + 3000)] },
+    });
+    const wrapper = await mountWithEvents();
+    const failed = (wrapper.vm as any).segmentEvents.filter(
+      (e: any) => e.type === "failed_request",
+    );
+    expect(failed).toHaveLength(1);
+    expect(failed[0].name).toBe("500 GET https://api.test/a");
     wrapper.unmount();
   });
 });

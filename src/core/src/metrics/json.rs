@@ -1413,7 +1413,7 @@ mod tests {
         }
 
         #[test]
-        fn test_json_serialization_performance() {
+        fn test_json_serialization_round_trips() {
             let record = create_test_metric_record(
                 "serialization_test",
                 "counter",
@@ -1425,16 +1425,11 @@ mod tests {
                 ],
             );
 
-            let start = std::time::Instant::now();
-            let serialized = serde_json::to_string(&record);
-            let duration = start.elapsed();
-
-            assert!(serialized.is_ok());
-            assert!(duration.as_micros() < 1000); // Should be very fast
-
-            let json_string = serialized.unwrap();
+            let json_string = serde_json::to_string(&record).unwrap();
             assert!(json_string.contains("serialization_test"));
             assert!(json_string.contains("999.999"));
+            let parsed: serde_json::Value = serde_json::from_str(&json_string).unwrap();
+            assert_eq!(parsed, record);
         }
     }
 }

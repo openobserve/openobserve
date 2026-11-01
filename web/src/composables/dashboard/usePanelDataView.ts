@@ -18,7 +18,7 @@ import { computed, ref, toValue, type MaybeRefOrGetter } from "vue";
 export type PanelPreviewView = "chart" | "data";
 
 // Already tabular, or not query-driven, so a raw-rows view adds nothing.
-const NO_DATA_VIEW_TYPES = ["table", "html", "markdown", "custom_chart"];
+const NO_DATA_VIEW_TYPES = ["table", "logs", "html", "markdown", "alert-list", "custom_chart"];
 
 /** Per-viewer Chart | Data switch state for a rendered panel; never saved with the panel. */
 export function usePanelDataView({

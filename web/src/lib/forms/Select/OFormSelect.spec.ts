@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect, afterEach } from "vitest";
+import { defineComponent } from "vue";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { z } from "zod";
 import OFormSelect from "./OFormSelect.vue";
@@ -145,5 +146,20 @@ describe("OFormSelect", () => {
     });
     expect(wrapper.findComponent(OSelect).props("optionTooltip")).toBe(true);
     expect(wrapper.findComponent(OSelect).props("labelPosition")).toBe("inside");
+  });
+
+  it("forwards OSelect's header-action event to the consumer", () => {
+    const received: unknown[] = [];
+    const Host = defineComponent({
+      components: { OForm, OFormSelect },
+      setup: () => ({ onHeaderAction: (option: unknown) => received.push(option) }),
+      template: `<OForm :default-values="{ kind: '' }">
+        <OFormSelect name="kind" :options="[]" @header-action="onHeaderAction" />
+      </OForm>`,
+    });
+    wrapper = mount(Host);
+    const header = { label: "Group", header: true, headerAction: "Hide" };
+    wrapper.findComponent(OSelect).vm.$emit("header-action", header);
+    expect(received).toEqual([header]);
   });
 });

@@ -26,6 +26,8 @@ use axum::{
 use config::get_config;
 use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
+#[cfg(feature = "cloud")]
+use openobserve_api_management::request::org_domains;
 #[cfg(feature = "cpu-profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
@@ -1261,6 +1263,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/streams/{stream_name}/data_by_time_range", delete(stream::delete_stream_data_by_time_range))
         .route("/{org_id}/streams/{stream_name}/data_by_time_range/status/{id}", get(stream::get_delete_stream_data_status))
         .route("/{org_id}/metrics/{metric_name}/usage", get(metrics_usage::get_metric_usage))
+        .route("/{org_id}/metrics/usage", get(metrics_usage::get_org_metric_usage))
 
         // Logs ingestion
         .route("/{org_id}/_bulk", post(logs::ingest::bulk))
@@ -2173,6 +2176,18 @@ pub fn service_routes() -> Router {
                 get(billing_group::check_membership).delete(billing_group::leave_group),
             )
             .route("/{org_id}/billing_group/members", get(billing_group::check_members))
+            .route(
+                "/{org_id}/settings/domains",
+                get(org_domains::get_linked_domain).post(org_domains::link_domain)
+            )
+            .route("/{org_id}/settings/domains/requests",post(org_domains::raise_request).get(org_domains::list_requests))
+            .route("/{org_id}/settings/domain/request/{id}/approve",post(org_domains::approve_request))
+            .route("/{org_id}/settings/domain/request/{id}/reject",post(org_domains::reject_request))
+            .route("/{org_id}/settings/domains/{domain}",delete(org_domains::delete_linked_domain))
+            .route(
+                "/{org_id}/settings/domains/verify/{domain}",
+                post(org_domains::verify_domain),
+            )
             .route(
                 "/{org_id}/billing_group/members/{member_org_id}",
                 delete(billing_group::remove_member),
@@ -3828,12 +3843,17 @@ mod tests {
             "the editors need the suggest mode before the authenticated config arrives"
         );
 
-        // build_type (enterprise/cloud/opensource) is not sensitive and the o2
-        // CLI + o2-operator read it from this unauthenticated endpoint to gate
-        // enterprise commands — it must stay a real build-type token.
+        // The o2 CLI and o2-operator gate enterprise commands on this unauthenticated field.
+        let expected_build_type = if cfg!(feature = "cloud") {
+            "cloud"
+        } else if cfg!(feature = "enterprise") {
+            "enterprise"
+        } else {
+            "opensource"
+        };
         assert_eq!(
             payload.get("build_type").and_then(Value::as_str),
-            Some("opensource"),
+            Some(expected_build_type),
             "bootstrap build_type must carry the real build kind"
         );
 
@@ -4825,6 +4845,26 @@ mod tests {
 
         let post = app.oneshot(request("POST")).await.unwrap();
         assert_eq!(post.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[test]
+    fn org_metric_usage_route_is_registered_and_published() {
+        assert!(
+            service_routes_registrations().contains(
+                r#".route("/{org_id}/metrics/usage",get(metrics_usage::get_org_metric_usage))"#
+            ),
+            "GET /{{org_id}}/metrics/usage must be registered in service_routes()"
+        );
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/metrics/usage")
+            .expect("org metric usage is missing from the OpenAPI surface");
+        assert_eq!(
+            path.get.as_ref().and_then(|op| op.operation_id.as_deref()),
+            Some("GetOrgMetricUsage")
+        );
     }
 
     #[tokio::test]

@@ -99,10 +99,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex-1 max-md:hidden" />
 
       <div class="flex shrink-0 items-center gap-2 max-md:ms-auto max-md:gap-1">
+        <OPageHeaderStatus />
         <!-- Explore keeps Apply: a date change there re-queries the whole card grid. -->
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
           v-model="selectedDate"
+          data-test="metrics-date-picker"
           :auto-apply-dashboard="mode === 'visualize'"
           calendar-presets
           @on:date-change="onDateChange"
@@ -110,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AutoRefreshInterval
           v-model="refreshInterval"
           trigger
+          data-test="metrics-auto-refresh"
           :is-compact="isMobile"
           @trigger="onRefreshTick"
         />
@@ -238,6 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @focus-picker="grid.loadLabelNames"
         @add="onAddLabelFilter"
         @remove="onRemoveLabelFilter"
+        @negate-group="onNegateLabelGroup"
         @clear-all="onClearLabelFilters"
       />
     </div>
@@ -299,6 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :facets="grid.prefixFacets.value"
           :selected="grid.selectedPrefixes.value"
           :has-selection="railHasSelection"
+          :loading="firstLoadPending"
           @update:selected="onPrefixChange"
           @clear="clearActiveRail"
         />
@@ -309,6 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :facets="grid.suffixFacets.value"
           :selected="grid.selectedSuffixes.value"
           :has-selection="railHasSelection"
+          :loading="firstLoadPending"
           @update:selected="onSuffixChange"
           @clear="clearActiveRail"
         />
@@ -373,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OCheckboxGroup>
           <OEmptyState
-            v-else
+            v-else-if="!firstLoadPending"
             size="inline"
             icon="search-off"
             :title="t('metrics.explorer.facets.noTypeMatch')"
@@ -440,12 +446,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ resultCountLabel }}</span
           >
 
+          <OToggleGroup
+            :model-value="[...grid.usageFilters.value]"
+            type="multiple"
+            data-test="metrics-explorer-usage-filter"
+            @update:model-value="onUsageFilterChange"
+          >
+            <OToggleGroupItem
+              v-for="opt in usageFilterOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              :data-test="`metrics-explorer-usage-${opt.value}`"
+              >{{ opt.label }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+          <OSpinner
+            v-if="grid.usageLoading.value"
+            size="xs"
+            :title="t('metrics.explorer.usageLoading')"
+            data-test="metrics-explorer-usage-loading"
+          />
+          <OButton
+            v-else-if="grid.usageError.value"
+            variant="ghost-destructive"
+            size="xs"
+            icon-left="refresh"
+            data-test="metrics-explorer-usage-retry"
+            @click="grid.retryUsage"
+          >
+            {{ t("metrics.explorer.usageFailed") }}
+          </OButton>
+
           <OToggleGroup v-model="sortModel" type="single" data-test="metrics-explorer-sort">
             <OToggleGroupItem
               v-for="opt in sortOptions"
               :key="opt.value"
               :value="opt.value"
               size="sm"
+              :tooltip="opt.tooltip"
               :data-test="`metrics-explorer-sort-${opt.value}`"
               >{{ opt.label }}</OToggleGroupItem
             >
@@ -690,7 +729,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <MetricsVisualize
       v-else-if="mode === 'visualize'"
       ref="visualizeRef"
-      key="metrics-visualize"
+      :key="`metrics-visualize-${visualizeMount}`"
       class="min-h-0 flex-1"
       :selected-date-time="visualizeDateTime"
       :seed="visualizeSeed"
@@ -725,6 +764,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useNotifications from "@/composables/useNotifications";
+import { MAX_FILTER_BRANCHES } from "@/components/promql/labelBoolean";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
@@ -734,6 +775,7 @@ import { isEqual, debounce } from "lodash-es";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OCheckboxGroup from "@/lib/forms/Checkbox/OCheckboxGroup.vue";
@@ -827,6 +869,7 @@ const ROW_HEIGHT = CARD_HEIGHT + ROW_GAP;
 export default defineComponent({
   name: "MetricsExplorer",
   components: {
+    OPageHeaderStatus,
     FirstDataPanel,
     DateTimePickerDashboard,
     AutoRefreshInterval,
@@ -860,6 +903,18 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18nTyped();
+    const { showErrorNotification } = useNotifications();
+
+    /** A link whose label groups expand past the cap loses them; say so rather than filter less in silence. */
+    const notifyGroupsOverCap = (f: { labelGroupsOverCap?: number }) => {
+      if (!f.labelGroupsOverCap) return;
+      showErrorNotification(
+        t("metrics.labelGroups.tooManyBranches", {
+          count: f.labelGroupsOverCap,
+          max: MAX_FILTER_BRANCHES,
+        }),
+      );
+    };
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
@@ -912,9 +967,27 @@ export default defineComponent({
     /* ---------------------------------------------------------- toolbar */
 
     const sortOptions = computed(() => [
-      { value: "a-z", label: t("metrics.explorer.sortAsc") },
-      { value: "z-a", label: t("metrics.explorer.sortDesc") },
+      { value: "a-z", label: t("metrics.explorer.sortAsc"), tooltip: undefined },
+      { value: "z-a", label: t("metrics.explorer.sortDesc"), tooltip: undefined },
+      {
+        value: "dashboards",
+        label: t("metrics.explorer.sortDashboards"),
+        tooltip: t("metrics.explorer.sortDashboardsTitle"),
+      },
+      {
+        value: "alerts",
+        label: t("metrics.explorer.sortAlerts"),
+        tooltip: t("metrics.explorer.sortAlertsTitle"),
+      },
     ]);
+    const usageFilterOptions = computed(() => [
+      { value: "dashboards", label: t("metrics.explorer.usageInDashboards") },
+      { value: "alerts", label: t("metrics.explorer.usageHasAlerts") },
+      { value: "slos", label: t("metrics.explorer.usageInSlos") },
+    ]);
+    const onUsageFilterChange = (value: any) => {
+      grid.usageFilters.value = new Set(Array.isArray(value) ? value : []);
+    };
     const viewOptions = computed(() => [
       { value: "grid", label: t("metrics.explorer.viewGrid"), icon: "grid-on" },
       { value: "rows", label: t("metrics.explorer.viewRows"), icon: "list" },
@@ -1308,6 +1381,11 @@ export default defineComponent({
       await requestOnScreen({ skipCache: true });
     };
 
+    const onNegateLabelGroup = async (group: number, negate: boolean) => {
+      grid.setLabelGroupNegated(group, negate);
+      await requestOnScreen({ skipCache: true });
+    };
+
     const onClearLabelFilters = async () => {
       // Over a copy: each removal mutates the source array.
       [...grid.labelFilters.value].forEach((f) => grid.removeLabelFilter(f));
@@ -1384,6 +1462,7 @@ export default defineComponent({
     // on the card's own query.
     // Consumed once by MetricsVisualize, then cleared.
     const visualizeSeed = ref<Record<string, any> | null>(null);
+    const visualizeMount = ref(0);
     const seedVisualizeFromUrl = (q: Record<string, any>) => {
       if (!q.metrics_data) return;
       const blob = decodeMetricsConfig(q.metrics_data);
@@ -1420,11 +1499,19 @@ export default defineComponent({
 
     const shareUrl = computed(() => {
       void route.fullPath; // reactive dep on the URL
+      void selectedDate.value;
       if (mode.value !== "visualize") return window.location.href;
       const url = new URL(window.location.href);
       const blob = visualizeBlob.value;
       if (blob) url.searchParams.set("metrics_data", blob);
       else url.searchParams.delete("metrics_data");
+      // A shared chart shows the window it was shared with, so a relative range is frozen.
+      const ct = dateTimePickerRef.value?.getConsumableDateTime?.();
+      if (ct?.startTime && ct?.endTime) {
+        url.searchParams.delete("period");
+        url.searchParams.set("from", String(ct.startTime));
+        url.searchParams.set("to", String(ct.endTime));
+      }
       return url.href;
     });
 
@@ -1493,10 +1580,9 @@ export default defineComponent({
       },
       { immediate: true },
     );
+    const firstLoadPending = computed(() => grid.loading.value && !grid.cards.value.length);
     // Only the first load: a manual refresh must not remount the open view behind a spinner.
-    const detailLoading = computed(
-      () => (grid.loading.value && !grid.cards.value.length) || detailSchemasPending.value,
-    );
+    const detailLoading = computed(() => firstLoadPending.value || detailSchemasPending.value);
 
     /** A card's current query, its ⚙ override and any NaN-guard / widening included. */
     const chartOf = (card: MetricCardModel) => {
@@ -1637,6 +1723,7 @@ export default defineComponent({
       // showFavoritesOnly is not restored from the URL — the mode drives it.
       if (f.hideEmptyPanels !== undefined) grid.hideEmptyPanels.value = f.hideEmptyPanels;
       if (f.sortBy) grid.sortBy.value = f.sortBy;
+      if (f.usageFilters) grid.usageFilters.value = f.usageFilters;
       if (f.viewMode) grid.viewMode.value = f.viewMode;
       if (f.mode) mode.value = f.mode;
       if (f.metric && f.mode !== "visualize") {
@@ -1659,6 +1746,7 @@ export default defineComponent({
         // Without membership data the chips fail open and narrow nothing.
         grid.ensureSchemas();
       }
+      notifyGroupsOverCap(f);
 
       if (q.period || (q.from && q.to)) {
         selectedDate.value = queryParamsToSelectedDate(q);
@@ -1686,6 +1774,7 @@ export default defineComponent({
         showFavoritesOnly: grid.showFavoritesOnly.value,
         hideEmptyPanels: grid.hideEmptyPanels.value,
         sortBy: grid.sortBy.value,
+        usageFilters: grid.usageFilters.value,
         viewMode: grid.viewMode.value,
         mode: mode.value,
         // Visualize has no detail view; without `metric` its tab keys drop too.
@@ -1813,6 +1902,7 @@ export default defineComponent({
         grid.showFavoritesOnly.value,
         grid.hideEmptyPanels.value,
         grid.sortBy.value,
+        grid.usageFilters.value,
         grid.viewMode.value,
         mode.value,
         detailMetric.value,
@@ -1827,10 +1917,13 @@ export default defineComponent({
       syncUrlState,
     );
 
+    // The blob this page last wrote, so its own replace is never read back as a new chart.
+    let writtenBlob = "";
     const syncVisualizeUrl = () => {
       if (route.name !== "metrics") return;
       const blob = mode.value === "visualize" ? visualizeBlob.value : "";
       if (String(blob) === String(route.query.metrics_data ?? "")) return;
+      writtenBlob = blob;
 
       const query: Record<string, any> = { ...route.query };
       if (blob) query.metrics_data = blob;
@@ -1868,6 +1961,22 @@ export default defineComponent({
     const onRouteQueryChange = () => {
       // Leaving the page fires this once with the next route's query.
       if (route.name !== "metrics") return;
+
+      // Visualize seeds only on mount, so another link's chart (or Back/Forward) remounts it.
+      const blobIn = String(route.query.metrics_data ?? "");
+      const ownWrite = !!blobIn && blobIn === writtenBlob;
+      // The marker is spent once its own update lands, or Back to that blob later would be ignored.
+      if (ownWrite) writtenBlob = "";
+      if (
+        !ownWrite &&
+        mode.value === "visualize" &&
+        route.query.mode === "visualize" &&
+        blobIn &&
+        blobIn !== visualizeBlob.value
+      ) {
+        seedVisualizeFromUrl(route.query as Record<string, any>);
+        visualizeMount.value += 1;
+      }
 
       const incoming: Record<string, string> = {};
       for (const key of MANAGED_PARAM_KEYS) {
@@ -1909,8 +2018,10 @@ export default defineComponent({
       grid.selectedSuffixes.value = f.selectedSuffixes ?? new Set();
       grid.selectedTypes.value = f.selectedTypes ?? new Set();
       grid.labelFilters.value = f.labelFilters ?? [];
+      notifyGroupsOverCap(f);
       grid.hideEmptyPanels.value = f.hideEmptyPanels ?? true;
       grid.sortBy.value = f.sortBy ?? "a-z";
+      grid.usageFilters.value = f.usageFilters ?? new Set();
       grid.viewMode.value = f.viewMode ?? "grid";
       // Setting mode last lets the isWorkspace watcher set showFavoritesOnly.
       mode.value = f.mode ?? "explore";
@@ -2229,9 +2340,7 @@ export default defineComponent({
     );
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    // Registered here (not just in the editor Index.vue) because `/metrics`
-    // mounts THIS explorer — the editor lives at `/metrics/editor`. Keys and
-    // scope come from the "metrics" group in shortcutRegistry.ts.
+    // Keys and scope come from the "metrics" group in shortcutRegistry.ts.
     useShortcuts([
       {
         // ⌘/Ctrl+Enter: an explicit Run in Visualize; elsewhere a grid refresh (there is no single query).
@@ -2313,8 +2422,11 @@ export default defineComponent({
       onSuffixChange,
       onAddLabelFilter,
       onRemoveLabelFilter,
+      onNegateLabelGroup,
       onClearLabelFilters,
       sortOptions,
+      usageFilterOptions,
+      onUsageFilterChange,
       PAGE_SIZE_INCREMENT,
       viewOptions,
       sortModel,
@@ -2359,6 +2471,7 @@ export default defineComponent({
       detailOpen,
       detailCard,
       detailLoading,
+      firstLoadPending,
       detailOverview,
       detailPanelQueries,
       chartOf,
@@ -2374,6 +2487,7 @@ export default defineComponent({
       onDetailOpenVisualize,
       onRouteQueryChange,
       visualizeSeed,
+      visualizeMount,
       visualizeRef,
       isVisualizePending,
       visualizeRunTooltip,

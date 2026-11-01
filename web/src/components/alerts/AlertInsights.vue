@@ -159,17 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost-primary"
         size="sm"
-        @click="openDedupConfig"
-        data-test="configure-dedup-btn"
-        icon-left="settings"
-      >
-        {{ t("alerts.insights.actions.configureDedup") }}
-        <OTooltip :content="t('alerts.insights.actions.configureDedupTooltip')" />
-      </OButton>
-
-      <OButton
-        variant="ghost-primary"
-        size="sm"
         @click="editAlert"
         data-test="edit-alert-btn"
         icon-left="edit"
@@ -245,7 +234,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :panel-id="contextMenu.panelId"
       @close="contextMenu.show = false"
       @filter="handleContextMenuFilter"
-      @configure-dedup="handleConfigureDedup"
       @edit-alert="handleEditAlert"
       @view-history="handleViewHistory"
     />
@@ -441,6 +429,7 @@ const fetchAlerts = async () => {
     );
     alertsList.value = res.data.list || [];
   } catch (error) {
+    if ((error as { response?: { status?: number } })?.response?.status === 403) return;
     toast({
       variant: "error",
       message: t("toastMessages.alerts.failedToLoadAlerts"),
@@ -593,42 +582,6 @@ const handleContextMenuFilter = (filter: any) => {
   refreshDashboard();
 };
 
-const handleConfigureDedup = async (alertName: string) => {
-  try {
-    // Use cached alerts list
-    const alert = alertsList.value.find((a: any) => a.name === alertName);
-
-    if (!alert) {
-      toast({
-        variant: "error",
-        message: t("toastMessages.alerts.alertNotFoundInAlerts", {
-          name: alertName,
-          count: alertsList.value.length,
-        }),
-      });
-      return;
-    }
-
-    // Navigate to alert edit page with dedup section
-    await router.push({
-      name: "alertList",
-      query: {
-        action: "update",
-        alert_id: alert.alert_id, // Use alert_id instead of id
-        name: alert.name,
-        org_identifier: store.state.selectedOrganization.identifier,
-        folder: alert.folder_id || "default",
-        section: "dedup",
-      },
-    });
-  } catch (error) {
-    toast({
-      variant: "error",
-      message: t("toastMessages.alerts.failedToNavigateToAlert"),
-    });
-  }
-};
-
 const handleEditAlert = async (alertName: string) => {
   try {
     // Use cached alerts list
@@ -678,22 +631,6 @@ const formatFilterValue = (value: number): string => {
 };
 
 // Action button methods
-const openDedupConfig = () => {
-  // `caption` predates OToast and is not rendered; cast keeps the object untouched.
-  toast({
-    variant: "info",
-    message: t("toastMessages.alerts.openingDedupConfig", { name: selectedAlertForAction.value }),
-    caption: "This would navigate to alert edit page with dedup section focused",
-  } as unknown as ToastOptions);
-
-  // TODO: Navigate to alert edit page with dedup section
-  // router.push({
-  //   name: 'alertEdit',
-  //   params: { alertName: selectedAlertForAction.value },
-  //   query: { section: 'dedup' }
-  // });
-};
-
 const editAlert = () => {
   toast({
     variant: "info",

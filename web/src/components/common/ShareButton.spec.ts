@@ -227,8 +227,30 @@ describe("ShareButton", () => {
         successMessage: "Link copied successfully",
         errorMessage: "Error copying link",
         timeout: 5000,
+        anchor: wrapper.find("button").element,
       },
     );
+  });
+
+  it("anchors the Copied confirmation on the share button, even from a shortcut", async () => {
+    Object.defineProperty(window.navigator, "userAgent", {
+      value: "Mozilla/5.0 (Macintosh) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0",
+      configurable: true,
+    });
+    (shortURLService.create as any).mockResolvedValue({
+      status: 200,
+      data: { short_url: "https://short.url/abc123" },
+    });
+    const wrapper = mount(ShareButton, {
+      props: { url: "https://example.com/logs" },
+      global: { plugins: [store, i18n] },
+    });
+
+    (wrapper.vm as any).handleShareClick();
+    await flushPromises();
+
+    expect((copyToClipboard as any).mock.calls[0][2].anchor).toBe(wrapper.get("button").element);
+    wrapper.unmount();
   });
 
   it("should emit copy:success event when copy succeeds (Chrome)", async () => {

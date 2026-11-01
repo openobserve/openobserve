@@ -64,19 +64,17 @@ const BUDGET_MAX = 600;
 /**
  * A team with one rotation and members, in the order the server accepts.
  *
- * Schedule before members: adding the first member to a rotationless team
- * auto-provisions a `source: "default"` rotation and repoints P1-P3 at it, and
- * a schedule written afterwards is then the §8.5 replacement the server
- * refuses.
+ * Members before schedule: a schedule naming somebody not on the team is
+ * refused with a 400.
  */
 async function stageTeam(page, name, { memberCount = 3 } = {}) {
   const users = await createOrgUsers(page, name, memberCount);
   const team = await createTeam(page, { name, timezone: 'UTC' });
+  await addTeamMembers(page, team.id, users);
   await setTeamSchedule(page, team.id, {
     timezone: 'UTC',
     rotations: [rotation({ id: 'Primary', members: users })],
   });
-  await addTeamMembers(page, team.id, users);
   return { team, users };
 }
 

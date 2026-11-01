@@ -8,13 +8,14 @@ on:
   pull_request:
     branches:
       - "**"
-    # labeled/unlabeled so adding or removing 'ready-for-ci' starts or resets CI; drafts never run paid CI.
+    # labeled/unlabeled so 'ready-for-ci' gates CI; only a new commit cancels an in-flight run (see concurrency); a draft starts no paid CI (an in-flight run still finishes).
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
-  cancel-in-progress: true
+  # Only a new commit cancels: a cancelled same-SHA run leaves a failed required summary that a newer run cannot clear.
+  cancel-in-progress: ${{ github.event_name != 'pull_request' || github.event.action == 'synchronize' }}
 
 env:
   COLUMNS: 150
@@ -29,6 +30,7 @@ env:
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_INGEST_ALLOWED_UPTO: 48  # Allow backdated data ingestion for backfill tests
   ZO_SSRF_ALLOW_LOOPBACK: true  # Allow localhost destinations in API tests
+  ZO_ALERT_COMPOSITE_SWEEP_SECS: 30  # A firing composite repeats only per sweep; the 300 s default made the ack test ~12 min
 
 jobs:
   check_changes:
@@ -41,9 +43,6 @@ jobs:
     outputs:
       has_changes: ${{ steps.check.outputs.has_changes }}
     steps:
-      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
-      - if: github.event_name == 'pull_request'
-        run: sleep 60
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -175,15 +174,7 @@ jobs:
         working-directory: tests/api-testing/
 
       - name: Run default-set tests
-        # Phase 6.b: regression matrix tests moved to their own
-        # api_regression_tests job below — they now run in parallel
-        # with this default-set job instead of sequentially within it.
-        # Cuts ~8 min off CI wall time at the cost of more runner minutes.
-        # NB: --force-sugar is intentionally omitted. pytest-sugar is already
-        # auto-loaded via the entry point; passing --force-sugar registers it
-        # a second time, which inflates the progress counter (CI displayed
-        # ~3x the real test count). Letting the plugin load via discovery
-        # alone keeps the counter honest.
+        # --force-sugar is omitted on purpose: pytest-sugar auto-loads, and the flag registers it twice (~3x count).
         run: |
           ${{ github.workspace }}/target/debug/openobserve > o2_default.log 2>&1 &
           SERVER_PID_DEFAULT=$!
@@ -194,11 +185,14 @@ jobs:
             fi
             sleep 1
           done
-          # test_pending_silence.py is carved into api_alerts_pending_tests
-          # (runs -n 4 in parallel) — those 4 wall-clock tests were ~85% of the
-          # alerts runtime when run serially here.
-          rye run pytest --ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex --ignore=tests/alerts/test_pending_silence.py --junitxml=junit-integration.xml
+          # The wall-clock alert files run in api_alerts_pending_tests.
+          IGNORES="--ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex --ignore=tests/alerts/test_pending_silence.py --ignore=tests/alerts/test_alert_ack.py --ignore=tests/alerts/test_firing_cycle.py"
+          rc=0
+          # loadfile keeps each file on one worker, so module fixtures and in-file order still hold.
+          rye run pytest $IGNORES -m "not serial" -n 4 --dist loadfile --junitxml=junit-integration.xml || rc=$?
+          rye run pytest $IGNORES -m serial --junitxml=junit-integration-serial.xml || rc=$?
           kill $SERVER_PID_DEFAULT || true
+          exit $rc
         working-directory: tests/api-testing/
 
       # Test-count metrics sidecar: ship the junit so report_to_openobserve can
@@ -209,7 +203,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: api-junit__api_integration_tests__main
-          path: tests/api-testing/junit-integration.xml
+          path: tests/api-testing/junit-integration*.xml
           if-no-files-found: warn
           retention-days: 7
 
@@ -449,12 +443,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  # Carved out of the serial default-set job: the 4 pending/silence alert
-  # tests are wall-clock bound (each needs 2-3 alert eval cycles at the 60s
-  # frequency floor + a real pending window), so serially they were ~85% of
-  # the alerts runtime (~10 min). Run here with -n 4 so their waits overlap
-  # and this job lands at ~the single longest test (~3 min), in parallel with
-  # the other API jobs.
+  # Alert tests that wait on several real scheduler runs (60 s frequency floor); spread per test so the waits overlap.
   api_alerts_pending_tests:
     name: api_alerts_pending
     needs: [check_changes, build_api_binary]
@@ -500,12 +489,8 @@ jobs:
         run: rye sync
         working-directory: tests/api-testing/
 
-      - name: Run pending/silence alert tests (parallel)
-        # Server binary lives at the repo root (target/debug/openobserve);
-        # this step uses working-directory: tests/api-testing/, so invoke it
-        # via ${{ github.workspace }}. The 4 tests use uniq() names/streams and
-        # a non-destructive shared org, so -n 4 is safe. --force-sugar omitted
-        # on purpose (see integration job — double-registers, ~3x count).
+      - name: Run wall-clock alert tests (parallel)
+        # Every test here uses uniq() names and streams, so spreading single tests across workers is safe.
         run: |
           ${{ github.workspace }}/target/debug/openobserve > o2_alerts_pending.log 2>&1 &
           SERVER_PID=$!
@@ -515,7 +500,7 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest tests/alerts/test_pending_silence.py -n 4 -v --junitxml=junit-alerts-pending.xml
+          rye run pytest tests/alerts/test_pending_silence.py tests/alerts/test_alert_ack.py tests/alerts/test_firing_cycle.py -n 11 -v --junitxml=junit-alerts-pending.xml
           kill $SERVER_PID || true
         working-directory: tests/api-testing/
 

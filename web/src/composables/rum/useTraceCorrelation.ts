@@ -163,14 +163,14 @@ export default function useTraceCorrelation(
             query: traceQuery,
             page_type: "traces",
           },
-          "APM",
+          "rum",
         );
 
         backendSpans = traceResponse.data.hits || [];
         hasTrace = backendSpans.length > 0;
       } catch (traceError) {
-        // Backend trace not found or stream doesn't exist - this is okay
-        console.debug("Backend trace not found:", traceError);
+        error.value =
+          traceError instanceof Error ? traceError : new Error("Backend trace query failed");
       }
 
       // Calculate performance breakdown

@@ -181,6 +181,11 @@ export default defineComponent({
         id: "gauge",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/logs.svg"),
+        title: t("dashboard.chartSelection.logs"),
+        id: "logs",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/bar-gauge.svg"),
         title: t("dashboard.chartSelection.barGauge"),
         id: "bar-gauge",

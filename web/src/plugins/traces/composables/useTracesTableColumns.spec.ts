@@ -45,7 +45,12 @@ vi.mock("@/utils/traces/constants", () => ({
   },
 }));
 
-import { useTracesTableColumns, LLM_COLUMN_IDS } from "./useTracesTableColumns";
+import {
+  useTracesTableColumns,
+  fillLastColumn,
+  LLM_COLUMN_IDS,
+  SPAN_DERIVED_COLUMN_IDS,
+} from "./useTracesTableColumns";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 
 // Default ordered field lists (mirror DEFAULT_TRACE_COLUMNS in useTraces.ts)
@@ -67,6 +72,10 @@ const DEFAULT_TRACES_FIELDS = [
   "status",
   "service_latency",
 ];
+
+/** Column ids that come from selectedFields, without the Spans-view derived columns. */
+const fieldIds = (cols: { id: string }[]) =>
+  cols.map((c) => c.id).filter((id) => !SPAN_DERIVED_COLUMN_IDS.has(id));
 
 /** Helper: create composable and immediately call buildColumns. Returns columns.value. */
 function buildCols(
@@ -98,7 +107,7 @@ describe("useTracesTableColumns", () => {
   describe("spans mode — default fields", () => {
     it("should return 7 columns matching the default spans field order", () => {
       const cols = buildCols(false, "spans", [...DEFAULT_SPANS_FIELDS]);
-      expect(cols.map((c) => c.id)).toEqual(DEFAULT_SPANS_FIELDS);
+      expect(fieldIds(cols)).toEqual(DEFAULT_SPANS_FIELDS);
     });
 
     it("should NOT include spans or service_latency", () => {
@@ -120,13 +129,13 @@ describe("useTracesTableColumns", () => {
       const fields = DEFAULT_SPANS_FIELDS.filter((f) => f !== "status_code");
       const cols = buildCols(false, "spans", fields);
       expect(cols.map((c) => c.id)).not.toContain("status_code");
-      expect(cols).toHaveLength(6);
+      expect(fieldIds(cols)).toHaveLength(6);
     });
   });
 
   describe("spans mode — empty selectedFields", () => {
     it("should return 1 column with timestamp", () => {
-      expect(buildCols(false, "spans", [])).toHaveLength(1);
+      expect(fieldIds(buildCols(false, "spans", []))).toHaveLength(1);
     });
   });
 
@@ -155,7 +164,7 @@ describe("useTracesTableColumns", () => {
         "span_status",
         "method",
       ];
-      expect(buildCols(false, "spans", reordered).map((c) => c.id)).toEqual(reordered);
+      expect(fieldIds(buildCols(false, "spans", reordered))).toEqual(reordered);
     });
   });
 
@@ -304,12 +313,14 @@ describe("useTracesTableColumns", () => {
   // ── spans mode: all columns have meta.sortable = true ─────────────────────
 
   describe("spans mode — all columns have meta.sortable = true", () => {
-    it("should set meta.sortable=true on every column in spans mode", () => {
+    it("should set meta.sortable=true on every field column in spans mode", () => {
       const cols = buildCols(false, "spans", [...DEFAULT_SPANS_FIELDS]);
-      cols.forEach((col) => {
-        const meta = col.meta as Record<string, unknown>;
-        expect(meta?.sortable).toBe(true);
-      });
+      cols
+        .filter((col) => !SPAN_DERIVED_COLUMN_IDS.has(col.id))
+        .forEach((col) => {
+          const meta = col.meta as Record<string, unknown>;
+          expect(meta?.sortable).toBe(true);
+        });
     });
 
     it("should set meta.sortable=true on span_status column in spans mode", () => {
@@ -369,7 +380,7 @@ describe("useTracesTableColumns", () => {
       const { columns, buildColumns } = useTracesTableColumns();
 
       buildColumns(false, "spans", [...DEFAULT_SPANS_FIELDS]);
-      expect(columns.value.map((c) => c.id)).toEqual(DEFAULT_SPANS_FIELDS);
+      expect(fieldIds(columns.value)).toEqual(DEFAULT_SPANS_FIELDS);
 
       buildColumns(false, "traces", [...DEFAULT_TRACES_FIELDS]);
       expect(columns.value.map((c) => c.id)).toEqual(DEFAULT_TRACES_FIELDS);
@@ -425,10 +436,10 @@ describe("useTracesTableColumns", () => {
       const { columns, buildColumns } = useTracesTableColumns();
 
       buildColumns(false, "spans", ["_timestamp", "service", "status_code"]);
-      expect(columns.value.map((c) => c.id)).toEqual(["_timestamp", "service", "status_code"]);
+      expect(fieldIds(columns.value)).toEqual(["_timestamp", "service", "status_code"]);
 
       buildColumns(false, "spans", ["status_code", "_timestamp", "service"]);
-      expect(columns.value.map((c) => c.id)).toEqual(["status_code", "_timestamp", "service"]);
+      expect(fieldIds(columns.value)).toEqual(["status_code", "_timestamp", "service"]);
     });
   });
 
@@ -504,6 +515,112 @@ describe("useTracesTableColumns", () => {
       const ids = buildCols(false, "spans", ["_timestamp", "service"]).map((c) => c.id);
       expect(ids.filter((id) => id === "_timestamp")).toHaveLength(1);
       expect(ids[0]).toBe("_timestamp");
+    });
+  });
+
+  // ── Spans view Error / Events columns ─────────────────────────────────────
+
+  describe("Spans view Error and Events columns", () => {
+    const ERROR_ID = "_span_error";
+    const EVENTS_ID = "_span_events";
+
+    it("places Error then Events right after the status column", () => {
+      const ids = buildCols(false, "spans", ["service_name", "span_status", "duration"]).map(
+        (c) => c.id,
+      );
+      expect(ids).toEqual([
+        "_timestamp",
+        "service_name",
+        "span_status",
+        ERROR_ID,
+        EVENTS_ID,
+        "duration",
+      ]);
+    });
+
+    it("appends them when the status column is not shown", () => {
+      const ids = buildCols(false, "spans", ["service_name"]).map((c) => c.id);
+      expect(ids.slice(-2)).toEqual([ERROR_ID, EVENTS_ID]);
+    });
+
+    it("never shows them in the Traces view", () => {
+      const ids = buildCols(false, "traces", [...DEFAULT_TRACES_FIELDS]).map((c) => c.id);
+      expect(ids).not.toContain(ERROR_ID);
+      expect(ids).not.toContain(EVENTS_ID);
+    });
+
+    it("does not duplicate them when a saved order already lists them", () => {
+      const ids = buildCols(false, "spans", ["span_status", EVENTS_ID, ERROR_ID]).map((c) => c.id);
+      expect(ids.filter((id) => id === ERROR_ID)).toHaveLength(1);
+      expect(ids.filter((id) => id === EVENTS_ID)).toHaveLength(1);
+    });
+
+    it("is not sortable and offers no cell actions, since neither is a stream field", () => {
+      const cols = buildCols(false, "spans", ["span_status"]);
+      for (const id of [ERROR_ID, EVENTS_ID]) {
+        const meta = cols.find((c) => c.id === id)?.meta as Record<string, unknown>;
+        expect(meta?.sortable).not.toBe(true);
+        expect(meta?.disableCellAction).toBe(true);
+      }
+    });
+
+    it("uses translated headers", () => {
+      const cols = buildCols(false, "spans", ["span_status"]);
+      expect(cols.find((c) => c.id === ERROR_ID)?.header).toBe("traces.results.errorColumn");
+      expect(cols.find((c) => c.id === EVENTS_ID)?.header).toBe("traces.results.eventsColumn");
+    });
+  });
+
+  describe("Traces view Spans column", () => {
+    it("explains the count in a header tooltip", () => {
+      const col = buildCols(false, "traces", [...DEFAULT_TRACES_FIELDS]).find(
+        (c) => c.id === "spans",
+      );
+      expect((col?.meta as Record<string, unknown>)?.headerTooltip).toBe(
+        "traces.results.spansColumnTooltip",
+      );
+    });
+  });
+
+  describe("column widths do not follow the data", () => {
+    const fillIds = (cols: { id: string; meta?: unknown }[]) =>
+      cols
+        .filter((c) => (c.meta as Record<string, unknown> | undefined)?.fillRemaining)
+        .map((c) => c.id);
+
+    it("makes the last Traces view column fill the remaining width", () => {
+      const cols = buildCols(false, "traces", [...DEFAULT_TRACES_FIELDS]);
+      expect(fillIds(cols)).toEqual(["service_latency"]);
+      const last = cols.at(-1)!;
+      expect((last.meta as Record<string, unknown>).autoWidth).toBe(true);
+      expect(last.minSize).toBe(160);
+    });
+
+    it("makes the last Spans view column fill the remaining width", () => {
+      const cols = buildCols(false, "spans", [...DEFAULT_SPANS_FIELDS]);
+      expect(fillIds(cols)).toEqual(["method"]);
+    });
+
+    it("moves the fill to a user-added last column", () => {
+      const cols = buildCols(false, "spans", [...DEFAULT_SPANS_FIELDS, "http_url"]);
+      expect(fillIds(cols)).toEqual(["http_url"]);
+      expect(cols.at(-1)!.minSize).toBe(160);
+    });
+
+    it("never makes the timestamp column fill", () => {
+      expect(fillIds(buildCols(false, "traces", ["_timestamp"]))).toEqual([]);
+    });
+
+    it("takes the fill off a column that is no longer last", () => {
+      const cols = [
+        { id: "method", size: 160, minSize: 160, meta: { autoWidth: true, fillRemaining: true } },
+        { id: "duration", size: 120, meta: {} },
+      ];
+      fillLastColumn(cols, "_timestamp");
+
+      expect(fillIds(cols)).toEqual(["duration"]);
+      expect(cols[0].minSize).toBeUndefined();
+      expect((cols[0].meta as Record<string, unknown>).autoWidth).toBeUndefined();
     });
   });
 });

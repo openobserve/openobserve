@@ -201,7 +201,7 @@ describe("OnCallReachAlarm", () => {
   it("names the deployment-level cause only when the server stated it", () => {
     expect(
       render({ smtpConfigured: false }).find('[data-test="oncall-reach-alarm-cause"]').text(),
-    ).toContain("no transport is configured");
+    ).toContain("cannot send email");
     expect(
       render({ smtpConfigured: null }).find('[data-test="oncall-reach-alarm-cause"]').exists(),
     ).toBe(false);

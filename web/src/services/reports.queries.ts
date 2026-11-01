@@ -40,8 +40,6 @@ export const reportsQuery = (org: string, filters: ReportListFilters) =>
       ).data ?? [],
     staleTime: NORMAL_STALE_TIME,
   });
-
-/** Background callers pass `silentForbidden` so a 403 stays out of the grouped access toast. */
 export const reportByIdQuery = (
   org: string,
   reportId: string,

@@ -311,6 +311,7 @@ use crate::{
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
         openobserve_api_management::request::metrics_usage::get_metric_usage,
+        openobserve_api_management::request::metrics_usage::get_org_metric_usage,
         openobserve_api_management::request::slos::list_slos,
         openobserve_api_management::request::slos::get_slo,
         openobserve_api_management::request::slos::create_slo,
@@ -1854,6 +1855,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "enterprise"))]
     #[test]
     fn prompt_paths_are_absent_from_oss_openapi() {
         let api = ApiDoc::openapi();
@@ -2082,11 +2084,11 @@ mod tests {
         let by_id = "/api/{org_id}/workflows/{id}";
         assert_documented_statuses(&[
             (base, "post", &["200", "400", "403", "500"]),
-            (base, "get", &["200", "403", "500"]),
+            (base, "get", &["200", "403", "404", "500"]),
             (
                 "/api/v2/{org_id}/workflows/move",
                 "patch",
-                &["200", "400", "403", "500"],
+                &["200", "400", "403", "404", "500"],
             ),
             (by_id, "delete", &["200", "400", "404", "500"]),
             (by_id, "put", &["200", "400", "500"]),

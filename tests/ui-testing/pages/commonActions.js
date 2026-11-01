@@ -130,20 +130,8 @@ export async function selectLogsViewMode(page, mode, timeout = 20000) {
     await page.locator(`[data-test="logs-view-mode-${mode}-item"]`).click();
 }
 
-/**
- * Navigate straight to the metrics PANEL EDITOR.
- *
- * `/metrics` is the zero-query Metrics Explorer (a browse grid of metric cards);
- * the query editor — PromQL input, Apply, date picker, Add to Dashboard — now
- * lives at `/metrics/editor`. Tests that drive the editor must therefore address
- * it directly: clicking the sidebar's Metrics item lands on the explorer, which
- * has none of those controls.
- *
- * A direct `goto` rather than a sidebar click followed by an in-app hop: the
- * editor is what these tests are actually about, and one navigation is one thing
- * that can fail. Sidebar navigation itself is covered by landingPage.spec.
- */
-export async function gotoMetricsEditor(page) {
+/** Opens the Metrics Explorer in Visualize mode, where the panel editor lives. */
+export async function gotoMetricsVisualize(page) {
     // Carry the org the page is CURRENTLY on, rather than pinning the default.
     // The sidebar click this replaced preserved the selected org, and the
     // change-org tests rely on that: they switch org, come here, and then assert
@@ -158,9 +146,9 @@ export async function gotoMetricsEditor(page) {
     }
 
     await page.goto(
-        `${process.env.ZO_BASE_URL}/web/metrics/editor?org_identifier=${orgIdentifier}`
+        `${process.env.ZO_BASE_URL}/web/metrics?org_identifier=${orgIdentifier}&mode=visualize`
     );
-    await page.locator('[data-test="metrics-page"]').waitFor({ state: 'visible', timeout: 30000 });
+    await page.locator('[data-test="metrics-explorer-visualize"]').waitFor({ state: 'visible', timeout: 30000 });
 }
 
 // Common Locator exports
@@ -655,92 +643,6 @@ export class CommonActions {
     static generateBasicAuthHeader(username, password) {
         const credentials = Buffer.from(`${username}:${password}`).toString('base64');
         return `Basic ${credentials}`;
-    }
-
-    /**
-     * Count alert notifications in validation stream
-     * Used for deduplication testing to verify suppression of duplicate alerts
-     * @param {string} validationStreamName - Name of the validation stream to query
-     * @param {string} alertName - Alert name to search for (partial match)
-     * @param {number} timeRangeMinutes - How far back to search (default: 15 minutes)
-     * @returns {Promise<{success: boolean, count: number, data: any[]}>}
-     */
-    async countAlertNotificationsInStream(validationStreamName, alertName, timeRangeMinutes = 15) {
-        const headers = getAuthHeaders();
-        const baseUrl = process.env["ZO_BASE_URL"];
-        const orgName = getOrgIdentifier();
-
-        const query = `SELECT * FROM "${validationStreamName}" WHERE str_match_ignore_case(text, '${alertName}')`;
-
-        const endTime = Date.now() * 1000; // microseconds
-        const startTime = endTime - (timeRangeMinutes * 60 * 1000 * 1000); // microseconds
-
-        const searchPayload = {
-            query: {
-                sql: query,
-                start_time: startTime,
-                end_time: endTime,
-                from: 0,
-                size: 1000
-            }
-        };
-
-        try {
-            const response = await this.page.request.post(`${baseUrl}/api/${orgName}/_search?type=logs`, {
-                headers,
-                data: searchPayload
-            });
-            const responseData = await response.json().catch(() => null);
-            const hits = responseData?.hits || [];
-            testLogger.debug(`Count notifications for "${alertName}" in ${validationStreamName}: found ${hits.length} notifications`);
-            return {
-                success: true,
-                count: hits.length,
-                data: hits
-            };
-        } catch (error) {
-            testLogger.error('Error counting notifications in stream', { error: error.message });
-            return { success: false, count: 0, data: [] };
-        }
-    }
-
-    /**
-     * Wait for exact notification count in validation stream
-     * Used for deduplication testing to verify the expected number of notifications
-     * @param {string} validationStreamName - Name of the validation stream
-     * @param {string} alertName - Alert name to search for
-     * @param {number} expectedCount - Expected number of notifications
-     * @param {number} maxWaitSeconds - Maximum time to wait (default: 120 seconds)
-     * @param {number} pollIntervalSeconds - How often to poll (default: 10 seconds)
-     * @returns {Promise<{match: boolean, actualCount: number, attempts: number}>}
-     */
-    async waitForExactNotificationCount(validationStreamName, alertName, expectedCount, maxWaitSeconds = 120, pollIntervalSeconds = 10) {
-        const maxAttempts = Math.ceil(maxWaitSeconds / pollIntervalSeconds);
-
-        testLogger.info(`Waiting for exactly ${expectedCount} notifications for "${alertName}" in "${validationStreamName}" (max ${maxWaitSeconds}s)...`);
-
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            const result = await this.countAlertNotificationsInStream(validationStreamName, alertName, 15);
-
-            if (result.success && result.count === expectedCount) {
-                testLogger.info(`Found expected ${expectedCount} notifications after ${attempt * pollIntervalSeconds}s`);
-                return { match: true, actualCount: result.count, attempts: attempt };
-            }
-
-            if (result.count > expectedCount) {
-                testLogger.warn(`Found more notifications than expected: ${result.count} > ${expectedCount}`);
-                return { match: false, actualCount: result.count, attempts: attempt };
-            }
-
-            if (attempt < maxAttempts) {
-                testLogger.debug(`Attempt ${attempt}/${maxAttempts}: Found ${result.count} notifications, expected ${expectedCount}, waiting ${pollIntervalSeconds}s...`);
-                await new Promise(resolve => setTimeout(resolve, pollIntervalSeconds * 1000));
-            }
-        }
-
-        const finalResult = await this.countAlertNotificationsInStream(validationStreamName, alertName, 15);
-        testLogger.info(`Final count: ${finalResult.count} notifications (expected ${expectedCount})`);
-        return { match: finalResult.count === expectedCount, actualCount: finalResult.count, attempts: maxAttempts };
     }
 
     /**

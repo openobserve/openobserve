@@ -418,6 +418,37 @@ describe("PanelEditor.vue", () => {
     vi.clearAllMocks();
   });
 
+  describe("chart toolbar", () => {
+    const mountWithRenderer = (noData: boolean) =>
+      shallowMount(PanelEditor, {
+        props: { pageType: "build" },
+        global: {
+          ...mountGlobal,
+          stubs: {
+            ...mountGlobal.stubs,
+            OButton: false,
+            PanelSchemaRenderer: {
+              name: "PanelSchemaRenderer",
+              props: ["searchType", "panelSchema", "selectedTimeObj", "width", "height"],
+              setup(_: unknown, { expose }: { expose: (exposed: object) => void }) {
+                expose({ noData });
+              },
+              template: "<div />",
+            },
+          },
+        },
+      });
+
+    it("keeps the legends button in place while the chart has no data, so the chart never jumps", async () => {
+      mockChartData.value = { type: "line", queries: [] };
+      wrapper = mountWithRenderer(true);
+      await flushPromises();
+      const btn = wrapper.find('[data-test="panel-editor-show-legends-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.classes()).toContain("invisible");
+    });
+  });
+
   describe("Component Initialization", () => {
     it("should mount successfully with dashboard pageType", () => {
       wrapper = shallowMount(PanelEditor, {

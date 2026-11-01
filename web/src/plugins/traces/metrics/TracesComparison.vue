@@ -17,45 +17,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <TracesDrillDownPage
     :open="true"
-    :title="t('traces.comparison.title')"
+    :title="t('traces.drillDown')"
     @update:open="(open: boolean) => !open && emit('close')"
   >
-    <template #actions>
-      <OToggleGroup
-        v-if="selection"
-        v-model="mode"
-        mobile-dropdown
-        data-test="traces-comparison-baseline-toggle"
-      >
-        <OToggleGroupItem
-          value="outside"
-          size="sm"
-          data-test="traces-comparison-baseline-toggle-outside"
-        >
-          {{ t("traces.comparison.baselineOutside") }}
-        </OToggleGroupItem>
-        <OToggleGroupItem
-          value="before"
-          size="sm"
-          data-test="traces-comparison-baseline-toggle-before"
-        >
-          {{ t("traces.comparison.baselineBefore") }}
-        </OToggleGroupItem>
-      </OToggleGroup>
-    </template>
-
     <OContent y class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto">
-      <div v-if="summary" class="text-text-secondary text-sm" data-test="traces-comparison-summary">
-        {{ summary }}
+      <div v-if="countsLine" class="text-text-body text-sm" data-test="traces-drill-down-counts">
+        {{ countsLine }}
+      </div>
+      <div v-if="active" class="flex flex-wrap items-center justify-between gap-2">
+        <div
+          v-if="summary"
+          class="text-text-secondary text-sm"
+          data-test="traces-comparison-summary"
+        >
+          {{ summary }}
+        </div>
+        <OToggleGroup
+          v-model="mode"
+          :label="t('traces.drillDownPanel.baseline')"
+          label-position="left"
+          mobile-dropdown
+          data-test="traces-comparison-baseline-toggle"
+        >
+          <OToggleGroupItem
+            value="outside"
+            size="sm"
+            data-test="traces-comparison-baseline-toggle-outside"
+          >
+            {{ t("traces.comparison.baselineOutside") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem
+            value="before"
+            size="sm"
+            data-test="traces-comparison-baseline-toggle-before"
+          >
+            {{ t("traces.comparison.baselineBefore") }}
+          </OToggleGroupItem>
+        </OToggleGroup>
       </div>
 
       <OEmptyState
         v-if="status === 'noSelection'"
-        icon="filter-list"
+        size="compact"
         :title="t('traces.comparison.noSelectionTitle')"
         :description="t('traces.comparison.noSelectionBody')"
+        class="my-auto shrink-0"
         data-test="traces-comparison-no-selection"
-      />
+      >
+        <template #illustration>
+          <span
+            class="bg-tabs-active-bg text-tabs-active-text inline-flex size-12 items-center justify-center rounded-full"
+          >
+            <OIcon name="filter-list" size="lg" />
+          </span>
+        </template>
+        <template #actions>
+          <div
+            class="flex w-full flex-col items-center gap-2 pt-3"
+            data-test="traces-drill-down-presets"
+          >
+            <span class="text-text-secondary text-xs">{{
+              t("traces.drillDownPanel.presetsTitle")
+            }}</span>
+            <div class="flex w-full flex-wrap justify-center gap-3">
+              <EmptyStateActionCard
+                v-for="preset in presets"
+                :key="preset.id"
+                :icon="preset.icon"
+                :label="preset.label"
+                :sublabel="preset.description"
+                :data-test="`traces-drill-down-preset-${preset.id}`"
+                @click="pickPreset(preset.id)"
+              />
+            </div>
+          </div>
+        </template>
+        <template v-if="presetNote" #extra>
+          <span class="text-text-secondary text-xs" data-test="traces-drill-down-preset-empty">
+            {{ presetNote }}
+          </span>
+        </template>
+      </OEmptyState>
       <div
         v-else-if="status === 'loading'"
         class="flex flex-1 flex-col items-center justify-center gap-2 py-12"
@@ -198,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -207,34 +249,46 @@ import { streamSchemaQuery } from "@/services/stream.queries";
 import useTraces from "@/composables/useTraces";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OContent from "@/lib/core/Content/OContent.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
 import TracesDrillDownPage from "./TracesDrillDownPage.vue";
 import TracesComparisonField from "./TracesComparisonField.vue";
+import { formatTimeWithSuffix } from "@/utils/formatters";
 import { formatDurationBound } from "./latencyHeatmap";
 import {
   CARDS_PAGE,
   SAMPLE_LIMIT,
   SAMPLE_TARGET,
   buildCountSql,
+  buildP90Sql,
   buildSampleSql,
   compareFields,
   comparisonColumns,
   populations,
+  presetSelection,
   sampleThreshold,
   type BaselineMode,
+  type ComparisonPreset,
   type ComparisonResult,
   type ComparisonSelection,
   type Population,
+  type PresetContext,
   type SampleRow,
   type SchemaField,
 } from "./traceComparison";
 
-const props = defineProps<{ selection: ComparisonSelection | null; streamName: string }>();
+const props = defineProps<{
+  selection: ComparisonSelection | null;
+  streamName: string;
+  presetContext?: PresetContext | null;
+}>();
 const emit = defineEmits<{
   (e: "close"): void;
   (e: "apply-filter", term: string): void;
@@ -245,15 +299,41 @@ const store = useStore();
 const { searchObj } = useTraces();
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+// A preset stands in for a selection only while the charts gave none.
+const picked = shallowRef<ComparisonSelection | null>(null);
+const active = computed<ComparisonSelection | null>(() => props.selection ?? picked.value);
+const presetNote = ref<I18nText | null>(null);
+const presets = computed<
+  { id: ComparisonPreset; icon: IconName; label: I18nText; description: I18nText }[]
+>(() => [
+  {
+    id: "errors",
+    icon: "error-outline",
+    label: t("traces.drillDownPanel.presetErrors"),
+    description: t("traces.drillDownPanel.presetErrorsDesc"),
+  },
+  {
+    id: "slowest",
+    icon: "hourglass-empty",
+    label: t("traces.drillDownPanel.presetSlowest"),
+    description: t("traces.drillDownPanel.presetSlowestDesc"),
+  },
+  {
+    id: "recent",
+    icon: "history-toggle-off",
+    label: t("traces.drillDownPanel.presetRecent"),
+    description: t("traces.drillDownPanel.presetRecentDesc"),
+  },
+]);
 const schemaQuery = useQuery(() =>
   Object.assign(streamSchemaQuery(org.value, props.streamName, "traces"), {
-    enabled: props.selection !== null,
+    enabled: active.value !== null,
   }),
 );
 const schemaFields = computed<SchemaField[] | null>(() => schemaQuery.data.value?.schema ?? null);
 const columns = computed(() =>
-  props.selection && schemaFields.value
-    ? comparisonColumns(schemaFields.value, props.selection.kind)
+  active.value && schemaFields.value
+    ? comparisonColumns(schemaFields.value, active.value.kind)
     : [],
 );
 // A refetched schema arrives as a new array; only a change in the compared columns restarts the comparison.
@@ -278,7 +358,14 @@ const status = ref<
   "noSelection" | "loading" | "error" | "emptySelection" | "emptyBaseline" | "ready"
 >(props.selection ? "loading" : "noSelection");
 const result = shallowRef<ComparisonResult | null>(null);
-const sizes = shallowRef({ selSampled: 0, selTotal: 0, baseSampled: 0, baseTotal: 0 });
+const sizes = shallowRef({
+  selSampled: 0,
+  selTotal: 0,
+  baseSampled: 0,
+  baseTotal: 0,
+  selTraces: 0,
+  baseTraces: 0,
+});
 const baselineWindow = shallowRef<{
   capped: boolean;
   limited: boolean;
@@ -307,8 +394,12 @@ const timeText = (startUs: number, endUs: number) => {
   return `${at(startUs, format)}–${at(endUs, format)}`;
 };
 
+// Box bounds are round bucket edges; a preset's p90 is any number of microseconds.
+const durationText = (us: number) =>
+  us < 1_000 || us % 1_000 === 0 ? formatDurationBound(us) : formatTimeWithSuffix(us);
+
 const summary = computed<I18nText | null>(() => {
-  const sel = props.selection;
+  const sel = active.value;
   if (!sel) return null;
   const window = timeText(sel.windowStartUs, sel.windowEndUs);
   if (sel.kind === "errors") return t("traces.comparison.summaryErrors", { window });
@@ -316,11 +407,11 @@ const summary = computed<I18nText | null>(() => {
   const { durationLoUs: lo, durationHiUs: hi } = sel;
   const band =
     lo && hi !== null
-      ? `${formatDurationBound(lo)}–${formatDurationBound(hi)}`
+      ? `${durationText(lo)}–${durationText(hi)}`
       : hi !== null
-        ? `< ${formatDurationBound(hi)}`
+        ? `< ${durationText(hi)}`
         : lo
-          ? `≥ ${formatDurationBound(lo)}`
+          ? `≥ ${durationText(lo)}`
           : "";
   return band ? t("traces.comparison.summaryBand", { window, band }) : raw(window);
 });
@@ -340,12 +431,24 @@ const sampleNote = computed(() =>
 );
 const limitNote = computed<I18nText | null>(() => {
   const w = baselineWindow.value;
-  const sel = props.selection;
+  const sel = active.value;
   if (!w || !sel) return null;
   const range = timeText(w.startUs, w.endUs);
   if (w.limited) return t("traces.comparison.baselineLimited", { range, hours: limitHours.value });
   if (w.capped) return t("traces.comparison.baselineCapped", { range });
   return null;
+});
+
+const countsLine = computed<I18nText | null>(() => {
+  if (status.value !== "ready") return null;
+  const z = sizes.value;
+  const spans = searchObj.meta?.searchMode === "spans";
+  const [sel, base] = spans ? [z.selTotal, z.baseTotal] : [z.selTraces, z.baseTraces];
+  const unit = spans ? "Spans" : "Traces";
+  return t("traces.drillDownPanel.counts", {
+    selected: t(`traces.drillDownPanel.selected${unit}`, { count: sel.toLocaleString() }, sel),
+    baseline: t(`traces.drillDownPanel.baseline${unit}`, { count: base.toLocaleString() }, base),
+  });
 });
 
 class ComparisonError extends Error {
@@ -363,7 +466,7 @@ const isCanceled = (e: any) =>
 interface Side {
   population: Population;
   controller: AbortController;
-  count: Promise<number>;
+  count: Promise<{ spans: number; traces: number }>;
   rows: Promise<SampleRow[]> | null;
   failed: boolean;
 }
@@ -403,16 +506,17 @@ function startSide(population: Population): Side {
   const side: Side = {
     population,
     controller: new AbortController(),
-    count: Promise.resolve(0),
+    count: Promise.resolve({ spans: 0, traces: 0 }),
     rows: null,
     failed: false,
   };
   const q = buildCountSql(props.streamName, population);
   side.count = track(
     side,
-    search(q.sql, q.startTime, q.endTime, side.controller.signal).then((d) =>
-      Number(d.hits?.[0]?.n ?? 0),
-    ),
+    search(q.sql, q.startTime, q.endTime, side.controller.signal).then((d) => ({
+      spans: Number(d.hits?.[0]?.n ?? 0),
+      traces: Number(d.hits?.[0]?.traces ?? 0),
+    })),
   );
   return side;
 }
@@ -451,7 +555,7 @@ function fail(e: unknown) {
 
 async function compare() {
   const id = ++run;
-  const sel = props.selection;
+  const sel = active.value;
   result.value = null;
   if (!sel) {
     status.value = "noSelection";
@@ -467,7 +571,10 @@ async function compare() {
 
   const pops = populations(sel, mode.value, limitUs.value);
   if ("error" in pops) {
-    fail(new ComparisonError(t("traces.comparison.rangeTooLong", { hours: limitHours.value })));
+    const key = props.selection
+      ? "traces.comparison.rangeTooLong"
+      : "traces.comparison.presetRangeTooLong";
+    fail(new ComparisonError(t(key, { hours: limitHours.value })));
     return;
   }
   baselineWindow.value = pops.baseline
@@ -489,9 +596,18 @@ async function compare() {
   const b = baselineSide;
 
   try {
-    const [ns, nb] = await Promise.all([s.count, b ? b.count : Promise.resolve(0)]);
+    const none = { spans: 0, traces: 0 };
+    const [cs, cb] = await Promise.all([s.count, b ? b.count : Promise.resolve(none)]);
+    const ns = cs.spans;
+    const nb = cb.spans;
     if (id !== run) return;
     if (ns === 0) {
+      // An empty preset goes back to the presets, where another can be picked.
+      if (!props.selection && picked.value) {
+        presetNote.value = t("traces.drillDownPanel.presetNoMatch");
+        picked.value = null;
+        return;
+      }
       status.value = "emptySelection";
       return;
     }
@@ -508,12 +624,50 @@ async function compare() {
       selTotal: ns,
       baseSampled: baseRows.length,
       baseTotal: nb,
+      selTraces: cs.traces,
+      baseTraces: cb.traces,
     };
     status.value = "ready";
   } catch (e) {
     if (id !== run || isCanceled(e)) return;
     fail(e);
   }
+}
+
+let presetController: AbortController | null = null;
+
+async function pickPreset(preset: ComparisonPreset) {
+  const ctx = props.presetContext;
+  if (!ctx) return;
+  presetNote.value = null;
+  let p90: number | null = null;
+  if (preset === "slowest") {
+    presetController?.abort();
+    const controller = new AbortController();
+    presetController = controller;
+    status.value = "loading";
+    try {
+      const q = buildP90Sql(props.streamName, ctx);
+      const d = await search(q.sql, q.startTime, q.endTime, controller.signal);
+      if (presetController !== controller) return;
+      const value = d.hits?.[0]?.p90;
+      p90 = value == null ? null : Number(value);
+    } catch (e) {
+      if (presetController !== controller || isCanceled(e)) return;
+      fail(e);
+      return;
+    }
+  }
+  const choice = presetSelection(preset, ctx, p90);
+  if (!choice) {
+    presetNote.value = t("traces.drillDownPanel.presetEmpty");
+    status.value = "noSelection";
+    return;
+  }
+  // The mode settles first, so the selection's own watcher starts the one comparison.
+  mode.value = choice.mode;
+  await nextTick();
+  picked.value = choice.selection;
 }
 
 const retry = () => {
@@ -527,15 +681,13 @@ const retry = () => {
   compare();
 };
 
-watch(mode, compare);
+// A preset sets its mode before its selection; comparing in between would flash the presets.
+watch(mode, () => {
+  if (active.value) compare();
+});
 // A schema failure, each repeat of it, and the recovery from it restart the comparison like a new column list.
 watch(
-  [
-    () => props.selection,
-    columnKey,
-    () => schemaQuery.isError.value,
-    () => schemaQuery.errorUpdatedAt.value,
-  ],
+  [active, columnKey, () => schemaQuery.isError.value, () => schemaQuery.errorUpdatedAt.value],
   () => {
     selectionSide?.controller.abort();
     selectionSide = null;
@@ -546,6 +698,7 @@ watch(
 
 onBeforeUnmount(() => {
   run++;
+  presetController?.abort();
   selectionSide?.controller.abort();
   baselineSide?.controller.abort();
 });

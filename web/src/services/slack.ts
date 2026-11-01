@@ -60,8 +60,6 @@ import type {
   SlackTestResponse,
   SlackUninstallResponse,
 } from "@/types/slack";
-
-/** Background callers pass `silentForbidden` so a 403 stays out of the grouped access toast. */
 export interface SlackRequestOptions {
   silentForbidden?: boolean;
 }

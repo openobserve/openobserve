@@ -98,6 +98,25 @@ describe("useStreamFields Composable", () => {
       consoleError.mockRestore();
     });
 
+    it("should not apply a stream list fetched for an org the user has left", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.streamResults = { list: [] } as any;
+      const originalOrg = store.state.selectedOrganization.identifier;
+      const fetchQuery = vi.spyOn(queryClient, "fetchQuery").mockImplementationOnce((async () => {
+        store.state.selectedOrganization.identifier = "other-org";
+        return [{ name: "usage", stream_type: "logs" }];
+      }) as any);
+
+      try {
+        await wrapper.vm.getStreamList(false);
+        expect(searchObj.data.streamResults.list).toEqual([]);
+      } finally {
+        fetchQuery.mockRestore();
+        store.state.selectedOrganization.identifier = originalOrg;
+      }
+    });
+
     it("should have loadStreamFields function", () => {
       expect(typeof wrapper.vm.loadStreamFields).toBe("function");
     });
@@ -401,6 +420,22 @@ describe("useStreamFields Composable", () => {
       };
       await wrapper.vm.loadStreamLists(true);
       expect(searchObj.data.stream.selectedStream).toEqual(["newest"]);
+    });
+
+    it("carries the is_internal flag onto each picker option", async () => {
+      searchObj.data.streamResults = {
+        list: [
+          { name: "app", stats: { doc_time_max: 5 } },
+          { name: "_rumdata", is_internal: true, stats: { doc_time_max: 9 } },
+          { name: "audit", is_internal: false, stats: { doc_time_max: 1 } },
+        ],
+      } as any;
+      await wrapper.vm.loadStreamLists(false);
+      expect(searchObj.data.stream.streamLists).toEqual([
+        { label: "app", value: "app", internal: false },
+        { label: "_rumdata", value: "_rumdata", internal: true },
+        { label: "audit", value: "audit", internal: false },
+      ]);
     });
   });
 

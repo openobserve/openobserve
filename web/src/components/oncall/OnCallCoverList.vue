@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       :frame="false"
       :loading="loading"
+      :loading-reset-key="teamId"
       pagination="client"
       :show-global-filter="false"
       table-id="oncall-team-covers"
@@ -245,6 +246,8 @@ function windowOf(cover: Override): string {
 let latestCoversRead = 0;
 
 async function fetchCovers(force = false) {
+  // A parent window still at 0 is not yet initialised; the endpoint rejects it with a 400.
+  if (props.window && (!props.window.from || !props.window.to)) return;
   loading.value = true;
   const readId = ++latestCoversRead;
   try {

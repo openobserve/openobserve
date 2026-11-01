@@ -1294,7 +1294,9 @@ export default class DashboardPanelConfigs {
       `[data-test="dashboard-config-color-mode-option"][data-test-label="${color}"]`
     );
     await trigger.waitFor({ state: "visible" });
-    // The threshold section above shifts layout while it renders, so a single click can land before the popover holds.
+    await trigger.scrollIntoViewIfNeeded();
+    // The sidebar closes open dropdowns on scroll, and a scroll event fires a frame later, after a same-frame click opened the list.
+    await this.page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await expect(async () => {
       if ((await trigger.getAttribute("aria-expanded")) !== "true") {
         await trigger.click();

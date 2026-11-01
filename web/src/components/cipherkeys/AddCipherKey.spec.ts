@@ -282,6 +282,19 @@ describe("AddCipherKey.vue", () => {
       expect(wrapper.vm.form.state.values.key.store.local).toBe("loaded-secret");
     });
 
+    it("never lets a __proto__ key in the loaded record reach Object.prototype", async () => {
+      (CipherKeysService.get_by_name as any).mockResolvedValue({
+        data: JSON.parse(
+          '{"name":"existing-key","__proto__":{"polluted":true},"key":{"__proto__":{"polluted":true}}}',
+        ),
+      });
+      wrapper = await createWrapper({ action: "edit", name: "existing-key" });
+      await flush();
+      const leaked = ({} as any).polluted;
+      delete (Object.prototype as any).polluted;
+      expect(leaked).toBeUndefined();
+    });
+
     it("makes the name input readonly AND disabled in update mode", async () => {
       wrapper = await createWrapper({ action: "edit", name: "existing-key" });
       await flush();

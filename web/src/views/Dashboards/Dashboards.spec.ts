@@ -446,6 +446,21 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.activeFolderId).toBe("folder1");
     });
 
+    it("keys the table on the folder so a folder switch shows the skeleton, not the last folder's rows", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      await nextTick();
+      const table = () => wrapper.findComponent({ name: "OTable" });
+      wrapper.vm.updateActiveFolderId("folder1");
+      await nextTick();
+      expect(table().vm.$attrs["loading-reset-key"]).toBe("folder1");
+
+      wrapper.vm.updateActiveFolderId("folder2");
+      await nextTick();
+      expect(table().vm.$attrs["loading-reset-key"]).toBe("folder2");
+    });
+
     it("should expose addDashboardRef and addFolderRef on the component surface", async () => {
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(store, router, i18n),

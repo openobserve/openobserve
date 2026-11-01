@@ -559,6 +559,13 @@ mod tests {
             "flame_graph_stack_field": "folded",
             "flame_graph_value_field": "value",
             "boxplot_whisker": "minmax",
+            "logs_message_field": "log",
+            "logs_level_field": "severity",
+            "logs_time_field": "_timestamp",
+            "logs_wrap": false,
+            "logs_prettify_json": true,
+            "logs_show_time": false,
+            "logs_order": "newest",
             "override_config": [{
                 "field": {"matchBy": "series", "value": "errors"},
                 "config": [

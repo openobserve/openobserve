@@ -34,6 +34,7 @@
     v-model:page-size="pageSize"
     :total-count="totalCount"
     :loading="loading"
+    :loading-reset-key="alertId"
     :frame="false"
     :show-global-filter="false"
     :persist-columns="true"

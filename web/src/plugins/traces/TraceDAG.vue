@@ -559,4 +559,19 @@ export default defineComponent({
 .trace-dag-flow :deep(.vue-flow__background) {
   background-color: var(--color-surface-panel) !important;
 }
+
+/* keep: lib-override:vue-flow — the controls stylesheet hard-codes light-only button colours. */
+.trace-dag-flow :deep(.vue-flow__controls-button) {
+  background: var(--color-surface-base);
+  border-bottom-color: var(--color-border-default);
+  color: var(--color-text-body);
+}
+
+.trace-dag-flow :deep(.vue-flow__controls-button svg) {
+  fill: currentColor;
+}
+
+.trace-dag-flow :deep(.vue-flow__controls-button:hover) {
+  background: var(--color-interactive-hover-bg);
+}
 </style>

@@ -694,12 +694,18 @@ describe("validatePanel on metric, gauge, pie, table, heatmap, state timeline an
   it("rejects out-of-range numbers", () => {
     expect(run("gauge", { gauge_segments: 1 })).toEqual([
       gt("dashboard.utils.configValueOutOfRange", {
-        setting: "gauge_segments",
+        setting: gt("dashboard.gaugeSegments"),
         min: "2",
         max: "100",
       }),
     ]);
-    expect(run("donut", { donut_inner_radius: 99 })).toHaveLength(1);
+    expect(run("donut", { donut_inner_radius: 99 })).toEqual([
+      gt("dashboard.utils.configValueOutOfRange", {
+        setting: gt("dashboard.donutInnerRadius"),
+        min: "0",
+        max: "95",
+      }),
+    ]);
     expect(run("pie", { pie_other_threshold: -1 })).toHaveLength(1);
     expect(run("metric", { value_font_size: 0 })).toHaveLength(1);
     expect(run("geomap", { map_cluster_radius: 0 })).toHaveLength(1);
@@ -1564,6 +1570,84 @@ describe("validatePanel on box plot", () => {
           tabId: "default",
           name: "Default",
           panels: [{ type: "boxplot", id: "p", title: "t", layout: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
+  });
+});
+
+describe("validatePanel on logs", () => {
+  const run = (
+    query: Partial<{ query: string; customQuery: boolean }>,
+    config: any = {},
+    queryType = "sql",
+  ) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      {
+        data: {
+          type: "logs",
+          queryType,
+          config,
+          queries: [
+            {
+              query: "",
+              customQuery: false,
+              fields: { x: [], y: [], breakdown: [], z: [] },
+              ...query,
+            },
+          ],
+        },
+        layout: { currentQueryIndex: 0 },
+      },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+  const sql = { customQuery: true, query: 'SELECT * FROM "demo_app"' };
+
+  it("needs a query but asks for no builder fields", () => {
+    expect(run(sql)).toEqual([]);
+    expect(run({ customQuery: true, query: "" })).toEqual([
+      gt("dashboard.utils.queryIsEmpty", { index: 1 }),
+    ]);
+  });
+
+  it("checks the allowed values of the order key", () => {
+    expect(run(sql, { logs_order: "oldest" })).toEqual([]);
+    expect(run(sql, { logs_order: "random" })).toHaveLength(1);
+  });
+
+  it("is not allowed on PromQL", () => {
+    expect(run({ customQuery: true, query: "up" }, {}, "promql")).toContain(
+      gt("dashboard.utils.promqlChartTypeUnsupported"),
+    );
+  });
+
+  it("is an importable panel type", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [
+            {
+              type: "logs",
+              id: "p-logs",
+              title: "t",
+              layout: { x: 0, y: 0, w: 1, h: 1, i: "logs" },
+              queries: [{ query: "SELECT 1", customQuery: true, fields: {} }],
+            },
+          ],
         },
       ],
     });

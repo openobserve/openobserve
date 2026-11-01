@@ -1,6 +1,7 @@
 import { toZonedTime } from "date-fns-tz";
 import { computeTreeLayout } from "./computeTreeLayout";
 import { resolveModelVendorLogo } from "./modelVendorLogo";
+import { classifyEntity } from "./serviceClassification";
 import { cssToken } from "@/utils/theme";
 import { gt } from "@/types/i18n";
 import { escapeHtml } from "@/utils/html";
@@ -1100,6 +1101,7 @@ export function getServiceIconDataUrl(
   isDark: boolean,
   borderColor: string,
   serviceType?: string | null,
+  dashedRing = false,
 ): string {
   // Agents are the SUBJECT of the agent graph, so they get an accent treatment
   // that makes them the primary read WITHOUT touching the health border
@@ -1176,7 +1178,7 @@ export function getServiceIconDataUrl(
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">` +
     pingRings +
-    `<circle cx="${cx}" cy="${cy}" r="24" fill="${bgColor}" stroke="${borderColor}" stroke-width="4"/>` +
+    `<circle cx="${cx}" cy="${cy}" r="24" fill="${bgColor}" stroke="${borderColor}" stroke-width="4"${dashedRing ? ' stroke-dasharray="6 4" pathLength="150"' : ""}/>` +
     `<g transform="translate(${iconTx},${iconTx})" fill="none" stroke="${iconColor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">` +
     icon +
     `</g></svg>`;
@@ -1228,7 +1230,11 @@ function getServiceIconSvg(
       return `image://${getModelLogoDataUrl(vendorLogo, borderColor)}`;
     }
   }
-  return `image://${getServiceIconDataUrl(name, isDark, borderColor, serviceType)}`;
+  const t = serviceType ?? "";
+  // Graph nodes carry no real-service flag: an empty type or "service" (a collapsed service group) is instrumented.
+  const kind = classifyEntity(t === "" || t === "service", t);
+  const isInferredDependency = ["datastore", "queue", "external", "rpc"].includes(kind);
+  return `image://${getServiceIconDataUrl(name, isDark, borderColor, serviceType, isInferredDependency)}`;
 }
 
 /**

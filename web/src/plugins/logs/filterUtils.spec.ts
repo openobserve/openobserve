@@ -17,6 +17,7 @@ import { describe, it, expect } from "vitest";
 import {
   getFieldFromExpression,
   hasFieldCondition,
+  removeFieldCondition,
   replaceExistingFieldCondition,
 } from "./filterUtils";
 
@@ -351,5 +352,35 @@ describe("include/exclude filter deduplication (watcher behavior)", () => {
       expect(query).toBe("status is null");
       expect(query).not.toContain("status is null and status is null");
     });
+  });
+});
+
+describe("values with embedded quotes and replacement tokens (issue 11966)", () => {
+  const jsonValue = `{"sql":"where http_body = ''x'' and a = ''y''"}`;
+
+  it("replaces a whole condition whose value has doubled quotes, leaving no residue", () => {
+    const query = `http_body = '${jsonValue}'`;
+    expect(replaceExistingFieldCondition(query, "http_body", "http_body = 'z'")).toBe(
+      "http_body = 'z'",
+    );
+  });
+
+  it("replaces a multi-value group whose values have doubled quotes", () => {
+    const query = `(http_body = '${jsonValue}' OR http_body = 'b''c')`;
+    expect(replaceExistingFieldCondition(query, "http_body", "http_body = 'z'")).toBe(
+      "http_body = 'z'",
+    );
+  });
+
+  it("inserts the new expression literally when it contains $ replacement tokens", () => {
+    const expr = "http_body = 'cost $& and $` and $'' and $1'";
+    expect(replaceExistingFieldCondition("http_body = 'a'", "http_body", expr)).toBe(expr);
+  });
+});
+
+describe("removeFieldCondition with AND inside a quoted value (issue 11966)", () => {
+  it("removes only the target condition and keeps a quoted ' and ' intact", () => {
+    expect(removeFieldCondition("a = 'x and y' AND b = '1'", "b")).toBe("a = 'x and y'");
+    expect(removeFieldCondition("a = 'x and y' AND b = '1'", "a")).toBe("b = '1'");
   });
 });

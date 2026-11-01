@@ -28,12 +28,15 @@ describe("usePanelDataView", () => {
     expect(view.isDataView.value).toBe(true);
   });
 
-  it.each(["table", "html", "markdown", "custom_chart"])("offers no Data view for %s", (type) => {
-    const view = usePanelDataView({ panelType: type, renderer });
-    view.previewView.value = "data";
-    expect(view.showDataViewToggle.value).toBe(false);
-    expect(view.isDataView.value).toBe(false);
-  });
+  it.each(["table", "logs", "html", "markdown", "alert-list", "custom_chart"])(
+    "offers no Data view for %s",
+    (type) => {
+      const view = usePanelDataView({ panelType: type, renderer });
+      view.previewView.value = "data";
+      expect(view.showDataViewToggle.value).toBe(false);
+      expect(view.isDataView.value).toBe(false);
+    },
+  );
 
   it("respects the enabled flag", () => {
     const view = usePanelDataView({
