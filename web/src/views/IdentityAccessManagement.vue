@@ -22,7 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <SectionRail :groups="sectionGroups" :active-key="activeSection" :title="t('menu.iam')" />
     </template>
     <section class="h-full min-h-0 min-w-0 overflow-y-auto">
-      <RouterView />
+      <RouterView v-slot="{ Component }">
+        <OAccessBoundary>
+          <component :is="Component" />
+        </OAccessBoundary>
+      </RouterView>
     </section>
   </OPageLayout>
 </template>
@@ -30,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
+import OAccessBoundary from "@/components/access/OAccessBoundary.vue";
 import { type SectionHubGroup } from "@/components/common/SectionHub.vue";
 import { computed, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";

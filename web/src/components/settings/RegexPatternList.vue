@@ -507,7 +507,6 @@ export default defineComponent({
     // The query owns its failure now, so this reports it once per error however
     // the read was triggered.
     watch(regexPatternsList.error, (error: any) => {
-      // The grouped access toast already reports a 403; a second red toast adds nothing.
       if (!error || forbidden.value) return;
       toast({
         message: error.data?.message || t("settings.regexPatternList.errorFetching"),
@@ -671,7 +670,7 @@ export default defineComponent({
           error?.data?.message ||
           error?.message ||
           t("settings.regexPatternList.errorBulkDeleting");
-        if (error.response?.status != 403 || error?.status != 403) {
+        if (error.response?.status !== 403 && error?.status !== 403) {
           toast({
             message: errorMessage,
             variant: "error",

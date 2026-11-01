@@ -21,10 +21,20 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { useHostsList, utilizationTint } from "./useHostsList";
 import searchService from "@/services/search";
+import streamService from "@/services/stream";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 
 vi.mock("@/services/search", () => ({
   default: { metrics_query: vi.fn(), search: vi.fn() },
+}));
+
+// The load stream carries k8s_node_name unless a test says otherwise.
+vi.mock("@/services/stream", () => ({
+  default: {
+    schema: vi.fn(() =>
+      Promise.resolve({ data: { schema: [{ name: "host_name" }, { name: "k8s_node_name" }] } }),
+    ),
+  },
 }));
 
 vi.mock("@/utils/timezone", () => ({
@@ -33,6 +43,7 @@ vi.mock("@/utils/timezone", () => ({
 
 const metricsQueryMock = vi.mocked(searchService.metrics_query);
 const searchMock = vi.mocked(searchService.search);
+const schemaMock = vi.mocked(streamService.schema);
 
 const PICKER = { start: 1_700_000_000_000_000, end: 1_700_000_900_000_000 };
 
@@ -470,6 +481,39 @@ describe("useHostsList — join & window anchoring", () => {
     const sql: string = (searchMock.mock.calls[0][0] as any).query.query.sql;
     expect(sql).toContain("instrumentation_library_name IS NULL");
     expect(sql).toContain("NOT LIKE '%instrumentation.system_metrics%'");
+  });
+
+  it("leaves k8s_node_name out of last-seen where the load stream has no such column", async () => {
+    schemaMock.mockResolvedValueOnce({ data: { schema: [{ name: "host_name" }] } } as any);
+    const h = withHostsList();
+    wrapper = h.wrapper;
+    const args = { ...refreshArgs, orgId: "linux-only" };
+    await h.list.refresh(args);
+    await flushPromises();
+    expect(schemaMock).toHaveBeenCalledWith("linux-only", "system_cpu_load_average_15m", "metrics");
+    const sql: string = (searchMock.mock.calls[0][0] as any).query.query.sql;
+    expect(sql).not.toContain("k8s_node_name");
+    expect(rowByName(h.list, "web-01")).toBeTruthy();
+    // The answer is kept for the org, so the next refresh asks only the queries.
+    await h.list.refresh(args);
+    await flushPromises();
+    expect(schemaMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves k8s_node_name out of last-seen when the schema cannot be read", async () => {
+    schemaMock.mockRejectedValueOnce(new Error("schema down"));
+    const h = withHostsList();
+    wrapper = h.wrapper;
+    const args = { ...refreshArgs, orgId: "schema-down" };
+    await h.list.refresh(args);
+    await flushPromises();
+    const sql: string = (searchMock.mock.calls[0][0] as any).query.query.sql;
+    expect(sql).not.toContain("k8s_node_name");
+    // A failed check is not kept: the next refresh asks again, and groups by node once it can.
+    await h.list.refresh(args);
+    await flushPromises();
+    expect(schemaMock).toHaveBeenCalledTimes(2);
+    expect((searchMock.mock.calls[1][0] as any).query.query.sql).toContain("k8s_node_name");
   });
 
   it("reduces duplicate liveness entries to one row per host with the first non-empty os_type", async () => {

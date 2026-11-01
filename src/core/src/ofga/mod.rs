@@ -553,7 +553,7 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
         keys.push("ai_chat_shares");
     }
     if pending.fleet {
-        keys.extend(["fleet", "fleets"]);
+        keys.extend(["fleets", "fleet_configs", "fleet_management"]);
     }
     if pending.missing_ownership {
         keys.extend([
@@ -838,11 +838,10 @@ mod tests {
         assert!(!pending_migrations("0.0.58", "0.0.57").fleet);
         assert!(!pending_migrations("0.0.59", "0.0.59").fleet);
         assert!(all_org_ownership_keys(&pending_migrations("0.0.59", "0.0.59")).is_empty());
-        assert!(all_org_ownership_keys(&pending_migrations("0.0.59", "0.0.58")).contains(&"fleet"));
-        assert!(
-            all_org_ownership_keys(&pending_migrations("0.0.59", "0.0.58")).contains(&"fleets")
-        );
-        assert!(OFGA_MODELS.contains_key("fleet"));
+        let keys = all_org_ownership_keys(&pending_migrations("0.0.59", "0.0.58"));
+        assert_eq!(keys, vec!["fleets", "fleet_configs", "fleet_management"]);
+        // OpenFGA rejects a batch naming an unknown type, which drops every later batch.
+        assert!(keys.iter().all(|key| OFGA_MODELS.contains_key(*key)));
     }
 
     #[test]

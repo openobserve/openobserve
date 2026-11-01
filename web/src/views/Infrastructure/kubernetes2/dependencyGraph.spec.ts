@@ -1,0 +1,626 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, expect, it } from "vitest";
+import type { Series } from "./kubernetesModel";
+import {
+  CARD_H,
+  MAX_GRAPH_EDGES,
+  buildGraph,
+  crossings,
+  dropQuiet,
+  endOf,
+  filterFlows,
+  flowQuery,
+  flowTotalsQuery,
+  flowWindowSeconds,
+  layoutColumns,
+  layoutGraph,
+  namespaceColors,
+  pairFlows,
+  type FlowEdge,
+  type FlowFilter,
+} from "./dependencyGraph";
+
+type End = [namespace: string, type: string, name: string];
+
+const W = (namespace: string, name: string, type = "Deployment"): End => [namespace, type, name];
+const NODE = (name: string): End => ["", "Node", name];
+const EXTERNAL: End = ["", "", ""];
+
+const flow = (src: End, dst: End, direction: string, value: number, host = "h1"): Series => ({
+  metric: {
+    host_id: host,
+    k8s_cluster: "prod",
+    k8s_src_namespace: src[0],
+    k8s_src_owner_type: src[1],
+    k8s_src_owner_name: src[2],
+    k8s_dst_namespace: dst[0],
+    k8s_dst_owner_type: dst[1],
+    k8s_dst_owner_name: dst[2],
+    direction,
+  },
+  value,
+});
+
+const WEB = W("frontend", "web");
+const API = W("backend", "api");
+const DB = W("data", "postgres", "StatefulSet");
+
+// The nodes hosting the source and destination pods.
+const onNodes = (s: Series, src: string, dst: string): Series => ({
+  ...s,
+  metric: { ...s.metric, k8s_src_node_name: src, k8s_dst_node_name: dst },
+});
+
+// Rows summed by the labels `keep` returns, as `sum by` does.
+const sumBy = (rows: Series[], keep: (m: Record<string, string>) => Record<string, string>) => {
+  const out = new Map<string, Series>();
+  for (const { metric, value } of rows) {
+    const m = keep(metric);
+    const key = JSON.stringify(m);
+    out.set(key, { metric: m, value: (out.get(key)?.value ?? 0) + value });
+  }
+  return [...out.values()];
+};
+
+const without = (m: Record<string, string>, ...labels: string[]) =>
+  Object.fromEntries(Object.entries(m).filter(([k]) => !labels.includes(k)));
+
+// What flowQuery and flowTotalsQuery return for rows labelled with the nodes of their ends.
+const queried = (rows: Series[]): [Series[], Series[]] => {
+  const perHost = sumBy(rows, (m) => without(m, "direction"));
+  const busiest = new Map<string, Series>();
+  for (const r of perHost) {
+    const key = JSON.stringify(without(r.metric, "host_id"));
+    if (r.value > (busiest.get(key)?.value ?? -Infinity)) busiest.set(key, r);
+  }
+  const totals = sumBy([...busiest.values()], (m) =>
+    without(m, "host_id", "k8s_src_node_name", "k8s_dst_node_name"),
+  );
+  return [sumBy(rows, (m) => without(m, "k8s_src_node_name", "k8s_dst_node_name")), totals];
+};
+
+const names = (e: FlowEdge) => [e.source.name, e.target.name];
+
+const ALL: FlowFilter = { namespaces: [], search: "", showSystem: true, showNodeTraffic: true };
+
+describe("flowQuery", () => {
+  it("sums per reporting node and direction, and drops Service rows", () => {
+    expect(flowQuery(null, 3600)).toBe(
+      "sum by (k8s_cluster, k8s_src_namespace, k8s_src_owner_name, k8s_src_owner_type, " +
+        "k8s_dst_namespace, k8s_dst_owner_name, k8s_dst_owner_type, direction, host_id) (" +
+        'rate(obi_network_flow_bytes{k8s_src_owner_type!="Service", k8s_dst_owner_type!="Service"}[3600s]))',
+    );
+  });
+
+  it("totals each direction of travel over the busiest reporter of each node pair", () => {
+    const ends =
+      "k8s_cluster, k8s_src_namespace, k8s_src_owner_name, k8s_src_owner_type, " +
+      "k8s_dst_namespace, k8s_dst_owner_name, k8s_dst_owner_type";
+    const share = `${ends}, k8s_src_node_name, k8s_dst_node_name`;
+    expect(flowTotalsQuery('pr"od', 300)).toBe(
+      `sum by (${ends}) (max by (${share}) (sum by (${share}, host_id) (` +
+        'rate(obi_network_flow_bytes{k8s_cluster="pr\\"od", k8s_src_owner_type!="Service", ' +
+        'k8s_dst_owner_type!="Service"}[300s]))))',
+    );
+  });
+
+  it("scopes to the cluster, escaping its name", () => {
+    expect(flowQuery('pr"od', 300)).toContain('{k8s_cluster="pr\\"od", k8s_src_owner_type');
+  });
+});
+
+describe("flowWindowSeconds", () => {
+  it.each([
+    [60, 300],
+    [3600, 3600],
+    [7 * 86_400, 86_400],
+  ])("rates a %ss range over %ss", (seconds, window) => {
+    expect(flowWindowSeconds(0, seconds * 1_000_000)).toBe(window);
+  });
+});
+
+describe("endOf", () => {
+  it("names a workload by namespace, owner type and name", () => {
+    expect(endOf(flow(API, DB, "request", 1).metric, "dst")).toEqual({
+      id: "prod/data/StatefulSet/postgres",
+      kind: "workload",
+      cluster: "prod",
+      namespace: "data",
+      name: "postgres",
+      ownerType: "StatefulSet",
+    });
+  });
+
+  it("reads a Node owner as the node and an empty owner as outside the cluster", () => {
+    const metric = flow(NODE("n1"), EXTERNAL, "request", 1).metric;
+    expect(endOf(metric, "src")).toMatchObject({ id: "prod/node/n1", kind: "node", name: "n1" });
+    expect(endOf(metric, "dst")).toMatchObject({ id: "prod/external", kind: "external" });
+  });
+});
+
+describe("pairFlows", () => {
+  it("draws one edge per pair, client to server, with the bytes each way", () => {
+    const [edge] = pairFlows([flow(DB, API, "response", 30), flow(API, DB, "request", 10)]);
+    expect(names(edge)).toEqual(["api", "postgres"]);
+    expect(edge).toMatchObject({ directed: true, forward: 10, backward: 30, total: 40 });
+    expect(edge).toMatchObject({ request: 10, response: 30, unknown: 0 });
+  });
+
+  it("orients from responses alone when the requests went unseen", () => {
+    const [edge] = pairFlows([flow(API, WEB, "response", 50), flow(WEB, API, "unknown", 5)]);
+    expect(names(edge)).toEqual(["web", "api"]);
+    expect(edge.directed).toBe(true);
+  });
+
+  it("leaves a pair undirected when most of its bytes have no direction", () => {
+    const [edge] = pairFlows([
+      flow(API, DB, "unknown", 80),
+      flow(DB, API, "unknown", 80),
+      flow(API, DB, "request", 10),
+    ]);
+    expect(edge.directed).toBe(false);
+    expect(edge.total).toBe(170);
+  });
+
+  it("counts cross-node traffic once, keeping the direction from the node that saw it", () => {
+    const [edge] = pairFlows([
+      flow(WEB, API, "request", 100, "n1"),
+      flow(API, WEB, "response", 300, "n1"),
+      flow(WEB, API, "unknown", 100, "n2"),
+      flow(API, WEB, "unknown", 300, "n2"),
+    ]);
+    expect(edge).toMatchObject({ total: 400, directed: true, request: 100, response: 300 });
+    expect(edge.unknown).toBe(0);
+    expect(names(edge)).toEqual(["web", "api"]);
+  });
+
+  // One web and one api replica per node, 100 B/s between every pair; each node reports the pairs with a pod on it.
+  it.each([
+    [2, 400],
+    [3, 900],
+  ])("adds up the node pairs of %s replicas spread across nodes", (replicas, total) => {
+    const nodes = Array.from({ length: replicas }, (_, i) => `n${i}`);
+    const rows = nodes.flatMap((host) =>
+      nodes.flatMap((src) =>
+        nodes
+          .filter((dst) => src === host || dst === host)
+          .map((dst) => onNodes(flow(WEB, API, "request", 100, host), src, dst)),
+      ),
+    );
+    const [edge] = pairFlows(...queried(rows));
+    expect(edge).toMatchObject({ total, forward: total, directed: true });
+    expect(edge.request).toBeCloseTo(total);
+  });
+
+  it("counts a node pair's bytes once though both of its nodes report them", () => {
+    const [edge] = pairFlows(
+      ...queried([
+        onNodes(flow(WEB, API, "request", 100, "n1"), "n1", "n2"),
+        onNodes(flow(WEB, API, "unknown", 100, "n2"), "n1", "n2"),
+        onNodes(flow(WEB, API, "request", 40, "n1"), "n1", "n1"),
+        onNodes(flow(WEB, API, "request", 30, "n2"), "n2", "n2"),
+      ]),
+    );
+    expect(edge).toMatchObject({ total: 170, unknown: 0 });
+    expect(edge.request).toBeCloseTo(170);
+  });
+
+  it("keeps the busiest node's count for a direction the totals leave out", () => {
+    const [toApi, toDb] = [flow(WEB, API, "request", 100, "n1"), flow(API, DB, "request", 50)];
+    const edges = pairFlows(
+      [toApi, flow(WEB, API, "request", 60, "n2"), toDb],
+      [{ ...toApi, value: 160 }],
+    );
+    expect(edges.map((e) => e.total)).toEqual([160, 50]);
+  });
+
+  it("keeps the busier node's count for each direction of travel", () => {
+    const [edge] = pairFlows([
+      flow(WEB, API, "request", 90, "n1"),
+      flow(WEB, API, "request", 70, "n2"),
+      flow(WEB, API, "unknown", 30, "n2"),
+    ]);
+    expect(edge).toMatchObject({ forward: 100, unknown: 0 });
+    expect(edge.request).toBeCloseTo(100);
+  });
+
+  it("orients from the node that saw the direction, even when another node counted more", () => {
+    const [edge] = pairFlows([
+      flow(WEB, API, "unknown", 100, "n1"),
+      flow(WEB, API, "request", 98, "n2"),
+    ]);
+    expect(edge).toMatchObject({ total: 100, directed: true });
+    expect(names(edge)).toEqual(["web", "api"]);
+  });
+
+  it("stays undirected when no node saw the direction", () => {
+    const [edge] = pairFlows([
+      flow(WEB, API, "unknown", 100, "n1"),
+      flow(WEB, API, "unknown", 98, "n2"),
+    ]);
+    expect(edge).toMatchObject({ total: 100, directed: false, unknown: 100 });
+  });
+
+  it("adds a pair's request and unknown rows together", () => {
+    const [edge] = pairFlows([flow(WEB, API, "request", 90), flow(WEB, API, "unknown", 3)]);
+    expect(edge).toMatchObject({ forward: 93, backward: 0, request: 90, unknown: 3 });
+  });
+
+  it("skips idle rows and traffic inside one workload or one node", () => {
+    expect(
+      pairFlows([
+        flow(API, API, "request", 10),
+        flow(NODE("n1"), NODE("n1"), "unknown", 10),
+        flow(EXTERNAL, EXTERNAL, "unknown", 10),
+        flow(WEB, API, "request", 0),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("keeps a Job and a CronJob of the same name apart", () => {
+    const edges = pairFlows([
+      flow(W("batch", "load", "Job"), API, "request", 1),
+      flow(W("batch", "load", "CronJob"), API, "request", 1),
+    ]);
+    expect(edges).toHaveLength(2);
+  });
+});
+
+describe("filterFlows", () => {
+  const edges = pairFlows([
+    flow(WEB, API, "request", 10),
+    flow(API, DB, "request", 10),
+    flow(W("kube-system", "coredns"), API, "response", 10),
+    flow(NODE("n1"), NODE("n2"), "unknown", 10),
+    flow(NODE("n1"), API, "request", 10),
+    flow(API, EXTERNAL, "request", 10),
+    flow(W("kube-system", "coredns"), W("openobserve-collector", "gateway"), "request", 10),
+  ]);
+  const pairs = (filter: Partial<FlowFilter>) =>
+    filterFlows(edges, { ...ALL, ...filter }).map((e) => names(e).join(">"));
+
+  it("hides system namespaces and node-to-node traffic when asked", () => {
+    expect(pairs({ showSystem: false, showNodeTraffic: false })).toEqual([
+      "web>api",
+      "api>postgres",
+      "n1>api",
+      "api>",
+    ]);
+  });
+
+  it("keeps the edges of a system namespace that the namespace filter picks", () => {
+    expect(pairs({ showSystem: false, namespaces: ["kube-system"] })).toEqual([
+      "api>coredns",
+      "coredns>gateway",
+    ]);
+  });
+
+  it("keeps the edges that touch a picked namespace, with their other ends", () => {
+    expect(pairs({ namespaces: ["data"] })).toEqual(["api>postgres"]);
+  });
+
+  it("searches both ends by name and namespace", () => {
+    expect(pairs({ search: "POSTGRES" })).toEqual(["api>postgres"]);
+    expect(pairs({ search: "frontend" })).toEqual(["web>api"]);
+  });
+});
+
+describe("buildGraph", () => {
+  const chain = pairFlows([
+    flow(W("frontend", "loadgen"), WEB, "request", 100),
+    flow(WEB, API, "request", 50),
+    flow(API, DB, "request", 20),
+    flow(W("batch", "pinger", "CronJob"), DB, "request", 1),
+  ]);
+
+  it("ranks each caller left of what it calls", () => {
+    const rank = Object.fromEntries(buildGraph(chain).nodes.map((n) => [n.end.name, n.rank]));
+    expect(rank).toEqual({ loadgen: 0, web: 1, api: 2, postgres: 3, pinger: 0 });
+  });
+
+  it("keeps the busiest ends and only the edges between them", () => {
+    const graph = buildGraph(chain, 3);
+    expect(graph.nodes.map((n) => n.end.name).sort()).toEqual(["api", "loadgen", "web"]);
+    expect(graph.edges.map((e) => names(e).join(">"))).toEqual(["loadgen>web", "web>api"]);
+  });
+
+  it("draws the busiest edges whole rather than one end of many", () => {
+    const disjoint = pairFlows(
+      Array.from({ length: 80 }, (_, i) =>
+        flow(W("a", `client-${i}`), W("b", `server-${i}`), "request", 10),
+      ),
+    );
+    const graph = buildGraph(disjoint, 80);
+    expect(graph.edges).toHaveLength(40);
+    expect(graph.nodes).toHaveLength(80);
+  });
+
+  it("caps a dense graph's edges, busiest first", () => {
+    const ends = Array.from({ length: 25 }, (_, i) => W("mesh", `svc-${i}`));
+    const rows: Series[] = [];
+    ends.forEach((a, i) =>
+      ends.slice(i + 1).forEach((b, j) => rows.push(flow(a, b, "request", 1000 - i - j))),
+    );
+    const dense = pairFlows(rows);
+    expect(dense).toHaveLength(300);
+    const graph = buildGraph(dense);
+    expect(graph.edges).toHaveLength(MAX_GRAPH_EDGES);
+    const weakestKept = Math.min(...graph.edges.map((e) => e.total));
+    const left = dense.filter((e) => !graph.edges.includes(e));
+    expect(Math.max(...left.map((e) => e.total))).toBeLessThanOrEqual(weakestKept);
+    // A card's rate is its drawn edges' alone.
+    for (const n of graph.nodes) {
+      const drawn = graph.edges.filter((e) => e.source.id === n.end.id || e.target.id === n.end.id);
+      expect(n.total).toBe(drawn.reduce((sum, e) => sum + e.total, 0));
+    }
+  });
+
+  it("survives a cycle", () => {
+    const cycle = pairFlows([
+      flow(WEB, API, "request", 10),
+      flow(API, DB, "request", 10),
+      flow(DB, WEB, "request", 10),
+    ]);
+    expect(buildGraph(cycle).nodes).toHaveLength(3);
+  });
+
+  it("puts undirected ends in the first column", () => {
+    const graph = buildGraph(pairFlows([flow(API, DB, "unknown", 10)]));
+    expect(graph.nodes.map((n) => n.rank)).toEqual([0, 0]);
+  });
+});
+
+describe("layoutGraph", () => {
+  const ids = (e: End) => `prod/${e[0]}/${e[1]}/${e[2]}`;
+
+  it("places ranks in columns and centres each column", () => {
+    const graph = buildGraph(
+      pairFlows([flow(WEB, API, "request", 10), flow(WEB, DB, "request", 10)]),
+    );
+    const at = layoutGraph(graph).positions;
+    expect(at.get(ids(WEB))).toEqual({ x: 0, y: -CARD_H / 2 });
+    const api = at.get(ids(API))!;
+    const db = at.get(ids(DB))!;
+    expect(api.x).toBe(db.x);
+    expect(api.x).toBeGreaterThan(0);
+    expect(api.y + db.y).toBe(-CARD_H);
+    expect(api.y).toBeLessThan(db.y);
+  });
+
+  it("puts nodes and the outside world in columns of their own past the workloads", () => {
+    const graph = buildGraph(
+      pairFlows([
+        flow(EXTERNAL, WEB, "request", 10),
+        flow(WEB, API, "request", 10),
+        flow(API, NODE("n1"), "request", 10),
+      ]),
+    );
+    const at = layoutGraph(graph).positions;
+    // The outside world calls web, yet it does not take the first column: web does.
+    expect(at.get(ids(WEB))!.x).toBe(0);
+    for (const id of ["prod/external", "prod/node/n1"]) {
+      expect(at.get(id)!.x).toBeGreaterThan(at.get(ids(API))!.x);
+    }
+  });
+
+  it("spreads a graph of only nodes and the outside world across their ranks", () => {
+    const graph = buildGraph(
+      pairFlows(
+        [
+          [NODE("n1"), NODE("n2")],
+          [NODE("n2"), EXTERNAL],
+        ].map(([from, to]) => flow(from, to, "request", 10)),
+      ),
+    );
+    const at = layoutGraph(graph).positions;
+    const xs = ["prod/node/n1", "prod/node/n2", "prod/external"].map((id) => at.get(id)!.x);
+    expect(xs[0]).toBe(0);
+    expect(xs[1]).toBeGreaterThan(xs[0]);
+    expect(xs[2]).toBeGreaterThan(xs[1]);
+  });
+
+  it("keeps ends the workloads call in the first column aside", () => {
+    const graph = buildGraph(
+      pairFlows([
+        flow(WEB, API, "request", 10),
+        flow(API, NODE("n1"), "request", 10),
+        flow(WEB, EXTERNAL, "unknown", 10),
+      ]),
+    );
+    const at = layoutGraph(graph).positions;
+    expect(at.get("prod/node/n1")!.x).toBe(at.get("prod/external")!.x);
+  });
+
+  it("keeps nodes in one column right of every workload when workloads are drawn", () => {
+    const graph = buildGraph(
+      pairFlows([flow(WEB, API, "request", 10), flow(NODE("n1"), NODE("n2"), "request", 10)]),
+    );
+    const at = layoutGraph(graph).positions;
+    const n1 = at.get("prod/node/n1")!.x;
+    expect(n1).toBeGreaterThan(at.get(ids(API))!.x);
+    expect(at.get("prod/node/n2")!.x).toBe(n1);
+  });
+
+  it("gives an edge that skips columns a slot in each column it passes, between the cards", () => {
+    // web -> api -> db, and web -> db skipping api's column.
+    const graph = buildGraph(
+      pairFlows([
+        flow(WEB, API, "request", 10),
+        flow(API, DB, "request", 10),
+        flow(WEB, DB, "request", 10),
+      ]),
+    );
+    const { positions, waypoints } = layoutGraph(graph);
+    const skip = graph.edges.find((e) => e.source.name === "web" && e.target.name === "postgres")!;
+    expect([...waypoints.keys()]).toEqual([skip.id]);
+    const [slot] = waypoints.get(skip.id)!;
+    const api = positions.get(ids(API))!;
+    expect(slot.x).toBe(api.x);
+    // Clear of api's card, above or below it.
+    expect(slot.y < api.y || slot.y > api.y + CARD_H).toBe(true);
+  });
+
+  it("puts an end that only calls just left of what it calls", () => {
+    const graph = buildGraph(
+      pairFlows([
+        flow(W("shop", "loadgen"), WEB, "request", 10),
+        flow(WEB, API, "request", 10),
+        flow(W("batch", "pinger"), API, "request", 10),
+      ]),
+    );
+    const at = layoutGraph(graph).positions;
+    expect(at.get(ids(W("batch", "pinger")))!.x).toBe(at.get(ids(WEB))!.x);
+    expect(at.get(ids(W("shop", "loadgen")))!.x).toBe(0);
+  });
+
+  // Callers a, b, c call z, y, x: by name both columns read a-c and x-z, and every edge crosses the others.
+  const crossed = () =>
+    buildGraph(
+      pairFlows(
+        [
+          ["a", "z"],
+          ["b", "y"],
+          ["c", "x"],
+          ["a", "y"],
+        ].map(([from, to]) => flow(W("shop", from), W("shop", to), "request", 10)),
+      ),
+    );
+
+  it("orders a column by its neighbours so edges do not cross", () => {
+    const at = layoutGraph(crossed()).positions;
+    const y = (name: string) => at.get(`prod/shop/Deployment/${name}`)!.y;
+    expect(y("a")).toBeLessThan(y("b"));
+    expect(y("b")).toBeLessThan(y("c"));
+    expect(y("z")).toBeLessThan(y("y"));
+    expect(y("y")).toBeLessThan(y("x"));
+  });
+
+  it("lays out the same graph the same way every time", () => {
+    const first = layoutGraph(crossed()).positions;
+    expect(layoutGraph(crossed()).positions).toEqual(first);
+    expect(new Set([...first.values()].map((p) => `${p.x},${p.y}`)).size).toBe(first.size);
+  });
+});
+
+describe("namespaceColors", () => {
+  const DEFAULT = ["backend", "frontend", "data", "batch", "bulk"];
+
+  it("gives the same namespaces the same colours, whatever order they come in", () => {
+    expect(namespaceColors(DEFAULT)).toEqual(namespaceColors([...DEFAULT].reverse()));
+    expect(namespaceColors(DEFAULT).get("backend")).toMatch(/^var\(--color-chart-series-\d+\)$/);
+  });
+
+  it("never gives two of up to twelve namespaces one colour", () => {
+    const twelve = Array.from({ length: 12 }, (_, i) => `ns-${i}`);
+    expect(new Set(namespaceColors(twelve).values()).size).toBe(12);
+  });
+
+  it("gives up to five namespaces colours of different hue families", () => {
+    const families: Record<string, string> = {
+      1: "blue",
+      7: "blue",
+      2: "green",
+      9: "green",
+      10: "green",
+      3: "orange",
+      6: "orange",
+      12: "orange",
+      4: "red",
+      8: "red",
+      11: "red",
+      5: "purple",
+    };
+    const used = [...namespaceColors(DEFAULT).values()].map(
+      (c) => families[c.match(/series-(\d+)/)![1]],
+    );
+    expect(new Set(used).size).toBe(5);
+  });
+
+  it("keeps a namespace's colour when namespaces that sort after it are added", () => {
+    const before = namespaceColors(DEFAULT);
+    const after = namespaceColors([...DEFAULT, "kube-system", "openobserve-collector", "zz"]);
+    for (const name of DEFAULT) expect(after.get(name)).toBe(before.get(name));
+  });
+});
+
+describe("crossings", () => {
+  // Every pair compared, as the count must equal.
+  const naive = (
+    segments: [string, string][],
+    columnOf: Map<string, number>,
+    at: Map<string, number>,
+  ) => {
+    let count = 0;
+    for (let i = 0; i < segments.length; i++) {
+      for (let j = i + 1; j < segments.length; j++) {
+        const [[p1, p2], [q1, q2]] = [segments[i], segments[j]];
+        if (columnOf.get(p1) !== columnOf.get(q1)) continue;
+        if ((at.get(p1)! - at.get(q1)!) * (at.get(p2)! - at.get(q2)!) < 0) count++;
+      }
+    }
+    return count;
+  };
+
+  it("counts what comparing every pair counts, ties included", () => {
+    // A small seeded generator, so the fixture is the same every run.
+    let seed = 7;
+    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let round = 0; round < 20; round++) {
+      const columnOf = new Map<string, number>();
+      const at = new Map<string, number>();
+      for (let c = 0; c < 4; c++) {
+        for (let r = 0; r < 6; r++) {
+          columnOf.set(`${c}:${r}`, c);
+          // Few distinct rows, so equal ends are common.
+          at.set(`${c}:${r}`, Math.floor(random() * 4));
+        }
+      }
+      const segments: [string, string][] = Array.from({ length: 30 }, () => {
+        const c = Math.floor(random() * 3);
+        return [`${c}:${Math.floor(random() * 6)}`, `${c + 1}:${Math.floor(random() * 6)}`];
+      });
+      expect(crossings(segments, columnOf, at)).toBe(naive(segments, columnOf, at));
+    }
+  });
+
+  it("lays out the largest map drawn, 80 ends and 200 edges across many columns, quickly", () => {
+    const nodes = Array.from({ length: 80 }, (_, i) => ({ end: { id: `e${i}` }, rank: i % 10 }));
+    const edges = Array.from({ length: 200 }, (_, i) => ({
+      id: `x${i}`,
+      source: { id: `e${(i * 7) % 80}` },
+      target: { id: `e${(i * 13 + 5) % 80}` },
+      directed: true,
+    }));
+    const started = performance.now();
+    const { positions } = layoutColumns(
+      nodes,
+      (x, y) => x.id.localeCompare(y.id),
+      edges,
+      () => false,
+    );
+    expect(positions.size).toBe(80);
+    expect(performance.now() - started).toBeLessThan(200);
+  });
+});
+
+describe("dropQuiet", () => {
+  it("leaves out connections below 1 B/s unless asked to keep them", () => {
+    const edges = [{ total: 0.3 }, { total: 1 }, { total: 500 }];
+    expect(dropQuiet(edges, false)).toEqual([{ total: 1 }, { total: 500 }]);
+    expect(dropQuiet(edges, true)).toEqual(edges);
+  });
+});
