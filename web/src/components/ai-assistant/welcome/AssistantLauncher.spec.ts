@@ -206,7 +206,7 @@ describe("AssistantLauncher", () => {
     await flushPromises();
     const first = wrapper.get('[data-test="assistant-launcher-recent-0"]');
     expect(first.attributes("data-status")).toBe("needs_you");
-    expect(first.text()).toContain("Needs your approval");
+    expect(first.text()).toContain("Needs you");
     expect(wrapper.findAll('[data-test^="assistant-launcher-recent-"]').length).toBeLessThanOrEqual(
       4,
     );

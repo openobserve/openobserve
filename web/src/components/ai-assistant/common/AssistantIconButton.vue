@@ -24,7 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-label="label"
     :aria-pressed="pressed"
     :data-test="dataTest"
-    class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+    :class="[
+      'max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
+      chevron ? 'w-9! gap-0.5' : '',
+    ]"
     @click="emit('click', $event)"
   >
     <span v-if="badge" class="relative inline-flex">
@@ -37,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </span>
     <OIcon v-else :name="icon" size="sm" />
+    <OIcon v-if="chevron" :name="assistantGlyph.expand" size="xs" />
     <template v-if="unavailable" #unavailable-reason>{{ disabledReason }}</template>
     <OTooltip
       v-if="!noTooltip"
@@ -55,13 +59,14 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
+import { assistantGlyph } from "./glyphs";
 import type {
   AssistantIconButtonEmits,
   AssistantIconButtonProps,
   AssistantIconButtonSlots,
 } from "./AssistantIconButton.types";
 
-const ICON_SIZES = { sm: "icon-sm", toolbar: "icon-toolbar", xs: "icon-xs-sq" } as const;
+const ICON_SIZES = { sm: "icon-xs-sq", toolbar: "icon-toolbar" } as const;
 
 const props = withDefaults(defineProps<AssistantIconButtonProps>(), {
   shortcutId: undefined,
@@ -73,6 +78,7 @@ const props = withDefaults(defineProps<AssistantIconButtonProps>(), {
   disabledReason: undefined,
   badge: undefined,
   noTooltip: false,
+  chevron: false,
 });
 
 const emit = defineEmits<AssistantIconButtonEmits>();

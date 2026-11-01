@@ -24,23 +24,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :content-class="composerPopoverClass(layout.tight)"
     >
       <template #trigger>
-        <OButton
-          variant="ghost"
-          size="icon-xs-sq"
-          :aria-label="name"
+        <AssistantIconButton
+          :label="name"
+          :icon="agentGlyph[shownAgent]"
+          chevron
+          :no-tooltip="menuOpen"
           :data-pending="pending ? '' : undefined"
-          :class="[
-            'text-text-secondary w-9! gap-0.5',
-            pending ? 'bg-surface-accent-hover ring-border-focus ring-1' : '',
-            TOUCH_TARGET_CLASS,
-          ]"
+          :class="pending ? 'bg-surface-accent-hover ring-border-focus ring-1' : ''"
           data-test="assistant-agent-picker"
           @keydown.up.prevent="menuOpen = true"
         >
-          <OIcon :name="agentGlyph[shownAgent]" size="xs" />
-          <OIcon :name="assistantGlyph.expand" size="xs" />
-          <OTooltip v-if="!menuOpen" :content="tooltip" />
-        </OButton>
+          <template #tooltip>{{ tooltip }}</template>
+        </AssistantIconButton>
       </template>
       <ODropdownGroup :label="t('assistant.agent.picker.heading')">
         <template v-for="row in rows" :key="row.id">
@@ -91,8 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
 
+import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { agentGlyph, assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import AssistantAskAdminPopover from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";
 import {
   announceComposer,
@@ -119,7 +114,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 import { agentClause } from "./agentClause";

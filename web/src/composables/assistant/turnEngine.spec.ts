@@ -1967,6 +1967,30 @@ describe("turnEngine: WP-06 outcomes, Regenerate and Edit and resend", () => {
     expect(messages.at(-1)?.versions?.map((v) => String(v.content))).toEqual(["kept"]);
   });
 
+  it("retries a failed turn in place, one prompt and the broken attempt as a version", async () => {
+    const h = setup();
+    h.type("why?");
+    const first = h.store.send(h.current.sid);
+    await settle();
+    h.feed(
+      { type: "message_delta", content: "partial" },
+      { type: "error", error_type: "provider_error", message: "down" },
+    );
+    h.end();
+    await first;
+    expect(h.session().turn.state).toBe("failed");
+    const retry = h.store.retry(h.current.sid);
+    await settle();
+    h.feed({ type: "message_delta", content: "whole" }, { type: "complete", persisted: true });
+    h.end();
+    await retry;
+    const messages = h.session().messages;
+    expect(messages.filter((m) => m.role === "user")).toHaveLength(1);
+    expect(String(messages.at(-1)?.content)).toBe("whole");
+    expect(messages.at(-1)?.versions?.map((v) => String(v.content))).toEqual(["partial"]);
+    expect(h.last().req.message.text).toBe("why?");
+  });
+
   it("keeps the draft when an edit is refused, and Retry resends the edit (S7)", async () => {
     const h = setup();
     await answered(h, "kept");

@@ -208,9 +208,8 @@ describe("AssistantTurnOutcome", () => {
       } as never,
     });
     expect(title(wrapper)).toBe(
-      "5 of your chats are running or waiting for you. Your message wasn't sent.",
+      "5 chats are running or waiting for you. Your message wasn't sent.",
     );
-    expect(wrapper.text()).toContain("Stop one, or send when one ends.");
     expect(wrapper.text()).toContain("Show running chats");
   });
 

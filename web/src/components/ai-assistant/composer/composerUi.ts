@@ -15,7 +15,7 @@
 
 import { computed, inject, reactive, toRaw, type ComputedRef, type InjectionKey } from "vue";
 
-import type { useAssistantStore } from "@/composables/assistant";
+import type { AssistantError, TurnState, useAssistantStore } from "@/composables/assistant";
 import type { I18nText } from "@/types/i18n";
 
 /** How long a cap sentence stays under the tray (`40` §2.6). */
@@ -29,6 +29,19 @@ export const COMPOSER_TIGHT_REM = 20;
 
 /** Chips shown before `+N` by width: none when narrow, one at 27 rem, three in a full view. */
 export const COMPOSER_WIDE_REM = 40;
+
+/** Refused sends the composer counts down on its error row. */
+export const BUSY_CODES: ReadonlySet<string> = new Set(["turn_limit", "rate_limited"]);
+
+const UNSENT_CODES: ReadonlySet<string> = new Set(["unreachable", "offline"]);
+
+/** The refusal the composer's own row states; a `failed` turn never restored its text, so its outcome keeps the Retry. */
+export function composerRowOf(turn: TurnState): AssistantError | null {
+  if (turn.state !== "refused") return null;
+  const { error } = turn;
+  if (UNSENT_CODES.has(error.code)) return error;
+  return BUSY_CODES.has(error.code) && error.retryAfterMs ? error : null;
+}
 
 /** A cleared draft's notice; `token` is `null` across orgs, where no Undo is offered (`40` §9). */
 export interface ClearedNotice {

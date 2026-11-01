@@ -23,8 +23,8 @@ export interface AssistantIconButtonProps {
   /** Registry id whose keycaps the tooltip renders (OTooltip `shortcut-id`). */
   shortcutId?: string;
   variant?: "ghost" | "outline" | "secondary" | "primary";
-  /** `sm` → OButton `icon-sm`, `toolbar` → `icon-toolbar`, `xs` → `icon-xs-sq`; 2.75 rem below md and on coarse pointers. */
-  size?: "sm" | "toolbar" | "xs";
+  /** `sm` → OButton `icon-xs-sq`, `toolbar` → `icon-toolbar`; 2.75 rem below md and on coarse pointers. */
+  size?: "sm" | "toolbar";
   /** The busy spinner of an action in flight (Stop while stopping). */
   loading?: boolean;
   /** Renders `aria-pressed`. */
@@ -36,6 +36,8 @@ export interface AssistantIconButtonProps {
   badge?: IconName;
   /** Touch has no hover: a tooltip opened by a tap would stay over the page. */
   noTooltip?: boolean;
+  /** A trailing chevron for a control that opens a menu of its own value, such as the agent picker. */
+  chevron?: boolean;
   dataTest: string;
 }
 

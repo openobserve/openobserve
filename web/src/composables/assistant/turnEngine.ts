@@ -938,7 +938,9 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         ...(previous.editedFrom && { editedFrom: previous.editedFrom }),
       };
       const clearsComposer = edited || restored;
-      return start(sid, opts, { snapshot, source: previous.source, clearsComposer });
+      // A failed answer's question stands, so the attempt replaces the answer and asks nothing new.
+      const source = turn.state === "failed" && !edited ? "regenerate" : previous.source;
+      return start(sid, opts, { snapshot, source, clearsComposer });
     },
     continueTurn(sid) {
       const chips = last.get(sid)?.snapshot.chips ?? [];

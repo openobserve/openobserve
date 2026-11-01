@@ -341,7 +341,7 @@ import {
   watch,
 } from "vue";
 
-import { announceComposer } from "@/components/ai-assistant/composer/composerUi";
+import { announceComposer, composerRowOf } from "@/components/ai-assistant/composer/composerUi";
 import { lastRangeText } from "@/components/ai-assistant/evidence/evidenceText";
 import AssistantTurnOutcome, {
   type OutcomeAction,
@@ -619,8 +619,12 @@ function turnAgent(turn: TranscriptTurn): AgentId {
 
 // A refused pick is on the composer; a failed hand-off is one row, at the marker's place.
 function outcomesOf(turn: TranscriptTurn): TranscriptTurn["outcomes"] {
-  if (!turn.user?.handoffFailed) return turn.outcomes;
-  return turn.outcomes.filter((outcome) => outcome.record.code !== "handoff_failed");
+  const current = session.value?.turn;
+  const row = turn.isLast && current ? composerRowOf(current)?.code : undefined;
+  const handoff = turn.user?.handoffFailed ? "handoff_failed" : undefined;
+  return turn.outcomes.filter(
+    ({ record }) => !record.code || (record.code !== row && record.code !== handoff),
+  );
 }
 
 function carried(turn: TranscriptTurn): { questions: number; answers: number } {

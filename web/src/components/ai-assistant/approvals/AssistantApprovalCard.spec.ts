@@ -27,7 +27,7 @@ import {
 
 import { fakeRouter } from "../__tests__/fakeAssistant";
 import AssistantApprovalCard from "./AssistantApprovalCard.vue";
-import type { ApprovalCardView } from "./approvals.types";
+import { assistantApprovalsHostKey, type ApprovalCardView } from "./approvals.types";
 
 const routes = [
   { path: "/alerts/:alert_id", name: "alertDetail", component: {} },
@@ -256,18 +256,29 @@ describe("AssistantApprovalCard", () => {
   });
 
   it("reads a toggle as Pause, names the object, and states when it ends and who is notified", async () => {
-    const wrapper = mountCard(
-      cardOf({
-        ...PAUSE,
-        args: {
-          ...PAUSE.args,
-          folder_name: "Payments",
-          paused_until: 1_800_000_000_000,
-          destinations: ["#cart-oncall"],
-          request_body: { name: "cart-5xx-spike" },
+    const wrapper = mount(AssistantApprovalCard, {
+      props: {
+        card: cardOf({
+          ...PAUSE,
+          args: {
+            ...PAUSE.args,
+            folder: "f-pay",
+            ends_at: 1_800_000_000_000_000,
+            request_body: { name: "cart-5xx-spike", destinations: ["#cart-oncall"] },
+          },
+        }),
+        org: "default",
+      },
+      attachTo: document.body,
+      global: {
+        plugins: [fakeRouter(routes)],
+        provide: {
+          [assistantApprovalsHostKey as symbol]: {
+            folderName: (id: string) => (id === "f-pay" ? "Payments" : null),
+          },
         },
-      }),
-    );
+      },
+    });
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-approval-heading"]').text()).toBe(
       "Pause alert cart-5xx-spike",

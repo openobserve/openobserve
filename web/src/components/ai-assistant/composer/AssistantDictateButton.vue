@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled-reason="disabledReason"
         :no-tooltip="primerOpen || offOpen"
         :aria-haspopup="crossed ? 'dialog' : undefined"
-        class="h-7! w-7!"
         data-test="assistant-dictate"
         @click="onClick"
       >

@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         ref="lineEl"
         tabindex="-1"
+        data-approval-line
         class="focus-visible:ring-assistant-focus-ring rounded-default flex min-w-0 items-start gap-1.5 outline-none focus-visible:ring-2"
       >
         <OSpinner v-if="view.state === 'sending'" size="xs" class="mt-0.5 shrink-0" />
@@ -135,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="xs"
         :icon-left="assistantGlyph.back"
         :class="['self-start', TOUCH_TARGET_CLASS]"
+        data-approval-back
         data-test="assistant-approval-result-back"
         @click="goBack"
       >
@@ -368,7 +370,9 @@ const replyText = computed(() =>
   view.value?.state === "replied" && replyOf() ? raw(replyOf()) : null,
 );
 
-const back = computed(() => (sid.value ? (host?.backTarget?.(sid.value) ?? null) : null));
+const back = computed(() =>
+  sid.value ? (host?.backTarget?.(sid.value, card.value?.id) ?? null) : null,
+);
 
 const glyph = computed<IconName>(() => {
   const state = view.value?.state;
@@ -538,7 +542,7 @@ function approvedLine(): I18nText | null {
   if (verb !== "pause" && verb !== "resume") return null;
   const noun = t(`assistant.entity.${approvalNoun(facts)}`, 1);
   const params = { entity: noun, name: raw(targetName()) };
-  const until = approvalUntil(facts);
+  const until = approvalUntil(facts, view.value?.outcome?.at);
   if (verb === "resume") return t("assistant.approval.record.resumed", params);
   return until === null
     ? t("assistant.approval.record.paused", params)

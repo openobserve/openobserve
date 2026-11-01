@@ -59,8 +59,10 @@ export interface AssistantApprovalsHost {
   undo(sid: Sid, ledgerId: string): Promise<ActionResult>;
   /** No split budgets: cards are Deny and Reply only, so an expired one offers no Ask again (PO B96). */
   gated?(): boolean;
-  /** The chat the reader came from when they reached this card from another chat. */
-  backTarget?(sid: Sid): { title: string; org?: string } | null;
+  /** A folder's display name; the card's arguments carry only its id. */
+  folderName?(id: string): string | null;
+  /** The chat the reader came from when they reached this request from another chat. */
+  backTarget?(sid: Sid, approvalId?: string): { title: string; org?: string } | null;
   goBack?(sid: Sid): void;
 }
 

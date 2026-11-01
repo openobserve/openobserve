@@ -27,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="backButton"
         :label="t('assistant.history.view.back', { title: raw(String(titleText)) })"
         :icon="assistantGlyph.back"
-        size="xs"
         data-test="assistant-chats-back"
         @click="closeChats"
       />
@@ -42,7 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="newShown"
           :label="newLabel"
           :icon="assistantGlyph.newChat"
-          size="xs"
           data-test="assistant-chats-new"
           @click="newFromList"
         />
@@ -208,7 +206,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="newShown && placement !== 'window'"
           :label="newLabel"
           :icon="assistantGlyph.newChat"
-          size="xs"
           data-test="assistant-thread-new"
           @click="askNew"
         />

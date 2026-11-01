@@ -58,7 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="placement !== 'window'"
             :label="t('assistant.shell.close', { product })"
             :icon="assistantGlyph.close"
-            size="xs"
             data-test="assistant-shell-close"
             @click="closeContainer"
           />
@@ -98,7 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <AssistantIconButton
                 :label="t('assistant.shell.layout')"
                 :icon="assistantGlyph.layout"
-                size="xs"
                 data-test="assistant-layout-button"
               />
             </template>
@@ -118,7 +116,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="placement !== 'window'"
             :label="t('assistant.shell.close', { product })"
             :icon="assistantGlyph.close"
-            size="xs"
             data-test="assistant-shell-close"
             @click="closeContainer"
           />
@@ -543,10 +540,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </slot>
       <!-- A refusal stored nothing, so it sits above the composer that holds the restored prompt (`30` §4.2) -->
-      <div v-if="refusal" class="shrink-0 px-3 pt-1.5">
+      <div v-if="refusalRow" class="shrink-0 px-3 pt-1.5">
         <AssistantTurnOutcome
           kind="refused"
-          :error="refusal"
+          :error="refusalRow"
           :role="capability.isAdmin ? 'admin' : 'member'"
           :retry-snapshot-available="!!activeSid && store.canRetry(activeSid)"
           :at="refusalAt"
@@ -582,9 +579,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="composer"
           :sid="activeSid"
           :density="density"
-          :ghost="ghost"
           :host="host"
           :visible="visible"
+          :access-lost="accessLost"
           :cooldown-reason="
             turnLock
               ? t(turnLockKey(turnLock))
@@ -597,35 +594,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #chips>
             <slot name="tray">
-              <AssistantContextTray
-                :sid="activeSid"
-                :collapsed="trayCollapsed"
-                :visible="visible"
-                framed
-              />
+              <AssistantContextTray :sid="activeSid" />
             </slot>
           </template>
         </AssistantComposer>
       </slot>
       <slot name="disclosure">
         <div class="flex shrink-0 flex-col gap-1.5 px-3 pb-2">
-          <OBanner
-            v-if="disclosureBanner"
-            variant="default"
-            dense
-            inline-actions
-            :content="t('assistant.context.disclosure')"
-            data-test="assistant-context-disclosure-banner"
-          >
-            <template #actions>
-              <AssistantIconButton
-                :label="t('assistant.context.disclosureDismiss')"
-                :icon="assistantGlyph.close"
-                data-test="assistant-context-disclosure-dismiss"
-                @click="dismissDisclosure"
-              />
-            </template>
-          </OBanner>
           <OText variant="meta" as="p" data-test="assistant-context-disclosure">
             {{ t("assistant.context.disclosureLine") }}
           </OText>
@@ -715,6 +690,7 @@ import {
   onMounted,
   onScopeDispose,
   provide,
+  reactive,
   ref,
   shallowRef,
   toRaw,
@@ -743,7 +719,7 @@ import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantComposer from "@/components/ai-assistant/composer/AssistantComposer.vue";
 import {
   announceComposer,
-  composerUi,
+  composerRowOf,
   noteDraftCleared,
 } from "@/components/ai-assistant/composer/composerUi";
 import AssistantDraftHost from "@/components/ai-assistant/evidence/AssistantDraftHost.vue";
@@ -774,11 +750,9 @@ import {
   consentCardFor,
   orgDisplayName,
   isRunning,
-  markHintSeen,
   noteAssistantKeydown,
   markSignedIn,
   queryRunOf,
-  readHints,
   registerAssistantFocusTarget,
   starterPayload,
   turnLockKey,
@@ -886,7 +860,6 @@ const shareDrawerOpen = ref(false);
 const shareQuickOpen = ref(false);
 const loadTriedAt = ref<number | null>(null);
 const openedByUser = ref(false);
-const disclosureDismissed = ref(false);
 
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
 // A window keeps its own chat, so two chats stream side by side and neither moves the sidebar's.
@@ -897,9 +870,15 @@ const gateReason = computed<GateReason>(() =>
   capability.gate.value === "off_for_org" ? "off_for_org" : "no_permission",
 );
 
+// Losing access mid-session never takes the chat or the draft off the screen (D7 decision 1).
+const hasContent = computed(
+  () => !!session.value?.messages.length || !!session.value?.composer.text.trim(),
+);
+const accessLost = computed(() => capability.gate.value === "no_permission" && hasContent.value);
+
 const state = computed<ShellState>(() => {
   const gate = capability.gate.value;
-  if (gate === "no_permission" || gate === "off_for_org") return "gate";
+  if (gate === "off_for_org" || (gate === "no_permission" && !hasContent.value)) return "gate";
   const routed = routeContext?.state.value ?? "idle";
   if (routed === "loading") return "loading";
   if (routed === "not_found") return "not_found";
@@ -1071,15 +1050,6 @@ const landmark = computed(() => {
   return { tag: "section", attrs: { role: "region", "aria-label": name } };
 });
 
-// Docked, windows, the sheet and a sidebar at the 24 rem default or narrower show the collapsed tray (`40` §1.2).
-const trayCollapsed = computed(
-  () =>
-    props.sheet ||
-    props.placement === "docked" ||
-    props.placement === "window" ||
-    (props.placement === "sidebar" && store.state.shell.sidebarWidthRem <= 24),
-);
-
 // Every credit surface is Cloud only and never on a locked door.
 const metered = computed(
   () => capability.value.edition === "cloud" && capability.assistantCanChat.value,
@@ -1097,17 +1067,6 @@ const creditNotice = useCreditNotice(
 );
 const creditThreshold = computed(() => creditNotice.threshold.value);
 
-// The fuller disclosure shows once per user+org on the first attachment, and again in a shared chat (CT-04 AC 5).
-const disclosureBanner = computed(() => {
-  const current = session.value;
-  const key = store.state.userOrgKey;
-  if (!current || !key || disclosureDismissed.value) return false;
-  // One notice at a time: the cleared notice wins while its Undo is offered.
-  if (composerUi(current.sid).cleared) return false;
-  if (!current.composer.chips.some((chip) => chip.provenance !== "page")) return false;
-  return !!current.share || !readHints(key).disclosure;
-});
-
 // The welcome's data is built only once the welcome shows, so a gated container never reads it (IW-05 AC 10).
 const welcomeScope = effectScope();
 const welcome = shallowRef<ReturnType<typeof useAssistantStarters> | null>(null);
@@ -1122,21 +1081,6 @@ watch(
   { immediate: true },
 );
 onScopeDispose(() => welcomeScope.stop());
-
-// The ghost is the first starter the welcome offers, never a recent chat (`70` §5).
-const ghost = computed(() => {
-  const first =
-    state.value === "empty" ? welcome.value?.starters.value.find((s) => s.kind !== "recent") : null;
-  return first
-    ? {
-        label: first.label,
-        text: first.prompt,
-        chips: first.chips,
-        kind: first.kind,
-        ...(first.home && { home: true }),
-      }
-    : null;
-});
 
 // The transcript imports no store (constraint 29); the shell hands it the session and the actions it may ask for.
 const messageSources = new Map<string, ComputedRef<ChatMessage[]>>();
@@ -1189,6 +1133,11 @@ const refusal = computed<AssistantError | null>(() => {
   if (turn?.state !== "refused" || dismissedRefusal.value === toRaw(turn)) return null;
   return turn.error;
 });
+
+// The composer's own row states these, so the row above it stays away.
+const refusalRow = computed(() =>
+  session.value && composerRowOf(session.value.turn) ? null : refusal.value,
+);
 
 const refusalRecord = computed<TurnOutcomeRecord | null>(() =>
   refusal.value
@@ -1303,7 +1252,45 @@ const sheetRequestWord = computed(() =>
   chatStatusWord("needs_you", sheetRequest.value?.expiresAt, reviewClock.value, t),
 );
 
+// The request reached from another chat, so its record alone leads back there.
+const cameFrom = reactive(new Map<Sid, { from: Sid; approvalId: string }>());
+watch(activeSid, (sid, before) => {
+  const pending = store.state.sessions[sid ?? ""]?.pendingApproval;
+  if (sid && before && pending) cameFrom.set(sid, { from: before, approvalId: pending.id });
+});
+
+function backTarget(sid: Sid, approvalId?: string): { title: string; org?: string } | null {
+  const entry = cameFrom.get(sid);
+  const back = entry ? store.state.sessions[entry.from] : null;
+  if (!back || entry?.approvalId !== approvalId) return null;
+  const crossOrg = back.org !== store.state.sessions[sid]?.org;
+  return {
+    title: String(back.title ?? t("assistant.thread.newChatTitle")),
+    ...(crossOrg && { org: orgNameOf(back.org) }),
+  };
+}
+
+function folderName(id: string): string | null {
+  const byType: Record<string, { folderId: string; name: string }[]> =
+    vuex.state.organizationData?.foldersByType ?? {};
+  const folders = Object.values(byType).flat();
+  return folders.find((folder) => folder.folderId === id)?.name ?? null;
+}
+
+function goBack(sid: Sid): void {
+  const entry = cameFrom.get(sid);
+  if (!entry) return;
+  cameFrom.delete(sid);
+  void openChat({ sid: entry.from }).then(
+    () => focusEntry(),
+    () => undefined,
+  );
+}
+
 const approvalsHost: AssistantApprovalsHost = {
+  backTarget,
+  goBack,
+  folderName,
   pendingId: (sid) => store.state.sessions[sid]?.pendingApproval?.id ?? null,
   currentUser: () => vuex.state.userInfo?.email ?? "",
   sendAgain: (sid, id) => void assistantApprovals()?.sendAgain(sid, id),
@@ -1647,7 +1634,7 @@ watch(
     if (active && active !== document.body) return;
     const action = before
       ? root.value?.querySelector<HTMLElement>(
-          `[data-approval-id="${CSS.escape(before)}"] :is(a, button)`,
+          `[data-approval-id="${CSS.escape(before)}"] :is([data-approval-line], a, button:not([data-approval-back]))`,
         )
       : null;
     if (action) action.focus();
@@ -1693,12 +1680,6 @@ watch(
     if (restoredText !== null && text !== restoredText) dismissedRefusal.value = toRaw(turn);
   },
 );
-
-function dismissDisclosure(): void {
-  disclosureDismissed.value = true;
-  const key = store.state.userOrgKey;
-  if (key) markHintSeen(key, "disclosure");
-}
 
 function recordKeydown(): void {
   noteAssistantKeydown();

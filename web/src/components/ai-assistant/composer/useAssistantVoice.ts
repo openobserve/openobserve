@@ -25,6 +25,7 @@ import {
 } from "vue";
 
 import {
+  HOLD_MS,
   markHintSeen,
   readHints,
   readVoiceOptIn,
@@ -34,7 +35,6 @@ import {
   writeVoiceOptIn,
   type Sid,
 } from "@/composables/assistant";
-import { HOLD_MS } from "@/composables/assistant/shortcuts";
 import { getIntlLocale } from "@/locales";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { isMacOS } from "@/utils/keyboardShortcuts";

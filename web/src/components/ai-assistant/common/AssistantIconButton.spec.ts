@@ -43,7 +43,7 @@ describe("AssistantIconButton", () => {
   });
 
   it("maps sizes onto the OButton icon sizes", () => {
-    expect(mountButton().get("button").classes()).toContain("h-8");
+    expect(mountButton().get("button").classes()).toContain("h-7");
     expect(mountButton({ size: "toolbar" }).get("button").classes()).toContain("size-[1.875rem]");
   });
 

@@ -170,6 +170,19 @@ describe("AssistantShell states", () => {
     expect(starters).not.toHaveBeenCalled();
   });
 
+  it("keeps a chat and its draft on screen when access goes mid-session (D7 decision 1)", async () => {
+    const { wrapper, store, capability } = setup();
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+      messages: [{ role: "user", content: raw("why?") }],
+    });
+    store.setActive(sid);
+    capability.value = { ...capability.value, gate: "no_permission" };
+    await flushPromises();
+    expect(root(wrapper).attributes("data-state")).toBe("conversation");
+    expect(wrapper.find('[data-gate="no_permission"]').exists()).toBe(false);
+  });
+
   it("moves the locked sidebar to the full view's hero and closes the panel", async () => {
     openLockedPanel(null);
     const { wrapper, router } = setup({}, "no_permission");
@@ -513,29 +526,6 @@ describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
     expect(textarea.selectionStart).toBe(4);
   });
 
-  it("shows no ghost while the welcome lists the starters (D5 decision 11, PO A34)", async () => {
-    const { wrapper, store } = live();
-    store.createSession({
-      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
-    });
-    await flushPromises();
-    expect(wrapper.find('[data-test="assistant-ghost"]').exists()).toBe(false);
-  });
-
-  it("hands a Home starter's provenance to the composer's ghost prop (PO A26)", async () => {
-    (STARTER as { home?: true }).home = true;
-    const { wrapper, store } = live();
-    store.createSession({
-      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
-    });
-    await flushPromises();
-    delete (STARTER as { home?: true }).home;
-    expect(wrapper.findComponent({ name: "AssistantComposer" }).props("ghost")).toMatchObject({
-      text: "Why did errors spike?",
-      home: true,
-    });
-  });
-
   it("keeps chat A's draft on New chat, says so, and moves it only on Bring it here (CT-06 AC 5, S7, V6)", async () => {
     const { wrapper, store } = live();
     const first = store.createSession({
@@ -574,33 +564,6 @@ describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="assistant-composer-cleared"]').exists()).toBe(false);
     expect(store.state.sessions[next].composer.timeOverride?.period).toBe("1h");
-  });
-
-  it("shows the fuller disclosure once on the first attachment, with a named dismiss (CT-04 AC 5)", async () => {
-    const { wrapper, store } = live();
-    const sid = store.createSession({
-      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
-    });
-    store.addChip(sid, {
-      id: "r1",
-      kind: "log_row",
-      label: raw("Log row"),
-      sizeBytes: 3,
-      provenance: "door",
-      sent: "serialized",
-    });
-    await flushPromises();
-    const banner = wrapper.get('[data-test="assistant-context-disclosure-banner"]');
-    expect(banner.text()).toContain(
-      "Attached data is sent to the assistant and saved with this chat.",
-    );
-    const dismiss = wrapper.get('[data-test="assistant-context-disclosure-dismiss"]');
-    expect(dismiss.attributes("aria-label")).toBe("Dismiss the data notice");
-    await dismiss.trigger("click");
-    expect(wrapper.find('[data-test="assistant-context-disclosure-banner"]').exists()).toBe(false);
-    expect(JSON.parse(localStorage.getItem("o2.assistant.hints:k1") ?? "{}")).toEqual({
-      disclosure: true,
-    });
   });
 });
 
@@ -723,27 +686,11 @@ describe("WP-06 conversation wiring", () => {
     );
   });
 
-  it("counts retry_after from the refusal's own end, so a remounted shell keeps the deadline (V6)", async () => {
-    const first = live({ state: "refused", error: RATE_LIMITED });
-    first.store.state.sessions[first.sid].turnMeta.endedAt = Date.now() - 10_000;
+  it("leaves a counted refusal to the composer's own row", async () => {
+    const { wrapper, store, sid } = live({ state: "refused", error: RATE_LIMITED });
+    store.state.sessions[sid].turnMeta.endedAt = Date.now() - 10_000;
     await flushPromises();
-    const label = (w: typeof first.wrapper) =>
-      w.get('[data-test="assistant-turn-outcome-action"]').text();
-    expect(label(first.wrapper)).toMatch(/^Retry in 20 s/);
-    first.wrapper.unmount();
-    const again = mount(AssistantShell, {
-      props: { placement: "sidebar" },
-      slots: { composer: '<div data-test="assistant-composer">composer</div>' },
-      global: {
-        plugins: [
-          fakeRouter([{ path: "/close-tab", name: "closeTab", component: {} }]),
-          fakeVuex(),
-        ],
-      },
-      attachTo: document.body,
-    });
-    await flushPromises();
-    expect(label(again)).toMatch(/^Retry in 20 s/);
+    expect(wrapper.find('[data-test="assistant-turn-outcome"]').exists()).toBe(false);
   });
 
   it("opens the running chats from a member's run-limit refusal", async () => {
@@ -1093,7 +1040,7 @@ describe("AssistantShell decision cards", () => {
     });
   });
 
-  it("keeps Review request in the strip while a card waits, and it lands on Deny", async () => {
+  it("keeps Review request in the strip while a card waits, and it lands on the heading", async () => {
     const { wrapper } = await mountWithCard();
     const close = wrapper.get('[data-test="assistant-shell-close"]').element as HTMLElement;
     close.focus();
@@ -1104,10 +1051,35 @@ describe("AssistantShell decision cards", () => {
     await review.trigger("click");
     await flushPromises();
     expect(document.activeElement).toBe(
-      wrapper.get('[data-test="assistant-approval-deny"]').element,
+      wrapper.get('[data-test="assistant-approval-card"] h3').element,
     );
     // It never leaves while the card waits, so the strip cannot shift under a pointer.
     expect(wrapper.find('[data-test="assistant-strip-review"]').exists()).toBe(true);
+  });
+
+  it("leads back from a request reached from another chat, under its record alone", async () => {
+    const { wrapper, store, sid } = await mountWithCard();
+    const other = store.createSession({ origin: ORIGIN, thread: "new" });
+    store.state.sessions[other].title = "p95 by route";
+    store.setActive(other);
+    await flushPromises();
+    store.setActive(sid);
+    await flushPromises();
+    const decide = vi.spyOn(store, "openSession").mockResolvedValue(other);
+    const session = store.state.sessions[sid];
+    const id = session.pendingApproval!.id;
+    session.pendingApproval = null;
+    session.messages[1].contentBlocks!.push({
+      type: "approval_result",
+      resolved: { id, approved: false },
+    });
+    await flushPromises();
+    const back = wrapper.get('[data-test="assistant-approval-result-back"]');
+    expect(back.text()).toBe("Back to p95 by route");
+    expect(document.activeElement?.hasAttribute("data-approval-back")).toBe(false);
+    await back.trigger("click");
+    await flushPromises();
+    expect(decide).toHaveBeenCalledWith({ sid: other }, { focus: true });
   });
 
   it("shows the waiting line with Stop where another tab holds the card", async () => {

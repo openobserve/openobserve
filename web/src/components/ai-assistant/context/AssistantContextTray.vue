@@ -125,9 +125,6 @@ import AssistantChipPopover from "./AssistantChipPopover.vue";
 import AssistantContextChip from "./AssistantContextChip.vue";
 import AssistantTimePrefix from "./AssistantTimePrefix.vue";
 
-// The shell still binds the pre-redesign layout props, which would land on the root as attributes.
-defineOptions({ inheritAttrs: false });
-
 const props = defineProps<AssistantContextTrayProps>();
 
 const { t } = useI18nTyped();

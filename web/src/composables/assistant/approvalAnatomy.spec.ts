@@ -18,8 +18,11 @@ import { describe, expect, it } from "vitest";
 import {
   approvalDiff,
   approvalEditor,
+  approvalFolderId,
   approvalName,
+  approvalNotifies,
   approvalObjectId,
+  approvalUntil,
   approvalVerb,
   isApprovalChange,
 } from "./approvalAnatomy";
@@ -43,6 +46,34 @@ describe("approvalVerb", () => {
     expect(approvalVerb(approvalOf({ tool: "bash" }))).toBeNull();
     expect(approvalVerb(pause({ alert_id: "a1" }))).toBeNull();
     expect(isApprovalChange(approvalOf({ tool: "acme", args: { command: "x" } }))).toBe(false);
+  });
+});
+
+describe("the tool arguments a card reads", () => {
+  const mute = (args: Record<string, unknown>) => pause(args, "o2_MuteAlert");
+
+  it("reads a mute as pause, ending at ends_at in microseconds or minutes from now", () => {
+    const body = { all_groups: true, until_clear: false, minutes: 30 };
+    expect(approvalVerb(mute({ alert_id: "a1", request_body: body }))).toBe("pause");
+    expect(approvalUntil(mute({ request_body: body }), 1_000)).toBe(1_000 + 30 * 60_000);
+    expect(approvalUntil(mute({ ends_at: 1_800_000_000_000_000 }))).toBe(1_800_000_000_000);
+  });
+
+  it("names no end for an until-clear mute or a plain disable", () => {
+    expect(approvalUntil(mute({ request_body: { until_clear: true } }))).toBeNull();
+    expect(approvalUntil(pause({ alert_id: "a1", value: false }))).toBeNull();
+  });
+
+  it("takes the folder id from the query or the body", () => {
+    expect(approvalFolderId(pause({ folder: "f1" }))).toBe("f1");
+    expect(approvalFolderId(mute({ request_body: { folder_id: "f2" } }))).toBe("f2");
+    expect(approvalFolderId(pause({}))).toBeNull();
+  });
+
+  it("names an alert's destinations and leaves out what is not a name", () => {
+    expect(approvalNotifies(pause({ request_body: { destinations: ["a", "b"] } }))).toBe("a, b");
+    expect(approvalNotifies(pause({ request_body: { destinations: [{}] } }))).toBeNull();
+    expect(approvalNotifies(pause({}))).toBeNull();
   });
 });
 

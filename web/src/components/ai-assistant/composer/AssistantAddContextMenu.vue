@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('assistant.composer.addContext')"
         :icon="assistantGlyph.addContext"
         :no-tooltip="open"
-        class="h-7! w-7!"
         data-test="assistant-add-context"
       >
         <template #tooltip>{{ t("assistant.composer.addContextTip") }}</template>

@@ -82,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="text"
               :label="t('assistant.welcome.launcher.clear')"
               :icon="assistantGlyph.close"
-              class="h-7! w-7!"
               data-test="assistant-launcher-clear"
               @click="clear"
             />
@@ -97,7 +96,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <AssistantIconButton
                   :label="t('assistant.context.title')"
                   :icon="assistantGlyph.info"
-                  class="h-7! w-7!"
                   data-test="assistant-launcher-sees"
                 />
               </template>
@@ -218,12 +216,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="row.status"
                   variant="meta"
                   :class="[
+                    chatStatusClass(row.status, false),
                     'group-hover:text-text-body shrink-0',
-                    row.status === 'needs_you' ? 'text-status-warning-text' : '',
                   ]"
                   data-test="assistant-launcher-recent-status"
                 >
-                  {{ t(CHAT_STATUS_KEYS[row.status]) }}
+                  {{ chatStatusWord(row.status, row.expiresAt, clock, t) }}
                 </OText>
                 <OText
                   v-else-if="row.at"
@@ -267,7 +265,7 @@ export function launcherState(gate: string): "loading" | "gate" | "ready" | null
 </script>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, useId } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -275,8 +273,9 @@ import { provideAssistantSurface } from "@/components/ai-assistant/common/assist
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import {
-  CHAT_STATUS_KEYS,
+  chatStatusClass,
   chatStatusOf,
+  chatStatusWord,
   inProgressFirst,
   isInProgress,
 } from "@/components/ai-assistant/history/chatStatus";
@@ -291,6 +290,7 @@ import {
   useAssistantCapability,
   useAssistantHistory,
   useAssistantName,
+  useAssistantRuns,
   useAssistantStarters,
   useAssistantStore,
   type ComposerState,
@@ -345,10 +345,13 @@ const window = computed(() => timeWindowOf(null, timeOverride.value));
 
 const history = useAssistantHistory();
 const recentRows = history.recent(RECENT_LOOKUP);
+const runs = useAssistantRuns();
+const runBySid = computed(() => new Map(runs.rows.value.map((row) => [row.sid, row])));
 const recent = computed(() =>
   inProgressFirst(
     recentRows.value.map((row) => ({
       sid: row.sid,
+      expiresAt: runBySid.value.get(row.sid)?.expiresAt ?? null,
       title: row.title,
       status: chatStatusOf(row, assistant.state.sessions[row.sid]?.turn.state),
       at: row.updatedAt ? raw(formatRelative(row.updatedAt)) : null,
@@ -359,6 +362,21 @@ const recent = computed(() =>
 const recentFailed = computed(() => history.listState.value.status === "error");
 const hasInProgress = computed(() => recent.value.some((row) => isInProgress(row.status)));
 onMounted(() => history.ensureLoaded());
+
+// Only a waiting row with a known end counts down, so the clock runs only then.
+const clock = ref(Date.now());
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+watch(
+  () => recent.value.some((row) => row.status === "needs_you" && row.expiresAt !== null),
+  (counting) => {
+    if (clockTimer) clearInterval(clockTimer);
+    clockTimer = counting ? setInterval(() => (clock.value = Date.now()), 1_000) : null;
+  },
+  { immediate: true },
+);
+onBeforeUnmount(() => {
+  if (clockTimer) clearInterval(clockTimer);
+});
 
 function onKeydown(event: KeyboardEvent): void {
   if (event.isComposing || event.keyCode === 229) return;

@@ -60,11 +60,7 @@ const PLACEMENT_FIELDS: ReadonlySet<string> = new Set([
 
 const ENABLED_FIELDS = ["value", "enabled", "enable"] as const;
 
-const UNTIL_FIELDS = ["paused_until", "until", "end_time", "expires_at"] as const;
-
-const SCOPE_FIELDS = ["folder_name", "folder", "team", "scope"] as const;
-
-const NOTIFY_FIELDS = ["notifies", "notify", "destinations", "channels"] as const;
+const MUTE_TOOL = /mutealert$/;
 
 // Entity types with an in-app editor that opens one object by id.
 const EDITOR_ROUTES: Readonly<
@@ -76,17 +72,19 @@ const EDITOR_ROUTES: Readonly<
   }),
 };
 
-/** The verb of a card: a toggle tool reads as pause or resume, a typed change as its kind. */
+/** The verb of a card: a toggle tool reads as pause or resume, a mute as pause, a typed change as its kind. */
 export function approvalVerb(card: Card): ApprovalVerb | null {
   const toggle = toggleOf(card);
   if (toggle) return toggle.enabled ? "resume" : "pause";
+  if (MUTE_TOOL.test(normalTool(card.tool))) return "pause";
   if (card.kind === "create" || card.kind === "update" || card.kind === "delete") return card.kind;
   return null;
 }
 
 /** The entity a toggle tool acts on, when the targets do not say. */
 export function approvalToolEntity(card: Pick<ApprovalBlockData, "tool">): string | null {
-  return normalTool(card.tool).match(TOGGLE_TOOL)?.[1] ?? null;
+  const tool = normalTool(card.tool);
+  return MUTE_TOOL.test(tool) ? "alert" : (tool.match(TOGGLE_TOOL)?.[1] ?? null);
 }
 
 /** The changed object's name: the target's, else the request body's; `null` when the card has none. */
@@ -154,39 +152,35 @@ export function approvalEditor(
   return { type, route: open(id, approvalName(card) ?? "", org) };
 }
 
-/** When the change ends, epoch ms, from the argument that says so; `null` for a change with no end. */
-export function approvalUntil(card: Pick<Card, "args">): number | null {
-  const sources = [card.args, recordOf(card.args?.request_body)];
-  for (const source of sources)
-    for (const key of UNTIL_FIELDS) {
-      const value = source?.[key];
-      if (typeof value === "number" && value > 0) return epochMsOfWire(value);
-      const parsed = typeof value === "string" ? Date.parse(value) : Number.NaN;
-      if (!Number.isNaN(parsed)) return parsed;
-    }
+/** When a change ends, epoch ms: MuteAlert's `ends_at` or `minutes` counted from `from`; `null` when no time is named. */
+export function approvalUntil(card: Pick<Card, "args">, from = Date.now()): number | null {
+  for (const source of argSources(card)) {
+    const ends = source?.ends_at;
+    if (typeof ends === "number" && ends > 0) return epochMsOfWire(ends);
+    const minutes = source?.minutes;
+    if (typeof minutes === "number" && minutes > 0) return from + minutes * 60_000;
+  }
   return null;
 }
 
-/** The folder or team the change sits in, for the card's meta; `null` when the card names none. */
-export function approvalScopeName(card: Pick<Card, "args">): string | null {
-  const sources = [card.args, recordOf(card.args?.request_body)];
-  for (const source of sources)
-    for (const key of SCOPE_FIELDS) {
+/** The folder id a change sits in; the wire has no folder name, so the shell resolves it. */
+export function approvalFolderId(card: Pick<Card, "args">): string | null {
+  for (const source of argSources(card))
+    for (const key of ["folder", "folder_id"]) {
       const value = source?.[key];
       if (typeof value === "string" && value.trim()) return value;
     }
   return null;
 }
 
-/** Who the change notifies, shown in Details; `null` when the card names nobody. */
+/** Who an alert change notifies, shown in Details; `null` when the card names nobody. */
 export function approvalNotifies(card: Pick<Card, "args">): string | null {
-  const sources = [card.args, recordOf(card.args?.request_body)];
-  for (const source of sources)
-    for (const key of NOTIFY_FIELDS) {
-      const value = source?.[key];
-      if (typeof value === "string" && value.trim()) return value;
-      if (Array.isArray(value) && value.length) return value.map(String).join(", ");
-    }
+  for (const source of argSources(card)) {
+    const value = source?.destinations;
+    if (!Array.isArray(value) || !value.length) continue;
+    const names = value.filter((entry) => typeof entry === "string");
+    return names.join(", ") || null;
+  }
   return null;
 }
 
@@ -213,6 +207,11 @@ function toggleOf(card: Pick<ApprovalBlockData, "tool" | "args">): { enabled: bo
 function epochMsOfWire(value: number): number {
   if (value > 1e14) return Math.round(value / 1000);
   return value < 1e12 ? value * 1000 : value;
+}
+
+// A tool's arguments sit at the top level or, for a write, under `request_body`.
+function argSources(card: Pick<Card, "args">): (Record<string, unknown> | null | undefined)[] {
+  return [card.args, recordOf(card.args?.request_body)];
 }
 
 function normalTool(tool: string): string {

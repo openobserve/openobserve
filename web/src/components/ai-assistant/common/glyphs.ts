@@ -59,7 +59,7 @@ export const assistantGlyph = {
   addContext: "add",
   dictate: "mic",
   dictateOff: "mic-off",
-  send: "send",
+  send: "arrow-upward",
   stop: "stop",
   jumpToLatest: "arrow-downward",
   notReadHelp: "help-outline",

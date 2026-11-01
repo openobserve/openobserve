@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 import { approvalClock, type HistoryRow } from "@/composables/assistant";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 
@@ -26,21 +25,6 @@ const STATUS_WORDS: Record<ChatStatus, I18nKey> = {
   failed: "assistant.history.state.failed",
   expired: "assistant.history.state.expired",
   draft: "assistant.history.state.draft",
-};
-
-/** Home's launcher row keeps its own word for a waiting chat. */
-export const CHAT_STATUS_KEYS: Record<ChatStatus, I18nKey> = {
-  ...STATUS_WORDS,
-  needs_you: "assistant.history.state.needsApproval",
-};
-
-/** Home's launcher row still draws a mark beside the word. */
-export const CHAT_STATUS_SIGNAL: Record<ChatStatus, AssistantSignal> = {
-  needs_you: "attention",
-  answering: "working",
-  failed: "failed",
-  expired: "failed",
-  draft: "unread",
 };
 
 const WORD_CLASSES: Partial<Record<ChatStatus, string>> = {

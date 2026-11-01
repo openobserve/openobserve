@@ -78,14 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AssistantIconButton
           :label="t('assistant.window.minimise')"
           :icon="assistantGlyph.minimise"
-          size="xs"
           data-test="assistant-window-minimise"
           @click="emit('minimise', 'button')"
         />
         <AssistantIconButton
           :label="t('assistant.tray.close', { title: raw(titleText) })"
           :icon="assistantGlyph.close"
-          size="xs"
           data-test="assistant-window-close"
           @click="emit('close')"
         />

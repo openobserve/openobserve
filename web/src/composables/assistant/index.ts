@@ -56,6 +56,7 @@ export type { ElsewhereView } from "./historyElsewhere";
 export { LOCAL_CAP } from "./historyDb";
 export { useChatExport } from "./useChatExport";
 export {
+  HOLD_MS,
   assistantFocusCard,
   assistantGoToAnswer,
   historyTargetAbove,

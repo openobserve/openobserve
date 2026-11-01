@@ -294,7 +294,7 @@ function valueText(value: unknown): string {
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
@@ -319,7 +319,7 @@ import {
   approvalNoun,
   approvalNotifies,
   approvalObjectId,
-  approvalScopeName,
+  approvalFolderId,
   approvalTargetHref,
   approvalUntil,
   approvalVerb,
@@ -340,7 +340,11 @@ import { formatOrgTime } from "@/utils/formatters";
 
 import AssistantPlanBlock from "./AssistantPlanBlock.vue";
 import { lowerFirst } from "./approvalText";
-import type { ApprovalCardDecision, ApprovalCardView } from "./approvals.types";
+import {
+  assistantApprovalsHostKey,
+  type ApprovalCardDecision,
+  type ApprovalCardView,
+} from "./approvals.types";
 
 /** The first targets listed; the rest are counted. */
 const FIRST_TARGETS = 5;
@@ -427,6 +431,8 @@ const groupName = computed(() =>
 );
 const nothingSelected = computed(() => planned.value && count.value === 0);
 
+const approvalsHost = inject(assistantApprovalsHostKey, null);
+
 // The composer takes over while the reader writes a reply or their own answer.
 const replying = computed(() => isReplyingTo(props.card.sessionId, props.card.id));
 
@@ -501,7 +507,8 @@ const nameUnknown = computed<I18nText | null>(() => {
 
 const endAndScope = computed<I18nText | null>(() => {
   const until = approvalUntil(props.card);
-  const name = approvalScopeName(props.card);
+  const folder = approvalFolderId(props.card);
+  const name = folder ? (approvalsHost?.folderName?.(folder) ?? null) : null;
   const time = until === null ? null : raw(formatOrgTime(until));
   if (time && name) return t("assistant.approval.meta", { time, scope: raw(name) });
   if (time) return t("assistant.approval.metaUntil", { time });

@@ -143,13 +143,6 @@ describe("AssistantContextTray", () => {
     expect(labels()).toEqual(["Log row · cart · 13:57"]);
   });
 
-  it("lands on no shell prop as a DOM attribute", async () => {
-    const { wrapper } = await setup({ collapsed: true, framed: true, visible: true });
-    const root = wrapper.get('[data-test="assistant-context-tray"]');
-    expect(root.attributes("framed")).toBeUndefined();
-    expect(root.attributes("visible")).toBeUndefined();
-  });
-
   it("removes a staged chip with Delete and moves focus to the next chip (CT-08 AC 4)", async () => {
     const { wrapper, store, sid } = await setup();
     store.addChip(sid, ROW);

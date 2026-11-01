@@ -155,7 +155,7 @@ export {
   approvalEditor,
   approvalToolEntity,
   approvalNotifies,
-  approvalScopeName,
+  approvalFolderId,
   approvalUntil,
   approvalName,
   approvalObjectId,

@@ -94,7 +94,6 @@ function setup(props: Partial<AssistantComposerProps> = {}, withSession = true) 
   return { wrapper, store, sid: sid!, send, textarea, status, host };
 }
 
-// The ghost is a follow-up, so it needs a chat that has left the welcome.
 async function answered(store: ReturnType<typeof setup>["store"], sid: string): Promise<void> {
   store.state.sessions[sid].messages.push({ role: "assistant", content: "Done" });
   await flushPromises();
@@ -232,6 +231,20 @@ describe("refused sends (§1)", () => {
     await vi.advanceTimersByTimeAsync(2_000);
     expect(row().exists()).toBe(false);
     expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBeUndefined();
+  });
+
+  it("keeps the draft, locks Send and the mic, and says why when access is lost mid-session", async () => {
+    const { wrapper, store, sid, send } = setup({ accessLost: true });
+    store.setDraft(sid, { text: "Why did cart start returning 503?" });
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-composer-helper"]').text()).toBe(
+      "You can read your chats. Starting or continuing one needs AI access.",
+    );
+    expect(wrapper.find('[data-test="assistant-composer-ask-admin"]').exists()).toBe(true);
+    expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBe("true");
+    expect(wrapper.get("textarea").element.value).toBe("Why did cart start returning 503?");
+    await wrapper.get("textarea").trigger("keydown", { key: "Enter" });
+    expect(send).not.toHaveBeenCalled();
   });
 
   it("says the message wasn't sent when the service isn't reachable; Send is the retry", async () => {
@@ -429,6 +442,37 @@ describe("states (`40` §1.3)", () => {
     );
   });
 
+  it("words the composer for a question's own answer", async () => {
+    const { store, sid, wrapper } = setup();
+    store.state.sessions[sid].pendingApproval = { id: "q1", kind: "question" } as PendingApproval;
+    store.startReply(sid, "q1");
+    store.setDraft(sid, { text: "staging" });
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-composer-reply"]').text()).toContain(
+      "Answering the question above",
+    );
+    expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-label")).toBe(
+      "Send answer",
+    );
+  });
+
+  it("returns focus to Reply on Cancel", async () => {
+    const { store, sid, wrapper } = setup();
+    const shell = document.createElement("div");
+    shell.setAttribute("data-assistant-root", "");
+    document.body.append(shell);
+    shell.append(wrapper.element);
+    store.state.sessions[sid].pendingApproval = { id: "c1" } as PendingApproval;
+    store.startReply(sid, "c1");
+    await flushPromises();
+    const reply = document.createElement("button");
+    reply.setAttribute("data-test", "assistant-approval-reply");
+    shell.append(reply);
+    await wrapper.get('[data-test="assistant-composer-reply-cancel"]').trigger("click");
+    await flushPromises();
+    expect(document.activeElement).toBe(reply);
+  });
+
   it("leaves Reply with Cancel or Escape, the draft back and nothing sent", async () => {
     const { store, sid, textarea, wrapper } = setup();
     const session = store.state.sessions[sid];
@@ -546,56 +590,7 @@ describe("keys (`40` §1.4, CT-09)", () => {
   });
 });
 
-describe("ghost and prefill (IW-06, `70` §5)", () => {
-  const ghost = {
-    label: raw("Why errors?"),
-    text: "Why did errors spike?",
-    chips: [ROW],
-    kind: "page" as const,
-  };
-
-  it("shows no ghost and takes no Right Arrow while the welcome is visible (PO A34)", async () => {
-    const { wrapper, textarea, store, sid } = setup({ ghost });
-    expect(wrapper.find('[data-test="assistant-ghost"]').exists()).toBe(false);
-    expect(textarea().attributes("aria-describedby")).toBeFalsy();
-    await textarea().trigger("keydown", { key: "ArrowRight" });
-    await flushPromises();
-    expect(store.state.sessions[sid].composer.text).toBe("");
-  });
-
-  it("accepts the ghost with Right Arrow, stages text and chips, sends nothing", async () => {
-    const { wrapper, textarea, store, sid, send, status } = setup({ ghost });
-    await answered(store, sid);
-    expect(wrapper.get('[data-test="assistant-ghost"]').text()).toBe('Try: "Why errors?"');
-    expect(textarea().attributes("aria-describedby")).toBeTruthy();
-    await textarea().trigger("keydown", { key: "ArrowRight" });
-    await flushPromises();
-    expect(store.state.sessions[sid].composer).toMatchObject({ text: "Why did errors spike?" });
-    expect(store.state.sessions[sid].composer.homeStarter).toBeUndefined();
-    expect(store.state.sessions[sid].composer.chips.map((c: ContextChip) => c.id)).toEqual([
-      "row-1",
-    ]);
-    expect(send).not.toHaveBeenCalled();
-    expect(status()).toBe("Suggestion inserted");
-    expect(wrapper.find('[data-test="assistant-ghost"]').exists()).toBe(false);
-    expect(trackAssistant).toHaveBeenCalledWith("ai_welcome_starter", {
-      starter_kind: "page",
-      index: 0,
-      via: "ghost",
-    });
-  });
-
-  it("accepts a Home starter's ghost with its provenance (PO A26)", async () => {
-    const { textarea, store, sid } = setup({ ghost: { ...ghost, home: true } });
-    await answered(store, sid);
-    await textarea().trigger("keydown", { key: "ArrowRight" });
-    await flushPromises();
-    expect(store.state.sessions[sid].composer).toMatchObject({
-      text: "Why did errors spike?",
-      homeStarter: true,
-    });
-  });
-
+describe("prefill (IW-06, `70` §5)", () => {
   it("asks Replace · Append · Cancel over a long draft, and Cancel keeps it", async () => {
     const { wrapper, textarea, store, sid } = setup();
     const long = "x".repeat(PREFILL_CHOICE_CHARS + 1);
@@ -874,16 +869,6 @@ describe("round 2 (U7–U9, U12, U16, U18–U19, F5, F8)", () => {
     expect(wrapper.find('[data-test="assistant-composer-cleared"]').exists()).toBe(true);
     await type(textarea(), "a new question");
     expect(wrapper.find('[data-test="assistant-composer-cleared"]').exists()).toBe(false);
-  });
-
-  it("names the ghost button by its visible text and keeps the hint in the textbox description (U12)", async () => {
-    const { wrapper, textarea, store, sid } = setup({
-      ghost: { label: raw("Why errors?"), text: "Why errors?", chips: [] },
-    });
-    await answered(store, sid);
-    expect(wrapper.get('[data-test="assistant-ghost"]').attributes("aria-label")).toBeUndefined();
-    const hintId = textarea().attributes("aria-describedby")!.split(" ").at(-1)!;
-    expect(document.getElementById(hintId)?.textContent).toContain("Press Right Arrow to use it");
   });
 
   it("gives the informative placeholder secondary-text contrast (U16)", () => {

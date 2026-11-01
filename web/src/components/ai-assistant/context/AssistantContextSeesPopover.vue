@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AssistantIconButton
           :label="t('assistant.context.title')"
           :icon="assistantGlyph.info"
-          class="h-7! w-7!"
           data-test="assistant-context-sees"
         />
       </slot>

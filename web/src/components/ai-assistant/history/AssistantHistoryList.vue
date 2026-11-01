@@ -80,7 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AssistantIconButton
             :label="t('assistant.history.listMenu')"
             :icon="assistantGlyph.more"
-            size="xs"
             data-test="assistant-history-list-menu"
           />
         </template>

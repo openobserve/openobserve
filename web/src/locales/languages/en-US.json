@@ -9549,6 +9549,7 @@
       "recallHint": "↑ recalls your last prompt | ↑ recalls your last {count} prompts",
       "recentPrompts": "Recent prompts",
       "removeImage": "Remove {name}",
+      "noAccess": "You can read your chats. Starting or continuing one needs AI access.",
       "replyHelper": "Reply declines the request",
       "replyPlaceholder": "Reply to the assistant",
       "running": "Wait for this answer to finish, or stop it.",
@@ -9621,7 +9622,6 @@
       "dataSharing": "Data sharing · {level}",
       "disclosure": "Attached data is sent to the assistant and saved with this chat.",
       "seesDisclosure": "Sent to the assistant and saved with this chat.",
-      "disclosureDismiss": "Dismiss the data notice",
       "disclosureLine": "Sends the chips and this page's time range",
       "disclosureShared": "Attached data is sent to the assistant, saved with this chat and included in any share.",
       "fewer": "Fewer chips",
@@ -10027,8 +10027,7 @@
       },
       "run_limit_member": {
         "action": "Show running chats",
-        "body": "Stop one, or send when one ends.",
-        "title": "{n} of your chats are running or waiting for you. Your message wasn't sent."
+        "title": "{n} chats are running or waiting for you. Your message wasn't sent."
       },
       "run_limit_org": {
         "action": "Retry",
@@ -10575,7 +10574,6 @@
         "draft": "Draft",
         "expired": "Expired",
         "failed": "Failed",
-        "needsApproval": "Needs your approval",
         "needsYou": "Needs you"
       },
       "storageBlocked": "Couldn't save to this browser. Private windows and full storage block history.",
@@ -11489,8 +11487,6 @@
       "language": "Dictation isn't available in {language}, your browser language."
     },
     "welcome": {
-      "ghostHint": "Suggestion: {label}. Press Right Arrow to use it.",
-      "ghostInserted": "Suggestion inserted",
       "lastRange": "last {period}",
       "launcher": {
         "ask": "Ask",
@@ -11565,8 +11561,7 @@
           "1Generic": "Which services had the slowest spans recently?"
         }
       },
-      "suggestions": "Suggestions",
-      "try": "Try: \"{prompt}\""
+      "suggestions": "Suggestions"
     },
     "rca": {
       "tag": "Incident analysis",
@@ -11645,12 +11640,14 @@
       }
     },
     "question": {
+      "answerHint": "Answering the question above",
       "needsAnswer": "Needs your answer: {question}",
       "otherAnswer": "Other answer",
       "record": {
         "answered": "Answered: {choice}",
         "expired": "Question expired. Nothing was changed."
-      }
+      },
+      "sendAnswer": "Send answer"
     },
     "send": {
       "unreachable": "Isn't reachable. Your message wasn't sent."
