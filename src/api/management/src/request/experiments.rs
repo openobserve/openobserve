@@ -408,16 +408,18 @@ async fn require_experiment_visibility(
 
 /// The objects an Experiment reads besides itself, as `(resource, id)`.
 ///
-/// A run returns the Dataset's rows, renders the Prompt's text and spends
-/// through the Provider's key, so the caller must be able to read each one. A
-/// Remote Task is added by the caller once its reference is resolved: its
-/// OpenFGA object is the head's `entity_id`, not the `name@version` the
-/// Experiment carries.
+/// A run returns the Dataset's rows, renders the Prompt's text, runs the
+/// Scorers and spends through the Provider's key, so the caller must be able to
+/// read each one. A Remote Task is added by the caller once its reference is
+/// resolved: its OpenFGA object is the head's `entity_id`, not the
+/// `name@version` the Experiment carries.
 fn referenced_objects<'a>(
     dataset_id: &'a str,
+    scorer_ids: &[&'a str],
     task: &'a ExperimentTaskConfig,
 ) -> Vec<(&'static str, &'a str)> {
     let mut objects = vec![("datasets", dataset_id)];
+    objects.extend(scorer_ids.iter().map(|id| ("scorers", *id)));
     if let Some((prompt_id, ..)) = task.prompt_ref() {
         objects.push(("prompts", prompt_id));
     }
@@ -433,6 +435,7 @@ async fn require_reference_access(
     org_id: &str,
     user_id: &str,
     dataset_id: &str,
+    scorer_ids: &[&str],
     task: &ExperimentTaskConfig,
 ) -> Result<(), Response> {
     // An unresolvable Remote Task reference is answered as a denial rather than
@@ -445,11 +448,13 @@ async fn require_reference_access(
         ),
         None => None,
     };
-    let mut objects = referenced_objects(dataset_id, task);
+    let mut objects = referenced_objects(dataset_id, scorer_ids, task);
     if let Some(remote_task) = &remote_task {
         objects.push(("remote_tasks", remote_task.entity_id.as_str()));
     }
     for (resource, id) in objects {
+        // Trimmed as the service trims the ids it resolves.
+        let id = id.trim();
         // One check per object, as the `GET /{resource}/{id}` routes make it:
         // the permitted-object list is skipped when list filtering is off.
         if !check_permissions(
@@ -477,7 +482,7 @@ async fn require_reference_access(
     responses(
         (status = 200, body = inline(ExperimentPreviewResponseBody)),
         (status = 400, description = "Invalid Experiment definition", body = ()),
-        (status = 403, description = "A referenced Dataset, Prompt, Provider or Remote Task is not accessible", body = ()),
+        (status = 403, description = "A referenced Dataset, Scorer, Prompt, Provider or Remote Task is not accessible", body = ()),
         (status = 404, description = "Dataset or scorer not found", body = ()),
     ),
 )]
@@ -488,8 +493,15 @@ pub async fn preview_experiment(
     axum::Json(body): axum::Json<CreateExperimentRequestBody>,
 ) -> Response {
     let input: experiments::CreateExperiment = body.into();
-    if let Err(response) =
-        require_reference_access(&org_id, &user.user_id, &input.dataset_id, &input.task).await
+    let scorer_ids: Vec<&str> = input.scorers.iter().map(|s| s.id.as_str()).collect();
+    if let Err(response) = require_reference_access(
+        &org_id,
+        &user.user_id,
+        &input.dataset_id,
+        &scorer_ids,
+        &input.task,
+    )
+    .await
     {
         return response;
     }
@@ -510,7 +522,7 @@ pub async fn preview_experiment(
     responses(
         (status = 200, body = inline(CreateExperimentResponseBody)),
         (status = 400, description = "Invalid Experiment definition", body = ()),
-        (status = 403, description = "A referenced Dataset, Prompt, Provider or Remote Task is not accessible", body = ()),
+        (status = 403, description = "A referenced Dataset, Scorer, Prompt, Provider or Remote Task is not accessible", body = ()),
         (status = 409, description = "Idempotency conflict", body = ()),
         (status = 412, description = "Cost estimate is above the warning threshold and was not confirmed", body = ()),
     ),
@@ -530,8 +542,15 @@ pub async fn create_experiment(
         }
     };
     let input: experiments::CreateExperiment = body.into();
-    if let Err(response) =
-        require_reference_access(&org_id, &user.user_id, &input.dataset_id, &input.task).await
+    let scorer_ids: Vec<&str> = input.scorers.iter().map(|s| s.id.as_str()).collect();
+    if let Err(response) = require_reference_access(
+        &org_id,
+        &user.user_id,
+        &input.dataset_id,
+        &scorer_ids,
+        &input.task,
+    )
+    .await
     {
         return response;
     }
@@ -1447,7 +1466,7 @@ pub async fn retry_experiment_slot(
     responses(
         (status = 200, description = "Pending clone created", body = ExperimentResponseBody),
         (status = 400, description = "Invalid Experiment definition after overrides", body = ()),
-        (status = 403, description = "A referenced Dataset, Prompt, Provider or Remote Task is not accessible", body = ()),
+        (status = 403, description = "A referenced Dataset, Scorer, Prompt, Provider or Remote Task is not accessible", body = ()),
         (status = 404, description = "Experiment, Dataset or scorer not found"),
         (status = 409, description = "Only sealed Experiments can be cloned, or the idempotency key describes a different clone"),
         (status = 412, description = "Cost estimate is above the warning threshold and was not confirmed", body = ()),
@@ -1458,14 +1477,19 @@ pub async fn clone_experiment(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CloneExperimentRequestBody>,
 ) -> Response {
-    // The clone pins whatever it ends up referencing: the source's Dataset and
-    // task where the request overrides nothing, the override's where it does.
-    // Checking only at create would leave clone as the way around that check.
+    // The clone pins whatever it ends up referencing: the source's Dataset,
+    // Scorers and task where the request overrides nothing, the override's
+    // where it does. Checking only at create would leave clone as the way
+    // around that check.
     let source = match experiments::get(&org_id, &experiment_id).await {
         Ok(source) => source,
         Err(error) => return experiment_error_response(error),
     };
     let overrides: experiments::CloneExperimentOverrides = body.into();
+    let scorer_ids: Vec<&str> = match &overrides.scorers {
+        Some(scorers) => scorers.iter().map(|s| s.id.as_str()).collect(),
+        None => source.scorers.iter().map(|s| s.id.as_str()).collect(),
+    };
     if let Err(response) = require_reference_access(
         &org_id,
         &user.user_id,
@@ -1473,6 +1497,7 @@ pub async fn clone_experiment(
             .dataset_id
             .as_deref()
             .unwrap_or(&source.dataset_id),
+        &scorer_ids,
         overrides.task.as_ref().unwrap_or(&source.task),
     )
     .await
@@ -1789,7 +1814,7 @@ mod tests {
     /// would let an Experiment pin it without a permission check, and no other
     /// test would notice.
     #[test]
-    fn every_dataset_prompt_and_provider_an_experiment_reads_is_checked() {
+    fn every_dataset_scorer_prompt_and_provider_an_experiment_reads_is_checked() {
         let prompt_ref = ExperimentTaskConfig::PromptRef {
             id: "prompt-1".to_string(),
             version: 2,
@@ -1797,9 +1822,11 @@ mod tests {
             params_overrides: None,
         };
         assert_eq!(
-            referenced_objects("dataset-1", &prompt_ref),
+            referenced_objects("dataset-1", &["scorer-1", "scorer-2"], &prompt_ref),
             vec![
                 ("datasets", "dataset-1"),
+                ("scorers", "scorer-1"),
+                ("scorers", "scorer-2"),
                 ("prompts", "prompt-1"),
                 ("providers", "provider-1"),
             ]
@@ -1811,7 +1838,7 @@ mod tests {
             params: None,
         };
         assert_eq!(
-            referenced_objects("dataset-1", &inline),
+            referenced_objects("dataset-1", &[], &inline),
             vec![("datasets", "dataset-1"), ("providers", "provider-1")]
         );
         let remote = ExperimentTaskConfig::Remote {
@@ -1819,7 +1846,7 @@ mod tests {
             overrides: None,
         };
         assert_eq!(
-            referenced_objects("dataset-1", &remote),
+            referenced_objects("dataset-1", &[], &remote),
             vec![("datasets", "dataset-1")]
         );
         let sdk = ExperimentTaskConfig::Sdk {
@@ -1827,7 +1854,7 @@ mod tests {
             config: serde_json::json!({}),
         };
         assert_eq!(
-            referenced_objects("dataset-1", &sdk),
+            referenced_objects("dataset-1", &[], &sdk),
             vec![("datasets", "dataset-1")]
         );
     }
