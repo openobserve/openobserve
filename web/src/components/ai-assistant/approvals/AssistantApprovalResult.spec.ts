@@ -55,6 +55,7 @@ function mountRecord(
     readonly?: boolean;
     live?: boolean;
     held?: { value: boolean };
+    gated?: boolean;
   } = {},
 ) {
   const message: ChatMessage = {
@@ -75,6 +76,7 @@ function mountRecord(
     askAgain: vi.fn(),
     stop: vi.fn(),
     undo: vi.fn(async () => ({ ok: true }) as const),
+    gated: () => over.gated === true,
   };
   const wrapper = mount(AssistantApprovalResult, {
     props: {
@@ -100,6 +102,14 @@ describe("AssistantApprovalResult", () => {
   it("renders nothing in the card's place while this tab still holds the card", () => {
     const { wrapper } = mountRecord(null, { pending: true });
     expect(wrapper.find('[data-test="assistant-approval-result"]').exists()).toBe(false);
+  });
+
+  it("offers no Ask again on an expired card a gated server would only refuse (PO B96)", () => {
+    const expired = { outcome: { state: "expired" as const, at: Date.now() } };
+    const open = mountRecord(expired);
+    expect(open.wrapper.text()).toContain("Ask again");
+    const gated = mountRecord(expired, { gated: true });
+    expect(gated.wrapper.text()).not.toContain("Ask again");
   });
 
   it("is never green before /confirm answers", () => {

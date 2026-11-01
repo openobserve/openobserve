@@ -352,6 +352,7 @@ function resolveCapability(input: CapabilityInput): AssistantCapability {
     capability.retentionDays = input.b06.retention_days;
   if (input.b06?.attachments === true) capability.attachments = true;
   if (input.b06?.approval_extend === true) capability.approvalExtend = true;
+  if (input.b06?.approval_extend_budgets) capability.approvalExtendBudgets = true;
   if (input.creditMode && input.edition.isCloud) capability.creditMode = input.creditMode;
   if (input.b06?.history_search === true) capability.historySearch = true;
   if (input.b06?.history_pins === true) capability.historyPins = true;

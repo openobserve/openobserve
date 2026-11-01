@@ -16,11 +16,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  HEARTBEAT_TRUST_MS,
   HINT_STALE_MS,
   POLL_FAST_FOR_MS,
   POLL_FAST_MS,
   POLL_SLOW_MS,
   POLL_STOP_MS,
+  assistantClientId,
   createElsewhere,
   type ElsewhereDeps,
 } from "./historyElsewhere";
@@ -76,6 +78,62 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("assistantClientId", () => {
+  it("stays the same across a reload of this tab", () => {
+    sessionStorage.clear();
+    const id = assistantClientId();
+    expect(id).toBeTruthy();
+    expect(assistantClientId()).toBe(id);
+  });
+});
+
+describe("the evidence rule (D1 decision 13, PO B3)", () => {
+  const view = { turnId: "t1", approval: false };
+
+  it("has no evidence from a started turn alone", () => {
+    const { elsewhere } = tab({ clientId: () => "me" });
+    elsewhere.start("s1", view);
+    expect(elsewhere.views.s1.evidence).toBe(false);
+    elsewhere.stop("s1");
+  });
+
+  it("trusts a heartbeat for 5 s, and each beat renews it", async () => {
+    const { elsewhere } = tab({ clientId: () => "me" });
+    elsewhere.start("s1", view);
+    elsewhere.beat("s1");
+    expect(elsewhere.views.s1.evidence).toBe(true);
+    await vi.advanceTimersByTimeAsync(HEARTBEAT_TRUST_MS - 1);
+    elsewhere.beat("s1");
+    await vi.advanceTimersByTimeAsync(HEARTBEAT_TRUST_MS - 1);
+    expect(elsewhere.views.s1.evidence).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(elsewhere.views.s1.evidence).toBe(false);
+    elsewhere.stop("s1");
+  });
+
+  it("takes the server's word only when it names another client", async () => {
+    const poll = vi.fn(async () => ({
+      running: true,
+      approval: false,
+      turnId: "t1",
+      ownerClientId: "other",
+    }));
+    const { elsewhere } = tab({ clientId: () => "me", poll });
+    elsewhere.start("s1", { ...view, ownerClientId: "me" });
+    expect(elsewhere.views.s1.evidence).toBe(false);
+    await vi.advanceTimersByTimeAsync(POLL_FAST_MS);
+    expect(elsewhere.views.s1.evidence).toBe(true);
+    elsewhere.stop("s1");
+  });
+
+  it("counts a browser-only chat as evidenced: its hints and lock are all there is", () => {
+    const { elsewhere } = tab();
+    elsewhere.start("s1", view, { polls: false });
+    expect(elsewhere.views.s1.evidence).toBe(true);
+    elsewhere.stop("s1");
+  });
 });
 
 describe("createElsewhere", () => {

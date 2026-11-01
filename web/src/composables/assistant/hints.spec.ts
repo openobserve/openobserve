@@ -74,6 +74,15 @@ describe("hint type", () => {
     expectTypeOf<AssistantHint["type"]>().not.toEqualTypeOf<"draft_changed">();
   });
 
+  it("carries the multi-chat hints by id only", () => {
+    const beat = { v: 1, type: "turn_heartbeat", org: "org1", sid: "s1", turnId: "t1", at };
+    expect(toHint({ ...beat, title: "secret" })).toEqual(beat);
+    expect(toHint({ ...beat, turnId: 3 })).toBeNull();
+    const cleared = { v: 1, type: "runs_cleared", sid: "s1", at };
+    expect(toHint({ ...cleared, title: "secret" })).toEqual(cleared);
+    expect(toHint({ ...cleared, sid: 1 })).toBeNull();
+  });
+
   it("rebuilds a received payload field by field and refuses anything else", () => {
     expect(toHint({ ...started, text: "my prompt" })).toEqual(started);
     expect(toHint({ ...started, org: { evil: true } })).toBeNull();

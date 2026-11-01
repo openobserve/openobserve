@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computed, defineComponent, h } from "vue";
 
 import { runEscapeLadder } from "@/composables/assistant";
@@ -157,7 +157,7 @@ describe("AssistantApprovalCard", () => {
     );
     expect(wrapper.get('[data-test="assistant-approval-heading"]').text()).toBe("Delete 1 alert");
     const countdown = wrapper.get('[data-test="assistant-approval-countdown"]');
-    expect(countdown.text()).toBe("Expires in 0:25");
+    expect(countdown.text()).toBe("Expires soon · 0:25");
     expect(countdown.attributes("aria-hidden")).toBe("true");
     expect(wrapper.get('[data-test="assistant-approval-expiry"]').attributes("aria-live")).toBe(
       "off",
@@ -611,5 +611,92 @@ describe("AssistantApprovalCard", () => {
     await flushPromises();
     const details = wrapper.get('[data-test="assistant-approval-details"]');
     expect(details.text()).toContain("Details");
+  });
+
+  describe("timing (`30` §7.3)", () => {
+    const PERMISSION_FRAME = { kind: "permission", tool: "o2_search", args: {} };
+    const inMs = (ms: number) => cardOf(PERMISSION_FRAME, { expiresAt: Date.now() + ms });
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("drops More time when the user's budget is spent, and says so", () => {
+      const spent = mountCard({ ...inMs(300_000), userExtendsLeft: 0 }, { extendable: true });
+      expect(spent.find('[data-test="assistant-approval-extend"]').exists()).toBe(false);
+      expect(spent.get('[data-test="assistant-approval-last-extension"]').text()).toBe(
+        "No more time can be added.",
+      );
+      const left = mountCard({ ...inMs(300_000), userExtendsLeft: 1 }, { extendable: true });
+      expect(left.find('[data-test="assistant-approval-extend"]').exists()).toBe(true);
+      expect(left.find('[data-test="assistant-approval-last-extension"]').exists()).toBe(false);
+    });
+
+    it("warns at 60 s and 20 s, once each, and an extension starts over", async () => {
+      const wrapper = mountCard(inMs(90_000));
+      await flushPromises();
+      const warnings = () =>
+        (wrapper.emitted("announce") ?? [])
+          .map(([text]) => String(text))
+          .filter((text) => text.includes("Approval expires in"));
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(warnings()).toHaveLength(1);
+      expect(warnings()[0]).toContain("More time is on the card.");
+      await vi.advanceTimersByTimeAsync(40_000);
+      expect(warnings()).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(warnings()).toHaveLength(2);
+      await wrapper.setProps({ card: inMs(70_000) });
+      await flushPromises();
+      expect((wrapper.emitted("announce") ?? []).map(([text]) => String(text)).join()).toContain(
+        "More time added.",
+      );
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(warnings()).toHaveLength(3);
+    });
+
+    it("gives no warning for a window it mounted inside: the mount line said the time", async () => {
+      const wrapper = mountCard(inMs(50_000));
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(5_000);
+      const spoken = (wrapper.emitted("announce") ?? []).map(([text]) => String(text));
+      expect(spoken.filter((text) => text.includes("Approval expires in"))).toEqual([]);
+    });
+
+    it("reads Expires soon from the 60 s warning on", async () => {
+      const wrapper = mountCard(inMs(90_000));
+      const countdown = () => wrapper.get('[data-test="assistant-approval-countdown"]').text();
+      expect(countdown()).toBe("Expires in 1:30");
+      await vi.advanceTimersByTimeAsync(31_000);
+      expect(countdown()).toBe("Expires soon · 0:59");
+    });
+  });
+
+  describe("gated, on a server without split budgets (PO A14, B96)", () => {
+    const frame = { kind: "permission", tool: "o2_search", args: {} };
+
+    it("keeps Deny and Reply, and puts the reason where Approve was", () => {
+      const wrapper = mountCard(cardOf(frame, { expiresAt: Date.now() + 300_000 }), {
+        gated: true,
+        extendable: true,
+      });
+      expect(wrapper.find('[data-test="assistant-approval-deny"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="assistant-approval-reply"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="assistant-approval-approve"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="assistant-approval-extend"]').exists()).toBe(false);
+      expect(wrapper.get('[data-test="assistant-approval-gated"]').text()).toContain(
+        "Approving needs a newer O2 Assistant agent.",
+      );
+    });
+
+    it("decides the gate when the card mounts, so an upgrade never changes a card being read", async () => {
+      const wrapper = mountCard(cardOf(frame), { gated: true });
+      await wrapper.setProps({ gated: false });
+      expect(wrapper.find('[data-test="assistant-approval-approve"]').exists()).toBe(false);
+    });
   });
 });

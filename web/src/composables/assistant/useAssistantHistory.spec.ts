@@ -480,6 +480,8 @@ describe("useAssistantHistory across tabs", () => {
     await flushPromises();
     await fake.history.open({ sid });
     hints.fire({ type: "turn_started", sid, turnId: "t9", org: "default" });
+    expect(fake.store.state.sessions[sid].turnMeta.ownedByThisTab).toBe(true);
+    hints.fire({ type: "turn_heartbeat", sid, turnId: "t9", org: "default" });
     expect(fake.store.state.sessions[sid].turnMeta.ownedByThisTab).toBe(false);
     await vi.waitFor(
       () => expect(fake.store.state.sessions[sid].turnMeta.ownedByThisTab).toBe(true),

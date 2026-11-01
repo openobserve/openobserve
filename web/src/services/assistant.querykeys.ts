@@ -20,6 +20,7 @@ export const assistantKeys = {
   capabilities: (org: string) => orgKey(org, "assistant", "capabilities"),
   chat: (org: string, sid: string) => orgKey(org, "assistant", "chat", sid),
   chats: (org: string) => orgKey(org, "assistant", "chats"),
+  activeChats: (org: string) => orgKey(org, "assistant", "chats", "active"),
   settings: (org: string) => orgKey(org, "assistant", "settings"),
   usage: (org: string) => orgKey(org, "assistant", "usage"),
 };

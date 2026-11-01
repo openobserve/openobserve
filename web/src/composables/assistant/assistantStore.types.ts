@@ -349,6 +349,8 @@ export interface PendingApproval {
   scanEstimate?: { bytes: number; rows?: number };
   /** Epoch ms; absent means no TTL is known (`o2_delete` batch today). */
   expiresAt?: number;
+  /** From the last extend answer; absent until the server has said. */
+  userExtendsLeft?: number;
   askedIn: "here" | "other_tab";
   /** False until B-05. */
   grantable: boolean;
@@ -523,6 +525,8 @@ export interface AssistantCapability {
   attachments?: boolean;
   /** `/confirm {id, extend:true}` gives a card more time. */
   approvalExtend?: boolean;
+  /** The server counts `by:"user"` and `by:"background"` apart; approvals are gated without it (PO A14, B96). */
+  approvalExtendBudgets?: boolean;
   /** Each used only when advertised: server search `q`, server pins, browser-chat import. */
   historySearch?: boolean;
   historyPins?: boolean;
@@ -553,6 +557,8 @@ export type AssistantErrorCode =
   | "consent_still_required"
   | "stopped_before_send"
   | "authorization_unavailable"
+  | "run_limit_member"
+  | "run_limit_org"
   | "turn_limit"
   | "rate_limited"
   | "turn_busy"
@@ -600,6 +606,7 @@ export type AssistantErrorAction =
   | "ask_again"
   | "send_again"
   | "change_level"
+  | "show_running"
   | "none";
 
 export interface AssistantError {
@@ -608,6 +615,9 @@ export interface AssistantError {
   phase: "pre_admission" | "post_admission" | "read" | "mutation" | "client";
   retryable: boolean;
   retryAfterMs?: number;
+  /** A run-limit 429's own cap and count; the copy never assumes 3. */
+  limit?: number;
+  active?: number;
   action: AssistantErrorAction;
   httpStatus?: number;
   /** Raw server text, shown in Details only. */
@@ -688,6 +698,8 @@ export type AssistantHint =
       origin: "chat" | "rca";
       at: number;
     }
+  /** From the tab that owns the stream, while the turn is not terminal; receivers trust it for 5 s. */
+  | { v: 1; type: "turn_heartbeat"; org: string; sid: string; turnId: string; at: number }
   | {
       v: 1;
       type: "turn_ended";
@@ -725,7 +737,9 @@ export type AssistantHint =
       op: "create" | "rename" | "pin" | "delete" | "clear";
       at: number;
     }
-  | { v: 1; type: "share_changed"; sid: string; at: number };
+  | { v: 1; type: "share_changed"; sid: string; at: number }
+  /** A row cleared or opened in this browser; receivers re-read the cleared set. */
+  | { v: 1; type: "runs_cleared"; sid: string; at: number };
 
 export interface AssistantStoreApi {
   /** Reactive; components read through `computed()`. */

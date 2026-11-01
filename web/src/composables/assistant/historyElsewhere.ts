@@ -23,6 +23,12 @@ export const POLL_FAST_FOR_MS = 60_000;
 export const POLL_STOP_MS = 10 * 60_000;
 /** Without Web Locks, a chat followed by hints alone is released when no hint has spoken for this long. */
 export const HINT_STALE_MS = 150_000;
+/** A `turn_heartbeat` is evidence of a live owner for this long (D1 decision 13). */
+export const HEARTBEAT_TRUST_MS = 5_000;
+
+const CLIENT_ID_KEY = "o2.assistant.clientId";
+
+let memoryClientId: string | null = null;
 
 /** How this tab follows a turn another tab or device runs. */
 export interface ElsewhereView {
@@ -30,6 +36,8 @@ export interface ElsewhereView {
   mode: "tail" | "polling" | "stalled" | "hint";
   approval: boolean;
   turnId: string | null;
+  /** Positive evidence of a live owner: a recent heartbeat, or the server naming another client. */
+  evidence?: boolean;
 }
 
 export interface ElsewhereDeps {
@@ -38,12 +46,22 @@ export interface ElsewhereDeps {
   onVisibility(cb: () => void): () => void;
   locks: Pick<LockManager, "request"> | null;
   /** One incremental read of the chat; `"gone"` when the server no longer has it. */
-  poll(sid: Sid): Promise<{ running: boolean; approval: boolean; turnId: string | null } | "gone">;
+  poll(sid: Sid): Promise<
+    | {
+        running: boolean;
+        approval: boolean;
+        turnId: string | null;
+        ownerClientId?: string | null;
+      }
+    | "gone"
+  >;
   /** The server's resumable tail for the lock holder; absent on today's server. */
   tail?(sid: Sid, signal: AbortSignal): Promise<void>;
   ended(sid: Sid): void;
   /** The chat was deleted while this tab followed it. */
   gone?(sid: Sid): void;
+  /** This tab's `x-o2-assistant-client-id`. */
+  clientId?(): string;
 }
 
 interface Watcher {
@@ -54,12 +72,21 @@ interface Watcher {
   requesting?: boolean;
   inFlight: boolean;
   readAt: number;
+  beatTimer?: ReturnType<typeof setTimeout>;
+  beating: boolean;
+  ownedElsewhere: boolean;
 }
 
 export interface Elsewhere {
   views: Readonly<Record<Sid, ElsewhereView>>;
   /** `polls: false` follows a browser-only chat by hints and the turn lock alone. */
-  start(sid: Sid, view: Omit<ElsewhereView, "mode">, opts?: { polls?: boolean }): void;
+  start(
+    sid: Sid,
+    view: Omit<ElsewhereView, "mode" | "evidence"> & { ownerClientId?: string | null },
+    opts?: { polls?: boolean },
+  ): void;
+  /** The owning tab's `turn_heartbeat`. */
+  beat(sid: Sid): void;
   stop(sid: Sid): void;
   refresh(sid: Sid): void;
   /** Whether this tab holds the chat's tail lock, for tests and the one-tail rule. */
@@ -67,10 +94,34 @@ export interface Elsewhere {
   dispose(): void;
 }
 
+/** This tab's id for `x-o2-assistant-client-id`, kept across a reload so a tab recognises its own turn. */
+export function assistantClientId(): string {
+  try {
+    const stored = sessionStorage.getItem(CLIENT_ID_KEY);
+    if (stored) return stored;
+    const id = crypto.randomUUID();
+    sessionStorage.setItem(CLIENT_ID_KEY, id);
+    return id;
+  } catch {
+    memoryClientId ??= crypto.randomUUID();
+    return memoryClientId;
+  }
+}
+
 /** Polls at 4 s, 15 s after a minute, never while hidden, and stops loudly at ten minutes; one tail per chat per browser. */
 export function createElsewhere(deps: ElsewhereDeps): Elsewhere {
   const views = reactive<Record<Sid, ElsewhereView>>({});
   const watchers = new Map<Sid, Watcher>();
+
+  const isOtherClient = (owner: string | null | undefined) =>
+    !!owner && !!deps.clientId && owner !== deps.clientId();
+
+  // A browser-only chat has no server owner: the hints and the turn lock that keep it followed are its evidence.
+  const refreshEvidence = (sid: Sid) => {
+    const watcher = watchers.get(sid);
+    if (!watcher || !views[sid]) return;
+    views[sid].evidence = !watcher.polls || watcher.beating || watcher.ownedElsewhere;
+  };
 
   const schedule = (sid: Sid) => {
     const watcher = watchers.get(sid);
@@ -126,6 +177,8 @@ export function createElsewhere(deps: ElsewhereDeps): Elsewhere {
     if (result && views[sid]) {
       views[sid].approval = result.approval;
       views[sid].turnId = result.turnId ?? views[sid].turnId;
+      watcher.ownedElsewhere = isOtherClient(result.ownerClientId);
+      refreshEvidence(sid);
     }
     takeTail(sid);
     schedule(sid);
@@ -163,6 +216,7 @@ export function createElsewhere(deps: ElsewhereDeps): Elsewhere {
     const watcher = watchers.get(sid);
     if (watcher) {
       clearTimeout(watcher.timer);
+      clearTimeout(watcher.beatTimer);
       watcher.release?.();
     }
     watchers.delete(sid);
@@ -189,17 +243,40 @@ export function createElsewhere(deps: ElsewhereDeps): Elsewhere {
     start(sid, view, opts = {}) {
       const polls = opts.polls ?? true;
       const known = watchers.get(sid);
+      const { approval, turnId, ownerClientId } = view;
       if (known && views[sid]) {
-        views[sid].approval = view.approval;
-        views[sid].turnId = view.turnId ?? views[sid].turnId;
+        views[sid].approval = approval;
+        views[sid].turnId = turnId ?? views[sid].turnId;
+        if (ownerClientId !== undefined) known.ownedElsewhere = isOtherClient(ownerClientId);
+        refreshEvidence(sid);
         armStale(sid);
         return;
       }
-      watchers.set(sid, { startedAt: deps.now(), polls, inFlight: false, readAt: 0 });
-      views[sid] = { ...view, mode: polls ? "polling" : "hint" };
+      watchers.set(sid, {
+        startedAt: deps.now(),
+        polls,
+        inFlight: false,
+        readAt: 0,
+        beating: false,
+        ownedElsewhere: isOtherClient(ownerClientId),
+      });
+      views[sid] = { approval, turnId, mode: polls ? "polling" : "hint" };
+      refreshEvidence(sid);
       takeTail(sid);
       schedule(sid);
       armStale(sid);
+    },
+    beat(sid) {
+      const watcher = watchers.get(sid);
+      if (!watcher) return;
+      watcher.beating = true;
+      refreshEvidence(sid);
+      armStale(sid);
+      clearTimeout(watcher.beatTimer);
+      watcher.beatTimer = setTimeout(() => {
+        watcher.beating = false;
+        refreshEvidence(sid);
+      }, HEARTBEAT_TRUST_MS);
     },
     stop,
     refresh(sid) {

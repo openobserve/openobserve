@@ -18,7 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SESSION_STALE_TIME } from "@/composables/query/cachePolicy";
 
 import assistant from "./assistant";
-import { capabilitiesQuery } from "./assistant.queries";
+import { assistantActiveChatsQuery, capabilitiesQuery } from "./assistant.queries";
 import { assistantKeys } from "./assistant.querykeys";
 
 vi.mock("./assistant", () => ({ default: { capabilities: vi.fn().mockResolvedValue(null) } }));
@@ -42,6 +42,17 @@ describe("capabilitiesQuery", () => {
     const queryFn = capabilitiesQuery("org1").queryFn as () => Promise<unknown>;
     await expect(queryFn()).resolves.toBeNull();
     expect(assistant.capabilities).toHaveBeenCalledWith("org1");
+  });
+});
+
+describe("assistantActiveChatsQuery", () => {
+  it("polls within the light's 15 s bound, in its own key beside the chats list", () => {
+    const options = assistantActiveChatsQuery("org1");
+    expect(options.queryKey).toEqual(assistantKeys.activeChats("org1"));
+    expect(options.queryKey.slice(0, -1)).toEqual(assistantKeys.chats("org1"));
+    expect(options.refetchInterval).toBe(15_000);
+    expect(options.retry).toBe(false);
+    expect(assistantActiveChatsQuery("").enabled).toBe(false);
   });
 });
 

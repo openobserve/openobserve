@@ -22,12 +22,14 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
+import { fakeRuns, runRow } from "../runs/runsTestKit";
 import AssistantHeaderButton from "./AssistantHeaderButton.vue";
 import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
 
-const { fake, openAssistant, track, toast, lg } = vi.hoisted(() => ({
+const { fake, openAssistant, track, toast, lg, otherRuns } = vi.hoisted(() => ({
   lg: { value: true },
   fake: { current: null as any },
+  otherRuns: { current: null as any },
   openAssistant: vi.fn(async () => ({ ok: true })),
   track: vi.fn(),
   toast: vi.fn(),
@@ -50,6 +52,7 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
   useAssistantStore: () => fake.current.store,
   useAssistantCapability: () => fake.current.handle,
   useAssistantHistory: () => fake.current.history,
+  useAssistantRuns: () => otherRuns.current,
   openAssistant,
 }));
 vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
@@ -60,6 +63,10 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
   toast,
 }));
+
+beforeEach(() => {
+  otherRuns.current = fakeRuns().runs;
+});
 
 function setup(
   gate: GateCode = "available",
@@ -370,6 +377,47 @@ describe("AssistantHeaderButton light", () => {
     expect(track.mock.calls.filter(([name]) => name === "ai_status_light")).toEqual([
       ["ai_status_light", { state: "working" }],
     ]);
+  });
+});
+
+describe("AssistantHeaderButton other orgs (PO B51)", () => {
+  const other = (over = {}) => runRow("x", { otherOrg: true, org: "acme", ...over });
+
+  it("counts another org's chats in the light and lists them on click, never opening one", async () => {
+    otherRuns.current = fakeRuns([other()]).runs;
+    const { wrapper } = setup();
+    expect(button(wrapper).attributes("data-state")).toBe("working");
+    await button(wrapper).trigger("click");
+    await flushPromises();
+    expect(otherRuns.current.requestOpen).toHaveBeenCalled();
+    expect(openAssistant).not.toHaveBeenCalled();
+  });
+
+  it("shows a waiting decision of another org as needs you, with its count", () => {
+    const waiting = other({ group: "needs_you", status: "needsApproval", request: "x" });
+    otherRuns.current = fakeRuns([waiting]).runs;
+    const { wrapper } = setup();
+    expect(button(wrapper).attributes("data-state")).toBe("needs_you");
+    expect(button(wrapper).attributes("aria-label")).toContain("1 waiting");
+  });
+
+  it("leaves a light of this org's chats alone", async () => {
+    otherRuns.current = fakeRuns([other()]).runs;
+    const { wrapper } = setup("available", {}, { state: "working", sid: "here" });
+    await button(wrapper).trigger("click");
+    await flushPromises();
+    expect(otherRuns.current.requestOpen).not.toHaveBeenCalled();
+    expect(openAssistant).toHaveBeenCalled();
+  });
+
+  it("counts one decision once, however many chats wait on it", async () => {
+    const waiting = { group: "needs_you", status: "needsApproval", request: "c" } as const;
+    otherRuns.current = fakeRuns([
+      runRow("a", waiting),
+      runRow("b", { ...waiting, request: "d" }),
+    ]).runs;
+    const { wrapper } = setup("available", {}, { state: "needs_you", sid: "a" });
+    expect(button(wrapper).attributes("aria-label")).toContain("2 waiting");
   });
 });
 

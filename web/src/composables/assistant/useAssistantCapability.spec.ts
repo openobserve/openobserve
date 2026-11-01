@@ -101,6 +101,21 @@ function setup(options: Setup = {}) {
 
 const cap = (handle: AssistantCapabilityHandle) => handle.capability.value;
 
+describe("approval_extend_budgets", () => {
+  it("reads either shape, and stays absent on an older server (PO A14)", async () => {
+    for (const budgets of [true, { user: 10, background: 3 }]) {
+      const { handle } = setup({
+        b06: { can_chat: true, approval_extend_budgets: budgets } as never,
+      });
+      await flushPromises();
+      expect(cap(handle).approvalExtendBudgets).toBe(true);
+    }
+    const { handle } = setup({ b06: { can_chat: true } as never });
+    await flushPromises();
+    expect(cap(handle).approvalExtendBudgets).toBeUndefined();
+  });
+});
+
 describe("gate order (10 §5)", () => {
   it("stays loading until /config resolves and the user+org is known", async () => {
     const { handle, config } = setup({ config: null });

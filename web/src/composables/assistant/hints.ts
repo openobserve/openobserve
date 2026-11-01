@@ -104,6 +104,9 @@ export function toHint(value: unknown): AssistantHint | null {
         origin: raw.origin,
         at,
       };
+    case "turn_heartbeat":
+      if (!ids(raw, "org", "sid", "turnId")) return null;
+      return { v: 1, type: raw.type, org: raw.org, sid: raw.sid, turnId: raw.turnId, at };
     case "turn_ended":
       if (!ids(raw, "org", "sid", "turnId") || !TURN_STATUSES.has(String(raw.status))) return null;
       return {
@@ -316,6 +319,7 @@ function otherHint(raw: Record<string, unknown>, at: number): AssistantHint | nu
         at,
       };
     case "share_changed":
+    case "runs_cleared":
       return ids(raw, "sid") ? { v: 1, type: raw.type, sid: raw.sid, at } : null;
     default:
       return null;
@@ -339,6 +343,7 @@ function countsAsNew(episodes: Set<string>, hint: AssistantHint): boolean {
   if (!("sid" in hint)) return true;
   if (hint.type === "approval_resolved") forget(episodes, `approval_pending:${hint.sid}:`);
   if (hint.type === "turn_ended") episodes.delete(`turn_started:${hint.sid}:${hint.turnId}`);
+  if (hint.type === "turn_heartbeat") return false;
   if (hint.type !== "approval_pending" && hint.type !== "turn_started") return true;
   const id = hint.type === "approval_pending" ? (hint.callId ?? hint.turnId) : hint.turnId;
   const key = `${hint.type}:${hint.sid}:${id}`;

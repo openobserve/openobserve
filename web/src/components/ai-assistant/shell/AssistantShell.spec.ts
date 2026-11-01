@@ -24,6 +24,7 @@ import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex, hintBus } from "../__tests__/fakeAssistant";
 import { historyStubs } from "../__tests__/historyStubs";
+import { fakeRuns } from "../runs/runsTestKit";
 import AssistantShell, {
   SHELL_ROUTE_CONTEXT,
   STEP_ANNOUNCE_MS,
@@ -742,6 +743,35 @@ describe("WP-06 conversation wiring", () => {
     expect(label(again)).toMatch(/^Retry in 20 s/);
   });
 
+  it("opens the running chats from a member's run-limit refusal", async () => {
+    const { runs } = fakeRuns();
+    setRuntimeHandle({
+      runs,
+      lifecycle: {
+        signedOutElsewhere: computed(() => false),
+        otherAccountSignedIn: computed(() => false),
+        turnLock: () => null,
+      },
+    } as never);
+    const refused = live({
+      state: "refused",
+      error: {
+        code: "run_limit_member",
+        phase: "pre_admission",
+        retryable: false,
+        action: "show_running",
+        limit: 3,
+      },
+    });
+    await flushPromises();
+    const action = refused.wrapper.get('[data-test="assistant-turn-outcome-action"]');
+    expect(action.text()).toBe("Show running chats");
+    await action.trigger("click");
+    await flushPromises();
+    setRuntimeHandle(null);
+    expect(runs.requestOpen).toHaveBeenCalled();
+  });
+
   it("keeps focus on Stop it when the cancel fails, and never takes focus the reader moved (V7)", async () => {
     const busy = {
       code: "turn_busy",
@@ -964,10 +994,14 @@ describe("AssistantShell decision cards", () => {
     args: { items: [{ resource_type: "alert", name: "checkout-latency-old", id: "a1" }] },
   };
 
-  async function mountWithCard(card: "approval" | "consent" | "none" = "approval", open = true) {
+  async function mountWithCard(
+    card: "approval" | "consent" | "none" = "approval",
+    open = true,
+    capability: Partial<AssistantCapability> = {},
+  ) {
     localStorage.clear();
     sessionStorage.clear();
-    fake.current = fakeAssistant("available");
+    fake.current = fakeAssistant("available", capability);
     const store = fake.current.store;
     const { approvalOf } = await import("@/composables/assistant/reducer");
     const approval = { ...approvalOf(DELETE), id: "t1:1" };
@@ -1026,6 +1060,16 @@ describe("AssistantShell decision cards", () => {
     const hidden = await mountWithCard("approval", false);
     expect(hidden.store.state.shell.placement.kind).toBe("hidden");
     expect(hidden.wrapper.find('[data-test="assistant-approval-card"]').exists()).toBe(false);
+  });
+
+  it("gates the card on a server without split budgets, and lets it through with them", async () => {
+    const older = await mountWithCard();
+    expect(older.wrapper.find('[data-test="assistant-approval-gated"]').exists()).toBe(true);
+    expect(older.wrapper.find('[data-test="assistant-approval-approve"]').exists()).toBe(false);
+    older.wrapper.unmount();
+    const newer = await mountWithCard("approval", true, { approvalExtendBudgets: true });
+    expect(newer.wrapper.find('[data-test="assistant-approval-gated"]').exists()).toBe(false);
+    expect(newer.wrapper.find('[data-test="assistant-approval-approve"]').exists()).toBe(true);
   });
 
   it("posts the card's decision through the store, and Reply puts the composer in reply mode", async () => {
@@ -1223,6 +1267,19 @@ describe("AssistantShell history states", () => {
       "Answering in another tab",
     );
     expect(wrapper.find('[data-test="assistant-shell-elsewhere-stop"]').exists()).toBe(true);
+  });
+
+  it("says Reconnecting, never another tab, until a live owner shows (PO B3)", async () => {
+    const { wrapper, store } = setup();
+    const sid = open(store);
+    const elsewhere = vi.spyOn(fake.current.history, "elsewhere");
+    elsewhere.mockReturnValue({ mode: "polling", evidence: false, approval: false, turnId: "t" });
+    store.state.sessions[sid].turn = { state: "responding.writing" } as never;
+    store.state.sessions[sid].turnMeta.ownedByThisTab = false;
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-shell-elsewhere-status"]').text()).toBe(
+      "Reconnecting",
+    );
   });
 
   it("says history is unavailable with Retry while the cached transcript stays", async () => {

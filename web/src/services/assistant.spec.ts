@@ -177,8 +177,51 @@ describe("assistant service", () => {
   });
 });
 
+describe("listActiveChats", () => {
+  it("asks for the active state and keeps the fields the list reads", async () => {
+    const get = vi.fn(async () => ({
+      data: {
+        chats: [
+          {
+            session_id: "s1",
+            title: "t",
+            updated_at: 1,
+            last_turn_status: "completed",
+            last_turn_ended_at: 2,
+            seen: false,
+            owner_client_id: "c1",
+          },
+        ],
+      },
+    }));
+    (http as any).mockReturnValue({ get });
+    const page = await assistant.listActiveChats("org 1");
+    expect(get).toHaveBeenCalledWith(
+      "/api/org%201/ai/chats",
+      expect.objectContaining({ params: expect.objectContaining({ state: "active" }) }),
+    );
+    expect(page.chats[0]).toMatchObject({
+      last_turn_status: "completed",
+      last_turn_ended_at: 2,
+      seen: false,
+      owner_client_id: "c1",
+    });
+  });
+});
+
 describe("parseChatDetail approvals", () => {
   const detail = (approvals: unknown) => parseChatDetail({ session_id: "s1", approvals });
+
+  it("carries the server's expiry and user budget, and drops a malformed one", () => {
+    const parsed = detail([
+      { id: "a", status: "pending", expires_at: 5, user_extends_left: 9 },
+      { id: "b", status: "pending", expires_at: "soon", user_extends_left: null },
+    ]);
+    expect(parsed.approvals).toEqual([
+      { id: "a", status: "pending", expires_at: 5, user_extends_left: 9 },
+      { id: "b", status: "pending" },
+    ]);
+  });
 
   it("reads each approval row's id, status and decision time", () => {
     const parsed = detail([
@@ -194,7 +237,7 @@ describe("parseChatDetail approvals", () => {
       { id: "apr_3", status: "denied", resolved: { at: 0 } },
     ]);
     expect(parsed.approvals).toEqual([
-      { id: "apr_1", status: "approved", at: 1_700_000_000_000 },
+      { id: "apr_1", status: "approved", at: 1_700_000_000_000, expires_at: 1 },
       { id: "apr_2", status: "expired" },
       { id: "apr_3", status: "denied" },
     ]);

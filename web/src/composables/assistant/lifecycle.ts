@@ -45,6 +45,9 @@ export const APPROVAL_STALE_MS = 150_000;
 /** A holding tab that sends no beat back within this long is gone, and the waiting tab cancels the turn itself. */
 export const STOP_RELAY_MS = 3_000;
 
+/** The owning tab says it is alive this often while a turn runs (PO B1); receivers trust a beat for 5 s. */
+export const TURN_HEARTBEAT_MS = 2_000;
+
 /** One `{org, sid, origin, turnId, at}` of the user's live-turn ledger (ids only). */
 export interface LiveTurn {
   org: string;
@@ -59,6 +62,16 @@ export interface LifecycleTrigger {
   invoker?: HTMLElement | null;
   /** A sign-out the app forces (a 403): nothing is asked, everything is still cancelled and purged. */
   forced?: boolean;
+}
+
+/** A chat another tab of this browser runs or waits on, for the running-chats list. */
+export interface RemoteTurn {
+  sid: Sid;
+  org: string;
+  state: "needs_you" | "working";
+  /** The last `turn_heartbeat` of its owner; `null` when only `turn_started` was heard. */
+  beatAt: number | null;
+  expiresAt?: number;
 }
 
 // A turn this tab runs, as the other tabs hear about it.
@@ -96,6 +109,8 @@ export interface AssistantLifecycleRuntime extends AssistantLifecycle {
   otherAccountSignedIn: ComputedRef<boolean>;
   /** Same-browser sessions another tab runs or waits on, for the header light. */
   remoteLight(): { state: "needs_you" | "working"; sid: Sid } | null;
+  /** The same sessions of every org, for the running-chats list. */
+  remoteTurns(): RemoteTurn[];
   /** True while another tab holds this session's approval card. */
   approvalElsewhere(sid: Sid): boolean;
   /** Stop on a turn another tab's card holds: that tab declines the card first, then the turn is cancelled. */
@@ -198,7 +213,16 @@ export function createLifecycle(deps: LifecycleDeps): AssistantLifecycleRuntime 
   const otherAccount = ref(false);
   // Another tab's live sessions for the header light; a tab that closed mid-turn ages out with the ledger's TTL.
   const remote = shallowReactive(
-    new Map<Sid, { org: string; state: "needs_you" | "working"; at: number; expiresAt?: number }>(),
+    new Map<
+      Sid,
+      {
+        org: string;
+        state: "needs_you" | "working";
+        at: number;
+        beatAt?: number;
+        expiresAt?: number;
+      }
+    >(),
   );
   const cardLive = (entry: { at: number; expiresAt?: number }, now: number) =>
     now - entry.at < APPROVAL_STALE_MS && (entry.expiresAt === undefined || now < entry.expiresAt);
@@ -234,13 +258,26 @@ export function createLifecycle(deps: LifecycleDeps): AssistantLifecycleRuntime 
       if (!local || !isRunning(local.turn))
         remote.set(hint.sid, { org: hint.org, state: "working", at: deps.now() });
     }),
+    hints.on("turn_heartbeat", (hint) => {
+      const local = store.state.sessions[hint.sid];
+      if (local && isRunning(local.turn) && local.turnMeta.ownedByThisTab) return;
+      const at = deps.now();
+      const known = remote.get(hint.sid);
+      // Reassigned, so a reader of the beat updates without the map changing shape on every beat.
+      remote.set(
+        hint.sid,
+        known ? { ...known, beatAt: at } : { org: hint.org, state: "working", at, beatAt: at },
+      );
+    }),
     hints.on("turn_ended", (hint) => void remote.delete(hint.sid)),
     hints.on("approval_pending", (hint) => {
       if (store.state.sessions[hint.sid]?.pendingApproval) return;
+      const beatAt = remote.get(hint.sid)?.beatAt;
       remote.set(hint.sid, {
         org: deps.currentOrg() ?? "",
         state: "needs_you",
         at: deps.now(),
+        ...(beatAt !== undefined && { beatAt }),
         ...(hint.expiresAt !== undefined && { expiresAt: hint.expiresAt }),
       });
       expireLater();
@@ -291,6 +328,23 @@ export function createLifecycle(deps: LifecycleDeps): AssistantLifecycleRuntime 
         working ??= sid;
       }
       return working ? { state: "working", sid: working } : null;
+    },
+    remoteTurns() {
+      const now = deps.now();
+      const turns: RemoteTurn[] = [];
+      for (const [sid, entry] of remote) {
+        const live =
+          entry.state === "needs_you" ? cardLive(entry, now) : now - entry.at < LIVE_TURN_TTL_MS;
+        if (!live) continue;
+        turns.push({
+          sid,
+          org: entry.org,
+          state: entry.state,
+          beatAt: entry.beatAt ?? null,
+          ...(entry.expiresAt !== undefined && { expiresAt: entry.expiresAt }),
+        });
+      }
+      return turns;
     },
     approvalElsewhere: (sid) => {
       const entry = remote.get(sid);
@@ -455,7 +509,29 @@ function mirrorTurns(deps: LifecycleDeps): { stop(): void; releaseCards(): void;
       origin: known.origin,
       at: deps.now(),
     });
+  const announceBeat = (sid: Sid, known: LiveMirror) =>
+    hints.postFor(known.userOrgKey, {
+      v: 1,
+      type: "turn_heartbeat",
+      org: known.org,
+      sid,
+      turnId: known.turnId,
+      at: deps.now(),
+    });
   const beatNow = () => pendingCards.forEach((card, sid) => announceCard(sid, card));
+  // Hidden tabs are throttled, so a beat may arrive late; receivers fall back to the server's owner id.
+  let turnBeat: ReturnType<typeof setInterval> | null = null;
+  const beatTurns = () => {
+    if (live.size && !turnBeat)
+      turnBeat = setInterval(
+        () => live.forEach((known, sid) => announceBeat(sid, known)),
+        TURN_HEARTBEAT_MS,
+      );
+    else if (!live.size && turnBeat) {
+      clearInterval(turnBeat);
+      turnBeat = null;
+    }
+  };
   // A card whose chat is gone here (a reset, a sign-out) is let go at once, or other tabs would stay locked.
   const releaseCard = (sid: Sid) => {
     const card = pendingCards.get(sid);
@@ -539,6 +615,7 @@ function mirrorTurns(deps: LifecycleDeps): { stop(): void; releaseCards(): void;
           };
           live.set(row.sid, mirror);
           announceTurn(row.sid, mirror);
+          announceBeat(row.sid, mirror);
           writeLiveTurn(
             hints.userHash(),
             { add: { org: row.org, sid: row.sid, origin: row.origin, turnId: row.turnId, at } },
@@ -548,7 +625,13 @@ function mirrorTurns(deps: LifecycleDeps): { stop(): void; releaseCards(): void;
           endTurn(deps, row.sid, known, statusOf(row.state), at);
           live.delete(row.sid);
         }
-        if (row.card && row.mine && !pendingCards.has(row.sid)) {
+        const held = pendingCards.get(row.sid);
+        if (held && row.card === held.callId && row.cardExpiresAt !== held.expiresAt) {
+          // An extension moved the expiry, or other tabs would drop the card at the old one.
+          held.expiresAt = row.cardExpiresAt;
+          announceCard(row.sid, held);
+        }
+        if (row.card && row.mine && !held) {
           const card: HeldCard = {
             userOrgKey: row.userOrgKey,
             turnId: row.turnId ?? "",
@@ -574,6 +657,7 @@ function mirrorTurns(deps: LifecycleDeps): { stop(): void; releaseCards(): void;
       }
       for (const sid of pendingCards.keys()) if (!seen.has(sid)) releaseCard(sid);
       beat();
+      beatTurns();
     },
     { deep: true },
   );
@@ -586,6 +670,7 @@ function mirrorTurns(deps: LifecycleDeps): { stop(): void; releaseCards(): void;
     stop: () => {
       stop();
       if (heartbeat) clearInterval(heartbeat);
+      if (turnBeat) clearInterval(turnBeat);
       if (typeof window !== "undefined")
         listeners.forEach(([type, listener]) => window.removeEventListener(type, listener));
       if (typeof document !== "undefined")

@@ -45,6 +45,8 @@ export const ASSISTANT_ERROR_CODES = [
   "consent_still_required",
   "stopped_before_send",
   "authorization_unavailable",
+  "run_limit_member",
+  "run_limit_org",
   "turn_limit",
   "rate_limited",
   "turn_busy",
@@ -90,6 +92,8 @@ export const ERROR_LEDGER: Record<AssistantErrorCode, ErrorLedgerRow> = {
   consent_still_required: { phase: "pre_admission", retryable: false, action: "manage_usage" },
   stopped_before_send: { phase: "pre_admission", retryable: true, action: "retry" },
   authorization_unavailable: { phase: "pre_admission", retryable: true, action: "retry" },
+  run_limit_member: { phase: "pre_admission", retryable: false, action: "show_running" },
+  run_limit_org: { phase: "pre_admission", retryable: true, action: "retry" },
   turn_limit: { phase: "pre_admission", retryable: true, action: "retry" },
   rate_limited: { phase: "pre_admission", retryable: true, action: "retry" },
   turn_busy: { phase: "pre_admission", retryable: false, action: "stop_it" },
@@ -137,6 +141,12 @@ export const WIRE_ACTIONS = [
 const CLIENT_ONLY_CODES: ReadonlySet<string> = new Set(["approval_elsewhere", "account_changed"]);
 
 const CODES: ReadonlySet<string> = new Set(ASSISTANT_ERROR_CODES);
+
+const RUN_LIMIT_CODES: ReadonlySet<string> = new Set([
+  "turn_limit",
+  "run_limit_member",
+  "run_limit_org",
+]);
 
 const WIRE_ACTION_SET: ReadonlySet<string> = new Set(WIRE_ACTIONS);
 
@@ -202,6 +212,10 @@ interface WireBody {
   recoverable?: unknown;
   retryable?: unknown;
   retry_after?: unknown;
+  retry_after_ms?: unknown;
+  scope?: unknown;
+  limit?: unknown;
+  active?: unknown;
   action?: unknown;
   trace_id?: unknown;
   turn_id?: unknown;
@@ -272,6 +286,7 @@ function build(
   if (sessionId) error.sessionId = sessionId;
   if (code === "rate_limited" && typeof body.retry_after === "number")
     error.retryAfterMs = body.retry_after * 1000;
+  if (code === "run_limit_member" || code === "run_limit_org") readRunLimit(error, body);
   const reason = code === "provider_error" ? providerReason(body) : null;
   if (reason) error.reason = reason;
   if (code === "rca_disabled" && (body.reason === "rca_off" || body.reason === "priority_off"))
@@ -315,7 +330,7 @@ function codeOf({ status, body }: ErrorInput): AssistantErrorCode {
   if (status === 403) return "permission_denied";
   if (isConsentPrompt(status, body)) return "consent_declined";
   const named = namedCode(body);
-  if (named) return named;
+  if (named) return RUN_LIMIT_CODES.has(named) ? runLimitCode(named, body) : named;
   if (status !== undefined) return statusCode(status, body);
   return frameCode(body);
 }
@@ -334,6 +349,20 @@ function namedCode(body: WireBody): AssistantErrorCode | null {
     if (isAssistantErrorCode(value)) return value;
   }
   return null;
+}
+
+// The copy follows the typed code or `scope`, never the message; `scope:"node"` and a member refusal without `limit` keep the fallback row (`80` §1.3).
+function runLimitCode(named: AssistantErrorCode, body: WireBody): AssistantErrorCode {
+  if (named === "run_limit_org" || body.scope === "org") return "run_limit_org";
+  const member = named === "run_limit_member" || body.scope === "user";
+  return member && typeof body.limit === "number" ? "run_limit_member" : "turn_limit";
+}
+
+function readRunLimit(error: AssistantError, body: WireBody): void {
+  if (typeof body.limit === "number") error.limit = body.limit;
+  if (typeof body.active === "number") error.active = body.active;
+  if (typeof body.retry_after_ms === "number") error.retryAfterMs = body.retry_after_ms;
+  else if (typeof body.retry_after === "number") error.retryAfterMs = body.retry_after * 1000;
 }
 
 function statusCode(status: number, body: WireBody): AssistantErrorCode {

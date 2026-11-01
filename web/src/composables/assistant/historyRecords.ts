@@ -71,6 +71,8 @@ export interface ElsewhereMark {
   turnId: string | null;
   approval: boolean;
   card?: ApprovalBlockData;
+  /** The client the server says runs the turn, when it tracks one. */
+  ownerClientId?: string | null;
 }
 
 /** Opens a chat from the server or the browser store, and builds what an export folds. */
@@ -156,6 +158,7 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
       elsewhereHooks.mark?.(sid, {
         turnId: detail.active_turn_id ?? (card ? turnId : null),
         approval: detail.pending_approval === true,
+        ownerClientId: detail.owner_client_id ?? null,
         ...(card && { card }),
       });
     return sid;
