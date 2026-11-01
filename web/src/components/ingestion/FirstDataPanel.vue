@@ -22,7 +22,6 @@ import { useQuery } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -44,11 +43,13 @@ import {
   useCredentialSnippet,
 } from "@/composables/useCredentialSnippet";
 import { useOrgCredential } from "@/composables/useOrgCredential";
+import { failedRequests, viewDenial } from "@/composables/useAccessStore";
 import type { FirstEventResult, StreamSignal } from "@/composables/firstEvent/useFirstEventWatch";
 import { firstSourceOption, readFirstSource } from "@/components/login/firstSourceOptions";
 import { getDataSourceCard, hasDataSourceCard } from "./setupCard/registry";
 import type { RichCardCode, RichCardContent } from "./setupCard/types";
 import FirstEventStatus from "./FirstEventStatus.vue";
+import OAccessLock from "@/components/access/OAccessLock.vue";
 
 // how long the card outlives the store flip while the watcher confirms the stream that caused it
 const CONFIRM_GRACE_MS = 10_000;
@@ -121,6 +122,17 @@ const isForbidden = (err: unknown) => {
 const forbidden = computed(
   () => flagOn.value && queriesFor().some(({ query }) => isForbidden(query.error.value)),
 );
+const streamDenials = computed(() => [
+  viewDenial(
+    "streams",
+    "list",
+    failedRequests(
+      ...queriesFor()
+        .map(({ query }) => query.error.value)
+        .filter(isForbidden),
+    ),
+  ),
+]);
 // the compact card waits for MainLayout's list, so an org with data never sees it flash; a failed list reads as empty like a failed probe
 const knownEmpty = computed(() =>
   queriesFor().every(({ query }) =>
@@ -411,10 +423,10 @@ const StatusLine = defineComponent({
   </OBanner>
 
   <template v-else-if="!arrived">
-    <OEmptyState
+    <OAccessLock
       v-if="forbidden && variant === 'full'"
+      :denials="streamDenials"
       size="hero"
-      preset="no-access"
       data-test="first-data-panel-no-access"
     />
     <template v-else>

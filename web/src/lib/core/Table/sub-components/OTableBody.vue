@@ -89,6 +89,7 @@ const emit = defineEmits<{
   "toggle-expansion": [row: any];
   "row-click": [row: any, event: MouseEvent];
   "row-dblclick": [row: any, event: MouseEvent];
+  "row-auxclick": [row: any, event: MouseEvent];
   "row-mouseenter": [row: any, event: MouseEvent];
   "row-mouseleave": [row: any];
   "cell-click": [params: { columnId: string; row: any; value: any }];
@@ -274,6 +275,7 @@ const headingColspan = computed(
       @toggle-expansion="emit('toggle-expansion', $event)"
       @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
       @row-dblclick="(row: any, evt: MouseEvent) => emit('row-dblclick', row, evt)"
+      @row-auxclick="(row: any, evt: MouseEvent) => emit('row-auxclick', row, evt)"
       @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
       @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
       @cell-click="emit('cell-click', $event)"
@@ -339,6 +341,7 @@ const headingColspan = computed(
         @toggle-expansion="emit('toggle-expansion', $event)"
         @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
         @row-dblclick="(row: any, evt: MouseEvent) => emit('row-dblclick', row, evt)"
+        @row-auxclick="(row: any, evt: MouseEvent) => emit('row-auxclick', row, evt)"
         @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
         @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
         @cell-click="emit('cell-click', $event)"
@@ -406,6 +409,7 @@ const headingColspan = computed(
       @toggle-expansion="emit('toggle-expansion', $event)"
       @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
       @row-dblclick="(row: any, evt: MouseEvent) => emit('row-dblclick', row, evt)"
+      @row-auxclick="(row: any, evt: MouseEvent) => emit('row-auxclick', row, evt)"
       @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
       @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
       @cell-click="emit('cell-click', $event)"

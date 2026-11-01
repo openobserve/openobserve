@@ -87,7 +87,7 @@ test.describe('Alerts — no destination', {
       await pm.alertNoDestinationPage.importAlerts([
         pm.alertNoDestinationPage.importPayload(name, destinations),
       ]);
-      await pm.alertNoDestinationPage.expectImportCreated(name);
+      await pm.alertNoDestinationPage.expectImportSucceeded();
 
       const id = await pm.alertNoDestinationPage.trackCreatedAlert(name);
       await pm.alertNoDestinationPage.expectStoredDestinations(id, []);

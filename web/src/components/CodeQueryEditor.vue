@@ -560,6 +560,8 @@ export default defineComponent({
         if (host.querySelector(".view-line") || framesLeft <= 1) editorReady.value = true;
         else handOverWhenPainted(host, framesLeft - 1);
       });
+    // A setup still awaiting must not bind to a remounted sibling that reuses this editorId.
+    let unmounted = false;
     let escapeCount = 0;
     let programmatic = false;
     const asProgrammatic = (edit: () => void) => {
@@ -858,6 +860,7 @@ export default defineComponent({
     const setupEditor = async () => {
       // Lazy load Monaco Editor on first use
       const monacoModule = await loadMonaco();
+      if (unmounted) return;
       monaco = monacoModule;
 
       // Expose Monaco on window for e2e tests (read-only assertions against editor model).
@@ -873,6 +876,7 @@ export default defineComponent({
         // The vendored PromQL grammar — without a tokenizer the
         // query renders monochrome (#9779, #9793).
         const promql = await loadPromqlLanguage();
+        if (unmounted) return;
         monaco.languages.setMonarchTokensProvider("promql", promql.language as any);
         monaco.languages.setLanguageConfiguration("promql", promql.languageConfiguration as any);
       }
@@ -895,19 +899,20 @@ export default defineComponent({
 
       // Faces load lazily on first use, so without this the first measurement can hit the fallback font.
       await document.fonts?.load?.(`1rem ${getFontMono()}`).catch(() => {});
+      if (unmounted) return;
 
       let editorElement = document.getElementById(props.editorId);
       let retryCount = 0;
       const maxRetries = 5;
 
       // Retry mechanism to ensure the editor element is found
-      while (!editorElement && retryCount < maxRetries) {
+      while (!editorElement && retryCount < maxRetries && !unmounted) {
         await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for 100ms
         editorElement = document.getElementById(props.editorId);
         retryCount++;
       }
 
-      if (!editorElement) {
+      if (unmounted || !editorElement) {
         return;
       }
 
@@ -1303,6 +1308,7 @@ export default defineComponent({
     onDeactivated(() => {});
 
     onUnmounted(() => {
+      unmounted = true;
       // Clean up global event listeners
       if (editorObj) {
         if (editorObj._windowClickHandler) {
