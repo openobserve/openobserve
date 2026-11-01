@@ -21,10 +21,7 @@ use utoipa::ToSchema;
 
 use crate::{
     meta::{
-        alerts::{
-            Operator, QueryCondition, TriggerCondition, deduplication::DeduplicationConfig,
-            priority::AlertPriority,
-        },
+        alerts::{Operator, QueryCondition, TriggerCondition, priority::AlertPriority},
         stream::StreamType,
         triggers::{ScheduledTriggerData, Trigger},
     },
@@ -93,8 +90,6 @@ pub struct Alert {
     pub updated_at: Option<DateTime<FixedOffset>>,
     #[serde(default)]
     pub last_edited_by: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deduplication: Option<DeduplicationConfig>,
     /// When true, this alert creates/joins incidents instead of sending direct notifications.
     /// Notification is sent only when a new incident is created or a new alert type joins
     /// an existing incident. Repeated firings are suppressed.
@@ -170,6 +165,10 @@ pub struct Alert {
     /// today. Named after Prometheus' `keep_firing_for`, with the same meaning.
     #[serde(default)]
     pub keep_firing_for: i64,
+
+    /// Notify once per state change; enterprise only, other builds ignore it.
+    #[serde(default)]
+    pub suppress_repeats: bool,
 }
 
 /// Accept a runbook link, or say why not.
@@ -223,7 +222,6 @@ impl MemorySize for Alert {
             + self.description.mem_size()
             + self.owner.mem_size()
             + self.last_edited_by.mem_size()
-            + self.deduplication.mem_size()
             + self.workflows.mem_size()
             + self.tags.mem_size()
             + std::mem::size_of::<Option<AlertPriority>>()
@@ -264,7 +262,6 @@ impl Default for Alert {
             updated_at: None,
             last_edited_by: None,
             last_satisfied_at: None,
-            deduplication: None,
             creates_incident: false,
             workflows: vec![],
             priority: None,
@@ -273,11 +270,17 @@ impl Default for Alert {
             notify_on_recovery: false,
             recovery_destinations: vec![],
             keep_firing_for: 0,
+            suppress_repeats: false,
         }
     }
 }
 
 impl Alert {
+    /// Whether repeat notifications are withheld; other builds than enterprise ignore the switch.
+    pub fn suppresses_repeats(&self) -> bool {
+        cfg!(feature = "enterprise") && self.suppress_repeats
+    }
+
     /// Pending rule mode needs per-series state; the default count gate means any series.
     pub fn normalize_promql_rule_mode(&mut self) {
         if self.query_condition.query_type != super::QueryType::PromQL
@@ -967,7 +970,6 @@ mod tests {
             template: None,
             context_attributes: None,
             updated_at: None,
-            deduplication: None,
             ..Default::default()
         };
         let json = serde_json::to_value(&alert).unwrap();
@@ -975,14 +977,12 @@ mod tests {
         assert!(!obj.contains_key("template"));
         assert!(!obj.contains_key("context_attributes"));
         assert!(!obj.contains_key("updated_at"));
-        assert!(!obj.contains_key("deduplication"));
     }
 
     #[test]
     fn test_alert_skip_serializing_if_some_fields_present() {
         use chrono::TimeZone;
 
-        use crate::meta::alerts::deduplication::DeduplicationConfig;
         let mut ctx = HashMap::new();
         ctx.insert("env".to_string(), "prod".to_string());
         let tz = chrono::FixedOffset::east_opt(0).unwrap();
@@ -991,7 +991,6 @@ mod tests {
             template: Some("my_template".to_string()),
             context_attributes: Some(ctx),
             updated_at: Some(dt),
-            deduplication: Some(DeduplicationConfig::default()),
             ..Default::default()
         };
         let json = serde_json::to_value(&alert).unwrap();
@@ -1000,7 +999,29 @@ mod tests {
         assert_eq!(obj["template"], serde_json::json!("my_template"));
         assert!(obj.contains_key("context_attributes"));
         assert!(obj.contains_key("updated_at"));
-        assert!(obj.contains_key("deduplication"));
+    }
+
+    #[test]
+    fn test_stored_deduplication_still_loads_and_is_dropped_on_save() {
+        let stored = r#"{
+            "name": "test_alert",
+            "org_id": "test_org",
+            "stream_type": "logs",
+            "stream_name": "test_stream",
+            "is_real_time": false,
+            "destinations": [],
+            "deduplication": {
+                "enabled": true,
+                "fingerprint_fields": ["host"],
+                "time_window_minutes": 30,
+                "grouping": {"enabled": true, "max_group_size": 10, "group_wait_seconds": 30}
+            }
+        }"#;
+
+        let alert: Alert = serde_json::from_str(stored).unwrap();
+        assert_eq!(alert.name, "test_alert");
+        let saved = serde_json::to_value(&alert).unwrap();
+        assert!(!saved.as_object().unwrap().contains_key("deduplication"));
     }
 
     // ── Feature 2: list params (PT-3, PT-8) ─────────────────────────────────
@@ -1221,5 +1242,23 @@ mod tests {
         assert_eq!(alert.runbook_url, None);
         let json = serde_json::to_value(&alert).unwrap();
         assert!(json.get("runbook_url").is_none());
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn repeat_suppression_is_ignored_outside_enterprise() {
+        let alert = Alert {
+            suppress_repeats: true,
+            ..Default::default()
+        };
+        assert!(!alert.suppresses_repeats());
+    }
+
+    #[test]
+    fn an_alert_saved_before_repeat_suppression_reads_with_it_off() {
+        let mut stored = serde_json::to_value(Alert::default()).unwrap();
+        stored.as_object_mut().unwrap().remove("suppress_repeats");
+        let alert: Alert = serde_json::from_value(stored).unwrap();
+        assert!(!alert.suppress_repeats);
     }
 }

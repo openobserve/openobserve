@@ -204,3 +204,50 @@ describe("AzureConfig.vue: first event status", () => {
     wrapper.unmount();
   });
 });
+
+describe("AzureConfig.vue: ingest endpoint", () => {
+  const ingestUrl = "http://localhost:5080/api/test-org/azure-activity-logs/_json";
+
+  it("shows the real activity-logs ingest URL in the manual configuration", () => {
+    const wrapper = mount(AzureConfig, {
+      global: { plugins: [mockI18n, mockRouter], provide: { store: mockStore } },
+    });
+    const manual = (wrapper.vm as any).manualContent as string;
+    expect(manual).toContain(ingestUrl);
+    expect(manual).not.toContain("_event_hub");
+    expect(manual).not.toContain("/azure/");
+    wrapper.unmount();
+  });
+
+  it("lists the username and password fields the ARM template asks for", () => {
+    const wrapper = mount(AzureConfig, {
+      global: { plugins: [mockI18n, mockRouter], provide: { store: mockStore } },
+    });
+    const manual = (wrapper.vm as any).manualContent as string;
+    expect(manual).toContain("OpenObserve username: [EMAIL]");
+    expect(manual).toContain("OpenObserve password: [PASSCODE]");
+    expect(manual).not.toContain("Access Key");
+    wrapper.unmount();
+  });
+
+  it("deploys the ARM template with the ingest URL and username/password parameters", async () => {
+    vi.clearAllMocks();
+    vi.stubGlobal("open", vi.fn());
+    const { generateARMTemplateURL } = await import("../../../utils/azureIntegrations");
+    const wrapper = mount(AzureConfig, {
+      global: { plugins: [mockI18n, mockRouter], provide: { store: mockStore } },
+    });
+    (wrapper.vm as any).handleDeploy();
+    expect(generateARMTemplateURL).toHaveBeenCalledWith(
+      expect.anything(),
+      ingestUrl,
+      "test@example.com",
+      "test-passcode",
+    );
+    wrapper.unmount();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+});

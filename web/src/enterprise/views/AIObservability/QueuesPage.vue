@@ -531,7 +531,6 @@ async function refresh(force = true) {
     // open re-fetches.
     optionsLoaded.value = false;
   } catch {
-    // The grouped access toast already reports a 403; a second red toast adds nothing.
     if (!forbidden.value) {
       toast({ variant: "error", message: t("aiObservability.queues.loadError") });
     }

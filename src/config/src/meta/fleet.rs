@@ -32,8 +32,6 @@ pub const DEFAULT_GATE_WINDOW_SECS: u32 = 5 * 60;
 pub const DEFAULT_GATE_PASS_PERCENT: u32 = 95;
 pub const DEFAULT_PAGE_LIMIT: usize = 100;
 pub const MAX_PAGE_LIMIT: usize = 1000;
-/// Bulk moves accept at most this many collectors (§4.4).
-pub const MAX_MOVE_COLLECTORS: usize = 1000;
 
 /// Issues keyed by pipeline id; the empty key holds document-level issues.
 pub type Issues = BTreeMap<String, Vec<ConfigIssue>>;
@@ -71,7 +69,7 @@ pub struct Collector {
     pub version: Option<String>,
     pub outdated: bool,
     pub status: CollectorStatus,
-    /// The connection's peer address, honouring `X-Forwarded-For`.
+    /// The connection's client address, as `ZO_HTTP_REAL_IP_SOURCE` resolves it.
     pub last_connected_from: Option<String>,
     pub fleet: CollectorFleet,
     pub token_id: Option<String>,
@@ -501,19 +499,22 @@ impl FleetSettings {
         self.or(org_defaults).or(&Self::builtin())
     }
 
+    /// The same bounds the settings form enforces, so the API cannot store what the UI refuses.
     pub fn validate(&self) -> Result<(), String> {
-        let positive = [
-            ("heartbeat_interval_secs", self.heartbeat_interval_secs),
-            ("offline_heartbeats", self.offline_heartbeats),
-            ("phase_timeout_secs", self.phase_timeout_secs),
+        let bounded = [
+            (
+                "heartbeat_interval_secs",
+                self.heartbeat_interval_secs,
+                5,
+                3600,
+            ),
+            ("offline_heartbeats", self.offline_heartbeats, 1, 100),
+            ("retention_days", self.retention_days, 0, 3650),
+            ("offline_ratio_percent", self.offline_ratio_percent, 1, 100),
+            ("phase_timeout_secs", self.phase_timeout_secs, 60, 86400),
         ];
-        for (name, value) in positive {
-            if value == Some(0) {
-                return Err(format!("{name} must be greater than 0"));
-            }
-        }
-        if self.offline_ratio_percent.is_some_and(|p| p > 100) {
-            return Err("offline_ratio_percent must be between 0 and 100".to_string());
+        for (name, value, min, max) in bounded {
+            in_range(name, value, min, max)?;
         }
         match self.gate {
             Some(gate) => gate.validate(),
@@ -543,13 +544,9 @@ impl Default for GateSettings {
 
 impl GateSettings {
     pub fn validate(&self) -> Result<(), String> {
-        if self.window_secs == 0 {
-            return Err("gate.window_secs must be greater than 0".to_string());
-        }
-        if self.pass_percent == 0 || self.pass_percent > 100 {
-            return Err("gate.pass_percent must be between 1 and 100".to_string());
-        }
-        Ok(())
+        in_range("gate.observe_secs", Some(self.observe_secs), 0, 86400)?;
+        in_range("gate.window_secs", Some(self.window_secs), 30, 86400)?;
+        in_range("gate.pass_percent", Some(self.pass_percent), 1, 100)
     }
 }
 
@@ -628,19 +625,6 @@ pub struct CreateFleetRequest {
 #[serde(deny_unknown_fields)]
 pub struct RenameFleetRequest {
     pub name: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct MoveCollectorsRequest {
-    pub collector_ids: Vec<String>,
-    /// Destination fleet id.
-    pub to_fleet: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct MoveCollectorsResponse {
-    pub moved: usize,
 }
 
 /// Why a reference-protected delete was refused (409).
@@ -1003,6 +987,15 @@ fn default_fleet() -> String {
     crate::meta::folder::DEFAULT_FOLDER.to_string()
 }
 
+fn in_range(name: &str, value: Option<u32>, min: u32, max: u32) -> Result<(), String> {
+    match value {
+        Some(v) if !(min..=max).contains(&v) => {
+            Err(format!("{name} must be between {min} and {max}"))
+        }
+        _ => Ok(()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1284,6 +1277,34 @@ mod tests {
     }
 
     #[test]
+    fn settings_validation_matches_the_form_bounds() {
+        let heartbeat = |secs| FleetSettings {
+            heartbeat_interval_secs: Some(secs),
+            ..Default::default()
+        };
+        for secs in [1, 4, 3601, 86_400] {
+            assert!(heartbeat(secs).validate().is_err(), "{secs}");
+        }
+        for secs in [5, 30, 3600] {
+            assert!(heartbeat(secs).validate().is_ok(), "{secs}");
+        }
+        let gate = |window_secs| FleetSettings {
+            gate: Some(GateSettings {
+                window_secs,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert!(gate(29).validate().is_err());
+        assert!(gate(30).validate().is_ok());
+        let ratio = FleetSettings {
+            offline_ratio_percent: Some(0),
+            ..Default::default()
+        };
+        assert!(ratio.validate().is_err());
+    }
+
+    #[test]
     fn org_settings_fill_missing_fields_and_refuse_unknown_ones() {
         let decoded: Settings = serde_json::from_str("{}").unwrap();
         assert_eq!(decoded, Settings::default());
@@ -1315,12 +1336,7 @@ mod tests {
     }
 
     #[test]
-    fn move_and_fleet_types_serialize_as_the_api_documents() {
-        let req: MoveCollectorsRequest =
-            serde_json::from_str(r#"{"collector_ids":["c1"],"to_fleet":"f2"}"#).unwrap();
-        assert_eq!((req.collector_ids.len(), req.to_fleet.as_str()), (1, "f2"));
-        let old = r#"{"collector_ids":[],"dst_folder_id":"f"}"#;
-        assert!(serde_json::from_str::<MoveCollectorsRequest>(old).is_err());
+    fn fleet_types_serialize_as_the_api_documents() {
         let list = FleetList {
             total: 1,
             items: vec![Fleet {

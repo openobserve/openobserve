@@ -96,7 +96,16 @@ describe("PromQLChartConfig", () => {
     });
 
     it("should show aggregation config for supported chart types", () => {
-      const supportedTypes = ["pie", "donut", "geomap", "maps", "metric", "gauge", "h-bar"];
+      const supportedTypes = [
+        "pie",
+        "donut",
+        "geomap",
+        "maps",
+        "metric",
+        "gauge",
+        "bar-gauge",
+        "h-bar",
+      ];
 
       supportedTypes.forEach((type) => {
         wrapper = createWrapper({ chartType: type });

@@ -67,6 +67,7 @@ const codeQueryEditorStub = {
     "showAutoComplete",
     "editorId",
     "valuesTimeRange",
+    "textPreview",
   ],
   emits: [
     "update:query",
@@ -565,6 +566,18 @@ describe("QueryEditor", () => {
       // Assert — called with the actual new value
       expect(mockSetValue).toHaveBeenCalledOnce();
       expect(mockSetValue).toHaveBeenCalledWith("SELECT 2");
+    });
+  });
+
+  describe("text preview", () => {
+    it("forwards textPreview to the code editor", () => {
+      wrapper = mountQueryEditor({ textPreview: true });
+      expect(wrapper.findComponent(codeQueryEditorStub).props("textPreview")).toBe(true);
+    });
+
+    it("leaves the preview off by default", () => {
+      wrapper = mountQueryEditor();
+      expect(wrapper.findComponent(codeQueryEditorStub).props("textPreview")).toBe(false);
     });
   });
 

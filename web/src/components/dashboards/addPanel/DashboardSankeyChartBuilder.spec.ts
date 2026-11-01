@@ -139,8 +139,8 @@ describe("DashboardSankeyChartBuilder", () => {
   };
 
   describe("Component Rendering", () => {
-    it("renders the source, target and value slots for a sankey, and none for a bar chart", () => {
-      mockDashboardPanelData.data.type = "sankey";
+    it("renders the source, target and value slots for a node graph, and none for a bar chart", () => {
+      mockDashboardPanelData.data.type = "node-graph";
       wrapper = createWrapper();
       expect(wrapper.find('[data-test="dashboard-source-layout"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="dashboard-target-layout"]').exists()).toBe(true);

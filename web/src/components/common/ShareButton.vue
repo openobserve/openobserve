@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButton
+    ref="buttonRef"
     :data-test="dataTest"
     :aria-label="t('search.shareLink')"
     :class="buttonClass"
@@ -121,6 +122,7 @@ export default defineComponent({
     const store = useStore();
 
     const isLoading = ref(false);
+    const buttonRef = ref<{ $el: HTMLElement } | null>(null);
     let pollIntervalId: number | null = null;
     let isPolling = false; // Flag to prevent multiple polling instances
 
@@ -177,6 +179,7 @@ export default defineComponent({
             successMessage: t("search.linkCopiedSuccessfully"),
             errorMessage: t("search.errorCopyingLink"),
             timeout: 5000,
+            anchor: buttonRef.value?.$el,
           })
             .then((success: boolean) => {
               if (success) {
@@ -254,6 +257,7 @@ export default defineComponent({
                 successMessage: t("search.linkCopiedSuccessfully"),
                 errorMessage: t("search.errorCopyingLink"),
                 timeout: 5000,
+                anchor: buttonRef.value?.$el,
               })
                 .then((success: boolean) => {
                   if (success) {
@@ -320,6 +324,7 @@ export default defineComponent({
       raw,
       t,
       isLoading,
+      buttonRef,
       isWebUrlNotConfigured,
       handleShareClick,
     };

@@ -170,7 +170,7 @@ describe("AppAnalytics shell", () => {
     document.body.innerHTML = "";
   });
 
-  it("shows the five sub-tabs, Named events after Retention, and highlights the routed one (AC-40)", async () => {
+  it("shows the six sub-tabs, Heatmaps between Paths and Retention, Named events last, and highlights the routed one (AC-40)", async () => {
     await mountAt("/product-analytics/funnels?period=7d");
     const tabs = wrapper!
       .findAll('[data-test^="rum-analytics-subtab-"][role="tab"]')
@@ -179,6 +179,7 @@ describe("AppAnalytics shell", () => {
       ["rum-analytics-subtab-overview", "Overview"],
       ["rum-analytics-subtab-funnels", "Funnels"],
       ["rum-analytics-subtab-paths", "Paths"],
+      ["rum-analytics-subtab-heatmaps", "Heatmaps"],
       ["rum-analytics-subtab-retention", "Retention"],
       ["rum-analytics-subtab-events", "Named events"],
     ]);

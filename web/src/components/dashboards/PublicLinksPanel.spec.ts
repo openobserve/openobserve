@@ -975,6 +975,158 @@ describe("PublicLinksPanel", () => {
       expect(w.findComponent({ name: "ODrawer" }).props("primaryButtonDisabled")).toBe(false);
       expect(await create(w)).toEqual({ qns: "ingress-nginx" });
     });
+
+    it("keeps an edited link's unset value when the dashboard now has one", async () => {
+      const unset = link({ frozen_variables: { qns: null } });
+      vi.mocked(admin.list).mockResolvedValue({ data: { list: [unset] } } as never);
+      vi.mocked(admin.update).mockResolvedValue({ data: unset } as never);
+      const w = realPickers({
+        editLinkId: "l1",
+        dashboardVariables: { getUrlParams: () => ({ "var-qns": "x" }) },
+      });
+      await flushPromises();
+      expect(stream.fetch).not.toHaveBeenCalled();
+
+      (
+        w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+      ).form.setFieldValue("name", "NOC wall (renamed)");
+      await submit(w);
+      const cfg = vi.mocked(admin.update).mock.calls[0][3];
+      expect(cfg.name).toBe("NOC wall (renamed)");
+      expect(cfg.frozen_variables.qns).toBeNull();
+    });
+  });
+
+  it("lists variable values for the link's own ranges, not the dashboard's time range", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+    const w = build({ timeObj: { start_time: new Date(0), end_time: new Date(900_000) } });
+    await flushPromises();
+    const pickerWindow = () =>
+      w.findComponent({ name: "VariablesValueSelector" }).props("selectedTimeDate") as {
+        start_time: Date;
+        end_time: Date;
+      };
+    expect(Date.now() - pickerWindow().end_time.getTime()).toBeLessThan(60_000);
+    expect(pickerWindow().end_time.getTime() - pickerWindow().start_time.getTime()).toBe(
+      86_400_000,
+    );
+
+    await w.find('[data-test="dashboards-public-links-panel-add-range-btn"]').trigger("click");
+    await flushPromises();
+    expect(pickerWindow().end_time.getTime() - pickerWindow().start_time.getTime()).toBe(
+      604_800_000,
+    );
+  });
+
+  it("offers no seconds in the range pickers, which the form refuses", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+    const w = build();
+    await flushPromises();
+    const pickers = w.findAllComponents({ name: "DateTime" });
+    expect(pickers).toHaveLength(2);
+    expect(pickers.every((p) => "hide-seconds" in p.attributes())).toBe(true);
+  });
+
+  it("asks before discarding a changed form, and leaves an untouched one without asking", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    const w = build();
+    await flushPromises();
+    const openNew = async () => {
+      await w.find('[data-test="dashboards-public-links-panel-new-btn"]').trigger("click");
+      await flushPromises();
+    };
+    const back = async () => {
+      await w.find('[data-test="dashboards-public-links-panel-back-btn"]').trigger("click");
+      await flushPromises();
+    };
+    const nameValue = () =>
+      (
+        w.find('[data-test="dashboards-public-links-panel-name-input"] input')
+          .element as HTMLInputElement
+      ).value;
+
+    await openNew();
+    await back();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(has(w, "dashboards-public-links-panel-list")).toBe(true);
+
+    await openNew();
+    (
+      w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+    ).form.setFieldValue("name", "Draft");
+    await flushPromises();
+    confirm.mockResolvedValueOnce(false);
+    await back();
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Unsaved changes", confirmLabel: "Discard changes" }),
+    );
+    expect(has(w, "dashboards-public-links-panel-form")).toBe(true);
+    expect(nameValue()).toBe("Draft");
+
+    confirm.mockResolvedValueOnce(true);
+    const guard = w.findComponent({ name: "ODrawer" }).props("closeGuard") as () => boolean;
+    expect(guard()).toBe(false);
+    await flushPromises();
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(has(w, "dashboards-public-links-panel-list")).toBe(true);
+  });
+
+  it("reloads the list on every opening and after a refused create", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    const w = build();
+    await flushPromises();
+    expect(admin.list).toHaveBeenCalledTimes(1);
+
+    await w.setProps({ modelValue: false });
+    await w.setProps({ modelValue: true });
+    await flushPromises();
+    expect(admin.list).toHaveBeenCalledTimes(2);
+
+    const limit = "This dashboard has reached its limit of 10 public links";
+    vi.mocked(admin.create).mockRejectedValue({
+      response: { status: 400, data: { message: limit } },
+    });
+    await w.find('[data-test="dashboards-public-links-panel-new-btn"]').trigger("click");
+    await flushPromises();
+    (
+      w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+    ).form.setFieldValue("name", "NOC wall");
+    await submit(w);
+    expect(notify.error).toHaveBeenCalledWith(limit);
+    expect(admin.list).toHaveBeenCalledTimes(3);
+  });
+
+  it("says when the org has public links off, and holds create, pause and resume", async () => {
+    vi.mocked(admin.list).mockResolvedValue({
+      data: {
+        list: [
+          link({ status: "disabled" }),
+          link({ id: "l2", name: "Lobby", status: "disabled", enabled: false }),
+        ],
+      },
+    } as never);
+    const w = build();
+    await flushPromises();
+    const el = (id: string) => w.find(`[data-test="dashboards-public-links-panel-${id}"]`);
+    expect(el("org-disabled").text()).toContain(
+      "Public links are turned off for this organization",
+    );
+    expect(el("new-btn").attributes("disabled")).toBeDefined();
+    expect(el("l1-pause-btn").attributes("disabled")).toBeDefined();
+    expect(el("l2-resume-btn").attributes("disabled")).toBeDefined();
+    expect(el("l2-resume-menu").attributes("disabled")).toBeDefined();
+    expect(el("l1-status").text()).toBe("Disabled");
+    expect(el("l2-status").text()).toBe("Disabled · Paused");
+  });
+
+  it("shows no org banner while public links are on", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    const w = build();
+    await flushPromises();
+    expect(has(w, "dashboards-public-links-panel-org-disabled")).toBe(false);
+    expect(
+      w.find('[data-test="dashboards-public-links-panel-new-btn"]').attributes("disabled"),
+    ).toBeUndefined();
   });
 
   it("finds a link by its slug or a pasted public URL", async () => {

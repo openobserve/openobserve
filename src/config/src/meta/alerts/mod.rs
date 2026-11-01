@@ -15,7 +15,7 @@
 
 use std::str::FromStr;
 
-use chrono::{Duration, FixedOffset, Offset, Timelike, Utc};
+use chrono::{Duration, FixedOffset, LocalResult, Offset, TimeZone, Timelike, Utc};
 use chrono_tz::Tz;
 use cron::Schedule;
 use serde::{Deserialize, Serialize};
@@ -36,7 +36,6 @@ pub mod alert;
 pub mod auto_investigate;
 pub mod composite;
 pub mod content_spec;
-pub mod deduplication;
 pub mod dispatch;
 pub mod grouping;
 pub mod incidents;
@@ -54,6 +53,8 @@ pub mod tags;
 /// when the alert's own silence is 0 — without a floor, every matching
 /// ingestion request sends a notification and its db writes.
 const REALTIME_MIN_SILENCE_SECS: i64 = 30;
+// Wider than any zone's clock change, so both copies of a repeated local time are seen.
+const CLOCK_CHANGE_WINDOW_HOURS: i64 = 3;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]
@@ -128,6 +129,71 @@ fn get_offset_minutes_from_tz(tz: &Tz, at_time: chrono::DateTime<Utc>) -> i32 {
     local_time.offset().fix().local_minus_utc() / 60
 }
 
+/// Next cron fire strictly after `after`, with the cron matched against `tz` wall-clock time.
+pub(crate) fn next_cron_in_zone(
+    schedule: &Schedule,
+    tz: &Tz,
+    after: chrono::DateTime<Utc>,
+) -> Option<chrono::DateTime<Utc>> {
+    let offset_now = get_offset_minutes_from_tz(tz, after);
+    let fixed = schedule
+        .after(&after.with_timezone(&fixed_offset(offset_now)?))
+        .next()
+        .map(|t| t.with_timezone(&Utc));
+    let window = Duration::hours(CLOCK_CHANGE_WINDOW_HOURS);
+    // Two clock changes never fall within a day, so equal offsets at both ends rule one out.
+    if let Some(t) = fixed
+        && t - after <= Duration::days(1)
+        && get_offset_minutes_from_tz(tz, t) == offset_now
+        && get_offset_minutes_from_tz(tz, after - window) == offset_now
+    {
+        return Some(t);
+    }
+    next_cron_across_clock_change(schedule, tz, after)
+}
+
+fn next_cron_across_clock_change(
+    schedule: &Schedule,
+    tz: &Tz,
+    after: chrono::DateTime<Utc>,
+) -> Option<chrono::DateTime<Utc>> {
+    let shift = Duration::hours(CLOCK_CHANGE_WINDOW_HOURS);
+    let local_after = after.with_timezone(tz).naive_local();
+    let mut best: Option<chrono::DateTime<Utc>> = None;
+    // The cron walks local wall-clock readings, carried in a `Utc` value as a plain clock.
+    for reading in schedule.after(&Utc.from_utc_datetime(&(local_after - shift))) {
+        let local = reading.naive_utc();
+        if best.is_some_and(|b| local > b.with_timezone(tz).naive_local() + shift) {
+            break;
+        }
+        let instants = match tz.from_local_datetime(&local) {
+            LocalResult::Single(t) => [Some(t.with_timezone(&Utc)), None],
+            LocalResult::Ambiguous(first, second) => [
+                Some(first.with_timezone(&Utc)),
+                Some(second.with_timezone(&Utc)),
+            ],
+            // A skipped reading runs at that reading in the offset in force before the change.
+            LocalResult::None => [skipped_reading_instant(tz, local, shift), None],
+        };
+        for t in instants.into_iter().flatten() {
+            if t > after && best.is_none_or(|b| t < b) {
+                best = Some(t);
+            }
+        }
+    }
+    best
+}
+
+fn skipped_reading_instant(
+    tz: &Tz,
+    local: chrono::NaiveDateTime,
+    shift: Duration,
+) -> Option<chrono::DateTime<Utc>> {
+    let before = tz.from_local_datetime(&(local - shift)).earliest()?;
+    let offset = Duration::seconds(before.offset().fix().local_minus_utc() as i64);
+    Some(Utc.from_utc_datetime(&(local - offset)))
+}
+
 impl TriggerCondition {
     // TODO: Currently, the frequency for alert is in seconds, but the
     // frequency for derived stream is in minutes. This needs to be fixed for alert.
@@ -161,53 +227,28 @@ impl TriggerCondition {
 
         if self.frequency_type == FrequencyType::Cron {
             let schedule = Schedule::from_str(&self.cron)?;
-
-            // Try to parse timezone string and get current offset (DST-aware)
-            // If parsing fails, fallback to the provided timezone_offset for backward compatibility
-            let current_offset_minutes =
-                match get_timezone_from_string(self.timezone.as_deref(), timezone_offset) {
-                    Ok(tz) => {
-                        // Using Tz - DST-aware timezone, get the current offset
-                        get_offset_minutes_from_tz(&tz, start_utc)
-                    }
-                    Err(_) => {
-                        // Fallback to provided timezone_offset for backward compatibility
-                        timezone_offset
-                    }
-                };
-
-            // Create FixedOffset with the calculated or provided offset
-            let tz_offset = fixed_offset(current_offset_minutes).ok_or_else(|| {
-                anyhow::anyhow!("timezone offset {current_offset_minutes} minutes is out of range")
-            })?;
-
-            if apply_silence {
-                let silence = Duration::try_minutes(self.silence)
+            let after = if apply_silence {
+                Duration::try_minutes(self.silence)
                     .and_then(|silence| start_utc.checked_add_signed(silence))
-                    .ok_or_else(|| anyhow::anyhow!("silence is out of range"))?;
-                let silence = silence.with_timezone(&tz_offset);
-                // Check for the cron timestamp after the silence period
-                Ok(schedule
-                    .after(&silence)
-                    .next()
-                    .ok_or_else(|| anyhow::anyhow!("cron schedule has no future occurrence"))?
-                    .timestamp_micros()
-                    .checked_add(tolerance)
-                    .ok_or_else(|| anyhow::anyhow!("tolerance is out of range"))?)
+                    .ok_or_else(|| anyhow::anyhow!("silence is out of range"))?
             } else {
-                // This is important, if provided start_utc was `Some`, it should use the next run
-                // after the start_utc. If it was `None`, it should use the next run after the
-                // current time.
-                let start_utc = start_utc.with_timezone(&tz_offset);
-                // Check for the cron timestamp in the future
-                Ok(schedule
-                    .after(&start_utc)
-                    .next()
-                    .ok_or_else(|| anyhow::anyhow!("cron schedule has no future occurrence"))?
-                    .timestamp_micros()
-                    .checked_add(tolerance)
-                    .ok_or_else(|| anyhow::anyhow!("tolerance is out of range"))?)
-            }
+                start_utc
+            };
+            let next = match get_timezone_from_string(self.timezone.as_deref(), timezone_offset) {
+                Ok(tz) => next_cron_in_zone(&schedule, &tz, after).map(|t| t.timestamp_micros()),
+                Err(_) => {
+                    let tz_offset = fixed_offset(timezone_offset).ok_or_else(|| {
+                        anyhow::anyhow!("timezone offset {timezone_offset} minutes is out of range")
+                    })?;
+                    schedule
+                        .after(&after.with_timezone(&tz_offset))
+                        .next()
+                        .map(|t| t.timestamp_micros())
+                }
+            };
+            next.ok_or_else(|| anyhow::anyhow!("cron schedule has no future occurrence"))?
+                .checked_add(tolerance)
+                .ok_or_else(|| anyhow::anyhow!("tolerance is out of range"))
         } else if apply_silence {
             // silence is in minutes, frequency is in seconds
             // When the silence period is less than the frequency, the alert runs after the silence
@@ -408,21 +449,20 @@ impl TriggerCondition {
             return i64::MAX;
         };
 
-        // Same DST-aware offset resolution as `get_next_trigger_time_*`, so the
-        // sweep and the scheduler agree on when this alert actually fires.
-        let offset_minutes = match get_timezone_from_string(self.timezone.as_deref(), 0) {
-            Ok(tz) => get_offset_minutes_from_tz(&tz, anchor),
-            Err(_) => 0,
+        let take = k.max(0) as usize;
+        let occurrences: Vec<i64> = match get_timezone_from_string(self.timezone.as_deref(), 0) {
+            Ok(tz) => std::iter::successors(next_cron_in_zone(&schedule, &tz, anchor), |prev| {
+                next_cron_in_zone(&schedule, &tz, *prev)
+            })
+            .take(take)
+            .map(|d| d.timestamp_micros())
+            .collect(),
+            Err(_) => schedule
+                .after(&anchor)
+                .take(take)
+                .map(|d| d.timestamp_micros())
+                .collect(),
         };
-        let Some(tz_offset) = FixedOffset::east_opt(offset_minutes * 60) else {
-            return i64::MAX;
-        };
-
-        let anchored = anchor.with_timezone(&tz_offset);
-        let occurrences = schedule
-            .after(&anchored)
-            .take(k.max(0) as usize)
-            .map(|d| d.timestamp_micros());
         cron_resolve_threshold_micros(last_seen, occurrences, k)
     }
 }
@@ -1926,6 +1966,81 @@ mod test {
                 tz_name
             );
         }
+    }
+
+    #[test]
+    fn test_cron_next_run_across_dst_change_keeps_local_time() {
+        use chrono::TimeZone;
+        use chrono_tz::America::Los_Angeles;
+
+        let condition = TriggerCondition {
+            frequency_type: FrequencyType::Cron,
+            cron: "0 0 9 * * *".to_string(),
+            timezone: Some("America/Los_Angeles".to_string()),
+            ..Default::default()
+        };
+        let cases = [
+            (
+                Utc.with_ymd_and_hms(2026, 10, 31, 17, 46, 0).unwrap(),
+                Utc.with_ymd_and_hms(2026, 11, 1, 17, 0, 0).unwrap(),
+            ),
+            (
+                Utc.with_ymd_and_hms(2026, 3, 7, 18, 0, 0).unwrap(),
+                Utc.with_ymd_and_hms(2026, 3, 8, 16, 0, 0).unwrap(),
+            ),
+        ];
+        for (start, expected) in cases {
+            let next = condition
+                .get_next_trigger_time_non_aligned(
+                    true,
+                    -420,
+                    false,
+                    Some(start.timestamp_micros()),
+                )
+                .unwrap();
+            assert_eq!(next, expected.timestamp_micros(), "start {start}");
+            let local = DateTime::from_timestamp_micros(next)
+                .unwrap()
+                .with_timezone(&Los_Angeles);
+            assert_eq!((local.hour(), local.minute()), (9, 0), "start {start}");
+            assert_eq!(
+                condition.group_resolve_threshold_micros(start.timestamp_micros(), 1),
+                next - start.timestamp_micros(),
+                "start {start}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_cron_next_run_inside_dst_change_hours() {
+        use chrono::TimeZone;
+
+        let la: Tz = "America/Los_Angeles".parse().unwrap();
+        let at = |h, m| Utc.with_ymd_and_hms(2026, 11, 1, h, m, 0).unwrap();
+        let spring = |h, m| Utc.with_ymd_and_hms(2026, 3, 8, h, m, 0).unwrap();
+        let next =
+            |cron: &str, after| next_cron_in_zone(&Schedule::from_str(cron).unwrap(), &la, after);
+        let cases = [
+            ("0 */5 * * * *", at(9, 10), at(9, 15)),
+            ("0 */5 * * * *", at(8, 55), at(9, 0)),
+            ("0 0 * * * *", at(8, 0), at(9, 0)),
+            // 02:30 does not exist on the spring-forward day, so it runs at 03:30 PDT.
+            ("0 30 2 * * *", spring(9, 0), spring(10, 30)),
+            ("0 30 2 * * *", spring(9, 30), spring(10, 30)),
+            ("0 30 2 * * *", spring(10, 10), spring(10, 30)),
+            ("0 30 1 1 11 * 2026", at(8, 30), at(9, 30)),
+        ];
+        for (cron, after, expected) in cases {
+            assert_eq!(next(cron, after), Some(expected), "{cron} after {after}");
+        }
+
+        let london: Tz = "Europe/London".parse().unwrap();
+        let sparse = Schedule::from_str("0 30 1 25 10 * 2026,2028").unwrap();
+        let first_copy = Utc.with_ymd_and_hms(2026, 10, 25, 0, 30, 0).unwrap();
+        assert_eq!(
+            next_cron_in_zone(&sparse, &london, first_copy),
+            Some(Utc.with_ymd_and_hms(2026, 10, 25, 1, 30, 0).unwrap())
+        );
     }
 
     #[test]

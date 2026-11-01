@@ -395,6 +395,43 @@ describe("FieldList", () => {
     });
   });
 
+  describe("Field list loading", () => {
+    const NO_FIELDS = "No fields found for the selected stream";
+    const fieldList = () => wrapper.findComponent({ name: "OFieldList" });
+
+    it("shows the loading rows, not the empty message, while the stream's fields load", async () => {
+      mockReturn.updateGroupedFields = vi.fn(() => new Promise<void>(() => {}));
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(fieldList().props("loading")).toBe(true);
+      expect(wrapper.text()).not.toContain(NO_FIELDS);
+    });
+
+    it("shows the loading rows while the stream list loads", async () => {
+      mockGetStreams.mockReturnValue(new Promise(() => {}));
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(fieldList().props("loading")).toBe(true);
+      expect(wrapper.text()).not.toContain(NO_FIELDS);
+    });
+
+    it("shows the empty message once both loads settle with no fields", async () => {
+      mockReturn.updateGroupedFields = vi.fn(() => Promise.resolve());
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(fieldList().props("loading")).toBe(false);
+      expect(wrapper.text()).toContain(NO_FIELDS);
+    });
+
+    it("settles to the empty message when the fields load fails", async () => {
+      mockReturn.updateGroupedFields = vi.fn(() => Promise.reject(new Error("schema")));
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(fieldList().props("loading")).toBe(false);
+      expect(wrapper.text()).toContain(NO_FIELDS);
+    });
+  });
+
   // ── Stream Selection ────────────────────────────────────────────────
 
   describe("Stream Selection", () => {

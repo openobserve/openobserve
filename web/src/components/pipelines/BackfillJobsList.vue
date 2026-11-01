@@ -510,7 +510,7 @@ const columns: OTableColumnDef[] = [
     id: "actions",
     header: t("common.actions"),
     accessorKey: "actions",
-    meta: { align: "center", actionCount: 4 },
+    meta: { align: "center", actionCount: 5 },
     isAction: true,
     size: 128,
   },
@@ -537,7 +537,6 @@ const loadJobs = async () => {
   } catch (error: any) {
     console.error("Error loading backfill jobs:", error);
     forbidden.value = error?.response?.status === 403;
-    // The grouped access toast already reports a 403; a second red toast adds nothing.
     if (!forbidden.value) {
       toast({
         variant: "error",

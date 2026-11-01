@@ -19,6 +19,9 @@ import { reactive } from "vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import { convertToUtcTimestamp } from "@/utils/timezone";
+import { formatAxisTickValue } from "@/utils/dashboard/axisTickFormat";
+import { createSeriesOverrideLookup } from "@/utils/dashboard/seriesOverrides";
+import { convertMultiSQLData } from "@/utils/dashboard/convertSQLData";
 
 // ---------------------------------------------------------------------------
 // Heavy async component stubs — must be declared before the component import
@@ -276,13 +279,84 @@ describe("TracesMetricsDashboard", () => {
       );
     });
 
-    it("labels Rate in traces/s with two decimals", async () => {
+    it("shows traces/s once in the Rate header and keeps the y ticks plain", async () => {
       await wrapper.vm.loadDashboard();
       await flushPromises();
       const config = getPanel(wrapper, "Rate").config;
-      expect(config.unit).toBe("custom");
-      expect(config.unit_custom).toBe("traces/s");
-      expect(config.decimals).toBe(2);
+      expect(config.title_meta).toBe("traces/s");
+      expect(formatAxisTickValue(10, config.unit, config.unit_custom, config.decimals)).toBe(
+        "10.00",
+      );
+    });
+
+    it("keeps traces/s with two decimals on the Rate tooltip value", async () => {
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const lookup = createSeriesOverrideLookup(getPanel(wrapper, "Rate").config);
+      expect(lookup.formatValue(12.345, "max_rate")).toBe("12.35traces/s");
+      expect(lookup.formatValue(0.5, "Rate")).toBe("0.50traces/s");
+    });
+
+    it("renders the Rate chart with plain y ticks and crosshair, and the unit on the tooltip", async () => {
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const rows = [
+        { time_bucket: "2024-01-01T00:00:00", max_rate: 4.5 },
+        { time_bucket: "2024-01-01T00:00:15", max_rate: 12 },
+      ];
+      const result: any = await convertMultiSQLData(
+        getPanel(wrapper, "Rate"),
+        [rows],
+        {
+          state: {
+            theme: "light",
+            timezone: "UTC",
+            zoConfig: { timestamp_column: "_timestamp", max_dashboard_series: 1000 },
+            selectedOrganization: { identifier: "default" },
+          },
+        },
+        { value: { offsetWidth: 800, offsetHeight: 400 } },
+        { value: null },
+        { value: [] },
+        {
+          queries: [
+            {
+              query: "SELECT 1",
+              startTime: 1704067200000000,
+              endTime: 1704067230000000,
+              timeRangeGap: { seconds: 0, periodAsStr: "" },
+              panelQueryIndex: 0,
+            },
+          ],
+        },
+        { height: "400px" },
+        { value: [] },
+        false,
+      );
+      const options = result.options;
+      const yAxis = Array.isArray(options.yAxis) ? options.yAxis[0] : options.yAxis;
+      expect(yAxis.axisLabel.formatter(10)).toBe("10.00");
+      expect(options.tooltip.axisPointer.label.formatter({ axisDimension: "y", value: 10 })).toBe(
+        "10.00",
+      );
+      const series = options.series[0];
+      const html = options.tooltip.formatter([
+        {
+          seriesName: series.name,
+          marker: "",
+          value: series.data[1],
+          data: series.data[1],
+        },
+      ]);
+      expect(html).toContain("12.00traces/s");
+    });
+
+    it("leaves the Errors panel header and units untouched", async () => {
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const config = getPanel(wrapper, "Errors").config;
+      expect(config.title_meta).toBeUndefined();
+      expect(config.override_config ?? []).toEqual([]);
     });
 
     it("should keep approx_distinct(trace_id) in the Errors panel query in traces mode", async () => {
@@ -323,7 +397,17 @@ describe("TracesMetricsDashboard", () => {
       await wrapper.vm.loadDashboard();
       await flushPromises();
       expect(getPanelQuery(wrapper, "Rate")).toContain("count(*) / 15.0");
-      expect(getPanel(wrapper, "Rate").config.unit_custom).toBe("spans/s");
+    });
+
+    it("shows spans/s in the Rate header and on the tooltip, never on the y ticks", async () => {
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const config = getPanel(wrapper, "Rate").config;
+      expect(config.title_meta).toBe("spans/s");
+      expect(formatAxisTickValue(250, config.unit, config.unit_custom, config.decimals)).toBe(
+        "250.00",
+      );
+      expect(createSeriesOverrideLookup(config).formatValue(3, "max_rate")).toBe("3.00spans/s");
     });
 
     it("should replace approx_distinct(trace_id) with count(*) in the Errors panel query", async () => {

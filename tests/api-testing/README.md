@@ -115,6 +115,8 @@ file should pass strict ruff.
 |---|---|
 | `framework` | Self-tests for `support/` framework. Run with `-m framework`. |
 | `enterprise` | Needs an enterprise build (e.g. the on-call suite, whose routes an OSS server answers 404). Run with `-m enterprise`; deselect with `-m "not enterprise"`. |
+| `slow` | Long-running test (e.g. the profiles 100k-stack ingest, ~2 min). Runs in the normal suite; deselect with `-m "not slow"`. |
+| `serial` | Reads or changes server-wide state (root passcode, shared seed stream, org-wide counts). Jobs that run the default set with `-n` (OSS `api_integration_tests`, ENT `oss_in_ent`) run `-m "not serial" -n 4 --dist loadfile`, then `-m serial` alone; mark any new test of that kind. |
 | `order(N)` | Run order pin (legacy — avoid in new tests). |
 
 ## Troubleshooting

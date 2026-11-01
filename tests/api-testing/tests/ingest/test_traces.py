@@ -1,6 +1,8 @@
 import json
 import time
 
+import pytest
+
 
 def valid_trace():
     start_time = int(time.time()*1000000000)
@@ -114,13 +116,14 @@ def test_e2e_old_trace_ingestion(create_session, base_url):
     trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["endTimeUnixNano"] = "1724898237576000000"
     resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
 
+    # OTLP/HTTP reports partial success with 200, and ProtoJSON encodes int64 as a string.
     assert (
-        resp_post_trace.status_code == 206
-    ), f"Invalid trace span time expected 206, but got {resp_post_trace.status_code}"
+        resp_post_trace.status_code == 200
+    ), f"Invalid trace span time expected 200, but got {resp_post_trace.status_code}"
 
     content = resp_post_trace.json()
     assert (
-        content["partialSuccess"]["rejectedSpans"] == 1
+        content["partialSuccess"]["rejectedSpans"] == "1"
     ), f"Invalid trace span time expected 1 rejected span, but got {content}"
 
 # This is specifically for https://github.com/openobserve/openobserve/issues/4371
@@ -166,6 +169,8 @@ def test_e2e_invalid_trace_ingestion(create_session, base_url):
     ), f"Invalid trace json response expected to contain incorrect field, but got {content}"
 
 
+# Compares trace counts on the shared default stream, which other files write to under xdist.
+@pytest.mark.serial
 def test_e2e_trace_invalid_ids(create_session, base_url):
     """Traces links with invalid ids should get be skipped."""
 

@@ -175,11 +175,13 @@ const saveThing = useMutation(() => saveThingMutation(orgId.value, () => isEdit.
 
 | UI need | Source |
 | --- | --- |
-| table skeleton (nothing to show yet) | `isPending` — false whenever cached data exists |
+| table `:loading` | `isPending` — false whenever cached data exists; on a refetch OTable keeps the last rows (dimmed) and draws the skeleton only on a cold load |
 | refresh-button spinner | `isFetching` — true for any request, including one with rows on screen |
 | `ORefreshButton :last-run-at` | `dataUpdatedAt` (the fetch time, not `Date.now()`) |
 | Refresh click | a named handler calling `refetch()` (always hits the server) **plus** a forced read of every secondary list on the view |
 | `:forbidden` | the query's `error` status (this list's own request only) |
+
+When the query key follows a folder, tab or entity, also bind `:loading-reset-key` to it so a switch shows the skeleton, not the previous context's rows; `skeleton-on-refetch` opts a table out of kept rows.
 
 `FunctionList.vue` and `TemplateList.vue` are reference list pages.
 

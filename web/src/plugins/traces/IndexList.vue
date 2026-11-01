@@ -85,6 +85,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @before-show="openFilterCreator"
                 @before-hide="cancelFilterCreator"
               >
+                <template v-if="field.name !== 'duration'" #caption>
+                  <div
+                    class="text-text-secondary py-1 text-xs"
+                    data-test="traces-field-values-count-caption"
+                  >
+                    {{ t("traces.results.fieldValueCountsCaption") }}
+                  </div>
+                </template>
                 <template v-if="field.name === 'duration'" #body>
                   <div v-if="durationPercentilesLoading" class="flex justify-center py-2">
                     <OSpinner size="xs" />
@@ -200,6 +208,7 @@ import useDurationPercentiles, {
 import { SPAN_KIND_MAP, parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
+import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -402,7 +411,7 @@ export default defineComponent({
       const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const fieldPattern = new RegExp(`^"?${escaped}"?\\s*[=!<>]`, "i");
       const multiPattern = new RegExp(`^\\(\\s*"?${escaped}"?\\s*[=!<>]`, "i");
-      const remaining = whereClause.split(/\s+AND\s+/i).filter((cond) => {
+      const remaining = splitOnAnd(whereClause).filter((cond) => {
         const trimmed = cond.trim();
         return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
       });

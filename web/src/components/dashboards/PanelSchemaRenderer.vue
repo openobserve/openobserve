@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
+          :density="panelSchema.config?.table_density"
           :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
@@ -101,6 +102,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
+        <AlertListPanelRenderer
+          v-else-if="panelSchema.type == 'alert-list'"
+          :config="panelSchema.config"
+          :refresh-signal="selectedTimeObj"
+        />
+        <FlameGraphPanelRenderer
+          v-else-if="panelSchema.type == 'flame-graph'"
+          :data="panelData.chartType == 'flame-graph' ? panelData : null"
+          :config="panelSchema.config"
+        />
+        <LogsPanelRenderer
+          v-else-if="panelSchema.type == 'logs'"
+          :data="panelData.chartType == 'logs' ? panelData : null"
+          :config="panelSchema.config"
+        />
         <CustomChartRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
@@ -346,6 +362,7 @@ import {
 } from "@/utils/dashboard/convertCustomChartData";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
+import { showsMissingValue } from "@/utils/dashboard/tableConfigUtils";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useRoute, useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
@@ -430,6 +447,14 @@ const MarkdownRenderer = defineAsyncComponent(() => {
   return import("./panels/MarkdownRenderer.vue");
 });
 
+const AlertListPanelRenderer = defineAsyncComponent(
+  () => import("./panels/AlertListPanelRenderer.vue"),
+);
+const FlameGraphPanelRenderer = defineAsyncComponent(
+  () => import("./panels/FlameGraphPanelRenderer.vue"),
+);
+const LogsPanelRenderer = defineAsyncComponent(() => import("./panels/LogsPanelRenderer.vue"));
+
 const AddAnnotation = defineAsyncComponent(() => {
   return import("./addPanel/AddAnnotation.vue");
 });
@@ -469,6 +494,9 @@ export default defineComponent({
     MapsRenderer,
     HTMLRenderer,
     MarkdownRenderer,
+    AlertListPanelRenderer,
+    FlameGraphPanelRenderer,
+    LogsPanelRenderer,
     AddAnnotation,
     CustomChartRenderer,
     LoadingProgress,
@@ -895,11 +923,11 @@ export default defineComponent({
       injectedPromqlData,
     );
 
-    // Html and markdown render without a query, so they never wait on one.
+    // Html, markdown and the alert list render without a query, so they never wait on one.
     const isAwaitingFirstLoad = computed(
       () =>
         isFirstLoadSettled?.value === false &&
-        !["html", "markdown"].includes(panelSchema.value?.type),
+        !["html", "markdown", "alert-list"].includes(panelSchema.value?.type),
     );
 
     // Dashboard-level annotation sources are queried once by the dashboard and merged after the panel's own.
@@ -2062,12 +2090,26 @@ export default defineComponent({
     // Multi-SQL note: panelData is built from filteredData (visible queries only)
     // by convertSQLData and friends, so the type-specific checks below
     // already reflect the multi-query aggregate.
+    // A metric or SQL gauge that names its missing value draws that text instead of the No Data state.
+    const drawsMissingValue = computed(() => {
+      const { type, queryType, config } = panelSchema.value ?? {};
+      if (!panelData.value?.chartType) return false;
+      if (type === "metric") return showsMissingValue(config);
+      return (
+        type === "gauge" &&
+        queryType !== "promql" &&
+        String(config?.no_value_replacement ?? "") !== ""
+      );
+    });
+
     const noData = computed(() => {
       const type = panelSchema.value.type;
 
-      if (type === "html" || type === "markdown") {
+      if (type === "html" || type === "markdown" || type === "alert-list") {
         return "";
       }
+
+      if (drawsMissingValue.value) return "";
 
       if (panelSchema.value?.queryType === "promql") {
         const hasResults =
@@ -2102,6 +2144,14 @@ export default defineComponent({
       // Raw data exists but conversion hasn't produced output yet — wait.
       if (!panelData.value?.chartType) {
         return "";
+      }
+
+      if (type === "flame-graph") {
+        return panelData.value?.root ? "" : "No Data";
+      }
+
+      if (type === "logs") {
+        return panelData.value?.rows?.length > 0 ? "" : "No Data";
       }
 
       // Table renders raw rows; the conversion returns { rows, columns }.

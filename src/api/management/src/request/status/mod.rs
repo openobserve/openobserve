@@ -251,6 +251,10 @@ struct ConfigResponse<'a> {
     synthetics_recorder_extension_url: String,
     /// The only DBM flag (`ZO_DB_MONITORING_ENABLED`): one OSS switch for every signal.
     database_monitoring_enabled: bool,
+    /// Off hides recent searches in the UI; the server then records nothing.
+    query_history_enabled: bool,
+    /// Days unstarred recent searches are kept; 0 or less keeps them until the per-page cap.
+    query_history_retention_days: i64,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -738,6 +742,8 @@ pub async fn zo_config(
         synthetics_browser_max_steps,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,
+        query_history_enabled: cfg.limit.query_history_enabled,
+        query_history_retention_days: cfg.limit.query_history_retention_days,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled,
@@ -1359,11 +1365,11 @@ pub async fn redirect(
                         Ok(v) => v.map(|(new_user, pending_invites)| {
                             format!("&new_user_login={new_user}&pending_invites={pending_invites}")
                         }),
-                        Err(_) => {
+                        Err(e) => {
                             return Response::builder()
                                 .status(StatusCode::UNAUTHORIZED)
                                 .header(header::CONTENT_TYPE, "application/json")
-                                .body(Body::from("\"Email Domain not allowed\""))
+                                .body(Body::from(e.to_string()))
                                 .unwrap();
                         }
                     };
@@ -2634,6 +2640,20 @@ mod tests {
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["public_dashboard_min_refresh_secs"], 60);
         assert_eq!(json["public_dashboards_enabled"], true);
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_query_history_settings() {
+        let cfg = get_config();
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["query_history_enabled"],
+            cfg.limit.query_history_enabled
+        );
+        assert_eq!(
+            json["query_history_retention_days"],
+            cfg.limit.query_history_retention_days
+        );
     }
 
     #[tokio::test]

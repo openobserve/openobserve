@@ -116,6 +116,27 @@ export const useHistogram = () => {
         plusSign = "+";
       }
 
+      // Live ticks fetch only the newest page and no count, so a full page means more events exist.
+      if (
+        Number(searchObj.meta.refreshInterval ?? 0) > 0 &&
+        !searchObj.data.queryResults.aggs?.length &&
+        (searchObj.data.queryResults.hits?.length ?? 0) >= searchObj.meta.resultGrid.rowsPerPage
+      ) {
+        plusSign = "+";
+      }
+
+      // A failed histogram leaves only the rows probe's page-plus-one total; code -1 means unavailable, not failed.
+      if (
+        searchObj.meta.showHistogram &&
+        searchObj.data.histogram?.errorMsg &&
+        searchObj.data.histogram?.errorCode !== -1 &&
+        !searchObj.data.queryResults.aggs?.length &&
+        endCount < totalCount
+      ) {
+        totalCount = endCount;
+        plusSign = "+";
+      }
+
       const scanSizeLabel =
         searchObj.data.queryResults.result_cache_ratio !== undefined &&
         searchObj.data.queryResults.result_cache_ratio > 0

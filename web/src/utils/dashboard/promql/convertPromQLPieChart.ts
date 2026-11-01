@@ -20,7 +20,7 @@ import { buildPieChartConfig } from "./shared/gridBuilder";
 import { createDistinctSeriesColor, getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { createSeriesOverrideLookup } from "../seriesOverrides";
-import { MAX_SEATS_PRECISION, pieLegendPercentDecimals } from "../legendConfiguration";
+import { pieLegendPercentDecimals, piePercentPrecision } from "../legendConfiguration";
 
 /**
  * Converter for pie and donut charts
@@ -39,11 +39,7 @@ export class PieConverter implements PromQLChartConverter {
     const chartType = panelSchema.type;
     const config = panelSchema.config || {};
     const seriesOverrides = createSeriesOverrideLookup(config);
-    // ECharts computes no digits past its seat precision, so the label prints no more than that.
-    const percentDecimals = Math.min(
-      pieLegendPercentDecimals(config.decimals),
-      MAX_SEATS_PRECISION,
-    );
+    const percentDecimals = piePercentPrecision(config);
     const data: any[] = [];
 
     // Calculate min/max for color scaling
@@ -99,6 +95,7 @@ export class PieConverter implements PromQLChartConverter {
           chartMax,
           store.state.theme,
           config.color?.colorBySeries,
+          config,
         );
 
       data.push({

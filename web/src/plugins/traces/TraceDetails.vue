@@ -120,23 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
               </span>
 
-              <div class="bg-text-label h-4 w-px py-0" />
-
-              <!-- Error Count Badge -->
-              <span class="inline-flex">
-                <OTag
-                  type="logsResultChip"
-                  value="error"
-                  size="sm"
-                  data-test="trace-details-error-spans-count"
-                  class="py-1!"
-                >
-                  <span
-                    >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
-                  >
-                </OTag>
-                <OTooltip :content="raw(errorSpansCount + ' ' + t('traces.errorsLabel'))" />
-              </span>
+              <template v-if="errorSpans.length">
+                <div class="bg-text-label h-4 w-px py-0" />
+                <TraceErrorSpansMenu :errors="errorSpans" compact @select="selectErrorSpan" />
+              </template>
             </div>
           </template>
 
@@ -228,12 +215,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="showCloseButton"
               data-test="trace-details-close-btn"
-              variant="ghost"
+              variant="outline"
               size="icon-xs"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
-              <OTooltip :content="t('common.cancel')" />
+              <OTooltip :content="t('common.close')" />
             </OButton>
           </template>
         </OPageHeader>
@@ -355,21 +342,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
               </span>
 
-              <div class="bg-text-label h-4 w-px py-0" />
-
-              <!-- Error Count Badge -->
-              <span class="me-[0.85rem] inline-flex">
-                <OTag
-                  type="logsResultChip"
-                  value="error"
-                  data-test="trace-details-error-spans-count"
-                >
-                  <span
-                    >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
-                  >
-                </OTag>
-                <OTooltip :content="raw(errorSpansCount + ' ' + t('traces.errorsLabel'))" />
-              </span>
+              <template v-if="errorSpans.length">
+                <div class="bg-text-label h-4 w-px py-0" />
+                <span class="me-[0.85rem] inline-flex">
+                  <TraceErrorSpansMenu :errors="errorSpans" @select="selectErrorSpan" />
+                </span>
+              </template>
             </div>
           </div>
 
@@ -414,13 +392,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="isStandaloneMode && showCloseButton"
               data-test="trace-details-close-btn"
-              variant="ghost"
+              variant="outline"
               size="icon-xs"
               class="me-1!"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
-              <OTooltip :content="t('common.cancel')" />
+              <OTooltip :content="t('common.close')" />
             </OButton>
           </div>
         </header>
@@ -1010,6 +988,8 @@ import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceDAG from "./TraceDAG.vue";
 import TraceHeader from "./TraceHeader.vue";
+import TraceErrorSpansMenu from "./components/TraceErrorSpansMenu.vue";
+import { errorSpansDeepestFirst } from "./utils/traceErrorSummary";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
@@ -1307,6 +1287,7 @@ export default defineComponent({
     TraceTree,
     TraceDAG,
     TraceHeader,
+    TraceErrorSpansMenu,
     FlameGraphView,
     OToggleGroup,
     OToggleGroupItem,
@@ -1764,11 +1745,7 @@ export default defineComponent({
     });
 
     // Computed properties for new header
-    const errorSpansCount = computed(() => {
-      const spans = effectiveSpanList.value;
-      if (!spans || spans.length === 0) return 0;
-      return spans.filter((span: any) => span.span_status === "ERROR").length;
-    });
+    const errorSpans = computed(() => errorSpansDeepestFirst(effectiveSpanList.value ?? []));
 
     const rootServiceName = computed(() => {
       if (traceTree.value.length > 0) {
@@ -3275,6 +3252,10 @@ export default defineComponent({
       }
     };
 
+    const selectErrorSpan = (spanId: string) => {
+      updateSelectedSpan(spanId, true);
+    };
+
     const handleDAGNodeClick = (spanId: string) => {
       updateSelectedSpan(spanId);
     };
@@ -3545,7 +3526,8 @@ export default defineComponent({
       hasLLMSpans,
       hasPreviewableSpans,
       // New header computed properties
-      errorSpansCount,
+      errorSpans,
+      selectErrorSpan,
       rootServiceName,
       traceStartTime,
       canManualEvaluate,

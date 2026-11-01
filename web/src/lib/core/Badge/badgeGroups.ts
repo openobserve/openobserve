@@ -486,7 +486,11 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       // Current RunOutcome vocabulary.
-      firing: { variant: "success-soft", labelKey: "components.badge.pipelineRunOutcome.firing" },
+      // Derived-stream runs record a successful run as `firing`.
+      firing: {
+        variant: "success-soft",
+        labelKey: "components.badge.pipelineRunOutcome.succeeded",
+      },
       normal: { variant: "success-soft", labelKey: "components.badge.pipelineRunOutcome.normal" },
       succeeded: {
         variant: "success-soft",
@@ -531,6 +535,9 @@ export const BADGE_GROUPS = {
       offline: { variant: "error-soft", labelKey: "components.badge.serviceStatus.offline" },
       failed: { variant: "error-soft", labelKey: "components.badge.serviceStatus.failed" },
       down: { variant: "error-soft", labelKey: "components.badge.serviceStatus.down" },
+      // Synthetics infrastructure error (backend status 4): the probe could not
+      // run, which is not the same as the target failing.
+      error: { variant: "error-soft", labelKey: "components.badge.serviceStatus.error" },
       unknown: { variant: "default-soft", labelKey: "common.unknown" },
     },
   },

@@ -53,6 +53,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <br />
             <b>{{ t("dashboard.promQLChartConfig.aggDiffLabel") }}</b>
             {{ t("dashboard.promQLChartConfig.aggDiffDesc") }}
+            <template v-if="chartType === 'pie' || chartType === 'donut'">
+              <br /><br />
+              {{ t("dashboard.promQLChartConfig.aggInstantNote") }}
+            </template>
           </template>
         </OTooltip>
       </template>
@@ -399,7 +403,16 @@ export default defineComponent({
     ];
 
     // Chart types that support aggregation
-    const chartsWithAggregation = ["pie", "donut", "geomap", "maps", "metric", "gauge", "h-bar"];
+    const chartsWithAggregation = [
+      "pie",
+      "donut",
+      "geomap",
+      "maps",
+      "metric",
+      "gauge",
+      "bar-gauge",
+      "h-bar",
+    ];
 
     // A pie or metric reduces each series to one value, which an instant query already is.
     const showAggregationConfig = computed(

@@ -21,8 +21,8 @@ import {
   applyPieDonutChartAlignment,
   applyPieDonutCenterAdjustment,
   calculatePieChartContainer,
-  MAX_SEATS_PRECISION,
   pieLegendPercentDecimals,
+  piePercentPrecision,
 } from "../../legendConfiguration";
 import { type SQLContext } from "../shared/types";
 import { escapeHtml } from "@/utils/html";
@@ -47,6 +47,14 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     getPieChartRadius,
   } = ctx;
   const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
+  const percentDecimals = piePercentPrecision(panelSchema?.config);
+  // A slice with its own decimals gets its exact share from applySeriesOverrides, not ECharts' rounding.
+  const sliceLabel = (params: { name: string; percent?: number }): string => {
+    const overrideDecimals = seriesOverrides.get(params.name)?.decimals;
+    const decimals =
+      overrideDecimals === undefined ? percentDecimals : pieLegendPercentDecimals(overrideDecimals);
+    return `${Number(params.percent ?? 0).toFixed(decimals)}%`;
+  };
   const distinctColor = createDistinctSeriesColor(
     (options?.xAxis?.[0]?.data ?? []).map(String),
     panelSchema?.config?.color,
@@ -107,6 +115,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
                     chartMax,
                     store.state.theme,
                     panelSchema?.config?.color?.colorBySeries,
+                    panelSchema?.config,
                   ) ??
                   null
                 );
@@ -114,16 +123,16 @@ export function applyPieDonutChart(ctx: SQLContext): void {
         },
         label: {
           show: true,
-          formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
+          formatter: sliceLabel,
           position: "inside", // You can adjust the position of the labels
           fontSize: 10,
           // ECharts haloes inside labels in the slice colour, which glares where a label spills onto a dark panel.
           textBorderColor: "transparent",
         },
-        percentPrecision: Math.min(
-          pieLegendPercentDecimals(panelSchema.config?.decimals),
-          MAX_SEATS_PRECISION,
-        ),
+        // Fixed decimals widen the labels, so colliding ones and slivers are hidden as on a PromQL pie.
+        labelLayout: { hideOverlap: true },
+        minShowLabelAngle: 3,
+        percentPrecision: percentDecimals,
       };
       return seriesObj;
     });
@@ -251,6 +260,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
                     chartMax,
                     store.state.theme,
                     panelSchema?.config?.color?.colorBySeries,
+                    panelSchema?.config,
                   ) ??
                   null
                 );
@@ -258,16 +268,16 @@ export function applyPieDonutChart(ctx: SQLContext): void {
         },
         label: {
           show: true,
-          formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
+          formatter: sliceLabel,
           position: "inside", // You can adjust the position of the labels
           fontSize: 10,
           // ECharts haloes inside labels in the slice colour, which glares where a label spills onto a dark panel.
           textBorderColor: "transparent",
         },
-        percentPrecision: Math.min(
-          pieLegendPercentDecimals(panelSchema.config?.decimals),
-          MAX_SEATS_PRECISION,
-        ),
+        // Fixed decimals widen the labels, so colliding ones and slivers are hidden as on a PromQL pie.
+        labelLayout: { hideOverlap: true },
+        minShowLabelAngle: 3,
+        percentPrecision: percentDecimals,
       };
       return seriesObj;
     });

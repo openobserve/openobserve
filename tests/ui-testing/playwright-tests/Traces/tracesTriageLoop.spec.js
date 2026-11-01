@@ -179,15 +179,22 @@ test.describe('Traces triage loop', () => {
         expect(toggled.find((q) => !isCount(q)).end).toBe(selection.start);
       }
 
-      // Step 6: filter to the top value — closes the page, restores the range, searches (manual mode too).
+      // Step 6: filter to the top value and restore the range; live mode searches, manual mode waits for Run.
       const beforeApply = queries.length;
       const top = (await pm.tracesPage.getComparisonCards())[0];
       await pm.tracesPage.includeFirstComparisonValue(top.name);
-      await expect(page.locator(pm.tracesPage.comparisonPage)).toBeHidden({ timeout: 15000 });
       await page.waitForTimeout(2000);
       const applied = (await pm.tracesPage.getQueryEditorContent()).trim();
       expect(applied.startsWith(`(${USER_FILTER}) and `), `Editor after apply: ${applied}`).toBeTruthy();
       expect(applied).toContain(top.name);
+      if (!live) {
+        expect(queries.slice(beforeApply).filter(isTableSearch), 'Manual mode stages the value until Run').toHaveLength(0);
+        await expect(page.locator(pm.tracesPage.comparisonPage), 'The page stays open until Run').toBeVisible();
+        await pm.tracesPage.runTraceSearch();
+        await pm.tracesPage.waitForTraceSearchResults();
+      }
+      // A search started from the applied value closes the page.
+      await expect(page.locator(pm.tracesPage.comparisonPage)).toBeHidden({ timeout: 15000 });
       const tableAfter = queries.slice(beforeApply).filter(isTableSearch);
       expect(tableAfter.length, 'Applying a value must search').toBeGreaterThan(0);
       const restored = tableAfter.at(-1);

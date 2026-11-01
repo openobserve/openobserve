@@ -120,6 +120,7 @@ use crate::{
         openobserve_api_search::search::saved_view::update_view,
         openobserve_api_management::request::query_history::record,
         openobserve_api_management::request::query_history::list,
+        openobserve_api_management::request::query_history::clear,
         openobserve_api_management::request::query_history::star,
         openobserve_api_management::request::query_history::delete,
         openobserve_api_management::request::folders::delete_folder,
@@ -306,13 +307,9 @@ use crate::{
         gen_ai::get_agent_mapping,
         gen_ai::list_scored_agents,
         gen_ai::save_agent_mapping,
-        openobserve_api_management::request::alerts::deduplication::get_config,
-        openobserve_api_management::request::alerts::deduplication::set_config,
-        openobserve_api_management::request::alerts::deduplication::delete_config,
         openobserve_api_management::request::alerts::deduplication::get_semantic_groups,
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
-        openobserve_api_management::request::alerts::dedup_stats::get_dedup_summary,
         openobserve_api_management::request::metrics_usage::get_metric_usage,
         openobserve_api_management::request::slos::list_slos,
         openobserve_api_management::request::slos::get_slo,
@@ -350,7 +347,6 @@ use crate::{
         openobserve_api_management::request::fleet::put_fleet_settings,
         openobserve_api_management::request::fleet::set_desired,
         openobserve_api_management::request::fleet::preview_desired,
-        openobserve_api_management::request::fleet::move_collectors,
         openobserve_api_management::request::fleet::list_tokens,
         openobserve_api_management::request::fleet::create_token,
         openobserve_api_management::request::fleet::revoke_token,
@@ -703,6 +699,9 @@ use crate::{
             openobserve_api_management::request::query_history::QueryHistoryRequest,
             openobserve_api_management::request::query_history::QueryHistoryStarRequest,
             openobserve_api_management::request::query_history::QueryHistoryEntry,
+            openobserve_api_management::request::query_history::QueryHistoryCountResponse,
+            openobserve_api_management::request::query_history::QueryHistoryListResponse,
+            openobserve_api_management::request::query_history::QueryHistoryClearResponse,
             meta::user::UpdateUser,
             meta::user::UserRoleRequest,
             meta::user::PostUserRequest,
@@ -744,11 +743,7 @@ use crate::{
             config::meta::service_streams::StreamInfo,
             config::meta::correlation::IdentitySet,
             config::meta::correlation::ServiceIdentityConfig,
-            // Alert Deduplication (enterprise)
-            config::meta::alerts::deduplication::GlobalDeduplicationConfig,
             config::meta::correlation::FieldAlias,
-            config::meta::alerts::deduplication::DeduplicationConfig,
-            openobserve_api_management::request::alerts::dedup_stats::DedupSummaryResponse,
             // Backfill
             pipelines::backfill::BackfillRequest,
             pipelines::backfill::BackfillResponse,
@@ -790,8 +785,6 @@ use crate::{
             config::meta::fleet::Settings,
             config::meta::fleet::CreateFleetRequest,
             config::meta::fleet::RenameFleetRequest,
-            config::meta::fleet::MoveCollectorsRequest,
-            config::meta::fleet::MoveCollectorsResponse,
             config::meta::fleet::References,
             config::meta::fleet::FleetConfig,
             config::meta::fleet::FleetConfigList,
@@ -1629,6 +1622,7 @@ mod tests {
         for (path, method) in [
             ("/api/{org_id}/query_history", "post"),
             ("/api/{org_id}/query_history", "get"),
+            ("/api/{org_id}/query_history", "delete"),
             ("/api/{org_id}/query_history/{id}", "patch"),
             ("/api/{org_id}/query_history/{id}", "delete"),
         ] {
@@ -1774,11 +1768,6 @@ mod tests {
                 "put",
                 &["200", "400", "403", "404", "409"][..],
             ),
-            (
-                "/api/{org_id}/fleet/fleets/move",
-                "post",
-                &["200", "400", "403", "404", "409"][..],
-            ),
             ("/api/{org_id}/fleet/configs", "get", &["200", "403"][..]),
             (
                 "/api/{org_id}/fleet/configs",
@@ -1846,15 +1835,11 @@ mod tests {
             ("/api/{org_id}/fleet/rollouts/{id}/pause", "post"),
             ("/api/{org_id}/fleet/rollouts/{id}/stop", "post"),
             ("/api/{org_id}/fleet/flow", "get"),
+            ("/api/{org_id}/fleet/fleets/move", "post"),
         ] {
             assert!(spec["paths"][path][method].is_null(), "{method} {path}");
         }
-        for schema in [
-            "SetDesiredRequest",
-            "FleetList",
-            "MoveCollectorsRequest",
-            "CollectorFleet",
-        ] {
+        for schema in ["SetDesiredRequest", "FleetList", "CollectorFleet"] {
             assert!(
                 spec["components"]["schemas"][schema].is_object(),
                 "{schema}"
@@ -1869,6 +1854,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "enterprise"))]
     #[test]
     fn prompt_paths_are_absent_from_oss_openapi() {
         let api = ApiDoc::openapi();
@@ -2097,11 +2083,11 @@ mod tests {
         let by_id = "/api/{org_id}/workflows/{id}";
         assert_documented_statuses(&[
             (base, "post", &["200", "400", "403", "500"]),
-            (base, "get", &["200", "403", "500"]),
+            (base, "get", &["200", "403", "404", "500"]),
             (
                 "/api/v2/{org_id}/workflows/move",
                 "patch",
-                &["200", "400", "403", "500"],
+                &["200", "400", "403", "404", "500"],
             ),
             (by_id, "delete", &["200", "400", "404", "500"]),
             (by_id, "put", &["200", "400", "500"]),

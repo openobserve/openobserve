@@ -31,6 +31,7 @@ document.body.appendChild(node);
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
     searchObj: mockSearchObj,
+    tracesParser: { value: null },
     updatedLocalLogFilterField: vi.fn(),
   }),
   DEFAULT_TRACE_COLUMNS: {
@@ -49,6 +50,14 @@ vi.mock("@/services/stream", async (importOriginal) => {
     },
   });
 });
+
+const mockFetchStream = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: mockFetchStream,
+    cancelStreamQueryBasedOnRequestId: vi.fn(),
+  }),
+}));
 
 // Mock SQL parser
 vi.mock("@/composables/useParser", () => ({
@@ -228,7 +237,7 @@ function mountIndexList(props: Record<string, unknown> = {}) {
           ],
         },
         FieldExpansion: {
-          template: '<div data-test="field-expansion">Field Expansion</div>',
+          template: '<div data-test="field-expansion">Field Expansion<slot name="caption" /></div>',
           props: [
             "field",
             "fieldValues",
@@ -366,6 +375,45 @@ describe("IndexList Component", () => {
     it("should show FieldExpansion for fields with showValues=true", () => {
       const basicFilters = wrapper.findAll('[data-test="field-expansion"]');
       expect(basicFilters.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Field value count caption", () => {
+    const captions = () => wrapper.findAll('[data-test="traces-field-values-count-caption"]');
+
+    const valueFields = [
+      { name: "service_name", label: "Service Name", showValues: true, ftsKey: false },
+      { name: "duration", label: "Duration", showValues: true, ftsKey: false },
+    ];
+
+    it("says the value counts are spans in the Traces view", () => {
+      expect(captions().length).toBeGreaterThan(0);
+      expect(captions()[0].text()).toBe("Counts are spans with this value, in the current range");
+    });
+
+    it("says the value counts are spans in the Spans view", async () => {
+      wrapper.unmount();
+      mockSearchObj.meta.searchMode = "spans";
+      try {
+        wrapper = mountIndexList();
+        await flushPromises();
+        expect(captions().length).toBeGreaterThan(0);
+        expect(captions()[0].text()).toBe("Counts are spans with this value, in the current range");
+      } finally {
+        mockSearchObj.meta.searchMode = "traces";
+      }
+    });
+
+    it.each(["traces", "spans"])("is not shown for duration in the %s view", async (mode) => {
+      wrapper.unmount();
+      mockSearchObj.meta.searchMode = mode;
+      try {
+        wrapper = mountIndexList({ fieldList: valueFields });
+        await flushPromises();
+        expect(captions()).toHaveLength(1);
+      } finally {
+        mockSearchObj.meta.searchMode = "traces";
+      }
     });
   });
 
@@ -750,6 +798,29 @@ describe("IndexList Component", () => {
       wrapper.vm.handleAddMultipleSearchTerms("service_name", ["o'brien", "plain"], "include");
       expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(
         "(service_name='o''brien' or service_name='plain')",
+      );
+    });
+  });
+
+  describe("field-values where clause with AND inside a quoted value (issue 11966)", () => {
+    const valuesSql = async (editorValue: string, field: string) => {
+      mockSearchObj.data.editorValue = editorValue;
+      mockFetchStream.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: field });
+      await flushPromises();
+      return atob(mockFetchStream.mock.calls[0][0].queryReq.sql);
+    };
+    const clause = "service_name = 'x and y' AND status = '1'";
+
+    it("keeps a remaining condition whose value contains AND", async () => {
+      expect(await valuesSql(clause, "status")).toBe(
+        `SELECT * FROM "test_stream" WHERE service_name = 'x and y'`,
+      );
+    });
+
+    it("does not rewrite a quoted value when removing the other field", async () => {
+      expect(await valuesSql(clause, "service_name")).toBe(
+        `SELECT * FROM "test_stream" WHERE status = '1'`,
       );
     });
   });

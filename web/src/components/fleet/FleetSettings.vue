@@ -107,31 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OFormSection>
 
-      <OFormSection
-        :title="t('fleet.settings.alerts')"
-        :info="t('fleet.settings.alertsDesc')"
-        data-test="fleet-settings-alerts"
-      >
-        <div class="flex flex-col gap-3">
-          <ul class="text-text-secondary flex list-disc flex-col gap-1 ps-5 text-sm">
-            <li>{{ t("fleet.settings.alertRolloutHalted") }}</li>
-            <li>{{ t("fleet.settings.alertAutoRolledBack") }}</li>
-            <li>{{ t("fleet.settings.alertOfflineRatio") }}</li>
-          </ul>
-          <div>
-            <OButton
-              variant="outline"
-              size="sm"
-              icon-right="open-in-new"
-              data-test="fleet-settings-alert-library"
-              @click="openAlertLibrary"
-            >
-              {{ t("fleet.settings.openAlertLibrary") }}
-            </OButton>
-          </div>
-        </div>
-      </OFormSection>
-
       <FleetCollectorVersions class="shrink-0" />
     </div>
   </OContent>
@@ -151,12 +126,11 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { updateFleetSettingsMutation } from "@/services/fleet.queries";
-import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { FleetOrgSettings, FleetSettings } from "@/services/fleet";
 import FleetCollectorVersions from "./FleetCollectorVersions.vue";
 import FleetSettingsForm from "./FleetSettingsForm.vue";
-import { serverMessage, useFleetSettings } from "./useFleetApi";
+import { useFleetSettings, failureText } from "./useFleetApi";
 
 const { t } = useI18nTyped();
 const orgId = useOrgId();
@@ -167,8 +141,6 @@ const forbidden = current.forbidden;
 const loadFailed = computed(() => !!current.error.value && !current.settings.value);
 const update = useMutation(() => updateFleetSettingsMutation(orgId.value));
 
-const route = useRoute();
-const router = useRouter();
 const loaded = ref<FleetOrgSettings | null>(null);
 const skipped = ref<FleetOrgSettings | null>(null);
 const defaultsKey = computed(() => JSON.stringify(loaded.value?.fleet_defaults ?? null));
@@ -239,11 +211,6 @@ async function saveDefaults(defaults: FleetSettings) {
   });
 }
 
-function openAlertLibrary() {
-  const org = route.query.org_identifier;
-  router.push({ name: "alertLibrary", query: org ? { org_identifier: org } : {} });
-}
-
 async function put(next: FleetOrgSettings) {
   const org = orgId.value;
   try {
@@ -254,7 +221,7 @@ async function put(next: FleetOrgSettings) {
   } catch (err) {
     toast({
       variant: "error",
-      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
+      message: failureText(err, t),
     });
   }
 }

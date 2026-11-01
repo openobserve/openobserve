@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Self CPU/memory profiling into `_meta.self_profiles` (feature `profiling`).
+//! Self CPU (feature `cpu-profiling`) and memory (feature `profiling`) profiling.
 
 mod convert;
 mod job;
@@ -21,8 +21,21 @@ mod sample;
 mod sink;
 
 pub use job::run;
-pub use sample::{dump_cpu_profile, dump_memory_flamegraph, dump_memory_pprof, jemalloc_stats};
+pub use sample::dump_cpu_profile;
+#[cfg(feature = "profiling")]
+pub use sample::{dump_memory_flamegraph, dump_memory_pprof, jemalloc_stats};
 
-pub(crate) const STREAM_NAME: &str = "self_profiles";
 pub(crate) const SERVICE_NAME: &str = "openobserve";
 pub(crate) const CPU_FREQUENCY_HZ: i32 = 100;
+
+#[cfg(test)]
+mod tests {
+    use config::{META_ORG_ID, meta::self_reporting::usage::is_system_stream};
+
+    use super::*;
+
+    #[test]
+    fn test_stream_name_is_a_meta_system_stream() {
+        assert!(is_system_stream(META_ORG_ID, STREAM_NAME));
+    }
+}

@@ -20,17 +20,18 @@
 import { computed, onScopeDispose, ref, watch } from "vue";
 import { useStore } from "vuex";
 import searchService from "@/services/search";
+import streamService from "@/services/stream";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import {
   HOSTS_CORES_QUERY,
   HOSTS_CPU_QUERY,
   HOSTS_DISK_QUERY,
-  HOSTS_LAST_SEEN_SQL,
   HOSTS_LIVENESS_QUERY,
   HOSTS_LOAD_QUERY,
   HOSTS_MEMORY_STATES,
   HOSTS_MEMORY_USAGE_QUERY,
   HOSTS_MEMORY_UTILIZATION_QUERY,
+  hostsLastSeenSql,
 } from "./hostsQueries";
 
 export type HostStatus = "ACTIVE" | "INACTIVE" | "UNKNOWN";
@@ -121,6 +122,30 @@ export function utilizationTint(value: number | null): "" | "warn" | "critical" 
   return "";
 }
 
+// Whether the load stream has k8s_node_name, per org: last-seen groups by node only where it does. Checked again after
+// a few minutes, so a cluster that starts sending is picked up; a failed check is not kept, and leaves the column out
+// rather than fail the query.
+const NODE_COLUMN_TTL_MS = 5 * 60 * 1000;
+const nodeColumn = new Map<string, { at: number; has: Promise<boolean> }>();
+
+function hasNodeColumn(orgId: string): Promise<boolean> {
+  const cached = nodeColumn.get(orgId);
+  if (cached && Date.now() - cached.at < NODE_COLUMN_TTL_MS) return cached.has;
+  const has = streamService
+    .schema(orgId, "system_cpu_load_average_15m", "metrics")
+    .then((res: any) =>
+      ((res?.data?.schema ?? []) as Array<{ name: string }>).some(
+        (f) => f.name === "k8s_node_name",
+      ),
+    )
+    .catch(() => {
+      nodeColumn.delete(orgId);
+      return false;
+    });
+  nodeColumn.set(orgId, { at: Date.now(), has });
+  return has;
+}
+
 export function useHostsList() {
   const store = useStore();
 
@@ -184,6 +209,7 @@ export function useHostsList() {
         query: encodeURIComponent(query),
         end_time: end,
       });
+    const lastSeenSql = hasNodeColumn(orgId).then(hostsLastSeenSql);
     const results = await Promise.allSettled([
       instant(HOSTS_LIVENESS_QUERY),
       instant(HOSTS_CPU_QUERY),
@@ -192,22 +218,24 @@ export function useHostsList() {
       instant(HOSTS_DISK_QUERY),
       instant(HOSTS_LOAD_QUERY),
       instant(HOSTS_CORES_QUERY),
-      searchService.search(
-        {
-          org_identifier: orgId,
-          query: {
+      lastSeenSql.then((sql) =>
+        searchService.search(
+          {
+            org_identifier: orgId,
             query: {
-              sql: HOSTS_LAST_SEEN_SQL,
-              start_time: start,
-              end_time: end,
-              from: 0,
-              // Silent ceiling: hosts beyond 10k rows drop from last-seen with no error surfaced.
-              size: 10000,
+              query: {
+                sql,
+                start_time: start,
+                end_time: end,
+                from: 0,
+                // Silent ceiling: hosts beyond 10k rows drop from last-seen with no error surfaced.
+                size: 10000,
+              },
             },
+            page_type: "metrics",
           },
-          page_type: "metrics",
-        },
-        "ui",
+          "ui",
+        ),
       ),
     ]);
     if (gen !== generation) return;

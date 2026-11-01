@@ -652,7 +652,7 @@ pub fn rca_agent_available() -> bool {
 /// Correlate an alert to an incident, and send a notification if appropriate.
 ///
 /// This is the main entry point for incident correlation in the alert execution flow.
-/// Called after deduplication, instead of direct notification for `creates_incident=true` alerts.
+/// Called instead of direct notification for `creates_incident=true` alerts.
 ///
 /// Notification behaviour:
 /// - `NewIncidentCreated` → sends incident notification to merged destinations of all correlated

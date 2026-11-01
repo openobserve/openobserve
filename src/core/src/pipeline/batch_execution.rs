@@ -2945,8 +2945,7 @@ async fn process_destination_node(
 
             let res = match client {
                 Ok(client) => {
-                    let mut req = client
-                        .post(endpoint.url)
+                    let mut req = destination_request(&client, &endpoint.method, &endpoint.url)
                         .header("Content-type", content_type);
                     for (name, val) in headers {
                         req = req.header(name, val);
@@ -3030,6 +3029,20 @@ fn destination_http_client(
             .danger_accept_invalid_certs(endpoint.skip_tls_verify),
     )
     .map_err(|e| e.to_string())
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn destination_request(
+    client: &reqwest::Client,
+    method: &config::meta::destinations::HTTPType,
+    url: &str,
+) -> reqwest::RequestBuilder {
+    use config::meta::destinations::HTTPType;
+    match method {
+        HTTPType::POST => client.post(url),
+        HTTPType::PUT => client.put(url),
+        HTTPType::GET => client.get(url),
+    }
 }
 
 /// Empty for a peer only the operator allowlist admits, since node outputs and errors reach users.
@@ -5342,6 +5355,37 @@ mod tests {
             },
         };
         assert!(error.contains("not allowed"), "{error}");
+    }
+
+    #[test]
+    fn test_destination_request_uses_endpoint_method() {
+        use config::meta::destinations::{Endpoint, HTTPType};
+        let client = reqwest::Client::new();
+        let cases = [
+            (HTTPType::POST, reqwest::Method::POST),
+            (HTTPType::PUT, reqwest::Method::PUT),
+            (HTTPType::GET, reqwest::Method::GET),
+        ];
+        for (method, expected) in cases {
+            let endpoint = Endpoint {
+                url: "http://example.com/ingest".to_string(),
+                method,
+                ..Default::default()
+            };
+            let req = destination_request(&client, &endpoint.method, &endpoint.url)
+                .build()
+                .unwrap();
+            assert_eq!(req.method(), expected);
+            assert_eq!(req.url().as_str(), "http://example.com/ingest");
+        }
+        let endpoint = Endpoint {
+            url: "http://example.com/ingest".to_string(),
+            ..Default::default()
+        };
+        let default_req = destination_request(&client, &endpoint.method, &endpoint.url)
+            .build()
+            .unwrap();
+        assert_eq!(default_req.method(), reqwest::Method::POST);
     }
 
     async fn capped_body_from(base: &str) -> String {

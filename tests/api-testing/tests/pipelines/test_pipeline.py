@@ -38,6 +38,9 @@ import pytest
 from support.client import OpenObserveClient
 from support.factories import unique_name
 
+# Its realtime pipelines read stream_pytest_data, which test_pipeline_regression.py also binds; one source stream allows one pipeline.
+pytestmark = pytest.mark.serial
+
 logger = logging.getLogger(__name__)
 
 ORG_ID = "default"

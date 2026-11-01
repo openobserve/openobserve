@@ -58,6 +58,7 @@ import { useStore } from "vuex";
 import { useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import { SERIES_OVERRIDE_MATCH_BY } from "@/utils/dashboard/seriesOverrides";
 import metrics from "./metrics.json";
 import { deepCopy } from "@/utils/zincutils";
 import type { MetricsRangeFilter } from "@/ts/interfaces/traces/trace.types";
@@ -248,9 +249,17 @@ const loadDashboard = async () => {
           .replace("[INTERVAL_SECONDS]", String(interval.seconds));
 
         if (panel.title === "Rate") {
-          panel.config.unit_custom = isSpansMode
+          const rateUnit = isSpansMode
             ? t("traces.metrics.perSecond.spans")
             : t("traces.metrics.perSecond.traces");
+          panel.config.title_meta = rateUnit;
+          // Ticks read the panel unit and the tooltip reads series overrides, so the unit lives only in the override.
+          panel.config.override_config = [
+            {
+              field: { matchBy: SERIES_OVERRIDE_MATCH_BY.REGEX, value: ".*" },
+              config: [{ type: "unit", value: { unit: "custom", customUnit: rateUnit } }],
+            },
+          ];
         }
 
         // Spans mode: replace trace-level distinct counts with span-level counts

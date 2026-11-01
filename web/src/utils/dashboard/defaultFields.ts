@@ -129,17 +129,37 @@ export const rawValueYField = (column: string) => ({
   treatAsNonTimestamp: true,
 });
 
+/** Drops y fields a raw-value chart cannot read (a timestamp or a count's column) and falls back to the first numeric column. */
+export const keepRawValueFields = (
+  query: any,
+  groupedFields: any[],
+  timestampColumn = "_timestamp",
+) => {
+  const timestamps = new Set(["_timestamp", timestampColumn]);
+  query.fields.y = query.fields.y.filter(
+    (itemY: any) =>
+      itemY.isDerived || !timestamps.has(itemY?.args?.[0]?.value?.field ?? itemY?.column),
+  );
+  if (query.fields.y.length || query.customQuery) return;
+  const column = firstNumericField(groupedFields, query.fields.stream, timestampColumn);
+  if (column) query.fields.y = [rawValueYField(column)];
+};
+
 // Chart types that drive their own builder and must not get the cartesian x/y seed.
 // heatmap is included because its measure lives on the Z/value axis — its Y axis is
 // a dimension that disallows aggregation, so a count(_timestamp) Y seed is invalid.
 export const SKIP_SEED_TYPES = [
   "geomap",
   "sankey",
+  "node-graph",
   "maps",
   "custom_chart",
   "html",
   "markdown",
   "heatmap",
+  "alert-list",
+  "flame-graph",
+  "logs",
 ];
 
 /**
@@ -161,6 +181,24 @@ export const buildDefaultBuilderFields = (
   if (chartType === "metric") return { x: [], y };
   // A count is not a state; the user picks the state column.
   if (chartType === "state-timeline") return { x, y: [] };
+  // One bar per label, so a time bucket is not a useful default label.
+  if (chartType === "bar-gauge") return { x: [], y };
+  // A histogram summarises raw values, so it starts from a numeric column, never a count or the timestamp.
+  if (chartType === "distribution") {
+    const column = firstNumericField(groupedFields, streamName, timestampColumn);
+    return { x: [], y: column ? [rawValueYField(column)] : [] };
+  }
+  // One tile per label, so a time bucket is not a useful default label.
+  if (chartType === "treemap") return { x: [], y };
+  // One ring segment per label, so a time bucket is not a useful default label.
+  if (chartType === "sunburst") return { x: [], y };
+  // One stage per label, so a time bucket is not a useful default label.
+  if (chartType === "funnel") return { x: [], y };
+  // A box plot summarises a numeric column, so it starts from one, never a count or the timestamp.
+  if (chartType === "boxplot") {
+    const column = firstNumericField(groupedFields, streamName, timestampColumn);
+    return { x: [], y: column ? [rawValueYField(column)] : [] };
+  }
   // A time bucket is not an entity; the user picks the entity field.
   if (chartType === "hostmap") return { x: [], y };
   return { x, y };
