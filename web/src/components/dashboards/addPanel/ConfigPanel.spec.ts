@@ -1875,6 +1875,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Component Initialization Logic", () => {
+    openSections();
+
     it("should initialize all default configuration values on mount", () => {
       // Create a completely fresh mock data with minimal config to test initialization
       const minimalMockData = {
@@ -2668,6 +2670,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Computed Properties and Watchers", () => {
+    openSections();
+
     it("should handle computed property dependencies", () => {
       wrapper = createWrapper();
 
@@ -2845,6 +2849,8 @@ describe("ConfigPanel", () => {
   });
 
   describe("Legend Configuration WatchEffects", () => {
+    openSections();
+
     it("should clear legend height when legends_position is bottom and legends_type is scroll", async () => {
       const panelDataWithLegendHeight = {
         ...mockDashboardPanelData,

@@ -58,6 +58,7 @@ vi.mock("@tanstack/vue-virtual", async () => {
 import ConfigPanel from "@/components/dashboards/addPanel/ConfigPanel.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { DEFAULT_EXPANDED_SECTIONS, type SectionId } from "@/utils/dashboard/searchLabelsConfig";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
 const makePanel = (type: string, config: Record<string, unknown> = {}) =>
@@ -108,7 +109,14 @@ describe("ConfigPanel Thresholds section", { timeout: 30_000 }, () => {
     document.body.innerHTML = "";
   });
 
-  const mountPanel = (type: string, config: Record<string, unknown> = {}) => {
+  const mountPanel = (
+    type: string,
+    config: Record<string, unknown> = {},
+    sections?: SectionId[],
+  ) => {
+    for (const section of Object.keys(DEFAULT_EXPANDED_SECTIONS) as SectionId[]) {
+      DEFAULT_EXPANDED_SECTIONS[section] = sections ? sections.includes(section) : true;
+    }
     const panel = makePanel(type, config);
     vi.mocked(useDashboardPanelData).mockReturnValue({
       dashboardPanelData: panel,
@@ -148,7 +156,7 @@ describe("ConfigPanel Thresholds section", { timeout: 30_000 }, () => {
     "gauge",
     "metric",
   ])("shows on %s", async (type) => {
-    mountPanel(type);
+    mountPanel(type, {}, ["thresholds"]);
     await flushPromises();
     expect(section().exists()).toBe(true);
     expect(wrapper!.find('[data-test="dashboard-config-thresholds"]').exists()).toBe(true);
@@ -177,14 +185,14 @@ describe("ConfigPanel Thresholds section", { timeout: 30_000 }, () => {
   });
 
   it("does not create the thresholds key on mount", async () => {
-    const panel = mountPanel("line");
+    const panel = mountPanel("line", {}, ["thresholds"]);
     await flushPromises();
     expect("thresholds" in panel.data.config).toBe(false);
     expect(count().exists()).toBe(false);
   });
 
   it("writes the key on the first step, counts steps, and deletes it with the last", async () => {
-    const panel = mountPanel("line");
+    const panel = mountPanel("line", {}, ["thresholds"]);
     await flushPromises();
     await wrapper!.find('[data-test="dashboard-config-thresholds-add-step"]').trigger("click");
     await flushPromises();
@@ -204,13 +212,15 @@ describe("ConfigPanel Thresholds section", { timeout: 30_000 }, () => {
   });
 
   it("passes coloured value mappings to the metric note", async () => {
-    mountPanel("metric", { mappings: [{ type: "value", value: "1", color: "#ff0000" }] });
+    mountPanel("metric", { mappings: [{ type: "value", value: "1", color: "#ff0000" }] }, [
+      "thresholds",
+    ]);
     await flushPromises();
     expect(wrapper!.find('[data-test="dashboard-config-thresholds-mapping-note"]').exists()).toBe(
       true,
     );
     wrapper!.unmount();
-    mountPanel("metric", { mappings: [{ type: "value", value: "1", text: "up" }] });
+    mountPanel("metric", { mappings: [{ type: "value", value: "1", text: "up" }] }, ["thresholds"]);
     await flushPromises();
     expect(wrapper!.find('[data-test="dashboard-config-thresholds-mapping-note"]').exists()).toBe(
       false,
@@ -242,51 +252,63 @@ describe("ConfigPanel Thresholds section", { timeout: 30_000 }, () => {
   });
 
   it("notes series overrides that have their own steps, even with no panel steps", async () => {
-    mountPanel("line", {
-      override_config: [
-        {
-          field: { matchBy: "series", value: "a" },
-          config: [{ type: "thresholds", value: { steps: [{ value: 1, color: "#ef4444" }] } }],
-        },
-        {
-          field: { matchBy: "series", value: "b" },
-          config: [{ type: "series_color", value: "#ef4444" }],
-        },
-        {
-          field: { matchBy: "series", value: "c" },
-          config: [{ type: "thresholds", value: { steps: [{ value: 1, color: "#ef4444" }] } }],
-        },
-        {
-          field: { matchBy: "name", value: "a" },
-          config: [{ type: "unit", value: { unit: "bytes" } }],
-        },
-      ],
-    });
+    mountPanel(
+      "line",
+      {
+        override_config: [
+          {
+            field: { matchBy: "series", value: "a" },
+            config: [{ type: "thresholds", value: { steps: [{ value: 1, color: "#ef4444" }] } }],
+          },
+          {
+            field: { matchBy: "series", value: "b" },
+            config: [{ type: "series_color", value: "#ef4444" }],
+          },
+          {
+            field: { matchBy: "series", value: "c" },
+            config: [{ type: "thresholds", value: { steps: [{ value: 1, color: "#ef4444" }] } }],
+          },
+          {
+            field: { matchBy: "name", value: "a" },
+            config: [{ type: "unit", value: { unit: "bytes" } }],
+          },
+        ],
+      },
+      ["thresholds"],
+    );
     await flushPromises();
     const note = wrapper!.find('[data-test="dashboard-config-thresholds-overrides-note"]');
     expect(note.text()).toBe("2 series overrides have their own limits");
     wrapper!.unmount();
-    mountPanel("line", {
-      override_config: [
-        {
-          field: { matchBy: "series", value: "a" },
-          config: [{ type: "thresholds", value: { steps: [{ value: 1, color: "#ef4444" }] } }],
-        },
-      ],
-    });
+    mountPanel(
+      "line",
+      {
+        override_config: [
+          {
+            field: { matchBy: "series", value: "a" },
+            config: [{ type: "thresholds", value: { steps: [{ value: 1, color: "#ef4444" }] } }],
+          },
+        ],
+      },
+      ["thresholds"],
+    );
     await flushPromises();
     expect(wrapper!.find('[data-test="dashboard-config-thresholds-overrides-note"]').text()).toBe(
       "1 series override has its own limits",
     );
     wrapper!.unmount();
-    mountPanel("line", {
-      override_config: [
-        {
-          field: { matchBy: "series", value: "b" },
-          config: [{ type: "series_color", value: "#ef4444" }],
-        },
-      ],
-    });
+    mountPanel(
+      "line",
+      {
+        override_config: [
+          {
+            field: { matchBy: "series", value: "b" },
+            config: [{ type: "series_color", value: "#ef4444" }],
+          },
+        ],
+      },
+      ["thresholds"],
+    );
     await flushPromises();
     expect(wrapper!.find('[data-test="dashboard-config-thresholds-overrides-note"]').exists()).toBe(
       false,
