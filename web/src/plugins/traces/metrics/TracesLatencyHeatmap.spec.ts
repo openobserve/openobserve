@@ -276,6 +276,13 @@ describe("TracesLatencyHeatmap", () => {
       expect(o.series[0].type).toBe("heatmap");
     });
 
+    it("renders the tooltip on the body, so the card does not clip it", async () => {
+      wrapper = await mountHeatmap();
+      const o = options(wrapper);
+      expect(o.tooltip.appendToBody).toBe(true);
+      expect(o.tooltip.className).toBe("o2-echarts-tooltip");
+    });
+
     it("draws cells without borders, so a dense grid is not striped", async () => {
       wrapper = await mountHeatmap();
       expect(options(wrapper).series[0].itemStyle.borderWidth).toBe(0);

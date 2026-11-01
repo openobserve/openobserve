@@ -29,6 +29,7 @@ import logging
 # the previous blanket skip (which never ran them on ANY build) was mistaken.
 pytestmark = [
     pytest.mark.order(1),
+    pytest.mark.serial,
 ]
 from helpers.sourcemap_helpers import (
     load_static_sourcemaps,

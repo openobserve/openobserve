@@ -163,6 +163,7 @@ import { type EnrichedSpan } from "@/ts/interfaces/traces/span.types";
 import { formatDuration } from "@/composables/traces/useTraceProcessing";
 import { maxOf } from "@/plugins/traces/threadView.utils";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
+import { getContrastTextColor } from "@/utils/traces/traceColors";
 import { escapeHtml } from "@/utils/html";
 import {
   normalizeSpanEvents,
@@ -649,7 +650,10 @@ const chartOptions = computed(() => {
                     type: "text",
                     style: {
                       text: data[params.dataIndex].spanData.operationName,
-                      fill: "#ffffff",
+                      fill:
+                        getContrastTextColor(data[params.dataIndex].itemStyle.color) === "black"
+                          ? "#000000"
+                          : "#ffffff",
                       font: "0.6875rem Inter, sans-serif",
                       overflow: "truncate",
                       width: rectWidth - 8,
