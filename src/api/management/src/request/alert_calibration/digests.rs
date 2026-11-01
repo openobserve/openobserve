@@ -69,12 +69,47 @@ pub struct AlertRuns {
     size: Option<i64>,
 }
 
-/// One run, which is identified by its window.
+/// One run, which is identified by its window, and the filters on its records.
 #[derive(Deserialize, IntoParams)]
 pub struct RunWindow {
     window_start: i64,
     window_end: i64,
     size: Option<i64>,
+    /// `run`, `finding` or `skip`. A version-1 record has no kind column, so each is matched on a
+    /// column every version writes.
+    kind: Option<String>,
+    rule_id: Option<String>,
+    /// `A`, `B` or `C`; a version-1 record has no tier.
+    tier: Option<String>,
+    pattern: Option<String>,
+}
+
+/// The extra WHERE clauses of a filtered record read.
+fn record_filters(run: &RunWindow) -> Result<Vec<String>, String> {
+    let mut filters = Vec::new();
+    if let Some(kind) = &run.kind {
+        // A version-1 record has no `kind`: a finding is the record with a severity, a run marker
+        // the one with no rule, and a skip exists only from version 2 on.
+        filters.push(match kind.as_str() {
+            "run" => "rule_id IS NULL".to_string(),
+            "finding" => "severity IS NOT NULL".to_string(),
+            "skip" => "kind = 'skip'".to_string(),
+            other => return Err(format!("kind must be run, finding or skip, not {other}")),
+        });
+    }
+    if let Some(tier) = &run.tier {
+        if !matches!(tier.as_str(), "A" | "B" | "C") {
+            return Err(format!("tier must be A, B or C, not {tier}"));
+        }
+        filters.push(format!("tier = '{tier}'"));
+    }
+    if let Some(rule_id) = &run.rule_id {
+        filters.push(format!("rule_id = {}", quote_sql_string(rule_id)));
+    }
+    if let Some(pattern) = &run.pattern {
+        filters.push(format!("pattern = {}", quote_sql_string(pattern)));
+    }
+    Ok(filters)
 }
 
 #[derive(Serialize, ToSchema)]
@@ -158,9 +193,10 @@ pub async fn list_runs_for_alert(
     Path(org_id): Path<String>,
     Query(query): Query<AlertRuns>,
 ) -> Response {
+    // A skip record names its rule and alert too, so a finding is told by its severity.
     let sql = format!(
         "SELECT DISTINCT window_start, window_end FROM \"{DIGEST_STREAM}\" \
-         WHERE rule_id IS NOT NULL AND str_match_ignore_case(alert_name, {})",
+         WHERE severity IS NOT NULL AND str_match_ignore_case(alert_name, {})",
         quote_sql_string(&query.alert_name)
     );
     read(
@@ -181,7 +217,7 @@ pub async fn list_runs_for_alert(
     tag = "Alert Calibration",
     operation_id = "GetAlertCalibrationRunRecords",
     summary = "Get the records of one alert calibration run",
-    description = "Every record the run with this window wrote, newest emission first.",
+    description = "Every record the run with this window wrote, newest emission first. `kind`, `rule_id`, `tier` and `pattern` narrow the records; a filter on a column no record has written yet returns nothing.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), RunWindow),
     responses(
@@ -193,11 +229,28 @@ pub async fn list_runs_for_alert(
     )
 )]
 pub async fn get_run_records(Path(org_id): Path<String>, Query(run): Query<RunWindow>) -> Response {
-    let sql = format!(
-        "SELECT * FROM \"{DIGEST_STREAM}\" WHERE window_start = {} AND window_end = {} \
-         ORDER BY _timestamp DESC",
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
+    }
+    let filters = match record_filters(&run) {
+        Ok(filters) => filters,
+        Err(msg) => return MetaHttpResponse::bad_request(msg),
+    };
+    let mut sql = format!(
+        "SELECT * FROM \"{DIGEST_STREAM}\" WHERE window_start = {} AND window_end = {}",
         run.window_start, run.window_end
     );
+    for filter in &filters {
+        sql.push_str(" AND ");
+        sql.push_str(filter);
+    }
+    sql.push_str(" ORDER BY _timestamp DESC");
+    // A filter names a column only some records write, so a stream without it matches nothing.
+    let columns = if filters.is_empty() {
+        Columns::Run
+    } else {
+        Columns::Finding
+    };
     // A run's records are stamped when it finishes, at or after the end of its window.
     read(
         &org_id,
@@ -205,7 +258,7 @@ pub async fn get_run_records(Path(org_id): Path<String>, Query(run): Query<RunWi
         run.window_end,
         now_micros(),
         run.size,
-        Columns::Run,
+        columns,
     )
     .await
 }
@@ -232,10 +285,11 @@ pub async fn count_findings_by_rule(
     Path(org_id): Path<String>,
     Query(range): Query<DigestRange>,
 ) -> Response {
+    // A skip record names its rule too, so a finding is told by its severity.
     let sql = format!(
         "SELECT rule_id, COUNT(DISTINCT alert_id) AS alerts_flagged, \
          COUNT(DISTINCT window_end) AS runs_flagging FROM \"{DIGEST_STREAM}\" \
-         WHERE rule_id IS NOT NULL GROUP BY rule_id"
+         WHERE severity IS NOT NULL GROUP BY rule_id"
     );
     read(
         &org_id,
@@ -367,5 +421,44 @@ mod tests {
         assert!(Columns::Finding.not_written_yet(&stream));
         assert!(Columns::Finding.not_written_yet(&field));
         assert!(!Columns::Finding.not_written_yet(&timeout));
+    }
+
+    fn window(kind: Option<&str>, tier: Option<&str>) -> RunWindow {
+        RunWindow {
+            window_start: 1,
+            window_end: 2,
+            size: None,
+            kind: kind.map(str::to_string),
+            rule_id: None,
+            tier: tier.map(str::to_string),
+            pattern: None,
+        }
+    }
+
+    // A version-1 record has no `kind`, so each kind maps to a column every version writes.
+    #[test]
+    fn a_kind_filter_matches_on_columns_the_version_one_shape_also_wrote() {
+        assert_eq!(
+            record_filters(&window(Some("finding"), None)).unwrap(),
+            ["severity IS NOT NULL"]
+        );
+        assert_eq!(
+            record_filters(&window(Some("run"), None)).unwrap(),
+            ["rule_id IS NULL"]
+        );
+        assert_eq!(
+            record_filters(&window(Some("skip"), Some("B"))).unwrap(),
+            ["kind = 'skip'", "tier = 'B'"]
+        );
+        assert!(record_filters(&window(None, None)).unwrap().is_empty());
+        assert!(record_filters(&window(Some("other"), None)).is_err());
+        assert!(record_filters(&window(None, Some("D"))).is_err());
+        let quoted = record_filters(&RunWindow {
+            rule_id: Some("noise".to_string()),
+            pattern: Some("it's".to_string()),
+            ..window(None, None)
+        })
+        .unwrap();
+        assert_eq!(quoted, ["rule_id = 'noise'", "pattern = 'it''s'"]);
     }
 }

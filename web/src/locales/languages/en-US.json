@@ -10343,6 +10343,27 @@
       "medium": "Medium confidence",
       "low": "Low confidence"
     },
+    "tier": {
+      "a": "Confirmed condition",
+      "b": "Investigate",
+      "c": "Owner decision"
+    },
+    "quality": {
+      "partial": "Partial evidence",
+      "unavailable": "Evidence unavailable"
+    },
+    "skipReason": {
+      "insufficientHistory": "Too little history",
+      "insufficientSamples": "Too few samples",
+      "unmeasurableSignal": "A signal the rule needs is missing",
+      "alertDisabled": "Alert disabled",
+      "windowTooShort": "Window too short for the rule",
+      "unsupportedMode": "Alert mode not supported by the rule",
+      "silenceCensoredHistory": "Silence paused evaluation, so episode lengths are not real",
+      "noIncidentSignal": "No incidents, so nothing says whether firings were wanted",
+      "sentinelByDesign": "Quiet by design",
+      "enrichmentTimeout": "Evidence read timed out"
+    },
     "coverage": {
       "full": "Full coverage",
       "gap": "Coverage gap",
@@ -10403,7 +10424,11 @@
       "statAlertsInScope": "Alerts in scope",
       "statDeclined": "Declined",
       "statDeclinedSub": "Declined, not cleared",
-      "statDeclinedTooltip": "Rule and alert pairs a rule would not judge, because the alert had too little history or too few samples for it. A gate, not a clearance; the per-alert reasons are not written to the stream.",
+      "statDeclinedTooltip": "Rule and alert pairs a rule would not judge. A gate, not a clearance. A floor not met is only counted; a rule that could not run, or looked and declined, is listed below with its reason.",
+      "limitations": "Limits of the evidence",
+      "declinedHeading": "Declined with a reason",
+      "declinedDesc": "Rules that could not run for an alert, or looked and declined. This is not a clearance.",
+      "declinedCounted": "{count} routine decline counted, not listed | {count} routine declines counted, not listed",
       "statWindow": "Window",
       "findingsHeading": "Findings",
       "suggestionsOnly": "Suggestions only, nothing is applied automatically",

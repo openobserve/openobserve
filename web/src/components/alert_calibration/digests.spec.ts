@@ -24,7 +24,9 @@ import {
   latestEmission,
   latestPerWindow,
   latestRun,
+  limitationsOf,
   parseLagRows,
+  schemaVersion,
   type DigestRecord,
   type FindingRecord,
   type RuleId,
@@ -107,7 +109,44 @@ describe("a run pulled again", () => {
   });
 
   it("has no detail when the stream holds no record for it", () => {
-    expect(latestEmission([])).toEqual({ run: null, findings: [] });
+    expect(latestEmission([])).toEqual({ run: null, findings: [], skips: [] });
+  });
+
+  it("keeps a version-1 record without a kind as a finding, and sets a version-2 skip apart", () => {
+    const { findings, skips } = latestEmission([
+      record({ _timestamp: 500, rule_id: "noise", severity: "Low", title: "v1" }),
+      record({
+        _timestamp: 500,
+        schema_version: 2,
+        kind: "finding",
+        rule_id: "failure",
+        severity: "High",
+        title: "v2",
+        tier: "A",
+      }),
+      record({
+        _timestamp: 500,
+        schema_version: 2,
+        kind: "skip",
+        rule_id: "silent",
+        alert_name: "panics",
+        skip_reason: "sentinel_by_design",
+      }),
+      record({ _timestamp: 500, schema_version: 2, kind: "run" }),
+    ]);
+    expect(findings.map((f) => [f.title, schemaVersion(f)])).toEqual([
+      ["v2", 2],
+      ["v1", 1],
+    ]);
+    expect(skips.map((s) => [s.alert_name, s.skip_reason])).toEqual([
+      ["panics", "sentinel_by_design"],
+    ]);
+  });
+
+  it("reads a finding's limitations out of the one column ingestion stringified", () => {
+    expect(limitationsOf(record({ limitations: JSON.stringify(["a", "b"]) }))).toEqual(["a", "b"]);
+    expect(limitationsOf(record())).toEqual([]);
+    expect(limitationsOf(record({ limitations: "plain" }))).toEqual(["plain"]);
   });
 });
 
