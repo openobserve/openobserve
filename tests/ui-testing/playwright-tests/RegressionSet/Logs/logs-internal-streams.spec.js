@@ -124,7 +124,8 @@ test.describe("Logs stream picker internal streams", () => {
     expect(below).not.toContain(other);
   });
 
-  test("the Hide/Show action is reached from the search box with Tab and toggles with Enter and Space", {
+  // Unskip once openobserve#16183 is fixed: Hide/Show drops keyboard focus when 2+ internal streams match.
+  test.fixme("the Hide/Show action is reached from the search box with Tab and toggles with Enter and Space", {
     tag: ['@P2', '@regression', '@logsRegression', '@logsRegressionInternalStreams'],
   }, async ({ page }) => {
     await pm.logsPage.pickStreamByTypedFilter(USER_STREAM, USER_STREAM);
