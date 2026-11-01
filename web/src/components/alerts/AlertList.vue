@@ -491,6 +491,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     size="sm"
                   />
+                  <OTag
+                    v-else
+                    variant="default-soft"
+                    dot
+                    :label="t('alerts.groups.firingCount', { count: 0 })"
+                    size="sm"
+                    :data-test="`alert-list-${row.name}-groups-none-firing`"
+                  />
                   <span class="text-text-secondary text-2xs">
                     {{
                       t("alerts.groups.ofNGroups", {
