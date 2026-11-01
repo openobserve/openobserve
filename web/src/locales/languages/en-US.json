@@ -9335,6 +9335,13 @@
     "rowFields": "Row Fields",
     "valueFields": "Value Fields",
     "noData": "No Data",
+    "previewView": "Preview view",
+    "previewChart": "Chart",
+    "previewData": "Data",
+    "showRawData": "Show raw data",
+    "showChart": "Show chart",
+    "dataViewEmpty": "No rows returned",
+    "dataViewCapped": "Showing the first {shown} of {total} rows",
     "logExplorer": {
       "title": "Logs Explorer",
       "openInLogs": "Open in Logs",

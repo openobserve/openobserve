@@ -2053,8 +2053,11 @@
       "error": "Błąd",
       "action": "Akcja",
       "view": "Widok",
-      "frustration": "Frustracja"
+      "frustration": "Frustracja",
+      "failedRequest": "Nieudane żądania",
+      "noResponse": "Brak odpowiedzi"
     },
+    "replayCanvasNotRecorded": "Nie zarejestrowano zawartości canvas",
     "actionOnTarget": "{action} na \"{target}\"",
     "errorWhileFetchingErrorEvents": "Błąd podczas pobierania zdarzeń błędów",
     "errorWhileFetchingSessionReplay": "Błąd podczas pobierania danych powtórek sesji",
@@ -9334,6 +9337,13 @@
     "rowFields": "Pola wierszy",
     "valueFields": "Pola wartości",
     "noData": "Brak danych",
+    "previewView": "Widok podglądu",
+    "previewChart": "Wykres",
+    "previewData": "Dane",
+    "showRawData": "Pokaż surowe dane",
+    "showChart": "Pokaż wykres",
+    "dataViewEmpty": "Nie zwrócono żadnych wierszy",
+    "dataViewCapped": "Wyświetlanie pierwszych {shown} z {total} wierszy",
     "logExplorer": {
       "title": "Eksplorator logów",
       "openInLogs": "Otwórz w logach",
@@ -13758,6 +13768,15 @@
       "allTitle": "Każda metryka, także te bez danych w tym zakresie",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "Pulpity",
+      "sortDashboardsTitle": "Najpierw najczęściej używane w pulpitach",
+      "sortAlerts": "Alerty",
+      "sortAlertsTitle": "Najpierw najczęściej używane w alertach",
+      "usageInDashboards": "W pulpitach",
+      "usageHasAlerts": "Ma alerty",
+      "usageInSlos": "W SLO",
+      "usageLoading": "Ładowanie informacji o użyciu metryk",
+      "usageFailed": "Użycie niedostępne, spróbuj ponownie",
       "viewGrid": "Siatka",
       "viewRows": "Wiersze",
       "modeExplore": "Eksploruj",
@@ -13891,16 +13910,7 @@
         "deleteMessage": "Usunąć widok {name} dla wszystkich w tej organizacji?",
         "modified": "{name} (zmodyfikowany)",
         "clear": "Wyczyść widok"
-      },
-      "sortDashboards": "Pulpity",
-      "sortDashboardsTitle": "Najpierw najczęściej używane w pulpitach",
-      "sortAlerts": "Alerty",
-      "sortAlertsTitle": "Najpierw najczęściej używane w alertach",
-      "usageInDashboards": "W pulpitach",
-      "usageHasAlerts": "Ma alerty",
-      "usageInSlos": "W SLO",
-      "usageLoading": "Ładowanie informacji o użyciu metryk",
-      "usageFailed": "Użycie niedostępne, spróbuj ponownie"
+      }
     },
     "metricCard": {
       "lastRefreshed": "Ostatnie odświeżenie:",
@@ -13927,6 +13937,17 @@
       "notEqualTo": "Różne od",
       "regexPattern": "Wzorzec regex (np. prod.*)",
       "regexNotMatching": "Regex niepasujący (np. test.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ Grupa OR",
+      "addGroupTooltip": "Dodaj grupę filtrów; seria pasuje, gdy pasuje do dowolnej grupy",
+      "addToGroup": "Dodaj filtr do tej grupy",
+      "anyOf": "dowolny z",
+      "andAnyOf": "i dowolny z",
+      "or": "lub",
+      "not": "nie",
+      "notTooltip": "Dopasuj serie, których nie obejmuje ta cała grupa",
+      "tooManyBranches": "Te filtry rozwijają się do {count} osobnych selektorów; może działać co najwyżej {max}. Scal wartości w jeden filtr wyrażenia regularnego lub usuń grupę."
     },
     "builderSwitch": {
       "unsupported": "Kreator nie może wyświetlić {construct}",
@@ -13967,11 +13988,11 @@
         "byLabelsLabel": "Według etykiet",
         "quantileLabel": "Kwantyl",
         "kLabel": "K",
-        "nearestMultipleLabel": "Najbliższa wielokrotność",
         "withoutLabel": "Bez (usuń te etykiety)",
         "withoutDesc": "Agreguj z pominięciem wybranych etykiet i zachowaj wszystkie pozostałe etykiety",
         "offsetLabel": "Przesunięcie",
-        "offsetDesc": "Jak daleko wstecz odczytać metrykę, np. 1h lub 1d"
+        "offsetDesc": "Jak daleko wstecz odczytać metrykę, np. 1h lub 1d",
+        "nearestMultipleLabel": "Najbliższa wielokrotność"
       },
       "rangeOnlyFirst": "Funkcja zakresowa może być tylko pierwszym krokiem",
       "rangeOnlyFirstNote": "Funkcja zakresowa odczytuje surowe próbki, więc może być tylko pierwszym krokiem. Usuń pozostałe kroki, aby ją dodać.",
@@ -14041,17 +14062,6 @@
       "empty": "Brak zapytań",
       "noMatch": "Żadne zapytanie nie pasuje do wyszukiwania ani filtra oznaczonych gwiazdką",
       "loadMore": "Załaduj więcej"
-    },
-    "labelGroups": {
-      "addGroup": "+ Grupa OR",
-      "addGroupTooltip": "Dodaj grupę filtrów; seria pasuje, gdy pasuje do dowolnej grupy",
-      "addToGroup": "Dodaj filtr do tej grupy",
-      "anyOf": "dowolny z",
-      "andAnyOf": "i dowolny z",
-      "or": "lub",
-      "not": "nie",
-      "notTooltip": "Dopasuj serie, których nie obejmuje ta cała grupa",
-      "tooManyBranches": "Te filtry rozwijają się do {count} osobnych selektorów; może działać co najwyżej {max}. Scal wartości w jeden filtr wyrażenia regularnego lub usuń grupę."
     }
   },
   "settings": {
@@ -21710,7 +21720,8 @@
         "longtask": "Długie zadanie",
         "view": "Widok",
         "action": "Akcja",
-        "resource": "Zasób"
+        "resource": "Zasób",
+        "failedrequest": "Nieudane żądanie"
       },
       "subscriptionPlan": {
         "payasyougo": "Płatność za użycie",
@@ -22724,6 +22735,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "Odczytuje metrykę sprzed podanego czasu",
       "rateDoc": "Oblicza średnią szybkość wzrostu na sekundę w określonym zakresie czasu",
       "irateDoc": "Oblicza chwilową szybkość wzrostu na sekundę na podstawie dwóch ostatnich punktów danych",
       "increaseDoc": "Oblicza całkowity wzrost w określonym zakresie czasu",
@@ -22794,8 +22806,7 @@
       "moduloName": "Modulo",
       "multiplyByName": "Pomnóż przez",
       "divideByName": "Podziel przez",
-      "exponentName": "Wykładnik",
-      "offsetDoc": "Odczytuje metrykę sprzed podanego czasu"
+      "exponentName": "Wykładnik"
     }
   },
   "passwordPolicy": {

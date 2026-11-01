@@ -73,6 +73,34 @@ export const forecastPointOf = (series: any, dataIndex: number | undefined) => {
   };
 };
 
+/** Flattens a panel query response into rows plus their columns in first-seen order. */
+export const flattenPanelResult = (
+  data: any,
+  queryType?: string,
+): { columns: string[]; rows: Record<string, any>[] } => {
+  const rows: Record<string, any>[] = [];
+  if (queryType === "promql") {
+    (data ?? []).forEach((promData: any) => {
+      if (!Array.isArray(promData?.result)) return;
+      promData.result.forEach((series: any) => {
+        // Instant queries return one `value` pair instead of a `values` range.
+        const points = series.values ?? (series.value ? [series.value] : []);
+        points.forEach((point: any) => {
+          rows.push({ timestamp: point[0], value: point[1], ...(series.metric ?? {}) });
+        });
+      });
+    });
+  } else {
+    (data ?? []).forEach((dataset: any) => {
+      if (!Array.isArray(dataset)) return;
+      rows.push(...dataset);
+    });
+  }
+  const columns = new Set<string>();
+  rows.forEach((row) => Object.keys(row).forEach((key) => columns.add(key)));
+  return { columns: Array.from(columns), rows };
+};
+
 /** The SQL column a right-clicked threshold applies to, read off the query's y-axis or its SQL. */
 const sqlYAxisColumnOf = (
   query: any,
@@ -367,101 +395,32 @@ export function usePanelDownload({
           return;
         }
 
-        let csvContent;
+        const isPromql = panelSchema.value.queryType === "promql";
+        // PromQL reads filteredData so hidden queries stay out of the export.
+        const { columns, rows } = flattenPanelResult(
+          isPromql ? filteredData?.value : data?.value,
+          panelSchema.value.queryType,
+        );
 
-        // Check if this is a PromQL query type panel
-        if (panelSchema.value.queryType === "promql") {
-          // Handle PromQL data format
-          const flattenedData: any[] = [];
-
-          // Iterate through each response item (multiple queries can produce multiple responses)
-          // Use filteredData to exclude hidden queries
-          filteredData?.value?.forEach((promData: any) => {
-            if (!promData?.result || !Array.isArray(promData.result)) return;
-
-            // Iterate through each result (time series)
-            promData.result.forEach((series: any) => {
-              const metricLabels = series.metric || {};
-
-              // Iterate through values array (timestamp, value pairs)
-              series.values.forEach((point: any) => {
-                const timestamp = point[0];
-                const value = point[1];
-
-                // Create a row with timestamp, value, and all metric labels
-                const row = {
-                  timestamp: timestamp,
-                  value: value,
-                  ...metricLabels,
-                };
-
-                flattenedData.push(row);
-              });
-            });
-          });
-
-          // Get all unique keys across all data points
-          const allKeys = new Set();
-          flattenedData.forEach((row: any) => {
-            Object.keys(row).forEach((key: any) => allKeys.add(key));
-          });
-
-          // Convert Set to Array and ensure timestamp and value come first
-          const keys = Array.from(allKeys);
-          keys.sort((a: any, b: any) => {
-            if (a === "timestamp") return -1;
-            if (b === "timestamp") return 1;
-            if (a === "value") return -1;
-            if (b === "value") return 1;
-            return a.localeCompare(b);
-          });
-
-          // Create CSV content
-          csvContent = [
-            keys.join(","), // Headers row
-            ...flattenedData.map((row: any) =>
-              keys.map((key: any) => wrapCsvValue(row[key] ?? "")).join(","),
-            ),
-          ].join("\r\n");
-        } else {
-          // Handle standard SQL format - now supporting multiple arrays
-          const flattenedData: any[] = [];
-
-          // Iterate through all datasets/arrays in the response
-          data?.value?.forEach((dataset: any) => {
-            // Skip if dataset is empty or not an array
-            if (!dataset || !Array.isArray(dataset) || dataset.length === 0) return;
-
-            dataset.forEach((row: any) => {
-              flattenedData.push({
-                ...row,
-              });
-            });
-          });
-
-          // If after flattening we have no data, show notification and return
-          if (flattenedData.length === 0) {
-            showErrorNotification(t("dashboard.noDataAvailableToDownload"));
-            return;
-          }
-
-          // Collect all possible keys from all objects
-          const allKeys = new Set();
-          flattenedData.forEach((row: any) => {
-            Object.keys(row).forEach((key: any) => allKeys.add(key));
-          });
-
-          // Convert Set to Array and sort for consistent order
-          const headers = Array.from(allKeys).sort();
-
-          // Create CSV content with headers and data rows
-          csvContent = [
-            headers.join(","), // Headers row
-            ...flattenedData.map((row: any) =>
-              headers.map((header: any) => wrapCsvValue(row[header] ?? "")).join(","),
-            ),
-          ].join("\r\n");
+        if (rows.length === 0) {
+          showErrorNotification(t("dashboard.noDataAvailableToDownload"));
+          return;
         }
+
+        const headers = isPromql
+          ? columns.sort((a, b) => {
+              if (a === "timestamp") return -1;
+              if (b === "timestamp") return 1;
+              if (a === "value") return -1;
+              if (b === "value") return 1;
+              return a.localeCompare(b);
+            })
+          : columns.sort();
+
+        const csvContent = [
+          headers.join(","),
+          ...rows.map((row) => headers.map((key) => wrapCsvValue(row[key] ?? "")).join(",")),
+        ].join("\r\n");
 
         const status = downloadFile((title ?? "chart-export") + ".csv", csvContent, "text/csv");
 

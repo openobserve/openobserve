@@ -16,7 +16,12 @@
 import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
 import { setLanguage } from "@/utils/cookies";
 import { gt } from "@/types/i18n";
-import { wrapCsvValue, usePanelAlertCreation, usePanelDownload } from "./usePanelActions";
+import {
+  flattenPanelResult,
+  wrapCsvValue,
+  usePanelAlertCreation,
+  usePanelDownload,
+} from "./usePanelActions";
 import { downloadFile } from "@/utils/dom";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 import { buildForecastAlertPromql, parseForecastAlertPromql } from "@/utils/alerts/forecastAlert";
@@ -66,6 +71,51 @@ describe("usePanelActions", () => {
       expect(wrapCsvValue("a,b")).toBe('"a,b"');
       expect(wrapCsvValue("a\nb")).toBe('"a\nb"');
       expect(wrapCsvValue("plain")).toBe("plain");
+    });
+  });
+
+  describe("flattenPanelResult", () => {
+    it("joins every SQL dataset and keeps columns in first-seen order", () => {
+      const out = flattenPanelResult([
+        [{ x_axis_1: "a", y_axis_1: 1 }],
+        [{ x_axis_1: "b", y_axis_1: 2, breakdown_1: "z" }],
+      ]);
+      expect(out.columns).toEqual(["x_axis_1", "y_axis_1", "breakdown_1"]);
+      expect(out.rows).toHaveLength(2);
+    });
+
+    it("turns PromQL series into one row per point with its labels", () => {
+      const out = flattenPanelResult(
+        [
+          {
+            result: [
+              {
+                metric: { job: "api" },
+                values: [
+                  [1, "5"],
+                  [2, "6"],
+                ],
+              },
+            ],
+          },
+        ],
+        "promql",
+      );
+      expect(out.columns).toEqual(["timestamp", "value", "job"]);
+      expect(out.rows[1]).toEqual({ timestamp: 2, value: "6", job: "api" });
+    });
+
+    it("reads the single value pair of a PromQL instant query", () => {
+      const out = flattenPanelResult(
+        [{ result: [{ metric: { job: "api" }, value: [3, "9"] }] }],
+        "promql",
+      );
+      expect(out.rows).toEqual([{ timestamp: 3, value: "9", job: "api" }]);
+    });
+
+    it("returns nothing for a missing or malformed response", () => {
+      expect(flattenPanelResult(undefined)).toEqual({ columns: [], rows: [] });
+      expect(flattenPanelResult([null, {}], "promql")).toEqual({ columns: [], rows: [] });
     });
   });
 
@@ -973,6 +1023,29 @@ describe("usePanelActions", () => {
         "Chart data downloaded as a CSV file",
         { timeout: 2000 },
       );
+    });
+
+    it("exports a PromQL instant result as CSV", () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.queryType = "promql";
+      (downloadFile as any).mockReturnValue(true);
+      usePanelDownload(deps as any).downloadDataAsCSV("instant");
+
+      expect(downloadFile).toHaveBeenCalledWith(
+        "instant.csv",
+        "timestamp,value\r\n1,10",
+        "text/csv",
+      );
+    });
+
+    it("reports no data instead of an empty PromQL CSV", () => {
+      const deps = makeDeps();
+      deps.panelSchema.value.queryType = "promql";
+      deps.filteredData.value = [{ result: [] }];
+      usePanelDownload(deps as any).downloadDataAsCSV("empty");
+
+      expect(downloadFile).not.toHaveBeenCalled();
+      expect(deps.showErrorNotification).toHaveBeenCalledWith("No data available to download");
     });
 
     it("exports PromQL filtered data as JSON", () => {

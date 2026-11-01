@@ -2053,8 +2053,11 @@
       "error": "Fehler",
       "action": "Aktion",
       "view": "Ansicht",
-      "frustration": "Frustration"
+      "frustration": "Frustration",
+      "failedRequest": "Fehlgeschlagene Anfragen",
+      "noResponse": "Keine Antwort"
     },
+    "replayCanvasNotRecorded": "Canvas-Inhalt nicht aufgezeichnet",
     "actionOnTarget": "{action} auf \"{target}\"",
     "errorWhileFetchingErrorEvents": "Fehler beim Abrufen der Fehlerereignisse",
     "errorWhileFetchingSessionReplay": "Fehler beim Abrufen der Session-Replay-Daten",
@@ -9334,6 +9337,13 @@
     "rowFields": "Zeilenfelder",
     "valueFields": "Wertfelder",
     "noData": "Keine Daten",
+    "previewView": "Vorschauansicht",
+    "previewChart": "Diagramm",
+    "previewData": "Daten",
+    "showRawData": "Rohdaten anzeigen",
+    "showChart": "Diagramm anzeigen",
+    "dataViewEmpty": "Keine Zeilen zurückgegeben",
+    "dataViewCapped": "Die ersten {shown} von {total} Zeilen werden angezeigt",
     "logExplorer": {
       "title": "Logs-Explorer",
       "openInLogs": "In Logs öffnen",
@@ -13758,6 +13768,15 @@
       "allTitle": "Jede Metrik, einschließlich solcher ohne Daten in diesem Bereich",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "Dashboards",
+      "sortDashboardsTitle": "Am häufigsten in Dashboards verwendet zuerst",
+      "sortAlerts": "Alarme",
+      "sortAlertsTitle": "Am häufigsten in Alarmen verwendet zuerst",
+      "usageInDashboards": "In Dashboards",
+      "usageHasAlerts": "Hat Alarme",
+      "usageInSlos": "In SLOs",
+      "usageLoading": "Nutzung der Metriken wird geladen",
+      "usageFailed": "Nutzung nicht verfügbar, erneut versuchen",
       "viewGrid": "Raster",
       "viewRows": "Zeilen",
       "modeExplore": "Erkunden",
@@ -13891,16 +13910,7 @@
         "deleteMessage": "Die Ansicht {name} für alle in dieser Organisation löschen?",
         "modified": "{name} (geändert)",
         "clear": "Ansicht zurücksetzen"
-      },
-      "sortDashboards": "Dashboards",
-      "sortDashboardsTitle": "Am häufigsten in Dashboards verwendet zuerst",
-      "sortAlerts": "Alarme",
-      "sortAlertsTitle": "Am häufigsten in Alarmen verwendet zuerst",
-      "usageInDashboards": "In Dashboards",
-      "usageHasAlerts": "Hat Alarme",
-      "usageInSlos": "In SLOs",
-      "usageLoading": "Nutzung der Metriken wird geladen",
-      "usageFailed": "Nutzung nicht verfügbar, erneut versuchen"
+      }
     },
     "metricCard": {
       "lastRefreshed": "Zuletzt aktualisiert:",
@@ -13927,6 +13937,17 @@
       "notEqualTo": "Ungleich",
       "regexPattern": "Regex-Muster (z. B. prod.*)",
       "regexNotMatching": "Regex nicht zutreffend (z. B. test.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR-Gruppe",
+      "addGroupTooltip": "Fügt eine Gruppe von Filtern hinzu; eine Zeitreihe trifft zu, wenn sie einer beliebigen Gruppe entspricht",
+      "addToGroup": "Filter zu dieser Gruppe hinzufügen",
+      "anyOf": "eines von",
+      "andAnyOf": "und eines von",
+      "or": "oder",
+      "not": "nicht",
+      "notTooltip": "Trifft die Zeitreihen, die diese gesamte Gruppe nicht trifft",
+      "tooManyBranches": "Diese Filter erweitern sich zu {count} separaten Selektoren; höchstens {max} können ausgeführt werden. Fassen Sie Werte in einem Regex-Filter zusammen oder entfernen Sie eine Gruppe."
     },
     "builderSwitch": {
       "unsupported": "Der Builder kann {construct} nicht anzeigen",
@@ -13967,11 +13988,11 @@
         "byLabelsLabel": "Nach Labels",
         "quantileLabel": "Quantil",
         "kLabel": "K",
-        "nearestMultipleLabel": "Nächstes Vielfaches",
         "withoutLabel": "Without (diese Labels entfernen)",
         "withoutDesc": "Aggregiert die ausgewählten Labels weg und behält alle anderen Labels",
         "offsetLabel": "Offset",
-        "offsetDesc": "Wie weit zurück die Metrik gelesen wird, z. B. 1h oder 1d"
+        "offsetDesc": "Wie weit zurück die Metrik gelesen wird, z. B. 1h oder 1d",
+        "nearestMultipleLabel": "Nächstes Vielfaches"
       },
       "rangeOnlyFirst": "Eine Range-Funktion kann nur der erste Schritt sein",
       "rangeOnlyFirstNote": "Eine Range-Funktion liest die Roh-Samples und kann daher nur der erste Schritt sein. Entfernen Sie die anderen Schritte, um eine hinzuzufügen.",
@@ -14041,17 +14062,6 @@
       "empty": "Noch keine Abfragen",
       "noMatch": "Keine Abfragen passen zur Suche oder zum Sternfilter",
       "loadMore": "Mehr laden"
-    },
-    "labelGroups": {
-      "addGroup": "+ OR-Gruppe",
-      "addGroupTooltip": "Fügt eine Gruppe von Filtern hinzu; eine Zeitreihe trifft zu, wenn sie einer beliebigen Gruppe entspricht",
-      "addToGroup": "Filter zu dieser Gruppe hinzufügen",
-      "anyOf": "eines von",
-      "andAnyOf": "und eines von",
-      "or": "oder",
-      "not": "nicht",
-      "notTooltip": "Trifft die Zeitreihen, die diese gesamte Gruppe nicht trifft",
-      "tooManyBranches": "Diese Filter erweitern sich zu {count} separaten Selektoren; höchstens {max} können ausgeführt werden. Fassen Sie Werte in einem Regex-Filter zusammen oder entfernen Sie eine Gruppe."
     }
   },
   "settings": {
@@ -21710,7 +21720,8 @@
         "longtask": "Lange Aufgabe",
         "view": "Anzeigen",
         "action": "Aktion",
-        "resource": "Ressource"
+        "resource": "Ressource",
+        "failedrequest": "Fehlgeschlagene Anfrage"
       },
       "subscriptionPlan": {
         "payasyougo": "Nutzungsbasierte Bezahlung",
@@ -22724,6 +22735,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "Liest die Metrik so, wie sie vor der angegebenen Dauer war",
       "rateDoc": "Berechnet die durchschnittliche Steigerungsrate pro Sekunde über den angegebenen Zeitraum",
       "irateDoc": "Berechnet die momentane Steigerungsrate pro Sekunde basierend auf den letzten zwei Datenpunkten",
       "increaseDoc": "Berechnet den Gesamtanstieg über den angegebenen Zeitraum",
@@ -22794,8 +22806,7 @@
       "moduloName": "Modulo",
       "multiplyByName": "Multiplizieren mit",
       "divideByName": "Dividieren durch",
-      "exponentName": "Exponent",
-      "offsetDoc": "Liest die Metrik so, wie sie vor der angegebenen Dauer war"
+      "exponentName": "Exponent"
     }
   },
   "passwordPolicy": {

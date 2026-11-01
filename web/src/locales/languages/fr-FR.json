@@ -2053,8 +2053,11 @@
       "error": "Erreur",
       "action": "Action",
       "view": "Vue",
-      "frustration": "Frustration"
+      "frustration": "Frustration",
+      "failedRequest": "Requêtes échouées",
+      "noResponse": "Aucune réponse"
     },
+    "replayCanvasNotRecorded": "Contenu du canvas non enregistré",
     "actionOnTarget": "{action} sur « {target} »",
     "errorWhileFetchingErrorEvents": "Erreur lors de la récupération des événements d'erreur",
     "errorWhileFetchingSessionReplay": "Erreur lors de la récupération des données de session replay",
@@ -9334,6 +9337,13 @@
     "rowFields": "Champs de ligne",
     "valueFields": "Champs de valeur",
     "noData": "Aucune donnée",
+    "previewView": "Vue de l'aperçu",
+    "previewChart": "Graphique",
+    "previewData": "Données",
+    "showRawData": "Afficher les données brutes",
+    "showChart": "Afficher le graphique",
+    "dataViewEmpty": "Aucune ligne renvoyée",
+    "dataViewCapped": "Affichage des {shown} premières lignes sur {total}",
     "logExplorer": {
       "title": "Explorateur de Logs",
       "openInLogs": "Ouvrir dans Logs",
@@ -13758,6 +13768,15 @@
       "allTitle": "Chaque métrique, y compris celles sans données dans cette plage",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "Tableaux de bord",
+      "sortDashboardsTitle": "Les plus utilisés dans les tableaux de bord en premier",
+      "sortAlerts": "Alertes",
+      "sortAlertsTitle": "Les plus utilisés dans les alertes en premier",
+      "usageInDashboards": "Dans les tableaux de bord",
+      "usageHasAlerts": "A des alertes",
+      "usageInSlos": "Dans les SLO",
+      "usageLoading": "Chargement des utilisations des métriques",
+      "usageFailed": "Utilisation indisponible, réessayez",
       "viewGrid": "Grille",
       "viewRows": "Lignes",
       "modeExplore": "Explorer",
@@ -13891,16 +13910,7 @@
         "deleteMessage": "Supprimer la vue {name} pour tous les membres de cette organisation ?",
         "modified": "{name} (modifiée)",
         "clear": "Effacer la vue"
-      },
-      "sortDashboards": "Tableaux de bord",
-      "sortDashboardsTitle": "Les plus utilisés dans les tableaux de bord en premier",
-      "sortAlerts": "Alertes",
-      "sortAlertsTitle": "Les plus utilisés dans les alertes en premier",
-      "usageInDashboards": "Dans les tableaux de bord",
-      "usageHasAlerts": "A des alertes",
-      "usageInSlos": "Dans les SLO",
-      "usageLoading": "Chargement des utilisations des métriques",
-      "usageFailed": "Utilisation indisponible, réessayez"
+      }
     },
     "metricCard": {
       "lastRefreshed": "Dernière actualisation :",
@@ -13927,6 +13937,17 @@
       "notEqualTo": "Différent de",
       "regexPattern": "Motif regex (ex. prod.*)",
       "regexNotMatching": "Regex ne correspondant pas (ex. test.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ Groupe OR",
+      "addGroupTooltip": "Ajouter un groupe de filtres ; une série correspond lorsqu'elle correspond à au moins un groupe",
+      "addToGroup": "Ajouter un filtre à ce groupe",
+      "anyOf": "l'un de",
+      "andAnyOf": "et l'un de",
+      "or": "ou",
+      "not": "non",
+      "notTooltip": "Sélectionner les séries auxquelles ce groupe entier ne correspond pas",
+      "tooManyBranches": "Ces filtres se développent en {count} sélecteurs distincts ; au maximum {max} peuvent s'exécuter. Fusionnez les valeurs dans un seul filtre regex ou supprimez un groupe."
     },
     "builderSwitch": {
       "unsupported": "Le générateur ne peut pas afficher {construct}",
@@ -13967,11 +13988,11 @@
         "byLabelsLabel": "Par étiquettes",
         "quantileLabel": "Quantile",
         "kLabel": "K",
-        "nearestMultipleLabel": "Multiple le plus proche",
         "withoutLabel": "Sans (supprimer ces labels)",
         "withoutDesc": "Agréger les labels sélectionnés et conserver tous les autres labels",
         "offsetLabel": "Décalage",
-        "offsetDesc": "Combien de temps en arrière lire la métrique, par ex. 1h ou 1d"
+        "offsetDesc": "Combien de temps en arrière lire la métrique, par ex. 1h ou 1d",
+        "nearestMultipleLabel": "Multiple le plus proche"
       },
       "rangeOnlyFirst": "Une fonction d'intervalle ne peut être que la première étape",
       "rangeOnlyFirstNote": "Une fonction d'intervalle lit les échantillons bruts, elle ne peut donc être que la première étape. Supprimez les autres étapes pour en ajouter une.",
@@ -14041,17 +14062,6 @@
       "empty": "Aucune requête pour l'instant",
       "noMatch": "Aucune requête ne correspond à la recherche ou au filtre des favoris",
       "loadMore": "Charger plus"
-    },
-    "labelGroups": {
-      "addGroup": "+ Groupe OR",
-      "addGroupTooltip": "Ajouter un groupe de filtres ; une série correspond lorsqu'elle correspond à au moins un groupe",
-      "addToGroup": "Ajouter un filtre à ce groupe",
-      "anyOf": "l'un de",
-      "andAnyOf": "et l'un de",
-      "or": "ou",
-      "not": "non",
-      "notTooltip": "Sélectionner les séries auxquelles ce groupe entier ne correspond pas",
-      "tooManyBranches": "Ces filtres se développent en {count} sélecteurs distincts ; au maximum {max} peuvent s'exécuter. Fusionnez les valeurs dans un seul filtre regex ou supprimez un groupe."
     }
   },
   "settings": {
@@ -21710,7 +21720,8 @@
         "longtask": "Tâche longue",
         "view": "Voir",
         "action": "Action",
-        "resource": "Ressource"
+        "resource": "Ressource",
+        "failedrequest": "Requête échouée"
       },
       "subscriptionPlan": {
         "payasyougo": "Paiement à l'utilisation",
@@ -22724,6 +22735,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "Lit la métrique telle qu'elle était il y a la durée indiquée",
       "rateDoc": "Calcule le taux d'augmentation moyen par seconde sur la plage temporelle spécifiée",
       "irateDoc": "Calcule le taux d'augmentation instantané par seconde en fonction des deux derniers points de données",
       "increaseDoc": "Calcule l'augmentation totale sur la plage temporelle spécifiée",
@@ -22794,8 +22806,7 @@
       "moduloName": "Modulo",
       "multiplyByName": "Multiplier par",
       "divideByName": "Diviser par",
-      "exponentName": "Exposant",
-      "offsetDoc": "Lit la métrique telle qu'elle était il y a la durée indiquée"
+      "exponentName": "Exposant"
     }
   },
   "passwordPolicy": {

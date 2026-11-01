@@ -2053,8 +2053,11 @@
       "error": "Lỗi",
       "action": "Hành động",
       "view": "Lượt xem",
-      "frustration": "Bực bội"
+      "frustration": "Bực bội",
+      "failedRequest": "Yêu cầu thất bại",
+      "noResponse": "Không có phản hồi"
     },
+    "replayCanvasNotRecorded": "Nội dung canvas chưa được ghi lại",
     "actionOnTarget": "{action} trên \"{target}\"",
     "errorWhileFetchingErrorEvents": "Lỗi khi tải các sự kiện lỗi",
     "errorWhileFetchingSessionReplay": "Lỗi khi tải dữ liệu phát lại phiên",
@@ -9334,6 +9337,13 @@
     "rowFields": "Trường hàng",
     "valueFields": "Trường giá trị",
     "noData": "Không có dữ liệu",
+    "previewView": "Chế độ xem trước",
+    "previewChart": "Biểu đồ",
+    "previewData": "Dữ liệu",
+    "showRawData": "Hiển thị dữ liệu thô",
+    "showChart": "Hiển thị biểu đồ",
+    "dataViewEmpty": "Không có hàng nào được trả về",
+    "dataViewCapped": "Đang hiển thị {shown} hàng đầu tiên trong số {total} hàng",
     "logExplorer": {
       "title": "Trình khám phá nhật ký",
       "openInLogs": "Mở trong Nhật ký",
@@ -13758,6 +13768,15 @@
       "allTitle": "Mọi chỉ số, kể cả không có dữ liệu trong khoảng này",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "Bảng điều khiển",
+      "sortDashboardsTitle": "Ưu tiên mục được dùng nhiều nhất trong bảng điều khiển",
+      "sortAlerts": "Cảnh báo",
+      "sortAlertsTitle": "Ưu tiên mục được dùng nhiều nhất trong cảnh báo",
+      "usageInDashboards": "Trong bảng điều khiển",
+      "usageHasAlerts": "Có cảnh báo",
+      "usageInSlos": "Trong SLO",
+      "usageLoading": "Đang tải nơi các chỉ số được sử dụng",
+      "usageFailed": "Không thể tải thông tin sử dụng, hãy thử lại",
       "viewGrid": "Lưới",
       "viewRows": "Hàng",
       "modeExplore": "Khám phá",
@@ -13891,16 +13910,7 @@
         "deleteMessage": "Xóa chế độ xem {name} cho mọi người trong tổ chức này?",
         "modified": "{name} (đã sửa đổi)",
         "clear": "Bỏ chế độ xem"
-      },
-      "sortDashboards": "Bảng điều khiển",
-      "sortDashboardsTitle": "Ưu tiên mục được dùng nhiều nhất trong bảng điều khiển",
-      "sortAlerts": "Cảnh báo",
-      "sortAlertsTitle": "Ưu tiên mục được dùng nhiều nhất trong cảnh báo",
-      "usageInDashboards": "Trong bảng điều khiển",
-      "usageHasAlerts": "Có cảnh báo",
-      "usageInSlos": "Trong SLO",
-      "usageLoading": "Đang tải nơi các chỉ số được sử dụng",
-      "usageFailed": "Không thể tải thông tin sử dụng, hãy thử lại"
+      }
     },
     "metricCard": {
       "lastRefreshed": "Làm mới lần cuối:",
@@ -13927,6 +13937,17 @@
       "notEqualTo": "Không bằng",
       "regexPattern": "Mẫu regex (ví dụ: prod.*)",
       "regexNotMatching": "Regex không khớp (ví dụ: test.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ Nhóm OR",
+      "addGroupTooltip": "Thêm một nhóm bộ lọc; một chuỗi khớp khi khớp với bất kỳ nhóm nào",
+      "addToGroup": "Thêm bộ lọc vào nhóm này",
+      "anyOf": "bất kỳ",
+      "andAnyOf": "và bất kỳ",
+      "or": "hoặc",
+      "not": "không",
+      "notTooltip": "Khớp với chuỗi mà toàn bộ nhóm này không khớp",
+      "tooManyBranches": "Các bộ lọc này mở rộng thành {count} bộ chọn riêng biệt; tối đa {max} bộ có thể chạy. Hãy gộp các giá trị vào một bộ lọc regex hoặc xóa một nhóm."
     },
     "builderSwitch": {
       "unsupported": "Trình dựng không thể hiển thị {construct}",
@@ -13967,11 +13988,11 @@
         "byLabelsLabel": "Theo Nhãn",
         "quantileLabel": "Phân vị",
         "kLabel": "K",
-        "nearestMultipleLabel": "Bội số gần nhất",
         "withoutLabel": "Không gồm (bỏ các nhãn này)",
         "withoutDesc": "Tổng hợp loại bỏ các nhãn đã chọn và giữ mọi nhãn khác",
         "offsetLabel": "Độ lệch",
-        "offsetDesc": "Đọc chỉ số lùi về bao xa, ví dụ 1h hoặc 1d"
+        "offsetDesc": "Đọc chỉ số lùi về bao xa, ví dụ 1h hoặc 1d",
+        "nearestMultipleLabel": "Bội số gần nhất"
       },
       "rangeOnlyFirst": "Hàm khoảng chỉ có thể là bước đầu tiên",
       "rangeOnlyFirstNote": "Hàm khoảng đọc các mẫu thô, vì vậy nó chỉ có thể là bước đầu tiên. Hãy xóa các bước khác để thêm một bước.",
@@ -14041,17 +14062,6 @@
       "empty": "Chưa có truy vấn nào",
       "noMatch": "Không có truy vấn nào khớp với tìm kiếm hoặc bộ lọc gắn sao",
       "loadMore": "Tải thêm"
-    },
-    "labelGroups": {
-      "addGroup": "+ Nhóm OR",
-      "addGroupTooltip": "Thêm một nhóm bộ lọc; một chuỗi khớp khi khớp với bất kỳ nhóm nào",
-      "addToGroup": "Thêm bộ lọc vào nhóm này",
-      "anyOf": "bất kỳ",
-      "andAnyOf": "và bất kỳ",
-      "or": "hoặc",
-      "not": "không",
-      "notTooltip": "Khớp với chuỗi mà toàn bộ nhóm này không khớp",
-      "tooManyBranches": "Các bộ lọc này mở rộng thành {count} bộ chọn riêng biệt; tối đa {max} bộ có thể chạy. Hãy gộp các giá trị vào một bộ lọc regex hoặc xóa một nhóm."
     }
   },
   "settings": {
@@ -21710,7 +21720,8 @@
         "longtask": "Tác vụ dài",
         "view": "Xem",
         "action": "Hành động",
-        "resource": "Tài nguyên"
+        "resource": "Tài nguyên",
+        "failedrequest": "Yêu cầu thất bại"
       },
       "subscriptionPlan": {
         "payasyougo": "Trả theo mức sử dụng",
@@ -22724,6 +22735,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "Đọc chỉ số như tại thời điểm cách đây khoảng thời gian đã cho",
       "rateDoc": "Tính tốc độ tăng trung bình mỗi giây trong khoảng thời gian đã chỉ định",
       "irateDoc": "Tính tốc độ tăng tức thời mỗi giây dựa trên hai điểm dữ liệu cuối cùng",
       "increaseDoc": "Tính tổng mức tăng trong khoảng thời gian đã chỉ định",
@@ -22794,8 +22806,7 @@
       "moduloName": "Modulo",
       "multiplyByName": "Nhân với",
       "divideByName": "Chia cho",
-      "exponentName": "Lũy thừa",
-      "offsetDoc": "Đọc chỉ số như tại thời điểm cách đây khoảng thời gian đã cho"
+      "exponentName": "Lũy thừa"
     }
   },
   "passwordPolicy": {
