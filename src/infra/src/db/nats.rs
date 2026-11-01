@@ -49,6 +49,8 @@ use crate::{
 const SUPER_CLUSTER_PREFIX: &str = "super_cluster_kv_";
 /// Equals the first-event watch stop, so a reason is written at most once per org per watch.
 pub const INGEST_REJECTION_MAX_AGE_SECS: u64 = 3_600;
+/// Life of a running assistant turn's entry without a refresh (PO B63).
+const AI_CHAT_ACTIVE_MAX_AGE_SECS: u64 = 30;
 // Every watcher recreation leaves a consumer on the server, so a failing one must back off.
 const KV_WATCH_BACKOFF_MIN: u64 = 1; // seconds
 const KV_WATCH_BACKOFF_MAX: u64 = 30; // seconds
@@ -1127,6 +1129,8 @@ fn bucket_ttl(bucket_name: &str) -> Option<Duration> {
         // o2-ai replicas heartbeat on the same contract as cluster nodes.
         "nodes" | "clusters" | "ai_replicas" => cfg.limit.node_heartbeat_ttl as u64,
         "ingest_rejection" => INGEST_REJECTION_MAX_AGE_SECS,
+        // Running assistant turns; a live turn refreshes its entry well inside this.
+        "ai_chat_active" => AI_CHAT_ACTIVE_MAX_AGE_SECS,
         _ => return None,
     };
     Some(Duration::from_secs(secs))
@@ -1193,6 +1197,15 @@ mod tests {
         assert!(!use_kv_watcher("/super_cluster_kv_nodes/"));
         assert!(!use_kv_watcher("/super_cluster_kv_clusters/"));
         assert!(!use_kv_watcher("/other_prefix/"));
+    }
+
+    #[test]
+    fn test_bucket_ttl_pins_ai_chat_active_to_three_refreshes() {
+        assert_eq!(
+            bucket_ttl("ai_chat_active"),
+            Some(Duration::from_secs(AI_CHAT_ACTIVE_MAX_AGE_SECS))
+        );
+        assert_eq!(AI_CHAT_ACTIVE_MAX_AGE_SECS, 30);
     }
 
     #[test]

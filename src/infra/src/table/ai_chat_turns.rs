@@ -94,6 +94,8 @@ pub async fn admit_with<C: ConnectionTrait>(
         first_event_at: Set(None),
         version_of: Set(None),
         decisions: Set(None),
+        agent_type: Set(None),
+        handoff_from: Set(None),
     };
     let admission = match Entity::insert(record).exec(conn).await {
         Ok(_) => Admission::Admitted,
@@ -112,6 +114,62 @@ pub async fn admit_with<C: ConnectionTrait>(
         interrupt_others_with(conn, org_id, session_id, turn_id, now).await?;
     }
     Ok(admission)
+}
+
+/// Records who answers `turn_id`; a retried id replaces what its failed attempt recorded.
+pub async fn set_agent(
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+    agent_type: &str,
+    handoff_from: Option<&str>,
+) -> Result<bool, errors::Error> {
+    set_agent_with(
+        get_orm_client_rw().await,
+        (org_id, session_id, turn_id),
+        agent_type,
+        handoff_from,
+    )
+    .await
+}
+
+pub async fn set_agent_with<C: ConnectionTrait>(
+    conn: &C,
+    (org_id, session_id, turn_id): (&str, &str, &str),
+    agent_type: &str,
+    handoff_from: Option<&str>,
+) -> Result<bool, errors::Error> {
+    let result = Entity::update_many()
+        .col_expr(Column::AgentType, Expr::value(Some(agent_type.to_string())))
+        .col_expr(
+            Column::HandoffFrom,
+            Expr::value(handoff_from.map(str::to_string)),
+        )
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::TurnId.eq(turn_id))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected == 1)
+}
+
+/// Labels the chat's turns that carry no agent, which a hand-off is about to stop reading as true.
+pub async fn label_unlabelled_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    agent_type: &str,
+) -> Result<u64, errors::Error> {
+    let result = Entity::update_many()
+        .col_expr(Column::AgentType, Expr::value(Some(agent_type.to_string())))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::AgentType.is_null())
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected)
 }
 
 /// Marks `turn_id` as a new version of `version_of`; `false` when the turn is unknown.

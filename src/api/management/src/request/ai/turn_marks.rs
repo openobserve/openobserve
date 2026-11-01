@@ -26,7 +26,7 @@ use std::{
 use config::utils::time::now_micros;
 use infra::table::{
     ai_approvals::{self, Decision, NewApproval},
-    ai_turn_marks::{self, KIND_ANSWERED, KIND_TURN, NewMark},
+    ai_turn_marks::{self, KIND_ANSWERED, KIND_SEEN, KIND_TURN, NewMark},
 };
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use serde_json::Value;
@@ -35,6 +35,8 @@ const MICROS_PER_SEC: i64 = 1_000_000;
 const TURN_GRACE_SECS: i64 = 60;
 // Outlives the 24 h a chat's newest turn may report a pending approval.
 const ANSWERED_TTL_SECS: i64 = 25 * 3600;
+// Past this a turn counts as seen anyway, so the `state=active` window never loses a mark.
+const SEEN_TTL_SECS: i64 = 25 * 3600;
 const CONFIRMATION_REQUIRED: &str = "confirmation_required";
 const CONFIRMATION_RESOLVED: &str = "confirmation_resolved";
 // A frame line longer than this is not an approval frame worth buffering.
@@ -142,6 +144,36 @@ pub(crate) async fn mark_turn(org_id: &str, session_id: &str, user_email: &str) 
             TurnMark::unwritten()
         }
     }
+}
+
+/// Notes that `user_email` saw how `turn_id` ended; best effort, as the marker is a hint.
+pub(crate) async fn mark_seen(org_id: &str, session_id: &str, user_email: &str, turn_id: &str) {
+    let now = now_micros();
+    let mark = NewMark {
+        org_id,
+        session_id,
+        user_email,
+        kind: KIND_SEEN,
+        value: Some(turn_id),
+        expires_at: now + SEEN_TTL_SECS * MICROS_PER_SEC,
+    };
+    if let Err(e) = ai_turn_marks::insert(&mark, now).await {
+        log::warn!("[org_id:{org_id}] seen marker of {session_id} not written: {e}");
+    }
+}
+
+/// The turns `user_email` has marked seen, per session; an unreadable mark reads as unseen.
+pub(crate) async fn seen_turns(
+    org_id: &str,
+    user_email: &str,
+    session_ids: &[String],
+) -> HashMap<String, Vec<String>> {
+    ai_turn_marks::values_per_session(org_id, user_email, KIND_SEEN, session_ids, now_micros())
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("[org_id:{org_id}] cannot read the seen markers: {e}");
+            HashMap::new()
+        })
 }
 
 /// Notes that `user_email` answered the session's pending confirmation now; best effort.

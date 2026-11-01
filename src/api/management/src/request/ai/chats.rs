@@ -40,9 +40,9 @@ use o2_enterprise::enterprise::{
     ai::{
         chat::{
             batcher::DurableEvent,
-            registry::{self, CancelReason, FeedItem, FeedRecv, TurnFeed},
+            registry::{self, CancelReason, FeedItem, FeedRecv, TurnFeed, TurnRefusal},
         },
-        client::get_agent_client,
+        client::{GENERATE_QUERY_AGENT_TYPE, get_agent_client},
     },
     common::config::get_config as get_o2_config,
 };
@@ -122,6 +122,8 @@ const IMPORT_UNAVAILABLE: &str = "unavailable";
 const IMPORT_QUOTA: &str = "quota_exceeded";
 const IMPORT_BUSY: &str = "import_busy";
 const ORIGIN_INCIDENT: &str = "incident";
+const STATE_ACTIVE: &str = "active";
+const PATCH_SHAPE: &str = "Expected {\"title\"?: string, \"pinned\"?: boolean, \"seen\"?: boolean}";
 
 /// One chat in the user's list.
 #[derive(Debug, Serialize, ToSchema)]
@@ -146,6 +148,18 @@ pub struct ChatSummary {
     /// The call id of that request, when it could be read.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pending_approval_id: Option<String>,
+    /// The tab running that turn, when it said; only with `state=active`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_turn_client_id: Option<String>,
+    /// How the newest turn stands; a list field, absent on a chat without turns.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_turn_status: Option<String>,
+    /// When the newest turn ended (micros).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_turn_ended_at: Option<i64>,
+    /// The caller has seen how the newest turn ended, on any device.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seen: Option<bool>,
     /// Pinned by the owner, on every device.
     pub pinned: bool,
     /// When it was pinned (micros); absent while unpinned.
@@ -161,6 +175,22 @@ impl ChatSummary {
         self.pending_approval = pending.is_some();
         self.pending_approval_id = pending.filter(|id| !id.is_empty()).cloned();
         self
+    }
+
+    /// The newest turn's outcome, and whether the caller has seen it.
+    fn with_last_turn(mut self, last: Option<&TurnRecord>, seen: bool, running_since: i64) -> Self {
+        let Some(last) = last else {
+            return self;
+        };
+        self.last_turn_status = Some(turn_status(last, running_since).to_string());
+        self.last_turn_ended_at = last.ended_at;
+        self.seen = Some(seen);
+        self
+    }
+
+    /// A row of the chats in progress: running, waiting on the caller, or ended unseen.
+    fn in_progress(&self) -> bool {
+        self.active_turn || self.pending_approval || self.seen == Some(false)
     }
 }
 
@@ -178,6 +208,10 @@ impl From<Model> for ChatSummary {
             active_turn_id: None,
             pending_approval: false,
             pending_approval_id: None,
+            active_turn_client_id: None,
+            last_turn_status: None,
+            last_turn_ended_at: None,
+            seen: None,
             pinned: row.pinned,
             pinned_at: row.pinned_at,
         }
@@ -200,6 +234,8 @@ pub struct ListParams {
     pub q: Option<String>,
     /// `true`: only pinned chats.
     pub pinned: Option<bool>,
+    /// `active`: only the chats in progress.
+    pub state: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -239,11 +275,13 @@ pub struct ChatDetailResponse {
     pub approvals: Option<Vec<serde_json::Value>>,
 }
 
-/// `PATCH` body: a new title, a pin, or both.
+/// `PATCH` body: a new title, a pin, the seen marker, or several.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RenameRequest {
     pub title: Option<String>,
     pub pinned: Option<bool>,
+    /// `true`: the caller has seen how the newest turn ended.
+    pub seen: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -516,7 +554,7 @@ struct History {
 
 /// How [`build_history`] cuts a chat's turns.
 #[derive(Debug, Default, Clone, Copy)]
-struct Cut {
+struct Cut<'a> {
     /// The committed seq the history ends at.
     cutoff: i64,
     /// Only turns past this seq, or whose record changed after `changed_since`.
@@ -525,6 +563,29 @@ struct Cut {
     /// Turns admitted later than this (a snapshot's time) are left out.
     admitted_by: Option<i64>,
     limit: Option<usize>,
+    /// The chat's current agent, which is what an unlabelled turn reads as.
+    chat_agent: Option<&'a str>,
+}
+
+/// What the list read about each chat's turns, by session.
+struct ListMarkers {
+    running: HashMap<String, TurnRecord>,
+    pending: HashMap<String, String>,
+    newest: HashMap<String, TurnRecord>,
+    /// The turn ids the caller has marked seen.
+    seen: HashMap<String, Vec<String>>,
+}
+
+impl ListMarkers {
+    /// A turn older than the marks' life predates them or outlived them, so it is settled.
+    fn seen_by_caller(&self, last: &TurnRecord, now: i64) -> bool {
+        let settled = last.ended_at.unwrap_or(last.started_at) < now - PENDING_APPROVAL_MAX_AGE;
+        settled
+            || self
+                .seen
+                .get(&last.session_id)
+                .is_some_and(|turns| turns.contains(&last.turn_id))
+    }
 }
 
 /// What a client's `state_version` says about its copy.
@@ -610,7 +671,7 @@ pub(super) fn admit_error_response(error: AdmitError) -> Response {
         }
         AdmitError::NotFound(message) => error::not_found(message),
         AdmitError::Busy => lease_busy(None).into_response(),
-        AdmitError::TurnLimit(scope) => turn_limit_response(scope),
+        AdmitError::TurnLimit(refusal) => turn_limit_response(refusal),
         AdmitError::AlreadySubmitted => already_submitted().into_response(),
         AdmitError::Unavailable(message) => error::history_unavailable(message),
     }
@@ -686,6 +747,7 @@ pub(super) async fn attach_turn_status_at(
     let cut = Cut {
         cutoff: row.last_committed_seq,
         admitted_by,
+        chat_agent: Some(&row.agent_type),
         ..Default::default()
     };
     build_history(turns, &records, running_since(now), cut).turns
@@ -729,14 +791,25 @@ pub(super) fn user_email(req: &axum::extract::Request) -> Option<String> {
         .map(str::to_string)
 }
 
-/// 429 `turn_limit`, its reason also in the legacy `error_code` (E2E #5).
-pub(super) fn turn_limit_response(scope: &str) -> Response {
-    AiErrorEnvelope::new(
-        AiErrorCode::TurnLimit,
+/// A 429 typed by its cap, whose reason stays `turn_limit` in the legacy `error_code` (E2E #5).
+pub(super) fn turn_limit_response(refusal: TurnRefusal) -> Response {
+    let code = match refusal.scope {
+        "user" => AiErrorCode::RunLimitMember,
+        "org" => AiErrorCode::RunLimitOrg,
+        _ => AiErrorCode::TurnLimit,
+    };
+    let body = AiErrorEnvelope::new(
+        code,
         "Too many AI responses are running at once; please wait for one to finish",
     )
     .legacy_code(TURN_LIMIT)
-    .with("scope", scope)
+    .with("scope", refusal.scope)
+    .with("limit", refusal.limit)
+    .with("active", refusal.active);
+    match refusal.retry_after_ms {
+        Some(wait) => body.with("retry_after_ms", wait),
+        None => body,
+    }
     .into_response()
 }
 
@@ -795,7 +868,12 @@ pub(super) fn lease_busy(active_turn_id: Option<String>) -> AiErrorEnvelope {
                    in the chat, case-insensitively (a chat stored before history search \
                    matches by title only); `agent_type` (repeatable) keeps only \
                    those agent types and `agent_type=!type` leaves one out; `pinned=true` keeps \
-                   the pinned chats.",
+                   the pinned chats. `state=active` keeps the chats in progress: a turn runs, an \
+                   approval waits, or the newest turn of the last day ended and the caller has \
+                   not seen it; a page may then hold fewer chats than `limit`, or none, and \
+                   still name a `next_cursor`. Each chat with a turn carries \
+                   `last_turn_status`, `last_turn_ended_at` and `seen`; `state=active` adds \
+                   `active_turn_client_id`, the `x-o2-assistant-client-id` that started the turn.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -804,10 +882,11 @@ pub(super) fn lease_busy(active_turn_id: Option<String>) -> AiErrorEnvelope {
         ("q" = Option<String>, Query, description = "Text in the title or the typed prompts (max 200 characters)"),
         ("agent_type" = Option<Vec<String>>, Query, description = "Agent types to keep; `!type` leaves one out (repeatable)"),
         ("pinned" = Option<bool>, Query, description = "Only pinned chats"),
+        ("state" = Option<String>, Query, description = "`active`: only the chats in progress"),
     ),
     responses(
         (status = 200, description = "A page of conversations", body = inline(ChatListResponse)),
-        (status = 400, description = "Invalid cursor", body = Object),
+        (status = 400, description = "Invalid cursor or state", body = Object),
     ),
     extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
@@ -831,12 +910,23 @@ pub async fn list(
         Some(Some(c)) => Some(c),
         None => None,
     };
-    let limit = params.limit.unwrap_or(DEFAULT_PAGE).clamp(1, MAX_PAGE);
-    let filter = match list_filter(&params, in_req.uri().query()) {
+    let in_progress = match params.state.as_deref() {
+        None => false,
+        Some(STATE_ACTIVE) => true,
+        Some(_) => return error::invalid_request("state can only be active"),
+    };
+    // A short page of the newest rows could hide a live chat, so this one reads a full page.
+    let default_page = if in_progress { MAX_PAGE } else { DEFAULT_PAGE };
+    let limit = params.limit.unwrap_or(default_page).clamp(1, MAX_PAGE);
+    let mut filter = match list_filter(&params, in_req.uri().query()) {
         Ok(filter) => filter,
         Err(resp) => return resp,
     };
-    let running_since = running_since(config::utils::time::now_micros());
+    let now = config::utils::time::now_micros();
+    let running_since = running_since(now);
+    if in_progress {
+        filter.updated_since = Some(running_since.min(now - PENDING_APPROVAL_MAX_AGE));
+    }
     // One extra row tells whether there is a next page.
     let mut rows = match ai_chat_sessions::list_for_user(
         &org_id,
@@ -859,13 +949,30 @@ pub async fn list(
     } else {
         None
     };
-    let (running, pending) = list_markers(&org_id, &user_email, &rows, running_since).await;
+    let markers = list_markers(&org_id, &user_email, &rows, running_since).await;
+    let clients = if in_progress {
+        registry::active_client_ids(&org_id).await
+    } else {
+        HashMap::new()
+    };
     let chats = rows
         .into_iter()
         .map(|row| {
             let session_id = row.session_id.clone();
-            ChatSummary::from(row).with_markers(running.get(&session_id), pending.get(&session_id))
+            let last = markers.newest.get(&session_id);
+            let seen = last.is_some_and(|last| markers.seen_by_caller(last, now));
+            let mut chat = ChatSummary::from(row)
+                .with_markers(
+                    markers.running.get(&session_id),
+                    markers.pending.get(&session_id),
+                )
+                .with_last_turn(last, seen, running_since);
+            if chat.active_turn {
+                chat.active_turn_client_id = clients.get(&session_id).cloned();
+            }
+            chat
         })
+        .filter(|chat| !in_progress || chat.in_progress())
         .collect();
     Json(ChatListResponse { chats, next_cursor }).into_response()
 }
@@ -975,6 +1082,7 @@ pub async fn get(
         changed_since: known.map(|k| k.changed_at),
         admitted_by: None,
         limit: params.limit.map(|l| l.clamp(1, MAX_TURNS_PAGE)),
+        chat_agent: Some(&row.agent_type),
     };
     let history = build_history(turns, &records, running_since(now), cut);
     let mut turns = history.turns;
@@ -1040,11 +1148,11 @@ pub async fn rename(
         Err(_) => return error::invalid_request("Request body too large"),
     };
     let Ok(patch) = serde_json::from_slice::<RenameRequest>(&body) else {
-        return error::invalid_request("Expected {\"title\"?: string, \"pinned\"?: boolean}");
+        return error::invalid_request(PATCH_SHAPE);
     };
     let title = patch.title.as_deref().map(str::trim);
-    if patch.title.is_none() && patch.pinned.is_none() {
-        return error::invalid_request("Expected {\"title\"?: string, \"pinned\"?: boolean}");
+    if patch.title.is_none() && patch.pinned.is_none() && patch.seen.is_none() {
+        return error::invalid_request(PATCH_SHAPE);
     }
     if title.is_some_and(|t| t.is_empty() || t.chars().count() > MAX_TITLE_CHARS) {
         return error::invalid_request(format!(
@@ -1058,11 +1166,18 @@ pub async fn rename(
         Ok(owner) => owner,
         Err(e) => return admit_error_response(e),
     };
+    if patch.seen == Some(true)
+        && let Err(resp) = mark_seen(&org_id, &session_id, &owner, &user_email).await
+    {
+        return resp;
+    }
     let key = (org_id.as_str(), session_id.as_str(), owner.as_str());
     match apply_patch(key, title, patch.pinned).await {
-        Ok(true) => {
-            MetaHttpResponse::json(serde_json::json!({"title": title, "pinned": patch.pinned}))
-        }
+        Ok(true) => MetaHttpResponse::json(serde_json::json!({
+            "title": title,
+            "pinned": patch.pinned,
+            "seen": patch.seen,
+        })),
         Ok(false) => error::not_found("Unknown conversation"),
         Err(e) => {
             log::error!("[AI-CHAT] cannot update {org_id}/{session_id}: {e}");
@@ -1397,6 +1512,23 @@ fn list_filter(params: &ListParams, raw_query: Option<&str>) -> Result<ListFilte
         )));
     }
     Ok(filter)
+}
+
+/// Marks the newest turn seen; a turn still running has no end to have seen yet.
+async fn mark_seen(
+    org_id: &str,
+    session_id: &str,
+    owner: &str,
+    user_email: &str,
+) -> Result<(), Response> {
+    let row = owned_chat(org_id, session_id, owner).await?;
+    let Some(last) = row.last_turn_id else {
+        return Ok(());
+    };
+    if running_turn_id(org_id, session_id).await.as_deref() != Some(&last) {
+        super::turn_marks::mark_seen(org_id, session_id, user_email, &last).await;
+    }
+    Ok(())
 }
 
 /// Applies a validated `PATCH`; `false` when the caller has no such chat.
@@ -1812,19 +1944,30 @@ fn approval_view(row: &infra::table::ai_approvals::Model) -> Value {
     })
 }
 
-/// Each listed chat's running turn and pending approval: one query and one search for the page.
+/// Each listed chat's turn state, read in one query or search per kind for the whole page.
 async fn list_markers(
     org_id: &str,
     user_email: &str,
     rows: &[Model],
     running_since: i64,
-) -> (HashMap<String, TurnRecord>, HashMap<String, String>) {
+) -> ListMarkers {
     let session_ids: Vec<String> = rows.iter().map(|r| r.session_id.clone()).collect();
-    let (running, pending) = tokio::join!(
-        ai_chat_turns::running_for_sessions(org_id, &session_ids, running_since),
-        list_pending(org_id, user_email, rows),
-    );
+    let keys: Vec<(String, String)> = rows
+        .iter()
+        .filter_map(|r| Some((r.session_id.clone(), r.last_turn_id.clone()?)))
+        .collect();
     // Markers annotate the list; an unreadable marker leaves it unset instead of failing the list.
+    let newest = ai_chat_turns::get_many(org_id, &keys)
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("[AI-CHAT] cannot read the newest turns of {org_id}: {e}");
+            Vec::new()
+        });
+    let (running, pending, seen) = tokio::join!(
+        ai_chat_turns::running_for_sessions(org_id, &session_ids, running_since),
+        list_pending(org_id, user_email, rows, &newest),
+        super::turn_marks::seen_turns(org_id, user_email, &session_ids),
+    );
     let running = running
         .unwrap_or_else(|e| {
             log::error!("[AI-CHAT] cannot read the running turns of {org_id}: {e}");
@@ -1837,7 +1980,16 @@ async fn list_markers(
         log::warn!("[AI-CHAT] cannot read the pending approvals of {org_id}: {e}");
         HashMap::new()
     });
-    (running, pending)
+    let newest = newest
+        .into_iter()
+        .map(|r| (r.session_id.clone(), r))
+        .collect();
+    ListMarkers {
+        running,
+        pending,
+        newest,
+        seen,
+    }
 }
 
 /// The pending approvals of listed chats, searched from their newest turns' starts on.
@@ -1845,14 +1997,8 @@ async fn list_pending(
     org_id: &str,
     user_email: &str,
     rows: &[Model],
+    newest: &[TurnRecord],
 ) -> Result<HashMap<String, String>, openobserve_core::ai_chat::ReadError> {
-    let keys: Vec<(String, String)> = rows
-        .iter()
-        .filter_map(|r| Some((r.session_id.clone(), r.last_turn_id.clone()?)))
-        .collect();
-    let newest = ai_chat_turns::get_many(org_id, &keys)
-        .await
-        .map_err(|e| openobserve_core::ai_chat::ReadError::Search(format!("turn records: {e}")))?;
     let now = config::utils::time::now_micros();
     let chats: Vec<(&Model, &str, i64)> = newest
         .iter()
@@ -1979,9 +2125,9 @@ fn build_history(
         let record = first_seq.and_then(|seq| covering_record(records, seq));
         if let Some(record) = record {
             while let Some(failed) = synthetic.next_if(|s| s.started_at < record.started_at) {
-                turns.push(failed_turn(failed));
+                turns.push(failed_turn(failed, cut.chat_agent));
             }
-            attach_record(&mut turn, record, running_since, cut.admitted_by);
+            attach_record(&mut turn, record, running_since, &cut);
         }
         let newer = cut
             .known_seq
@@ -1990,7 +2136,7 @@ fn build_history(
             turns.push(turn);
         }
     }
-    turns.extend(synthetic.map(failed_turn));
+    turns.extend(synthetic.map(|failed| failed_turn(failed, cut.chat_agent)));
     let has_more = cut.limit.is_some_and(|limit| turns.len() > limit);
     if let Some(limit) = cut.limit.filter(|_| has_more) {
         turns.drain(..turns.len() - limit);
@@ -2024,33 +2170,52 @@ fn covering_record(records: &[TurnRecord], first_seq: i64) -> Option<&TurnRecord
 }
 
 /// Labels a projected turn with its record; its frames end as the live stream of that outcome did.
-fn attach_record(
-    turn: &mut Value,
-    record: &TurnRecord,
-    running_since: i64,
-    decided_by: Option<i64>,
-) {
+fn attach_record(turn: &mut Value, record: &TurnRecord, running_since: i64, cut: &Cut<'_>) {
+    let decided_by = cut.admitted_by;
     // A snapshot shows the answers given by its time (micros), not ones given since (ms).
     let decisions: Vec<Value> = ai_chat_turns::decisions_of(record)
         .into_iter()
         .filter(|d| decided_by.is_none_or(|by| d["at"].as_i64().is_some_and(|ms| ms * 1000 <= by)))
         .collect();
     openobserve_core::ai_chat::projection::attach_decisions(turn, &decisions);
+    let agent = record.agent_type.as_deref().or(cut.chat_agent);
+    if record.status == TURN_COMPLETED && agent == Some(GENERATE_QUERY_AGENT_TYPE) {
+        openobserve_core::ai_chat::projection::attach_query_frame(turn);
+    }
     let Some(obj) = turn.as_object_mut() else {
         return;
     };
-    let status =
-        if record.status == TURN_RUNNING && !ai_chat_turns::is_running(record, running_since) {
-            TURN_INTERRUPTED
-        } else {
-            record.status.as_str()
-        };
+    let status = turn_status(record, running_since);
     if status == TURN_RUNNING || status == TURN_FAILED {
         end_frames_as(obj, status, record.error_code.as_deref());
     }
     obj.insert("turn_id".into(), record.turn_id.clone().into());
     obj.insert("status".into(), status.into());
     obj.insert("error_code".into(), record.error_code.clone().into());
+    insert_agent(obj, record, cut.chat_agent);
+}
+
+/// The turn's agent, the chat's when an older node left it unlabelled, and the one it took over.
+fn insert_agent(
+    turn: &mut serde_json::Map<String, Value>,
+    record: &TurnRecord,
+    chat_agent: Option<&str>,
+) {
+    if let Some(agent) = record.agent_type.as_deref().or(chat_agent) {
+        turn.insert("agent_type".into(), agent.into());
+    }
+    if let Some(from) = record.handoff_from.as_deref() {
+        turn.insert("handoff_from".into(), from.into());
+    }
+}
+
+/// What a turn's record says, once a turn past the longest allowed run counts as interrupted.
+fn turn_status(record: &TurnRecord, running_since: i64) -> &str {
+    if record.status == TURN_RUNNING && !ai_chat_turns::is_running(record, running_since) {
+        TURN_INTERRUPTED
+    } else {
+        record.status.as_str()
+    }
 }
 
 /// A running turn has no terminal frame yet; a failed one ends with its error, never `complete`.
@@ -2081,17 +2246,21 @@ fn end_frames_as(turn: &mut serde_json::Map<String, Value>, status: &str, code: 
 }
 
 /// A failed turn that stored nothing; the prompt is not kept server-side, so `user` is null.
-fn failed_turn(record: &TurnRecord) -> Value {
+fn failed_turn(record: &TurnRecord, chat_agent: Option<&str>) -> Value {
     let code = record.error_code.as_deref();
     let error = failed_turn_message(code);
-    serde_json::json!({
+    let mut turn = serde_json::json!({
         "turn_id": record.turn_id,
         "status": TURN_FAILED,
         "error_code": code,
         "frames": [error_frame(&error, code)],
         "error": error,
         "user": null,
-    })
+    });
+    if let Some(turn) = turn.as_object_mut() {
+        insert_agent(turn, record, chat_agent);
+    }
+    turn
 }
 
 /// The terminal frame a failed turn's live stream would have ended with; `code` is the stored one.
@@ -2543,11 +2712,19 @@ mod tests {
 
     #[tokio::test]
     async fn a_turn_limit_admit_error_is_the_429() {
-        for scope in ["user", "org", "node"] {
-            let resp = admit_error_response(AdmitError::TurnLimit(scope));
+        for (scope, code) in [
+            ("user", "run_limit_member"),
+            ("org", "run_limit_org"),
+            ("node", "turn_limit"),
+        ] {
+            let resp = admit_error_response(AdmitError::TurnLimit(refusal(scope, None)));
             assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
             let body = body_of(resp).await;
-            assert_eq!(body["error_code"], TURN_LIMIT);
+            assert_eq!(body["code"], code);
+            assert_eq!(
+                body["error_code"], TURN_LIMIT,
+                "old clients keep reading this"
+            );
             assert_eq!(body["scope"], scope);
         }
     }
@@ -2574,14 +2751,23 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_turn_limit_is_a_429_coded_turn_limit_in_both_keys() {
-        let resp = turn_limit_response("user");
-        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
-        let body = body_of(resp).await;
-        assert_eq!(body["code"], "turn_limit");
-        assert_eq!(body["error_code"], "turn_limit");
-        assert_eq!(body["scope"], "user");
+    async fn a_run_limit_says_how_full_it_is_and_only_a_shared_cap_says_when_to_retry() {
+        let body = body_of(turn_limit_response(refusal("user", None))).await;
+        assert_eq!(body["code"], "run_limit_member");
+        assert_eq!(
+            (body["limit"].as_u64(), body["active"].as_u64()),
+            (Some(3), Some(3))
+        );
+        assert!(body.get("retry_after_ms").is_none());
         assert_eq!(body["retryable"], true);
+
+        let body = body_of(turn_limit_response(refusal("org", Some(15_000)))).await;
+        assert_eq!(body["code"], "run_limit_org");
+        assert_eq!(body["retry_after_ms"], 15_000);
+
+        let body = body_of(turn_limit_response(refusal("node", Some(15_000)))).await;
+        assert_eq!(body["code"], "turn_limit");
+        assert_eq!(body["scope"], "node");
     }
 
     #[tokio::test]
@@ -2739,6 +2925,8 @@ mod tests {
             first_event_at: None,
             version_of: None,
             decisions: None,
+            agent_type: None,
+            handoff_from: None,
         }
     }
 
@@ -2770,7 +2958,127 @@ mod tests {
         }
     }
 
-    fn cut(cutoff: i64, known_seq: Option<i64>, limit: Option<usize>) -> Cut {
+    fn refusal(scope: &'static str, retry_after_ms: Option<u64>) -> TurnRefusal {
+        TurnRefusal {
+            scope,
+            limit: 3,
+            active: 3,
+            retry_after_ms,
+        }
+    }
+
+    fn labelled(agent: Option<&str>, handoff_from: Option<&str>) -> TurnRecord {
+        use infra::table::ai_chat_turns::TURN_COMPLETED;
+        TurnRecord {
+            agent_type: agent.map(str::to_string),
+            handoff_from: handoff_from.map(str::to_string),
+            ..record("t1", TURN_COMPLETED, (Some(0), Some(4)), 10)
+        }
+    }
+
+    fn turn_of(record: TurnRecord, chat_agent: &str) -> Value {
+        let cut = Cut {
+            chat_agent: Some(chat_agent),
+            ..cut(4, None, None)
+        };
+        let mut turns = build_history(vec![projected(0, 4)], &[record], 0, cut).turns;
+        turns.remove(0)
+    }
+
+    #[test]
+    fn a_turn_carries_its_agent_and_an_unlabelled_one_reads_as_the_chat() {
+        let turn = turn_of(labelled(Some("sre"), Some("o2-ai")), "o2-ai");
+        assert_eq!(turn["agent_type"], "sre");
+        assert_eq!(turn["handoff_from"], "o2-ai");
+        let turn = turn_of(labelled(None, None), "sre-rca");
+        assert_eq!(turn["agent_type"], "sre-rca");
+        assert!(turn.get("handoff_from").is_none());
+    }
+
+    #[test]
+    fn a_failed_turn_that_stored_nothing_still_names_its_agent() {
+        let failed = TurnRecord {
+            agent_type: Some("sre".to_string()),
+            ..record("t2", TURN_FAILED, (Some(0), None), 20)
+        };
+        let view = Cut {
+            chat_agent: Some("o2-ai"),
+            ..cut(4, None, None)
+        };
+        let turns = build_history(Vec::new(), &[failed], 0, view).turns;
+        assert_eq!(turns[0]["agent_type"], "sre");
+    }
+
+    #[test]
+    fn only_a_finished_query_builder_turn_gets_its_query_frame_back() {
+        let answer = "```sql\nSELECT 1\n```";
+        let frames = serde_json::json!([
+            {"type": "message_delta", "content": answer},
+            {"type": "complete"},
+        ]);
+        let reload = |record: TurnRecord| {
+            let mut turn = projected(0, 4);
+            turn["frames"] = frames.clone();
+            let view = Cut {
+                chat_agent: Some("o2-ai"),
+                ..cut(4, None, None)
+            };
+            build_history(vec![turn], &[record], 0, view)
+                .turns
+                .remove(0)
+        };
+        let built = reload(labelled(Some("generate-query"), None));
+        assert_eq!(built["frames"][1]["type"], "query");
+        assert_eq!(built["frames"][1]["text"], "SELECT 1");
+        assert_eq!(built["frames"][2]["type"], "complete");
+        let asked = reload(labelled(Some("o2-ai"), None));
+        assert_eq!(asked["frames"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn a_chat_is_in_progress_while_it_runs_waits_or_ended_unseen() {
+        let chat = || ChatSummary::from(chat_row());
+        let done = labelled(None, None);
+        assert!(!chat().in_progress(), "no turn yet");
+        assert!(!chat().with_last_turn(Some(&done), true, 0).in_progress());
+        let unseen = chat().with_last_turn(Some(&done), false, 0);
+        assert!(unseen.in_progress());
+        assert_eq!(unseen.last_turn_status.as_deref(), Some("completed"));
+        let waiting = chat()
+            .with_markers(None, Some(&"call".to_string()))
+            .with_last_turn(Some(&done), true, 0);
+        assert!(waiting.in_progress());
+        let running = record("t5", TURN_RUNNING, (Some(0), None), 50);
+        let live = chat().with_markers(Some(&running), None);
+        assert!(live.in_progress());
+    }
+
+    #[test]
+    fn a_dead_running_turn_reads_as_interrupted_in_the_list() {
+        let dead = record("t5", TURN_RUNNING, (Some(0), None), 50);
+        let chat = ChatSummary::from(chat_row()).with_last_turn(Some(&dead), false, 100);
+        assert_eq!(chat.last_turn_status.as_deref(), Some(TURN_INTERRUPTED));
+    }
+
+    #[test]
+    fn a_turn_is_seen_by_its_mark_or_by_outliving_the_marks() {
+        let mut last = labelled(None, None);
+        last.ended_at = Some(0);
+        let session = last.session_id.clone();
+        let markers = |seen: Vec<String>| ListMarkers {
+            running: HashMap::new(),
+            pending: HashMap::new(),
+            newest: HashMap::new(),
+            seen: HashMap::from([(session.clone(), seen)]),
+        };
+        let now = PENDING_APPROVAL_MAX_AGE;
+        assert!(!markers(Vec::new()).seen_by_caller(&last, now));
+        assert!(!markers(vec!["older".to_string()]).seen_by_caller(&last, now));
+        assert!(markers(vec!["t1".to_string()]).seen_by_caller(&last, now));
+        assert!(markers(Vec::new()).seen_by_caller(&last, now + 1));
+    }
+
+    fn cut(cutoff: i64, known_seq: Option<i64>, limit: Option<usize>) -> Cut<'static> {
         Cut {
             cutoff,
             known_seq,
@@ -3726,6 +4034,7 @@ mod tests {
             cursor: None,
             q: q.map(str::to_string),
             pinned,
+            state: None,
         }
     }
 

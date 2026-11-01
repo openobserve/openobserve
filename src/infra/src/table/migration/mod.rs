@@ -256,6 +256,7 @@ mod m20261025_000005_add_held_action_to_slack_link_requests;
 mod m20261026_000001_backfill_v1_rca_pointer;
 mod m20261028_000001_add_group_label_set_to_alert_states;
 mod m20261029_000001_widen_alert_dedup_fingerprint;
+mod m20261030_000001_add_agent_to_ai_chat_turns;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -745,6 +746,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261025_000005_add_held_action_to_slack_link_requests::Migration),
             Box::new(m20261028_000001_add_group_label_set_to_alert_states::Migration),
             Box::new(m20261029_000001_widen_alert_dedup_fingerprint::Migration),
+            Box::new(m20261030_000001_add_agent_to_ai_chat_turns::Migration),
             Box::new(m20261016_000001_add_first_event_at_to_ai_chat_turns::Migration),
             Box::new(m20261020_000001_add_health_to_org_ai_toolsets::Migration),
             Box::new(m20261020_000002_create_ai_grants::Migration),
@@ -856,6 +858,7 @@ mod tests {
         (131, "m20261021_000005_create_ai_chat_imports"),
         (132, "m20261021_000006_create_paid_overage_attribution"),
         (133, "m20261021_000007_create_ai_approvals"),
+        (134, "m20261030_000001_add_agent_to_ai_chat_turns"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -989,6 +992,10 @@ mod tests {
             (
                 "m20260923_000001_create_ai_chat_sessions",
                 "m20261006_000001_create_ai_chat_shares",
+            ),
+            (
+                "m20261007_000001_create_ai_chat_turns",
+                "m20261030_000001_add_agent_to_ai_chat_turns",
             ),
             (
                 "m20261006_000001_create_ai_chat_shares",

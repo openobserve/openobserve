@@ -4427,7 +4427,14 @@ mod tests {
         use crate::{ai_chat::admission::AdmitError, alerts::rca_turn::RcaTurnError};
 
         assert_eq!(
-            RcaTurnError::from(AdmitError::TurnLimit("user")),
+            RcaTurnError::from(AdmitError::TurnLimit(
+                o2_enterprise::enterprise::ai::chat::TurnRefusal {
+                    scope: "user",
+                    limit: 1,
+                    active: 1,
+                    retry_after_ms: None,
+                }
+            )),
             RcaTurnError::TurnLimit
         );
         assert_eq!(RcaTurnError::from(AdmitError::Busy), RcaTurnError::Busy);

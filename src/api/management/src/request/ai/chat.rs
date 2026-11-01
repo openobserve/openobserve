@@ -43,10 +43,10 @@ use {
                 OwnerCancel, PersistSettings, TurnCaps, TurnEnd, TurnIdentity, TurnSpec, spawn_turn,
             },
             client::{
-                DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE,
-                SESSION_OWNER_UNAVAILABLE, SRE_CHAT_AGENT_TYPE, TurnPolicy, get_agent_client,
-                is_agent_unreachable, is_session_owner_unavailable, upstream_error_code,
-                upstream_error_status, upstream_retry_after,
+                CLIENT_ID_HEADER, DEFAULT_AGENT_TYPE, GENERATE_QUERY_AGENT_TYPE, ImageAttachment,
+                QueryRequest, RCA_AGENT_TYPE, SESSION_OWNER_UNAVAILABLE, SRE_CHAT_AGENT_TYPE,
+                TurnPolicy, get_agent_client, is_agent_unreachable, is_session_owner_unavailable,
+                upstream_error_code, upstream_error_status, upstream_retry_after,
             },
         },
         common::{
@@ -64,7 +64,7 @@ use {
 use super::error::{self, AiErrorAction, AiErrorCode, AiErrorEnvelope};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    models::ai::{Attachment, ChatMode, PromptRequest, PromptResponse},
+    models::ai::{Attachment, ChatMode, PromptRequest, PromptResponse, TurnAgent},
 };
 
 /// Context flag telling o2-ai that `history` is a fork's or an import's transcript, not new turns.
@@ -101,7 +101,7 @@ const CONFIRM_RELAY_TIMEOUT: std::time::Duration = std::time::Duration::from_sec
 #[cfg(any(feature = "enterprise", test))]
 const APPROVAL_RESOLVED: &str = "approval_resolved";
 #[cfg(any(feature = "enterprise", test))]
-const CONFIRM_REFUSAL_KEYS: [&str; 7] = [
+const CONFIRM_REFUSAL_KEYS: [&str; 10] = [
     "id",
     "resolved_by",
     "at",
@@ -109,6 +109,9 @@ const CONFIRM_REFUSAL_KEYS: [&str; 7] = [
     "withdrawn",
     "pending_id",
     "extends",
+    "by",
+    "user_extends_left",
+    "background_extends_left",
 ];
 
 #[cfg(any(feature = "enterprise", test))]
@@ -122,6 +125,19 @@ const UNKNOWN_HEALTH_OWNER_WAIT: std::time::Duration = std::time::Duration::from
 
 #[cfg(feature = "enterprise")]
 const RCA_MODE_REFUSED: &str = "mode \"rca\" is only accepted by the incident analysis route";
+/// What an extension changes on a stored card besides its expiry.
+#[cfg(any(feature = "enterprise", test))]
+const EXTEND_ANSWER_KEYS: [&str; 3] = ["extends", "user_extends_left", "background_extends_left"];
+/// Agents a chat can be handed over from; the autonomous incident agent runs but is never named.
+#[cfg(feature = "enterprise")]
+const HANDOFF_SOURCES: [&str; 4] = [
+    DEFAULT_AGENT_TYPE,
+    SRE_CHAT_AGENT_TYPE,
+    GENERATE_QUERY_AGENT_TYPE,
+    RCA_AGENT_TYPE,
+];
+#[cfg(feature = "enterprise")]
+const MAX_TURN_CLIENT_ID_BYTES: usize = 128;
 
 /// The RCA agent's context contract (`RcaContext`, `is_reanalysis`); o2-ai routes on key presence.
 #[cfg(feature = "enterprise")]
@@ -637,6 +653,12 @@ struct StreamTurn {
     auth: String,
     /// The browser login that sent the turn, so signing it out stops the turn.
     auth_session_id: Option<String>,
+    /// The tab that sent the turn.
+    client_id: Option<String>,
+    /// The agent `agent_type` takes the chat over from.
+    handoff_from: Option<String>,
+    /// The caller named `agent_type`, so a different one is a hand-off.
+    agent_chosen: bool,
     forward_headers: Option<std::collections::HashMap<String, String>>,
     client: Arc<o2_enterprise::enterprise::ai::client::AiAgentClient>,
     span: Option<opentelemetry::Context>,
@@ -651,6 +673,8 @@ struct TurnMeter {
     charge: TurnCharge,
     /// `(session_id, turn_id)` of a persisted turn, whose first event is stamped on its record.
     record: Option<(String, String)>,
+    /// The agent the chat moves to once o2-ai starts this turn.
+    handoff: Option<&'static str>,
     first_event: bool,
     refused: bool,
 }
@@ -663,6 +687,7 @@ impl TurnMeter {
             lines: SseLines::default(),
             charge,
             record,
+            handoff: None,
             first_event: false,
             refused: false,
         }
@@ -769,6 +794,7 @@ impl TurnMeter {
         };
         let org_id = self.charge.org_id.clone();
         let at = config::utils::time::now_micros();
+        let handoff = self.handoff;
         tokio::spawn(async move {
             if let Err(e) =
                 infra::table::ai_chat_turns::set_first_event_at(&org_id, &session_id, &turn_id, at)
@@ -776,26 +802,60 @@ impl TurnMeter {
             {
                 log::warn!("[AI-CHAT] cannot stamp the first event of turn {turn_id}: {e}");
             }
+            let Some(agent) = handoff else {
+                return;
+            };
+            if let Err(e) =
+                infra::table::ai_chat_sessions::hand_off(&org_id, &session_id, agent).await
+            {
+                log::warn!("[AI-CHAT] cannot move {session_id} to agent {agent}: {e}");
+            }
         });
     }
 }
 
-/// The query helper never runs RCA; an explicit chat turn skips the stored agent, others keep it.
+/// A named agent wins; else the helper skips RCA, a chat turn the stored agent, others keep it.
 #[cfg(feature = "enterprise")]
 async fn turn_agent_and_context(
     org_id: &str,
     user_id: &str,
     session_id: Option<&str>,
     context: serde_json::Value,
-    mode: Option<ChatMode>,
+    (mode, agent): (Option<ChatMode>, Option<TurnAgent>),
 ) -> (&'static str, serde_json::Value) {
+    if let Some(agent) = agent {
+        return named_agent_and_context(org_id, user_id, context, agent).await;
+    }
     match mode {
-        Some(ChatMode::GenerateQuery) => agent_for_mode(mode, context, None),
+        Some(ChatMode::GenerateQuery) => {
+            let (_, context) = agent_for_mode(mode, context, None);
+            (GENERATE_QUERY_AGENT_TYPE, context)
+        }
         Some(ChatMode::Chat) => {
             let rca = incident_rca_context(org_id, user_id, &context).await;
             agent_for_mode(mode, context, rca)
         }
         _ => session_agent_and_context(org_id, user_id, session_id, context).await,
+    }
+}
+
+/// Only Investigator takes an incident's context, and only from a caller who cleared the RCA bar.
+#[cfg(feature = "enterprise")]
+async fn named_agent_and_context(
+    org_id: &str,
+    user_id: &str,
+    context: serde_json::Value,
+    agent: TurnAgent,
+) -> (&'static str, serde_json::Value) {
+    let rca = match agent {
+        TurnAgent::Sre => incident_rca_context(org_id, user_id, &context).await,
+        _ => None,
+    };
+    let (default_agent, context) = select_chat_agent(context, rca);
+    match agent {
+        TurnAgent::Sre => (SRE_CHAT_AGENT_TYPE, context),
+        TurnAgent::GenerateQuery => (GENERATE_QUERY_AGENT_TYPE, context),
+        TurnAgent::O2Ai | TurnAgent::Unsupported => (default_agent, context),
     }
 }
 
@@ -856,20 +916,23 @@ async fn session_agent_and_context(
     session_id: Option<&str>,
     context: serde_json::Value,
 ) -> (&'static str, serde_json::Value) {
-    let stored = match session_id.and_then(openobserve_core::ai_chat::admission::normalize_uuid) {
-        Some(id) => match infra::table::ai_chat_sessions::get(org_id, &id).await {
-            Ok(row) => row.map(|row| row.agent_type),
-            Err(e) => {
-                log::warn!("[org_id:{org_id}] cannot read the agent of chat {id}: {e}");
-                None
-            }
-        },
-        None => None,
-    };
-    if keeps_default_agent(stored.as_deref()) {
+    if keeps_default_agent(stored_agent(org_id, session_id).await.as_deref()) {
         return select_chat_agent(context, None);
     }
     chat_agent_and_context(org_id, user_id, context).await
+}
+
+/// The stored chat's current agent; an unreadable one reads as no chat.
+#[cfg(feature = "enterprise")]
+async fn stored_agent(org_id: &str, session_id: Option<&str>) -> Option<String> {
+    let id = session_id.and_then(openobserve_core::ai_chat::admission::normalize_uuid)?;
+    match infra::table::ai_chat_sessions::get(org_id, &id).await {
+        Ok(row) => row.map(|row| row.agent_type),
+        Err(e) => {
+            log::warn!("[org_id:{org_id}] cannot read the agent of chat {id}: {e}");
+            None
+        }
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -1016,6 +1079,70 @@ fn turn_tools<M, C>(mode: Option<ChatMode>, mcps: Vec<M>, clis: Vec<C>) -> (Vec<
     (mcps, clis)
 }
 
+/// A named agent settles the mode a request left unsaid.
+#[cfg(feature = "enterprise")]
+fn with_agent_mode(mut prompt: PromptRequest) -> PromptRequest {
+    prompt.mode = prompt.mode.or(prompt.agent.map(TurnAgent::mode));
+    prompt
+}
+
+/// Why a turn's `agent` and `handoff_from` cannot run together with its mode, or `None`.
+#[cfg(feature = "enterprise")]
+fn agent_problem(
+    agent: Option<TurnAgent>,
+    handoff_from: Option<&str>,
+    mode: Option<ChatMode>,
+) -> Option<&'static str> {
+    let Some(agent) = agent else {
+        return handoff_from.is_some().then_some("handoff_from needs agent");
+    };
+    if agent == TurnAgent::Unsupported {
+        return Some("Unsupported agent");
+    }
+    if handoff_from.is_some_and(|from| !HANDOFF_SOURCES.contains(&from)) {
+        return Some("Unsupported handoff_from");
+    }
+    mode.is_some_and(|mode| mode != agent.mode())
+        .then_some("agent and mode disagree")
+}
+
+/// Refuses a named agent this server cannot run before anything is stored or charged.
+#[cfg(feature = "enterprise")]
+async fn refuse_turn_agent(
+    org_id: &str,
+    prompt: &PromptRequest,
+    session_id: Option<&str>,
+) -> Result<(), Response> {
+    let handoff_from = prompt.handoff_from.as_deref();
+    if let Some(problem) = agent_problem(prompt.agent, handoff_from, prompt.mode) {
+        return Err(error::invalid_request(problem));
+    }
+    let Some(agent) = prompt.agent.map(TurnAgent::id) else {
+        return Ok(());
+    };
+    if !super::capabilities::agent_ready(org_id, agent) {
+        return Err(agent_unreachable_error());
+    }
+    // An old node would answer a moved chat with the agent it stored, so wait for all to be new.
+    let moves_chat = stored_agent(org_id, session_id)
+        .await
+        .is_some_and(|stored| stored != agent);
+    if moves_chat && !openobserve_core::ai_chat::admission::v2_gate_open().await {
+        return Err(agent_unreachable_error());
+    }
+    Ok(())
+}
+
+/// The tab's id, for the chats list to tell its owner; a malformed one is treated as none.
+#[cfg(feature = "enterprise")]
+fn turn_client_id(headers: &axum::http::HeaderMap) -> Option<String> {
+    let id = headers.get(CLIENT_ID_HEADER)?.to_str().ok()?;
+    let valid = !id.is_empty()
+        && id.len() <= MAX_TURN_CLIENT_ID_BYTES
+        && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-');
+    valid.then(|| id.to_string())
+}
+
 /// Refuses a turn whose mode is unknown, or an ephemeral one that is not a query or names a chat.
 #[cfg(feature = "enterprise")]
 async fn refuse_turn_mode(
@@ -1109,8 +1236,13 @@ fn bind_confirm_body_to_org(body: &[u8], org_id: &str) -> Option<Value> {
 fn extended_card(card: &str, answer: &Value) -> Option<(i64, String)> {
     let expires_at_ms = answer.get("expires_at")?.as_i64()?;
     let mut card: Value = serde_json::from_str(card).ok()?;
-    card.as_object_mut()?
-        .insert("expires_at".to_string(), Value::from(expires_at_ms));
+    let fields = card.as_object_mut()?;
+    fields.insert("expires_at".to_string(), Value::from(expires_at_ms));
+    for key in EXTEND_ANSWER_KEYS {
+        if let Some(value) = answer.get(key) {
+            fields.insert(key.to_string(), value.clone());
+        }
+    }
     Some((expires_at_ms.saturating_mul(1000), card.to_string()))
 }
 
@@ -1421,6 +1553,16 @@ fn upstream_failure(
 #[cfg(feature = "enterprise")]
 fn not_enabled_error() -> Response {
     error::not_enabled("AI is not enabled")
+}
+
+/// A named agent cannot run this turn; the service itself may be up.
+#[cfg(feature = "enterprise")]
+fn agent_unreachable_error() -> Response {
+    AiErrorEnvelope::new(
+        AiErrorCode::AgentUnreachable,
+        "The chosen agent cannot take this chat right now",
+    )
+    .into_response()
 }
 
 /// An agent service that is not configured is the assistant being off for this deployment.
@@ -2881,9 +3023,17 @@ async fn chat_turn(
         if !o2_cfg.ai.has_agent_target() {
             return error::not_enabled("AI agent URL is not set");
         }
+        let prompt_body = with_agent_mode(prompt_body);
         // Nothing is stored on this path, so an ephemeral query turn needs only the mode check.
         if let Some(problem) = turn_mode_problem(prompt_body.mode, prompt_body.ephemeral) {
             return error::invalid_request(problem);
+        }
+        let session_header = parts
+            .headers
+            .get(X_O2_ASSISTANT_SESSION_ID.as_str())
+            .and_then(|v| v.to_str().ok());
+        if let Err(refusal) = refuse_turn_agent(org_id_str, &prompt_body, session_header).await {
+            return refusal;
         }
 
         let model = Ai::model_override(&prompt_body.model).map(str::to_string);
@@ -2956,16 +3106,12 @@ async fn chat_turn(
         let context = agent_context(&prompt_body.context, org_id_str, delegated);
 
         // An existing chat keeps its stored agent; resolve before context moves into QueryRequest.
-        let session_header = parts
-            .headers
-            .get(X_O2_ASSISTANT_SESSION_ID.as_str())
-            .and_then(|v| v.to_str().ok());
         let (agent_type, context) = turn_agent_and_context(
             org_id_str,
             user_id,
             session_header,
             context,
-            prompt_body.mode,
+            (prompt_body.mode, prompt_body.agent),
         )
         .await;
 
@@ -3289,6 +3435,7 @@ async fn stream_turn(
                 .await;
             return refusal;
         }
+        let prompt_body = with_agent_mode(prompt_body);
         let session = forward_headers.get(X_O2_ASSISTANT_SESSION_ID.as_str());
         if let Err(refusal) =
             refuse_turn_mode(&org_id_str, &prompt_body, session.map(String::as_str)).await
@@ -3296,6 +3443,12 @@ async fn stream_turn(
             audit
                 .report(refusal.status(), Some("Mode or ephemeral turn refused"))
                 .await;
+            return refusal;
+        }
+        if let Err(refusal) =
+            refuse_turn_agent(&org_id_str, &prompt_body, session.map(String::as_str)).await
+        {
+            audit.report(refusal.status(), Some("Agent refused")).await;
             return refusal;
         }
         let model = Ai::model_override(&prompt_body.model).map(str::to_string);
@@ -3370,7 +3523,7 @@ async fn stream_turn(
                 .get(X_O2_ASSISTANT_SESSION_ID.as_str())
                 .map(String::as_str),
             context,
-            prompt_body.mode,
+            (prompt_body.mode, prompt_body.agent),
         )
         .await;
 
@@ -3440,6 +3593,9 @@ async fn stream_turn(
             query: query_req,
             auth: auth_str,
             auth_session_id: super::chats::login_key(&parts.headers),
+            client_id: turn_client_id(&parts.headers),
+            handoff_from: prompt_body.handoff_from,
+            agent_chosen: prompt_body.agent.is_some(),
             forward_headers: if forward_headers.is_empty() {
                 None
             } else {
@@ -3486,6 +3642,9 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
         query: mut query_req,
         auth,
         auth_session_id,
+        client_id,
+        handoff_from,
+        agent_chosen,
         forward_headers,
         client,
         span,
@@ -3524,7 +3683,12 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
         session_id.as_deref(),
         turn_id.as_deref(),
         &user_id,
-        auth_session_id.as_deref(),
+        openobserve_core::ai_chat::admission::TurnOrigin {
+            auth_session_id: auth_session_id.as_deref(),
+            client_id: client_id.as_deref(),
+            handoff_from: handoff_from.as_deref(),
+            agent_chosen,
+        },
         agent_type,
         &query_req.query,
         &trace_id,
@@ -3579,11 +3743,12 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
         version_turn(&row, &turn_id, replaced, &mut query_req).await;
     }
 
-    let meter = TurnMeter::new(
+    let mut meter = TurnMeter::new(
         TurnPhase::charged(),
         charge,
         Some((session_id.clone(), turn_id.clone())),
     );
+    meter.handoff = (agent_chosen && row.agent_type != agent_type).then_some(agent_type);
     let (stop_org, stop_session, stop_auth) = (org_id.clone(), session_id.clone(), auth.clone());
     let (stop_turn, stop_user) = (Some(turn_id.clone()), user_id.clone());
     let stop = move || {
@@ -3731,7 +3896,9 @@ async fn direct_turn(turn: StreamTurn) -> Response {
             &charge_key,
             &user_id,
             auth_session_id.as_deref(),
-        ) {
+        )
+        .await
+        {
             Ok(registration) => Some(registration),
             Err(refusal) => {
                 end_span(&span);
@@ -3861,9 +4028,9 @@ async fn direct_turn(turn: StreamTurn) -> Response {
     sse_response(Body::from_stream(s))
 }
 
-/// An ephemeral turn writes no row, so `admit_turn`'s active-turn caps are taken here, per node.
+/// An ephemeral turn writes no row, so `admit_turn`'s active-turn caps are taken here.
 #[cfg(feature = "enterprise")]
-fn register_ephemeral_turn(
+async fn register_ephemeral_turn(
     org_id: &str,
     session_id: Option<&str>,
     turn_key: &str,
@@ -3876,15 +4043,19 @@ fn register_ephemeral_turn(
     let key = session_id
         .filter(|sid| is_valid_session_id(sid))
         .map_or_else(|| turn_key.to_string(), str::to_ascii_lowercase);
-    registry::register_capped(
+    let turn = openobserve_core::ai_chat::admission::TurnKey {
         org_id,
-        &key,
-        turn_key,
-        user_id,
+        session_id: &key,
+        turn_id: turn_key,
+    };
+    let owner = registry::TurnOwner {
         auth_session_id,
-        registry::TurnCaps::from_config(),
-    )
-    .map_err(super::chats::turn_limit_response)
+        client_id: None,
+    };
+    let caps = registry::TurnCaps::from_config();
+    openobserve_core::ai_chat::admission::register_turn(turn, user_id, user_id, owner, caps)
+        .await
+        .map_err(super::chats::turn_limit_response)
 }
 
 /// Meters a persisted turn and reads on after the browser leaves, so a background turn still pays.
@@ -4073,6 +4244,15 @@ mod tests {
         );
     }
 
+    fn refusal(scope: &'static str) -> o2_enterprise::enterprise::ai::chat::registry::TurnRefusal {
+        o2_enterprise::enterprise::ai::chat::registry::TurnRefusal {
+            scope,
+            limit: 3,
+            active: 3,
+            retry_after_ms: (scope != "user").then_some(15_000),
+        }
+    }
+
     async fn body_of(response: Response) -> serde_json::Value {
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
@@ -4093,7 +4273,7 @@ mod tests {
             body.get("error_code").is_none(),
             "never the turn limit's error_code"
         );
-        let turn_limit = body_of(super::super::chats::turn_limit_response("user")).await;
+        let turn_limit = body_of(super::super::chats::turn_limit_response(refusal("node"))).await;
         assert_eq!(turn_limit["code"], "turn_limit");
         assert_ne!(turn_limit["code"], body["code"]);
     }
@@ -4604,7 +4784,10 @@ mod tests {
                 consent_required_error(serde_json::json!({"feature": "ai_credits"})).into_response()
             }
             "authorization_unavailable" => authorization_unavailable_error().into_response(),
-            "turn_limit" => chats::turn_limit_response("user"),
+            "turn_limit" => chats::turn_limit_response(refusal("node")),
+            "run_limit_member" => chats::turn_limit_response(refusal("user")),
+            "run_limit_org" => chats::turn_limit_response(refusal("org")),
+            "agent_unreachable" => agent_unreachable_error(),
             "rate_limited" => {
                 upstream_failure(false, false, Some(429), Some(30), None).into_response()
             }
@@ -4631,12 +4814,15 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn every_envelope_fixture_is_what_the_server_sends() {
-        let dir = concat!(
+        let errors = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../../web/src/composables/assistant/__fixtures__/errors/envelope"
+            "/../../../web/src/composables/assistant/__fixtures__/errors"
         );
+        let files = ["envelope", "v2"]
+            .into_iter()
+            .flat_map(|dir| std::fs::read_dir(format!("{errors}/{dir}")).unwrap());
         let mut seen = 0;
-        for entry in std::fs::read_dir(dir).unwrap() {
+        for entry in files {
             let path = entry.unwrap().path();
             let code = path.file_stem().unwrap().to_str().unwrap().to_string();
             let fixture: serde_json::Value =
@@ -4667,6 +4853,78 @@ mod tests {
             seen += 1;
         }
         assert!(seen >= 19, "only {seen} envelope fixtures were read");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_named_agent_settles_a_silent_mode_and_never_contradicts_one() {
+        let named = |agent, mode| {
+            let mut prompt = prompt(serde_json::json!({}));
+            prompt.agent = Some(agent);
+            prompt.mode = mode;
+            with_agent_mode(prompt).mode
+        };
+        assert_eq!(
+            named(TurnAgent::GenerateQuery, None),
+            Some(ChatMode::GenerateQuery)
+        );
+        assert_eq!(named(TurnAgent::Sre, None), Some(ChatMode::Chat));
+        assert_eq!(
+            named(TurnAgent::O2Ai, Some(ChatMode::GenerateQuery)),
+            Some(ChatMode::GenerateQuery),
+            "left for agent_problem"
+        );
+
+        let chat = Some(ChatMode::Chat);
+        let query = Some(TurnAgent::GenerateQuery);
+        assert_eq!(agent_problem(None, None, chat), None);
+        assert_eq!(
+            agent_problem(None, Some("sre"), chat),
+            Some("handoff_from needs agent")
+        );
+        assert_eq!(
+            agent_problem(Some(TurnAgent::Unsupported), None, None),
+            Some("Unsupported agent")
+        );
+        assert_eq!(
+            agent_problem(query, None, chat),
+            Some("agent and mode disagree")
+        );
+        assert_eq!(
+            agent_problem(Some(TurnAgent::Sre), Some("o2-ai-judge"), chat),
+            Some("Unsupported handoff_from")
+        );
+        assert_eq!(
+            agent_problem(Some(TurnAgent::Sre), Some("sre-rca"), chat),
+            None
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_turn_s_client_id_is_a_bounded_token_or_nothing() {
+        let with = |value: &str| {
+            let mut headers = axum::http::HeaderMap::new();
+            headers.insert(CLIENT_ID_HEADER, value.parse().unwrap());
+            turn_client_id(&headers)
+        };
+        assert_eq!(with("tab-1").as_deref(), Some("tab-1"));
+        assert_eq!(with(""), None);
+        assert_eq!(with("a b"), None);
+        assert_eq!(with(&"a".repeat(129)), None);
+        assert_eq!(turn_client_id(&axum::http::HeaderMap::new()), None);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_refused_agent_is_a_typed_503_nothing_stored_can_read_as_outage() {
+        let body = body_of(agent_unreachable_error()).await;
+        assert_eq!(body["code"], "agent_unreachable");
+        assert_eq!(body["retryable"], true);
+        assert_eq!(
+            AiErrorCode::from_stored("agent_unreachable"),
+            Some(AiErrorCode::AgentUnavailable)
+        );
     }
 
     #[test]
@@ -4765,11 +5023,17 @@ mod tests {
     #[test]
     fn an_extension_moves_the_stored_expiry_and_card() {
         let card = r#"{"type":"confirmation_required","id":"apr_1","expires_at":1000}"#;
-        let answer = serde_json::json!({"id": "apr_1", "expires_at": 5000, "extends": 1});
+        let answer = serde_json::json!({
+            "id": "apr_1", "expires_at": 5000, "extends": 1,
+            "user_extends_left": 9, "background_extends_left": 3,
+        });
         let (expires_at, extended) = extended_card(card, &answer).unwrap();
         assert_eq!(expires_at, 5_000_000);
         let extended: Value = serde_json::from_str(&extended).unwrap();
         assert_eq!(extended["expires_at"], 5000);
+        assert_eq!(extended["extends"], 1);
+        assert_eq!(extended["user_extends_left"], 9);
+        assert_eq!(extended["background_extends_left"], 3);
         assert_eq!(extended["id"], "apr_1");
         assert!(extended_card(card, &serde_json::json!({"extends": 1})).is_none());
     }
@@ -4791,6 +5055,9 @@ mod tests {
         assert_eq!(bound["reply"], "no");
         assert_eq!(bound["id"], "apr_1");
         assert!(extends_only(br#"{"id":"apr_1","extend":true}"#));
+        assert!(extends_only(
+            br#"{"id":"apr_1","extend":true,"by":"background"}"#
+        ));
         assert!(!extends_only(br#"{"id":"apr_1","approved":true}"#));
     }
 
@@ -5532,7 +5799,7 @@ mod tests {
                 STICKY_ROOT,
                 session,
                 context.clone(),
-                Some(ChatMode::Chat),
+                (Some(ChatMode::Chat), None),
             )
             .await;
             assert_eq!(agent, SRE_CHAT_AGENT_TYPE, "{session:?}: {picked}");
@@ -5545,7 +5812,7 @@ mod tests {
             STICKY_ROOT,
             Some(&new_chat),
             plain.clone(),
-            Some(ChatMode::Chat),
+            (Some(ChatMode::Chat), None),
         )
         .await;
         assert_eq!(agent, DEFAULT_AGENT_TYPE);
@@ -5936,12 +6203,37 @@ mod tests {
     async fn a_query_helper_turn_runs_the_chat_agent_without_rca_inputs() {
         let context =
             serde_json::json!({"incident_id": "inc-1", "severity": "P1", "locale": "de-DE"});
-        let (agent, context) =
-            turn_agent_and_context("org", "user", None, context, Some(ChatMode::GenerateQuery))
-                .await;
-        assert_eq!(agent, DEFAULT_AGENT_TYPE);
+        let query = (Some(ChatMode::GenerateQuery), None);
+        let (agent, context) = turn_agent_and_context("org", "user", None, context, query).await;
+        assert_eq!(
+            agent, GENERATE_QUERY_AGENT_TYPE,
+            "stored under its own label"
+        );
+        assert_eq!(
+            o2_enterprise::enterprise::ai::client::agent_route(agent),
+            DEFAULT_AGENT_TYPE
+        );
         assert!(context.get("incident_id").is_none() && context.get("severity").is_none());
         assert_eq!(context["locale"], "de-DE");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_named_agent_overrides_the_stored_one_and_only_investigator_keeps_the_incident_route()
+    {
+        let context = serde_json::json!({"severity": "P1", "locale": "de-DE"});
+        let turn = |agent: TurnAgent| {
+            let picked = (Some(agent.mode()), Some(agent));
+            turn_agent_and_context("org", "user", None, context.clone(), picked)
+        };
+        let (agent, picked) = turn(TurnAgent::O2Ai).await;
+        assert_eq!(agent, DEFAULT_AGENT_TYPE);
+        assert!(picked.get("severity").is_none());
+        assert_eq!(turn(TurnAgent::Sre).await.0, SRE_CHAT_AGENT_TYPE);
+        assert_eq!(
+            turn(TurnAgent::GenerateQuery).await.0,
+            GENERATE_QUERY_AGENT_TYPE
+        );
     }
 
     #[cfg(feature = "enterprise")]
@@ -6052,35 +6344,39 @@ mod tests {
     }
 
     #[cfg(feature = "enterprise")]
-    #[test]
-    fn ephemeral_turns_count_against_the_active_turn_limit() {
+    #[tokio::test]
+    async fn ephemeral_turns_count_against_the_active_turn_limit() {
         let caps = o2_enterprise::enterprise::ai::chat::TurnCaps::from_config();
         if caps.per_user == 0 {
             return;
         }
         let user = format!("eph-{}", config::ider::uuid());
-        let held: Vec<_> = (0..caps.per_user)
-            .map(|n| {
-                register_ephemeral_turn("eph-org", None, &format!("t{n}"), &user, None).unwrap()
-            })
-            .collect();
-        let Err(refusal) = register_ephemeral_turn("eph-org", None, "t-over", &user, None) else {
+        let mut held = Vec::new();
+        for n in 0..caps.per_user {
+            let turn_key = format!("t{n}");
+            let turn = register_ephemeral_turn("eph-org", None, &turn_key, &user, None);
+            held.push(turn.await.unwrap());
+        }
+        let over = register_ephemeral_turn("eph-org", None, "t-over", &user, None).await;
+        let Err(refusal) = over else {
             panic!("a turn over the per-user cap was admitted");
         };
         assert_eq!(refusal.status(), StatusCode::TOO_MANY_REQUESTS);
         drop(held);
-        assert!(register_ephemeral_turn("eph-org", None, "t-again", &user, None).is_ok());
+        let again = register_ephemeral_turn("eph-org", None, "t-again", &user, None).await;
+        assert!(again.is_ok());
     }
 
     #[cfg(feature = "enterprise")]
-    #[test]
-    fn a_stop_without_a_saved_chat_reaches_the_turn_streaming_here() {
+    #[tokio::test]
+    async fn a_stop_without_a_saved_chat_reaches_the_turn_streaming_here() {
         assert!(direct_stop(false, true));
         assert!(!direct_stop(true, true));
         assert!(!direct_stop(false, false));
         let session = uuid::Uuid::now_v7().to_string();
-        let _turn =
-            register_ephemeral_turn("eph-org", Some(&session), "t1", "alice", None).unwrap();
+        let _turn = register_ephemeral_turn("eph-org", Some(&session), "t1", "alice", None)
+            .await
+            .unwrap();
         let running = o2_enterprise::enterprise::ai::chat::registry::turns("eph-org", &session);
         let running: Vec<(&str, &str)> = running
             .iter()

@@ -15,8 +15,40 @@
     "persistence": true,
     "public_links": true,
     "retention_days": 90,
-    "agents": ["o2-ai"],
-    "toolsets": [{ "id": "ts_1", "name": "Kubernetes", "enabled": true }],
+    "agents": [
+      {
+        "id": "o2-ai",
+        "name": "O2 Assistant",
+        "purpose": "Answers questions and helps with tasks",
+        "pickable": true,
+        "available": true,
+        "read_only": false
+      },
+      {
+        "id": "sre",
+        "name": "Investigator",
+        "purpose": "Finds the likely cause of a problem, with evidence",
+        "pickable": true,
+        "available": false,
+        "read_only": false,
+        "reason": "disabled"
+      },
+      {
+        "id": "generate-query",
+        "name": "Query builder",
+        "purpose": "Writes one SQL or PromQL query for you to run or insert",
+        "pickable": true,
+        "available": true,
+        "read_only": false
+      }
+    ],
+    "toolsets": [
+      {
+        "id": "ts_1",
+        "name": "Kubernetes",
+        "enabled": true
+      }
+    ],
     "toolset_secret_merge": true,
     "policy_enforced": true,
     "history_search": true,
@@ -28,6 +60,10 @@
     "context_used": true,
     "answer_locale": true,
     "rca_chat_mode": true,
-    "rca_feedback": true
+    "rca_feedback": true,
+    "approval_extend_budgets": {
+      "user": 10,
+      "background": 3
+    }
   }
 }

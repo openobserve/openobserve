@@ -160,6 +160,47 @@ pub struct PromptRequest {
     )]
     #[schema(value_type = Option<Vec<Object>>)]
     pub attachments: Option<Vec<Attachment>>,
+    /// The agent the user chose; absent, the server routes as it always did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<TurnAgent>,
+    /// The agent this turn takes the chat over from; needs `agent`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handoff_from: Option<String>,
+}
+
+/// The agents a user can name on a turn; the autonomous incident agent is not one of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum TurnAgent {
+    #[serde(rename = "o2-ai")]
+    O2Ai,
+    #[serde(rename = "sre")]
+    Sre,
+    #[serde(rename = "generate-query")]
+    GenerateQuery,
+    /// An agent this server does not know; the turn is refused with a typed 400.
+    #[serde(other)]
+    Unsupported,
+}
+
+impl TurnAgent {
+    /// The id on the wire and in storage; an unknown agent has none.
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::O2Ai => "o2-ai",
+            Self::Sre => "sre",
+            Self::GenerateQuery => "generate-query",
+            Self::Unsupported => "",
+        }
+    }
+
+    /// The mode the agent runs in, whatever the request's own `mode` left unsaid.
+    pub fn mode(self) -> ChatMode {
+        match self {
+            Self::GenerateQuery => ChatMode::GenerateQuery,
+            Self::O2Ai | Self::Sre => ChatMode::Chat,
+            Self::Unsupported => ChatMode::Unsupported,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

@@ -196,6 +196,25 @@ pub async fn list_for_session_with<C: ConnectionTrait>(
         .map_err(db_err)
 }
 
+/// The org's undecided, unexpired cards; a turn that ended on one still holds its slot.
+pub async fn list_waiting(org_id: &str, now: i64) -> Result<Vec<Model>, errors::Error> {
+    list_waiting_with(get_orm_client_ro().await, org_id, now).await
+}
+
+pub async fn list_waiting_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    now: i64,
+) -> Result<Vec<Model>, errors::Error> {
+    Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Status.eq(STATUS_PENDING))
+        .filter(Column::ExpiresAt.gt(now))
+        .all(conn)
+        .await
+        .map_err(db_err)
+}
+
 /// Expires unanswered cards past `expires_at` and deletes decided ones past retention.
 pub async fn purge(now: i64) -> Result<u64, errors::Error> {
     purge_with(get_orm_client_rw().await, now).await
