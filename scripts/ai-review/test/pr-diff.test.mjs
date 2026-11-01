@@ -133,7 +133,7 @@ test("a diff that cannot be pinned stays the API diff and says so", t => {
   ];
   for (const change of cases) assert.deepEqual(pinDiff({ diff: "api", log, ...change }), { diff: "api", pinned: false });
   assert.equal(logs.length, cases.length);
-  assert.deepEqual(pinDiff({ diff: "api", prDir: dir, mergeBase: head, head }), { diff: "api", pinned: false });
+  assert.deepEqual(pinDiff({ diff: "api of a newer push", prDir: dir, mergeBase: head, head }), { diff: "", pinned: true });
 });
 
 test("a large diff from a newer push is replaced by the captured commit's diff, whatever its size", t => {
