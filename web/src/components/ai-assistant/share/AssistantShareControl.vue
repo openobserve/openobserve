@@ -23,14 +23,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :description="state.kind === 'blocked' ? t(state.reason) : null"
     data-test="assistant-thread-menu-share"
     @select="onMenuSelect"
-    >{{
-      t(
-        state.kind === "manage"
-          ? "assistant.thread.shareSettings"
-          : "assistant.share.shareEllipsis",
-      )
-    }}</ODropdownItem
+    >{{ t("assistant.share.share") }}</ODropdownItem
   >
+  <OPopover
+    v-else-if="variant === 'quick' && state.kind !== 'absent'"
+    v-model:open="open"
+    side="bottom"
+    align="start"
+    privacy="mask"
+    :aria-label="t('assistant.share.title')"
+    :content-class="quickWidth"
+  >
+    <template #anchor>
+      <span aria-hidden="true" class="absolute start-0 bottom-0 size-0" />
+    </template>
+    <AssistantShareQuick
+      v-if="open"
+      :org="org"
+      :sid="sid"
+      :share="current"
+      :running="running"
+      :public-links="capability.publicLinks"
+      :public-max-expiry-days="capability.publicMaxExpiryDays"
+      :redact-attachments="redactAttachments"
+      :has-attachments="attachments"
+      @created="onCreated"
+      @settings="emit('settings')"
+      @announce="announce"
+    />
+  </OPopover>
   <ODrawer
     v-else-if="variant === 'drawer' && state.kind !== 'absent'"
     v-model:open="open"
@@ -52,66 +73,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @announce="announce"
     />
   </ODrawer>
-  <span
-    v-else-if="variant === 'header' && state.kind !== 'absent'"
-    ref="rootEl"
-    class="inline-flex min-w-0 flex-wrap items-center gap-1"
-    data-test="assistant-share-control"
-  >
-    <component :is="mdUp ? OPopover : ODrawer" v-model:open="open" v-bind="surfaceProps">
-      <template v-if="mdUp" #anchor>
-        <OButton
-          variant="ghost"
-          size="sm"
-          class="max-md:min-h-11 pointer-coarse:min-h-11"
-          :icon-left="shared ? assistantGlyph.shared : assistantGlyph.share"
-          :disabled="state.kind === 'blocked'"
-          :focusable-unavailable="state.kind === 'blocked'"
-          :aria-label="buttonName"
-          :aria-expanded="open ? 'true' : 'false'"
-          aria-haspopup="dialog"
-          :data-shared="shared ? '' : undefined"
-          data-test="assistant-thread-share"
-          @click="onShare"
-        >
-          <span class="@max-[32rem]:sr-only" data-test="assistant-thread-share-label">{{
-            buttonLabel
-          }}</span>
-          <template v-if="state.kind === 'blocked'" #unavailable-reason>{{
-            t(state.reason)
-          }}</template>
-          <OTooltip :content="t(state.kind === 'blocked' ? state.reason : state.tooltip)" />
-        </OButton>
-      </template>
-      <AssistantShareSettings
-        v-if="open"
-        ref="settings"
-        v-bind="settingsProps"
-        @created="onCreated"
-        @revoked="open = false"
-        @see-all="seeAll"
-        @new-link="newLink"
-        @cancel-new="cancelNew"
-        @announce="announce"
-      />
-    </component>
-    <OButton
-      v-if="!mdUp"
-      variant="ghost"
-      size="sm"
-      class="min-h-11"
-      :icon-left="shared ? assistantGlyph.shared : assistantGlyph.share"
-      :disabled="state.kind === 'blocked'"
-      :focusable-unavailable="state.kind === 'blocked'"
-      :aria-label="buttonName"
-      :data-shared="shared ? '' : undefined"
-      data-test="assistant-thread-share"
-      @click="onShare"
-    >
-      {{ buttonLabel }}
-      <template v-if="state.kind === 'blocked'" #unavailable-reason>{{ t(state.reason) }}</template>
-    </OButton>
-  </span>
 </template>
 
 <script lang="ts">
@@ -119,15 +80,17 @@ import type { Sid } from "@/composables/assistant";
 
 export interface AssistantShareControlProps {
   sid: Sid;
-  /** `drawer` has no trigger of its own: More's Share opens it through `open`. */
-  variant: "header" | "menu-item" | "drawer";
+  /** `quick` and `drawer` have no trigger of their own: the title menu's Share opens them through `open`. */
+  variant: "menu-item" | "quick" | "drawer";
 }
 
 export interface AssistantShareControlEmits {
   /** All shared links: the Shared links manager. */
   (e: "manage"): void;
-  /** More's Share item, which cannot hold a surface once its menu closes. */
+  /** Change settings, or Share where no popover fits; the drawer holds everything. */
   (e: "settings"): void;
+  /** The title menu's Share, which cannot hold a surface once its menu closes. */
+  (e: "open-quick"): void;
 }
 </script>
 
@@ -145,15 +108,14 @@ import {
 } from "@/composables/assistant";
 import { isTerminal } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { ShareView } from "@/services/ai_chat_share";
 import { chatSharesQuery } from "@/services/ai_chat_share.queries";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 
+import AssistantShareQuick from "./AssistantShareQuick.vue";
 import AssistantShareSettings from "./AssistantShareSettings.vue";
 import { knownAttachments } from "./chatAttachments";
 import { canRedactAttachments, shareButtonState } from "./chatShare";
@@ -173,7 +135,6 @@ const view = useAssistantSession(() => props.sid);
 const { mdUp } = useBreakpoint();
 
 const settings = ref<InstanceType<typeof AssistantShareSettings> | null>(null);
-const rootEl = ref<HTMLElement | null>(null);
 // A just-created link shows in the popover before the list re-reads.
 const created = ref<ShareView | null>(null);
 // Create mode beside an existing link, so a second audience never needs a revoke first.
@@ -223,16 +184,7 @@ const state = computed(() => {
   });
 });
 
-const buttonLabel = computed(() =>
-  shared.value ? t("assistant.share.shared") : t("assistant.share.share"),
-);
-const buttonName = computed(() => {
-  const share = current.value;
-  if (!share) return undefined;
-  return t(
-    share.visibility === "public" ? "assistant.share.sharedPublic" : "assistant.share.sharedOrg",
-  );
-});
+const quickWidth = computed(() => (mdUp.value ? "w-80 p-3" : "w-70 p-3"));
 
 const settingsProps = computed(() => ({
   org: org.value,
@@ -247,28 +199,12 @@ const settingsProps = computed(() => ({
   hasAttachments: attachments.value,
 }));
 
-const surfaceProps = computed<Record<string, unknown>>(() =>
-  mdUp.value
-    ? {
-        side: "bottom",
-        align: "end",
-        ariaLabel: t("assistant.share.title"),
-        contentClass: "w-96 max-w-[calc(100vw-1.5rem)] p-4",
-      }
-    : {
-        width: 100,
-        title: t("assistant.share.title"),
-        anchor: rootEl.value?.closest<HTMLElement>("[data-assistant-root]") ?? null,
-        returnFocusTo: () =>
-          rootEl.value?.querySelector<HTMLElement>('[data-test="assistant-thread-share"]') ?? null,
-      },
-);
-
 watch(open, async (isOpen) => {
   if (!isOpen) {
     anotherLink.value = false;
     return;
   }
+  if (props.variant !== "drawer") return;
   await nextTick();
   // Reka focuses the first field on open; the primary action is the one a sharer wants next.
   requestAnimationFrame(() => settings.value?.focusPrimary());
@@ -283,20 +219,14 @@ watch(
   },
 );
 
-// Share never creates a link by itself: the popover shows what would be shared first (D5 decision 6).
-function onShare(): void {
-  const kind = state.value.kind;
-  if (kind === "blocked" || kind === "absent") return;
-  open.value = true;
-}
-
 // The menu closes on select and unmounts this item, so the surface opens from the shell.
 function onMenuSelect(event: Event): void {
   if (state.value.kind === "blocked") {
     event.preventDefault();
     return;
   }
-  emit("settings");
+  if (mdUp.value) emit("open-quick");
+  else emit("settings");
 }
 
 function onCreated(share: ShareView, copied: boolean): void {

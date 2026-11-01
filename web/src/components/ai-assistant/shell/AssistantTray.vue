@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="(bar, index) in shown"
       :key="bar.sid"
       data-test="assistant-tray-bar"
-      class="bg-surface-base border-border-default rounded-surface flex h-10 w-50 min-w-0 items-center gap-1 border ps-2 pe-1 shadow-lg xl:w-60"
+      class="bg-surface-base border-border-default rounded-surface flex h-10 w-60 min-w-0 items-center gap-1 border ps-1 pe-1 shadow-lg"
     >
       <OButton
         :ref="(el) => setBar(index, el)"
@@ -40,11 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @focus="rover = index"
         @keydown="onKey"
       >
-        <span class="relative inline-flex shrink-0">
-          <AssistantMark size="sm" />
-          <AssistantStatusDot v-if="bar.signal" :state="bar.signal" placement="corner" />
-        </span>
+        <AssistantStatusDot v-if="bar.signal" :state="bar.signal" />
         <OTruncatedText class="min-w-0">{{ bar.title }}</OTruncatedText>
+        <span
+          v-if="bar.failed"
+          class="text-status-error-text ms-auto shrink-0 text-xs"
+          data-test="assistant-tray-failed"
+          >{{ t("assistant.history.state.failed") }}</span
+        >
       </OButton>
       <AssistantIconButton
         :label="t('assistant.tray.close', { title: raw(String(bar.title)) })"
@@ -53,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="emit('close', bar.sid)"
       />
     </div>
-    <ODropdown v-if="hidden.length" align="end">
+    <ODropdown v-if="hidden.length" align="end" content-class="w-60">
       <template #trigger>
         <OButton variant="outline" size="sm" data-test="assistant-tray-more">
           {{ t("assistant.tray.more", { count: hidden.length }) }}
@@ -62,17 +65,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODropdownItem
         v-for="bar in hidden"
         :key="bar.sid"
+        :aria-label="bar.name"
         data-test="assistant-tray-more-item"
         @select="emit('restore', bar.sid)"
       >
-        {{ bar.title }}
+        <span class="flex min-w-0 flex-1 items-baseline justify-between gap-3">
+          <OTruncatedText class="min-w-0">{{ bar.title }}</OTruncatedText>
+          <span
+            :class="[
+              'group-data-[highlighted]/item:text-text-body shrink-0 text-xs',
+              bar.failed ? 'text-status-error-text' : 'text-text-secondary',
+            ]"
+            data-test="assistant-tray-more-status"
+            >{{ bar.word }}</span
+          >
+        </span>
       </ODropdownItem>
     </ODropdown>
   </section>
 </template>
 
 <script lang="ts">
-import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 import type { AssistantSession, Sid } from "@/composables/assistant";
 
 export interface AssistantTrayProps {
@@ -82,13 +95,16 @@ export interface AssistantTrayProps {
   visibleBars: number;
 }
 
-/** The bar's mark, in the shapes that keep needs-you and answer-ready apart without colour. */
-export function traySignal(session: AssistantSession | undefined): AssistantSignal | null {
-  if (!session) return null;
-  if (session.pendingApproval || session.pendingConsent) return "attention";
+export type TrayState = "needsYou" | "working" | "failed" | "idle";
+
+/** The chat's tray state: amber waiting and the answering ring are marks, Failed is a word, the rest is quiet. */
+export function trayState(session: AssistantSession | undefined): TrayState {
+  if (!session) return "idle";
+  if (session.pendingApproval || session.pendingConsent) return "needsYou";
   const state = session.turn.state;
-  if (session.unread) return state === "failed" || state === "refused" ? "failed" : "unread";
-  return ["idle", "done", "failed", "refused", "stopped"].includes(state) ? null : "working";
+  if (state === "failed" || state === "refused") return "failed";
+  if (state === "done" || state === "stopped") return "idle";
+  return state === "idle" ? "idle" : "working";
 }
 </script>
 
@@ -96,23 +112,21 @@ export function traySignal(session: AssistantSession | undefined): AssistantSign
 import { computed, ref, watch } from "vue";
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
-import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import { useAssistantName, useAssistantStore } from "@/composables/assistant";
+import { runAgentKey, useAssistantName, useAssistantStore } from "@/composables/assistant";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
-const STATUS_KEYS: Record<AssistantSignal | "idle", I18nKey> = {
-  working: "assistant.tray.status.working",
-  attention: "assistant.tray.status.needsYou",
-  failed: "assistant.tray.status.failed",
-  unread: "assistant.tray.status.ready",
-  idle: "assistant.tray.status.idle",
-};
+const TRAY_SIGNAL = {
+  needsYou: "attention",
+  working: "working",
+  failed: null,
+  idle: null,
+} as const;
 
 const props = defineProps<AssistantTrayProps>();
 
@@ -129,15 +143,18 @@ const bars = computed(() =>
   props.order.map((sid) => {
     const session = store.state.sessions[sid];
     const title = session?.title ?? t("assistant.thread.newChatTitle");
-    const signal = traySignal(session);
+    const state = trayState(session);
+    const word = t(`assistant.tray.status.${state}`);
     return {
       sid,
       title,
-      signal,
+      word,
+      failed: state === "failed",
+      signal: TRAY_SIGNAL[state],
       name: t("assistant.tray.restore", {
-        agent: product,
         title: raw(String(title)),
-        status: t(STATUS_KEYS[signal ?? "idle"]),
+        agent: t(`assistant.runs.agent.${runAgentKey(session?.agentId ?? null)}`, { product }),
+        status: word,
       }),
     };
   }),

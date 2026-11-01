@@ -88,9 +88,11 @@ import {
   TRAY_FOOTPRINT_REM,
   coversFully,
   intersects,
+  isRunning,
   openWindowsOf,
   registerEscapeRung,
   useAssistantCapability,
+  useAssistantRuns,
   useAssistantStore,
   type DropTarget,
   type MinimiseReason,
@@ -98,6 +100,7 @@ import {
   type Sid,
 } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
@@ -108,6 +111,7 @@ import { tearOffRequest, type WindowKeyboardMode } from "./assistantWindowHost";
 
 const { t } = useI18nTyped();
 const store = useAssistantStore();
+const runs = useAssistantRuns();
 const capability = useAssistantCapability();
 const route = useRoute();
 const { lgUp } = useBreakpoint();
@@ -183,9 +187,31 @@ function minimise(sid: Sid, reason: MinimiseReason): void {
 }
 
 function close(sid: Sid): void {
+  const session = store.state.sessions[sid];
+  const answering = !!session && isRunning(session.turn) && !session.pendingApproval;
+  const title = titleOf(session?.title);
   store.closeWindow(sid);
   trackAssistant("ai_window_closed", {});
   leaveWindow();
+  if (answering) stillAnswering(sid, title);
+}
+
+// The status region says the same; the toast is the sighted feedback and its Stop (D1 decision 6).
+function stillAnswering(sid: Sid, title: ReturnType<typeof raw>): void {
+  toast({
+    variant: "default",
+    message: t("assistant.window.stillAnswering", { title }),
+    mask: true,
+    live: "off",
+    action: {
+      label: t("assistant.runs.stop"),
+      dataTest: "assistant-window-toast-stop",
+      handler: () => {
+        const row = runs.rows.value.find((candidate) => candidate.sid === sid);
+        if (row) void runs.stop(row);
+      },
+    },
+  });
 }
 
 function pin(sid: Sid): void {

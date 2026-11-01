@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       'bg-surface-base rounded-surface fixed start-[calc(var(--o-window-x)*1rem)] top-[calc(var(--o-window-y)*1rem)] flex w-[calc(var(--o-window-w)*1rem)] flex-col border shadow-lg forced-colors:border-[CanvasText]',
       focused
-        ? 'border-border-strong z-5100 forced-colors:border-[Highlight]'
+        ? 'border-border-control z-5100 forced-colors:border-[Highlight]'
         : 'border-border-default z-5000',
       obscured === 'collapsed' ? 'h-10 overflow-hidden' : 'h-[calc(var(--o-window-h)*1rem)]',
       obscured === 'hidden' ? 'invisible' : '',
@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       placement="window"
       :sid="win.sid"
       :focused="focused"
+      :narrow="narrow"
       density="compact"
       class="rounded-surface min-h-0 flex-1 overflow-hidden"
     >
@@ -73,30 +74,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon :name="assistantGlyph.grip" size="sm" />
         </OButton>
       </template>
-      <template #menu-first>
-        <template v-if="narrow">
-          <ODropdownSub :text-value="t('assistant.shell.layout')">
-            <template #trigger>
-              <span data-test="assistant-window-more-layout">{{
-                t("assistant.shell.layout")
-              }}</span>
-            </template>
-            <AssistantLayoutMenu bare placement="window" :sid="win.sid" />
-          </ODropdownSub>
-          <ODropdownSeparator />
-        </template>
-      </template>
       <template #container-actions>
         <AssistantIconButton
           :label="t('assistant.window.minimise')"
           :icon="assistantGlyph.minimise"
+          size="xs"
           data-test="assistant-window-minimise"
           @click="emit('minimise', 'button')"
         />
-        <AssistantLayoutMenu v-if="!narrow" placement="window" :sid="win.sid" />
         <AssistantIconButton
           :label="t('assistant.tray.close', { title: raw(titleText) })"
           :icon="assistantGlyph.close"
+          size="xs"
           data-test="assistant-window-close"
           @click="emit('close')"
         />
@@ -185,12 +174,9 @@ import {
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-import AssistantLayoutMenu from "./AssistantLayoutMenu.vue";
 import AssistantShell from "./AssistantShell.vue";
 import {
   assistantWindowHostKey,
@@ -386,8 +372,8 @@ async function startMode(next: WindowKeyboardMode): Promise<void> {
 
 function focusLayout(): void {
   const selector = narrow.value
-    ? '[data-test="assistant-thread-menu"]'
-    : '[data-test="assistant-window-layout"]';
+    ? '[data-test="assistant-thread-title-button"]'
+    : '[data-test="assistant-layout-button"]';
   root.value?.querySelector<HTMLElement>(selector)?.focus();
 }
 

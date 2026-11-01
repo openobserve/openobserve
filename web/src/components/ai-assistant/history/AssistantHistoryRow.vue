@@ -19,8 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :is="tag"
     :role="tag === 'div' ? 'listitem' : undefined"
     :class="[
-      'group/row rounded-default hover:bg-surface-subtle relative flex min-w-0 items-center gap-1 ps-1',
-      current ? 'border-s-border-strong border-s-2' : 'border-s-2 border-s-transparent',
+      'group/row rounded-default hover:bg-surface-subtle relative flex min-w-0 items-center gap-1',
+      current && 'bg-surface-subtle',
     ]"
     :aria-busy="pending ? 'true' : undefined"
     :data-sid="row.sid"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @blur="commitRename"
       />
     </div>
-    <OContextMenu v-else :disabled="readonly || !!pending">
+    <OContextMenu v-else :disabled="readonly || !!pending || !actions.length">
       <template #trigger>
         <OButton
           ref="button"
@@ -54,87 +54,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-current="current ? 'true' : undefined"
           class="h-auto! min-h-8 min-w-0 flex-1 justify-start! py-1.5 text-start max-md:min-h-11 pointer-coarse:min-h-11"
           data-test="assistant-history-row"
-          @click="emit('open', row.sid)"
+          :aria-disabled="org ? 'true' : undefined"
+          @click="!org && emit('open', row.sid)"
           @keydown="(event: KeyboardEvent) => emit('navigate', event)"
         >
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="flex min-w-0 items-center gap-1.5">
-              <OIcon
-                v-if="row.pinned"
-                :name="assistantGlyph.pin"
-                size="xs"
-                class="text-text-secondary shrink-0"
-                aria-hidden="true"
-              />
-              <OTruncatedText
-                :class="['text-text-body min-w-12 flex-1', current && 'font-medium']"
-                :tooltip="fullTitle"
-                >{{ row.title }}</OTruncatedText
-              >
-              <!-- The button is named by its content; these keep the spoken parts apart. -->
-              <span class="sr-only">, </span>
-              <OText
-                variant="meta"
-                as="span"
-                class="text-text-body shrink-0"
-                data-test="assistant-history-row-time"
-                >{{ time }}</OText
-              >
+          <span class="flex min-w-0 flex-1 items-center gap-2">
+            <OIcon
+              v-if="agentIcon"
+              :name="agentIcon"
+              size="xs"
+              class="text-text-secondary shrink-0"
+              aria-hidden="true"
+              data-test="assistant-history-row-agent"
+            />
+            <span class="flex min-w-0 flex-1 flex-col">
+              <OTruncatedText class="text-text-body min-w-12" :tooltip="fullTitle">{{
+                row.title
+              }}</OTruncatedText>
+              <OText v-if="org" variant="meta" as="span" data-test="assistant-history-row-org">
+                {{ org }}
+              </OText>
             </span>
+            <!-- The button is named by its content; these keep the spoken parts apart. -->
+            <span class="sr-only">, </span>
+            <template v-if="pending">
+              <OSpinner size="xs" />
+              <OText variant="meta" data-test="assistant-history-row-pending">{{
+                pendingText
+              }}</OText>
+            </template>
             <span
-              v-if="pending || status || originTag"
-              class="flex min-w-0 items-center gap-1.5"
-              data-test="assistant-history-row-meta"
+              v-else-if="status"
+              :class="[
+                'group-hover/row:text-text-body shrink-0 text-xs tabular-nums',
+                chatStatusClass(status, current),
+              ]"
+              :data-status="status"
+              data-test="assistant-history-row-state"
+              >{{ chatStatusWord(status, expiresAt, now ?? Date.now(), t) }}</span
             >
-              <template v-if="pending">
-                <OSpinner size="xs" />
-                <OText variant="meta" data-test="assistant-history-row-pending">{{
-                  pendingText
-                }}</OText>
-              </template>
-              <template v-else-if="status">
-                <span class="sr-only">, </span>
-                <AssistantStatusDot :state="CHAT_STATUS_SIGNAL[status]" placement="inline" />
-                <OText
-                  variant="meta"
-                  class="text-text-body"
-                  :data-status="status"
-                  data-test="assistant-history-row-state"
-                  >{{ t(CHAT_STATUS_KEYS[status]) }}</OText
-                >
-              </template>
-              <template v-if="originTag">
-                <span class="sr-only">, </span>
-                <OTag
-                  type="assistantOrigin"
-                  :value="originTag"
-                  size="xs"
-                  data-test="assistant-history-row-origin"
-                />
-              </template>
-            </span>
+            <OText
+              v-else
+              variant="meta"
+              as="span"
+              class="shrink-0 tabular-nums"
+              data-test="assistant-history-row-time"
+              >{{ time }}</OText
+            >
           </span>
         </OButton>
       </template>
       <template v-for="action in actions" :key="action.id">
-        <OContextMenuSeparator v-if="action.id === 'delete'" />
+        <OContextMenuSeparator v-if="isDestructive(action.id) && actions.length > 1" />
         <OContextMenuItem
-          v-if="action.id === 'download'"
-          :icon-left="assistantGlyph.download"
-          @select="emit('download', row.sid, 'markdown')"
-        >
-          {{ t("assistant.history.download") }} · {{ t("assistant.thread.downloadMarkdown") }}
-        </OContextMenuItem>
-        <OContextMenuItem
-          v-if="action.id === 'download'"
-          :icon-left="assistantGlyph.download"
-          @select="emit('download', row.sid, 'json')"
-        >
-          {{ t("assistant.history.download") }} · {{ t("assistant.thread.downloadJson") }}
-        </OContextMenuItem>
-        <OContextMenuItem
-          v-else
-          :variant="action.id === 'delete' ? 'destructive' : 'default'"
+          :variant="isDestructive(action.id) ? 'destructive' : 'default'"
           @select="run(action.id)"
         >
           {{ action.label }}
@@ -172,26 +145,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template v-for="action in actions" :key="action.id">
-        <ODropdownSeparator v-if="action.id === 'delete'" />
-        <ODropdownSub v-if="action.id === 'download'" :text-value="action.label">
-          <template #icon-left><OIcon :name="assistantGlyph.download" size="sm" /></template>
-          <template #trigger>{{ action.label }}</template>
-          <ODropdownItem
-            data-test="assistant-history-row-download-markdown"
-            @select="emit('download', row.sid, 'markdown')"
-          >
-            {{ t("assistant.thread.downloadMarkdown") }}
-          </ODropdownItem>
-          <ODropdownItem
-            data-test="assistant-history-row-download-json"
-            @select="emit('download', row.sid, 'json')"
-          >
-            {{ t("assistant.thread.downloadJson") }}
-          </ODropdownItem>
-        </ODropdownSub>
+        <ODropdownSeparator v-if="isDestructive(action.id) && actions.length > 1" />
         <ODropdownItem
-          v-else
-          :variant="action.id === 'delete' ? 'destructive' : 'default'"
+          :icon-left="action.icon"
+          :variant="isDestructive(action.id) ? 'destructive' : 'default'"
+          :disabled="action.reason !== undefined"
+          :focusable-unavailable="action.reason !== undefined"
+          :description="action.reason"
           :data-test="`assistant-history-row-${action.id}`"
           @select="run(action.id)"
         >
@@ -204,6 +164,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import type { HistoryPending, HistoryRow, Sid } from "@/composables/assistant";
+import type { IconName } from "@/lib/core/Icon/OIcon.types";
+import type { I18nText } from "@/types/i18n";
 
 import type { ChatStatus } from "./chatStatus";
 
@@ -211,8 +173,18 @@ export interface AssistantHistoryRowProps {
   row: HistoryRow;
   current: boolean;
   mode: "panel" | "rail";
-  /** The chat's live state; the list adds this tab's failed turns, which the row alone cannot see. */
+  /** The chat's status word; the list adds this tab's failed turns, which the row alone cannot see. */
   status?: ChatStatus | null;
+  /** When a waiting chat's request ends, for the row's countdown. */
+  expiresAt?: number | null;
+  /** The list's clock, so a countdown and every age move together. */
+  now?: number;
+  /** Another org's chat: the org is its second line, and it never opens in place (PO B51). */
+  org?: string | null;
+  /** The agent's glyph; only with two or more agents, then on every row. */
+  agentIcon?: IconName | null;
+  /** Why the chat cannot float here, when it cannot. */
+  floatBlocked?: I18nText;
   pending: HistoryPending | null;
   /** The one row button in the Tab order (roving tabindex). */
   tabbable: boolean;
@@ -226,13 +198,14 @@ export interface AssistantHistoryRowProps {
   tag?: "li" | "div";
 }
 
-type RowAction = "open" | "rename" | "pin" | "download" | "delete";
+type RowAction = "float" | "stop" | "rename" | "pin" | "share" | "delete" | "deleteDraft";
 
 const MAX_TITLE = 200;
 const COUNTER_FROM = 180;
 const KEBAB_CLASS = [
   "shrink-0 transition-opacity motion-reduce:transition-none",
   "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100",
+  "group-data-[current]/row:opacity-100",
   "max-md:opacity-100 pointer-coarse:opacity-100",
 ];
 </script>
@@ -241,9 +214,7 @@ const KEBAB_CLASS = [
 import { computed, nextTick, ref } from "vue";
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
-import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -256,14 +227,18 @@ import OContextMenuSeparator from "@/lib/overlay/ContextMenu/OContextMenuSeparat
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { formatOrgTime } from "@/utils/formatters";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { formatOrgTime, formatRelativeCompact } from "@/utils/formatters";
 
-import { CHAT_STATUS_KEYS, CHAT_STATUS_SIGNAL, chatStatusOf } from "./chatStatus";
+import { chatStatusClass, chatStatusOf, chatStatusWord } from "./chatStatus";
 
 const props = withDefaults(defineProps<AssistantHistoryRowProps>(), {
   status: undefined,
+  expiresAt: null,
+  now: undefined,
+  org: null,
+  agentIcon: null,
+  floatBlocked: undefined,
   readonly: false,
   timezone: undefined,
   tag: "li",
@@ -274,9 +249,19 @@ const emit = defineEmits<{
   navigate: [event: KeyboardEvent];
   rename: [sid: Sid, title: string];
   pin: [sid: Sid, pinned: boolean];
-  download: [sid: Sid, format: "markdown" | "json"];
+  float: [sid: Sid];
+  stop: [sid: Sid];
+  share: [sid: Sid];
   delete: [sid: Sid];
+  "delete-draft": [sid: Sid];
 }>();
+
+interface RowMenuAction {
+  id: RowAction;
+  label: I18nText;
+  icon: IconName;
+  reason?: I18nText;
+}
 
 const { t } = useI18nTyped();
 const button = ref<InstanceType<typeof OButton> | null>(null);
@@ -294,29 +279,46 @@ const status = computed(() =>
 const pendingText = computed(() =>
   props.pending ? t(`assistant.history.pending.${props.pending}`) : undefined,
 );
-const originTag = computed(() => {
-  if (props.serverMode && props.row.local) return "browser";
-  return props.row.origin === "none" ? null : props.row.origin;
-});
-const time = computed(() => formatOrgTime(props.row.updatedAt, { timeZone: props.timezone }));
+const time = computed(() => formatRelativeCompact(props.row.updatedAt, props.now));
 const absolute = computed(() =>
   formatOrgTime(props.row.updatedAt, { timeZone: props.timezone, absolute: true }),
 );
 const fullTitle = computed(() => raw(`${String(props.row.title)} · ${absolute.value}`));
 const counter = computed(() => t("assistant.thread.titleCounter", { count: draft.value.length }));
 
-// A browser-only row in server mode can still be read, downloaded and removed, nothing more.
-const actions = computed<{ id: RowAction; label: I18nText }[]>(() => {
+// A browser-only row in server mode can still be read and removed, nothing more.
+const actions = computed<RowMenuAction[]>(() => {
+  if (props.org) return [];
+  if (status.value === "draft")
+    return [
+      {
+        id: "deleteDraft",
+        label: t("assistant.history.deleteDraft"),
+        icon: assistantGlyph.remove,
+      },
+    ];
   const browserOnly = props.serverMode && props.row.local;
-  const list: { id: RowAction; label: I18nText }[] = [
-    { id: "open", label: t("assistant.history.open") },
-  ];
+  const list: RowMenuAction[] = [];
+  if (!browserOnly)
+    list.push({
+      id: "float",
+      label: t("assistant.history.openFloating"),
+      icon: assistantGlyph.floatingWindow,
+      reason: props.floatBlocked,
+    });
+  if (status.value === "answering")
+    list.push({ id: "stop", label: t("assistant.history.stop"), icon: assistantGlyph.stopped });
   if (!props.readonly && !browserOnly) {
-    list.push({ id: "rename", label: t("assistant.history.rename") });
-    list.push({ id: "pin", label: pinLabel.value });
+    list.push({ id: "rename", label: t("assistant.history.rename"), icon: assistantGlyph.edit });
+    list.push({ id: "pin", label: pinLabel.value, icon: assistantGlyph.pin });
+    list.push({ id: "share", label: t("assistant.share.share"), icon: assistantGlyph.share });
   }
-  list.push({ id: "download", label: t("assistant.history.download") });
-  if (!props.readonly) list.push({ id: "delete", label: t("assistant.history.deleteAction") });
+  if (!props.readonly)
+    list.push({
+      id: "delete",
+      label: t("assistant.history.deleteChat"),
+      icon: assistantGlyph.remove,
+    });
   return list;
 });
 
@@ -347,10 +349,17 @@ async function openMenuSoon(): Promise<void> {
 
 // The menu returns focus to its trigger as it closes; the field waits for that.
 function run(action: RowAction): void {
-  if (action === "open") emit("open", props.row.sid);
-  else if (action === "rename") setTimeout(() => void startRename(), 0);
+  if (action === "rename") setTimeout(() => void startRename(), 0);
   else if (action === "pin") emit("pin", props.row.sid, !props.row.pinned);
+  else if (action === "float") emit("float", props.row.sid);
+  else if (action === "stop") emit("stop", props.row.sid);
+  else if (action === "share") emit("share", props.row.sid);
   else if (action === "delete") emit("delete", props.row.sid);
+  else emit("delete-draft", props.row.sid);
+}
+
+function isDestructive(action: RowAction): boolean {
+  return action === "delete" || action === "deleteDraft";
 }
 
 async function startRename(): Promise<void> {

@@ -14,33 +14,70 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
-import type { HistoryRow } from "@/composables/assistant";
-import type { I18nKey } from "@/types/i18n";
+import { approvalClock, type HistoryRow } from "@/composables/assistant";
+import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 
-/** A chat's live state in words; `null` is a chat at rest. */
-export type ChatStatus = "needs_you" | "answering" | "failed";
+/** A chat's status word; `null` is a chat at rest, which shows its time. */
+export type ChatStatus = "needs_you" | "answering" | "failed" | "expired" | "draft";
 
-export const CHAT_STATUS_KEYS: Record<ChatStatus, I18nKey> = {
-  needs_you: "assistant.history.state.needsApproval",
+const STATUS_WORDS: Record<ChatStatus, I18nKey> = {
+  needs_you: "assistant.history.state.needsYou",
   answering: "assistant.history.state.answering",
   failed: "assistant.history.state.failed",
+  expired: "assistant.history.state.expired",
+  draft: "assistant.history.state.draft",
 };
 
-/** The status mark beside the words, so colour is never the only cue. */
+/** Home's launcher row keeps its own word for a waiting chat. */
+export const CHAT_STATUS_KEYS: Record<ChatStatus, I18nKey> = {
+  ...STATUS_WORDS,
+  needs_you: "assistant.history.state.needsApproval",
+};
+
+/** Home's launcher row still draws a mark beside the word. */
 export const CHAT_STATUS_SIGNAL: Record<ChatStatus, AssistantSignal> = {
   needs_you: "attention",
   answering: "working",
   failed: "failed",
+  expired: "failed",
+  draft: "unread",
 };
 
-/** `turnState` is this tab's turn for the chat, when it holds one. */
+const WORD_CLASSES: Partial<Record<ChatStatus, string>> = {
+  needs_you: "text-assistant-signal-attention",
+  failed: "text-status-error-text",
+};
+
+/** The word's colour; on a filled row every word is body text, so amber and red never sit on the fill below 4.5:1. */
+export function chatStatusClass(status: ChatStatus, filled: boolean): string {
+  return filled ? "text-text-body" : (WORD_CLASSES[status] ?? "text-text-secondary");
+}
+
+/** The word a row shows; "Needs you · m:ss" once the request's end is known. */
+export function chatStatusWord(
+  status: ChatStatus,
+  expiresAt: number | null | undefined,
+  now: number,
+  t: TranslateFn,
+): I18nText {
+  const word = t(STATUS_WORDS[status]);
+  if (status !== "needs_you" || typeof expiresAt !== "number") return word;
+  return t("assistant.turn.withElapsed", {
+    status: word,
+    elapsed: raw(approvalClock(expiresAt - now)),
+  });
+}
+
+/** `turn` is this tab's turn for the chat, or just its state, when it holds one. */
 export function chatStatusOf(
   row: Pick<HistoryRow, "pendingApproval" | "activeTurn">,
-  turnState?: string,
+  turn?: string | { state: string; error?: { code: string } },
 ): ChatStatus | null {
   if (row.pendingApproval) return "needs_you";
   if (row.activeTurn) return "answering";
-  return turnState === "failed" ? "failed" : null;
+  const held = typeof turn === "string" ? { state: turn } : turn;
+  if (held?.state !== "failed") return null;
+  return held.error?.code === "approval_expired" ? "expired" : "failed";
 }
 
 /** A failed chat is at rest, so only a chat that still answers or waits is in progress. */

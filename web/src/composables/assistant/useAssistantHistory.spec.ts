@@ -175,6 +175,18 @@ describe("useAssistantHistory in local-only mode", () => {
     expect(fake.history.visible.value.map((row) => String(row.title))).toEqual(["Chat 2"]);
   });
 
+  it("lists a chat with only a typed draft apart from the saved rows", async () => {
+    const fake = setup({}, [record(1)]);
+    await flushPromises();
+    const sid = fake.store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    expect(fake.history.drafts.value).toEqual([]);
+    fake.store.state.sessions[sid].composer.text = "Compare p95\nbefore the deploy";
+    expect(fake.history.drafts.value.map((row) => String(row.title))).toEqual(["Compare p95"]);
+    expect(fake.history.rows.value.some((row) => row.sid === sid)).toBe(false);
+  });
+
   it("searches the loaded rows by title and first prompt on the client", async () => {
     const fake = setup({}, [record(1, { title: "Payments p95" }), record(2, { title: "VRL" })]);
     await flushPromises();

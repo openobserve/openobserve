@@ -73,9 +73,9 @@ describe("AssistantDecisionNotice", () => {
     expect(region?.tagName).toBe("SECTION");
     expect(region?.getAttribute("aria-label")).toBe("O2 Assistant notice");
     expect(region?.getAttribute("aria-live")).toBeNull();
-    expect(region?.textContent).toContain("O2 Assistant needs your decision");
+    expect(region?.textContent).toContain("Needs you");
     expect(region?.textContent).toContain("Chat a");
-    expect(region?.textContent).toContain("Expires in 5:00");
+    expect(region?.querySelector('[data-test="assistant-decision-notice-clock"]')).toBeNull();
     expect(document.activeElement).toBe(document.body);
   });
 
@@ -85,18 +85,35 @@ describe("AssistantDecisionNotice", () => {
     expect(notice()).toBeNull();
   });
 
-  it("gives way to the Runs button while a visible container shows another chat", async () => {
+  it("shows while a visible container holds another chat, since that bar only counts it", async () => {
     const { store } = setup();
     store.state.shell.placement = { kind: "sidebar" };
     store.state.shell.activeSid = "other";
     await nextTick();
-    expect(notice()).toBeNull();
+    expect(notice()).not.toBeNull();
   });
 
-  it("replaces the line for a second request, and Review opens the list", async () => {
-    const { runs } = setup([decision("a"), decision("b")]);
+  it("counts on line 1, names the request ending first, and Review opens it", async () => {
+    const { runs } = setup([
+      decision("a", { expiresAt: NOW + 30_000 }),
+      decision("b", { expiresAt: NOW + 200_000 }),
+    ]);
     await nextTick();
-    expect(notice()?.textContent).toContain("2 chats need your decision");
+    expect(notice()?.textContent).toContain("2 chats need you");
+    expect(notice()?.textContent).toContain("Chat a");
+    press("review");
+    expect(runs.runs.open).toHaveBeenCalledWith(expect.objectContaining({ sid: "a" }), {
+      focus: "card",
+    });
+    expect(runs.runs.requestOpen).not.toHaveBeenCalled();
+  });
+
+  it("names another org on line 3 and lists that chat instead of opening it", async () => {
+    const { runs } = setup([decision("a", { otherOrg: true, org: "payments" })]);
+    await nextTick();
+    expect(document.querySelector('[data-test="assistant-decision-notice-org"]')?.textContent).toBe(
+      "in payments",
+    );
     press("review");
     expect(runs.runs.requestOpen).toHaveBeenCalled();
     expect(runs.runs.open).not.toHaveBeenCalled();
@@ -128,13 +145,13 @@ describe("AssistantDecisionNotice", () => {
     await nextTick();
     await vi.advanceTimersByTimeAsync(30_000);
     await nextTick();
-    expect(notice()?.textContent).toContain("Expires soon · 1:00");
+    expect(notice()?.textContent).toContain("1:00");
     press("hide");
     await nextTick();
     expect(notice()).toBeNull();
     await vi.advanceTimersByTimeAsync(40_000);
     await nextTick();
-    expect(notice()?.textContent).toContain("Expires soon · 0:20");
+    expect(notice()?.textContent).toContain("0:20");
     await vi.advanceTimersByTimeAsync(10_000);
     const spoken = (wrapper.emitted("announce") ?? []).map(([text]) => String(text));
     expect(spoken.filter((text) => text.startsWith("Approval expires in"))).toEqual([
@@ -150,15 +167,15 @@ describe("AssistantDecisionNotice", () => {
     expect(spoken.join()).toContain("No more time can be added. Review it from");
   });
 
-  it("warns even while a visible container shows another chat", async () => {
-    const { store } = setup([decision("a", { expiresAt: NOW + 70_000 })]);
-    store.state.shell.placement = { kind: "sidebar" };
-    store.state.shell.activeSid = "other";
+  it("joins the time to the request line in amber from the first warning", async () => {
+    setup([decision("a", { expiresAt: NOW + 70_000 })]);
     await nextTick();
-    expect(notice()).toBeNull();
+    expect(document.querySelector('[data-test="assistant-decision-notice-clock"]')).toBeNull();
     await vi.advanceTimersByTimeAsync(10_000);
     await nextTick();
-    expect(notice()?.textContent).toContain("Expires soon");
+    const clock = document.querySelector('[data-test="assistant-decision-notice-clock"]');
+    expect(clock?.textContent).toBe("1:00");
+    expect(clock?.className).toContain("text-assistant-signal-attention");
   });
 
   it("keeps background sentences 3 s apart and drops none", async () => {

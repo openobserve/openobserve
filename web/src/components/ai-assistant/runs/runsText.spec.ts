@@ -15,62 +15,34 @@
 
 import { describe, expect, it } from "vitest";
 
+import type { PendingApproval } from "@/composables/assistant";
 import { gt, raw } from "@/types/i18n";
 
-import { rowSignal, runAgent, runSignal, runStatus, runsSummary, runTitle } from "./runsText";
+import { runRequest, runTitle } from "./runsText";
 import { runRow } from "./runsTestKit";
 
-const counts = (over = {}) => ({ needs: 0, answering: 0, failed: 0, ready: 0, ...over });
+const card = (over = {}) =>
+  ({
+    kind: "delete",
+    tool: "delete_alert",
+    targets: [{ type: "alert", name: "nginx_5xx", id: "1" }],
+    ...over,
+  }) as unknown as PendingApproval;
 
 describe("runsText", () => {
-  it("picks one signal by priority: needs you, failed, ready, working", () => {
-    expect(runSignal(counts({ needs: 1, failed: 2, ready: 3, answering: 4 }))).toBe("attention");
-    expect(runSignal(counts({ failed: 2, ready: 3 }))).toBe("failed");
-    expect(runSignal(counts({ ready: 3, answering: 4 }))).toBe("unread");
-    expect(runSignal(counts({ answering: 4 }))).toBe("working");
-  });
-
-  it("gives a row the signal of its group", () => {
-    expect(rowSignal(runRow("a", { group: "needs_you" }))).toBe("attention");
-    expect(rowSignal(runRow("a", { group: "failed" }))).toBe("failed");
-    expect(rowSignal(runRow("a", { group: "ready" }))).toBe("unread");
-    expect(rowSignal(runRow("a"))).toBe("working");
-  });
-
-  it("words the summary in the order asked, dropping zero parts (PO B53)", () => {
-    const all = counts({ needs: 2, answering: 1 });
-    expect(runsSummary(all, ["answering", "needs"], gt)).toBe("1 answering · 2 need you");
-    expect(runsSummary(all, ["needs", "answering"], gt)).toBe("2 need you · 1 answering");
-    expect(runsSummary(counts({ needs: 1 }), ["answering", "needs"], gt)).toBe("1 needs you");
-    expect(runsSummary(counts(), ["answering", "needs"], gt)).toBe("");
-  });
-
-  it("never leaves a row without a title", () => {
-    expect(runTitle(runRow("a"), gt)).toBe("Chat a");
+  it("titles a row, and says where a titleless chat lives", () => {
+    expect(runTitle(runRow("a", { title: raw("Top errors") }), gt)).toBe("Top errors");
     expect(runTitle(runRow("a", { title: null }), gt)).toBe("New chat");
-    expect(runTitle(runRow("a", { title: null, otherOrg: true, org: "acme" }), gt)).toBe(
-      "A chat in acme",
+    expect(runTitle(runRow("a", { title: null, otherOrg: true, org: "payments" }), gt)).toBe(
+      "A chat in payments",
     );
   });
 
-  it("names the agent by its job, with the product for the default one", () => {
-    expect(runAgent(runRow("a", { agent: "sre-rca" }), "O2", gt)).toBe("Investigator");
-    expect(runAgent(runRow("a"), "O2", gt)).toBe("O2");
-  });
-
-  it("words each status with what belongs to it", () => {
-    expect(runStatus(runRow("a", { startedAt: 1_000 }), 13_000, gt)).toContain("Answering · ");
-    expect(runStatus(runRow("a", { startedAt: null }), 13_000, gt)).toBe("Answering");
-    expect(runStatus(runRow("a", { status: "needsApproval", expiresAt: 76_000 }), 1_000, gt)).toBe(
-      raw("Needs your approval · 1:15"),
+  it("states the request in the card's own words", () => {
+    expect(runRequest(runRow("a", { card: card() }), gt)).toBe("Delete alert nginx_5xx");
+    expect(runRequest(runRow("a", { card: card({ kind: "update" }) }), gt)).toBe(
+      "Update alert nginx_5xx",
     );
-    expect(runStatus(runRow("a", { status: "needsApproval" }), 1_000, gt)).toBe(
-      "Needs your approval",
-    );
-    expect(runStatus(runRow("a", { status: "elsewhere" }), 1_000, gt)).toBe(
-      "Answering in another tab",
-    );
-    expect(runStatus(runRow("a", { status: "reconnecting" }), 1_000, gt)).toBe("Reconnecting");
-    expect(runStatus(runRow("a", { status: "stopped" }), 1_000, gt)).toContain("Stopped · ");
+    expect(runRequest(runRow("a"), gt)).toBeNull();
   });
 });

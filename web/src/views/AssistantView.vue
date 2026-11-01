@@ -31,7 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         mode="rail"
         :current-sid="store.state.shell.activeSid"
         container="full_view"
-        @new="shell?.askNew()"
+        @close="shell?.focusEntry()"
+        @shared-links="shell?.openSharedLinks()"
       />
     </template>
     <div class="flex h-full min-h-0 flex-col" data-test="assistant-view" :data-view="view">
@@ -54,9 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :focus-on-mount="arrivedFromLockedPanel"
         @action="onGateAction"
       />
-      <div v-else class="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col">
-        <AssistantShell ref="shell" placement="full" density="roomy" />
-      </div>
+      <AssistantShell v-else ref="shell" placement="full" density="roomy" />
     </div>
     <ODialog
       :open="learnOpen"
@@ -94,7 +93,7 @@ export function viewFor(gate: GateCode, isAdmin: boolean): AssistantViewState {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The rail's default and limits; the layout's splitter works in pixels of the root font size. */
-export const RAIL_REM = 18;
+export const RAIL_REM = 17.5;
 export const RAIL_MIN_REM = 14;
 export const RAIL_MAX_REM = 24;
 

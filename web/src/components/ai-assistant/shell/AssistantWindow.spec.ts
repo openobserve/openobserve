@@ -190,15 +190,15 @@ describe("AssistantWindow", () => {
     expect(store.state.shell.lastFocusedContainer).toEqual({ window: sid });
   });
 
-  it("folds Layout into More below 24 rem and keeps Minimise and Close direct (PO A15)", async () => {
+  it("folds Layout into the title menu below 24 rem and keeps Minimise and Close direct (PO A15)", async () => {
     const wide = setup();
-    expect(wide.wrapper.find('[data-test="assistant-window-layout"]').exists()).toBe(true);
+    expect(wide.wrapper.find('[data-test="assistant-layout-button"]').exists()).toBe(true);
     wide.wrapper.unmount();
     const { wrapper, store, sid } = setup();
     store.setWindowGeometry(sid, { ...store.windowOf(sid).geometry, wRem: 20 });
     await wrapper.setProps({ win: { ...store.windowOf(sid) } });
     await flushPromises();
-    expect(wrapper.find('[data-test="assistant-window-layout"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-layout-button"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-window-minimise"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-window-close"]').exists()).toBe(true);
   });
@@ -210,7 +210,7 @@ describe("AssistantWindow", () => {
     await flushPromises();
     const grip = wrapper.get('[data-test="assistant-window-grip"]');
     expect(grip.attributes("data-o2-btn")).toBeDefined();
-    expect(wrapper.get('[data-test="assistant-window-move-mode"]').text()).toContain("Moving.");
+    expect(wrapper.get('[data-test="assistant-window-move-mode"]').text()).toContain("Arrows move");
     await grip.trigger("keydown", { key: "ArrowLeft" });
     await grip.trigger("keydown", { key: "ArrowUp", shiftKey: true });
     await nextTick();

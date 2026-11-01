@@ -63,17 +63,16 @@ afterEach(() => {
 
 describe("AssistantHistoryRow", () => {
   it("is a list item with one row button named by title and time, and a separate kebab", () => {
-    const wrapper = setup({ origin: "editor" });
+    const wrapper = setup();
     expect(wrapper.element.tagName).toBe("LI");
     const button = wrapper.get('[data-test="assistant-history-row"]');
     expect(button.attributes("aria-label")).toBeUndefined();
-    expect(button.text()).toMatch(/^Checkout 5xx spike, .+, Editor$/);
+    expect(button.text()).toMatch(/^Checkout 5xx spike, .+$/);
     expect(button.attributes("tabindex")).toBe("0");
     expect(button.find('[data-test="assistant-history-row-menu"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-history-row-menu"]').attributes("aria-label")).toBe(
       "Actions for Checkout 5xx spike",
     );
-    expect(wrapper.get('[data-test="assistant-history-row-origin"]').text()).toBe("Editor");
   });
 
   it("marks the current chat and keeps the other rows out of the Tab order", () => {
@@ -81,7 +80,7 @@ describe("AssistantHistoryRow", () => {
     expect(current.get('[data-test="assistant-history-row"]').attributes("aria-current")).toBe(
       "true",
     );
-    expect(current.classes()).toContain("border-s-border-strong");
+    expect(current.classes()).toContain("bg-surface-subtle");
     document.body.innerHTML = "";
     const other = setup({}, { tabbable: false });
     expect(
@@ -90,23 +89,42 @@ describe("AssistantHistoryRow", () => {
     expect(other.get('[data-test="assistant-history-row"]').attributes("tabindex")).toBe("-1");
   });
 
-  it("keeps title and time on the first line and states the chat in words on the second", () => {
+  it("shows the status word instead of the time, with no dot", () => {
     const answering = setup({ activeTurn: true });
-    expect(answering.get('[data-test="assistant-history-row-time"]').exists()).toBe(true);
-    const meta = answering.get('[data-test="assistant-history-row-meta"]');
-    expect(meta.get('[data-test="assistant-history-row-state"]').text()).toBe("Answering");
-    expect(answering.get('[data-test="assistant-history-row"]').text()).toMatch(/, Answering$/);
+    expect(answering.get('[data-test="assistant-history-row-state"]').text()).toBe("Answering");
+    expect(answering.find('[data-test="assistant-history-row-time"]').exists()).toBe(false);
+    expect(answering.find('[data-test="assistant-status-dot"]').exists()).toBe(false);
     document.body.innerHTML = "";
-    const needs = setup({ activeTurn: true, pendingApproval: true });
-    expect(needs.get('[data-test="assistant-history-row-state"]').text()).toBe(
-      "Needs your approval",
+    const needs = setup(
+      { activeTurn: true, pendingApproval: true },
+      { expiresAt: 222_000, now: 0 },
+    );
+    expect(needs.get('[data-test="assistant-history-row-state"]').text()).toBe("Needs you · 3:42");
+    expect(needs.get('[data-test="assistant-history-row-state"]').classes()).toContain(
+      "text-assistant-signal-attention",
     );
     document.body.innerHTML = "";
     const failed = setup({}, { status: "failed" });
-    expect(failed.get('[data-test="assistant-history-row-state"]').text()).toBe("Answer failed");
+    expect(failed.get('[data-test="assistant-history-row-state"]').text()).toBe("Failed");
     document.body.innerHTML = "";
     const idle = setup();
-    expect(idle.find('[data-test="assistant-history-row-meta"]').exists()).toBe(false);
+    expect(idle.find('[data-test="assistant-history-row-state"]').exists()).toBe(false);
+    expect(idle.find('[data-test="assistant-history-row-time"]').exists()).toBe(true);
+  });
+
+  it("puts another org on the second line, with no menu and no opening in place", async () => {
+    const wrapper = await armed({}, { org: "Payments EU" });
+    expect(wrapper.get('[data-test="assistant-history-row-org"]').text()).toBe("Payments EU");
+    expect(wrapper.find('[data-test="assistant-history-row-menu"]').exists()).toBe(false);
+    await wrapper.get('[data-test="assistant-history-row"]').trigger("click");
+    expect(wrapper.emitted("open")).toBeUndefined();
+  });
+
+  it("offers a draft only Delete draft", async () => {
+    const wrapper = await armed({}, { status: "draft" });
+    await wrapper.get('[data-test="assistant-history-row-deleteDraft"]').trigger("click");
+    expect(wrapper.emitted("delete-draft")).toHaveLength(1);
+    expect(menuIds(wrapper)).toEqual(["assistant-history-row-deleteDraft"]);
   });
 
   it("keeps the text tokens while a change is pending and disables the kebab with the reason", () => {
@@ -122,26 +140,18 @@ describe("AssistantHistoryRow", () => {
     expect(menuIds(setup())).toEqual([]);
     document.body.innerHTML = "";
     expect(menuIds(await armed())).toEqual([
-      "assistant-history-row-open",
+      "assistant-history-row-float",
       "assistant-history-row-rename",
       "assistant-history-row-pin",
-      "assistant-history-row-download-markdown",
-      "assistant-history-row-download-json",
+      "assistant-history-row-share",
       "assistant-history-row-delete",
     ]);
     document.body.innerHTML = "";
-    expect(menuIds(await armed({ local: true }))).toEqual([
-      "assistant-history-row-open",
-      "assistant-history-row-download-markdown",
-      "assistant-history-row-download-json",
-      "assistant-history-row-delete",
-    ]);
+    expect(menuIds(await armed({ activeTurn: true }))).toContain("assistant-history-row-stop");
     document.body.innerHTML = "";
-    expect(menuIds(await armed({}, { readonly: true }))).toEqual([
-      "assistant-history-row-open",
-      "assistant-history-row-download-markdown",
-      "assistant-history-row-download-json",
-    ]);
+    expect(menuIds(await armed({ local: true }))).toEqual(["assistant-history-row-delete"]);
+    document.body.innerHTML = "";
+    expect(menuIds(await armed({}, { readonly: true }))).toEqual(["assistant-history-row-float"]);
   });
 
   it("names the browser pin when the server does not keep pins", async () => {

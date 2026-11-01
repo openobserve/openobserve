@@ -15,7 +15,15 @@
 
 import { describe, expect, it } from "vitest";
 
-import { chatStatusOf, inProgressFirst, isInProgress } from "./chatStatus";
+import { gt } from "@/types/i18n";
+
+import {
+  chatStatusClass,
+  chatStatusOf,
+  chatStatusWord,
+  inProgressFirst,
+  isInProgress,
+} from "./chatStatus";
 
 describe("chatStatus", () => {
   it("puts a waiting approval before a running answer, and a failed turn only from this tab", () => {
@@ -23,6 +31,30 @@ describe("chatStatus", () => {
     expect(chatStatusOf({ pendingApproval: false, activeTurn: true })).toBe("answering");
     expect(chatStatusOf({ pendingApproval: false, activeTurn: false }, "failed")).toBe("failed");
     expect(chatStatusOf({ pendingApproval: false, activeTurn: false }, "done")).toBeNull();
+  });
+
+  it("reads an expired request as Expired, not as a failure", () => {
+    const row = { pendingApproval: false, activeTurn: false };
+    const turn = { state: "failed", error: { code: "approval_expired" } };
+    expect(chatStatusOf(row, turn)).toBe("expired");
+    expect(chatStatusOf(row, { state: "failed", error: { code: "provider_error" } })).toBe(
+      "failed",
+    );
+  });
+
+  it("words a waiting chat with its countdown once the end is known", () => {
+    expect(chatStatusWord("needs_you", 202_000, 0, gt)).toBe("Needs you · 3:22");
+    expect(chatStatusWord("needs_you", null, 0, gt)).toBe("Needs you");
+    expect(chatStatusWord("failed", null, 0, gt)).toBe("Failed");
+    expect(chatStatusWord("draft", null, 0, gt)).toBe("Draft");
+  });
+
+  it("keeps amber and red off a filled row", () => {
+    expect(chatStatusClass("needs_you", false)).toBe("text-assistant-signal-attention");
+    expect(chatStatusClass("failed", false)).toBe("text-status-error-text");
+    expect(chatStatusClass("answering", false)).toBe("text-text-secondary");
+    expect(chatStatusClass("needs_you", true)).toBe("text-text-body");
+    expect(chatStatusClass("failed", true)).toBe("text-text-body");
   });
 
   it("counts only chats that still answer or wait as in progress", () => {

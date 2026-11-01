@@ -41,6 +41,7 @@ import {
 } from "./historyContext";
 import type { LocalRecord } from "./historyDb";
 import { readHistoryFilter, writeHistoryFilter } from "./prefs";
+import { runAgentKey } from "./runs";
 import { isTerminal } from "./turnStates";
 
 export const LIST_REREAD_MS = 15_000;
@@ -159,19 +160,32 @@ export function createHistoryList(ctx: HistoryCtx) {
   });
 
   const visible = computed(() => {
-    const { kind, q } = filterState.value;
+    const { kind, q, agent, started } = filterState.value;
     const needle = q.trim().toLowerCase();
     return rows.value.filter((row) => {
       if (kind === "pinned" && !row.pinned) return false;
-      if ((kind === "editor" || kind === "alert" || kind === "incident") && row.origin !== kind)
-        return false;
       if (kind === "shared" && !row.share && !sharedSids.value.has(row.sid)) return false;
+      if (agent && runAgentKey(row.agentType) !== agent) return false;
+      if (started && !startedFrom(row.origin, started)) return false;
       if (!needle || (ctx.serverMode() && searchOnServer())) return true;
       return (
         String(row.title).toLowerCase().includes(needle) || contentMatches(row.sid, needle, ctx)
       );
     });
   });
+
+  // A chat with only a typed draft has no record yet, so it lives in the store alone.
+  const drafts = computed<HistoryRow[]>(() =>
+    (Object.values(ctx.deps.store().state.sessions) as AssistantSession[])
+      .filter(
+        (session) =>
+          session.userOrgKey === ctx.key() &&
+          !session.record.ephemeral &&
+          !session.messages.length &&
+          !!session.composer.text.trim(),
+      )
+      .map((session) => draftRow(session, ctx)),
+  );
 
   const hasMore = computed(() => ctx.serverMode() && !!pages.value.at(-1)?.next_cursor);
 
@@ -210,6 +224,7 @@ export function createHistoryList(ctx: HistoryCtx) {
 
   const api = {
     rows,
+    drafts,
     visible,
     hasMore,
     listState,
@@ -309,6 +324,11 @@ export function groupOf(
   return "older";
 }
 
+/** "Alert or incident" and "Query or function editor" are the started-from choices a row can answer. */
+export function startedFrom(origin: EntryOrigin, started: "alert" | "editor"): boolean {
+  return started === "alert" ? origin === "alert" || origin === "incident" : origin === "editor";
+}
+
 export function wireOrigin(summary?: ChatSummaryWire): EntryOrigin {
   const value = summary?.origin;
   return value === "editor" || value === "alert" || value === "incident" ? value : "none";
@@ -398,6 +418,13 @@ function withLiveSessions(rows: HistoryRow[], ctx: HistoryCtx): HistoryRow[] {
     merged.push(liveRow(session, ctx));
   }
   return merged;
+}
+
+function draftRow(session: AssistantSession, ctx: HistoryCtx): HistoryRow {
+  return {
+    ...liveRow(session, ctx),
+    title: raw(session.composer.text.trim().split("\n")[0].slice(0, MAX_TITLE)),
+  };
 }
 
 function liveRow(session: AssistantSession, ctx: HistoryCtx): HistoryRow {

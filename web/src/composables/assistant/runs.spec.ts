@@ -394,6 +394,18 @@ describe("createRuns", () => {
     expect(runs.decisions.value).toEqual([]);
   });
 
+  it("leads the decisions with the request ending first", async () => {
+    const { store, runs, sid } = setup();
+    const other = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+      detached: true,
+    });
+    store.state.sessions[sid].pendingApproval = { id: "c1", expiresAt: NOW + 90_000 } as never;
+    store.state.sessions[other].pendingApproval = { id: "c2", expiresAt: NOW + 30_000 } as never;
+    await nextTick();
+    expect(runs.decisions.value.map((row) => row.sid)).toEqual([other, sid]);
+  });
+
   it("stops following the active read when the org changes, and never in browser mode", async () => {
     const org = ref("default");
     const stop = vi.fn();
@@ -410,12 +422,12 @@ describe("createRuns", () => {
     expect(browserOnly).not.toHaveBeenCalled();
   });
 
-  it("clears across tabs: the row leaves, and the hint carries only the id", async () => {
+  it("clears an opened row across tabs: the row leaves, and the hint carries only the id", async () => {
     const { hints, runs, feed, store } = setup();
     feed([chat("s", { seen: false, last_turn_status: "completed" })]);
     await nextTick();
     expect(runs.rows.value).toHaveLength(1);
-    runs.clear("s");
+    await runs.open(runs.rows.value[0]);
     await nextTick();
     expect(runs.rows.value).toEqual([]);
     expect(hints.post).toHaveBeenCalledWith({ v: 1, type: "runs_cleared", sid: "s", at: NOW });

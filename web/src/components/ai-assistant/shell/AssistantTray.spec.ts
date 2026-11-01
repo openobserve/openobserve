@@ -15,11 +15,12 @@
 
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { nextTick } from "vue";
 
 import type { AssistantSession } from "@/composables/assistant";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
-import AssistantTray, { traySignal } from "./AssistantTray.vue";
+import AssistantTray, { trayState } from "./AssistantTray.vue";
 
 const { fake } = vi.hoisted(() => ({ fake: { current: null as any } }));
 
@@ -91,6 +92,15 @@ describe("AssistantTray", () => {
     expect(wrapper.emitted("close")).toEqual([[order[0]]]);
   });
 
+  it("writes Failed after the title instead of a mark", async () => {
+    const { wrapper, order } = setup(1);
+    fake.current.store.state.sessions[order[0]].turn = { state: "failed" } as never;
+    await nextTick();
+    expect(wrapper.get('[data-test="assistant-tray-failed"]').text()).toBe("Failed");
+    expect(wrapper.find('[data-test="assistant-status-dot"]').exists()).toBe(false);
+    expect(restores(wrapper)[0].attributes("aria-label")).toContain("Failed");
+  });
+
   it("shows two bars at 1024–1279 and keeps the rest behind +{count}", () => {
     const { wrapper } = setup(4, 2);
     expect(restores(wrapper)).toHaveLength(2);
@@ -98,18 +108,16 @@ describe("AssistantTray", () => {
   });
 });
 
-describe("traySignal", () => {
+describe("trayState", () => {
   const session = (over: Partial<AssistantSession>) =>
     ({ unread: false, turn: { state: "idle" }, ...over }) as AssistantSession;
 
-  it("ranks a decision first, then the unread outcome, then a running turn", () => {
-    expect(traySignal(undefined)).toBeNull();
-    expect(traySignal(session({}))).toBeNull();
-    expect(traySignal(session({ pendingApproval: {} as never, unread: true }))).toBe("attention");
-    expect(traySignal(session({ unread: true, turn: { state: "failed" } as never }))).toBe(
-      "failed",
-    );
-    expect(traySignal(session({ unread: true, turn: { state: "done" } as never }))).toBe("unread");
-    expect(traySignal(session({ turn: { state: "streaming" } as never }))).toBe("working");
+  it("ranks a decision first; only a waiting or answering chat keeps a mark", () => {
+    expect(trayState(undefined)).toBe("idle");
+    expect(trayState(session({}))).toBe("idle");
+    expect(trayState(session({ pendingApproval: {} as never, unread: true }))).toBe("needsYou");
+    expect(trayState(session({ turn: { state: "failed" } as never }))).toBe("failed");
+    expect(trayState(session({ unread: true, turn: { state: "done" } as never }))).toBe("idle");
+    expect(trayState(session({ turn: { state: "streaming" } as never }))).toBe("working");
   });
 });

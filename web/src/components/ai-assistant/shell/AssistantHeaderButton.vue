@@ -539,20 +539,29 @@ function toastHidden(): void {
   for (const session of mine.value) {
     const turnId = session.turnMeta.turnId;
     if (!turnId || isShown(session.sid)) continue;
-    // A waiting chat speaks through the decision notice, so only a ready answer toasts.
-    const kind = session.unread && session.turn.state === "done" ? "ready" : null;
+    // A waiting chat speaks through the decision notice, so only a finished answer toasts.
+    const kind = toastKind(session);
     if (!kind || toasted.has(`${turnId}:${kind}`)) continue;
     toasted.add(`${turnId}:${kind}`);
     showToast(session.sid, kind);
   }
 }
 
-function showToast(sid: string, kind: "ready"): void {
+function toastKind(session: AssistantSession): "ready" | "failed" | null {
+  if (!session.unread) return null;
+  if (session.turn.state === "done") return "ready";
+  return session.turn.state === "failed" || session.turn.state === "refused" ? "failed" : null;
+}
+
+function showToast(sid: string, kind: "ready" | "failed"): void {
   let opened = false;
   const title = { title: titleOf(sid) };
   toast({
     variant: "default",
-    message: t("assistant.header.toastReady", title),
+    message:
+      kind === "failed"
+        ? t("assistant.header.toastFailed", title)
+        : t("assistant.header.toastReady", title),
     timeout: HEADER_TOAST_MS,
     mask: true,
     live: "off",

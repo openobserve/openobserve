@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButton
     :variant="variant"
-    :size="size === 'toolbar' ? 'icon-toolbar' : 'icon-sm'"
+    :size="ICON_SIZES[size]"
     :disabled="disabled"
     :loading="loading"
     :focusable-unavailable="unavailable"
@@ -60,6 +60,8 @@ import type {
   AssistantIconButtonProps,
   AssistantIconButtonSlots,
 } from "./AssistantIconButton.types";
+
+const ICON_SIZES = { sm: "icon-sm", toolbar: "icon-toolbar", xs: "icon-xs-sq" } as const;
 
 const props = withDefaults(defineProps<AssistantIconButtonProps>(), {
   shortcutId: undefined,

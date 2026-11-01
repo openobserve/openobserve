@@ -21,31 +21,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-label="t('assistant.notice.region', { product })"
       data-assistant-surface
       data-dd-privacy="mask"
-      class="bg-surface-base border-border-default rounded-surface fixed end-4 bottom-[calc(var(--o-assistant-inset-bottom,0rem)+1rem)] z-5000 flex w-[min(22.5rem,calc(100vw-2rem))] flex-wrap items-center justify-between gap-x-3 gap-y-2 border p-3 shadow-lg"
+      class="bg-surface-overlay rounded-surface fixed end-4 bottom-[calc(var(--o-assistant-inset-bottom,0rem)+1rem)] z-5000 flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-2 border border-transparent p-3 shadow-lg"
       data-test="assistant-decision-notice"
     >
       <div class="flex min-w-0 flex-col gap-0.5">
-        <OText variant="body" as="p" class="break-words" data-test="assistant-decision-notice-line">
-          {{ line }}
-        </OText>
-        <OText v-if="subject" variant="meta" as="p" class="break-words">
+        <p
+          class="text-text-heading flex min-w-0 items-center gap-2 text-sm font-medium"
+          data-test="assistant-decision-notice-line"
+        >
+          <AssistantStatusDot state="attention" />
+          <span class="min-w-0 break-words">{{ line }}</span>
+        </p>
+        <OText
+          v-if="subject"
+          variant="body"
+          as="p"
+          class="break-words"
+          data-test="assistant-decision-notice-chat"
+        >
           {{ runTitle(subject, t) }}
         </OText>
         <OText
-          v-if="clock"
+          v-if="subject && (ask || clock || orgLabel)"
           variant="meta"
           as="p"
           aria-live="off"
-          class="tabular-nums"
-          data-test="assistant-decision-notice-clock"
+          class="break-words"
+          data-test="assistant-decision-notice-request"
         >
-          {{ clock }}
+          <template v-if="ask">{{ ask }}</template>
+          <template v-if="clock">
+            <template v-if="ask"> · </template>
+            <span
+              class="text-assistant-signal-attention tabular-nums"
+              data-test="assistant-decision-notice-clock"
+              >{{ clock }}</span
+            >
+          </template>
+          <template v-if="orgLabel">
+            <template v-if="ask || clock"> · </template>
+            <span data-test="assistant-decision-notice-org">{{ orgLabel }}</span>
+          </template>
         </OText>
       </div>
-      <div class="flex shrink-0 items-center gap-2">
+      <div class="flex items-center justify-end gap-2">
         <OButton
           variant="ghost"
-          size="sm"
+          size="xs"
           class="max-md:min-h-11 pointer-coarse:min-h-11"
           data-test="assistant-decision-notice-hide"
           @click="hide"
@@ -53,8 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("assistant.notice.hide") }}
         </OButton>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="primary"
+          size="xs"
           class="max-md:min-h-11 pointer-coarse:min-h-11"
           data-test="assistant-decision-notice-review"
           @click="review"
@@ -69,21 +91,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useStore } from "vuex";
 
+import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import {
   approvalClock,
   approvalDuration,
-  shownSids,
   useAssistantName,
   useAssistantRuns,
   useAssistantStore,
   type RunRow,
 } from "@/composables/assistant";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
-import { runTitle } from "./runsText";
+import { runRequest, runTitle } from "./runsText";
 
 const TICK_MS = 1_000;
 
@@ -99,7 +123,7 @@ const SHARED_ROUTES: ReadonlySet<unknown> = new Set(["sharedChat", "publicShared
 const emit = defineEmits<{
   /** One sentence for the header region, the notice's only voice. */
   announce: [text: I18nText];
-  /** Hide notice was pressed; focus goes to the header button. */
+  /** Hide was pressed; focus goes to the header button. */
   hidden: [];
 }>();
 
@@ -108,6 +132,8 @@ const { product } = useAssistantName();
 const store = useAssistantStore();
 const runs = useAssistantRuns();
 const route = useRoute();
+const vuex = useStore();
+const { lgUp } = useBreakpoint();
 const now = ref(Date.now());
 const modalOpen = ref(false);
 const hiddenRequests = ref(new Set<string>());
@@ -120,29 +146,45 @@ let timer: ReturnType<typeof setInterval> | null = null;
 const requestOf = (row: RunRow) => row.request ?? row.sid;
 const decisions = computed(() => runs.decisions.value);
 const warned = computed(() => decisions.value.filter((row) => warning.value.has(requestOf(row))));
-// A visible container showing another chat changes only the Runs button, until a card is about to expire.
 const plain = computed(() =>
-  shownSids(store.state).length
-    ? []
-    : decisions.value.filter((row) => !hiddenRequests.value.has(requestOf(row))),
+  decisions.value.filter((row) => !hiddenRequests.value.has(requestOf(row))),
 );
-const blocked = computed(() => modalOpen.value || SHARED_ROUTES.has(route?.name));
-const subject = computed<RunRow | null>(() => {
-  if (blocked.value) return null;
-  return warned.value[0] ?? (plain.value.length === 1 ? plain.value[0] : null);
+// A full phone sheet covers the notice; its own warning row stands in.
+const coveredBySheet = computed(() => {
+  const { placement, sheetSnap } = store.state.shell;
+  return !lgUp.value && placement.kind !== "hidden" && sheetSnap === "full";
 });
+const blocked = computed(
+  () => modalOpen.value || coveredBySheet.value || SHARED_ROUTES.has(route?.name),
+);
+// Line 1 counts; lines 2 and 3 name the request that ends first, and a warning brings its own back.
+const listedRows = computed(() => {
+  const warnedRows = warned.value.filter((row) => !plain.value.includes(row));
+  return [...warnedRows, ...plain.value];
+});
+const subject = computed<RunRow | null>(() =>
+  blocked.value ? null : (listedRows.value[0] ?? null),
+);
 const line = computed<I18nText | null>(() => {
-  if (subject.value) return t("assistant.notice.decision", { product });
-  if (blocked.value || !plain.value.length) return null;
-  return t("assistant.notice.decisionMany", { n: plain.value.length });
+  if (!subject.value) return null;
+  const count = listedRows.value.length;
+  return count > 1
+    ? t("assistant.notice.decisionMany", { n: count })
+    : t("assistant.notice.decision");
 });
-const clock = computed<I18nText | null>(() => {
+const ask = computed(() => (subject.value ? runRequest(subject.value, t) : null));
+// The time joins the request at the warnings, in amber; the bare clock stays on the card.
+const clock = computed<string | null>(() => {
   const until = subject.value?.expiresAt;
-  if (typeof until !== "number") return null;
-  const time = raw(approvalClock(until - now.value));
-  return until - now.value <= WARN_FIRST_MS
-    ? t("assistant.approval.expiringSoon", { time })
-    : t("assistant.approval.expiresIn", { time });
+  if (typeof until !== "number" || until - now.value > WARN_FIRST_MS) return null;
+  return approvalClock(until - now.value);
+});
+const orgLabel = computed<I18nText | null>(() => {
+  const row = subject.value;
+  if (!row?.otherOrg) return null;
+  const orgs: { identifier: string; name?: string }[] = vuex.state.organizations ?? [];
+  const name = orgs.find((org) => org.identifier === row.org)?.name ?? row.org;
+  return t("assistant.notice.inOrg", { org: raw(name) });
 });
 
 function drain(): void {
@@ -188,8 +230,7 @@ function tick(): void {
 }
 
 function hide(): void {
-  const rows = warned.value.length ? warned.value : plain.value;
-  rows.forEach((row) => {
+  listedRows.value.forEach((row) => {
     hiddenRequests.value.add(requestOf(row));
     warning.value.delete(requestOf(row));
   });
@@ -198,7 +239,8 @@ function hide(): void {
 
 function review(): void {
   const row = subject.value;
-  if (row) void runs.open(row, { focus: "card" });
+  // Another org's chat never opens in place, so Review lists it (PO B51).
+  if (row && !row.otherOrg) void runs.open(row, { focus: "card" });
   else void runs.requestOpen();
 }
 

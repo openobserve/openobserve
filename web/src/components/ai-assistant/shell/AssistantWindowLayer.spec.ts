@@ -22,7 +22,8 @@ import { runEscapeLadder } from "@/composables/assistant";
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantWindowLayer from "./AssistantWindowLayer.vue";
 
-const { fake, lg, track } = vi.hoisted(() => ({
+const { fake, lg, track, toast } = vi.hoisted(() => ({
+  toast: vi.fn(),
   fake: { current: null as any },
   lg: { value: true },
   track: vi.fn(),
@@ -56,6 +57,7 @@ vi.mock("@/composables/assistant", async (importOriginal) => {
     }),
   };
 });
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
 vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/assistantAnalytics")>()),
   trackAssistant: track,
@@ -233,5 +235,37 @@ describe("AssistantWindowLayer", () => {
     minimise.click();
     await flushPromises();
     expect(document.activeElement).toBe(page);
+  });
+
+  it("hides a window closed mid-answer, and its toast offers Stop", async () => {
+    const { store } = fake.current;
+    const sid = newChat();
+    store.state.sessions[sid].title = "Cart errors" as never;
+    store.state.sessions[sid].turn = { state: "responding.writing" } as never;
+    store.floatChat(sid, { focus: "none" });
+    await setup();
+    toast.mockClear();
+    document.body.querySelector<HTMLElement>('[data-test="assistant-window-close"]')?.click();
+    await flushPromises();
+    expect(windows()).toHaveLength(0);
+    expect(store.state.sessions[sid].turn.state).toBe("responding.writing");
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Cart errors is still answering",
+        action: expect.objectContaining({ label: "Stop" }),
+      }),
+    );
+  });
+
+  it("raises no toast for a finished chat, nor for one that waits on a decision", async () => {
+    const { store } = fake.current;
+    const sid = newChat();
+    store.state.sessions[sid].turn = { state: "done" } as never;
+    store.floatChat(sid, { focus: "none" });
+    await setup();
+    toast.mockClear();
+    document.body.querySelector<HTMLElement>('[data-test="assistant-window-close"]')?.click();
+    await flushPromises();
+    expect(toast).not.toHaveBeenCalled();
   });
 });

@@ -25,46 +25,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-dd-privacy="mask"
     data-test="assistant-history"
   >
-    <div class="flex min-w-0 shrink-0 items-center gap-1">
+    <div v-if="toolsShown" class="flex min-w-0 shrink-0 items-center gap-1">
       <OSearchInput
         :model-value="history.filter.value.q"
         size="sm"
         :placeholder="t('assistant.history.search')"
         :debounce="SEARCH_DEBOUNCE_MS"
         clearable
-        :aria-controls="history.visible.value.length ? listId : undefined"
+        :aria-controls="drawn.length ? listId : undefined"
         class="min-w-0 flex-1"
         data-test="assistant-history-search"
         @update:model-value="(q) => history.setFilter({ q })"
         @keydown="onSearchKey"
       />
-      <OButton
-        v-if="!readonly && mode === 'rail'"
-        variant="outline"
-        size="sm"
-        :icon-left="assistantGlyph.newChat"
-        class="shrink-0 max-md:min-h-11 pointer-coarse:min-h-11"
-        data-test="assistant-history-new"
-        @click="emit('new')"
-      >
-        {{ t("assistant.history.new") }}
-      </OButton>
+      <ODropdown v-if="filterShown" align="end">
+        <template #trigger>
+          <OButton
+            variant="ghost"
+            size="xs"
+            :icon-left="assistantGlyph.filter"
+            :aria-label="filterName"
+            :class="[
+              'shrink-0 max-md:min-h-11 pointer-coarse:min-h-11',
+              activeFilters.length && 'text-assistant-link',
+            ]"
+            data-test="assistant-history-filter"
+          >
+            <span v-if="!narrow">{{ filterName }}</span>
+          </OButton>
+        </template>
+        <ODropdownGroup
+          v-for="section in filterSections"
+          :key="section.id"
+          :label="section.label"
+          :data-test="`assistant-history-filter-${section.id}`"
+        >
+          <ODropdownItem
+            v-for="choice in section.choices"
+            :key="choice.id"
+            role="menuitemradio"
+            :aria-checked="choice.checked"
+            :data-test="`assistant-history-filter-${choice.id}`"
+            @select="choice.toggle"
+          >
+            {{ choice.label }}
+            <template v-if="choice.checked" #icon-right>
+              <OIcon :name="assistantGlyph.done" size="sm" class="text-assistant-link ms-auto" />
+            </template>
+          </ODropdownItem>
+        </ODropdownGroup>
+      </ODropdown>
+      <ODropdown align="end">
+        <template #trigger>
+          <AssistantIconButton
+            :label="t('assistant.history.listMenu')"
+            :icon="assistantGlyph.more"
+            size="xs"
+            data-test="assistant-history-list-menu"
+          />
+        </template>
+        <ODropdownItem
+          v-if="sharesOffered"
+          :icon-left="assistantGlyph.share"
+          data-test="assistant-history-shared-links"
+          @select="emit('shared-links')"
+        >
+          {{ t("assistant.history.sharedLinks") }}
+        </ODropdownItem>
+        <ODropdownItem
+          v-if="history.rows.value.length"
+          :icon-left="assistantGlyph.download"
+          data-test="assistant-history-download-all"
+          @select="exporter.exportAll('json')"
+        >
+          {{ t("assistant.history.downloadAll") }}
+        </ODropdownItem>
+        <ODropdownSub
+          v-if="narrow && $slots['menu-layout']"
+          :text-value="t('assistant.shell.layout')"
+        >
+          <template #icon-left><OIcon :name="assistantGlyph.layout" size="sm" /></template>
+          <template #trigger>{{ t("assistant.shell.layout") }}</template>
+          <slot name="menu-layout" />
+        </ODropdownSub>
+        <template v-if="history.rows.value.length && !readonly">
+          <ODropdownSeparator />
+          <ODropdownItem
+            variant="destructive"
+            :icon-left="assistantGlyph.remove"
+            data-test="assistant-history-clear-all"
+            @select="clearAllOpen = true"
+          >
+            {{ t("assistant.history.clearAll.action") }}
+          </ODropdownItem>
+        </template>
+      </ODropdown>
     </div>
 
     <div ref="scroller" class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
       <h2 v-if="mode === 'rail'" class="sr-only">{{ t("assistant.history.title") }}</h2>
-      <AssistantLocalOnlyHeader
-        v-if="history.mode.value === 'local'"
-        :count="history.localCount.value"
-        :cap="LOCAL_CAP"
-        :is-admin="capability.isAdmin"
-        :clear-on-sign-out="clearOnSignOut"
-        :description-id="modeLineId"
-        @update:clear-on-sign-out="setClearOnSignOut"
-      />
-      <OText v-else :id="modeLineId" variant="meta" as="p" data-test="assistant-history-account">
-        {{ accountLine }}
-      </OText>
       <OText v-if="keptNotice" variant="meta" as="p" data-test="assistant-history-kept">
         {{ t("assistant.history.localOnly.keptOnSignOut") }}
       </OText>
@@ -114,29 +173,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBanner>
 
       <div
-        class="max-w-full min-w-0 shrink-0 overflow-x-auto"
-        data-test="assistant-history-filter-strip"
+        v-if="activeFilters.length"
+        class="flex min-w-0 shrink-0 flex-wrap items-center gap-1"
+        data-test="assistant-history-chips"
       >
-        <OToggleGroup
-          type="single"
-          mobile-dropdown
-          :label="t('assistant.history.filter.label')"
-          :model-value="history.filter.value.kind"
-          data-test="assistant-history-filter"
-          @update:model-value="
-            (kind) => kind && history.setFilter({ kind: kind as HistoryFilter['kind'] })
-          "
+        <OButton
+          v-for="chip in activeFilters"
+          :key="chip.id"
+          variant="secondary"
+          size="xs"
+          :icon-right="assistantGlyph.close"
+          :aria-label="t('assistant.history.filter.remove', { filter: chip.label })"
+          class="max-md:min-h-11 pointer-coarse:min-h-11"
+          :data-test="`assistant-history-chip-${chip.id}`"
+          @click="chip.clear"
         >
-          <OToggleGroupItem v-for="kind in filterKinds" :key="kind" :value="kind" size="sm">
-            {{ t(`assistant.history.filter.${kind}`) }}
-          </OToggleGroupItem>
-        </OToggleGroup>
+          {{ chip.label }}
+        </OButton>
+        <OText variant="meta" as="span" data-test="assistant-history-chips-count">
+          {{ t("assistant.history.filter.count", { count: drawn.length }, drawn.length) }}
+        </OText>
       </div>
       <OText
         v-if="searchLine"
         variant="meta"
         as="p"
-        class="shrink-0"
+        class="sr-only"
         data-test="assistant-history-search-line"
       >
         {{ searchLine }}
@@ -157,12 +219,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="listState.status === 'error' && !history.rows.value.length"
           size="inline"
           :backdrop="false"
-          :title="t('assistant.history.serverError')"
+          :title="
+            triedAt ? t('assistant.history.serverErrorAgain') : t('assistant.history.serverError')
+          "
+          :description="triedAt ? t('assistant.history.lastTried', { time: triedTime }) : undefined"
           :action-label="t('common.retry')"
           data-test="assistant-history-error"
-          @action="history.retry()"
+          @action="retryList"
         >
-          <template v-if="listState.error" #description>
+          <template v-if="listState.error && !triedAt" #description>
             <AssistantErrorDetails
               :error="listState.error"
               :at="errorAt"
@@ -171,30 +236,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OEmptyState>
         <OEmptyState
-          v-else-if="!history.rows.value.length"
+          v-else-if="!history.rows.value.length && !drawn.length"
           size="inline"
           :backdrop="false"
           :title="t('assistant.history.empty.title')"
-          :description="t('assistant.history.empty.body')"
           data-test="assistant-history-empty"
         />
         <OEmptyState
-          v-else-if="!history.visible.value.length && history.filter.value.q.trim()"
+          v-else-if="!drawn.length && query"
           size="inline"
           :backdrop="false"
-          :title="t('assistant.history.noMatch', { q: raw(history.filter.value.q.trim()) })"
-          :action-label="t('assistant.history.clearSearch')"
+          :title="t('assistant.history.noMatch', { q: raw(query) })"
+          :description="titlesOnly ? t('assistant.history.titlesOnly') : undefined"
+          :action-label="
+            titlesOnly ? t('assistant.history.loadOlder') : t('assistant.history.clearSearch')
+          "
           data-test="assistant-history-no-match"
-          @action="clearSearch"
+          @action="titlesOnly ? loadOlder() : clearSearch()"
         />
         <OEmptyState
-          v-else-if="!history.visible.value.length"
+          v-else-if="!drawn.length"
           size="inline"
           :backdrop="false"
           :title="t('assistant.history.filterEmpty')"
-          :action-label="t('assistant.history.showAll')"
+          :action-label="t('assistant.history.filter.clear')"
           data-test="assistant-history-filter-empty"
-          @action="showAll"
+          @action="clearFilters"
         />
         <div
           v-else-if="virtual"
@@ -230,8 +297,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @navigate="(event) => keys.onKeydown(event, item.row.sid)"
                 @rename="(sid, title) => history.rename(sid, title)"
                 @pin="(sid, pinned) => history.pin(sid, pinned)"
-                @download="(sid, format) => exporter.exportChat(sid, format)"
+                @float="floatRow"
+                @stop="stopRow"
+                @share="shareRow"
                 @delete="askDelete"
+                @delete-draft="deleteDraft"
               />
             </template>
           </OVirtualScroll>
@@ -241,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :id="listId"
           :aria-label="t('assistant.history.title')"
           :aria-describedby="modeLineId"
-          class="flex flex-col gap-2"
+          class="flex flex-col gap-3"
           data-test="assistant-history-list"
         >
           <li v-for="group in groups" :key="group.id" class="min-w-0">
@@ -264,15 +334,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @navigate="(event) => keys.onKeydown(event, row.sid)"
                   @rename="(sid, title) => history.rename(sid, title)"
                   @pin="(sid, pinned) => history.pin(sid, pinned)"
-                  @download="(sid, format) => exporter.exportChat(sid, format)"
+                  @float="floatRow"
+                  @stop="stopRow"
+                  @share="shareRow"
                   @delete="askDelete"
+                  @delete-draft="deleteDraft"
                 />
               </ul>
             </div>
           </li>
         </ul>
         <OButton
-          v-if="history.hasMore.value && history.visible.value.length"
+          v-if="history.hasMore.value && drawn.length && !endScope"
           variant="ghost"
           size="sm"
           class="mt-1 max-md:min-h-11 pointer-coarse:min-h-11"
@@ -283,18 +356,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <AssistantHistoryFooter
-        :mode="history.mode.value"
-        :has-rows="history.rows.value.length > 0"
-        :has-more="history.hasMore.value"
-        :retention-days="history.retentionDays.value"
-        :readonly="readonly"
-        :downloading="exporter.busy.value.has('all')"
-        @download-all="exporter.exportAll('json')"
-        @clear-all="clearAllOpen = true"
+      <AssistantLocalOnlyHeader
+        v-if="history.mode.value === 'local'"
+        :count="history.localCount.value"
+        :cap="LOCAL_CAP"
+        :is-admin="capability.isAdmin"
+        :clear-on-sign-out="clearOnSignOut"
+        :description-id="modeLineId"
+        class="px-2"
+        @update:clear-on-sign-out="setClearOnSignOut"
+      />
+      <p
+        v-else-if="endScope"
+        :id="modeLineId"
+        class="text-text-secondary px-2 text-xs"
+        data-test="assistant-history-end-scope"
       >
-        <template v-if="$slots.shares" #shares><slot name="shares" /></template>
-      </AssistantHistoryFooter>
+        {{ t("assistant.history.titlesOnly") }} ·
+        <button
+          type="button"
+          class="text-assistant-link cursor-pointer"
+          data-test="assistant-history-load-older"
+          @click="loadOlder"
+        >
+          {{ t("assistant.history.loadOlder") }}
+        </button>
+      </p>
+      <OText
+        v-else-if="retentionLine"
+        :id="modeLineId"
+        variant="meta"
+        as="p"
+        class="px-2"
+        data-test="assistant-history-retention"
+      >
+        {{ retentionLine }}
+      </OText>
     </div>
 
     <AssistantHistoryConfirm
@@ -320,6 +417,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:open="(open) => (clearAllOpen = open)"
       @confirm="confirmClearAll"
     />
+    <AssistantShareControl
+      v-if="sharing"
+      v-model:open="sharingOpen"
+      :sid="sharing"
+      variant="drawer"
+      @manage="emit('shared-links')"
+    />
   </div>
 </template>
 
@@ -336,6 +440,9 @@ export interface AssistantHistoryListProps {
   container: Container;
 }
 
+/** Filter joins the tools from this many chats, or while one is active. */
+export const FILTER_FROM = 8;
+
 export const SEARCH_DEBOUNCE_MS = 300;
 
 /** From this many rows the list mounts only what is on screen. */
@@ -351,7 +458,13 @@ const GROUP_ORDER = [
   "browser",
 ] as const;
 
-const ROW_ESTIMATE_PX = 40;
+const ROW_ESTIMATE_PX = 32;
+
+const NARROW_REM = 24;
+
+const REM_PX = 16;
+
+const COUNTDOWN_TICK_MS = 1_000;
 
 const GROUP_HEADING_CLASS = "text-text-secondary px-2 pb-1 text-xs font-medium";
 
@@ -367,33 +480,46 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import AssistantErrorDetails from "@/components/ai-assistant/common/AssistantErrorDetails.vue";
+import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import AssistantShareControl from "@/components/ai-assistant/share/AssistantShareControl.vue";
 import {
   groupOf,
   LOCAL_CAP,
+  MAX_FLOATING_CHATS,
   registerHistoryTarget,
+  runAgentKey,
   useAssistantCapability,
   useAssistantHistory,
+  useAssistantName,
+  useAssistantRuns,
   useAssistantStore,
   useChatExport,
+  type RunRow,
 } from "@/composables/assistant";
+import { rosterOffersChoice } from "@/composables/assistant/pure";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { mySharesQuery } from "@/services/ai_chat_share.queries";
 import { trackAssistant } from "@/services/assistantAnalytics";
-import { raw, useI18nTyped } from "@/types/i18n";
-import { orgDayDistance, orgTimeZone } from "@/utils/formatters";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { formatOrgTime, orgDayDistance, orgTimeZone } from "@/utils/formatters";
 
 import AssistantHistoryConfirm from "./AssistantHistoryConfirm.vue";
-import AssistantHistoryFooter from "./AssistantHistoryFooter.vue";
 import AssistantHistoryRow from "./AssistantHistoryRow.vue";
 import AssistantImportCard from "./AssistantImportCard.vue";
 import AssistantLocalOnlyHeader from "./AssistantLocalOnlyHeader.vue";
@@ -402,14 +528,17 @@ import { useAssistantHistoryKeys } from "./useAssistantHistoryKeys";
 
 const props = defineProps<AssistantHistoryListProps>();
 
-const emit = defineEmits<{ opened: [sid: Sid]; new: []; close: [] }>();
+const emit = defineEmits<{ opened: [sid: Sid]; close: []; "shared-links": [] }>();
 
-defineSlots<{ shares?: () => unknown }>();
+defineSlots<{ "menu-layout"?: () => unknown }>();
 
 const { t } = useI18nTyped();
+const { product } = useAssistantName();
 const history = useAssistantHistory();
 const capability = useAssistantCapability();
 const store = useAssistantStore();
+const runs = useAssistantRuns();
+const { lgUp } = useBreakpoint();
 const exporter = useChatExport();
 const router = useRouter();
 const vuex = useStore();
@@ -425,6 +554,10 @@ const clearing = ref(false);
 const clearOnSignOut = ref(history.clearOnSignOut());
 const keptNotice = ref(history.mode.value === "local" && history.takeKeptNotice());
 const now = ref(Date.now());
+const widthRem = ref(Number.POSITIVE_INFINITY);
+const sharing = ref<Sid | null>(null);
+const sharingOpen = ref(false);
+const triedAt = ref<number | null>(null);
 
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
 const orgName = computed<string>(() => vuex.state.selectedOrganization?.label ?? org.value);
@@ -455,30 +588,110 @@ watch(
   { immediate: true },
 );
 
-// Only the server keeps share links, so a browser-only list has nothing to show as shared.
-const filterKinds = computed<HistoryFilter["kind"][]>(() => [
-  "all",
-  "pinned",
-  "editor",
-  "alert",
-  "incident",
-  ...(history.mode.value === "server" ? (["shared"] as const) : []),
-]);
+const narrow = computed(() => props.mode === "panel" && widthRem.value < NARROW_REM);
+const query = computed(() => history.filter.value.q.trim());
+const titlesOnly = computed(() => history.searchPartial.value);
+// The end line carries Load older while a title search has more to read.
+const endScope = computed(() => titlesOnly.value && drawn.value.length > 0);
+const sharesOffered = computed(
+  () => capability.value.persistence && capability.value.canShare !== "no",
+);
+const offersAgents = computed(() => rosterOffersChoice(capability.value.agents));
+const triedTime = computed(() => (triedAt.value ? formatOrgTime(triedAt.value) : ""));
 
-const accountLine = computed(() => {
+function filterChoice<K extends "kind" | "agent" | "started">(
+  key: K,
+  value: NonNullable<HistoryFilter[K]>,
+  off: HistoryFilter[K],
+  id: string,
+  label: I18nText,
+) {
+  const checked = history.filter.value[key] === value;
+  return {
+    id,
+    label,
+    checked,
+    toggle: () => history.setFilter({ [key]: checked ? off : value }),
+    clear: () => history.setFilter({ [key]: off }),
+  };
+}
+
+// Only the server keeps share links, so a browser-only list has nothing to show as shared.
+const filterSections = computed(() => {
+  const server = history.mode.value === "server";
+  const f = "assistant.history.filter";
+  const sections = [
+    {
+      id: "show",
+      label: t(`${f}.show`),
+      choices: [
+        filterChoice("kind", "pinned", "all", "pinned", t(`${f}.pinned`)),
+        ...(server ? [filterChoice("kind", "shared", "all", "shared", t(`${f}.shared`))] : []),
+      ],
+    },
+    {
+      id: "started",
+      label: t(`${f}.started`),
+      choices: [
+        filterChoice("started", "alert", null, "alert", t(`${f}.alertOrIncident`)),
+        filterChoice("started", "editor", null, "editor", t(`${f}.queryEditor`)),
+      ],
+    },
+  ];
+  if (offersAgents.value)
+    sections.splice(1, 0, {
+      id: "agent",
+      label: t(`${f}.agent`),
+      choices: (["general", "investigator", "queryBuilder"] as const).map((id) =>
+        filterChoice("agent", id, null, id, t(`assistant.runs.agent.${id}`, { product })),
+      ),
+    });
+  return sections;
+});
+const activeFilters = computed(() =>
+  filterSections.value.flatMap((section) => section.choices.filter((choice) => choice.checked)),
+);
+const filterShown = computed(
+  () => history.rows.value.length >= FILTER_FROM || activeFilters.value.length > 0,
+);
+const filterName = computed(() =>
+  activeFilters.value.length
+    ? t("assistant.history.filter.active", { n: activeFilters.value.length })
+    : t("assistant.history.filter.button"),
+);
+// A failed read or an empty list has nothing to search; a first load keeps the box under the skeleton.
+const toolsShown = computed(
+  () =>
+    listState.value.status === "loading" ||
+    listState.value.status === "idle" ||
+    history.rows.value.length > 0 ||
+    history.drafts.value.length > 0 ||
+    !!query.value,
+);
+
+const retentionLine = computed(() => {
+  if (history.hasMore.value || !history.rows.value.length) return null;
   const days = history.retentionDays.value;
-  return days
-    ? t("assistant.history.account", {
-        retention: t("assistant.history.retentionDays", { count: days }, days),
-      })
-    : t("assistant.history.accountNoRetention");
+  return days ? t("assistant.history.kept", { days }) : null;
 });
 
+// The rail row always matches the transcript, so a live chat the pages have not reached still lists.
+const runBySid = computed(() => new Map(runs.rows.value.map((row) => [row.sid, row])));
+const liveRows = computed<HistoryRow[]>(() => {
+  const listed = new Set(history.rows.value.map((row) => row.sid));
+  return runs.rows.value.filter((row) => !listed.has(row.sid) && isCounted(row)).map(rowOfRun);
+});
+const shownRows = computed<HistoryRow[]>(() => {
+  if (query.value || activeFilters.value.length) return history.visible.value;
+  const seen = new Set(history.visible.value.map((row) => row.sid));
+  const drafts = history.drafts.value.filter((row) => !seen.has(row.sid));
+  return [...liveRows.value, ...history.visible.value, ...drafts];
+});
+const drawn = computed(() => shownRows.value);
+
 const searchLine = computed(() => {
-  const q = history.filter.value.q.trim();
-  if (!q || !history.visible.value.length) return null;
-  if (history.searchPartial.value) return t("assistant.history.searchPartial");
-  const count = history.visible.value.length;
+  if (!query.value || !drawn.value.length) return null;
+  const count = drawn.value.length;
   return t("assistant.history.matchCount", { count }, count);
 });
 
@@ -486,7 +699,7 @@ const groups = computed(() => {
   const server = history.mode.value === "server";
   const zone = timezone.value;
   const buckets = new Map<GroupId, HistoryRow[]>();
-  for (const row of history.visible.value) {
+  for (const row of drawn.value) {
     // A chat that answers or waits leaves its date group until it settles (D5 decision 2).
     const id = isInProgress(statusOf(row))
       ? "running"
@@ -498,7 +711,7 @@ const groups = computed(() => {
   return GROUP_ORDER.filter((id) => buckets.has(id)).map((id) => ({ id, rows: buckets.get(id)! }));
 });
 
-const virtual = computed(() => history.visible.value.length > VIRTUAL_FROM);
+const virtual = computed(() => drawn.value.length > VIRTUAL_FROM);
 const flat = computed<FlatEntry[]>(() =>
   groups.value.flatMap((group) => [
     { kind: "group" as const, id: group.id },
@@ -517,7 +730,20 @@ const keys = useAssistantHistoryKeys(ordered, preferred, focusRow);
 
 // Day groups move at midnight in the org zone without a reload.
 let clock: ReturnType<typeof setInterval> | null = null;
+let countdown: ReturnType<typeof setInterval> | null = null;
+let sizes: ResizeObserver | null = null;
 let unregisterHistory: (() => void) | null = null;
+
+// A countdown moves every second; a list with none stays still.
+watch(
+  () => drawn.value.some((row) => typeof runBySid.value.get(row.sid)?.expiresAt === "number"),
+  (counting) => {
+    if (countdown) clearInterval(countdown);
+    countdown = counting ? setInterval(tick, COUNTDOWN_TICK_MS) : null;
+  },
+  { immediate: true },
+);
+
 onMounted(() => {
   if (props.mode === "rail")
     unregisterHistory = registerHistoryTarget({
@@ -528,19 +754,40 @@ onMounted(() => {
   if (props.mode === "panel") root.value?.addEventListener("keydown", onRootKey);
   history.ensureLoaded();
   trackAssistant("ai_history_open", { placement: props.mode });
-  clock = setInterval(() => (now.value = Date.now()), 60_000);
+  clock = setInterval(tick, 60_000);
   if (props.mode !== "rail") void nextTick(() => focusSearch());
+  measure();
+  if (typeof ResizeObserver === "undefined" || !root.value) return;
+  sizes = new ResizeObserver(measure);
+  sizes.observe(root.value);
 });
 onBeforeUnmount(() => {
   root.value?.removeEventListener("keydown", onRootKey);
   if (clock) clearInterval(clock);
+  if (countdown) clearInterval(countdown);
+  sizes?.disconnect();
   unregisterHistory?.();
 });
 
+function tick(): void {
+  now.value = Date.now();
+}
+
+function measure(): void {
+  const width = root.value?.getBoundingClientRect().width ?? 0;
+  if (width > 0) widthRem.value = width / REM_PX;
+}
+
 function rowProps(row: HistoryRow) {
+  const run = runBySid.value.get(row.sid);
   return {
     row,
     status: statusOf(row),
+    expiresAt: run?.expiresAt ?? null,
+    now: now.value,
+    org: run?.otherOrg ? orgLabel(run.org) : null,
+    agentIcon: agentIcon(row),
+    floatBlocked: floatBlocked.value,
     current: row.sid === props.currentSid,
     mode: props.mode,
     pending: history.pending[row.sid] ?? null,
@@ -552,14 +799,62 @@ function rowProps(row: HistoryRow) {
   };
 }
 
+const floatBlocked = computed(() =>
+  store.state.shell.windows.length >= MAX_FLOATING_CHATS
+    ? t("assistant.shell.placeWindowLimit")
+    : !lgUp.value
+      ? t("assistant.history.floatNeedsRoom")
+      : undefined,
+);
+
+function agentIcon(row: HistoryRow): IconName | null {
+  if (!offersAgents.value) return null;
+  const key = runAgentKey(row.agentType);
+  if (key === "investigator") return assistantGlyph.agentInvestigator;
+  return key === "queryBuilder" ? assistantGlyph.agentQueryBuilder : assistantGlyph.agentGeneral;
+}
+
+function orgLabel(id: string): string {
+  const orgs: { identifier: string; name?: string }[] = vuex.state.organizations ?? [];
+  return orgs.find((candidate) => candidate.identifier === id)?.name ?? id;
+}
+
+function isCounted(row: RunRow): boolean {
+  return (row.group === "answering" || row.group === "needs_you") && !row.consent;
+}
+
+function rowOfRun(run: RunRow): HistoryRow {
+  return {
+    sid: run.sid,
+    chatId: null,
+    title: run.title ?? t("assistant.thread.newChatTitle"),
+    titleSource: "generated",
+    createdAt: run.at,
+    updatedAt: run.at,
+    origin: "none",
+    originContainer: "sidebar",
+    pinned: false,
+    activeTurn: run.group === "answering",
+    pendingApproval: run.group === "needs_you",
+    share: null,
+    local: false,
+    ephemeral: false,
+    agentType: run.agent,
+  };
+}
+
 function statusOf(row: HistoryRow): ChatStatus | null {
-  return chatStatusOf(row, store.state.sessions[row.sid]?.turn.state);
+  if (history.drafts.value.some((draft) => draft.sid === row.sid)) return "draft";
+  const run = runBySid.value.get(row.sid);
+  if (run && isCounted(run)) return run.group === "needs_you" ? "needs_you" : "answering";
+  if (run?.group === "failed") return "failed";
+  return chatStatusOf(row, store.state.sessions[row.sid]?.turn);
 }
 
 function groupLabel(id: GroupId): string {
   if (id !== "running") return t(`assistant.history.group.${id}`);
   const count = groups.value.find((group) => group.id === "running")?.rows.length ?? 0;
-  return t("assistant.history.group.running", { count });
+  return t("assistant.history.group.running", { count, cap: runs.cap.value });
 }
 
 // Escape that nothing inside used (search clearing, a menu) returns the panel to its chat.
@@ -604,6 +899,9 @@ function onSearchKey(event: KeyboardEvent): void {
     event.stopPropagation();
     event.preventDefault();
     history.setFilter({ q: "" });
+  } else if (event.key === "Escape" && props.mode === "rail") {
+    event.preventDefault();
+    emit("close");
   }
 }
 
@@ -612,8 +910,8 @@ function clearSearch(): void {
   focusSearch();
 }
 
-function showAll(): void {
-  history.setFilter({ kind: "all" });
+function clearFilters(): void {
+  history.setFilter({ kind: "all", agent: null, started: null });
   focusSearch();
 }
 
@@ -636,6 +934,31 @@ async function openRow(sid: Sid): Promise<void> {
   await opening.catch(() => undefined);
 }
 
+async function floatRow(sid: Sid): Promise<void> {
+  if (!store.state.sessions[sid])
+    await store.openSession({ sid }, { focus: false }).catch(() => undefined);
+  store.floatChat(sid);
+}
+
+async function stopRow(sid: Sid): Promise<void> {
+  const run = runBySid.value.get(sid);
+  if (run) await runs.stop(run);
+}
+
+function shareRow(sid: Sid): void {
+  sharing.value = sid;
+  sharingOpen.value = true;
+}
+
+async function retryList(): Promise<void> {
+  await history.retry();
+  if (listState.value.status === "error") triedAt.value = Date.now();
+}
+
+function deleteDraft(sid: Sid): void {
+  store.dropSession(sid, "deleted");
+}
+
 function askDelete(sid: Sid): void {
   deleting.value = history.rows.value.find((row) => row.sid === sid) ?? null;
 }
@@ -648,13 +971,13 @@ async function confirmDelete(): Promise<void> {
   if (result.ok) await nextTick(() => keys.focusFirst());
 }
 
-// The footer's button goes with the rows, so focus lands on the search instead of the page.
+// The tools go with the rows, so focus returns to the chat instead of the page.
 async function confirmClearAll(): Promise<void> {
   clearing.value = true;
   const result = await history.clearAll();
   clearing.value = false;
   clearAllOpen.value = false;
-  if (result.ok) setTimeout(focusSearch, 0);
+  if (result.ok) setTimeout(() => emit("close"), 0);
 }
 
 function setClearOnSignOut(on: boolean): void {

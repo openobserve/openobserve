@@ -280,7 +280,7 @@ export interface AiEventProps {
   ai_window_closed: Record<string, never>;
   ai_window_cap_reached: Record<string, never>;
   ai_sheet_snap: { snap: "peek" | "half" | "full" };
-  ai_toast: { kind: "ready" | "needs_you"; action: "open" | "dismiss" };
+  ai_toast: { kind: "ready" | "needs_you" | "failed"; action: "open" | "dismiss" };
   ai_turn_busy: Record<string, never>;
   ai_leave_guard: { host: DockHostId | "alert" | "settings"; choice: "keep" | "discard" };
   ai_status_light: { state: "needs_you" | "working" | "unread" | "failed" | "open" | "idle" };
