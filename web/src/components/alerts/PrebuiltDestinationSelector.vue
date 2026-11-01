@@ -36,8 +36,8 @@ limitations under the License. -->
                 : 'bg-card-glass-bg',
             ]"
             role="button"
-            :tabindex="tile.disabled ? -1 : 0"
-            :aria-disabled="tile.disabled || undefined"
+            tabindex="0"
+            :aria-disabled="tile.disabled ? 'true' : undefined"
             :aria-describedby="`${uid}-${tile.id}`"
             @click="selectType(tile.id)"
             @keydown.enter.prevent="selectType(tile.id)"

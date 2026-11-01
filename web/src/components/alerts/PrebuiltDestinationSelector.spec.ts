@@ -795,7 +795,7 @@ describe("Approved Slack choices", () => {
     const app = findCardByType(wrapper, "slack_app");
     expect(app.exists()).toBe(true);
     expect(app.attributes("aria-disabled")).toBe("true");
-    expect(app.attributes("tabindex")).toBe("-1");
+    expect(app.attributes("tabindex")).toBe("0");
     const reason = wrapper.find(`[id="${app.attributes("aria-describedby")}"]`);
     expect(reason.text()).toContain("Needs the Enterprise Slack app on a single cluster");
     expect(app.find(".card-content").classes()).toContain("opacity-40");
