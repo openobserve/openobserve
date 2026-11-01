@@ -45,6 +45,7 @@ fn scorer_error_response(value: ScorerError) -> Response {
         }
         ScorerError::MissingName => MetaHttpResponse::bad_request("Scorer name cannot be empty"),
         ScorerError::NotFound => MetaHttpResponse::not_found("Scorer not found"),
+        ScorerError::ProviderNotFound(_) => MetaHttpResponse::not_found(value),
         ScorerError::InvalidScorerType(_)
         | ScorerError::ScorerTypeImmutable
         | ScorerError::ProducesScoreConfigIdImmutable
@@ -460,6 +461,9 @@ async fn run_scorer_test(
 
     match &scorer.scorer_type {
         infra::table::scorers::ScorerType::LlmJudge => {
+            // Same provider checks as create: the provider must be in this org and
+            // offer the model, so a test cannot spend another org's credentials.
+            scorers::validate_llm_judge_provider_model(org_id, &scorer).await?;
             let prepared =
                 openobserve_core::llm_evaluations::prepared_scorers::PreparedLlmJudgeScorer::prepare_with_score_config_info(
                     org_id,
@@ -558,6 +562,7 @@ mod tests {
             (ScorerError::ProducesScoreConfigIdImmutable, 400),
             (ScorerError::InvalidOutputSchema("bad".to_string()), 400),
             (ScorerError::InvalidProviderConfig("bad".to_string()), 400),
+            (ScorerError::ProviderNotFound("p".to_string()), 404),
             (ScorerError::DuplicateName, 409),
             (ScorerError::InUseByEvalJob, 409),
         ];
