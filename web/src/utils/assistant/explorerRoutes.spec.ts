@@ -63,7 +63,7 @@ describe("explorerTarget", () => {
       "metrics",
       "1",
     );
-    expect(route.name).toBe("metricsEditor");
+    expect(route.name).toBe("metrics");
     expect(route.query).toMatchObject({ query_type: "promql", from: String(FROM), to: String(TO) });
     expect(b64DecodeUnicode(route.query!.query)).toBe("rate(x[5m])");
   });

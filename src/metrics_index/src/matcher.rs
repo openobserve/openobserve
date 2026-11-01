@@ -136,6 +136,12 @@ mod tests {
                         "bc{abc}x",
                     ],
                 ),
+                ("^first$|last", "=~", vec!["first", "last"]),
+                (
+                    "(first|prefix)-.*",
+                    "!~",
+                    vec!["first", "last", "middle", "bc{abc}", "xbc{abc}", "bc{abc}x"],
+                ),
                 ("bc{abc}", "=~", vec!["bc{abc}"]),
                 (
                     "bc{abc}",

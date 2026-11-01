@@ -1877,6 +1877,10 @@ export const BADGE_GROUPS = {
       action: { variant: "purple-soft", labelKey: "components.badge.rumEventType.action" },
       error: { variant: "error-soft", labelKey: "common.error" },
       resource: { variant: "teal-soft", labelKey: "components.badge.rumEventType.resource" },
+      failedrequest: {
+        variant: "error-soft",
+        labelKey: "components.badge.rumEventType.failedrequest",
+      },
       longtask: { variant: "warning-soft", labelKey: "components.badge.rumEventType.longtask" },
     },
     fallback: { variant: "default-soft" },

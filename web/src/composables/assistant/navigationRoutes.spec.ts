@@ -33,7 +33,7 @@ const router = createRouter({
   history: createMemoryHistory("/web/"),
   routes: [
     { path: "/logs", name: "logs", component: blank },
-    { path: "/metrics/editor", name: "metricsEditor", component: blank },
+    { path: "/metrics", name: "metrics", component: blank },
     { path: "/traces", name: "traces", component: blank },
     { path: "/dashboards", name: "dashboards", component: blank },
     { path: "/dashboards/view", name: "viewDashboard", component: blank },

@@ -35,7 +35,6 @@ export default function useRoutePrefetch() {
         import("@/plugins/logs/SearchResult.vue"),
       ]);
     },
-    // /metrics renders the explorer; the panel editor lives at /metrics/editor.
     "/metrics": () => import("@/plugins/metrics/explorer/MetricsExplorer.vue"),
     "/traces": () => import("@/plugins/traces/Index.vue"),
     "/rum": () => import("@/views/RUM/RealUserMonitoring.vue"),

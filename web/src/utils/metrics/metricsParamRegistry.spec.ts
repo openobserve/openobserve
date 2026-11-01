@@ -20,6 +20,7 @@ import type { ParamDescriptor } from "@/utils/url/deepLinkParams";
 import {
   METRICS_EDITOR_PARAM_KEYS,
   hasMetricsEditorParams,
+  hasMetricsOverrideParams,
 } from "@/utils/metrics/metricsEditorParams";
 
 const byKey = (key: string) => METRICS_PARAMS.find((d) => d.key === key) as ParamDescriptor;
@@ -140,7 +141,7 @@ describe("metricsEditorParams stays in sync with the registry", () => {
     // The router guard cannot import METRICS_PARAMS (that would pull the Vuex
     // store into the router's module graph), so it uses a standalone key list.
     // If a param is added to the registry and not to that list, a deep link
-    // carrying it would land on the explorer instead of the editor.
+    // carrying it would land on the grid instead of in Visualize.
     const registryKeys = METRICS_PARAMS.flatMap((p: any) => [p.key, ...(p.aliases ?? [])]);
 
     for (const key of registryKeys) {
@@ -157,5 +158,19 @@ describe("metricsEditorParams stays in sync with the registry", () => {
     expect(hasMetricsEditorParams({ org_identifier: "o", period: "15m" })).toBe(false);
     expect(hasMetricsEditorParams({})).toBe(false);
     expect(hasMetricsEditorParams(undefined)).toBe(false);
+  });
+});
+
+describe("hasMetricsOverrideParams", () => {
+  it("is true for any editor param but the blob, indexed ones included", () => {
+    expect(hasMetricsOverrideParams({ query: "x" })).toBe(true);
+    expect(hasMetricsOverrideParams({ "stream.2": "cpu" })).toBe(true);
+    expect(hasMetricsOverrideParams({ metrics_data: "abc", chart_type: "bar" })).toBe(true);
+  });
+
+  it("is false for a blob-only or param-free link", () => {
+    expect(hasMetricsOverrideParams({ metrics_data: "abc", mode: "visualize" })).toBe(false);
+    expect(hasMetricsOverrideParams({ org_identifier: "o", period: "15m" })).toBe(false);
+    expect(hasMetricsOverrideParams(undefined)).toBe(false);
   });
 });

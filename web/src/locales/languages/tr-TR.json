@@ -1315,7 +1315,6 @@
       "moreExamples": "Ek örnekler için,",
       "clickHere": "buraya tıklayın"
     },
-    "legendLabel": "Lejant",
     "switchToLogs": "Günlüklere geri dön",
     "savedViewsLabel": "Kayıtlı Görünümler",
     "savedViewName": "Görünüm Adı",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "Formül {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter}, bu panelde bir sorgu değil",
-    "formulaReferencesFormula": "{letter} bir formüldür ve bir formül başka bir formüle başvuramaz",
+    "formulaCycle": "Formüller birbirine döngü halinde başvuruyor: {cycle}",
+    "formulaTooLong": "Formül genişletildiğinde {limit} karakteri aşıyor",
+    "formulaTooDeep": "Formüller {limit} düzeyden daha derin iç içe geçmiş",
     "formulaInputNote": "Bir formülde kullanıldığında: burada bu sorgunun anlık/aralık ayarı, lejantı, adımı ve zaman kaydırması geçerli olmaz.",
     "multiSqlQueryLabel": "Sorgu Etiketi",
     "multiSqlQueryLabelHint": "Lejantlarda bu sorgu için özel ad (örn., 'Üretim')",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "Değer",
     "hostmapGroupBy": "Gruplama",
     "otherColumn": "Diğer Sütunlar",
-    "metric": "Metrik",
     "filters": "Filtreler",
     "labelFilters": "Etiket Filtreleri",
     "operations": "Operasyonlar",
@@ -13630,21 +13630,6 @@
     "awsStsSelfHostedInfo": "Bu, rol üstlenmek ve işlemleri gerçekleştirmek için AWS sts kullanır. Kurulum ortamında bu role erişimi olan aws kimlik bilgilerini yapılandırdığınızdan emin olun."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "Anlık vektör seçicileri için kullanın",
-      "rangeVector": "Aralık vektör seçicileri için kullanın",
-      "aggregate": "Veriyi toplamak için kullanın",
-      "or": "veya",
-      "rate": "Bir aralık vektörü üzerinde hız hesaplamaları için kullanın",
-      "sqlTitle": "Sözdizimi Kılavuzu: SQL Modu",
-      "sqlFullText": "'error' değerinin tam metin araması için kullanın",
-      "sqlColumn": "'error' değerinin sütun araması için kullanın",
-      "sqlCode": "code sütununda 200 değerini aramak için kullanın",
-      "sqlStream": "stream sütununda 'stderr' değerini aramak için kullanın",
-      "sqlFunction": "log sütununda {fn} sorgu fonksiyonunu aramak ve kullanmak için kullanın",
-      "sqlMoreExamples": "Ek örnekler için,",
-      "sqlClickHere": "buraya tıklayın"
-    },
     "add": "Ekle",
     "runQuery": "Sorguyu çalıştır",
     "runQueryOptions": "Sorgu çalıştırma seçenekleri",
@@ -13760,7 +13745,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "Gösterge panosuna ekle",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "Ortalama",
+          "sortAvgTitle": "Değerleri pencere boyunca ortalamalarına göre sırala",
+          "sortOutlying": "Aykırı",
+          "sortOutlyingTitle": "Değerleri, serilerinin diğerlerinden ne kadar saptığına göre sırala",
+          "outlier": "Aykırı değer"
         },
         "related": {
           "empty": "İlgili metrik yok",
@@ -13885,9 +13875,9 @@
         "selectLabel": "Bir etiket seçin",
         "invalidLabel": "Geçersiz etiket adı.",
         "selectOrTypeValue": "Bir değer seçin veya yazın",
-        "operatorHelp": "=  tam olarak bu değer\n!=  bu değer dışındaki her şey\n=~  bir regex ile eşleşir — 500{'|'}503 ile ikisini de eşleştirin\n!~  bir regex ile eşleşmez\n\nFiltreler VE ile birleştirilir. İki değerden birini eşleştirmek için =~ operatörünü bir regex ile kullanın.",
+        "operatorHelp": "=  tam olarak bu değer\n!=  bu değer dışındaki her şey\n=~  bir regex ile eşleşir — ikisinden biriyle eşleşmek için 500{'|'}503 kullanın\n!~  bir regex ile eşleşmez\n\nFiltreler AND ile birleştirilir. İki değerden biriyle eşleşmek için bir regex ile =~ kullanın veya bir OR grubu ekleyin.",
         "andSeparator": "ve",
-        "andSeparatorTitle": "Filtreler VE ile birleştirilir — bir metrik tümünü eşleştirmelidir. İki değerden birini eşleştirmek için =~ operatörünü bir regex ile kullanın.",
+        "andSeparatorTitle": "Filtreler AND ile birleştirilir — bir metrik bunların tümüyle eşleşmelidir. İki değerden biriyle eşleşmek için bir regex ile =~ operatörünü kullanın veya bir OR grubu ekleyin.",
         "noSuggestions": "Öneri yok — bir değer yazın.",
         "moreFilters": "+{count} daha",
         "moreFiltersTooltip": "Tüm filtreleri satır içinde göstermek için tıklayın",
@@ -13927,11 +13917,16 @@
         "deleteMessage": "Bu kuruluştaki herkes için {name} görünümü silinsin mi?",
         "modified": "{name} (değiştirildi)",
         "clear": "Görünümü temizle"
-      }
-    },
-    "index": {
-      "namePanelRequired": "Panel adı zorunludur",
-      "errorsFixTryAgain": "Bazı hatalar var, lütfen düzeltip tekrar deneyin"
+      },
+      "sortDashboards": "Gösterge panoları",
+      "sortDashboardsTitle": "Gösterge panolarında en çok kullanılanlar önce",
+      "sortAlerts": "Uyarılar",
+      "sortAlertsTitle": "Uyarılarda en çok kullanılanlar önce",
+      "usageInDashboards": "Gösterge panolarında",
+      "usageHasAlerts": "Uyarıları var",
+      "usageInSlos": "SLO'larda",
+      "usageLoading": "Metriklerin kullanıldığı yerler yükleniyor",
+      "usageFailed": "Kullanım bilgisi kullanılamıyor, yeniden deneyin"
     },
     "metricCard": {
       "lastRefreshed": "Son Yenileme:",
@@ -13943,25 +13938,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Grafik oluşturulamadı"
-    },
-    "queryBuilder": {
-      "title": "PromQL Sorgu Oluşturucu",
-      "subtitle": "PromQL sorgularını görsel olarak oluşturun ve test edin",
-      "generatedQuery": "Oluşturulan PromQL Sorgusu:",
-      "noQueryBuilt": "Henüz sorgu oluşturulmadı",
-      "copyQuery": "Sorguyu Kopyala",
-      "clearAll": "Tümünü Temizle",
-      "testQuery": "Sorguyu Test Et",
-      "queryResultPreview": "Sorgu Sonucu Önizlemesi:",
-      "queryCopied": "Sorgu panoya kopyalandı!",
-      "queryCleared": "Sorgu temizlendi",
-      "testingSoon": "Sorgu testi yakında uygulanacak",
-      "executionSoon": "Sorgu yürütme bir sonraki aşamada uygulanacak"
-    },
-    "metricSelector": {
-      "metricName": "Metrik Adı",
-      "loadingMetrics": "Metrikler yükleniyor...",
-      "noMetricsFound": "Metrik bulunamadı"
     },
     "labelFilterEditor": {
       "label": "Etiket",
@@ -13984,8 +13960,6 @@
       "noMetric": "Oluşturucu, adlandırılmış tek bir metrik üzerinde sorgu gerektirir",
       "mismatch": "Oluşturucu bu sorguyu tam olarak gösteremiyor",
       "constructs": {
-        "without": "bir without (…) gruplaması",
-        "offset": "bir offset değiştiricisi",
         "at": "bir {'@'} değiştiricisi",
         "orMatchers": "etiket eşleştiricileri arasında bir veya",
         "subquery": "bir alt sorgu",
@@ -14019,7 +13993,11 @@
         "byLabelsLabel": "Etiketlere Göre",
         "quantileLabel": "Kantil",
         "kLabel": "K",
-        "nearestMultipleLabel": "En yakın kat"
+        "nearestMultipleLabel": "En yakın kat",
+        "withoutLabel": "Hariç (bu etiketleri kaldır)",
+        "withoutDesc": "Seçilen etiketleri toplulaştırarak kaldırın ve diğer tüm etiketleri koruyun",
+        "offsetLabel": "Ofset",
+        "offsetDesc": "Metriğin ne kadar geriye dönük okunacağı, örn. 1h veya 1d"
       },
       "rangeOnlyFirst": "Bir aralık fonksiyonu yalnızca ilk adım olabilir",
       "rangeOnlyFirstNote": "Bir aralık fonksiyonu ham örnekleri okur, bu nedenle yalnızca ilk adım olabilir. Bir tane eklemek için diğer adımları kaldırın.",
@@ -14089,6 +14067,17 @@
       "empty": "Henüz sorgu yok",
       "noMatch": "Arama veya yıldızlı filtresiyle eşleşen sorgu yok",
       "loadMore": "Daha fazla yükle"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR grubu",
+      "addGroupTooltip": "Bir filtre grubu ekleyin; bir seri, gruplardan herhangi biriyle eşleştiğinde eşleşir.",
+      "addToGroup": "Bu gruba filtre ekle",
+      "anyOf": "herhangi biri",
+      "andAnyOf": "ve herhangi biri",
+      "or": "veya",
+      "not": "değil",
+      "notTooltip": "Bu grubun tamamının eşleşmediği serilerle eşleş",
+      "tooManyBranches": "Bu filtreler {count} ayrı seçiciye genişler; en fazla {max} tanesi çalıştırılabilir. Değerleri tek bir regex filtresinde birleştirin veya bir grubu kaldırın."
     }
   },
   "settings": {
@@ -15107,26 +15096,37 @@
       },
       "noData": "Veri yok",
       "unavailable": "Gecikme ısı haritası bu arama için kullanılamıyor",
-      "loadFailed": "Gecikme ısı haritası yüklenemedi"
+      "loadFailed": "Gecikme ısı haritası yüklenemedi",
+      "selection": {
+        "label": "Isı haritası seçimi",
+        "reopen": "Seçim işlemlerini göster",
+        "count": "{count} span seçildi | {count} span seçildi",
+        "range": "{band} · {window}",
+        "filter": "Seçime göre filtrele",
+        "drillDown": "Ayrıntıya in",
+        "askAi": "Yapay Zeka'ya Sor",
+        "askAiChip": "Isı haritası seçimi · {count} span | Isı haritası seçimi · {count} span",
+        "clear": "Seçimi temizle"
+      }
     },
     "comparison": {
-      "title": "Seçimi karşılaştır",
-      "baselineOutside": "Seçimin dışında",
-      "baselineBefore": "Hemen öncesi",
+      "baselineOutside": "Aralığın geri kalanı",
+      "baselineBefore": "Seçimden önce",
       "sampleNote": "Seçim: {selection} · Referans: {baseline}",
       "sampleNoteAll": "tüm {count} Span | tüm {count} Span",
       "sampleCapped": "{total} Span'ın {sampled} tanesi örneklendi",
       "noiseNote": "{pts} puanın altındaki farklar örnekleme gürültüsü sınırları içindedir",
       "loading": "Span'lar örnekleniyor…",
-      "loadFailed": "Seçim karşılaştırılamadı",
+      "loadFailed": "Ayrıntıya inme görünümü yüklenemedi",
       "sampleOverflow": "Örnek, Span sayısıyla eşleşmiyor; örneğin geç gelen veriler nedeniyle. Yeniden saymak için tekrar deneyin.",
       "baselineCapped": "Referans {range} ile sınırlandırıldı, seçimin her iki yanında en fazla 3 sa",
       "baselineLimited": "Referans, bu akışın {hours} saatlik sorgu sınırı nedeniyle {range} ile sınırlandırıldı",
-      "rangeClamped": "Sunucu zaman aralığını kısalttı, bu nedenle karşılaştırma eksik kalır",
+      "rangeClamped": "Sunucu zaman aralığını kısalttı; bu nedenle ayrıntıya inme eksik olur",
       "rangeTooLong": "Seçim, bu akışın {hours} saatlik sorgu sınırından daha uzun",
+      "presetRangeTooLong": "Zaman aralığı bu akışın {hours} saatlik sorgu sınırından daha uzun",
       "retry": "Tekrar dene",
       "noSelectionTitle": "Karşılaştırmak için Span seçin",
-      "noSelectionBody": "Süre ısı haritasında bir kutu çizin veya Hatalar ya da Oran grafiğinde alan seçin, ardından Drill down'ı açın.",
+      "noSelectionBody": "Geri dönüp Süre ısı haritasında bir alan seçin veya Hatalar ya da Hız grafiğinde sürükleyerek seçim yapın.",
       "emptySelection": "Seçimde Span yok",
       "emptyBaseline": "Referans Span yok",
       "emptyBaselineHint": "Bu referansla eşleşen bir şey yok. Bunun yerine {mode} deneyin.",
@@ -15151,6 +15151,23 @@
       "summaryBand": "{window} · {band}"
     },
     "drillDownBackTarget": "sonuçlar",
+    "drillDownPanel": {
+      "counts": "{selected} / {baseline}",
+      "selectedTraces": "{count} seçili iz | {count} seçili iz",
+      "baselineTraces": "{count} referans iz | {count} referans iz",
+      "selectedSpans": "{count} seçili span | {count} seçili span",
+      "baselineSpans": "{count} referans span | {count} referans span",
+      "baseline": "Referans",
+      "presetsTitle": "Veya bir ön ayardan başlayın",
+      "presetErrors": "Hatalar / kalanlar",
+      "presetSlowest": "En yavaş %10 / kalanlar",
+      "presetRecent": "Son dönem / önceki dönem",
+      "presetErrorsDesc": "Hata içeren span'ler ile diğer tüm span'ler",
+      "presetSlowestDesc": "p90 ve üzerindeki span'ler ile daha hızlı span'ler",
+      "presetRecentDesc": "Zaman aralığının ikinci yarısı ile ilk yarısı",
+      "presetEmpty": "Bu aralıkta sıralanacak span süresi yok",
+      "presetNoMatch": "Bu ön ayar, bu aralıkta karşılaştırılacak span bulamadı"
+    },
     "metrics": {
       "perSecond": {
         "traces": "iz/s",
@@ -15273,6 +15290,7 @@
     "errorSpans": "Hata Spanları",
     "filterByErrors": "Hatalara göre filtrele",
     "clearErrorFilter": "Hata filtresini temizle",
+    "updatingResults": "Sonuçlar güncelleniyor",
     "error": "HATA",
     "errorCount": "{n} HATA | {n} HATA",
     "success": "BAŞARI",
@@ -21619,7 +21637,8 @@
         "resetColumnWidths": "Sütun genişliklerini sıfırla"
       },
       "selectAllRows": "Tüm satırları seç",
-      "selectRow": "{name} satırını seç",
+      "selectRowAt": "Satır {index} öğesini seç",
+      "selectRowAtNamed": "Satır {index}, {name} öğesini seç",
       "removeColumnAria": "Sütunu kaldır",
       "formatColumnAria": "Sütunu biçimlendir",
       "selectedOfTotal": "{total} öğeden {selected} tanesi seçildi",
@@ -22804,7 +22823,8 @@
       "moduloName": "Mod",
       "multiplyByName": "Çarpma",
       "divideByName": "Bölme",
-      "exponentName": "Üs"
+      "exponentName": "Üs",
+      "offsetDoc": "Metriği belirtilen süre önceki haliyle okur"
     }
   },
   "passwordPolicy": {
@@ -26418,6 +26438,8 @@
     "section_handled": "Ele alındı",
     "section_resolved": "Çözüldü",
     "sectionHint_ringing": "kimse onaylamadı — bunlar hâlâ arıyor",
+    "sectionHint_ringingRouted": "kimse üstlenmedi — bunlardan {count} tanesi hâlâ çağrı gönderiyor | kimse üstlenmedi — bunlardan {count} tanesi hâlâ çağrı gönderiyor",
+    "sectionHint_ringingUnrouted": "{count} tanesinin ekibi yok, bu yüzden çağrı göndermiyor | {count} tanesinin ekibi yok, bu yüzden çağrı göndermiyor",
     "sectionHint_snoozed": "çağrılar duraklatıldı — kendiliğinden geri gelirler",
     "sectionHint_handled": "onaylandı — her birini bir insan üstlendi",
     "sectionHint_resolved": "kapatıldı — kayıt için saklanıyor",

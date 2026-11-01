@@ -4083,7 +4083,7 @@ describe("Index.vue (Main Traces Page)", () => {
       }
     };
 
-    const mountPage = async (searchBar: any = true) => {
+    const mountPage = async (searchBar: any = true, indexList: any = true) => {
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -4091,7 +4091,7 @@ describe("Index.vue (Main Traces Page)", () => {
           provide: { store: store },
           stubs: {
             "search-bar": searchBar,
-            "index-list": true,
+            "index-list": indexList,
             "search-result": true,
             "service-graph": true,
             "services-catalog": true,
@@ -4238,6 +4238,43 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("test-stream");
       expect(mockSearchObj.data.editorValue).toBe("service_name = 'checkout'");
       expect(ownSearches()).toHaveLength(1);
+    });
+
+    it("refreshes open field values once the other stream's view filter has landed", async () => {
+      const editorAtRefresh: string[] = [];
+      const refreshOpenFieldValues = vi.fn(() =>
+        editorAtRefresh.push(mockSearchObj.data.editorValue),
+      );
+      await mountPage(true, { template: "<div />", methods: { refreshOpenFieldValues } });
+
+      await applyViewAndWaitForSearch(
+        savedView({ stream: { label: "test-stream", value: "test-stream" } }),
+      );
+
+      expect(editorAtRefresh).toEqual(["service_name = 'checkout'"]);
+    });
+
+    it("refreshes open field values once the picked stream's fields have loaded", async () => {
+      const fieldsAtRefresh: number[] = [];
+      const refreshOpenFieldValues = vi.fn(() =>
+        fieldsAtRefresh.push(mockSearchObj.data.stream.selectedStreamFields.length),
+      );
+      await mountPage(true, { template: "<div />", methods: { refreshOpenFieldValues } });
+
+      await wrapper.vm.applyStreamChange("test-stream");
+      await drain();
+
+      expect(fieldsAtRefresh).toHaveLength(1);
+      expect(fieldsAtRefresh[0]).toBeGreaterThan(0);
+    });
+
+    it("leaves open field values alone when the view keeps the stream", async () => {
+      const refreshOpenFieldValues = vi.fn();
+      await mountPage(true, { template: "<div />", methods: { refreshOpenFieldValues } });
+
+      await applyViewAndWaitForSearch(savedView());
+
+      expect(refreshOpenFieldValues).not.toHaveBeenCalled();
     });
 
     it("applies only the latest view when an earlier apply finishes last", async () => {

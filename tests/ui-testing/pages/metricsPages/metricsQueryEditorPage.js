@@ -30,7 +30,7 @@ export class MetricsQueryEditorPage {
         }
 
         // Class-member locators (POM strict — §3)
-        this.runQueryButton = page.locator('[data-test="metrics-apply"]');
+        this.runQueryButton = page.locator('[data-test="metrics-explorer-run"]');
         this.queryEditorContainer = page.locator('[data-test="dashboard-panel-query-editor"]');
         this.customQueryTypeButton = page.locator('[data-test="dashboard-custom-query-type"]');
         this.promqlQueryTypeButton = page.locator('[data-test="dashboard-promql-query-type"]');

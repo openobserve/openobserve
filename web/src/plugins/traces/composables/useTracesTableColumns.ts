@@ -192,6 +192,27 @@ function spanDerivedColumns(
   ];
 }
 
+/** Marks the last non-timestamp column to absorb leftover width, which clamps every other column to its size. */
+export function fillLastColumn(
+  cols: OTableColumnDef<Record<string, any>>[],
+  timestampCol: string,
+): void {
+  for (const col of cols) {
+    if (!(col.meta as Record<string, unknown> | undefined)?.fillRemaining) continue;
+    const {
+      autoWidth: _autoWidth,
+      fillRemaining: _fillRemaining,
+      ...meta
+    } = col.meta as Record<string, unknown>;
+    col.meta = meta;
+    delete col.minSize;
+  }
+  const last = cols.at(-1);
+  if (!last || last.id === timestampCol) return;
+  last.minSize = last.size;
+  last.meta = { ...last.meta, autoWidth: true, fillRemaining: true };
+}
+
 export function useTracesTableColumns() {
   /**
    * Rebuild the `columns` ref from the given parameters.
@@ -261,6 +282,8 @@ export function useTracesTableColumns() {
       if (statusIdx === -1) cols.push(...derived);
       else cols.splice(statusIdx + 1, 0, ...derived);
     }
+
+    fillLastColumn(cols, timestampCol);
 
     columns.value = cols;
     return cols;

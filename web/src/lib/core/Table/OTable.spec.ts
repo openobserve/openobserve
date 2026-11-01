@@ -987,8 +987,59 @@ describe("OTable", () => {
       });
       const all = wrapper.find('[data-test="o2-table-select-all"] [role="checkbox"]');
       expect(all.attributes("aria-label")).toBe("Select all rows");
-      const row = wrapper.find('[data-test="o2-table-select-0"] [role="checkbox"]');
-      expect(row.attributes("aria-label")).toMatch(/^Select row /);
+      const labels = wrapper
+        .findAll('[data-test="o2-table-select-cell"] [role="checkbox"]')
+        .map((c) => c.attributes("aria-label"));
+      expect(labels).toEqual([
+        "Select row 1, User 1",
+        "Select row 2, User 2",
+        "Select row 3, User 3",
+      ]);
+    });
+
+    it("keeps rows that share a title apart by their position", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: [
+            { priority: 2, title: "Disk full" },
+            { priority: 2, title: "Disk full" },
+            { priority: 3, title: "CPU high" },
+          ],
+          columns: [
+            { id: "priority", header: "Priority", accessorKey: "priority" },
+            { id: "title", header: "Title", accessorKey: "title" },
+          ],
+          selection: "multiple",
+        },
+      });
+      const labels = wrapper
+        .findAll('[data-test="o2-table-select-cell"] [role="checkbox"]')
+        .map((c) => c.attributes("aria-label"));
+      expect(labels).toEqual([
+        "Select row 1, Disk full",
+        "Select row 2, Disk full",
+        "Select row 3, CPU high",
+      ]);
+    });
+
+    it("names a row by position alone when it has no text cell, never by a number cell", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: [
+            { priority: 4, title: "" },
+            { priority: 4, title: "  " },
+          ],
+          columns: [
+            { id: "priority", header: "Priority", accessorKey: "priority" },
+            { id: "title", header: "Title", accessorKey: "title" },
+          ],
+          selection: "multiple",
+        },
+      });
+      const labels = wrapper
+        .findAll('[data-test="o2-table-select-cell"] [role="checkbox"]')
+        .map((c) => c.attributes("aria-label"));
+      expect(labels).toEqual(["Select row 1", "Select row 2"]);
     });
 
     it("does not render checkbox column when selection is none", () => {

@@ -61,7 +61,7 @@ describe("AssistantQueryBlock", () => {
         plugins: [
           fakeRouter([
             { path: "/traces", name: "traces", component: { render: () => null } },
-            { path: "/metrics/editor", name: "metricsEditor", component: { render: () => null } },
+            { path: "/metrics", name: "metrics", component: { render: () => null } },
           ]),
         ],
         provide: live ? evidence.provide : {},

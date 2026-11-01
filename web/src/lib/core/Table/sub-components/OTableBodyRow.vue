@@ -66,17 +66,14 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 const selectLabel = computed(() => {
-  let named: unknown;
-  for (const cell of props.row.getVisibleCells()) {
-    const value = cell.getValue();
-    if ((typeof value === "string" && value.trim()) || typeof value === "number") {
-      named = value;
-      break;
-    }
-  }
-  return t("components.table.selectRow", {
-    name: raw(String(named ?? props.row.index + 1).slice(0, 80)),
-  });
+  const index = props.row.index + 1;
+  const named = props.row
+    .getVisibleCells()
+    .map((cell) => cell.getValue())
+    .find((value: unknown): value is string => typeof value === "string" && !!value.trim());
+  // The position keeps the label unique, since many rows can share the same title.
+  if (!named) return t("components.table.selectRowAt", { index });
+  return t("components.table.selectRowAtNamed", { index, name: raw(named.slice(0, 80)) });
 });
 
 const emit = defineEmits<{

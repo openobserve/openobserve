@@ -226,6 +226,8 @@ export function compareBreakdown(
   const head = new Set(cur.rows.flatMap((r) => (r.value === null ? [] : [r.value])));
   // An attribute breakdown from a start step keeps its unnamed units in their own row, apart from Other.
   const split = !!cur.start && !cur.start.anyStep;
+  // From any step, Other holds only named values and unnamed units sit in Not set.
+  const anyStep = !!cur.start?.anyStep;
   // Only a value with units at step k is in this period's Other; the rest show as previous-only rows.
   const folded = split
     ? cur.rows.some((r) => r.other)
@@ -233,7 +235,9 @@ export function compareBreakdown(
       : []
     : curHits.filter(isNamedDim);
   const seenNow = new Set(folded.map((h) => String(h.dim)));
-  const restRow = cur.rows.find((r) => r.value === null && (split ? r.noValue : true));
+  const restRow = cur.rows.find(
+    (r) => r.value === null && (split ? r.noValue : anyStep ? r.notSet : true),
+  );
   const byValue = new Map<string, Record<string, unknown>[]>();
   const restNamed: Record<string, unknown>[] = [];
   const restUnnamed: Record<string, unknown>[] = [];
@@ -249,8 +253,8 @@ export function compareBreakdown(
   const hitsOf = (r: BreakdownRow): Record<string, unknown>[] | null => {
     if (r.leftBefore) return null;
     if (r.value !== null) return byValue.get(r.value) ?? [];
-    if (r.noValue) return restUnnamed;
-    return split ? restNamed : [...restNamed, ...restUnnamed];
+    if (r.noValue || (anyStep && r.notSet)) return restUnnamed;
+    return split || anyStep ? restNamed : [...restNamed, ...restUnnamed];
   };
   const rows: ComparedBreakdownRow[] = cur.rows.map((r) => {
     const hits = hitsOf(r);

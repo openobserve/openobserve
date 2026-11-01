@@ -111,7 +111,6 @@ const ROUTE_KIND: Readonly<Record<string, LinkKind>> = {
 const EXPLORER_OF_ROUTE: Readonly<Record<string, Explorer>> = {
   logs: "logs",
   metrics: "metrics",
-  metricsEditor: "metrics",
   traces: "traces",
 };
 

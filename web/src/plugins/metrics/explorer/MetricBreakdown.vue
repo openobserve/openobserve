@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <MetricChartTile
         ref="focusedTile"
         :class="heatmap ? 'min-h-60' : 'h-60'"
-        :queries="heatmap ? heatmapQueries : queriesByLabel[activeLabel]"
+        :queries="heatmap ? heatmapQueries : focusedQueries"
         :chart-type="chartType"
         :unit="unit"
         :color="color"
@@ -142,6 +142,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`metrics-breakdown-distinct-${activeLabel}`"
             >{{ distinctText(activeLabel) }}</span
           >
+          <div class="flex-1" />
+          <OToggleGroup
+            v-if="!heatmap"
+            v-model="rowSortModel"
+            type="single"
+            class="shrink-0"
+            data-test="metrics-breakdown-sort"
+          >
+            <OToggleGroupItem
+              value="avg"
+              size="xs"
+              :title="t('metrics.explorer.detail.breakdown.sortAvgTitle')"
+              data-test="metrics-breakdown-sort-avg"
+              >{{ t("metrics.explorer.detail.breakdown.sortAvg") }}</OToggleGroupItem
+            >
+            <OToggleGroupItem
+              value="outlying"
+              size="xs"
+              :title="t('metrics.explorer.detail.breakdown.sortOutlyingTitle')"
+              data-test="metrics-breakdown-sort-outlying"
+              >{{ t("metrics.explorer.detail.breakdown.sortOutlying") }}</OToggleGroupItem
+            >
+          </OToggleGroup>
         </PanelBar>
 
         <div class="p-2">
@@ -203,12 +226,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @row-mouseleave="(row) => highlight(row, 'downplay')"
           >
             <template #cell-value="{ row }">
-              <span
-                class="text-text-body block truncate font-mono text-xs"
-                :title="row.value"
-                :data-test="`metrics-breakdown-value-${activeLabel}-${row.value}`"
-                >{{ row.value }}</span
-              >
+              <div class="flex min-w-0 items-center gap-1">
+                <span
+                  class="text-text-body block truncate font-mono text-xs"
+                  :title="row.value"
+                  :data-test="`metrics-breakdown-value-${activeLabel}-${row.value}`"
+                  >{{ row.value }}</span
+                >
+                <OTag
+                  v-if="row.outlier"
+                  variant="warning-outline"
+                  size="sm"
+                  class="shrink-0"
+                  :data-test="`metrics-breakdown-outlier-${activeLabel}-${row.value}`"
+                  >{{ t("metrics.explorer.detail.breakdown.outlier") }}</OTag
+                >
+              </div>
             </template>
 
             <template #cell-trend="{ row }">
@@ -338,6 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :unit="unit"
           :color="color"
           :time-range="timeRange"
+          :step-seconds="stepSeconds"
           :run-query="runQuery"
           :data-test="`metrics-breakdown-card-${label}`"
           @select="select(label)"
@@ -418,6 +452,8 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import streamService from "@/services/stream";
@@ -429,10 +465,12 @@ import {
   BREAKDOWN_LABEL_LIMIT,
   breakdownTitleKey,
   buildBreakdownQuery,
+  buildBreakdownRank,
   buildHeatmapBreakdownQuery,
   buildHeatmapValueQuery,
   breakdownQueryOf,
   CARD_KIND,
+  formatPromDuration,
   toO2Unit,
 } from "@/utils/metrics/metricDefaults";
 import {
@@ -446,6 +484,7 @@ import {
   type HeatmapStats,
   type SeriesStats,
 } from "@/utils/metrics/breakdownStats";
+import { OUTLIER_SCORE, outlierScores, seriesPointsByValue } from "@/utils/metrics/outlierScore";
 import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { labelFiltersToSql } from "@/utils/metrics/labelFilterSql";
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
@@ -488,6 +527,9 @@ const STAT_COLUMNS = ["avg", "latest", "share", "rate", "p50", "p90", "p99"] as 
 
 const ABSENT = raw("—");
 
+/** At most this many rows carry the outlier tag, so it marks the standouts rather than a crowd. */
+const OUTLIER_TAGS = 3;
+
 interface BreakdownRow {
   value: string;
   /** Formatted like the chart's y-axis; `null` when the value has no series. */
@@ -502,6 +544,8 @@ interface BreakdownRow {
   /** Sparkline path in a 100×24 box, one subpath per unbroken run. */
   trend: string | null;
   color: string | null;
+  /** Among the few series that stray furthest from the rest, under the Outlying sort. */
+  outlier: boolean;
 }
 
 /**
@@ -551,6 +595,8 @@ export default defineComponent({
     AiEntryButton: defineAsyncComponent(
       () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
     ),
+    OToggleGroup,
+    OToggleGroupItem,
   },
   props: {
     card: { type: Object as PropType<MetricCardModel>, required: true },
@@ -845,28 +891,37 @@ export default defineComponent({
         ? t("metrics.explorer.detail.breakdown.titleFn", { fn: raw(fnLabel.value), label })
         : t(breakdownTitleKey(props.card.cardKind), { label });
 
-    /** `panel`: at the dashboard panel's rate window rather than the tile's. */
-    const queriesFor = (label: string, panel = false): TileQuery[] | null => {
+    /** `panel`: at the dashboard panel's rate window; `ranked`: capped by a whole-window rank, else per step. */
+    const queriesFor = (label: string, panel = false, ranked = false): TileQuery[] | null => {
       if (!countsByLabel.value[label].ready) return null;
-      const topk = topkByLabel.value[label] ? { topk: TOPK } : undefined;
+      const { start_time, end_time } = props.timeRange;
+      const window = panel ? "$__range" : formatPromDuration((end_time - start_time) / 1e6);
+      const cap = topkByLabel.value[label] ? { topk: TOPK } : undefined;
+      const ctx = {
+        metricName: props.card.name,
+        filters: props.filters,
+        rateWindow: panel ? props.panelRateWindow : props.rateWindow,
+        applyNanGuard: props.nanGuard,
+      };
       // Several-line functions chart their first line: a tile is one series per label value.
       const source = follows.value
         ? (panel ? props.panelQueries : props.variant!.queries)[0]?.expr
         : undefined;
       const expr = follows.value
         ? source
-          ? breakdownQueryOf(source, label, topk)
+          ? breakdownQueryOf(source, label, {
+              topk: cap?.topk,
+              rank:
+                cap && ranked
+                  ? buildBreakdownRank(props.card.cardKind, ctx, label, { ...cap, window })
+                  : null,
+            })
           : null
         : buildBreakdownQuery(
             props.card.cardKind,
-            {
-              metricName: props.card.name,
-              filters: props.filters,
-              rateWindow: panel ? props.panelRateWindow : props.rateWindow,
-              applyNanGuard: props.nanGuard,
-            },
+            ctx,
             label,
-            topk,
+            cap && ranked ? { ...cap, window } : cap,
           );
       const stream =
         (follows.value && props.variant!.queries[0]?.builder?.metric) || props.card.name;
@@ -876,6 +931,10 @@ export default defineComponent({
     /** `null` until the label's counts answer: only they know whether to cap at top 10. */
     const queriesByLabel = computed<Record<string, TileQuery[] | null>>(() =>
       Object.fromEntries(labels.value.map((label) => [label, queriesFor(label)])),
+    );
+    // One label, so its values can afford a rank over the whole window instead of rotating per step.
+    const focusedQueries = computed(() =>
+      activeLabel.value ? queriesFor(activeLabel.value, false, true) : null,
     );
 
     const distinctText = (label: string) => {
@@ -1053,12 +1112,25 @@ export default defineComponent({
         focusedChart()?.dispatchAction({ type, seriesName: chartNameOf(row.value) });
     };
 
+    const rowSort = ref<"avg" | "outlying">("avg");
+    // A toggle group emits undefined when its active item is clicked again; the table always has one order.
+    const rowSortModel = computed({
+      get: () => rowSort.value,
+      set: (v: any) => {
+        if (v) rowSort.value = v;
+      },
+    });
+
     const rows = computed<BreakdownRow[]>(() => {
       const label = activeLabel.value;
       const stats =
         label && focused.value.status === "done" && !heatmap.value
           ? seriesStatsByValue(focused.value.results, label)
           : new Map<string, SeriesStats>();
+      const scores =
+        rowSort.value === "outlying" && label && stats.size
+          ? outlierScores(seriesPointsByValue(focused.value.results, label))
+          : null;
       const values = [...activeValues.value];
       for (const value of [...stats.keys(), ...heatmapStats.value.keys()])
         if (!values.includes(value)) values.push(value);
@@ -1078,7 +1150,7 @@ export default defineComponent({
             : null;
         return {
           value,
-          rank: h?.rate ?? s?.avg ?? -Infinity,
+          rank: h?.rate ?? (scores && s ? scores.get(value) : s?.avg) ?? -Infinity,
           avg: s ? format(s.avg, s.decimals) : null,
           latest: s ? format(s.latest, s.decimals) : null,
           share: s && total > 0 ? `${((s.sum / total) * 100).toFixed(1)}%` : null,
@@ -1092,7 +1164,10 @@ export default defineComponent({
       });
       // Stable: values without a series keep their count order, after the rest.
       ranked.sort((a, b) => b.rank - a.rank);
-      return ranked.map(({ rank: _rank, ...row }) => row);
+      return ranked.map(({ rank, ...row }, i) => ({
+        ...row,
+        outlier: !!scores && i < OUTLIER_TAGS && rank >= OUTLIER_SCORE,
+      }));
     });
 
     const columns = computed<OTableColumnDef<BreakdownRow>[]>(() => [
@@ -1179,7 +1254,7 @@ export default defineComponent({
       const label = activeLabel.value;
       if (label && heatmap.value) return openHeatmapToDashboard(label);
       // Not the tile's window, which would freeze the panel at this range.
-      const queries = label ? queriesFor(label, true) : null;
+      const queries = label ? queriesFor(label, true, true) : null;
       if (!label || !queries?.length) return;
       const data = buildPanelDataForCard(props.card, {
         queries,
@@ -1236,6 +1311,7 @@ export default defineComponent({
       retryCounts,
       topkByLabel,
       queriesByLabel,
+      focusedQueries,
       distinctText,
       activeCounts,
       ABSENT,
@@ -1244,6 +1320,7 @@ export default defineComponent({
       focusedTile,
       statsLoading,
       rows,
+      rowSortModel,
       columns,
       highlight,
       select,

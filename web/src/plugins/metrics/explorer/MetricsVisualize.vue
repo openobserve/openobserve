@@ -17,9 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   Visualize mode for the Metrics explorer — a query-driven workspace.
 
-  This is the SAME dashboard PanelEditor the metrics editor route (plugins/metrics
-  /Index.vue) mounts in production, run in-page with editMode and the metrics
-  defaults (line + promql + query bar on). Chart types are NOT restricted — the
+  This is the SAME dashboard PanelEditor Add Panel mounts, run in-page with
+  editMode and the metrics defaults (line + promql + query bar on). Chart types are NOT restricted — the
   same full set AddPanel offers, gated only by ChartSelection's own PromQL rules.
   So the chart the user builds here is exactly the one they get on a dashboard,
   and it inherits right-click → Create Alert for free.
@@ -103,6 +102,8 @@ export default defineComponent({
       type: Object as PropType<Record<string, any> | null>,
       default: null,
     },
+    /** Opens the seed without running it, for a link that applies a query and waits for Run. */
+    holdSeed: { type: Boolean, default: false },
   },
   emits: ["seed-consumed", "update:time-range", "run"],
   setup(props, { emit }) {
@@ -129,8 +130,6 @@ export default defineComponent({
       values: [],
     };
 
-    // Same defaults the metrics editor route applies: a line chart driven by a
-    // promql query, with the query bar shown so the user can type PromQL.
     const applyMetricsDefaults = () => {
       resetDashboardPanelData();
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
@@ -147,8 +146,7 @@ export default defineComponent({
     };
 
     // Open on a card's type-based query: reset to a clean metrics panel, then lay
-    // the seed's panel-schema `data` on top (the same shape the metrics editor
-    // receives from the card drill-in). Every query is forced to the metrics
+    // the seed's panel-schema `data` on top. Every query is forced to the metrics
     // stream type. Mirrors `applyMetricsBlob`, but from a raw data object.
     const applySeed = (seed: Record<string, any>) => {
       resetDashboardPanelData();
@@ -168,21 +166,24 @@ export default defineComponent({
      */
     let seededOnMount = false;
 
-    // BEFORE the PanelEditor child mounts (matches the metrics editor route): if
+    // Until the first input, a held seed's range only moves the window: the link's range can land after mount.
+    let seedHeld = false;
+
+    // BEFORE the PanelEditor child mounts: if
     // it mounts first, it initialises an empty query area and a later assign does
     // not reflect into the already-built query bar.
     onBeforeMount(() => {
       if (props.seed) {
         applySeed(props.seed);
-        seededOnMount = true;
+        seededOnMount = !props.holdSeed;
+        seedHeld = props.holdSeed;
         emit("seed-consumed");
       } else {
         applyMetricsDefaults();
       }
     });
 
-    // Validate before opening the add-to-dashboard dialog — the same handshake
-    // the metrics editor uses, so an incomplete panel can't be saved.
+    // Validate before opening the add-to-dashboard dialog, so an incomplete panel can't be saved.
     const onAddToDashboard = () => {
       const errors: string[] = [];
       validatePanel(errors, true);
@@ -262,7 +263,10 @@ export default defineComponent({
     const isRunQueryPending = computed(() => livePreview.isPending.value);
 
     // A seeded panel's load-time normalisation is not an edit, so live preview starts with the user's first input.
-    const armOnFirstInput = () => livePreview.arm();
+    const armOnFirstInput = () => {
+      seedHeld = false;
+      livePreview.arm();
+    };
     onMounted(() => {
       window.addEventListener("pointerdown", armOnFirstInput, true);
       window.addEventListener("keydown", armOnFirstInput, true);
@@ -326,7 +330,7 @@ export default defineComponent({
       () => props.selectedDateTime,
       () => {
         if (applyingEntry) return;
-        if (!dashboardPanelData.data?.queries?.[0]?.query) applyDateTime();
+        if (seedHeld || !dashboardPanelData.data?.queries?.[0]?.query) applyDateTime();
         else if (isAutoRunOn.value) runQuery();
       },
       { deep: true },

@@ -21,7 +21,7 @@ export type Explorer = "logs" | "metrics" | "traces";
 /** The route names the explorer targets use; the navigation allowlist accepts them too. */
 export const EXPLORER_ROUTE_NAMES: Record<Explorer, string> = {
   logs: "logs",
-  metrics: "metricsEditor",
+  metrics: "metrics",
   traces: "traces",
 };
 

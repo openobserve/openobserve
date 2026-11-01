@@ -154,7 +154,6 @@
     "Metrics": [
       "web/src/plugins/metrics/**",
       "web/src/components/promql/**",
-      "web/src/views/PromQL/**",
       "web/src/services/metrics.*",
       "tests/ui-testing/pages/metricsPages/**"
     ],

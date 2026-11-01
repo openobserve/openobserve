@@ -1315,7 +1315,6 @@
       "moreExamples": "Für weitere Beispiele,",
       "clickHere": "klicken Sie hier"
     },
-    "legendLabel": "Legende",
     "switchToLogs": "Zurück zu Logs",
     "savedViewsLabel": "Gespeicherte Ansichten",
     "savedViewName": "Namen anzeigen",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "Formel {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} ist keine Abfrage in diesem Panel",
-    "formulaReferencesFormula": "{letter} ist eine Formel, und eine Formel darf nicht auf eine andere Formel verweisen",
+    "formulaCycle": "Formeln verweisen in einer Schleife aufeinander: {cycle}",
+    "formulaTooLong": "Die Formel wird auf mehr als {limit} Zeichen erweitert",
+    "formulaTooDeep": "Formeln sind mehr als {limit} Ebenen tief verschachtelt",
     "formulaInputNote": "In einer Formel verwendet: dort gelten die Instant-/Bereichseinstellung, die Legende, der Schritt und die Zeitverschiebung dieser Abfrage nicht.",
     "multiSqlQueryLabel": "Bezeichnung abfragen",
     "multiSqlQueryLabelHint": "Benutzerdefinierter Name für diese Abfrage in Legenden (z. B. 'Production')",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "Wert",
     "hostmapGroupBy": "Gruppieren nach",
     "otherColumn": "Andere Spalte",
-    "metric": "Metrisch",
     "filters": "Filter",
     "labelFilters": "Label-Filter",
     "operations": "Operationen",
@@ -13630,21 +13630,6 @@
     "awsStsSelfHostedInfo": "Dabei werden AWS sts verwendet, um Rollen zu übernehmen und Operationen durchzuführen. Stellen Sie sicher, dass Sie in der Installationsumgebung AWS-Anmeldeinformationen konfiguriert haben, die Zugriff auf diese Rolle haben."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "Für Instant-Vector-Selektoren verwenden Sie",
-      "rangeVector": "Für Range-Vector-Selektoren verwenden Sie",
-      "aggregate": "Zum Aggregieren von Daten verwenden Sie",
-      "or": "oder",
-      "rate": "Für Ratenberechnungen über einen Range-Vektor verwenden Sie",
-      "sqlTitle": "Syntax-Leitfaden: SQL-Modus",
-      "sqlFullText": "Für die Volltextsuche nach dem Wert 'error' verwenden Sie",
-      "sqlColumn": "Für die Spaltensuche nach dem Wert 'error' verwenden Sie",
-      "sqlCode": "Um den Wert 200 in der Spalte 'code' zu suchen, verwenden Sie",
-      "sqlStream": "Um den Wert 'stderr' in der Spalte 'stream' zu suchen, verwenden Sie",
-      "sqlFunction": "Um die Abfragefunktion {fn} auf der Spalte 'log' zu suchen und zu verwenden, verwenden Sie",
-      "sqlMoreExamples": "Für weitere Beispiele,",
-      "sqlClickHere": "klicken Sie hier"
-    },
     "add": "Hinzufügen",
     "runQuery": "Abfrage ausführen",
     "runQueryOptions": "Optionen für Abfrage ausführen",
@@ -13760,7 +13745,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "Zum Dashboard hinzufügen",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "Durchschnitt",
+          "sortAvgTitle": "Werte nach ihrem Durchschnitt über das Zeitfenster ordnen",
+          "sortOutlying": "Ausreißer",
+          "sortOutlyingTitle": "Werte danach ordnen, wie stark ihre Zeitreihe von den anderen abweicht",
+          "outlier": "Ausreißer"
         },
         "related": {
           "empty": "Keine zugehörigen Metriken",
@@ -13885,9 +13875,9 @@
         "selectLabel": "Ein Label auswählen",
         "invalidLabel": "Ungültiger Label-Name.",
         "selectOrTypeValue": "Wert auswählen oder eingeben",
-        "operatorHelp": "=  entspricht genau diesem Wert\n!=  entspricht alles außer diesem Wert\n=~  entspricht einem Regex – verwenden Sie 500{'|'}503, um eines von beiden zu treffen\n!~  entspricht keinem Regex\n\nFilter werden mit UND kombiniert. Um einen von zwei Werten zu treffen, verwenden Sie =~ mit einem Regex.",
+        "operatorHelp": "=  ist genau dieser Wert\n!=  ist alles andere als dieser Wert\n=~  entspricht einem Regex — verwenden Sie 500{'|'}503, um beides zu treffen\n!~  entspricht keinem Regex\n\nFilter werden mit AND kombiniert. Um einen von zwei Werten zu treffen, verwenden Sie =~ mit einem Regex oder fügen Sie eine OR-Gruppe hinzu.",
         "andSeparator": "und",
-        "andSeparatorTitle": "Filter werden mit UND kombiniert — eine Metrik muss allen entsprechen. Um einen von zwei Werten zutreffen, verwenden Sie den Operator =~ mit einem regulären Ausdruck.",
+        "andSeparatorTitle": "Filter werden mit AND kombiniert — eine Metrik muss allen entsprechen. Um einen von zwei Werten zu treffen, verwenden Sie den Operator =~ mit einem Regex oder fügen Sie eine OR-Gruppe hinzu.",
         "noSuggestions": "Keine Vorschläge — geben Sie einen Wert ein.",
         "moreFilters": "+{count} weitere",
         "moreFiltersTooltip": "Klicken, um alle Filter inline anzuzeigen",
@@ -13927,11 +13917,16 @@
         "deleteMessage": "Die Ansicht {name} für alle in dieser Organisation löschen?",
         "modified": "{name} (geändert)",
         "clear": "Ansicht zurücksetzen"
-      }
-    },
-    "index": {
-      "namePanelRequired": "Name des Panels ist erforderlich",
-      "errorsFixTryAgain": "Es sind einige Fehler aufgetreten, bitte beheben Sie diese und versuchen Sie es erneut"
+      },
+      "sortDashboards": "Dashboards",
+      "sortDashboardsTitle": "Am häufigsten in Dashboards verwendet zuerst",
+      "sortAlerts": "Alarme",
+      "sortAlertsTitle": "Am häufigsten in Alarmen verwendet zuerst",
+      "usageInDashboards": "In Dashboards",
+      "usageHasAlerts": "Hat Alarme",
+      "usageInSlos": "In SLOs",
+      "usageLoading": "Nutzung der Metriken wird geladen",
+      "usageFailed": "Nutzung nicht verfügbar, erneut versuchen"
     },
     "metricCard": {
       "lastRefreshed": "Zuletzt aktualisiert:",
@@ -13943,25 +13938,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Diagramm konnte nicht gerendert werden"
-    },
-    "queryBuilder": {
-      "title": "PromQL-Abfrage-Builder",
-      "subtitle": "Erstellen und testen Sie PromQL-Abfragen visuell",
-      "generatedQuery": "Generierte PromQL-Abfrage:",
-      "noQueryBuilt": "Noch keine Abfrage erstellt",
-      "copyQuery": "Abfrage kopieren",
-      "clearAll": "Alle löschen",
-      "testQuery": "Abfrage testen",
-      "queryResultPreview": "Vorschau des Abfrageergebnisses:",
-      "queryCopied": "Abfrage in die Zwischenablage kopiert!",
-      "queryCleared": "Abfrage gelöscht",
-      "testingSoon": "Abfragetests werden bald implementiert",
-      "executionSoon": "Die Abfrageausführung wird in der nächsten Phase implementiert"
-    },
-    "metricSelector": {
-      "metricName": "Metrikname",
-      "loadingMetrics": "Metriken werden geladen...",
-      "noMetricsFound": "Keine Metriken gefunden"
     },
     "labelFilterEditor": {
       "label": "Label",
@@ -13984,8 +13960,6 @@
       "noMetric": "Der Builder benötigt eine Abfrage über eine benannte Metrik",
       "mismatch": "Der Builder kann diese Abfrage nicht exakt anzeigen",
       "constructs": {
-        "without": "eine without (…)-Gruppierung",
-        "offset": "ein Offset-Modifier",
         "at": "ein {'@'}-Modifier",
         "orMatchers": "ein or zwischen Label-Matchern",
         "subquery": "eine Unterabfrage",
@@ -14019,7 +13993,11 @@
         "byLabelsLabel": "Nach Labels",
         "quantileLabel": "Quantil",
         "kLabel": "K",
-        "nearestMultipleLabel": "Nächstes Vielfaches"
+        "nearestMultipleLabel": "Nächstes Vielfaches",
+        "withoutLabel": "Without (diese Labels entfernen)",
+        "withoutDesc": "Aggregiert die ausgewählten Labels weg und behält alle anderen Labels",
+        "offsetLabel": "Offset",
+        "offsetDesc": "Wie weit zurück die Metrik gelesen wird, z. B. 1h oder 1d"
       },
       "rangeOnlyFirst": "Eine Range-Funktion kann nur der erste Schritt sein",
       "rangeOnlyFirstNote": "Eine Range-Funktion liest die Roh-Samples und kann daher nur der erste Schritt sein. Entfernen Sie die anderen Schritte, um eine hinzuzufügen.",
@@ -14089,6 +14067,17 @@
       "empty": "Noch keine Abfragen",
       "noMatch": "Keine Abfragen passen zur Suche oder zum Sternfilter",
       "loadMore": "Mehr laden"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR-Gruppe",
+      "addGroupTooltip": "Fügt eine Gruppe von Filtern hinzu; eine Zeitreihe trifft zu, wenn sie einer beliebigen Gruppe entspricht",
+      "addToGroup": "Filter zu dieser Gruppe hinzufügen",
+      "anyOf": "eines von",
+      "andAnyOf": "und eines von",
+      "or": "oder",
+      "not": "nicht",
+      "notTooltip": "Trifft die Zeitreihen, die diese gesamte Gruppe nicht trifft",
+      "tooManyBranches": "Diese Filter erweitern sich zu {count} separaten Selektoren; höchstens {max} können ausgeführt werden. Fassen Sie Werte in einem Regex-Filter zusammen oder entfernen Sie eine Gruppe."
     }
   },
   "settings": {
@@ -15107,26 +15096,37 @@
       },
       "noData": "Keine Daten",
       "unavailable": "Die Latenz-Heatmap ist für diese Suche nicht verfügbar",
-      "loadFailed": "Latenz-Heatmap konnte nicht geladen werden"
+      "loadFailed": "Latenz-Heatmap konnte nicht geladen werden",
+      "selection": {
+        "label": "Heatmap-Auswahl",
+        "reopen": "Auswahlaktionen anzeigen",
+        "count": "{count} Span ausgewählt | {count} Spans ausgewählt",
+        "range": "{band} · {window}",
+        "filter": "Auf Auswahl filtern",
+        "drillDown": "Drill-down",
+        "askAi": "KI fragen",
+        "askAiChip": "Heatmap-Auswahl · {count} Span | Heatmap-Auswahl · {count} Spans",
+        "clear": "Auswahl aufheben"
+      }
     },
     "comparison": {
-      "title": "Auswahl vergleichen",
-      "baselineOutside": "Außerhalb der Auswahl",
-      "baselineBefore": "Kurz davor",
+      "baselineOutside": "Rest des Zeitraums",
+      "baselineBefore": "Vor der Auswahl",
       "sampleNote": "Auswahl: {selection} · Basislinie: {baseline}",
       "sampleNoteAll": "alle {count} Span | alle {count} Spans",
       "sampleCapped": "{sampled} von {total} Spans gesampelt",
       "noiseNote": "Unterschiede unter {pts} Pkt. liegen innerhalb des Sampling-Rauschens",
       "loading": "Spans werden gesampelt…",
-      "loadFailed": "Auswahl konnte nicht verglichen werden",
+      "loadFailed": "Drill-down konnte nicht geladen werden",
       "sampleOverflow": "Die Stichprobe stimmt nicht mit der Span-Anzahl überein, beispielsweise weil verspätete Daten eingetroffen sind. Erneut versuchen, um neu zu zählen.",
       "baselineCapped": "Basislinie auf {range} begrenzt, bis zu 3 h beidseitig der Auswahl",
       "baselineLimited": "Basislinie auf {range} begrenzt durch das {hours}-Stunden-Abfragelimit dieses Streams",
-      "rangeClamped": "Der Server hat den Zeitraum verkürzt, sodass der Vergleich unvollständig wäre",
+      "rangeClamped": "Der Server hat den Zeitraum verkürzt, daher wäre das Drill-down unvollständig",
       "rangeTooLong": "Die Auswahl ist länger als das {hours}-Stunden-Abfragelimit dieses Streams",
+      "presetRangeTooLong": "Der Zeitraum ist länger als das {hours}-Stunden-Abfragelimit dieses Streams",
       "retry": "Erneut versuchen",
       "noSelectionTitle": "Spans zum Vergleichen auswählen",
-      "noSelectionBody": "Ziehen Sie ein Rechteck auf der Dauer-Heatmap auf oder wählen Sie einen Bereich im Fehler- oder Rate-Diagramm aus, und öffnen Sie dann Drill down.",
+      "noSelectionBody": "Gehen Sie zurück und ziehen Sie einen Bereich auf der Dauer-Heatmap auf, oder markieren Sie einen Bereich im Fehler- oder Rate-Diagramm.",
       "emptySelection": "Keine Spans in der Auswahl",
       "emptyBaseline": "Keine Basislinien-Spans",
       "emptyBaselineHint": "Nichts entsprach dieser Basislinie. Versuchen Sie stattdessen {mode}.",
@@ -15151,6 +15151,23 @@
       "summaryBand": "{window} · {band}"
     },
     "drillDownBackTarget": "Ergebnisse",
+    "drillDownPanel": {
+      "counts": "{selected} vs. {baseline}",
+      "selectedTraces": "{count} ausgewählter Trace | {count} ausgewählte Traces",
+      "baselineTraces": "{count} Baseline-Trace | {count} Baseline-Traces",
+      "selectedSpans": "{count} ausgewählter Span | {count} ausgewählte Spans",
+      "baselineSpans": "{count} Baseline-Span | {count} Baseline-Spans",
+      "baseline": "Baseline",
+      "presetsTitle": "Oder starten Sie mit einer Voreinstellung",
+      "presetErrors": "Fehler vs. Rest",
+      "presetSlowest": "Langsamste 10 % vs. Rest",
+      "presetRecent": "Neuere vs. frühere",
+      "presetErrorsDesc": "Spans mit einem Fehler gegenüber allen anderen Spans",
+      "presetSlowestDesc": "Spans bei oder über p90 gegenüber schnelleren Spans",
+      "presetRecentDesc": "Zweite Hälfte des Zeitraums gegenüber der ersten Hälfte",
+      "presetEmpty": "In diesem Bereich gibt es keine Span-Dauern zum Vergleichen",
+      "presetNoMatch": "Diese Voreinstellung hat in diesem Bereich keine Spans zum Vergleichen gefunden"
+    },
     "metrics": {
       "perSecond": {
         "traces": "Traces/s",
@@ -15273,6 +15290,7 @@
     "errorSpans": "Fehler-Spans",
     "filterByErrors": "Nach Fehlern filtern",
     "clearErrorFilter": "Fehlerfilter löschen",
+    "updatingResults": "Ergebnisse werden aktualisiert",
     "error": "FEHLER",
     "errorCount": "{n} FEHLER | {n} FEHLER",
     "success": "ERFOLG",
@@ -21619,7 +21637,8 @@
         "resetColumnWidths": "Spaltenbreiten zurücksetzen"
       },
       "selectAllRows": "Alle Zeilen auswählen",
-      "selectRow": "Zeile {name} auswählen",
+      "selectRowAt": "Zeile {index} auswählen",
+      "selectRowAtNamed": "Zeile {index}, {name} auswählen",
       "removeColumnAria": "Spalte entfernen",
       "formatColumnAria": "Spalte formatieren",
       "selectedOfTotal": "{selected} von {total} ausgewählt",
@@ -22804,7 +22823,8 @@
       "moduloName": "Modulo",
       "multiplyByName": "Multiplizieren mit",
       "divideByName": "Dividieren durch",
-      "exponentName": "Exponent"
+      "exponentName": "Exponent",
+      "offsetDoc": "Liest die Metrik so, wie sie vor der angegebenen Dauer war"
     }
   },
   "passwordPolicy": {
@@ -26418,6 +26438,8 @@
     "section_handled": "Bestätigt",
     "section_resolved": "Behoben",
     "sectionHint_ringing": "Niemand hat bestätigt — diese werden weiterhin alarmiert.",
+    "sectionHint_ringingRouted": "niemand hat bestätigt — {count} davon alarmiert noch | niemand hat bestätigt — {count} davon alarmieren noch",
+    "sectionHint_ringingUnrouted": "{count} hat kein Team, daher wird nicht alarmiert | {count} haben kein Team, daher wird nicht alarmiert",
     "sectionHint_snoozed": "Alarmierung pausiert — sie kommen von selbst zurück.",
     "sectionHint_handled": "Bestätigt — eine Person ist für jeden Eintrag zuständig.",
     "sectionHint_resolved": "Geschlossen — zur Aufzeichnung aufbewahrt.",

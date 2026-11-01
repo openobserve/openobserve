@@ -1315,7 +1315,6 @@
       "moreExamples": "Voor meer voorbeelden,",
       "clickHere": "klik hier"
     },
-    "legendLabel": "Legenda",
     "switchToLogs": "Schakel terug naar Logs",
     "savedViewsLabel": "Opgeslagen weergaven",
     "savedViewName": "Naam bekijken",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "Formule {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} is geen query in dit paneel",
-    "formulaReferencesFormula": "{letter} is een formule, en een formule mag niet naar een andere formule verwijzen",
+    "formulaCycle": "Formules verwijzen in een lus naar elkaar: {cycle}",
+    "formulaTooLong": "De formule wordt uitgebreid tot meer dan {limit} tekens",
+    "formulaTooDeep": "Formules zijn meer dan {limit} niveaus diep genest",
     "formulaInputNote": "Gebruikt in een formule: daar gelden de instelling voor instant/bereik, de legenda, de stap en de tijdsverschuiving van deze query niet.",
     "multiSqlQueryLabel": "Query-label",
     "multiSqlQueryLabelHint": "Aangepaste naam voor deze zoekopdracht in legenda's (bijvoorbeeld 'Productie')",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "Waarde",
     "hostmapGroupBy": "Groeperen op",
     "otherColumn": "Andere kolommen",
-    "metric": "Metriek",
     "filters": "Filters",
     "labelFilters": "Filters voor etiketten",
     "operations": "Operaties",
@@ -13630,21 +13630,6 @@
     "awsStsSelfHostedInfo": "Dit maakt gebruik van AWS sts om de rol op zich te nemen en operaties uit te voeren. Zorg ervoor dat u aws-inloggegevens hebt geconfigureerd in de installatie-env die toegang hebben tot deze rol."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "Voor instant vector selectors, gebruik",
-      "rangeVector": "Voor range vector selectors, gebruik",
-      "aggregate": "Om gegevens te aggregeren, gebruik",
-      "or": "of",
-      "rate": "Voor snelheidsberekeningen over een range vector, gebruik",
-      "sqlTitle": "Syntaxisgids: SQL-modus",
-      "sqlFullText": "Voor volledige tekstzoekopdracht van waarde 'error' gebruik",
-      "sqlColumn": "Voor kolomzoekopdracht van waarde 'error' gebruik",
-      "sqlCode": "Om waarde 200 te zoeken voor codekolom gebruik",
-      "sqlStream": "Om waarde 'stderr' te zoeken voor streamkolom gebruik",
-      "sqlFunction": "Om te zoeken en queryfunctie {fn} te gebruiken op kolom log, gebruik",
-      "sqlMoreExamples": "Voor extra voorbeelden,",
-      "sqlClickHere": "klik hier"
-    },
     "add": "Toevoegen",
     "runQuery": "Query uitvoeren",
     "runQueryOptions": "Opties voor query uitvoeren",
@@ -13760,7 +13745,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "Toevoegen aan dashboard",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "Gemiddelde",
+          "sortAvgTitle": "Rangschik waarden op hun gemiddelde over het venster",
+          "sortOutlying": "Afwijkend",
+          "sortOutlyingTitle": "Rangschik waarden op hoe ver hun reeks van de andere afwijkt",
+          "outlier": "Uitschieter"
         },
         "related": {
           "empty": "Geen gerelateerde metrieken",
@@ -13885,9 +13875,9 @@
         "selectLabel": "Selecteer een label",
         "invalidLabel": "Ongeldige labelnaam.",
         "selectOrTypeValue": "Selecteer of typ een waarde",
-        "operatorHelp": "=  is precies deze waarde\n!=  is alles behalve deze waarde\n=~  komt overeen met een regex — gebruik 500{'|'}503 om een van beide te matchen\n!~  komt niet overeen met een regex\n\nFilters worden gecombineerd met EN. Om een van twee waarden te matchen, gebruik =~ met een regex.",
+        "operatorHelp": "=  is precies deze waarde\n!=  is alles behalve deze waarde\n=~  komt overeen met een regex — gebruik 500{'|'}503 om een van beide te matchen\n!~  komt niet overeen met een regex\n\nFilters worden gecombineerd met AND. Om een van twee waarden te matchen, gebruik =~ met een regex of voeg een OR-groep toe.",
         "andSeparator": "en",
-        "andSeparatorTitle": "Filters worden gecombineerd met EN — een metriek moet aan alle voldoen. Om een van twee waarden te matchen, gebruik de =~ operator met een regex.",
+        "andSeparatorTitle": "Filters worden gecombineerd met AND — een metriek moet aan allemaal voldoen. Om een van twee waarden te matchen, gebruik de operator =~ met een regex of voeg een OR-groep toe.",
         "noSuggestions": "Geen suggesties — typ een waarde.",
         "moreFilters": "+{count} meer",
         "moreFiltersTooltip": "Klik om alle filters inline te tonen",
@@ -13927,11 +13917,16 @@
         "deleteMessage": "De weergave {name} voor iedereen in deze organisatie verwijderen?",
         "modified": "{name} (gewijzigd)",
         "clear": "Weergave wissen"
-      }
-    },
-    "index": {
-      "namePanelRequired": "Naam van paneel is vereist",
-      "errorsFixTryAgain": "Er zijn fouten, los ze op en probeer opnieuw"
+      },
+      "sortDashboards": "Dashboards",
+      "sortDashboardsTitle": "Meest gebruikt in dashboards bovenaan",
+      "sortAlerts": "Alarmen",
+      "sortAlertsTitle": "Meest gebruikt in alarmen bovenaan",
+      "usageInDashboards": "In dashboards",
+      "usageHasAlerts": "Heeft alarmen",
+      "usageInSlos": "In SLO's",
+      "usageLoading": "Laden waar metrieken worden gebruikt",
+      "usageFailed": "Gebruik niet beschikbaar, opnieuw proberen"
     },
     "metricCard": {
       "lastRefreshed": "Laatst vernieuwd:",
@@ -13943,25 +13938,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Diagram weergeven mislukt"
-    },
-    "queryBuilder": {
-      "title": "PromQL Query Bouwer",
-      "subtitle": "Bouw en test PromQL queries visueel",
-      "generatedQuery": "Gegenereerde PromQL Query:",
-      "noQueryBuilt": "Nog geen query gebouwd",
-      "copyQuery": "Query kopiëren",
-      "clearAll": "Alles wissen",
-      "testQuery": "Test query",
-      "queryResultPreview": "Query resultaat voorbeeld:",
-      "queryCopied": "Query gekopieerd naar klembord!",
-      "queryCleared": "Query gewist",
-      "testingSoon": "Query testen wordt binnenkort geïmplementeerd",
-      "executionSoon": "Query uitvoering wordt in de volgende fase geïmplementeerd"
-    },
-    "metricSelector": {
-      "metricName": "Metriek naam",
-      "loadingMetrics": "Metrieken laden...",
-      "noMetricsFound": "Geen metrieken gevonden"
     },
     "labelFilterEditor": {
       "label": "Label",
@@ -13984,8 +13960,6 @@
       "noMetric": "De builder heeft een query nodig over één benoemde metriek",
       "mismatch": "De builder kan deze query niet exact weergeven",
       "constructs": {
-        "without": "een without (…)-groepering",
-        "offset": "een offset-modifier",
         "at": "een {'@'} modifier",
         "orMatchers": "een or tussen labelmatchers",
         "subquery": "een subquery",
@@ -14019,7 +13993,11 @@
         "byLabelsLabel": "Op labels",
         "quantileLabel": "Kwantiel",
         "kLabel": "K",
-        "nearestMultipleLabel": "Dichtstbijzijnde veelvoud"
+        "nearestMultipleLabel": "Dichtstbijzijnde veelvoud",
+        "withoutLabel": "Zonder (deze labels weglaten)",
+        "withoutDesc": "Aggregeer de geselecteerde labels weg en behoud alle overige labels",
+        "offsetLabel": "Offset",
+        "offsetDesc": "Hoe ver terug de metriek moet worden gelezen, bijv. 1h of 1d"
       },
       "rangeOnlyFirst": "Een range-functie kan alleen de eerste stap zijn",
       "rangeOnlyFirstNote": "Een range-functie leest de ruwe samples, dus kan alleen de eerste stap zijn. Verwijder de andere stappen om er een toe te voegen.",
@@ -14089,6 +14067,17 @@
       "empty": "Nog geen queries",
       "noMatch": "Geen queries komen overeen met de zoekopdracht of het filter voor sterren",
       "loadMore": "Meer laden"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR-groep",
+      "addGroupTooltip": "Voeg een groep filters toe; een reeks komt overeen als deze aan een van de groepen voldoet",
+      "addToGroup": "Voeg een filter toe aan deze groep",
+      "anyOf": "een van",
+      "andAnyOf": "en een van",
+      "or": "of",
+      "not": "niet",
+      "notTooltip": "Kom overeen met de reeks die niet aan deze hele groep voldoet",
+      "tooManyBranches": "Deze filters worden uitgebreid naar {count} afzonderlijke selectors; maximaal {max} kunnen worden uitgevoerd. Voeg waarden samen in één regex-filter of verwijder een groep."
     }
   },
   "settings": {
@@ -15107,26 +15096,37 @@
       },
       "noData": "Geen gegevens",
       "unavailable": "De latentie-heatmap is niet beschikbaar voor deze zoekopdracht",
-      "loadFailed": "Kan de latentie-heatmap niet laden"
+      "loadFailed": "Kan de latentie-heatmap niet laden",
+      "selection": {
+        "label": "Heatmapselectie",
+        "reopen": "Selectieacties tonen",
+        "count": "{count} span geselecteerd | {count} spans geselecteerd",
+        "range": "{band} · {window}",
+        "filter": "Filteren op selectie",
+        "drillDown": "Drill-down",
+        "askAi": "Vraag AI",
+        "askAiChip": "Heatmapselectie · {count} span | Heatmapselectie · {count} spans",
+        "clear": "Selectie wissen"
+      }
     },
     "comparison": {
-      "title": "Selectie vergelijken",
-      "baselineOutside": "Buiten de selectie",
-      "baselineBefore": "Net ervoor",
+      "baselineOutside": "Rest van bereik",
+      "baselineBefore": "Vóór selectie",
       "sampleNote": "Selectie: {selection} · Basislijn: {baseline}",
       "sampleNoteAll": "alle {count} span | alle {count} spans",
       "sampleCapped": "{sampled} bemonsterd van {total} spans",
       "noiseNote": "Verschillen onder {pts} punten vallen binnen de steekproefruis",
       "loading": "Spans bemonsteren…",
-      "loadFailed": "Kan de selectie niet vergelijken",
+      "loadFailed": "Kon de drill-down niet laden",
       "sampleOverflow": "De steekproef komt niet overeen met het aantal spans, bijvoorbeeld doordat er gegevens te laat zijn aangekomen. Probeer opnieuw om de telling te herhalen.",
       "baselineCapped": "Basislijn beperkt tot {range}, tot 3 u aan weerszijden van de selectie",
       "baselineLimited": "Basislijn beperkt tot {range} door de querylimiet van {hours} uur van deze stream",
-      "rangeClamped": "De server heeft het tijdsbereik ingekort, waardoor de vergelijking onvolledig zou zijn",
+      "rangeClamped": "De server heeft het tijdsbereik ingekort, waardoor de drill-down onvolledig zou zijn",
       "rangeTooLong": "De selectie is langer dan de querylimiet van {hours} uur van deze stream",
+      "presetRangeTooLong": "Het tijdsbereik is langer dan de querylimiet van {hours} uur voor deze stream",
       "retry": "Opnieuw proberen",
       "noSelectionTitle": "Selecteer spans om te vergelijken",
-      "noSelectionBody": "Teken een vak op de Duur-heatmap, of selecteer een bereik in de grafiek Fouten of Snelheid, en open vervolgens Drill-down.",
+      "noSelectionBody": "Ga terug en teken een kader op de heatmap Duur, of veeg over de grafiek Fouten of Rate.",
       "emptySelection": "Geen spans in de selectie",
       "emptyBaseline": "Geen spans in de basislijn",
       "emptyBaselineHint": "Er kwam niets overeen met deze basislijn. Probeer in plaats daarvan {mode}.",
@@ -15151,6 +15151,23 @@
       "summaryBand": "{window} · {band}"
     },
     "drillDownBackTarget": "resultaten",
+    "drillDownPanel": {
+      "counts": "{selected} vs {baseline}",
+      "selectedTraces": "{count} geselecteerde trace | {count} geselecteerde traces",
+      "baselineTraces": "{count} baseline trace | {count} baseline traces",
+      "selectedSpans": "{count} geselecteerde span | {count} geselecteerde spans",
+      "baselineSpans": "{count} baseline span | {count} baseline spans",
+      "baseline": "Baseline",
+      "presetsTitle": "Of begin met een voorinstelling",
+      "presetErrors": "Fouten vs rest",
+      "presetSlowest": "Traagste 10% vs rest",
+      "presetRecent": "Recent vs eerder",
+      "presetErrorsDesc": "Spans met een fout tegenover alle andere spans",
+      "presetSlowestDesc": "Spans op of boven p90 tegenover snellere spans",
+      "presetRecentDesc": "Tweede helft van het tijdsbereik tegenover de eerste helft",
+      "presetEmpty": "Geen spanduur in dit bereik om te rangschikken",
+      "presetNoMatch": "Die voorinstelling vond geen spans om te vergelijken in dit bereik"
+    },
     "metrics": {
       "perSecond": {
         "traces": "traces/s",
@@ -15273,6 +15290,7 @@
     "errorSpans": "Foutspans",
     "filterByErrors": "Filteren op fouten",
     "clearErrorFilter": "Foutfilter wissen",
+    "updatingResults": "Resultaten bijwerken",
     "error": "FOUT",
     "errorCount": "{n} FOUT | {n} FOUTEN",
     "success": "SUCCES",
@@ -21619,7 +21637,8 @@
         "resetColumnWidths": "Kolombreedtes herstellen"
       },
       "selectAllRows": "Alle rijen selecteren",
-      "selectRow": "Rij {name} selecteren",
+      "selectRowAt": "Rij {index} selecteren",
+      "selectRowAtNamed": "Rij {index}, {name} selecteren",
       "removeColumnAria": "Kolom verwijderen",
       "formatColumnAria": "Kolom opmaken",
       "selectedOfTotal": "{selected} van {total} geselecteerd",
@@ -22804,7 +22823,8 @@
       "moduloName": "Modulo",
       "multiplyByName": "Vermenigvuldigen met",
       "divideByName": "Delen door",
-      "exponentName": "Exponent"
+      "exponentName": "Exponent",
+      "offsetDoc": "Leest de metriek zoals die de opgegeven duur geleden was"
     }
   },
   "passwordPolicy": {
@@ -26418,6 +26438,8 @@
     "section_handled": "In behandeling",
     "section_resolved": "Opgelost",
     "sectionHint_ringing": "niemand heeft ze bevestigd — ze worden nog opgeroepen",
+    "sectionHint_ringingRouted": "niemand heeft bevestigd — {count} van deze wordt nog steeds opgeroepen | niemand heeft bevestigd — {count} van deze worden nog steeds opgeroepen",
+    "sectionHint_ringingUnrouted": "{count} heeft geen team, dus wordt er niet opgeroepen | {count} hebben geen team, dus wordt er niet opgeroepen",
     "sectionHint_snoozed": "oproepen gepauzeerd — ze komen vanzelf terug",
     "sectionHint_handled": "overgenomen — er is een persoon verantwoordelijk voor elk",
     "sectionHint_resolved": "gesloten — bewaard voor het archief",

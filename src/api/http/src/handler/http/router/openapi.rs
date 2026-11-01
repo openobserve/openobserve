@@ -330,6 +330,7 @@ const MCP_OPT_OUT_CATEGORIES: [&str; 2] = ["authorization", "users"];
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
         openobserve_api_management::request::metrics_usage::get_metric_usage,
+        openobserve_api_management::request::metrics_usage::get_org_metric_usage,
         openobserve_api_management::request::slos::list_slos,
         openobserve_api_management::request::slos::get_slo,
         openobserve_api_management::request::slos::create_slo,

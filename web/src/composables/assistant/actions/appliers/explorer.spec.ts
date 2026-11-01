@@ -57,6 +57,6 @@ describe("explorer applier", () => {
     store.state.shell.placement = { kind: "docked", hostId: "alert_query" };
     await explorerApplier(sid, { kind: "open_in_explorer", query, explorer: "metrics" }, env);
     expect(router.push).not.toHaveBeenCalled();
-    expect(env.openTab).toHaveBeenCalledWith("/web/metricsEditor");
+    expect(env.openTab).toHaveBeenCalledWith("/web/metrics");
   });
 });
