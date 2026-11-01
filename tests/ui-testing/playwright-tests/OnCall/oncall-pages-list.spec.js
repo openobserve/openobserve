@@ -3,7 +3,7 @@
  *
  * Plan: docs/test_generator/features/oncall-test-plan.md
  *   §2.4  the page detail badges each responder with what the ledger says
- *   §3.2  an exhausted ladder reads "Ladder finished — nobody left"
+ *   §3.2  an exhausted ladder reads "Nobody answered"
  *   §3.3  a ladder still climbing keeps saying so — the wording is per-state
  *   §11.3 a group heading's count against the rows actually drawn
  *   §11.6 a teamless page reads "Unrouted", and the exhaust reason must not
@@ -63,10 +63,10 @@ const { DEFAULT_TEAM_LOCK, acquireOrgLock } = require('../utils/oncall-org-lock.
 
 const PREFIX = 'e2e_oncall_pages';
 
-/** Wording the plan pins, verbatim from `oncall.ladderFinished`. */
-const FINISHED_WORDING = 'Ladder finished';
-/** The blanket wording §3.2 guards against, from `oncall.escalationClimbing`. */
-const CLIMBING_WORDING = 'Escalating';
+/** Wording the plan pins, verbatim from `oncall.state_exhausted`. */
+const FINISHED_WORDING = 'Nobody answered';
+/** The climbing wording an exhausted ladder must drop, from `oncall.escalationPagingStep*`. */
+const CLIMBING_WORDING = 'Paging step';
 /** `oncall.statUnrouted` — what a page nothing claimed must say. */
 const UNROUTED_WORDING = 'Unrouted';
 
@@ -255,7 +255,7 @@ test.describe('On-call pages list', {
    * situations. The honest wording is per-state, so this reads the same cell
    * twice: once while the ladder is still climbing — it must not already claim
    * to be finished — and once after the server reports exhaustion, where it must
-   * say so in words and must NOT still read "Escalating".
+   * say so in words and must NOT still read "Paging step".
    *
    * BOTH READS GO THROUGH THE TEAM FILTER, and that is what makes this test
    * survive a busy org rather than a freshly-wiped one. The list loads a

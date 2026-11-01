@@ -367,6 +367,8 @@ test.describe('On-call escalation policy editor', {
 
     // None — never set, so the policy's list applies again.
     await pm.oncallPolicyEditorPage.clearTeamChannel();
+    // The channel choice is only a draft until the policy's Save, which also closes the editor.
+    await pm.oncallPolicyEditorPage.savePolicy();
     await expect
       .poll(async () => (await getTeamChannel(page, team.id))?.source, {
         timeout: 20000,
@@ -378,6 +380,8 @@ test.describe('On-call escalation policy editor', {
     expect(cleared.destinations,
       'both states render an empty list — which is exactly why source has to carry the difference')
       .toEqual([]);
+    await pm.oncallPolicyEditorPage.openEditor();
+    await pm.oncallPolicyEditorPage.openTab('delivery');
     const policySource = await pm.oncallPolicyEditorPage.readChannelSourceText();
     expect(policySource.toLowerCase(),
       'and the screen must now attribute it to the policy instead')

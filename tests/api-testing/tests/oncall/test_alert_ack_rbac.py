@@ -70,7 +70,7 @@ def editor(client: OpenObserveClient, oncall_org: str, oncall: OnCallClient) -> 
 
 @pytest.fixture(scope="module")
 def member(client: OpenObserveClient, oncall_org: str, oncall: OnCallClient) -> tuple[str, OpenObserveClient]:
-    return _non_admin(client, oncall_org, oncall, "user")
+    return _non_admin(client, oncall_org, oncall, "viewer")
 
 
 @pytest.fixture(scope="module")
