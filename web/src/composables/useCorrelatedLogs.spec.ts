@@ -536,4 +536,73 @@ describe("useCorrelatedLogs", () => {
       expect(composable.currentFilters.value.service).toBe("test-service");
     });
   });
+
+  describe("Result count while streams arrive", () => {
+    const hitsOf = (count: number, from: number) =>
+      Array.from({ length: count }, (_, i) => ({ _timestamp: from + i }));
+
+    it("streams rows in but holds the count and pager until every stream is done", async () => {
+      let callbacks: any;
+      mockFetchQueryDataWithHttpStream.mockImplementation((_params: any, cb: any) => {
+        callbacks = cb;
+        return Promise.resolve();
+      });
+      const composable = useCorrelatedLogs(props, gt);
+      await composable.fetchCorrelatedLogs();
+
+      callbacks.data(null, {
+        type: "search_response_metadata",
+        content: { results: { total: 100, took: 5 } },
+      });
+      callbacks.data(null, {
+        type: "search_response_hits",
+        content: { results: { hits: hitsOf(100, 0) } },
+      });
+      expect(composable.searchResults.value).toHaveLength(100);
+      expect(composable.totalPages.value).toBe(1);
+      expect(composable.totalHits.value).toBe(0);
+
+      callbacks.data(null, {
+        type: "search_response_metadata",
+        content: { results: { total: 34, took: 5 } },
+      });
+      callbacks.data(null, {
+        type: "search_response_hits",
+        content: { results: { hits: hitsOf(34, 500) } },
+      });
+      expect(composable.totalPages.value).toBe(1);
+
+      callbacks.complete(null);
+      expect(composable.totalPages.value).toBe(5);
+      expect(composable.totalHits.value).toBe(134);
+      expect(composable.searchResults.value[0]._timestamp).toBe(533);
+    });
+
+    it("ignores the rows and completion of a fetch that a newer one replaced", async () => {
+      const streams: any[] = [];
+      mockFetchQueryDataWithHttpStream.mockImplementation((_params: any, cb: any) => {
+        streams.push(cb);
+        return Promise.resolve();
+      });
+      const composable = useCorrelatedLogs(props, gt);
+      await composable.fetchCorrelatedLogs();
+      await composable.fetchCorrelatedLogs();
+
+      streams[0].data(null, {
+        type: "search_response_hits",
+        content: { results: { hits: hitsOf(5, 0) } },
+      });
+      streams[0].complete(null);
+      expect(composable.searchResults.value).toHaveLength(0);
+      expect(composable.isLoading.value).toBe(true);
+
+      streams[1].data(null, {
+        type: "search_response_hits",
+        content: { results: { hits: hitsOf(2, 0) } },
+      });
+      streams[1].complete(null);
+      expect(composable.searchResults.value).toHaveLength(2);
+      expect(composable.isLoading.value).toBe(false);
+    });
+  });
 });

@@ -126,6 +126,7 @@ import WorkspacePremium from "~icons/material-symbols/workspace-premium-outline"
 import UnfoldLess from "~icons/material-symbols/unfold-less";
 import LeftPanelClose from "~icons/material-symbols/left-panel-close";
 import LeftPanelOpen from "~icons/material-symbols/left-panel-open";
+import PinDrop from "~icons/material-symbols/pin-drop-outline";
 import Reorder from "~icons/material-symbols/reorder";
 import FirstPage from "~icons/material-symbols/first-page";
 import LastPage from "~icons/material-symbols/last-page";
@@ -196,6 +197,8 @@ import PhotoCamera from "~icons/material-symbols/photo-camera-outline";
 import AddCircleIcon from "~icons/material-symbols/add-circle-outline";
 import AdsClickIcon from "~icons/material-symbols/ads-click";
 import AnalyticsIcon from "~icons/material-symbols/analytics-outline";
+import DoNotDisturbOnIcon from "~icons/material-symbols/do-not-disturb-on-outline";
+import LibraryAddIcon from "~icons/material-symbols/library-add-outline";
 import ArrowBackIosIcon from "~icons/material-symbols/arrow-back-ios";
 import ArrowForwardIosIcon from "~icons/material-symbols/arrow-forward-ios";
 import ArrowRightIcon from "~icons/material-symbols/arrow-right";
@@ -266,6 +269,7 @@ import MonetizationOnIcon from "~icons/material-symbols/paid-outline-rounded";
 import NoteAddIcon from "~icons/material-symbols/note-add-outline";
 import NotificationsActiveIcon from "~icons/material-symbols/notifications-active-outline";
 import PaletteIcon from "~icons/material-symbols/palette-outline";
+import WaterDropIcon from "~icons/material-symbols/water-drop-outline";
 import PaymentsIcon from "~icons/material-symbols/payments-outline";
 import PrintIcon from "~icons/material-symbols/print-outline";
 import PsychologyIcon from "~icons/material-symbols/psychology-outline";
@@ -490,6 +494,7 @@ export const iconRegistry = {
   "unfold-less": UnfoldLess,
   "left-panel-close": LeftPanelClose,
   "left-panel-open": LeftPanelOpen,
+  "pin-drop": PinDrop,
   reorder: Reorder,
   "first-page": FirstPage,
   "last-page": LastPage,
@@ -586,6 +591,8 @@ export const iconRegistry = {
   "add-circle": AddCircleIcon,
   "add-circle-outline": AddCircleIcon,
   "ads-click": AdsClickIcon,
+  "do-not-disturb-on": DoNotDisturbOnIcon,
+  "library-add": LibraryAddIcon,
   analytics: AnalyticsIcon,
   "arrow-back-ios": ArrowBackIosIcon,
   "arrow-forward-ios": ArrowForwardIosIcon,
@@ -658,6 +665,7 @@ export const iconRegistry = {
   "notifications-active": NotificationsActiveIcon,
   palette: PaletteIcon,
   payments: PaymentsIcon,
+  "water-drop": WaterDropIcon,
   print: PrintIcon,
   psychology: PsychologyIcon,
   radar: RadarIcon,

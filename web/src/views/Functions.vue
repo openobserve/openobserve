@@ -158,7 +158,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <RouterView v-slot="{ Component }">
-        <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+        <OAccessBoundary>
+          <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+        </OAccessBoundary>
       </RouterView>
     </div>
   </OPageLayout>
@@ -168,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
+import OAccessBoundary from "@/components/access/OAccessBoundary.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -185,6 +188,7 @@ export default defineComponent({
     OPageHeader,
     OPageLayout,
     PipelineSectionTabs,
+    OAccessBoundary,
     OButton,
     ODropdown,
     ODropdownItem,

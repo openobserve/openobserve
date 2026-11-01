@@ -113,6 +113,12 @@ impl<'a> Defaults<'a> {
         self.values
     }
 
+    /// Whether any value waits for a values query.
+    #[cfg(feature = "enterprise")]
+    pub fn has_pending(&self) -> bool {
+        !self.pending.is_empty()
+    }
+
     /// The values queries `from` reaches through their stream, field and filter references.
     #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
     pub fn reachable_queries(

@@ -73,7 +73,9 @@ export function buildNavigationRoute(
       queryParams.fn_editor = "false";
     }
 
-    return { path: `/${action.resource_type}`, query: queryParams };
+    // Only Logs runs SQL for every signal; the traces filter box and the metrics editor expect a filter or PromQL.
+    const runsSql = target.sql_mode && ["traces", "metrics"].includes(action.resource_type);
+    return { path: runsSql ? "/logs" : `/${action.resource_type}`, query: queryParams };
   }
 
   if (action.action === "navigate_direct") {

@@ -9,8 +9,8 @@
   Shares ODropdown's overlay coordination so descendant overlays (OSelect /
   OCombobox / nested dropdowns) opening INSIDE the popover never dismiss it.
 
-  Props: open (v-model) | side | align | sideOffset | hideWhenDetached | modal | ariaLabel | contentClass | collisionPadding | autoFocus | privacy
-  Slots: trigger | anchor (positions without a trigger) | default
+  Props: open (v-model) | anchor | side | align | flipAlign | sideOffset | arrow | hideWhenDetached | modal | ariaLabel | contentClass | collisionPadding | autoFocus | privacy
+  Slots: trigger (unused when `anchor` is set) | anchor (positions without a trigger) | default | arrow (paths in a 12x6 viewBox)
   Emits: update:open | open-auto-focus
 -->
 <script lang="ts">
@@ -40,8 +40,15 @@ if (typeof document !== "undefined" && !(globalThis as any)[_oPopKey]) {
 </script>
 
 <script setup lang="ts">
-import { PopoverAnchor, PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from "reka-ui";
-import { inject, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
+import {
+  PopoverRoot,
+  PopoverTrigger,
+  PopoverAnchor,
+  PopoverArrow,
+  PopoverPortal,
+  PopoverContent,
+} from "reka-ui";
+import { inject, nextTick, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
 import { useOverlayScope } from "@/lib/overlay/overlayScope";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
@@ -56,11 +63,17 @@ const { lgUp } = useBreakpoint();
 const props = withDefaults(
   defineProps<{
     open?: boolean;
+    /** Positions against this element instead of a trigger, for a popover opened by code rather than a click on its own control. */
+    anchor?: Element | null;
     /** Trap focus + block outside pointer events. Popovers are non-modal by default. */
     modal?: boolean;
     side?: "top" | "right" | "bottom" | "left";
     align?: "start" | "center" | "end";
+    /** End alignment flips to start when the content would cross the viewport's left edge, instead of sliding off the anchor's edge. */
+    flipAlign?: boolean;
     sideOffset?: number;
+    /** Draws a caret on the edge facing the anchor, pointing at the anchor's centre. */
+    arrow?: boolean;
     /** Hide the content when the trigger scrolls out of view (Floating UI). */
     hideWhenDetached?: boolean;
     ariaLabel?: I18nText;
@@ -90,12 +103,17 @@ const emit = defineEmits<{
   "update:open": [boolean];
   /** Forwards reka's initial-focus event so a consumer can redirect it (call `preventDefault()` to opt out of the default first-tabbable focus). */
   "open-auto-focus": [Event];
+  /** Forwards reka's outside pointerdown; `preventDefault()` keeps the popover open, e.g. for a panel it owns outside its content. */
+  "pointer-down-outside": [Event];
+  /** Forwards reka's outside focus; `preventDefault()` keeps the popover open. */
+  "focus-outside": [Event];
 }>();
 
 const slots = defineSlots<{
   trigger?: () => unknown;
   anchor?: () => unknown;
   default?: () => unknown;
+  arrow?: () => unknown;
 }>();
 
 const FOCUSABLE =
@@ -162,6 +180,18 @@ function onEscapeKeyDown(event: KeyboardEvent) {
 // responsive in both controlled and uncontrolled usage.
 const internalOpen = ref(props.open ?? false);
 const triggerRef = ref<{ $el?: Node } | null>(null);
+const contentRef = ref<{ $el?: Node } | null>(null);
+const placedAlign = ref(props.align);
+
+watch([internalOpen, () => props.align], async ([open]) => {
+  placedAlign.value = props.align;
+  if (!open || !props.flipAlign || props.align !== "end") return;
+  await nextTick();
+  const anchorEl = props.anchor ?? triggerRef.value?.$el;
+  const contentEl = contentRef.value?.$el;
+  if (!(anchorEl instanceof Element) || !(contentEl instanceof HTMLElement)) return;
+  if (anchorEl.getBoundingClientRect().right < contentEl.offsetWidth) placedAlign.value = "start";
+});
 
 watch(
   () => props.open,
@@ -248,6 +278,7 @@ function handlePointerDownOutside(event: Event) {
     return;
   }
   closedFromOutside = true;
+  emit("pointer-down-outside", event);
 }
 function handleFocusOutside(event: Event) {
   if (nestedOverlayCount.value > 0 || withinNestedCloseGrace()) {
@@ -255,6 +286,7 @@ function handleFocusOutside(event: Event) {
     return;
   }
   closedFromOutside = true;
+  emit("focus-outside", event);
 }
 
 // Close on ancestor scroll so the portal never floats detached from its trigger.
@@ -274,7 +306,7 @@ function handleViewportScroll(event: Event) {
     target.closest?.("[data-o-popover-content], [role='menu'], [role='listbox']")
   )
     return;
-  const triggerEl = triggerRef.value?.$el as Node | undefined;
+  const triggerEl = (props.anchor ?? triggerRef.value?.$el) as Node | null | undefined;
   if (triggerEl && target.contains(triggerEl)) handleOpenChange(false);
 }
 watch(internalOpen, (open) => {
@@ -300,20 +332,22 @@ const overlayScope = useOverlayScope();
 
 <template>
   <PopoverRoot :open="internalOpen" :modal="modal" @update:open="handleOpenChange">
-    <PopoverAnchor v-if="slots.anchor" ref="anchorRef" as-child>
+    <PopoverAnchor v-if="anchor" :reference="anchor" class="hidden" />
+    <PopoverAnchor v-else-if="slots.anchor" ref="anchorRef" as-child>
       <slot name="anchor" />
     </PopoverAnchor>
-    <PopoverTrigger v-if="slots.trigger" ref="triggerRef" as-child>
+    <PopoverTrigger v-if="!anchor && slots.trigger" ref="triggerRef" as-child>
       <slot name="trigger" />
     </PopoverTrigger>
 
     <PopoverPortal>
       <PopoverContent
+        ref="contentRef"
         data-o-popover-content
         v-bind="overlayScope"
         :data-dd-privacy="privacy"
         :side="side"
-        :align="align"
+        :align="placedAlign"
         :side-offset="sideOffset"
         :hide-when-detached="hideWhenDetached"
         :collision-padding="collisionPadding ?? (lgUp ? 0 : 8)"
@@ -338,6 +372,11 @@ const overlayScope = useOverlayScope();
         ]"
       >
         <slot />
+        <PopoverArrow v-if="arrow" :width="14" :height="7" class="-translate-y-px overflow-visible">
+          <slot name="arrow">
+            <path class="fill-dropdown-bg" d="M0 0L6 6L12 0Z" />
+          </slot>
+        </PopoverArrow>
       </PopoverContent>
     </PopoverPortal>
   </PopoverRoot>

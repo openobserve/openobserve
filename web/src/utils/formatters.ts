@@ -164,7 +164,9 @@ export const formatSizeFromMB = (sizeInMB: string | number) => {
   const units = ["KB", "MB", "GB", "TB", "PB"];
   let index = 1;
 
-  while (size >= 1024 && index < units.length - 1) {
+  // Compare the rounded value, so 1023.996 MB moves up to "1.00 GB" rather
+  // than printing as "1024.00 MB".
+  while (Number(size.toFixed(2)) >= 1024 && index < units.length - 1) {
     size /= 1024;
     index++;
   }

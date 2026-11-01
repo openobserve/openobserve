@@ -47,6 +47,12 @@ const toStreamError = (e: any): Error =>
         e,
       );
 
+// A prefetch is used once and expires, so it never stands in for a later, fresher read.
+const SCHEMA_PREFETCH_TTL_MS = 30_000;
+const prefetchedSchemas = new Map<string, { at: number; request: Promise<any> }>();
+const schemaPrefetchKey = (org: string, streamType: string, streamName: string) =>
+  JSON.stringify([org, streamType, streamName]);
+
 const useStreams = (t: TranslateFn) => {
   const store = useStore();
 
@@ -284,20 +290,24 @@ const useStreams = (t: TranslateFn) => {
 
             if ((schema && !hasSchema) || force) {
               try {
-                const _stream: any = await StreamService.schema(
-                  store.state.selectedOrganization.identifier,
-                  streamName,
-                  streamType,
-                );
+                const org = store.state.selectedOrganization.identifier;
+                const prefetched = force
+                  ? undefined
+                  : takePrefetchedSchema(org, streamType, streamName);
+                const _stream: any = await (prefetched ??
+                  StreamService.schema(org, streamName, streamType));
                 const streamList = deepCopy(streamsCache[streamType].value || {});
                 streamList.list[streamIndex] = removeSchemaFields(_stream.data);
                 updateStreamsInStore(streamType, streamList);
               } catch (err: any) {
                 return reject(
-                  new Error(
-                    t("logStream.errorWhileFetchingSchema", {
-                      message: err?.message || t("search.unknownError"),
-                    }),
+                  withResponse(
+                    new Error(
+                      t("logStream.errorWhileFetchingSchema", {
+                        message: err?.message || t("search.unknownError"),
+                      }),
+                    ),
+                    err,
                   ),
                 );
               }
@@ -327,6 +337,36 @@ const useStreams = (t: TranslateFn) => {
         }
       })();
     });
+  };
+
+  const takePrefetchedSchema = (org: string, streamType: string, streamName: string) => {
+    const key = schemaPrefetchKey(org, streamType, streamName);
+    const entry = prefetchedSchemas.get(key);
+    if (!entry) return undefined;
+    prefetchedSchemas.delete(key);
+    return Date.now() - entry.at < SCHEMA_PREFETCH_TTL_MS ? entry.request : undefined;
+  };
+
+  /** Starts a stream's schema request before its stream list arrives; getStream() uses it instead of asking again. */
+  const prefetchStreamSchema = (streamName: string, streamType: string) => {
+    const org = store.state.selectedOrganization?.identifier;
+    if (!streamName || !streamType || !org) return;
+    const now = Date.now();
+    for (const [key, entry] of prefetchedSchemas) {
+      if (now - entry.at >= SCHEMA_PREFETCH_TTL_MS) prefetchedSchemas.delete(key);
+    }
+    const key = schemaPrefetchKey(org, streamType, streamName);
+    if (prefetchedSchemas.has(key)) return;
+    const mapping = store.state.streams?.streamsIndexMapping?.[streamType];
+    if (mapping && Object.prototype.hasOwnProperty.call(mapping, streamName)) {
+      if (streamsCache[streamType]?.value?.list?.[mapping[streamName]]?.schema?.length) return;
+    }
+    // The URL may name a stream the user cannot read; the stream list reports that, not a toast from here.
+    const request = StreamService.schema(org, streamName, streamType, { silentForbidden: true });
+    request.catch(() => {
+      if (prefetchedSchemas.get(key)?.request === request) prefetchedSchemas.delete(key);
+    });
+    prefetchedSchemas.set(key, { at: now, request });
   };
 
   const getMultiStreams = async (
@@ -779,6 +819,7 @@ const useStreams = (t: TranslateFn) => {
   return {
     getStreams,
     getStream,
+    prefetchStreamSchema,
     setStreams,
     getMultiStreams,
     resetStreams,

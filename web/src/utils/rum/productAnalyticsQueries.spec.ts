@@ -610,9 +610,13 @@ describe("funnel builders (G4, AC-12, AC-14, AC-15, AC-47)", () => {
       { steps, unit: "sessions", window: "session", breakdown: "browser" },
       opts,
     );
+    // A built-in breakdown adds its per-value median from step 1, for the table's Median time column.
     const expected = SEQ.Q7_FUNNEL_BREAKDOWN.replace(
       "ORDER BY c1 DESC LIMIT 1000",
       "ORDER BY c1 DESC, dim LIMIT 1000",
+    ).replace(
+      " FROM ps GROUP BY dim",
+      ", approx_percentile_cont(d3, 0.5) AS mt1 FROM ps GROUP BY dim",
     );
     expect(norm(sql, s)).toBe(norm(expected, s));
   });
@@ -629,7 +633,7 @@ describe("funnel builders (G4, AC-12, AC-14, AC-15, AC-47)", () => {
     );
     expect(sql).toContain(", s1s, dim FROM su)");
     expect(sql).toContain(
-      "SELECT dim, SUM(r1) AS c1, SUM(r2) AS c2, SUM(r3) AS c3 FROM pu WHERE anon = 0 GROUP BY dim ORDER BY c1 DESC, dim LIMIT 1000",
+      "SELECT dim, SUM(r1) AS c1, SUM(r2) AS c2, SUM(r3) AS c3, approx_percentile_cont(d3, 0.5) AS mt1 FROM pu WHERE anon = 0 GROUP BY dim ORDER BY c1 DESC, dim LIMIT 1000",
     );
   });
 
@@ -1362,6 +1366,13 @@ describe("assertJoinFree over every builder (AC-55)", () => {
         QUERIES.funnelSql(s, id, { ...d, breakdown: null }, opts),
       ]),
     funnelPanelSql: () => defs.map((d) => QUERIES.funnelPanelSql(s, d, opts)),
+    funnelTrendSql: () =>
+      defs.flatMap((d) => [
+        QUERIES.funnelTrendSql(s, id, d, bounds, { a: 1, b: 2 }, opts),
+        QUERIES.funnelTrendSql(s, id, { ...d, breakdown: null }, bounds, { a: 1, b: 2 }, opts),
+      ]),
+    funnelTrendPanelSql: () =>
+      defs.map((d) => QUERIES.funnelTrendPanelSql(s, d, { a: 1, b: 2 }, "1 day", opts)),
     funnelAlertSql: () => defs.map((d) => QUERIES.funnelAlertSql(s, id, d, 50, opts)),
     nextStepsSql: () => defs.map((d) => QUERIES.nextStepsSql(s, id, d, opts)),
     dropoffNextSql: () =>
@@ -1434,6 +1445,10 @@ describe("assertJoinFree over every builder (AC-55)", () => {
     userAgentSuggestionSql: () => [P5_NEW.userAgentSuggestionSql(s)],
     namedEventPreviewSql: () => [P5_NEW.namedEventPreviewSql(s, ev)],
     filterValuesSql: () => [QUERIES.filterValuesSql(s, "usr_email")],
+    stepFieldSampleSql: () =>
+      defs.map((d) =>
+        QUERIES.stepFieldSampleSql(s, d, [ev], ["context_payment_method", "usr_email"], 200),
+      ),
     whyEnteredSql: () =>
       defs.map((d) =>
         QUERIES.whyEnteredSql(

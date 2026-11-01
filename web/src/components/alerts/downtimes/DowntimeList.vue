@@ -72,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               show-index
               row-key="id"
               :loading="loading"
+              :loading-reset-key="activeFolderId"
               :forbidden="forbidden"
               pagination="client"
               :page-size="20"

@@ -223,6 +223,17 @@ describe("stream service", () => {
       );
     });
 
+    it("passes a request config through, so a prefetch can keep a 403 quiet", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: { fields: [] } });
+
+      await stream.schema("org123", "test_stream", "logs", { silentForbidden: true });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/org123/streams/test_stream/schema?type=logs",
+        { silentForbidden: true },
+      );
+    });
+
     it("should make GET request for stream schema without type", async () => {
       const params = {
         org_identifier: "org123",

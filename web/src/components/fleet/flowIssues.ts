@@ -20,7 +20,7 @@ import { FLOW_POLL_MS } from "@/services/fleet.queries";
 import { useRolloutText } from "./rolloutText";
 import { formatCount } from "./fleetFormat";
 import type { Telemetry } from "./flowTypes";
-import { useFleetCollectors, useFleetRollouts } from "./useFleetApi";
+import { isForbidden, useFleetCollectors, useFleetRollouts } from "./useFleetApi";
 
 export type Severity = "error" | "warning" | "progress" | "info";
 // "restricted": the caller may not read some metric streams, so a path without issues is unknown, not healthy.
@@ -245,7 +245,11 @@ export function useFlowIssues() {
   return {
     fleetIssues,
     pipelineIssues,
-    error: computed(() => collectors.error.value ?? rollouts.error.value),
+    // A 403 only hides issues; the map itself loaded, so it is no load error.
+    error: computed(
+      () =>
+        [collectors.error.value, rollouts.error.value].find((e) => e && !isForbidden(e)) ?? null,
+    ),
     refetch,
   };
 }

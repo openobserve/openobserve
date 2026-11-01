@@ -1330,16 +1330,20 @@ mod tests {
     }
 
     #[cfg(feature = "enterprise")]
+    async fn response_json(resp: Response) -> serde_json::Value {
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    // Only the store id is set; the OpenFGA client stays unset, so OpenFGA calls answer 500.
+    #[cfg(feature = "enterprise")]
     fn init_ofga_test() {
-        // Initialize OFGA store ID for tests to prevent panics
         o2_openfga::config::OFGA_STORE_ID.insert("store_id".to_owned(), "test_store_id".to_owned());
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_create_role_enterprise_success() {
         #[cfg(feature = "enterprise")]
         {
@@ -1350,10 +1354,10 @@ mod tests {
             };
 
             let resp = create_role(Path("test_org".to_string()), Json(role_request)).await;
-            // Note: This will likely fail in test environment due to missing OFGA setup
-            // but we're testing the endpoint structure and request handling
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1397,18 +1401,15 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_delete_role_enterprise() {
         #[cfg(feature = "enterprise")]
         {
             init_ofga_test();
             let resp = delete_role(Path(("test_org".to_string(), "test_role".to_string()))).await;
-            // Will likely fail due to missing OFGA setup, but testing structure
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1419,18 +1420,15 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_get_roles_enterprise() {
         #[cfg(feature = "enterprise")]
         {
             init_ofga_test();
             let resp = get_roles(Path("test_org".to_string()), mock_user_email()).await;
-            // Will likely fail due to missing OFGA setup, but testing structure
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1441,10 +1439,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_update_role_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1467,9 +1461,10 @@ mod tests {
                 Json(role_request),
             )
             .await;
-            // Will likely fail due to missing OFGA setup, but testing structure
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1484,10 +1479,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_get_role_permissions_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1498,9 +1489,20 @@ mod tests {
                 "test_resource".to_string(),
             )))
             .await;
-            // Will likely fail due to missing OFGA setup, but testing structure
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            assert_eq!(extract_status_code(&resp), StatusCode::OK);
+            assert_eq!(response_json(resp).await, serde_json::json!([]));
+
+            // A known resource reaches OpenFGA, which unit tests never initialise.
+            let resp = get_role_permissions(Path((
+                "test_org".to_string(),
+                "test_role".to_string(),
+                "dashboards".to_string(),
+            )))
+            .await;
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1516,19 +1518,16 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_get_users_with_role_enterprise() {
         #[cfg(feature = "enterprise")]
         {
             init_ofga_test();
             let resp =
                 get_users_with_role(Path(("test_org".to_string(), "test_role".to_string()))).await;
-            // Will likely fail due to missing OFGA setup, but testing structure
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1540,10 +1539,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_get_roles_for_user_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1553,9 +1548,9 @@ mod tests {
                 "test@example.com".to_string(),
             )))
             .await;
-            // Will likely fail due to missing OFGA setup, but testing structure
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            // Role lookup degrades to no roles rather than failing when OpenFGA is down.
+            assert_eq!(extract_status_code(&resp), StatusCode::OK);
+            assert_eq!(response_json(resp).await, serde_json::json!([]));
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1570,18 +1565,15 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_get_roles_for_all_users_enterprise() {
         #[cfg(feature = "enterprise")]
         {
             init_ofga_test();
             let resp = get_roles_for_all_users(Path("test_org".to_string())).await;
-            // Will likely fail due to missing OFGA setup, but testing structure
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1592,10 +1584,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_get_groups_for_user_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1605,9 +1593,10 @@ mod tests {
                 "test@example.com".to_string(),
             )))
             .await;
-            // Will likely fail due to missing OFGA setup, but testing structure
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1622,10 +1611,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_create_group_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1641,9 +1626,10 @@ mod tests {
             };
 
             let resp = create_group(Path("test_org".to_string()), Json(group)).await;
-            // Will likely fail due to missing OFGA setup, but testing structure
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1660,10 +1646,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_update_group_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1683,9 +1665,10 @@ mod tests {
                 Json(group_request),
             )
             .await;
-            // Will likely fail due to missing OFGA setup, but testing structure
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1707,18 +1690,15 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_get_groups_enterprise() {
         #[cfg(feature = "enterprise")]
         {
             init_ofga_test();
             let resp = get_groups(Path("test_org".to_string()), mock_user_email()).await;
-            // Will likely fail due to missing OFGA setup, but testing structure
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1729,19 +1709,16 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_get_group_details_enterprise() {
         #[cfg(feature = "enterprise")]
         {
             init_ofga_test();
             let resp =
                 get_group_details(Path(("test_org".to_string(), "test_group".to_string()))).await;
-            // Will likely fail due to missing OFGA setup, but testing structure
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1753,18 +1730,15 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(
-        feature = "enterprise",
-        should_panic(expected = "called `Option::unwrap()` on a `None` value")
-    )]
     async fn test_delete_group_enterprise() {
         #[cfg(feature = "enterprise")]
         {
             init_ofga_test();
             let resp = delete_group(Path(("test_org".to_string(), "test_group".to_string()))).await;
-            // Will likely fail due to missing OFGA setup, but testing structure
-            let status = extract_status_code(&resp);
-            assert!(status.is_client_error() || status.is_server_error());
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]

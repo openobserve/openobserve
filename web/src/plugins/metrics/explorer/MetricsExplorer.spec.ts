@@ -654,6 +654,50 @@ describe("MetricsExplorer wiring", () => {
     });
   });
 
+  describe("the facet rails wait for the first metric load", () => {
+    beforeEach(() => {
+      grid.cards.value = [];
+    });
+    afterEach(() => {
+      grid.loading.value = false;
+      grid.cards.value = [];
+      grid.activeRail.value = "prefix";
+    });
+
+    it.each(["prefix", "suffix"])(
+      "passes loading to the %s rail until the metrics settle",
+      (rail) => {
+        grid.activeRail.value = rail;
+        grid.loading.value = true;
+        expect(mountExplorer().findComponent({ name: "PrefixFilterPanel" }).props("loading")).toBe(
+          true,
+        );
+        grid.loading.value = false;
+        expect(mountExplorer().findComponent({ name: "PrefixFilterPanel" }).props("loading")).toBe(
+          false,
+        );
+      },
+    );
+
+    it("does not mark the rail loading on a reload that already has cards", () => {
+      grid.loading.value = true;
+      grid.cards.value = [CARD];
+      expect(mountExplorer().findComponent({ name: "PrefixFilterPanel" }).props("loading")).toBe(
+        false,
+      );
+    });
+
+    it("shows no type empty state while the metrics load, and shows it once they settle empty", () => {
+      grid.activeRail.value = "type";
+      grid.loading.value = true;
+      expect(mountExplorer().find('[data-test="metrics-explorer-type-empty"]').exists()).toBe(
+        false,
+      );
+      grid.loading.value = false;
+      expect(mountExplorer().find('[data-test="metrics-explorer-type-empty"]').exists()).toBe(true);
+    });
+  });
+
   describe("the type facet uses OCheckboxGroup over a Set<->array boundary", () => {
     it("exposes selectedTypes as an array for the group, and writes back a Set", () => {
       // The composable keeps selectedTypes as a Set (URL state + filtering depend
@@ -1974,12 +2018,24 @@ describe("MetricsExplorer wiring", () => {
       const timeRange = { valueType: "relative", relativeTimePeriod: "6h" };
       wrapper
         .findComponent('[data-test="metrics-history"]')
-        .vm.$emit("load", { metricsData: "blob", timeRange });
-      expect(visualizeApplyPanelData).toHaveBeenCalledWith("blob", timeRange);
+        .vm.$emit("load", { metricsData: "blob", timeRange, run: true });
+      expect(visualizeApplyPanelData).toHaveBeenCalledWith("blob", timeRange, true);
       expect(analytics.track).toHaveBeenCalledWith(
         "metrics_explorer_history_loaded",
         expect.any(Object),
       );
+    });
+
+    it("passes a load-only pick through without running", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as unknown as { setMode: (mode: string) => void }).setMode("visualize");
+      await wrapper.vm.$nextTick();
+
+      const timeRange = { valueType: "relative", relativeTimePeriod: "6h" };
+      wrapper
+        .findComponent('[data-test="metrics-history"]')
+        .vm.$emit("load", { metricsData: "blob", timeRange, run: false });
+      expect(visualizeApplyPanelData).toHaveBeenCalledWith("blob", timeRange, false);
     });
 
     it("the pane's range change sets the toolbar picker", async () => {

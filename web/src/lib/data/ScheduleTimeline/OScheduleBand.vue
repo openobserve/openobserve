@@ -29,6 +29,7 @@ const SOFT_CLASS: Record<ScheduleBandTone, string> = {
   // 50-tint span against a white card is indistinguishable from empty track.
   covered: "bg-badge-success-solid-bg text-badge-success-solid-text",
   partial: "bg-badge-warning-solid-bg text-badge-warning-solid-text",
+  unreachable: "bg-badge-error-solid-bg text-badge-error-solid-text",
 };
 
 const SOLID_CLASS: Partial<Record<ScheduleBandTone, string>> = {

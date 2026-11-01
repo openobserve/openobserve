@@ -1876,12 +1876,7 @@ mod tests {
     }
 
     async fn create_query_history_table() {
-        use sea_orm::{ConnectionTrait, Schema};
-        let conn = get_orm_client_rw().await;
-        let backend = conn.get_database_backend();
-        let mut stmt = Schema::new(backend)
-            .create_table_from_entity(infra_table::entity::query_history::Entity);
-        conn.execute(backend.build(stmt.if_not_exists()))
+        infra_table::query_history::create_table_for_tests(get_orm_client_rw().await)
             .await
             .unwrap();
     }
@@ -1906,14 +1901,24 @@ mod tests {
         };
         create_new_user(user).await.unwrap();
         for org in ["dummy", "other"] {
-            infra_table::query_history::record(org, email, "up", serde_json::json!({}), 1)
-                .await
-                .unwrap();
+            infra_table::query_history::record(infra_table::query_history::NewRun {
+                org_id: org,
+                user_email: email,
+                source: "logs",
+                query: "up",
+                query_key: None,
+                streams: &[],
+                status: "ok",
+                context: serde_json::json!({}),
+                now_us: 1,
+            })
+            .await
+            .unwrap();
         }
     }
 
     async fn history_count(org: &str, email: &str) -> usize {
-        infra_table::query_history::list(org, email, None, None, 10, 0)
+        infra_table::query_history::list(org, email, &Default::default(), 10, 0)
             .await
             .unwrap()
             .len()
@@ -2541,24 +2546,8 @@ mod tests {
         let _guard = set_up().await;
 
         let email = "locked@zo.dev";
-        let resp = post_user(
-            "dummy",
-            UserRequest {
-                email: email.to_string(),
-                password: "Pass#1234567890".to_string(),
-                role: common::meta::user::UserOrgRole {
-                    base_role: UserRole::Viewer,
-                    custom_role: None,
-                },
-                first_name: "locked".to_owned(),
-                last_name: "".to_owned(),
-                is_external: false,
-                token: None,
-            },
-            "admin@zo.dev",
-        )
-        .await;
-        assert!(resp.is_ok());
+        // post_user refuses non-admin roles while OpenFGA is off, which it always is in unit tests.
+        create_member(email, &[("dummy", UserRole::Viewer)]).await;
 
         infra_table::user_auth_state::insert_first_failure(email, 1)
             .await

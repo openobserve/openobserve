@@ -144,6 +144,7 @@
         :query="query"
         :nlp-mode="nlpMode"
         :read-only="readOnly"
+        :text-preview="textPreview"
         :release-wheel-to-page="releaseWheelToPage"
         :show-auto-complete="showAutoComplete"
         :keywords="keywords"
@@ -154,6 +155,7 @@
         :assistant-chord="helper?.onChord"
         :filter-mode="filterMode"
         :values-time-range="valuesTimeRange ?? null"
+        :recent-queries="recentQueries ?? []"
         @update:query="handleQueryUpdate"
         @user-edit="onUserEdit"
         @run-query="emit('run-query')"
@@ -273,6 +275,7 @@ interface Props {
   // Query props
   query: string;
   readOnly?: boolean;
+  textPreview?: boolean; // Draw the query as plain text until Monaco has painted
   showAutoComplete?: boolean;
   releaseWheelToPage?: boolean; // default true: let the page scroll when editor has nothing left to scroll
 
@@ -284,6 +287,7 @@ interface Props {
   freeTextDecorations?: { ranges: { start: number; end: number }[]; hover: I18nText } | null;
   filterMode?: boolean; // The query is a bare WHERE fragment (Logs without SQL mode)
   valuesTimeRange?: { startTime: number; endTime: number } | null; // Range field values are looked up in (microseconds)
+  recentQueries?: string[]; // The user's recent queries, offered as clock rows while typing
 
   // NL Mode (optional external control)
   nlpMode?: boolean; // External NLP mode control (undefined = internal control)
@@ -314,6 +318,7 @@ const props = withDefaults(defineProps<Props>(), {
   languages: () => ["sql"],
   defaultLanguage: "sql",
   readOnly: false,
+  textPreview: false,
   showAutoComplete: true,
   releaseWheelToPage: true,
   keywords: () => [],
@@ -333,7 +338,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   "update:query": [query: string, origin?: QueryChangeOrigin];
-  "user-edit": [];
+  "user-edit": [isBlank: boolean, wasBlank: boolean];
   "language-change": [language: Language];
   "ask-ai": [naturalLanguage: string, language: Language];
   "run-query": [];
@@ -543,9 +548,9 @@ const handleEditorBlur = () => {
   emit("blur");
 };
 
-const onUserEdit = () => {
+const onUserEdit = (isBlank: boolean, wasBlank: boolean) => {
   helper?.onUserEdit();
-  emit("user-edit");
+  emit("user-edit", isBlank, wasBlank);
 };
 
 // Handle auto-detection from editor

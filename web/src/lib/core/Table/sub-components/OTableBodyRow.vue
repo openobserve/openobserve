@@ -84,6 +84,7 @@ const emit = defineEmits<{
   "toggle-expansion": [row: any];
   "row-click": [row: any, event: MouseEvent];
   "row-dblclick": [row: any, event: MouseEvent];
+  "row-auxclick": [row: any, event: MouseEvent];
   "row-mouseenter": [row: any, event: MouseEvent];
   "row-mouseleave": [row: any];
   "cell-click": [params: { columnId: string; row: any; value: any }];
@@ -201,6 +202,13 @@ function onSelectCellClick() {
   emit("toggle-selection", props.row.original);
 }
 
+function onAuxclick(event: MouseEvent) {
+  if (event.button !== 1) return;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest("button, a, input, select, textarea, label, [role='button']")) return;
+  emit("row-auxclick", props.row.original, event);
+}
+
 function onDblclick(event: MouseEvent) {
   emit("row-dblclick", props.row.original, event);
 }
@@ -258,6 +266,7 @@ function displayPosition(): number | undefined {
     :data-status-bar="statusBarColor ? 'true' : undefined"
     @click="onClick"
     @dblclick="onDblclick"
+    @auxclick="onAuxclick"
     @mouseenter="onRowMouseenter"
     @mouseleave="onRowMouseleave"
   >

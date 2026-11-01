@@ -63,6 +63,13 @@ const dotTitle = computed(() => {
   return t("refreshButton.dataStale");
 });
 
+// The age alone is the inline label, so the name leads with the action a screen reader should announce.
+const buttonName = computed(() =>
+  props.lastRunAt
+    ? t("refreshButton.refreshWithAge", { age: relativeTime.value || t("refreshButton.justNow") })
+    : t("refreshButton.refresh"),
+);
+
 const exactTime = computed(() => {
   if (!props.lastRunAt) return t("refreshButton.notYetRefreshed");
   return t("refreshButton.lastRefreshed", {
@@ -98,6 +105,7 @@ function handleClick(e: MouseEvent) {
     :loading="loading"
     :disabled="disabled"
     :data-test="dataTest"
+    :aria-label="buttonName"
     @click="handleClick"
   >
     <!-- The age drops below md so a toolbar keeps search, columns and refresh on one phone row. -->
@@ -142,6 +150,7 @@ function handleClick(e: MouseEvent) {
       :loading="loading"
       :disabled="disabled"
       :data-test="dataTest"
+      :aria-label="buttonName"
       @click="handleClick"
     >
       <OTooltip :content="exactTime" :shortcut-id="shortcutId" />

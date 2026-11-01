@@ -1088,3 +1088,76 @@ describe("convertServiceGraphToNetwork layered layout", () => {
     expect(opt.options.series[0].edgeSymbol).toEqual(["none", "arrow"]);
   });
 });
+
+describe("inferred dependency nodes draw a dashed ring", () => {
+  const decodeSymbol = (symbol: string): string =>
+    atob(symbol.replace("image://", "").replace("data:image/svg+xml;base64,", ""));
+  const DASH = "stroke-dasharray";
+
+  const graph = {
+    nodes: [
+      { id: "frontend", label: "frontend", requests: 100, errors: 0 },
+      { id: "grouped-services", label: "grouped-services", service_type: "service" },
+      { id: "redis", label: "redis", service_type: "database" },
+      { id: "kafka", label: "kafka", service_type: "queue" },
+      { id: "grpc-backend", label: "grpc-backend", service_type: "rpc" },
+      { id: "stripe", label: "stripe", service_type: "external" },
+      { id: "mystery", label: "mystery", service_type: "something-new" },
+      { id: "planner", label: "planner", service_type: "agent" },
+      { id: "run_query", label: "run_query", service_type: "tool" },
+      { id: "custom-llm", label: "custom-llm", service_type: "model" },
+    ],
+    edges: [
+      { from: "frontend", to: "grouped-services", total_requests: 1 },
+      { from: "frontend", to: "redis", total_requests: 1 },
+      { from: "frontend", to: "kafka", total_requests: 1 },
+      { from: "frontend", to: "grpc-backend", total_requests: 1 },
+      { from: "frontend", to: "stripe", total_requests: 1 },
+      { from: "frontend", to: "mystery", total_requests: 1 },
+      { from: "frontend", to: "planner", total_requests: 1 },
+      { from: "planner", to: "run_query", total_requests: 1 },
+      { from: "planner", to: "custom-llm", total_requests: 1 },
+    ],
+  };
+  const dashedIds = ["redis", "kafka", "grpc-backend", "stripe", "mystery"];
+  const solidIds = ["frontend", "grouped-services", "planner", "run_query", "custom-llm"];
+
+  const flattenTree = (nodes: any[], out: Record<string, any> = {}) => {
+    for (const n of nodes) {
+      out[n.name] = n;
+      if (n.children) flattenTree(n.children, out);
+    }
+    return out;
+  };
+
+  it.each([false, true])("network layout (agentHighlight=%s)", (agentHighlight) => {
+    const opt: any = convertServiceGraphToNetwork(
+      graph,
+      "force",
+      undefined,
+      false,
+      undefined,
+      1200,
+      700,
+      agentHighlight,
+    );
+    const byId: Record<string, any> = {};
+    opt.options.series[0].data.forEach((n: any) => (byId[n.id] = n));
+    for (const id of dashedIds) expect(decodeSymbol(byId[id].symbol), id).toContain(DASH);
+    for (const id of solidIds) expect(decodeSymbol(byId[id].symbol), id).not.toContain(DASH);
+  });
+
+  it("tree layout", () => {
+    const opt: any = convertServiceGraphToTree(graph as any, "horizontal");
+    const byName = flattenTree(opt.options.series[0].data);
+    for (const id of dashedIds) expect(decodeSymbol(byName[id].symbol), id).toContain(DASH);
+    for (const id of solidIds) expect(decodeSymbol(byName[id].symbol), id).not.toContain(DASH);
+  });
+
+  it("keeps the traces-list icon solid even for an inferred type", () => {
+    for (const t of ["database", "queue", "rpc", "external"]) {
+      const svg = decodeSymbol(getServiceIconDataUrl("redis", false, "#22c55e", t));
+      expect(svg, t).not.toContain(DASH);
+    }
+  });
+});

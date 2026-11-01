@@ -45,6 +45,10 @@ describe("SearchBar — Run button ignores natural-language detection (#15049)",
       name: "ODropdownItem",
       template: '<div class="o-dropdown-item-stub" v-bind="$attrs"><slot /></div>',
     },
+    ODropdownSub: {
+      name: "ODropdownSub",
+      template: '<div class="o-dropdown-sub-stub"><slot name="trigger" /><slot /></div>',
+    },
     ODropdownSeparator: { name: "ODropdownSeparator", template: "<div />" },
   };
 

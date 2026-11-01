@@ -434,6 +434,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
+                v-if="
+                  licenseData.license.limits?.Ingestion?.typ !== 'Unlimited' &&
+                  (licenseData.license.limits?.Ingestion?.value || 50) === 50
+                "
+                data-test="about-license-plan-detail"
                 class="text-status-positive rounded-default border-status-positive/22 bg-card-glass-tint-positive flex items-start gap-1.5 border px-3 py-2 text-xs"
               >
                 <OIcon name="check-circle" size="sm" class="mt-0.5 shrink-0" />

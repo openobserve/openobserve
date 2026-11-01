@@ -597,7 +597,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     .await?;
 
     #[cfg(feature = "cloud")]
-    tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
+    {
+        openobserve_core::org_domain_ownership::init().await;
+        tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
+        tokio::task::spawn(openobserve_core::org_domain_ownership::watch());
+    }
 
     // check version
     db::metas::version::set()
@@ -691,7 +695,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    #[cfg(feature = "profiling")]
+    #[cfg(feature = "cpu-profiling")]
     tokio::task::spawn(openobserve_core::self_profiles::run());
 
     // telemetry run

@@ -41,7 +41,11 @@ const users = vi.mocked(usersService);
 const ORG_USERS = [{ email: "ana@o2.ai" }, { email: "bob@o2.ai" }];
 
 const stubs = {
-  ODrawer: { name: "ODrawer", props: ["open"], template: "<div v-if='open'><slot /></div>" },
+  ODrawer: {
+    name: "ODrawer",
+    props: ["open", "primaryButtonLabel"],
+    template: "<div v-if='open'><slot /></div>",
+  },
 };
 
 function render(team: unknown = null) {
@@ -80,6 +84,8 @@ describe("OnCallTeamForm", () => {
   // E2: the rotation editor's handover phrases stay out of the standalone shift-length labels.
   it("labels the shift lengths on their own, without the handover phrases", async () => {
     const wrapper = render();
+    await flushPromises();
+    setValues(wrapper, { members: ["ana@o2.ai"] });
     await flushPromises();
     const shift = wrapper
       .findAllComponents({ name: "OFormSelect" })
@@ -213,6 +219,40 @@ describe("OnCallTeamForm", () => {
     const anchor = Date.parse("2026-08-17T10:00") * 1000;
     expect(rotations[0].shift_rules[0].anchor_micros).toBe(anchor);
     expect(rotations[1].shift_rules[0].anchor_micros).toBe(anchor - MICROS_PER_WEEK);
+  });
+
+  /// A Secondary is one shift earlier on the team's clock: a clock change moves the instant, not the wall time.
+  it.each([
+    ["written by the form", null],
+    [
+      "staffed by the server",
+      {
+        timezone: "UTC",
+        rotations: ["rot_primary", "rot_secondary"].map((id) => ({
+          id,
+          name: id,
+          shift_rules: [{ name: "Base", members: [], shift_micros: 1, anchor_micros: 1 }],
+        })),
+      },
+    ],
+  ])("anchors the Secondary across a clock change in the team's zone (%s)", async (_, data) => {
+    oncall.getSchedule.mockResolvedValue({ data } as any);
+    const wrapper = render();
+    await flushPromises();
+    setValues(wrapper, {
+      name: "Payments",
+      timezone: "Europe/London",
+      members: ["ana@o2.ai", "bob@o2.ai"],
+      first_handover_date: "2026-10-26",
+      first_handover_time: "09:00",
+    });
+    await submit(wrapper);
+    await flushPromises();
+
+    const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
+    // Monday 26 Oct 09:00 GMT, and the Monday before at 09:00 BST: the clocks went back in between.
+    expect(rotations[0].shift_rules[0].anchor_micros).toBe(Date.UTC(2026, 9, 26, 9, 0) * 1000);
+    expect(rotations[1].shift_rules[0].anchor_micros).toBe(Date.UTC(2026, 9, 19, 8, 0) * 1000);
   });
 
   /// The checkbox has to be able to say no. The backend staffs a second
@@ -406,6 +446,54 @@ describe("OnCallTeamForm", () => {
     expect(wrapper.find('[data-test="oncall-team-form-members"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-team-form-handover"]').exists()).toBe(false);
     expect(users.orgUsers).not.toHaveBeenCalled();
+  });
+
+  // S1: the rotation fields wait for somebody to rotate.
+  it("shows the rotation fields only once a member is picked", async () => {
+    const wrapper = render();
+    await flushPromises();
+    const handover = () => wrapper.find('[data-test="oncall-team-form-handover"]');
+    const shift = () => wrapper.find('[data-test="oncall-team-form-shift"]');
+
+    expect(handover().exists()).toBe(false);
+    expect(shift().exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-team-form-timezone"]').exists()).toBe(true);
+
+    setValues(wrapper, { members: ["ana@o2.ai"] });
+    await flushPromises();
+    expect(handover().exists()).toBe(true);
+    expect(shift().exists()).toBe(true);
+  });
+
+  // S1: the primary button names what it will create.
+  it("names the outcome on the primary button", async () => {
+    const wrapper = render();
+    await flushPromises();
+    const label = () => wrapper.findComponent({ name: "ODrawer" }).props("primaryButtonLabel");
+
+    expect(label()).toBe("Create team");
+    setValues(wrapper, { members: ["ana@o2.ai"] });
+    await flushPromises();
+    expect(label()).toBe("Create team and rotation");
+  });
+
+  // S1: the parent opens the team it just made, so `saved` carries its id.
+  it("emits the new team's id on create", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    setValues(wrapper, { name: "Payments" });
+    await submit(wrapper);
+    await flushPromises();
+
+    expect(wrapper.emitted("saved")?.[0]).toEqual(["team_new"]);
+  });
+
+  it("keeps Save on the edit drawer", async () => {
+    const wrapper = render({ id: "t1", name: "Payments", timezone: "UTC" });
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "ODrawer" }).props("primaryButtonLabel")).toBe("Save");
   });
 
   it("fills the picker with the whole org in one click", async () => {

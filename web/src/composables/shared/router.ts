@@ -26,7 +26,7 @@ import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
-import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
+import { PA_ROUTES, redirectHeatmaps } from "@/utils/rum/productAnalyticsRoutes";
 import { endSignedInSession } from "@/utils/drafts/signOutFlow";
 import { silenceUnloadPrompts } from "@/utils/sessionServices";
 import {
@@ -210,6 +210,7 @@ const NamedEventsListPage = () =>
   import("@/components/rum/productAnalytics/NamedEventsListPage.vue");
 const NamedEventEditor = () => import("@/views/RUM/NamedEventEditor.vue");
 const SourceMaps = () => import("@/views/RUM/SourceMaps.vue");
+const ClickHeatmap = () => import("@/views/RUM/ClickHeatmap.vue");
 const UploadSourceMaps = () => import("@/views/RUM/UploadSourceMaps.vue");
 
 const ReportList = () => import("@/components/reports/ReportList.vue");
@@ -901,6 +902,9 @@ const useRoutes = () => {
           path: "pipelines",
           name: "pipelines",
           component: PipelinesList,
+          meta: {
+            accessResource: "pipelines",
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -1350,6 +1354,10 @@ const useRoutes = () => {
           },
         },
         {
+          path: "heatmaps",
+          redirect: (to: any) => redirectHeatmaps(to),
+        },
+        {
           path: "source-maps",
           name: "SourceMaps",
           component: SourceMaps,
@@ -1458,6 +1466,14 @@ const useRoutes = () => {
           path: "paths",
           name: PA_ROUTES.paths,
           component: AnalyticsPaths,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "heatmaps",
+          name: PA_ROUTES.heatmaps,
+          component: ClickHeatmap,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

@@ -226,6 +226,8 @@ export interface SearchObject {
   loadingHistogram: boolean;
   loadingCounter: boolean;
   loadingStream: boolean;
+  // The field list is extracted but still waiting for its semantic groups.
+  loadingFieldGroups: boolean;
   loadingSavedView: boolean;
   shouldIgnoreWatcher: boolean;
   // Streaming progress (0-100) for the results table and histogram bars
@@ -317,6 +319,7 @@ export const searchState = () => {
       searchObj.loadingHistogram = false;
       searchObj.loadingCounter = false;
       searchObj.loadingStream = false;
+      searchObj.loadingFieldGroups = false;
       searchObj.loadingSavedView = false;
 
       await nextTick();

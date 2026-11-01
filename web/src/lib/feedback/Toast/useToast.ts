@@ -82,7 +82,10 @@ if (typeof document !== "undefined") {
 
 // ── Public dismiss-function type ─────────────────────────────────────────────
 
-type DismissFn = (replacement?: Pick<ToastOptions, "variant" | "message" | "title">) => void;
+/** Closes the toast; `id` is its record's id, the same one a collapsed duplicate returns. */
+type DismissFn = ((replacement?: Pick<ToastOptions, "variant" | "message" | "title">) => void) & {
+  readonly id: string;
+};
 
 // ── Core toast() function ────────────────────────────────────────────────────
 
@@ -192,7 +195,7 @@ function updateToast(
 }
 
 function makeDismissFn(id: string, position: ToastPosition): DismissFn {
-  return (replacement) => {
+  const close = (replacement?: Pick<ToastOptions, "variant" | "message" | "title">) => {
     dismiss(id);
     if (replacement) {
       toast({
@@ -203,6 +206,7 @@ function makeDismissFn(id: string, position: ToastPosition): DismissFn {
       });
     }
   };
+  return Object.assign(close, { id });
 }
 
 function dismiss(id: string): void {

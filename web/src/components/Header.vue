@@ -190,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
 
+        <OPageHeaderStatus fallback />
         <!-- EDITION BADGE / UPGRADE BUTTON -->
         <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
         <!-- Open Source: primary CTA to drive upgrades -->
@@ -263,6 +264,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OButton>
           </template>
+          <span
+            v-else-if="aiSlotPending"
+            aria-hidden="true"
+            class="size-[1.875rem] shrink-0"
+            data-test="header-ai-slot-placeholder"
+          />
 
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
           <ThemeSwitcher class="max-md:hidden"></ThemeSwitcher>
@@ -508,6 +515,7 @@ import OrganizationSelector from "./OrganizationSelector.vue";
 import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
@@ -528,6 +536,7 @@ export default defineComponent({
     AssistantHeaderButton: defineAsyncComponent(
       () => import("@/components/ai-assistant/shell/AssistantHeaderButton.vue"),
     ),
+    OPageHeaderStatus,
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OrganizationSelector,
@@ -732,6 +741,9 @@ export default defineComponent({
     const aiButtonVisible = computed(
       () => !aiAccess.value.allowed || Boolean(props.store.state.zoConfig.ai_enabled),
     );
+    const aiSlotPending = computed(
+      () => aiAccess.value.allowed && !props.store.state.zoConfig?.version,
+    );
 
     // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
     const linkedAccountsVisible = computed(
@@ -835,9 +847,12 @@ export default defineComponent({
     };
 
     const navGateContext = useNavGateContext();
-    // Same gate and route check the nav flyout applies to the On-Call entries.
+    // Waits for an explicit `true`: the gate is open before the full config loads, and unmounting the first menu item then drops keyboard focus.
     const showMyOncall = computed(
-      () => isGateOpen(navGateContext.value, "oncall") && props.router.hasRoute("onCallMine"),
+      () =>
+        props.store.state.zoConfig?.oncall_enabled === true &&
+        isGateOpen(navGateContext.value, "oncall") &&
+        props.router.hasRoute("onCallMine"),
     );
 
     const goToMyOncall = () => {
@@ -855,6 +870,7 @@ export default defineComponent({
       raw,
       getImageURL,
       enterpriseButtonText,
+      aiSlotPending,
       ingestionQuotaPercentage,
       ingestionQuotaColor,
       showEnterpriseDialog,

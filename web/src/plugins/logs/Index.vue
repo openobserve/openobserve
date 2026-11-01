@@ -234,8 +234,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @configure="onConfigureFreeTextStream"
                       />
                     </div>
+                    <!-- A run clears errorMsg as it starts, so the re-run keeps the last shown error until rows or a new error land. -->
                     <div
-                      v-else-if="searchObj.data.errorMsg !== '' && searchObj.loading == false"
+                      v-else-if="
+                        (searchObj.data.errorMsg !== '' && searchObj.loading == false) ||
+                        (searchObj.loading &&
+                          !searchObj.data.queryResults?.hits?.length &&
+                          shownError.msg !== '')
+                      "
                       data-test="logs-search-error-state"
                     >
                       <LogsPermalinkBanner
@@ -245,14 +251,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @go-to-page="onSharedPageGo"
                       />
                       <LogsErrorState
-                        :error-code="parseInt(searchObj.data.errorCode) || 0"
-                        :error-msg="searchObj.data.errorMsg"
-                        :error-detail="searchObj.data.errorDetail"
+                        :error-code="shownError.code"
+                        :error-msg="shownError.msg"
+                        :error-detail="shownError.detail"
                         :ai-enabled="isAiEnabled"
                         :stream-name="searchObj.data.stream.selectedStream[0]"
                         :free-text-candidate="recoveryCards.freeTextCandidate"
                         :run-suggestion="recoveryCards.runSuggestion"
                         :filter-mode="!searchObj.meta.sqlMode"
+                        :query="shownError.query"
                         @ask-ai="onAskAiFixQuery"
                         @fix-query="onFixQuery"
                         @configure-stream="onConfigureStream"
@@ -340,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :query-window-us="queryWindowUs"
                         :timezone="store.state.timezone"
                         @jump-to-stream-data="onJumpToStreamData"
-                        @open-history="showSearchHistoryfn"
+                        @open-history="openSearchHistory"
                         @ask-ai="onAskAiFixQuery"
                       >
                         <template v-if="assistantV2" #ai-door>
@@ -348,6 +355,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                       </LogsNoEventsState>
                     </div>
+                    <SearchResultSkeleton
+                      v-else-if="
+                        streamSwitchPending &&
+                        searchObj.meta.logsVisualizeToggle === 'logs' &&
+                        !searchObj.data.queryResults.hits?.length &&
+                        searchObj.loading == false &&
+                        searchObj.meta.searchApplied == false
+                      "
+                    />
                     <div
                       v-else-if="
                         searchObj.meta.logsVisualizeToggle === 'logs' &&
@@ -591,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :query-window-us="queryWindowUs"
               :timezone="store.state.timezone"
               @jump-to-stream-data="onJumpToStreamData"
-              @open-history="showSearchHistoryfn"
+              @open-history="openSearchHistory"
               @ask-ai="onAskAiFixQuery"
             >
               <template v-if="assistantV2" #ai-door>
@@ -719,7 +735,10 @@ import {
   getVisualizationConfig,
   decodeVisualizationConfig,
 } from "@/composables/useLogs/logsVisualization";
-import useSearchBar, { bumpSelectionToken } from "@/composables/useLogs/useSearchBar";
+import useSearchBar, {
+  bumpSelectionToken,
+  streamSwitchPending,
+} from "@/composables/useLogs/useSearchBar";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
@@ -731,6 +750,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
+import { logsReapplyRequest } from "@/utils/queryHistory/logs";
+import { takeRecentLanding } from "@/utils/queryHistory/routes";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
@@ -741,6 +762,7 @@ import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue"
 import LogsAutoRunGuard from "@/plugins/logs/LogsAutoRunGuard.vue";
 import LogsPermalinkBanner from "@/plugins/logs/LogsPermalinkBanner.vue";
 import LogsPermalinkDrawer from "@/plugins/logs/LogsPermalinkDrawer.vue";
+import SearchResultSkeleton from "@/plugins/logs/SearchResultSkeleton.vue";
 import {
   activePermalink,
   clearColumnsFromUrl,
@@ -757,6 +779,7 @@ import {
   type ResolveContext,
 } from "@/composables/useLogs/permalinkResolve";
 import {
+  endLogsArrival,
   parseSharedPage,
   resetShownSearch,
   sharedPage,
@@ -815,12 +838,17 @@ export default defineComponent({
   components: {
     SearchBar,
     IndexList,
-    SearchResult: defineAsyncComponent(() => import("@/plugins/logs/SearchResult.vue")),
+    SearchResult: defineAsyncComponent({
+      loader: () => import("@/plugins/logs/SearchResult.vue"),
+      loadingComponent: SearchResultSkeleton,
+      delay: 0,
+    }),
     VisualizeLogsQuery: defineAsyncComponent(() => import("@/plugins/logs/VisualizeLogsQuery.vue")),
     BuildQueryPage: defineAsyncComponent(() => import("@/plugins/logs/BuildQueryPage.vue")),
     LogsNoFtsPanel,
     LogsMissingStreamBanner,
     LogsPermalinkBanner,
+    SearchResultSkeleton,
     LogsPermalinkDrawer,
     AiEntryButton: defineAsyncComponent(
       () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
@@ -1153,6 +1181,7 @@ export default defineComponent({
           savedSearchObj.loadingHistogram = false;
           savedSearchObj.loadingCounter = false;
           savedSearchObj.loadingStream = false;
+          savedSearchObj.loadingFieldGroups = false;
           savedSearchObj.loadingSavedView = false;
           await store.dispatch("logs/setLogs", savedSearchObj);
         }
@@ -1224,13 +1253,17 @@ export default defineComponent({
       },
     );
     // The assistant's nonce `t` re-applies a second link whose `type` did not change.
+    // Primitive sources, so other route changes never re-apply; a recent-searches restore bumps seq to restore one row twice.
     watch(
       [
         () => router.currentRoute.value.query.type,
+        () => logsReapplyRequest.value.seq,
         () => (isAssistantV2() ? router.currentRoute.value.query.t : undefined),
       ],
-      async ([type]) => {
-        if (type == "search_history_re_apply" || type == "ai_chat_query") {
+      async ([type, seq], [, prevSeq]) => {
+        const requested = seq !== prevSeq;
+        const runRequested = requested && logsReapplyRequest.value.run;
+        if (requested || type === "search_history_re_apply" || type === "ai_chat_query") {
           searchObj.meta.jobId = "";
           resetRunStateForReapply();
 
@@ -1240,11 +1273,7 @@ export default defineComponent({
           resetSearchObj();
 
           // Set time range based on source type
-          if (
-            type == "ai_chat_query" &&
-            router.currentRoute.value.query.from &&
-            router.currentRoute.value.query.to
-          ) {
+          if (router.currentRoute.value.query.from && router.currentRoute.value.query.to) {
             searchBarRef.value.dateTimeRef.setAbsoluteTime(
               router.currentRoute.value.query.from,
               router.currentRoute.value.query.to,
@@ -1267,6 +1296,8 @@ export default defineComponent({
           await getFunctions();
           await extractFields();
           refreshData();
+          // A newer restore started meanwhile; it carries its own run decision.
+          if (runRequested && logsReapplyRequest.value.seq === seq) runQueryFn();
         }
       },
     );
@@ -1548,6 +1579,8 @@ export default defineComponent({
       try {
         // restoreUrlQueryParams() deletes a search_history_re_apply `type` off the route, so read it first.
         const arrivalType = router.currentRoute.value.query.type;
+        // Claimed on arrival, so a restore that lands on another tab is not left for a later landing.
+        const landing = takeRecentLanding("logs");
         isRouteChanged();
         if (!store.state.logs.isInitialized) {
           searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
@@ -1560,6 +1593,9 @@ export default defineComponent({
           resetSearchObj();
 
           resetStreamData();
+
+          // extractFields() clears this; until then the field list must not read "no fields found".
+          if (router.currentRoute.value.query.stream) searchObj.loadingStream = true;
 
           searchObj.meta.quickMode = isQuickModeEnabled();
 
@@ -1604,6 +1640,8 @@ export default defineComponent({
           if (isLogsTab() || searchObj.meta.logsVisualizeToggle === "drilldown") {
             if (RE_APPLY_QUERY_TYPES.includes(arrivalType)) {
               await applyReAppliedQuery();
+              if (landing?.run) runQueryFn();
+              else endLogsArrival();
             } else {
               searchObj.loading = true;
               loadLogsData("landing", { origin: currentInitOrigin() ?? undefined });
@@ -1653,6 +1691,7 @@ export default defineComponent({
       } catch (error) {
         console.error("Failed to setup logs tab:", error);
         searchObj.loading = false;
+        searchObj.loadingStream = false;
       }
     }
 
@@ -1988,6 +2027,15 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
+    let liveRowsShown = false;
+    watch(
+      () => Number(searchObj.meta.refreshInterval) > 0,
+      (live) => {
+        if (live) liveRowsShown = true;
+      },
+      { immediate: true },
+    );
+
     const onChangeInterval = () => {
       if (
         searchObj.meta.refreshInterval > 0 &&
@@ -1999,6 +2047,12 @@ export default defineComponent({
 
       patchUrlViewState();
       refreshData();
+      // Live ticks fetch no count, so leaving live mode runs once to show the real total.
+      if (liveRowsShown && !(Number(searchObj.meta.refreshInterval) > 0)) {
+        liveRowsShown = false;
+        // "run" is explicit and would execute unsaved editor edits.
+        if (!searchObj.meta.editorDirty) autoRun.engine.requestRun("run");
+      }
     };
 
     const onAutoIntervalTrigger = () => {
@@ -2007,6 +2061,11 @@ export default defineComponent({
         handleRunQueryFn();
       }
     };
+    // The usage page stays the fallback when recent searches are turned off.
+    const openSearchHistory = () => {
+      if (!searchBarRef.value?.openRecentSearches?.()) showSearchHistoryfn();
+    };
+
     const showSearchHistoryfn = () => {
       // Search History is now its own route (was an `action=history` overlay).
       // Forward the active stream type/name so the history shown there matches
@@ -3917,6 +3976,27 @@ export default defineComponent({
       );
     });
     const showGuardBanner = computed(() => guardBlocksGrid.value && !showGuardEmptyState.value);
+    // A re-run rewrites the error before it fails again, so the kept panel holds the error it last showed.
+    const shownError = ref({ code: 0, msg: "", detail: "", query: "" });
+    watch(
+      () =>
+        [
+          searchObj.data.errorCode,
+          searchObj.data.errorMsg,
+          searchObj.data.errorDetail,
+          searchObj.loading,
+        ] as const,
+      ([code, msg, detail, loading]) => {
+        if (!loading)
+          shownError.value = {
+            code: parseInt(code) || 0,
+            msg,
+            detail,
+            query: searchObj.data.query,
+          };
+      },
+      { immediate: true },
+    );
     const showGuardSearchJob = computed(() => config.isEnterprise === "true");
 
     watch(
@@ -4118,6 +4198,8 @@ export default defineComponent({
       showSearchCancelledState,
       showSearchCancelledNotice,
       showGuardEmptyState,
+      streamSwitchPending,
+      shownError,
       showGuardBanner,
       showGuardSearchJob,
       onGuardRunAnyway,
@@ -4178,6 +4260,7 @@ export default defineComponent({
       onChangeInterval,
       onAutoIntervalTrigger,
       showSearchHistoryfn,
+      openSearchHistory,
       isAiEnabled,
       assistantV2,
       noStreamDoor,
@@ -4319,7 +4402,8 @@ export default defineComponent({
       if (this.searchObj.meta.sqlMode) parsedSQL = this.fnParsedSQL();
 
       if (this.searchObj.meta?.showHistogram && !this.searchObj?.shouldIgnoreWatcher) {
-        this.searchObj.data.queryResults.aggs = [];
+        // The page total is summed from aggs, so drop them only when a refetch replaces them.
+        if (this.searchObj.meta.histogramDirtyFlag) this.searchObj.data.queryResults.aggs = [];
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(this.t("search.histogramUnavailableForQueries"), -1);

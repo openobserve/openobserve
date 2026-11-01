@@ -341,6 +341,12 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       ] as [string, string[]][]) {
         await wrapper!.get(`[data-test="${trigger}"]`).trigger("click");
         await flushPromises();
+        if (trigger === "logs-search-bar-utilities-menu-btn") {
+          document
+            .querySelector<HTMLElement>('[data-test="logs-search-bar-menu-list-saved-views-btn"]')!
+            .click();
+          await flushPromises();
+        }
         for (const testId of ids) {
           const element = document.querySelector<HTMLElement>(`[data-test="${testId}"]`)!;
           expect(element).not.toBeNull();

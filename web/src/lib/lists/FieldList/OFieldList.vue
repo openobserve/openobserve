@@ -70,6 +70,7 @@
             }"
             :tabindex="keyboard ? 0 : undefined"
             :role="keyboard ? 'button' : undefined"
+            :aria-disabled="row.disabled ? 'true' : undefined"
             :data-test="`o-field-list-row-${row.name}`"
             :draggable="draggable && isDragEnabled(row, row._index ?? 0) && isDragArmed()"
             @click="(e: MouseEvent) => onRowClick(row, e)"

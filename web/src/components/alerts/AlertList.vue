@@ -115,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               show-index
               row-key="alert_id"
               :loading="loading"
+              :loading-reset-key="`${activeFolderId}:${activeTab}`"
               :forbidden="forbidden"
               pagination="client"
               :page-size="pageSize"
@@ -489,6 +490,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       })
                     "
                     size="sm"
+                  />
+                  <OTag
+                    v-else
+                    variant="default-soft"
+                    dot
+                    :label="t('alerts.groups.firingCount', { count: 0 })"
+                    size="sm"
+                    :data-test="`alert-list-${row.name}-groups-none-firing`"
                   />
                   <span class="text-text-secondary text-2xs">
                     {{
@@ -2416,7 +2425,6 @@ export default defineComponent({
         console.error(error);
         dismiss();
         forbidden.value = error?.response?.status === 403;
-        // The grouped access toast already reports a 403; a second red toast adds nothing.
         if (!forbidden.value) {
           toast({
             variant: "error",
@@ -2848,12 +2856,13 @@ export default defineComponent({
         .then((list: any) => {
           destinations.value = list as any;
         })
-        .catch(() =>
+        .catch((err: { response?: { status?: number } }) => {
+          if (err?.response?.status === 403) return;
           toast({
             variant: "error",
             message: t("toastMessages.alerts.errorWhileFetchingDestinations"),
-          }),
-        );
+          });
+        });
     };
 
     const getTemplates = (force = false) => {
@@ -2871,12 +2880,13 @@ export default defineComponent({
         .then((list: any) => {
           templates.value = list;
         })
-        .catch(() =>
+        .catch((err: { response?: { status?: number } }) => {
+          if (err?.response?.status === 403) return;
           toast({
             variant: "error",
             message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
-          }),
-        );
+          });
+        });
     };
     // The form's refresh event carries no payload, so a bare `getTemplates` handler would never see `force`.
     const refreshTemplates = () => getTemplates(true);
@@ -4127,7 +4137,7 @@ export default defineComponent({
           error.response?.data?.message ||
           error?.message ||
           t("alerts.messages.bulkDeleteAlertsFailed");
-        if (error.response?.status != 403 || error?.status != 403) {
+        if (error.response?.status !== 403 && error?.status !== 403) {
           toast({
             variant: "error",
             message: errorMessage,

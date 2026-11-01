@@ -15,6 +15,8 @@ const { t } = useI18nTyped();
 const props = defineProps<{
   columns: OTableColumnDef[];
   columnVisibility: Record<string, boolean>;
+  /** The table's own defaults, which a reset returns to; unset shows every column. */
+  defaultColumnVisibility?: Record<string, boolean>;
   hasResizedColumns?: boolean;
 }>();
 
@@ -45,10 +47,9 @@ function toggleColumn(columnId: string): void {
 }
 
 function resetToDefault(): void {
-  // Remove all per-column visibility overrides — restores the prop-defined defaults
   const reset: Record<string, boolean> = {};
   for (const col of toggleableColumns.value) {
-    reset[col.id] = true;
+    reset[col.id] = props.defaultColumnVisibility?.[col.id] !== false;
   }
   emit("update:columnVisibility", reset);
 }

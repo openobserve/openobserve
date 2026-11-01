@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               row-key="report_id"
               :frame="false"
               :loading="isLoadingReports"
+              :loading-reset-key="activeFolderId"
               :forbidden="forbidden"
               pagination="client"
               selection="multiple"

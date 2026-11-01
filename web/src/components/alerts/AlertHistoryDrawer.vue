@@ -141,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model:page-size="selectedPerPage"
                   :total-count="resultTotal"
                   :loading="isLoadingHistory"
+                  :loading-reset-key="alertId"
                   :row-class="getRowClass"
                   :default-columns="false"
                   :show-global-filter="false"

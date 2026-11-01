@@ -68,6 +68,7 @@ tests/ui-testing/playwright-tests/utils/auth/user.json
 
 # ---------- other agents ----------
 /.agents/*
+!/.agents/engineering-guidelines.md
 
 alert_mock
 # Local verification artifacts (browser screenshots, per-crate scratch DBs)

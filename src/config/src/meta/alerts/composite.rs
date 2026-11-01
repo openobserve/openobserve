@@ -25,7 +25,7 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
-use chrono::{FixedOffset, Offset as _, Utc};
+use chrono::{FixedOffset, Utc};
 use chrono_tz::Tz;
 use cron::Schedule;
 use serde::{Deserialize, Serialize};
@@ -412,14 +412,17 @@ pub fn alert_stale_deadline_micros(
     for _ in 0..stale_k {
         let anchor = chrono::DateTime::<Utc>::from_timestamp_micros(cursor)
             .ok_or_else(|| CompositeError::Parse("invalid freshness timestamp".to_string()))?;
-        let offset = configured_timezone
-            .as_ref()
-            .map(|timezone| anchor.with_timezone(timezone).offset().fix())
-            .or(legacy_timezone)
-            .ok_or_else(|| CompositeError::Parse("invalid alert timezone".to_string()))?;
-        cursor = schedule
-            .after(&anchor.with_timezone(&offset))
-            .next()
+        let next = match (configured_timezone.as_ref(), legacy_timezone) {
+            (Some(timezone), _) => super::next_cron_in_zone(&schedule, timezone, anchor),
+            (None, Some(offset)) => schedule
+                .after(&anchor.with_timezone(&offset))
+                .next()
+                .map(|next| next.with_timezone(&Utc)),
+            (None, None) => {
+                return Err(CompositeError::Parse("invalid alert timezone".to_string()));
+            }
+        };
+        cursor = next
             .map(|next| next.timestamp_micros())
             .ok_or_else(|| CompositeError::Parse("cron has no future occurrence".to_string()))?;
     }
@@ -1159,13 +1162,13 @@ mod tests {
             .unwrap()
             .timestamp_micros();
         let condition = cron_condition("0 0 9 * * *", Some("America/Los_Angeles"));
-        let ordinary = ordinary_kth_cron_occurrence(&condition, 0, level_at, 3);
-
-        assert_eq!(
-            alert_stale_deadline_micros(level_at, &condition, 0, 3).unwrap(),
-            ordinary,
-            "composite freshness and ordinary scheduling must share DST rules"
-        );
+        for k in 1..=3 {
+            assert_eq!(
+                alert_stale_deadline_micros(level_at, &condition, 0, k as i64).unwrap(),
+                ordinary_kth_cron_occurrence(&condition, 0, level_at, k),
+                "composite freshness and ordinary scheduling must share DST rules (k={k})"
+            );
+        }
     }
 
     #[test]

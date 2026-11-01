@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="query"
         clearable
         class="w-full"
-        :placeholder="t('iam.editRole.filterModules')"
+        :placeholder="t('iam.editRole.filterModulesTasks')"
         data-test="edit-role-module-rail-search"
       />
       <OToggleGroup v-model="scope" class="w-full">
@@ -78,7 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-for="group in visibleGroups" :key="group.id">
           <!-- Header behaviour mirrors GroupedFieldList (logs/traces IndexList): click to fold, chevron shows state. -->
           <div
-            class="text-text-secondary bg-surface-subtle rounded-default hover:text-text-heading mt-3 flex cursor-pointer items-center justify-between py-1 ps-1.5 pe-0.5 text-xs font-semibold transition-colors select-none"
+            class="text-text-secondary bg-surface-subtle rounded-default hover:text-text-heading mt-3 flex items-center justify-between py-1 ps-1.5 pe-0.5 text-xs font-semibold transition-colors select-none"
+            :class="term ? 'cursor-default' : 'cursor-pointer'"
             :aria-expanded="isExpanded(group.id)"
             :data-test="`edit-role-module-rail-group-${group.id}`"
             @click="toggleGroup(group.id)"
@@ -142,15 +143,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTabs>
 
-      <div
-        v-if="!visibleGroups.length"
-        class="text-text-secondary px-1.5 py-4 text-center text-xs"
+      <!-- A query that matches nothing says so even under Selected, where "nothing selected" would be false. -->
+      <OEmptyState
+        v-if="!visibleGroups.length && (term || scope === 'granted')"
+        size="inline"
+        variant="no-results"
+        class="px-1.5"
+        :title="
+          term
+            ? t('iam.editRole.noModuleMatchQuery', { query: raw(term) })
+            : t('iam.editRole.noGrantedModule')
+        "
+        :description="term ? t('iam.editRole.noModuleMatchHint') : undefined"
         data-test="edit-role-module-rail-no-match"
-      >
-        {{
-          scope === "granted" ? t("iam.editRole.noGrantedModule") : t("iam.editRole.noModuleMatch")
-        }}
-      </div>
+      />
     </div>
   </nav>
 </template>
@@ -160,6 +166,7 @@ import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -168,7 +175,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { ALL_MODULES_ICON, ALL_MODULES_KEY } from "@/components/iam/roles/roleModules";
+import { ALL_MODULES_ICON, ALL_MODULES_KEY, matchModule } from "@/components/iam/roles/roleModules";
 
 export type RailModule = {
   key: string;
@@ -195,12 +202,13 @@ const { t, locale } = useI18nTyped();
 
 const query = ref("");
 
+const term = computed(() => query.value.trim());
+
 const scope = ref("all");
 
 const grantedCount = computed(() => props.modules.filter((module) => module.granted > 0).length);
 
 const visibleGroups = computed(() => {
-  const term = query.value.trim().toLowerCase();
   const groups: {
     id: string;
     label: I18nText;
@@ -210,7 +218,7 @@ const visibleGroups = computed(() => {
 
   props.modules.forEach((module) => {
     if (scope.value === "granted" && !module.granted) return;
-    if (term && !String(module.label).toLowerCase().includes(term)) return;
+    if (!matchModule(module, term.value)) return;
 
     const last = groups[groups.length - 1];
     if (last && last.id === module.groupId) last.modules.push(module);

@@ -112,6 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="panelData.chartType == 'flame-graph' ? panelData : null"
           :config="panelSchema.config"
         />
+        <LogsPanelRenderer
+          v-else-if="panelSchema.type == 'logs'"
+          :data="panelData.chartType == 'logs' ? panelData : null"
+          :config="panelSchema.config"
+        />
         <CustomChartRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
@@ -451,6 +456,7 @@ const AlertListPanelRenderer = defineAsyncComponent(
 const FlameGraphPanelRenderer = defineAsyncComponent(
   () => import("./panels/FlameGraphPanelRenderer.vue"),
 );
+const LogsPanelRenderer = defineAsyncComponent(() => import("./panels/LogsPanelRenderer.vue"));
 
 const AddAnnotation = defineAsyncComponent(() => {
   return import("./addPanel/AddAnnotation.vue");
@@ -493,6 +499,7 @@ export default defineComponent({
     MarkdownRenderer,
     AlertListPanelRenderer,
     FlameGraphPanelRenderer,
+    LogsPanelRenderer,
     AddAnnotation,
     CustomChartRenderer,
     LoadingProgress,
@@ -2144,6 +2151,10 @@ export default defineComponent({
 
       if (type === "flame-graph") {
         return panelData.value?.root ? "" : "No Data";
+      }
+
+      if (type === "logs") {
+        return panelData.value?.rows?.length > 0 ? "" : "No Data";
       }
 
       // Table renders raw rows; the conversion returns { rows, columns }.

@@ -18,20 +18,26 @@ import type { AxiosInstance } from "axios";
 import axios from "axios";
 import config from "../aws-exports";
 import { expireSession } from "@/utils/sessionServices";
-import { addUnauthorizedError } from "@/composables/useUnauthorizedErrorGrouper";
+import {
+  currentAccessRouteKey,
+  noteAccessSuccess,
+  recordForbidden,
+} from "@/composables/useAccessStore";
 import { usePasswordReset } from "@/composables/usePasswordReset";
 import { isPasswordResetError } from "@/utils/passwordResetErrors";
 
 declare module "axios" {
   interface AxiosRequestConfig {
-    /** The caller renders a 403 itself, so it is left out of the grouped "Access Required" toast. */
+    /** The caller renders a 403 itself, so the access boundary does not record it. */
     skipAccessToast?: boolean;
-    /** Skip the global Unauthorized toast on a 403; the caller handles the refusal itself. */
+    /** The caller handles the refusal itself, so the access boundary does not record the 403. */
     silentForbidden?: boolean;
     /** An assistant request that handles 401 itself, so it never takes the logout-and-reload branch. */
     assistantManaged?: boolean;
     /** Set on the one retry of an assistant request after an SSO refresh. */
     assistantRetried?: boolean;
+    /** Route the request started on, so a late 403 is not pinned on the page the user moved to. */
+    accessRouteKey?: string;
   }
 }
 
@@ -137,8 +143,19 @@ const http = ({ headers } = {} as any) => {
     headers,
   });
 
+  instance.interceptors.request.use((requestConfig) => {
+    // A retry after a token refresh reuses its config, so it keeps the page that first asked.
+    requestConfig.accessRouteKey ??= currentAccessRouteKey();
+    return requestConfig;
+  });
+
   instance.interceptors.response.use(
     function (response) {
+      noteAccessSuccess({
+        url: response.request?.responseURL || response.config?.url,
+        method: response.config?.method,
+        routeKey: response.config?.accessRouteKey,
+      });
       return response;
     },
     function (error) {
@@ -175,7 +192,11 @@ const http = ({ headers } = {} as any) => {
               !error.config?.silentForbidden
             ) {
               const responseUrl = error.request?.responseURL || error.config?.url || "";
-              addUnauthorizedError(responseUrl);
+              recordForbidden({
+                url: responseUrl,
+                method: error.config?.method,
+                routeKey: error.config?.accessRouteKey,
+              });
             }
             break;
           case 404:

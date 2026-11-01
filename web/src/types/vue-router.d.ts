@@ -21,5 +21,7 @@ declare module "vue-router" {
     allowOnEmptyData?: boolean;
     /** The assistant opens floating here when the user stored no mode; a predicate serves one tab of a route. */
     assistantPrefersFloating?: boolean | ((route: RouteLocationNormalizedLoaded) => boolean);
+    /** Resource key of this route's main list; a 403 on it replaces the page with the no-access state. */
+    accessResource?: string;
   }
 }

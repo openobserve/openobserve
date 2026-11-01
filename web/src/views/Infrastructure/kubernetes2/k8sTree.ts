@@ -32,6 +32,7 @@ export interface TreeGroup {
 export const VIEW_ICON: Record<View, IconName> = {
   cluster: "dashboard",
   map: "hub",
+  dependencies: "account-tree",
   nodes: "dns",
   namespaces: "folder-outline",
   events: "event",
@@ -169,6 +170,7 @@ export function buildTree({ inventory, cluster, events, stats }: TreeSource): Tr
       items: [
         item("cluster", "infra.k8s2.treeOverview", null),
         item("map", "infra.k8s2.viewMap", null),
+        item("dependencies", "infra.k8s2.viewDependencies", null),
         item("nodes", "infra.k8s2.viewNodes", "nodes"),
         item("namespaces", "infra.k8s2.viewNamespaces", "namespaces"),
         {

@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :resource-name="streamName"
     :free-text-candidate="freeTextCandidate ?? undefined"
     :run-suggestion="runSuggestion ?? undefined"
+    :query="filterMode ? undefined : query"
     size="hero"
     illustration="broken-panel"
     @ask-ai="emit('ask-ai')"
@@ -59,6 +60,7 @@ const props = defineProps<{
   freeTextCandidate?: string | null;
   runSuggestion?: string | null;
   filterMode?: boolean;
+  query?: string;
 }>();
 
 const emit = defineEmits<{

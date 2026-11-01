@@ -206,7 +206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Pinned dashboard tab -->
           <div v-else-if="activeHomeTab.startsWith('dash:')" class="min-h-0 flex-1 overflow-hidden">
+            <HomeViewSkeleton v-if="pinnedTabPending" />
             <PinnedDashboardTab
+              v-else
               :key="activeHomeTab"
               :dashboard-id="parsePinnedTabId(activeHomeTab).dashboardId"
               :folder-id="parsePinnedTabId(activeHomeTab).folderId"
@@ -325,7 +327,7 @@ export default defineComponent({
     // The v2 assistant replaces the AI tab with the Overview launcher; the legacy tabs stay byte-identical with it off.
     const assistantV2 = isAssistantV2();
 
-    const { homeDashboard, clearHomeDashboard, updateLabel } = useHomeDashboard(t);
+    const { homeDashboard, clearHomeDashboard, updateLabel, isLoadedFor } = useHomeDashboard(t);
 
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string; closable?: boolean }[] = [];
@@ -415,27 +417,37 @@ export default defineComponent({
     watch(
       () => DEFAULT_TABS.value.map((t) => t.id).join(","),
       () => {
-        const current = tabOrder.value;
-        const merged: { id: string; label: string }[] = [];
-        // Preserve existing user-defined order, drop tabs no longer available
-        current.forEach((t) => {
-          const match = DEFAULT_TABS.value.find((d) => d.id === t.id);
-          if (match) merged.push(match);
-        });
-        // Append any newly available tabs
-        DEFAULT_TABS.value.forEach((d) => {
-          if (!merged.find((m) => m.id === d.id)) merged.push(d);
-        });
-        tabOrder.value = merged;
+        // Late tabs land where the user dragged them, or in the default order (AI first) if never dragged.
+        tabOrder.value = loadTabOrder();
       },
     );
 
     const savedActiveTab = assistantV2 ? null : localStorage.getItem(LS_ACTIVE_TAB_KEY);
+    const isAvailableTab = (id: string) => DEFAULT_TABS.value.some((tb) => tb.id === id);
+    const pinnedTabPending = ref(
+      !!savedActiveTab?.startsWith("dash:") &&
+        !isAvailableTab(savedActiveTab) &&
+        !isLoadedFor(store.state.selectedOrganization?.identifier),
+    );
     const activeHomeTab = ref(
-      savedActiveTab && DEFAULT_TABS.value.find((t) => t.id === savedActiveTab)
+      savedActiveTab && (pinnedTabPending.value || isAvailableTab(savedActiveTab))
         ? savedActiveTab
         : tabOrder.value[0].id,
     );
+    if (pinnedTabPending.value) {
+      const stopHold = watch(
+        () => [
+          isAvailableTab(activeHomeTab.value),
+          isLoadedFor(store.state.selectedOrganization?.identifier),
+        ],
+        ([available, loaded]) => {
+          if (!available && !loaded) return;
+          pinnedTabPending.value = false;
+          if (!available) activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
+          stopHold();
+        },
+      );
+    }
 
     watch(activeHomeTab, (val) => {
       if (assistantV2) homePrefs.save({ active: val });
@@ -548,6 +560,7 @@ export default defineComponent({
       isMobile,
       mobileChatsOpen,
       activeHomeTab,
+      pinnedTabPending,
       tabOrder,
       onTabReorder,
       isEnterpriseOrCloud,

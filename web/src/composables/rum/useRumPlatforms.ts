@@ -50,7 +50,7 @@ const BROWSER_SOURCE = "browser";
  * Columns only the browser SDK emits — used by the schema fallback to infer `hasBrowser`.
  * Kept deliberately small: any one present means browser data has been ingested.
  */
-const BROWSER_ONLY_FIELDS = [
+export const BROWSER_ONLY_FIELDS = [
   "view_largest_contentful_paint",
   "view_cumulative_layout_shift",
   "view_interaction_to_next_paint",
@@ -60,7 +60,7 @@ const BROWSER_ONLY_FIELDS = [
 ];
 
 /** Columns only the mobile SDKs emit — used by the schema fallback to infer `hasMobile`. */
-const MOBILE_ONLY_FIELDS = [
+export const MOBILE_ONLY_FIELDS = [
   "view_slow_frames_rate",
   "view_freeze_rate",
   "view_frozen_frame_count",
@@ -180,17 +180,21 @@ const useRumPlatforms = () => {
     );
   };
 
-  // Fallback: infer from which columns exist in the stream schema.
-  const probeBySchema = async (): Promise<RumPlatformResult> => {
-    const stream = await getStream(RUM_STREAM, "logs", true);
-    const names = new Set((stream?.schema ?? []).map((field: any) => field?.name));
+  const schemaNames = async (): Promise<Set<string> | null> => {
+    try {
+      const stream = await getStream(RUM_STREAM, "logs", true);
+      return new Set<string>((stream?.schema ?? []).map((field: any) => field?.name));
+    } catch {
+      return null;
+    }
+  };
+
+  // Schema-only inference never learns which mobile platform, only that mobile data exists.
+  const resultFromSchema = (names: Set<string>): RumPlatformResult => {
     const hasBrowser = BROWSER_ONLY_FIELDS.some((f) => names.has(f));
     const hasMobile = MOBILE_ONLY_FIELDS.some((f) => names.has(f));
-    const platforms: string[] = [];
-    if (hasBrowser) platforms.push(BROWSER_SOURCE);
-    // Schema can't tell which mobile platform, only that mobile data exists.
     return {
-      platforms,
+      platforms: hasBrowser ? [BROWSER_SOURCE] : [],
       hasBrowser,
       hasMobile,
       mobilePlatforms: [],
@@ -208,16 +212,15 @@ const useRumPlatforms = () => {
     state.loading = false;
   };
 
+  // Without a `source` column the probe would 400, so the schema answers instead.
   const runDetection = async (dateTime: RumDateTime): Promise<RumPlatformResult> => {
+    const names = await schemaNames();
+    if (names && !names.has("source")) return resultFromSchema(names);
     try {
       return await probeBySource(dateTime);
     } catch (probeError) {
       state.error = probeError;
-      try {
-        return await probeBySchema();
-      } catch {
-        return DEFAULT_RESULT;
-      }
+      return names ? resultFromSchema(names) : DEFAULT_RESULT;
     }
   };
 

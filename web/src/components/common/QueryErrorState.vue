@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Detail panel + buttons (outside OEmptyState — avoids its overflow:hidden) -->
     <div v-if="hasAnyContent" class="mx-auto flex w-full max-w-2xl flex-col gap-3 px-6">
       <ErrorDetailPanel
-        :summary-line="summaryLine"
+        :summary-line="explanation ? '' : summaryLine"
         :detail-body="detailBody"
         :has-detail="hasDetail"
         :trace-id="traceId"
@@ -229,11 +229,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ resolvedTitle }}
         </p>
         <p
-          v-if="summaryLine"
+          v-if="explanation || summaryLine"
           class="text-text-secondary m-0 text-xs break-words"
           data-test="query-error-summary"
         >
-          {{ summaryLine }}
+          {{ explanation || summaryLine }}
         </p>
       </div>
     </div>
@@ -368,6 +368,8 @@ const props = withDefaults(
     description?: I18nText;
     freeTextCandidate?: string;
     runSuggestion?: string;
+    /** The SQL the error was raised for, so the plain-language reading can name what is missing. */
+    query?: string;
   }>(),
   { size: "hero", aiEnabled: false },
 );
@@ -399,12 +401,15 @@ const {
   isQueryError,
   defaultTitle,
   defaultDescription,
+  explanation,
   showDetail,
   copyErrorDetails,
 } = useQueryError({
   errorCode: () => props.errorCode,
   errorMsg: () => props.errorMsg,
   errorDetail: () => props.errorDetail,
+  query: () => props.query,
+  streamName: () => props.resourceName,
 });
 
 const assistantV2 = isAssistantV2();
@@ -420,7 +425,9 @@ const showAiDoor = computed(
 
 const { t } = useI18nTyped();
 const resolvedTitle = computed(() => props.title ?? defaultTitle.value);
-const resolvedDescription = computed(() => props.description ?? defaultDescription.value);
+const resolvedDescription = computed(
+  () => props.description ?? (explanation.value || defaultDescription.value),
+);
 
 const runSuggestionText = computed(() => props.runSuggestion?.trim() ?? "");
 const showRunSuggestion = computed(() => isQueryError.value && runSuggestionText.value !== "");

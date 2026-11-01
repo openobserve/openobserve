@@ -188,12 +188,17 @@ test.describe("Model Pricing — Create & Form Validation", () => {
             // first submit attempt (not on load / first keystroke).
             await expect(pm.modelPricingPage.saveBtn).toBeEnabled();
 
+            // A submit still running when the next values are typed reads them and can really save the model.
+            const expectSubmitDone = () =>
+                expect(pm.modelPricingPage.saveBtn).not.toHaveAttribute('aria-busy', { timeout: 5000 });
+
             // Both fields empty → the first submit arms validation: required errors
             // appear and the editor stays open (submit is blocked).
             await pm.modelPricingPage.saveBtn.click();
             await expect(pm.modelPricingPage.nameInputError).toBeVisible({ timeout: 5000 });
             await expect(pm.modelPricingPage.patternInputError).toBeVisible({ timeout: 5000 });
             await pm.modelPricingPage.editorTitle.waitFor({ state: 'visible', timeout: 5000 });
+            await expectSubmitDone();
 
             // Name too long → inline error; fix → error clears (revalidates on change)
             await pm.modelPricingPage.fillName('a'.repeat(257));
@@ -209,6 +214,9 @@ test.describe("Model Pricing — Create & Form Validation", () => {
 
             // No prices → save stays on editor
             await pm.modelPricingPage.saveBtn.click();
+            await expect(pm.modelPricingPage.toastMessage.filter({ hasText: /add at least one token price/i }))
+                .toBeVisible({ timeout: 5000 });
+            await expectSubmitDone();
             await pm.modelPricingPage.editorTitle.waitFor({ state: 'visible', timeout: 5000 });
 
             // Draft key with spaces → save-time toast. The "Add price" button now
@@ -220,12 +228,14 @@ test.describe("Model Pricing — Create & Form Validation", () => {
             await pm.modelPricingPage.saveBtn.click();
             await expect(pm.modelPricingPage.toastMessage.filter({ hasText: /must not contain spaces/i }))
                 .toBeVisible({ timeout: 5000 });
+            await expectSubmitDone();
 
             // Draft key that is a pure integer → save-time toast
             await pm.modelPricingPage.fillDraftPriceRow('123', '0.000002');
             await pm.modelPricingPage.saveBtn.click();
             await expect(pm.modelPricingPage.toastMessage.filter({ hasText: /cannot be a pure integer/i }))
                 .toBeVisible({ timeout: 5000 });
+            await expectSubmitDone();
 
             // Valid prices → save succeeds, both chips visible in list
             await pm.modelPricingPage.addPriceRow('input', '0.000002');

@@ -628,7 +628,6 @@ export default defineComponent({
           queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
       } catch (e: any) {
         this.forbidden = e?.response?.status === 403;
-        // The grouped access toast already reports a 403; a second red toast adds nothing.
         if (!this.forbidden) {
           toast({ variant: "error", message: this.t("alert_sources.error") });
         }

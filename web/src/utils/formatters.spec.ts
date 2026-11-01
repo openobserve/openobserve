@@ -378,6 +378,17 @@ describe("formatSizeFromMB", () => {
     // A very small positive value (e.g. 0.000001 MB) should show 0.01 MB
     expect(formatSizeFromMB("0.000001")).toBe("0.01 MB");
   });
+
+  it("moves up a unit when rounding would print 1024.00", () => {
+    expect(formatSizeFromMB(1023.994)).toBe("1023.99 MB");
+    expect(formatSizeFromMB(1023.996)).toBe("1.00 GB");
+    expect(formatSizeFromMB(1024 * 1024 - 0.001)).toBe("1.00 TB");
+    expect(formatSizeFromMB(1024 ** 3 - 1)).toBe("1.00 PB");
+  });
+
+  it("stays in PB, its largest unit", () => {
+    expect(formatSizeFromMB(1024 ** 4)).toBe("1024.00 PB");
+  });
 });
 
 // ---------------------------------------------------------------------------

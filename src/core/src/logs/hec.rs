@@ -196,6 +196,9 @@ pub async fn preflight_streams(
         if let Some(reason) = stream_rejection(stream, user) {
             return Err(Error::IngestionError(reason));
         }
+        // the write loop rejects it too, but only after the groups before it are committed
+        schema::check_stream_key_len(org_id, StreamType::Logs, stream)
+            .map_err(|e| Error::IngestionError(e.to_string()))?;
         check_ingestion_allowed(org_id, StreamType::Logs, Some(stream)).await?;
     }
     // Every group at once, so a collector batch is refused before its first group is written.
@@ -522,6 +525,34 @@ mod tests {
             ("group_two".to_string(), vec![good]),
         ];
         assert!(preflight_records("preflight_org", all_good).await.is_ok());
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn preflight_rejects_a_batch_holding_a_too_long_stream() {
+        let long_name = "h".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let streams = vec![
+            (
+                "hec_key_len_ok".to_string(),
+                vec![json::json!({"log": "a"})],
+            ),
+            (long_name.clone(), vec![json::json!({"log": "b"})]),
+        ];
+        let user = IngestUser::from_user_email("a@a.com");
+        let result = preflight_streams("preflight_org", &streams, &user).await;
+
+        let bounded =
+            infra::file_list::stream_key_violation("preflight_org", StreamType::Logs, &long_name)
+                .is_some();
+        if bounded {
+            assert!(
+                matches!(&result, Err(Error::IngestionError(msg)) if msg.contains("Stream name too long")),
+                "{result:?}"
+            );
+        } else {
+            assert!(result.is_ok(), "{result:?}");
+        }
     }
 
     #[tokio::test]

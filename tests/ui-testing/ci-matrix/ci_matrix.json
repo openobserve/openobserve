@@ -639,6 +639,21 @@
     "disabled": []
   },
   {
+    "testfolder": "Profiles",
+    "actual_folder": "Profiles",
+    "browser": "chrome",
+    "run_files": [
+      "profiles-navigation-entry.spec.js",
+      "profiles-query-controls.spec.js",
+      "profiles-chart-breakdown.spec.js",
+      "profiles-views.spec.js",
+      "profiles-flame-graph.spec.js",
+      "profiles-compare.spec.js",
+      "profiles-states-edge.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "Assistant",
     "_comment": "O2 Assistant mocked harness on the production bundle the binary embeds. Every assistant WP appends its spec files here in the PR that creates them; @edition flows skip here and run in the assistant_editions job.",
     "actual_folder": "assistant",

@@ -95,14 +95,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OText variant="meta">{{ raw(segment.label) }}</OText>
             </span>
+            <!-- Only the service is typed in: a service can exist before discovery sees it, a cluster name cannot be guessed. -->
             <OSelect
               :model-value="segment.value"
               :options="segment.options"
               size="sm"
               width="sm"
               searchable
+              :creatable="segment.dimension === SERVICE_DIMENSION"
               :data-test="`oncall-scope-segment-${segment.dimension}`"
               @update:model-value="(v: unknown) => setSegment(segment.dimension, String(v ?? ''))"
+              @create="(typed: string) => setSegment(segment.dimension, typed.trim())"
             />
             <!-- How much of the estate this segment takes. The one number
                  somebody weighing a broad rule wants, and the reason `Any` does
@@ -257,6 +260,11 @@ const segments = computed(() =>
     const values = valuesOf(dimension);
     const value = String(props.modelValue?.[dimension] ?? ANY);
     const chosen = values.find((candidate) => candidate.value === value);
+    // A typed service is the value before discovery knows it, so it is offered with a note rather than dropped.
+    const unseen =
+      value !== ANY && !chosen
+        ? [{ label: raw(value), value, subLabel: t("oncall.scopeNotSeenYet") }]
+        : [];
     return {
       dimension,
       label: displayOf(dimension),
@@ -264,6 +272,7 @@ const segments = computed(() =>
       options: [
         { label: raw(t("oncall.scopeAny")), value: ANY },
         ...values.map((candidate) => ({ label: raw(candidate.value), value: candidate.value })),
+        ...unseen,
       ],
       // Under an `Any`, how much it is letting through; under a value, how much
       // that value covers. Both answer "how broad is this", which is the

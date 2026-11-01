@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { configQuery } from "@/services/config.queries";
+import { configQuery, isFullConfigLoaded } from "@/services/config.queries";
 import { createApp } from "vue";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import store from "./stores";
@@ -98,7 +98,7 @@ const getConfig = async () => {
 
     // Never clobber the authenticated full config with the bootstrap subset if
     // the full fetch (MainLayout) happens to resolve first.
-    if (!store.state.zoConfig?.version) {
+    if (!isFullConfigLoaded(store.state.zoConfig)) {
       store.dispatch("setConfig", res.data);
     }
     config.enableAnalytics = res.data.telemetry_enabled?.toString() ?? "false";

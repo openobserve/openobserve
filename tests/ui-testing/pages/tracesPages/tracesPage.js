@@ -51,6 +51,7 @@ export class TracesPage {
 
     // Main Components
     this.searchBar = '[data-test="logs-search-bar"]';
+    this.queryPlaceholderTypewriter = '.query-editor-placeholder-typewriter';
     this.indexList = '[data-test="traces-search-index-list"]';
     this.fieldListCollapseButton = '[data-test="traces-search-field-list-collapse-btn"]';
     this.searchResult = '[data-test="logs-search-search-result"]';
@@ -68,6 +69,7 @@ export class TracesPage {
 
     // Trace Details
     this.traceDetailsHeader = '[data-test="trace-details-header"]';
+    this.traceDetailsSpanIdLabel = '[data-test="trace-details-sidebar-header-toolbar-span-id"]';
     this.traceDetailsBackButton = '[data-test="trace-details-back-btn"]';
     this.traceDetailsCloseButton = '[data-test="trace-details-close-btn"]';
     this.traceDetailsCopyTraceIdButton = '[data-test="trace-details-copy-trace-id-btn"]';
@@ -190,7 +192,6 @@ export class TracesPage {
 
     this.moreMenuButton = '[data-test="traces-search-bar-more-menu-btn"]';
     this.openDropdownMenu = page.getByRole('menu');
-    this.menuSavedViewsGroup = '[data-test="traces-search-bar-menu-saved-views-group"]';
     this.menuPinSavedViewsButton = '[data-test="traces-search-bar-menu-pin-saved-views-btn"]';
     this.menuListSavedViewsButton = '[data-test="traces-search-bar-menu-list-saved-views-btn"]';
     this.menuCreateSavedViewButton = '[data-test="traces-search-bar-menu-create-saved-view-btn"]';
@@ -198,8 +199,6 @@ export class TracesPage {
     this.pinnedSavedViewsTrigger = '[data-test="traces-search-bar-saved-views-btn"]';
     this.pinnedSavedViewItemPrefix = '[data-test^="traces-saved-view-apply-"]';
     this.savedViewNameInput = '[data-test="traces-saved-view-name-input"]';
-    this.savedViewsListDialog = '[data-test="traces-saved-views-dialog"]';
-    this.savedViewsDialogApplyPrefix = '[data-test^="traces-saved-views-dialog-apply-"]';
 
     this.waterfallAxisLastLabels = '[data-test="trace-header-tic-label-3"]';
     this.spanBar = '[data-test="span-marker"]';
@@ -208,16 +207,8 @@ export class TracesPage {
   }
 
   // Getter methods for common trace elements
-  getTraceDetailsElements() {
-    return this.page.locator('[data-test="trace-details-header"], [data-test="trace-details-tree"], [data-test="trace-details-sidebar"]');
-  }
-
   getTraceResultItems() {
     return this.page.locator(this.searchResultItem);
-  }
-
-  getResultsContainer() {
-    return this.page.locator(this.searchResultList).first();
   }
 
   async navigateToTraces() {
@@ -896,6 +887,32 @@ export class TracesPage {
     }
   }
 
+  traceRowLinks() {
+    return this.page.locator('[data-test="trace-row-link"]');
+  }
+
+  // A cell without the link, so the row's own middle-click handler runs rather than the browser's native link handling.
+  firstRowNonLinkCell() {
+    return this.page
+      .locator('[data-test^="o2-table-row-"]')
+      .first()
+      .locator('td[data-test^="o2-table-cell-"]:not(:has(a))')
+      .first();
+  }
+
+  trackNewPages(context) {
+    const opened = [];
+    context.on('page', (p) => opened.push(p));
+    return opened;
+  }
+
+  // The fixed wait is deliberate: a second tab would open late, and there is no event for "nothing else opened".
+  async expectOneNewPage(opened) {
+    await expect.poll(() => opened.length, { timeout: 10000 }).toBe(1);
+    await this.page.waitForTimeout(1000);
+    expect(opened, 'exactly one new tab must open').toHaveLength(1);
+  }
+
   /**
    * Setup trace search with stream and time range
    * @param {string} streamName - Stream name to select
@@ -1082,14 +1099,6 @@ export class TracesPage {
   }
 
   /**
-   * Get trace count from results
-   * @returns {number} Number of visible traces
-   */
-  async getTraceCount() {
-    return await this.page.locator(this.searchResultItem).count();
-  }
-
-  /**
    * Wait for search to complete with proper error handling
    * @param {number} timeout - Maximum time to wait in milliseconds
    * @returns {Object} Search result status
@@ -1161,8 +1170,8 @@ export class TracesPage {
    * @param {string} text - Text to check for
    */
   async expectQueryEditorContains(text) {
-    const content = await this.getQueryEditorContent();
-    expect(content).toContain(text);
+    // Monaco loads lazily and reads '' until window.monaco exists, so a single read races the editor.
+    await expect.poll(() => this.getQueryEditorContent(), { timeout: 30000 }).toContain(text);
   }
 
   /**
@@ -3086,10 +3095,7 @@ export class TracesPage {
   }
 
   async applySavedView(viewName) {
-    await this.page.locator('[data-test="traces-search-bar-saved-views-btn"]').click();
-    const view = this.page.locator('[data-test^="traces-saved-view-apply-"]').filter({ hasText: viewName }).first();
-    await view.waitFor({ state: 'visible', timeout: 10000 });
-    await view.click();
+    await this.applySavedViewFromMoreMenu(viewName);
   }
 
   // enterTraceQuery appends to existing text, so clear first and confirm the editor holds only `query`.
@@ -3154,22 +3160,25 @@ export class TracesPage {
   }
 
   async closeMoreMenu() {
-    await this.page.keyboard.press('Escape');
-    await expect(this.openDropdownMenu).toBeHidden({ timeout: 10000 });
+    // A nested submenu consumes the first Escape, so repeat until no menu is left.
+    await expect(async () => {
+      if (await this.openDropdownMenu.count()) await this.page.keyboard.press('Escape');
+      await expect(this.openDropdownMenu).toHaveCount(0, { timeout: 1000 });
+    }).toPass({ timeout: 10000 });
   }
 
   async expectMoreMenuSavedViewsEntriesVisible() {
-    const group = this.page.locator(this.menuSavedViewsGroup);
-    await expect(group).toBeVisible({ timeout: 10000 });
-    await expect(group.locator(this.menuPinSavedViewsButton)).toBeVisible();
-    await expect(group.locator(this.menuListSavedViewsButton)).toContainText(/list saved views/i);
-    await expect(group.locator(this.menuCreateSavedViewButton)).toContainText(/create saved view/i);
+    const trigger = this.page.locator(this.menuListSavedViewsButton);
+    await expect(trigger).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.menuPinSavedViewsButton)).toBeVisible();
+    await expect(trigger).toContainText(/saved views/i);
+    await trigger.click();
+    await expect(this.page.locator(this.menuCreateSavedViewButton)).toContainText(/create saved view/i);
   }
 
   /** Asserts on an open menu, so an unopened menu cannot pass for a missing group. */
   async expectMoreMenuSavedViewsEntriesHidden() {
     await expect(this.openDropdownMenu).toBeVisible({ timeout: 10000 });
-    await expect(this.page.locator(this.menuSavedViewsGroup)).toHaveCount(0);
     await expect(this.page.locator(this.menuListSavedViewsButton)).toHaveCount(0);
     await expect(this.page.locator(this.menuCreateSavedViewButton)).toHaveCount(0);
   }
@@ -3196,6 +3205,7 @@ export class TracesPage {
 
   async openCreateSavedViewFromMoreMenu() {
     await this.openMoreMenu();
+    await this.page.locator(this.menuListSavedViewsButton).click();
     await this.page.locator(this.menuCreateSavedViewButton).click();
     await expect(this.page.locator(this.savedViewNameInput)).toBeVisible({ timeout: 10000 });
   }
@@ -3207,21 +3217,14 @@ export class TracesPage {
     await view.click();
   }
 
-  async openSavedViewsListFromMoreMenu() {
+  async applySavedViewFromMoreMenu(viewName) {
     await this.openMoreMenu();
     await this.page.locator(this.menuListSavedViewsButton).click();
-    await expect(this.page.locator(this.savedViewsListDialog)).toBeVisible({ timeout: 10000 });
-  }
-
-  savedViewsDialogApplyCell(viewName) {
-    return this.page.locator(`${this.savedViewsListDialog} ${this.savedViewsDialogApplyPrefix}[data-test-view-name="${viewName}"]`);
-  }
-
-  async applySavedViewFromListDialog(viewName) {
-    const cell = this.savedViewsDialogApplyCell(viewName);
-    await expect(cell).toBeVisible({ timeout: 15000 });
-    await cell.click();
-    await expect(this.page.locator(this.savedViewsListDialog)).toBeHidden({ timeout: 10000 });
+    const view = this.page
+      .locator('[data-test^="traces-search-bar-menu-saved-views-apply-"]')
+      .filter({ has: this.page.getByText(viewName, { exact: true }) });
+    await expect(view).toBeVisible({ timeout: 15000 });
+    await view.click();
   }
 
   async expectQueryEditorEventuallyContains(text) {
@@ -3249,5 +3252,70 @@ export class TracesPage {
 
   async expectWaterfallSpanRow(spanId) {
     await expect(this.page.locator(`${this.spanRow}[id="${spanId}"]`)).toBeVisible({ timeout: 30000 });
+  }
+
+  startCollectingPageErrors() {
+    this.pageErrors = [];
+    this.page.on('pageerror', (error) => this.pageErrors.push(error.message));
+  }
+
+  getPageErrors() {
+    return [...(this.pageErrors || [])];
+  }
+
+  async navigateToTracesWithFilter({ filter, stream = 'default', period = '15m', org = process.env['ORGNAME'] || 'default' }) {
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    // Same url-safe base64 alphabet as b64EncodeUnicode in web/src/utils/formatters.ts.
+    const query = Buffer.from(filter, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '.');
+    await this.page.goto(`${baseUrl}/web/traces?stream=${encodeURIComponent(stream)}&period=${period}&query=${query}&org_identifier=${org}`);
+  }
+
+  async navigateToTraceDetailsSpanUrl({ traceId, spanId, fromUs, toUs, stream = 'default', org = process.env['ORGNAME'] || 'default' }) {
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    await this.page.goto(`${baseUrl}/web/traces/trace-details?stream=${encodeURIComponent(stream)}&trace_id=${traceId}&span_id=${spanId}&from=${fromUs}&to=${toUs}&org_identifier=${org}`);
+  }
+
+  async hardReload() {
+    await this.page.reload({ waitUntil: 'load' });
+  }
+
+  async expectTracesListRendered() {
+    await expect(this.page.locator(this.searchBar)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.searchResultItem).first()).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectTracesSearchBarRendered() {
+    await expect(this.page.locator(this.searchBar)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.queryEditor).first()).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectTraceDetailsSelectedSpan(spanId) {
+    await expect(this.page.locator(this.traceDetailsHeader)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.traceDetailsSpanIdLabel).first()).toContainText(spanId, { timeout: 30000 });
+  }
+
+  // An example counts only once the typewriter moves off it, so a half-typed string is never mistaken for one.
+  async sampleQueryPlaceholder({ minExamples = 2, maxMs = 12000, intervalMs = 100 } = {}) {
+    const typewriter = this.page.locator(`${this.searchBar} ${this.queryPlaceholderTypewriter}`);
+    await expect(typewriter).toHaveText(/\S/, { timeout: 30000 });
+    return typewriter.evaluate((el, { minExamples, maxMs, intervalMs }) => new Promise((resolve) => {
+      const seen = new Set();
+      const peaks = new Set();
+      let prev = '';
+      const summarize = () => {
+        const samples = [...seen].filter((s) => s.trim());
+        const examples = [...peaks].filter((p) => p.trim() && !samples.some((o) => o !== p && o.startsWith(p)));
+        return { samples, examples };
+      };
+      const finish = () => { clearInterval(timer); clearTimeout(cap); resolve(summarize()); };
+      const timer = setInterval(() => {
+        const cur = el.textContent || '';
+        seen.add(cur);
+        if (!cur.startsWith(prev)) peaks.add(prev);
+        prev = cur;
+        if (summarize().examples.length >= minExamples) finish();
+      }, intervalMs);
+      const cap = setTimeout(finish, maxMs);
+    }), { minExamples, maxMs, intervalMs });
   }
 }
