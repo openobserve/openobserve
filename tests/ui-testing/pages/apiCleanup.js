@@ -3712,7 +3712,7 @@ class APICleanup {
         return removed;
     }
 
-    /** Crashed-run fleet leftovers; quiet on OSS, where every fleet route answers 403. */
+    /** Crashed-run fleet leftovers; quiet on OSS, where the fleet routes are not registered and answer 404. */
     async cleanupFleetArtifacts(fleetPrefixes = ['fl_auto_'], configPrefixes = ['fl-auto-']) {
         testLogger.info('Starting fleet artifact cleanup', { fleetPrefixes, configPrefixes });
         const headers = { 'Authorization': this.authHeader, 'Content-Type': 'application/json' };
@@ -3720,6 +3720,8 @@ class APICleanup {
         const json = async (res) => { try { return await res.json(); } catch { return null; } };
         const starts = (value, prefixes) => typeof value === 'string' && prefixes.some((p) => value.startsWith(p));
         const removed = { tokens: 0, fleets: 0, configs: 0 };
+        // The fl_auto_ roles and users do not depend on the fleet API, so sweep them even when it is unavailable.
+        for (const prefix of fleetPrefixes) await this.cleanupIamArtifacts(prefix);
         try {
             const fleetsRes = await this._fetch(api('/fleet/fleets?offset=0&limit=1000'), { method: 'GET', headers });
             if (!fleetsRes.ok) {
@@ -3751,7 +3753,6 @@ class APICleanup {
         } catch (e) {
             testLogger.warn('Fleet artifact cleanup hit an error — continuing', { error: e?.message });
         }
-        for (const prefix of fleetPrefixes) await this.cleanupIamArtifacts(prefix);
         return removed;
     }
 

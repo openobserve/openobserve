@@ -227,8 +227,7 @@ class FleetSeed {
   }
 
   async ingestionBaseUrl() {
-    const resp = await this.page.request.get(`${process.env.ZO_BASE_URL.replace(/\/$/, '')}/config`);
-    const config = resp.ok() ? await resp.json() : {};
+    const config = await this.ok('GET', '/config', undefined, 'get org config');
     return config?.ingestion_url || null;
   }
 

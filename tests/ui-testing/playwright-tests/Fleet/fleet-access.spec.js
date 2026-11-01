@@ -55,6 +55,8 @@ test.describe('Fleet management access', { tag: ['@fleet', '@enterprise', '@all'
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
+    // The beforeAll page that seeded the fixtures is closed, so seed API calls need this test's live page.
+    seed.setPage(page);
   });
 
   test('FL-RBAC-02 + R-16105a · a member without fleet grants gets the no-access states and no pipelines error banner', {

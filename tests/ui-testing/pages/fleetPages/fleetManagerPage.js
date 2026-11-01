@@ -56,7 +56,8 @@ class FleetManagerPage {
   // Fail loudly, never skip: these specs run only on an enterprise build with fleet management on.
   async assertEnabled() {
     const base = process.env.ZO_BASE_URL.replace(/\/$/, '');
-    const config = await this.page.request.get(`${base}/config`);
+    // The unauthenticated /config is the login bootstrap and has no fleet_enabled; the org config does.
+    const config = await this.page.request.get(`${base}/api/${getOrgIdentifier()}/config`, { headers: getAuthHeaders() });
     const fleetEnabled = config.ok() ? (await config.json())?.fleet_enabled : undefined;
     const list = await this.page.request.get(`${base}/api/${getOrgIdentifier()}/fleet/fleets?offset=0&limit=1`, {
       headers: getAuthHeaders(),
