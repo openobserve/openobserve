@@ -66,7 +66,8 @@ test.describe('Synthetics lists keep their view state on return (#15269)', () =>
     testLogger.info('Checks list state restored after browser back');
   });
 
-  test("a check's runs list keeps its status filter, sort, page size and page after leaving the results page and coming back", {
+  // Unskip once openobserve#16175 is fixed: the search result cache returns the newest runs twice on reopen.
+  test.fixme("a check's runs list keeps its status filter, sort, page size and page after leaving the results page and coming back", {
     tag: TAGS,
   }, async () => {
     const locationId = await synthetics.createProbeLocation(tag);

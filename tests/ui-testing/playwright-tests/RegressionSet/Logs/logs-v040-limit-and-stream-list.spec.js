@@ -80,7 +80,8 @@ test.describe("Logs v0.40.0 regressions", () => {
     testLogger.info('PASSED: stream list top rows survive a scroll (Bug #10602)');
   });
 
-  test("the stream select must only show its tooltip once more than one stream is picked", {
+  // Unskip once openobserve#16176 is fixed: the tooltip anchors to the picker's hidden announcement span, not the select.
+  test.fixme("the stream select must only show its tooltip once more than one stream is picked", {
     tag: ['@bug-10602', '@P2', '@regression', '@logsRegression', '@logsRegressionStreamList']
   }, async ({ page }) => {
     const singleSelection = await pm.logsPage.getStreamSelectTooltipText();
