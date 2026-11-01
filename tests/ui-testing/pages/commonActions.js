@@ -130,20 +130,8 @@ export async function selectLogsViewMode(page, mode, timeout = 20000) {
     await page.locator(`[data-test="logs-view-mode-${mode}-item"]`).click();
 }
 
-/**
- * Navigate straight to the metrics PANEL EDITOR.
- *
- * `/metrics` is the zero-query Metrics Explorer (a browse grid of metric cards);
- * the query editor — PromQL input, Apply, date picker, Add to Dashboard — now
- * lives at `/metrics/editor`. Tests that drive the editor must therefore address
- * it directly: clicking the sidebar's Metrics item lands on the explorer, which
- * has none of those controls.
- *
- * A direct `goto` rather than a sidebar click followed by an in-app hop: the
- * editor is what these tests are actually about, and one navigation is one thing
- * that can fail. Sidebar navigation itself is covered by landingPage.spec.
- */
-export async function gotoMetricsEditor(page) {
+/** Opens the Metrics Explorer in Visualize mode, where the panel editor lives. */
+export async function gotoMetricsVisualize(page) {
     // Carry the org the page is CURRENTLY on, rather than pinning the default.
     // The sidebar click this replaced preserved the selected org, and the
     // change-org tests rely on that: they switch org, come here, and then assert
@@ -158,9 +146,9 @@ export async function gotoMetricsEditor(page) {
     }
 
     await page.goto(
-        `${process.env.ZO_BASE_URL}/web/metrics/editor?org_identifier=${orgIdentifier}`
+        `${process.env.ZO_BASE_URL}/web/metrics?org_identifier=${orgIdentifier}&mode=visualize`
     );
-    await page.locator('[data-test="metrics-page"]').waitFor({ state: 'visible', timeout: 30000 });
+    await page.locator('[data-test="metrics-explorer-visualize"]').waitFor({ state: 'visible', timeout: 30000 });
 }
 
 // Common Locator exports

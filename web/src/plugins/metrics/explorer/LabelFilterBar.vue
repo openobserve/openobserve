@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     ref="barRef"
     class="relative flex min-w-0 flex-1 items-center gap-2"
-    :class="expanded ? 'flex-wrap' : 'flex-nowrap'"
+    :class="expanded || grouped ? 'flex-wrap' : 'flex-nowrap'"
     data-test="metrics-explorer-label-filter-bar"
   >
     <!-- Invisible copy of EVERY chip at its natural width — what the fit
@@ -50,44 +50,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          on the label alone would collide two chips onto one v-for key. -->
     <!-- The registry's fieldTag/primarysm — the same variant+size the group
          pins, spelled as type/value instead of loose props. -->
-    <template v-for="(filter, i) in shownFilters" :key="labelFilterKey(filter)">
-      <!-- Said, not inferred. Matchers in a PromQL selector are ALWAYS AND, but
-           two adjacent chips look equally like "either of these" — and the one
-           thing a second chip cannot mean is OR, so the ambiguity always resolves
-           the wrong way. The title carries the fix (`=~` with a regex) for anyone
-           who wanted OR and now knows they did not get it. -->
+    <template v-for="section in sections" :key="section.group">
       <span
-        v-if="i > 0"
+        v-if="section.group > 0"
         class="text-3xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
-        :title="t('metrics.explorer.labels.andSeparatorTitle')"
-        data-test="metrics-explorer-label-and"
-        >{{ t("metrics.explorer.labels.andSeparator") }}</span
+        :data-test="`metrics-explorer-label-group-join-${section.group}`"
+        >{{
+          section.position > 0
+            ? t("metrics.labelGroups.or")
+            : section.hasBase
+              ? t("metrics.labelGroups.andAnyOf")
+              : t("metrics.labelGroups.anyOf")
+        }}</span
       >
-      <OTag
-        type="fieldTag"
-        value="primarysm"
-        class="max-w-62.5 min-w-0"
-        :data-test="`metrics-explorer-label-chip-${filter.label}`"
+      <div
+        :class="
+          section.group > 0
+            ? 'border-border-default rounded-default flex min-w-0 flex-wrap items-center gap-2 border border-dashed p-0.5'
+            : 'contents'
+        "
+        :data-test="section.group > 0 ? `metrics-explorer-label-group-${section.group}` : undefined"
       >
-        <OTruncatedText class="font-mono text-xs"
-          >{{ filter.label }} {{ filter.operator || "=" }} {{ filter.value }}</OTruncatedText
+        <OButton
+          v-if="section.group > 0"
+          variant="ghost"
+          size="xs"
+          :active="section.negate"
+          :aria-pressed="section.negate"
+          :data-test="`metrics-explorer-label-group-not-${section.group}`"
+          @click="toggleNegate(section.group, !section.negate)"
         >
-        <template #trailing>
-          <button
-            type="button"
-            class="ms-1 inline-flex cursor-pointer items-center"
-            :aria-label="
-              t('metrics.explorer.labels.removeFilterAria', {
-                filter: labelFilterKey(filter),
-              })
-            "
-            :data-test="`metrics-explorer-label-chip-remove-${filter.label}`"
-            @click.stop="$emit('remove', filter)"
+          {{ t("metrics.labelGroups.not") }}
+          <OTooltip :content="t('metrics.labelGroups.notTooltip')" :delay="200" />
+        </OButton>
+        <template v-for="(filter, i) in section.filters" :key="labelFilterKey(filter)">
+          <!-- Said, not inferred: two adjacent chips read as either one, but they are always AND. -->
+          <span
+            v-if="i > 0"
+            class="text-3xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
+            :title="t('metrics.explorer.labels.andSeparatorTitle')"
+            data-test="metrics-explorer-label-and"
+            >{{ t("metrics.explorer.labels.andSeparator") }}</span
           >
-            <OIcon name="close" size="xs" />
-          </button>
+          <OTag
+            type="fieldTag"
+            value="primarysm"
+            class="max-w-62.5 min-w-0"
+            :data-test="`metrics-explorer-label-chip-${filter.label}`"
+          >
+            <OTruncatedText class="font-mono text-xs"
+              >{{ filter.label }} {{ filter.operator || "=" }} {{ filter.value }}</OTruncatedText
+            >
+            <template #trailing>
+              <button
+                type="button"
+                class="ms-1 inline-flex cursor-pointer items-center"
+                :aria-label="
+                  t('metrics.explorer.labels.removeFilterAria', {
+                    filter: labelFilterKey(filter),
+                  })
+                "
+                :data-test="`metrics-explorer-label-chip-remove-${filter.label}`"
+                @click.stop="$emit('remove', filter)"
+              >
+                <OIcon name="close" size="xs" />
+              </button>
+            </template>
+          </OTag>
         </template>
-      </OTag>
+        <OButton
+          v-if="section.group > 0 && step === 'idle'"
+          variant="ghost"
+          size="xs"
+          icon-left="add"
+          :aria-label="t('metrics.labelGroups.addToGroup')"
+          :data-test="`metrics-explorer-label-group-add-${section.group}`"
+          @click="startPicking(section.group)"
+        >
+          <OTooltip :content="t('metrics.labelGroups.addToGroup')" :delay="200" />
+        </OButton>
+      </div>
     </template>
     <OTag
       v-if="hiddenFilters.length"
@@ -162,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="xs"
           icon-left="add"
           data-test="metrics-explorer-label-add"
-          @click="startPicking"
+          @click="startPicking(0)"
         >
           {{ t("metrics.explorer.labels.addFilter") }}
         </OButton>
@@ -202,9 +244,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
              The tooltip is where `=~` earns its keep: matching either of two
              values is the one thing chips CANNOT do by adding a second filter
-             (matchers in a PromQL selector are always AND, and this engine
-             rejects `or` matchers outright), so regex alternation is the only
-             way to say it — and a user has no reason to guess that. The labels
+             (matchers in a PromQL selector are always AND), so regex
+             alternation or an OR group is how to say it — and a user has no
+             reason to guess that. The labels
              stay the bare symbols: they are what PromQL calls these, and the
              trigger is `w-20`. -->
           <div class="w-20">
@@ -255,6 +297,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('metrics.explorer.labels.cancelDraftAria')" />
           </OButton>
         </div>
+        <!-- After the picker chain, never inside it: a `v-if` there would break its `v-else-if`. -->
+        <OButton
+          v-if="step === 'idle' && filters.length"
+          variant="ghost"
+          size="xs"
+          data-test="metrics-explorer-label-add-group"
+          @click="startPicking(nextGroup)"
+        >
+          {{ t("metrics.labelGroups.addGroup") }}
+          <OTooltip :content="t('metrics.labelGroups.addGroupTooltip')" :delay="200" />
+        </OButton>
+        <span
+          v-if="capError"
+          class="text-status-error-text text-xs"
+          role="alert"
+          data-test="metrics-explorer-label-too-many-branches"
+          >{{ capError }}</span
+        >
       </div>
 
       <!-- The empty-row hint, typed out.
@@ -309,6 +369,13 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useFilterHint } from "@/composables/metrics/useFilterHint";
 import { labelFilterKey, type LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
+import {
+  compileLabelFilters,
+  filterGroupsOf,
+  hasFilterGroups,
+  MAX_FILTER_BRANCHES,
+  type LabelMatchOp,
+} from "@/components/promql/labelBoolean";
 
 /** The PromQL selector builder throws on anything else, so an invalid name is
  *  rejected here rather than being turned into a broken query. */
@@ -334,6 +401,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "add", filter: LabelFilter): void;
   (e: "remove", filter: LabelFilter): void;
+  (e: "negate-group", group: number, negate: boolean): void;
   (e: "clear-all"): void;
   /** First open only — lets the parent lazily fetch label names. */
   (e: "focus-picker"): void;
@@ -376,8 +444,8 @@ const measure = async () => {
   const bar = barRef.value;
   const meas = measureRef.value;
   // No layout to measure (jsdom, hidden tab): show everything rather than
-  // clamping on a width of zero.
-  if (!bar || !meas || !bar.clientWidth) {
+  // clamping on a width of zero. Grouped filters always wrap in full.
+  if (!bar || !meas || !bar.clientWidth || grouped.value) {
     fitCount.value = Number.MAX_SAFE_INTEGER;
     return;
   }
@@ -430,10 +498,51 @@ onBeforeUnmount(() => {
 
 watch(() => props.filters, measure, { deep: true });
 
+const grouped = computed(() => hasFilterGroups(props.filters));
+
 const shownFilters = computed(() =>
-  expanded.value ? props.filters : props.filters.slice(0, fitCount.value),
+  expanded.value || grouped.value ? props.filters : props.filters.slice(0, fitCount.value),
 );
-const hiddenFilters = computed(() => (expanded.value ? [] : props.filters.slice(fitCount.value)));
+const hiddenFilters = computed(() =>
+  expanded.value || grouped.value ? [] : props.filters.slice(fitCount.value),
+);
+
+const sections = computed(() => {
+  const base = shownFilters.value.filter((f) => (f.group ?? 0) <= 0);
+  const groups = filterGroupsOf(shownFilters.value).map(({ group, negate, members }, position) => ({
+    group,
+    negate,
+    position,
+    hasBase: base.length > 0,
+    filters: members,
+  }));
+  return [{ group: 0, negate: false, position: 0, hasBase: false, filters: base }, ...groups];
+});
+
+const nextGroup = computed(() => Math.max(0, ...props.filters.map((f) => f.group ?? 0)) + 1);
+
+/** The picker's target: 0 is the base list, anything else an OR group. */
+const targetGroup = ref(0);
+const capError = ref("");
+
+/** Null when `filters` compiles within the branch cap, otherwise the message to show. */
+const capMessage = (filters: LabelFilter[]): string | null => {
+  const compiled = compileLabelFilters(
+    filters.map((f) => ({ ...f, label: String(f.label), op: (f.operator ?? "=") as LabelMatchOp })),
+  );
+  if (compiled.ok) return null;
+  return t("metrics.labelGroups.tooManyBranches", {
+    count: compiled.branchCount,
+    max: MAX_FILTER_BRANCHES,
+  });
+};
+
+const toggleNegate = (group: number, negate: boolean) => {
+  const next = props.filters.map((f) => (f.group === group ? { ...f, negate } : f));
+  const message = capMessage(next);
+  capError.value = message ?? "";
+  if (!message) emit("negate-group", group, negate);
+};
 
 type Step = "idle" | "label" | "value";
 const step = ref<Step>("idle");
@@ -507,8 +616,10 @@ const cancel = () => {
 // names (they are window-scoped), so a one-shot emit left the picker saying
 // "No options found" for the rest of the page. The parent's loader dedupes —
 // it returns early while names are loaded or loading — so re-emitting is free.
-const startPicking = () => {
+const startPicking = (group = 0) => {
   resetDraft();
+  targetGroup.value = group;
+  capError.value = "";
   step.value = "label";
   emit("focus-picker");
   autoOpen(() => labelStepRef.value);
@@ -560,12 +671,19 @@ const commit = (value: string) => {
   const trimmed = (value ?? "").trim();
   if (!LABEL_NAME_RE.test(label) || !trimmed) return;
 
-  emit("add", {
+  const filter: LabelFilter = {
     label: raw(label),
     value: trimmed,
     operator: draftOperator.value || "=",
-  });
+  };
+  if (targetGroup.value > 0) {
+    filter.group = targetGroup.value;
+    if (props.filters.some((f) => f.group === targetGroup.value && f.negate)) filter.negate = true;
+  }
+  const message = capMessage([...props.filters, filter]);
   cancel();
+  capError.value = message ?? "";
+  if (!message) emit("add", filter);
 };
 
 /** Selecting a value IS the commit — there is nothing left to confirm. */
