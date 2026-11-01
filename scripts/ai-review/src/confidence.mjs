@@ -94,10 +94,11 @@ export function changedCodeEvidence(diff, pairedDir = "") {
   for (const section of String(diff ?? "").split(/^diff --git /m)) {
     const raw = /^a\/.*? b\/(.*?)\n/.exec(section)?.[1];
     if (!raw) continue;
-    const path = prefix && raw.startsWith(prefix) ? raw.slice(prefix.length) : raw;
-    const testPath = TEST_PATH_RE.test(path);
-    if (testPath || (path.endsWith(".rs") && RUST_TEST_ADDED_RE.test(section))) testsChanged = true;
-    if (!testPath && PROD_PATH_RE.test(path)) prodChanged = true;
+    const renamedFrom = /^rename from "?(.*?)"?$/m.exec(section)?.[1];
+    // Moving code out of a production path removes it from there, so the source counts as much as the destination.
+    const [path, source = path] = [raw, renamedFrom].filter(Boolean).map(p => (prefix && p.startsWith(prefix) ? p.slice(prefix.length) : p));
+    if (TEST_PATH_RE.test(path) || (path.endsWith(".rs") && RUST_TEST_ADDED_RE.test(section))) testsChanged = true;
+    if ([path, source].some(p => !TEST_PATH_RE.test(p) && PROD_PATH_RE.test(p))) prodChanged = true;
   }
   return { prodChanged, testsChanged };
 }
