@@ -77,8 +77,9 @@ function url(path) {
  * rule that should be rejected), so this deliberately does not throw on a
  * non-2xx the way `oncall-seed.js`'s `must()` does.
  */
-async function call(page, method, path, data) {
-  const opts = { headers: getAuthHeaders() };
+async function call(page, method, path, data, { asSession = false } = {}) {
+  // A secondary sign-in is identified by its cookie alone; root's header would make the identity a precedence question.
+  const opts = { headers: asSession ? {} : getAuthHeaders() };
   if (data !== undefined) opts.data = data;
   const res = await page.request[method](url(path), opts);
   const text = await res.text().catch(() => '');
@@ -99,8 +100,8 @@ async function call(page, method, path, data) {
  * there", so every emptiness assertion built on one passed the moment the API
  * stopped answering. An error is not an empty result.
  */
-async function read(page, path) {
-  const { ok, status, body, text } = await call(page, 'get', path);
+async function read(page, path, { asSession = false } = {}) {
+  const { ok, status, body, text } = await call(page, 'get', path, undefined, { asSession });
   if (!ok) {
     throw new Error(`GET ${path} failed: ${status} ${String(text ?? '').slice(0, 200)}`);
   }
@@ -166,6 +167,9 @@ async function nonAdminRolesAvailable(page) {
     email, password: SEED_USER_PASSWORD, first_name: 'RBAC', last_name: 'Probe',
     role: 'viewer', organization: orgId(),
   });
+  if (status >= 400 && !/already exist/i.test(text || '') && !/open-?fga/i.test(text || '')) {
+    throw new Error(`probing for non-admin roles failed: HTTP ${status} — ${String(text).slice(0, 200)}`);
+  }
   _nonAdminRoles = status === 200 || /already exist/i.test(text || '');
   if (_nonAdminRoles) await deleteOrgUser(page, email);
   testLogger.info('Non-admin roles probe', { available: _nonAdminRoles, status });
@@ -344,7 +348,8 @@ async function waitForResponseState(page, responseId, states, { timeout = 180_00
 async function simulateRouting(page, { dimensions, oncallTeam = undefined }) {
   const payload = { dimensions };
   if (oncallTeam !== undefined) payload.oncall_team = oncallTeam;
-  const { body } = await call(page, 'post', '/oncall/routing/preview', payload);
+  const { ok, status, body, text } = await call(page, 'post', '/oncall/routing/preview', payload);
+  if (!ok) throw new Error(`routing preview failed: HTTP ${status} — ${String(text).slice(0, 200)}`);
   return body;
 }
 
@@ -465,18 +470,38 @@ async function shortenPolicyForSpeed(page, teamId, priority, delaysSeconds, { ta
 
 const MAILPIT = process.env.MAILPIT_URL || 'http://localhost:8025';
 
+/** Why the on-call mail helpers cannot read mail here, or null when Mailpit answers. */
+async function mailSinkProblem() {
+  if ((await sink.backend()) === 'mailpit') return null;
+  return `the on-call mail helpers read Mailpit only and it is not reachable on ${MAILPIT}; `
+    + await sink.unavailableReason();
+}
+
+/** Throw rather than let a missing sink read as "no mail was sent". */
+async function assertMailSink() {
+  const problem = await mailSinkProblem();
+  if (problem) throw new Error(`cannot read mail: ${problem}`);
+}
+
 /**
- * One message, fully fetched.
+ * Call first in a test that reads mail: skips locally when no sink is up, throws in CI where that is a broken runner.
  *
- * `mail-sink.js` indexes messages (id, subject, timestamp) and can fetch the
- * NEWEST one, but a page fan-out puts several in the sink at once and the one a
- * case cares about is rarely the newest. This adds the per-id read on the
- * Mailpit backend only — the sink that exists on this environment — rather than
- * re-implementing the module's backend selection.
+ * @param {import('@playwright/test').TestType<any, any>} test
  */
+async function requireMailSink(test) {
+  const problem = await mailSinkProblem();
+  if (!problem) return;
+  if (process.env.CI) throw new Error(`this test reads mail and the CI runner has no mail sink: ${problem}`);
+  test.skip(true, problem);
+}
+
+/** One message by id, or null if it was deleted after it was listed; a fan-out's wanted message is rarely the newest. */
 async function fetchMessage(id) {
   const res = await fetch(`${MAILPIT}/api/v1/message/${id}`);
-  if (!res.ok) return null;
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`reading Mailpit message ${id} failed: HTTP ${res.status} — ${(await res.text()).slice(0, 200)}`);
+  }
   const m = await res.json();
   return {
     id,
@@ -489,14 +514,14 @@ async function fetchMessage(id) {
 }
 
 /**
- * Wait for a message matching `to` and/or `subject`, newest first.
+ * Wait for a message matching `to` and/or `subject`, newest first; null only when none arrived in time.
  *
  * `sinceMs` scopes to messages that arrived after a caller-recorded instant, so
  * a shared sink full of other workers' fixtures cannot satisfy the wait with
  * somebody else's page.
  */
 async function waitForMail({ to = null, subject = null, sinceMs = 0, timeout = 120_000, pollMs = 2000 } = {}) {
-  if (!(await sink.available())) return null;
+  await assertMailSink();
   const wantTo = to ? String(to).toLowerCase() : null;
   const deadline = Date.now() + timeout;
 
@@ -507,8 +532,7 @@ async function waitForMail({ to = null, subject = null, sinceMs = 0, timeout = 1
       : index;
     for (const row of [...candidates].sort((a, b) => b.ts - a.ts)) {
       const full = await fetchMessage(row.id);
-      if (!full) continue;
-      if (wantTo && !full.to.includes(wantTo)) continue;
+      if (!full || (wantTo && !full.to.includes(wantTo))) continue;
       return full;
     }
     await new Promise((r) => setTimeout(r, pollMs));
@@ -518,7 +542,7 @@ async function waitForMail({ to = null, subject = null, sinceMs = 0, timeout = 1
 
 /** Every message since an instant, fully fetched — for fan-out assertions. */
 async function mailSince(sinceMs) {
-  if (!(await sink.available())) return [];
+  await assertMailSink();
   const index = (await sink.list()).filter((m) => m.ts >= sinceMs);
   const out = [];
   for (const row of index) {
@@ -583,19 +607,19 @@ async function putPolicy(page, teamId, { rungs, destinations = undefined, l0 = u
   return await call(page, 'put', `/oncall/teams/${encodeURIComponent(teamId)}/policy`, payload);
 }
 
-/** The caller's own inbox: `{total, unread, deliveries}`. Keyed on the auth header, never a param. */
-async function myDeliveries(page, { unreadOnly = undefined, limit = undefined } = {}) {
+/** The caller's own inbox: `{total, unread, deliveries}`. Keyed on the caller's identity, never a param. */
+async function myDeliveries(page, { unreadOnly = undefined, limit = undefined, asSession = false } = {}) {
   const params = new URLSearchParams();
   if (unreadOnly !== undefined) params.set('unread_only', String(unreadOnly));
   if (limit !== undefined) params.set('limit', String(limit));
   const query = params.toString() ? `?${params}` : '';
-  return await read(page, `/oncall/my/deliveries${query}`);
+  return await read(page, `/oncall/my/deliveries${query}`, { asSession });
 }
 
 /** Mark inbox rows read or unread again. `{all: true, read: true}` marks everything. */
-async function markDeliveriesRead(page, { eventIds = [], read: isRead = true, all = false } = {}) {
+async function markDeliveriesRead(page, { eventIds = [], read: isRead = true, all = false, asSession = false } = {}) {
   return await call(page, 'post', '/oncall/my/deliveries/read',
-    { event_ids: eventIds, read: isRead, all });
+    { event_ids: eventIds, read: isRead, all }, { asSession });
 }
 
 /** The team overview: the summary card's own endpoint, built from four other reads. */
@@ -613,7 +637,10 @@ async function getTeamOverview(page, teamId) {
  */
 async function getTeamAttention(page, teamId) {
   const body = await read(page, `/oncall/teams/${encodeURIComponent(teamId)}/config-risks`);
-  return body?.risks ?? [];
+  if (!Array.isArray(body?.risks)) {
+    throw new Error(`config-risks answered no risks list: ${JSON.stringify(body).slice(0, 200)}`);
+  }
+  return body.risks;
 }
 
 /** Ownership-rule hit statistics, the numbers the rules table renders per row. */
@@ -645,6 +672,26 @@ async function deleteTeamExpectingStatus(page, teamId) {
  */
 async function createOwnershipRuleExpectingStatus(page, body) {
   return await call(page, 'post', '/oncall/ownership', body);
+}
+
+/** The org is explicit because a case staged in its own org must not fall back to the shared one. */
+async function deleteDestination(page, name, org = orgId()) {
+  return await page.request.delete(
+    `${baseUrl()}/api/${org}/alerts/destinations/${encodeURIComponent(name)}`,
+    { headers: getAuthHeaders() },
+  );
+}
+
+/** Teardown only: an already-gone alert is not a failure. */
+async function deleteAlertById(page, alertId, org = orgId()) {
+  try {
+    await page.request.delete(
+      `${baseUrl()}/api/v2/${org}/alerts/${encodeURIComponent(alertId)}`,
+      { headers: getAuthHeaders() },
+    );
+  } catch (e) {
+    testLogger.debug('Alert cleanup failed (non-fatal)', { alertId, error: e.message });
+  }
 }
 
 module.exports = {
@@ -686,6 +733,7 @@ module.exports = {
   deleteAbsence,
   deleteOwnershipRule,
   shortenPolicyForSpeed,
+  requireMailSink,
   waitForMail,
   mailSince,
   extractLinks,
@@ -700,4 +748,6 @@ module.exports = {
   getOwnershipStats,
   createOwnershipRuleExpectingStatus,
   deleteTeamExpectingStatus,
+  deleteDestination,
+  deleteAlertById,
 };

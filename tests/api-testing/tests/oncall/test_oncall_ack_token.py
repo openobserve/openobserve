@@ -26,7 +26,7 @@ why this surface carries the sharpest invariants in the feature — from
   * a GET must only look — a link-prefetching mail gateway would otherwise
     acknowledge a page nobody read
 
-## The token could not be obtained, and nothing here pretends otherwise
+## The token exists only inside the page email, so it is read from a mailbox
 
 An acknowledgement token is minted inside the enterprise crate
 (`o2_enterprise::enterprise::oncall::token`) and embedded in the outgoing
@@ -44,18 +44,18 @@ notification. Everything reachable from this repo was checked:
     (the one OSS reference, src/jobs/src/job/oncall_maintenance.rs, passes None).
   * No notification- or template-preview route exists.
 
-So 12.3, 12.4 and 12.6 are BLOCKED on a mailbox (or an enterprise mint helper)
-and are marked skip with that reason. They are written out in full rather than
-stubbed, so they run the moment `minted_ack_token` can return a real one. No
-token is fabricated and no verifier is stubbed to turn them green — a test that
-passes without exercising `ack_claims` would prove nothing about this route.
+So 12.3, 12.4 and 12.6 read the token out of a real mailbox (Mailpit), which
+the enterprise `ent_oncall` API shard starts. Without one they skip locally and
+FAIL when `CI` is set: a skip there would hide a broken job behind a green run.
+No token is fabricated and no verifier is stubbed to turn them green — a test
+that passes without exercising `ack_claims` would prove nothing about this route.
 
 12.1, 12.2, 12.5 and 12.7 need only a malformed, expired or foreign token and
 run for real. Read the honest note on each: with no signing key on this side, a
 401 cannot be attributed to the *specific* check that produced it, so the
 expired and foreign-org cases pin "no such token acts", not "the expiry check
 fired". 12.7 is live for everything observable without a valid token (a GET
-never says "Acknowledged", never carries a Location) and its full form is skipped.
+never says "Acknowledged", never carries a Location) and its full form needs the mailbox.
 
 Only the pages' fixed headings are asserted ("Acknowledged", "Already acknowledged
 by", "This link no longer works"); the rest is markup a person reads. Status codes,
@@ -76,20 +76,17 @@ from tests.oncall.oncall_helpers import (
     ack_link_for,
     mailpit_available,
     make_user,
+    oncall_enabled,
     rotation,
     shift_rule,
+    skip_or_fail_in_ci,
     uniq,
 )
 
-TOKEN_MINT_UNAVAILABLE = (
-    "no acknowledgement token is obtainable: it is minted inside "
-    "o2_enterprise::enterprise::oncall::token and only ever leaves the server "
-    "inside the notification body. The delivery ledger "
-    "(GET /oncall/responses/{id}/deliveries), the personal inbox "
-    "(GET /oncall/my/deliveries) and test-page all omit it, and no "
-    "notification-preview or mint endpoint exists. Needs a captured mailbox or "
-    "an enterprise-side mint helper exposed to tests."
-)
+
+class AckTokenLeak(AssertionError):
+    """A removed member's emailed link still acknowledged the page (o2-enterprise#2481)."""
+
 
 # JWT-shaped so the route gets something structurally plausible to reject, but
 # signed with nothing — this must never be mistaken for a real token.
@@ -97,9 +94,7 @@ UNSIGNED_SIGNATURE = "not-a-real-signature"
 
 # Shapes a hostile or broken link can arrive in. Each must be refused, and
 # refused the same way: 401 from the claims check.
-# The whole feature needs an enterprise build with `O2_ONCALL_ENABLED`; the
-# marker lets CI hold this directory separately, and the session-scoped gate
-# in conftest skips it rather than failing when the flag is off.
+# Enterprise-only: the conftest gate skips on an OSS build and fails on an enterprise one without `O2_ONCALL_ENABLED`.
 pytestmark = pytest.mark.enterprise
 
 MALFORMED_TOKENS = [
@@ -118,26 +113,14 @@ MALFORMED_TOKENS = [
 # =============================================================================
 
 @pytest.fixture(scope="module", autouse=True)
-def require_oncall(create_session, base_url, org_id):
-    """Skip the module unless the build actually serves the on-call routes.
+def require_oncall(client, org_id):
+    """Skip the module only on an OSS build; `oncall_enabled` raises on anything else.
 
-    Probes `oncall/teams` rather than reading `config.oncall_enabled`: that key
-    is what the issue report quoted, but a current enterprise build does not
-    publish it, and gating on it skipped every test against a server that was
-    serving on-call correctly. A 404 means the routes are not registered, in
-    which case `/oncall/ack` falls through to the authenticated catch-all and
-    every assertion below would be measuring the auth middleware instead.
+    Without the routes `/oncall/ack` falls through to the authenticated
+    catch-all, and every assertion below would be measuring the auth middleware.
     """
-    resp = create_session.get(f"{base_url}api/{org_id}/oncall/teams")
-    if resp.status_code == 404:
-        pytest.skip("this build does not serve the on-call routes")
-    # 404 above is the only legitimate skip: the routes are genuinely absent. Any
-    # OTHER unexpected status is the server being broken, and skipping on it takes
-    # all 42 cases in this file with it — a 500 would have retired the whole ack
-    # surface silently.
-    assert resp.status_code in (200, 403), (
-        f"on-call is registered but `oncall/teams` answered {resp.status_code}, so the "
-        f"server is not healthy enough to measure the ack route against: {resp.text[:200]}")
+    if not oncall_enabled(client, org_id):
+        pytest.skip("on-call is enterprise-only and this is an OSS build")
 
 
 @pytest.fixture
@@ -161,7 +144,7 @@ def minted_ack_token(oncall):
     on call" instead of a page, which is the trap that looks like a missing token.
     """
     if not mailpit_available():
-        pytest.skip(
+        skip_or_fail_in_ci(
             f"no readable mailbox at {MAILPIT_BASE}; the ack token exists only "
             "inside a page email. Run Mailpit and point the server's SMTP at it."
         )
@@ -177,14 +160,14 @@ def minted_ack_token(oncall):
     page = oncall.open_pages_for([team_id], priority=2)[0]
     link = ack_link_for(marker)
     if not link:
-        pytest.skip(
+        skip_or_fail_in_ci(
             "a page opened but no acknowledge link reached the mailbox within the "
             "wait; check the server's SMTP settings and ZO_WEB_URL"
         )
 
     token = urllib.parse.parse_qs(urllib.parse.urlparse(link).query).get("token", [None])[0]
     assert token, f"ack link carried no token: {link}"
-    yield token, page["id"], email
+    return token, page["id"], email
 
 
 # =============================================================================
@@ -570,7 +553,7 @@ def test_a_get_with_a_valid_token_does_not_acknowledge(create_session, base_url,
 
 
 # =============================================================================
-# 12.3, 12.4, 12.6 — blocked on a token that cannot be obtained
+# 12.3, 12.4, 12.6 — a real token, read from the page email
 # =============================================================================
 
 def test_a_valid_token_acknowledges_and_links_with_the_org(create_session, base_url,
@@ -660,6 +643,8 @@ def test_a_used_link_opened_again_shows_the_state_not_the_button(create_session,
         "attributed to the removed person. The signed-in path refuses the same action "
         "with NotOnThisTeam. o2-enterprise#2481."
     ),
+    # Only the defect's own observation raises it, so a broken fixture or setup assert still fails.
+    raises=AckTokenLeak,
     strict=True,
 )
 def test_a_token_whose_subject_left_the_team_is_refused(create_session, base_url, org_id,
@@ -683,7 +668,10 @@ def test_a_token_whose_subject_left_the_team_is_refused(create_session, base_url
     )
     assert removed.status_code == 200, removed.text
 
-    assert_handler_refused(post_ack(base_url, org_id, token))
+    leaver_post = post_ack(base_url, org_id, token)
+    if ACKED_HEADING in leaver_post.text:
+        raise AckTokenLeak(f"a removed member's link still acknowledged: {leaver_post.text[:300]}")
+    assert_handler_refused(leaver_post)
     assert_handler_refused(get_ack(base_url, org_id, token))
 
     after = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}")

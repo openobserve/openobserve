@@ -19,12 +19,15 @@ window applies at no instant at all, which is what §8.2 refuses.
 §7's two-failure threshold is deliberate, and §7.2 exists to guard it against
 being tightened: one blip must not bench somebody who is holding the pager.
 Producing a *recorded* delivery failure needs a transport that is configured
-and fails, which is what the helper's dead destination (a closed port on
-loopback) is for. Where the deployment cannot deliver to a member at all — no
-SMTP, no webhook — a degradation caused by failures cannot be told apart from
-one caused by there being no transport, and those tests skip with that reason
-rather than asserting something they cannot see. That is a real gap in coverage
-on an SMTP-less instance and is called out rather than papered over.
+and fails. Email alone decides `would_a_page_land`, and delivery health is kept
+per recipient and channel (a webhook page is recorded against the team's
+channel, never the person), so the failures are email ones: mail configured but
+not landing. In the enterprise `ent_oncall` CI shard that is a Mailpit that
+refuses `MAILBOX_DOMAIN` (and accepts the ack-token tests' `test.invalid`).
+Where the deployment cannot deliver to a member at all — no SMTP — or where its
+mail does land, a degradation caused by failures cannot be produced: those tests
+skip with that reason locally, and FAIL when `CI` is set, where either state
+means the shard's mail setup is broken.
 """
 from __future__ import annotations
 
@@ -38,15 +41,17 @@ from support.client import OpenObserveClient
 from support.wait import WaitTimeout
 
 from .oncall_helpers import (
-    DEAD_DEST,
+    MAILBOX_DOMAIN,
     MINUTES_PER_DAY,
     OnCallClient,
+    delivered_recipients,
     ladder,
     make_user,
     micros_from_now,
     rotation,
     rotation_target,
     shift_rule,
+    skip_or_fail_in_ci,
     uniq,
     user_target,
 )
@@ -54,9 +59,7 @@ from .oncall_helpers import failed_recipients as failures_in
 
 logger = logging.getLogger(__name__)
 
-# The whole feature needs an enterprise build with `O2_ONCALL_ENABLED`; the
-# marker lets CI hold this directory separately, and the session-scoped gate
-# in conftest skips it rather than failing when the flag is off.
+# Enterprise-only: the conftest gate skips on an OSS build and fails on an enterprise one without `O2_ONCALL_ENABLED`.
 pytestmark = pytest.mark.enterprise
 
 ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
@@ -72,7 +75,7 @@ DEGRADE_AFTER = 2
 
 @pytest.fixture(scope="module")
 def rota_member(client: OpenObserveClient, oncall: OnCallClient, oncall_org: str) -> str:
-    email, _unused = make_user(client, oncall_org, "user")
+    email, _unused = make_user(client, oncall_org, "user", domain=MAILBOX_DOMAIN)
     oncall.users.append(email)
     return email
 
@@ -91,6 +94,12 @@ def member_verdict(oncall: OnCallClient, team_id: str, email: str) -> dict | Non
         if (member.get("user_email") or "").lower() == email.lower():
             return member
     return None
+
+
+def skip_if_mail_lands(ledger: dict, email: str) -> None:
+    """A deployment whose mail is delivered cannot produce the failures §7 counts."""
+    if any(email.lower() in r.lower() for r in delivered_recipients(ledger)):
+        skip_or_fail_in_ci("mail to this member was delivered here, so no delivery failure can be produced")
 
 
 def one_rotation(rotation_id: str, members: list[str], **kw) -> list[dict]:
@@ -269,36 +278,50 @@ def test_the_escalation_preview_agrees_with_reachability(
             f"preview says {recipient}, reachability says {verdict}")
 
 
-def test_a_preview_for_a_transport_that_can_deliver_nothing_says_so(
-        oncall: OnCallClient, rota_team: str, rota_member: str):
+def test_a_preview_whose_ladder_can_reach_nobody_says_so(
+        client: OpenObserveClient, oncall: OnCallClient, oncall_org: str,
+        rota_team: str, rota_member: str):
     """§7.3 — the loudest finding a preview can report.
 
-    Reachable only on a deployment with no SMTP, which is the ordinary state of
-    a test instance: with the ladder set to the email channel alone, nothing
-    the preview describes can reach a human, and it has to say so rather than
-    drawing a ladder that looks configured.
+    When nothing the preview describes can reach a human it has to say so rather
+    than draw a ladder that looks configured. `reaches_nobody` is "no recipient's
+    email would land" (email alone decides the verdict, whatever channels the
+    ladder names), so it is produced either way a deployment can be: with no
+    SMTP, for any member; with SMTP, for a member whose address mail can never
+    reach — a reserved domain. Each branch pins its own reason, so neither can
+    pass on the other's.
     """
     reach = oncall.reachability(rota_team)
     assert reach.status_code == 200, reach.text
     if reach.json().get("smtp_configured"):
-        pytest.skip("SMTP is configured here, so the email channel can deliver")
+        member, _unused = make_user(client, oncall_org, "user")
+        oncall.users.append(member)
+        team = oncall.staffed_team([member], name=uniq("oncall_pt_nowhere"))
+        cause = "uses a domain reserved for documentation"
+    else:
+        team, member, cause = rota_team, rota_member, "no SMTP transport"
 
     assert oncall.set_policy(
-        rota_team, [ladder([user_target(rota_member)], channels=["email"])]
+        team, [ladder([user_target(member)], channels=["email"])]
     ).status_code == 200
 
-    preview = oncall.escalation_preview(rota_team, priority=1)
+    preview = oncall.escalation_preview(team, priority=1)
     assert preview.status_code == 200, preview.text
     body = preview.json()
     assert body.get("reaches_nobody") is True, body
-    for rung in body.get("rungs", []):
-        for recipient in rung.get("recipients", []):
-            assert recipient.get("would_a_page_land") is False, recipient
+    recipients = [r for rung in body.get("rungs", []) for r in rung.get("recipients", [])]
+    assert recipients, f"the rung targets {member} and must list them: {body}"
+    for recipient in recipients:
+        assert recipient.get("would_a_page_land") is False, recipient
+        assert cause in (recipient.get("why_not") or ""), recipient
 
 
 @pytest.fixture(scope="module")
 def failing_team(oncall: OnCallClient, rota_member: str) -> dict:
-    """A team whose only transport is a destination that cannot be reached.
+    """A team that pages its only member by email alone.
+
+    Email because it alone moves `would_a_page_land`: a webhook page is recorded
+    against the team's channel, so it can never bench a person.
 
     Two rungs to the same person: the first fires with the record and the
     second is reachable on demand via `escalate`, which is how a SECOND
@@ -309,9 +332,8 @@ def failing_team(oncall: OnCallClient, rota_member: str) -> dict:
     baseline = member_verdict(oncall, team, rota_member)
     assert oncall.set_policy(
         team,
-        [ladder([user_target(rota_member)], channels=["webhook"],
-                delays=[0, 30 * 60 * 1_000_000])],
-        destinations=[DEAD_DEST]).status_code == 200
+        [ladder([user_target(rota_member)], channels=["email"],
+                delays=[0, 30 * 60 * 1_000_000])]).status_code == 200
     page = oncall.open_pages_for([team])[0]
     return {"team": team, "page": page, "baseline": baseline}
 
@@ -320,25 +342,22 @@ def test_a_single_delivery_failure_does_not_bench_a_responder(
         oncall: OnCallClient, failing_team: dict, rota_member: str):
     """§7.2 — the guard on the threshold. One blip is not a pattern.
 
-    Skipped rather than asserted when the member was already unreachable before
-    any page was sent: a degradation caused by two failures cannot be told
+    Skipped locally (failed in CI) rather than asserted when the member was
+    already unreachable before any page was sent: a degradation caused by two failures cannot be told
     apart from one caused by there being no transport at all, and asserting
     into that ambiguity would produce a test that passes for the wrong reason.
     """
     if not (failing_team["baseline"] or {}).get("would_a_page_land"):
-        pytest.skip("this member is unreachable before any failure; "
-                    "a failure-driven degradation cannot be isolated here")
+        skip_or_fail_in_ci("this member is unreachable before any failure; "
+                           "a failure-driven degradation cannot be isolated here")
 
     ledger = oncall.wait_for_deliveries(failing_team["page"]["id"])
+    skip_if_mail_lands(ledger, rota_member)
     mine = [r for r in failures_in(ledger) if r and rota_member.lower() in r.lower()]
-    # NOT a skip. `failing_team` routes through DEAD_DEST, a destination that
-    # cannot be reached, so exactly one recorded failure is deterministic by
-    # construction — nothing about a deployment changes it. Skipping here turns a
-    # broken delivery ledger into a green run, which is the failure this whole
-    # section exists to catch.
+    # NOT a skip: mail is configured and was not delivered, so a missing failure row is a broken ledger.
     assert len(mine) == 1, (
         f"expected exactly one recorded failure against {rota_member}, got {len(mine)}. "
-        "The destination is unreachable by construction, so this is the delivery "
+        "Mail is configured here and was not delivered, so this is the delivery "
         f"ledger not recording failures, not an environment difference: {ledger}")
 
     verdict = member_verdict(oncall, failing_team["team"], rota_member)
@@ -356,8 +375,8 @@ def test_two_consecutive_failures_drop_a_responder_out_of_reachable(
     one page.
     """
     if not (failing_team["baseline"] or {}).get("would_a_page_land"):
-        pytest.skip("this member is unreachable before any failure; "
-                    "a failure-driven degradation cannot be isolated here")
+        skip_or_fail_in_ci("this member is unreachable before any failure; "
+                           "a failure-driven degradation cannot be isolated here")
 
     resp = oncall.escalate(failing_team["page"]["id"])
     assert resp.status_code == 200, resp.text
@@ -370,11 +389,12 @@ def test_two_consecutive_failures_drop_a_responder_out_of_reachable(
                                             count=DEGRADE_AFTER)
     except WaitTimeout:
         ledger = oncall.deliveries(failing_team["page"]["id"]).json()
+    skip_if_mail_lands(ledger, rota_member)
     mine = [r for r in failures_in(ledger) if r and rota_member.lower() in r.lower()]
-    # NOT a skip, for the same reason as above: DEAD_DEST guarantees the failures.
+    # NOT a skip, for the same reason as above: nothing was delivered, so every attempt must be a failure.
     assert len(mine) >= DEGRADE_AFTER, (
         f"expected at least {DEGRADE_AFTER} recorded failures against {rota_member}, "
-        f"got {len(mine)}. The destination is unreachable by construction, so a short "
+        f"got {len(mine)}. Mail is configured here and was not delivered, so a short "
         f"count means the ledger stopped recording failures: {ledger}")
 
     verdict = member_verdict(oncall, failing_team["team"], rota_member)

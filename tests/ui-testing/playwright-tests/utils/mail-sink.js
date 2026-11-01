@@ -14,8 +14,10 @@
  *   mailinator — public inbox read over HTTP, works against a shared env where
  *                you cannot run a container next to the app
  *
- * Tests that need a sink call `await sink.available()` and skip cleanly when
- * false, rather than failing.
+ * Tests that need a sink check `await sink.available()` first: with no sink
+ * `list()` throws rather than report an empty mailbox. On-call specs go through
+ * `requireMailSink` (oncall-seed-ext.js), which skips locally and fails under CI,
+ * where a missing sink is a broken runner.
  */
 const MODE = process.env.MAIL_SINK || 'auto';
 const MAILPIT = process.env.MAILPIT_URL || 'http://localhost:8025';
@@ -76,7 +78,7 @@ async function list() {
     const d = await r.json();
     return (d.msgs || []).map((m) => ({ id: m.id, subject: m.subject, ts: Number(m.time) || 0 }));
   }
-  return [];
+  throw new Error(`cannot list mail: ${await unavailableReason()}`);
 }
 
 async function count() {

@@ -7,7 +7,8 @@
  *   through: the manual pass asserted API status codes and never asserted what
  *   the screen drew.
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * WHAT §10.5 ASKS FOR IS NOT WHAT MAIN DOES, AND THE DIVERGENCE IS DELIBERATE.
  * `useOnCallPermissions` carries this in its own comment: the API has no

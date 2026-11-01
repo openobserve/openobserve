@@ -122,7 +122,7 @@ file should pass strict ruff.
 ## Troubleshooting
 
 - **`KeyError: 'ZO_BASE_URL'` on collection** — `conftest.py` reads env vars at import. Export them before running pytest (even `--collect-only`).
-- **On-call ack-token tests skip** — they read the paging mail to get the acknowledgement token, which exists only in the delivered message. Start Mailpit (`MAILPIT_BASE_URL`, default `http://127.0.0.1:8025`) and point the server at it with `ZO_SMTP_ENABLED=true ZO_SMTP_HOST=127.0.0.1 ZO_SMTP_PORT=1025`. CI does not start Mailpit, so these skip there by design.
+- **On-call ack-token tests skip locally** — they read the paging mail to get the acknowledgement token, which exists only in the delivered message. Start Mailpit with `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025 --smtp-allowed-recipients '(?i)@test\.invalid$'` (the filter makes mail to the reachability tests' other domain a real refusal), point the server at it with `ZO_SMTP_ENABLED=true ZO_SMTP_HOST=127.0.0.1 ZO_SMTP_PORT=1025 ZO_SMTP_FROM_EMAIL=oncall@ci.openobserve.test`, and set `MAILPIT_BASE_URL` if it is not `http://127.0.0.1:8025`. With no mailbox they skip locally and fail when `CI` is set. The enterprise `ent_oncall` shard starts Mailpit v1.21.8 on 1025/8025 with that recipient filter and starts the server with the same SMTP settings.
 - **`test_workflow.py` fails with SMTP error** — `ZO_SMTP_ENABLED=true` not set. CI does this; locally you'd need to wire an SMTP env.
 - **Test_organisations.py warning about `yield`** — `test_create_organization` uses pre-pytest-4 yield-style and is silently ignored. Scheduled for rewrite in Phase 4.
 

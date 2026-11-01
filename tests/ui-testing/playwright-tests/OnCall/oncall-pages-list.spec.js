@@ -3,13 +3,14 @@
  *
  * Plan: docs/test_generator/features/oncall-test-plan.md
  *   §2.4  the page detail badges each responder with what the ledger says
- *   §3.2  an exhausted ladder reads "Ladder finished — nobody left"
+ *   §3.2  an exhausted ladder reads "Nobody answered"
  *   §3.3  a ladder still climbing keeps saying so — the wording is per-state
  *   §11.3 a group heading's count against the rows actually drawn
  *   §11.6 a teamless page reads "Unrouted", and the exhaust reason must not
  *         claim the team was deleted
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * SLOW BY NATURE. Every case here needs a REAL page, which means an alert that
  * fires and a scheduler that turns the firing into a record — `firePageAndWait`
@@ -58,13 +59,14 @@ const {
   deleteOnCallFixturesByPrefix,
 } = require('../utils/oncall-seed.js');
 const { createOrgUser, oncallUserEmail } = require('../utils/oncall-seed-ext.js');
+const { DEFAULT_TEAM_LOCK, acquireOrgLock } = require('../utils/oncall-org-lock.js');
 
 const PREFIX = 'e2e_oncall_pages';
 
-/** Wording the plan pins, verbatim from `oncall.ladderFinished`. */
-const FINISHED_WORDING = 'Ladder finished';
-/** The blanket wording §3.2 guards against, from `oncall.escalationClimbing`. */
-const CLIMBING_WORDING = 'Escalating';
+/** Wording the plan pins, verbatim from `oncall.state_exhausted`. */
+const FINISHED_WORDING = 'Nobody answered';
+/** The climbing wording an exhausted ladder must drop, from `oncall.escalationPagingStep*`. */
+const CLIMBING_WORDING = 'Paging step';
 /** `oncall.statUnrouted` — what a page nothing claimed must say. */
 const UNROUTED_WORDING = 'Unrouted';
 
@@ -177,7 +179,16 @@ test.describe('On-call pages list', {
 
   test('the pages list loads with its table', {
     tag: ['@P0', '@smoke'],
-  }, async () => {
+  }, async ({ page }, testInfo) => {
+    test.setTimeout(480_000);
+    // An org that has never paged draws the setup checklist instead of the table, and CI starts every shard fresh.
+    const { team } = await seedPageableTeam(page, testInfo);
+    const stream = uniqueName(`${workerPrefix(testInfo)}_stream`);
+    await seedOnCallStream(page, stream);
+    await firePageAndWait(page, {
+      alertOptions: { name: uniqueName(`${workerPrefix(testInfo)}_alert`), stream, teamId: team.id },
+    });
+
     await pm.oncallPagesListPage.goto(ORG);
     await pm.oncallPagesListPage.expectAvailable();
     await pm.oncallPagesListPage.expectListVisible();
@@ -244,7 +255,7 @@ test.describe('On-call pages list', {
    * situations. The honest wording is per-state, so this reads the same cell
    * twice: once while the ladder is still climbing — it must not already claim
    * to be finished — and once after the server reports exhaustion, where it must
-   * say so in words and must NOT still read "Escalating".
+   * say so in words and must NOT still read "Paging step".
    *
    * BOTH READS GO THROUGH THE TEAM FILTER, and that is what makes this test
    * survive a busy org rather than a freshly-wiped one. The list loads a
@@ -277,6 +288,8 @@ test.describe('On-call pages list', {
         name: uniqueName(`${workerPrefix(testInfo)}_alert`),
         stream,
         teamId: team.id,
+        // seedPageableTeam writes a P1-only ladder; at the default P2 nothing would climb at all.
+        priority: 1,
       },
     });
     const responseId = pages[0].id;
@@ -292,11 +305,20 @@ test.describe('On-call pages list', {
     // §3.3 — while it is still climbing the cell must not claim it is over.
     await openListOnThisTeam();
     await expect(cell, 'the freshly opened page must be on the list').toBeVisible({ timeout: 60000 });
-    const climbing = await getEscalationProgress(page, responseId);
-    if (climbing && climbing.exhausted !== true) {
-      await expect(cell, 'a ladder still due to fire must not read as finished')
-        .not.toContainText(FINISHED_WORDING);
-    }
+    // Read after the list fetched, so a ladder still climbing now was climbing when the cell was drawn.
+    // The first rung is written after the record opens, so it is polled for rather than read once.
+    let climbing;
+    await expect.poll(async () => {
+      climbing = await getEscalationProgress(page, responseId);
+      return climbing?.fired?.length ?? 0;
+    }, {
+      timeout: 60_000,
+      intervals: [2000],
+      message: 'the P1 ladder must have fired its first rung',
+    }).toBeGreaterThan(0);
+    expect(climbing?.exhausted, 'a ladder whose second rung is a minute away has not run out yet').not.toBe(true);
+    await expect(cell, 'a ladder still due to fire must not read as finished')
+      .not.toContainText(FINISHED_WORDING);
 
     // The ladder's own cadence decides when it runs out; poll the server rather
     // than the screen, so a UI that never updates fails as a UI failure.
@@ -329,52 +351,34 @@ test.describe('On-call pages list', {
    * §11.6 — a page nothing routed is "Unrouted", and the reason must be true.
    *
    * A teamless page is still opened and must stay closable, so the row reads
-   * "Unrouted" rather than going blank. The second half matters more: the
-   * exhaust reason has to say nothing claimed it, not that a team was deleted —
-   * the second sends somebody looking for a team that never existed.
-   *
-   * Requires the org to have NO default routing team. Setting one is org-wide
-   * and would break every other worker's routing, so this skips rather than
-   * touching it.
-   *
-   * PARKED ON A CONFIRMED PRODUCT DEFECT, NOT ON A TEST PROBLEM. The second
-   * half genuinely fails on this build, and the assertion below is the correct
-   * one — so it is left exactly as written and the test is fixme'd rather than
-   * softened. Reproduced without Playwright: fire an alert with no
-   * `oncall_team` into an org whose `default_team_id` is null, and
-   * `GET /api/{org}/oncall/responses/{id}/escalation` answers
-   *   {"stopped_because": "the owning team was deleted — this page needs a new owner"}
-   * on a page whose `team_id` has been null since it opened. Nothing was ever
-   * deleted; no team ever claimed it. The string belongs to the enterprise
-   * backend (it appears in this repo only as a fixture, in
-   * web/src/components/oncall/OnCallEscalation.spec.ts:430), so the fix is a
-   * paired o2-enterprise change. Everything up to that assertion — the page
-   * opening teamless, the row reading "Unrouted" — passes.
+   * "Unrouted" rather than going blank, and the reason it went nowhere must say
+   * nothing claimed it rather than blame a deletion that never happened.
    */
-  test.fixme('§11.6 a teamless page reads Unrouted and blames nothing on a deletion. o2-enterprise#2481.', {
+  test('§11.6 a teamless page reads Unrouted and blames nothing on a deletion', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    test.setTimeout(480_000);
-    const routing = await getRoutingConfig(page);
-    test.skip(
-      Boolean(routing?.default_team_id),
-      'this org nominates a catch-all team, so nothing can be unrouted — clearing it is org-wide and would break parallel workers',
-    );
-
+    test.setTimeout(720_000);
     const stream = uniqueName(`${workerPrefix(testInfo)}_stream`);
-    // A dimension value nothing owns: the shared service names are claimed by
-    // other fixtures, and a rule matching one would route this page after all.
+    // A dimension value nothing owns, so no ownership rule can claim the page.
     const service = uniqueName(`${workerPrefix(testInfo)}_svc`);
     await seedOnCallStream(page, stream, { services: [service] });
-
-    // No `oncall_team`, so routing is left to the rules and nothing claims the page.
     const destination = await seedNotificationDestination(page, workerPrefix(testInfo));
     const alertName = uniqueName(`${workerPrefix(testInfo)}_alert`);
-    const { pages } = await firePageAndWait(page, {
-      alertOptions: { name: alertName, stream, destinations: [destination] },
-    });
-    const record = pages[0];
-    expect(record.team_id ?? null, 'nothing must have claimed this page').toBeFalsy();
+
+    // Held until the page has opened: a default team nominated meanwhile by the routing spec would claim it.
+    const releaseLock = await acquireOrgLock(DEFAULT_TEAM_LOCK, { testInfo });
+    let record;
+    try {
+      expect((await getRoutingConfig(page))?.default_team_id ?? null,
+        'no test may leave a default team nominated, or nothing in this org can be unrouted').toBeNull();
+      const { pages } = await firePageAndWait(page, {
+        alertOptions: { name: alertName, stream, destinations: [destination] },
+        expectTeamId: null,
+      });
+      record = pages[0];
+    } finally {
+      releaseLock();
+    }
 
     await pm.oncallPagesListPage.goto(ORG);
     await pm.oncallPagesListPage.expectListVisible();
@@ -388,18 +392,20 @@ test.describe('On-call pages list', {
       'a page no rule claimed reads Unrouted — the team cell is a tag, not a link, so it carries no row-scoped data-test',
     ).toContainText(UNROUTED_WORDING, { timeout: 30000 });
 
-    // The sentences the product would show for why this went nowhere.
     const progress = await getEscalationProgress(page, record.id);
     const detail = await getResponse(page, record.id);
+    expect(progress, 'the escalation state of an open page must be readable').toBeTruthy();
+    expect(detail, 'the page must be readable').toBeTruthy();
+    testLogger.info('§11.6 escalation state', { stoppedBecause: progress.stopped_because });
+    expect(progress.stopped_because, 'the ladder must say why it is not climbing: nothing ever routed this page')
+      .toMatch(/never routed/i);
+
     const reasons = [
-      progress?.stopped_because,
-      detail?.response?.why_not,
-      ...(detail?.events ?? [])
-        .filter((e) => e?.kind === 'exhausted')
-        .map((e) => e?.body),
+      progress.stopped_because,
+      detail.response?.why_not,
+      ...(detail.events ?? []).filter((e) => e?.kind === 'exhausted').map((e) => e?.body),
     ].filter((s) => typeof s === 'string' && s.length > 0);
     testLogger.info('§11.6 exhaust reasons', { reasons });
-
     for (const reason of reasons) {
       expect(
         reason,
@@ -437,22 +443,22 @@ test.describe('On-call pages list', {
         name: uniqueName(`${workerPrefix(testInfo)}_alert`),
         stream,
         teamId: team.id,
+        // seedPageableTeam writes a P1-only ladder; at the default P2 nobody would be paged.
+        priority: 1,
       },
     });
     const responseId = pages[0].id;
 
-    // The ledger is written as the ladder runs, so an empty read a second after
-    // the record opens is "not yet", not "nothing was sent". Polled with a
-    // deadline rather than asserted, because an empty ledger is a legitimate
-    // outcome this test then asserts the ABSENCE of a badge against.
     let sends = [];
-    const ledgerDeadline = Date.now() + 120_000;
-    while (Date.now() < ledgerDeadline) {
+    await expect.poll(async () => {
       sends = deliveryRows(await getDeliveries(page, responseId))
         .filter((row) => row?.recipient === memberEmail);
-      if (sends.length) break;
-      await page.waitForTimeout(3000);
-    }
+      return sends.length;
+    }, {
+      timeout: 120_000,
+      intervals: [3000],
+      message: 'the P1 first rung pages the rotation holder, so the ledger must record a send to them',
+    }).toBeGreaterThan(0);
     testLogger.info('§2.4 ledger for the on-call responder', {
       memberEmail, sends: sends.length,
     });
@@ -461,14 +467,6 @@ test.describe('On-call pages list', {
     await expect(pm.oncallPagesListPage.getWhoIsOn()).toBeVisible({ timeout: 30000 });
 
     const badge = pm.oncallPagesListPage.getWhoIsOnPrimaryReach();
-    if (sends.length === 0) {
-      await expect(
-        badge,
-        'with nothing in the ledger for this address there is nothing to badge',
-      ).toHaveCount(0);
-      return;
-    }
-
     await expect(badge, 'a responder the ladder paged must carry a reach badge')
       .toBeVisible({ timeout: 30000 });
     const landed = sends.some((row) => row?.delivered === true);

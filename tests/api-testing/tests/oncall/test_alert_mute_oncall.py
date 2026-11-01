@@ -141,7 +141,7 @@ def test_until_it_clears_with_keep_firing_for_ends_on_the_run_that_ends_the_hold
 
 def test_the_mute_rule_refuses_a_viewer_with_names_and_lets_an_editor_and_a_responder_mute(
         client: OpenObserveClient, oncall_org: str, oncall: OnCallClient, admin):
-    responder_email, as_responder = _non_admin(client, oncall_org, oncall, "user")
+    responder_email, as_responder = _non_admin(client, oncall_org, oncall, "viewer")
     _, as_viewer = _non_admin(client, oncall_org, oncall, "viewer")
     _, as_editor = _non_admin(client, oncall_org, oncall, "editor")
     admin_email, _ = admin
