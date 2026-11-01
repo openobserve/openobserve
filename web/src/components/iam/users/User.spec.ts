@@ -26,6 +26,7 @@ import organizationsService from "@/services/organizations";
 import { getRoles } from "@/services/iam";
 import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
+import { userKeys } from "@/services/users.querykeys";
 
 // Create i18n instance with comprehensive translations for CI/CD compatibility
 const i18n = createI18n({
@@ -842,6 +843,41 @@ describe("User Component", () => {
         user_org: store.state.selectedOrganization.identifier,
         page: "Users",
       });
+    });
+
+    it("does not reopen the dialog on repaint after a manual edit", async () => {
+      vi.useFakeTimers();
+      try {
+        const org = store.state.selectedOrganization.identifier;
+        await router.replace({
+          query: {
+            ...router.currentRoute.value.query,
+            action: "update",
+            email: "test@example.com",
+          },
+        });
+        queryClient.setQueryData(userKeys.users(org), [
+          {
+            email: "test@example.com",
+            first_name: "Test",
+            last_name: "User",
+            role: "viewer",
+            is_external: false,
+          },
+        ]);
+        wrapper.vm.addUser({ row: { email: "test@example.com", role: "viewer" } }, true);
+        await vi.advanceTimersByTimeAsync(150);
+        expect(wrapper.vm.showAddUserDialog).toBe(true);
+
+        // Save closes the dialog; a repaint while ?email= lingers must not reopen it.
+        wrapper.vm.showAddUserDialog = false;
+        await wrapper.vm.getOrgMembers(true);
+        await vi.advanceTimersByTimeAsync(200);
+        expect(wrapper.vm.showAddUserDialog).toBe(false);
+      } finally {
+        vi.useRealTimers();
+        await router.replace({ query: {} });
+      }
     });
   });
 
