@@ -116,9 +116,9 @@ const CONFIRM_REFUSAL_KEYS: [&str; 10] = [
 
 #[cfg(any(feature = "enterprise", test))]
 const CONFIRM_SCOPES: [&str; 3] = ["once", "chat", "always"];
-// Older clients name the card `approval_id` or `call_id`; the relay forwards it as `id`.
+// Older clients name the card `approval_id` or `call_id`, a question `request_id`; o2-ai gets `id`.
 #[cfg(any(feature = "enterprise", test))]
-const CONFIRM_ID_KEYS: [&str; 3] = ["id", "approval_id", "call_id"];
+const CONFIRM_ID_KEYS: [&str; 4] = ["id", "approval_id", "call_id", "request_id"];
 // With o2-ai's health unknown, a turn waits this long at most for a replacement owner.
 #[cfg(feature = "enterprise")]
 const UNKNOWN_HEALTH_OWNER_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -1256,7 +1256,8 @@ fn confirm_id(body: &Value) -> Option<String> {
         .map(str::to_string)
 }
 
-/// Why a `/confirm` body is malformed: `id`, `scope`, `items`, `reply` and `extend` are typed.
+/// Why a `/confirm` body is malformed: ids, `scope`, `items`, `reply`, `answer` and `extend` are
+/// typed.
 #[cfg(any(feature = "enterprise", test))]
 fn confirm_body_problem(body: &[u8]) -> Option<&'static str> {
     let Ok(Value::Object(body)) = serde_json::from_slice::<Value>(body) else {
@@ -1266,6 +1267,9 @@ fn confirm_body_problem(body: &[u8]) -> Option<&'static str> {
     let ids_ok = CONFIRM_ID_KEYS.iter().all(|key| is(key, Value::is_string));
     if !ids_ok || !is("reply", Value::is_string) {
         return Some("id and reply must be strings");
+    }
+    if !is("answer", Value::is_string) {
+        return Some("answer must be a string");
     }
     if !is("extend", Value::is_boolean) {
         return Some("extend must be a boolean");
@@ -1280,6 +1284,13 @@ fn confirm_body_problem(body: &[u8]) -> Option<&'static str> {
         return Some("items must be a list of target ids");
     }
     None
+}
+
+/// `{request_id, answer}` answers an `ask_user` question: no card, grant or pending mark is
+/// involved.
+#[cfg(any(feature = "enterprise", test))]
+fn answers_question(body: &[u8]) -> bool {
+    serde_json::from_slice::<Value>(body).is_ok_and(|body| body.get("answer").is_some())
 }
 
 /// `{id, extend: true}` only asks o2-ai for more time; nothing is decided.
@@ -1790,6 +1801,9 @@ async fn relay_confirm_answer(answered: &Answered<'_>, response_body: &str) -> R
     } = *answered;
     let answer = serde_json::from_str::<Value>(response_body)
         .unwrap_or_else(|_| serde_json::json!({"ok": true}));
+    if answers_question(request) {
+        return (StatusCode::OK, axum::Json(answer)).into_response();
+    }
     if !extends_only(request) {
         let resolved = &answer["resolved"];
         let tool = resolved["tool"]
@@ -2790,7 +2804,8 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
                        is the card's id (or its `call_id`), `scope` is `once`, `chat` or \
                        `always` (only for a grantable card), `items` approves a subset of a \
                        batch and `reply` declines with text. `{id, extend: true}` asks for more \
-                       time instead (at most three times) and answers the new `expires_at`.",
+                       time instead (at most three times) and answers the new `expires_at`. \
+                       `{request_id, answer}` answers an `ask_user` question.",
         example = json!({"id": "apr_3f9c2e81a0b4d5c6e7f8", "approved": true, "scope": "once"}),
     ),
     responses(
@@ -5017,6 +5032,8 @@ mod tests {
         assert_eq!(value["id"], "apr_9");
         assert!(value.get("approval_record").is_none() && value.get("policy").is_none());
         assert!(confirm_body_problem(br#"{"call_id":3}"#).is_some());
+        assert!(confirm_body_problem(br#"{"request_id":3,"answer":"a"}"#).is_some());
+        assert!(confirm_body_problem(br#"{"request_id":"ask_1","answer":3}"#).is_some());
         assert!(confirm_body_problem(br#"{"id":"apr_1","scope":"tool"}"#).is_some());
     }
 
@@ -5036,6 +5053,18 @@ mod tests {
         assert_eq!(extended["background_extends_left"], 3);
         assert_eq!(extended["id"], "apr_1");
         assert!(extended_card(card, &serde_json::json!({"extends": 1})).is_none());
+    }
+
+    #[test]
+    fn an_ask_user_answer_reaches_o2_ai_on_its_request_id_and_touches_no_card() {
+        let body = br#"{"request_id":"ask_1","answer":"opt_2"}"#;
+        assert_eq!(confirm_body_problem(body), None);
+        let bound = bind_confirm_body_to_org(body, "acme").unwrap();
+        assert_eq!(bound["id"], "ask_1");
+        assert_eq!(bound["answer"], "opt_2");
+        assert!(answers_question(body));
+        assert!(!answers_question(br#"{"id":"apr_1","approved":true}"#));
+        assert_eq!(decision_of(body, "alice@acme.io", 1), None);
     }
 
     #[test]
