@@ -499,7 +499,7 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest tests/alerts/test_pending_silence.py tests/alerts/test_alert_ack.py tests/alerts/test_firing_cycle.py -n 4 -v --junitxml=junit-alerts-pending.xml
+          rye run pytest tests/alerts/test_pending_silence.py tests/alerts/test_alert_ack.py tests/alerts/test_firing_cycle.py -n 11 -v --junitxml=junit-alerts-pending.xml
           kill $SERVER_PID || true
         working-directory: tests/api-testing/
 

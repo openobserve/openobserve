@@ -73,7 +73,7 @@ def org_id():
 
 @pytest.fixture(scope="session", autouse=True)
 def ingest_data(tmp_path_factory):
-    """Ingest the shared seed data once per server, even across xdist workers and repeated sessions."""
+    """Ingest the shared seed data once per server (xdist workers included); re-ingest once the last copy is over 1 hour old."""
     # The basetemp parent is shared by every xdist worker of a run, so the lock serialises them.
     lock_path = tmp_path_factory.getbasetemp().parent / "ingest_data.lock"
     with open(lock_path, "w") as lock:
