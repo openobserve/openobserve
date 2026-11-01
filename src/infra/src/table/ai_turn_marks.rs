@@ -32,6 +32,8 @@ pub const KIND_TURN: &str = "turn";
 pub const KIND_CONFIRMATION: &str = "confirmation";
 /// `user_email` answered the session's pending confirmation at `created_at`.
 pub const KIND_ANSWERED: &str = "answered";
+/// `user_email` saw the end of the turn in `value`.
+pub const KIND_SEEN: &str = "seen";
 
 /// One mark to store; the id and time are filled in.
 #[derive(Debug, Clone, Copy)]
@@ -205,6 +207,52 @@ pub async fn created_per_session_with<C: ConnectionTrait>(
         times.sort_unstable();
     }
     Ok(created)
+}
+
+/// The values of the unexpired marks of `kind` per listed session of `user_email`.
+pub async fn values_per_session(
+    org_id: &str,
+    user_email: &str,
+    kind: &str,
+    session_ids: &[String],
+    now: i64,
+) -> Result<HashMap<String, Vec<String>>, errors::Error> {
+    values_per_session_with(
+        get_orm_client_ro().await,
+        (org_id, user_email),
+        kind,
+        session_ids,
+        now,
+    )
+    .await
+}
+
+pub async fn values_per_session_with<C: ConnectionTrait>(
+    conn: &C,
+    (org_id, user_email): (&str, &str),
+    kind: &str,
+    session_ids: &[String],
+    now: i64,
+) -> Result<HashMap<String, Vec<String>>, errors::Error> {
+    if session_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let rows = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::UserEmail.eq(user_email))
+        .filter(Column::Kind.eq(kind))
+        .filter(Column::SessionId.is_in(session_ids.iter().map(String::as_str)))
+        .filter(Column::ExpiresAt.gt(now))
+        .all(conn)
+        .await
+        .map_err(db_err)?;
+    let mut values: HashMap<String, Vec<String>> = HashMap::new();
+    for row in rows {
+        if let Some(value) = row.value {
+            values.entry(row.session_id).or_default().push(value);
+        }
+    }
+    Ok(values)
 }
 
 /// Removes every expired mark, e.g. of a node that died mid-turn.

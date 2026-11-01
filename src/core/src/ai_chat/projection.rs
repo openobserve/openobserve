@@ -77,6 +77,16 @@ const REDACTED_STEP_KEYS: [&str; 6] = ["type", "id", "call_id", "kind", "state",
 const REDACTED_DROPPED_FRAMES: [&str; 2] = ["query", "findings"];
 const VIEWER_DECISION_KEYS: [&str; 4] = ["type", "id", "approved", "at"];
 const TERMINAL_FRAMES: [&str; 3] = ["complete", "cancelled", "error"];
+const QUERY_FRAME: &str = "query";
+// The fenced languages o2-ai's `query_frame` accepts, and the frame's name for each.
+const QUERY_LANGUAGES: [(&str, &str); 4] = [
+    ("sql", "sql"),
+    ("promql", "promql"),
+    ("vrl", "vrl"),
+    ("traces", "traces"),
+];
+// The arguments a query step names its text under.
+const QUERY_STEP_KEYS: [&str; 3] = ["sql", "query", "promql"];
 const CONFIRMATION_REQUIRED: &str = "confirmation_required";
 const CONFIRMATION_RESOLVED: &str = "confirmation_resolved";
 const NAVIGATION_ACTION: &str = "navigation_action";
@@ -205,6 +215,8 @@ static MODEL_NAME: LazyLock<(Regex, String)> = LazyLock::new(|| {
     )
 });
 
+static QUERY_BLOCK: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?s)```([A-Za-z]+)[^\n]*\n(.*?)```").expect("valid query block"));
 static NONCED_OPENER: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^--- (.+?) \[([a-z2-7]{8})\] ---$").expect("valid opener"));
 static NONCED_CLOSER: LazyLock<Regex> =
@@ -922,6 +934,20 @@ pub fn attach_decisions(turn: &mut Value, decisions: &[Value]) {
     }
 }
 
+/// Rebuilds a query builder turn's end frame, which o2-ai only streams and never stores.
+pub fn attach_query_frame(turn: &mut Value) {
+    let Some(Value::Array(frames)) = turn.get_mut("frames") else {
+        return;
+    };
+    if frames.iter().any(|f| frame_type(f) == QUERY_FRAME) {
+        return;
+    }
+    let Some(frame) = query_frame(frames) else {
+        return;
+    };
+    frames.insert(frames.len() - trailing_terminal(frames), frame);
+}
+
 fn redact_frame(frame: &mut Value) {
     let Some(map) = frame.as_object_mut() else {
         return;
@@ -1026,6 +1052,64 @@ fn resolved_frame(decision: &Map<String, Value>, asked: Option<&mut Value>, n: u
         }
     }
     Value::Object(frame)
+}
+
+/// The answer's last fenced query, validated only by a successful run of that same text.
+fn query_frame(frames: &[Value]) -> Option<Value> {
+    let answer: String = frames
+        .iter()
+        .filter(|f| frame_type(f) == "message_delta")
+        .filter_map(|f| f.get("content").and_then(Value::as_str))
+        .collect();
+    let (language, text) = QUERY_BLOCK
+        .captures_iter(&answer)
+        .filter_map(|block| {
+            let fenced = block[1].to_ascii_lowercase();
+            let (_, language) = QUERY_LANGUAGES.iter().find(|(tag, _)| *tag == fenced)?;
+            let text = block[2].trim();
+            (!text.is_empty()).then(|| (*language, text.to_string()))
+        })
+        .last()?;
+    let validated = query_ran(frames, &text);
+    Some(json!({
+        "type": QUERY_FRAME,
+        "language": language,
+        "text": text,
+        "validated": validated,
+    }))
+}
+
+/// Whether the newest step that ran `text` succeeded.
+fn query_ran(frames: &[Value], text: &str) -> bool {
+    let wanted = normal_query(text);
+    let ran: Vec<&str> = frames
+        .iter()
+        .filter(|f| frame_type(f) == "tool_call")
+        .filter(|f| {
+            obj(f.get("context")).is_some_and(|context| {
+                QUERY_STEP_KEYS
+                    .iter()
+                    .filter_map(|key| context.get(*key).and_then(Value::as_str))
+                    .any(|query| normal_query(query) == wanted)
+            })
+        })
+        .filter_map(|f| f.get("call_id").and_then(Value::as_str))
+        .collect();
+    frames
+        .iter()
+        .rev()
+        .filter(|f| frame_type(f) == "tool_result")
+        .find(|f| {
+            f.get("call_id")
+                .and_then(Value::as_str)
+                .is_some_and(|id| ran.contains(&id))
+        })
+        .is_some_and(|f| f.get("success") == Some(&Value::Bool(true)))
+}
+
+fn normal_query(text: &str) -> String {
+    let joined = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    joined.trim_end_matches(';').trim().to_string()
 }
 
 /// How many frames at the end are terminal (`complete`, `cancelled`, `error`).
@@ -1972,6 +2056,51 @@ fn py_strip(text: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_query_builder_turn_gets_its_end_frame_back_before_the_terminal() {
+        let fence = "```";
+        let mut turn = json!({"frames": [
+            {"type": "tool_call", "tool": "SearchSQL", "call_id": "c1",
+             "context": {"sql": "SELECT  a FROM b;"}},
+            {"type": "tool_result", "tool": "SearchSQL", "call_id": "c1", "success": true},
+            {"type": "message_delta", "content": format!("Try:\n{fence}sql\nSELECT 1\n{fence}\n")},
+            {"type": "message_delta", "content": format!("or\n{fence}SQL\nSELECT a\nFROM b\n{fence}")},
+            {"type": "complete"},
+        ]});
+        attach_query_frame(&mut turn);
+        let frames = turn["frames"].as_array().unwrap();
+        assert_eq!(frames.len(), 6);
+        assert_eq!(frames[5]["type"], "complete");
+        assert_eq!(
+            frames[4],
+            json!({"type": "query", "language": "sql", "text": "SELECT a\nFROM b", "validated": true})
+        );
+        attach_query_frame(&mut turn);
+        assert_eq!(turn["frames"].as_array().unwrap().len(), 6, "only once");
+    }
+
+    #[test]
+    fn a_query_that_never_ran_or_failed_is_not_validated_and_prose_gets_no_frame() {
+        let fence = "```";
+        let answer = format!("{fence}promql\nrate(x[5m])\n{fence}");
+        let mut unrun = json!({"frames": [{"type": "message_delta", "content": answer}]});
+        attach_query_frame(&mut unrun);
+        assert_eq!(unrun["frames"][1]["language"], "promql");
+        assert_eq!(unrun["frames"][1]["validated"], false);
+
+        let mut failed = json!({"frames": [
+            {"type": "tool_call", "call_id": "c1", "context": {"query": "rate(x[5m])"}},
+            {"type": "tool_result", "call_id": "c1", "success": false},
+            {"type": "message_delta", "content": answer},
+        ]});
+        attach_query_frame(&mut failed);
+        assert_eq!(failed["frames"][3]["validated"], false);
+
+        let mut prose = json!({"frames": [{"type": "message_delta", "content": "No query."}]});
+        attach_query_frame(&mut prose);
+        assert_eq!(prose["frames"].as_array().unwrap().len(), 1);
+    }
 
     fn load(name: &str) -> (Vec<DurableEvent>, Value) {
         let path = format!("{}/src/ai_chat/testdata/{name}", env!("CARGO_MANIFEST_DIR"));

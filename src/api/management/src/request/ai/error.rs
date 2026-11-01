@@ -55,10 +55,13 @@ pub enum AiErrorCode {
     ChangedSince,
     UndoExpired,
     BelowUsage,
+    RunLimitMember,
+    RunLimitOrg,
+    AgentUnreachable,
 }
 
 impl AiErrorCode {
-    pub const ALL: [AiErrorCode; 29] = [
+    pub const ALL: [AiErrorCode; 32] = [
         AiErrorCode::SessionExpired,
         AiErrorCode::PermissionDenied,
         AiErrorCode::NotEnabled,
@@ -88,6 +91,9 @@ impl AiErrorCode {
         AiErrorCode::ChangedSince,
         AiErrorCode::UndoExpired,
         AiErrorCode::BelowUsage,
+        AiErrorCode::RunLimitMember,
+        AiErrorCode::RunLimitOrg,
+        AiErrorCode::AgentUnreachable,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -121,6 +127,9 @@ impl AiErrorCode {
             AiErrorCode::ChangedSince => "changed_since",
             AiErrorCode::UndoExpired => "undo_expired",
             AiErrorCode::BelowUsage => "below_usage",
+            AiErrorCode::RunLimitMember => "run_limit_member",
+            AiErrorCode::RunLimitOrg => "run_limit_org",
+            AiErrorCode::AgentUnreachable => "agent_unreachable",
         }
     }
 
@@ -131,12 +140,15 @@ impl AiErrorCode {
 
     /// The ledger code of a stored `ai_chat_turns.error_code` or an upstream code.
     pub fn from_stored(code: &str) -> Option<Self> {
+        // A stored `agent_unreachable` is the turn's own failure, not the refusal at send.
+        if code == "agent_unreachable" {
+            return Some(AiErrorCode::AgentUnavailable);
+        }
         if let Some(code) = Self::from_ledger(code) {
             return Some(code);
         }
         let code = match code {
-            "agent_unreachable"
-            | "stream_interrupted"
+            "stream_interrupted"
             | "turn_timeout"
             | "restore_failed"
             | "event_store_unavailable"
@@ -184,8 +196,12 @@ impl AiErrorCode {
             AiErrorCode::ConsentRequired => StatusCode::PRECONDITION_FAILED,
             AiErrorCode::AuthorizationUnavailable
             | AiErrorCode::AgentUnavailable
+            | AiErrorCode::AgentUnreachable
             | AiErrorCode::HistoryUnavailable => StatusCode::SERVICE_UNAVAILABLE,
-            AiErrorCode::TurnLimit | AiErrorCode::RateLimited => StatusCode::TOO_MANY_REQUESTS,
+            AiErrorCode::TurnLimit
+            | AiErrorCode::RunLimitMember
+            | AiErrorCode::RunLimitOrg
+            | AiErrorCode::RateLimited => StatusCode::TOO_MANY_REQUESTS,
             AiErrorCode::TurnBusy
             | AiErrorCode::AlreadySubmitted
             | AiErrorCode::SessionOwnerUnavailable
@@ -209,8 +225,11 @@ impl AiErrorCode {
             self,
             AiErrorCode::AuthorizationUnavailable
                 | AiErrorCode::TurnLimit
+                | AiErrorCode::RunLimitMember
+                | AiErrorCode::RunLimitOrg
                 | AiErrorCode::RateLimited
                 | AiErrorCode::AgentUnavailable
+                | AiErrorCode::AgentUnreachable
                 | AiErrorCode::SessionOwnerUnavailable
                 | AiErrorCode::ProviderError
                 | AiErrorCode::RestoreRequired
@@ -235,9 +254,11 @@ impl AiErrorCode {
             AiErrorCode::CreditsExhausted | AiErrorCode::SubscriptionRequired => {
                 Some(AiErrorAction::ManageBilling)
             }
-            AiErrorCode::TurnLimit | AiErrorCode::RateLimited | AiErrorCode::StreamDropped => {
-                Some(AiErrorAction::Retry)
-            }
+            AiErrorCode::TurnLimit
+            | AiErrorCode::RunLimitMember
+            | AiErrorCode::RunLimitOrg
+            | AiErrorCode::RateLimited
+            | AiErrorCode::StreamDropped => Some(AiErrorAction::Retry),
             AiErrorCode::SignedOut => Some(AiErrorAction::SignIn),
             AiErrorCode::AgentUnavailable | AiErrorCode::SessionOwnerUnavailable => {
                 Some(AiErrorAction::Retry)

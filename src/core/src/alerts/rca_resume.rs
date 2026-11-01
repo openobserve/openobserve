@@ -446,6 +446,8 @@ pub(crate) mod tests {
             first_event_at: None,
             version_of: None,
             decisions: None,
+            agent_type: None,
+            handoff_from: None,
         };
         turn_rows::Entity::insert(turn_rows::ActiveModel::from(row).reset_all())
             .exec(infra::db::get_orm_client_rw().await)

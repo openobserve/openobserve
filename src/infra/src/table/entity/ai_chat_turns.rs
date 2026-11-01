@@ -26,6 +26,12 @@ pub struct Model {
     /// JSON array of the approval decisions answered during the turn.
     #[sea_orm(column_type = "Text", nullable)]
     pub decisions: Option<String>,
+    /// The agent that answered; NULL on a turn an older node admitted, read as the chat's agent.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub agent_type: Option<String>,
+    /// The agent this turn took the chat over from; NULL unless it is a hand-off.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub handoff_from: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

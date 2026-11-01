@@ -17,7 +17,7 @@
 
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait, Set, SqlErr,
+    QuerySelect, QueryTrait, Set, SqlErr, TransactionTrait,
     sea_query::{Expr, Func, LikeExpr},
 };
 
@@ -70,6 +70,8 @@ pub struct ListFilter {
     pub exclude_agent_types: Vec<String>,
     /// Only pinned chats.
     pub pinned_only: bool,
+    /// Only chats touched at or after this time (micros).
+    pub updated_since: Option<i64>,
 }
 
 impl ListFilter {
@@ -85,6 +87,9 @@ impl ListFilter {
         }
         if self.pinned_only {
             cond = cond.add(Column::Pinned.eq(true));
+        }
+        if let Some(since) = self.updated_since {
+            cond = cond.add(Column::UpdatedAt.gte(since));
         }
         if let Some(q) = self.q.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
             let pattern = format!("%{}%", escape_like(&q.to_lowercase()));
@@ -373,6 +378,58 @@ pub async fn get_many_with<C: ConnectionTrait>(
         );
     }
     Ok(rows)
+}
+
+/// Moves the chat to `agent_type`; `false` when the chat is gone.
+pub async fn set_agent_type_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    agent_type: &str,
+) -> Result<bool, errors::Error> {
+    let result = Entity::update_many()
+        .col_expr(Column::AgentType, Expr::value(agent_type))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::Status.eq(STATUS_ACTIVE))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected == 1)
+}
+
+/// Commits a hand-off; turns an older node left unlabelled keep the agent that answered them.
+pub async fn hand_off(
+    org_id: &str,
+    session_id: &str,
+    agent_type: &str,
+) -> Result<bool, errors::Error> {
+    hand_off_with(get_orm_client_rw().await, org_id, session_id, agent_type).await
+}
+
+pub async fn hand_off_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    agent_type: &str,
+) -> Result<bool, errors::Error> {
+    let txn = conn.begin().await.map_err(db_err)?;
+    let current: Option<String> = Entity::find()
+        .select_only()
+        .column(Column::AgentType)
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .into_tuple()
+        .one(&txn)
+        .await
+        .map_err(db_err)?;
+    let Some(current) = current.filter(|agent| agent != agent_type) else {
+        return Ok(false);
+    };
+    super::ai_chat_turns::label_unlabelled_with(&txn, org_id, session_id, &current).await?;
+    let moved = set_agent_type_with(&txn, org_id, session_id, agent_type).await?;
+    txn.commit().await.map_err(db_err)?;
+    Ok(moved)
 }
 
 /// Record the turn about to run under the lease; `false` when `turn_id` is already recorded.

@@ -36,8 +36,8 @@ use config::meta::user::UserRole;
 use db::user::is_root_user;
 use o2_enterprise::enterprise::{
     ai::client::{
-        AiAgentClient, DiscoverResponse, HealthResponse, get_agent_client, is_agent_unreachable,
-        upstream_error_status,
+        AgentInfo, AiAgentClient, DiscoverResponse, HealthResponse, SRE_CHAT_AGENT_TYPE,
+        get_agent_client, is_agent_unreachable, upstream_error_status,
     },
     common::config::get_config as get_o2_config,
 };
@@ -64,6 +64,8 @@ const ROUND_TRIP_REJECTED: &str = "O2 Assistant rejected this request";
 const TURN_VERSIONS_CAPABILITY: &str = "turn_versions";
 const SERVER_REFUSED: &str = "O2 Assistant refused this server's internal secret";
 const NOT_CONFIGURED: &str = "O2 Assistant is not configured on this server";
+// An older o2-ai lists the judge; it only scores answers and nobody talks to it.
+const JUDGE_AGENT_TYPE: &str = "o2-ai-judge";
 
 static HEALTH: LazyLock<Mutex<HealthCache>> = LazyLock::new(Mutex::default);
 // One refresh at a time, so an expired entry costs o2-ai one call and no probe waits for it.
@@ -90,7 +92,9 @@ pub struct Capabilities {
     pub public_links: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub retention_days: Option<i64>,
-    pub agents: Vec<String>,
+    /// This user's roster; absent until every node of the region can run a chosen agent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agents: Option<Vec<AgentRow>>,
     pub toolsets: Vec<ToolsetSummary>,
     pub toolset_secret_merge: bool,
     pub policy_enforced: bool,
@@ -112,6 +116,9 @@ pub struct Capabilities {
     pub answer_locale: bool,
     /// `mode: "chat"` with an `incident_id` reaches the interactive incident agent, not RCA.
     pub rca_chat_mode: bool,
+    /// `/confirm` takes `by: "background"` and spends these budgets apart.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub approval_extend_budgets: Option<ExtendBudgets>,
     /// Set only when the org turned the assistant off; `can_chat` is then false.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gate: Option<Gate>,
@@ -124,6 +131,7 @@ impl Capabilities {
         settings: Settings,
         toolsets: Vec<ToolsetSummary>,
     ) -> Self {
+        let agents = roster(health.status, &facts, &permissions, &settings);
         Self {
             health,
             model: facts.model,
@@ -138,7 +146,7 @@ impl Capabilities {
             persistence: settings.persistence,
             public_links: settings.public_links,
             retention_days: settings.retention_days,
-            agents: facts.agents,
+            agents: Some(agents),
             toolsets,
             toolset_secret_merge: true,
             policy_enforced: facts.policy_enforced,
@@ -151,8 +159,15 @@ impl Capabilities {
             context_used: facts.context_used,
             answer_locale: facts.answer_locale,
             rca_chat_mode: settings.rca && facts.rca_chat_mode,
+            approval_extend_budgets: facts.approval_extend_budgets,
             gate: None,
         }
+    }
+
+    /// Without `agents` the client sends none, which is what a closed v2 gate needs.
+    fn without_agents(mut self) -> Self {
+        self.agents = None;
+        self
     }
 
     /// An org that turned the assistant off refuses every turn, so nobody can chat.
@@ -193,6 +208,35 @@ pub struct LastError {
     pub at: String,
 }
 
+/// One agent as this user sees it in the picker.
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct AgentRow {
+    pub id: String,
+    pub name: String,
+    pub purpose: String,
+    pub pickable: bool,
+    pub available: bool,
+    pub read_only: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<AgentBlock>,
+}
+
+/// Why an agent is listed but cannot be sent to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentBlock {
+    Role,
+    Disabled,
+    Unreachable,
+}
+
+/// Extensions one approval card allows, per budget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+pub struct ExtendBudgets {
+    pub user: u32,
+    pub background: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct ToolsetSummary {
     pub id: String,
@@ -221,7 +265,7 @@ struct AgentFacts {
     model: Option<String>,
     agent_version: Option<String>,
     model_provider: Option<String>,
-    agents: Vec<String>,
+    agents: Vec<AgentFact>,
     policy_enforced: bool,
     /// o2-ai's health lists `turn_versions` in `capabilities`: it answers from the given history.
     turn_versions: bool,
@@ -229,6 +273,7 @@ struct AgentFacts {
     context_used: bool,
     answer_locale: bool,
     rca_chat_mode: bool,
+    approval_extend_budgets: Option<ExtendBudgets>,
 }
 
 impl AgentFacts {
@@ -244,13 +289,65 @@ impl AgentFacts {
                 .model_provider
                 .clone()
                 .or_else(|| from_health(health.model_provider())),
-            agents: discover.agents.iter().map(|a| a.id.clone()).collect(),
+            agents: discover
+                .agents
+                .iter()
+                .filter(|a| a.id != JUDGE_AGENT_TYPE)
+                .map(AgentFact::new)
+                .collect(),
             policy_enforced: discover.policy_enforced,
             turn_versions: agent_capability(health, TURN_VERSIONS_CAPABILITY),
             attachments: discover.attachments,
             context_used: discover.context_used,
             answer_locale: discover.answer_locale,
             rca_chat_mode: discover.rca_chat_mode,
+            approval_extend_budgets: discover.approval_extend_budgets.map(|b| ExtendBudgets {
+                user: b.user,
+                background: b.background,
+            }),
+        }
+    }
+
+    /// Whether a turn may name `agent`; a roster without flags, or none yet, says nothing.
+    fn admits(&self, agent: &str, settings: &Settings) -> bool {
+        if !self.agents.iter().any(|a| a.pickable) {
+            return true;
+        }
+        let listed = self.agents.iter().any(|a| a.id == agent && a.pickable);
+        listed && !self.turned_off(agent, settings)
+    }
+
+    /// Investigator needs incident analysis on and an o2-ai that keeps such a turn interactive.
+    fn turned_off(&self, agent: &str, settings: &Settings) -> bool {
+        agent == SRE_CHAT_AGENT_TYPE && !(settings.rca && self.rca_chat_mode)
+    }
+}
+
+/// An agent as o2-ai's discovery describes it.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct AgentFact {
+    id: String,
+    name: String,
+    purpose: String,
+    pickable: bool,
+    read_only: bool,
+}
+
+impl AgentFact {
+    fn new(agent: &AgentInfo) -> Self {
+        Self {
+            id: agent.id.clone(),
+            name: agent
+                .display_name
+                .clone()
+                .filter(|name| !name.is_empty())
+                .unwrap_or_else(|| agent.name.clone()),
+            purpose: agent
+                .purpose
+                .clone()
+                .unwrap_or_else(|| agent.description.clone()),
+            pickable: agent.pickable == Some(true),
+            read_only: agent.read_only == Some(true),
         }
     }
 }
@@ -497,6 +594,11 @@ pub async fn get_capabilities(
         Vec::new()
     };
     let capabilities = Capabilities::new(health, permissions, Settings::from_config(), toolsets);
+    let capabilities = if openobserve_core::ai_chat::admission::v2_gate_open().await {
+        capabilities
+    } else {
+        capabilities.without_agents()
+    };
     let capabilities = if enabled {
         capabilities
     } else {
@@ -588,6 +690,12 @@ pub(crate) fn note_turn_frame(chunk: &[u8]) {
     if is_agent_unreachable_frame(chunk) {
         mark_unreachable();
     }
+}
+
+/// Whether a turn may name `agent` right now, from what the last check of o2-ai said.
+pub(crate) fn agent_ready(org_id: &str, agent: &str) -> bool {
+    let (_, facts) = HEALTH.lock().unwrap().snapshot(org_id);
+    facts.admits(agent, &Settings::from_config())
 }
 
 /// Whether this deployment lets chats be shared `(in the org, publicly)`.
@@ -873,6 +981,42 @@ fn agent_capability(health: &HealthResponse, name: &str) -> bool {
         .is_some_and(|c| c.iter().any(|v| v.as_str() == Some(name)))
 }
 
+/// The roster for one user: every agent stays listed, with why it cannot be sent to.
+fn roster(
+    status: HealthStatus,
+    facts: &AgentFacts,
+    permissions: &Permissions,
+    settings: &Settings,
+) -> Vec<AgentRow> {
+    let block = |agent: &AgentFact| {
+        if !permissions.chat {
+            Some(AgentBlock::Role)
+        } else if facts.turned_off(&agent.id, settings) {
+            Some(AgentBlock::Disabled)
+        } else if status == HealthStatus::Unreachable {
+            Some(AgentBlock::Unreachable)
+        } else {
+            None
+        }
+    };
+    facts
+        .agents
+        .iter()
+        .map(|agent| {
+            let reason = block(agent);
+            AgentRow {
+                id: agent.id.clone(),
+                name: agent.name.clone(),
+                purpose: agent.purpose.clone(),
+                pickable: agent.pickable,
+                available: reason.is_none(),
+                read_only: agent.read_only,
+                reason,
+            }
+        })
+        .collect()
+}
+
 fn rfc3339(at: DateTime<Utc>) -> String {
     at.to_rfc3339_opts(SecondsFormat::Secs, true)
 }
@@ -936,6 +1080,29 @@ mod tests {
         .await
     }
 
+    fn fact(id: &str, pickable: bool) -> AgentFact {
+        AgentFact {
+            id: id.to_string(),
+            name: id.to_uppercase(),
+            purpose: "p".to_string(),
+            pickable,
+            read_only: false,
+        }
+    }
+
+    fn ids(facts: &AgentFacts) -> Vec<&str> {
+        facts.agents.iter().map(|a| a.id.as_str()).collect()
+    }
+
+    fn agent_info(extra: Value) -> AgentInfo {
+        let mut agent = json!({"id": "sre", "name": "sre", "description": "Runs incidents"});
+        agent
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        serde_json::from_value(agent).unwrap()
+    }
+
     fn sample_health() -> (Health, AgentFacts) {
         let health = Health {
             status: HealthStatus::Ok,
@@ -946,13 +1113,17 @@ mod tests {
             model: Some("default".to_string()),
             agent_version: Some("1.42.0".to_string()),
             model_provider: Some("openai".to_string()),
-            agents: vec!["o2-ai".to_string(), "sre".to_string()],
+            agents: vec![fact("o2-ai", true), fact("sre", true)],
             policy_enforced: false,
             turn_versions: true,
             attachments: true,
             context_used: true,
             answer_locale: true,
             rca_chat_mode: true,
+            approval_extend_budgets: Some(ExtendBudgets {
+                user: 10,
+                background: 3,
+            }),
         };
         (health, facts)
     }
@@ -1157,7 +1328,7 @@ mod tests {
         }))
         .unwrap();
         let facts = AgentFacts::new(&health, &discover);
-        assert_eq!(facts.agents, ["o2-ai"]);
+        assert_eq!(ids(&facts), ["o2-ai"]);
         assert_eq!(facts.agent_version.as_deref(), Some("1.0.0"));
         assert!(facts.policy_enforced);
         assert!(!facts.turn_versions);
@@ -1168,6 +1339,103 @@ mod tests {
         let odd: HealthResponse =
             serde_json::from_value(json!({"capabilities": "turn_versions"})).unwrap();
         assert!(!AgentFacts::new(&odd, &discover).turn_versions);
+    }
+
+    #[test]
+    fn a_fact_prefers_the_display_name_and_an_older_answer_is_not_pickable() {
+        let flagged = AgentFact::new(&agent_info(json!({
+            "display_name": "Investigator", "purpose": "Finds causes", "pickable": true,
+            "read_only": true,
+        })));
+        assert_eq!(flagged.name, "Investigator");
+        assert_eq!(flagged.purpose, "Finds causes");
+        assert!(flagged.pickable && flagged.read_only);
+        let older = AgentFact::new(&agent_info(json!({})));
+        assert_eq!(
+            (older.name.as_str(), older.purpose.as_str()),
+            ("sre", "Runs incidents")
+        );
+        assert!(!older.pickable && !older.read_only);
+    }
+
+    #[test]
+    fn the_judge_never_reaches_the_roster() {
+        let discover: DiscoverResponse = serde_json::from_value(json!({"agents": [
+            {"id": "o2-ai", "name": "O2", "description": "d"},
+            {"id": "o2-ai-judge", "name": "J", "description": "d"},
+        ]}))
+        .unwrap();
+        let health: HealthResponse = serde_json::from_value(json!({"status": "ok"})).unwrap();
+        assert_eq!(ids(&AgentFacts::new(&health, &discover)), ["o2-ai"]);
+    }
+
+    #[test]
+    fn the_roster_says_why_each_agent_cannot_be_sent_to() {
+        let (_, mut facts) = sample_health();
+        let allowed = Permissions {
+            chat: true,
+            ..Default::default()
+        };
+        let settings = Settings {
+            rca: true,
+            ..sample_settings()
+        };
+        let reasons =
+            |status, facts: &AgentFacts, permissions: &Permissions, settings: &Settings| {
+                let rows = roster(status, facts, permissions, settings);
+                rows.into_iter()
+                    .map(|r| (r.available, r.reason))
+                    .collect::<Vec<_>>()
+            };
+        let free = (true, None);
+        assert_eq!(
+            reasons(HealthStatus::Ok, &facts, &allowed, &settings),
+            [free, free]
+        );
+        let role = (false, Some(AgentBlock::Role));
+        let denied = Permissions::default();
+        assert_eq!(
+            reasons(HealthStatus::Ok, &facts, &denied, &settings),
+            [role, role]
+        );
+        let down = (false, Some(AgentBlock::Unreachable));
+        assert_eq!(
+            reasons(HealthStatus::Unreachable, &facts, &allowed, &settings),
+            [down, down]
+        );
+        facts.rca_chat_mode = false;
+        assert_eq!(
+            reasons(HealthStatus::Ok, &facts, &allowed, &settings),
+            [free, (false, Some(AgentBlock::Disabled))]
+        );
+    }
+
+    #[test]
+    fn a_turn_may_name_only_a_pickable_agent_of_a_flagged_roster() {
+        let settings = Settings {
+            rca: true,
+            ..sample_settings()
+        };
+        let (_, mut facts) = sample_health();
+        facts.agents.push(fact("sre-rca", false));
+        assert!(facts.admits("o2-ai", &settings));
+        assert!(!facts.admits("generate-query", &settings), "not offered");
+        assert!(!facts.admits("sre-rca", &settings));
+        facts.rca_chat_mode = false;
+        assert!(!facts.admits("sre", &settings));
+
+        let unflagged = AgentFacts {
+            agents: vec![fact("o2-ai", false)],
+            ..Default::default()
+        };
+        assert!(
+            unflagged.admits("sre", &settings),
+            "an older o2-ai says nothing"
+        );
+        assert!(
+            AgentFacts::default().admits("sre", &settings),
+            "no check yet"
+        );
     }
 
     #[test]
@@ -1292,7 +1560,7 @@ mod tests {
             let (_, facts) = cache
                 .fresh(retry + Duration::from_secs(1), ORG, true)
                 .unwrap_or_else(|| panic!("re-checked after {outcome:?}"));
-            assert_eq!(facts.agents, ["o2-ai", "sre"], "{outcome:?}");
+            assert_eq!(ids(&facts), ["o2-ai", "sre"], "{outcome:?}");
             assert!(
                 cache.fresh(retry + HEALTH_TTL, ORG, true).is_none(),
                 "{outcome:?}"
@@ -1380,7 +1648,7 @@ mod tests {
             cache.record(now, &checked(HealthStatus::Ok, answered()));
             let (health, facts) = cache.record(now, &checked(HealthStatus::Ok, round_trip.clone()));
             assert_eq!(health.status, HealthStatus::Ok, "{round_trip:?}");
-            assert_eq!(facts.agents, ["o2-ai", "sre"], "{round_trip:?}");
+            assert_eq!(ids(&facts), ["o2-ai", "sre"], "{round_trip:?}");
             assert_eq!(facts, sample_health().1, "{round_trip:?}");
             // Only a server-side failure becomes the node's last error, never a caller's refusal.
             assert_eq!(
@@ -1402,7 +1670,7 @@ mod tests {
         let RoundTrip::Answered(facts) = &answered.round_trip else {
             panic!("{answered:?}");
         };
-        assert!(facts.policy_enforced && facts.agents == ["o2-ai"]);
+        assert!(facts.policy_enforced && ids(facts) == ["o2-ai"]);
         assert!(test_result(&answered, Duration::ZERO).ok);
 
         for status in ["401 Unauthorized", "403 Forbidden"] {
@@ -1465,7 +1733,7 @@ mod tests {
         let answered = caller(vec![HEALTHY, DISCOVERED]).await;
         assert_eq!(answered.facts_org.as_deref(), Some(ORG));
         let (_, mine) = cache.record(now, &answered);
-        assert_eq!(mine.agents, ["o2-ai"]);
+        assert_eq!(ids(&mine), ["o2-ai"]);
         assert!(
             cache.snapshot("other").1.agents.is_empty(),
             "facts stay with their org"
@@ -1546,7 +1814,7 @@ mod tests {
         let (health, facts) = current_health(ORG, Some("Basic x".to_string())).await;
         assert!(started.elapsed() < Duration::from_millis(500));
         assert_eq!(health.status, HealthStatus::Ok);
-        assert_eq!(facts.agents, ["o2-ai", "sre"]);
+        assert_eq!(ids(&facts), ["o2-ai", "sre"]);
         drop(running);
         assert!(
             RefreshGuard::begin(&REFRESHING).is_some(),
