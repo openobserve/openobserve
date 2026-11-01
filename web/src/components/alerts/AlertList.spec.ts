@@ -625,10 +625,11 @@ describe("AlertList - data fetching and columns", () => {
     wrapper.vm.activeTab = "all";
     await flushPromises();
 
-    const spans = wrapper
-      .findAll('[data-test="alert-list-multi-quiet-groups"] span')
-      .map((span: any) => span.text());
-    expect(spans).toEqual(["0 firing", "of 28 groups"]);
+    const cell = wrapper.find('[data-test="alert-list-multi-quiet-groups"]');
+    expect(cell.find('[data-test="alert-list-multi-quiet-groups-none-firing"]').text()).toBe(
+      "0 firing",
+    );
+    expect(cell.text()).toContain("of 28 groups");
   });
 
   // Feature 2 (PT-3/PT-6): the columns that REPLACED them.
