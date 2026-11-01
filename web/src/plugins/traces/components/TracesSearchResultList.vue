@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="searchObj.data.resultGrid.columns"
                 :data="hits"
                 :loading="loading"
-                :row-class="traceRowClass"
+                :get-row-status-color="traceRowStatusColor"
                 :active-row-index="activeRowIndex"
                 sorting="server"
                 :sort-by="props.sortBy"
@@ -299,6 +299,7 @@ import { SPAN_ERROR_COLUMN_ID, SPAN_EVENTS_COLUMN_ID } from "./spanResultCells";
 import { isLLMTrace, extractLLMData, formatCost, formatTokens } from "../../../utils/llmUtils";
 import { formatTimeWithSuffix } from "../../../utils/zincutils";
 import { escapeSingleQuotes } from "../../../utils/queryUtils";
+import { severityIndicatorColor } from "@/utils/logs/statusParser";
 import { useStore } from "vuex";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
@@ -591,11 +592,17 @@ const onCloseColumn = (columnDef: any) => {
   }
 };
 
-const traceRowClass = (row: any) => {
-  if (props.searchMode === "spans") {
-    return row.span_status === "ERROR" ? "oz-table__row--error" : "";
-  }
-  return (row.errors ?? 0) > 0 ? "oz-table__row--error" : "";
+const ERROR_ROW_STATUS_COLOR = severityIndicatorColor({
+  level: "error",
+  source: "field",
+  field: null,
+  notFetched: false,
+});
+
+const traceRowStatusColor = (row: any): string | undefined => {
+  const isError =
+    props.searchMode === "spans" ? row.span_status === "ERROR" : (row.errors ?? 0) > 0;
+  return isError ? ERROR_ROW_STATUS_COLOR : undefined;
 };
 
 const noResults = computed(
@@ -737,12 +744,5 @@ defineExpose({ stepTraceRow });
 /* keep(complex-state): :deep override to square off the child table's corners */
 .traces-table-container :deep(.table-container) {
   border-radius: 0 !important;
-}
-
-/* keep(generated-content): the error-row left border. `traceRowClass` puts
-   `oz-table__row--error` on table-rendered <tr>s and the rule reaches their
-   <td>, hence :deep. Mirrors PlayerTracesTab's `trace-row--error`. */
-.traces-table-container :deep(.oz-table__row--error td:first-child) {
-  box-shadow: var(--shadow-rail-thin-geom) var(--color-status-error-text);
 }
 </style>
