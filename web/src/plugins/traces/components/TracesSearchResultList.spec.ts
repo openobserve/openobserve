@@ -70,7 +70,8 @@ vi.mock("@/composables/useTraces", () => ({
   },
 }));
 
-vi.mock("@/plugins/traces/composables/useTracesTableColumns", () => ({
+vi.mock("@/plugins/traces/composables/useTracesTableColumns", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/plugins/traces/composables/useTracesTableColumns")>()),
   useTracesTableColumns: () => ({
     buildColumns: vi.fn(() => []),
   }),
@@ -102,6 +103,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
       "columns",
       "data",
       "rowClass",
+      "getRowStatusColor",
       "loading",
       "sortBy",
       "sortOrder",
@@ -472,31 +474,36 @@ describe("TracesSearchResultList", () => {
     });
   });
 
-  // ─── Row error class ──────────────────────────────────────────────────────
-  describe("row error class", () => {
-    it("passes a rowClass function to TracesTable", () => {
-      wrapper = mount_({ hits: [makeHit("t1")], loading: false });
-      const table = wrapper.findComponent({ name: "OTable" });
-      const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(typeof rowClassFn).toBe("function");
-    });
+  // ─── Row error status bar ─────────────────────────────────────────────────
+  describe("row error status bar", () => {
+    const ERROR_BAR = "var(--color-log-severity-error-indicator)";
+    const statusColorFn = (w: any) =>
+      w.findComponent({ name: "OTable" }).props("getRowStatusColor") as (
+        row: any,
+      ) => string | undefined;
 
-    it("returns 'oz-table__row--error' for rows with errors", () => {
+    it("does not mark rows through a row class", () => {
       wrapper = mount_({ hits: [makeHit("t1", 2)], loading: false });
-      const table = wrapper.findComponent({ name: "OTable" });
-      const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(rowClassFn(makeHit("t1", 2))).toBe("oz-table__row--error");
+      expect(wrapper.findComponent({ name: "OTable" }).props("rowClass")).toBeUndefined();
     });
 
-    it("returns empty string for rows without errors", () => {
+    it("gives rows with errors the Logs error status colour", () => {
+      wrapper = mount_({ hits: [makeHit("t1", 2)], loading: false });
+      expect(statusColorFn(wrapper)(makeHit("t1", 2))).toBe(ERROR_BAR);
+    });
+
+    it("gives rows without errors no status colour", () => {
       wrapper = mount_({ hits: [makeHit("t1", 0)], loading: false });
-      const table = wrapper.findComponent({ name: "OTable" });
-      const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(rowClassFn(makeHit("t1", 0))).toBe("");
+      expect(statusColorFn(wrapper)(makeHit("t1", 0))).toBeUndefined();
     });
   });
 
-  describe("row error class — spans mode", () => {
+  describe("row error status bar — spans mode", () => {
+    const ERROR_BAR = "var(--color-log-severity-error-indicator)";
+    const statusColorFn = (w: any) =>
+      w.findComponent({ name: "OTable" }).props("getRowStatusColor") as (
+        row: any,
+      ) => string | undefined;
     const makeSpanHit = (id: string, span_status = "OK") => ({
       trace_id: id,
       service_name: "frontend",
@@ -508,38 +515,19 @@ describe("TracesSearchResultList", () => {
       start_time: Date.now() * 1_000_000,
     });
 
-    it("uses span_status='ERROR' for error class in spans mode", () => {
-      wrapper = mount_({
-        hits: [makeSpanHit("s1")],
-        loading: false,
-        searchMode: "spans",
-      });
-      const table = wrapper.findComponent({ name: "OTable" });
-      const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe("oz-table__row--error");
+    it("uses span_status='ERROR' for the error bar in spans mode", () => {
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
+      expect(statusColorFn(wrapper)(makeSpanHit("s1", "ERROR"))).toBe(ERROR_BAR);
     });
 
-    it("returns empty string for non-error span_status in spans mode", () => {
-      wrapper = mount_({
-        hits: [makeSpanHit("s1")],
-        loading: false,
-        searchMode: "spans",
-      });
-      const table = wrapper.findComponent({ name: "OTable" });
-      const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(rowClassFn(makeSpanHit("s1", "OK"))).toBe("");
+    it("gives non-error spans no status colour in spans mode", () => {
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
+      expect(statusColorFn(wrapper)(makeSpanHit("s1", "OK"))).toBeUndefined();
     });
 
-    it("uses errors count (not span_status) for error class in traces mode", () => {
-      wrapper = mount_({
-        hits: [makeHit("t1", 0)],
-        loading: false,
-        searchMode: "traces",
-      });
-      const table = wrapper.findComponent({ name: "OTable" });
-      const rowClassFn = table.props("rowClass") as (row: any) => string;
-      // traces mode: errors > 0 triggers error class
-      expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe("oz-table__row--error");
+    it("uses errors count (not span_status) for the error bar in traces mode", () => {
+      wrapper = mount_({ hits: [makeHit("t1", 0)], loading: false, searchMode: "traces" });
+      expect(statusColorFn(wrapper)({ ...makeHit("t1", 2), span_status: "OK" })).toBe(ERROR_BAR);
     });
   });
 
@@ -615,6 +603,75 @@ describe("TracesSearchResultList", () => {
       expect(sharedSearchObj.data.resultGrid.columns.some((c: any) => c.id === "span_status")).toBe(
         false,
       );
+    });
+  });
+
+  describe("onCloseColumn — fill column", () => {
+    afterEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [];
+      sharedSearchObj.data.stream.selectedFields = [];
+    });
+
+    it("hands the remaining width to the new last column when the last one is closed", async () => {
+      sharedSearchObj.data.resultGrid.columns = [
+        { id: "service_name", size: 160, meta: {} },
+        { id: "duration", size: 120, meta: {} },
+        { id: "method", size: 160, minSize: 160, meta: { autoWidth: true, fillRemaining: true } },
+      ];
+      sharedSearchObj.data.stream.selectedFields = ["service_name", "duration", "method"];
+      wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: "spans" as any });
+      await wrapper.findComponent({ name: "OTable" }).vm.$emit("close-column", { id: "method" });
+
+      const last = sharedSearchObj.data.resultGrid.columns.at(-1);
+      expect(last.id).toBe("duration");
+      expect(last.meta.fillRemaining).toBe(true);
+      expect(last.minSize).toBe(120);
+    });
+  });
+
+  describe("onColumnReorder — fill column", () => {
+    afterEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [];
+      sharedSearchObj.data.stream.selectedFields = [];
+    });
+
+    const fillIds = () =>
+      sharedSearchObj.data.resultGrid.columns
+        .filter((c: any) => c.meta?.fillRemaining)
+        .map((c: any) => c.id);
+
+    const reorder = async (order: string[], searchMode = "spans") => {
+      sharedSearchObj.data.resultGrid.columns = [
+        { id: "service_name", size: 160, meta: {} },
+        { id: "span_status", size: 120, meta: {} },
+        { id: "_span_error", size: 240, meta: {} },
+        { id: "duration", size: 120, meta: {} },
+        { id: "method", size: 160, minSize: 160, meta: { autoWidth: true, fillRemaining: true } },
+      ];
+      sharedSearchObj.data.stream.selectedFields = [
+        "service_name",
+        "span_status",
+        "duration",
+        "method",
+      ];
+      wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: searchMode as any });
+      await wrapper.findComponent({ name: "OTable" }).vm.$emit("column-order-change", order);
+    };
+
+    it("moves the fill to the column dragged last and off the old filler", async () => {
+      await reorder(["service_name", "method", "span_status", "_span_error", "duration"]);
+
+      expect(fillIds()).toEqual(["duration"]);
+      const method = sharedSearchObj.data.resultGrid.columns.find((c: any) => c.id === "method");
+      expect(method.minSize).toBeUndefined();
+      expect(method.meta.autoWidth).toBeUndefined();
+    });
+
+    it("fills a Spans-view error column that is dragged last", async () => {
+      await reorder(["service_name", "span_status", "duration", "method", "_span_error"]);
+
+      expect(fillIds()).toEqual(["_span_error"]);
+      expect(sharedSearchObj.data.resultGrid.columns.at(-1).id).toBe("_span_error");
     });
   });
 

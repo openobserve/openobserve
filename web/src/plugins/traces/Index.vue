@@ -259,6 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex h-full flex-col overflow-hidden pt-2.5">
         <IndexList
+          ref="mobileIndexListRef"
           :field-list="searchObj.data.stream.selectedStreamFields"
           :active-include-field-values="activeIncludeFilterValues"
           :active-exclude-field-values="activeExcludeFilterValues"
@@ -477,7 +478,13 @@ watch(
   { immediate: true },
 );
 const { showErrorNotification } = useNotifications();
-const indexListRef = ref(null);
+const indexListRef = ref<{ refreshOpenFieldValues?: () => void } | null>(null);
+const mobileIndexListRef = ref<{ refreshOpenFieldValues?: () => void } | null>(null);
+// Only once the new stream's fields and query are final, or open fields fetch from a half-applied state.
+const refreshOpenFieldValues = () => {
+  indexListRef.value?.refreshOpenFieldValues?.();
+  mobileIndexListRef.value?.refreshOpenFieldValues?.();
+};
 const { getStreams, getStream } = useStreams(t);
 const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 const chartRedrawTimeout = ref(null);
@@ -504,9 +511,6 @@ let pageGeneration = 0;
 let pageLoaded = false;
 // A landing claimed by a load the page left mid-way, replayed by the next load.
 let pendingLanding: { run: boolean } | null = null;
-// A relative range drifts while the page sits in the keep-alive cache, so Back re-runs results older than this.
-const STALE_RESULTS_MS = 60_000;
-let lastSearchCompletedAt = 0;
 // The processed WHERE clause from the last buildSearch() call — used for the count query
 let builtWhereClause = "";
 // Paging must keep page 1's filter, so later editor edits never mix into it.
@@ -756,11 +760,22 @@ function buildSearch(reuseLastWindow = false) {
   }
 }
 
+// The stream and view a count was taken over; a run over another dataset must not keep it.
+let countedDataset = "";
+
+// A re-run keeps the last error count and pager on screen until its own count lands.
+function dropKeptCount(results: any) {
+  results.countPending = false;
+  if (searchObj.data.queryResults !== results) return;
+  results.errorCount = undefined;
+  searchObj.meta.resultGrid.showPagination = false;
+}
+
 function fetchTracesCount() {
   const queryReq = searchObj.data.queryPayload;
   const results = searchObj.data.queryResults;
   if (!queryReq || !selectedStreamName.value) {
-    results.countPending = false;
+    dropKeptCount(results);
     return;
   }
 
@@ -781,9 +796,11 @@ function fetchTracesCount() {
   const countTraceId = generateTraceContext().traceId;
   currentCountTraceId = countTraceId;
   // A newer search replaces queryResults, so a late count must not land on it.
+  let landed = false;
   const settle = () => {
     if (currentCountTraceId === countTraceId) currentCountTraceId = null;
-    results.countPending = false;
+    if (landed) results.countPending = false;
+    else dropKeptCount(results);
   };
 
   fetchQueryDataWithHttpStream(
@@ -813,6 +830,7 @@ function fetchTracesCount() {
           results.total = count;
           results.errorCount = hits[0]?.error_count ?? 0;
           searchObj.meta.resultGrid.showPagination = count > 0;
+          landed = true;
         }
       },
       error: (_payload: any, err: any) => {
@@ -908,18 +926,22 @@ async function getQueryData(
 
     if (!isPagination) {
       queryReq = buildSearch(isSort);
+      if (queryReq == null) return false;
       searchObj.data.queryPayload = queryReq;
-      lastSearchCompletedAt = 0;
+      const dataset = `${selectedStreamName.value}|${searchObj.meta.searchMode}`;
+      const sameDataset = dataset === countedDataset;
+      countedDataset = dataset;
+      if (!sameDataset) searchObj.meta.resultGrid.showPagination = false;
       // Reset hits for a fresh search
       searchObj.data.queryResults = {
         hits: [],
         total: null,
         countPending: true,
+        errorCount: sameDataset ? searchObj.data.queryResults?.errorCount : undefined,
         from: 0,
         size: queryReq.query.size,
         took: 0,
       };
-      searchObj.meta.resultGrid.showPagination = false;
     } else {
       queryReq = searchObj.data.queryPayload;
     }
@@ -1102,7 +1124,7 @@ async function getQueryData(
           if (!tracesRequestState[searchTraceId]) return;
 
           searchObj.loading = false;
-          if (!isPagination) searchObj.data.queryResults.countPending = false;
+          if (!isPagination) dropKeptCount(searchObj.data.queryResults);
           if (isPagination) noteTracesPageLoad(searchTraceId, "error");
 
           const errData = err?.content || err;
@@ -1160,7 +1182,6 @@ async function getQueryData(
           delete tracesRequestState[searchTraceId];
           if (isPagination) noteTracesPageLoad(searchTraceId, "done");
           if (!isPagination) {
-            lastSearchCompletedAt = Date.now();
             analytics.track("traces_search_completed", {
               hits: searchObj.data.queryResults?.hits?.length ?? 0,
             });
@@ -1177,6 +1198,7 @@ async function getQueryData(
   } catch (e: any) {
     console.error("Error while fetching traces", e?.message);
     searchObj.loading = false;
+    if (!isPagination) dropKeptCount(searchObj.data.queryResults);
     searchObj.data.errorMsg = e?.message || t("traces.index.searchRequestFailed");
     searchObj.data.errorDetail = "";
     if (boundTraceId) noteTracesPageLoad(boundTraceId, "error");
@@ -1219,7 +1241,7 @@ const rebuildColumns = () => {
 const cancelSearch = () => {
   // Cancel dashboard panel queries (RenderDashboardCharts via usePanelDataLoader)
   window.dispatchEvent(new Event("cancelQuery"));
-  if (currentSearchTraceId) searchObj.data.queryResults.countPending = false;
+  if (currentSearchTraceId) dropKeptCount(searchObj.data.queryResults);
   cancelMainSearch();
 };
 
@@ -1478,6 +1500,10 @@ async function loadPageData() {
       searchData(false);
     }
   }
+  // A count cut off by leaving has nothing left to land it once this load runs no search.
+  if (searchObj.data.queryResults?.countPending && !searchObj.loading && !currentCountTraceId) {
+    dropKeptCount(searchObj.data.queryResults);
+  }
   pendingUrlPage = null;
 }
 
@@ -1639,15 +1665,10 @@ onActivated(async () => {
   }
 
   if (reloaded) return;
-  const staleRelativeRange =
-    searchObj.data.datetime?.type === "relative" &&
-    lastSearchCompletedAt > 0 &&
-    Date.now() - lastSearchCompletedAt > STALE_RESULTS_MS &&
-    !isAutoRunOff();
   if (queryChanged) {
     restoreUrlQueryParams();
     await loadPageData();
-  } else if (rerunSearch || staleRelativeRange) {
+  } else if (rerunSearch) {
     // Back must show the page the user left, as a remount would from the URL.
     pendingUrlPage = searchObj.data.resultGrid.currentPage;
     runQueryFn(false);
@@ -2187,6 +2208,7 @@ const onChangeStream = async () => {
     loadLocalLogFilterField(searchObj.meta.searchMode);
     rebuildColumns();
   }
+  refreshOpenFieldValues();
   if (!isAutoRunOff()) runQueryFn();
 };
 
@@ -2260,6 +2282,7 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
   if (view.editorValue && searchObj.data.stream.selectedStreamFields.length) {
     restoreFilters(view.editorValue);
   }
+  if (streamChanged) refreshOpenFieldValues();
   if (run) runQueryFn();
 };
 

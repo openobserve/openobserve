@@ -31,7 +31,10 @@ import {
 const { schemaFields, schemaError, searchObj, viewport } = vi.hoisted(() => ({
   schemaFields: { value: [] as { name: string; type: string }[] },
   schemaError: { value: null as Error | null },
-  searchObj: { data: { datetime: { queryRangeRestrictionInHour: 0 } } },
+  searchObj: {
+    data: { datetime: { queryRangeRestrictionInHour: 0 } },
+    meta: { searchMode: "traces" as "traces" | "spans" },
+  },
   viewport: { mdUp: true },
 }));
 
@@ -69,6 +72,8 @@ vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
 }));
 
 import TracesComparison from "./TracesComparison.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const search = vi.mocked(searchService.search);
 const store = createStore({
@@ -123,16 +128,17 @@ const samples = () => calls.filter((c) => !isCount(c));
 let autoRespond: ((c: Call) => unknown) | null = null;
 const defaultResponse = (c: Call) =>
   isCount(c)
-    ? { hits: [{ n: isSelection(c) ? 21077 : 1256694 }] }
+    ? { hits: isSelection(c) ? [{ n: 21077, traces: 3120 }] : [{ n: 1256694, traces: 98012 }] }
     : { hits: isSelection(c) ? selRows : baseRows };
 
 let wrapper: any = null;
 const settle = async () => {
   for (let i = 0; i < 8; i++) await flushPromises();
 };
+const PRESET_CONTEXT = { rangeStartUs: W0, rangeEndUs: W0 + HOUR, filter: "service_name = 'a'" };
 const mountPanel = async (selection: ComparisonSelection | null = SELECTION) => {
   wrapper = mount(TracesComparison, {
-    props: { selection, streamName: "default" },
+    props: { selection, streamName: "default", presetContext: PRESET_CONTEXT },
     global: { plugins: [i18n, store] },
     attachTo: document.body,
   });
@@ -153,6 +159,7 @@ beforeEach(() => {
   schemaError.value = null;
   store.state.timezone = "UTC";
   searchObj.data.datetime.queryRangeRestrictionInHour = 0;
+  searchObj.meta.searchMode = "traces";
   viewport.mdUp = true;
   autoRespond = defaultResponse;
   search.mockReset();
@@ -176,6 +183,7 @@ beforeEach(() => {
 afterEach(() => {
   wrapper?.unmount();
   wrapper = null;
+  document.body.innerHTML = "";
 });
 
 describe("TracesComparison", () => {
@@ -503,5 +511,241 @@ describe("TracesComparison", () => {
     const lines = wrapper.findAll('[data-test="traces-comparison-error-line"]');
     expect(lines.map((l: any) => l.element.tagName)).toEqual(["SPAN", "SPAN"]);
     expect(wrapper.find('[data-test="traces-comparison-error"] p div').exists()).toBe(false);
+  });
+
+  describe("page", () => {
+    const back = () => wrapper.find('[data-test="traces-drill-down-back-btn"]');
+
+    it("opens as the full-pane Drill down page with a back button", async () => {
+      await mountPanel(null);
+      const page = wrapper.findComponent({ name: "TracesDrillDownPage" });
+      expect(page.props()).toMatchObject({ open: true, title: i18n.global.t("traces.drillDown") });
+      expect(back().attributes("aria-label")).toBe("Back to results");
+      expect(wrapper.text()).not.toMatch(/comparison|compare selection/i);
+    });
+
+    it("closes from the back button", async () => {
+      await mountPanel();
+      await back().trigger("click");
+      expect(wrapper.emitted("close")).toHaveLength(1);
+    });
+
+    it("closes on Escape", async () => {
+      await mountPanel();
+      back().element.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(wrapper.emitted("close")).toHaveLength(1);
+    });
+
+    it("heads the page with the selected and baseline trace counts in the Traces view", async () => {
+      await mountPanel();
+      expect(text("traces-drill-down-counts")).toBe(
+        "3,120 selected traces vs 98,012 baseline traces",
+      );
+    });
+
+    it("counts spans in the Spans view", async () => {
+      searchObj.meta.searchMode = "spans";
+      await mountPanel();
+      expect(text("traces-drill-down-counts")).toBe(
+        "21,077 selected spans vs 1,256,694 baseline spans",
+      );
+    });
+
+    it("labels the baseline toggle Rest of range and Before selection", async () => {
+      await mountPanel();
+      expect(text("traces-comparison-baseline-toggle-outside")).toBe("Rest of range");
+      expect(text("traces-comparison-baseline-toggle-before")).toBe("Before selection");
+    });
+  });
+
+  describe("presets", () => {
+    const R0 = PRESET_CONTEXT.rangeStartUs;
+    const R1 = PRESET_CONTEXT.rangeEndUs;
+    const MID = R0 + HOUR / 2;
+    const pick = async (preset: string) => {
+      await wrapper.find(`[data-test="traces-drill-down-preset-${preset}"]`).trigger("click");
+      await settle();
+    };
+    // Preset selections are told apart from their baselines by the error term or the window.
+    const presetResponse = (c: Call) => {
+      if (c.sql.includes("approx_percentile_cont")) return { hits: [{ p90: 250_000 }] };
+      const selection =
+        (c.sql.includes("span_status = 'ERROR'") && !c.sql.includes("!= 'ERROR'")) ||
+        (c.sql.includes("duration >= 250000") && !c.sql.includes("NOT (")) ||
+        c.start === MID;
+      if (isCount(c)) return { hits: [{ n: selection ? 40 : 400, traces: selection ? 4 : 40 }] };
+      return { hits: selection ? selRows : baseRows };
+    };
+
+    beforeEach(() => {
+      autoRespond = presetResponse;
+    });
+
+    it("offers the three presets under the no-selection message and searches nothing", async () => {
+      await mountPanel(null);
+      expect(has("traces-comparison-no-selection")).toBe(true);
+      expect(text("traces-drill-down-presets")).toContain("Or start from a preset");
+      for (const [id, label] of [
+        ["errors", "Errors vs rest"],
+        ["slowest", "Slowest 10% vs rest"],
+        ["recent", "Recent vs earlier"],
+      ]) {
+        expect(text(`traces-drill-down-preset-${id}`)).toContain(label);
+      }
+      expect(search).not.toHaveBeenCalled();
+    });
+
+    it("tells the user how to make a selection", async () => {
+      await mountPanel(null);
+      expect(text("traces-comparison-no-selection")).toContain(
+        "Go back and box an area on the Duration heatmap, or brush the Errors or Rate chart.",
+      );
+    });
+
+    it("renders each preset as a card with its name and what it compares", async () => {
+      await mountPanel(null);
+      expect(wrapper.findAllComponents(OEmptyState)).toHaveLength(1);
+      for (const [id, label, description, icon] of [
+        [
+          "errors",
+          "Errors vs rest",
+          "Spans with an error against all other spans",
+          "error-outline",
+        ],
+        [
+          "slowest",
+          "Slowest 10% vs rest",
+          "Spans at or above p90 against faster spans",
+          "hourglass-empty",
+        ],
+        [
+          "recent",
+          "Recent vs earlier",
+          "Second half of the time range against the first half",
+          "history-toggle-off",
+        ],
+      ]) {
+        const card = wrapper.find(`[data-test="traces-drill-down-preset-${id}"]`);
+        expect(card.element.tagName).toBe("BUTTON");
+        expect(card.text()).toContain(label);
+        expect(card.text()).toContain(description);
+        expect(card.findComponent(OIcon).props("name")).toBe(icon);
+      }
+    });
+
+    it("puts the preset cards inside the no-selection message, under the preset label", async () => {
+      await mountPanel(null);
+      const presets = wrapper.find(
+        '[data-test="traces-comparison-no-selection"] [data-test="traces-drill-down-presets"]',
+      );
+      expect(presets.exists()).toBe(true);
+      expect(presets.text().indexOf("Or start from a preset")).toBe(0);
+    });
+
+    it("compares the errors in the whole range with the rest of it", async () => {
+      await mountPanel(null);
+      await pick("errors");
+      const where = counts().map((c) => c.sql);
+      expect(counts().every((c) => c.start === R0 && c.end === R1)).toBe(true);
+      expect(where.some((q) => q.endsWith("AND span_status = 'ERROR'"))).toBe(true);
+      expect(where.some((q) => q.includes("COALESCE(span_status, '') != 'ERROR'"))).toBe(true);
+      expect(has("traces-comparison")).toBe(true);
+      expect(has("traces-drill-down-presets")).toBe(false);
+    });
+
+    it("asks for the p90 duration first, then compares the spans at or over it", async () => {
+      await mountPanel(null);
+      await pick("slowest");
+      expect(calls[0].sql).toBe(
+        `SELECT approx_percentile_cont(duration, 0.9) AS p90 FROM "default" WHERE (service_name = 'a')`,
+      );
+      expect([calls[0].start, calls[0].end]).toEqual([R0, R1]);
+      expect(counts().some((c) => c.sql.endsWith("AND duration >= 250000"))).toBe(true);
+      expect(has("traces-comparison")).toBe(true);
+    });
+
+    it("stays on the presets and says so when the range has no durations", async () => {
+      autoRespond = (c) => ({ hits: c.sql.includes("approx_percentile_cont") ? [] : [] });
+      await mountPanel(null);
+      await pick("slowest");
+      expect(counts()).toHaveLength(0);
+      expect(has("traces-drill-down-presets")).toBe(true);
+      expect(text("traces-drill-down-preset-empty")).toBe(
+        i18n.global.t("traces.drillDownPanel.presetEmpty"),
+      );
+    });
+
+    it("goes back to the presets with a note when a preset finds no spans", async () => {
+      autoRespond = (c) => {
+        const errorsSide = c.sql.includes("span_status = 'ERROR'") && !c.sql.includes("!= 'ERROR'");
+        return isCount(c) ? { hits: [{ n: errorsSide ? 0 : 400, traces: 0 }] } : { hits: [] };
+      };
+      await mountPanel(null);
+      await pick("errors");
+      expect(has("traces-comparison-empty-selection")).toBe(false);
+      expect(has("traces-drill-down-presets")).toBe(true);
+      expect(text("traces-drill-down-preset-empty")).toBe(
+        i18n.global.t("traces.drillDownPanel.presetNoMatch"),
+      );
+    });
+
+    it("shows the slowest preset's band as a readable duration", async () => {
+      autoRespond = (c) => {
+        if (c.sql.includes("approx_percentile_cont")) return { hits: [{ p90: 18_900 }] };
+        const selection = c.sql.includes("duration >= 18900") && !c.sql.includes("NOT (");
+        if (isCount(c)) return { hits: [{ n: selection ? 40 : 400, traces: 4 }] };
+        return { hits: selection ? selRows : baseRows };
+      };
+      await mountPanel(null);
+      await pick("slowest");
+      expect(text("traces-comparison-summary")).toContain("≥ 18.90ms");
+      expect(text("traces-comparison-summary")).not.toContain("us");
+    });
+
+    it("never flashes the presets while a preset with another baseline loads", async () => {
+      autoRespond = (c) =>
+        isCount(c) && c.start === MID ? { hits: [{ n: 0, traces: 0 }] } : presetResponse(c);
+      await mountPanel(null);
+      await pick("recent");
+      expect(has("traces-drill-down-presets")).toBe(true);
+      autoRespond = null;
+      await wrapper.find('[data-test="traces-drill-down-preset-slowest"]').trigger("click");
+      await settle();
+      const seen: boolean[] = [];
+      const observer = new MutationObserver(() =>
+        seen.push(!!document.querySelector('[data-test="traces-drill-down-presets"]')),
+      );
+      observer.observe(document.body, { childList: true, subtree: true });
+      calls
+        .find((c) => c.sql.includes("approx_percentile_cont"))!
+        .resolve({ hits: [{ p90: 250_000 }] });
+      await settle();
+      observer.disconnect();
+      expect(seen).not.toContain(true);
+      expect(has("traces-comparison-loading")).toBe(true);
+    });
+
+    it("words the query-limit error for a preset as a range, not a selection", async () => {
+      searchObj.data.datetime.queryRangeRestrictionInHour = 0.5;
+      await mountPanel(null);
+      await pick("errors");
+      expect(wrapper.text()).toContain(
+        i18n.global.t("traces.comparison.presetRangeTooLong", { hours: 0.5 }),
+      );
+      expect(wrapper.text()).not.toContain("The selection is longer");
+    });
+
+    it("compares the second half of the range with the first half", async () => {
+      await mountPanel(null);
+      await pick("recent");
+      const windows = counts().map((c) => [c.start, c.end]);
+      expect(windows).toContainEqual([MID, R1]);
+      expect(windows).toContainEqual([R0, MID]);
+      expect(
+        wrapper
+          .find('[data-test="traces-comparison-baseline-toggle-before"]')
+          .attributes("data-state"),
+      ).toBe("on");
+    });
   });
 });

@@ -165,15 +165,36 @@ export function buildHeatmapGrid(
 
 const clampIndex = (i: number, length: number) => Math.min(Math.max(i, 0), length - 1);
 
+export interface HeatmapCellRange {
+  i0: number;
+  i1: number;
+  j0: number;
+  j1: number;
+}
+
+export function boxCells(grid: LatencyHeatmapGrid, box: HeatmapBox): HeatmapCellRange {
+  const cols = grid.colStartUs.length;
+  return {
+    i0: clampIndex(Math.round(Math.min(box.start, box.end)), cols),
+    i1: clampIndex(Math.round(Math.max(box.start, box.end)), cols),
+    j0: clampIndex(Math.round(Math.min(box.start1, box.end1)), grid.rows.length),
+    j1: clampIndex(Math.round(Math.max(box.start1, box.end1)), grid.rows.length),
+  };
+}
+
+export function spansInCells(grid: LatencyHeatmapGrid, r: HeatmapCellRange): number {
+  return grid.cells.reduce(
+    (sum, [col, row, , count]) =>
+      col >= r.i0 && col <= r.i1 && row >= r.j0 && row <= r.j1 ? sum + count : sum,
+    0,
+  );
+}
+
 export function selectionFromBox(
   grid: LatencyHeatmapGrid,
   box: HeatmapBox,
 ): LatencyHeatmapSelection {
-  const cols = grid.colStartUs.length;
-  const i0 = clampIndex(Math.round(Math.min(box.start, box.end)), cols);
-  const i1 = clampIndex(Math.round(Math.max(box.start, box.end)), cols);
-  const j0 = clampIndex(Math.round(Math.min(box.start1, box.end1)), grid.rows.length);
-  const j1 = clampIndex(Math.round(Math.max(box.start1, box.end1)), grid.rows.length);
+  const { i0, i1, j0, j1 } = boxCells(grid, box);
   return {
     timeStartUs: Math.max(grid.rangeStartUs, grid.colStartUs[i0]),
     timeEndUs: Math.min(grid.rangeEndUs, grid.colStartUs[i1] + grid.intervalUs),
