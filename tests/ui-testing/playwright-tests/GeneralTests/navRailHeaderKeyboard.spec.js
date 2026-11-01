@@ -26,10 +26,13 @@ async function setLanguageCookie(page, code) {
 
 const isFocused = (locator) => locator.evaluate((el) => el === document.activeElement);
 
-async function openProfileMenuByKeyboard(page) {
+async function openProfileMenuByKeyboard(page, { whileLoading = false } = {}) {
+  const navRail = new NavRailPage(page);
+  if (!whileLoading) await navRail.waitForHomeLoaded();
   await page.locator(PROFILE).focus();
   await page.keyboard.press("Enter");
   await expect(page.locator(ROW)).toBeVisible();
+  if (!whileLoading) await navRail.expectFocusInMenu();
 }
 
 async function arrowToRow(page) {
@@ -42,8 +45,6 @@ async function arrowToRow(page) {
 }
 
 test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
-  test.describe.configure({ mode: "serial" });
-
   for (const size of SIZES) {
     for (const dir of DIRS) {
       test(`language list is reachable and unclipped at ${size.width}x${size.height} ${dir}`, async ({
@@ -169,7 +170,8 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
 
     testLogger.step("Open the profile menu by keyboard while the full config is held");
     await navigateToBase(page);
-    await openProfileMenuByKeyboard(page);
+    // The home view cannot finish loading while the config is held.
+    await openProfileMenuByKeyboard(page, { whileLoading: true });
     await expect(page.locator(ONCALL_ROW)).toHaveCount(0);
 
     testLogger.step("Release the full config with on-call off");
