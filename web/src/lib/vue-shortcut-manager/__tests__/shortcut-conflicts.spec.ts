@@ -20,6 +20,8 @@ import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import {
   SHORTCUT_REGISTRY,
   getShortcutDef,
+  getShortcutDisplay,
+  isHoldShortcut,
   resolveShortcutKeys,
   type ShortcutCapabilities,
 } from "../shortcutRegistry";
@@ -91,6 +93,13 @@ describe("shortcut conflict audit (10 §6.4)", () => {
     expect(visibleBindings(true)).toEqual(
       expect.arrayContaining(["assistantComposer meta+up", "editor ctrl+shift+m"]),
     );
+  });
+
+  it("shares the dictate chord with assistantOpen on purpose, as a display entry that binds nothing", () => {
+    expect(getShortcutDef("assistantComposerDictate")).toBeUndefined();
+    expect(getShortcutDisplay("assistantComposerDictate")).toBe("ctrl+i");
+    expect(getShortcutDisplay("assistantOpen")).toBe("ctrl+i");
+    expect(isHoldShortcut("assistantComposerDictate")).toBe(true);
   });
 
   it("never binds the palette chord to the assistant", () => {

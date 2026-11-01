@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </li>
       </ul>
       <div class="ms-auto shrink-0">
-        <AssistantContextSeesPopover :sid="sid" :icon-only="compact" />
+        <AssistantContextSeesPopover :sid="sid" />
       </div>
     </div>
 

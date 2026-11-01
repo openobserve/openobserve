@@ -12,6 +12,17 @@ describe("OShortcut", () => {
     wrapper?.unmount();
   });
 
+  describe("held chords", () => {
+    it("should render Hold before the keycaps of a held chord only", () => {
+      wrapper = mount(OShortcut, { props: { id: "assistantComposerDictate" } });
+      expect(wrapper.get('[data-test="o-shortcut-hold"]').text()).toBe("Hold");
+      expect(wrapper.get("kbd").text()).toBe("⌘I");
+      wrapper.unmount();
+      wrapper = mount(OShortcut, { props: { id: "assistantOpen" } });
+      expect(wrapper.find('[data-test="o-shortcut-hold"]').exists()).toBe(false);
+    });
+  });
+
   describe("combo rendering (string)", () => {
     it("should render a combo string as a single symbolised keycap", () => {
       wrapper = mount(OShortcut, { props: { keys: "ctrl+shift+a" } });

@@ -50,6 +50,8 @@ export const assistantGlyph = {
   download: "file-download",
   info: "info-outline",
   addContext: "add",
+  dictate: "mic",
+  dictateOff: "mic-off",
   send: "send",
   stop: "stop",
   jumpToLatest: "arrow-downward",

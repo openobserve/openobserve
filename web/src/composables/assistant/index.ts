@@ -109,7 +109,17 @@ export {
   isRunning,
 } from "./assistantStore";
 export { sidebarWidthFor } from "./sidebarWidth";
-export { readRecall, readHints, readSidebar, markHintSeen, migrateHome, writeHome } from "./prefs";
+export {
+  readRecall,
+  readHints,
+  readSidebar,
+  markHintSeen,
+  migrateHome,
+  writeHome,
+  readVoiceOptIn,
+  writeVoiceOptIn,
+  watchPrefs,
+} from "./prefs";
 export { assistantDashboardDraft, clearDashboardDraft } from "./actions/appliers/drafts";
 export {
   assistantObjectNameKey,

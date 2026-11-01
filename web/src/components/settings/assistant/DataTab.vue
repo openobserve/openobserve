@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
     </OForm>
+    <AssistantVoiceSetting v-if="state !== 'loading'" />
   </div>
 </template>
 
@@ -145,6 +146,7 @@ import {
 } from "@/services/assistant_settings.queries";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 
+import AssistantVoiceSetting from "./AssistantVoiceSetting.vue";
 import {
   readStateOf,
   useAssistantSettingsPage,

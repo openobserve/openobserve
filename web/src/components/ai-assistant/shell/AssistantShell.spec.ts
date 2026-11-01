@@ -508,30 +508,26 @@ describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
     expect(textarea.selectionStart).toBe(4);
   });
 
-  it("offers the first starter as the composer's ghost", async () => {
+  it("shows no ghost while the welcome lists the starters (D5 decision 11, PO A34)", async () => {
     const { wrapper, store } = live();
     store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
     await flushPromises();
-    expect(wrapper.get('[data-test="assistant-ghost"]').text()).toBe(
-      'Try: "Why did errors spike?"',
-    );
+    expect(wrapper.find('[data-test="assistant-ghost"]').exists()).toBe(false);
   });
 
-  it("hands a Home starter's provenance to the ghost, so accepting it stages it (PO A26)", async () => {
+  it("hands a Home starter's provenance to the composer's ghost prop (PO A26)", async () => {
     (STARTER as { home?: true }).home = true;
     const { wrapper, store } = live();
-    const sid = store.createSession({
+    store.createSession({
       origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
     });
     await flushPromises();
     delete (STARTER as { home?: true }).home;
-    await wrapper.get('[data-test="assistant-ghost"]').trigger("click");
-    await flushPromises();
-    expect(store.state.sessions[sid].composer).toMatchObject({
+    expect(wrapper.findComponent({ name: "AssistantComposer" }).props("ghost")).toMatchObject({
       text: "Why did errors spike?",
-      homeStarter: true,
+      home: true,
     });
   });
 

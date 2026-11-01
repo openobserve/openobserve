@@ -22,6 +22,7 @@ import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
+import { fakeVoiceEngine } from "../__tests__/fakeVoice";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { dashboardKeys } from "@/services/dashboards.querykeys";
@@ -32,6 +33,7 @@ import AssistantComposer, {
   type AssistantComposerProps,
 } from "./AssistantComposer.vue";
 import { composerUi, noteDraftCleared, resetComposerUiForTests } from "./composerUi";
+import { HOLD_MS, SILENCE_MS, resetVoiceForTests, setVoiceOptIn } from "./useAssistantVoice";
 
 const { fake, breakpoint } = vi.hoisted(() => ({
   fake: { current: null as any },
@@ -85,6 +87,12 @@ function setup(props: Partial<AssistantComposerProps> = {}, withSession = true) 
   const textarea = () => wrapper.get<HTMLTextAreaElement>('[data-test="assistant-composer-field"]');
   const status = () => wrapper.get('[data-test="assistant-composer-status"]').text();
   return { wrapper, store, sid: sid!, send, textarea, status, host };
+}
+
+// The ghost is a follow-up, so it needs a chat that has left the welcome.
+async function answered(store: ReturnType<typeof setup>["store"], sid: string): Promise<void> {
+  store.state.sessions[sid].messages.push({ role: "assistant", content: "Done" });
+  await flushPromises();
 }
 
 function seedMentionGroups(): void {
@@ -412,8 +420,18 @@ describe("ghost and prefill (IW-06, `70` §5)", () => {
     kind: "page" as const,
   };
 
+  it("shows no ghost and takes no Right Arrow while the welcome is visible (PO A34)", async () => {
+    const { wrapper, textarea, store, sid } = setup({ ghost });
+    expect(wrapper.find('[data-test="assistant-ghost"]').exists()).toBe(false);
+    expect(textarea().attributes("aria-describedby")).toBeFalsy();
+    await textarea().trigger("keydown", { key: "ArrowRight" });
+    await flushPromises();
+    expect(store.state.sessions[sid].composer.text).toBe("");
+  });
+
   it("accepts the ghost with Right Arrow, stages text and chips, sends nothing", async () => {
     const { wrapper, textarea, store, sid, send, status } = setup({ ghost });
+    await answered(store, sid);
     expect(wrapper.get('[data-test="assistant-ghost"]').text()).toBe('Try: "Why errors?"');
     expect(textarea().attributes("aria-describedby")).toBeTruthy();
     await textarea().trigger("keydown", { key: "ArrowRight" });
@@ -435,6 +453,7 @@ describe("ghost and prefill (IW-06, `70` §5)", () => {
 
   it("accepts a Home starter's ghost with its provenance (PO A26)", async () => {
     const { textarea, store, sid } = setup({ ghost: { ...ghost, home: true } });
+    await answered(store, sid);
     await textarea().trigger("keydown", { key: "ArrowRight" });
     await flushPromises();
     expect(store.state.sessions[sid].composer).toMatchObject({
@@ -600,7 +619,10 @@ describe("one frame, the + menu and long pastes (D4 §3.1, §3.6, §3.9)", () =>
       "Image…",
     );
     const keys = menu.querySelector('[data-test="assistant-add-context-keys"]')!;
-    expect(keys.querySelectorAll("li")).toHaveLength(4);
+    expect(keys.querySelectorAll("li")).toHaveLength(5);
+    expect(
+      keys.querySelector('[data-test="assistant-composer-hint-voice"]')?.textContent,
+    ).toContain("Voice dictation is off in this browser.");
   });
 
   it("adds a + pick as a chip without touching the typed text", async () => {
@@ -738,10 +760,11 @@ describe("round 2 (U7–U9, U12, U16, U18–U19, F5, F8)", () => {
     expect(wrapper.find('[data-test="assistant-composer-cleared"]').exists()).toBe(false);
   });
 
-  it("names the ghost button by its visible text and keeps the hint in the textbox description (U12)", () => {
-    const { wrapper, textarea } = setup({
+  it("names the ghost button by its visible text and keeps the hint in the textbox description (U12)", async () => {
+    const { wrapper, textarea, store, sid } = setup({
       ghost: { label: raw("Why errors?"), text: "Why errors?", chips: [] },
     });
+    await answered(store, sid);
     expect(wrapper.get('[data-test="assistant-ghost"]').attributes("aria-label")).toBeUndefined();
     const hintId = textarea().attributes("aria-describedby")!.split(" ").at(-1)!;
     expect(document.getElementById(hintId)?.textContent).toContain("Press Right Arrow to use it");
@@ -1002,5 +1025,361 @@ describe("WP-06: Go to answer and the stalled Stop", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("dictation (WP-48)", () => {
+  let engine: ReturnType<typeof fakeVoiceEngine>;
+
+  const mic = (wrapper: ReturnType<typeof setup>["wrapper"]) =>
+    wrapper.get('[data-test="assistant-dictate"]');
+  const helper = (wrapper: ReturnType<typeof setup>["wrapper"]) =>
+    wrapper.find('[data-test="assistant-composer-helper"]');
+
+  function voiceSetup(props: Partial<AssistantComposerProps> = {}) {
+    localStorage.setItem("o2.assistant.hints:k1", JSON.stringify({ dictate: true }));
+    const ctx = setup(props);
+    setVoiceOptIn("k1", true);
+    return ctx;
+  }
+
+  async function listen(ctx: ReturnType<typeof setup>) {
+    await flushPromises();
+    await mic(ctx.wrapper).trigger("click");
+    await flushPromises();
+    engine.handlers!.onStart();
+    await flushPromises();
+  }
+
+  beforeEach(() => {
+    engine = fakeVoiceEngine();
+    resetVoiceForTests(engine);
+  });
+
+  afterEach(() => {
+    resetVoiceForTests();
+    vi.useRealTimers();
+    document.body.innerHTML = "";
+  });
+
+  it("renders no mic on self-hosted until the browser opt-in (A5, A30)", async () => {
+    const { wrapper } = setup();
+    expect(wrapper.find('[data-test="assistant-dictate"]').exists()).toBe(false);
+    setVoiceOptIn("k1", true);
+    await flushPromises();
+    expect(mic(wrapper).attributes("aria-label")).toBe("Dictate");
+    expect(mic(wrapper).attributes("aria-pressed")).toBe("false");
+  });
+
+  it("renders the mic on Cloud by default", async () => {
+    const { wrapper } = setup();
+    fake.current.capability.value.edition = "cloud";
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-dictate"]').exists()).toBe(true);
+  });
+
+  it("renders no mic in a browser that cannot dictate", async () => {
+    engine.isAvailable = false;
+    const { wrapper } = voiceSetup();
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-dictate"]').exists()).toBe(false);
+  });
+
+  it("renders no mic on a touch device below md (decision 21)", async () => {
+    breakpoint.md = false;
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    const { wrapper } = voiceSetup();
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-dictate"]').exists()).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it("asks once per user+org: Not now starts nothing, Continue starts and is remembered", async () => {
+    const ctx = setup();
+    setVoiceOptIn("k1", true);
+    await flushPromises();
+    await mic(ctx.wrapper).trigger("click");
+    await flushPromises();
+    const primer = () => document.body.querySelector('[data-test="assistant-dictate-primer"]');
+    expect(primer()?.textContent).toContain("Chrome turns speech into text with Google's");
+    expect(engine.handlers).toBeNull();
+
+    const decline = '[data-test="assistant-dictate-primer-decline"]';
+    document.body.querySelector<HTMLElement>(decline)!.click();
+    await flushPromises();
+    expect(engine.handlers).toBeNull();
+    expect(JSON.parse(localStorage.getItem("o2.assistant.hints:k1") ?? "{}").dictate).toBeFalsy();
+
+    await mic(ctx.wrapper).trigger("click");
+    await flushPromises();
+    const accept = '[data-test="assistant-dictate-primer-accept"]';
+    document.body.querySelector<HTMLElement>(accept)!.click();
+    await flushPromises();
+    expect(engine.handlers).not.toBeNull();
+    expect(JSON.parse(localStorage.getItem("o2.assistant.hints:k1")!).dictate).toBe(true);
+  });
+
+  it("shows the waiting line with the mic pressed, and a press cancels", async () => {
+    engine.holdPrompt = true;
+    const ctx = voiceSetup();
+    await flushPromises();
+    await mic(ctx.wrapper).trigger("click");
+    await flushPromises();
+    expect(ctx.wrapper.get('[data-test="assistant-dictate-waiting"]').text()).toBe(
+      "Waiting for microphone permission",
+    );
+    expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("true");
+    expect(ctx.status()).toBe("Waiting for microphone permission");
+
+    await mic(ctx.wrapper).trigger("click");
+    await flushPromises();
+    expect(ctx.wrapper.find('[data-test="assistant-dictate-waiting"]').exists()).toBe(false);
+    expect(ctx.status()).toBe("Dictation cancelled.");
+  });
+
+  it("shows listening, names the engine (B14) and says the start once", async () => {
+    const ctx = voiceSetup();
+    await listen(ctx);
+    expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("true");
+    expect(mic(ctx.wrapper).attributes("aria-label")).toBe("Dictate");
+    expect(ctx.wrapper.get('[data-test="assistant-dictate-status"]').text()).toContain("Listening");
+    expect(helper(ctx.wrapper).text()).toBe(
+      "Chrome · OpenObserve doesn't store the audio · Enter or Esc to finish, not send",
+    );
+    expect(ctx.status()).toBe("Listening. Press Enter, Escape or the mic to stop.");
+    expect(ctx.textarea().attributes("data-test")).toBe("assistant-composer-field");
+    expect(ctx.wrapper.get('[data-test="assistant-composer"]').attributes("data-state")).toBe(
+      "listening",
+    );
+  });
+
+  it("shows the tail in the box but never in the draft, and stays quiet per word", async () => {
+    const ctx = voiceSetup();
+    await type(ctx.textarea(), "why");
+    await listen(ctx);
+    const said = ctx.status();
+
+    engine.handlers!.onResults([{ index: 0, text: "cart fail", final: false }]);
+    await flushPromises();
+
+    expect(ctx.textarea().element.value).toBe("why cart fail");
+    expect(ctx.store.state.sessions[ctx.sid].composer.text).toBe("why");
+    expect(ctx.wrapper.get('[data-test="assistant-dictate-tail"]').text()).toContain("cart fail");
+    expect(ctx.status()).toBe(said);
+  });
+
+  it("takes a typed edit of the tail as settled, as shown", async () => {
+    const ctx = voiceSetup();
+    await listen(ctx);
+    engine.handlers!.onResults([{ index: 0, text: "cart", final: false }]);
+    await flushPromises();
+
+    await type(ctx.textarea(), "carts");
+    engine.handlers!.onResults([{ index: 0, text: "cart failed", final: true }]);
+    await flushPromises();
+
+    expect(ctx.store.state.sessions[ctx.sid].composer.text).toBe("carts");
+  });
+
+  it("makes Enter settle, not send, and the next Enter send (CT-17 AC 6)", async () => {
+    const ctx = voiceSetup();
+    await listen(ctx);
+    engine.handlers!.onResults([{ index: 0, text: "two words", final: false }]);
+    await flushPromises();
+
+    await ctx.textarea().trigger("keydown", { key: "Enter" });
+    await flushPromises();
+
+    expect(ctx.send).not.toHaveBeenCalled();
+    expect(ctx.store.state.sessions[ctx.sid].composer.text).toBe("two words");
+    expect(helper(ctx.wrapper).text()).toBe("Press Enter again to send.");
+    expect(ctx.status()).toBe("Dictation stopped. 2 words added. Press Enter to send.");
+
+    await ctx.textarea().trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(ctx.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes Send settle first even from an empty draft", async () => {
+    const ctx = voiceSetup();
+    await listen(ctx);
+    await ctx.wrapper.get('[data-test="assistant-send"]').trigger("click");
+    await flushPromises();
+    expect(ctx.send).not.toHaveBeenCalled();
+    expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("false");
+  });
+
+  it("stops on Escape through rung a2, ahead of the container rungs", async () => {
+    const ctx = voiceSetup();
+    await listen(ctx);
+    const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true });
+    Object.defineProperty(event, "target", { value: ctx.textarea().element });
+
+    expect(runEscapeLadder(event)).toBe(true);
+    await flushPromises();
+
+    expect(ctx.status()).toBe("Dictation stopped. 0 words added.");
+    expect(runEscapeLadder(event)).toBe(false);
+  });
+
+  it("settles in the original chat when the visible chat changes", async () => {
+    const ctx = voiceSetup();
+    await type(ctx.textarea(), "start");
+    await listen(ctx);
+    engine.handlers!.onResults([{ index: 0, text: "for chat one", final: false }]);
+    await flushPromises();
+    const other = ctx.store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+
+    await ctx.wrapper.setProps({ sid: other });
+    await flushPromises();
+
+    expect(other).not.toBe(ctx.sid);
+    expect(ctx.store.state.sessions[ctx.sid].composer.text).toBe("start for chat one");
+    expect(ctx.store.state.sessions[other].composer.text).toBe("");
+    expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("false");
+  });
+
+  it("stops when a card arrives, and shows the disabled mic's reason", async () => {
+    const ctx = voiceSetup();
+    await listen(ctx);
+    ctx.store.state.sessions[ctx.sid].pendingConsent = { id: "c1" } as never;
+    await flushPromises();
+    expect(ctx.wrapper.get('[data-test="assistant-composer"]').attributes("data-state")).toBe(
+      "inert",
+    );
+    expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("false");
+    expect(mic(ctx.wrapper).attributes("aria-disabled")).toBe("true");
+  });
+
+  it("stops when the composer is hidden, and on unmount", async () => {
+    const ctx = voiceSetup();
+    await listen(ctx);
+    await ctx.wrapper.setProps({ visible: false });
+    await flushPromises();
+    expect(engine.abort).toHaveBeenCalledTimes(1);
+
+    await ctx.wrapper.setProps({ visible: true });
+    await listen(ctx);
+    ctx.wrapper.unmount();
+    expect(engine.abort).toHaveBeenCalledTimes(2);
+  });
+
+  it("settles before ↑ recalls", async () => {
+    const ctx = voiceSetup();
+    await listen(ctx);
+    engine.handlers!.onResults([{ index: 0, text: "kept", final: false }]);
+    await flushPromises();
+    await ctx.textarea().trigger("keydown", { key: "ArrowUp" });
+    await flushPromises();
+    expect(ctx.store.state.sessions[ctx.sid].composer.text).toBe("kept");
+    expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("false");
+  });
+
+  it("shows the blocked mic with How to allow it, and leaves typed text alone", async () => {
+    engine.rejectMic = Object.assign(new Error("no"), { name: "NotAllowedError" });
+    const ctx = voiceSetup();
+    await type(ctx.textarea(), "typed");
+    await flushPromises();
+    await mic(ctx.wrapper).trigger("click");
+    await flushPromises();
+
+    expect(helper(ctx.wrapper).text()).toBe("Microphone access is blocked for this site.");
+    expect(ctx.status()).toBe("Microphone access is blocked for this site.");
+    expect(mic(ctx.wrapper).attributes("aria-disabled")).toBeUndefined();
+    expect(ctx.wrapper.find('[data-test="assistant-dictate-how"]').exists()).toBe(true);
+    expect(ctx.store.state.sessions[ctx.sid].composer.text).toBe("typed");
+  });
+
+  it("offers Try again for an unreachable service, naming the vendor", async () => {
+    const ctx = voiceSetup();
+    await listen(ctx);
+    engine.handlers!.onError("network");
+    await flushPromises();
+    expect(helper(ctx.wrapper).text()).toContain("Couldn't reach Google's speech service.");
+    await ctx.wrapper.get('[data-test="assistant-dictate-retry"]').trigger("click");
+    await flushPromises();
+    expect(helper(ctx.wrapper).exists()).toBe(false);
+    expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("true");
+  });
+
+  it("keeps a disabled mic with the reason once the browser proved silent (B58)", async () => {
+    vi.useFakeTimers();
+    const ctx = voiceSetup();
+    await vi.advanceTimersByTimeAsync(0);
+    await mic(ctx.wrapper).trigger("click");
+    await vi.advanceTimersByTimeAsync(0);
+    engine.handlers!.onStart();
+    engine.meter.db = -30;
+    await vi.advanceTimersByTimeAsync(SILENCE_MS);
+    const line = "Your browser didn't turn speech into text. Type instead, or try another browser.";
+    expect(helper(ctx.wrapper).text()).toBe(line);
+    expect(mic(ctx.wrapper).attributes("aria-disabled")).toBe("true");
+  });
+
+  it("turns the mic off offline unless the engine runs on the device", async () => {
+    const ctx = voiceSetup();
+    await flushPromises();
+    const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    window.dispatchEvent(new Event("offline"));
+    await flushPromises();
+    expect(mic(ctx.wrapper).attributes("aria-disabled")).toBe("true");
+    expect(helper(ctx.wrapper).text()).toBe(
+      "You're offline. Your draft is kept; dictation needs a connection.",
+    );
+    online.mockRestore();
+    window.dispatchEvent(new Event("online"));
+  });
+
+  it("dictates on a held chord in the focused box, and stops on release", async () => {
+    const ctx = voiceSetup();
+    await flushPromises();
+    vi.useFakeTimers();
+    ctx.textarea().element.focus();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "i", ctrlKey: true }));
+    await vi.advanceTimersByTimeAsync(HOLD_MS);
+    engine.handlers!.onStart();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(ctx.wrapper.get('[data-test="assistant-dictate-status"]').text()).toContain(
+      "release Ctrl I to stop",
+    );
+    document.dispatchEvent(new KeyboardEvent("keyup", { key: "i" }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("false");
+  });
+
+  it("does not dictate on a hold while a card holds the composer", async () => {
+    const ctx = voiceSetup();
+    ctx.store.state.sessions[ctx.sid].pendingConsent = { id: "c1" } as never;
+    await flushPromises();
+    vi.useFakeTimers();
+    ctx.textarea().element.focus();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "i", ctrlKey: true }));
+    await vi.advanceTimersByTimeAsync(HOLD_MS);
+    expect(engine.handlers).toBeNull();
+  });
+
+  it("does not start while an IME is composing", async () => {
+    const ctx = voiceSetup();
+    await flushPromises();
+    ctx.textarea().element.dispatchEvent(new Event("compositionstart"));
+    await mic(ctx.wrapper).trigger("click");
+    await flushPromises();
+    expect(engine.handlers).toBeNull();
+  });
+
+  it("keeps focus on a keyboard press and returns it to the box after a pointer press", async () => {
+    const ctx = voiceSetup();
+    await flushPromises();
+    const button = mic(ctx.wrapper).element as HTMLElement;
+    button.focus();
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
+    await flushPromises();
+    expect(document.activeElement).toBe(button);
+    engine.handlers!.onStart();
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    await flushPromises();
+    expect(document.activeElement).toBe(ctx.textarea().element);
   });
 });

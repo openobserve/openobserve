@@ -47,6 +47,8 @@ export interface ShortcutEntry {
   skipInInput?: boolean;
   /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
   visible?: (caps: ShortcutCapabilities) => boolean;
+  /** Pressed and held, not tapped: the cheatsheet and `OShortcut` render "Hold" before the keycaps. */
+  hold?: boolean;
 }
 
 export interface ShortcutGroup {
@@ -72,6 +74,8 @@ export interface ShortcutCapabilities {
   downtimesEnabled: boolean;
   /** `useAssistantCapability().assistantCanChat` with the v2 flag on, else false. */
   assistantCanChat: boolean;
+  /** This browser and org can dictate into the assistant. */
+  voiceAvailable?: boolean;
 }
 
 export interface ShortcutModule {
@@ -299,6 +303,13 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         display: "up",
         descriptionKey: "shortcuts.actions.assistantComposerRecall",
         visible: assistantChat,
+      },
+      {
+        id: "assistantComposerDictate",
+        display: "ctrl+i",
+        descriptionKey: "shortcuts.actions.assistantComposerDictate",
+        hold: true,
+        visible: (caps) => assistantChat(caps) && !!caps.voiceAvailable,
       },
       {
         id: "assistantGoToAnswer",
@@ -1422,6 +1433,11 @@ const ENTRIES: Map<string, ShortcutEntry> = (() => {
   }
   return map;
 })();
+
+/** True for a chord that is held, not tapped. */
+export function isHoldShortcut(id: string): boolean {
+  return ENTRIES.get(id)?.hold === true;
+}
 
 /**
  * Resolve a shortcut's display key(s) by id — for tooltips / `OShortcut`. Works

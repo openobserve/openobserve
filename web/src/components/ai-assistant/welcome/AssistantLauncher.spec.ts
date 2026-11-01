@@ -235,8 +235,23 @@ describe("AssistantLauncher", () => {
     expect(wrapper.get('[data-test="assistant-launcher-disclosure"]').text()).toMatch(
       /^Sends with the default time range, \S/,
     );
-    expect(wrapper.get('[data-test="assistant-launcher-sees"]').text()).toBe("What it sees");
     expect(wrapper.get('[data-test="assistant-launcher-open"]').text()).toBe("Open full view");
+  });
+
+  it("opens What the assistant sees from a named icon that takes no text width (PO A34)", () => {
+    const { wrapper } = setup();
+    const sees = wrapper.get('[data-test="assistant-launcher-sees"]');
+    expect(sees.text()).toBe("");
+    expect(sees.attributes("aria-label")).toBe("What the assistant sees");
+  });
+
+  it("shows at most three suggestions and no other suggestion group (PO A34)", () => {
+    const { wrapper } = setup();
+    expect(wrapper.findAll('[data-test^="assistant-launcher-starter-"]')).toHaveLength(3);
+    expect(wrapper.findAll("h3").map((heading) => heading.text())).toEqual([
+      "Suggestions",
+      "Your chats",
+    ]);
   });
 
   it("shows skeleton rows while the starters load", () => {

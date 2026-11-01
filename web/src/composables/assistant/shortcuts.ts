@@ -31,7 +31,7 @@ import { openAssistant } from "./openAssistant";
 import { getAssistantRuntime } from "./runtime";
 
 /** The Escape ladder's rungs, innermost first (`10` §6.3); `e` is retired and never asked. */
-export const ESCAPE_RUNGS = ["a", "b", "c", "d", "f", "g", "h"] as const;
+export const ESCAPE_RUNGS = ["a", "a2", "b", "c", "d", "f", "g", "h"] as const;
 
 /** The assistant's focus scope: `assistantClose` is bound only while focus is inside it. */
 export const ASSISTANT_ROOT_SELECTOR = "[data-assistant-root]";
@@ -50,6 +50,8 @@ const OPEN_OVERLAY_SELECTOR =
 /** The trigger of an open select, menu or popover; focus stays on it while its popup is open. */
 const EXPANDED_TRIGGER_SELECTOR =
   "[role='combobox'][aria-expanded='true'], [aria-haspopup]:not([aria-haspopup='false'])[aria-expanded='true']";
+
+const COMPOSER_FIELD_SELECTOR = "[data-assistant-composer]";
 
 // Rung handlers return true when they handled the key, which stops the ladder there.
 const rungs = new Map<EscapeRung, Set<(event: KeyboardEvent) => boolean>>();
@@ -236,7 +238,10 @@ export function assistantFocusCard(): boolean {
 }
 
 /** Opens or focuses; the chord never closes (`10` §6.2). */
-export function onAssistantOpen(): void {
+export function onAssistantOpen(event?: KeyboardEvent): void {
+  // MS-IME converts on Ctrl+I, and a hold in the textbox dictates at the caret, which a refocus would move.
+  if (event?.isComposing || event?.keyCode === 229) return;
+  if (document.activeElement?.matches(COMPOSER_FIELD_SELECTOR) && !assistantFocusCard()) return;
   const { store } = getAssistantRuntime();
   if (store.state.shell.placement.kind !== "hidden" && focusFirst()) {
     trackAssistant("ai_shortcut", { shortcut_id: "assistantOpen", effect: "focus" });
