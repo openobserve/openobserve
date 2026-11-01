@@ -21620,7 +21620,8 @@
         "resetColumnWidths": "Reset column widths"
       },
       "selectAllRows": "Select all rows",
-      "selectRow": "Select row {name}",
+      "selectRowAt": "Select row {index}",
+      "selectRowAtNamed": "Select row {index}, {name}",
       "removeColumnAria": "Remove column",
       "formatColumnAria": "Format column",
       "selectedOfTotal": "{selected} of {total} selected",
@@ -26420,6 +26421,8 @@
     "section_handled": "Handled",
     "section_resolved": "Resolved",
     "sectionHint_ringing": "nobody has acknowledged — these are still paging",
+    "sectionHint_ringingRouted": "nobody has acknowledged — {count} of these is still paging | nobody has acknowledged — {count} of these are still paging",
+    "sectionHint_ringingUnrouted": "{count} has no team, so it is not paging | {count} have no team, so they are not paging",
     "sectionHint_snoozed": "paging paused — they come back on their own",
     "sectionHint_handled": "acknowledged — a human owns each of these",
     "sectionHint_resolved": "closed — kept for the record",

@@ -21619,7 +21619,8 @@
         "resetColumnWidths": "重置列宽"
       },
       "selectAllRows": "选择所有行",
-      "selectRow": "选择行 {name}",
+      "selectRowAt": "选择第 {index} 行",
+      "selectRowAtNamed": "选择第 {index} 行，{name}",
       "removeColumnAria": "移除列",
       "formatColumnAria": "格式化列",
       "selectedOfTotal": "已选择 {selected}/{total}",
@@ -26418,6 +26419,8 @@
     "section_handled": "已处理",
     "section_resolved": "已解决",
     "sectionHint_ringing": "尚无人确认——这些仍在呼叫",
+    "sectionHint_ringingRouted": "无人确认 — 其中 {count} 个仍在呼叫 | 无人确认 — 其中 {count} 个仍在呼叫",
+    "sectionHint_ringingUnrouted": "{count} 个没有所属团队，因此不会呼叫 | {count} 个没有所属团队，因此不会呼叫",
     "sectionHint_snoozed": "呼叫已暂停——它们会自动恢复",
     "sectionHint_handled": "已确认——每项都有人负责",
     "sectionHint_resolved": "已关闭——留作记录",

@@ -21619,7 +21619,8 @@
         "resetColumnWidths": "Kolombreedtes herstellen"
       },
       "selectAllRows": "Alle rijen selecteren",
-      "selectRow": "Rij {name} selecteren",
+      "selectRowAt": "Rij {index} selecteren",
+      "selectRowAtNamed": "Rij {index}, {name} selecteren",
       "removeColumnAria": "Kolom verwijderen",
       "formatColumnAria": "Kolom opmaken",
       "selectedOfTotal": "{selected} van {total} geselecteerd",
@@ -26418,6 +26419,8 @@
     "section_handled": "In behandeling",
     "section_resolved": "Opgelost",
     "sectionHint_ringing": "niemand heeft ze bevestigd — ze worden nog opgeroepen",
+    "sectionHint_ringingRouted": "niemand heeft bevestigd — {count} van deze wordt nog steeds opgeroepen | niemand heeft bevestigd — {count} van deze worden nog steeds opgeroepen",
+    "sectionHint_ringingUnrouted": "{count} heeft geen team, dus wordt er niet opgeroepen | {count} hebben geen team, dus wordt er niet opgeroepen",
     "sectionHint_snoozed": "oproepen gepauzeerd — ze komen vanzelf terug",
     "sectionHint_handled": "overgenomen — er is een persoon verantwoordelijk voor elk",
     "sectionHint_resolved": "gesloten — bewaard voor het archief",

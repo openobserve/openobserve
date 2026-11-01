@@ -21619,7 +21619,8 @@
         "resetColumnWidths": "Repor larguras das colunas"
       },
       "selectAllRows": "Selecionar todas as linhas",
-      "selectRow": "Selecionar linha {name}",
+      "selectRowAt": "Selecionar linha {index}",
+      "selectRowAtNamed": "Selecionar linha {index}, {name}",
       "removeColumnAria": "Remover coluna",
       "formatColumnAria": "Formatar coluna",
       "selectedOfTotal": "{selected} de {total} selecionados",
@@ -26418,6 +26419,8 @@
     "section_handled": "Atendido",
     "section_resolved": "Resolvido",
     "sectionHint_ringing": "ninguém reconheceu — ainda estão a ser acionados",
+    "sectionHint_ringingRouted": "ninguém reconheceu — {count} destes ainda está a acionar | ninguém reconheceu — {count} destes ainda estão a acionar",
+    "sectionHint_ringingUnrouted": "{count} não tem equipa, pelo que não está a acionar | {count} não têm equipa, pelo que não estão a acionar",
     "sectionHint_snoozed": "Acionamento em pausa — são retomados automaticamente",
     "sectionHint_handled": "reconhecido — cada um destes tem um responsável",
     "sectionHint_resolved": "fechado — mantido para registo",

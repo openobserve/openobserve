@@ -534,6 +534,67 @@ describe("OnCallResponses", () => {
       expect(sections(wrapper)).toEqual({ ringing: 1 });
       expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(true);
     });
+
+    const ringingHeader = "[data-test='oncall-section-header-ringing']";
+
+    it("says unrouted pages are not paging, apart from the ones that are", async () => {
+      const wrapper = await withPages([
+        page({ id: "a" }),
+        page({ id: "b", team_id: null }, "al_pay"),
+        page({ id: "c", team_id: null }, "al_disk"),
+      ]);
+
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).not.toContain("nobody has acknowledged — these are still paging");
+      expect(text).toContain(
+        "nobody has acknowledged — 1 of these is still paging·2 have no team, so they are not paging",
+      );
+    });
+
+    it("keeps the plain still-paging hint when every ringing page has a team", async () => {
+      const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
+
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).toContain("nobody has acknowledged — these are still paging");
+      expect(wrapper.find("[data-test='oncall-section-hint-unrouted']").exists()).toBe(false);
+    });
+
+    it("counts a grouped alert as paging when an earlier firing of it has a team", async () => {
+      const wrapper = await withPages([
+        page({ id: "new", team_id: null, opened_at: 1_700_000_100_000_000 }),
+        page({ id: "old", opened_at: 1_700_000_000_000_000 }),
+        page({ id: "c", team_id: null }, "al_disk"),
+      ]);
+
+      expect(sections(wrapper)).toEqual({ ringing: 2 });
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).toContain("1 of these is still paging");
+      expect(text).toContain("1 has no team, so it is not paging");
+    });
+
+    it("counts a grouped alert as not paging when only its snoozed firing has a team", async () => {
+      const wrapper = await withPages([
+        page({ id: "new", team_id: null, opened_at: 1_700_000_100_000_000 }),
+        page({
+          id: "old",
+          opened_at: 1_700_000_000_000_000,
+          snoozed_until: (Date.now() + 60_000) * 1000,
+        }),
+      ]);
+
+      expect(sections(wrapper)).toEqual({ ringing: 1 });
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).not.toContain("still paging");
+      expect(text).toContain("1 has no team, so it is not paging");
+    });
+
+    it("drops the still-paging hint when no ringing page has a team", async () => {
+      const wrapper = await withPages([page({ id: "b", team_id: null }, "al_pay")]);
+
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).not.toContain("still paging");
+      expect(text).toContain("1 has no team, so it is not paging");
+    });
   });
 
   describe("the escalation ladder", () => {
@@ -1350,6 +1411,65 @@ describe("OnCallResponses", () => {
         .findAllComponents({ name: "OEmptyState" })
         .find((node) => node.props("preset") === "no-oncall-responses");
       expect(empty?.props("filtered")).toBe(true);
+    });
+
+    it("counts down the handover of the rotation the viewer holds, not the first one", async () => {
+      const nowMs = 1_786_000_000_000;
+      const now = vi.spyOn(Date, "now").mockReturnValue(nowMs);
+      const rule = (members: string[], shift_micros: number) => ({
+        name: "Base",
+        members,
+        shift_micros,
+        anchor_micros: 0,
+      });
+      service.getSchedule.mockResolvedValue({
+        data: {
+          id: "sch_1",
+          org_id: "default",
+          team_id: "team_1",
+          timezone: "UTC",
+          created_at: 0,
+          updated_at: 0,
+          rotations: [
+            {
+              id: "rot_weekly",
+              name: "Primary",
+              shift_rules: [rule(["ana@o2.ai"], 604_800_000_000)],
+            },
+            {
+              id: "rot_hourly",
+              name: "Secondary",
+              shift_rules: [rule(["example@gmail.com"], 3_600_000_000)],
+            },
+          ],
+        },
+      } as any);
+      service.whoIsOnCall.mockResolvedValue({
+        data: [
+          {
+            rotation_id: "rot_weekly",
+            rotation_name: "Primary",
+            rule: "Base",
+            user_email: "ana@o2.ai",
+          },
+          {
+            rotation_id: "rot_hourly",
+            rotation_name: "Secondary",
+            rule: "Base",
+            user_email: "example@gmail.com",
+          },
+        ],
+      } as any);
+      try {
+        const wrapper = await withPages([page()]);
+
+        const banner = wrapper.findComponent({ name: "OnCallShiftBanner" });
+        expect(banner.props("rotation")).toBe("Secondary");
+        // The next hour boundary, where the first rotation would have given the next week's.
+        expect(banner.props("endsAt")).toBe(1_786_003_200_000_000);
+      } finally {
+        now.mockRestore();
+      }
     });
   });
 

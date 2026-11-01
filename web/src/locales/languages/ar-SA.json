@@ -21619,7 +21619,8 @@
         "resetColumnWidths": "إعادة ضبط عرض الأعمدة"
       },
       "selectAllRows": "تحديد كل الصفوف",
-      "selectRow": "تحديد الصف {name}",
+      "selectRowAt": "تحديد الصف {index}",
+      "selectRowAtNamed": "تحديد الصف {index}، {name}",
       "removeColumnAria": "إزالة العمود",
       "formatColumnAria": "عمود التنسيق",
       "selectedOfTotal": "تم تحديد {selected} من {total}",
@@ -26418,6 +26419,8 @@
     "section_handled": "تمت المعالجة",
     "section_resolved": "تم الحل",
     "sectionHint_ringing": "لم يُقرّ بها أحد — لا تزال تستدعي المناوبين",
+    "sectionHint_ringingRouted": "لم يتولَّ أحد المسؤولية — {count} منها لا يزال قيد الاستدعاء | لم يتولَّ أحد المسؤولية — {count} منها لا يزال قيد الاستدعاء",
+    "sectionHint_ringingUnrouted": "{count} ليس له فريق، لذا لا يتم استدعاؤه | {count} ليس لها فريق، لذا لا يتم استدعاؤها",
     "sectionHint_snoozed": "تم إيقاف الاستدعاء مؤقتًا — ستعود من تلقاء نفسها",
     "sectionHint_handled": "تم إقرارها — يوجد مسؤول بشري لكل منها",
     "sectionHint_resolved": "أُغلقت — تُحفظ للسجل",
