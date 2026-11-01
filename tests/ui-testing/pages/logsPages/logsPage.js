@@ -1921,7 +1921,7 @@ export class LogsPage {
 
     // Search partition methods
     async clickRunQueryButton() {
-        await this.page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
+        await this.page.locator(this.runQueryButton).click();
     }
 
     async verifySearchPartitionResponse() {
@@ -2631,7 +2631,7 @@ export class LogsPage {
         await this.enableSqlModeIfNeeded();
         await this.page.waitForTimeout(1000);
 
-        await this.page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
+        await this.page.locator(this.runQueryButton).click();
         
         // Wait for query execution and results to load
         await this.page.waitForTimeout(3000);
@@ -3078,7 +3078,7 @@ export class LogsPage {
             const isCancel = text.includes('Cancel') || title.toLowerCase().includes('cancel');
             return !disabled && !isCancel;
         }, this.queryButton, { timeout: 30000 });
-        return await btn.click();
+        return await this.page.locator(this.runQueryButton).click();
     }
 
     /**
@@ -13480,7 +13480,7 @@ export class LogsPage {
                     !r.url().includes('is_ui_histogram'),
                 { timeout }
             ),
-            this.page.locator(this.searchBarRefreshButton).click(),
+            this.page.locator(this.runQueryButton).click(),
         ]);
         // A streamed (text/event-stream) response never reports finished; the Run button wait covers completion.
         if (!(await response.headerValue('content-type'))?.includes('text/event-stream')) {
