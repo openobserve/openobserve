@@ -452,9 +452,15 @@ async fn require_reference_access(
     if let Some(remote_task) = &remote_task {
         objects.push(("remote_tasks", remote_task.entity_id.as_str()));
     }
+    // Trimmed as the service trims the ids it resolves; each object is checked
+    // once however often the request repeats it.
+    let mut objects: Vec<_> = objects
+        .into_iter()
+        .map(|(resource, id)| (resource, id.trim()))
+        .collect();
+    objects.sort_unstable();
+    objects.dedup();
     for (resource, id) in objects {
-        // Trimmed as the service trims the ids it resolves.
-        let id = id.trim();
         // One check per object, as the `GET /{resource}/{id}` routes make it:
         // the permitted-object list is skipped when list filtering is off.
         if !check_permissions(
