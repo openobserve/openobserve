@@ -2546,24 +2546,8 @@ mod tests {
         let _guard = set_up().await;
 
         let email = "locked@zo.dev";
-        let resp = post_user(
-            "dummy",
-            UserRequest {
-                email: email.to_string(),
-                password: "Pass#1234567890".to_string(),
-                role: common::meta::user::UserOrgRole {
-                    base_role: UserRole::Viewer,
-                    custom_role: None,
-                },
-                first_name: "locked".to_owned(),
-                last_name: "".to_owned(),
-                is_external: false,
-                token: None,
-            },
-            "admin@zo.dev",
-        )
-        .await;
-        assert!(resp.is_ok());
+        // post_user refuses non-admin roles while OpenFGA is off, which it always is in unit tests.
+        create_member(email, &[("dummy", UserRole::Viewer)]).await;
 
         infra_table::user_auth_state::insert_first_failure(email, 1)
             .await
