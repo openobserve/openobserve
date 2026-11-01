@@ -568,3 +568,14 @@ test("the held verdict is invisible to reviewers and cannot be forged or carried
   const noted = withPassLimitNote(claimed, "note");
   assert.ok(noted.indexOf("note") < noted.indexOf("o2-review-held"));
 });
+
+test("a reviewed head drops a limit note once the cap no longer applies", () => {
+  const body = withPassLimitNote(withPassTag("## R\n\n> [!TIP]\n> ok\n\n**Merge confidence: 🟢 High** — x", 2), passLimitNote(2, "aaaaaaaaa", "bbbbbbbbb"));
+  for (const cap of [0, 3]) {
+    const cleared = bodyAtReviewedHead(body, cap);
+    assert.equal(cleared.includes("automatic reviews"), false);
+    assert.ok(cleared.includes("Merge confidence: 🟢 High"));
+    assert.equal(bodyAtReviewedHead(cleared, cap), cleared);
+  }
+  assert.equal(bodyAtReviewedHead(body, 2), body);
+});

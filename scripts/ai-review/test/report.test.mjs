@@ -1096,3 +1096,20 @@ test("renaming production code away counts as a production change", () => {
   assert.equal(changedCodeEvidence(rename("docs/a.md", "docs/b.md")).prodChanged, false);
   assert.equal(changedCodeEvidence(rename("o2/src/service/old.rs", "o2/archive/old.rs"), "o2").prodChanged, true);
 });
+
+test("a blocker survives when every reviewer's report is cut off", async () => {
+  const blocker = "<finding><category>security</category><severity>p1</severity><file>a.rs</file><line>1</line><summary>a real blocker</summary></finding>";
+  const cutOff = { ...silentReviewer("security"), findings: parseFindings(`<findings>\n${blocker}`) };
+  const run = await runMain({ results: [cutOff, silentReviewer("correctness")] });
+  assert.ok(run.posted.includes("a real blocker"));
+  assert.ok(run.posted.includes("the findings below are incomplete"));
+  assert.ok(run.posted.includes("Not reviewed"));
+  assert.equal(run.approvals.length, 0);
+  assert.equal(run.coordinatorCalls, 0);
+});
+
+test("a total failure with nothing parsed still says there is nothing to report", async () => {
+  const run = await runMain({ results: [silentReviewer("security"), silentReviewer("correctness")] });
+  assert.ok(run.posted.includes("there are no findings to report"));
+  assert.equal(run.posted.includes("Findings so far"), false);
+});

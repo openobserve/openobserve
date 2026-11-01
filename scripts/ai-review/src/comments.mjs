@@ -187,9 +187,11 @@ export function bodyAtUnreviewedHead(body, head) {
 export function bodyAtReviewedHead(body, maxPasses) {
   const line = confidenceLineOf(body);
   const held = body.search(new RegExp(REVIEW_HELD_TAG, "i")) !== -1;
-  if (!held && (!line || isSettledConfidenceLine(line))) return body;
-  const restored = withConfidenceLine(withoutTag(body, REVIEW_HELD_TAG), heldLine(body));
-  return maxPasses > 0 && restored.search(PASS_LIMIT_NOTE_RE) !== -1 ? withPassLimitNote(restored, passLimitNote(maxPasses)) : restored;
+  const settled = !held && (!line || isSettledConfidenceLine(line));
+  const restored = settled ? body : withConfidenceLine(withoutTag(body, REVIEW_HELD_TAG), heldLine(body));
+  if (body.search(PASS_LIMIT_NOTE_RE) === -1) return restored;
+  if (!passLimitReached(reviewPassCount(body), maxPasses)) return restored.replace(PASS_LIMIT_NOTE_RE, "");
+  return settled ? body : withPassLimitNote(restored, passLimitNote(maxPasses));
 }
 
 export function bodyAtPassLimit(body, maxPasses, head) {
