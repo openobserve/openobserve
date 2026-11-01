@@ -13719,7 +13719,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "Ajouter au tableau de bord",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "Moyenne",
+          "sortAvgTitle": "Classer les valeurs selon leur moyenne sur la fenêtre",
+          "sortOutlying": "Hors norme",
+          "sortOutlyingTitle": "Classer les valeurs selon l'écart de leur série par rapport aux autres",
+          "outlier": "Aberrant"
         },
         "related": {
           "empty": "Aucune métrique associée",
@@ -13844,9 +13849,9 @@
         "selectLabel": "Sélectionner une étiquette",
         "invalidLabel": "Nom d'étiquette invalide.",
         "selectOrTypeValue": "Sélectionner ou saisir une valeur",
-        "operatorHelp": "=  est exactement cette valeur\n!=  est tout sauf cette valeur\n=~  correspond à une regex — utiliser 500{'|'}503 pour correspondre à l'un ou l'autre\n!~  ne correspond pas à une regex\n\nLes filtres sont combinés avec ET. Pour correspondre à l'une des deux valeurs, utilisez l'opérateur =~ avec une regex.",
+        "operatorHelp": "=  correspond exactement à cette valeur\n!=  correspond à tout sauf cette valeur\n=~  correspond à une regex — utilisez 500{'|'}503 pour l'une ou l'autre\n!~  ne correspond pas à une regex\n\nLes filtres sont combinés avec AND. Pour correspondre à l'une de deux valeurs, utilisez =~ avec une regex ou ajoutez un groupe OR.",
         "andSeparator": "et",
-        "andSeparatorTitle": "Les filtres sont combinés avec ET — une métrique doit correspondre à tous. Pour correspondre à l'une des deux valeurs, utilisez l'opérateur =~ avec une regex.",
+        "andSeparatorTitle": "Les filtres sont combinés avec AND — une métrique doit correspondre à tous. Pour correspondre à l'une de deux valeurs, utilisez l'opérateur =~ avec une regex ou ajoutez un groupe OR.",
         "noSuggestions": "Aucune suggestion — saisissez une valeur.",
         "moreFilters": "+{count} de plus",
         "moreFiltersTooltip": "Cliquez pour afficher tous les filtres en ligne",
@@ -13886,7 +13891,16 @@
         "deleteMessage": "Supprimer la vue {name} pour tous les membres de cette organisation ?",
         "modified": "{name} (modifiée)",
         "clear": "Effacer la vue"
-      }
+      },
+      "sortDashboards": "Tableaux de bord",
+      "sortDashboardsTitle": "Les plus utilisés dans les tableaux de bord en premier",
+      "sortAlerts": "Alertes",
+      "sortAlertsTitle": "Les plus utilisés dans les alertes en premier",
+      "usageInDashboards": "Dans les tableaux de bord",
+      "usageHasAlerts": "A des alertes",
+      "usageInSlos": "Dans les SLO",
+      "usageLoading": "Chargement des utilisations des métriques",
+      "usageFailed": "Utilisation indisponible, réessayez"
     },
     "metricCard": {
       "lastRefreshed": "Dernière actualisation :",
@@ -13920,8 +13934,6 @@
       "noMetric": "Le générateur a besoin d'une requête sur une métrique nommée",
       "mismatch": "Le générateur ne peut pas afficher cette requête exactement",
       "constructs": {
-        "without": "un regroupement without (…)",
-        "offset": "un modificateur offset",
         "at": "un modificateur {'@'}",
         "orMatchers": "un or entre les matchers de labels",
         "subquery": "une sous-requête",
@@ -13955,7 +13967,11 @@
         "byLabelsLabel": "Par étiquettes",
         "quantileLabel": "Quantile",
         "kLabel": "K",
-        "nearestMultipleLabel": "Multiple le plus proche"
+        "nearestMultipleLabel": "Multiple le plus proche",
+        "withoutLabel": "Sans (supprimer ces labels)",
+        "withoutDesc": "Agréger les labels sélectionnés et conserver tous les autres labels",
+        "offsetLabel": "Décalage",
+        "offsetDesc": "Combien de temps en arrière lire la métrique, par ex. 1h ou 1d"
       },
       "rangeOnlyFirst": "Une fonction d'intervalle ne peut être que la première étape",
       "rangeOnlyFirstNote": "Une fonction d'intervalle lit les échantillons bruts, elle ne peut donc être que la première étape. Supprimez les autres étapes pour en ajouter une.",
@@ -14025,6 +14041,17 @@
       "empty": "Aucune requête pour l'instant",
       "noMatch": "Aucune requête ne correspond à la recherche ou au filtre des favoris",
       "loadMore": "Charger plus"
+    },
+    "labelGroups": {
+      "addGroup": "+ Groupe OR",
+      "addGroupTooltip": "Ajouter un groupe de filtres ; une série correspond lorsqu'elle correspond à au moins un groupe",
+      "addToGroup": "Ajouter un filtre à ce groupe",
+      "anyOf": "l'un de",
+      "andAnyOf": "et l'un de",
+      "or": "ou",
+      "not": "non",
+      "notTooltip": "Sélectionner les séries auxquelles ce groupe entier ne correspond pas",
+      "tooManyBranches": "Ces filtres se développent en {count} sélecteurs distincts ; au maximum {max} peuvent s'exécuter. Fusionnez les valeurs dans un seul filtre regex ou supprimez un groupe."
     }
   },
   "settings": {
@@ -22766,7 +22793,8 @@
       "moduloName": "Modulo",
       "multiplyByName": "Multiplier par",
       "divideByName": "Diviser par",
-      "exponentName": "Exposant"
+      "exponentName": "Exposant",
+      "offsetDoc": "Lit la métrique telle qu'elle était il y a la durée indiquée"
     }
   },
   "passwordPolicy": {

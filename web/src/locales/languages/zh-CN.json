@@ -13719,7 +13719,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "添加到仪表盘",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "平均值",
+          "sortAvgTitle": "按值在窗口内的平均值进行排序",
+          "sortOutlying": "离群",
+          "sortOutlyingTitle": "按序列偏离其他序列的程度对值进行排序",
+          "outlier": "离群值"
         },
         "related": {
           "empty": "无相关指标",
@@ -13844,9 +13849,9 @@
         "selectLabel": "选择一个标签",
         "invalidLabel": "无效的标签名称。",
         "selectOrTypeValue": "选择或输入一个值",
-        "operatorHelp": "=  等于此值\n!=  不等于此值\n=~  匹配正则表达式 — 使用 500{'|'}503 匹配任一\n!~  不匹配正则表达式\n\n过滤器以 AND 方式组合。要匹配两个值中的任一，请使用 =~ 并配合正则表达式。",
+        "operatorHelp": "=  精确匹配此值\n!=  匹配除此值以外的任何值\n=~  匹配正则表达式 — 使用 500{'|'}503 可匹配其中任一值\n!~  不匹配正则表达式\n\n过滤器使用 AND 组合。要匹配两个值中的任一值，请使用 =~ 配合正则表达式，或添加 OR 组。",
         "andSeparator": "和",
-        "andSeparatorTitle": "过滤器以 AND 方式组合 — 指标必须匹配所有条件。要匹配两个值中的任一，请使用 =~ 运算符配合正则表达式。",
+        "andSeparatorTitle": "过滤器使用 AND 组合 — 指标必须匹配所有过滤器。要匹配两个值中的任一值，请使用 =~ 运算符配合正则表达式，或添加 OR 组。",
         "noSuggestions": "无建议 — 请输入一个值。",
         "moreFilters": "+{count} 更多",
         "moreFiltersTooltip": "点击以在内联中显示所有过滤器",
@@ -13886,7 +13891,16 @@
         "deleteMessage": "要为本组织中的所有人删除视图 {name} 吗？",
         "modified": "{name}（已修改）",
         "clear": "清除视图"
-      }
+      },
+      "sortDashboards": "仪表盘",
+      "sortDashboardsTitle": "仪表盘中用得最多的优先",
+      "sortAlerts": "告警",
+      "sortAlertsTitle": "告警中用得最多的优先",
+      "usageInDashboards": "仪表盘中",
+      "usageHasAlerts": "有告警",
+      "usageInSlos": "SLO 中",
+      "usageLoading": "正在加载指标的使用情况",
+      "usageFailed": "使用情况不可用，请重试"
     },
     "metricCard": {
       "lastRefreshed": "上次刷新时间：",
@@ -13920,8 +13934,6 @@
       "noMetric": "构建器需要针对一个具名指标的查询",
       "mismatch": "构建器无法精确显示此查询",
       "constructs": {
-        "without": "一个 without (…) 分组",
-        "offset": "一个 offset 修饰符",
         "at": "一个 {'@'} 修饰符",
         "orMatchers": "标签匹配器之间的一个 or",
         "subquery": "一个子查询",
@@ -13955,7 +13967,11 @@
         "byLabelsLabel": "按标签",
         "quantileLabel": "分位数",
         "kLabel": "K",
-        "nearestMultipleLabel": "最接近的倍数"
+        "nearestMultipleLabel": "最接近的倍数",
+        "withoutLabel": "不包含（丢弃这些标签）",
+        "withoutDesc": "聚合时去除所选标签，并保留其他所有标签",
+        "offsetLabel": "偏移",
+        "offsetDesc": "读取指标时回溯多久，例如 1h 或 1d"
       },
       "rangeOnlyFirst": "范围函数只能作为第一步",
       "rangeOnlyFirstNote": "范围函数读取原始样本，因此只能作为第一步。请移除其他步骤以添加范围函数。",
@@ -14025,6 +14041,17 @@
       "empty": "暂无查询",
       "noMatch": "没有查询匹配搜索或加星过滤器",
       "loadMore": "加载更多"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR 组",
+      "addGroupTooltip": "添加一组过滤器；序列匹配任意一组即视为匹配",
+      "addToGroup": "向此组添加过滤器",
+      "anyOf": "任一",
+      "andAnyOf": "并且任一",
+      "or": "或",
+      "not": "非",
+      "notTooltip": "匹配整个组都不匹配的序列",
+      "tooManyBranches": "这些过滤器会展开为 {count} 个独立选择器；最多可运行 {max} 个。请将值合并到一个正则过滤器中，或移除一个组。"
     }
   },
   "settings": {
@@ -22766,7 +22793,8 @@
       "moduloName": "模运算",
       "multiplyByName": "乘以",
       "divideByName": "除以",
-      "exponentName": "指数"
+      "exponentName": "指数",
+      "offsetDoc": "读取指标在指定时长之前的值"
     }
   },
   "passwordPolicy": {

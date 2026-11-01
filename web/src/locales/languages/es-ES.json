@@ -13719,7 +13719,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "Añadir al dashboard",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "Promedio",
+          "sortAvgTitle": "Ordena los valores por su promedio durante la ventana",
+          "sortOutlying": "Atípicos",
+          "sortOutlyingTitle": "Ordena los valores según cuánto se aleja su serie de las demás",
+          "outlier": "Atípico"
         },
         "related": {
           "empty": "No hay métricas relacionadas",
@@ -13844,9 +13849,9 @@
         "selectLabel": "Seleccionar una etiqueta",
         "invalidLabel": "Nombre de etiqueta no válido.",
         "selectOrTypeValue": "Seleccionar o escribir un valor",
-        "operatorHelp": "=  es exactamente este valor\n!=  es cualquier cosa excepto este valor\n=~  coincide con una regex — use 500{'|'}503 para coincidir con cualquiera\n!~  no coincide con una regex\n\nLos filtros se combinan con AND. Para coincidir con uno de dos valores, use =~ con una regex.",
+        "operatorHelp": "=  es exactamente este valor\n!=  es cualquier valor excepto este\n=~  coincide con una regex — usa 500{'|'}503 para coincidir con cualquiera de los dos\n!~  no coincide con una regex\n\nLos filtros se combinan con AND. Para coincidir con cualquiera de dos valores, usa =~ con una regex o añade un grupo OR.",
         "andSeparator": "y",
-        "andSeparatorTitle": "Los filtros se combinan con AND — una métrica debe coincidir con todos. Para coincidir con uno de dos valores, use el operador =~ con una regex.",
+        "andSeparatorTitle": "Los filtros se combinan con AND — una métrica debe coincidir con todos ellos. Para coincidir con cualquiera de dos valores, usa el operador =~ con una regex o añade un grupo OR.",
         "noSuggestions": "Sin sugerencias — escriba un valor.",
         "moreFilters": "+{count} más",
         "moreFiltersTooltip": "Haga clic para mostrar todos los filtros en línea",
@@ -13886,7 +13891,16 @@
         "deleteMessage": "¿Eliminar la vista {name} para todos los usuarios de esta organización?",
         "modified": "{name} (modificada)",
         "clear": "Limpiar vista"
-      }
+      },
+      "sortDashboards": "Dashboards",
+      "sortDashboardsTitle": "Primero, los más usados en Dashboards",
+      "sortAlerts": "Alertas",
+      "sortAlertsTitle": "Primero, los más usados en alertas",
+      "usageInDashboards": "En Dashboards",
+      "usageHasAlerts": "Tiene alertas",
+      "usageInSlos": "En SLOs",
+      "usageLoading": "Cargando dónde se usan las métricas",
+      "usageFailed": "Uso no disponible, reintentar"
     },
     "metricCard": {
       "lastRefreshed": "Última actualización:",
@@ -13920,8 +13934,6 @@
       "noMetric": "El generador necesita una consulta sobre una métrica con nombre",
       "mismatch": "El generador no puede mostrar esta consulta exactamente",
       "constructs": {
-        "without": "una agrupación without (…)",
-        "offset": "un modificador de desplazamiento",
         "at": "un modificador {'@'}",
         "orMatchers": "un or entre comparadores de etiquetas",
         "subquery": "una subconsulta",
@@ -13955,7 +13967,11 @@
         "byLabelsLabel": "Por etiquetas",
         "quantileLabel": "Cuantil",
         "kLabel": "K",
-        "nearestMultipleLabel": "Múltiplo más cercano"
+        "nearestMultipleLabel": "Múltiplo más cercano",
+        "withoutLabel": "Sin (eliminar estas etiquetas)",
+        "withoutDesc": "Agrega prescindiendo de las etiquetas seleccionadas y conserva todas las demás etiquetas",
+        "offsetLabel": "Desplazamiento",
+        "offsetDesc": "Cuánto tiempo atrás se debe leer la métrica; p. ej., 1h o 1d"
       },
       "rangeOnlyFirst": "Una función de rango solo puede ser el primer paso",
       "rangeOnlyFirstNote": "Una función de rango lee las muestras sin procesar, por lo que solo puede ser el primer paso. Elimina los demás pasos para agregar una.",
@@ -14025,6 +14041,17 @@
       "empty": "Aún no hay consultas",
       "noMatch": "Ninguna consulta coincide con la búsqueda o el filtro de destacadas",
       "loadMore": "Cargar más"
+    },
+    "labelGroups": {
+      "addGroup": "+ Grupo OR",
+      "addGroupTooltip": "Añade un grupo de filtros; una serie coincide cuando coincide con cualquier grupo",
+      "addToGroup": "Añadir un filtro a este grupo",
+      "anyOf": "cualquiera de",
+      "andAnyOf": "y cualquiera de",
+      "or": "o",
+      "not": "no",
+      "notTooltip": "Coincide con las series que no coinciden con este grupo completo",
+      "tooManyBranches": "Estos filtros se expanden a {count} selectores separados; como máximo se pueden ejecutar {max}. Combina los valores en un único filtro de regex o elimina un grupo."
     }
   },
   "settings": {
@@ -22766,7 +22793,8 @@
       "moduloName": "Módulo",
       "multiplyByName": "Multiplicar por",
       "divideByName": "Dividir por",
-      "exponentName": "Exponente"
+      "exponentName": "Exponente",
+      "offsetDoc": "Lee la métrica tal como estaba hace la duración indicada"
     }
   },
   "passwordPolicy": {

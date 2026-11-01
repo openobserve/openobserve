@@ -13714,7 +13714,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "加入儀表板",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "平均",
+          "sortAvgTitle": "依各值在視窗期間的平均值排序",
+          "sortOutlying": "離群",
+          "sortOutlyingTitle": "依各序列偏離其他序列的程度排序值",
+          "outlier": "離群值"
         },
         "related": {
           "empty": "沒有相關指標",
@@ -13839,9 +13844,9 @@
         "selectLabel": "選取標籤",
         "invalidLabel": "無效的標籤名稱。",
         "selectOrTypeValue": "選取或輸入值",
-        "operatorHelp": "= 完全等於此值\n!= 不等於此值\n=~ 符合正規表示式 — 使用 500{'|'}503 來匹配任一\n!~ 不符合正規表示式\n\n篩選器以 AND 結合。若要匹配兩個值中的任一個，請使用 =~ 搭配正規表示式。",
+        "operatorHelp": "=  等於此值\n!=  不等於此值\n=~  符合正規表達式 — 使用 500{'|'}503 可符合任一\n!~  不符合正規表達式\n\n篩選條件以 AND 組合。若要符合兩個值其中之一，請使用 =~ 搭配正規表達式，或新增 OR 群組。",
         "andSeparator": "且",
-        "andSeparatorTitle": "篩選器以 AND 結合 — 指標必須符合所有條件。若要匹配兩個值中的任一個，請使用 =~ 運算子搭配正規表示式。",
+        "andSeparatorTitle": "篩選條件以 AND 組合 — 指標必須符合全部條件。若要符合兩個值其中之一，請使用 =~ 運算子搭配正規表達式，或新增 OR 群組。",
         "noSuggestions": "無建議 — 請輸入值。",
         "moreFilters": "+{count} 更多",
         "moreFiltersTooltip": "按一下以顯示所有內嵌篩選器",
@@ -13881,7 +13886,16 @@
         "deleteMessage": "要為此組織中的所有使用者刪除檢視 {name} 嗎？",
         "modified": "{name}（已修改）",
         "clear": "清除檢視"
-      }
+      },
+      "sortDashboards": "儀表板",
+      "sortDashboardsTitle": "儀表板中使用最多者優先",
+      "sortAlerts": "警示",
+      "sortAlertsTitle": "警示中使用最多者優先",
+      "usageInDashboards": "儀表板中",
+      "usageHasAlerts": "有警示",
+      "usageInSlos": "SLOs 中",
+      "usageLoading": "正在載入指標使用位置",
+      "usageFailed": "無法取得使用資訊，請重試"
     },
     "metricCard": {
       "lastRefreshed": "上次重新整理：",
@@ -13915,8 +13929,6 @@
       "noMetric": "建構器需要對單一具名指標的查詢",
       "mismatch": "建構器無法精確顯示此查詢",
       "constructs": {
-        "without": "without (…) 分組",
-        "offset": "offset 修飾符",
         "at": "{'@'} 修飾符",
         "orMatchers": "標籤比對器之間的 or",
         "subquery": "子查詢",
@@ -13950,7 +13962,11 @@
         "byLabelsLabel": "依標籤",
         "quantileLabel": "分位數",
         "kLabel": "K",
-        "nearestMultipleLabel": "最接近的倍數"
+        "nearestMultipleLabel": "最接近的倍數",
+        "withoutLabel": "排除（捨棄這些標籤）",
+        "withoutDesc": "將選取的標籤彙總排除，並保留其他所有標籤",
+        "offsetLabel": "偏移",
+        "offsetDesc": "要往回讀取多久以前的指標，例如 1h 或 1d"
       },
       "rangeOnlyFirst": "範圍函式只能是第一步",
       "rangeOnlyFirstNote": "範圍函式會讀取原始樣本，因此只能是第一步。請移除其他步驟以新增。",
@@ -14020,6 +14036,17 @@
       "empty": "尚無查詢",
       "noMatch": "沒有查詢符合搜尋或星號篩選條件",
       "loadMore": "載入更多"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR 群組",
+      "addGroupTooltip": "新增一組篩選條件；序列符合任一組即算符合",
+      "addToGroup": "新增篩選條件至此群組",
+      "anyOf": "任一",
+      "andAnyOf": "且任一",
+      "or": "或",
+      "not": "非",
+      "notTooltip": "改為符合此整組條件未涵蓋的序列",
+      "tooManyBranches": "這些篩選條件會展開成 {count} 個獨立選取器；最多只能執行 {max} 個。請將值合併為一個正規表達式篩選條件，或移除一個群組。"
     }
   },
   "settings": {
@@ -22761,7 +22788,8 @@
       "moduloName": "模數",
       "multiplyByName": "乘以",
       "divideByName": "除以",
-      "exponentName": "冪運算"
+      "exponentName": "冪運算",
+      "offsetDoc": "讀取指標在指定時間長度之前的值"
     }
   },
   "passwordPolicy": {
