@@ -1755,6 +1755,75 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.isLabelEligible(card)).toBe(false);
       expect(grid.inapplicableLabelFilters(card)).toEqual([pod]);
     });
+
+    const onlyLeOnBucket = () =>
+      (StreamService.nameList as any).mockResolvedValueOnce({
+        data: {
+          list: STREAMS.map((stream) =>
+            stream.name === "lat_seconds_bucket"
+              ? { ...stream, schema: [{ name: "le", type: "Utf8" }] }
+              : { ...stream, schema: [{ name: "pod", type: "Utf8" }] },
+          ),
+        },
+      });
+
+    it("keeps a card whose streams lack the label of a negated group", async () => {
+      const grid = await setup();
+      onlyLeOnBucket();
+      await grid.addLabelFilter({
+        label: "pod",
+        value: "a",
+        operator: "=",
+        group: 1,
+        negate: true,
+      } as any);
+
+      expect(grid.isLabelEligible(cardNamed(grid, "lat_seconds_bucket"))).toBe(true);
+    });
+
+    it("keeps a negated group fitting when any one inverted member fits", async () => {
+      const grid = await setup();
+      onlyLeOnBucket();
+      await grid.addLabelFilter({
+        label: "pod",
+        value: ".*",
+        operator: "=~",
+        group: 1,
+        negate: true,
+      } as any);
+      const card = cardNamed(grid, "lat_seconds_bucket");
+      expect(grid.isLabelEligible(card)).toBe(false);
+
+      await grid.addLabelFilter({
+        label: "pod",
+        value: "b",
+        operator: "=",
+        group: 1,
+        negate: true,
+      } as any);
+      expect(grid.isLabelEligible(card)).toBe(true);
+    });
+
+    it("keeps a card for a != member, unless it only matches a present label", async () => {
+      const grid = await setup();
+      onlyLeOnBucket();
+      const notA = { label: "pod", value: "a", operator: "!=", group: 1 } as any;
+      await grid.addLabelFilter(notA);
+      const card = cardNamed(grid, "lat_seconds_bucket");
+      expect(grid.isLabelEligible(card)).toBe(true);
+
+      grid.removeLabelFilter(notA);
+      await grid.addLabelFilter({ label: "pod", value: "", operator: "!=", group: 1 } as any);
+      expect(grid.isLabelEligible(card)).toBe(false);
+    });
+
+    it("keeps a card for a !~ member whose pattern rejects the empty value", async () => {
+      const grid = await setup();
+      onlyLeOnBucket();
+      await grid.addLabelFilter({ label: "pod", value: "a.+", operator: "!~", group: 1 } as any);
+
+      expect(grid.isLabelEligible(cardNamed(grid, "lat_seconds_bucket"))).toBe(true);
+    });
   });
 
   describe("an org switch must not deadlock the deferred loads", () => {

@@ -36,7 +36,7 @@ export const MAX_FILTER_BRANCHES = 16;
 /** Grouped matchers compiled at all; merging can fold many into few, but every card pays for the work. */
 export const MAX_GROUPED_MATCHERS = MAX_FILTER_BRANCHES * 16;
 
-const INVERSE: Record<LabelMatchOp, LabelMatchOp> = {
+export const INVERSE: Record<LabelMatchOp, LabelMatchOp> = {
   "=": "!=",
   "!=": "=",
   "=~": "!~",

@@ -15,7 +15,12 @@
 
 import { computed, onScopeDispose, reactive, ref, shallowRef, watch } from "vue";
 import { type TranslateFn, I18nText } from "@/types/i18n";
-import { filterGroupsOf, hasFilterGroups } from "@/components/promql/labelBoolean";
+import {
+  filterGroupsOf,
+  hasFilterGroups,
+  INVERSE,
+  type LabelMatchOp,
+} from "@/components/promql/labelBoolean";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import useHttpStreamingSearch from "@/composables/useStreamingSearch";
@@ -306,6 +311,17 @@ function writeJson(key: string, value: unknown) {
   } catch {
     // Private mode / quota. Overrides are a convenience, never a correctness
     // requirement — losing them must not break the grid.
+  }
+}
+
+/** PromQL reads an absent label as "", so a matcher that passes "" never needs the label. */
+function passesAbsent(op: LabelMatchOp, value: string): boolean {
+  if (op === "=") return value === "";
+  if (op === "!=") return value !== "";
+  try {
+    return new RegExp(`^(?:${value})$`).test("") === (op === "=~");
+  } catch {
+    return false;
   }
 }
 
@@ -608,7 +624,15 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
   /** Built once per filter change; `labelFit` runs for every card on every grid pass. */
   const labelGroups = computed(() =>
-    hasFilterGroups(labelFilters.value) ? filterGroupsOf(labelFilters.value) : null,
+    hasFilterGroups(labelFilters.value)
+      ? filterGroupsOf(labelFilters.value).map(({ negate, members }) => ({
+          negate,
+          members: members.map((filter) => {
+            const op = (filter.operator ?? "=") as LabelMatchOp;
+            return { filter, absentOk: passesAbsent(negate ? INVERSE[op] : op, filter.value) };
+          }),
+        }))
+      : null,
   );
 
   const labelFit = (card: MetricCard): { eligible: boolean; inapplicable: LabelFilter[] } => {
@@ -629,8 +653,11 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     if (!groups) return { eligible: missing.length === 0, inapplicable: missing };
     // Grid narrowing only: the query keeps every group, since a negated or empty-matching one still matches here.
     const baseMissing = missing.filter((f) => (f.group ?? 0) <= 0);
-    const someGroupFits = groups.some(({ members }) =>
-      members.every((f) => carriedBy(operands, f)),
+    const fits = ({ filter, absentOk }: { filter: LabelFilter; absentOk: boolean }) =>
+      absentOk || carriedBy(operands, filter);
+    // A negated group pushes down to one branch per inverted member, so any one fitting suffices.
+    const someGroupFits = groups.some(({ negate, members }) =>
+      negate ? members.some(fits) : members.every(fits),
     );
     return { eligible: !baseMissing.length && someGroupFits, inapplicable: baseMissing };
   };
