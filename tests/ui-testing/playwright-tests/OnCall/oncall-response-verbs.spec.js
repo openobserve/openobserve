@@ -10,7 +10,8 @@
  *            renders as such rather than as a blank cell
  *   TS-02.01 a viewer can work a page end to end
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * SNOOZE IS NOT AN ACK, AND THAT IS THE WHOLE CASE. Naively implemented, a
  * snooze either claims the record (so nobody else picks it up and nobody is

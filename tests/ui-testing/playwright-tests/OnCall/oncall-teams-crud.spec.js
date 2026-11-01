@@ -406,11 +406,11 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     const team = await createTeam(page, { name, timezone: 'UTC' });
     // Weekdays and weekends alike, so the instants below need no day-of-week arithmetic.
     const officeHours = { days: [0, 1, 2, 3, 4, 5, 6], start_minute: 9 * 60, end_minute: 17 * 60 };
+    await addTeamMembers(page, team.id, [member]);
     await setTeamSchedule(page, team.id, {
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: [member], restrictions: [officeHours] })],
     });
-    await addTeamMembers(page, team.id, [member]);
 
     // Tomorrow 01:00 UTC is 10:00 in Tokyo; tomorrow 10:00 UTC is 19:00 in Tokyo.
     const tomorrow = new Date();

@@ -5,7 +5,8 @@
  *   TS-06.07 applying a preset must issue a real `POST /teams/{id}/schedule/from-preset`,
  *            and the primary rotation afterwards must hold the preset's shift rules.
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * WHY THIS IS ITS OWN FILE AND NOT AN APPEND. `oncall-quickstart.spec.js` is
  * being repaired by another workstream in this same run, so it is off-limits.
@@ -57,8 +58,9 @@ const {
   waitForMail,
   requireMailSink,
   extractLinks,
+  deleteDestination,
+  deleteAlertById,
 } = require('../utils/oncall-seed-ext.js');
-const { getAuthHeaders } = require('../utils/cloud-auth.js');
 const { withFreshOrg } = require('../utils/first-event-helpers.js');
 
 const PREFIX = 'e2e_oncall_onboarding';
@@ -170,8 +172,10 @@ test.describe('On-call onboarding', {
       expect(storedMembers, `the "${row}" group must be stored with the people staffed into it`)
         .toContainEqual([...staffing[row]].sort());
     }
-    expect(after.rotations.filter((r) => r.id !== primary.id),
-      'only the primary rotation is rewritten; every other rotation is left as it was').toEqual(others);
+    // The write goes through `set_schedule`, which clears `source` on every rotation, so only the shape is compared.
+    const shape = (r) => ({ id: r.id, name: r.name, shift_rules: r.shift_rules });
+    expect(after.rotations.filter((r) => r.id !== primary.id).map(shape),
+      'only the primary rotation is rewritten; every other rotation is left as it was').toEqual(others.map(shape));
   });
 
   // Staged in an org of its own: in the shared org other workers' setup completes all four steps, so the checklist is never drawn there.
@@ -185,7 +189,11 @@ test.describe('On-call onboarding', {
     const stateOf = (key) => list.readSetupStepState(key);
     const expectSteps = async (expected, why) => {
       for (const [key, done] of Object.entries(expected)) {
-        await expect.poll(async () => (await stateOf(key)) === 'done', {
+        // A step that is not drawn reads null, so a missing checklist cannot pass as "not done".
+        await expect.poll(async () => {
+          const state = await stateOf(key);
+          return state === null ? null : state === 'done';
+        }, {
           timeout: 20000, intervals: [1000],
           message: `${why}: the "${key}" step must read ${done ? 'done' : 'not done'}`,
         }).toBe(done);
@@ -201,7 +209,9 @@ test.describe('On-call onboarding', {
         const prefix = uniqueName(`${workerPrefix(testInfo)}_chk`);
         const reload = async () => {
           await list.goto(stagedOrg);
+          await list.waitForSetupContext();
           await list.expandSetupChecklist();
+          await expect(checklist, 'an unfinished setup must draw the checklist').toBeVisible({ timeout: 30000 });
         };
 
         await reload();
@@ -237,13 +247,11 @@ test.describe('On-call onboarding', {
         // A page bound straight to a team completes routing without a rule, so all four steps are done.
         await list.goto(stagedOrg);
         await expect(list.getRowByIndex(0), 'the fired page must be on the list').toBeVisible({ timeout: 30000 });
+        await list.waitForSetupContext();
         await expect(checklist, 'a fully configured org must draw no checklist').toHaveCount(0);
         await expect(list.getSetupBanner(), 'and no setup banner either').toHaveCount(0);
 
-        const deleted = await page.request.delete(
-          `${process.env.ZO_BASE_URL}/api/${stagedOrg}/alerts/destinations/${encodeURIComponent(destination)}`,
-          { headers: getAuthHeaders() },
-        );
+        const deleted = await deleteDestination(page, destination, stagedOrg);
         expect(deleted.ok(), `deleting the destination must succeed: ${deleted.status()}`).toBe(true);
         await list.goto(stagedOrg);
         await expect(list.getSetupBanner(),
@@ -258,10 +266,7 @@ test.describe('On-call onboarding', {
         await expect(list.getSetupBanner(),
           'hiding the checklist must not survive a reload while the setup is still unfinished').toBeVisible({ timeout: 30000 });
       } finally {
-        if (alertId) {
-          await page.request.delete(`${process.env.ZO_BASE_URL}/api/v2/${stagedOrg}/alerts/${alertId}`,
-            { headers: getAuthHeaders() }).catch(() => {});
-        }
+        if (alertId) await deleteAlertById(page, alertId, stagedOrg);
         process.env.ORGNAME = sharedOrg;
       }
     });

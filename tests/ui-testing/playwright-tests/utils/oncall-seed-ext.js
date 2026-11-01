@@ -77,8 +77,9 @@ function url(path) {
  * rule that should be rejected), so this deliberately does not throw on a
  * non-2xx the way `oncall-seed.js`'s `must()` does.
  */
-async function call(page, method, path, data) {
-  const opts = { headers: getAuthHeaders() };
+async function call(page, method, path, data, { asSession = false } = {}) {
+  // A secondary sign-in is identified by its cookie alone; root's header would make the identity a precedence question.
+  const opts = { headers: asSession ? {} : getAuthHeaders() };
   if (data !== undefined) opts.data = data;
   const res = await page.request[method](url(path), opts);
   const text = await res.text().catch(() => '');
@@ -99,8 +100,8 @@ async function call(page, method, path, data) {
  * there", so every emptiness assertion built on one passed the moment the API
  * stopped answering. An error is not an empty result.
  */
-async function read(page, path) {
-  const { ok, status, body, text } = await call(page, 'get', path);
+async function read(page, path, { asSession = false } = {}) {
+  const { ok, status, body, text } = await call(page, 'get', path, undefined, { asSession });
   if (!ok) {
     throw new Error(`GET ${path} failed: ${status} ${String(text ?? '').slice(0, 200)}`);
   }
@@ -606,19 +607,19 @@ async function putPolicy(page, teamId, { rungs, destinations = undefined, l0 = u
   return await call(page, 'put', `/oncall/teams/${encodeURIComponent(teamId)}/policy`, payload);
 }
 
-/** The caller's own inbox: `{total, unread, deliveries}`. Keyed on the auth header, never a param. */
-async function myDeliveries(page, { unreadOnly = undefined, limit = undefined } = {}) {
+/** The caller's own inbox: `{total, unread, deliveries}`. Keyed on the caller's identity, never a param. */
+async function myDeliveries(page, { unreadOnly = undefined, limit = undefined, asSession = false } = {}) {
   const params = new URLSearchParams();
   if (unreadOnly !== undefined) params.set('unread_only', String(unreadOnly));
   if (limit !== undefined) params.set('limit', String(limit));
   const query = params.toString() ? `?${params}` : '';
-  return await read(page, `/oncall/my/deliveries${query}`);
+  return await read(page, `/oncall/my/deliveries${query}`, { asSession });
 }
 
 /** Mark inbox rows read or unread again. `{all: true, read: true}` marks everything. */
-async function markDeliveriesRead(page, { eventIds = [], read: isRead = true, all = false } = {}) {
+async function markDeliveriesRead(page, { eventIds = [], read: isRead = true, all = false, asSession = false } = {}) {
   return await call(page, 'post', '/oncall/my/deliveries/read',
-    { event_ids: eventIds, read: isRead, all });
+    { event_ids: eventIds, read: isRead, all }, { asSession });
 }
 
 /** The team overview: the summary card's own endpoint, built from four other reads. */
@@ -671,6 +672,26 @@ async function deleteTeamExpectingStatus(page, teamId) {
  */
 async function createOwnershipRuleExpectingStatus(page, body) {
   return await call(page, 'post', '/oncall/ownership', body);
+}
+
+/** The org is explicit because a case staged in its own org must not fall back to the shared one. */
+async function deleteDestination(page, name, org = orgId()) {
+  return await page.request.delete(
+    `${baseUrl()}/api/${org}/alerts/destinations/${encodeURIComponent(name)}`,
+    { headers: getAuthHeaders() },
+  );
+}
+
+/** Teardown only: an already-gone alert is not a failure. */
+async function deleteAlertById(page, alertId, org = orgId()) {
+  try {
+    await page.request.delete(
+      `${baseUrl()}/api/v2/${org}/alerts/${encodeURIComponent(alertId)}`,
+      { headers: getAuthHeaders() },
+    );
+  } catch (e) {
+    testLogger.debug('Alert cleanup failed (non-fatal)', { alertId, error: e.message });
+  }
 }
 
 module.exports = {
@@ -727,4 +748,6 @@ module.exports = {
   getOwnershipStats,
   createOwnershipRuleExpectingStatus,
   deleteTeamExpectingStatus,
+  deleteDestination,
+  deleteAlertById,
 };

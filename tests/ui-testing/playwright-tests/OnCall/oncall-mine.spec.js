@@ -328,7 +328,7 @@ test.describe('On-call — my duty, my inbox, my history', {
       const rowFor = async (session) => {
         let found;
         await expect.poll(async () => {
-          const box = await myDeliveries(session.page, { limit: 200 });
+          const box = await myDeliveries(session.page, { limit: 200, asSession: true });
           found = (box?.deliveries ?? []).find((d) => String(d.title ?? '').includes(prefix));
           return Boolean(found);
         }, {
@@ -344,27 +344,30 @@ test.describe('On-call — my duty, my inbox, my history', {
       testLogger.info('TS-19.03b both inboxes hold the page', {
         ours: ourRow.event_id, theirs: theirRow.event_id,
       });
+      // Rows carry no recipient, so distinct ledger rows are what prove two different inboxes were read.
+      expect(theirRow.event_id, 'each responder must be reading their own inbox row').not.toBe(ourRow.event_id);
 
       // One person reads it. Their own marker is the only thing that may move.
       expect((await markDeliveriesRead(first.page, {
-        eventIds: [ourRow.event_id], read: true,
+        eventIds: [ourRow.event_id], read: true, asSession: true,
       })).status).toBe(200);
 
       await expect.poll(async () => {
-        const box = await myDeliveries(first.page, { limit: 200 });
+        const box = await myDeliveries(first.page, { limit: 200, asSession: true });
         return (box?.deliveries ?? []).find((d) => d.event_id === ourRow.event_id)?.read;
       }, {
         timeout: 30000, intervals: [1000],
         message: 'the reader\'s own marker must actually move',
       }).toBeTruthy();
 
-      const theirBox = await myDeliveries(second.page, { limit: 200 });
+      const theirBox = await myDeliveries(second.page, { limit: 200, asSession: true });
       const stillTheirs = (theirBox.deliveries ?? []).find((d) => d.event_id === theirRow.event_id);
       testLogger.info('TS-19.03b the other inbox after the read', { read: stillTheirs?.read });
+      expect(stillTheirs, 'the colleague\'s row must still be in their inbox').toBeTruthy();
       expect(
-        stillTheirs?.read,
+        stillTheirs.read,
         'a colleague reading a page must not mark it read for me',
-      ).toBeFalsy();
+      ).toBe(false);
     } finally {
       await first.context.close().catch(() => {});
       await second.context.close().catch(() => {});

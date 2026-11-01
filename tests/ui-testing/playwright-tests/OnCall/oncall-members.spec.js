@@ -7,7 +7,8 @@
  *   TS-04.02 a member on no rotation is named out loud, not silently stranded
  *   TS-04.04 a member payload that adds nobody is refused (the W-02 guard)
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * WHAT IS DELIBERATELY *NOT* ASSERTED HERE:
  *   - The exact default ladder DELAYS. The plan quotes the book's 5/15/30/60m;

@@ -12,7 +12,8 @@
  *            them, and does not silently invent one
  *   TS-29.07 console and network hygiene on every on-call route
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * FOUR SURFACES, ONE TRUTH. A page record is described in four places — the
  * record itself, the human timeline, the delivery ledger and the cause
@@ -41,6 +42,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { isNoReportYet } = require('../../pages/oncallPages/oncallResponseDetailPage.js');
 const path = require('path');
 
 /** The signed-in state global-setup writes; see enhanced-baseFixtures.js. */
@@ -82,10 +84,6 @@ const workerPrefix = (testInfo) => `${PREFIX}_w${testInfo.workerIndex}`;
 
 /** The cause used wherever the case needs one but is not about which one. */
 const A_CAUSE = 'noisy_threshold';
-
-/** A 404 on this record's agent report is the designed "no agent ran" answer (request/oncall/mod.rs get_response_report). */
-const isNoReportYet = (url, org, responseId) =>
-  new URL(url).pathname === `/api/${org}/oncall/responses/${responseId}/report`;
 
 const gate = { checked: false, available: false, reason: '' };
 

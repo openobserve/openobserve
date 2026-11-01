@@ -5,7 +5,8 @@
  *   "Quick start with regions unnamed and unstaffed: Save is disabled, or it
  *    names the missing field — never a silent no-op."
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * THE PLAN'S NOTE UNDER §11.2 IS STALE AGAINST MAIN. It records "still
  * reproduces: Save fires no request, shows no inline error and no toast" from an

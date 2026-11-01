@@ -11,7 +11,8 @@
  * Where a case needs a reachable agent (a verdict on a real page), it skips
  * unless the preview reports one; CI runs without an agent.
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * There is no L0 page object, and none is invented here. The lever is
  * `setTeamPolicy`'s `l0` argument — absent means UNCHANGED, so it is only ever

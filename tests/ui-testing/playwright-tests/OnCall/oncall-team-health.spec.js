@@ -7,7 +7,8 @@
  *   TS-19.01 the delivery ledger records every attempt, one row per
  *            (run, rung, recipient, channel)
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * WHY "DERIVED ON READ" IS THE WHOLE OF TS-21.02. A stored risk list would
  * argue with the configuration beside it the instant somebody fixed something,

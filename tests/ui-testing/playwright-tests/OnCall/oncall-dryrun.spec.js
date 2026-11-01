@@ -7,7 +7,8 @@
  *   TS-13.03 a test page goes down the real path and leaves no trace
  *   TS-13.06 every link in every page email resolves to a real route (the W-01 guard)
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * WHY THESE FOUR ARE ONE FILE. They are the same claim from four directions: a
  * dry run has to be TRUE and has to be FREE. A preview that lies converts a

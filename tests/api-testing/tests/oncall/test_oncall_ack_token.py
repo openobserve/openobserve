@@ -26,7 +26,7 @@ why this surface carries the sharpest invariants in the feature — from
   * a GET must only look — a link-prefetching mail gateway would otherwise
     acknowledge a page nobody read
 
-## The token could not be obtained, and nothing here pretends otherwise
+## The token exists only inside the page email, so it is read from a mailbox
 
 An acknowledgement token is minted inside the enterprise crate
 (`o2_enterprise::enterprise::oncall::token`) and embedded in the outgoing
@@ -83,15 +83,10 @@ from tests.oncall.oncall_helpers import (
     uniq,
 )
 
-TOKEN_MINT_UNAVAILABLE = (
-    "no acknowledgement token is obtainable: it is minted inside "
-    "o2_enterprise::enterprise::oncall::token and only ever leaves the server "
-    "inside the notification body. The delivery ledger "
-    "(GET /oncall/responses/{id}/deliveries), the personal inbox "
-    "(GET /oncall/my/deliveries) and test-page all omit it, and no "
-    "notification-preview or mint endpoint exists. Needs a captured mailbox or "
-    "an enterprise-side mint helper exposed to tests."
-)
+
+class AckTokenLeak(AssertionError):
+    """A removed member's emailed link still acknowledged the page (o2-enterprise#2481)."""
+
 
 # JWT-shaped so the route gets something structurally plausible to reject, but
 # signed with nothing — this must never be mistaken for a real token.
@@ -558,7 +553,7 @@ def test_a_get_with_a_valid_token_does_not_acknowledge(create_session, base_url,
 
 
 # =============================================================================
-# 12.3, 12.4, 12.6 — blocked on a token that cannot be obtained
+# 12.3, 12.4, 12.6 — a real token, read from the page email
 # =============================================================================
 
 def test_a_valid_token_acknowledges_and_links_with_the_org(create_session, base_url,
@@ -648,8 +643,8 @@ def test_a_used_link_opened_again_shows_the_state_not_the_button(create_session,
         "attributed to the removed person. The signed-in path refuses the same action "
         "with NotOnThisTeam. o2-enterprise#2481."
     ),
-    # Without it a failing `minted_ack_token` (pytest.fail, not AssertionError) would also read as this xfail.
-    raises=AssertionError,
+    # Only the defect's own observation raises it, so a broken fixture or setup assert still fails.
+    raises=AckTokenLeak,
     strict=True,
 )
 def test_a_token_whose_subject_left_the_team_is_refused(create_session, base_url, org_id,
@@ -673,7 +668,10 @@ def test_a_token_whose_subject_left_the_team_is_refused(create_session, base_url
     )
     assert removed.status_code == 200, removed.text
 
-    assert_handler_refused(post_ack(base_url, org_id, token))
+    leaver_post = post_ack(base_url, org_id, token)
+    if ACKED_HEADING in leaver_post.text:
+        raise AckTokenLeak(f"a removed member's link still acknowledged: {leaver_post.text[:300]}")
+    assert_handler_refused(leaver_post)
     assert_handler_refused(get_ack(base_url, org_id, token))
 
     after = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}")

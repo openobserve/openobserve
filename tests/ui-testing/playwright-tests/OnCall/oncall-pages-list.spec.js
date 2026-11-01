@@ -9,7 +9,8 @@
  *   §11.6 a teamless page reads "Unrouted", and the exhaust reason must not
  *         claim the team was deleted
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * SLOW BY NATURE. Every case here needs a REAL page, which means an alert that
  * fires and a scheduler that turns the firing into a record — `firePageAndWait`
@@ -305,9 +306,17 @@ test.describe('On-call pages list', {
     await openListOnThisTeam();
     await expect(cell, 'the freshly opened page must be on the list').toBeVisible({ timeout: 60000 });
     // Read after the list fetched, so a ladder still climbing now was climbing when the cell was drawn.
-    const climbing = await getEscalationProgress(page, responseId);
+    // The first rung is written after the record opens, so it is polled for rather than read once.
+    let climbing;
+    await expect.poll(async () => {
+      climbing = await getEscalationProgress(page, responseId);
+      return climbing?.fired?.length ?? 0;
+    }, {
+      timeout: 60_000,
+      intervals: [2000],
+      message: 'the P1 ladder must have fired its first rung',
+    }).toBeGreaterThan(0);
     expect(climbing?.exhausted, 'a ladder whose second rung is a minute away has not run out yet').not.toBe(true);
-    expect(climbing?.fired?.length ?? 0, 'the P1 ladder must have fired its first rung').toBeGreaterThan(0);
     await expect(cell, 'a ladder still due to fire must not read as finished')
       .not.toContainText(FINISHED_WORDING);
 
