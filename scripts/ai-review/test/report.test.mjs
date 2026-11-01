@@ -1127,3 +1127,8 @@ test("a coordinator report without its findings list falls back to the reviewers
   const fallback = buildFallbackReview([reviewer([xmlFinding("p1", "kept blocker")])], "full", [], "<!-- m -->");
   assert.ok(fallback.includes("kept blocker"));
 });
+
+test("an outer findings wrapper left open is a cut-off report", () => {
+  assert.equal(reviewerReported("<findings><findings><no-issues>No problems.</no-issues></findings>", []), false);
+  assert.equal(reviewerReported("<findings><no-issues>No problems.</no-issues></findings>", []), true);
+});

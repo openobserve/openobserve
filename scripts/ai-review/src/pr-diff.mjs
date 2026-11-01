@@ -44,8 +44,7 @@ export function pinDiff({ diff, prDir, mergeBase, head, run = runFile, log = () 
     return { diff, pinned: false };
   }
   try {
-    const local = localDiff(prDir, mergeBase, head, run);
-    return local ? { diff: local, pinned: true } : { diff, pinned: false };
+    return { diff: localDiff(prDir, mergeBase, head, run), pinned: true };
   } catch (err) {
     log(`could not diff ${mergeBase}..${head} locally; the API diff is not pinned: ${String(err?.message).slice(0, 200)}`);
     return { diff, pinned: false };

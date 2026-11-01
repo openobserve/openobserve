@@ -75,7 +75,8 @@ export function parseFindings(xmlText) {
 // Scanned outside the finished blocks, so a `<finding>` quoted inside one is not an opener; like an unclosed inline block, an opener left over means text was lost.
 function outputCutOff(text) {
   const rest = text.replace(FINDING_BLOCK_RE, "");
-  return /<finding\b/.test(rest) || rest.lastIndexOf("<findings") > rest.lastIndexOf("</findings>");
+  const unclosed = (rest.match(/<findings\b/g)?.length ?? 0) > (rest.match(/<\/findings>/g)?.length ?? 0);
+  return unclosed || /<finding\b/.test(rest) || rest.lastIndexOf("<findings") > rest.lastIndexOf("</findings>");
 }
 
 // "No findings" must be stated in full: empty, free-form or cut-off output is a reviewer that said nothing, not one that found nothing, and an unread block could be the blocker.
