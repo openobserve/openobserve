@@ -28,6 +28,7 @@ import {
   APPROVAL_HEARTBEAT_MS,
   APPROVAL_STALE_MS,
   LIVE_TURN_TTL_MS,
+  TURN_HEARTBEAT_MS,
   STOP_RELAY_MS,
   createLifecycle,
   readLiveTurns,
@@ -633,6 +634,70 @@ describe("turn mirror and live-turn ledger", () => {
       expect.objectContaining({ type: "turn_ended", sid, status: "completed" }),
     );
     expect(readLiveTurns(USER_HASH)).toEqual([]);
+  });
+
+  it("beats every 2 s while the turn runs, and stops when it ends (PO B1)", async () => {
+    vi.useFakeTimers();
+    const { store, hints } = setup();
+    const sid = running(store);
+    await nextTick();
+    const beats = () =>
+      hints.postFor.mock.calls.filter(([, hint]) => hint.type === "turn_heartbeat").length;
+    expect(beats()).toBe(1);
+    await vi.advanceTimersByTimeAsync(TURN_HEARTBEAT_MS * 2);
+    expect(beats()).toBe(3);
+    expect(hints.postFor).toHaveBeenCalledWith(
+      "k1",
+      expect.objectContaining({ type: "turn_heartbeat", sid, turnId: "t1", org: "org1" }),
+    );
+    store.state.sessions[sid].turn = { state: "done", saved: "local" };
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(TURN_HEARTBEAT_MS * 3);
+    expect(beats()).toBe(3);
+  });
+
+  it("re-announces a held card when an extension moves its expiry", async () => {
+    const { store, hints } = setup();
+    const sid = running(store);
+    const session = store.state.sessions[sid];
+    session.turn = { state: "awaiting_approval" } as never;
+    session.pendingApproval = { id: "c1", expiresAt: 1_000, askedIn: "here" } as never;
+    await nextTick();
+    session.pendingApproval!.expiresAt = 2_000;
+    await nextTick();
+    const cards = hints.postFor.mock.calls.filter(([, hint]) => hint.type === "approval_pending");
+    expect(cards[cards.length - 1][1]).toMatchObject({ expiresAt: 2_000 });
+  });
+
+  it("lists every org's turns another tab runs, with the owner's last beat", () => {
+    let clock = 1_000;
+    const { lifecycle, receive } = setup({}, () => clock);
+    receive({
+      v: 1,
+      type: "turn_started",
+      org: "org2",
+      sid: "s2",
+      turnId: "t",
+      origin: "chat",
+      at: 1,
+    });
+    expect(lifecycle.remoteTurns()).toEqual([
+      { sid: "s2", org: "org2", state: "working", beatAt: null },
+    ]);
+    clock = 2_000;
+    receive({ v: 1, type: "turn_heartbeat", org: "org2", sid: "s2", turnId: "t", at: 2 });
+    expect(lifecycle.remoteTurns()[0].beatAt).toBe(2_000);
+    expect(lifecycle.remoteLight()).toBeNull();
+    receive({
+      v: 1,
+      type: "turn_ended",
+      org: "org2",
+      sid: "s2",
+      turnId: "t",
+      status: "completed",
+      at: 3,
+    });
+    expect(lifecycle.remoteTurns()).toEqual([]);
   });
 
   it("prunes ledger entries older than an hour and merges two tabs' writes", () => {

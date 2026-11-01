@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :container="container"
       >
         <template #container-actions>
+          <AssistantRunsButton />
           <slot name="container-actions" />
           <AssistantIconButton
             v-if="placement === 'sidebar' && !sheet"
@@ -83,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSkeleton v-if="state === 'loading'" type="text" class="w-40" />
         <span class="flex-1" />
         <div class="flex shrink-0 items-center gap-1">
+          <AssistantRunsButton v-if="state !== 'gate'" />
           <slot name="container-actions" />
           <AssistantIconButton
             v-if="placement === 'sidebar' && (!sheet || state === 'gate')"
@@ -336,6 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :multi-org="(vuex.state.organizations?.length ?? 0) > 1"
                   :sending="approvalSending"
                   :extendable="capability.approvalExtend === true"
+                  :gated="capability.approvalExtendBudgets !== true"
                   @decide="onDecide"
                   @reply="onReply"
                   @extend="onExtend"
@@ -715,6 +718,7 @@ import {
   useAssistantCredits,
   useAssistantName,
   useAssistantHistory,
+  useAssistantRuns,
   useAssistantStarters,
   useAssistantStore,
   useCreditNotice,
@@ -751,6 +755,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatCount, formatOrgIsoDay } from "@/utils/formatters";
 
+import AssistantRunsButton from "@/components/ai-assistant/runs/AssistantRunsButton.vue";
+
 import AssistantContainerMenu from "./AssistantContainerMenu.vue";
 import AssistantStatusRegion from "./AssistantStatusRegion.vue";
 import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
@@ -780,6 +786,7 @@ const { product } = useAssistantName();
 const store = useAssistantStore();
 const history = useAssistantHistory();
 const capability = useAssistantCapability();
+const runs = useAssistantRuns();
 const lockedPanel = useLockedPanel();
 const routeContext = inject(SHELL_ROUTE_CONTEXT, null);
 const route = useRoute();
@@ -875,11 +882,13 @@ const elsewhere = computed(() => {
   const view = history.elsewhere(current.sid);
   const mode = view?.mode ?? "hint";
   const line =
-    mode === "polling"
-      ? t("assistant.shell.answeringElsewherePolling")
-      : mode === "stalled"
-        ? t("assistant.shell.stillRunningRefresh")
-        : t("assistant.shell.answeringElsewhere");
+    mode === "stalled"
+      ? t("assistant.shell.stillRunningRefresh")
+      : view?.evidence === false
+        ? t("assistant.runs.state.reconnecting")
+        : mode === "polling"
+          ? t("assistant.shell.answeringElsewherePolling")
+          : t("assistant.shell.answeringElsewhere");
   return {
     line,
     stalled: mode === "stalled",
@@ -1188,6 +1197,7 @@ const approvalsHost: AssistantApprovalsHost = {
   stop: (sid) => void stopHeldTurn(sid),
   undo: (sid, ledgerId) =>
     assistantApprovals()?.undo(sid, ledgerId) ?? Promise.resolve({ ok: false, reason: "failed" }),
+  gated: () => capability.value.approvalExtendBudgets !== true,
 };
 provide(assistantApprovalsHostKey, approvalsHost);
 
@@ -1272,6 +1282,7 @@ function announcementText(key: string, params: Record<string, unknown>): ReturnT
     role: role.value,
     persistence: capability.value.persistence,
     signedIn: signedIn.value,
+    gated: capability.value.approvalExtendBudgets !== true,
   });
   if (!action) return t(`assistant.announce.${state}`, { title: text });
   const label = outcomeActionLabel(action, turn.error.code, role.value, t, te);
@@ -1317,6 +1328,8 @@ function onOutcomeAction(sid: string, action: OutcomeAction, outcome: TurnOutcom
     case "stop_it":
       void stopBusy(sid).then((stopped) => stopped && focusAfterRequest(started));
       return;
+    case "show_running":
+      return void runs.requestOpen(started instanceof HTMLElement ? started : null);
     case "sign_in":
       return signIn();
     case "retry_save":

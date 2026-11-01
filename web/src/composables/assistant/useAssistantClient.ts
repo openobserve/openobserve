@@ -27,6 +27,7 @@ import { getUUID, getUUIDv7 } from "@/utils/uuid";
 import { ERROR_LEDGER, toAssistantError } from "./assistantErrors";
 import type { AssistantError, AssistantSession, SendRequest, Sid } from "./assistantStore.types";
 import type { AssistantFrame } from "./frames";
+import { assistantClientId } from "./historyElsewhere";
 import { parseStream, type StreamEnd } from "./sseParser";
 
 /** B-13 returns the trace id on admission; until then it comes from `complete`. */
@@ -169,7 +170,7 @@ export function useAssistantClient(opts: AssistantClientOptions = {}): Assistant
           method: "POST",
           body,
           credentials: "include",
-          headers: streamHeaders(req.sid, req.turnId, true),
+          headers: { ...streamHeaders(req.sid, req.turnId, true), ...clientIdHeader(baseUrl()) },
           signal,
         });
       return stream(request, sink, signal, req.turnId, "session_expired");
@@ -251,6 +252,13 @@ function wireBody(req: ClientSendRequest): Record<string, unknown> {
 
 function toWireImages(images: ImageAttachment[]) {
   return images.map((img) => ({ data: img.data, mime_type: img.mimeType, filename: img.filename }));
+}
+
+// A cross-origin preflight fails outright on a server whose CORS list predates this header, and the owner id is only an extra signal.
+function clientIdHeader(base: string): Record<string, string> {
+  if (typeof location === "undefined" || new URL(base, location.href).origin !== location.origin)
+    return {};
+  return { "x-o2-assistant-client-id": assistantClientId() };
 }
 
 function streamHeaders(sid: Sid, turnId: string, json: boolean): Record<string, string> {

@@ -87,6 +87,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="region"
       data-test="assistant-header-status-region"
     />
+    <AssistantDecisionNotice
+      v-if="shortcutId"
+      @announce="(text) => region?.announce(text)"
+      @hidden="buttonEl()?.focus()"
+    />
     <ODialog
       v-if="lgUp"
       :open="!!dialogGate"
@@ -176,6 +181,8 @@ interface HeaderView {
   signal: AssistantSignal | null;
   count?: number;
   badge: "locked" | "notSetUp" | null;
+  /** Only another org's chats lit it. */
+  otherOrg?: boolean;
   /** The pitch or setup card a click opens instead of the container. */
   dialog: GateReason | null;
 }
@@ -204,6 +211,7 @@ import { provideAssistantSurface } from "@/components/ai-assistant/common/assist
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import AssistantDecisionNotice from "@/components/ai-assistant/runs/AssistantDecisionNotice.vue";
 import AssistantGateState, {
   gateLearnOpen,
   type GateCta,
@@ -215,6 +223,7 @@ import {
   useAssistantName,
   useAssistantOpenChord,
   useAssistantPlacement,
+  useAssistantRuns,
   useAssistantStore,
 } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -240,6 +249,7 @@ const { t } = useI18nTyped();
 const { product } = useAssistantName();
 const store = useAssistantStore();
 const history = useAssistantHistory();
+const runs = useAssistantRuns();
 const capability = useAssistantCapability();
 const placement = useAssistantPlacement(store);
 const lockedPanel = useLockedPanel();
@@ -337,7 +347,7 @@ function lightView(): HeaderView {
   const p = { product };
   const open = visible.value;
   if (light.state === "needs_you") {
-    const waiting = mine.value.filter(needsYou).length;
+    const waiting = runs.needsCount.value || mine.value.filter(needsYou).length;
     const session = light.sid ? store.state.sessions[light.sid] : undefined;
     const consent = session?.turn.state === "awaiting_consent" || !!session?.pendingConsent;
     return {
@@ -397,9 +407,32 @@ function lightView(): HeaderView {
           signal: "unread",
         };
   }
+  const others = otherOrgView();
+  if (others) return others;
   if (light.state === "open" || open)
     return plain("open", t("assistant.header.nameOpen", p), t("assistant.header.stateOpen", p));
   return plain("idle", t("assistant.header.tooltip", p), t("assistant.header.tooltip", p));
+}
+
+// Another org's chats count in the light; a click lists them, never opens them in place (PO B51).
+function otherOrgView(): HeaderView | null {
+  const rows = runs.otherOrg.value;
+  if (!rows.length) return null;
+  const p = { product };
+  const waiting = rows.filter((row) => row.group === "needs_you").length;
+  if (waiting)
+    return {
+      ...plain(
+        "needs_you",
+        t("assistant.header.needsYouCountName", { ...p, count: waiting }),
+        t("assistant.header.stateNeedsApproval"),
+      ),
+      signal: "attention",
+      count: waiting,
+      otherOrg: true,
+    };
+  const name = t("assistant.header.answeringName", p);
+  return { ...plain("working", name, name), signal: "working", otherOrg: true };
 }
 
 function buttonEl(): HTMLElement | null {
@@ -423,6 +456,7 @@ function onClick(): void {
     }
     return;
   }
+  if (current.otherOrg) return void runs.requestOpen(buttonEl());
   openOnLitSession(buttonEl());
 }
 
@@ -501,26 +535,20 @@ function toastHidden(): void {
   for (const session of mine.value) {
     const turnId = session.turnMeta.turnId;
     if (!turnId || isShown(session.sid)) continue;
-    const kind = needsYou(session)
-      ? "needs_you"
-      : session.unread && session.turn.state === "done"
-        ? "ready"
-        : null;
+    // A waiting chat speaks through the decision notice, so only a ready answer toasts.
+    const kind = session.unread && session.turn.state === "done" ? "ready" : null;
     if (!kind || toasted.has(`${turnId}:${kind}`)) continue;
     toasted.add(`${turnId}:${kind}`);
     showToast(session.sid, kind);
   }
 }
 
-function showToast(sid: string, kind: "ready" | "needs_you"): void {
+function showToast(sid: string, kind: "ready"): void {
   let opened = false;
   const title = { title: titleOf(sid) };
   toast({
     variant: "default",
-    message:
-      kind === "ready"
-        ? t("assistant.header.toastReady", title)
-        : t("assistant.header.toastNeedsYou", title),
+    message: t("assistant.header.toastReady", title),
     timeout: HEADER_TOAST_MS,
     mask: true,
     live: "off",

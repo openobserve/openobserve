@@ -22,7 +22,7 @@ import { raw } from "@/types/i18n";
 import { toAssistantError } from "./assistantErrors";
 import type { Sid } from "./assistantStore.types";
 import { goneElsewhere, type HistoryCtx, type HistoryDeps } from "./historyContext";
-import { createElsewhere, type Elsewhere } from "./historyElsewhere";
+import { assistantClientId, createElsewhere, type Elsewhere } from "./historyElsewhere";
 import {
   cardEnding,
   ownerOptions,
@@ -79,10 +79,12 @@ export function createHistoryCrossTab(ctx: HistoryCtx, records: HistoryRecords) 
         running: !!detail.active_turn,
         approval: detail.pending_approval === true,
         turnId: detail.active_turn_id ?? null,
+        ownerClientId: detail.owner_client_id ?? null,
       };
     },
     ended: (sid) => void endElsewhere(sid),
     gone: (sid) => void goneElsewhere(sid, ctx),
+    clientId: assistantClientId,
   });
 
   const ownsRunning = (sid: Sid) => {
@@ -101,7 +103,11 @@ export function createHistoryCrossTab(ctx: HistoryCtx, records: HistoryRecords) 
     session.turnMeta.ownedByThisTab = false;
     session.turnMeta.turnId = active.turnId;
     session.turnMeta.startedAt ??= deps.now();
-    const view = { turnId: active.turnId, approval: active.approval };
+    const view = {
+      turnId: active.turnId,
+      approval: active.approval,
+      ownerClientId: active.ownerClientId ?? null,
+    };
     elsewhere.start(sid, view, { polls: ctx.serverMode() });
     if (!ctx.serverMode()) void waitForLocalOwner(sid, true);
     if (active.card && active.turnId) void holdRestored(sid, active.turnId, active.card);
@@ -244,12 +250,16 @@ export function createHistoryCrossTab(ctx: HistoryCtx, records: HistoryRecords) 
   };
 
   const offs = [
+    // `turn_started` alone is no evidence of a live owner (BUG-019), so only a heartbeat hands the chat over.
     deps.hints.on("turn_started", (hint) => {
+      if (elsewhere.views[hint.sid])
+        elsewhere.start(hint.sid, { approval: false, turnId: hint.turnId });
+    }),
+    deps.hints.on("turn_heartbeat", (hint) => {
       const session = ctx.session(hint.sid);
       if (session && (session.turn.state === "idle" || isTerminal(session.turn)))
         mark(hint.sid, { turnId: hint.turnId, approval: false });
-      else if (session && elsewhere.views[hint.sid])
-        elsewhere.start(hint.sid, { approval: false, turnId: hint.turnId });
+      elsewhere.beat(hint.sid);
     }),
     deps.hints.on("turn_ended", (hint) => void endElsewhere(hint.sid)),
     deps.hints.on("approval_pending", (hint) => {

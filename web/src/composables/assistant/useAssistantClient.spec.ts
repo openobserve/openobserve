@@ -110,6 +110,20 @@ afterEach(() => {
 });
 
 describe("useAssistantClient: send", () => {
+  it("names this tab on a same-origin send only, so an older CORS list never fails the preflight", async () => {
+    const seen: Record<string, string>[] = [];
+    const fetchImpl = vi.fn(async (_url: unknown, init: RequestInit) => {
+      seen.push(init.headers as Record<string, string>);
+      return sse([{ type: "complete" }]);
+    }) as unknown as typeof fetch;
+    const send = (baseUrl: string) =>
+      useAssistantClient({ fetchImpl, baseUrl: () => baseUrl }).send(request(), sink(), signal());
+    await send(location.origin);
+    await send("https://api.example.com");
+    expect(seen[0]["x-o2-assistant-client-id"]).toBeTruthy();
+    expect(seen[1]["x-o2-assistant-client-id"]).toBeUndefined();
+  });
+
   it("posts one chat_stream with the idempotency headers and credentials (00 §5.1)", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(sse([{ type: "complete" }]));
     const client = useAssistantClient({ fetchImpl });

@@ -46,6 +46,8 @@ export interface AssistantCapabilitiesResponse {
   attachments?: boolean;
   /** `/confirm {id, extend:true}` resets a card's expiry. */
   approval_extend?: boolean;
+  /** Split user and background extension budgets (W-10); the `{user, background}` sizes when given. */
+  approval_extend_budgets?: boolean | { user?: number; background?: number };
   context_used?: boolean;
   answer_locale?: boolean;
   history_search?: boolean;
@@ -84,6 +86,8 @@ export interface ConfirmBody {
   /** Asks for more time on the card `id` instead of deciding. */
   id?: string;
   extend?: boolean;
+  /** Which budget an extend spends; absent reads as `user`. */
+  by?: "user" | "background";
 }
 
 /** o2-ai answers a delete batch item by item; a permission or CLI answer only echoes the decision. */
@@ -98,6 +102,8 @@ export interface ConfirmResponse {
   replied?: boolean;
   /** The card's new expiry after `extend`. */
   expires_at?: number;
+  user_extends_left?: number;
+  background_extends_left?: number;
 }
 
 /** The restored object, when the server's action ledger can undo an entry. */
@@ -133,6 +139,13 @@ export interface ChatSummaryWire {
   pinned?: boolean;
   agent_type?: string | null;
   origin?: string;
+  /** `state=active` (W-11); each absent on a server without it. */
+  last_turn_status?: string | null;
+  /** Microseconds. */
+  last_turn_ended_at?: number | null;
+  seen?: boolean;
+  /** The `x-o2-assistant-client-id` of the tab that runs the active turn. */
+  owner_client_id?: string | null;
 }
 
 export interface ChatsPage {
@@ -160,6 +173,9 @@ export interface ChatApproval {
   status: "pending" | "approved" | "denied" | "expired" | "withdrawn";
   /** Epoch ms of the decision, from the stored `confirmation_resolved`. */
   at?: number;
+  /** The expiry the server holds now, so a returning tab never counts down a stale one. */
+  expires_at?: number;
+  user_extends_left?: number;
 }
 
 export interface ChatImportItem {
@@ -266,11 +282,17 @@ const chatSummarySchema = z.object({
   pinned: z.boolean().optional().catch(undefined),
   agent_type: z.string().max(64).nullable().optional().catch(undefined),
   origin: z.string().max(32).optional().catch(undefined),
+  last_turn_status: z.string().max(32).nullable().optional().catch(undefined),
+  last_turn_ended_at: z.number().nullable().optional().catch(undefined),
+  seen: z.boolean().optional().catch(undefined),
+  owner_client_id: z.string().max(128).nullable().optional().catch(undefined),
 });
 
 const chatApprovalSchema = z.object({
   id: z.string().min(1).max(128),
   status: z.enum(["pending", "approved", "denied", "expired"]),
+  expires_at: z.number().optional().catch(undefined),
+  user_extends_left: z.number().optional().catch(undefined),
   resolved: z
     .object({
       at: z.number().optional().catch(undefined),
@@ -356,7 +378,7 @@ export function parseChatDetail(data: unknown): ChatDetail {
 function chatApprovalOf(value: unknown): ChatApproval[] {
   const parsed = chatApprovalSchema.safeParse(value);
   if (!parsed.success) return [];
-  const { id, resolved } = parsed.data;
+  const { id, resolved, expires_at, user_extends_left } = parsed.data;
   const at = resolved?.at;
   const status =
     parsed.data.status !== "denied"
@@ -366,7 +388,15 @@ function chatApprovalOf(value: unknown): ChatApproval[] {
         : resolved?.expired === true
           ? "expired"
           : "denied";
-  return [{ id, status, ...(typeof at === "number" && at > 0 && { at }) }];
+  return [
+    {
+      id,
+      status,
+      ...(typeof at === "number" && at > 0 && { at }),
+      ...(expires_at !== undefined && { expires_at }),
+      ...(user_extends_left !== undefined && { user_extends_left }),
+    },
+  ];
 }
 
 const assistant = {
@@ -479,6 +509,15 @@ const assistant = {
     const res = await http().get<ChatsPage>(`/api/${enc(org)}/ai/chats`, {
       ...ASSISTANT_REQUEST,
       params: query,
+    });
+    return parseChatsPage(res.data);
+  },
+
+  /** Running, waiting and recently finished chats; a server without `state` answers its plain first page. */
+  listActiveChats: async (org: string): Promise<ChatsPage> => {
+    const res = await http().get<ChatsPage>(`/api/${enc(org)}/ai/chats`, {
+      ...ASSISTANT_REQUEST,
+      params: { limit: String(CHATS_PAGE), state: "active" },
     });
     return parseChatsPage(res.data);
   },

@@ -216,6 +216,36 @@ describe("toAssistantError: status beats body", () => {
     });
   });
 
+  it("picks the run-limit copy by the typed scope, never by the message", () => {
+    const refusal = (body: Record<string, unknown>) =>
+      toAssistantError({ status: 429, body: { error_code: "turn_limit", ...body } });
+    const member = refusal({ scope: "user", limit: 5, active: 5, message: "org limit" });
+    expect(member).toMatchObject({
+      code: "run_limit_member",
+      limit: 5,
+      active: 5,
+      action: "show_running",
+      retryable: false,
+    });
+    expect(refusal({ scope: "org", retry_after_ms: 4_000 })).toMatchObject({
+      code: "run_limit_org",
+      retryAfterMs: 4_000,
+      action: "retry",
+    });
+    expect(refusal({ scope: "org", retry_after: 4 }).retryAfterMs).toBe(4_000);
+    expect(refusal({ scope: "user" }).code).toBe("turn_limit");
+    expect(refusal({ scope: "node", limit: 200 }).code).toBe("turn_limit");
+    expect(refusal({}).code).toBe("turn_limit");
+  });
+
+  it("takes a server that names the run-limit code itself, with the same fallback", () => {
+    const named = (error_code: string, body: Record<string, unknown> = {}) =>
+      toAssistantError({ status: 429, body: { error_code, ...body } }).code;
+    expect(named("run_limit_member", { limit: 3 })).toBe("run_limit_member");
+    expect(named("run_limit_member")).toBe("turn_limit");
+    expect(named("run_limit_org")).toBe("run_limit_org");
+  });
+
   it("reads a 429 without error_code as rate_limited, never turn_limit (BE D4)", () => {
     expect(toAssistantError({ status: 429, body: { code: 429, error: "slow down" } }).code).toBe(
       "rate_limited",

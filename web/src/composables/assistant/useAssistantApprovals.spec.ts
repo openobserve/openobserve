@@ -379,8 +379,46 @@ describe("useAssistantApprovals", () => {
     await expect(plain.approvals.extend(plain.sid)).resolves.toBe(false);
     const more = setup(PERMISSION, true);
     await expect(more.approvals.extend(more.sid)).resolves.toBe(true);
-    expect(more.extend).toHaveBeenCalledWith("org1", more.sid, "per_1");
+    expect(more.extend).toHaveBeenCalledWith("org1", more.sid, "per_1", "user");
     expect(more.session.pendingApproval?.expiresAt).toBe(now + 300_000);
+  });
+
+  it("records the user's budget from the answer, and a refusal ends More time but not the card", async () => {
+    const { sid, approvals, extend, session } = setup(PERMISSION, true);
+    extend.mockResolvedValueOnce({ expires_at: now + 300_000, user_extends_left: 9 } as never);
+    await approvals.extend(sid);
+    expect(session.pendingApproval?.userExtendsLeft).toBe(9);
+    extend.mockRejectedValueOnce({
+      response: { status: 409, data: { code: "extend_limit", by: "user" } },
+    });
+    await expect(approvals.extend(sid)).resolves.toBe(false);
+    expect(session.pendingApproval?.userExtendsLeft).toBe(0);
+    expect(session.pendingApproval?.expiresAt).toBe(now + 300_000);
+  });
+
+  it("extends out of view from the background budget and reports what came of it", async () => {
+    const { sid, approvals, extend, session } = setup(PERMISSION, true);
+    const id = held(sid)!;
+    await expect(approvals.extendInBackground(sid, id)).resolves.toBe("extended");
+    expect(extend).toHaveBeenCalledWith("org1", sid, id, "background");
+    extend.mockRejectedValueOnce({
+      response: { status: 409, data: { code: "extend_limit", by: "background" } },
+    });
+    await expect(approvals.extendInBackground(sid, id)).resolves.toBe("spent");
+    expect(session.pendingApproval?.id).toBe(id);
+    extend.mockRejectedValueOnce(new Error("offline"));
+    await expect(approvals.extendInBackground(sid, id)).resolves.toBe("failed");
+    expect(session.pendingApproval?.id).toBe(id);
+    await expect(approvals.extendInBackground(sid, "other")).resolves.toBe("failed");
+  });
+
+  it("ends the card here when the server says it already expired", async () => {
+    const { sid, approvals, extend, session } = setup(PERMISSION, true);
+    const id = held(sid)!;
+    extend.mockRejectedValueOnce({ response: { status: 409, data: { code: "approval_expired" } } });
+    await expect(approvals.extendInBackground(sid, id)).resolves.toBe("expired");
+    await vi.runAllTimersAsync();
+    expect(session.pendingApproval).toBeNull();
   });
 
   it("asks again in one short turn naming the expired card", async () => {

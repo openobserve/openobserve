@@ -27,7 +27,9 @@ import type {
 
 /** The card as its component renders it: the transcript's block, plus the pending card's ids and expiry while it waits. */
 export type ApprovalCardView = ApprovalBlockData &
-  Partial<Pick<PendingApproval, "sessionId" | "turnId" | "expiresAt" | "askedIn">>;
+  Partial<
+    Pick<PendingApproval, "sessionId" | "turnId" | "expiresAt" | "askedIn" | "userExtendsLeft">
+  >;
 
 /** Every state a record renders; `waiting_elsewhere` is a card another tab of this browser holds. */
 export type ApprovalResultState = ApprovalOutcome["state"] | "waiting_elsewhere";
@@ -55,6 +57,8 @@ export interface AssistantApprovalsHost {
   /** Stop on a turn another tab is waiting on. */
   stop(sid: Sid): void;
   undo(sid: Sid, ledgerId: string): Promise<ActionResult>;
+  /** No split budgets: cards are Deny and Reply only, so an expired one offers no Ask again (PO B96). */
+  gated?(): boolean;
 }
 
 /** Provided by the shell beside the evidence host. */

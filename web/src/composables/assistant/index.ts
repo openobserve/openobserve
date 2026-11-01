@@ -34,7 +34,7 @@ export { useAssistantName } from "./useAssistantName";
 export { useAssistantClient } from "./useAssistantClient";
 export { parseStream, extractFrames } from "./sseParser";
 export { toAssistantError, ASSISTANT_ERROR_CODES } from "./assistantErrors";
-export { STALL_MS, turnStatusText } from "./turnStateMachine";
+export { STALL_MS, elapsedText, turnStatusText } from "./turnStateMachine";
 export { starterPayload, widerPeriodText } from "./starterPayload";
 export { useAssistantStarters } from "./useAssistantStarters";
 export { groupOf, originOf, useAssistantHistory } from "./useAssistantHistory";
@@ -152,10 +152,13 @@ export {
   useTurnLock,
 } from "./runtimeHandle";
 export { queryRunOf } from "./actions/appliers/query";
+export { runAgentKey, runsCounts, shownSids, useAssistantRuns, RUN_CAP_DEFAULT } from "./runs";
+export type { AssistantRuns, RunRow, RunStatus, RunsCounts } from "./runs";
 export {
   DELETE_TTL_MS,
   PERMISSION_TTL_MS,
   approvalClock,
+  approvalDuration,
   approvalEntity,
   approvalHeading,
   approvalOutcomeOf,

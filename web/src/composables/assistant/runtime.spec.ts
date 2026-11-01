@@ -29,6 +29,7 @@ import * as storeModule from "./assistantStore";
 import { assistantStore, openAssistant, useAssistantCapability } from "./index";
 import { openTabWithoutOpener } from "./openTab";
 import { pushRecall, readRecall } from "./prefs";
+import { useAssistantRuns } from "./runs";
 import { getAssistantRuntime, resetAssistantRuntimeForTests } from "./runtime";
 
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
@@ -79,6 +80,12 @@ describe("assistant runtime", () => {
     expect(assistantStore.state.capability.gate).toBe("loading");
     void assistantStore.headerLight;
     expect(createStore).toHaveBeenCalledTimes(1);
+  });
+
+  it("builds one running-chats list and hands it to every reader", () => {
+    const runtime = getAssistantRuntime();
+    expect(useAssistantRuns()).toBe(runtime.runs);
+    expect(runtime.runs.rows.value).toEqual([]);
   });
 
   it("resolves the gate from the wired getters and lets a door open", async () => {

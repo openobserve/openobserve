@@ -149,6 +149,7 @@ export {
 } from "./approvalAnatomy";
 export {
   approvalClock,
+  approvalDuration,
   approvalEntity,
   approvalHeading,
   approvalNoun,

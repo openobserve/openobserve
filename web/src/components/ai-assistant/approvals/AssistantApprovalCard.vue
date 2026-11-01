@@ -57,7 +57,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tabular-nums"
           data-test="assistant-approval-countdown"
         >
-          {{ t("assistant.approval.expiresIn", { time: clockText }) }}
+          {{
+            t(expiringSoon ? "assistant.approval.expiringSoon" : "assistant.approval.expiresIn", {
+              time: clockText,
+            })
+          }}
+        </OText>
+        <OText
+          v-if="remainingMs !== null && !sending && extendsSpent"
+          variant="meta"
+          as="span"
+          data-test="assistant-approval-last-extension"
+        >
+          {{ t("assistant.approval.lastExtension") }}
         </OText>
       </div>
       <OText v-if="card.askedIn === 'other_tab'" variant="meta" as="p">
@@ -184,9 +196,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- The buttons stay while the decision is on its way, so focus stays where it was -->
       <div class="flex min-w-0 flex-col gap-2">
+        <OText v-if="gated" variant="meta" as="p" data-test="assistant-approval-gated">
+          {{ t("assistant.approval.gateTiming", { product }) }}
+        </OText>
         <div class="flex min-w-0 flex-wrap items-center gap-2">
           <OButton
-            v-if="mdUp"
+            v-if="mdUp || gated"
             ref="denyButton"
             variant="secondary"
             size="sm"
@@ -211,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("assistant.approval.reply") }}
           </OButton>
           <OButton
-            v-if="planned && card.editable"
+            v-if="planned && card.editable && !gated"
             variant="ghost"
             size="sm"
             :disabled="sending"
@@ -223,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("assistant.approval.edit") }}
           </OButton>
           <OButton
-            v-if="editor"
+            v-if="editor && !gated"
             variant="ghost"
             size="sm"
             :disabled="sending"
@@ -247,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("assistant.approval.moreTime") }}
           </OButton>
           <OButton
-            v-if="mdUp"
+            v-if="mdUp && !gated"
             :variant="card.destructive ? 'destructive' : 'primary'"
             size="sm"
             :disabled="sending || nothingSelected"
@@ -262,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OButton>
         </div>
-        <div v-if="!mdUp" class="flex min-w-0 gap-2">
+        <div v-if="!mdUp && !gated" class="flex min-w-0 gap-2">
           <OButton
             ref="denyButton"
             variant="secondary"
@@ -360,12 +375,14 @@ import {
   assistantKeydownAt,
   registerEscapeRung,
   useAssistantIdleFocus,
+  useAssistantName,
   type ApprovalDecision,
   type ApprovalScope,
 } from "@/composables/assistant";
 import {
   approvalClock,
   approvalDiff,
+  approvalDuration,
   approvalEditor,
   approvalEntity,
   approvalHeading,
@@ -397,9 +414,7 @@ const FIRST_TARGETS = 5;
 /** An id the name could not be resolved for is shown this short (D3-n). */
 const SHORT_ID_CHARS = 8;
 
-/** A card this long gets one spoken warning at a minute left (WCAG 2.2.1). */
-const LONG_CARD_MS = 120_000;
-
+/** From here until a decision the tag line reads "Expires soon" (`30` §7.3). */
 const WARN_AT_MS = 60_000;
 
 /** Past this many items the impact says it is a large batch, without blocking it. */
@@ -407,6 +422,9 @@ const LARGE_BATCH = 20;
 
 /** A key pressed this close before the card mounted may land its keyup on the card; that one activation is ignored. */
 const CARRIED_KEY_MS = 1_000;
+
+/** The two warnings of every window, longest first (`30` §7.3). */
+const WARN_ATS_MS = [60_000, 20_000];
 
 const props = withDefaults(
   defineProps<{
@@ -416,11 +434,13 @@ const props = withDefaults(
     sending?: boolean;
     /** The server lets the card ask for more time. */
     extendable?: boolean;
+    /** The server has no split budgets: Deny and Reply only (PO A14, B96). */
+    gated?: boolean;
     /** The org's display name; shown only when the user can switch between orgs. */
     orgName?: string;
     multiOrg?: boolean;
   }>(),
-  { org: "", sending: false, extendable: false, orgName: "", multiOrg: false },
+  { org: "", sending: false, extendable: false, gated: false, orgName: "", multiOrg: false },
 );
 
 const emit = defineEmits<{
@@ -432,6 +452,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const { product } = useAssistantName();
 const router = useRouter();
 const { mdUp } = useBreakpoint();
 const idle = useAssistantIdleFocus();
@@ -456,9 +477,11 @@ const selected = ref<string[]>(props.card.targets.map((target) => target.id ?? t
 const mountedAt = ref(Number.POSITIVE_INFINITY);
 let keydownAt = Number.NEGATIVE_INFINITY;
 let carriedKey = false;
-let warned = false;
+// A card that mounts inside a warning's window said its time in the mount announcement.
+let warned = new Set(WARN_ATS_MS.filter((at) => initialLeft() <= at));
 let unmounted = false;
-const initialMs = typeof props.card.expiresAt === "number" ? props.card.expiresAt - Date.now() : 0;
+// Decided when the card mounts, so a server upgrade never changes a card under the reader (`30` §7.3).
+const gated = props.gated;
 let timer: ReturnType<typeof setInterval> | null = null;
 const offs: (() => void)[] = [];
 
@@ -477,9 +500,16 @@ const remainingMs = computed(() =>
 );
 const clockText = computed(() => raw(approvalClock(remainingMs.value ?? 0)));
 // From mount, so the reader never has to race the countdown for it (PO A11, A23).
+const extendsSpent = computed(() => props.card.userExtendsLeft === 0);
 const moreTime = computed(
-  () => props.extendable && remainingMs.value !== null && remainingMs.value > 0,
+  () =>
+    props.extendable &&
+    !gated &&
+    !extendsSpent.value &&
+    remainingMs.value !== null &&
+    remainingMs.value > 0,
 );
+const expiringSoon = computed(() => remainingMs.value !== null && remainingMs.value <= WARN_AT_MS);
 
 const targets = computed(() =>
   props.card.targets.map((target) => ({
@@ -594,6 +624,10 @@ const describedBy = computed(
 
 const argsText = computed(() => JSON.stringify(props.card.args ?? {}, null, 2));
 
+function initialLeft(): number {
+  return typeof props.card.expiresAt === "number" ? props.card.expiresAt - Date.now() : Infinity;
+}
+
 function onKeydown(): void {
   keydownAt = Date.now();
 }
@@ -611,7 +645,7 @@ function deny(reason: "deny" | "escape"): void {
 }
 
 function approve(): void {
-  if (nothingSelected.value) return;
+  if (nothingSelected.value || gated) return;
   decide({
     approved: true,
     scope: canAlwaysAllow(props.card) ? scope.value : "once",
@@ -656,19 +690,23 @@ function announce(moved: boolean): void {
 }
 
 function duration(ms: number): I18nText {
-  const seconds = Math.ceil(ms / 1000);
-  if (seconds < 120) return t("assistant.approval.seconds", { count: seconds }, seconds);
-  const minutes = Math.round(seconds / 60);
-  return t("assistant.approval.minutes", { count: minutes }, minutes);
+  return approvalDuration(ms, t);
 }
 
+// Each warning speaks once per window; an extension starts the window over.
 function tick(): void {
   now.value = Date.now();
   const ms = remainingMs.value;
-  if (ms === null || warned || props.sending || initialMs <= LONG_CARD_MS || ms > WARN_AT_MS)
-    return;
-  warned = true;
-  emit("announce", t("assistant.approval.expiresSoon"));
+  if (ms === null || props.sending) return;
+  const due = WARN_ATS_MS.find((at) => ms <= at && !warned.has(at));
+  if (due === undefined) return;
+  for (const at of WARN_ATS_MS) if (ms <= at) warned.add(at);
+  const key = extendsSpent.value
+    ? "assistant.announce.approvalExpiringFinal"
+    : "assistant.announce.approvalExpiring";
+  const line = t(key, { title: heading.value, duration: duration(ms) });
+  const focused = root.value?.contains(document.activeElement);
+  emit("announce", focused ? line : t(idle.jumpKey(), { line, keys: t(idle.spokenKeys()) }));
 }
 
 onMounted(async () => {
@@ -698,6 +736,19 @@ onBeforeUnmount(() => {
   if (timer) clearInterval(timer);
   offs.forEach((off) => off());
 });
+
+watch(
+  () => props.card.expiresAt,
+  (next, before) => {
+    if (typeof next !== "number" || typeof before !== "number" || next <= before) return;
+    warned = new Set();
+    now.value = Date.now();
+    emit(
+      "announce",
+      t("assistant.announce.approvalExtended", { duration: duration(next - now.value) }),
+    );
+  },
+);
 
 watch(
   () => props.card.id,

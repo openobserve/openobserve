@@ -310,11 +310,11 @@ export function outcomeActionLabel(
 export function outcomeActionOf(
   kind: OutcomeKind,
   error: AssistantError | undefined,
-  opts: { role: "admin" | "member"; persistence: boolean; signedIn: boolean },
+  opts: { role: "admin" | "member"; persistence: boolean; signedIn: boolean; gated?: boolean },
 ): OutcomeAction | null {
   if (kind === "stopped") return "continue";
   if (kind === "doneNotSaved") return opts.persistence ? "retry_save" : null;
-  if (kind === "expired") return "ask_again";
+  if (kind === "expired") return opts.gated ? null : "ask_again";
   if (kind === "restored" || kind === "cancelledElsewhere" || !error) return null;
   if (error.code === "session_expired" && opts.signedIn) return "retry";
   if (error.action === "none" || error.action === "send_again") return null;
@@ -324,9 +324,10 @@ export function outcomeActionOf(
 </script>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from "vue";
+import { computed, defineAsyncComponent, inject, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
+import { assistantApprovalsHostKey } from "@/components/ai-assistant/approvals/approvals.types";
 import AssistantErrorDetails from "@/components/ai-assistant/common/AssistantErrorDetails.vue";
 import { billingHrefOf } from "@/components/ai-assistant/credits/AssistantCreditManage.vue";
 import { explorerLabel } from "@/components/ai-assistant/evidence/evidenceText";
@@ -457,6 +458,7 @@ const readonlyLine = computed<I18nText>(() =>
     : title.value,
 );
 
+const approvalsHost = inject(assistantApprovalsHostKey, null);
 const action = computed<OutcomeAction | null>(
   () =>
     creditCopy.value?.action ??
@@ -464,6 +466,7 @@ const action = computed<OutcomeAction | null>(
       role: props.role,
       persistence: props.persistence,
       signedIn: props.signedIn,
+      gated: approvalsHost?.gated?.() === true,
     }),
 );
 const billingHref = computed(() =>

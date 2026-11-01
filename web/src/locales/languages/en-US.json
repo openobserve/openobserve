@@ -9249,6 +9249,11 @@
     "announce": {
       "approval": "Waiting for your approval: {title}.",
       "approvalExpires": "Waiting for your approval: {title}. Expires in {duration}.",
+      "approvalExpiring": "Approval expires in {duration}: {title}. More time is on the card.",
+      "approvalExpiringFinal": "Approval expires in {duration}: {title}. No more time can be added.",
+      "approvalExpiringNotice": "Approval expires in {duration}: {title}. Review it from the {product} notice.",
+      "approvalExpiringNoticeFinal": "Approval expires in {duration}: {title}. No more time can be added. Review it from the {product} notice.",
+      "approvalExtended": "More time added. Expires in {duration}.",
       "approvalJump": "{line} Press {keys} to review it.",
       "approvalJumpTouch": "{line} Review request is above the message box.",
       "closed": "{product} closed.",
@@ -9286,7 +9291,8 @@
       "effect": "Effect",
       "escapeHint": "Esc declines",
       "expiresIn": "Expires in {time}",
-      "expiresSoon": "This request expires in 1 minute.",
+      "expiringSoon": "Expires soon · {time}",
+      "gateTiming": "Approving needs a newer {product} agent. Nothing changes unless you approve; ask an admin to update the agent.",
       "heading": {
         "delete": "Delete {count} {entity}",
         "permission": "Allow {tool}",
@@ -9294,6 +9300,7 @@
       },
       "inOrg": "in {org}",
       "minutes": "{count} minute | {count} minutes",
+      "lastExtension": "No more time can be added.",
       "moreTargets": "and {count} more",
       "moreTime": "More time",
       "named": "{verb} {name}",
@@ -9978,6 +9985,15 @@
         "title": "The AI provider is limiting requests. Your message wasn't sent.",
         "titleTimed": "The AI provider is limiting requests. Your message wasn't sent."
       },
+      "run_limit_member": {
+        "action": "Show running chats",
+        "body": "Stop one, or send when one ends.",
+        "title": "{n} of your chats are running or waiting for you. Your message wasn't sent."
+      },
+      "run_limit_org": {
+        "action": "Retry",
+        "title": "{product} is busy for your organization. Your message wasn't sent."
+      },
       "restore_required": {
         "action": "Reload chat",
         "title": "This chat was reset on the server. Reload to continue."
@@ -10283,7 +10299,6 @@
       "stateOpen": "{product} · Open",
       "stateRunningCount": "{count} answer running | {count} answers running",
       "stateWorking": "Answering: {title}",
-      "toastNeedsYou": "Waiting for your approval · {title}",
       "toastReady": "Answer ready · {title}",
       "tooltip": "{product}",
       "unavailableName": "{product}, unavailable"
@@ -10608,6 +10623,15 @@
       "you": "You"
     },
     "name": "O2 Assistant",
+    "limit": {
+      "slotFree": "A chat finished. You can send now."
+    },
+    "notice": {
+      "decision": "{product} needs your decision",
+      "decisionMany": "{n} chats need your decision",
+      "hide": "Hide notice",
+      "region": "{product} notice"
+    },
     "outcome": {
       "actions": {
         "askAdmin": "Ask an admin",
@@ -10842,6 +10866,49 @@
       "v2Optin": "Assistant v2 preview in this browser",
       "v2OptinDeployment": "Turned on for this deployment, so this browser can't turn it off.",
       "v2OptinHelp": "Reload the page to switch."
+    },
+    "runs": {
+      "agent": {
+        "general": "{product}",
+        "investigator": "Investigator",
+        "queryBuilder": "Query builder"
+      },
+      "back": "Back to the chat",
+      "button": "{count} other chat: {summary} | {count} other chats: {summary}",
+      "capacity": "{active} of {cap} running chats",
+      "chatInOrg": "A chat in {org}",
+      "clear": "Clear from this list",
+      "clearFinished": "Clear finished",
+      "footer": "Finished chats leave this list when you open them",
+      "heading": "Chats in progress",
+      "inOrg": "In {org}",
+      "openFull": "Open in full view",
+      "openHere": "Open here",
+      "review": "Review",
+      "reviewName": "Review {title}",
+      "rowActions": "Actions for {title}",
+      "rowExpires": "{title}, {agent}, {status}, {time} left",
+      "rowMeta": "{agent} · {status}",
+      "rowName": "{title}, {agent}, {status}",
+      "state": {
+        "answering": "Answering",
+        "elsewhere": "Answering in another tab",
+        "failed": "Answer failed",
+        "needsApproval": "Needs your approval",
+        "ready": "Answer ready",
+        "reconnecting": "Reconnecting",
+        "stopped": "Stopped",
+        "working": "Answering · {elapsed}"
+      },
+      "stop": "Stop",
+      "stopName": "Stop {title}",
+      "summary": {
+        "answering": "{count} answering",
+        "failed": "{count} failed",
+        "needs": "{count} needs you | {count} need you",
+        "ready": "{count} ready"
+      },
+      "thisChat": "This chat"
     },
     "share": {
       "allOrgAdminOnly": "Only organization admins can see every shared chat.",

@@ -20,6 +20,9 @@ import { LIVE_STALE_TIME, SESSION_STALE_TIME } from "@/composables/query/cachePo
 import assistant, { type ChatDetail } from "./assistant";
 import { assistantKeys } from "./assistant.querykeys";
 
+// The header light's own bound on how stale another device's chats may be (`00` §12.2).
+const ACTIVE_CHATS_POLL_MS = 15_000;
+
 /** B-06 capabilities; `enabled` is false on an unentitled or unconfigured build, so nothing is requested there. */
 export const capabilitiesQuery = (org: string, enabled = true) =>
   queryOptions({
@@ -49,6 +52,18 @@ export const assistantChatsQuery = (org: string, cursor?: string, q?: string) =>
     queryFn: () => assistant.listChats(org, { cursor, ...(q && { q }) }),
     staleTime: LIVE_STALE_TIME,
     placeholderData: keepPreviousData,
+    retry: false,
+    enabled: !!org,
+  });
+
+/** The chats-in-progress read; it polls only while the page is visible (`00` §12.2). */
+export const assistantActiveChatsQuery = (org: string) =>
+  queryOptions({
+    queryKey: assistantKeys.activeChats(org),
+    queryFn: () => assistant.listActiveChats(org),
+    staleTime: LIVE_STALE_TIME,
+    refetchInterval: ACTIVE_CHATS_POLL_MS,
+    refetchOnWindowFocus: true,
     retry: false,
     enabled: !!org,
   });

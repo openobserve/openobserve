@@ -342,6 +342,7 @@ const action = computed<{
       label: t("assistant.approval.result.sendAgain"),
       run: () => host.sendAgain(current, id),
     };
+  if (state === "expired" && host.gated?.()) return null;
   if (state === "expired" || (state === "unconfirmed" && !card.value.destructive))
     return {
       id: "ask-again",

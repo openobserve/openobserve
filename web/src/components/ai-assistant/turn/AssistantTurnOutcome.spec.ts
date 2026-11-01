@@ -26,7 +26,10 @@ import type { AssistantError, AssistantErrorCode } from "@/composables/assistant
 import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 
 import { fakeRouter } from "../__tests__/fakeAssistant";
-import AssistantTurnOutcome, { type AssistantTurnOutcomeProps } from "./AssistantTurnOutcome.vue";
+import AssistantTurnOutcome, {
+  outcomeActionOf,
+  type AssistantTurnOutcomeProps,
+} from "./AssistantTurnOutcome.vue";
 
 vi.mock("@/components/ai-assistant/gate/AssistantAskAdminPopover.vue", () => ({
   __esModule: true,
@@ -187,6 +190,30 @@ const LEDGER: [AssistantErrorCode, "failed" | "refused", string, string | null, 
 ];
 
 describe("AssistantTurnOutcome", () => {
+  it("offers Ask again on an expired card only where the card could be approved", () => {
+    const opts = { role: "admin", persistence: true, signedIn: false } as const;
+    expect(outcomeActionOf("expired", undefined, opts)).toBe("ask_again");
+    expect(outcomeActionOf("expired", undefined, { ...opts, gated: true })).toBeNull();
+  });
+
+  it("states the run limit with the server's own number, and offers the list", () => {
+    const wrapper = mountOutcome({
+      kind: "refused",
+      error: {
+        code: "run_limit_member",
+        phase: "pre_admission",
+        retryable: false,
+        action: "show_running",
+        limit: 5,
+      } as never,
+    });
+    expect(title(wrapper)).toBe(
+      "5 of your chats are running or waiting for you. Your message wasn't sent.",
+    );
+    expect(wrapper.text()).toContain("Stop one, or send when one ends.");
+    expect(wrapper.text()).toContain("Show running chats");
+  });
+
   it.each(LEDGER)(
     "renders %s with its title and at most one action, by role",
     async (code, kind, text, admin, member) => {

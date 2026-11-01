@@ -17,9 +17,11 @@ import {
   computed,
   effectScope,
   markRaw,
+  ref,
   shallowReactive,
   shallowRef,
   watch,
+  type Ref,
   type ShallowRef,
 } from "vue";
 import {
@@ -40,6 +42,8 @@ import { registerSessionConsentSurface } from "@/composables/usePaidOverageConse
 import assistantService, {
   type AssistantCapabilitiesResponse,
   type AssistantUsage,
+  type ChatSummaryWire,
+  type ChatsPage,
 } from "@/services/assistant";
 import type { PaidOverageFeature } from "@/services/paidOverage";
 import { paidOverageQuery, setPaidOverageMutation } from "@/services/paidOverage.queries";
@@ -47,7 +51,11 @@ import searchService from "@/services/search";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { gt } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
-import { assistantUsageQuery, capabilitiesQuery } from "@/services/assistant.queries";
+import {
+  assistantActiveChatsQuery,
+  assistantUsageQuery,
+  capabilitiesQuery,
+} from "@/services/assistant.queries";
 import { assistantKeys } from "@/services/assistant.querykeys";
 import { aiChatShareKeys } from "@/services/ai_chat_share.querykeys";
 import type { TelemetryContextGetters, TelemetryRole } from "@/services/assistantAnalytics";
@@ -58,6 +66,7 @@ import { requestDashboardDraft } from "./actions/appliers/drafts";
 import { pruneQueryRuns } from "./actions/appliers/query";
 import { registerBuiltInAppliers } from "./actions/appliers";
 import { createActionDispatcher, type ActionEnv } from "./actions/registry";
+import { createApprovalKeepAlive, type ApprovalKeepAlive } from "./approvalKeepAlive";
 import {
   containerOf,
   createAssistantStore,
@@ -74,12 +83,17 @@ import type {
 import { cancelConsentOnClose, createConsentRuntime, type ConsentRuntime } from "./consent";
 import { serialize } from "./context/serialize";
 import { createHintChannel, type AssistantHintChannel } from "./hints";
+import { isAssistantV2 } from "./flags";
 import { createIndexedDbHistory } from "./historyDb";
+import { assistantClientId } from "./historyElsewhere";
+import { cardEnding } from "./historyRecords";
 import { createLifecycle, type AssistantLifecycleRuntime } from "./lifecycle";
 import { forgetHistoryKeys, historyKeysOf, markKeptOnSignOut, readClearOnSignOut } from "./prefs";
 import { createOpenAssistant, type OpenAssistantCall } from "./openAssistant";
 import { openTabWithoutOpener } from "./openTab";
+import { createRuns, shownSids, type AssistantRuns, type RunsDeps } from "./runs";
 import { setRuntimeHandle } from "./runtimeHandle";
+import { assistantFocusCard } from "./shortcuts";
 import { createTurnEngine, type TurnEngineDeps } from "./turnEngine";
 import {
   createAssistantCapability,
@@ -127,6 +141,8 @@ export interface AssistantRuntime {
   approvals: ApprovalsRuntime;
   consent: ConsentRuntime;
   history: AssistantHistory;
+  runs: AssistantRuns;
+  keepAlive: ApprovalKeepAlive;
   context: ShallowRef<AssistantRuntimeContext | null>;
   /** Set by `telemetryContext`; the `context.client.ui_version` of every turn (B-13). */
   uiVersion: ShallowRef<string>;
@@ -152,6 +168,8 @@ export function getAssistantRuntime(): AssistantRuntime {
 export function resetAssistantRuntimeForTests(): void {
   runtime?.capability.dispose();
   runtime?.history.dispose();
+  runtime?.keepAlive.dispose();
+  runtime?.runs.dispose();
   runtime?.lifecycle.dispose();
   runtime?.hints.close();
   runtime = null;
@@ -183,6 +201,7 @@ function buildRuntime(): AssistantRuntime {
     const context = shallowRef<AssistantRuntimeContext | null>(null);
     const uiVersion = shallowRef("");
     const { lgUp } = useBreakpoint();
+    const pageVisible = usePageVisible();
     const deps: AssistantStoreDeps = inertAssistantDeps({
       getOrg: () => context.value?.getOrg() ?? null,
       getUser: () => context.value?.getUser() ?? null,
@@ -218,8 +237,10 @@ function buildRuntime(): AssistantRuntime {
       resend: (sid, snapshot, input, opts) => store.resend(sid, snapshot, input, opts),
       engine: () => deps.engine,
       dispatch: dispatcher.approvals,
-      extend: (org, sid, id) => useAssistantClient().confirm(org, sid, { id, extend: true }),
+      extend: (org, sid, id, by) =>
+        useAssistantClient().confirm(org, sid, { id, extend: true, by }),
       extendable: () => capability.capability.value.approvalExtend === true,
+      readCard,
       changed: refreshLists,
       hints,
       now: deps.now,
@@ -235,6 +256,7 @@ function buildRuntime(): AssistantRuntime {
       signOutKeys: () => orgKeysOf(context.value),
       remoteLight: () =>
         lifecycle.remoteLight() ??
+        runs.light() ??
         (deps.history as Partial<AssistantHistory>).listLight?.value ??
         null,
       turnLock: (sid) => lifecycle.turnLock(sid),
@@ -291,6 +313,25 @@ function buildRuntime(): AssistantRuntime {
       refreshUsage(hint.org);
     });
     hints.on("consent_granted", (hint) => refreshUsage(hint.org));
+    const runs = createRuns(
+      runsDeps(
+        context,
+        () => store,
+        () => capability,
+        () => lifecycle,
+        hints,
+      ),
+    );
+    const keepAlive = createApprovalKeepAlive({
+      state: () => store.state,
+      shownHere: () => (pageVisible.value ? shownSids(store.state) : []),
+      budgets: () => capability.capability.value.approvalExtendBudgets === true,
+      locks: locksApi(),
+      extend: (sid, id) => approvals.extendInBackground(sid, id),
+      reconcile: (sid) => approvals.reconcile(sid),
+      now: deps.now,
+      onReturn,
+    });
     const openAssistant = createOpenAssistant({
       store,
       capability: () => capability.capability.value,
@@ -313,11 +354,93 @@ function buildRuntime(): AssistantRuntime {
       approvals,
       consent,
       history,
+      runs,
+      keepAlive,
       context,
       uiVersion,
       openAssistant,
     };
   })!;
+}
+
+// `document.visibilityState` is not reactive, and the shown lock must drop the moment the page hides.
+function usePageVisible(): Ref<boolean> {
+  const visible = ref(typeof document === "undefined" || document.visibilityState !== "hidden");
+  if (typeof document !== "undefined")
+    document.addEventListener("visibilitychange", () => {
+      visible.value = document.visibilityState !== "hidden";
+    });
+  return visible;
+}
+
+function locksApi(): Pick<LockManager, "request" | "query"> | null {
+  return typeof navigator !== "undefined" && navigator.locks ? navigator.locks : null;
+}
+
+function onReturn(cb: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  const onVisible = () => {
+    if (document.visibilityState === "visible") cb();
+  };
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("pageshow", cb);
+  window.addEventListener("online", cb);
+  return () => {
+    document.removeEventListener("visibilitychange", onVisible);
+    window.removeEventListener("pageshow", cb);
+    window.removeEventListener("online", cb);
+  };
+}
+
+async function readCard(org: string, sid: string, turnId: string, id: string) {
+  const detail = await assistantService.getChat(org, sid);
+  const row = detail.approvals?.find((approval) => approval.id === id);
+  return {
+    ending: cardEnding(detail, turnId, id),
+    expires_at: row?.expires_at,
+    user_extends_left: row?.user_extends_left,
+  };
+}
+
+// The runtime outlives every container, so the list follows the active read on its own observer.
+function watchActiveChats(org: string, onChats: (chats: ChatSummaryWire[]) => void): () => void {
+  return observe<ChatsPage>(assistantActiveChatsQuery(org), (result) => {
+    if (result.data) onChats(result.data.chats);
+  });
+}
+
+// Getters, because the list is built before anything calls it and reads the runtime lazily.
+function runsDeps(
+  context: ShallowRef<AssistantRuntimeContext | null>,
+  store: () => AssistantStoreInternal,
+  capability: () => AssistantCapabilityHandle,
+  lifecycle: () => AssistantLifecycleRuntime,
+  hints: AssistantHintChannel,
+): RunsDeps {
+  return {
+    store,
+    hints,
+    remote: () => lifecycle().remoteTurns(),
+    now: () => Date.now(),
+    org: () => context.value?.getOrg()?.identifier ?? null,
+    clientId: assistantClientId,
+    serverMode: () => isAssistantV2() && capability().capability.value.persistence,
+    watchActive: watchActiveChats,
+    invalidateActive: (org) =>
+      void queryClient.invalidateQueries({ queryKey: assistantKeys.activeChats(org) }),
+    reveal: (invoker) =>
+      getAssistantRuntime().openAssistant({
+        entryKind: "header_button",
+        entryVerb: "ask",
+        objectKind: "none",
+        intent: "open",
+        thread: "current",
+        invoker,
+      }),
+    focusCard: assistantFocusCard,
+    stopElsewhere: (sid) => lifecycle().stopElsewhere(sid),
+    approvalElsewhere: (sid) => lifecycle().approvalElsewhere(sid),
+  };
 }
 
 // History is built after the store and the capability, which take it lazily through `deps`.

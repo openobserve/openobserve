@@ -329,6 +329,8 @@ const FAILURE_LINES: Partial<Record<AssistantErrorCode, { key: I18nKey; actions:
 const FAILED_PROPOSAL_CODES: ReadonlySet<string> = new Set([
   "offline",
   "rate_limited",
+  "run_limit_member",
+  "run_limit_org",
   "turn_limit",
   "unreachable",
   "agent_unavailable",
@@ -911,7 +913,7 @@ function failureLine(state: Extract<HelperState, { kind: "failed" }>): Line {
       [isAdmin.value ? "manage-usage" : "ask-admin"],
     );
   }
-  if (code === "rate_limited" || code === "turn_limit")
+  if (code === "rate_limited" || code === "turn_limit" || code.startsWith("run_limit_"))
     return failed(
       retryWait.value > 0
         ? t("assistant.helper.rateLimited", { seconds: retryWait.value })

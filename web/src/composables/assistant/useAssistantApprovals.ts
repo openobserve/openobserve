@@ -104,14 +104,27 @@ export interface ApprovalsDeps {
   /** The registry's approvals-only dispatch: the one path that posts a decision or an undo. */
   dispatch(sid: Sid, action: AssistantAction): Promise<ActionResult>;
   /** The server's `extend`, outside the decision path: it decides nothing. */
-  extend(org: string, sid: Sid, id: string): Promise<ConfirmResponse>;
+  extend(org: string, sid: Sid, id: string, by: ExtendBudget): Promise<ConfirmResponse>;
   extendable(): boolean;
+  /** The server's view of a card, read fresh; absent or `null` where it keeps no record. */
+  readCard?(org: string, sid: Sid, turnId: string, id: string): Promise<ServerCard | null>;
   /** An approve or an undo changed objects of these types, so their open lists refresh. */
   changed?(types: string[]): void;
   hints: Pick<HintChannel, "on">;
   now(): number;
   lastKeydownAt(): number;
   t: TranslateFn;
+}
+
+/** Which of a card's two extension budgets a request spends (PO A11, B71). */
+export type ExtendBudget = "user" | "background";
+
+/** What an out-of-view extend came to; `spent` stops further ones, `failed` may be tried again. */
+export type BackgroundExtend = "extended" | "spent" | "expired" | "failed";
+
+/** A card as the chat's record has it: how it ended, else its current expiry and user budget. */
+export interface ServerCard extends Pick<ConfirmResponse, "expires_at" | "user_extends_left"> {
+  ending: ApprovalOutcome["state"] | "unknown" | null;
 }
 
 /** `ApprovalsService` plus the record's own actions (Send again, Ask again, More time, Undo). */
@@ -121,6 +134,10 @@ export interface ApprovalsRuntime extends ApprovalsService {
   /** Lets a restored card go with the record of how the server ended it, without a POST; `unknown` keeps no outcome. */
   release(sid: Sid, approvalId: string, state: ApprovalOutcome["state"] | "unknown"): void;
   extend(sid: Sid): Promise<boolean>;
+  /** The out-of-view extend, spending only the background budget. */
+  extendInBackground(sid: Sid, approvalId: string): Promise<BackgroundExtend>;
+  /** Re-reads the chat and adopts the server's expiry, or lets a card it ended go. */
+  reconcile(sid: Sid): Promise<void>;
   sendAgain(sid: Sid, approvalId: string): Promise<void>;
   askAgain(sid: Sid, approvalId: string): Promise<void>;
   undo(sid: Sid, ledgerId: string): Promise<ActionResult>;
@@ -303,6 +320,19 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
     void run(sid, id, { approved: false, reason: "expired" });
   };
 
+  // The server's expiry and extension count win; a card that changed meanwhile is never touched.
+  const adopt = (sid: Sid, id: string, response: ConfirmResponse): boolean => {
+    const until = epochMs(response.expires_at);
+    const current = sessionOf(sid)?.pendingApproval;
+    if (until === null || current?.id !== id) return false;
+    current.expiresAt = Math.min(until, deps.now() + MAX_CARD_MS);
+    if (typeof response.user_extends_left === "number")
+      current.userExtendsLeft = response.user_extends_left;
+    armTimer(sid, id, current.expiresAt);
+    deps.engine().approvalExtended?.(sid);
+    return true;
+  };
+
   const offs: (() => void)[] = [
     // The server's TTL decides what a signed-out tab left pending; nothing is approved or posted on the way out.
     deps.hints.on("signed_out", () => {
@@ -395,17 +425,40 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
       const pending = session?.pendingApproval;
       if (!session || !pending || !deps.extendable()) return false;
       try {
-        const response = await deps.extend(session.org, pending.sessionId, pending.id);
-        const until = epochMs(response.expires_at);
+        const response = await deps.extend(session.org, pending.sessionId, pending.id, "user");
+        return adopt(sid, pending.id, response);
+      } catch (err) {
         const current = sessionOf(sid)?.pendingApproval;
-        if (until === null || current?.id !== pending.id) return false;
-        current.expiresAt = Math.min(until, deps.now() + MAX_CARD_MS);
-        armTimer(sid, pending.id, current.expiresAt);
-        deps.engine().approvalExtended?.(sid);
-        return true;
-      } catch {
+        if (extendRefusal(err) === "spent" && current?.id === pending.id)
+          current.userExtendsLeft = 0;
         return false;
       }
+    },
+    async extendInBackground(sid, approvalId) {
+      const session = sessionOf(sid);
+      const pending = session?.pendingApproval;
+      if (!session || pending?.id !== approvalId) return "failed";
+      try {
+        const response = await deps.extend(session.org, sid, approvalId, "background");
+        return adopt(sid, approvalId, response) ? "extended" : "failed";
+      } catch (err) {
+        const refusal = extendRefusal(err);
+        if (refusal === "expired") expire(sid, approvalId);
+        return refusal;
+      }
+    },
+    async reconcile(sid) {
+      const session = sessionOf(sid);
+      const pending = session?.pendingApproval;
+      if (!session || !pending || !deps.readCard) return;
+      if (inFlight.has(keyOf(sid, pending.id))) return;
+      const card = await deps
+        .readCard(session.org, sid, pending.turnId, pending.id)
+        .catch(() => null);
+      if (!card || sessionOf(sid)?.pendingApproval?.id !== pending.id) return;
+      if (!card.ending) return void adopt(sid, pending.id, card);
+      runtime.release(sid, pending.id, card.ending);
+      deps.engine().approvalDecided?.(sid);
     },
     async sendAgain(sid, approvalId) {
       const entry = retries.get(sid);
@@ -446,6 +499,14 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
 export function approvalClock(ms: number): string {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+/** A card's time left in words, for what is spoken: "45 seconds", "4 minutes". */
+export function approvalDuration(ms: number, t: TranslateFn): I18nText {
+  const seconds = Math.ceil(ms / 1000);
+  if (seconds < 120) return t("assistant.approval.seconds", { count: seconds }, seconds);
+  const minutes = Math.round(seconds / 60);
+  return t("assistant.approval.minutes", { count: minutes }, minutes);
 }
 
 /** The plural entity noun key of a card's targets; mixed or unknown types read "object". */
@@ -730,6 +791,17 @@ function namesOf(card: ApprovalBlockData, ids: string[]): string {
 function changedTypes(card: ApprovalBlockData, detail: ApprovalDetail | undefined): string[] {
   const items = detail?.result?.items.filter((item) => item.status === "done");
   return [...new Set((items ?? card.targets).map((item) => item.type))];
+}
+
+// A refused extend names the budget it spent; only `approval_expired` and a card the server no longer holds end it here.
+function extendRefusal(err: unknown): Exclude<BackgroundExtend, "extended"> {
+  const response = (err as { response?: { status?: number; data?: unknown } } | null)?.response;
+  const body = (response?.data ?? {}) as { code?: unknown; error_code?: unknown; error?: unknown };
+  const code = [body.code, body.error_code, body.error].find((v) => typeof v === "string");
+  if (code === "extend_limit") return "spent";
+  if (code === "approval_expired" || response?.status === 404 || response?.status === 410)
+    return "expired";
+  return "failed";
 }
 
 function epochMs(value: unknown): number | null {

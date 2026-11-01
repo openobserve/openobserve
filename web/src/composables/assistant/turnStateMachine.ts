@@ -170,6 +170,7 @@ const OUTCOME_ACTIONS: ReadonlySet<string> = new Set<AssistantErrorAction>([
   "ask_again",
   "send_again",
   "change_level",
+  "show_running",
   "none",
 ]);
 
@@ -421,6 +422,7 @@ export function errorTitle(
   if (copy.org !== undefined) params.org = copy.org;
   if (copy.product !== undefined) params.product = copy.product;
   if (copy.t && copy.elapsedMs !== undefined) params.elapsed = elapsedText(copy.elapsedMs, copy.t);
+  if (error.limit !== undefined) params.n = error.limit;
   // A `retry_after` countdown is on the button, so the title gives no estimate of its own.
   if (error.code === "rate_limited" && error.retryAfterMs)
     return { key: "assistant.error.rate_limited.titleTimed", params };
@@ -825,7 +827,8 @@ function lifecycleLine(
   return t("assistant.turn.retrying", { n: retrying.attempt });
 }
 
-function elapsedText(ms: number, t: TranslateFn): I18nText {
+/** "12 s" or "1 min 5 s", as every running status says it. */
+export function elapsedText(ms: number, t: TranslateFn): I18nText {
   const total = Math.floor(ms / 1000);
   if (total < 60) return t("assistant.turn.elapsedSeconds", { n: total });
   return t("assistant.turn.elapsedMinutes", { m: Math.floor(total / 60), s: total % 60 });
