@@ -21589,7 +21589,8 @@
         "resetColumnWidths": "Resetuj szerokości kolumn"
       },
       "selectAllRows": "Zaznacz wszystkie wiersze",
-      "selectRow": "Zaznacz wiersz {name}",
+      "selectRowAt": "Wybierz wiersz {index}",
+      "selectRowAtNamed": "Wybierz wiersz {index}, {name}",
       "removeColumnAria": "Usuń kolumnę",
       "formatColumnAria": "Formatuj kolumnę",
       "selectedOfTotal": "Wybrano {selected} z {total}",
@@ -26387,6 +26388,8 @@
     "section_handled": "Obsłużone",
     "section_resolved": "Rozwiązane",
     "sectionHint_ringing": "nikt nie potwierdził — te wezwania wciąż trwają",
+    "sectionHint_ringingRouted": "nikt nie potwierdził — {count} z nich nadal jest wzywane | nikt nie potwierdził — {count} z nich nadal jest wzywanych",
+    "sectionHint_ringingUnrouted": "{count} nie ma zespołu, więc nie jest wzywane | {count} nie mają zespołu, więc nie są wzywane",
     "sectionHint_snoozed": "wzywanie wstrzymane — wrócą same",
     "sectionHint_handled": "potwierdzone — każdym zajmuje się człowiek",
     "sectionHint_resolved": "zamknięte — zachowane dla dokumentacji",

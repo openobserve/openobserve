@@ -21589,7 +21589,8 @@
         "resetColumnWidths": "Ripristina larghezze colonne"
       },
       "selectAllRows": "Seleziona tutte le righe",
-      "selectRow": "Seleziona la riga {name}",
+      "selectRowAt": "Seleziona riga {index}",
+      "selectRowAtNamed": "Seleziona riga {index}, {name}",
       "removeColumnAria": "Rimuovi colonna",
       "formatColumnAria": "Formatta colonna",
       "selectedOfTotal": "{selected} di {total} selezionati",
@@ -26387,6 +26388,8 @@
     "section_handled": "Gestiti",
     "section_resolved": "Risolti",
     "sectionHint_ringing": "nessuno le ha prese in carico — stanno ancora inviando notifiche",
+    "sectionHint_ringingRouted": "nessuno ha preso in carico — {count} di questi sta ancora generando notifiche | nessuno ha preso in carico — {count} di questi stanno ancora generando notifiche",
+    "sectionHint_ringingUnrouted": "{count} non ha un team, quindi non sta generando notifiche | {count} non hanno un team, quindi non stanno generando notifiche",
     "sectionHint_snoozed": "notifiche in pausa — si riattivano da sole",
     "sectionHint_handled": "presi in carico — una persona è responsabile di ciascuno",
     "sectionHint_resolved": "chiusi — conservati agli atti",

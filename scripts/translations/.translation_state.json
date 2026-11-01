@@ -8482,7 +8482,8 @@
       "formatColumnAria": "5f0c0af6efc43083",
       "removeColumnAria": "9807a23d19fdf7b2",
       "selectAllRows": "9cf6c2bf95fb9747",
-      "selectRow": "080517857143b88d",
+      "selectRowAt": "294603867840fec2",
+      "selectRowAtNamed": "6ec463a581ffd956",
       "selectedCount": "a59008ba5f776947",
       "selectedOfTotal": "73ffb823f5889bf1"
     },
@@ -18698,6 +18699,8 @@
     "sectionHint_handled": "1ae45f55ef8ae534",
     "sectionHint_resolved": "7ccc927dd026552c",
     "sectionHint_ringing": "267e1c559487547e",
+    "sectionHint_ringingRouted": "eed6237eeccd471c",
+    "sectionHint_ringingUnrouted": "5fd68e3f69e31c51",
     "sectionHint_snoozed": "632057805efe13d1",
     "section_handled": "1e7536d56c45d9cd",
     "section_resolved": "5be3c2c8354e1eb9",

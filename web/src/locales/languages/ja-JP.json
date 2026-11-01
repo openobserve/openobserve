@@ -21589,7 +21589,8 @@
         "resetColumnWidths": "列幅をリセット"
       },
       "selectAllRows": "すべての行を選択",
-      "selectRow": "行 {name} を選択",
+      "selectRowAt": "{index} 行目を選択",
+      "selectRowAtNamed": "{index} 行目、{name} を選択",
       "removeColumnAria": "列を削除",
       "formatColumnAria": "列の書式設定",
       "selectedOfTotal": "{total} 件中 {selected} 件を選択中",
@@ -26387,6 +26388,8 @@
     "section_handled": "対応中",
     "section_resolved": "解決済み",
     "sectionHint_ringing": "誰も対応していません — まだ呼び出し中です",
+    "sectionHint_ringingRouted": "誰も確認応答していません — そのうち {count} 件はまだ呼び出し中です | 誰も確認応答していません — そのうち {count} 件はまだ呼び出し中です",
+    "sectionHint_ringingUnrouted": "{count} 件はチームがないため、呼び出しされていません | {count} 件はチームがないため、呼び出しされていません",
     "sectionHint_snoozed": "呼び出し一時停止中 — 自動的に再開されます",
     "sectionHint_handled": "対応中 — それぞれに担当者がいます",
     "sectionHint_resolved": "解決済み — 記録用に保持されています",

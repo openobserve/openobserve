@@ -21589,7 +21589,8 @@
         "resetColumnWidths": "열 너비 재설정"
       },
       "selectAllRows": "모든 행 선택",
-      "selectRow": "행 {name} 선택",
+      "selectRowAt": "{index}행 선택",
+      "selectRowAtNamed": "행 {index}, {name} 선택",
       "removeColumnAria": "열 제거",
       "formatColumnAria": "열 서식",
       "selectedOfTotal": "{total}개 중 {selected}개 선택됨",
@@ -26387,6 +26388,8 @@
     "section_handled": "확인됨",
     "section_resolved": "해결됨",
     "sectionHint_ringing": "아무도 수신 확인하지 않음 — 아직 호출 중",
+    "sectionHint_ringingRouted": "아무도 확인하지 않음 — {count}건이 아직 호출 중 | 아무도 확인하지 않음 — {count}건이 아직 호출 중",
+    "sectionHint_ringingUnrouted": "{count}건은 팀이 없어 호출되지 않음 | {count}건은 팀이 없어 호출되지 않음",
     "sectionHint_snoozed": "호출 일시 중지 — 자동으로 다시 호출됨",
     "sectionHint_handled": "수신 확인됨 — 각 항목에 담당자가 있음",
     "sectionHint_resolved": "종료됨 — 기록으로 보관됨",

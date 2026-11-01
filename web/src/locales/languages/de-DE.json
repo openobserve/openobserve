@@ -21589,7 +21589,8 @@
         "resetColumnWidths": "Spaltenbreiten zurücksetzen"
       },
       "selectAllRows": "Alle Zeilen auswählen",
-      "selectRow": "Zeile {name} auswählen",
+      "selectRowAt": "Zeile {index} auswählen",
+      "selectRowAtNamed": "Zeile {index}, {name} auswählen",
       "removeColumnAria": "Spalte entfernen",
       "formatColumnAria": "Spalte formatieren",
       "selectedOfTotal": "{selected} von {total} ausgewählt",
@@ -26387,6 +26388,8 @@
     "section_handled": "Bestätigt",
     "section_resolved": "Behoben",
     "sectionHint_ringing": "Niemand hat bestätigt — diese werden weiterhin alarmiert.",
+    "sectionHint_ringingRouted": "niemand hat bestätigt — {count} davon alarmiert noch | niemand hat bestätigt — {count} davon alarmieren noch",
+    "sectionHint_ringingUnrouted": "{count} hat kein Team, daher wird nicht alarmiert | {count} haben kein Team, daher wird nicht alarmiert",
     "sectionHint_snoozed": "Alarmierung pausiert — sie kommen von selbst zurück.",
     "sectionHint_handled": "Bestätigt — eine Person ist für jeden Eintrag zuständig.",
     "sectionHint_resolved": "Geschlossen — zur Aufzeichnung aufbewahrt.",

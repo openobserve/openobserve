@@ -21589,7 +21589,8 @@
         "resetColumnWidths": "Réinitialiser les largeurs des colonnes"
       },
       "selectAllRows": "Sélectionner toutes les lignes",
-      "selectRow": "Sélectionner la ligne {name}",
+      "selectRowAt": "Sélectionner la ligne {index}",
+      "selectRowAtNamed": "Sélectionner la ligne {index}, {name}",
       "removeColumnAria": "Supprimer la colonne",
       "formatColumnAria": "Formater la colonne",
       "selectedOfTotal": "{selected} sur {total} sélectionnés",
@@ -26387,6 +26388,8 @@
     "section_handled": "Pris en charge",
     "section_resolved": "Résolus",
     "sectionHint_ringing": "Personne n'a accusé réception — les notifications continuent",
+    "sectionHint_ringingRouted": "personne n'a pris en charge — {count} d'entre elles envoie encore des notifications | personne n'a pris en charge — {count} d'entre elles envoient encore des notifications",
+    "sectionHint_ringingUnrouted": "{count} n'a pas d'équipe, donc n'envoie pas de notification | {count} n'ont pas d'équipe, donc n'envoient pas de notification",
     "sectionHint_snoozed": "Notifications en pause — elles reprennent automatiquement",
     "sectionHint_handled": "Pris en charge — une personne est responsable de chacun.",
     "sectionHint_resolved": "Clôturés — conservés pour les archives.",
