@@ -2054,8 +2054,11 @@
       "error": "Błąd",
       "action": "Akcja",
       "view": "Widok",
-      "frustration": "Frustracja"
+      "frustration": "Frustracja",
+      "failedRequest": "Nieudane żądania",
+      "noResponse": "Brak odpowiedzi"
     },
+    "replayCanvasNotRecorded": "Nie zarejestrowano zawartości Canvas",
     "actionOnTarget": "{action} na \"{target}\"",
     "errorWhileFetchingErrorEvents": "Błąd podczas pobierania zdarzeń błędów",
     "errorWhileFetchingSessionReplay": "Błąd podczas pobierania danych powtórek sesji",
@@ -10628,6 +10631,8 @@
       "legendNoData": "Brak danych"
     },
     "importAlertTitle": "Importuj alert",
+    "importAlert": "Importuj alert",
+    "alertLibrary": "Biblioteka alertów",
     "exportDialogTitle": "Eksportuj alert | Eksportuj alerty ({count})",
     "exportDialogSubtitle": "Przejrzyj definicję, a następnie pobierz ją jako JSON lub jako Terraform dla dostawcy OpenObserve.",
     "jsonFilesOnlyHint": "Tylko pliki .json",
@@ -13039,7 +13044,6 @@
     "statReady": "Gotowe do użycia",
     "statNeedsData": "Nie pozyskane",
     "statAll": "Wszystkie",
-    "notIngested": "Nie pozyskane: {stream}",
     "notIngestedHint": "Ta organizacja nie otrzymuje {stream}, więc ten alert nigdy by nie został wyzwolony. Dodaj go mimo to, a zacznie działać, gdy dane dotrą.",
     "alertCount": "{count} alert | alerty: {count}",
     "noCollectorTitle": "Nic tutaj nie pasuje jeszcze do twoich danych",
@@ -13066,6 +13070,9 @@
     "alertTypeAnomaly": "Anomalia",
     "enterprise": "Enterprise",
     "enterpriseHint": "Alerty wykrywania anomalii wymagają OpenObserve Enterprise.",
+    "card": {
+      "customizeTooltip": "Otwiera wstępnie wypełniony edytor alertów"
+    },
     "drawer": {
       "dataAvailable": "Dane dostępne",
       "streamNotFound": "Nie znaleziono strumienia",
@@ -13096,21 +13103,11 @@
     },
     "install": {
       "title": "Dodaj alerty z biblioteki",
-      "subtitle": "Wybierz, które alerty dodać, gdzie mają być zapisane i opcjonalnie gdzie mają powiadamiać.",
-      "stepDestination": "Miejsce docelowe",
+      "subtitle": "Wybierz, gdzie mają zostać zapisane te alerty, a następnie dodaj je.",
       "stepAlerts": "Alerty",
       "stepFolder": "Folder",
       "stepTune": "Dostosuj",
       "stepInstall": "Dodaj",
-      "destinationIntro": "Każdy alert w tej partii powiadamia miejsce docelowe wybrane tutaj. Pliki biblioteki wskazują miejsca docelowe organizacji, z której zostały wyeksportowane, a te nie istnieją w Twojej. Ten krok jest opcjonalny: pomiń go, a alerty zostaną dodane bez miejsca docelowego.",
-      "destinationLabel": "Miejsce docelowe",
-      "destinationsLoadFailed": "Nie można było wczytać istniejących miejsc docelowych.",
-      "retry": "Spróbuj ponownie",
-      "destinationsNoneBody": "Ta organizacja nie ma jeszcze miejsc docelowych alertów. Utwórz jedno na stronie Miejsca docelowe, kiedy będziesz gotowy.",
-      "openDestinations": "Otwórz miejsca docelowe",
-      "selectAll": "Zaznacz wszystkie",
-      "clear": "Wyczyść",
-      "selectedCount": "Wybrano {count} z {total}",
       "folderIntro": "Dodane alerty są tu umieszczane. Utwórz folder za pomocą przycisku +, jeśli ta partia zasługuje na własny.",
       "tuneToggle": "Ustaw je dla każdego alertu w tej partii",
       "tuneHint": "Tylko „{frequency}” i „{silence}” można bezpiecznie ustawić dla całej partii. Progi pozostają ustawiane per alert — aby zmienić jeden, otwórz ten alert i dodaj go osobno.",
@@ -13129,7 +13126,6 @@
       "next": "Dalej",
       "cancel": "Anuluj",
       "done": "Gotowe",
-      "confirmLarge": "Rozumiem, że utworzy to alerty ({count}) w {folder}, z których każdy powiadamia {destination}.",
       "tuneThresholdOnly": "Dotyczy tylko alertów progowych.",
       "anomalyTrainingNote": "Alerty anomalii zaczynają działać, gdy wytrenują się na wystarczającej historii strumienia.",
       "anomalyUnavailable": "Alerty anomalii wymagają OpenObserve Enterprise z włączonym wykrywaniem anomalii, więc ten został pominięty.",
@@ -21721,7 +21717,8 @@
         "longtask": "Długie zadanie",
         "view": "Widok",
         "action": "Akcja",
-        "resource": "Zasób"
+        "resource": "Zasób",
+        "failedrequest": "Nieudane żądanie"
       },
       "subscriptionPlan": {
         "payasyougo": "Płatność za użycie",

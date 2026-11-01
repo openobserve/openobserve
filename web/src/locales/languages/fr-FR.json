@@ -2054,8 +2054,11 @@
       "error": "Erreur",
       "action": "Action",
       "view": "Vue",
-      "frustration": "Frustration"
+      "frustration": "Frustration",
+      "failedRequest": "Requêtes échouées",
+      "noResponse": "Aucune réponse"
     },
+    "replayCanvasNotRecorded": "Contenu du canvas non enregistré",
     "actionOnTarget": "{action} sur « {target} »",
     "errorWhileFetchingErrorEvents": "Erreur lors de la récupération des événements d'erreur",
     "errorWhileFetchingSessionReplay": "Erreur lors de la récupération des données de session replay",
@@ -10628,6 +10631,8 @@
       "legendNoData": "Aucune donnée"
     },
     "importAlertTitle": "Importer une alerte",
+    "importAlert": "Importer une alerte",
+    "alertLibrary": "Bibliothèque d'alertes",
     "exportDialogTitle": "Exporter l'alerte | Exporter {count} alertes",
     "exportDialogSubtitle": "Examinez la définition, puis téléchargez-la au format JSON ou Terraform pour le fournisseur OpenObserve.",
     "jsonFilesOnlyHint": "Fichiers .json uniquement",
@@ -13039,7 +13044,6 @@
     "statReady": "Prêt à l'emploi",
     "statNeedsData": "Non ingéré",
     "statAll": "Tous",
-    "notIngested": "Non ingéré : {stream}",
     "notIngestedHint": "Cette organisation ne reçoit pas {stream}, donc cette alerte ne se déclencherait jamais. Ajoutez-la quand même et elle commencera à fonctionner dès que les données arriveront.",
     "alertCount": "{count} alerte | {count} alertes",
     "noCollectorTitle": "Rien ici ne correspond encore à vos données",
@@ -13066,6 +13070,9 @@
     "alertTypeAnomaly": "Anomalie",
     "enterprise": "Enterprise",
     "enterpriseHint": "Les alertes de détection d'anomalies nécessitent OpenObserve Enterprise.",
+    "card": {
+      "customizeTooltip": "Ouvre l'éditeur d'alertes prérempli"
+    },
     "drawer": {
       "dataAvailable": "Données disponibles",
       "streamNotFound": "Flux introuvable",
@@ -13096,21 +13103,11 @@
     },
     "install": {
       "title": "Ajouter des alertes depuis la bibliothèque",
-      "subtitle": "Choisissez les alertes à ajouter, où elles sont classées et, en option, où elles notifient.",
-      "stepDestination": "Destination",
+      "subtitle": "Choisissez où ces alertes sont classées, puis ajoutez-les.",
       "stepAlerts": "Alertes",
       "stepFolder": "Dossier",
       "stepTune": "Réglage",
       "stepInstall": "Ajouter",
-      "destinationIntro": "Chaque alerte de ce lot notifie la destination que vous choisissez ici. Les fichiers de la bibliothèque nomment les destinations de l'organisation d'où ils ont été exportés, lesquelles n'existent pas dans la vôtre. Cette étape est facultative : passez-la et les alertes sont ajoutées sans destination.",
-      "destinationLabel": "Destination",
-      "destinationsLoadFailed": "Vos destinations existantes n'ont pas pu être chargées.",
-      "retry": "Réessayer",
-      "destinationsNoneBody": "Cette organisation n'a pas encore de destination d'alerte. Créez-en une sur la page Destinations quand vous le souhaitez.",
-      "openDestinations": "Ouvrir Destinations",
-      "selectAll": "Tout sélectionner",
-      "clear": "Effacer",
-      "selectedCount": "{count} sur {total} sélectionnés",
       "folderIntro": "Les alertes ajoutées sont classées ici. Créez un dossier à partir du bouton + si ce lot mérite un dossier dédié.",
       "tuneToggle": "Définir ces paramètres pour chaque alerte de ce lot",
       "tuneHint": "Seuls « {frequency} » et « {silence} » peuvent être définis pour tout un lot. Les seuils restent spécifiques à chaque alerte — modifiez-en un en ouvrant cette alerte et en l'ajoutant séparément.",
@@ -13129,7 +13126,6 @@
       "next": "Suivant",
       "cancel": "Annuler",
       "done": "Terminé",
-      "confirmLarge": "Je comprends que cela crée {count} alertes dans {folder}, chacune notifiant {destination}.",
       "tuneThresholdOnly": "S'applique uniquement aux alertes à seuil.",
       "anomalyTrainingNote": "Les alertes d'anomalie commencent à se déclencher une fois entraînées sur un historique suffisant du flux.",
       "anomalyUnavailable": "Les alertes d'anomalie nécessitent OpenObserve Enterprise avec la détection d'anomalies activée ; celle-ci a donc été ignorée.",
@@ -21721,7 +21717,8 @@
         "longtask": "Tâche longue",
         "view": "Voir",
         "action": "Action",
-        "resource": "Ressource"
+        "resource": "Ressource",
+        "failedrequest": "Requête échouée"
       },
       "subscriptionPlan": {
         "payasyougo": "Paiement à l'utilisation",

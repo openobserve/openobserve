@@ -2054,8 +2054,11 @@
       "error": "Hata",
       "action": "Eylem",
       "view": "Görünüm",
-      "frustration": "Hayal kırıklığı"
+      "frustration": "Hayal kırıklığı",
+      "failedRequest": "Başarısız istekler",
+      "noResponse": "Yanıt yok"
     },
+    "replayCanvasNotRecorded": "Canvas içeriği kaydedilmedi",
     "actionOnTarget": "\"{target}\" üzerinde {action}",
     "errorWhileFetchingErrorEvents": "Hata olayları alınırken hata oluştu",
     "errorWhileFetchingSessionReplay": "Oturum tekrarı verileri alınırken hata oluştu",
@@ -10628,6 +10631,8 @@
       "legendNoData": "Veri yok"
     },
     "importAlertTitle": "Uyarıyı İçe Aktar",
+    "importAlert": "Uyarı içe aktar",
+    "alertLibrary": "Uyarı kitaplığı",
     "exportDialogTitle": "Uyarıyı dışa aktar | {count} uyarıyı dışa aktar",
     "exportDialogSubtitle": "Tanımı gözden geçirin, ardından JSON veya OpenObserve sağlayıcısı için Terraform olarak indirin.",
     "jsonFilesOnlyHint": "Yalnızca .json dosyaları",
@@ -13039,7 +13044,6 @@
     "statReady": "Kullanıma hazır",
     "statNeedsData": "Alınmadı",
     "statAll": "Tümü",
-    "notIngested": "Alınmadı: {stream}",
     "notIngestedHint": "Bu kuruluş {stream} almıyor, bu nedenle bu uyarı asla tetiklenmez. Yine de ekleyin; veri geldiğinde çalışmaya başlayacaktır.",
     "alertCount": "{count} uyarı | {count} uyarı",
     "noCollectorTitle": "Burada henüz verilerinizle eşleşen bir şey yok",
@@ -13066,6 +13070,9 @@
     "alertTypeAnomaly": "Anomali",
     "enterprise": "Enterprise",
     "enterpriseHint": "Anomali algılama uyarıları OpenObserve Enterprise gerektirir.",
+    "card": {
+      "customizeTooltip": "Uyarı düzenleyicisini önceden doldurulmuş olarak açar"
+    },
     "drawer": {
       "dataAvailable": "Veri mevcut",
       "streamNotFound": "Akış bulunamadı",
@@ -13096,21 +13103,11 @@
     },
     "install": {
       "title": "Kütüphaneden uyarı ekle",
-      "subtitle": "Hangi uyarıların ekleneceğini, nereye kaydedileceğini ve isteğe bağlı olarak nereye bildirim göndereceğini seçin.",
-      "stepDestination": "Hedef",
+      "subtitle": "Bu uyarıların nereye kaydedileceğini seçin, ardından ekleyin.",
       "stepAlerts": "Uyarılar",
       "stepFolder": "Klasör",
       "stepTune": "Ayarla",
       "stepInstall": "Ekle",
-      "destinationIntro": "Bu gruptaki her uyarı, burada seçtiğiniz hedefe bildirim gönderir. Kitaplık dosyaları, dışa aktarıldıkları kuruluşun hedeflerini adlandırır ve bunlar sizinkinde mevcut değildir. Bu adım isteğe bağlıdır: atlayın ve uyarılar hedef olmadan eklenir.",
-      "destinationLabel": "Hedef",
-      "destinationsLoadFailed": "Mevcut hedefleriniz yüklenemedi.",
-      "retry": "Tekrar dene",
-      "destinationsNoneBody": "Bu kuruluşun henüz uyarı hedefi yok. Hazır olduğunuzda Hedefler sayfasından bir tane oluşturun.",
-      "openDestinations": "Hedefleri Aç",
-      "selectAll": "Tümünü seç",
-      "clear": "Temizle",
-      "selectedCount": "{count} / {total} seçildi",
       "folderIntro": "Eklenen uyarılar buraya kaydedilir. Bu grup kendi klasörünü hak ediyorsa + düğmesinden bir klasör oluşturun.",
       "tuneToggle": "Bu gruptaki her uyarı için bunları ayarlayın",
       "tuneHint": "Yalnızca “{frequency}” ve “{silence}” değerlerini tüm bir grup için ayarlamak güvenlidir. Eşikler uyarı başına kalır — birini değiştirmek için ilgili uyarıyı açın ve tek başına ekleyin.",
@@ -13129,7 +13126,6 @@
       "next": "İleri",
       "cancel": "İptal",
       "done": "Bitti",
-      "confirmLarge": "Bunun {folder} içinde {count} uyarı oluşturacağını ve her birinin {destination} adresine bildirim göndereceğini anlıyorum.",
       "tuneThresholdOnly": "Yalnızca eşik uyarılarına uygulanır.",
       "anomalyTrainingNote": "Anomali uyarıları, akışın geçmişiyle yeterince eğitildikten sonra tetiklenmeye başlar.",
       "anomalyUnavailable": "Anomali uyarıları, anomali algılaması açık OpenObserve Enterprise gerektirir; bu nedenle bu uyarı atlandı.",
@@ -21721,7 +21717,8 @@
         "longtask": "Uzun Görev",
         "view": "Görüntüle",
         "action": "İşlem",
-        "resource": "Kaynak"
+        "resource": "Kaynak",
+        "failedrequest": "Başarısız istek"
       },
       "subscriptionPlan": {
         "payasyougo": "Kullandıkça Öde",

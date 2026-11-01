@@ -2054,8 +2054,11 @@
       "error": "Error",
       "action": "Acción",
       "view": "Vista",
-      "frustration": "Frustración"
+      "frustration": "Frustración",
+      "failedRequest": "Solicitudes fallidas",
+      "noResponse": "Sin respuesta"
     },
+    "replayCanvasNotRecorded": "Contenido del lienzo no grabado",
     "actionOnTarget": "{action} sobre \"{target}\"",
     "errorWhileFetchingErrorEvents": "Error al obtener eventos de error",
     "errorWhileFetchingSessionReplay": "Error al obtener datos de reproducción de sesión",
@@ -10628,6 +10631,8 @@
       "legendNoData": "Sin datos"
     },
     "importAlertTitle": "Importar alerta",
+    "importAlert": "Importar alerta",
+    "alertLibrary": "Biblioteca de alertas",
     "exportDialogTitle": "Exportar alerta | Exportar {count} alertas",
     "exportDialogSubtitle": "Revisa la definición y luego descárgala como JSON o como Terraform para el proveedor de OpenObserve.",
     "jsonFilesOnlyHint": "Solo archivos .json",
@@ -13039,7 +13044,6 @@
     "statReady": "Lista para usar",
     "statNeedsData": "Sin ingesta",
     "statAll": "Todas",
-    "notIngested": "Sin ingesta: {stream}",
     "notIngestedHint": "Esta organización no está recibiendo {stream}, por lo que esta alerta nunca se activaría. Añádela de todos modos y empezará a funcionar cuando lleguen los datos.",
     "alertCount": "{count} alerta | {count} alertas",
     "noCollectorTitle": "Nada aquí coincide con sus datos todavía",
@@ -13066,6 +13070,9 @@
     "alertTypeAnomaly": "Anomalía",
     "enterprise": "Enterprise",
     "enterpriseHint": "Las alertas de detección de anomalías requieren OpenObserve Enterprise.",
+    "card": {
+      "customizeTooltip": "Abre el editor de alertas con los datos rellenados"
+    },
     "drawer": {
       "dataAvailable": "Datos disponibles",
       "streamNotFound": "Stream no encontrado",
@@ -13096,21 +13103,11 @@
     },
     "install": {
       "title": "Añadir alertas de la biblioteca",
-      "subtitle": "Elige qué alertas agregar, dónde se archivan y, opcionalmente, a dónde notifican.",
-      "stepDestination": "Destino",
+      "subtitle": "Elige dónde se archivan estas alertas y, a continuación, añádelas.",
       "stepAlerts": "Alertas",
       "stepFolder": "Carpeta",
       "stepTune": "Ajustar",
       "stepInstall": "Añadir",
-      "destinationIntro": "Cada alerta de este lote notifica al destino que elijas aquí. Los archivos de la biblioteca nombran los destinos de la organización desde la que se exportaron, que no existen en la tuya. Este paso es opcional: omítelo y las alertas se agregarán sin destino.",
-      "destinationLabel": "Destino",
-      "destinationsLoadFailed": "No se pudieron cargar tus destinos existentes.",
-      "retry": "Inténtalo de nuevo",
-      "destinationsNoneBody": "Esta organización aún no tiene destinos de alertas. Crea uno en la página Destinos cuando quieras.",
-      "openDestinations": "Abrir Destinos",
-      "selectAll": "Seleccionar todo",
-      "clear": "Limpiar",
-      "selectedCount": "{count} de {total} seleccionados",
       "folderIntro": "Las alertas añadidas se archivan aquí. Crea una carpeta desde el botón + si este lote merece una propia.",
       "tuneToggle": "Establecer estos para cada alerta de este lote",
       "tuneHint": "Solo “{frequency}” y “{silence}” se pueden establecer de forma segura para todo un lote. Los umbrales se mantienen por alerta: cambia uno abriendo esa alerta y añadiéndola por separado.",
@@ -13129,7 +13126,6 @@
       "next": "Siguiente",
       "cancel": "Cancelar",
       "done": "Listo",
-      "confirmLarge": "Entiendo que esto crea {count} alertas en {folder}, cada una notificando a {destination}.",
       "tuneThresholdOnly": "Solo se aplica a las alertas de umbral.",
       "anomalyTrainingNote": "Las alertas de anomalías empiezan a avisar cuando se han entrenado con suficiente historial del flujo.",
       "anomalyUnavailable": "Las alertas de anomalías requieren OpenObserve Enterprise con la detección de anomalías activada, así que esta se ha omitido.",
@@ -21721,7 +21717,8 @@
         "longtask": "Tarea larga",
         "view": "Ver",
         "action": "Acción",
-        "resource": "Recurso"
+        "resource": "Recurso",
+        "failedrequest": "Solicitud fallida"
       },
       "subscriptionPlan": {
         "payasyougo": "Pago por uso",

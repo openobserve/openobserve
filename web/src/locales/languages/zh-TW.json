@@ -2054,8 +2054,11 @@
       "error": "錯誤",
       "action": "動作",
       "view": "檢視",
-      "frustration": "沮喪"
+      "frustration": "沮喪",
+      "failedRequest": "失敗的請求",
+      "noResponse": "無回應"
     },
+    "replayCanvasNotRecorded": "未錄製 Canvas 內容",
     "actionOnTarget": "{action} 於「{target}」",
     "errorWhileFetchingErrorEvents": "擷取錯誤事件時發生錯誤",
     "errorWhileFetchingSessionReplay": "擷取工作階段重播資料時發生錯誤",
@@ -10623,6 +10626,8 @@
       "legendNoData": "無資料"
     },
     "importAlertTitle": "匯入警示",
+    "importAlert": "匯入警示",
+    "alertLibrary": "警示庫",
     "exportDialogTitle": "匯出警示 | 匯出 {count} 個警示",
     "exportDialogSubtitle": "檢閱定義，然後將其下載為 JSON 或適用於 OpenObserve provider 的 Terraform。",
     "jsonFilesOnlyHint": "僅限 .json 檔案",
@@ -13034,7 +13039,6 @@
     "statReady": "可立即使用",
     "statNeedsData": "未攝取",
     "statAll": "全部",
-    "notIngested": "未攝取：{stream}",
     "notIngestedHint": "此組織目前未接收 {stream}，因此此警示永遠不會觸發。您仍可將其加入，等數據到達後便會開始運作。",
     "alertCount": "{count} 個警示 | {count} 個警示",
     "noCollectorTitle": "這裡尚無與您的資料相符的項目",
@@ -13061,6 +13065,9 @@
     "alertTypeAnomaly": "異常",
     "enterprise": "Enterprise",
     "enterpriseHint": "異常偵測警示需要 OpenObserve Enterprise。",
+    "card": {
+      "customizeTooltip": "開啟已預先填入的警示編輯器"
+    },
     "drawer": {
       "dataAvailable": "資料可用",
       "streamNotFound": "找不到串流",
@@ -13091,21 +13098,11 @@
     },
     "install": {
       "title": "從警示庫新增警示",
-      "subtitle": "選擇要新增哪些警示、它們歸檔的位置，以及選擇性地設定它們通知的目標。",
-      "stepDestination": "目標",
+      "subtitle": "選擇這些警示要歸檔的位置，然後新增它們。",
       "stepAlerts": "警示",
       "stepFolder": "資料夾",
       "stepTune": "調整",
       "stepInstall": "新增",
-      "destinationIntro": "此批次中的每個警示都會通知您在此選擇的目標。媒體庫檔案中列出的目標名稱來自匯出它們的組織，您的組織中並不存在這些目標。此步驟為選用：略過後，這些警示將在沒有目標的情況下新增。",
-      "destinationLabel": "目標",
-      "destinationsLoadFailed": "無法載入您現有的目標。",
-      "retry": "再試一次",
-      "destinationsNoneBody": "此組織尚無警示目標。當您準備好時，請在「目標」頁面建立一個。",
-      "openDestinations": "開啟目標",
-      "selectAll": "全選",
-      "clear": "清除",
-      "selectedCount": "已選取 {count} / {total}",
       "folderIntro": "已新增的警示會儲存在這裡。如果這批警示需要自己的資料夾，請使用 + 按鈕建立。",
       "tuneToggle": "為此批次中的每個警示設定這些",
       "tuneHint": "只有「{frequency}」和「{silence}」可以安全地為整批設定。閾值仍依每個警示個別設定 — 若要變更某個警示，請開啟該警示並單獨加入。",
@@ -13124,7 +13121,6 @@
       "next": "下一步",
       "cancel": "取消",
       "done": "完成",
-      "confirmLarge": "我了解此操作會在 {folder} 中建立 {count} 個警示，每個都會通知 {destination}。",
       "tuneThresholdOnly": "僅適用於閾值警示。",
       "anomalyTrainingNote": "異常警示在以足夠的資料流歷史完成訓練後才開始發出警示。",
       "anomalyUnavailable": "異常警示需要已啟用異常偵測的 OpenObserve Enterprise，因此已略過此警示。",
@@ -21716,7 +21712,8 @@
         "longtask": "長任務",
         "view": "檢視",
         "action": "動作",
-        "resource": "資源"
+        "resource": "資源",
+        "failedrequest": "失敗的請求"
       },
       "subscriptionPlan": {
         "payasyougo": "隨用隨付",

@@ -88,6 +88,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             shortcut-id="alertsImport"
           />
         </OButton>
+        <OButton
+          v-if="showAlertLibrary"
+          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
+          variant="outline"
+          size="sm"
+          icon-left="menu-book"
+          data-test="alert-list-alert-library-btn"
+          @click="goToAlertLibrary"
+        >
+          <template v-if="!isCompactToolbar">{{ t("alerts.alertLibrary") }}</template>
+          <OTooltip v-if="isCompactToolbar" :content="t('alerts.alertLibrary')" side="bottom" />
+        </OButton>
       </template>
 
       <div data-test="alert-list-splitter" class="flex min-h-0 flex-1 max-md:flex-col">
@@ -149,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OStatStrip
                     :items="summaryStats"
                     :loading="loading"
+                    compact
                     selectable
                     :selected-key="stateFilter"
                     default-key="total"
@@ -818,16 +831,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OEmptyState
                   v-else
-                  size="hero"
+                  size="block"
                   preset="no-alerts"
                   :filtered="!!(filterQuery || searchQuery || stateFilter)"
                   @action="
                     (id) =>
-                      id === 'clear-filters'
-                        ? ((filterQuery = ''), (searchQuery = ''), (stateFilter = null))
-                        : showAddUpdateFn({})
+                      id === 'clear-filters' &&
+                      ((filterQuery = ''), (searchQuery = ''), (stateFilter = null))
                   "
-                />
+                >
+                  <!-- First run only: the filtered state keeps its single Clear filters action. -->
+                  <template v-if="!(filterQuery || searchQuery || stateFilter)" #actions>
+                    <OButton
+                      v-if="showAlertLibrary"
+                      variant="primary"
+                      size="lg"
+                      icon-left="menu-book"
+                      data-test="alert-list-empty-alert-library"
+                      @click="goToAlertLibrary"
+                    >
+                      {{ t("alerts.alertLibrary") }}
+                    </OButton>
+                    <OButton
+                      v-if="!showAlertLibrary"
+                      variant="primary"
+                      size="lg"
+                      icon-left="add"
+                      data-test="alert-list-empty-new-alert"
+                      @click="showAddUpdateFn({})"
+                    >
+                      {{ t("emptyState.noAlerts.action") }}
+                    </OButton>
+                    <OButton
+                      variant="outline"
+                      size="lg"
+                      icon-left="upload-file"
+                      data-test="alert-list-empty-import"
+                      @click="importAlert"
+                    >
+                      {{ t("alerts.importAlert") }}
+                    </OButton>
+                    <OButton
+                      v-if="showAlertLibrary"
+                      variant="outline"
+                      size="lg"
+                      icon-left="add"
+                      data-test="alert-list-empty-new-alert"
+                      @click="showAddUpdateFn({})"
+                    >
+                      {{ t("emptyState.noAlerts.action") }}
+                    </OButton>
+                  </template>
+                </OEmptyState>
               </template>
 
               <template #selection-actions>
@@ -3409,6 +3464,18 @@ export default defineComponent({
       });
     };
 
+    // Raw split (no trim), the same rule AlertSectionTabs hides the Library tab by.
+    const showAlertLibrary = computed(
+      () => !(store.state.zoConfig?.custom_hide_menus ?? "").split(",").includes("alertLibrary"),
+    );
+
+    const goToAlertLibrary = () => {
+      router.push({
+        name: "alertLibrary",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    };
+
     const goToAlertInsights = () => {
       router.push({
         name: "alertInsights",
@@ -4246,6 +4313,8 @@ export default defineComponent({
       refreshDestination,
       showImportAlertDialog,
       importAlert,
+      showAlertLibrary,
+      goToAlertLibrary,
       goToAlertInsights,
       goToAlertHistory,
       getTemplates,

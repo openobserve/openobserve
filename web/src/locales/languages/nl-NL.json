@@ -2054,8 +2054,11 @@
       "error": "Fout",
       "action": "Actie",
       "view": "Weergave",
-      "frustration": "Frustratie"
+      "frustration": "Frustratie",
+      "failedRequest": "Mislukte verzoeken",
+      "noResponse": "Geen reactie"
     },
+    "replayCanvasNotRecorded": "Canvas-inhoud niet opgenomen",
     "actionOnTarget": "{action} op \"{target}\"",
     "errorWhileFetchingErrorEvents": "Fout bij het ophalen van foutgebeurtenissen",
     "errorWhileFetchingSessionReplay": "Fout bij het ophalen van sessie-replaygegevens",
@@ -10628,6 +10631,8 @@
       "legendNoData": "Geen gegevens"
     },
     "importAlertTitle": "Alarm importeren",
+    "importAlert": "Alarm importeren",
+    "alertLibrary": "Alarmbibliotheek",
     "exportDialogTitle": "Exporteer alarm | Exporteer {count} alarmen",
     "exportDialogSubtitle": "Bekijk de definitie en download deze als JSON of als Terraform voor de OpenObserve-provider.",
     "jsonFilesOnlyHint": "Alleen .json-bestanden",
@@ -13039,7 +13044,6 @@
     "statReady": "Klaar voor gebruik",
     "statNeedsData": "Niet opgenomen",
     "statAll": "Alle",
-    "notIngested": "Niet opgenomen: {stream}",
     "notIngestedHint": "Deze organisatie ontvangt geen {stream}, dus dit alarm zou nooit afgaan. Voeg het toch toe en het zal werken zodra de gegevens arriveren.",
     "alertCount": "{count} melding | {count} meldingen",
     "noCollectorTitle": "Niets hier komt nog overeen met uw gegevens.",
@@ -13066,6 +13070,9 @@
     "alertTypeAnomaly": "Anomalie",
     "enterprise": "Enterprise",
     "enterpriseHint": "Alerts voor anomaliedetectie vereisen OpenObserve Enterprise.",
+    "card": {
+      "customizeTooltip": "Opent de waarschuwingseditor vooraf ingevuld"
+    },
     "drawer": {
       "dataAvailable": "Gegevens beschikbaar",
       "streamNotFound": "Stream niet gevonden",
@@ -13096,21 +13103,11 @@
     },
     "install": {
       "title": "Alarmen uit de bibliotheek toevoegen",
-      "subtitle": "Kies welke alarmen je wilt toevoegen, waar ze worden opgeslagen en optioneel waar ze melding van maken.",
-      "stepDestination": "Bestemming",
+      "subtitle": "Kies waar deze alarmen worden ondergebracht en voeg ze daarna toe.",
       "stepAlerts": "Alarmen",
       "stepFolder": "Map",
       "stepTune": "Afstemmen",
       "stepInstall": "Toevoegen",
-      "destinationIntro": "Elk alarm in deze batch meldt naar de bestemming die je hier kiest. Bibliotheekbestanden vermelden de bestemmingen van de organisatie waaruit ze zijn geëxporteerd, die niet in de jouwe bestaan. Deze stap is optioneel: sla hem over en de alarmen worden zonder bestemming toegevoegd.",
-      "destinationLabel": "Bestemming",
-      "destinationsLoadFailed": "Je bestaande bestemmingen konden niet worden geladen.",
-      "retry": "Probeer opnieuw",
-      "destinationsNoneBody": "Deze organisatie heeft nog geen alarmbestemmingen. Maak er een aan op de pagina Bestemmingen wanneer je er klaar voor bent.",
-      "openDestinations": "Bestemmingen openen",
-      "selectAll": "Alles selecteren",
-      "clear": "Wissen",
-      "selectedCount": "{count} van {total} geselecteerd",
       "folderIntro": "Toegevoegde alarmen worden hier opgeslagen. Maak een map met de + knop als deze batch een eigen map verdient.",
       "tuneToggle": "Stel deze in voor elk alarm in deze batch",
       "tuneHint": "Alleen “{frequency}” en “{silence}” zijn veilig om voor een hele batch in te stellen. Drempelwaarden blijven per alarm — wijzig er een door dat alarm te openen en het afzonderlijk toe te voegen.",
@@ -13129,7 +13126,6 @@
       "next": "Volgende",
       "cancel": "Annuleren",
       "done": "Klaar",
-      "confirmLarge": "Ik begrijp dat dit {count} meldingen aanmaakt in {folder}, die elk {destination} waarschuwen.",
       "tuneThresholdOnly": "Geldt alleen voor drempelalerts.",
       "anomalyTrainingNote": "Anomalie-alerts gaan pas af nadat ze op genoeg geschiedenis van de stream zijn getraind.",
       "anomalyUnavailable": "Anomalie-alerts vereisen OpenObserve Enterprise met anomaliedetectie ingeschakeld, dus deze is overgeslagen.",
@@ -21721,7 +21717,8 @@
         "longtask": "Lange taak",
         "view": "Bekijken",
         "action": "Actie",
-        "resource": "Resource"
+        "resource": "Resource",
+        "failedrequest": "Mislukt verzoek"
       },
       "subscriptionPlan": {
         "payasyougo": "Betaal per gebruik",

@@ -2054,8 +2054,11 @@
       "error": "错误",
       "action": "操作",
       "view": "视图",
-      "frustration": "挫败"
+      "frustration": "挫败",
+      "failedRequest": "失败的请求",
+      "noResponse": "无响应"
     },
+    "replayCanvasNotRecorded": "Canvas 内容未录制",
     "actionOnTarget": "在 \"{target}\" 上 {action}",
     "errorWhileFetchingErrorEvents": "获取错误事件时出错",
     "errorWhileFetchingSessionReplay": "获取会话重放数据时出错",
@@ -10628,6 +10631,8 @@
       "legendNoData": "无数据"
     },
     "importAlertTitle": "导入告警",
+    "importAlert": "导入告警",
+    "alertLibrary": "告警库",
     "exportDialogTitle": "导出告警 | 导出 {count} 条告警",
     "exportDialogSubtitle": "查看定义，然后将其下载为 JSON 或用于 OpenObserve provider 的 Terraform。",
     "jsonFilesOnlyHint": "仅 .json 文件",
@@ -13039,7 +13044,6 @@
     "statReady": "可立即使用",
     "statNeedsData": "未摄取",
     "statAll": "全部",
-    "notIngested": "未摄取：{stream}",
     "notIngestedHint": "此组织未接收 {stream}，因此此告警永远不会触发。仍要添加，数据到达后它将开始工作。",
     "alertCount": "{count} 个告警 | {count} 个告警",
     "noCollectorTitle": "这里还没有与你的数据匹配的内容",
@@ -13066,6 +13070,9 @@
     "alertTypeAnomaly": "异常",
     "enterprise": "Enterprise",
     "enterpriseHint": "异常检测告警需要 OpenObserve Enterprise。",
+    "card": {
+      "customizeTooltip": "打开已预填的告警编辑器"
+    },
     "drawer": {
       "dataAvailable": "数据可用",
       "streamNotFound": "未找到流",
@@ -13096,21 +13103,11 @@
     },
     "install": {
       "title": "从库中添加告警",
-      "subtitle": "选择要添加的告警、它们的归档位置，以及可选的通知目标。",
-      "stepDestination": "目标",
+      "subtitle": "选择这些告警的归档位置，然后添加它们。",
       "stepAlerts": "告警",
       "stepFolder": "文件夹",
       "stepTune": "调整",
       "stepInstall": "添加",
-      "destinationIntro": "此批次中的每个告警都会通知您在此处选择的目标。库文件中标注的是导出它们的组织中的目标，这些目标在您的组织中并不存在。此步骤为可选：跳过它，这些告警将被添加但不设置目标。",
-      "destinationLabel": "目标",
-      "destinationsLoadFailed": "无法加载您现有的目标。",
-      "retry": "重试",
-      "destinationsNoneBody": "此组织尚无告警目标。准备就绪后，可在“目标”页面创建一个。",
-      "openDestinations": "打开目标",
-      "selectAll": "全选",
-      "clear": "清除",
-      "selectedCount": "已选择 {count} / {total}",
       "folderIntro": "添加的告警在此归档。如果此批次需要单独文件夹，可使用 + 按钮创建。",
       "tuneToggle": "为此批次中的每个告警设置这些",
       "tuneHint": "只有“{frequency}”和“{silence}”可安全地整批设置。阈值保持每个告警独立——如需更改，请打开该告警并单独添加。",
@@ -13129,7 +13126,6 @@
       "next": "下一步",
       "cancel": "取消",
       "done": "完成",
-      "confirmLarge": "我了解此操作会在 {folder} 中创建 {count} 个告警，每个都通知 {destination}。",
       "tuneThresholdOnly": "仅适用于阈值告警。",
       "anomalyTrainingNote": "异常告警在基于足够的数据流历史完成训练后才开始告警。",
       "anomalyUnavailable": "异常告警需要启用了异常检测的 OpenObserve Enterprise，因此已跳过此告警。",
@@ -21721,7 +21717,8 @@
         "longtask": "长任务",
         "view": "查看",
         "action": "操作",
-        "resource": "资源"
+        "resource": "资源",
+        "failedrequest": "失败的请求"
       },
       "subscriptionPlan": {
         "payasyougo": "按需付费",
