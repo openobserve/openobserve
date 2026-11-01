@@ -66,17 +66,14 @@ export default {
     }
 
     // Only real user interaction triggers a heartbeat; API polling never does.
-    const idleLimitMs = 30 * 60 * 1000;
+    // The server is authoritative for the configurable idle timeout.
     // Heartbeats must be substantially more frequent than the shortest supported idle timeout.
     const heartbeatIntervalMs = 15 * 1000;
-    let lastInteraction = Date.now();
     let lastHeartbeat = 0;
     let heartbeatPending = false;
-    let idleCheck: ReturnType<typeof setInterval> | undefined;
     const markInteraction = () => {
       if (document.visibilityState !== "visible") return;
       const now = Date.now();
-      lastInteraction = now;
       if (!store.state.loggedIn || heartbeatPending ||
           now - lastHeartbeat < heartbeatIntervalMs) return;
       lastHeartbeat = now;
@@ -92,17 +89,11 @@ export default {
       interactionEvents.forEach((event) =>
         window.addEventListener(event, markInteraction, { passive: true }),
       );
-      idleCheck = setInterval(() => {
-        if (store.state.loggedIn && Date.now() - lastInteraction >= idleLimitMs) {
-          expireSession(store);
-        }
-      }, 15_000);
     });
     onUnmounted(() => {
       interactionEvents.forEach((event) =>
         window.removeEventListener(event, markInteraction),
       );
-      if (idleCheck) clearInterval(idleCheck);
     });
 
     // Initialize theme colors on app mount
