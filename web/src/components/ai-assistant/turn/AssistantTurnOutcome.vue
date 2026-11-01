@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :kind="askKind"
             :org="org"
             :payer="creditCopy?.payer"
+            :agent="askKind === 'agent_access' ? String(refusedAgentName) : undefined"
           >
             <template #trigger>
               <OButton
@@ -123,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        v-if="hint || manualShown || detailsShown"
+        v-if="hint || manualShown || agentFallback || detailsShown"
         class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs"
         data-test="assistant-turn-outcome-meta"
       >
@@ -139,6 +140,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="emit('manual', manualRoute!)"
         >
           {{ manualLabel }}
+        </OButton>
+        <OButton
+          v-if="agentFallback"
+          variant="ghost-primary"
+          size="xs"
+          class="max-md:min-h-11 pointer-coarse:min-h-11"
+          data-test="assistant-turn-outcome-agent-fallback"
+          @click="useAgentFallback"
+        >
+          {{ agentFallback.label }}
         </OButton>
         <AssistantErrorDetails
           v-if="detailsShown"
@@ -247,7 +258,18 @@ const ROLE_SPLIT_KINDS: Record<string, AskAdminKind> = {
   off_for_org: "enable",
   permission_denied_tool: "tool_policy",
   data_level_blocked: "tool_policy",
+  agent_disabled: "agent_access",
+  agent_not_permitted: "agent_access",
 };
+
+const AGENT_REFUSALS: ReadonlySet<string> = new Set([
+  "agent_disabled",
+  "agent_not_permitted",
+  "agent_unreachable",
+]);
+
+// `80` §1.3 words these two "Try again"; every other Retry keeps the one shared word.
+const TRY_AGAIN_CODES: ReadonlySet<string> = new Set(["agent_unreachable", "handoff_failed"]);
 
 const RETRYING: ReadonlySet<OutcomeAction> = new Set(["retry", "ask_again"]);
 
@@ -267,6 +289,7 @@ export const SETTINGS_TABS: Readonly<Record<string, string>> = {
   off_for_org: "access",
   permission_denied_tool: "permissions",
   data_level_blocked: "data",
+  agent_disabled: "access",
 };
 
 // A code the client does not know is labelled by its action, never by the unknown code's Retry.
@@ -298,7 +321,7 @@ export function outcomeActionLabel(
   if (action === "retry_save") return t("assistant.turn.retrySave");
   if (action === "ask_again") return t("assistant.outcome.askAgain");
   if (action === "edit_resend") return t("assistant.outcome.editResend");
-  if (action === "retry") return t("assistant.outcome.retry");
+  if (action === "retry" && !TRY_AGAIN_CODES.has(code)) return t("assistant.outcome.retry");
   const split = `assistant.error.${code}.action${role === "admin" ? "Admin" : "Member"}`;
   if (code !== "unknown" && te(split)) return t(split);
   const own = `assistant.error.${code}.action`;
@@ -331,6 +354,10 @@ import AssistantErrorDetails from "@/components/ai-assistant/common/AssistantErr
 import { billingHrefOf } from "@/components/ai-assistant/credits/AssistantCreditManage.vue";
 import { explorerLabel } from "@/components/ai-assistant/evidence/evidenceText";
 import {
+  DEFAULT_AGENT,
+  agentIdOf,
+  agentName,
+  agentStore,
   errorTitle,
   failedAfterChange,
   turnLockKey,
@@ -407,6 +434,21 @@ const manualLabel = computed(() => {
   return t("assistant.outcome.manualRoute", { explorer: explorerLabel(explorer, t) });
 });
 const look = computed(() => LOOKS[props.kind]);
+const refusedAgentName = computed(() =>
+  agentName(agentIdOf(props.error?.agent) ?? DEFAULT_AGENT, t),
+);
+// Picking never sends, so the draft stays and the next Send is the hand-off (`80` §1.3).
+const agentFallback = computed(() => {
+  const error = props.error;
+  if (props.readonly || !props.sid || !error) return null;
+  if (error.code === "handoff_failed" && agentIdOf(error.handoffFrom)) {
+    const agent = agentIdOf(error.handoffFrom)!;
+    return { agent, label: t("assistant.outcome.keepGoingWith", { agent: agentName(agent, t) }) };
+  }
+  if (!AGENT_REFUSALS.has(error.code) || agentIdOf(error.agent) === DEFAULT_AGENT) return null;
+  const agent = DEFAULT_AGENT;
+  return { agent, label: t("assistant.outcome.useAgentInstead", { agent: agentName(agent, t) }) };
+});
 const askKind = computed<AskAdminKind>(() => ROLE_SPLIT_KINDS[code.value ?? ""] ?? "access");
 
 const title = computed<I18nText>(() => {
@@ -534,6 +576,11 @@ const hint = computed<I18nText | null>(() => {
     return null;
   return te(key) ? t(key) : null;
 });
+
+function useAgentFallback(): void {
+  if (agentFallback.value && props.sid)
+    agentStore()?.pickAgent(props.sid, agentFallback.value.agent, "fallback");
+}
 
 function stopTimer(): void {
   if (timer) clearInterval(timer);

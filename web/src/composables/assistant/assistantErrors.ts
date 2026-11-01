@@ -25,6 +25,10 @@ declare module "./assistantStore.types" {
     reason?: ProviderReason;
     /** Which switch an `rca_disabled` refusal names. */
     rcaReason?: RcaDisabledReason;
+    /** The agent an `agent_*` refusal or a failed hand-off names. */
+    agent?: string;
+    /** `handoff_failed`: the agent that kept the chat. */
+    handoffFrom?: string;
   }
 }
 
@@ -67,6 +71,10 @@ export const ASSISTANT_ERROR_CODES = [
   "account_changed",
   "rca_disabled",
   "analysis_in_progress",
+  "agent_disabled",
+  "agent_not_permitted",
+  "agent_unreachable",
+  "handoff_failed",
 ] as const satisfies readonly AssistantErrorCode[];
 
 /** `80` §1.3; role-split codes carry the admin action, the member one is `.actionMember`. */
@@ -108,6 +116,10 @@ export const ERROR_LEDGER: Record<AssistantErrorCode, ErrorLedgerRow> = {
   account_changed: { phase: "pre_admission", retryable: false, action: "none" },
   rca_disabled: { phase: "pre_admission", retryable: false, action: "ask_admin" },
   analysis_in_progress: { phase: "pre_admission", retryable: false, action: "none" },
+  agent_disabled: { phase: "pre_admission", retryable: false, action: "open_settings" },
+  agent_not_permitted: { phase: "pre_admission", retryable: false, action: "ask_admin" },
+  agent_unreachable: { phase: "pre_admission", retryable: true, action: "retry" },
+  handoff_failed: { phase: "post_admission", retryable: true, action: "retry" },
 };
 
 /** The closed `action` vocabulary of the B-01 envelope; the client words every button from the code (WP-17). */
@@ -146,6 +158,13 @@ const CODE_ALIASES: Record<string, AssistantErrorCode> = {
   credit_exhausted: "credits_exhausted",
   lease_conflict: "turn_busy",
 };
+
+// A stored turn and an `error` frame still say `agent_unreachable` for the service-wide failure; only an HTTP refusal is per agent.
+const AGENT_REFUSALS: ReadonlySet<string> = new Set([
+  "agent_disabled",
+  "agent_not_permitted",
+  "agent_unreachable",
+]);
 
 const AGENT_DOWN_STATUSES: ReadonlySet<number> = new Set([502, 503, 504]);
 
@@ -190,6 +209,7 @@ interface WireBody {
   active_turn_id?: unknown;
   consent?: unknown;
   reason?: unknown;
+  agent?: unknown;
 }
 
 interface ErrorInput {
@@ -256,6 +276,8 @@ function build(
   if (reason) error.reason = reason;
   if (code === "rca_disabled" && (body.reason === "rca_off" || body.reason === "priority_off"))
     error.rcaReason = body.reason;
+  const agent = textOf(body.agent);
+  if (agent) error.agent = agent;
   return error;
 }
 
@@ -287,6 +309,8 @@ function actionOf(
 }
 
 function codeOf({ status, body }: ErrorInput): AssistantErrorCode {
+  const refusal = status === undefined ? null : agentRefusal(body);
+  if (refusal) return refusal;
   // Constraint 12: a 403 is the role, whatever the body says.
   if (status === 403) return "permission_denied";
   if (isConsentPrompt(status, body)) return "consent_declined";
@@ -294,6 +318,12 @@ function codeOf({ status, body }: ErrorInput): AssistantErrorCode {
   if (named) return named;
   if (status !== undefined) return statusCode(status, body);
   return frameCode(body);
+}
+
+function agentRefusal(body: WireBody): AssistantErrorCode | null {
+  for (const value of [body.code, body.category, body.error_code])
+    if (typeof value === "string" && AGENT_REFUSALS.has(value)) return value as AssistantErrorCode;
+  return null;
 }
 
 // B-01 envelope codes, the string `code`/`category` of shapes C/M1/M2 and the `error_code` of D/F/I2.

@@ -166,7 +166,14 @@ const turnStartedFrameSchema = z.looseObject({
   type: z.literal("turn_started"),
   turn_id: z.string(),
   agent_type: z.string().optional(),
+  handoff_from: z.string().optional(),
   trace_id: z.string().optional(),
+});
+
+const handoffSuggestedFrameSchema = z.looseObject({
+  type: z.literal("handoff_suggested"),
+  agent: z.string(),
+  reason: z.string().optional(),
 });
 
 const stepFrameSchema = z.looseObject({
@@ -261,6 +268,7 @@ export const assistantFrameSchema = z.discriminatedUnion("type", [
   completeFrameSchema,
   cancelledFrameSchema,
   turnStartedFrameSchema,
+  handoffSuggestedFrameSchema,
   stepFrameSchema,
   retryingFrameSchema,
   compactingFrameSchema,
@@ -292,6 +300,7 @@ export type ErrorFrame = FrameOf<"error">;
 export type CompleteFrame = FrameOf<"complete">;
 export type CancelledFrame = FrameOf<"cancelled">;
 export type TurnStartedFrame = FrameOf<"turn_started">;
+export type HandoffSuggestedFrame = FrameOf<"handoff_suggested">;
 export type StepFrame = FrameOf<"step">;
 export type RetryingFrame = FrameOf<"retrying">;
 export type CompactingFrame = FrameOf<"compacting">;

@@ -16,16 +16,33 @@
 import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ContextChip } from "@/composables/assistant";
+import { fakeAssistant } from "@/components/ai-assistant/__tests__/fakeAssistant";
+import { composerUi } from "@/components/ai-assistant/composer/composerUi";
+import type { CapabilityAgent, ContextChip } from "@/composables/assistant";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { dashboardKeys } from "@/services/dashboards.querykeys";
 import { pipelineKeys } from "@/services/pipelines.querykeys";
 import { streamKeys } from "@/services/stream.querykeys";
 
-import AssistantMentionMenu, { MENTION_GROUP_LIMIT } from "./AssistantMentionMenu.vue";
+import AssistantMentionMenu, {
+  MENTION_GROUP_LIMIT,
+  type MentionOption,
+} from "./AssistantMentionMenu.vue";
 
-const { breakpoint } = vi.hoisted(() => ({ breakpoint: { md: true } }));
+const { breakpoint, fake } = vi.hoisted(() => ({
+  breakpoint: { md: true },
+  fake: { current: null as any },
+}));
+
+vi.mock("@/composables/assistant", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/assistant")>();
+  return {
+    ...actual,
+    useAssistantStore: () => fake.current?.store ?? actual.useAssistantStore(),
+    useAssistantCapability: () => fake.current?.handle ?? actual.useAssistantCapability(),
+  };
+});
 
 vi.mock("@/composables/useBreakpoint", async () => {
   const { computed } = await import("vue");
@@ -75,6 +92,83 @@ async function open(query = "", dashboardsError = false) {
 
 beforeEach(() => {
   breakpoint.md = true;
+  fake.current = null;
+});
+
+const ROSTER: CapabilityAgent[] = [
+  { id: "o2-ai", pickable: true, available: true },
+  { id: "sre", pickable: true, available: true },
+  { id: "generate-query", pickable: true, available: false, reason: "role" },
+];
+
+function withAgents(roster: CapabilityAgent[] = ROSTER) {
+  fake.current = fakeAssistant("available", { agents: roster });
+  const { store } = fake.current;
+  const sid = store.createSession({
+    origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+  });
+  store.state.shell.activeSid = sid;
+  return { store, sid };
+}
+
+const agentRows = (wrapper: {
+  findAll(q: string): { attributes(n: string): string | undefined }[];
+}) =>
+  wrapper
+    .findAll('[data-test="assistant-mention-agent"]')
+    .map((row) => row.attributes("data-agent"));
+
+describe("AssistantMentionMenu: Agents group (MULTI-AGENT-02)", () => {
+  it("leads with Agents, filters by name prefix and id, and highlights the match", async () => {
+    withAgents();
+    const { wrapper } = await open();
+    expect(wrapper.findAll('[role="group"]')[0].attributes("data-test")).toBe(
+      "assistant-mention-group-agents",
+    );
+    expect(agentRows(wrapper)).toEqual(["o2-ai", "sre", "generate-query"]);
+    for (const query of ["inv", "sre", "Investigator"]) {
+      await wrapper.setProps({ query });
+      expect(agentRows(wrapper)).toEqual(["sre"]);
+      expect(wrapper.vm.current()?.agent).toBe("sre");
+    }
+  });
+
+  it("renders no group for one agent, without a roster, or in the + menu", async () => {
+    withAgents([ROSTER[0]]);
+    const one = await open();
+    expect(one.wrapper.find('[data-test="assistant-mention-group-agents"]').exists()).toBe(false);
+    fake.current = fakeAssistant("available");
+    const none = await open();
+    expect(none.wrapper.find('[data-test="assistant-mention-group-agents"]').exists()).toBe(false);
+    withAgents();
+    const plus = mount(AssistantMentionMenu, {
+      props: { open: true, query: "", org: ORG, listboxId: "lb", inline: true },
+    });
+    await flushPromises();
+    expect(plus.find('[data-test="assistant-mention-group-agents"]').exists()).toBe(false);
+  });
+
+  it("hands a pick to the composer, sets the agent and speaks once, with no chip", async () => {
+    const { store, sid } = withAgents();
+    const { wrapper } = await open("inv");
+    wrapper.vm.choose(wrapper.vm.current()!);
+    const [picked] = wrapper.emitted("select")![0] as [MentionOption];
+    expect(picked.chip).toBeUndefined();
+    expect(store.state.sessions[sid].agentId).toBe("sre");
+    expect(composerUi(sid).status?.text).toBe("Investigator will answer.");
+  });
+
+  it("keeps a disabled agent reachable: Enter reads the reason and chooses nothing", async () => {
+    const { store, sid } = withAgents();
+    const { wrapper } = await open("query");
+    const row = wrapper.vm.current()!;
+    expect(row.agent).toBe("generate-query");
+    expect(row.disabled).toBe(true);
+    wrapper.vm.choose(row);
+    expect(wrapper.emitted("select")).toBeUndefined();
+    expect(store.state.sessions[sid].agentId).toBeUndefined();
+    expect(composerUi(sid).status?.text).toBe("Not available to your role");
+  });
 });
 
 describe("AssistantMentionMenu", () => {

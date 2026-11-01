@@ -27,6 +27,29 @@ import type { TurnState, TurnTerminal } from "./turnStates";
 /** UUIDv7, the server session id. */
 export type Sid = string;
 
+/** The pickable agents; `sre-rca` reads as `sre`, and no other id ever renders as an agent. */
+export type AgentId = "o2-ai" | "sre" | "generate-query";
+
+/** One `agents[]` row of `GET /ai/capabilities`, for this user. */
+export interface CapabilityAgent {
+  id: AgentId;
+  pickable: boolean;
+  available: boolean;
+  reason?: "role" | "disabled" | "unreachable";
+  /** Epoch ms of the check behind an `unreachable` row. */
+  checkedAt?: number;
+  /** Only the server may call an agent read-only (PO A13). */
+  readOnly?: boolean;
+}
+
+/** A `handoff_suggested` frame held on its turn; a new turn drops it. */
+export interface HandoffSuggestion {
+  agent: AgentId;
+  reason: string;
+  /** "Not now" keeps the one-line form. */
+  collapsed?: boolean;
+}
+
 export type DockHostId = "alert_query" | "json_editor" | "function" | "scheduled_query" | "regex";
 
 /** Editors that take the inline helper but never dock a chat. */
@@ -54,9 +77,6 @@ export type Container =
 
 /** The telemetry envelope also names surfaces that host no session (`99` §3.2). */
 export type TelemetryContainer = Container | "home" | "settings" | "billing";
-
-/** Wire ids of the pickable agents (W-01). */
-export type AgentId = "o2-ai" | "sre" | "generate-query";
 
 export type WindowCorner = "top-start" | "top-end" | "bottom-start" | "bottom-end";
 
@@ -154,6 +174,14 @@ export interface TurnMeta {
   usage: TurnUsage | null;
   /** B-09 `context_used` echo. */
   contextUsed: string[] | null;
+  /** The agent `turn_started` named for this turn; never a bare request. */
+  agentId?: AgentId | null;
+  /** The agent this turn took the chat from; set only once `turn_started` echoed the hand-off. */
+  handoffFrom?: AgentId;
+  /** At most one per chat, because a new turn starts a fresh meta. */
+  handoffSuggestion?: HandoffSuggestion;
+  /** A send withdrew a pending card, so the hand-off marker names it as not carried. */
+  withdrewApproval?: boolean;
 }
 
 /** The fork seed kept with a continued shared chat (`50` §9). */
@@ -273,6 +301,8 @@ export interface OpenAssistantArgs {
   };
   /** RCA interactive mode (`60` §5.1), forwarded on `PromptRequest`. */
   mode?: "chat";
+  /** The door's default agent; applies to a chat without turns or a pick of its own. */
+  agent?: AgentId;
   /** `auto` appends when the active session's last turn is under 30 min old (`04` §2). */
   thread?: "new" | "current" | "auto";
   container?: "auto" | "sidebar" | "full" | "docked";
@@ -421,6 +451,9 @@ export interface ShareSummary {
   count: number;
 }
 
+/** `door` is the default of a new chat, never a choice, so it counts no pick. */
+export type AgentPickVia = "picker" | "mention" | "suggestion" | "fallback" | "door";
+
 export type EntryOrigin = "editor" | "alert" | "incident" | "none";
 
 export interface HistoryRow {
@@ -484,6 +517,8 @@ export interface AssistantCapability {
   publicLinks: boolean;
   publicMaxExpiryDays: number;
   retentionDays?: number;
+  /** `agents[]` of the capabilities read; absent means no picker and no `agent` on the wire. */
+  agents?: CapabilityAgent[];
   /** B-09: the server takes typed `attachments` and echoes `context_used`. */
   attachments?: boolean;
   /** `/confirm {id, extend:true}` gives a card more time. */
@@ -543,7 +578,11 @@ export type AssistantErrorCode =
   | "approval_elsewhere"
   | "account_changed"
   | "rca_disabled"
-  | "analysis_in_progress";
+  | "analysis_in_progress"
+  | "agent_disabled"
+  | "agent_not_permitted"
+  | "agent_unreachable"
+  | "handoff_failed";
 
 /** The one action a terminal block offers (`80` §1.3); `none` renders Details only. */
 export type AssistantErrorAction =
@@ -612,9 +651,9 @@ export interface AssistantSession {
   ledger: ActionLedgerEntry[];
   /** Set when a turn ends while no container shows the session. */
   unread: boolean;
-  /** Absent means the default agent, the only one until the roster ships (WP-37). */
+  /** The chat's current agent; absent until a pick, a door or a hand-off names one. */
   agentId?: AgentId;
-  /** A chat with turns changes agent on its next send. */
+  /** Picked on a chat with turns; becomes `agentId` when the next send's `turn_started` echoes it. */
   nextAgentId?: AgentId;
 }
 
@@ -721,8 +760,6 @@ export interface AssistantStoreApi {
   restoreWindow(sid: Sid, opts?: { focus?: "composer" | "none" }): void;
   /** The chat leaves the screen; a running answer keeps running. */
   closeWindow(sid: Sid): void;
-  /** Sets the agent of a new chat, or of the next send of a chat with turns; never sends. */
-  pickAgent(sid: Sid, agent: AgentId, via: "picker" | "mention" | "suggestion" | "fallback"): void;
 
   stage(
     sid: Sid,
@@ -780,6 +817,16 @@ export interface AssistantStoreApi {
   resolveConsent(sid: Sid, accepted: boolean, acknowledged?: boolean): Promise<void>;
 
   dispatch(sid: Sid, action: AssistantAction): Promise<ActionResult>;
+
+  /** New chat: sets `agentId`; chat with turns: sets `nextAgentId`; never sends. */
+  pickAgent(sid: Sid, agent: AgentId, via: AgentPickVia): void;
+  /** The suggestion card's Hand off: picks its agent and sends `prompt`, leaving the draft alone. */
+  acceptHandoff(sid: Sid, prompt: string): Promise<TurnTerminal>;
+  /** "Not now": collapses the card to its one line. */
+  dismissHandoff(sid: Sid): void;
+  /** A refusal at send marks the agent until the capability is re-read (MULTI-AGENT-12 AC 5). */
+  noteAgentRefused(agent: AgentId, code: AssistantErrorCode): void;
+  agentRefusal(agent: AgentId): AssistantErrorCode | null;
 
   /** Internal: called by `effects.ts` only, never exported from the barrel. */
   announce(sid: Sid, key: I18nKey, params?: Record<string, unknown>): void;
@@ -887,6 +934,10 @@ export interface SendRequest {
   attachments?: WireAttachment[];
   /** The approval card a Reply or Ask again answers. */
   replyToApproval?: string;
+  /** Omitted while `capability.agents` offers no choice; overrides the incident routing only when given. */
+  agent?: AgentId;
+  /** Stored on the turn as `handoff_from`. */
+  handoffFrom?: AgentId;
 }
 
 /** One B-09 attachment (`00` §6.3). */

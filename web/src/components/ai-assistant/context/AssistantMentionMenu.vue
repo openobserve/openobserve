@@ -81,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'assistant-mention-option'
           "
           :data-kind="item.kind"
+          :data-agent="item.agent"
           tabindex="-1"
           @mousedown.prevent
           @click="choose(item)"
@@ -106,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import type { ChipKind, ContextChip } from "@/composables/assistant";
+import type { AgentId, ChipKind, ContextChip } from "@/composables/assistant";
 import type { I18nText } from "@/types/i18n";
 
 /** One choice of the `@` menu; a time option carries a period, Show more and Retry carry an action (CT-05 AC 2, 4, 11). */
@@ -122,10 +123,12 @@ export interface MentionOption {
   groupId?: string;
   /** No access: shown, never chosen. */
   disabled?: boolean;
+  /** An Agents row: it sets who answers and adds no chip. */
+  agent?: AgentId;
 }
 
 /** An action row of the menu: Show more and Retry act in place, Image hands over to the file picker. */
-export type MentionAction = "more" | "retry" | "image";
+export type MentionAction = "more" | "retry" | "image" | "agent";
 
 export interface AssistantMentionMenuProps {
   open: boolean;
@@ -151,7 +154,19 @@ const STREAM_TYPES = ["logs", "metrics", "traces"] as const;
 import { useQuery } from "@tanstack/vue-query";
 import { computed, reactive, ref, watch } from "vue";
 
-import { shortLabelFor, timeRangeText } from "@/composables/assistant";
+import { announceComposer } from "@/components/ai-assistant/composer/composerUi";
+import {
+  shortLabelFor,
+  timeRangeText,
+  useAssistantCapability,
+  useAssistantStore,
+} from "@/composables/assistant";
+import {
+  agentMatches,
+  agentName,
+  agentReason,
+  rosterOffersChoice,
+} from "@/composables/assistant/pure";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { alertsListQuery } from "@/services/alerts.queries";
@@ -184,6 +199,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useAssistantStore();
+const capability = useAssistantCapability();
 const active = ref(0);
 const expanded = reactive(new Set<string>());
 const enabled = computed(() => props.open && !!props.org);
@@ -316,8 +333,32 @@ const pipelineOptions = computed<MentionOption[]>(() =>
   }),
 );
 
+// The menu's own filter, not `group()`'s: a purpose line must never match (MULTI-AGENT-02 AC 2).
+const agentGroup = computed<Group[]>(() => {
+  const roster = capability.value.agents;
+  if (props.inline || !rosterOffersChoice(roster)) return [];
+  const items = (roster ?? []).flatMap((agent): MentionOption[] => {
+    const label = agentName(agent.id, t);
+    if (!agentMatches(agent.id, String(label), props.query)) return [];
+    const reason = agentReason(agent, store.agentRefusal(agent.id), t);
+    return [
+      {
+        id: `agent:${agent.id}`,
+        kind: "field",
+        label,
+        action: "agent",
+        agent: agent.id,
+        ...(reason && { secondary: reason, disabled: true }),
+      },
+    ];
+  });
+  const title = t("assistant.composer.mention.group.agents");
+  return [{ id: "agents", title, kind: title, state: "ready", items }];
+});
+
 const groups = computed<Group[]>(() =>
   [
+    ...agentGroup.value,
     group("time", t("assistant.composer.mention.group.time"), raw(""), "ready", timeOptions.value),
     group(
       "streams",
@@ -355,9 +396,14 @@ const groups = computed<Group[]>(() =>
   ].filter((g) => g.state !== "ready" || g.items.length > 0),
 );
 
-const flat = computed(() => groups.value.flatMap((g) => g.items.filter((item) => !item.disabled)));
+// A disabled agent stays in the ↑/↓ cycle, so Enter on it can read its reason (MULTI-AGENT-02 AC 6).
+const flat = computed(() =>
+  groups.value.flatMap((g) => g.items.filter((item) => !item.disabled || item.action === "agent")),
+);
 const results = computed(
-  () => flat.value.filter((item) => !item.action || item.action === "image").length,
+  () =>
+    flat.value.filter((item) => !item.action || item.action === "image" || item.action === "agent")
+      .length,
 );
 const empty = computed(() => groups.value.every((g) => g.state === "ready") && results.value === 0);
 
@@ -375,6 +421,7 @@ function imageGroup(): Group {
 
 // Show more and Retry act in place; an option or the Image row is handed to the composer.
 function choose(item: MentionOption): void {
+  if (item.action === "agent") return chooseAgent(item);
   if (item.disabled) return;
   if (item.action === "more" && item.groupId) {
     expanded.add(item.groupId);
@@ -387,6 +434,20 @@ function choose(item: MentionOption): void {
   emit("select", item);
 }
 const activeOptionId = computed(() => flat.value[active.value]?.id ?? null);
+
+// The composer strips the `@…` token on `select`; the sentence here replaces its "added" one in the same tick.
+function chooseAgent(item: MentionOption): void {
+  const sid = store.state.shell.activeSid;
+  if (item.disabled) {
+    if (sid && item.secondary) announceComposer(sid, item.secondary);
+    return;
+  }
+  emit("select", item);
+  const target = store.state.shell.activeSid;
+  if (!target || !item.agent) return;
+  store.pickAgent(target, item.agent, "mention");
+  announceComposer(target, t("assistant.agent.announceChosen", { agent: item.label }));
+}
 
 function group(
   id: string,

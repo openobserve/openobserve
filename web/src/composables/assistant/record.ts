@@ -17,6 +17,7 @@ import type { ChatMessage, ContentBlock, ImageAttachment, TurnSpan } from "@/ts/
 import type { ChatApproval } from "@/services/assistant";
 import { gt, raw, type TranslateFn } from "@/types/i18n";
 
+import { agentIdOf } from "./agents";
 import { toAssistantError } from "./assistantErrors";
 import { generateNavigationFromToolResult } from "./navigationRoutes";
 import {
@@ -53,6 +54,9 @@ export interface StoredTurn {
   error?: string | null;
   status?: TurnStatus;
   error_code?: string | null;
+  /** Who answered this turn; absent before migration 134 and on a shared read that drops it. */
+  agent_type?: string | null;
+  handoff_from?: string | null;
   /** Seq range of the turn's events; absent on a turn that stored nothing. */
   first_seq?: number | null;
   last_seq?: number | null;
@@ -102,6 +106,7 @@ export const KNOWN_FRAME_TYPES: ReadonlySet<string> = new Set([
   "step",
   "retrying",
   "compacting",
+  "handoff_suggested",
   "permission_denied",
   "confirmation_resolved",
   "query",
@@ -251,7 +256,21 @@ function foldTurn(
   }
   if (ctx.phase === "replay") markReplayStatus(shown, own, state);
   else markTurnStatus(shown, own, 0, state, ctx, audience);
+  stampTurnAgent(turn, own);
   messages.push(...own);
+}
+
+// An unknown agent id stays unset, so the turn reads as the chat's current agent (MULTI-AGENT-13 AC 3).
+function stampTurnAgent(turn: StoredTurn, own: ChatMessage[]): void {
+  const prompt = own[0]?.role === "user" ? own[0] : null;
+  if (!prompt) return;
+  const echoed = turn.frames.find((frame) => frame?.type === "turn_started")?.agent_type;
+  const agent = agentIdOf(turn.agent_type) ?? agentIdOf(echoed);
+  if (agent) prompt.agentId = agent;
+  const from = agentIdOf(turn.handoff_from);
+  if (!from || !agent || from === agent) return;
+  if (turn.error_code === "handoff_failed") prompt.handoffFailed = { from, to: agent };
+  else prompt.handoffFrom = from;
 }
 
 // SEC-11: only the trailing blocks under the message's own nonce are attachments; anything else stays the user's text.

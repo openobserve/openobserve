@@ -95,7 +95,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 export type AskAdminKind =
-  "access" | "credits" | "consent" | "enable" | "share_read" | "settings" | "tool_policy";
+  | "access"
+  | "credits"
+  | "consent"
+  | "enable"
+  | "share_read"
+  | "settings"
+  | "tool_policy"
+  | "agent_access";
 
 export interface AssistantAskAdminPopoverProps {
   kind: AskAdminKind;
@@ -103,6 +110,8 @@ export interface AssistantAskAdminPopoverProps {
   /** Credits and consent billed to a payer target the payer's admins. */
   payer?: string;
   tool?: string;
+  /** The agent's display name, for kind `agent_access`. */
+  agent?: string;
   /** The prompt the user typed; only its first 80 characters, and only once the box is ticked. */
   promptPreview?: string;
 }
@@ -214,6 +223,7 @@ const message = computed<I18nText>(() => {
     org: raw(targetOrg.value),
     whereToGrant: whereToGrant.value,
     tool: raw(props.tool),
+    agent: raw(props.agent ?? ""),
     link: raw(linkFor(props.kind)),
   };
   const base = t(`assistant.askAdmin.message.${props.kind}`, params);
@@ -225,7 +235,11 @@ const message = computed<I18nText>(() => {
 });
 
 const subject = computed(() =>
-  t(`assistant.askAdmin.subject.${props.kind}`, { product, org: raw(targetOrg.value) }),
+  t(`assistant.askAdmin.subject.${props.kind}`, {
+    product,
+    org: raw(targetOrg.value),
+    agent: raw(props.agent ?? ""),
+  }),
 );
 
 const mailto = computed(() => mailtoHref(admins.value, subject.value, message.value));

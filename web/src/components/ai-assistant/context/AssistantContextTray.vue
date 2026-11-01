@@ -86,7 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </li>
       </ul>
-      <div class="ms-auto shrink-0">
+      <div class="ms-auto flex min-w-0 shrink-0 items-center gap-1">
+        <AssistantAgentPicker :sid="sid" />
         <AssistantContextSeesPopover :sid="sid" :icon-only="compact" />
       </div>
     </div>
@@ -158,6 +159,8 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 import { chipOpenQuery } from "@/composables/assistant/pure";
 import { explorerOf } from "@/utils/assistant/explorerRoutes";
+
+import AssistantAgentPicker from "@/components/ai-assistant/agents/AssistantAgentPicker.vue";
 
 import AssistantChipPopover from "./AssistantChipPopover.vue";
 import AssistantContextChip from "./AssistantContextChip.vue";

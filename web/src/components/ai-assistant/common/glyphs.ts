@@ -13,12 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { ChipKind } from "@/composables/assistant";
+import type { AgentId, ChipKind } from "@/composables/assistant";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 
 /** The assistant's glyphs; assistant code names icons only through this map (`90` §4.1). */
 export const assistantGlyph = {
   assistant: "auto-awesome",
+  agentGeneral: "auto-awesome",
+  agentInvestigator: "troubleshoot",
+  agentQueryBuilder: "auto-fix-high",
+  handoff: "arrow-forward",
   explain: "lightbulb-outline",
   troubleshoot: "build",
   addToChat: "add-comment",
@@ -113,5 +117,12 @@ export const chipGlyph = {
   report: assistantGlyph.chipReport,
   pasted_text: assistantGlyph.chipPastedText,
 } as const satisfies Record<ChipKind, IconName>;
+
+/** Agents differ by glyph and name, never colour (D2 decision 8). */
+export const agentGlyph = {
+  "o2-ai": assistantGlyph.agentGeneral,
+  sre: assistantGlyph.agentInvestigator,
+  "generate-query": assistantGlyph.agentQueryBuilder,
+} as const satisfies Record<AgentId, IconName>;
 
 export type AssistantGlyph = keyof typeof assistantGlyph;

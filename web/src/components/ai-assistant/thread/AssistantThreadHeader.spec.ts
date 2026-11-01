@@ -94,6 +94,31 @@ afterEach(() => {
   toast.mockClear();
 });
 
+describe("AssistantThreadHeader: agent identity (MULTI-AGENT-03)", () => {
+  const identity = '[data-test="assistant-agent-identity"]';
+  const ROSTER = [
+    { id: "o2-ai", pickable: true, available: true },
+    { id: "sre", pickable: true, available: true },
+  ] as const;
+
+  it("adds nothing to a chat with the default agent and no roster", async () => {
+    const { wrapper } = await setup();
+    expect(wrapper.find(identity).exists()).toBe(false);
+  });
+
+  it("names the chat's agent beside the title, and every existing action stays", async () => {
+    const { wrapper, store, sid } = await setup({}, { over: { agents: [...ROSTER] } });
+    store.state.sessions[sid].agentId = "sre";
+    await flushPromises();
+    expect(wrapper.get(identity).attributes("data-agent")).toBe("sre");
+    expect(wrapper.get(identity).text()).toContain("Investigator");
+    expect(wrapper.find('[data-test="assistant-thread-title"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-thread-history"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-thread-new"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-thread-menu"]').exists()).toBe(true);
+  });
+});
+
 describe("AssistantThreadHeader", () => {
   it("tags an incident analysis chat with its origin, and no other chat", async () => {
     const { wrapper, store, sid } = await setup();

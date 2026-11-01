@@ -117,8 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-scroll-anchor
   >
     <div v-if="hasContent || live" class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-      <AssistantMark size="sm" />
-      <OText variant="meta" class="leading-5">{{ t("assistant.name") }}</OText>
+      <AssistantAgentIdentity size="meta" :agent="agent" :time="answerTime" />
       <slot name="versions" />
       <span class="flex-1" />
     </div>
@@ -285,7 +284,7 @@ import AssistantPolicyNotice from "@/components/ai-assistant/approvals/Assistant
 import AssistantConsentNote from "@/components/ai-assistant/credits/AssistantConsentNote.vue";
 import AssistantFindings from "@/components/ai-assistant/evidence/AssistantFindings.vue";
 import AssistantTurnFooter from "@/components/ai-assistant/evidence/AssistantTurnFooter.vue";
-import type { AssistantTurnView, PolicyBlockData } from "@/composables/assistant/pure";
+import type { AgentId, AssistantTurnView, PolicyBlockData } from "@/composables/assistant/pure";
 import type { BlockKind } from "@/services/assistantAnalytics";
 import type { ChatMessage, ContentBlock } from "@/ts/interfaces/chat";
 
@@ -300,6 +299,8 @@ export interface AssistantMessageProps {
   density?: "compact" | "roomy";
   /** The answer's turn: its session, prompt and outcome, for the evidence blocks. */
   turn?: AssistantTurnView | null;
+  /** The agent that answered this turn; a chat or server without agents reads as the default one. */
+  agent?: AgentId;
 }
 
 // A decision's record replaces its card in place; the pending card itself renders in the container.
@@ -386,7 +387,7 @@ export function resetBlockRenderersForTests(): void {
 import { computed, inject, provide } from "vue";
 import { useRouter } from "vue-router";
 
-import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
+import AssistantAgentIdentity from "@/components/ai-assistant/agents/AssistantAgentIdentity.vue";
 import { chipGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import AssistantInlineClaims from "@/components/ai-assistant/evidence/AssistantInlineClaims.vue";
@@ -397,6 +398,7 @@ import AssistantQueryBlock, {
 } from "@/components/ai-assistant/evidence/AssistantQueryBlock.vue";
 import { claimNumbersKey, stepCitation } from "@/components/ai-assistant/evidence/evidenceText";
 import {
+  agentName,
   assistantEvidenceHostKey,
   claimNumbers,
   fenceQuery,
@@ -449,6 +451,7 @@ const props = withDefaults(defineProps<AssistantMessageProps>(), {
   readonly: false,
   density: "compact",
   turn: null,
+  agent: "o2-ai",
 });
 
 const { t } = useI18nTyped();
@@ -478,11 +481,25 @@ const attachments = computed<{ name: string; body: string; hidden?: boolean }[]>
 const chips = computed(() => props.message.chips ?? []);
 const images = computed<ImageAttachment[]>(() => props.message.images ?? []);
 
-const userMeta = computed<I18nText>(() => {
+const baseUserMeta = computed<I18nText>(() => {
   const who = props.message.author ? raw(props.message.author) : t("assistant.message.you");
   const at = props.message.sentAt;
   if (at === undefined) return who;
   return t("assistant.message.meta", { who, time: formatOrgTime(at, { showZone: true }) });
+});
+
+const userMeta = computed<I18nText>(() => {
+  const { handoffFrom, agentId } = props.message;
+  if (!handoffFrom || !agentId) return baseUserMeta.value;
+  return t("assistant.message.metaHandoff", {
+    meta: baseUserMeta.value,
+    agent: agentName(agentId, t),
+  });
+});
+
+const answerTime = computed(() => {
+  const at = props.message.sentAt;
+  return at === undefined ? undefined : raw(formatOrgTime(at, { showZone: true }));
 });
 
 const rerunRange = computed(() => {

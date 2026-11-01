@@ -37,6 +37,8 @@ import type { I18nKey, I18nText } from "@/types/i18n";
 import { getUUIDv7 } from "@/utils/uuid";
 
 import { MAX_LEDGER } from "./actions/appliers/approval";
+import { createAgentActions } from "./agentActions";
+import { currentAgent } from "./agents";
 import { ERROR_LEDGER } from "./assistantErrors";
 import type {
   AssistantCapability,
@@ -396,6 +398,7 @@ export function createAssistantStore(
     ...createComposerSlice(core),
     ...createTurnSlice(core),
     ...lifecycle.api,
+    ...createAgentActions(core, () => store.resend),
   };
   return store;
 }
@@ -602,6 +605,7 @@ function createCore(
       const { chips, timeOverride, removedPageKeys, images, mode, replyStash, homeStarter } = toRaw(
         session.composer,
       );
+      const pendingAgent = session.nextAgentId ?? session.agentId;
       // A reply is not a draft: the one kept is the text Reply set aside.
       const text = mode === "reply" ? (replyStash ?? "") : session.composer.text;
       core.drafts.schedule(session.userOrgKey, session.sid, {
@@ -611,6 +615,7 @@ function createCore(
         removedPageKeys,
         imageCount: images.length,
         ...(homeStarter && mode !== "reply" && { homeStarter: true }),
+        ...(pendingAgent && { agentId: pendingAgent }),
       });
     },
     persistPlacement() {
@@ -1038,16 +1043,7 @@ function createWindowSlice(core: StoreCore) {
       return [...recent, ...open.filter((sid) => !recent.includes(sid))];
     },
   };
-  return { ...api, pickAgent: createPickAgent(core) };
-}
-
-function createPickAgent(core: StoreCore): AssistantStoreApi["pickAgent"] {
-  return (sid, agent) => {
-    const session = core.session(sid);
-    if (!session) return;
-    if (session.messages.length > 0) session.nextAgentId = agent;
-    else session.agentId = agent;
-  };
+  return api;
 }
 
 function createComposerSlice(core: StoreCore) {
@@ -1301,7 +1297,10 @@ function createTurnSlice(core: StoreCore) {
       const running = inFlight.get(sid);
       if (running) return running;
       // A new turn moves the conversation on, so a card still waiting is withdrawn first.
-      if (session.pendingApproval) void deps.approvals.withdraw(sid, "withdrawn");
+      if (session.pendingApproval) {
+        session.turnMeta.withdrewApproval = true;
+        void deps.approvals.withdraw(sid, "withdrawn");
+      }
       delete core.notices[sid];
       rememberPrompt(core, session);
       const { text, chips, timeOverride, removedPageKeys } = toRaw(session.composer);
@@ -1745,8 +1744,11 @@ function restoreStoredDraft(core: StoreCore, sid: Sid): void {
   if (!session || !core.writable(session) || session.composer.text) return;
   const draft = core.drafts.read(session.userOrgKey, sid);
   if (!draft) return;
-  const { imageCount = 0, ...stored } = draft;
+  const { imageCount = 0, agentId, ...stored } = draft;
   Object.assign(session.composer, stored);
+  // A pick survives a reload the way its draft does; on a chat with turns it is still only Next.
+  if (agentId && session.messages.length === 0) session.agentId = agentId;
+  else if (agentId && agentId !== currentAgent(session)) session.nextAgentId = agentId;
   session.composer.homeStarter = stored.homeStarter;
   core.restoredDrafts.set(sid, { imageCount });
 }

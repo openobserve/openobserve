@@ -108,6 +108,21 @@ afterEach(() => {
 });
 
 describe("AssistantContextTray", () => {
+  it("carries the agent picker while the roster offers a choice", async () => {
+    const { wrapper } = await setup();
+    const picker = '[data-test="assistant-agent-picker"]';
+    expect(wrapper.find(picker).exists()).toBe(false);
+    fake.current.capability.value = {
+      ...fake.current.capability.value,
+      agents: [
+        { id: "o2-ai", pickable: true, available: true },
+        { id: "sre", pickable: true, available: true },
+      ],
+    };
+    await flushPromises();
+    expect(wrapper.find(picker).exists()).toBe(true);
+  });
+
   it("drops its own padding inside the composer frame", async () => {
     const { wrapper } = await setup({ framed: true });
     expect(wrapper.get('[data-test="assistant-context-tray"]').classes()).not.toContain("px-3");

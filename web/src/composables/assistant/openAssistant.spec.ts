@@ -22,6 +22,7 @@ import type {
   AssistantCapability,
   AssistantHostAdapter,
   DockHostId,
+  CapabilityAgent,
   GateCode,
   HostRegistry,
   OpenAssistantResult,
@@ -692,5 +693,39 @@ describe("types", () => {
       objectKind: "log_row",
       intent: "send",
     });
+  });
+});
+
+describe("openAssistant: door default agent (MULTI-AGENT-06)", () => {
+  const ROSTER: CapabilityAgent[] = [
+    { id: "o2-ai", pickable: true, available: true },
+    { id: "sre", pickable: true, available: true },
+    { id: "generate-query", pickable: true, available: true },
+  ];
+
+  it("gives a new chat the door's agent, and the picker shows it before anything is sent", async () => {
+    const h = setup();
+    h.store.syncCapability({ ...capability, agents: ROSTER });
+    const { sid } = ok(await h.open(explain({ intent: "stage", agent: "sre" })));
+    expect(h.store.state.sessions[sid].agentId).toBe("sre");
+  });
+
+  it("leaves a chat the user picked for alone", async () => {
+    const h = setup();
+    h.store.syncCapability({ ...capability, agents: ROSTER });
+    const sid = h.store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+      thread: "new",
+    });
+    h.store.pickAgent(sid, "generate-query", "picker");
+    h.store.open({ kind: "sidebar" }, { sid });
+    await h.open({ ...addToChat(), agent: "sre" });
+    expect(h.store.state.sessions[sid].agentId).toBe("generate-query");
+  });
+
+  it("names no agent without a roster, so the server keeps routing", async () => {
+    const h = setup();
+    const { sid } = ok(await h.open(explain({ intent: "stage", agent: "sre" })));
+    expect(h.store.state.sessions[sid].agentId).toBeUndefined();
   });
 });

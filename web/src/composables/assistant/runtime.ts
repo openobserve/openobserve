@@ -391,6 +391,7 @@ function engineDeps(
         persistence: () => handle.capability.value.persistence,
         attachments: () => handle.capability.value.attachments === true,
         rcaChatMode: () => handle.capability.value.rcaChatMode === true,
+        agents: () => handle.capability.value.agents,
       };
     },
     history: () => deps.history,

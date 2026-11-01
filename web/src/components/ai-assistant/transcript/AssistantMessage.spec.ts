@@ -71,6 +71,34 @@ describe("AssistantMessage", () => {
     document.body.innerHTML = "";
   });
 
+  it("heads an answer with its turn's agent, and the product's own without one", () => {
+    const message = { role: "assistant", content: raw("hi") } as const;
+    const handed = mount(AssistantMessage, {
+      props: { message, turnId: "t1", agent: "sre", live: true },
+    });
+    expect(handed.get('[data-test="assistant-agent-identity"]').attributes("data-agent")).toBe(
+      "sre",
+    );
+    const plain = mount(AssistantMessage, { props: { message, turnId: "t1", live: true } });
+    expect(plain.get('[data-test="assistant-agent-identity"]').attributes("data-agent")).toBe(
+      "o2-ai",
+    );
+  });
+
+  it("says to whom only on the prompt that handed over", () => {
+    const prompt = { role: "user", content: raw("q") } as const;
+    const handed = mount(AssistantMessage, {
+      props: { message: { ...prompt, agentId: "sre", handoffFrom: "o2-ai" }, turnId: "t1" },
+    });
+    expect(handed.get('[data-test="assistant-message-meta"]').text()).toContain(
+      "· to Investigator",
+    );
+    const later = mount(AssistantMessage, {
+      props: { message: { ...prompt, agentId: "sre" }, turnId: "t1" },
+    });
+    expect(later.get('[data-test="assistant-message-meta"]').text()).not.toContain("· to");
+  });
+
   it("gives a long run break points with <wbr>, keeping the text exactly as sent", () => {
     setMarkdownParserForTests(null);
     const text = "token " + "a".repeat(200) + " end";

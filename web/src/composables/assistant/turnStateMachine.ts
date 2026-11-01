@@ -17,6 +17,7 @@ import type { TurnOutcomeRecord } from "@/ts/interfaces/chat";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import { sqlStreamOf } from "@/utils/assistant/explorerRoutes";
 
+import { DEFAULT_AGENT, agentIdOf, agentName } from "./agents";
 import {
   ERROR_LEDGER,
   isAssistantErrorCode,
@@ -397,6 +398,13 @@ export function outcomeError(record: TurnOutcomeRecord): AssistantError {
 }
 
 // Titles that claim "Nothing was changed."; after an applied change they have a variant without it (D7 §3.2).
+const AGENT_TITLES: ReadonlySet<AssistantErrorCode> = new Set([
+  "agent_disabled",
+  "agent_not_permitted",
+  "agent_unreachable",
+  "handoff_failed",
+]);
+
 const AFTER_CHANGE_TITLES: Partial<Record<AssistantErrorCode, I18nKey>> = {
   agent_unavailable: "assistant.error.agent_unavailable.titleAfterChange",
   stream_dropped: "assistant.error.stream_dropped.titleAfterChange",
@@ -421,6 +429,10 @@ export function errorTitle(
   if (copy.org !== undefined) params.org = copy.org;
   if (copy.product !== undefined) params.product = copy.product;
   if (copy.t && copy.elapsedMs !== undefined) params.elapsed = elapsedText(copy.elapsedMs, copy.t);
+  if (copy.t && AGENT_TITLES.has(error.code))
+    params.agent = agentName(agentIdOf(error.agent) ?? DEFAULT_AGENT, copy.t);
+  if (copy.t && error.handoffFrom)
+    params.fromAgent = agentName(agentIdOf(error.handoffFrom) ?? DEFAULT_AGENT, copy.t);
   // A `retry_after` countdown is on the button, so the title gives no estimate of its own.
   if (error.code === "rate_limited" && error.retryAfterMs)
     return { key: "assistant.error.rate_limited.titleTimed", params };
