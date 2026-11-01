@@ -16,9 +16,9 @@ jobs:
     timeout-minutes: 5
     permissions:
       checks: write
-    # Fork tokens are read-only, so forks keep the smoke-only behaviour rather than a placeholder nothing can complete.
+    # Fork and Dependabot tokens are read-only, so they keep the smoke-only behaviour rather than a placeholder nothing can complete.
     if: >-
-      github.event.pull_request.head.repo.fork == false &&
+      github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]' &&
       (github.event.action != 'labeled' || (github.event.label.name == 'ready-for-ci' && github.event.pull_request.auto_merge != null))
     steps:
       - env:

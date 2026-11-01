@@ -8,7 +8,7 @@ on:
   pull_request:
     branches:
       - "**"
-    # labeled/unlabeled so 'ready-for-ci' gates CI; only a new commit cancels an in-flight run (see concurrency); drafts never run paid CI.
+    # labeled/unlabeled so 'ready-for-ci' gates CI; only a new commit cancels an in-flight run (see concurrency); a draft starts no paid CI (an in-flight run still finishes).
     # auto_merge_enabled: the one full-matrix run per PR, at merge time (see generate_matrix).
     types: [opened, reopened, synchronize, labeled, unlabeled, auto_merge_enabled, ready_for_review, converted_to_draft]
   merge_group:
@@ -866,6 +866,7 @@ jobs:
       labels: eks-openobserve-standard-4
     permissions:
       checks: write
+      pull-requests: read
     needs:
       [
         check_changes,
@@ -917,14 +918,19 @@ jobs:
           fi
 
       - name: Complete the auto-merge placeholder
-        # Only a full-matrix verdict (or no Playwright changes) may stand in for the run the placeholder waits on.
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.check_changes.result == 'success' && (needs.check_changes.outputs.has_changes != 'true' || needs.generate_matrix.outputs.smoke_active == 'false') }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]' && needs.check_changes.result == 'success' }}
         # github-script, not gh: the eks runners are not known to ship the gh CLI.
         uses: actions/github-script@v9
         env:
           VERDICT: ${{ steps.verdict.outcome }}
+          SMOKE: ${{ needs.check_changes.outputs.has_changes == 'true' && needs.generate_matrix.outputs.smoke_active != 'false' }}
         with:
           script: |
+            if (process.env.SMOKE === 'true') {
+              // A smoke verdict may stand in only once auto-merge is off, else a full run dropped from the queue strands the placeholder.
+              const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: context.payload.pull_request.number });
+              if (pr.auto_merge) { core.info('Smoke run and auto-merge is on: leaving the placeholder to the full-matrix run.'); return; }
+            }
             const conclusion = process.env.VERDICT === 'success' ? 'success' : 'failure';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const runs = await github.paginate(github.rest.checks.listForRef, {
