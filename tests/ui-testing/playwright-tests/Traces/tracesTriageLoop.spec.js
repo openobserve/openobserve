@@ -24,8 +24,8 @@ function decodedSqlOf(request) {
 }
 
 // The comparison sends its own counts and LIMIT 4000 samples; nothing else does.
-const isComparison = (q) => /^SELECT count\(\*\) AS n FROM/.test(q.sql) || /LIMIT 4000$/.test(q.sql);
-const isCount = (q) => /^SELECT count\(\*\) AS n FROM/.test(q.sql);
+const isComparison = (q) => /^SELECT count\(\*\) AS n\b/.test(q.sql) || /LIMIT 4000$/.test(q.sql);
+const isCount = (q) => /^SELECT count\(\*\) AS n\b/.test(q.sql);
 // The table search: spans mode posts a base64 `SELECT *` SQL.
 const isTableSearch = (q) => /^SELECT \* FROM/.test(q.sql);
 
