@@ -286,6 +286,7 @@ import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
 import {
   SPAN_DERIVED_COLUMN_IDS,
   useTracesTableColumns,
+  fillLastColumn,
 } from "@/plugins/traces/composables/useTracesTableColumns";
 import TraceTimestampCell from "./TraceTimestampCell.vue";
 import TraceServiceCell from "./TraceServiceCell.vue";
@@ -571,6 +572,13 @@ const onColumnReorder = (newOrder: string[]) => {
   searchObj.data.stream.selectedFields = newOrder.filter(
     (id) => id !== store.state.zoConfig.timestamp_column && !SPAN_DERIVED_COLUMN_IDS.has(id),
   );
+  const rank = new Map(newOrder.map((id, index) => [id, index]));
+  const ordered = [...searchObj.data.resultGrid.columns].sort(
+    (a: { id: string }, b: { id: string }) =>
+      (rank.get(a.id) ?? newOrder.length) - (rank.get(b.id) ?? newOrder.length),
+  );
+  fillLastColumn(ordered, timestampCol.value);
+  searchObj.data.resultGrid.columns = ordered;
   // useTraces only persists per traces/spans; other modes have no column state.
   updatedLocalLogFilterField(mode as "traces" | "spans");
 };
@@ -582,9 +590,11 @@ const onCloseColumn = (columnDef: any) => {
     searchObj.data.stream.selectedFields.splice(fieldIdx, 1);
     updatedLocalLogFilterField(mode as "traces" | "spans");
   }
-  searchObj.data.resultGrid.columns = searchObj.data.resultGrid.columns.filter(
+  const remaining = searchObj.data.resultGrid.columns.filter(
     (c: { id: string }) => c.id !== columnDef.id,
   );
+  fillLastColumn(remaining, timestampCol.value);
+  searchObj.data.resultGrid.columns = remaining;
 
   // If the closed column was the active sort column, reset to default
   if (columnDef.id === props.sortBy) {

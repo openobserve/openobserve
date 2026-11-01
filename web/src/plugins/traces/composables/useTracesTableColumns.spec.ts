@@ -47,6 +47,7 @@ vi.mock("@/utils/traces/constants", () => ({
 
 import {
   useTracesTableColumns,
+  fillLastColumn,
   LLM_COLUMN_IDS,
   SPAN_DERIVED_COLUMN_IDS,
 } from "./useTracesTableColumns";
@@ -578,6 +579,48 @@ describe("useTracesTableColumns", () => {
       expect((col?.meta as Record<string, unknown>)?.headerTooltip).toBe(
         "traces.results.spansColumnTooltip",
       );
+    });
+  });
+
+  describe("column widths do not follow the data", () => {
+    const fillIds = (cols: { id: string; meta?: unknown }[]) =>
+      cols
+        .filter((c) => (c.meta as Record<string, unknown> | undefined)?.fillRemaining)
+        .map((c) => c.id);
+
+    it("makes the last Traces view column fill the remaining width", () => {
+      const cols = buildCols(false, "traces", [...DEFAULT_TRACES_FIELDS]);
+      expect(fillIds(cols)).toEqual(["service_latency"]);
+      const last = cols.at(-1)!;
+      expect((last.meta as Record<string, unknown>).autoWidth).toBe(true);
+      expect(last.minSize).toBe(160);
+    });
+
+    it("makes the last Spans view column fill the remaining width", () => {
+      const cols = buildCols(false, "spans", [...DEFAULT_SPANS_FIELDS]);
+      expect(fillIds(cols)).toEqual(["method"]);
+    });
+
+    it("moves the fill to a user-added last column", () => {
+      const cols = buildCols(false, "spans", [...DEFAULT_SPANS_FIELDS, "http_url"]);
+      expect(fillIds(cols)).toEqual(["http_url"]);
+      expect(cols.at(-1)!.minSize).toBe(160);
+    });
+
+    it("never makes the timestamp column fill", () => {
+      expect(fillIds(buildCols(false, "traces", ["_timestamp"]))).toEqual([]);
+    });
+
+    it("takes the fill off a column that is no longer last", () => {
+      const cols = [
+        { id: "method", size: 160, minSize: 160, meta: { autoWidth: true, fillRemaining: true } },
+        { id: "duration", size: 120, meta: {} },
+      ];
+      fillLastColumn(cols, "_timestamp");
+
+      expect(fillIds(cols)).toEqual(["duration"]);
+      expect(cols[0].minSize).toBeUndefined();
+      expect((cols[0].meta as Record<string, unknown>).autoWidth).toBeUndefined();
     });
   });
 });

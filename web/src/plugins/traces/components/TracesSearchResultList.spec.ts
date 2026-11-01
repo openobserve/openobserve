@@ -70,7 +70,8 @@ vi.mock("@/composables/useTraces", () => ({
   },
 }));
 
-vi.mock("@/plugins/traces/composables/useTracesTableColumns", () => ({
+vi.mock("@/plugins/traces/composables/useTracesTableColumns", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/plugins/traces/composables/useTracesTableColumns")>()),
   useTracesTableColumns: () => ({
     buildColumns: vi.fn(() => []),
   }),
@@ -602,6 +603,75 @@ describe("TracesSearchResultList", () => {
       expect(sharedSearchObj.data.resultGrid.columns.some((c: any) => c.id === "span_status")).toBe(
         false,
       );
+    });
+  });
+
+  describe("onCloseColumn — fill column", () => {
+    afterEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [];
+      sharedSearchObj.data.stream.selectedFields = [];
+    });
+
+    it("hands the remaining width to the new last column when the last one is closed", async () => {
+      sharedSearchObj.data.resultGrid.columns = [
+        { id: "service_name", size: 160, meta: {} },
+        { id: "duration", size: 120, meta: {} },
+        { id: "method", size: 160, minSize: 160, meta: { autoWidth: true, fillRemaining: true } },
+      ];
+      sharedSearchObj.data.stream.selectedFields = ["service_name", "duration", "method"];
+      wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: "spans" as any });
+      await wrapper.findComponent({ name: "OTable" }).vm.$emit("close-column", { id: "method" });
+
+      const last = sharedSearchObj.data.resultGrid.columns.at(-1);
+      expect(last.id).toBe("duration");
+      expect(last.meta.fillRemaining).toBe(true);
+      expect(last.minSize).toBe(120);
+    });
+  });
+
+  describe("onColumnReorder — fill column", () => {
+    afterEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [];
+      sharedSearchObj.data.stream.selectedFields = [];
+    });
+
+    const fillIds = () =>
+      sharedSearchObj.data.resultGrid.columns
+        .filter((c: any) => c.meta?.fillRemaining)
+        .map((c: any) => c.id);
+
+    const reorder = async (order: string[], searchMode = "spans") => {
+      sharedSearchObj.data.resultGrid.columns = [
+        { id: "service_name", size: 160, meta: {} },
+        { id: "span_status", size: 120, meta: {} },
+        { id: "_span_error", size: 240, meta: {} },
+        { id: "duration", size: 120, meta: {} },
+        { id: "method", size: 160, minSize: 160, meta: { autoWidth: true, fillRemaining: true } },
+      ];
+      sharedSearchObj.data.stream.selectedFields = [
+        "service_name",
+        "span_status",
+        "duration",
+        "method",
+      ];
+      wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: searchMode as any });
+      await wrapper.findComponent({ name: "OTable" }).vm.$emit("column-order-change", order);
+    };
+
+    it("moves the fill to the column dragged last and off the old filler", async () => {
+      await reorder(["service_name", "method", "span_status", "_span_error", "duration"]);
+
+      expect(fillIds()).toEqual(["duration"]);
+      const method = sharedSearchObj.data.resultGrid.columns.find((c: any) => c.id === "method");
+      expect(method.minSize).toBeUndefined();
+      expect(method.meta.autoWidth).toBeUndefined();
+    });
+
+    it("fills a Spans-view error column that is dragged last", async () => {
+      await reorder(["service_name", "span_status", "duration", "method", "_span_error"]);
+
+      expect(fillIds()).toEqual(["_span_error"]);
+      expect(sharedSearchObj.data.resultGrid.columns.at(-1).id).toBe("_span_error");
     });
   });
 
