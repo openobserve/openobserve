@@ -106,6 +106,16 @@ describe("useFunnelTrend", () => {
     expect(pa.funnelInterval.value).toBe("auto");
   });
 
+  it("the interval select shows Auto for a pick the range rules out, keeping the pick", () => {
+    const { trend, pa } = setup();
+    pa.funnelInterval.value = "month";
+    expect(trend.intervalOptions.value.find((o) => o.value === "month")?.disabled).toBe(true);
+    expect(trend.selectedInterval.value).toBe("auto");
+    expect(pa.funnelInterval.value).toBe("month");
+    pa.funnelInterval.value = "day";
+    expect(trend.selectedInterval.value).toBe("day");
+  });
+
   it("from lists steps 1 to n-1 and to lists only the steps after from", () => {
     const { trend, pa, def } = setup();
     def.value = { ...def.value, steps: steps(4) };
@@ -186,5 +196,17 @@ describe("useFunnelTrend", () => {
     expect(String(trend.previous.value?.label)).toBe("rum.analytics.funnel.comparePrev");
     compare.value = null;
     expect(trend.previous.value).toBeNull();
+  });
+
+  it("an attribute breakdown on a field the schema lacks reads as no breakdown, so compare runs", async () => {
+    const compare = ref<CompareMode | null>("prev");
+    const { trend, runner, pa, def, release } = setup(compare);
+    def.value = { ...def.value, breakdown: { f: "plan" } };
+    expect(trend.breakdown.value).toBe(false);
+    release();
+    await trend.run(def.value);
+    expect(runner.run.mock.calls.filter((c) => c[0] === "funnel-trend-prev")).toHaveLength(1);
+    pa.scope.value = { ...pa.scope.value, schema: { plan: true } };
+    expect(trend.breakdown.value).toBe(true);
   });
 });
