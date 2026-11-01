@@ -109,6 +109,7 @@ const inFlight: Array<{
   query: string;
   start: number;
   end: number;
+  step: string;
   queryType: string;
   complete: (result: any) => void;
 }> = [];
@@ -148,6 +149,7 @@ vi.mock("@/composables/useStreamingSearch", () => ({
         query: payload.queryReq.query,
         start: payload.queryReq.start_time,
         end: payload.queryReq.end_time,
+        step: payload.queryReq.step,
         queryType: payload.queryReq.query_type,
         complete: (result: any) => {
           handlers.data({}, { type: "promql_response", content: { results: result } });
@@ -181,8 +183,26 @@ vi.mock("@/services/stream", async (importOriginal) => {
   return overlayServiceMock(await importOriginal(), { default: { nameList: vi.fn() } });
 });
 vi.mock("@/services/metrics", () => ({
-  default: { labels: vi.fn(), labelValues: vi.fn(), metadata: vi.fn() },
+  default: { labels: vi.fn(), labelValues: vi.fn(), metadata: vi.fn(), getOrgMetricUsage: vi.fn() },
 }));
+
+// Interval probes stay out of `inFlight` unless a test opts in, so query counts elsewhere hold.
+const { intervalProbes } = vi.hoisted(() => ({
+  intervalProbes: { measure: false, cache: null as any },
+}));
+vi.mock("./metricExportInterval", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  intervalProbes.cache = actual.createExportIntervalCache();
+  return {
+    ...actual,
+    exportIntervalCache: {
+      peek: (key: string) => intervalProbes.cache.peek(key),
+      detect: (key: string, measure: () => Promise<number | null>) =>
+        intervalProbes.measure ? intervalProbes.cache.detect(key, measure) : Promise.resolve(null),
+      clear: () => intervalProbes.cache.clear(),
+    },
+  };
+});
 
 // Every queue the composable creates, so a test can spy on the grid's scheduler.
 const { createdQueues } = vi.hoisted(() => ({ createdQueues: [] as any[] }));
@@ -264,6 +284,8 @@ const createGrid = (translate: typeof t) => {
 describe("useMetricsExplorerGrid", () => {
   beforeEach(() => {
     inFlight.length = 0;
+    intervalProbes.measure = false;
+    intervalProbes.cache.clear();
     localStorage.clear();
     // The deferred `fetchSchema=true` load, which the label filters trigger.
     (StreamService.nameList as any).mockResolvedValue({ data: { list: STREAMS } });
@@ -599,6 +621,223 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.labelFilters.value).toEqual([first, second]);
     });
   });
+  describe("export-interval alignment", () => {
+    const COUNTER = "http_requests_total";
+    const probes = () => inFlight.filter((q) => q.queryType === "instant");
+    const ranges = () => inFlight.filter((q) => q.queryType !== "instant");
+    const counted = (n: number) => ({
+      resultType: "vector",
+      result: [{ metric: {}, value: [NOW_US / 1e6, String(n)] }],
+    });
+    const land = (q: (typeof inFlight)[number], result: any) => {
+      inFlight.splice(inFlight.indexOf(q), 1);
+      q.complete(result);
+    };
+
+    beforeEach(() => {
+      intervalProbes.measure = true;
+    });
+
+    /** Requests the card's preview and lands it, leaving the probe that follows in flight. */
+    const charted = async (grid: any, card: any, opts?: any) => {
+      const preview = grid.requestPreview(card, opts);
+      await flush();
+      land(ranges()[0], SERIES);
+      await preview;
+      await flush();
+    };
+
+    it("charts at the range step first, probing only once that chart has landed", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, COUNTER);
+      const preview = grid.requestPreview(card);
+      await flush();
+
+      // Nothing measures while the first chart is still loading.
+      expect(probes()).toEqual([]);
+      // 1h over 50 points is 72s, aligned to the org's 15s scrape: 75s, and a [1m30s] window.
+      expect(ranges().map((q) => [q.query, q.step])).toEqual([
+        [`sum(rate({__name__="${COUNTER}"}[1m30s]))`, "75s"],
+      ]);
+      land(ranges()[0], SERIES);
+      await preview;
+      expect(grid.previews.value[COUNTER].status).toBe("done");
+      await flush();
+
+      expect(probes().map((q) => q.query)).toEqual([
+        `max(count_over_time({__name__="${COUNTER}"}[10m]))`,
+      ]);
+      expect(probes()[0].start).toBe(NOW_US);
+      expect(probes()[0].end).toBe(NOW_US);
+
+      // 10 samples in 10m: a 60s exporter does not divide 75s, so a 120s step and a [4m] window.
+      land(probes()[0], counted(10));
+      await flush();
+      expect(ranges().map((q) => [q.query, q.step])).toEqual([
+        [`sum(rate({__name__="${COUNTER}"}[4m]))`, "120s"],
+      ]);
+      // The previous chart stays up while the aligned one loads.
+      expect(grid.previews.value[COUNTER].results).toEqual([SERIES]);
+      land(ranges()[0], SERIES);
+      await flush();
+      await flush();
+      expect(grid.previews.value[COUNTER].status).toBe("done");
+      expect(inFlight).toEqual([]);
+
+      // The detail view and Breakdown derive from the same aligned step and window.
+      expect(grid.detailStepFor(card)).toBe(120);
+      expect(grid.rateWindowFor(card)).toBe("4m");
+    });
+
+    it("never runs a probe ahead of a preview: it queues below every preview priority", async () => {
+      const grid = await setup();
+      const run = vi.spyOn(createdQueues.at(-1), "run");
+      await charted(grid, cardNamed(grid, COUNTER));
+
+      const calls = run.mock.calls.map(([key, priority]) => ({ key: String(key), priority }));
+      const probe = calls.findIndex((c) => c.key.includes("count_over_time"));
+      const chart = calls.findIndex((c) => c.key.includes("sum(rate("));
+      expect(chart).toBeGreaterThanOrEqual(0);
+      expect(probe).toBeGreaterThan(chart);
+      expect(calls[probe].priority).toBe(PRIORITY.BACKGROUND);
+      expect(PRIORITY.BACKGROUND).toBeGreaterThan(
+        Math.max(PRIORITY.DIALOG, PRIORITY.VISIBLE, PRIORITY.PREFETCH),
+      );
+    });
+
+    it("does not probe for a prefetched card", async () => {
+      const grid = await setup();
+      await charted(grid, cardNamed(grid, COUNTER), { priority: PRIORITY.PREFETCH });
+      expect(probes()).toEqual([]);
+    });
+
+    it("probes a prefetched card once it comes on screen", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, COUNTER);
+      await charted(grid, card, { priority: PRIORITY.PREFETCH });
+      await grid.requestPreview(card);
+      await flush();
+      expect(probes()).toHaveLength(1);
+    });
+
+    it("drops a hidden card's probe, and measures again when it is next seen", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, COUNTER);
+      await charted(grid, card);
+      const stranded = probes()[0];
+      grid.cancelPreview(card);
+      await flush();
+      land(stranded, counted(10));
+      await flush();
+      expect(ranges()).toEqual([]);
+      expect(grid.detailStepFor(card)).toBe(75);
+
+      await grid.requestPreview(card);
+      await flush();
+      expect(probes()).toHaveLength(1);
+    });
+
+    it("re-queries nothing when the scrape-aligned step already fits the measured interval", async () => {
+      const grid = await setup();
+      await charted(grid, cardNamed(grid, COUNTER));
+
+      // 40 samples in 10m: a 15s exporter, which divides the 75s step already charted.
+      land(probes()[0], counted(40));
+      await flush();
+      await flush();
+      expect(inFlight).toEqual([]);
+    });
+
+    it("re-counts over an hour for a sparse metric, and does not align when it still cannot tell", async () => {
+      const grid = await setup();
+      await charted(grid, cardNamed(grid, COUNTER));
+
+      land(probes()[0], counted(1));
+      await flush();
+      expect(probes().map((q) => q.query)).toEqual([
+        `max(count_over_time({__name__="${COUNTER}"}[1h]))`,
+      ]);
+      land(probes()[0], counted(1));
+      await flush();
+      await flush();
+      expect(inFlight).toEqual([]);
+      expect(grid.detailStepFor(cardNamed(grid, COUNTER))).toBe(75);
+    });
+
+    it("aligns from the first query once the interval is cached", async () => {
+      const grid = await setup();
+      await charted(grid, cardNamed(grid, COUNTER));
+      land(probes()[0], counted(10));
+      await flush();
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+      await flush();
+      await flush();
+
+      // A new window clears every preview; the cached interval aligns the very next query.
+      grid.setTimeRange({ start_time: NOW_US - 2 * HOUR_US, end_time: NOW_US });
+      inFlight.length = 0;
+      const again = grid.requestPreview(cardNamed(grid, COUNTER));
+      await flush();
+      // 2h over 50 points is 144s, aligned to 180s.
+      expect(ranges().map((q) => q.step)).toEqual(["180s"]);
+      land(ranges()[0], SERIES);
+      await again;
+      await flush();
+      expect(probes()).toEqual([]);
+    });
+
+    it("does not re-query when the measured interval is wider than the range", async () => {
+      const grid = await setup();
+      grid.setTimeRange({ start_time: NOW_US - 5 * 60 * 1e6, end_time: NOW_US });
+      inFlight.length = 0;
+      const card = cardNamed(grid, COUNTER);
+      await charted(grid, card);
+      const step = grid.detailStepFor(card);
+
+      // One sample in 10m, then 6 in an hour: a 600s exporter, which cannot align a 5m range.
+      land(probes()[0], counted(1));
+      await flush();
+      land(probes()[0], counted(6));
+      for (let i = 0; i < 5; i++) await flush();
+
+      expect(ranges()).toEqual([]);
+      expect(grid.detailStepFor(card)).toBe(step);
+    });
+
+    it("queues a refresh's chart query before the probe of an expired interval", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, COUNTER);
+      await charted(grid, card);
+      land(probes()[0], counted(40));
+      await flush();
+      await flush();
+      // The interval's TTL ran out.
+      intervalProbes.cache.clear();
+      const run = vi.spyOn(createdQueues.at(-1), "run");
+
+      const refresh = grid.requestPreview(card, { skipCache: true });
+      await flush();
+      expect(probes()).toEqual([]);
+      expect(ranges()).toHaveLength(1);
+      const keys = run.mock.calls.map(([key]) => String(key));
+      expect(keys.findIndex((k) => k.includes("count_over_time"))).toBe(-1);
+
+      land(ranges()[0], SERIES);
+      await refresh;
+      await flush();
+      expect(probes()).toHaveLength(1);
+    });
+
+    it("measures a stream once however often its card asks", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, COUNTER);
+      await charted(grid, card);
+      await grid.requestPreview(card);
+      await flush();
+      expect(probes()).toHaveLength(1);
+    });
+  });
+
   describe("an info metric", () => {
     it("previews as a COUNT of its series, not as nothing at all", async () => {
       // Its payload is its labels and its value is always 1, so the chart worth
@@ -1308,8 +1547,8 @@ describe("useMetricsExplorerGrid", () => {
       inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES)); // probe: samples exist
       await flush();
 
-      // 1h range, 50 points, 15s scrape → standard window [1m27s], first retry 4x.
-      expect(inFlight.map((q) => q.query).join()).toContain("[5m48s]");
+      // 1h range, 50 points, 15s scrape → a 75s step aligned to the scrape, standard window [1m30s], first retry 4x.
+      expect(inFlight.map((q) => q.query).join()).toContain("[6m]");
       inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
       await preview;
 
@@ -1320,7 +1559,7 @@ describe("useMetricsExplorerGrid", () => {
       // Carried for the drill-in: the editor resolves `$__rate_interval` from
       // the same overstated scrape interval, so it needs the window that
       // actually worked.
-      expect(settled.widenedRateWindow).toBe("5m48s");
+      expect(settled.widenedRateWindow).toBe("6m");
     });
 
     it("escalates to a second, wider window before conceding sparseness", async () => {
@@ -1335,12 +1574,12 @@ describe("useMetricsExplorerGrid", () => {
       inFlight.splice(0, inFlight.length).forEach((q) => q.complete(NO_SERIES)); // 4x: still nothing
       await flush();
 
-      expect(inFlight.map((q) => q.query).join()).toContain("[23m12s]"); // 16x
+      expect(inFlight.map((q) => q.query).join()).toContain("[24m]"); // 16x
       inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
       await preview;
 
       expect(grid.previews.value["lat_seconds_count"].sparse).toBe(false);
-      expect(grid.previews.value["lat_seconds_count"].widenedRateWindow).toBe("23m12s");
+      expect(grid.previews.value["lat_seconds_count"].widenedRateWindow).toBe("24m");
       expect(names(grid)).toContain("lat_seconds_count");
     });
 
@@ -1465,6 +1704,56 @@ describe("useMetricsExplorerGrid", () => {
       grid.removeLabelFilter(pod);
       expect(grid.inapplicableLabelFilters(card)).toEqual([]);
       expect(grid.isLabelEligible(card)).toBe(true);
+    });
+  });
+
+  describe("OR groups narrow by any group a card can apply", () => {
+    it("keeps a card one group fits, and queries every group as written", async () => {
+      const grid = await setup();
+      (StreamService.nameList as any).mockResolvedValueOnce({
+        data: {
+          list: STREAMS.map((stream) =>
+            stream.name === "lat_seconds_bucket"
+              ? { ...stream, schema: [{ name: "le", type: "Utf8" }] }
+              : { ...stream, schema: [{ name: "pod", type: "Utf8" }] },
+          ),
+        },
+      });
+      const le = { label: "le", value: "0.5", operator: "=", group: 1 } as any;
+      const pod = { label: "pod", value: "a", operator: "=", group: 2 } as any;
+      await grid.addLabelFilter(le);
+      await grid.addLabelFilter(pod);
+
+      const card = cardNamed(grid, "lat_seconds_bucket");
+      expect(grid.isLabelEligible(card)).toBe(true);
+      expect(grid.inapplicableLabelFilters(card)).toEqual([]);
+      // A group the stream cannot satisfy changes nothing, but a negated one would match every series.
+      const expr = grid.effectiveVariant(card).resolved.queries[0].expr;
+      expect(expr).toContain('le="0.5"');
+      expect(expr).toContain('pod="a"');
+
+      grid.removeLabelFilter(le);
+      expect(grid.isLabelEligible(card)).toBe(false);
+    });
+
+    it("drops a card that lacks a base filter even when a group fits", async () => {
+      const grid = await setup();
+      (StreamService.nameList as any).mockResolvedValueOnce({
+        data: {
+          list: STREAMS.map((stream) =>
+            stream.name === "lat_seconds_bucket"
+              ? { ...stream, schema: [{ name: "le", type: "Utf8" }] }
+              : { ...stream, schema: [{ name: "pod", type: "Utf8" }] },
+          ),
+        },
+      });
+      const pod = { label: "pod", value: "a", operator: "=" } as any;
+      await grid.addLabelFilter(pod);
+      await grid.addLabelFilter({ label: "le", value: "0.5", operator: "=", group: 1 } as any);
+
+      const card = cardNamed(grid, "lat_seconds_bucket");
+      expect(grid.isLabelEligible(card)).toBe(false);
+      expect(grid.inapplicableLabelFilters(card)).toEqual([pod]);
     });
   });
 
@@ -2013,6 +2302,106 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.familyOf("http_requests_total")).not.toBe(grid.familyOf("lat_seconds_bucket"));
       // A concrete window for the breakdown query, sized like the card's own.
       expect(grid.rateWindowFor(cardNamed(grid, "http_requests_total"))).toMatch(/^\d+[smh]/);
+    });
+  });
+
+  describe("usage sorts and filters", () => {
+    const USAGE = {
+      cpu_temperature: { dashboards: 1, alerts: 3, slos: 0, pipelines: 0 },
+      http_requests_total: { dashboards: 5, alerts: 0, slos: 1, pipelines: 0 },
+      idle_metric_total: { dashboards: 1, alerts: 1, slos: 0, pipelines: 0 },
+    };
+    const usageMock = () => (metricsService as any).getOrgMetricUsage as ReturnType<typeof vi.fn>;
+    const names = (grid: any) => grid.sortedCards.value.map((c: any) => c.name);
+    let orgSeq = 0;
+
+    beforeEach(() => {
+      // The usage cache lives for the session, so each test gets an org of its own.
+      storeState.selectedOrganization = { identifier: `usage-org-${++orgSeq}` };
+      usageMock()
+        .mockReset()
+        .mockResolvedValue({ data: { metrics: USAGE } });
+    });
+    afterEach(() => {
+      storeState.selectedOrganization = { identifier: "org1" };
+    });
+
+    it("fetches nothing until a usage sort is picked, then ranks by dashboards with A–Z ties", async () => {
+      const grid = await setup();
+      await flush();
+      expect(usageMock()).not.toHaveBeenCalled();
+
+      grid.sortBy.value = "dashboards";
+      await flush();
+      expect(usageMock()).toHaveBeenCalledTimes(1);
+      expect(usageMock().mock.calls[0][0]).toMatchObject({ org_identifier: `usage-org-${orgSeq}` });
+      expect(names(grid).slice(0, 3)).toEqual([
+        "http_requests_total",
+        "cpu_temperature",
+        "idle_metric_total",
+      ]);
+      expect(grid.usageLoading.value).toBe(false);
+    });
+
+    it("ranks by alerts", async () => {
+      const grid = await setup();
+      grid.sortBy.value = "alerts";
+      await flush();
+      expect(names(grid).slice(0, 2)).toEqual(["cpu_temperature", "idle_metric_total"]);
+    });
+
+    it("filters AND together, and fail open while the scan is in flight", async () => {
+      let resolve!: (v: any) => void;
+      usageMock().mockReturnValue(new Promise((r) => (resolve = r)));
+      const grid = await setup();
+      const all = names(grid);
+
+      grid.usageFilters.value = new Set(["dashboards"]);
+      await flush();
+      expect(grid.usageLoading.value).toBe(true);
+      expect(names(grid)).toEqual(all);
+
+      resolve({ data: { metrics: USAGE } });
+      await flush();
+      expect(grid.usageLoading.value).toBe(false);
+      expect(names(grid)).toEqual(["cpu_temperature", "http_requests_total", "idle_metric_total"]);
+
+      grid.usageFilters.value = new Set(["dashboards", "alerts"]);
+      expect(names(grid)).toEqual(["cpu_temperature", "idle_metric_total"]);
+      grid.usageFilters.value = new Set(["slos"]);
+      expect(names(grid)).toEqual(["http_requests_total"]);
+      expect(grid.activeFilterCount.value).toBe(1);
+
+      grid.clearFilters();
+      expect(grid.usageFilters.value.size).toBe(0);
+      expect(names(grid)).toEqual(all);
+    });
+
+    it("scans an org once per session, however many grids ask", async () => {
+      const first = await setup();
+      first.sortBy.value = "dashboards";
+      await flush();
+      const second = await setup();
+      second.usageFilters.value = new Set(["alerts"]);
+      await flush();
+      expect(usageMock()).toHaveBeenCalledTimes(1);
+      expect(names(second)).toEqual(["cpu_temperature", "idle_metric_total"]);
+    });
+
+    it("surfaces a failed scan, keeps the A–Z order, and retries without the failure cached", async () => {
+      usageMock().mockRejectedValueOnce(new Error("boom"));
+      const grid = await setup();
+      const all = names(grid);
+      grid.sortBy.value = "dashboards";
+      await flush();
+      expect(grid.usageError.value).toBe(true);
+      expect(grid.usageLoading.value).toBe(false);
+      expect(names(grid)).toEqual(all);
+
+      await grid.retryUsage();
+      expect(usageMock()).toHaveBeenCalledTimes(2);
+      expect(grid.usageError.value).toBe(false);
+      expect(names(grid)[0]).toBe("http_requests_total");
     });
   });
 });

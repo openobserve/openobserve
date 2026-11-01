@@ -17,6 +17,7 @@ import { isEqual } from "lodash-es";
 import metricsService from "@/services/metrics";
 import { gt, type I18nKey } from "@/types/i18n";
 import { promqlRenderer } from "./operations/queryModeller";
+import { compileLabelFilters } from "./labelBoolean";
 import {
   PromqlStepGroup,
   PromqlStepId,
@@ -30,9 +31,11 @@ export type PromqlTree = { type: string; [key: string]: any };
 export type BuilderMapping =
   { ok: true; query: PromqlBuilderQuery } | { ok: false; reason: string };
 
+type TreeSelector = { name: string | null; matchers: PromqlLabelMatcher[]; offset?: string };
+
 type Layer =
   | { step: PromqlStep; inner: PromqlTree }
-  | { step?: PromqlStep; selector: { name: string | null; matchers: PromqlLabelMatcher[] } }
+  | { step?: PromqlStep; selector: TreeSelector }
   | { reason: string };
 
 const SCALAR_STEPS: Record<string, PromqlStepId> = {
@@ -48,8 +51,6 @@ const cannotShow = (construct: string) =>
   gt("metrics.builderSwitch.unsupported", { construct }) as string;
 
 const KIND_PHRASES: Record<string, I18nKey> = {
-  without: "metrics.builderSwitch.constructs.without",
-  offset: "metrics.builderSwitch.constructs.offset",
   "@": "metrics.builderSwitch.constructs.at",
   "or matchers": "metrics.builderSwitch.constructs.orMatchers",
   subquery: "metrics.builderSwitch.constructs.subquery",
@@ -175,7 +176,7 @@ const aggregateLayer = (node: PromqlTree): Layer => {
       ),
     };
   }
-  const takesParam = spec.params.length === 2;
+  const takesParam = spec.params[0]?.type === "number";
   if (takesParam !== !!node.param || (node.param && !isNumber(node.param))) {
     return {
       reason: cannotShow(
@@ -183,7 +184,8 @@ const aggregateLayer = (node: PromqlTree): Layer => {
       ),
     };
   }
-  const params = takesParam ? [node.param.value, node.by] : [node.by];
+  const grouping = Array.isArray(node.without) ? [node.without, true] : [node.by];
+  const params = takesParam ? [node.param.value, ...grouping] : grouping;
   return { step: { id: node.op, params }, inner: node.expr };
 };
 
@@ -209,6 +211,63 @@ const binaryLayer = (node: PromqlTree): Layer => {
   };
 };
 
+const unionLeaves = (node: PromqlTree): PromqlTree[] =>
+  node.type === "binary" && node.op === "or"
+    ? [...unionLeaves(node.lhs), ...unionLeaves(node.rhs)]
+    : [node];
+
+const matcherKey = (m: PromqlLabelMatcher) => `${m.label}\u0000${m.op}\u0000${m.value}`;
+
+/** Matchers every branch shares become the base list; the rest of each branch is one OR group. */
+const branchesToGroups = (branches: PromqlLabelMatcher[][]): PromqlLabelMatcher[] => {
+  const common = branches[0].filter((m) =>
+    branches.every((branch) => branch.some((other) => matcherKey(other) === matcherKey(m))),
+  );
+  const shared = new Set(common.map(matcherKey));
+  const base = common.map((m) => ({ label: m.label, op: m.op, value: m.value }));
+  // A branch that is only the shared matchers is the base itself, which absorbs every other branch.
+  if (branches.some((branch) => branch.every((m) => shared.has(matcherKey(m))))) return base;
+  const groups = branches.flatMap((branch, index) =>
+    branch
+      .filter((m) => !shared.has(matcherKey(m)))
+      .map((m) => ({ label: m.label, op: m.op, value: m.value, group: index + 1 })),
+  );
+  return [...base, ...groups];
+};
+
+/** `A or B …` over one metric, each side the same range step (or none), is a set of filter branches. */
+const unionLayer = (node: PromqlTree): Layer => {
+  const refuse = {
+    reason: cannotShow(gt("metrics.builderSwitch.constructs.setOperator", { op: "or" }) as string),
+  };
+  const leaves = unionLeaves(node).map((leaf) => {
+    if (leaf.type === "selector") return { selector: leaf as unknown as TreeSelector };
+    if (leaf.type === "unsupported") return { reason: cannotShowKind(leaf.kind) };
+    if (leaf.type !== "call") return refuse;
+    const spec = promqlRenderer.getStepSpec(leaf.func);
+    return spec?.group === PromqlStepGroup.RateAndRange ? rangeLayer(leaf.func, leaf.args) : refuse;
+  });
+  const failed = leaves.find((leaf) => "reason" in leaf);
+  if (failed) return failed;
+  const sides = leaves as { step?: PromqlStep; selector: TreeSelector }[];
+  const [first] = sides;
+  const sameShape = sides.every(
+    (side) =>
+      isEqual(side.step, first.step) &&
+      side.selector.name === first.selector.name &&
+      side.selector.offset === first.selector.offset,
+  );
+  if (!sameShape || !first.selector.name) return refuse;
+  return {
+    step: first.step,
+    selector: {
+      name: first.selector.name,
+      offset: first.selector.offset,
+      matchers: branchesToGroups(sides.map((side) => side.selector.matchers)),
+    },
+  };
+};
+
 const layerOf = (node: PromqlTree): Layer => {
   switch (node.type) {
     case "selector":
@@ -218,7 +277,7 @@ const layerOf = (node: PromqlTree): Layer => {
     case "aggregate":
       return aggregateLayer(node);
     case "binary":
-      return binaryLayer(node);
+      return node.op === "or" ? unionLayer(node) : binaryLayer(node);
     case "unsupported":
       return { reason: cannotShowKind(node.kind) };
     case "matrix":
@@ -239,17 +298,66 @@ export const treeToBuilder = (tree: PromqlTree): BuilderMapping => {
       if (!layer.selector.name) {
         return { ok: false, reason: gt("metrics.builderSwitch.noMetric") as string };
       }
+      const operations = steps.reverse();
+      if (layer.selector.offset) {
+        operations.push({ id: PromqlStepId.Offset, params: [layer.selector.offset] });
+      }
       return {
         ok: true,
         query: {
           metric: layer.selector.name,
           labels: layer.selector.matchers,
-          operations: steps.reverse(),
+          operations,
         },
       };
     }
     node = layer.inner;
   }
+};
+
+/** The OR-of-AND branches a filter list means, in a fixed order, so equal filters compare equal. */
+const canonicalBranches = (labels: PromqlLabelMatcher[]): string[][] => {
+  const compiled = compileLabelFilters(labels);
+  const branches = compiled.ok ? compiled.branches : [labels];
+  return branches
+    .map((branch) => branch.map((m) => matcherKey(m as PromqlLabelMatcher)).sort())
+    .sort((a, b) => a.join("\u0001").localeCompare(b.join("\u0001")));
+};
+
+const filterLayer = (node: PromqlTree): Layer | null => {
+  if (node.type === "binary" && node.op === "or") return unionLayer(node);
+  if (node.type === "selector") return { selector: node as unknown as TreeSelector };
+  if (
+    node.type === "call" &&
+    promqlRenderer.getStepSpec(node.func)?.group === PromqlStepGroup.RateAndRange
+  ) {
+    return rangeLayer(node.func, node.args);
+  }
+  return null;
+};
+
+/** A tree with each selector or union of selectors replaced by the filter branches it means, so a merged rendering matches the union it came from. */
+export const canonicalTree = (node: PromqlTree): PromqlTree => {
+  const layer = filterLayer(node);
+  if (layer && "selector" in layer) {
+    return {
+      type: "filters",
+      step: layer.step ?? null,
+      name: layer.selector.name,
+      offset: layer.selector.offset ?? null,
+      branches: canonicalBranches(layer.selector.matchers),
+    };
+  }
+  const out: PromqlTree = { type: node.type };
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "type") continue;
+    out[key] = Array.isArray(value)
+      ? value.map((v) => (isTree(v) ? canonicalTree(v) : v))
+      : isTree(value)
+        ? canonicalTree(value)
+        : value;
+  }
+  return out;
 };
 
 const parse = async (org: string, query: string): Promise<PromqlTree> =>
@@ -271,7 +379,8 @@ export const promqlToBuilder = async (org: string, text: string): Promise<Builde
   const mismatch = { ok: false as const, reason: gt("metrics.builderSwitch.mismatch") as string };
   try {
     const again = await parse(org, promqlRenderer.renderQuery(mapped.query));
-    return isEqual(stripParens(tree), stripParens(again)) ? mapped : mismatch;
+    const same = isEqual(canonicalTree(stripParens(tree)), canonicalTree(stripParens(again)));
+    return same ? mapped : mismatch;
   } catch {
     return mismatch;
   }

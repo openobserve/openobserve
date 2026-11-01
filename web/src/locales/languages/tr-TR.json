@@ -1315,7 +1315,6 @@
       "moreExamples": "Ek örnekler için,",
       "clickHere": "buraya tıklayın"
     },
-    "legendLabel": "Lejant",
     "switchToLogs": "Günlüklere geri dön",
     "savedViewsLabel": "Kayıtlı Görünümler",
     "savedViewName": "Görünüm Adı",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "Formül {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter}, bu panelde bir sorgu değil",
-    "formulaReferencesFormula": "{letter} bir formüldür ve bir formül başka bir formüle başvuramaz",
+    "formulaCycle": "Formüller birbirine döngü halinde başvuruyor: {cycle}",
+    "formulaTooLong": "Formül genişletildiğinde {limit} karakteri aşıyor",
+    "formulaTooDeep": "Formüller {limit} düzeyden daha derin iç içe geçmiş",
     "formulaInputNote": "Bir formülde kullanıldığında: burada bu sorgunun anlık/aralık ayarı, lejantı, adımı ve zaman kaydırması geçerli olmaz.",
     "multiSqlQueryLabel": "Sorgu Etiketi",
     "multiSqlQueryLabelHint": "Lejantlarda bu sorgu için özel ad (örn., 'Üretim')",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "Değer",
     "hostmapGroupBy": "Gruplama",
     "otherColumn": "Diğer Sütunlar",
-    "metric": "Metrik",
     "filters": "Filtreler",
     "labelFilters": "Etiket Filtreleri",
     "operations": "Operasyonlar",
@@ -13604,21 +13604,6 @@
     "awsStsSelfHostedInfo": "Bu, rol üstlenmek ve işlemleri gerçekleştirmek için AWS sts kullanır. Kurulum ortamında bu role erişimi olan aws kimlik bilgilerini yapılandırdığınızdan emin olun."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "Anlık vektör seçicileri için kullanın",
-      "rangeVector": "Aralık vektör seçicileri için kullanın",
-      "aggregate": "Veriyi toplamak için kullanın",
-      "or": "veya",
-      "rate": "Bir aralık vektörü üzerinde hız hesaplamaları için kullanın",
-      "sqlTitle": "Sözdizimi Kılavuzu: SQL Modu",
-      "sqlFullText": "'error' değerinin tam metin araması için kullanın",
-      "sqlColumn": "'error' değerinin sütun araması için kullanın",
-      "sqlCode": "code sütununda 200 değerini aramak için kullanın",
-      "sqlStream": "stream sütununda 'stderr' değerini aramak için kullanın",
-      "sqlFunction": "log sütununda {fn} sorgu fonksiyonunu aramak ve kullanmak için kullanın",
-      "sqlMoreExamples": "Ek örnekler için,",
-      "sqlClickHere": "buraya tıklayın"
-    },
     "add": "Ekle",
     "runQuery": "Sorguyu çalıştır",
     "runQueryOptions": "Sorgu çalıştırma seçenekleri",
@@ -13903,10 +13888,6 @@
         "clear": "Görünümü temizle"
       }
     },
-    "index": {
-      "namePanelRequired": "Panel adı zorunludur",
-      "errorsFixTryAgain": "Bazı hatalar var, lütfen düzeltip tekrar deneyin"
-    },
     "metricCard": {
       "lastRefreshed": "Son Yenileme:",
       "traceId": "İz Kimliği: {id}",
@@ -13917,25 +13898,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Grafik oluşturulamadı"
-    },
-    "queryBuilder": {
-      "title": "PromQL Sorgu Oluşturucu",
-      "subtitle": "PromQL sorgularını görsel olarak oluşturun ve test edin",
-      "generatedQuery": "Oluşturulan PromQL Sorgusu:",
-      "noQueryBuilt": "Henüz sorgu oluşturulmadı",
-      "copyQuery": "Sorguyu Kopyala",
-      "clearAll": "Tümünü Temizle",
-      "testQuery": "Sorguyu Test Et",
-      "queryResultPreview": "Sorgu Sonucu Önizlemesi:",
-      "queryCopied": "Sorgu panoya kopyalandı!",
-      "queryCleared": "Sorgu temizlendi",
-      "testingSoon": "Sorgu testi yakında uygulanacak",
-      "executionSoon": "Sorgu yürütme bir sonraki aşamada uygulanacak"
-    },
-    "metricSelector": {
-      "metricName": "Metrik Adı",
-      "loadingMetrics": "Metrikler yükleniyor...",
-      "noMetricsFound": "Metrik bulunamadı"
     },
     "labelFilterEditor": {
       "label": "Etiket",

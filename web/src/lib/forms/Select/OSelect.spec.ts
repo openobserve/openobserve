@@ -573,4 +573,56 @@ describe("OSelect", () => {
       expect(wrapper.findComponent(OTruncatedText).props("tooltip")).toBe(false);
     });
   });
+
+  describe("inline appearance with an inside label", () => {
+    const options = [
+      { label: "Off", value: "off" },
+      { label: "1 day ago", value: "1d" },
+    ];
+    const mountInline = (searchable: boolean) =>
+      mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          appearance: "inline",
+          label: "Compare to",
+          labelPosition: "inside",
+          modelValue: "off",
+          options,
+          searchable,
+        },
+      });
+
+    it.each([false, true])(
+      "puts the label in the trigger beside the value (searchable: %s)",
+      async (searchable) => {
+        wrapper = mountInline(searchable);
+        await flushPromises();
+        const trigger = wrapper.find('button[role="combobox"]');
+        expect(trigger.text()).toContain("Compare to");
+        expect(trigger.text()).toContain("Off");
+        expect(trigger.attributes("aria-label")).toBe("Compare to");
+        expect(wrapper.find("label").exists()).toBe(false);
+      },
+    );
+
+    // The chevron is positioned against this wrapper, so a wrapper wider than the trigger strands it off the click target.
+    it.each([false, true])(
+      "keeps the chevron's wrapper hugging the trigger (searchable: %s)",
+      (searchable) => {
+        wrapper = mountInline(searchable);
+        expect(wrapper.find('button[role="combobox"]').element.parentElement!.className).toContain(
+          "w-fit",
+        );
+      },
+    );
+
+    it("opens the menu from the keyboard on the trigger", async () => {
+      wrapper = mountInline(false);
+      const trigger = wrapper.find('button[role="combobox"]');
+      await trigger.trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      expect(trigger.attributes("aria-expanded")).toBe("true");
+      expect(document.body.textContent).toContain("1 day ago");
+    });
+  });
 });

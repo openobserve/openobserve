@@ -1315,7 +1315,6 @@
       "moreExamples": "للمزيد من الأمثلة،",
       "clickHere": "اضغط هنا"
     },
-    "legendLabel": "وسيلة الإيضاح",
     "switchToLogs": "العودة إلى السجلات",
     "savedViewsLabel": "عرض محفوظ",
     "savedViewName": "عرض الاسم",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "المعادلة {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} ليس استعلامًا في هذه اللوحة",
-    "formulaReferencesFormula": "{letter} معادلة، ولا يجوز لمعادلة أن تشير إلى معادلة أخرى",
+    "formulaCycle": "تشير المعادلات إلى بعضها في حلقة: {cycle}",
+    "formulaTooLong": "تتجاوز المعادلة بعد توسيعها {limit} حرف",
+    "formulaTooDeep": "تتداخل المعادلات بعمق يتجاوز {limit} مستويات",
     "formulaInputNote": "يُستخدم في معادلة: هناك، لا ينطبق إعداد اللحظة/النطاق لهذا الاستعلام، ولا المفتاح التوضيحي، ولا الخطوة، ولا الإزاحة الزمنية.",
     "multiSqlQueryLabel": "تسمية الاستعلام",
     "multiSqlQueryLabelHint": "اسم مخصص لهذا الاستعلام في وسائل الإيضاح (على سبيل المثال، 'الإنتاج')",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "القيمة",
     "hostmapGroupBy": "تجميع حسب",
     "otherColumn": "أعمدة أخرى",
-    "metric": "القياس",
     "filters": "الفلاتر",
     "labelFilters": "فلاتر التسميات",
     "operations": "العمليات",
@@ -13604,21 +13604,6 @@
     "awsStsSelfHostedInfo": "يستخدم هذا AWS STS لتولي الدور وأداء العمليات. تأكد من أنك قمت بتكوين بيانات اعتماد AWS في بيئة التثبيت التي لديها وصول لهذا الدور."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "بالنسبة لمحددات المتجهات الفورية، استخدم",
-      "rangeVector": "بالنسبة لمحددات متجه النطاق، استخدم",
-      "aggregate": "لتجميع البيانات، استخدم",
-      "or": "أو",
-      "rate": "لحسابات المعدل عبر متجه مدى، استخدم",
-      "sqlTitle": "دليل النحو: وضع SQL",
-      "sqlFullText": "للبحث في النص الكامل عن القيمة 'error' استخدم",
-      "sqlColumn": "للبحث في عمود عن القيمة 'error' استخدم",
-      "sqlCode": "للبحث عن القيمة 200 لاستخدام عمود الكود",
-      "sqlStream": "للبحث عن القيمة 'stderr' لاستخدام عمود التدفق",
-      "sqlFunction": "للبحث واستخدام دالة الاستعلام {fn} على سجل الأعمدة استخدم",
-      "sqlMoreExamples": "للمزيد من الأمثلة،",
-      "sqlClickHere": "اضغط هنا"
-    },
     "add": "إضافة",
     "runQuery": "تنفيذ الاستعلام",
     "runQueryOptions": "خيارات تنفيذ الاستعلام",
@@ -13903,10 +13888,6 @@
         "clear": "مسح العرض"
       }
     },
-    "index": {
-      "namePanelRequired": "اسم اللوحة مطلوب",
-      "errorsFixTryAgain": "هناك بعض الأخطاء، يرجى تصحيحها والمحاولة مرة أخرى"
-    },
     "metricCard": {
       "lastRefreshed": "آخر تحديث:",
       "traceId": "معرف التتبع: {id}",
@@ -13917,25 +13898,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "فشل في رسم مخطط العرض"
-    },
-    "queryBuilder": {
-      "title": "PromQL منشئ الاستعلامات",
-      "subtitle": "بناء واختبار PromQL الاستعلامات بصريا",
-      "generatedQuery": "استعلام PromQL تم إنشاؤه:",
-      "noQueryBuilt": "لم يتم إنشاء أي استعلام حتى الآن",
-      "copyQuery": "نسخ الاستعلام",
-      "clearAll": "مسح الكل",
-      "testQuery": "اختبار الاستعلام",
-      "queryResultPreview": "معاينة نتائج الاستعلام:",
-      "queryCopied": "تم نسخ الاستعلام إلى لوحة الحافظ!",
-      "queryCleared": "تم مسح الاستعلام",
-      "testingSoon": "سيتم تنفيذ اختبار الاستعلام قريبا",
-      "executionSoon": "سيتم تنفيذ تنفيذ الاستعلامات في المرحلة التالية"
-    },
-    "metricSelector": {
-      "metricName": "الاسم المتري",
-      "loadingMetrics": "تحميل المقاييس...",
-      "noMetricsFound": "لم يتم العثور على أي مقاييس"
     },
     "labelFilterEditor": {
       "label": "العلامة التجارية",

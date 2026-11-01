@@ -1315,7 +1315,6 @@
       "moreExamples": "追加の例については、",
       "clickHere": "ここをクリック"
     },
-    "legendLabel": "凡例",
     "switchToLogs": "ログに戻る",
     "savedViewsLabel": "保存済みビュー",
     "savedViewName": "ビュー名",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "数式 {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} はこのパネルのクエリではありません",
-    "formulaReferencesFormula": "{letter} は数式であり、数式から別の数式を参照することはできません",
+    "formulaCycle": "数式が互いにループして参照しています: {cycle}",
+    "formulaTooLong": "数式を展開すると {limit} 文字を超えます",
+    "formulaTooDeep": "数式のネストが {limit} 階層を超えています",
     "formulaInputNote": "数式で使用する場合、このクエリのインスタント/レンジ設定、凡例、ステップ、タイムシフトは適用されません。",
     "multiSqlQueryLabel": "クエリラベル",
     "multiSqlQueryLabelHint": "このクエリの凡例でのカスタム名 (例:'Production')",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "値",
     "hostmapGroupBy": "グループ化",
     "otherColumn": "その他の列",
-    "metric": "メトリック",
     "filters": "フィルター",
     "labelFilters": "ラベルフィルター",
     "operations": "オペレーション",
@@ -13604,21 +13604,6 @@
     "awsStsSelfHostedInfo": "これは AWS sts を使用してロールを引き受け、操作を実行します。インストール環境で、このロールにアクセスできる AWS 認証情報が設定されていることを確認してください。"
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "インスタントベクターセレクターには、次を使用します",
-      "rangeVector": "レンジベクターセレクターには、次を使用します",
-      "aggregate": "データを集約するには、次を使用します",
-      "or": "または",
-      "rate": "レンジベクターのレート計算には、次を使用します",
-      "sqlTitle": "構文ガイド: SQLモード",
-      "sqlFullText": "値 'error' の全文検索には、次を使用します",
-      "sqlColumn": "値 'error' の列検索には、次を使用します",
-      "sqlCode": "code列で値200を検索するには、次を使用します",
-      "sqlStream": "stream列で値 'stderr' を検索するには、次を使用します",
-      "sqlFunction": "log列でクエリ関数 {fn} を検索して使用するには、次を使用します",
-      "sqlMoreExamples": "その他の例については、",
-      "sqlClickHere": "ここをクリック"
-    },
     "add": "追加",
     "runQuery": "クエリを実行",
     "runQueryOptions": "クエリ実行オプション",
@@ -13903,10 +13888,6 @@
         "clear": "ビューをクリア"
       }
     },
-    "index": {
-      "namePanelRequired": "パネル名は必須です",
-      "errorsFixTryAgain": "いくつかのエラーがあります。修正して再試行してください。"
-    },
     "metricCard": {
       "lastRefreshed": "最終更新:",
       "traceId": "トレースID: {id}",
@@ -13917,25 +13898,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "チャートのレンダリングに失敗しました"
-    },
-    "queryBuilder": {
-      "title": "PromQLクエリビルダー",
-      "subtitle": "視覚的にPromQLクエリを作成・テスト",
-      "generatedQuery": "生成されたPromQLクエリ:",
-      "noQueryBuilt": "まだクエリが作成されていません",
-      "copyQuery": "クエリをコピー",
-      "clearAll": "すべてクリア",
-      "testQuery": "クエリをテスト",
-      "queryResultPreview": "クエリ結果プレビュー:",
-      "queryCopied": "クエリがクリップボードにコピーされました！",
-      "queryCleared": "クエリをクリアしました",
-      "testingSoon": "クエリテストは近日実装予定です",
-      "executionSoon": "クエリ実行は次のフェーズで実装されます"
-    },
-    "metricSelector": {
-      "metricName": "メトリクス名",
-      "loadingMetrics": "メトリクスを読み込み中...",
-      "noMetricsFound": "メトリクスが見つかりません"
     },
     "labelFilterEditor": {
       "label": "ラベル",

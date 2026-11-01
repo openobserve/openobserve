@@ -1315,7 +1315,6 @@
       "moreExamples": "Para obtener ejemplos adicionales,",
       "clickHere": "haga clic aquí"
     },
-    "legendLabel": "Leyenda",
     "switchToLogs": "Volver a Logs",
     "savedViewsLabel": "Vistas guardadas",
     "savedViewName": "Nombre de la vista",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "Fórmula {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} no es una consulta en este panel",
-    "formulaReferencesFormula": "{letter} es una fórmula, y una fórmula no puede hacer referencia a otra fórmula",
+    "formulaCycle": "Las fórmulas se referencian entre sí en un bucle: {cycle}",
+    "formulaTooLong": "La fórmula expandida supera los {limit} caracteres",
+    "formulaTooDeep": "Las fórmulas se anidan más de {limit} niveles",
     "formulaInputNote": "Se usa en una fórmula: allí no se aplican la configuración de instantánea/rango, la leyenda, el paso ni el desplazamiento temporal de esta consulta.",
     "multiSqlQueryLabel": "Etiqueta de consulta",
     "multiSqlQueryLabelHint": "Nombre personalizado para esta consulta en las leyendas (p. ej., «Producción»)",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "Valor",
     "hostmapGroupBy": "Agrupar por",
     "otherColumn": "Otras columnas",
-    "metric": "Métrica",
     "filters": "Filtros",
     "labelFilters": "Filtros de etiquetas",
     "operations": "Operaciones",
@@ -13604,21 +13604,6 @@
     "awsStsSelfHostedInfo": "Esto utiliza AWS sts para asumir funciones y realizar operaciones. Asegúrese de haber configurado las credenciales de AWS en el entorno de instalación que tienen acceso a esta función."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "Para selectores de vector instantáneo, use",
-      "rangeVector": "Para selectores de vector de rango, use",
-      "aggregate": "Para agregar datos, use",
-      "or": "o",
-      "rate": "Para cálculos de tasa sobre un vector de rango, use",
-      "sqlTitle": "Guía de sintaxis: Modo SQL",
-      "sqlFullText": "Para búsqueda de texto completo del valor 'error' use",
-      "sqlColumn": "Para búsqueda en columna del valor 'error' use",
-      "sqlCode": "Para buscar el valor 200 en la columna code use",
-      "sqlStream": "Para buscar el valor 'stderr' en la columna stream use",
-      "sqlFunction": "Para buscar y usar la función de consulta {fn} en la columna log use",
-      "sqlMoreExamples": "Para ejemplos adicionales,",
-      "sqlClickHere": "haga clic aquí"
-    },
     "add": "Añadir",
     "runQuery": "Ejecutar consulta",
     "runQueryOptions": "Opciones de ejecución de consulta",
@@ -13903,10 +13888,6 @@
         "clear": "Limpiar vista"
       }
     },
-    "index": {
-      "namePanelRequired": "El nombre del panel es obligatorio",
-      "errorsFixTryAgain": "Hay algunos errores, corríjalos e intente de nuevo"
-    },
     "metricCard": {
       "lastRefreshed": "Última actualización:",
       "traceId": "ID de traza: {id}",
@@ -13917,25 +13898,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Error al renderizar el gráfico"
-    },
-    "queryBuilder": {
-      "title": "Constructor de consultas PromQL",
-      "subtitle": "Construya y pruebe consultas PromQL visualmente",
-      "generatedQuery": "Consulta PromQL generada:",
-      "noQueryBuilt": "Aún no se ha creado ninguna consulta",
-      "copyQuery": "Copiar consulta",
-      "clearAll": "Limpiar todo",
-      "testQuery": "Probar consulta",
-      "queryResultPreview": "Vista previa del resultado de la consulta:",
-      "queryCopied": "¡Consulta copiada al portapapeles!",
-      "queryCleared": "Consulta limpiada",
-      "testingSoon": "La prueba de consultas se implementará pronto",
-      "executionSoon": "La ejecución de consultas se implementará en la siguiente fase"
-    },
-    "metricSelector": {
-      "metricName": "Nombre de métrica",
-      "loadingMetrics": "Cargando métricas...",
-      "noMetricsFound": "No se encontraron métricas"
     },
     "labelFilterEditor": {
       "label": "Etiqueta",
