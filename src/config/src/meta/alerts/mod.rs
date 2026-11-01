@@ -177,10 +177,17 @@ pub fn cron_fires_between(
     until: chrono::DateTime<Utc>,
 ) -> Option<(Vec<chrono::DateTime<Utc>>, chrono::DateTime<Utc>)> {
     match timezone.and_then(|name| unwrap_browser_time(name).parse::<Tz>().ok()) {
-        Some(tz) => Some((
-            cron_fires_in_zone(schedule, &tz, after, until),
-            next_cron_in_zone(schedule, &tz, until.max(after))?,
-        )),
+        Some(tz) => {
+            // The on-time case: nothing is due by `until`, so the hours-wide walk is skipped.
+            let first = next_cron_in_zone(schedule, &tz, after)?;
+            if first > until {
+                return Some((vec![], first));
+            }
+            Some((
+                cron_fires_in_zone(schedule, &tz, after, until),
+                next_cron_in_zone(schedule, &tz, until.max(after))?,
+            ))
+        }
         None => {
             let mut fires = schedule
                 .after(&after.with_timezone(&fixed_offset(tz_offset)?))
@@ -2198,6 +2205,31 @@ mod test {
                 assert_eq!(got, Some((stepped, next)), "{cron} {after}");
             }
         }
+    }
+
+    #[test]
+    fn cron_fires_between_returns_only_the_next_fire_when_nothing_is_due() {
+        use chrono::TimeZone;
+
+        let schedule = Schedule::from_str("0 0 9 * * *").unwrap();
+        let at = |d, h| Utc.with_ymd_and_hms(2026, 11, d, h, 0, 0).unwrap();
+        for (after, until) in [(at(1, 5), at(1, 6)), (at(1, 13), at(1, 13))] {
+            assert_eq!(
+                cron_fires_between(&schedule, Some("America/New_York"), -240, after, until),
+                Some((vec![], at(1, 14))),
+                "{after}"
+            );
+        }
+        assert_eq!(
+            cron_fires_between(
+                &schedule,
+                Some("America/New_York"),
+                -240,
+                at(1, 13),
+                at(1, 14)
+            ),
+            Some((vec![at(1, 14)], at(2, 14)))
+        );
     }
 
     #[test]

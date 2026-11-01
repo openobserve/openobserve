@@ -547,6 +547,22 @@ pub async fn update_user(
         return Ok(MetaHttpResponse::bad_request("No changes to update"));
     }
 
+    // Read before any write below, so a failed read leaves the user and membership untouched.
+    #[cfg(feature = "enterprise")]
+    let existing_roles = if custom_roles_need_change && get_openfga_config().enabled {
+        match o2_openfga::authorizer::roles::get_roles_for_org_user(org_id, email).await {
+            Ok(roles) => roles,
+            Err(e) => {
+                log::error!("Error reading custom roles for user {email} in {org_id} org : {e}");
+                return Ok(MetaHttpResponse::internal_error(
+                    "Failed to update custom roles for user",
+                ));
+            }
+        }
+    } else {
+        vec![]
+    };
+
     // Ahead of the record writes below: an unlock that the caller asked for must not be skipped
     // because a later write failed, and it is safe to repeat if they retry the whole update.
     if remove_lockout {
@@ -614,7 +630,7 @@ pub async fn update_user(
         {
             use o2_openfga::authorizer::{
                 authz::{get_user_crole_tuple, update_tuples, update_user_role},
-                roles::{get_role_key, get_roles_for_org_user, get_user_crole_removal_tuples},
+                roles::{get_role_key, get_user_crole_removal_tuples},
             };
 
             if get_openfga_config().enabled
@@ -638,17 +654,6 @@ pub async fn update_user(
                     }
                 }
                 if custom_roles_need_change {
-                    let existing_roles = match get_roles_for_org_user(org_id, email).await {
-                        Ok(roles) => roles,
-                        Err(e) => {
-                            log::error!(
-                                "Error reading custom roles for user {email} in {org_id} org : {e}"
-                            );
-                            return Ok(MetaHttpResponse::internal_error(
-                                "Failed to update custom roles for user",
-                            ));
-                        }
-                    };
                     let mut write_tuples = vec![];
                     let mut delete_tuples = vec![];
                     custom_roles.iter().for_each(|crole| {
