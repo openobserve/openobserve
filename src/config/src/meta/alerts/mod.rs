@@ -1149,6 +1149,20 @@ pub fn fixed_offset(offset_minutes: i32) -> Option<FixedOffset> {
         .and_then(FixedOffset::east_opt)
 }
 
+/// Next cron fire after `after_micros` in `timezone`, falling back to the fixed offset.
+pub fn next_cron_fire_in_zone(
+    schedule: &Schedule,
+    after_micros: i64,
+    timezone: Option<&str>,
+    offset_minutes: i32,
+) -> Option<i64> {
+    let after = chrono::DateTime::<Utc>::from_timestamp_micros(after_micros)?;
+    match timezone.and_then(|name| name.parse::<Tz>().ok()) {
+        Some(tz) => next_cron_fire_micros(schedule, after, &tz).ok(),
+        None => next_cron_fire_micros(schedule, after, &fixed_offset(offset_minutes)?).ok(),
+    }
+}
+
 /// `start_micros + secs + tolerance`, or `None` when any step overflows.
 fn micros_after(start_micros: i64, secs: i64, tolerance: i64) -> Option<i64> {
     Duration::try_seconds(secs)
@@ -1850,8 +1864,7 @@ mod test {
             timezone: Some("America/Los_Angeles".to_string()),
             ..Default::default()
         };
-        // (start, expected fire): 17:00 PDT the day before fall back, 20:00 PST the day before
-        // spring forward
+        // 09:00 Los Angeles is 17:00 UTC in PST but 16:00 UTC in PDT
         let cases = [
             (
                 Utc.with_ymd_and_hms(2026, 11, 1, 0, 0, 0).unwrap(),

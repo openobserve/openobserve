@@ -606,7 +606,6 @@ mod tests {
 
         e2e_alerts().await;
 
-        // derived streams
         e2e_create_test_pipeline().await;
         e2e_handle_derived_stream_success().await;
         e2e_handle_derived_stream_pipeline_not_found().await;
@@ -616,11 +615,9 @@ mod tests {
         e2e_handle_derived_stream_evaluation_failure().await;
         e2e_cleanup_test_pipeline().await;
 
-        // enrichment table
         test_enrichment_table_integration().await;
         test_enrichment_table_local_all_sequential().await;
 
-        // backfill jobs
         test_backfill_job_list_and_delete().await;
         test_backfill_job_get_nonexistent().await;
         test_backfill_job_delete_by_pipeline().await;
@@ -629,34 +626,26 @@ mod tests {
         // Own fn: inline spawns widen e2e_test's frame and overflow the debug stack.
         e2e_org_deletion().await;
 
-        // others
         e2e_health_check().await;
         e2e_config().await;
 
-        // clear
         e2e_delete_stream().await;
         sandbox.tear_down().await;
     }
 
     async fn e2e_boot() {
-        // start gRPC server
         tokio::task::spawn(async move {
             init_grpc_server()
                 .await
                 .expect("router gRPC server init failed");
         });
 
-        // register node
         common::infra::cluster::register_and_keep_alive()
             .await
             .unwrap();
-        // init config
         config::init().await.unwrap();
-        // init infra
         migration::init_db().await.unwrap();
-        // ensure database tables are created
         infra::db::create_table().await.unwrap();
-        // db migration steps, since it's separated out
         infra::table::migrate().await.unwrap();
         infra::init().await.unwrap();
         #[cfg(feature = "enterprise")]
@@ -672,16 +661,13 @@ mod tests {
             .await
             .unwrap();
         openobserve_core::bootstrap::init().await.unwrap();
-        // ingester init
         ingester::init().await.unwrap();
-        // init job
         openobserve_jobs::job::init().await.unwrap();
 
-        // Wait for async initialization tasks (like default user creation) to complete
+        // Default user creation runs asynchronously after bootstrap.
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-        // Clean up any leftover state from previous test runs/retries
-        // This ensures tests are idempotent
+        // A retried run starts from the state the failed attempt left behind.
         cleanup_previous_test_state().await;
     }
 

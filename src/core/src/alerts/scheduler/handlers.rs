@@ -15,12 +15,12 @@
 
 use std::{collections::HashMap, str::FromStr, time::Instant};
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        alerts::{TriggerCondition, fixed_offset, level::DeliveryDecision},
+        alerts::{TriggerCondition, fixed_offset, level::DeliveryDecision, next_cron_fire_in_zone},
         dashboards::reports::{ReportFrequency, ReportFrequencyType},
         pipeline::components::{DerivedStream, NodeData, PipelineSource},
         self_reporting::{
@@ -2196,7 +2196,7 @@ fn get_skipped_timestamps(
     let mut next_run_at;
     if !cron.is_empty() {
         let Some((skipped, next)) =
-            skipped_cron_timestamps(supposed_to_run_at, cron, tz_offset, delay)
+            skipped_cron_timestamps(supposed_to_run_at, cron, tz_offset, timezone_str, delay)
         else {
             log::warn!(
                 "[ALERT] cron '{cron}' with tz_offset {tz_offset} cannot be evaluated, skipping none"
@@ -2244,14 +2244,11 @@ fn skipped_cron_timestamps(
     supposed_to_run_at: i64,
     cron: &str,
     tz_offset: i32,
+    timezone_str: Option<&str>,
     delay: i64,
 ) -> Option<(Vec<i64>, i64)> {
     let cron = Schedule::from_str(cron).ok()?;
-    let tz = fixed_offset(tz_offset)?;
-    let next_after = |ts: i64| {
-        let dt = DateTime::from_timestamp_micros(ts)?.with_timezone(&tz);
-        cron.after(&dt).next().map(|next| next.timestamp_micros())
-    };
+    let next_after = |ts: i64| next_cron_fire_in_zone(&cron, ts, timezone_str, tz_offset);
     let mut skipped = Vec::new();
     let mut next_run_at = next_after(supposed_to_run_at)?;
     while next_run_at <= supposed_to_run_at + delay {
@@ -7364,6 +7361,7 @@ fn publish_slo_pass_timed(
 
 #[cfg(test)]
 mod tests {
+    use chrono::TimeZone;
     use config::meta::stream::StreamType;
 
     use super::*;
@@ -8049,6 +8047,61 @@ mod tests {
 
         // Final timestamp should be the current time when align_time is false
         assert_eq!(final_timestamp, now);
+    }
+
+    #[test]
+    fn skipped_cron_timestamps_follow_the_alert_timezone_across_dst() {
+        let micros = |y, m, d, h| {
+            Utc.with_ymd_and_hms(y, m, d, h, 0, 0)
+                .unwrap()
+                .timestamp_micros()
+        };
+        let delay = hour_micros(50);
+        // The stored offset predates each change, so a fixed-offset catch-up lands an hour off.
+        let cases = [
+            (
+                micros(2026, 10, 31, 16),
+                -420,
+                vec![micros(2026, 11, 1, 17), micros(2026, 11, 2, 17)],
+                micros(2026, 11, 3, 17),
+            ),
+            (
+                micros(2026, 3, 7, 17),
+                -480,
+                vec![micros(2026, 3, 8, 16), micros(2026, 3, 9, 16)],
+                micros(2026, 3, 10, 16),
+            ),
+        ];
+        for (start, tz_offset, skipped, next) in cases {
+            let got = skipped_cron_timestamps(
+                start,
+                "0 0 9 * * *",
+                tz_offset,
+                Some("America/Los_Angeles"),
+                delay,
+            );
+            assert_eq!(got, Some((skipped, next)), "start {start}");
+        }
+    }
+
+    #[test]
+    fn skipped_cron_timestamps_use_the_fixed_offset_without_a_valid_timezone() {
+        let micros = |d, h| {
+            Utc.with_ymd_and_hms(2026, 11, d, h, 0, 0)
+                .unwrap()
+                .timestamp_micros()
+        };
+        for timezone in [None, Some("Not/AZone")] {
+            let got = skipped_cron_timestamps(
+                micros(1, 0),
+                "0 0 9 * * *",
+                -420,
+                timezone,
+                hour_micros(40),
+            );
+            let want = (vec![micros(1, 16), micros(2, 16)], micros(3, 16));
+            assert_eq!(got, Some(want), "{timezone:?}");
+        }
     }
 
     #[test]
