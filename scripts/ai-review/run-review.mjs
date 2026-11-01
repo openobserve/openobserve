@@ -1046,7 +1046,8 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
     });
     // The machine-readable list of kept findings never reaches the summary comment.
     const inline = extractInlineBlock(completion.text);
-    if (inline.error) console.warn(`[${isoNow()}] Coordinator inline block: ${inline.error}; no inline comments from it`);
+    // Without its list the report may be cut off, and stamping it would hide the reviewers' blockers from every later run.
+    if (inline.error) throw new Error(`inline block: ${inline.error}`);
     TRACE.endSpan(coordinatorSpan, {
       "review.output_length": completion.text.length,
       "gen_ai.response.id": completion.responseId,

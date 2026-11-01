@@ -178,7 +178,7 @@ export function isApprovedReview(text) {
   const callouts = [...visible.matchAll(/^ {0,3}> ?\[![A-Za-z]+\]/gm)];
   const decision = /^> \[!TIP\]\n> ### ✅ Approved[ \t]*$/m.exec(visible);
   if (callouts.length !== 1 || decision?.index !== callouts[0].index) return false;
-  return !/^ {0,3}(?:`{3,}|~{3,}|<)/m.test(visible.slice(0, decision.index));
+  return !/^[ >]*(?:`{3,}|~{3,}|<)/m.test(visible.slice(0, decision.index));
 }
 
 function coverageReasons({ diff, diffPinned, filteredFileCount, reviewedChars, pr }) {

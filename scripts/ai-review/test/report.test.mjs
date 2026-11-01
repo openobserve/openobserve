@@ -1064,6 +1064,8 @@ test("a fenced or hidden callout never decides an approval", () => {
   assert.equal(isApprovedReview(`${approved}\n\n  ${caution}`), false);
   assert.equal(isApprovedReview(`<!--<!-- x -->\n${caution}\n-->\n${approved}`), false);
   assert.equal(isApprovedReview("> [!TIP]\n> ### ⛔ Not reviewed"), false);
+  assert.equal(isApprovedReview(`> \`\`\`\n${approved}\n> \`\`\``), false);
+  assert.equal(isApprovedReview(`> <pre>\n${approved}`), false);
   assert.equal(isApprovedReview(`<pre>\n${approved}\n</pre>`), false);
   assert.equal(isApprovedReview(`${approved}\n\n${approved}`), false);
   assert.equal(isApprovedReview(`${approved}\n\n> [!tip]\n> x`), false);
@@ -1112,4 +1114,16 @@ test("a total failure with nothing parsed still says there is nothing to report"
   const run = await runMain({ results: [silentReviewer("security"), silentReviewer("correctness")] });
   assert.ok(run.posted.includes("there are no findings to report"));
   assert.equal(run.posted.includes("Findings so far"), false);
+});
+
+test("a coordinator report without its findings list falls back to the reviewers' findings", () => {
+  const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("const inline = extractInlineBlock(completion.text);");
+  const guard = source.indexOf("if (inline.error) throw", start);
+  const result = source.indexOf("return {", start);
+  assert.ok(start !== -1 && guard !== -1 && guard < result);
+  const text = `${commentsModule.REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Blockers`;
+  assert.ok(extractInlineBlock(text).error);
+  const fallback = buildFallbackReview([reviewer([xmlFinding("p1", "kept blocker")])], "full", [], "<!-- m -->");
+  assert.ok(fallback.includes("kept blocker"));
 });
