@@ -132,6 +132,7 @@ pub async fn list_scorers(
     responses(
         (status = 200, body = inline(ScorerResponseBody)),
         (status = 400, description = "Bad Request", body = ()),
+        (status = 404, description = "Provider not found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
     extensions(
@@ -233,7 +234,7 @@ pub async fn list_scorer_versions(Path((org_id, entity_id)): Path<(String, Strin
     request_body(content = inline(ScorerUpdateRequestBody), description = "Scorer payload"),
     responses(
         (status = 200, body = inline(ScorerResponseBody)),
-        (status = 404, description = "Not Found", body = ()),
+        (status = 404, description = "Scorer or provider not found", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "update"})),
