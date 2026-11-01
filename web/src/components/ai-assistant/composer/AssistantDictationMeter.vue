@@ -32,10 +32,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :style="{ transform: `scaleY(${barScale(weight)})` }"
       />
     </span>
-    <span class="min-w-0 truncate">{{ label }}</span>
-    <span aria-hidden="true" class="tabular-nums" data-test="assistant-dictate-elapsed">{{
-      elapsed
-    }}</span>
+    <span v-if="!narrow" class="min-w-0 truncate">{{ label }}</span>
+    <span
+      v-if="!tight"
+      aria-hidden="true"
+      class="tabular-nums"
+      data-test="assistant-dictate-elapsed"
+      >{{ elapsed }}</span
+    >
   </span>
 </template>
 
@@ -47,6 +51,10 @@ export interface AssistantDictationMeterProps {
   /** 0–1. */
   level: number;
   elapsedMs: number;
+  /** Below 24 rem the word yields first. */
+  narrow?: boolean;
+  /** At 20 rem the elapsed time goes too. */
+  tight?: boolean;
 }
 
 const BAR_WEIGHTS = [0.6, 1, 0.8, 0.5] as const;
@@ -58,7 +66,10 @@ const MIN_BAR_SCALE = 0.2;
 <script setup lang="ts">
 import { computed } from "vue";
 
-const props = defineProps<AssistantDictationMeterProps>();
+const props = withDefaults(defineProps<AssistantDictationMeterProps>(), {
+  narrow: false,
+  tight: false,
+});
 
 const elapsed = computed(() => {
   const seconds = Math.floor(props.elapsedMs / 1000);

@@ -24,10 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-dd-privacy="mask"
     :data-state="state"
   >
-    <OCard variant="outlined" class="flex min-w-0 flex-col gap-3 p-4 max-md:p-3">
-      <div class="flex min-w-0 flex-wrap items-center gap-2">
-        <AssistantMark size="sm" />
-        <h2 :id="titleId" class="text-text-heading text-sm font-semibold">
+    <OCard variant="outlined" class="@container flex min-w-0 flex-col gap-3 p-3">
+      <div class="flex min-h-7 min-w-0 flex-wrap items-center gap-2">
+        <OIcon :name="assistantGlyph.assistant" size="sm" class="text-text-secondary shrink-0" />
+        <h2 :id="titleId" class="text-text-heading text-sm font-medium">
           {{ t("assistant.name") }}
         </h2>
         <OTag
@@ -39,10 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <span class="flex-1" />
         <OButton
-          variant="ghost"
-          size="sm"
+          v-if="mdUp"
+          variant="ghost-primary"
+          size="chip"
           :icon-right="assistantGlyph.goTo"
-          class="max-md:min-h-11 pointer-coarse:min-h-11"
+          :class="TOUCH_TARGET_CLASS"
           data-test="assistant-launcher-open"
           @click="openFull"
         >
@@ -50,166 +51,186 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
+      <template v-if="folded" />
       <AssistantGateState
-        v-if="state === 'gate'"
+        v-else-if="state === 'gate'"
         reason="no_permission"
         size="inline"
         :is-admin="capability.isAdmin"
         :context="{ org, feature: 'chat' }"
       />
-      <template v-else>
-        <div class="flex min-w-0 items-center gap-2">
-          <OInput
-            ref="input"
-            v-model="text"
-            size="md"
-            width="full"
-            :disabled="state === 'loading'"
-            :placeholder="t('assistant.welcome.launcher.placeholder')"
-            :input-attrs="{
-              'aria-label': t('assistant.welcome.launcher.inputName', { product }),
-              'aria-describedby': disclosureId,
-              maxlength: MAX_LAUNCHER_CHARS,
-              enterkeyhint: 'send',
-            }"
-            class="min-w-0 flex-1"
-            data-test="assistant-launcher-input"
-            @keydown="onKeydown"
-          >
-            <template #icon-left>
-              <OIcon :name="assistantGlyph.assistant" size="sm" class="text-text-secondary" />
-            </template>
-          </OInput>
-          <AssistantIconButton
-            v-if="text"
-            :label="t('assistant.welcome.launcher.clear')"
-            :icon="assistantGlyph.close"
-            data-test="assistant-launcher-clear"
-            @click="clear"
-          />
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :icon-left="mdUp ? undefined : assistantGlyph.send"
-            :disabled="state === 'loading'"
-            class="shrink-0 max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11"
-            data-test="assistant-launcher-ask"
-            @click="ask(false)"
-          >
-            <span :class="mdUp ? '' : 'sr-only'">{{ t("assistant.welcome.launcher.ask") }}</span>
-            <OShortcut v-if="mdUp" keys="enter" size="sm" class="ms-1" aria-hidden="true" />
-          </OButton>
-        </div>
-
-        <div class="flex min-w-0 flex-wrap items-center gap-x-1">
-          <OText :id="disclosureId" variant="meta" as="p" data-test="assistant-launcher-disclosure">
-            {{ disclosure }}
-          </OText>
-          <AssistantContextSeesPopover :sid="null" align="start">
-            <template #trigger>
-              <AssistantIconButton
-                :label="t('assistant.context.title')"
-                :icon="assistantGlyph.info"
-                data-test="assistant-launcher-sees"
-              />
-            </template>
-          </AssistantContextSeesPopover>
-        </div>
-      </template>
+      <OInput
+        v-else
+        ref="input"
+        v-model="text"
+        size="md"
+        width="full"
+        :disabled="state === 'loading'"
+        :placeholder="t('assistant.composer.placeholder')"
+        :input-attrs="{
+          'aria-label': t('assistant.welcome.launcher.inputName', { product }),
+          maxlength: MAX_LAUNCHER_CHARS,
+          enterkeyhint: 'send',
+        }"
+        class="min-w-0"
+        data-test="assistant-launcher-input"
+        @keydown="onKeydown"
+      >
+        <template #icon-right>
+          <span class="flex shrink-0 items-center gap-0.5">
+            <AssistantIconButton
+              v-if="text"
+              :label="t('assistant.welcome.launcher.clear')"
+              :icon="assistantGlyph.close"
+              class="h-7! w-7!"
+              data-test="assistant-launcher-clear"
+              @click="clear"
+            />
+            <AssistantTimePrefix
+              :window="window"
+              :disabled="state === 'loading'"
+              align="end"
+              @change="(range) => (timeOverride = range)"
+            />
+            <AssistantContextSeesPopover :sid="null" hide-streams>
+              <template #trigger>
+                <AssistantIconButton
+                  :label="t('assistant.context.title')"
+                  :icon="assistantGlyph.info"
+                  class="h-7! w-7!"
+                  data-test="assistant-launcher-sees"
+                />
+              </template>
+            </AssistantContextSeesPopover>
+            <OButton
+              variant="primary"
+              size="xs"
+              :icon-left="mdUp ? undefined : assistantGlyph.send"
+              :disabled="state === 'loading' || !text.trim()"
+              class="shrink-0 max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11"
+              data-test="assistant-launcher-ask"
+              @click="ask(false)"
+            >
+              <span :class="mdUp ? '' : 'sr-only'">{{ t("assistant.welcome.launcher.ask") }}</span>
+            </OButton>
+          </span>
+        </template>
+      </OInput>
 
       <div
-        :class="['grid min-w-0 grid-cols-1 gap-x-6 gap-y-3', showSuggestions && 'md:grid-cols-2']"
+        v-if="!folded"
+        :class="[
+          'grid min-w-0 grid-cols-1 gap-x-6 gap-y-3',
+          showSuggestions && '@[40rem]:grid-cols-2',
+        ]"
       >
         <div
           v-if="showSuggestions"
-          class="flex min-w-0 flex-col gap-2"
+          class="flex min-w-0 flex-col"
           data-test="assistant-launcher-suggestions"
         >
-          <h3 class="text-text-secondary text-xs font-medium">
-            {{ t("assistant.welcome.suggestions") }}
-          </h3>
           <ul
             v-if="state === 'loading'"
             class="flex flex-col gap-2"
             data-test="assistant-launcher-loading"
           >
-            <li v-for="n in 3" :key="n"><OSkeleton type="text" class="h-8 w-full" /></li>
+            <li v-for="n in 3" :key="n"><OSkeleton type="text" class="h-5 w-3/5" /></li>
           </ul>
-          <ul v-else class="flex flex-col gap-2">
-            <li v-for="(starter, index) in shownStarters" :key="starter.id" class="min-w-0">
-              <OButton
-                variant="secondary"
-                size="sm"
-                block
-                class="h-auto! min-h-8 justify-start! py-1.5 text-start whitespace-normal! max-md:min-h-11 pointer-coarse:min-h-11"
+          <ul v-else class="flex flex-col items-start">
+            <li v-for="(starter, index) in shownStarters" :key="starter.id" class="max-w-full">
+              <AssistantStarterRow
+                :label="starter.label"
                 :data-test="`assistant-launcher-starter-${index}`"
                 @click="pickStarter(starter, index)"
-              >
-                {{ starter.label }}
-              </OButton>
+              />
             </li>
           </ul>
         </div>
         <!-- A chat that answers or waits outranks suggestions on a phone (PO A21). -->
         <div
-          :class="['flex min-w-0 flex-col gap-2', hasInProgress && 'max-md:order-first']"
+          :class="['flex min-w-0 flex-col', hasInProgress && 'max-md:order-first']"
           data-test="assistant-launcher-your-chats"
         >
-          <div class="flex min-w-0 items-center gap-2">
-            <h3 class="text-text-secondary min-w-0 flex-1 text-xs font-medium">
-              {{ t("assistant.welcome.launcher.yourChats") }}
+          <div class="flex min-h-7 min-w-0 items-center gap-2">
+            <h3 class="text-text-secondary min-w-0 flex-1 text-xs">
+              {{ t("assistant.welcome.launcher.recent") }}
             </h3>
             <OButton
               v-if="recent.length"
               variant="ghost-primary"
-              size="sm"
-              class="shrink-0 max-md:min-h-11 pointer-coarse:min-h-11"
+              size="chip"
+              :class="['shrink-0', TOUCH_TARGET_CLASS]"
               data-test="assistant-launcher-all-chats"
               @click="openFull"
               >{{ t("assistant.welcome.launcher.allChats") }}</OButton
             >
           </div>
-          <ul v-if="state === 'loading'" class="flex flex-col gap-2">
-            <li v-for="n in 3" :key="n"><OSkeleton type="text" class="h-8 w-full" /></li>
+          <ul v-if="state === 'loading'" class="flex flex-col gap-3 pt-2">
+            <li v-for="n in 2" :key="n"><OSkeleton type="text" class="h-5 w-2/3" /></li>
           </ul>
-          <OEmptyState
+          <OBanner
+            v-else-if="recentFailed"
+            variant="error-soft"
+            bar
+            dense
+            icon="error-outline"
+            :content="t('assistant.history.serverError')"
+            class="rounded-default min-h-9"
+            data-test="assistant-launcher-recent-failed"
+          >
+            <template #actions>
+              <OButton
+                variant="ghost"
+                size="xs"
+                :class="TOUCH_TARGET_CLASS"
+                data-test="assistant-launcher-recent-retry"
+                @click="history.retry()"
+              >
+                {{ t("common.retry") }}
+              </OButton>
+            </template>
+          </OBanner>
+          <OText
             v-else-if="recent.length === 0"
-            size="inline"
-            icon="history"
-            :backdrop="false"
-            :title="t('assistant.welcome.launcher.noRecent')"
-            :description="t('assistant.welcome.launcher.noRecentHint')"
+            variant="meta"
+            as="p"
+            class="flex min-h-7 items-center"
             data-test="assistant-launcher-recent-empty"
-          />
-          <ul v-else class="flex flex-col gap-1">
+          >
+            {{ t("assistant.welcome.launcher.noRecent") }}
+          </OText>
+          <ul v-else class="flex flex-col">
             <li v-for="(row, index) in recent" :key="row.sid" class="min-w-0">
               <OButton
                 variant="ghost"
                 size="sm"
                 block
-                class="h-auto! min-h-8 justify-start! gap-2 py-1.5 text-start max-md:min-h-11 pointer-coarse:min-h-11"
+                class="group h-8! justify-start! gap-2 px-1.5! text-start font-normal max-md:h-11! pointer-coarse:h-11!"
                 :data-test="`assistant-launcher-recent-${index}`"
                 :data-status="row.status ?? undefined"
                 @click="openChat(row.sid)"
               >
-                <AssistantStatusDot
-                  v-if="row.status"
-                  :state="CHAT_STATUS_SIGNAL[row.status]"
-                  placement="inline"
-                />
-                <OTruncatedText class="text-text-body min-w-0 flex-1">{{
+                <OTruncatedText class="text-text-heading min-w-0 flex-1">{{
                   row.title
                 }}</OTruncatedText>
                 <span v-if="row.status || row.at" class="sr-only">, </span>
                 <OText
                   v-if="row.status"
                   variant="meta"
-                  class="text-text-body shrink-0"
+                  :class="[
+                    'group-hover:text-text-body shrink-0',
+                    row.status === 'needs_you' ? 'text-status-warning-text' : '',
+                  ]"
                   data-test="assistant-launcher-recent-status"
                 >
                   {{ t(CHAT_STATUS_KEYS[row.status]) }}
                 </OText>
-                <OText v-else-if="row.at" variant="meta" class="shrink-0">{{ row.at }}</OText>
+                <OText
+                  v-else-if="row.at"
+                  variant="meta"
+                  class="group-hover:text-text-body shrink-0"
+                  >{{ row.at }}</OText
+                >
               </OButton>
             </li>
           </ul>
@@ -252,44 +273,44 @@ import { useStore } from "vuex";
 
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
-import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
-import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import {
   CHAT_STATUS_KEYS,
-  CHAT_STATUS_SIGNAL,
   chatStatusOf,
   inProgressFirst,
   isInProgress,
 } from "@/components/ai-assistant/history/chatStatus";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantContextSeesPopover from "@/components/ai-assistant/context/AssistantContextSeesPopover.vue";
+import AssistantTimePrefix from "@/components/ai-assistant/context/AssistantTimePrefix.vue";
 import AssistantGateState from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import {
   openAssistant,
   starterPayload,
-  timeRangeText,
   timeWindowOf,
   useAssistantCapability,
   useAssistantHistory,
   useAssistantName,
   useAssistantStarters,
   useAssistantStore,
+  type ComposerState,
   type Starter,
 } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatRelative } from "@/utils/formatters";
+
+import AssistantStarterRow from "./AssistantStarterRow.vue";
 
 // Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
 provideAssistantSurface();
@@ -301,11 +322,11 @@ const vuex = useStore();
 const capability = useAssistantCapability();
 const assistant = useAssistantStore();
 const { mdUp } = useBreakpoint();
-const { starters, loading, scope } = useAssistantStarters({ page: "home" });
+const { starters, loading } = useAssistantStarters({ page: "home" });
 
 const titleId = `assistant-launcher-title-${useId()}`;
-const disclosureId = `assistant-launcher-disclosure-${useId()}`;
 const text = ref("");
+const timeOverride = ref<ComposerState["timeOverride"]>(null);
 const input = ref<InstanceType<typeof OInput> | null>(null);
 
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
@@ -316,25 +337,11 @@ const state = computed(() => {
 const shown = computed(() => state.value !== null);
 const creditsExhausted = computed(() => capability.value.creditMode === "exhausted");
 const shownStarters = computed(() => starters.value.slice(0, LAUNCHER_ROWS));
-// The sidebar's own welcome already lists the starters, so Home shows one set (D5 decision 10).
-const sidebarWelcome = computed(() => {
-  const shell = assistant.state.shell;
-  const sid = shell.activeSid;
-  return (
-    shell.placement.kind === "sidebar" && !(sid && assistant.state.sessions[sid]?.messages.length)
-  );
-});
-const showSuggestions = computed(() => state.value !== "gate" && !sidebarWelcome.value);
+// The sidebar is the composer while it is open, so the card folds to its header (D5 decision 10).
+const folded = computed(() => assistant.state.shell.placement.kind === "sidebar");
+const showSuggestions = computed(() => state.value !== "gate");
 
-// The full view sends what its own page shows; with no page range that is the default window.
-const disclosure = computed(() =>
-  t(
-    scope.value.streamCount === 0
-      ? "assistant.welcome.launcher.disclosureNoStreams"
-      : "assistant.welcome.launcher.disclosure",
-    { range: timeRangeText(timeWindowOf(null, null)) },
-  ),
-);
+const window = computed(() => timeWindowOf(null, timeOverride.value));
 
 const history = useAssistantHistory();
 const recentRows = history.recent(RECENT_LOOKUP);
@@ -349,6 +356,7 @@ const recent = computed(() =>
     (row) => row.status,
   ).slice(0, LAUNCHER_ROWS),
 );
+const recentFailed = computed(() => history.listState.value.status === "error");
 const hasInProgress = computed(() => recent.value.some((row) => isInProgress(row.status)));
 onMounted(() => history.ensureLoaded());
 
@@ -376,7 +384,11 @@ function ask(stage: boolean): void {
     intent: stage ? "stage" : "send",
     thread: "new",
     container: "full",
-    payload: { text: line, chips: [] },
+    payload: {
+      text: line,
+      chips: [],
+      ...(timeOverride.value && { timeOverride: timeOverride.value }),
+    },
   });
 }
 
@@ -394,7 +406,10 @@ function pickStarter(starter: Starter, index: number): void {
     intent: "stage",
     thread: "new",
     container: "full",
-    payload: starterPayload(starter, org.value),
+    payload: {
+      ...starterPayload(starter, org.value),
+      ...(timeOverride.value && { timeOverride: timeOverride.value }),
+    },
   });
 }
 

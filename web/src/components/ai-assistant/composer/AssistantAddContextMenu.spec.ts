@@ -85,11 +85,4 @@ describe("AssistantAddContextMenu", () => {
     expect(wrapper.emitted("image")).toHaveLength(1);
     expect(wrapper.emitted("select")).toBeUndefined();
   });
-
-  it("says why there is no mic while dictation is off", async () => {
-    await openMenu();
-    expect(
-      document.body.querySelector('[data-test="assistant-composer-hint-voice"]')?.textContent,
-    ).toContain("Voice dictation is off in this browser.");
-  });
 });

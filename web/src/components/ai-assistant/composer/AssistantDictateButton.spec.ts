@@ -24,7 +24,7 @@ import AssistantDictateButton, {
 
 function render(props: Partial<AssistantDictateButtonProps> = {}) {
   return mount(AssistantDictateButton, {
-    props: { pressed: false, denied: false, primerOpen: false, sentence: null, ...props },
+    props: { mic: "live", pressed: false, primerOpen: false, sentence: null, ...props },
     attachTo: document.body,
   });
 }
@@ -48,8 +48,9 @@ describe("AssistantDictateButton", () => {
   });
 
   it("uses aria-disabled with a reason, so the mic stays focusable", () => {
-    const button = render({ disabledReason: raw("Blocked") }).get(mic);
+    const button = render({ mic: "crossed", disabledReason: raw("Blocked") }).get(mic);
     expect(button.attributes("aria-disabled")).toBe("true");
+    expect(button.attributes("aria-haspopup")).toBe("dialog");
     expect(button.attributes("disabled")).toBeUndefined();
   });
 
@@ -57,6 +58,18 @@ describe("AssistantDictateButton", () => {
     const wrapper = render();
     await wrapper.get(mic).trigger("click");
     expect(wrapper.emitted("press")).toHaveLength(1);
+  });
+
+  it("opens Turn on for an admin's off mic instead of pressing, and hands the choice up", async () => {
+    const wrapper = render({ mic: "off" });
+    await wrapper.get(mic).trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("press")).toBeUndefined();
+    const off = document.body.querySelector('[data-test="assistant-dictate-off"]');
+    expect(off?.textContent).toContain("Dictation is off in this browser.");
+    document.body.querySelector<HTMLElement>('[data-test="assistant-dictate-turn-on"]')!.click();
+    await flushPromises();
+    expect(wrapper.emitted("turn-on")).toHaveLength(1);
   });
 
   it("names the engine in the primer and answers Not now and Continue", async () => {

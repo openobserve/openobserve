@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     side="top"
     align="start"
     :aria-label="t('assistant.composer.addContext')"
-    content-class="w-[min(22rem,calc(100vw-1.5rem))] p-2"
+    :content-class="`${layout.tight ? 'w-[calc(20rem-0.375rem)]' : 'w-[min(22rem,calc(100vw-1.5rem))]'} p-2`"
     privacy="mask"
     @update:open="onOpen"
   >
@@ -29,8 +29,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('assistant.composer.addContext')"
         :icon="assistantGlyph.addContext"
         :no-tooltip="open"
+        class="h-7! w-7!"
         data-test="assistant-add-context"
-      />
+      >
+        <template #tooltip>{{ t("assistant.composer.addContextTip") }}</template>
+      </AssistantIconButton>
     </template>
     <div class="flex flex-col gap-2" data-test="assistant-add-context-menu">
       <OInput
@@ -52,21 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         with-image
         @select="pick"
       />
-      <ul
-        class="border-border-default flex flex-col gap-1 border-t px-1 pt-2"
-        data-test="assistant-add-context-keys"
-      >
-        <li
-          v-for="row in keyRows"
-          :key="row.id"
-          class="flex items-center justify-between gap-3 text-xs"
-          :data-test="`assistant-composer-hint-${row.id}`"
-        >
-          <span class="text-text-secondary">{{ row.label }}</span>
-          <OShortcut v-if="row.shortcut" :id="row.id" tone="strong" />
-          <kbd v-else-if="row.keys" class="text-text-body font-mono">{{ row.keys }}</kbd>
-        </li>
-      </ul>
     </div>
   </OPopover>
 </template>
@@ -91,13 +79,12 @@ import { computed, nextTick, ref, useId } from "vue";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantMentionMenu from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
-import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-import { useVoiceAvailability } from "./useAssistantVoice";
+import { useComposerLayout } from "./composerUi";
 
 defineProps<AssistantAddContextMenuProps>();
 
@@ -109,52 +96,7 @@ const query = ref("");
 const search = ref<InstanceType<typeof OInput> | null>(null);
 const menu = ref<InstanceType<typeof AssistantMentionMenu> | null>(null);
 const listboxId = `assistant-add-context-${useId()}`;
-const voice = useVoiceAvailability();
-
-interface KeyRow {
-  id: string;
-  label: I18nText;
-  shortcut?: boolean;
-  keys?: I18nText;
-}
-
-const voiceRow = computed((): KeyRow => {
-  if (voice.status.value === "ready")
-    return {
-      id: "assistantComposerDictate",
-      label: t("shortcuts.actions.assistantComposerDictate"),
-      shortcut: true,
-    };
-  return {
-    id: "voice",
-    label: t(
-      voice.status.value === "off"
-        ? "assistant.voice.error.voice_off"
-        : "assistant.voice.error.unsupported",
-    ),
-  };
-});
-
-// The keys the retired hints popover listed, plus the `@` that opens this same menu from the textbox.
-const keyRows = computed((): KeyRow[] => [
-  { id: "mention", label: t("assistant.composer.mention.title"), keys: raw("@") },
-  {
-    id: "assistantComposerRecall",
-    label: t("shortcuts.actions.assistantComposerRecall"),
-    shortcut: true,
-  },
-  {
-    id: "assistantComposerNewline",
-    label: t("shortcuts.actions.assistantComposerNewline"),
-    shortcut: true,
-  },
-  {
-    id: "assistantComposerSend",
-    label: t("shortcuts.actions.assistantComposerSend"),
-    shortcut: true,
-  },
-  voiceRow.value,
-]);
+const layout = useComposerLayout();
 
 const searchAttrs = computed(() => ({
   "aria-label": t("assistant.composer.addMenuSearch"),

@@ -43,8 +43,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-busy="group.state === 'loading' || undefined"
         :data-test="`assistant-mention-group-${group.id}`"
       >
-        <div class="text-text-secondary px-2 pt-2 pb-1 text-xs font-medium" aria-hidden="true">
-          {{ group.title }}
+        <div
+          class="text-text-secondary flex justify-between px-2 pt-2 pb-1 text-xs font-medium"
+          aria-hidden="true"
+        >
+          <span>{{ group.title }}</span>
+          <span v-if="group.total" class="tabular-nums" data-test="assistant-mention-group-count">{{
+            group.total
+          }}</span>
         </div>
         <div v-if="group.state === 'loading'" class="px-2 py-1" aria-hidden="true">
           <OSkeleton type="text" class="h-5 w-2/3" />
@@ -65,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 })
           "
           :class="[
-            'rounded-default flex min-h-8 flex-col justify-center px-2 py-1 text-sm max-md:min-h-11 pointer-coarse:min-h-11',
+            'rounded-default flex min-h-8 items-center gap-2 px-2 py-1 text-sm max-md:min-h-11 pointer-coarse:min-h-11',
             item.disabled ? 'text-text-secondary' : 'cursor-pointer',
             item.id === activeOptionId
               ? 'bg-dropdown-item-hover-bg text-text-heading'
@@ -87,10 +93,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="choose(item)"
           @keydown.enter.prevent="choose(item)"
         >
-          <OTruncatedText>{{ item.label }}</OTruncatedText>
+          <OIcon
+            v-if="item.glyph"
+            :name="item.glyph"
+            size="xs"
+            class="text-text-secondary shrink-0"
+          />
+          <OTruncatedText :class="['min-w-0 flex-1', item.code ? 'font-mono' : '']">{{
+            item.label
+          }}</OTruncatedText>
           <span
-            v-if="item.secondary"
-            :class="['text-xs', item.id === activeOptionId ? '' : 'text-text-secondary']"
+            v-if="item.secondary && (item.agent || query)"
+            :class="['shrink-0 text-xs', item.id === activeOptionId ? '' : 'text-text-secondary']"
             >{{ item.secondary }}</span
           >
         </div>
@@ -108,26 +122,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import type { AgentId, ChipKind, ContextChip } from "@/composables/assistant";
+import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import type { I18nText } from "@/types/i18n";
 
-/** One choice of the `@` menu; a time option carries a period, Show more and Retry carry an action (CT-05 AC 2, 4, 11). */
+/** One choice of the `@` menu; Show all and Retry carry an action (CT-05 AC 2, 4, 11). */
 export interface MentionOption {
   id: string;
   kind: ChipKind;
   label: I18nText;
   secondary?: I18nText;
   chip?: ContextChip;
-  /** `null` is "Page time". */
-  period?: string | null;
   action?: MentionAction;
   groupId?: string;
   /** No access: shown, never chosen. */
   disabled?: boolean;
   /** An Agents row: it sets who answers and adds no chip. */
   agent?: AgentId;
+  glyph?: IconName;
+  /** Names read as identifiers, in the mono face. */
+  code?: boolean;
 }
 
-/** An action row of the menu: Show more and Retry act in place, Image hands over to the file picker. */
+/** An action row of the menu: Show all and Retry act in place, Image hands over to the file picker. */
 export type MentionAction = "more" | "retry" | "image" | "agent";
 
 export interface AssistantMentionMenuProps {
@@ -142,10 +158,11 @@ export interface AssistantMentionMenuProps {
   withImage?: boolean;
 }
 
-/** At most this many options per group before "Show more" (CT-05 AC 2). */
-export const MENTION_GROUP_LIMIT = 8;
+/** At most this many options per group before "Show all", with no query typed. */
+export const MENTION_GROUP_LIMIT = 2;
 
-const TIME_PERIODS = ["15m", "1h", "24h", "7d"] as const;
+/** With a query the list is short already, so a group shows more of what matched. */
+export const MENTION_SEARCH_LIMIT = 8;
 
 const STREAM_TYPES = ["logs", "metrics", "traces"] as const;
 </script>
@@ -154,19 +171,17 @@ const STREAM_TYPES = ["logs", "metrics", "traces"] as const;
 import { useQuery } from "@tanstack/vue-query";
 import { computed, reactive, ref, watch } from "vue";
 
+import { agentGlyph, assistantGlyph, chipGlyph } from "@/components/ai-assistant/common/glyphs";
+import { agentClause } from "@/components/ai-assistant/agents/agentClause";
 import { announceComposer } from "@/components/ai-assistant/composer/composerUi";
-import {
-  shortLabelFor,
-  timeRangeText,
-  useAssistantCapability,
-  useAssistantStore,
-} from "@/composables/assistant";
+import { shortLabelFor, useAssistantCapability, useAssistantStore } from "@/composables/assistant";
 import {
   agentMatches,
   agentName,
   agentReason,
   rosterOffersChoice,
 } from "@/composables/assistant/pure";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { alertsListQuery } from "@/services/alerts.queries";
@@ -183,9 +198,11 @@ interface Group {
   title: I18nText;
   kind: I18nText;
   state: GroupState;
-  /** The options, then the Show more, Retry or no-access row, all in the ↑/↓ cycle. */
+  /** The options, then the Show all, Retry or no-access row, all in the ↑/↓ cycle. */
   items: MentionOption[];
   retry?: () => void;
+  /** How many the group holds; the header's right-hand count. */
+  total?: number;
 }
 
 const props = withDefaults(defineProps<AssistantMentionMenuProps>(), {
@@ -240,21 +257,6 @@ const matches = (option: MentionOption) => {
   return terms.value.every((term) => hay.includes(term));
 };
 
-const timeOptions = computed<MentionOption[]>(() => [
-  ...TIME_PERIODS.map((period) => ({
-    id: `time:${period}`,
-    kind: "time" as const,
-    label: timeRangeText({ from: 0, to: 0, period, source: "custom" }, t),
-    period,
-  })),
-  {
-    id: "time:page",
-    kind: "time" as const,
-    label: t("assistant.composer.mention.pageTime"),
-    period: null,
-  },
-]);
-
 const streamOptions = computed<MentionOption[]>(() =>
   STREAM_TYPES.flatMap((type, index) =>
     namesOf(streams[index].data.value)
@@ -263,7 +265,7 @@ const streamOptions = computed<MentionOption[]>(() =>
         option(
           "stream",
           `${type}:${name}`,
-          t("assistant.context.chip.stream", { name: raw(name) }),
+          raw(name),
           raw(type),
           {
             id: name,
@@ -281,16 +283,7 @@ const dashboardOptions = computed<MentionOption[]>(() =>
     const id = stringOf(row.dashboard_id ?? row.dashboardId);
     const title = stringOf(row.title) ?? id;
     return id && title
-      ? [
-          option(
-            "panel",
-            id,
-            t("assistant.context.chip.dashboard", { name: raw(title) }),
-            undefined,
-            { id, type: "dashboard" },
-            stringOf(row.title),
-          ),
-        ]
+      ? [option("panel", id, raw(title), undefined, { id, type: "dashboard" }, stringOf(row.title))]
       : [];
   }),
 );
@@ -300,16 +293,7 @@ const alertOptions = computed<MentionOption[]>(() =>
     const id = stringOf(row.alert_id ?? row.id);
     const name = stringOf(row.name) ?? id;
     return id && name
-      ? [
-          option(
-            "alert",
-            id,
-            t("assistant.context.chip.alert", { name: raw(name) }),
-            undefined,
-            { id },
-            stringOf(row.name),
-          ),
-        ]
+      ? [option("alert", id, raw(name), undefined, { id }, stringOf(row.name))]
       : [];
   }),
 );
@@ -319,16 +303,7 @@ const pipelineOptions = computed<MentionOption[]>(() =>
     const id = stringOf(row.pipeline_id ?? row.id);
     const name = stringOf(row.name) ?? id;
     return id && name
-      ? [
-          option(
-            "pipeline_node",
-            id,
-            t("assistant.context.chip.pipeline", { name: raw(name) }),
-            undefined,
-            { id },
-            stringOf(row.name),
-          ),
-        ]
+      ? [option("pipeline_node", id, raw(name), undefined, { id }, stringOf(row.name))]
       : [];
   }),
 );
@@ -348,18 +323,19 @@ const agentGroup = computed<Group[]>(() => {
         label,
         action: "agent",
         agent: agent.id,
-        ...(reason && { secondary: reason, disabled: true }),
+        glyph: reason ? assistantGlyph.locked : agentGlyph[agent.id],
+        secondary: reason ?? agentClause(agent, t),
+        ...(reason && { disabled: true }),
       },
     ];
   });
   const title = t("assistant.composer.mention.group.agents");
-  return [{ id: "agents", title, kind: title, state: "ready", items }];
+  return [{ id: "agents", title, kind: title, state: "ready", items, total: items.length }];
 });
 
 const groups = computed<Group[]>(() =>
   [
     ...agentGroup.value,
-    group("time", t("assistant.composer.mention.group.time"), raw(""), "ready", timeOptions.value),
     group(
       "streams",
       t("assistant.composer.mention.group.streams"),
@@ -393,7 +369,10 @@ const groups = computed<Group[]>(() =>
       () => void pipelines.refetch(),
     ),
     ...(props.withImage ? [imageGroup()] : []),
-  ].filter((g) => g.state !== "ready" || g.items.length > 0),
+  ].filter(
+    (g) =>
+      (g.state !== "ready" || g.items.length > 0) && (g.id !== "pipelines" || !!terms.value.length),
+  ),
 );
 
 // A disabled agent stays in the ↑/↓ cycle, so Enter on it can read its reason (MULTI-AGENT-02 AC 6).
@@ -409,7 +388,13 @@ const empty = computed(() => groups.value.every((g) => g.state === "ready") && r
 
 function imageGroup(): Group {
   const label = t("assistant.composer.addImage");
-  const item: MentionOption = { id: "action:image", kind: "image", label, action: "image" };
+  const item: MentionOption = {
+    id: "action:image",
+    kind: "image",
+    label,
+    action: "image",
+    glyph: chipGlyph.image,
+  };
   return {
     id: "attach",
     title: t("assistant.composer.addGroupAttach"),
@@ -419,7 +404,7 @@ function imageGroup(): Group {
   };
 }
 
-// Show more and Retry act in place; an option or the Image row is handed to the composer.
+// Show all and Retry act in place; an option or the Image row is handed to the composer.
 function choose(item: MentionOption): void {
   if (item.action === "agent") return chooseAgent(item);
   if (item.disabled) return;
@@ -458,7 +443,8 @@ function group(
   retry?: () => void,
 ): Group {
   const found = all.filter(matches);
-  const shown = expanded.has(id) ? found : found.slice(0, MENTION_GROUP_LIMIT);
+  const limit = terms.value.length > 0 ? MENTION_SEARCH_LIMIT : MENTION_GROUP_LIMIT;
+  const shown = expanded.has(id) ? found : found.slice(0, limit);
   const extra = (action: "more" | "retry", label: I18nText): MentionOption => ({
     id: `${action}:${id}`,
     kind: "field",
@@ -471,7 +457,7 @@ function group(
       ? [
           ...shown,
           ...(found.length > shown.length
-            ? [extra("more", t("assistant.composer.mention.showMoreIn", { group: title }))]
+            ? [extra("more", t("assistant.composer.mention.showAll"))]
             : []),
         ]
       : state === "error"
@@ -486,7 +472,7 @@ function group(
               },
             ]
           : [];
-  return { id, title, kind, state, items, retry };
+  return { id, title, kind, state, items, retry, total: state === "ready" ? found.length : 0 };
 }
 
 function option(
@@ -509,7 +495,14 @@ function option(
     provenance: "mention",
     sent: "whitelist",
   };
-  return { id: chip.id, kind, label, ...(secondary && { secondary }), chip };
+  return {
+    id: chip.id,
+    kind,
+    label,
+    ...(secondary && { secondary }),
+    chip,
+    code: kind === "stream" || kind === "alert",
+  };
 }
 
 function stateOf(
@@ -551,7 +544,7 @@ defineExpose({
   },
   /** The option Enter picks; `null` when nothing matches, so Enter inserts nothing (CT-05 AC 5). */
   current: () => flat.value[active.value] ?? null,
-  /** Runs Enter on the highlighted row: an option is selected, Show more and Retry act in place. */
+  /** Runs Enter on the highlighted row: an option is selected, Show all and Retry act in place. */
   choose,
   activeId: computed(() => {
     const current = flat.value[active.value];

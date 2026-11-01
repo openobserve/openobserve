@@ -59,14 +59,12 @@ const ROSTER: CapabilityAgent[] = [
 const stubs = {
   ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
   ODropdownGroup: { props: ["label"], template: "<div>{{ label }}<slot /></div>" },
-  ODropdownSeparator: true,
   ODropdownItem: {
     props: ["description"],
     emits: ["select"],
     template:
-      '<div role="menuitemradio" @click="$emit(\'select\')"><slot name="icon-left" /><slot /><p>{{ description }}</p><slot name="icon-right" /></div>',
+      '<div @click="$emit(\'select\')"><slot name="icon-left" /><slot /><p>{{ description }}</p><slot name="icon-right" /></div>',
   },
-  OSheet: { template: '<div><slot name="header" /><slot /></div>' },
 };
 
 function setup(roster: CapabilityAgent[] = ROSTER, messages = false) {
@@ -88,7 +86,6 @@ function setup(roster: CapabilityAgent[] = ROSTER, messages = false) {
 const trigger = (w: ReturnType<typeof mount>) => w.get('[data-test="assistant-agent-picker"]');
 const option = (w: ReturnType<typeof mount>, id: string) =>
   w.get(`[data-test="assistant-agent-option-${id}"]`);
-const next = (w: ReturnType<typeof mount>) => w.find('[data-test="assistant-agent-picker-next"]');
 
 beforeEach(() => {
   breakpoint.mobile = false;
@@ -106,14 +103,19 @@ describe("AssistantAgentPicker", () => {
     );
   });
 
-  it("names the trigger for a screen reader and lists the roster with heading, note and policy", () => {
+  it("names the trigger with the agent and its clause, and lists one row per agent", () => {
     const { wrapper } = setup();
-    expect(trigger(wrapper).attributes("aria-label")).toContain("Change agent");
-    expect(wrapper.text()).toContain("Who answers");
-    expect(wrapper.text()).toContain("Type @ and a name");
-    expect(option(wrapper, "sre").text()).toContain("Read-only");
-    expect(option(wrapper, "generate-query").text()).toContain("Asks before changing anything");
-    expect(wrapper.findAll('[role="menuitemradio"]')).toHaveLength(3);
+    expect(trigger(wrapper).attributes("aria-label")).toBe(
+      "Agent: O2 Assistant, Asks before changing anything",
+    );
+    expect(wrapper.text()).toContain("Agent");
+    expect(option(wrapper, "sre").text()).toContain("Finds causes · Read-only");
+    expect(option(wrapper, "generate-query").text()).toContain(
+      "Writes queries · Asks before changing anything",
+    );
+    expect(wrapper.findAll('[role="option"]')).toHaveLength(3);
+    expect(option(wrapper, "o2-ai").attributes("aria-selected")).toBe("true");
+    expect(option(wrapper, "o2-ai").classes()).toContain("bg-dropdown-item-hover-bg");
   });
 
   it("sets a new chat's agent without sending, and announces it", async () => {
@@ -122,18 +124,18 @@ describe("AssistantAgentPicker", () => {
     await option(wrapper, "sre").trigger("click");
     expect(store.state.sessions[sid].agentId).toBe("sre");
     expect(send).not.toHaveBeenCalled();
-    expect(trigger(wrapper).text()).toContain("Investigator");
-    expect(next(wrapper).exists()).toBe(false);
+    expect(trigger(wrapper).attributes("aria-label")).toContain("Investigator");
+    expect(trigger(wrapper).attributes("data-pending")).toBeUndefined();
     expect(composerUi(sid).status?.text).toBe("Investigator will answer.");
   });
 
-  it("shows Next on a chat with turns, and the current agent takes it away", async () => {
+  it("marks a pending switch on a chat with turns, and the current agent takes it away", async () => {
     const { wrapper, store, sid } = setup(ROSTER, true);
     await option(wrapper, "sre").trigger("click");
-    expect(next(wrapper).text()).toBe("Next: Investigator");
+    expect(trigger(wrapper).attributes("data-pending")).toBe("");
     expect(store.state.sessions[sid].messages.some((m: any) => m.handoffFrom)).toBe(false);
     await option(wrapper, "o2-ai").trigger("click");
-    expect(next(wrapper).exists()).toBe(false);
+    expect(trigger(wrapper).attributes("data-pending")).toBeUndefined();
   });
 
   it("locks a row with its reason, offers Ask an admin for a role, and reads the reason on Enter", async () => {
@@ -143,14 +145,14 @@ describe("AssistantAgentPicker", () => {
       { id: "generate-query", pickable: true, available: false, reason: "role" },
     ];
     const { wrapper, store, sid } = setup(roster);
-    expect(option(wrapper, "generate-query").text()).toContain("Not available to your role");
+    expect(option(wrapper, "generate-query").text()).toContain("Not available");
     expect(wrapper.get('[data-test="ask-admin-stub"]').attributes("data-kind")).toBe(
       "agent_access",
     );
     expect(option(wrapper, "sre").text()).toContain("Not reachable right now");
     await option(wrapper, "generate-query").trigger("click");
     expect(store.state.sessions[sid].agentId).toBeUndefined();
-    expect(composerUi(sid).status?.text).toBe("Not available to your role");
+    expect(composerUi(sid).status?.text).toBe("Not available · Ask an admin");
   });
 
   it("marks an agent a send refused, until the capability is re-read", async () => {
@@ -158,16 +160,5 @@ describe("AssistantAgentPicker", () => {
     store.noteAgentRefused("sre", "agent_disabled");
     await flushPromises();
     expect(option(wrapper, "sre").text()).toContain("Turned off");
-  });
-
-  it("uses a sheet list with tall rows on a phone", async () => {
-    breakpoint.mobile = true;
-    const { wrapper, store, sid } = setup();
-    await trigger(wrapper).trigger("click");
-    expect(wrapper.find('[data-test="assistant-agent-sheet"]').exists()).toBe(true);
-    expect(trigger(wrapper).classes()).toContain("min-h-11");
-    expect(option(wrapper, "sre").classes()).toContain("min-h-14");
-    await option(wrapper, "sre").trigger("click");
-    expect(store.state.sessions[sid].agentId).toBe("sre");
   });
 });

@@ -9246,6 +9246,10 @@
       "undoneState": "Undone",
       "unsupported": "Activity history needs a newer server version."
     },
+    "attach": {
+      "saved": "Attachments are saved with this chat.",
+      "ok": "OK"
+    },
     "announce": {
       "approval": "Waiting for your approval: {title}.",
       "approvalExpires": "Waiting for your approval: {title}. Expires in {duration}.",
@@ -9432,7 +9436,6 @@
       "queryError": "Query error",
       "span": "Span"
     },
-    "beta": "Beta",
     "billing": {
       "allowance": {
         "confirm": "Set limit",
@@ -9512,7 +9515,6 @@
           "dashboards": "Dashboards",
           "pipelines": "Pipelines",
           "streams": "Streams",
-          "time": "Time range",
           "agents": "Agents"
         },
         "kind": {
@@ -9525,26 +9527,34 @@
         "optionName": "{group}, {label}",
         "pageTime": "Page time",
         "retry": "Couldn't load {kind} · Retry",
-        "showMoreIn": "Show more {group}",
+        "showAll": "Show all",
         "title": "Add to context"
       },
       "name": "Message {product}",
-      "placeholder": "Ask about {summary}",
-      "offline": "You're offline. Your draft is kept; dictation needs a connection.",
-      "placeholderEmpty": "Ask a question or add context with {'@'}",
+      "placeholder": "Ask about your data",
+      "followUp": "Ask a follow-up",
+      "scoped": "Ask about {stream}",
+      "agent": "Ask {agent}",
+      "inert": "Decide above to continue",
+      "busy": "{product} is busy. Send again in {s} s.",
+      "unsent": "Isn't reachable. Your message wasn't sent.",
+      "goToRequest": "Go to request",
+      "imageCap": "{name} wasn't added. Up to {count} images, {size} each.",
+      "elsewhere": "Answering in another tab.",
+      "sendReply": "Send reply",
+      "addContextTip": "Add context · {'@'}",
+      "offline": "You're offline. Draft kept.",
       "rateLimited": "Wait for the Retry countdown to end.",
       "recalled": "Recalled prompt {n} of {count}",
       "recallHint": "↑ recalls your last prompt | ↑ recalls your last {count} prompts",
       "recentPrompts": "Recent prompts",
       "removeImage": "Remove {name}",
-      "replyHelper": "Your reply answers the request above; staged context stays here.",
+      "replyHelper": "Reply declines the request",
       "replyPlaceholder": "Reply to the assistant",
       "running": "Wait for this answer to finish, or stop it.",
       "sendEmpty": "Type a message or add context to send",
       "undo": "Undo",
-      "waitingApproval": "Answer the request above to continue.",
-      "waitingConsent": "Decide on paid usage above to continue.",
-      "replyCancel": "Cancel reply",
+      "replyCancel": "Cancel",
       "replyRefused": "Your reply wasn't sent. This request can't be answered from this page.",
       "addContext": "Add context",
       "addMenuSearch": "Search streams, panels, alerts",
@@ -9610,6 +9620,7 @@
       "chipName": "{label}, {secondary}",
       "dataSharing": "Data sharing · {level}",
       "disclosure": "Attached data is sent to the assistant and saved with this chat.",
+      "seesDisclosure": "Sent to the assistant and saved with this chat.",
       "disclosureDismiss": "Dismiss the data notice",
       "disclosureLine": "Sends the chips and this page's time range",
       "disclosureShared": "Attached data is sent to the assistant, saved with this chat and included in any share.",
@@ -9658,14 +9669,19 @@
       "streamsValue": "{names} ({type})",
       "summary": "{scope} · {range}",
       "time": {
-        "apply": "Apply",
+        "last": "Last {period}",
+        "name": "Time range, {range}, {source}",
+        "reversed": "End must be after start",
+        "source": {
+          "default": "default",
+          "page": "from this page",
+          "custom": "custom"
+        },
         "custom": "custom",
         "default": "Time · last 15 min · default",
-        "defaultNote": "The default range is used because this page has no time range.",
         "fromPage": "page",
         "page": "Time · {range}",
-        "swap": "Change time range",
-        "usePage": "Use page time"
+        "swap": "Change time range"
       },
       "title": "What the assistant sees",
       "trayLabel": "Context for your next message",
@@ -10274,7 +10290,7 @@
         "title": "{product} is turned off for this organization"
       },
       "openAccessSettings": "Open access settings",
-      "tryAgain": "Try again",
+      "tryAgain": "Retry",
       "unhealthy": {
         "body": "The assistant service isn't responding. Try again in a few minutes.",
         "notice": "{product} isn't responding. Your last message wasn't answered.",
@@ -11429,14 +11445,8 @@
       "stoppedIncomplete": "Stopped, incomplete"
     },
     "voice": {
-      "allow": {
-        "chrome": "In Chrome, select the icon to the left of the address, open Site settings and set Microphone to Allow.",
-        "edge": "In Edge, select the lock icon next to the address, open Permissions for this site and set Microphone to Allow.",
-        "headphones": "With a screen reader, use headphones while dictating.",
-        "other": "Open this site's settings in your browser and set Microphone to Allow.",
-        "safari": "In Safari, open Settings for This Website from the Safari menu and set Microphone to Allow.",
-        "title": "How to allow the microphone"
-      },
+      "allowTitle": "Allow the microphone",
+      "allowBody": "Click the lock in the address bar, allow Microphone, then reload this page.",
       "cancelled": "Dictation cancelled.",
       "continue": "Continue",
       "dictate": "Dictate",
@@ -11447,33 +11457,23 @@
         "microsoft": "Edge turns speech into text with Microsoft's speech service.",
         "vendor": "Your browser sends speech to its maker's speech service to turn it into text."
       },
-      "engineShort": {
-        "browser": "Your browser",
-        "device": "Your device"
-      },
       "enterToSend": "Press Enter again to send.",
       "error": {
-        "browser_silent": "Your browser didn't turn speech into text. Type instead, or try another browser.",
         "how": "How to allow it",
-        "language_unsupported": "Dictation in {language} isn't supported by this browser.",
         "mic_denied": "Microphone access is blocked for this site.",
         "no_mic": "No microphone found. Connect one and try again.",
         "no_speech": "Didn't hear anything. Try again.",
-        "service_unreachable": "Couldn't reach {vendor}'s speech service. Check your connection, then try again.",
-        "service_unreachable_generic": "Couldn't reach your browser's speech service. Check your connection, then try again.",
+        "service_unreachable": "Couldn't reach {vendor}'s speech service.",
+        "service_unreachable_generic": "Couldn't reach your browser's speech service.",
         "stt_unavailable": "Speech-to-text stopped. What was heard is kept.",
-        "time_limit": "Dictation stops after 2 minutes. Press the mic to go on.",
-        "unsupported": "This browser can't dictate and server speech-to-text is off.",
-        "voice_off": "Voice dictation is off in this browser. An org admin can turn it on for their own browser under Settings, Assistant, Data."
+        "time_limit": "Dictation stops after 2 minutes. Press the mic to go on."
       },
-      "helperFinish": "Enter or Esc to finish, not send",
-      "helperListening": "{engineShort} · OpenObserve doesn't store the audio",
       "listening": "Listening",
       "notNow": "Not now",
-      "primerBody": "Your browser will ask to use the microphone. What you say appears in the box for you to edit; nothing is sent until you press Send.",
+      "primerBody": "Nothing is sent until you press Send.",
       "primerEngine": "{engineSentence} OpenObserve doesn't store the audio.",
       "primerTitle": "Dictate into the message",
-      "releaseToStop": "Listening · release {keys} to stop",
+      "holdLine": "Release {keys} to stop",
       "seesLine": "Dictation: {engineSentence} OpenObserve doesn't store the audio.",
       "started": "Listening. Press Enter, Escape or the mic to stop.",
       "stopTooltip": "Stop dictation",
@@ -11481,13 +11481,14 @@
       "stoppedEnter": "Dictation stopped. {count} word added. Press Enter to send. | Dictation stopped. {count} words added. Press Enter to send.",
       "tooltip": "Dictate · Hold {keys}",
       "tryAgain": "Try again",
-      "waitingPermission": "Waiting for microphone permission"
+      "waitingPermission": "Waiting for permission",
+      "waitingShort": "Waiting",
+      "offAdmin": "Dictation is off in this browser.",
+      "turnOn": "Turn on",
+      "silent": "Your browser didn't turn speech into text. Reload to try again.",
+      "language": "Dictation isn't available in {language}, your browser language."
     },
     "welcome": {
-      "capability": {
-        "readOnly": "Ask about your logs, traces, metrics, alerts and dashboards. It runs read-only queries, links to what it finds and can't change anything in this organization.",
-        "readWrite": "Ask about your logs, traces, metrics, alerts and dashboards. It runs read-only queries, links to what it finds and asks before changing anything."
-      },
       "ghostHint": "Suggestion: {label}. Press Right Arrow to use it.",
       "ghostInserted": "Suggestion inserted",
       "lastRange": "last {period}",
@@ -11495,14 +11496,10 @@
         "ask": "Ask",
         "clear": "Clear question",
         "allChats": "All chats",
-        "disclosure": "Sends with the default time range, {range}",
-        "disclosureNoStreams": "Sends with the default time range, {range} · no streams yet",
         "inputName": "Ask {product}",
         "noRecent": "No chats yet",
-        "noRecentHint": "Start one above, or ask about a log row, panel or alert.",
         "openFull": "Open full view",
-        "placeholder": "Ask about your logs, alerts and dashboards…",
-        "yourChats": "Your chats"
+        "recent": "Recent"
       },
       "prefill": {
         "append": "Append",
@@ -11510,19 +11507,6 @@
         "question": "Replace your draft with the suggestion?",
         "replace": "Replace"
       },
-      "scope": "Sees:",
-      "scopeObject": {
-        "dashboard": "dashboard {name}",
-        "js": "this JavaScript",
-        "json": "this JSON",
-        "promql": "this PromQL",
-        "regex": "this pattern",
-        "sql": "this SQL",
-        "vrl": "this VRL"
-      },
-      "scopeOrg": "org {org}",
-      "scopeStream": "stream {stream}",
-      "sentWithFirst": "Sent with your first message",
       "starter": {
         "alerts": {
           "1": "Which alerts fired most in the last 24 h?",
@@ -11539,8 +11523,8 @@
           "2": "Explain what this function does"
         },
         "home": {
-          "attention": "What needs attention in `{org}` right now?",
-          "errorsSummary": "Summarise errors in `{stream}` over the last hour",
+          "attention": "What needs attention right now?",
+          "errorsSummary": "Summarise errors in `{stream}`",
           "slowSpans": "Which services had the slowest spans in the last hour?"
         },
         "ingest": {
@@ -11581,7 +11565,6 @@
           "1Generic": "Which services had the slowest spans recently?"
         }
       },
-      "streams": "no streams yet | {count} stream | {count} streams",
       "suggestions": "Suggestions",
       "try": "Try: \"{prompt}\""
     },
@@ -11610,29 +11593,31 @@
       },
       "investigator": {
         "name": "Investigator",
-        "purpose": "Finds the likely cause of a problem, with evidence"
+        "purpose": "Finds causes"
       },
       "queryBuilder": {
         "name": "Query builder",
-        "purpose": "Writes one SQL or PromQL query for you to run or insert"
+        "purpose": "Writes queries"
       },
       "policy": {
         "readOnly": "Read-only",
         "asks": "Asks before changing anything"
       },
       "picker": {
-        "label": "Agent: {agent}. Change agent",
-        "heading": "Who answers",
-        "note": "Type {'@'} and a name while writing to switch. Switching later hands this chat over; earlier answers stay as they are.",
-        "next": "Next: {agent}"
+        "label": "Agent: {agent}, {clause}",
+        "tooltip": "{agent} · {clause}",
+        "heading": "Agent"
       },
       "unavailable": {
-        "role": "Not available to your role",
+        "role": "Not available · Ask an admin",
+        "short": "Not available",
         "disabled": "Turned off for this organization",
         "unreachable": "Not reachable right now · checked {time}",
         "unreachableNow": "Not reachable right now"
       },
-      "announceChosen": "{agent} will answer."
+      "announceChosen": "{agent} will answer.",
+      "pendingSwitch": "{agent} answers from now on. Earlier answers stay.",
+      "clause": "{purpose} · {policy}"
     },
     "handoff": {
       "marker": "Handed to {agent} by you · {time}",

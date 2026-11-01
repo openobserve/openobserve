@@ -27,6 +27,7 @@ import { streamKeys } from "@/services/stream.querykeys";
 
 import AssistantMentionMenu, {
   MENTION_GROUP_LIMIT,
+  MENTION_SEARCH_LIMIT,
   type MentionOption,
 } from "./AssistantMentionMenu.vue";
 
@@ -167,7 +168,7 @@ describe("AssistantMentionMenu: Agents group (MULTI-AGENT-02)", () => {
     wrapper.vm.choose(row);
     expect(wrapper.emitted("select")).toBeUndefined();
     expect(store.state.sessions[sid].agentId).toBeUndefined();
-    expect(composerUi(sid).status?.text).toBe("Not available to your role");
+    expect(composerUi(sid).status?.text).toBe("Not available · Ask an admin");
   });
 });
 
@@ -211,7 +212,7 @@ describe("AssistantMentionMenu", () => {
     expect(wrapper.emitted("select")?.[0]?.[0]).toMatchObject({ action: "image" });
   });
 
-  it("lists the five groups as a listbox with the first option active (CT-05 AC 1, 9)", async () => {
+  it("lists the groups as a listbox with the first option active, and no time group (CT-05 AC 1, 9)", async () => {
     const { wrapper, options } = await open();
     const listbox = document.body.querySelector('[data-test="assistant-mention-menu"]')!;
     expect(listbox.getAttribute("role")).toBe("listbox");
@@ -219,26 +220,33 @@ describe("AssistantMentionMenu", () => {
     const groups = [...document.body.querySelectorAll('[role="group"]')].map((g) =>
       g.getAttribute("aria-label"),
     );
-    expect(groups).toEqual(["Time range", "Streams", "Dashboards", "Alerts", "Pipelines"]);
+    expect(groups).toEqual(["Streams", "Dashboards", "Alerts"]);
     expect(options()[0].getAttribute("aria-selected")).toBe("true");
     expect((wrapper.vm as unknown as { activeId: string }).activeId).toBe(options()[0].id);
-    expect(options()[0].getAttribute("aria-label")).toBe("Time range, last 15 min");
+    expect(options()[0].getAttribute("aria-label")).toContain("Streams, ");
   });
 
-  it("filters across groups, at most 8 per group with Show more (CT-05 AC 2)", async () => {
+  it("filters across groups, a query showing more per group, with Show all (CT-05 AC 2)", async () => {
     const first = await open("che");
     const { options } = first;
     expect(options().map((o) => o.textContent?.trim().split("\n")[0].trim())).toEqual([
-      expect.stringContaining("Stream · checkout"),
-      expect.stringContaining("Dashboard · Checkout"),
-      expect.stringContaining("Alert · checkout-latency"),
+      expect.stringContaining("checkout"),
+      expect.stringContaining("Checkout"),
+      expect.stringContaining("checkout-latency"),
     ]);
     first.wrapper.unmount();
     const all = await open("stream");
     expect(all.options().filter((o) => o.dataset.kind === "stream")).toHaveLength(
+      MENTION_SEARCH_LIMIT,
+    );
+    expect(
+      document.body.querySelector('[data-test="assistant-mention-more"]')?.textContent,
+    ).toContain("Show all");
+    all.wrapper.unmount();
+    const plain = await open();
+    expect(plain.options().filter((o) => o.dataset.kind === "stream")).toHaveLength(
       MENTION_GROUP_LIMIT,
     );
-    expect(document.body.querySelector('[data-test="assistant-mention-more"]')).not.toBeNull();
   });
 
   it("emits the chosen chip with the ids the wire reads (CT-05 AC 3, 12)", async () => {
@@ -266,14 +274,13 @@ describe("AssistantMentionMenu", () => {
     }
     expect(picked.find((chip) => chip.kind === "panel")?.short).toBe("Checkout");
     expect(picked.find((chip) => chip.kind === "alert")?.short).toBe("checkout-latency");
-    expect(picked.find((chip) => chip.kind === "pipeline_node")?.short).toBe("ingest-k8s");
   });
 
   it("moves the highlight from the textbox and hands Enter the current option", async () => {
     const { wrapper } = await open();
     const vm = wrapper.vm as unknown as { move(d: number): void; current(): { id: string } | null };
     vm.move(1);
-    expect(vm.current()?.id).toBe("time:1h");
+    expect(vm.current()?.id).toMatch(/^mention:stream:/);
     vm.move(-2);
     expect(vm.current()).not.toBeNull();
   });
@@ -305,7 +312,7 @@ describe("AssistantMentionMenu", () => {
     expect(options()[0].className).toContain("pointer-coarse:min-h-11");
   });
 
-  it("puts Show more and Retry in the arrow cycle, acted on by Enter (CT-05 AC 2, 11)", async () => {
+  it("puts Show all and Retry in the arrow cycle, acted on by Enter (CT-05 AC 2, 11)", async () => {
     const { wrapper } = await open("stream");
     const vm = wrapper.vm as unknown as {
       move(d: number): void;
@@ -318,7 +325,7 @@ describe("AssistantMentionMenu", () => {
     await flushPromises();
     expect(
       document.body.querySelectorAll('[data-test="assistant-mention-option"][data-kind="stream"]'),
-    ).toHaveLength(10);
+    ).toHaveLength(9);
     expect(wrapper.emitted("select")).toBeUndefined();
   });
 });

@@ -83,6 +83,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OBanner>
 
+    <OBanner
+      v-if="errorRow"
+      variant="error-soft"
+      bar
+      dense
+      icon="error-outline"
+      :content="errorRow"
+      class="rounded-default min-h-9"
+      data-test="assistant-composer-error-row"
+    />
+    <OBanner
+      v-if="attachNotice"
+      variant="default"
+      bar
+      dense
+      icon="info-outline"
+      :content="t('assistant.attach.saved')"
+      class="rounded-default min-h-9"
+      data-test="assistant-composer-attach-notice"
+    >
+      <template #actions>
+        <OButton
+          variant="ghost"
+          size="xs"
+          :class="TOUCH_TARGET_CLASS"
+          data-test="assistant-composer-attach-ok"
+          @click="dismissAttachNotice"
+        >
+          {{ t("assistant.attach.ok") }}
+        </OButton>
+      </template>
+    </OBanner>
+
+    <div
+      v-if="replying"
+      class="flex min-w-0 items-center gap-2"
+      data-test="assistant-composer-reply"
+    >
+      <OText variant="meta" as="p" class="min-w-0 flex-1">
+        {{ t("assistant.composer.replyHelper") }}
+      </OText>
+      <OButton
+        variant="ghost"
+        size="chip"
+        :class="TOUCH_TARGET_CLASS"
+        data-test="assistant-composer-reply-cancel"
+        @click="leaveReply"
+      >
+        {{ t("assistant.composer.replyCancel") }}
+      </OButton>
+    </div>
+
     <div class="relative flex flex-col gap-1.5">
       <AssistantMentionMenu
         ref="mention"
@@ -93,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @select="pickMention"
         @close="closeMention"
       />
-      <!-- One frame holds the chips, the text and its controls, so the message reads as one control (D4 §3.1) -->
+      <!-- One DOM at every width: the text, then the control row beside it or under it -->
       <OTextarea
         ref="textbox"
         :model-value="shownText"
@@ -105,76 +157,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :readonly="inertKind !== null"
         :placeholder="placeholder"
         :input-attrs="textboxAttrs"
+        :tabindex="inertKind ? -1 : undefined"
+        :class="frameClass"
         placeholder-tone="strong"
         data-test="assistant-composer"
         :data-state="state"
+        :data-rows="twoRows ? 2 : 1"
         @update:model-value="onInput"
         @keydown="onKeydown"
         @paste="onPaste"
         @focus="refreshPageContext"
         @blur="onBlur"
       >
-        <template v-if="$slots.chips || images.length > 0" #header>
-          <div
-            class="flex min-w-0 flex-col gap-1 px-1.5 pt-1.5"
-            data-test="assistant-composer-chips"
+        <template v-if="inertKind" #footer>
+          <OButton
+            v-if="cardAway"
+            variant="ghost-primary"
+            size="chip"
+            :class="['me-1 shrink-0', TOUCH_TARGET_CLASS]"
+            data-test="assistant-composer-go-to-request"
+            @click="goToRequest"
           >
-            <slot name="chips" />
-            <ul
-              v-if="images.length > 0"
-              class="flex flex-wrap gap-1.5"
-              data-test="assistant-image-strip"
-            >
-              <li v-for="image in images" :key="image.id ?? image.filename">
-                <AssistantChipPopover
-                  :chip="imageChip(image)"
-                  :image-src="dataUrl(image)"
-                  :open="openImage === image.id"
-                  @update:open="(open) => (openImage = open ? (image.id ?? null) : null)"
-                  @remove="removeImage(image)"
-                >
-                  <template #anchor>
-                    <span
-                      class="border-border-default rounded-default inline-flex items-center gap-0.5 border p-0.5"
-                    >
-                      <OButton
-                        variant="ghost"
-                        size="icon-md"
-                        class="p-0! max-md:size-11 pointer-coarse:size-11"
-                        :aria-label="image.filename"
-                        aria-haspopup="dialog"
-                        :aria-expanded="openImage === image.id"
-                        data-test="assistant-image-open"
-                        @click="openImage = image.id ?? null"
-                      >
-                        <img
-                          :src="dataUrl(image)"
-                          :alt="image.filename"
-                          class="rounded-default size-10 object-cover"
-                        />
-                      </OButton>
-                      <OButton
-                        variant="ghost"
-                        size="icon-xs"
-                        class="max-md:size-11 pointer-coarse:size-11"
-                        :aria-label="t('assistant.composer.removeImage', { name: image.filename })"
-                        data-test="assistant-image-remove"
-                        @click="removeImage(image)"
-                      >
-                        <OIcon :name="assistantGlyph.close" size="xs" />
-                      </OButton>
-                    </span>
-                  </template>
-                </AssistantChipPopover>
-              </li>
-            </ul>
-          </div>
+            {{ t("assistant.composer.goToRequest") }}
+          </OButton>
         </template>
-        <template #footer>
+        <template v-else #footer>
           <div
-            class="flex items-center gap-1 px-1.5 pb-1.5"
+            ref="controls"
+            :class="[
+              'flex min-w-0 items-center gap-0.5',
+              twoRows ? 'mt-1 flex-wrap px-1 pb-1' : 'shrink-0 pe-1',
+            ]"
             data-test="assistant-composer-controls"
           >
+            <slot v-if="!replying" name="chips" />
+            <AssistantDictationMeter
+              v-if="voice.listening.value"
+              :label="voice.rowLabel.value"
+              :level="voice.level.value"
+              :elapsed-ms="voice.elapsedMs.value"
+              :narrow="width.narrow.value"
+              :tight="width.tight.value && pickerRoom"
+            />
+            <span
+              v-else-if="voice.waiting.value"
+              class="text-text-secondary inline-flex min-w-0 items-center gap-1.5 text-xs"
+              data-test="assistant-dictate-waiting"
+            >
+              <OSpinner size="xs" class="motion-reduce:hidden" />
+              <span class="truncate">{{
+                width.narrow.value
+                  ? t("assistant.voice.waitingShort")
+                  : t("assistant.voice.waitingPermission")
+              }}</span>
+            </span>
+            <span v-if="twoRows" data-spacer class="flex-1" />
             <AssistantAddContextMenu
               v-if="!replying"
               ref="addMenu"
@@ -182,30 +219,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="addOption"
               @image="openPicker"
             />
+            <AssistantContextSeesPopover v-if="!replying" :sid="sid" />
+            <AssistantAgentPicker v-if="!replying" :sid="sid" />
             <AssistantIconButton
-              v-if="!mdUp && recallEntries.length > 0"
+              v-if="coarse && recallEntries.length > 0"
               :label="t('assistant.composer.recentPrompts')"
               :icon="assistantGlyph.history"
               data-test="assistant-recall-open"
               @click="recallOpen = true"
             />
-            <span class="flex-1" />
-            <AssistantDictationMeter
-              v-if="voice.listening.value"
-              :label="voice.rowLabel.value"
-              :level="voice.level.value"
-              :elapsed-ms="voice.elapsedMs.value"
-            />
             <AssistantDictateButton
-              v-if="voice.show.value"
+              v-if="voice.mic.value !== 'none'"
+              :mic="voice.mic.value"
               :pressed="voice.mine.value"
-              :denied="voice.denied.value"
               :primer-open="voice.primerOpen.value"
               :sentence="voice.sentence.value"
-              :disabled-reason="micOffReason"
+              :disabled-reason="voice.helperLine.value ?? micOffReason"
               @press="onMicPress"
               @accept="voice.acceptPrimer"
               @decline="voice.declinePrimer"
+              @turn-on="voice.turnOn"
             />
             <span class="grid">
               <AssistantIconButton
@@ -214,31 +247,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('assistant.turn.stopLabel')"
                 :icon="assistantGlyph.stop"
                 :loading="state === 'stopping'"
-                class="hover:text-status-warning-text focus-visible:text-status-warning-text"
+                class="h-7! w-7!"
                 data-test="assistant-stop"
                 @click="stop"
               />
               <AssistantIconButton
                 v-else
                 variant="primary"
-                :label="t('assistant.turn.sendLabel')"
+                :label="
+                  replying ? t('assistant.composer.sendReply') : t('assistant.turn.sendLabel')
+                "
                 :icon="assistantGlyph.send"
                 :disabled="!canSend"
                 :disabled-reason="sendBlockedReason"
+                class="h-7! w-7!"
                 data-test="assistant-send"
                 @click="trySend"
               />
             </span>
           </div>
-          <OText
-            v-if="voice.waiting.value"
-            variant="meta"
-            as="p"
-            class="px-3 pb-1.5"
-            data-test="assistant-dictate-waiting"
-          >
-            {{ t("assistant.voice.waitingPermission") }}
-          </OText>
         </template>
       </OTextarea>
       <AssistantDictationTail
@@ -264,25 +291,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :id="helperId"
         variant="meta"
         as="p"
-        :class="['min-w-0 flex-1', helperEmphasis ? 'text-text-body font-medium' : '']"
+        :class="[
+          'min-w-0',
+          helperEmphasis ? 'text-text-body font-medium' : '',
+          helperFailed ? 'text-status-error-text' : '',
+        ]"
         data-test="assistant-composer-helper"
       >
         {{ helper }}
       </OText>
       <OButton
-        v-if="replying"
-        variant="ghost"
-        size="xs"
-        :class="TOUCH_TARGET_CLASS"
-        data-test="assistant-composer-reply-cancel"
-        @click="leaveReply"
-      >
-        {{ t("assistant.composer.replyCancel") }}
-      </OButton>
-      <OButton
         v-if="pasteOffer && helper === pasteLine"
         variant="ghost-primary"
-        size="xs"
+        size="chip"
         :class="TOUCH_TARGET_CLASS"
         data-test="assistant-composer-paste-inline"
         @click="pasteInline"
@@ -292,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="helper === voice.helperLine.value && voice.action.value === 'retry'"
         variant="ghost-primary"
-        size="xs"
+        size="chip"
         :class="TOUCH_TARGET_CLASS"
         data-test="assistant-dictate-retry"
         @click="voice.retry"
@@ -301,8 +322,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <AssistantVoiceAllowPopover
         v-if="helper === voice.helperLine.value && voice.action.value === 'how'"
-        :steps="voice.allowSteps.value"
       />
+      <OButton
+        v-if="helper === threadLine"
+        variant="ghost-primary"
+        size="chip"
+        :class="TOUCH_TARGET_CLASS"
+        data-test="assistant-context-start-new"
+        @click="startNew"
+      >
+        {{ t("assistant.context.startNew") }}
+      </OButton>
     </div>
     <OText
       v-if="storageBlocked"
@@ -328,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @type-error="() => refuse('type', t('assistant.context.imageType'))"
     />
     <AssistantRecallSheet
-      v-if="!mdUp"
+      v-if="coarse"
       v-model:open="recallOpen"
       :entries="recallEntries"
       @select="pickRecall"
@@ -372,15 +402,29 @@ const EMPHASIS_MS = 2_000;
 const MENTION_ANNOUNCE_MS = 400;
 
 const CARET_KEYS: ReadonlySet<string> = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
+
+const THREAD_WINDOW_MS = 30 * 60_000;
+
+// A refused send whose text came back: these say so above the frame; every other refusal is the transcript's.
+const BUSY_CODES: ReadonlySet<string> = new Set(["turn_limit", "rate_limited"]);
+
+const UNSENT_CODES: ReadonlySet<string> = new Set(["unreachable", "offline"]);
+
+// The frame lives inside OTextarea, whose wrapper is only reachable from the root until the lib grows `#trailing`.
+const FRAME_CLASS =
+  "[&>div]:focus-within:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-assistant-focus-ring)_25%,transparent)]";
+
+const INERT_FRAME_CLASS = "[&>div]:border-border-default [&>div]:bg-surface-subtle";
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, useId, watch } from "vue";
 
+import AssistantAgentPicker from "@/components/ai-assistant/agents/AssistantAgentPicker.vue";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
-import AssistantChipPopover from "@/components/ai-assistant/context/AssistantChipPopover.vue";
+import AssistantContextSeesPopover from "@/components/ai-assistant/context/AssistantContextSeesPopover.vue";
 import AssistantMentionMenu, {
   type MentionOption,
 } from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
@@ -395,7 +439,6 @@ import {
   isRunning,
   markHintSeen,
   pastedTextChip,
-  periodMs,
   readHints,
   readRecall,
   refreshPageContext,
@@ -407,16 +450,23 @@ import {
   useAssistantStore,
   type RecallEntry,
 } from "@/composables/assistant";
+import {
+  DEFAULT_AGENT,
+  agentName,
+  currentAgent,
+  nextAgent,
+  rosterOffersChoice,
+} from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import type { FileValue } from "@/lib/forms/File/OFile.types";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
-import { MAX_IMAGE_SIZE_BYTES, type ImageAttachment } from "@/ts/interfaces/chat";
+import { MAX_IMAGE_SIZE_BYTES } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatBytes } from "@/utils/formatters";
 import { getUUIDv7 } from "@/utils/uuid";
@@ -428,7 +478,10 @@ import AssistantDictationTail from "./AssistantDictationTail.vue";
 import AssistantRecallSheet from "./AssistantRecallSheet.vue";
 import AssistantVoiceAllowPopover from "./AssistantVoiceAllowPopover.vue";
 import {
+  CAP_NOTICE_MS,
   announceComposer,
+  composerFitsOneRow,
+  composerLayoutKey,
   composerUi,
   moveDraft,
   forgetComposerUi,
@@ -436,6 +489,7 @@ import {
   noteDraftCleared,
 } from "./composerUi";
 import { useAssistantVoice } from "./useAssistantVoice";
+import { controlsWidthOf, textWidthOf, useComposerWidth } from "./useComposerWidth";
 
 const props = withDefaults(defineProps<AssistantComposerProps>(), {
   density: "compact",
@@ -454,6 +508,8 @@ const textbox = ref<InstanceType<typeof OTextarea> | null>(null);
 const file = ref<InstanceType<typeof OFile> | null>(null);
 const addMenu = ref<InstanceType<typeof AssistantAddContextMenu> | null>(null);
 const mention = ref<InstanceType<typeof AssistantMentionMenu> | null>(null);
+const controls = ref<HTMLElement | null>(null);
+const width = useComposerWidth(root);
 const uid = useId();
 const helperId = `assistant-composer-helper-${uid}`;
 const ghostHintId = `assistant-composer-ghost-${uid}`;
@@ -465,7 +521,6 @@ const blockedLine = ref<I18nText | null>(null);
 const droppedImages = ref(0);
 const recallOpen = ref(false);
 const recallEntries = ref<RecallEntry[]>([]);
-const openImage = ref<string | null>(null);
 const mentionAt = ref<number | null>(null);
 const mentionQuery = ref("");
 const prefillPending = ref<{ text: string; chips: ContextChip[]; homeStarter?: boolean } | null>(
@@ -473,6 +528,8 @@ const prefillPending = ref<{ text: string; chips: ContextChip[]; homeStarter?: b
 );
 // The last long paste, offered back as plain text until the next edit or send (D4 decision 10).
 const pasteOffer = ref<{ chipId: string; text: string; at: number } | null>(null);
+const attachDismissed = ref(false);
+const cardAway = ref(false);
 const now = ref(Date.now());
 let emphasisTimer: ReturnType<typeof setTimeout> | null = null;
 let emptyEnterSaid = false;
@@ -481,6 +538,9 @@ let mentionTimer: ReturnType<typeof setTimeout> | null = null;
 let pointerDown = false;
 let cancelDeferredClose: (() => void) | null = null;
 let clearedTimer: ReturnType<typeof setTimeout> | null = null;
+let capTimer: ReturnType<typeof setTimeout> | null = null;
+let cardObserver: IntersectionObserver | null = null;
+let cardMutations: MutationObserver | null = null;
 const usedSendIds = new Set<string>();
 const offs: (() => void)[] = [];
 
@@ -504,9 +564,13 @@ const images = computed(() => composer.value?.images ?? []);
 const stagedChips = computed(() =>
   (composer.value?.chips ?? []).filter((chip) => chip.provenance !== "page"),
 );
-const hasContent = computed(
-  () => !!text.value.trim() || stagedChips.value.length > 0 || images.value.length > 0,
-);
+const attached = computed(() => stagedChips.value.length > 0 || images.value.length > 0);
+const attachNotice = computed(() => {
+  const key = store.state.userOrgKey;
+  if (!key || attachDismissed.value || !attached.value || replying.value) return false;
+  return !readHints(key).attachSaved;
+});
+const hasContent = computed(() => !!text.value.trim() || attached.value);
 const storageBlocked = computed(() => store.drafts.storageBlocked.value);
 const ui = computed(() => composerUi(props.sid ?? ""));
 const status = computed(() => (liveSid.value ? composerUi(liveSid.value).status : ui.value.status));
@@ -525,6 +589,9 @@ const inertKind = computed<"approval" | "consent" | null>(() => {
   return session.value?.pendingConsent ? "consent" : null;
 });
 
+// The mic and the recall sheet follow the pointer, not the width, so a narrow desktop window keeps its keyboard.
+const coarse = ref(!!window.matchMedia?.("(pointer: coarse)").matches);
+
 const voice = useAssistantVoice({
   field: el,
   ensureSid,
@@ -535,7 +602,10 @@ const voice = useAssistantVoice({
     store.setDraft(id, { text: value });
   },
   blocked: () => !props.visible || !!inertKind.value,
-  touch: () => !mdUp.value && !!window.matchMedia?.("(pointer: coarse)").matches,
+  tap: () => {
+    if (props.visible && inertKind.value) assistantFocusCard();
+  },
+  touch: () => !mdUp.value && coarse.value,
   say,
   focusField: () => el()?.focus({ preventScroll: true }),
 });
@@ -553,7 +623,7 @@ const state = computed(() => {
   return hasContent.value ? "draft" : "empty";
 });
 
-const showStop = computed(() => running.value);
+const showStop = computed(() => running.value && !elsewhere.value);
 
 // After 30 s without a frame Stop is the one emphasised control (HT-01 AC 3); the clock runs only while a turn does.
 const clock = ref(Date.now());
@@ -574,28 +644,39 @@ const stalled = computed(() => {
   const last = meta?.lastByteAt ?? meta?.lastFrameAt ?? meta?.startedAt ?? null;
   return running.value && last !== null && clock.value - last >= STALL_MS;
 });
+
+const refusal = computed(() => (turn.value?.state === "refused" ? turn.value.error : null));
+const busyLeft = ref(0);
+let busyTimer: ReturnType<typeof setInterval> | null = null;
+const busyUntil = computed(() => {
+  const error = refusal.value;
+  if (!error || !BUSY_CODES.has(error.code) || !error.retryAfterMs) return 0;
+  return (session.value?.turnMeta.endedAt ?? Date.now()) + error.retryAfterMs;
+});
+const errorRow = computed<I18nText | null>(() => {
+  if (busyLeft.value > 0)
+    return t("assistant.composer.busy", { product: t("assistant.name"), s: busyLeft.value });
+  return refusal.value && UNSENT_CODES.has(refusal.value.code)
+    ? t("assistant.composer.unsent")
+    : null;
+});
+
 const canSend = computed(
   () =>
     voice.mine.value ||
     (hasContent.value &&
       !inertKind.value &&
-      (replying.value || (!running.value && !props.cooldownReason))),
+      (replying.value || (!running.value && !props.cooldownReason && busyLeft.value === 0))),
 );
 const sendBlockedReason = computed(() => {
+  if (busyLeft.value > 0) return errorRow.value ?? undefined;
   if (props.cooldownReason) return props.cooldownReason;
-  if (inertKind.value)
-    return inertKind.value === "approval"
-      ? t("assistant.composer.waitingApproval")
-      : t("assistant.composer.waitingConsent");
   return hasContent.value ? undefined : t("assistant.composer.sendEmpty");
 });
 
-const micOffReason = computed<I18nText | undefined>(() => {
-  if (voice.status.value === "silent") return t("assistant.voice.error.browser_silent");
-  if (voice.offline.value && !voice.mine.value) return t("assistant.composer.offline");
-  if (inertKind.value === "approval") return t("assistant.composer.waitingApproval");
-  return inertKind.value === "consent" ? t("assistant.composer.waitingConsent") : undefined;
-});
+const micOffReason = computed<I18nText | undefined>(() =>
+  voice.offline.value && !voice.mine.value ? t("assistant.composer.offline") : undefined,
+);
 
 // A chat with no messages shows the welcome, and the ghost never repeats its starters (D5 decision 11, PO A34).
 const ghostShown = computed(
@@ -611,11 +692,22 @@ const ghostHint = computed(() =>
     : raw(""),
 );
 
+const shownAgent = computed(() => nextAgent(session.value));
+const agentLabel = computed(() => agentName(shownAgent.value, t));
+const pickerRoom = computed(() => rosterOffersChoice(store.state.capability.agents));
+
 const placeholder = computed<I18nText>(() => {
+  if (inertKind.value) return t("assistant.composer.inert");
   if (replying.value) return t("assistant.composer.replyPlaceholder");
-  if (props.ghost) return t("assistant.composer.name", { product: t("assistant.name") });
-  if (context.noScope.value) return t("assistant.composer.placeholderEmpty");
-  return t("assistant.composer.placeholder", { summary: context.summary.value });
+  if (shownAgent.value !== DEFAULT_AGENT)
+    return t("assistant.composer.agent", { agent: agentLabel.value });
+  if (!context.noScope.value)
+    return t("assistant.composer.scoped", {
+      stream: raw((context.page.value?.selectedStreams ?? []).join(", ")),
+    });
+  return session.value?.messages.length
+    ? t("assistant.composer.followUp")
+    : t("assistant.composer.placeholder");
 });
 
 const recallHint = computed(() => {
@@ -631,12 +723,41 @@ const creditsRefusedAbove = computed(() => {
   return turn?.state === "refused" && isCreditsRefusal(turn.error.code);
 });
 
+const pendingLine = computed<I18nText | null>(() => {
+  const next = session.value?.nextAgentId;
+  return next && next !== currentAgent(session.value)
+    ? t("assistant.agent.pendingSwitch", { agent: agentLabel.value })
+    : null;
+});
+
+const capLine = computed(() => {
+  const cap = composerUi(props.sid ?? "").cap;
+  return cap && now.value - cap.at < CAP_NOTICE_MS ? cap.text : null;
+});
+
+// A door's staging into a chat that answered in the last 30 min offers a fresh chat instead (`40` §2.4).
+const threadLine = computed<I18nText | null>(() => {
+  const current = session.value;
+  if (!current || current.messages.length === 0 || !current.title) return null;
+  if (!current.composer.chips.some((chip) => chip.provenance === "door")) return null;
+  const last = store.lastTurnAt(current.sid);
+  return last !== null && now.value - last < THREAD_WINDOW_MS
+    ? t("assistant.context.inChat", { title: current.title })
+    : null;
+});
+
+const answeringLine = computed<I18nText | null>(() => {
+  if (elsewhere.value) return t("assistant.composer.elsewhere");
+  return running.value && hasContent.value && !stalled.value && state.value !== "stopping"
+    ? t("assistant.composer.running")
+    : null;
+});
+
 const helper = computed<I18nText | null>(() => {
-  if (inertKind.value === "approval") return t("assistant.composer.waitingApproval");
-  if (inertKind.value === "consent") return t("assistant.composer.waitingConsent");
+  if (inertKind.value) return null;
   if (voice.helperLine.value) return voice.helperLine.value;
-  if (replying.value) return t("assistant.composer.replyHelper");
   if (blockedLine.value) return blockedLine.value;
+  if (capLine.value) return capLine.value;
   const notice = liveSid.value ? store.entryNotice(liveSid.value) : null;
   if (notice) return t(notice);
   if (pasteOffer.value) return pasteLine.value;
@@ -650,8 +771,46 @@ const helper = computed<I18nText | null>(() => {
   if (store.state.capability.creditMode === "exhausted" && !creditsRefusedAbove.value)
     return t("assistant.credits.predictedExhausted", { org: raw(org.value) });
   if (voice.show.value && voice.offline.value) return t("assistant.composer.offline");
-  return recallHint.value;
+  return answeringLine.value ?? pendingLine.value ?? threadLine.value ?? recallHint.value;
 });
+
+const helperFailed = computed(() => helper.value === voice.helperLine.value && voice.failure.value);
+
+const voiceExtra = computed(() => voice.listening.value || voice.waiting.value);
+const twoRows = ref(false);
+
+function measureRows(): void {
+  const field = el();
+  twoRows.value = !composerFitsOneRow({
+    narrow: width.narrow.value,
+    extras: (attached.value && !replying.value) || voiceExtra.value,
+    text: shownText.value,
+    textWidth: width.width.value > 0 ? textWidthOf(field, shownText.value) : 0,
+    frameWidth: width.width.value > 0 ? (field?.parentElement?.clientWidth ?? 0) : 0,
+    controlsWidth: controlsWidthOf(controls.value),
+  });
+}
+
+watch(
+  [shownText, width.width, width.narrow, attached, replying, voiceExtra, inertKind],
+  () => void nextTick(measureRows),
+  { flush: "post" },
+);
+
+const frameClass = computed(() => [
+  inertKind.value ? INERT_FRAME_CLASS : FRAME_CLASS,
+  twoRows.value ? "" : "[&>div]:flex-row [&>div]:items-center",
+]);
+
+provide(
+  composerLayoutKey,
+  computed(() => ({
+    narrow: width.narrow.value,
+    tight: width.tight.value,
+    wide: width.wide.value,
+    yieldChips: width.tight.value && voiceExtra.value && pickerRoom.value,
+  })),
+);
 
 const pasteLine = computed(() => t("assistant.context.pastedAsChip"));
 
@@ -682,12 +841,17 @@ const textboxAttrs = computed(() => ({
       .filter(Boolean)
       .join(" ") || undefined,
   "aria-disabled": inertKind.value ? "true" : undefined,
+  "aria-readonly": inertKind.value ? "true" : undefined,
   // A textarea cannot be a combobox, so there is no `aria-expanded`; the menu's state is spoken instead.
   "aria-autocomplete": "list",
   "aria-controls": mentionAt.value !== null ? listboxId : undefined,
   "aria-activedescendant": mentionAt.value !== null ? mention.value?.activeId : undefined,
   "data-assistant-composer": "",
-  class: "max-md:min-h-11 pointer-coarse:min-h-11",
+  class: [
+    "py-2.25! max-md:min-h-11 pointer-coarse:min-h-11",
+    twoRows.value ? "pb-0!" : "",
+    inertKind.value ? "text-text-secondary!" : "",
+  ].join(" "),
 }));
 
 /** Puts the caret at the end or at an offset (CT-08 AC 9; `70` landing rules). */
@@ -818,21 +982,14 @@ function addOption(option: MentionOption): void {
   void nextTick(() => focusInput("end"));
 }
 
-// Adds the option's chip or sets its time; false when a cap refused the chip.
+// Adds the option's chip; false when a cap refused it.
 function applyOption(id: Sid, option: MentionOption): boolean {
-  if (option.kind !== "time" && option.chip) {
+  if (option.chip) {
     const result = store.addChip(id, option.chip);
     if (!result.ok) {
       capHit(result.cap === "rows" ? "rows" : "bytes");
       return false;
     }
-  }
-  if (option.kind === "time") {
-    const period = option.period ?? null;
-    store.setTimeOverride(
-      id,
-      period ? { from: Date.now() - periodMs(period), to: Date.now(), period } : null,
-    );
   }
   say(t("assistant.context.added", { label: option.label }));
   trackAssistant("ai_context_changed", {
@@ -953,9 +1110,7 @@ function trySend(): void {
   if (!id || !composer.value) return;
   if (inertKind.value) {
     trackAssistant("ai_composer_enter_blocked", { reason: "inert" });
-    const line = helper.value ?? t("assistant.composer.waitingApproval");
-    if (!helperEmphasis.value) say(line);
-    return emphasise(line);
+    return say(placeholder.value);
   }
   if (replying.value) {
     if (hasContent.value) return void sendReply(id);
@@ -963,6 +1118,7 @@ function trySend(): void {
     emptyEnterSaid = true;
     return;
   }
+  if (busyLeft.value > 0 && errorRow.value) return say(errorRow.value);
   if (props.cooldownReason) {
     if (blockedLine.value !== props.cooldownReason) say(props.cooldownReason);
     return emphasise(props.cooldownReason);
@@ -1153,6 +1309,14 @@ function capHit(cap: "rows" | "bytes" | "images" | "type" | "size", line?: I18nT
   if (id && props.visible) noteCap(id, sentence);
 }
 
+function imageCapLine(name: string): I18nText {
+  return t("assistant.composer.imageCap", {
+    name: raw(name),
+    count: MAX_IMAGES,
+    size: raw(formatBytes(MAX_IMAGE_SIZE_BYTES)),
+  });
+}
+
 function refuse(cap: "type" | "size" | "images", line: I18nText): void {
   capHit(cap, line);
 }
@@ -1252,7 +1416,7 @@ async function addFiles(files: File[], pasted = false): Promise<void> {
     const filename = pasted ? pastedName() : picked.name;
     const result = store.addImage(id, { data, mimeType: picked.type, filename, size: picked.size });
     if (!result.ok) {
-      capHit(result.cap === "images" ? "images" : result.cap);
+      capHit(result.cap === "images" ? "images" : result.cap, imageCapLine(filename));
       break;
     }
   }
@@ -1273,35 +1437,23 @@ function onMicPress(event: MouseEvent): void {
   if (event.detail > 0 && !voice.primerOpen.value) el()?.focus({ preventScroll: true });
 }
 
-function removeImage(image: ImageAttachment): void {
-  const id = liveSid.value;
-  if (!id || !image.id) return;
-  store.removeImage(id, image.id);
-  openImage.value = null;
-  say(t("assistant.context.removed", { label: raw(image.filename) }));
-  trackAssistant("ai_context_changed", {
-    action: "remove",
-    kind: "image",
-    count: 1,
-    bytes: image.size,
-  });
+function dismissAttachNotice(): void {
+  attachDismissed.value = true;
+  const key = store.state.userOrgKey;
+  if (key) markHintSeen(key, "attachSaved");
   void nextTick(() => focusInput("end"));
 }
 
-function imageChip(image: ImageAttachment): ContextChip {
-  return {
-    id: image.id ?? image.filename,
-    kind: "image",
-    label: raw(image.filename),
-    secondary: raw(formatBytes(image.size)),
-    sizeBytes: image.size,
-    provenance: "attach",
-    sent: "serialized",
-  };
+function goToRequest(): void {
+  assistantFocusCard();
 }
 
-function dataUrl(image: ImageAttachment): string {
-  return `data:${image.mimeType};base64,${image.data}`;
+// The whole staged payload moves, so the new chat sends exactly what this one would have (S8).
+function startNew(): void {
+  const current = session.value;
+  if (!current) return;
+  const fresh = store.createSession({ origin: { ...current.origin }, thread: "new" });
+  moveDraft(store, current.sid, fresh);
 }
 
 // Drops anywhere on the container land in the strip, with an outline on the whole body while dragging (CT-10 AC 6).
@@ -1350,11 +1502,81 @@ watch(
   },
 );
 
+// Stop goes when its turn ends, and a focused Stop would drop focus on the page (HT-04 AC 3).
+watch(
+  showStop,
+  (shown) => {
+    if (!shown && root.value?.contains(document.activeElement))
+      if (document.activeElement?.matches('[data-test="assistant-stop"]')) focusInput("end");
+  },
+  { flush: "pre" },
+);
+
 // A reason for a swallowed Enter is true only while its cause lasts (U8).
 watch(inertKind, (kind) => {
   if (kind === null) clearBlocked();
   else voice.stop("other");
 });
+
+// A cap's sentence leaves on its own after 6 s; `now` has to tick for that.
+watch(
+  () => composerUi(props.sid ?? "").cap?.at,
+  (at) => {
+    if (at === undefined) return;
+    now.value = Date.now();
+    if (capTimer) clearTimeout(capTimer);
+    capTimer = setTimeout(() => (now.value = Date.now()), CAP_NOTICE_MS);
+  },
+);
+
+watch(
+  busyUntil,
+  (until) => {
+    if (busyTimer) clearInterval(busyTimer);
+    busyTimer = null;
+    const tick = () => {
+      busyLeft.value = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+      if (busyLeft.value === 0 && busyTimer) clearInterval(busyTimer);
+    };
+    tick();
+    if (busyLeft.value > 0) busyTimer = setInterval(tick, 1_000);
+  },
+  { immediate: true },
+);
+
+// "Go to request" shows only while the card is out of view; the card may mount after the frame that named it.
+function stopCardWatch(): void {
+  cardObserver?.disconnect();
+  cardMutations?.disconnect();
+  cardObserver = null;
+  cardMutations = null;
+  cardAway.value = false;
+}
+
+function observeCard(): boolean {
+  const card = shellRoot()?.querySelector('[data-test="assistant-approval-card"]');
+  if (!card || typeof IntersectionObserver === "undefined") return false;
+  cardObserver = new IntersectionObserver(([entry]) => (cardAway.value = !entry.isIntersecting));
+  cardObserver.observe(card);
+  return true;
+}
+
+watch(
+  () => session.value?.pendingApproval?.id,
+  async (id) => {
+    stopCardWatch();
+    await nextTick();
+    const shell = shellRoot();
+    if (!id || !shell || observeCard() || typeof MutationObserver === "undefined") return;
+    cardMutations = new MutationObserver(() => {
+      if (!observeCard()) return;
+      cardMutations?.disconnect();
+      cardMutations = null;
+    });
+    cardMutations.observe(shell, { childList: true, subtree: true });
+  },
+  { immediate: true },
+);
 
 // The original chat keeps what was dictated: a switch, a hide or an org change settles there (`40` §1.8.3).
 watch(liveSid, (id, previous) => {
@@ -1499,6 +1721,7 @@ watch(recallHint, (hint) => {
 
 onMounted(() => {
   refreshRecall();
+  measureRows();
   const shell = shellRoot();
   shell?.addEventListener("dragover", onDragOver);
   shell?.addEventListener("dragleave", onDragLeave);
@@ -1578,6 +1801,9 @@ onBeforeUnmount(() => {
   if (emphasisTimer) clearTimeout(emphasisTimer);
   if (clearedTimer) clearTimeout(clearedTimer);
   if (mentionTimer) clearTimeout(mentionTimer);
+  if (capTimer) clearTimeout(capTimer);
+  if (busyTimer) clearInterval(busyTimer);
+  stopCardWatch();
   cancelDeferredClose?.();
 });
 

@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ContextChip, PendingApproval } from "@/composables/assistant";
-import { runEscapeLadder } from "@/composables/assistant/shortcuts";
+import { registerAssistantFocusTarget, runEscapeLadder } from "@/composables/assistant/shortcuts";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw } from "@/types/i18n";
 
@@ -36,7 +36,7 @@ import { composerUi, noteDraftCleared, resetComposerUiForTests } from "./compose
 import { HOLD_MS, SILENCE_MS, resetVoiceForTests, setVoiceOptIn } from "./useAssistantVoice";
 
 const { fake, breakpoint } = vi.hoisted(() => ({
-  fake: { current: null as any },
+  fake: { current: null as any, member: false },
   breakpoint: { md: true },
 }));
 
@@ -65,8 +65,12 @@ const ROW: ContextChip = {
   sent: "serialized",
 };
 
+const mounted: VueWrapper[] = [];
+
 function setup(props: Partial<AssistantComposerProps> = {}, withSession = true) {
   fake.current = fakeAssistant();
+  if (fake.member)
+    fake.current.capability.value = { ...fake.current.capability.value, isAdmin: false };
   const store = fake.current.store;
   const sid = withSession
     ? store.createSession({
@@ -84,6 +88,7 @@ function setup(props: Partial<AssistantComposerProps> = {}, withSession = true) 
     global: { plugins: [fakeRouter(), fakeVuex()] },
     attachTo: host.lastElementChild as HTMLElement,
   });
+  mounted.push(wrapper);
   const textarea = () => wrapper.get<HTMLTextAreaElement>('[data-test="assistant-composer-field"]');
   const status = () => wrapper.get('[data-test="assistant-composer-status"]').text();
   return { wrapper, store, sid: sid!, send, textarea, status, host };
@@ -112,6 +117,7 @@ async function type(textarea: ReturnType<ReturnType<typeof setup>["textarea"]>, 
 
 beforeEach(() => {
   breakpoint.md = true;
+  fake.member = false;
   sessionStorage.clear();
   localStorage.clear();
   resetComposerUiForTests();
@@ -119,6 +125,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // A live composer over a wiped body would throw inside the next flush and fail an unrelated test.
+  for (const wrapper of mounted.splice(0)) if (wrapper.exists()) wrapper.unmount();
   document.body.innerHTML = "";
 });
 
@@ -143,16 +151,109 @@ describe("names and regions (CT-08)", () => {
     );
   });
 
-  it("uses the static name as the placeholder while the welcome offers a ghost (IW-06 AC 1)", () => {
-    const { textarea } = setup({
-      ghost: { label: raw("Why errors?"), text: "Why errors?", chips: [] },
-    });
-    expect(textarea().attributes("placeholder")).toBe("Message O2 Assistant");
+  it("asks about your data in an empty chat, with no count (§1)", () => {
+    const { textarea } = setup();
+    expect(textarea().attributes("placeholder")).toBe("Ask about your data");
   });
 
-  it("teaches scope with the default range when the page has no stream (CT-01 AC 10)", () => {
-    const { textarea } = setup();
-    expect(textarea().attributes("placeholder")).toBe("Ask a question or add context with @");
+  it("asks for a follow-up once the chat has a turn", async () => {
+    const { textarea, store, sid } = setup();
+    await answered(store, sid);
+    expect(textarea().attributes("placeholder")).toBe("Ask a follow-up");
+  });
+
+  it("names the chosen agent while it is not the default, and says the switch once", async () => {
+    const { wrapper, textarea, store, sid } = setup();
+    store.state.sessions[sid].nextAgentId = "sre";
+    await flushPromises();
+    expect(textarea().attributes("placeholder")).toBe("Ask Investigator");
+    expect(wrapper.get('[data-test="assistant-composer-helper"]').text()).toBe(
+      "Investigator answers from now on. Earlier answers stay.",
+    );
+  });
+});
+
+describe("rows (§1)", () => {
+  it("keeps one row while nothing beyond time is attached, and two once a chip is", async () => {
+    const { wrapper, store, sid } = setup();
+    await flushPromises();
+    const frame = () => wrapper.get('[data-test="assistant-composer"]');
+    expect(frame().attributes("data-rows")).toBe("1");
+    store.addChip(sid, ROW);
+    await flushPromises();
+    expect(frame().attributes("data-rows")).toBe("2");
+  });
+
+  it("takes two rows for a second line of text", async () => {
+    const { wrapper, textarea } = setup();
+    await type(textarea(), "one\ntwo");
+    expect(wrapper.get('[data-test="assistant-composer"]').attributes("data-rows")).toBe("2");
+  });
+
+  it("keeps the same DOM order at every width: text, tray, +, i, picker, mic, Send", () => {
+    const wrapper = mount(AssistantComposer, {
+      props: { sid: null },
+      slots: { chips: '<div data-test="tray-stub">tray</div>' },
+      global: { plugins: [fakeRouter(), fakeVuex()] },
+    });
+    mounted.push(wrapper);
+    const order = (a: string, b: string) =>
+      wrapper
+        .get(`[data-test="${a}"]`)
+        .element.compareDocumentPosition(wrapper.get(`[data-test="${b}"]`).element) &
+      Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(order("assistant-composer-field", "tray-stub")).toBeTruthy();
+    expect(order("tray-stub", "assistant-add-context")).toBeTruthy();
+    expect(order("assistant-add-context", "assistant-context-sees")).toBeTruthy();
+    expect(order("assistant-context-sees", "assistant-send")).toBeTruthy();
+  });
+});
+
+describe("refused sends (§1)", () => {
+  const refuse = (store: ReturnType<typeof setup>["store"], sid: string, error: object) => {
+    const session = store.state.sessions[sid];
+    session.turn = { state: "refused", error } as never;
+    session.turnMeta.endedAt = Date.now();
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("counts a busy refusal down, keeps the draft, and turns Send on at 0", async () => {
+    vi.useFakeTimers();
+    const { wrapper, store, sid } = setup();
+    store.setDraft(sid, { text: "why?" });
+    refuse(store, sid, { code: "turn_limit", retryAfterMs: 2_000 });
+    await vi.advanceTimersByTimeAsync(0);
+    const row = () => wrapper.find('[data-test="assistant-composer-error-row"]');
+    expect(row().text()).toBe("O2 Assistant is busy. Send again in 2 s.");
+    expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBe("true");
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(row().exists()).toBe(false);
+    expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBeUndefined();
+  });
+
+  it("says the message wasn't sent when the service isn't reachable; Send is the retry", async () => {
+    const { wrapper, store, sid } = setup();
+    store.setDraft(sid, { text: "why?" });
+    refuse(store, sid, { code: "unreachable" });
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-composer-error-row"]').text()).toBe(
+      "Isn't reachable. Your message wasn't sent.",
+    );
+    expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBeUndefined();
+  });
+
+  it("states the first attachment once; OK remembers it", async () => {
+    const { wrapper, store, sid } = setup();
+    store.addChip(sid, ROW);
+    await flushPromises();
+    const notice = '[data-test="assistant-composer-attach-notice"]';
+    expect(wrapper.get(notice).text()).toContain("Attachments are saved with this chat.");
+    await wrapper.get('[data-test="assistant-composer-attach-ok"]').trigger("click");
+    expect(wrapper.find(notice).exists()).toBe(false);
+    expect(JSON.parse(localStorage.getItem("o2.assistant.hints:k1")!).attachSaved).toBe(true);
   });
 });
 
@@ -226,28 +327,61 @@ describe("states (`40` §1.3)", () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
-  it("is inert under an approval card: readonly, aria-disabled, the reason as helper (CT-07)", async () => {
+  it("is inert under an approval card: no controls, a muted kept draft, one stop out (CT-07)", async () => {
     const { wrapper, store, sid, textarea } = setup();
+    store.setDraft(sid, { text: "kept" });
     store.state.sessions[sid].pendingApproval = { id: "c1" } as PendingApproval;
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-composer"]').attributes("data-state")).toBe("inert");
     expect(textarea().attributes("readonly")).toBeDefined();
     expect(textarea().attributes("aria-disabled")).toBe("true");
-    const helper = wrapper.get('[data-test="assistant-composer-helper"]');
-    expect(helper.text()).toBe("Answer the request above to continue.");
-    expect(textarea().attributes("aria-describedby")).toContain(helper.attributes("id"));
+    expect(textarea().attributes("tabindex")).toBe("-1");
+    expect(textarea().attributes("placeholder")).toBe("Decide above to continue");
+    expect(textarea().element.value).toBe("kept");
+    expect(wrapper.find('[data-test="assistant-composer-controls"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-composer-helper"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-composer-go-to-request"]').exists()).toBe(false);
   });
 
-  it("switches to the reply placeholder and helper (CT-07 AC 4)", async () => {
+  it("offers Go to request only while the card is out of view", async () => {
+    let report: (entries: { isIntersecting: boolean }[]) => void = () => undefined;
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(callback: typeof report) {
+          report = callback;
+        }
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+    const { wrapper, store, sid, host } = setup();
+    host.insertAdjacentHTML("afterbegin", '<div data-test="assistant-approval-card"></div>');
+    store.state.sessions[sid].pendingApproval = { id: "c1" } as PendingApproval;
+    await flushPromises();
+    const link = '[data-test="assistant-composer-go-to-request"]';
+    report([{ isIntersecting: false }]);
+    await flushPromises();
+    expect(wrapper.get(link).text()).toBe("Go to request");
+    report([{ isIntersecting: true }]);
+    await flushPromises();
+    expect(wrapper.find(link).exists()).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it("states the decline above the frame in reply mode, with no context controls (CT-07 AC 4)", async () => {
     const { wrapper, store, sid, textarea } = setup();
     store.state.sessions[sid].pendingApproval = { id: "c1" } as PendingApproval;
     store.startReply(sid, "c1");
     await flushPromises();
     expect(textarea().attributes("placeholder")).toBe("Reply to the assistant");
     expect(textarea().attributes("readonly")).toBeUndefined();
-    expect(wrapper.get('[data-test="assistant-composer-helper"]').text()).toContain(
-      "Your reply answers",
+    expect(wrapper.get('[data-test="assistant-composer-reply"]').text()).toContain(
+      "Reply declines the request",
     );
+    expect(wrapper.find('[data-test="assistant-add-context"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-label")).toBe("Send reply");
   });
 
   it("answers the card with Enter in reply mode, the turn still running, chips left staged", async () => {
@@ -552,8 +686,8 @@ describe("images (CT-10)", () => {
   const png = (name: string, size = 10) =>
     new File([new Uint8Array(size)], name, { type: "image/png" });
 
-  it("names pasted shots uniquely and removes the one asked for (AC 1–2)", async () => {
-    const { wrapper, textarea, store, sid, status } = setup();
+  it("names pasted shots uniquely (AC 1)", async () => {
+    const { textarea, store, sid } = setup();
     for (let i = 0; i < 2; i++) {
       await textarea().trigger("paste", {
         clipboardData: { files: [png("image.png")], getData: () => "" },
@@ -561,14 +695,10 @@ describe("images (CT-10)", () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     await flushPromises();
-    const names = () =>
-      store.state.sessions[sid].composer.images.map((i: { filename: string }) => i.filename);
-    expect(names()).toEqual(["pasted-image-1.png", "pasted-image-2.png"]);
-    const removes = wrapper.findAll('[data-test="assistant-image-remove"]');
-    expect(removes[1].attributes("aria-label")).toBe("Remove pasted-image-2.png");
-    await removes[1].trigger("click");
-    expect(names()).toEqual(["pasted-image-1.png"]);
-    expect(status()).toBe("pasted-image-2.png removed from context");
+    const names = store.state.sessions[sid].composer.images.map(
+      (i: { filename: string }) => i.filename,
+    );
+    expect(names).toEqual(["pasted-image-1.png", "pasted-image-2.png"]);
   });
 
   it("states the type cap where the control is, never as a toast (AC 5)", async () => {
@@ -586,7 +716,7 @@ describe("one frame, the + menu and long pastes (D4 §3.1, §3.6, §3.9)", () =>
   const paste = (textarea: ReturnType<ReturnType<typeof setup>["textarea"]>, text: string) =>
     textarea.trigger("paste", { clipboardData: { files: [], getData: () => text } });
 
-  it("holds the chips slot, the text and the controls inside the one bordered frame", () => {
+  it("holds the text and the controls inside the one bordered frame", () => {
     const { wrapper, textarea } = setup();
     const frame = textarea().element.parentElement!;
     expect(frame.className).toContain("border");
@@ -595,19 +725,9 @@ describe("one frame, the + menu and long pastes (D4 §3.1, §3.6, §3.9)", () =>
     expect(frame.querySelector('[data-test="assistant-send"]')).not.toBeNull();
     expect(wrapper.find('[data-test="assistant-composer-hints"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-attach-image"]').exists()).toBe(false);
-    const withChips = mount(AssistantComposer, {
-      props: { sid: null },
-      slots: { chips: '<div data-test="tray-stub">tray</div>' },
-      global: { plugins: [fakeRouter(), fakeVuex()] },
-    });
-    const field = withChips.get('[data-test="assistant-composer-field"]').element;
-    const head = withChips.get('[data-test="assistant-composer-chips"]').element;
-    expect(head.parentElement).toBe(field.parentElement);
-    expect(head.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(head.querySelector('[data-test="tray-stub"]')).not.toBeNull();
   });
 
-  it("opens the + menu with a search, the context groups, Image and the keys footer", async () => {
+  it("opens the + menu with a search, the context groups and Image, and no voice row", async () => {
     seedMentionGroups();
     const { wrapper } = setup();
     await wrapper.get('[data-test="assistant-add-context"]').trigger("click");
@@ -618,11 +738,7 @@ describe("one frame, the + menu and long pastes (D4 §3.1, §3.6, §3.9)", () =>
     expect(menu.querySelector('[data-test="assistant-mention-image"]')?.textContent).toContain(
       "Image…",
     );
-    const keys = menu.querySelector('[data-test="assistant-add-context-keys"]')!;
-    expect(keys.querySelectorAll("li")).toHaveLength(5);
-    expect(
-      keys.querySelector('[data-test="assistant-composer-hint-voice"]')?.textContent,
-    ).toContain("Voice dictation is off in this browser.");
+    expect(menu.textContent).not.toContain("Voice dictation");
   });
 
   it("adds a + pick as a chip without touching the typed text", async () => {
@@ -816,7 +932,9 @@ describe("round 2 (U7–U9, U12, U16, U18–U19, F5, F8)", () => {
 
   it("returns focus to Recent prompts when its sheet is dismissed (U20)", async () => {
     breakpoint.md = false;
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("coarse") }));
     const { wrapper } = setup();
+    vi.unstubAllGlobals();
     const state = (wrapper.vm as unknown as { $: { setupState: Record<string, unknown> } }).$
       .setupState;
     state.recallEntries = [{ text: "earlier question", chips: [], at: 1 }];
@@ -1059,16 +1177,28 @@ describe("dictation (WP-48)", () => {
   afterEach(() => {
     resetVoiceForTests();
     vi.useRealTimers();
-    document.body.innerHTML = "";
   });
 
-  it("renders no mic on self-hosted until the browser opt-in (A5, A30)", async () => {
+  it("renders no mic for a member while dictation is off in this browser (A5, A30)", async () => {
+    fake.member = true;
     const { wrapper } = setup();
     expect(wrapper.find('[data-test="assistant-dictate"]').exists()).toBe(false);
     setVoiceOptIn("k1", true);
     await flushPromises();
     expect(mic(wrapper).attributes("aria-label")).toBe("Dictate");
     expect(mic(wrapper).attributes("aria-pressed")).toBe("false");
+  });
+
+  it("offers an admin Turn on in place, which makes the mic live", async () => {
+    const { wrapper } = setup();
+    expect(mic(wrapper).attributes("aria-haspopup")).toBe("dialog");
+    await mic(wrapper).trigger("click");
+    await flushPromises();
+    const turnOn = '[data-test="assistant-dictate-turn-on"]';
+    document.body.querySelector<HTMLElement>(turnOn)!.click();
+    await flushPromises();
+    expect(mic(wrapper).attributes("aria-haspopup")).toBeUndefined();
+    expect(document.body.querySelector(turnOn)).toBeNull();
   });
 
   it("renders the mic on Cloud by default", async () => {
@@ -1126,10 +1256,10 @@ describe("dictation (WP-48)", () => {
     await mic(ctx.wrapper).trigger("click");
     await flushPromises();
     expect(ctx.wrapper.get('[data-test="assistant-dictate-waiting"]').text()).toBe(
-      "Waiting for microphone permission",
+      "Waiting for permission",
     );
     expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("true");
-    expect(ctx.status()).toBe("Waiting for microphone permission");
+    expect(ctx.status()).toBe("Waiting for permission");
 
     await mic(ctx.wrapper).trigger("click");
     await flushPromises();
@@ -1137,15 +1267,13 @@ describe("dictation (WP-48)", () => {
     expect(ctx.status()).toBe("Dictation cancelled.");
   });
 
-  it("shows listening, names the engine (B14) and says the start once", async () => {
+  it("shows listening with nothing under the frame, and says the start once", async () => {
     const ctx = voiceSetup();
     await listen(ctx);
     expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("true");
     expect(mic(ctx.wrapper).attributes("aria-label")).toBe("Dictate");
     expect(ctx.wrapper.get('[data-test="assistant-dictate-status"]').text()).toContain("Listening");
-    expect(helper(ctx.wrapper).text()).toBe(
-      "Chrome · OpenObserve doesn't store the audio · Enter or Esc to finish, not send",
-    );
+    expect(helper(ctx.wrapper).exists()).toBe(false);
     expect(ctx.status()).toBe("Listening. Press Enter, Escape or the mic to stop.");
     expect(ctx.textarea().attributes("data-test")).toBe("assistant-composer-field");
     expect(ctx.wrapper.get('[data-test="assistant-composer"]').attributes("data-state")).toBe(
@@ -1241,7 +1369,7 @@ describe("dictation (WP-48)", () => {
     expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("false");
   });
 
-  it("stops when a card arrives, and shows the disabled mic's reason", async () => {
+  it("stops when a card arrives; the inert frame has no mic", async () => {
     const ctx = voiceSetup();
     await listen(ctx);
     ctx.store.state.sessions[ctx.sid].pendingConsent = { id: "c1" } as never;
@@ -1249,8 +1377,8 @@ describe("dictation (WP-48)", () => {
     expect(ctx.wrapper.get('[data-test="assistant-composer"]').attributes("data-state")).toBe(
       "inert",
     );
-    expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("false");
-    expect(mic(ctx.wrapper).attributes("aria-disabled")).toBe("true");
+    expect(ctx.wrapper.find('[data-test="assistant-dictate"]').exists()).toBe(false);
+    expect(engine.abort).toHaveBeenCalled();
   });
 
   it("stops when the composer is hidden, and on unmount", async () => {
@@ -1287,12 +1415,13 @@ describe("dictation (WP-48)", () => {
 
     expect(helper(ctx.wrapper).text()).toBe("Microphone access is blocked for this site.");
     expect(ctx.status()).toBe("Microphone access is blocked for this site.");
-    expect(mic(ctx.wrapper).attributes("aria-disabled")).toBeUndefined();
+    expect(mic(ctx.wrapper).attributes("aria-disabled")).toBe("true");
+    expect(mic(ctx.wrapper).attributes("aria-haspopup")).toBe("dialog");
     expect(ctx.wrapper.find('[data-test="assistant-dictate-how"]').exists()).toBe(true);
     expect(ctx.store.state.sessions[ctx.sid].composer.text).toBe("typed");
   });
 
-  it("offers Try again for an unreachable service, naming the vendor", async () => {
+  it("offers Retry for an unreachable service, naming the vendor", async () => {
     const ctx = voiceSetup();
     await listen(ctx);
     engine.handlers!.onError("network");
@@ -1313,7 +1442,7 @@ describe("dictation (WP-48)", () => {
     engine.handlers!.onStart();
     engine.meter.db = -30;
     await vi.advanceTimersByTimeAsync(SILENCE_MS);
-    const line = "Your browser didn't turn speech into text. Type instead, or try another browser.";
+    const line = "Your browser didn't turn speech into text. Reload to try again.";
     expect(helper(ctx.wrapper).text()).toBe(line);
     expect(mic(ctx.wrapper).attributes("aria-disabled")).toBe("true");
   });
@@ -1325,9 +1454,7 @@ describe("dictation (WP-48)", () => {
     window.dispatchEvent(new Event("offline"));
     await flushPromises();
     expect(mic(ctx.wrapper).attributes("aria-disabled")).toBe("true");
-    expect(helper(ctx.wrapper).text()).toBe(
-      "You're offline. Your draft is kept; dictation needs a connection.",
-    );
+    expect(helper(ctx.wrapper).text()).toBe("You're offline. Draft kept.");
     online.mockRestore();
     window.dispatchEvent(new Event("online"));
   });
@@ -1342,11 +1469,24 @@ describe("dictation (WP-48)", () => {
     engine.handlers!.onStart();
     await vi.advanceTimersByTimeAsync(0);
     expect(ctx.wrapper.get('[data-test="assistant-dictate-status"]').text()).toContain(
-      "release Ctrl I to stop",
+      "Release Ctrl I to stop",
     );
     document.dispatchEvent(new KeyboardEvent("keyup", { key: "i" }));
     await vi.advanceTimersByTimeAsync(0);
     expect(mic(ctx.wrapper).attributes("aria-pressed")).toBe("false");
+  });
+
+  it("takes a tap of the chord to the waiting request and starts nothing", async () => {
+    const ctx = voiceSetup();
+    ctx.store.state.sessions[ctx.sid].pendingApproval = { id: "c1" } as PendingApproval;
+    await flushPromises();
+    const focusCard = vi.fn(() => true);
+    const off = registerAssistantFocusTarget("card", focusCard);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "i", ctrlKey: true }));
+    document.dispatchEvent(new KeyboardEvent("keyup", { key: "i" }));
+    off();
+    expect(focusCard).toHaveBeenCalled();
+    expect(engine.handlers).toBeNull();
   });
 
   it("does not dictate on a hold while a card holds the composer", async () => {

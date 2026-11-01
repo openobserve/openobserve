@@ -16,8 +16,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { raw } from "@/types/i18n";
-
 import AssistantVoiceAllowPopover from "./AssistantVoiceAllowPopover.vue";
 
 afterEach(() => {
@@ -25,17 +23,14 @@ afterEach(() => {
 });
 
 describe("AssistantVoiceAllowPopover", () => {
-  it("gives this browser's steps and the headphones sentence (B17)", async () => {
-    const wrapper = mount(AssistantVoiceAllowPopover, {
-      props: { steps: raw("Open site settings.") },
-      attachTo: document.body,
-    });
+  it("says how to allow the microphone (B17)", async () => {
+    const wrapper = mount(AssistantVoiceAllowPopover, { attachTo: document.body });
     await wrapper.get('[data-test="assistant-dictate-how"]').trigger("click");
     await flushPromises();
     const text = document.body.querySelector(
       '[data-test="assistant-dictate-how-popover"]',
     )?.textContent;
-    expect(text).toContain("Open site settings.");
-    expect(text).toContain("With a screen reader, use headphones while dictating.");
+    expect(text).toContain("Allow the microphone");
+    expect(text).toContain("Click the lock in the address bar");
   });
 });

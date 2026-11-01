@@ -88,18 +88,6 @@ const SENTENCE_KEYS: Record<NonNullable<VoiceBrand>, I18nKey> = {
   safari: "assistant.voice.engine.apple",
 };
 
-const ALLOW_KEYS: Record<NonNullable<VoiceBrand>, I18nKey> = {
-  chrome: "assistant.voice.allow.chrome",
-  edge: "assistant.voice.allow.edge",
-  safari: "assistant.voice.allow.safari",
-};
-
-const BRAND_SHORT: Record<NonNullable<VoiceBrand>, string> = {
-  chrome: "Chrome",
-  edge: "Edge",
-  safari: "Safari",
-};
-
 // One engine and one owner per tab: a second composer starting takes the microphone from the first.
 let shared: VoiceController | null = null;
 let engineOverride: VoiceEngine | null = null;
@@ -112,6 +100,9 @@ export type VoiceMode = "off" | "browser";
 
 /** What a text entry may offer: `silent` keeps a disabled mic rather than removing it mid-use (`40` §1.8.4). */
 export type VoiceStatus = "off" | "unsupported" | "silent" | "ready";
+
+/** `none` renders no mic; `crossed` is a reason a new press cannot help; `off` is an admin's Turn on. */
+export type VoiceMic = "none" | "live" | "crossed" | "off";
 
 export type VoicePhase = "idle" | "waiting" | "listening";
 
@@ -144,6 +135,8 @@ export interface VoiceTarget {
   /** True while this entry is the one a hold should dictate into. */
   holdReady(): boolean;
   hold(): void;
+  /** A press shorter than a hold. */
+  tap(): void;
 }
 
 export interface VoiceState {
@@ -161,6 +154,8 @@ export interface VoiceState {
   denied: boolean;
   /** Tab memory: this browser exposes a recogniser that returns nothing (B58). */
   silent: boolean;
+  /** Tab memory: this browser has no speech service for the UI language. */
+  languageRefused: boolean;
   online: boolean;
   /** Runs on the device, so no vendor hears it and being offline is fine. */
   onDevice: boolean;
@@ -200,6 +195,8 @@ export interface VoiceComposerOptions {
   writeDraft(sid: Sid, text: string): void;
   /** Hold is refused here: inert, not visible. */
   blocked(): boolean;
+  /** A short press: takes focus to a pending request, if one waits. */
+  tap(): void;
   /** True on a touch device below `md`, which uses the keyboard's own dictation key. */
   touch(): boolean;
   say(line: I18nText): void;
@@ -210,6 +207,7 @@ export interface VoiceComposer {
   status: ComputedRef<VoiceStatus>;
   /** The mic renders. */
   show: ComputedRef<boolean>;
+  mic: ComputedRef<VoiceMic>;
   /** Mic off for now, but still there. */
   offline: ComputedRef<boolean>;
   mine: ComputedRef<boolean>;
@@ -217,6 +215,8 @@ export interface VoiceComposer {
   waiting: ComputedRef<boolean>;
   denied: ComputedRef<boolean>;
   helperLine: ComputedRef<I18nText | null>;
+  /** The helper line reports a failure, not a state. */
+  failure: ComputedRef<boolean>;
   action: ComputedRef<"retry" | "how" | null>;
   elapsedMs: ComputedRef<number>;
   level: ComputedRef<number>;
@@ -227,7 +227,8 @@ export interface VoiceComposer {
   shown(text: string): string;
   primerOpen: Ref<boolean>;
   sentence: ComputedRef<I18nText | null>;
-  allowSteps: ComputedRef<I18nText>;
+  /** Saves the opt-in, which makes the mic live in place. */
+  turnOn(): void;
   press(via: VoiceVia): void;
   acceptPrimer(): void;
   declinePrimer(): void;
@@ -278,6 +279,7 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
     level: 0,
     denied: false,
     silent: false,
+    languageRefused: false,
     online: typeof navigator === "undefined" || navigator.onLine !== false,
     onDevice: false,
   });
@@ -339,6 +341,7 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
 
   function fail(current: VoiceRun, code: VoiceErrorCode): void {
     if (code === "mic_denied") state.denied = true;
+    if (code === "language_unsupported") state.languageRefused = true;
     finish(current, { kind: "error", code });
   }
 
@@ -481,9 +484,11 @@ export function createVoiceController(engine: VoiceEngine): VoiceController {
   }
 
   function releaseHold(): void {
+    const tapped = holdTimer !== null;
     clearHold();
     if (holding && state.via === "hold") stop("release");
     holding = false;
+    if (tapped) for (const target of targets) target.tap();
   }
 
   function onKeydown(event: KeyboardEvent): void {
@@ -614,6 +619,7 @@ export function holdKeys(): string {
 export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer {
   const { t } = useI18nTyped();
   const store = useAssistantStore();
+  const capability = useAssistantCapability();
   const availability = useVoiceAvailability();
   const controller = voiceController();
   const state = controller.state;
@@ -630,10 +636,20 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
   const listening = computed(() => mine.value && state.phase === "listening");
   const waiting = computed(() => mine.value && state.phase === "waiting");
   const status = availability.status;
-  const usable = computed(() => status.value === "ready" || status.value === "silent");
-  const show = computed(() => usable.value && !options.touch());
   const offline = computed(() => !state.online && !state.onDevice);
+  const mic = computed<VoiceMic>(() => {
+    if (options.touch() || status.value === "unsupported") return "none";
+    if (status.value === "off") return capability.value.isAdmin ? "off" : "none";
+    const unavailable =
+      status.value === "silent" || state.denied || state.languageRefused || offline.value;
+    return unavailable && !mine.value ? "crossed" : "live";
+  });
+  const show = computed(() => mic.value !== "none");
   const brand = () => controller.engine.brand();
+
+  const languageLine = computed(() =>
+    t("assistant.voice.language", { language: raw(languageEndonym(getIntlLocale())) }),
+  );
 
   const errorLine = computed<I18nText | null>(() => {
     const code = lastError.value;
@@ -642,42 +658,41 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
       return t("assistant.voice.error.service_unreachable", {
         vendor: raw(serviceVendor(brand() ?? "chrome")),
       });
-    if (code === "language_unsupported")
-      return t("assistant.voice.error.language_unsupported", {
-        language: raw(languageEndonym(getIntlLocale())),
-      });
+    if (code === "language_unsupported") return languageLine.value;
+    if (code === "browser_silent") return t("assistant.voice.silent");
     return t(`assistant.voice.error.${code}`);
   });
 
-  const listeningLine = computed(() => {
-    const short = state.onDevice
-      ? t("assistant.voice.engineShort.device")
-      : brandShort(brand(), t("assistant.voice.engineShort.browser"));
-    const line = t("assistant.voice.helperListening", { engineShort: short });
-    return raw(`${line} · ${t("assistant.voice.helperFinish")}`);
+  // A reason a new press cannot help outlives the edit that clears a one-off error.
+  const stuckLine = computed<I18nText | null>(() => {
+    if (status.value === "silent") return t("assistant.voice.silent");
+    if (state.denied) return t("assistant.voice.error.mic_denied");
+    return state.languageRefused ? languageLine.value : null;
   });
 
   const helperLine = computed<I18nText | null>(() => {
-    if (listening.value) return listeningLine.value;
     if (enterHint.value) return t("assistant.voice.enterToSend");
-    return errorLine.value;
+    return stuckLine.value ?? errorLine.value;
   });
 
+  const failure = computed(
+    () =>
+      helperLine.value !== null &&
+      !enterHint.value &&
+      (state.denied || !!lastError.value?.startsWith("service_unreachable")),
+  );
+
   const action = computed(() => {
-    if (lastError.value === "mic_denied") return "how";
+    if (enterHint.value) return null;
+    if (state.denied) return "how";
     return lastError.value?.startsWith("service_unreachable") ? "retry" : null;
   });
 
   const rowLabel = computed(() =>
     state.via === "hold"
-      ? t("assistant.voice.releaseToStop", { keys: raw(holdKeys()) })
+      ? t("assistant.voice.holdLine", { keys: raw(holdKeys()) })
       : t("assistant.voice.listening"),
   );
-
-  const allowSteps = computed(() => {
-    const current = brand();
-    return t(current ? ALLOW_KEYS[current] : "assistant.voice.allow.other");
-  });
 
   function clearHint(): void {
     enterHint.value = false;
@@ -711,13 +726,12 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
     },
     ended,
     holdReady: () =>
-      status.value === "ready" &&
-      !options.touch() &&
-      !offline.value &&
+      mic.value === "live" &&
       !options.blocked() &&
       !composingHere &&
       document.activeElement === options.field(),
     hold: () => press("hold"),
+    tap: options.tap,
   };
 
   function begin(via: VoiceVia): void {
@@ -730,7 +744,7 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
 
   function press(via: VoiceVia): void {
     if (mine.value) return controller.stop("mic");
-    if (status.value !== "ready" || offline.value || composingHere) return;
+    if (mic.value !== "live" || composingHere) return;
     const key = store.state.userOrgKey;
     if (key && readHints(key).dictate) return begin(via);
     pendingVia = via;
@@ -747,6 +761,11 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
   function declinePrimer(): void {
     primerOpen.value = false;
     options.focusField();
+  }
+
+  function turnOn(): void {
+    const key = store.state.userOrgKey;
+    if (key) setVoiceOptIn(key, true);
   }
 
   function stopMine(reason: VoiceStopReason): void {
@@ -780,12 +799,14 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
   return {
     status,
     show,
+    mic,
     offline,
     mine,
     listening,
     waiting,
     denied: computed(() => state.denied),
     helperLine,
+    failure,
     action,
     elapsedMs: computed(() => state.elapsedMs),
     level: computed(() => state.level),
@@ -799,7 +820,7 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
     },
     primerOpen,
     sentence: availability.sentence,
-    allowSteps,
+    turnOn,
     press,
     acceptPrimer,
     declinePrimer,
@@ -810,10 +831,6 @@ export function useAssistantVoice(options: VoiceComposerOptions): VoiceComposer 
     setComposing,
     clearHint,
   };
-}
-
-function brandShort(brand: VoiceBrand, fallback: I18nText): I18nText {
-  return brand ? raw(BRAND_SHORT[brand]) : fallback;
 }
 
 function unreachableCode(engine: VoiceEngine): VoiceErrorCode {
