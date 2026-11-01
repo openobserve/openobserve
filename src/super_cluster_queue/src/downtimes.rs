@@ -407,6 +407,16 @@ mod tests {
 
     use super::*;
 
+    /// The global meta store CI configures through `ZO_META_STORE`, migrated once per binary.
+    async fn meta_store() {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        ONCE.get_or_init(|| async {
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+    }
+
     async fn db() -> DatabaseConnection {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         let backend = db.get_database_backend();
@@ -1242,12 +1252,35 @@ mod tests {
 
     #[tokio::test]
     async fn with_downtimes_off_a_replicated_message_still_reaches_the_database() {
-        // Both flags reach the folder lookup, which fails without a region database.
-        let put = || DowntimeMessage::Put {
-            org: "acme".to_string(),
-            downtime: Box::new(slo_downtime()),
+        meta_store().await;
+        // A fresh org isolates the row in the shared meta store so cleanup can hard-delete it.
+        let org = format!("dt_{}", config::ider::generate());
+        let replicated = Downtime {
+            org: org.clone(),
+            ..slo_downtime()
         };
-        assert!(apply(put(), true).await.is_err());
-        assert!(apply(put(), false).await.is_err());
+        let put = DowntimeMessage::Put {
+            org: org.clone(),
+            downtime: Box::new(replicated.clone()),
+        };
+        apply(put, false).await.unwrap();
+        let db = infra::db::get_orm_client_rw().await;
+        assert_eq!(
+            table::downtimes::get_with(db, &org, &replicated.id)
+                .await
+                .unwrap(),
+            Some(replicated.clone())
+        );
+
+        table::downtimes::delete_by_org_with(db, &org)
+            .await
+            .unwrap();
+        table::folders::delete_by_org(&org).await.unwrap();
+        assert_eq!(
+            table::downtimes::version_with(db, &org, &replicated.id)
+                .await
+                .unwrap(),
+            None
+        );
     }
 }
