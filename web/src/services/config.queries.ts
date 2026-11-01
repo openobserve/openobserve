@@ -44,6 +44,10 @@ export const configFullQuery = (org: string) =>
     staleTime: SESSION_STALE_TIME,
   });
 
+/** Only the full config carries `version`, and it is empty on a build without a git tag, so test presence, not truthiness. */
+export const isFullConfigLoaded = (zoConfig: Record<string, unknown> | undefined): boolean =>
+  !!zoConfig && Object.prototype.hasOwnProperty.call(zoConfig, "version");
+
 // ── Writes ──────────────────────────────────────────────────────────────────
 
 /** The branding text lives in the session-tier full config, so without this drop the next org switch restores the old text. */

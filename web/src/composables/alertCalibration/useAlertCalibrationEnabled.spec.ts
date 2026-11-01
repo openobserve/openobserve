@@ -26,4 +26,9 @@ describe("whether a page leaves because alert calibration is off", () => {
     expect(isAlertCalibrationOff({ version: "v1" })).toBe(true);
     expect(isAlertCalibrationOff({ version: "v1", alert_calibration_enabled: true })).toBe(false);
   });
+
+  it("treats a full config from a build without a git tag as loaded", () => {
+    expect(isAlertCalibrationOff({ version: "", alert_calibration_enabled: false })).toBe(true);
+    expect(isAlertCalibrationOff({ version: "", alert_calibration_enabled: true })).toBe(false);
+  });
 });
