@@ -47,6 +47,7 @@ use crate::{
         openobserve_api_management::request::organization::org::rename_org,
         openobserve_api_management::request::organization::assume_service_account::assume_service_account,
         openobserve_api_management::request::organization::org::org_summary,
+        openobserve_api_management::request::organization::org::org_overview,
         openobserve_api_management::request::organization::org::get_user_passcode,
         openobserve_api_management::request::organization::org::update_user_passcode,
         openobserve_api_management::request::organization::org::get_user_rumtoken,

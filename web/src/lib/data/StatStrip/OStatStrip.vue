@@ -41,6 +41,8 @@ const props = withDefaults(
      * Leave off for the standard strip — long labels need the wider basis.
      */
     compact?: boolean;
+    /** Show each tile's qualifier on its own line, for strips whose tiles are too narrow to fit label and qualifier together. */
+    stackSub?: boolean;
   }>(),
   {
     items: () => [],
@@ -49,6 +51,7 @@ const props = withDefaults(
     selectedKey: null,
     defaultKey: null,
     compact: false,
+    stackSub: false,
   },
 );
 
@@ -89,13 +92,14 @@ const onCardClick = (item: StatItem) => {
       :label="item.label"
       :value="item.value"
       :sub="item.sub"
+      :stack-sub="stackSub"
       :sub-icon="item.subIcon"
       :sub-tooltip="item.subTooltip"
       :icon="item.icon"
       :tone="item.tone"
       :trend="item.trend"
       :max="item.max"
-      :loading="showSkeleton"
+      :loading="showSkeleton || item.loading === true"
       :clickable="selectable && item.selectable !== false"
       :selected="item.selectable !== false && activeKey === item.key"
       :data-test="item.dataTest"

@@ -219,6 +219,15 @@ describe("OEmptyState", () => {
       expect(wrapper.find("p").exists()).toBe(true);
     });
 
+    it("renders a text-only p title for slim, with no icon or illustration", () => {
+      wrapper = buildWrapper({ size: "slim" });
+
+      expect(wrapper.find("h2").exists()).toBe(false);
+      expect(wrapper.find("p").exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-icon-stub"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="illustration-stub"]').exists()).toBe(false);
+    });
+
     it("does not render the illustration when size is inline", () => {
       // Arrange & Act — inline never renders the full illustration
       wrapper = buildWrapper({ size: "inline" });

@@ -13,14 +13,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="px-page-edge text-text-body flex h-full flex-col gap-0 overflow-y-auto pt-2.5 pb-2.5">
+  <OContent class="text-text-body flex h-full flex-col gap-0 overflow-y-auto pt-2.5 pb-2.5">
     <!-- Header: refresh + time picker -->
     <div v-if="pageState !== 'forbidden'" class="mb-4 flex justify-end">
       <div class="flex items-center gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
-          :loading="isLoading"
-          :disabled="isLoading"
+          :loading="isLoading || overviewState.loading"
+          :disabled="isLoading || overviewState.loading"
           @click="() => loadAll(true)"
         />
         <DateTime
@@ -38,7 +38,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Sections rendered top-to-bottom; each collapses when empty -->
+    <p
+      v-if="showOverviewCards && overview"
+      class="text-text-secondary mb-2 text-xs"
+      data-test="overview-freshness-note"
+    >
+      {{ t("overview.freshness", { time: generatedAtLabel }) }}
+    </p>
+
+    <OBanner
+      v-if="showOverviewCards && overviewRefreshFailed"
+      variant="warning"
+      inline-actions
+      class="mb-3"
+      data-test="overview-stale-notice"
+    >
+      {{ t("overview.stale.message", { time: generatedAtLabel }) }}
+      <template #actions>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="refresh"
+          data-test="overview-stale-retry-btn"
+          @click="() => loadOverview(true)"
+        >
+          {{ t("overview.stale.retry") }}
+        </OButton>
+      </template>
+    </OBanner>
+
+    <OverviewHeadlineStrip
+      v-if="showOverviewCards"
+      class="mb-5"
+      :overview="overview"
+      :pending="overviewPending"
+      :failed="overviewFailed"
+      :forbidden="overviewForbidden"
+      :incidents-state="incidentsTile"
+      :incidents-total="incidentsTotal"
+      @select="onHeadlineSelect"
+    />
 
     <!-- ACTIVE INCIDENTS (enterprise / cloud only) -->
     <section
@@ -126,14 +165,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.activeIncidents')"
       @retry="() => loadAll(true)"
     />
+    <OverviewSectionEmpty
+      v-else-if="showSectionForbidden('incidents')"
+      section="incidents"
+      kind="forbidden"
+      :title="t('overview.activeIncidents')"
+    />
 
-    <!-- Locked: no license to unlock Incidents, shown instead of omitted so
-         the capability is discoverable from a build that can't enable it. -->
-    <section
-      v-else-if="!incidentsAccess.allowed"
-      class="mb-5"
-      data-test="overview-incidents-locked"
+    <OverviewSectionEmpty
+      v-else-if="showSectionEmpty('incidents')"
+      section="incidents"
+      kind="empty"
+      :title="t('overview.activeIncidents')"
+    />
+
+    <div
+      v-if="showOverviewCards"
+      class="mb-5 grid grid-cols-2 gap-3 max-lg:grid-cols-1"
+      data-test="overview-alerts-health-grid"
     >
+      <OverviewAlertsCard
+        :section="overview?.alerts"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        :forbidden="overviewForbidden"
+        :incidents-state="incidentsTile"
+        :incidents-total="incidentsTotal"
+        @retry="() => loadOverview(true)"
+        @open="goToAlertList"
+        @create="goToAddAlert"
+      />
+      <OverviewDataHealthCard
+        class="self-start"
+        :overview="overview"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        :forbidden="overviewForbidden"
+        @retry="() => loadOverview(true)"
+        @open="onHealthOpen"
+      />
+    </div>
+
+    <!-- the upsell sits below the alerts grid so it never outranks live alert state -->
+    <section v-if="!incidentsAccess.allowed" class="mb-5" data-test="overview-incidents-locked">
       <div class="mb-2 flex items-center justify-between ps-1">
         <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
           {{ t("overview.activeIncidents") }}
@@ -309,6 +383,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.services')"
       @retry="() => loadAll(true)"
     />
+    <OverviewSectionEmpty
+      v-else-if="showSectionForbidden('services')"
+      section="services"
+      kind="forbidden"
+      :title="t('overview.services')"
+    />
 
     <!-- Locked: Services shares the Incidents license gate — same bundle, no
          separate upsell story of its own. -->
@@ -326,6 +406,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
       </div>
     </section>
+
+    <OverviewSectionEmpty
+      v-else-if="showSectionEmpty('services')"
+      section="services"
+      kind="empty"
+      :title="t('overview.services')"
+    />
 
     <!-- Service node side panel (latency / RED charts) -->
     <template v-if="incidentsAccess.allowed && selectedService">
@@ -401,6 +488,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.activeAnomalies')"
       @retry="() => loadAll(true)"
     />
+    <OverviewSectionEmpty
+      v-else-if="showSectionForbidden('anomalies')"
+      section="anomalies"
+      kind="forbidden"
+      :title="t('overview.activeAnomalies')"
+    />
+    <OverviewSectionEmpty
+      v-else-if="showSectionEmpty('anomalies')"
+      section="anomalies"
+      kind="empty"
+      :no-checks="anomalyConfigCount === 0"
+      :title="t('overview.activeAnomalies')"
+    />
 
     <!-- RECENT EVENTS (alert firing feed) -->
     <section v-if="recentEvents.length > 0" class="mb-5" data-test="overview-recent-events-section">
@@ -450,9 +550,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.recentEvents')"
       @retry="() => loadAll(true)"
     />
+    <OverviewSectionEmpty
+      v-else-if="showSectionForbidden('recentEvents')"
+      section="recentEvents"
+      kind="forbidden"
+      :title="t('overview.recentEvents')"
+    />
+    <OverviewSectionEmpty
+      v-else-if="showSectionEmpty('recentEvents')"
+      section="recentEvents"
+      kind="empty"
+      :title="t('overview.recentEvents')"
+    />
+
+    <OverviewSignalCards
+      v-if="showOverviewCards"
+      class="mb-5"
+      :section="overview?.streams"
+      :pending="overviewPending"
+      :failed="overviewFailed"
+      :forbidden="overviewForbidden"
+      @open="onSignalOpen"
+    />
+
+    <div
+      v-if="showOverviewCards"
+      class="mb-5 grid grid-cols-2 gap-3 max-lg:grid-cols-1"
+      data-test="overview-streams-limit-grid"
+    >
+      <OverviewStreamsCard
+        :section="overview?.streams"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        :forbidden="overviewForbidden"
+        @retry="() => loadOverview(true)"
+        @open="goToStreams"
+        @start-ingesting="goToIngestion"
+      />
+      <div class="flex flex-col gap-3 self-start">
+        <OverviewLimitCard
+          v-if="!isCloud"
+          :section="overview?.limits"
+          :pending="overviewPending"
+          :failed="overviewFailed"
+          :forbidden="overviewForbidden"
+          @retry="() => loadOverview(true)"
+          @unlock="openUpgradeDialog"
+        />
+        <OverviewStorageCard
+          :section="overview?.streams"
+          :pending="overviewPending"
+          :failed="overviewFailed"
+          :forbidden="overviewForbidden"
+          @retry="() => loadOverview(true)"
+        />
+      </div>
+    </div>
 
     <OEmptyState
-      v-if="pageState === 'forbidden'"
+      v-if="pageState === 'forbidden' || errorIsForbidden"
       preset="no-access"
       size="block"
       data-test="overview-no-access-empty-state"
@@ -512,103 +668,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <HomeNoDataState v-else-if="pageState === 'no-data'" tab="overview" flag-off />
 
-    <!-- Empty state — everything is healthy or no data yet -->
-    <OEmptyState
-      v-else-if="pageState === 'all-clear'"
-      illustration="check"
-      size="hero"
-      :hide-action="true"
-      data-test="overview-all-clear-empty-state"
-    >
-      <template #title>{{ t("overview.allClear") }}</template>
-      <template #description>{{
-        flagOn ? t("overview.allClearDescScoped") : t("overview.allClearDesc")
-      }}</template>
-      <template #actions>
-        <!-- View alerts -->
-        <button
-          v-if="showAlertsCard"
-          type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
-          data-test="overview-empty-alerts-card"
-          @click="goToAlertList"
-        >
-          <span
-            class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
-          >
-            <OIcon name="notifications" size="md" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
-              t("overview.emptyActionAlerts")
-            }}</OTruncatedText>
-            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
-              t("overview.emptyActionAlertsDesc")
-            }}</span>
-          </span>
-          <OIcon
-            name="chevron-right"
-            size="sm"
-            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
-          />
-        </button>
-        <!-- Explore logs -->
-        <button
-          v-if="showLogsCard"
-          type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
-          data-test="overview-empty-logs-card"
-          @click="goToLogs"
-        >
-          <span
-            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
-          >
-            <OIcon name="search" size="md" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
-              t("overview.emptyActionLogs")
-            }}</OTruncatedText>
-            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
-              t("overview.emptyActionLogsDesc")
-            }}</span>
-          </span>
-          <OIcon
-            name="chevron-right"
-            size="sm"
-            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
-          />
-        </button>
-        <!-- Explore traces -->
-        <button
-          v-if="showTracesCard"
-          type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
-          data-test="overview-empty-traces-card"
-          @click="goToTraces"
-        >
-          <span
-            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
-          >
-            <OIcon name="account-tree" size="md" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
-              t("overview.emptyActionTraces")
-            }}</OTruncatedText>
-            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
-              t("overview.emptyActionTracesDesc")
-            }}</span>
-          </span>
-          <OIcon
-            name="chevron-right"
-            size="sm"
-            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
-          />
-        </button>
-      </template>
-    </OEmptyState>
-
     <!-- Alert History Drawer — opened from anomaly Investigate button -->
     <AlertHistoryDrawer
       v-model:open="showAlertHistoryDrawer"
@@ -617,7 +676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       alert-type="anomaly_detection"
       data-test="overview-alert-history-drawer"
     />
-  </div>
+  </OContent>
 </template>
 
 <script setup lang="ts">
@@ -648,8 +707,27 @@ import OverviewSkeleton from "./OverviewSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OverviewSectionError from "./OverviewSectionError.vue";
+import OverviewSectionEmpty from "./OverviewSectionEmpty.vue";
 import HomeNoDataState from "./HomeNoDataState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
+import OverviewHeadlineStrip, {
+  type OverviewTarget,
+  type IncidentsTile,
+} from "./overview/OverviewHeadlineStrip.vue";
+import OverviewAlertsCard from "./overview/OverviewAlertsCard.vue";
+import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
+import OverviewStreamsCard from "./overview/OverviewStreamsCard.vue";
+import config from "@/aws-exports";
+import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
+import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
+import OverviewStorageCard from "./overview/OverviewStorageCard.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
+import { formatTimestampInTimezone } from "@/utils/date";
+import { type OverviewDestination, type OverviewSignal } from "./overview/overviewFormat";
+import { overviewKeys } from "@/services/overview.querykeys";
+import type { OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
@@ -772,6 +850,14 @@ const sectionState = reactive<Record<SectionKey, { loading: boolean; loaded: boo
   recentEvents: { loading: false, loaded: false },
 });
 
+let alertCountSeq = 0;
+const sectionSeq: Record<SectionKey, number> = {
+  incidents: 0,
+  services: 0,
+  anomalies: 0,
+  recentEvents: 0,
+};
+
 const isSectionPending = (key: SectionKey) =>
   sectionState[key].loading && !sectionState[key].loaded;
 
@@ -782,12 +868,32 @@ const sectionFailure = reactive<Record<SectionKey, unknown>>({
   anomalies: null,
   recentEvents: null,
 });
+const isCloud = config.isCloud === "true";
+const overview = ref<OrgOverview | null>(null);
+const overviewFailed = ref(false);
+const overviewState = reactive({ loading: false });
+let overviewSeq = 0;
+let overviewOrg = "";
+const overviewForbidden = ref(false);
+// a failed refresh keeps the last good snapshot on screen instead of blanking every card
+const overviewRefreshFailed = ref(false);
+const generatedAtLabel = computed(() => {
+  if (!overview.value) return "";
+  const zone = store.state.timezone || "UTC";
+  const time = formatTimestampInTimezone(overview.value.generated_at, "YYYY-MM-DD HH:mm", zone);
+  return `${time} (${zone})`;
+});
+const showOverviewCards = computed(
+  () => !["forbidden", "no-data", "not-monitored"].includes(pageState.value),
+);
+const overviewPending = computed(
+  () => overviewState.loading && (!overview.value || overviewFailed.value),
+);
 const alertCount = ref<number | null>(null);
-const summaryFailed = ref(false);
 const anomalyConfigCount = ref<number | null>(null);
-// null keeps all clear: only answered lists prove an org empty, and only the flag-off page asks
+// null leaves no-data undecided: only answered lists prove an org empty, and only the flag-off page asks
 const noUserStreams = ref<boolean | null>(null);
-// a probe that failed for any reason but 403 leaves "no streams" unproven, so all clear may not show
+// a probe that failed for any reason but 403 leaves "no streams" unproven, so the first-data hero may not show
 const streamProbeFailed = ref(false);
 
 const isForbidden = (err: unknown) => {
@@ -811,31 +917,85 @@ const pageState = computed<PageState>(() => {
   if (isLoading.value || hasAnyData.value) return "content";
   if (allFailed.value) {
     const allForbidden = attemptedSections.value.every((k) => isForbidden(sectionFailure[k]));
-    return flagOn.value && allForbidden ? "forbidden" : "error";
+    const cardsLoaded = !!overview.value && !overviewFailed.value && !overviewForbidden.value;
+    if (flagOn.value && allForbidden && !cardsLoaded) return "forbidden";
+    // the cards loaded, so the failed sections keep their own inline Retry
+    return cardsLoaded ? "partial" : "error";
   }
   if (attemptedSections.value.some(isFailed)) return "partial";
-  if (!flagOn.value && streamProbeFailed.value) return "error";
   if (!flagOn.value && noUserStreams.value === true) return "no-data";
-  // without the summary the page cannot tell all clear from nothing watched, so neither may show
-  if (flagOn.value && summaryFailed.value) return "error";
+  // a failed summary leaves alertCount null, so the page never claims nothing is watched
   if (flagOn.value && alertCount.value === 0 && (anomalyConfigCount.value ?? 0) === 0) {
     return "not-monitored";
   }
   return "all-clear";
 });
+// every attempted call was refused, so "could not load" would contradict the No access cards
+const errorIsForbidden = computed(
+  () =>
+    pageState.value === "error" &&
+    overviewForbidden.value &&
+    attemptedSections.value.every((k) => !isFailed(k) || isDenied(k)),
+);
+const pageShowsSections = computed(
+  () => pageState.value !== "error" && pageState.value !== "forbidden",
+);
+// an edition without the service graph refuses it with 403, which is no outage
+const isDenied = (key: SectionKey) => isForbidden(sectionFailure[key]);
 const showSectionError = (key: SectionKey) =>
-  isFailed(key) && pageState.value !== "error" && pageState.value !== "forbidden";
+  isFailed(key) && !isDenied(key) && pageShowsSections.value;
+const showSectionForbidden = (key: SectionKey) =>
+  isFailed(key) && isDenied(key) && pageShowsSections.value;
+const sectionApplies = (key: SectionKey) => {
+  if (key === "incidents") return isIncidentsEnabled.value;
+  if (key === "anomalies") return anomalyEnabled.value;
+  if (key === "services") return incidentsAccess.value.allowed;
+  return true;
+};
+// an empty message needs a settled, successful, applicable section on a page that shows the cards
+const showSectionEmpty = (key: SectionKey) =>
+  showOverviewCards.value &&
+  pageShowsSections.value &&
+  sectionState[key].loaded &&
+  !isFailed(key) &&
+  sectionApplies(key);
 
 /* Wraps a loader with its section's state. The loaders swallow their own errors,
    and `finally` also covers the early `return` in the enterprise-gated ones, so
    a section can never be left stuck pending. */
-const runSection = async (key: SectionKey, load: () => Promise<void>) => {
+const runSection = async (key: SectionKey, load: (current: () => boolean) => Promise<void>) => {
+  const seq = ++sectionSeq[key];
+  const current = () => seq === sectionSeq[key];
   sectionState[key].loading = true;
   try {
-    await load();
+    await load(current);
   } finally {
+    // a superseded call must not mark the newer call's section as settled
+    if (current()) {
+      sectionState[key].loading = false;
+      sectionState[key].loaded = true;
+    }
+  }
+};
+
+// bumping every sequence makes responses still in flight for the previous org discard themselves
+const resetLegacySections = () => {
+  anomalies.value = [];
+  incidents.value = [];
+  incidentsTotal.value = 0;
+  services.value = [];
+  recentEvents.value = [];
+  alertCount.value = null;
+  alertCountSeq++;
+  lastFetched.value = null;
+  graphData.value = { nodes: [], edges: [] };
+  selectedService.value = null;
+  servicePanelVisible.value = false;
+  for (const key of Object.keys(sectionState) as SectionKey[]) {
+    sectionSeq[key]++;
     sectionState[key].loading = false;
-    sectionState[key].loaded = true;
+    sectionState[key].loaded = false;
+    sectionFailure[key] = null;
   }
 };
 
@@ -876,11 +1036,13 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier);
 const loadAll = async (force = false) => {
   if (!orgId.value) return;
   isLoading.value = true;
+  // outside allSettled: a slow or failed /overview must never hold the page states
+  void loadOverview(force);
   await Promise.allSettled([
-    runSection("recentEvents", () => loadHistoryAndSplit(force)),
-    runSection("anomalies", () => loadAnomalies(force)),
-    runSection("incidents", () => loadIncidents(force)),
-    runSection("services", () => loadServiceGraph(force)),
+    runSection("recentEvents", (current) => loadHistoryAndSplit(force, current)),
+    runSection("anomalies", (current) => loadAnomalies(force, current)),
+    runSection("incidents", (current) => loadIncidents(force, current)),
+    runSection("services", (current) => loadServiceGraph(force, current)),
     loadAlertCount(force),
   ]);
   await loadUserStreams(force);
@@ -889,10 +1051,63 @@ const loadAll = async (force = false) => {
   if (!allFailed.value && pageState.value !== "error") lastFetched.value = new Date();
 };
 
-// only the flag-on page tells "nothing is watched" apart from "all clear"
+// only the latest call may set the result or clear loading
+const loadOverview = async (force = false) => {
+  const org = orgId.value;
+  const seq = ++overviewSeq;
+  if (org !== overviewOrg) {
+    overviewOrg = org;
+    overview.value = null;
+    overviewFailed.value = false;
+    overviewForbidden.value = false;
+    overviewRefreshFailed.value = false;
+    resetLegacySections();
+  }
+  overviewState.loading = true;
+  try {
+    const key = overviewKeys.data(org, OVERVIEW_TOP);
+    if (force) {
+      // an in-flight read would be shared and never send refresh=true
+      await queryClient.cancelQueries({ queryKey: key, exact: true });
+      await queryClient.invalidateQueries({ queryKey: key, exact: true, refetchType: "none" });
+    }
+    const res = await queryClient.fetchQuery(orgOverviewQuery(org, { refresh: force }));
+    if (seq !== overviewSeq) return;
+    overview.value = res;
+    overviewFailed.value = false;
+    overviewForbidden.value = false;
+    overviewRefreshFailed.value = false;
+  } catch (err) {
+    if (seq !== overviewSeq) return;
+    overviewForbidden.value = isForbidden(err);
+    if (overview.value && !overviewForbidden.value) {
+      overviewRefreshFailed.value = true;
+      return;
+    }
+    overview.value = null;
+    overviewRefreshFailed.value = false;
+    overviewFailed.value = !overviewForbidden.value;
+  } finally {
+    if (seq === overviewSeq) {
+      overviewState.loading = false;
+    }
+  }
+};
+
+const incidentsTile = computed<IncidentsTile>(() => {
+  if (!incidentsAccess.value.allowed) return "locked";
+  if (!isIncidentsEnabled.value) return "unavailable";
+  if (isSectionPending("incidents")) return "loading";
+  if (isDenied("incidents") && isFailed("incidents")) return "forbidden";
+  if (isFailed("incidents")) return "error";
+  return "ok";
+});
+
+// only the flag-on page can tell that nothing is watched
 const loadAlertCount = async (force = false) => {
   if (!flagOn.value) return;
-  summaryFailed.value = false;
+  const org = orgId.value;
+  const seq = ++alertCountSeq;
   try {
     const options = orgSummaryQuery(orgId.value);
     if (force) {
@@ -903,10 +1118,11 @@ const loadAlertCount = async (force = false) => {
       });
     }
     const summary: any = await queryClient.fetchQuery(options);
+    if (seq !== alertCountSeq || org !== orgId.value) return;
     alertCount.value = (summary?.alerts?.num_realtime ?? 0) + (summary?.alerts?.num_scheduled ?? 0);
   } catch {
+    if (seq !== alertCountSeq || org !== orgId.value) return;
     alertCount.value = null;
-    summaryFailed.value = true;
   }
 };
 
@@ -930,7 +1146,7 @@ const typeHasUserStream = async (org: string, type: string, reread: boolean) => 
   return page.list.length >= head.total ? false : null;
 };
 
-// Refresh and Retry re-read only while the hero waits or a probe failed; an org the notice saw data in asks nothing
+// Refresh and Retry re-read only while the first-data hero waits or a probe failed; an org the notice saw data in asks nothing
 const loadUserStreams = async (force = false) => {
   const org = orgId.value;
   const reread = force && (noUserStreams.value === true || streamProbeFailed.value);
@@ -959,7 +1175,7 @@ const loadUserStreams = async (force = false) => {
 };
 
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
-const loadAnomalies = async (force = false) => {
+const loadAnomalies = async (force = false, current: () => boolean = () => true) => {
   sectionFailure.anomalies = null;
   try {
     const org = orgId.value;
@@ -984,6 +1200,7 @@ const loadAnomalies = async (force = false) => {
     // Fire list first; only fetch history if configs exist
     try {
       const configs: any[] = await readConfigs(org);
+      if (!current()) return;
       anomalyConfigCount.value = configs.length;
       if (!configs.length) {
         anomalies.value = [];
@@ -991,6 +1208,7 @@ const loadAnomalies = async (force = false) => {
       }
       const configById = new Map(configs.map((c: any) => [c.id ?? c.anomaly_id, c]));
       const bulkRes = await readHistory(org, 20);
+      if (!current()) return;
       const bulkConfigs: any[] = bulkRes?.configs ?? [];
       // Merge bulk history hits with config metadata
       rawHits = bulkConfigs.map((entry: any) => ({
@@ -1000,6 +1218,7 @@ const loadAnomalies = async (force = false) => {
     } catch {
       // Bulk endpoint not available — fall back to per-config requests
       const configs: any[] = await readConfigs(org);
+      if (!current()) return;
       anomalyConfigCount.value = configs.length;
       if (!configs.length) {
         anomalies.value = [];
@@ -1009,6 +1228,7 @@ const loadAnomalies = async (force = false) => {
       const results = await Promise.allSettled(
         configs.map((c) => anomalyService.getHistory(org, c.id ?? c.anomaly_id, limitPerConfig)),
       );
+      if (!current()) return;
       rawHits = configs.map((cfg, idx) => ({
         cfg,
         hits:
@@ -1057,6 +1277,7 @@ const loadAnomalies = async (force = false) => {
 
     anomalies.value = result;
   } catch (err) {
+    if (!current()) return;
     anomalies.value = [];
     anomalyConfigCount.value = null;
     sectionFailure.anomalies = err;
@@ -1064,7 +1285,7 @@ const loadAnomalies = async (force = false) => {
 };
 
 // Alert trigger history feeds recentEvents only
-const loadHistoryAndSplit = async (force = false) => {
+const loadHistoryAndSplit = async (force = false, current: () => boolean = () => true) => {
   sectionFailure.recentEvents = null;
   try {
     // Exact bounds: `alertHistoryQuery` rounds only its key, so the newest minutes still reach the server.
@@ -1084,6 +1305,7 @@ const loadHistoryAndSplit = async (force = false) => {
       });
     }
     const res: any = await queryClient.fetchQuery(historyOptions);
+    if (!current()) return;
     const hits: any[] = res?.hits ?? [];
 
     // Recent events: firing shown per-occurrence; failed deduped by alert_name with count.
@@ -1133,12 +1355,13 @@ const loadHistoryAndSplit = async (force = false) => {
       .sort((a, b) => (b.rawTs ?? 0) - (a.rawTs ?? 0))
       .slice(0, 5);
   } catch (err) {
+    if (!current()) return;
     recentEvents.value = [];
     sectionFailure.recentEvents = err;
   }
 };
 
-const loadIncidents = async (force = false) => {
+const loadIncidents = async (force = false, current: () => boolean = () => true) => {
   if (!isIncidentsEnabled.value) return;
   sectionFailure.incidents = null;
   try {
@@ -1151,16 +1374,18 @@ const loadIncidents = async (force = false) => {
       });
     }
     const res: any = await queryClient.fetchQuery(incidentOptions);
+    if (!current()) return;
     incidents.value = res?.incidents ?? [];
     incidentsTotal.value = res?.total ?? incidents.value.length;
   } catch (err) {
+    if (!current()) return;
     incidents.value = [];
     incidentsTotal.value = 0;
     sectionFailure.incidents = err;
   }
 };
 
-const loadServiceGraph = async (force = false) => {
+const loadServiceGraph = async (force = false, current: () => boolean = () => true) => {
   if (!incidentsAccess.value.allowed) return;
   sectionFailure.services = null;
   try {
@@ -1178,6 +1403,7 @@ const loadServiceGraph = async (force = false) => {
       });
     }
     const res: any = await queryClient.fetchQuery(topologyOptions);
+    if (!current()) return;
     const nodes: any[] = res?.nodes ?? [];
     const edges: any[] = res?.edges ?? [];
     graphData.value = { nodes, edges };
@@ -1224,6 +1450,7 @@ const loadServiceGraph = async (force = false) => {
     await nextTick();
     onSvcScroll();
   } catch (err) {
+    if (!current()) return;
     services.value = [];
     sectionFailure.services = err;
   }
@@ -1354,7 +1581,6 @@ const goToIncident = (inc: any) => {
 // ever offering a card the user has no way to actually land on.
 const showAlertsCard = computed(() => router.hasRoute("alertList"));
 const showLogsCard = computed(() => router.hasRoute("logs"));
-const showTracesCard = computed(() => router.hasRoute("traces"));
 
 const goToAlertList = () => {
   router.push({ name: "alertList", query: { org_identifier: orgId.value } });
@@ -1362,6 +1588,38 @@ const goToAlertList = () => {
 
 const goToAddAlert = () => {
   router.push({ name: "addAlert", query: { org_identifier: orgId.value } });
+};
+
+const goToPipelines = () => {
+  router.push({ name: "pipelines", query: { org_identifier: orgId.value } });
+};
+
+const goToStreams = () => {
+  router.push({ name: "logstreams", query: { org_identifier: orgId.value } });
+};
+
+const goToIngestion = () => {
+  router.push({ name: "ingestion", query: { org_identifier: orgId.value } });
+};
+
+const onHealthOpen = (destination: OverviewDestination) => {
+  if (destination === "alerts") goToAlertList();
+  else if (destination === "pipelines") goToPipelines();
+  else goToStreams();
+};
+
+const onSignalOpen = (signal: OverviewSignal) => {
+  router.push({ name: signal, query: { org_identifier: orgId.value } });
+};
+
+const onHeadlineSelect = (target: OverviewTarget) => {
+  if (target === "firing" || target === "failing") goToAlertList();
+  else if (target === "pipelines") goToPipelines();
+  else if (target === "streams" || target === "quiet") goToStreams();
+  else if (incidentsTile.value === "locked") openUpgradeDialog();
+  else if (incidentsTile.value !== "unavailable" && incidentsTile.value !== "forbidden") {
+    goToIncidentList();
+  }
 };
 
 const goToIncidentList = () => {
@@ -1377,10 +1635,6 @@ const goToAnomalies = () => {
 
 const goToLogs = () => {
   router.push({ name: "logs", query: { org_identifier: orgId.value } });
-};
-
-const goToTraces = () => {
-  router.push({ name: "traces", query: { org_identifier: orgId.value } });
 };
 
 const goToServiceGraph = () => {
@@ -1412,6 +1666,9 @@ watch(
 
 // zoConfig loads asynchronously after mount — retry incidents when it becomes available
 watch(isIncidentsEnabled, (enabled) => {
-  if (enabled && incidents.value.length === 0) loadIncidents();
+  if (!enabled || incidents.value.length > 0) return;
+  // the earlier pass returned early and marked the section loaded, so re-arm its skeleton
+  sectionState.incidents.loaded = false;
+  void runSection("incidents", (current) => loadIncidents(false, current));
 });
 </script>

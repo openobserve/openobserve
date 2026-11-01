@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     • hero   full page / section (dashboards list, alerts page) — big
              illustration, rich copy, fills its container, dot-grid backdrop
     • block  inside a card or panel — medium illustration, tighter copy
+    • slim    one text line inside a card section — no icon, no illustration
     • inline  inside a table body / dropdown — tiny: just icon + one line
 
   Driven by a PRESET (the common path) or by props/slots (the escape hatch):
@@ -83,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div :class="['flex max-w-xl flex-col', sizeClass.copy]">
         <component
-          :is="size === 'inline' ? 'p' : 'h2'"
+          :is="isInlineCopy ? 'p' : 'h2'"
           :class="['text-text-heading font-medium tracking-[-0.01em]', sizeClass.title]"
         >
           <slot name="title">{{ resolvedTitle }}</slot>
@@ -122,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="resolvedActionLabel"
               :variant="actionVariant"
-              :size="size === 'inline' ? 'sm' : 'md'"
+              :size="isInlineCopy ? 'sm' : 'md'"
               :icon-left="resolvedActionIcon"
               @click="emit('action')"
             >
@@ -131,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="secondaryActionLabel"
               variant="ghost"
-              :size="size === 'inline' ? 'sm' : 'md'"
+              :size="isInlineCopy ? 'sm' : 'md'"
               @click="emit('secondaryAction')"
             >
               {{ secondaryActionLabel }}
@@ -166,7 +167,7 @@ import {
   type EmptyStateVariant,
 } from "./presets";
 
-type Size = "hero" | "block" | "compact" | "inline";
+type Size = "hero" | "block" | "compact" | "inline" | "slim";
 
 const props = withDefaults(
   defineProps<{
@@ -225,6 +226,7 @@ const preset = computed<EmptyStatePreset | undefined>(() =>
 );
 
 const size = computed(() => props.size);
+const isInlineCopy = computed(() => size.value === "inline" || size.value === "slim");
 
 // --- filtered (search/filter matched nothing) vs first-run ------------------
 const isFiltered = computed(() => !!props.filtered);
@@ -259,7 +261,7 @@ const resolvedActions = computed<EmptyStateAction[]>(() => {
   if (isFiltered.value) return [FILTERED_ACTION];
   return props.actions ?? preset.value?.actions ?? [];
 });
-const showCards = computed(() => size.value !== "inline" && resolvedActions.value.length > 0);
+const showCards = computed(() => !isInlineCopy.value && resolvedActions.value.length > 0);
 
 // Simple button fallback (only when a call site passes actionLabel directly and
 // there are no cards).
@@ -281,10 +283,10 @@ const illustrationComponent = computed(() =>
 );
 // inline never shows the full illustration — it uses a compact icon instead.
 const hasIllustration = computed(
-  () => size.value !== "inline" && (!!slots.illustration || !!illustrationComponent.value),
+  () => !isInlineCopy.value && (!!slots.illustration || !!illustrationComponent.value),
 );
 const inlineIcon = computed<IconName | undefined>(() => {
-  if (size.value !== "inline") return undefined;
+  if (size.value !== "inline") return undefined; // slim is text only
   if (props.icon) return props.icon;
   // sensible default icon per tone
   return variant.value === "error" ? "error-outline" : "search-off";
@@ -368,6 +370,18 @@ const SIZE_MAP: Record<
     description: raw("text-sm"),
     illustrationWidth: 150,
     illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-28",
+    iconWrap: "",
+  },
+  slim: {
+    root: "w-full min-h-0 px-4 py-3",
+    stack: "gap-0",
+    copy: "gap-0",
+    actions: "gap-2 pt-1",
+    extra: "w-full flex flex-col items-center gap-1.5 pt-1",
+    title: raw("text-sm!"),
+    description: raw("text-xs"),
+    illustrationWidth: 0,
+    illustration: "",
     iconWrap: "",
   },
   inline: {
