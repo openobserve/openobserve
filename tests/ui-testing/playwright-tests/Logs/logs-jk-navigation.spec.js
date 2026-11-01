@@ -27,7 +27,6 @@ const STREAM = "jk_logs";
 const TOTAL = 130;
 
 const editor = '[data-test="logs-search-bar-query-editor"] .monaco-editor';
-const runBtn = '[data-test="logs-search-bar-refresh-btn"]';
 const table = '[data-test="logs-search-result-logs-table"]';
 const pager = '[data-test="logs-search-result-pagination"]';
 const jsonContent = '[data-test="log-detail-json-content"]';
@@ -93,9 +92,10 @@ async function openResults(page) {
   await expect
     .poll(() => searches.hits().length, { timeout: 30000 })
     .toBeGreaterThan(0);
-  await new PageManager(page).logsPage.waitForRunQueryButton();
+  const logs = new PageManager(page).logsPage;
+  await logs.waitForRunQueryButton();
   const before = searches.hits().length;
-  await page.locator(runBtn).click();
+  await page.locator(logs.runQueryButton).click();
   await expect
     .poll(() => searches.hits().length, { timeout: 30000 })
     .toBeGreaterThan(before);
@@ -365,8 +365,6 @@ test.describe("Logs J/K navigation (item 4a)", () => {
     async ({ page }) => {
       const pm = new PageManager(page);
       const logs = pm.logsPage;
-      await openResults(page);
-      await openRow(page, logs, 49);
       await page.route("**/_search_stream**", (route) =>
         fromOf(route.request()) > 0
           ? route.fulfill({
@@ -376,6 +374,8 @@ test.describe("Logs J/K navigation (item 4a)", () => {
             })
           : route.continue(),
       );
+      await openResults(page);
+      await openRow(page, logs, 49);
       await logs.pressLogRowKey("j");
       await expect(page.locator(logs.logDetailDialog)).toBeHidden({
         timeout: 30000,
@@ -396,14 +396,14 @@ test.describe("Logs J/K navigation (item 4a)", () => {
     async ({ page }) => {
       const pm = new PageManager(page);
       const logs = pm.logsPage;
-      await openResults(page);
-      await openRow(page, logs, 49);
       let release;
       const held = new Promise((resolve) => (release = resolve));
       await page.route("**/_search_stream**", async (route) => {
         if (fromOf(route.request()) > 0) await held;
         await route.continue();
       });
+      await openResults(page);
+      await openRow(page, logs, 49);
       await logs.pressLogRowKey("j");
       await expect(page.locator(logs.logDetailPageLoading)).toBeVisible();
       await expect(page.locator(logs.logDetailNextBtn)).toBeVisible();
@@ -536,7 +536,7 @@ test.describe("Logs J/K navigation (item 4a)", () => {
       await page.keyboard.press("Backspace");
 
       const before = searches.hits().length;
-      await page.locator(runBtn).click();
+      await page.locator(logs.runQueryButton).click();
       await expect
         .poll(() => searches.hits().length, { timeout: 30000 })
         .toBeGreaterThan(before);
