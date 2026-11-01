@@ -94,10 +94,10 @@ def _ingest_seed_data_once():
 
     def _data_is_searchable():
         search_url = f"{base_url_with_slash}api/{org}/_search?type=logs"
-        # Wide window: data fixtures may have older timestamps.
+        # Seed rows are stamped at ingest, so anything older than the tests' 1h window is stale.
         now = datetime.now(UTC)
         end_us = int(now.timestamp() * 1_000_000)
-        start_us = int((now - timedelta(weeks=2)).timestamp() * 1_000_000)
+        start_us = int((now - timedelta(hours=1)).timestamp() * 1_000_000)
         payload = {
             "query": {
                 "sql": f'SELECT COUNT(*) AS c FROM "{stream_name}"',
