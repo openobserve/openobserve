@@ -572,6 +572,22 @@ describe("OnCallResponses", () => {
       expect(text).toContain("1 has no team, so it is not paging");
     });
 
+    it("counts a grouped alert as not paging when only its snoozed firing has a team", async () => {
+      const wrapper = await withPages([
+        page({ id: "new", team_id: null, opened_at: 1_700_000_100_000_000 }),
+        page({
+          id: "old",
+          opened_at: 1_700_000_000_000_000,
+          snoozed_until: (Date.now() + 60_000) * 1000,
+        }),
+      ]);
+
+      expect(sections(wrapper)).toEqual({ ringing: 1 });
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).not.toContain("still paging");
+      expect(text).toContain("1 has no team, so it is not paging");
+    });
+
     it("drops the still-paging hint when no ringing page has a team", async () => {
       const wrapper = await withPages([page({ id: "b", team_id: null }, "al_pay")]);
 

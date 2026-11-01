@@ -1772,7 +1772,9 @@ const sectionCounts = computed<Record<string, number>>(() => {
 const unroutedRinging = computed(
   () =>
     rows.value.filter(
-      (row) => rowSection(row) === "ringing" && !row.escalating.some((r) => r.team_id),
+      (row) =>
+        rowSection(row) === "ringing" &&
+        !row.escalating.some((r) => r.team_id && !r.acked_by && !isSnoozed(r)),
     ).length,
 );
 const routedRinging = computed(() => (sectionCounts.value.ringing ?? 0) - unroutedRinging.value);
