@@ -197,6 +197,34 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v5
 
+      # Before the AWS credentials step so the booted server never inherits them
+      - name: Generate OpenAPI spec (best-effort)
+        continue-on-error: true
+        env:
+          ZO_ROOT_USER_EMAIL: root@example.com
+          ZO_ROOT_USER_PASSWORD: Complexpass#123
+          ZO_HTTP_ADDR: 127.0.0.1
+          ZO_SWAGGER_ENABLED: "true"
+          ZO_TELEMETRY: "false"
+        run: |
+          workdir="$(mktemp -d -p "${RUNNER_TEMP}")"
+          # The musl build is static, so it runs on whatever glibc the runner has
+          archive="$(find . -type f -name "openobserve-${GITHUB_REF_NAME}-linux-amd64-musl.tar.gz" -print -quit)"
+          tar -xzf "${archive}" -C "${workdir}"
+
+          ZO_DATA_DIR="${workdir}/data" "${workdir}/openobserve" > "${workdir}/server.log" 2>&1 &
+          pid=$!
+          trap 'status=$?; [ "${status}" -eq 0 ] || tail -n 50 "${workdir}/server.log"; kill "${pid}" 2>/dev/null || true' EXIT
+
+          for _ in $(seq 1 60); do
+            curl -sf http://127.0.0.1:5080/healthz > /dev/null && break
+            sleep 1
+          done
+
+          curl -sSf http://127.0.0.1:5080/api-doc/openapi.json -o "${workdir}/openapi.json"
+          grep -q '"openapi"' "${workdir}/openapi.json"
+          mv "${workdir}/openapi.json" openapi.json
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
@@ -238,6 +266,8 @@ jobs:
           name: "Release ${{ github.ref_name }}"
           generate_release_notes: true
           body: ${{ steps.generate-body.outputs.body }}
+          files: openapi.json
+          fail_on_unmatched_files: false
 
       - name: Send release notification to Strapi
         uses: actions/github-script@v9
