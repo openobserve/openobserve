@@ -15258,6 +15258,10 @@
     "reviewAndApplyFilters": "Bekijk en pas filters toe op traces",
     "spansLabel": "spans",
     "errorsLabel": "fouten",
+    "errorStrip": {
+      "spanLabel": "{service} · {operation}",
+      "menuTitle": "Foutspans, diepste eerst"
+    },
     "previousMatch": "Vorige wedstrijd",
     "nextMatch": "Volgende wedstrijd",
     "searchInSpans": "Zoeken in spans",
@@ -15507,6 +15511,22 @@
       "roleAssistant": "Assistent",
       "roleSystem": "Systeem",
       "roleTool": "Tool"
+    },
+    "results": {
+      "tracesWithMatchingSpan": "{count} trace met een overeenkomende span | {count} traces met een overeenkomende span",
+      "spansColumnTooltip": "Totaal aantal spans in trace",
+      "fieldValueCountsCaption": "Aantallen zijn spans met deze waarde, in het huidige bereik",
+      "errorColumn": "Fout",
+      "eventsColumn": "Gebeurtenissen",
+      "eventExceptions": "{count} uitzondering | {count} uitzonderingen",
+      "eventLogs": "{count} log | {count} logs",
+      "eventCounts": "{exceptions} · {logs}",
+      "eventsHoverTitle": "Gebeurtenissen op {operation}",
+      "eventsHoverOrder": "{count}, in tijdsvolgorde",
+      "eventKindException": "uitzondering",
+      "eventKindLog": "log",
+      "eventOffset": "+{offset}",
+      "moreEvents": "+{count} meer"
     },
     "tableColumns": {
       "service": "Service",

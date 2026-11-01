@@ -15258,6 +15258,10 @@
     "reviewAndApplyFilters": "트레이스에 필터 검토 및 적용",
     "spansLabel": "스팬",
     "errorsLabel": "오류",
+    "errorStrip": {
+      "spanLabel": "{service} · {operation}",
+      "menuTitle": "오류 스팬, 깊은 것부터"
+    },
     "previousMatch": "이전 일치 항목",
     "nextMatch": "다음 일치 항목",
     "searchInSpans": "스팬에서 검색",
@@ -15507,6 +15511,22 @@
       "roleAssistant": "어시스턴트",
       "roleSystem": "시스템",
       "roleTool": "도구"
+    },
+    "results": {
+      "tracesWithMatchingSpan": "일치하는 스팬이 있는 트레이스 {count}개 | 일치하는 스팬이 있는 트레이스 {count}개",
+      "spansColumnTooltip": "트레이스의 총 스팬 수",
+      "fieldValueCountsCaption": "개수는 현재 범위에서 이 값을 가진 스팬 수입니다",
+      "errorColumn": "오류",
+      "eventsColumn": "이벤트",
+      "eventExceptions": "예외 {count}개 | 예외 {count}개",
+      "eventLogs": "로그 {count}개 | 로그 {count}개",
+      "eventCounts": "{exceptions} · {logs}",
+      "eventsHoverTitle": "{operation}의 이벤트",
+      "eventsHoverOrder": "{count}개, 시간순",
+      "eventKindException": "예외",
+      "eventKindLog": "로그",
+      "eventOffset": "+{offset}",
+      "moreEvents": "+{count}개 더"
     },
     "tableColumns": {
       "service": "서비스",

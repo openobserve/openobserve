@@ -15258,6 +15258,10 @@
     "reviewAndApplyFilters": "フィルターを確認してトレースに適用",
     "spansLabel": "スパン",
     "errorsLabel": "エラー",
+    "errorStrip": {
+      "spanLabel": "{service} · {operation}",
+      "menuTitle": "エラースパン（深い順）"
+    },
     "previousMatch": "前の試合",
     "nextMatch": "次の試合",
     "searchInSpans": "スパン内を検索",
@@ -15507,6 +15511,22 @@
       "roleAssistant": "アシスタント",
       "roleSystem": "システム",
       "roleTool": "ツール"
+    },
+    "results": {
+      "tracesWithMatchingSpan": "{count} 件の一致するスパンを含むトレース | {count} 件の一致するスパンを含むトレース",
+      "spansColumnTooltip": "トレース内のスパン総数",
+      "fieldValueCountsCaption": "件数は現在の範囲でこの値を持つスパンの数です",
+      "errorColumn": "エラー",
+      "eventsColumn": "イベント",
+      "eventExceptions": "{count} 件の例外 | {count} 件の例外",
+      "eventLogs": "{count} 件のログ | {count} 件のログ",
+      "eventCounts": "{exceptions} · {logs}",
+      "eventsHoverTitle": "{operation} のイベント",
+      "eventsHoverOrder": "{count}、時刻順",
+      "eventKindException": "例外",
+      "eventKindLog": "ログ",
+      "eventOffset": "+{offset}",
+      "moreEvents": "+{count} 件"
     },
     "tableColumns": {
       "service": "サービス",

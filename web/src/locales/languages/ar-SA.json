@@ -15258,6 +15258,10 @@
     "reviewAndApplyFilters": "راجع وتطبيق الفلاتر على Traces",
     "spansLabel": "الامتدادات",
     "errorsLabel": "أخطاء",
+    "errorStrip": {
+      "spanLabel": "{service} · {operation}",
+      "menuTitle": "امتدادات الخطأ، الأعمق أولًا"
+    },
     "previousMatch": "التطابق السابق",
     "nextMatch": "التطابق التالي",
     "searchInSpans": "البحث في الامتدادات",
@@ -15507,6 +15511,22 @@
       "roleAssistant": "مساعد",
       "roleSystem": "النظام",
       "roleTool": "الأداة"
+    },
+    "results": {
+      "tracesWithMatchingSpan": "{count} تتبع يحتوي على امتداد مطابق | {count} تتبعات تحتوي على امتداد مطابق",
+      "spansColumnTooltip": "إجمالي الامتدادات في التتبع",
+      "fieldValueCountsCaption": "الأعداد تمثل امتدادات تحمل هذه القيمة، في النطاق الحالي",
+      "errorColumn": "خطأ",
+      "eventsColumn": "الأحداث",
+      "eventExceptions": "{count} استثناء | {count} استثناءات",
+      "eventLogs": "{count} سجل | {count} سجلات",
+      "eventCounts": "{exceptions} · {logs}",
+      "eventsHoverTitle": "الأحداث على {operation}",
+      "eventsHoverOrder": "{count}، حسب الترتيب الزمني",
+      "eventKindException": "استثناء",
+      "eventKindLog": "سجل",
+      "eventOffset": "+{offset}",
+      "moreEvents": "+{count} أخرى"
     },
     "tableColumns": {
       "service": "الخدمة",
