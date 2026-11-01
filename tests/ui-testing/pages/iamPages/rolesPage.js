@@ -193,6 +193,17 @@ export class RolesPage {
         return [...new Set(slugs.map((s) => s.replace(RAIL_ITEM, '')))];
     }
 
+    /** Rail module key → its label, read without the granted-count badge. */
+    async railModuleLabels() {
+        const rows = await this.page
+            .locator(`[data-test^="${RAIL_ITEM}"]`)
+            .evaluateAll((els) => els.map((e) => [
+                e.getAttribute('data-test'),
+                (e.querySelector('.o-tab__label')?.textContent ?? '').trim(),
+            ]));
+        return Object.fromEntries(rows.map(([slug, label]) => [slug.replace(RAIL_ITEM, ''), label]));
+    }
+
     /**
      * Resource keys of the rows the pane is CURRENTLY showing — after any search or
      * filter. On the All Modules view a row is a whole module, so this is the set one
