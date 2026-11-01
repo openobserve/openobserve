@@ -290,6 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 // @ts-nocheck
+import { unescapeSqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import {
   ref,
@@ -1733,7 +1734,9 @@ const restoreFiltersFromQuery = (node: any) => {
     if (node.left.column) {
       let values = [];
       if (node.operator === "IN") {
-        values = node.right.value.map((_value: { value: string }) => _value.value);
+        values = node.right.value.map((_value: { value: string }) =>
+          unescapeSqlLiteral(_value.value),
+        );
       }
       if (searchObj.data.stream.fieldValues?.[node?.left?.column]?.selectedValues)
         searchObj.data.stream.fieldValues[node.left.column].selectedValues = values;
@@ -2075,7 +2078,7 @@ const activeIncludeFilterValues = computed((): Record<string, string[]> => {
         if (node.left?.type === "column_ref") {
           const colName = extractTracesColName(node.left.column);
           if (colName && node.right?.value != null) {
-            const val = String(node.right.value);
+            const val = unescapeSqlLiteral(node.right.value);
             if (!result[colName]) result[colName] = [];
             if (!result[colName].includes(val)) result[colName].push(val);
           }
@@ -2124,7 +2127,7 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
         if (node.left?.type === "column_ref") {
           const colName = extractTracesColName(node.left.column);
           if (colName && node.right?.value != null) {
-            const val = String(node.right.value);
+            const val = unescapeSqlLiteral(node.right.value);
             if (!result[colName]) result[colName] = [];
             if (!result[colName].includes(val)) result[colName].push(val);
           }

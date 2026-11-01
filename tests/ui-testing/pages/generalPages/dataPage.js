@@ -90,6 +90,19 @@ export class DataPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 });
     }
 
+    get azureManualCodeBlock() {
+        return this.page.locator('[data-test="ingestion-azure-manual-code-block"]');
+    }
+
+    async expectAzureManualIngestUrl(org) {
+        const block = this.azureManualCodeBlock;
+        await expect(block).toBeVisible({ timeout: 15000 });
+        await expect(block, 'Bug #16021: endpoint must be the real _json ingest route')
+            .toContainText(`/api/${org}/azure-activity-logs/_json`);
+        await expect(block).not.toContainText('_event_hub');
+        await expect(block).not.toContainText('/azure/');
+    }
+
     async clickFirstAIIntegration() {
         await expect(this.aiIntegrationFirstItem, 'At least one AI integration should be visible').toBeVisible({ timeout: 5000 });
         await this.aiIntegrationFirstItem.click();

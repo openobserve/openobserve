@@ -265,7 +265,7 @@ describe("useTraceCorrelation", () => {
       await fetchCorrelation();
 
       const apmCall = vi.mocked(searchService.search).mock.calls[1];
-      expect(apmCall[1]).toBe("APM");
+      expect(apmCall[1]).toBe("rum");
       expect(apmCall[0].page_type).toBe("traces");
       const sql: string = apmCall[0].query.query.sql;
       expect(sql).toContain('from "default"');
@@ -350,7 +350,7 @@ describe("useTraceCorrelation", () => {
         expect.objectContaining({
           org_identifier: "test-org",
         }),
-        "APM",
+        "rum",
       );
     });
 
@@ -410,6 +410,23 @@ describe("useTraceCorrelation", () => {
       expect(consoleErrorSpy).toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
+    });
+
+    it("exposes a backend query failure instead of reporting only missing spans", async () => {
+      const failure = new Error("Request failed with status code 400");
+      vi.mocked(searchService.search)
+        .mockResolvedValueOnce(createMockSearchResponse([createMockRumEvent()]))
+        .mockRejectedValueOnce(failure);
+      const result = useTraceCorrelation(ref("00000000000000000000000000000002"), t);
+      await result.fetchCorrelation();
+      expect(result.error.value).toBe(failure);
+      expect(result.hasBackendTrace.value).toBe(false);
+      expect(result.correlationData.value?.rum_events).toHaveLength(1);
+
+      mockSuccessfulSearch([createMockRumEvent()], [createMockBackendSpan()]);
+      await result.fetchCorrelation();
+      expect(result.error.value).toBeNull();
+      expect(result.hasBackendTrace.value).toBe(true);
     });
 
     it("should reset loading state on error", async () => {
