@@ -291,11 +291,11 @@ fn sse(payload: &Value) -> bytes::Bytes {
 
 /// Resolve a provider that belongs to this organization.
 async fn load_provider(org_id: &str, provider_id: &str) -> Result<PreparedProvider, Response> {
-    let provider = match infra::table::providers::get(provider_id).await {
-        Ok(Some(provider)) if provider.org_id == org_id => provider,
+    let provider = match infra::table::providers::get(org_id, provider_id).await {
+        Ok(Some(provider)) => provider,
         // A provider in another organization is reported as absent rather than
         // forbidden, so its existence cannot be probed.
-        Ok(_) => return Err(MetaHttpResponse::not_found("Provider not found")),
+        Ok(None) => return Err(MetaHttpResponse::not_found("Provider not found")),
         Err(error) => {
             log::error!("[Playground] failed to load provider {provider_id}: {error}");
             return Err(MetaHttpResponse::internal_error("Internal server error"));
