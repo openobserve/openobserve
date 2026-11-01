@@ -568,8 +568,14 @@ async fn clamp_to_max_query_range(org_id: &str, user_id: &str, start: i64, end: 
     };
     let max_hours =
         get_settings_max_query_range(settings.max_query_range, org_id, Some(user_id)).await;
-    if max_hours > 0 && (end - start) > max_hours * 3600 * 1_000_000 {
-        end - max_hours * 3600 * 1_000_000
+    clamp_start(start, end, max_hours)
+}
+
+fn clamp_start(start: i64, end: i64, max_hours: i64) -> i64 {
+    // Stream settings accept any i64 hours; a plain multiply wraps and pushes start past end.
+    let max_micros = max_hours.saturating_mul(3600 * 1_000_000);
+    if max_hours > 0 && (end - start) > max_micros {
+        end - max_micros
     } else {
         start
     }
@@ -1029,6 +1035,18 @@ mod tests {
             ..Default::default()
         };
         assert!(parse_filter("org", &q).is_ok());
+    }
+
+    #[test]
+    fn clamp_start_limits_the_range_and_survives_a_huge_max_query_range() {
+        let hour = 3600 * 1_000_000;
+        assert_eq!(clamp_start(0, 10 * hour, 2), 8 * hour);
+        assert_eq!(clamp_start(9 * hour, 10 * hour, 2), 9 * hour);
+        assert_eq!(clamp_start(0, 10 * hour, 0), 0);
+        // The fuzzer stored 4_746_838_768 hours, which wrapped start to 1359918033685982348.
+        let (start, end) = (1_792_919_976_430_732, 1_793_524_776_430_732);
+        assert_eq!(clamp_start(start, end, 4_746_838_768), start);
+        assert_eq!(clamp_start(start, end, i64::MAX), start);
     }
 
     #[test]
