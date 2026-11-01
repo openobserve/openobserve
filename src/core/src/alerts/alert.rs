@@ -4317,34 +4317,6 @@ async fn build_notification_context(
             None => String::new(),
         }
     } else {
-        match alert.query_condition.query_type {
-            QueryType::SQL => {
-                if let Some(sql) = &alert.query_condition.sql {
-                    alert_query = sql.clone();
-                }
-            }
-            QueryType::Custom => {
-                if let Some(conditions) = &alert.query_condition.conditions
-                    && let Ok(v) = build_sql(
-                        &alert.org_id,
-                        &alert.stream_name,
-                        alert.stream_type,
-                        &alert.query_condition,
-                        conditions,
-                    )
-                    .await
-                {
-                    alert_query = v;
-                }
-            }
-            // NOT `unreachable!()`. It used to be, and adding the fourth
-            // query type made it reachable — every SLO alert evaluation
-            // panicked the scheduler worker. A query type this builder does
-            // not know how to deep-link into is a missing link, never a
-            // crash on the notification path.
-            _ => {}
-        };
-        // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
         if alert.stream_type == StreamType::Traces {
             format!(
                 "{}{}/web/traces?stream={}&from={}&to={}&org_identifier={}&tab=spans&type={}",
@@ -4357,20 +4329,43 @@ async fn build_notification_context(
                 SearchEventType::Alerts
             )
         } else {
+            match alert.query_condition.query_type {
+                QueryType::SQL => {
+                    if let Some(sql) = &alert.query_condition.sql {
+                        alert_query = sql.clone();
+                    }
+                }
+                QueryType::Custom => {
+                    if let Some(conditions) = &alert.query_condition.conditions
+                        && let Ok(v) = build_sql(
+                            &alert.org_id,
+                            &alert.stream_name,
+                            alert.stream_type,
+                            &alert.query_condition,
+                            conditions,
+                        )
+                        .await
+                    {
+                        alert_query = v;
+                    }
+                }
+                _ => {}
+            };
             format!(
                 "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}&type={}&show_histogram=false",
-            cfg.common.web_url,
-            cfg.common.base_uri,
-            alert.stream_type,
-            alert.stream_name,
-            alert.stream_name,
-            alert_start_time,
-            alert_end_time,
-            base64::encode_url(&alert_query),
-            alert.org_id,
-            function_content,
-            SearchEventType::Alerts
-        )
+                cfg.common.web_url,
+                cfg.common.base_uri,
+                alert.stream_type,
+                alert.stream_name,
+                alert.stream_name,
+                alert_start_time,
+                alert_end_time,
+                base64::encode_url(&alert_query),
+                alert.org_id,
+                function_content,
+                SearchEventType::Alerts
+            )
+        }
     };
 
     // Shorten the alert url
@@ -9503,4 +9498,53 @@ mod rule_notification_tests {
             .unwrap_err();
         assert!(matches!(error, AlertError::PromqlMissingQuery));
     }
+
+    #[tokio::test]
+    async fn test_alert_url_traces_and_logs() {
+        let mut alert = Alert::default();
+        alert.org_id = "org1".into();
+        alert.stream_name = "my_traces_stream".into();
+        alert.stream_type = StreamType::Traces;
+        alert.query_condition.query_type = QueryType::SQL;
+        alert.query_condition.sql = Some("SELECT * FROM \"my_traces_stream\"".into());
+
+        let rows = vec![];
+        let options = ProcessTemplateOptions {
+            rows_end_time: 1708416597898186,
+            start_time: Some(1708416534519324),
+            evaluation_timestamp: 1708416600000000,
+            is_email: false,
+            level: Some(config::meta::alerts::level::AlertLevel::Critical),
+            actual_value: Some(1.0),
+            episode_id: None,
+            resolved: false,
+        };
+
+        let context = build_notification_context("org1", &alert, &rows, &[], options, None).await;
+        let url = if let Some((_, suffix)) = context.alert_url.split_once("/web/short/") {
+            let id = suffix.split('?').next().unwrap();
+            short_url::retrieve(&alert.org_id, id).await.unwrap()
+        } else {
+            context.alert_url
+        };
+
+        assert!(url.contains("/web/traces"));
+        assert!(url.contains("stream=my_traces_stream"));
+        assert!(url.contains("org_identifier=org1"));
+        assert!(url.contains("tab=spans"));
+
+        // Test logs alert still gets /web/logs
+        alert.stream_type = StreamType::Logs;
+        alert.stream_name = "my_logs_stream".into();
+        let context_logs = build_notification_context("org1", &alert, &rows, &[], options, None).await;
+        let url_logs = if let Some((_, suffix)) = context_logs.alert_url.split_once("/web/short/") {
+            let id = suffix.split('?').next().unwrap();
+            short_url::retrieve(&alert.org_id, id).await.unwrap()
+        } else {
+            context_logs.alert_url
+        };
+        assert!(url_logs.contains("/web/logs"));
+        assert!(url_logs.contains("stream=my_logs_stream"));
+    }
+
 }
