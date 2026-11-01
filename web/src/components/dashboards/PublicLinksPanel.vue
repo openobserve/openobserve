@@ -55,10 +55,9 @@
       </div>
     </template>
     <!-- Listing and creating are separate grants, so a refused list doesn't mean a refused create. -->
-    <OEmptyState
+    <OAccessLock
       v-if="forbidden && currentView === 'list'"
-      preset="no-access"
-      :description="t('dashboard.publicDashboard.noPublishPermission')"
+      :denials="linksDenials"
       :action-label="t('dashboard.publicLinks.newLink')"
       data-test="dashboards-public-links-panel-no-permission"
       @action="openForm(null)"
@@ -610,6 +609,7 @@ import useNotifications from "@/composables/useNotifications";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useOrgId } from "@/composables/query";
 import { useNow } from "@/composables/useNow";
+import { failedRequests, viewDenial } from "@/composables/useAccessStore";
 import { copyToClipboard } from "@/utils/clipboard";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -627,6 +627,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OAccessLock from "@/components/access/OAccessLock.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -787,6 +788,9 @@ const forbidden = computed(
     (linksQuery.error.value as { response?: { status?: number } } | null)?.response?.status === 403,
 );
 const loadFailed = computed(() => !!linksQuery.error.value && !forbidden.value);
+const linksDenials = computed(() => [
+  viewDenial("public_dashboards", "get", failedRequests(linksQuery.error.value)),
+]);
 const linkIds = computed(() => links.value.map((link) => link.id));
 const statusQuery = useQuery(() =>
   Object.assign(publicLinksStatusBatchQuery(orgId.value, linkIds.value), {

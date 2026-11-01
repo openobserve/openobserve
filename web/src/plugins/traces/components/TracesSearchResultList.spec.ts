@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -117,7 +118,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
       "selectedStreamFields",
       "wrap",
     ],
-    emits: ["row-click", "sort-change", "close-column", "column-order-change"],
+    emits: ["row-click", "row-auxclick", "sort-change", "close-column", "column-order-change"],
     setup() {
       return { cellActionsColumn: cellActionsColumnRef };
     },
@@ -167,6 +168,12 @@ vi.mock("./SpanStatusCodeBadge.vue", () => ({
     template: "<span />",
   },
 }));
+
+// Reka UI portals menu content into <body>; render it inline so tests can query it.
+vi.mock("reka-ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("reka-ui")>();
+  return { ...actual, ContextMenuPortal: actual.ContextMenuContent };
+});
 
 import TracesSearchResultList from "./TracesSearchResultList.vue";
 
@@ -321,6 +328,125 @@ describe("TracesSearchResultList", () => {
     it("does not show the no-results message when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
       expect(wrapper.text()).not.toContain("No traces found");
+    });
+  });
+
+  // ─── Open in a new tab ────────────────────────────────────────────────────
+  describe("open in new tab", () => {
+    const hit = makeHit("t-new-tab");
+    const href = (row: any) => `/web/traces/trace?trace_id=${row.trace_id}`;
+
+    beforeEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [{ id: "operation_name" }];
+    });
+
+    it("renders the operation name as a real link to the trace", () => {
+      wrapper = mount_({ hits: [hit], loading: false, rowHref: href });
+      const link = wrapper.find('[data-test="trace-row-link"]');
+      expect(link.exists()).toBe(true);
+      expect(link.element.tagName).toBe("A");
+      expect(link.attributes("href")).toBe("/web/traces/trace?trace_id=t-new-tab");
+    });
+
+    it("keeps the link out of the tab order because the row is already focusable", () => {
+      wrapper = mount_({ hits: [hit], loading: false, rowHref: href });
+      expect(wrapper.find('[data-test="trace-row-link"]').attributes("tabindex")).toBe("-1");
+    });
+
+    it("keeps the in-app open on a plain click and blocks the full page load", async () => {
+      wrapper = mount_({ hits: [hit], loading: false, rowHref: href });
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+      wrapper.find('[data-test="trace-row-link"]').element.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(wrapper.emitted("row-click")![0]).toEqual([hit]);
+      expect(wrapper.emitted("open-in-new-tab")).toBeFalsy();
+    });
+
+    it("leaves a ctrl/cmd click on the link to the browser", () => {
+      wrapper = mount_({ hits: [hit], loading: false, rowHref: href });
+      const event = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        ctrlKey: true,
+      });
+      wrapper.find('[data-test="trace-row-link"]').element.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(wrapper.emitted("row-click")).toBeFalsy();
+    });
+
+    it("opens a new tab on ctrl/cmd click anywhere on the row", async () => {
+      wrapper = mount_({ hits: [hit], loading: false, rowHref: href });
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("row-click", hit, { ctrlKey: true });
+      await table.vm.$emit("row-click", hit, { metaKey: true });
+      expect(wrapper.emitted("open-in-new-tab")).toEqual([[hit], [hit]]);
+      expect(wrapper.emitted("row-click")).toBeFalsy();
+    });
+
+    it("renders no link and keeps ctrl click as a row click when the parent gives no href", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      expect(wrapper.find('a[data-test="trace-row-link"]').exists()).toBe(false);
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("row-click", hit, { ctrlKey: true });
+      expect(wrapper.emitted("row-click")![0]).toEqual([hit]);
+      expect(wrapper.emitted("open-in-new-tab")).toBeFalsy();
+    });
+
+    it("opens a new tab on a middle click on the row", async () => {
+      wrapper = mount_({ hits: [hit], loading: false, rowHref: href });
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("row-auxclick", hit, { button: 1 });
+      expect(wrapper.emitted("open-in-new-tab")![0]).toEqual([hit]);
+    });
+
+    it("ignores a middle click on the row when the parent gives no href", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("row-auxclick", hit, { button: 1 });
+      expect(wrapper.emitted("open-in-new-tab")).toBeFalsy();
+    });
+
+    describe("context menu", () => {
+      const openMenu = async (props: Record<string, any>) => {
+        wrapper = mount(TracesSearchResultList, {
+          props: { hits: [hit], loading: false, ...props } as any,
+          global: { plugins: [i18n, store] },
+          attachTo: document.body,
+        });
+        const cell = document.createElement("td");
+        cell.setAttribute("data-test", "o2-table-cell-operation_name");
+        wrapper.find(".contents").element.appendChild(cell);
+        cell.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+        // The table records the right-clicked cell after the capture-phase reset, as in the app.
+        const table = wrapper.findComponent({ name: "OTable" });
+        await table.vm.$emit("cell-contextmenu", {
+          columnId: "operation_name",
+          row: hit,
+          value: "x",
+        });
+        await nextTick();
+        await nextTick();
+        await flushPromises();
+      };
+      const item = () =>
+        wrapper.element.querySelector('[data-test="trace-context-menu-open-new-tab"]');
+
+      it("offers open in new tab with an href and emits the right-clicked row", async () => {
+        await openMenu({ rowHref: href });
+        expect(item()).not.toBeNull();
+        item()!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        await flushPromises();
+        expect(wrapper.emitted("open-in-new-tab")![0]).toEqual([hit]);
+      });
+
+      it("omits open in new tab when the parent gives no href", async () => {
+        await openMenu({});
+        expect(
+          wrapper.element.querySelector('[data-test="trace-context-menu-field"]'),
+        ).not.toBeNull();
+        expect(item()).toBeNull();
+      });
     });
   });
 

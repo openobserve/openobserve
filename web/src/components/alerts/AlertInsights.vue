@@ -429,6 +429,7 @@ const fetchAlerts = async () => {
     );
     alertsList.value = res.data.list || [];
   } catch (error) {
+    if ((error as { response?: { status?: number } })?.response?.status === 403) return;
     toast({
       variant: "error",
       message: t("toastMessages.alerts.failedToLoadAlerts"),

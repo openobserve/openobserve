@@ -145,7 +145,6 @@
     "Logs": [
       "web/src/plugins/logs/**",
       "web/src/components/logs/**",
-      "web/src/services/httpsearch.*",
       "web/src/services/saved_views.*",
       "web/src/services/patterns.*",
       "tests/ui-testing/pages/logsPages/**",

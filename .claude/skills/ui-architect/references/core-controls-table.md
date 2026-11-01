@@ -440,7 +440,7 @@ arrow, the rows re-order, and the order is wrong.
 - Filter: `update:globalFilter`, `filter-change`
 - Selection: `update:selectedIds`, `selection-change` (emits selected rows)
 - Expansion: `update:expandedIds`
-- Row: `row-click`, `row-dblclick`, `row-mouseenter`, `row-mouseleave`, `cell-click`
+- Row: `row-click`, `row-dblclick`, `row-auxclick` (middle button), `row-mouseenter`, `row-mouseleave`, `cell-click`
 - Columns: `column-order-change`, `column-visibility-change`, `update:columnSizes`
 - Virtual scroll: `scroll`, `scroll-end`
 

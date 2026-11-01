@@ -98,8 +98,6 @@ export const downtimesListQuery = (org: string) =>
       ),
     staleTime: LIVE_STALE_TIME,
   });
-
-/** The list for surfaces that only name a muting downtime: a 403 there shows no access toast. */
 export const downtimesLookupQuery = (org: string) =>
   queryOptions({
     queryKey: downtimeKeys.lookup(org),

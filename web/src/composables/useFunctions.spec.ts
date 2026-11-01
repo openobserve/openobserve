@@ -173,14 +173,12 @@ describe("useFunctions", () => {
       return returnValue;
     });
 
-    it("wraps inner catch errors and re-throws as Error instances", async () => {
-      // The source uses a double try/catch; both convert to `new Error(e.message)`
-      vi.mocked(TransformService.list).mockRejectedValueOnce({
-        message: "Custom error object",
-      });
+    it("re-throws the original rejection so callers can read its HTTP status", async () => {
+      const denied = { message: "Forbidden", response: { status: 403 } };
+      vi.mocked(TransformService.list).mockRejectedValueOnce(denied);
 
       const { getAllFunctions } = useFunctions();
-      await expect(getAllFunctions()).rejects.toThrow("Custom error object");
+      await expect(getAllFunctions()).rejects.toBe(denied);
     });
   });
 });
