@@ -21619,7 +21619,8 @@
         "resetColumnWidths": "Restablecer anchos de columna"
       },
       "selectAllRows": "Seleccionar todas las filas",
-      "selectRow": "Seleccionar fila {name}",
+      "selectRowAt": "Seleccionar fila {index}",
+      "selectRowAtNamed": "Seleccionar fila {index}, {name}",
       "removeColumnAria": "Eliminar columna",
       "formatColumnAria": "Formatear columna",
       "selectedOfTotal": "{selected} de {total} seleccionados",
@@ -26418,6 +26419,8 @@
     "section_handled": "Atendidas",
     "section_resolved": "Resueltas",
     "sectionHint_ringing": "nadie ha confirmado — siguen avisando",
+    "sectionHint_ringingRouted": "nadie lo ha reconocido — {count} de estos sigue avisando | nadie lo ha reconocido — {count} de estos siguen avisando",
+    "sectionHint_ringingUnrouted": "{count} no tiene equipo, por lo que no está avisando | {count} no tienen equipo, por lo que no están avisando",
     "sectionHint_snoozed": "avisos en pausa: volverán a sonar solos",
     "sectionHint_handled": "Confirmadas: una persona se ocupa de cada una",
     "sectionHint_resolved": "Cerradas: se conservan para el registro",

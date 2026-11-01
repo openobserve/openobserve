@@ -21619,7 +21619,8 @@
         "resetColumnWidths": "Сбросить ширину колонок"
       },
       "selectAllRows": "Выбрать все строки",
-      "selectRow": "Выбрать строку {name}",
+      "selectRowAt": "Выбрать строку {index}",
+      "selectRowAtNamed": "Выбрать строку {index}, {name}",
       "removeColumnAria": "Удалить колонку",
       "formatColumnAria": "Форматировать колонку",
       "selectedOfTotal": "Выбрано {selected} из {total}",
@@ -26418,6 +26419,8 @@
     "section_handled": "Обработано",
     "section_resolved": "Решено",
     "sectionHint_ringing": "никто не подтвердил — вызовы всё ещё отправляются",
+    "sectionHint_ringingRouted": "никто не подтвердил — {count} из них всё ещё вызывает дежурных | никто не подтвердил — {count} из них всё ещё вызывают дежурных",
+    "sectionHint_ringingUnrouted": "{count} не имеет команды, поэтому не вызывает дежурных | {count} не имеют команды, поэтому не вызывают дежурных",
     "sectionHint_snoozed": "вызовы приостановлены — они вернутся сами",
     "sectionHint_handled": "подтверждено — за каждое отвечает человек",
     "sectionHint_resolved": "закрыто — сохранено для истории",

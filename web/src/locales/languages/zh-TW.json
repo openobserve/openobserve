@@ -21614,7 +21614,8 @@
         "resetColumnWidths": "重設欄位寬度"
       },
       "selectAllRows": "選取所有列",
-      "selectRow": "選取列 {name}",
+      "selectRowAt": "選取第 {index} 列",
+      "selectRowAtNamed": "選取第 {index} 列，{name}",
       "removeColumnAria": "移除欄位",
       "formatColumnAria": "格式化欄位",
       "selectedOfTotal": "已選取 {selected} 個，共 {total} 個",
@@ -26413,6 +26414,8 @@
     "section_handled": "已處理",
     "section_resolved": "已解決",
     "sectionHint_ringing": "尚無人確認 — 這些仍在呼叫中",
+    "sectionHint_ringingRouted": "尚無人確認 — 其中 {count} 筆仍在呼叫值班 | 尚無人確認 — 其中 {count} 筆仍在呼叫值班",
+    "sectionHint_ringingUnrouted": "{count} 筆沒有團隊，因此不會呼叫值班 | {count} 筆沒有團隊，因此不會呼叫值班",
     "sectionHint_snoozed": "呼叫已暫停 — 時間到會自動恢復",
     "sectionHint_handled": "已確認 — 每項皆有人負責",
     "sectionHint_resolved": "已關閉 — 保留作為紀錄",

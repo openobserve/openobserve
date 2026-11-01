@@ -566,6 +566,12 @@ const clearUnresolvedDashboardConflict = (dashboardId: any) => {
 const updatedAtOf = (data: any): number | null =>
   Number(data?.updatedAt ?? data?.updated_at) || null;
 
+// An inherited key such as `constructor` must never resolve to a shared prototype object.
+const ownDashboard = (store: any, dashboardId: any) => {
+  const all = store.state.organizationData.allDashboardData;
+  return Object.prototype.hasOwnProperty.call(all, dashboardId) ? all[dashboardId] : undefined;
+};
+
 const retrieveAndStoreDashboardData = async (
   store: any,
   dashboardId: any,
@@ -596,7 +602,7 @@ const retrieveAndStoreDashboardData = async (
     hash: hash,
   });
 
-  return store.state.organizationData.allDashboardData[dashboardId];
+  return ownDashboard(store, dashboardId);
 };
 
 export const updateDashboard = async (
@@ -693,7 +699,7 @@ export const fetchServerDashboard = async (store: any, dashboardId: any, folderI
 
 /** Makes the cached dashboard equal to `source` in place, so views holding the cached object show it too. */
 export const adoptDashboardWorkingCopy = (store: any, dashboardId: any, source: any) => {
-  const target = store.state.organizationData.allDashboardData?.[dashboardId];
+  const target = ownDashboard(store, dashboardId);
   if (!target || !source || toRaw(target) === toRaw(source)) return;
   const next = JSON.parse(JSON.stringify(toRaw(source)));
   // The source can be JSON-editor input, so keys that reach Object.prototype are never copied or deleted.
@@ -742,8 +748,11 @@ const ensureVariablesStructure = (dashboard: any): void => {
 };
 
 export const getDashboard = async (store: any, dashboardId: any, folderId: any) => {
+  // The id comes from the URL, and a prototype key would hand back Object.prototype to be mutated.
+  if (["__proto__", "constructor", "prototype"].includes(String(dashboardId))) return {};
+
   // check if dashboard data is present in store
-  let dashboardJson = store.state.organizationData.allDashboardData[dashboardId];
+  let dashboardJson = ownDashboard(store, dashboardId);
 
   if (!dashboardJson && dashboardId) {
     clearUnresolvedDashboardConflict(dashboardId);

@@ -147,6 +147,18 @@ describe("OnCallCoverList", () => {
     );
   });
 
+  it("waits for the calendar's window instead of asking for from=0&to=0", async () => {
+    const wrapper = render({ window: { from: 0, to: 0 } });
+    await flushPromises();
+    expect(service.listOverrides).not.toHaveBeenCalled();
+
+    const real = { from: FROM + 7 * 86_400_000_000, to: FROM + 8 * 86_400_000_000 };
+    await wrapper.setProps({ window: real });
+    await flushPromises();
+    expect(service.listOverrides).toHaveBeenCalledTimes(1);
+    expect(service.listOverrides).toHaveBeenCalledWith(expect.objectContaining(real));
+  });
+
   /// Both bounds or neither: the endpoint refuses a half-specified window
   /// rather than quietly answering the unfiltered list. The service drops an
   /// undefined bound before it builds the query string.

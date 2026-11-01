@@ -21619,7 +21619,8 @@
         "resetColumnWidths": "Sütun genişliklerini sıfırla"
       },
       "selectAllRows": "Tüm satırları seç",
-      "selectRow": "{name} satırını seç",
+      "selectRowAt": "Satır {index} öğesini seç",
+      "selectRowAtNamed": "Satır {index}, {name} öğesini seç",
       "removeColumnAria": "Sütunu kaldır",
       "formatColumnAria": "Sütunu biçimlendir",
       "selectedOfTotal": "{total} öğeden {selected} tanesi seçildi",
@@ -26418,6 +26419,8 @@
     "section_handled": "Ele alındı",
     "section_resolved": "Çözüldü",
     "sectionHint_ringing": "kimse onaylamadı — bunlar hâlâ arıyor",
+    "sectionHint_ringingRouted": "kimse üstlenmedi — bunlardan {count} tanesi hâlâ çağrı gönderiyor | kimse üstlenmedi — bunlardan {count} tanesi hâlâ çağrı gönderiyor",
+    "sectionHint_ringingUnrouted": "{count} tanesinin ekibi yok, bu yüzden çağrı göndermiyor | {count} tanesinin ekibi yok, bu yüzden çağrı göndermiyor",
     "sectionHint_snoozed": "çağrılar duraklatıldı — kendiliğinden geri gelirler",
     "sectionHint_handled": "onaylandı — her birini bir insan üstlendi",
     "sectionHint_resolved": "kapatıldı — kayıt için saklanıyor",

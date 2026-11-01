@@ -251,6 +251,40 @@ describe("useStreams Composable", () => {
       expect(result.list).toEqual([{ name: "from-query" }]);
     });
 
+    it("does not write a list into the store once the org has switched mid-fetch", async () => {
+      queryClient.clear();
+      let release: (v: any) => void = () => {};
+      vi.mocked(StreamService.nameList).mockReturnValueOnce(
+        new Promise((r) => (release = r)) as any,
+      );
+
+      const pending = streamsInstance.getStreams("logs", false, false);
+      await vi.waitFor(() => expect(StreamService.nameList).toHaveBeenCalled());
+      mockStore.state.selectedOrganization.identifier = "other-org";
+      release({ data: { list: [{ name: "usage", stream_type: "logs" }] } });
+      await pending;
+
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith("streams/setStreams", expect.anything());
+    });
+
+    it("does not write the all-types lists into the store once the org has switched", async () => {
+      queryClient.clear();
+      let release: (v: any) => void = () => {};
+      vi.mocked(StreamService.nameList).mockReturnValue(new Promise((r) => (release = r)) as any);
+
+      const pending = streamsInstance.getStreams("all", false, false);
+      await vi.waitFor(() => expect(StreamService.nameList).toHaveBeenCalled());
+      mockStore.state.selectedOrganization.identifier = "other-org";
+      release({ data: { list: [{ name: "usage", stream_type: "logs" }] } });
+      await pending;
+
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith("streams/setStreams", expect.anything());
+      expect(mockStore.commit).not.toHaveBeenCalledWith(
+        "streams/updateStreamsFetched",
+        expect.anything(),
+      );
+    });
+
     it("rejects with the CancelledError itself when the fetch is cancelled", async () => {
       queryClient.clear();
       mockStore.state.streams.logs = null;
