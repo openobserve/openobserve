@@ -16,6 +16,8 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+
 import type { ContextChip, PendingApproval } from "@/composables/assistant";
 import { registerAssistantFocusTarget, runEscapeLadder } from "@/composables/assistant/shortcuts";
 import { trackAssistant } from "@/services/assistantAnalytics";
@@ -34,6 +36,7 @@ import AssistantComposer, {
 } from "./AssistantComposer.vue";
 import { composerUi, noteDraftCleared, resetComposerUiForTests } from "./composerUi";
 import { HOLD_MS, SILENCE_MS, resetVoiceForTests, setVoiceOptIn } from "./useAssistantVoice";
+import AssistantDictateButton from "./AssistantDictateButton.vue";
 
 const { fake, breakpoint } = vi.hoisted(() => ({
   fake: { current: null as any, member: false },
@@ -181,6 +184,56 @@ describe("rows (§1)", () => {
     store.addChip(sid, ROW);
     await flushPromises();
     expect(frame().attributes("data-rows")).toBe("2");
+  });
+
+  describe("measured", () => {
+    function measured(textWidth: number): void {
+      vi.stubGlobal(
+        "ResizeObserver",
+        class {
+          constructor(private readonly changed: () => void) {}
+          observe = () => this.changed();
+          disconnect = () => undefined;
+        },
+      );
+      vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+        width: 408,
+      } as DOMRect);
+      vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(406);
+      vi.spyOn(Element.prototype, "scrollHeight", "get").mockReturnValue(38);
+      vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+        measureText: () => ({ width: textWidth }),
+      } as never);
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
+
+    it("falls to two rows when one row cannot hold the empty draft's placeholder", async () => {
+      measured(400);
+      const { wrapper } = setup();
+      await flushPromises();
+      expect(wrapper.get('[data-test="assistant-composer"]').attributes("data-rows")).toBe("2");
+    });
+
+    it("keeps one row for a placeholder that fits", async () => {
+      measured(100);
+      const { wrapper } = setup();
+      await flushPromises();
+      expect(wrapper.get('[data-test="assistant-composer"]').attributes("data-rows")).toBe("1");
+    });
+
+    it("sizes the field again on a row flip, so a height from the other layout never clips it", async () => {
+      measured(100);
+      const { textarea, store, sid } = setup();
+      await flushPromises();
+      textarea().element.style.height = "29px";
+      store.addChip(sid, ROW);
+      await flushPromises();
+      expect(textarea().element.style.height).toBe("38px");
+    });
   });
 
   it("takes two rows for a second line of text", async () => {
@@ -1177,6 +1230,9 @@ describe("dictation (WP-48)", () => {
   it("offers an admin Turn on in place, which makes the mic live", async () => {
     const { wrapper } = setup();
     expect(mic(wrapper).attributes("aria-haspopup")).toBe("dialog");
+    expect(wrapper.findComponent(AssistantDictateButton).findComponent(OIcon).props("name")).toBe(
+      "mic",
+    );
     await mic(wrapper).trigger("click");
     await flushPromises();
     const turnOn = '[data-test="assistant-dictate-turn-on"]';
@@ -1196,6 +1252,13 @@ describe("dictation (WP-48)", () => {
   it("renders no mic in a browser that cannot dictate", async () => {
     engine.isAvailable = false;
     const { wrapper } = voiceSetup();
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-dictate"]').exists()).toBe(false);
+  });
+
+  it("renders no Turn on for an admin in a browser that cannot dictate", async () => {
+    engine.isAvailable = false;
+    const { wrapper } = setup();
     await flushPromises();
     expect(wrapper.find('[data-test="assistant-dictate"]').exists()).toBe(false);
   });

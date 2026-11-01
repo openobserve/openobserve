@@ -599,13 +599,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </AssistantComposer>
       </slot>
-      <slot name="disclosure">
-        <div class="flex shrink-0 flex-col gap-1.5 px-3 pb-2">
-          <OText variant="meta" as="p" data-test="assistant-context-disclosure">
-            {{ t("assistant.context.disclosureLine") }}
-          </OText>
-        </div>
-      </slot>
     </div>
 
     <AssistantShareControl
@@ -823,7 +816,6 @@ defineSlots<{
   "status-strip"?: () => unknown;
   tray?: () => unknown;
   composer?: () => unknown;
-  disclosure?: () => unknown;
 }>();
 
 const { t, te } = useI18nTyped();

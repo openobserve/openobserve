@@ -1286,7 +1286,10 @@ fn follow_ups_of(block: &str) -> Vec<String> {
     let mut items: Vec<String> = Vec::new();
     for item in body.iter().filter_map(Value::as_str) {
         let words = item.split_whitespace().collect::<Vec<_>>().join(" ");
-        let text: String = words.chars().take(FOLLOW_UP_CHARS_MAX).collect();
+        let text: String = redact_internal_details(&words)
+            .chars()
+            .take(FOLLOW_UP_CHARS_MAX)
+            .collect();
         if !text.is_empty() && !items.contains(&text) {
             items.push(text);
         }
@@ -3114,6 +3117,27 @@ mod tests {
         let frames = last_frames(&session_answering(bad, "o2-ai", Value::Null));
         assert!(answer_text(&frames).ends_with("Done.\n\n"));
         assert!(frames.iter().all(|f| f["type"] != "follow_ups"));
+    }
+
+    #[test]
+    fn a_reopened_follow_up_is_scrubbed_like_the_live_one() {
+        let answer = concat!(
+            "Done.\n```follow_ups\n[",
+            r#""Check nats://user:secret@nats:4222", "#,
+            r#""Read /home/appuser/work/state.json", "#,
+            r#""Is http://127.0.0.1:4096/session up?""#,
+            "]\n```\n"
+        );
+        let frames = last_frames(&session_answering(answer, "o2-ai", Value::Null));
+        let frame = frames.iter().find(|f| f["type"] == "follow_ups").unwrap();
+        assert_eq!(
+            frame["items"],
+            json!([
+                "Check [internal endpoint]",
+                "Read [internal path]",
+                "Is [internal endpoint] up?"
+            ])
+        );
     }
 
     #[test]

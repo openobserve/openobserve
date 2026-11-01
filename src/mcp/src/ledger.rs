@@ -18,6 +18,7 @@
 use std::sync::{Arc, OnceLock};
 
 use anyhow::{Result, anyhow};
+use futures_util::future::BoxFuture;
 use reqwest::{Method, header::HeaderMap};
 use serde_json::{Map, Value, json};
 use tokio::sync::OnceCell;
@@ -134,6 +135,12 @@ impl Origin {
 pub trait Recorder: Send + Sync {
     /// Must not block: the MCP answer waits for it.
     fn record(&self, action: Recorded);
+
+    /// Stores an approved call before its MCP answer, so `/confirm` finds that execution's row.
+    fn record_approved(&self, action: Recorded) -> BoxFuture<'static, ()> {
+        self.record(action);
+        Box::pin(std::future::ready(()))
+    }
 }
 
 /// The object types whose changes can be undone, each with its API routes.
@@ -313,6 +320,7 @@ impl Op {
 pub struct Plan {
     org_id: String,
     origin: Origin,
+    approval_id: Option<String>,
     tool: String,
     op: Op,
     kind: Option<ResourceKind>,
@@ -345,6 +353,8 @@ pub enum Snapshot {
 pub struct Recorded {
     pub org_id: String,
     pub origin: Origin,
+    /// The approval this call ran under, only where it needed and passed the signature check.
+    pub approval_id: Option<String>,
     pub tool: String,
     pub op: Op,
     pub resource_type: String,
@@ -449,9 +459,15 @@ pub fn plan(
         })
         .filter_map(|(name, _)| Some((name.clone(), arguments.get(name)?.clone())))
         .collect();
+    let approval_id = super::tools::requires_confirmation(metadata)
+        .then_some(origin.approval.as_deref())
+        .flatten()
+        .and_then(crate::approval::approval_id_of)
+        .map(str::to_string);
     Some(Plan {
         org_id: org_id.to_string(),
-        // The approval authorized one call; the ledger never keeps it.
+        approval_id,
+        // The signature authorized one call; the ledger never keeps it.
         origin: Origin {
             approval: None,
             ..origin.clone()
@@ -497,6 +513,9 @@ pub async fn finish(
     };
     let recorded = recorded(plan, before, after, resource_id, (ok, status_code));
     match RECORDER.get() {
+        Some(recorder) if recorded.approval_id.is_some() => {
+            recorder.record_approved(recorded).await;
+        }
         Some(recorder) => recorder.record(recorded),
         None => log::debug!("[ai ledger] no recorder; action not stored"),
     }
@@ -730,6 +749,7 @@ fn recorded(
     Recorded {
         org_id: plan.org_id,
         origin: plan.origin,
+        approval_id: plan.approval_id,
         tool: plan.tool,
         op: plan.op,
         resource_type: plan.resource_type,
@@ -1466,12 +1486,40 @@ mod tests {
         base
     }
 
+    #[test]
+    fn a_plan_keeps_the_approval_id_of_a_call_that_needed_one_and_never_its_signature() {
+        let metadata = tool(
+            "DeleteAlert",
+            "DELETE",
+            "/api/v2/{org_id}/alerts/{alert_id}",
+            &[("alert_id", "path")],
+        );
+        let arguments = json!({"org_id": "o", "alert_id": "a1"});
+        let approved = Origin {
+            approval: Some("ap1.1893456000.c0ffee".to_string()),
+            ..origin()
+        };
+        let planned = plan("o", &metadata, &arguments, Some(&approved)).unwrap();
+        assert_eq!(planned.approval_id.as_deref(), Some("ap1"));
+        assert!(planned.origin.approval.is_none());
+        let unsigned = plan("o", &metadata, &arguments, Some(&origin())).unwrap();
+        assert!(unsigned.approval_id.is_none());
+    }
+
     #[derive(Default)]
-    struct Rows(std::sync::Mutex<Vec<Recorded>>);
+    struct Rows(Arc<std::sync::Mutex<Vec<Recorded>>>);
 
     impl Recorder for Rows {
         fn record(&self, action: Recorded) {
             self.0.lock().unwrap().push(action);
+        }
+
+        fn record_approved(&self, action: Recorded) -> BoxFuture<'static, ()> {
+            let rows = self.0.clone();
+            Box::pin(async move {
+                tokio::task::yield_now().await;
+                rows.lock().unwrap().push(action);
+            })
         }
     }
 
@@ -1498,10 +1546,24 @@ mod tests {
             Some(Snapshot::Found(json!({"id": "a1", "name": "cpu"})))
         );
         finish(planned, before, 200, "{}", Some("Basic x")).await;
+        {
+            let rows = rows.0.lock().unwrap();
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].origin.user_email, "a@x");
+            assert!(rows[0].approval_id.is_none());
+            assert!(rows[0].undoable);
+            assert!(rows[0].before.as_deref().unwrap().contains("cpu"));
+        }
+
+        let approved = Origin {
+            approval: Some("ap1.1893456000.c0ffee".to_string()),
+            ..origin()
+        };
+        let planned = plan("o", &metadata, &arguments, Some(&approved)).unwrap();
+        let before = planned.before(Some("Basic x")).await;
+        finish(planned, before, 200, "{}", Some("Basic x")).await;
         let rows = rows.0.lock().unwrap();
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].origin.user_email, "a@x");
-        assert!(rows[0].undoable);
-        assert!(rows[0].before.as_deref().unwrap().contains("cpu"));
+        assert_eq!(rows.len(), 2, "stored before the MCP answer goes back");
+        assert_eq!(rows[1].approval_id.as_deref(), Some("ap1"));
     }
 }

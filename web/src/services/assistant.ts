@@ -226,9 +226,8 @@ const enc = encodeURIComponent;
 
 // The server's own page size (`chats.rs` default), so Load older and the client search see the same pages.
 const CHATS_PAGE = 50;
-// The server's largest page (`chats.rs` `MAX_PAGE`); `state=active` reads only the last day's chats, which this many pages cover.
+// The server's largest page (`chats.rs` `MAX_PAGE`).
 const ACTIVE_CHATS_PAGE = 200;
-const MAX_ACTIVE_PAGES = 10;
 
 const inProgress = (chat: ChatSummaryWire) =>
   !!chat.active_turn || !!chat.pending_approval || chat.seen === false;
@@ -526,18 +525,20 @@ const assistant = {
   /** Running, waiting and recently finished chats, every page of them; a server without `state` answers its plain first page. */
   listActiveChats: async (org: string): Promise<ChatsPage> => {
     const chats: ChatSummaryWire[] = [];
+    const visited = new Set<string>();
     let cursor: string | undefined;
-    for (let page = 0; page < MAX_ACTIVE_PAGES; page += 1) {
+    do {
+      if (cursor) visited.add(cursor);
       const res = await http().get<ChatsPage>(`/api/${enc(org)}/ai/chats`, {
         ...ASSISTANT_REQUEST,
         params: { limit: String(ACTIVE_CHATS_PAGE), state: "active", ...(cursor && { cursor }) },
       });
       const parsed = parseChatsPage(res.data);
       chats.push(...parsed.chats);
-      // The server pages its recent rows before it filters them, so an empty page can still have a next one.
+      // The server pages its recent rows before it filters them, so an empty page can still have a next one and a live chat may sit behind any number of them.
       cursor = parsed.next_cursor ?? undefined;
-      if (!cursor || !parsed.chats.every(inProgress)) break;
-    }
+      if (!parsed.chats.every(inProgress)) break;
+    } while (cursor && !visited.has(cursor));
     return { chats };
   },
 

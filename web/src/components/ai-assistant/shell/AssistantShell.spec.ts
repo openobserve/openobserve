@@ -501,14 +501,12 @@ describe("AssistantShell rows ⑤–⑦ (WP-05)", () => {
     return { wrapper, store: fake.current.store };
   }
 
-  it("fills the tray, the composer and the disclosure line in their rows", async () => {
+  it("fills the tray and the composer in their rows, with no line under the composer", async () => {
     const { wrapper } = live();
     await flushPromises();
     expect(wrapper.find('[data-test="assistant-context-tray"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="assistant-composer-root"]').exists()).toBe(true);
-    expect(wrapper.get('[data-test="assistant-context-disclosure"]').text()).toBe(
-      "Sends the chips and this page's time range",
-    );
+    expect(wrapper.find('[data-test="assistant-context-disclosure"]').exists()).toBe(false);
   });
 
   it("puts focus in the composer textbox at the end on an explicit open", async () => {

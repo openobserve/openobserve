@@ -572,9 +572,9 @@ export function useVoiceStatus(): VoiceStatusReader {
     return key && readVoiceOptIn(key) ? "browser" : "off";
   });
   const status = computed<VoiceStatus>(() => {
+    if (!controller.engine.available()) return "unsupported";
     if (mode.value === "off") return "off";
-    if (controller.state.silent) return "silent";
-    return controller.engine.available() ? "ready" : "unsupported";
+    return controller.state.silent ? "silent" : "ready";
   });
 
   watch(

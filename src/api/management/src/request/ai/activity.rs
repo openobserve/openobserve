@@ -25,6 +25,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::utils::time::now_micros;
+use futures::future::BoxFuture;
 use infra::table::{
     ai_actions::{
         self, APPROVAL_APPROVED, APPROVAL_NONE, APPROVAL_STANDING, ListQuery, STATUS_DONE,
@@ -210,6 +211,10 @@ impl Recorder for LedgerRecorder {
     fn record(&self, action: Recorded) {
         tokio::spawn(store(action));
     }
+
+    fn record_approved(&self, action: Recorded) -> BoxFuture<'static, ()> {
+        Box::pin(store(action))
+    }
 }
 
 #[utoipa::path(
@@ -373,39 +378,37 @@ pub(crate) fn with_ledger_ids(response: &mut Value, rows: &[Option<ai_actions::M
     }
 }
 
-/// The ledger row of one confirmed item: the executor's, stamped, else a new one.
+/// Records one confirmed item; only the row of this very execution comes back, for Undo to name.
 async fn confirmed_action(
     org_id: &str,
     session_id: &str,
-    (approval_id, user_id): (&str, &str),
+    approval: (&str, &str),
     item: &Value,
     since: i64,
 ) -> Option<ai_actions::Model> {
     let (kind, id) = (text(item, "type")?, text(item, "id")?);
-    let stamped = ai_actions::stamp_approval(
-        org_id,
-        session_id,
-        (&kind, &id),
-        (approval_id, user_id),
-        since,
-    )
-    .await;
-    match stamped {
-        Ok(Some(row)) => Some(row),
-        Ok(None) => {
-            let row = confirmed_row(org_id, session_id, user_id, approval_id, item);
-            ai_actions::insert(row)
-                .await
-                .inspect_err(|e| {
-                    log::error!("[org_id:{org_id}] cannot store a confirmed action: {e}");
-                })
-                .ok()
-        }
+    let target = (kind.as_str(), id.as_str());
+    match ai_actions::stamp_execution(org_id, session_id, target, approval).await {
+        Ok(Some(row)) => return Some(row),
+        Ok(None) => {}
         Err(e) => {
-            log::error!("[org_id:{org_id}] cannot stamp a confirmed action: {e}");
-            None
+            log::error!("[org_id:{org_id}] cannot stamp a confirmed execution: {e}");
+            return None;
         }
     }
+    let stamped = ai_actions::stamp_approval(org_id, session_id, target, approval, since).await;
+    match stamped {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            let (approval_id, user_id) = approval;
+            let row = confirmed_row(org_id, session_id, user_id, approval_id, item);
+            if let Err(e) = ai_actions::insert(row).await {
+                log::error!("[org_id:{org_id}] cannot store a confirmed action: {e}");
+            }
+        }
+        Err(e) => log::error!("[org_id:{org_id}] cannot stamp a confirmed action: {e}"),
+    }
+    None
 }
 
 /// The card a `/confirm` decided: o2-ai's answer first, else whichever id key the body used.
@@ -478,7 +481,7 @@ fn ledger_row(action: Recorded, standing: bool, now: i64) -> ai_actions::Model {
         org_id: action.org_id,
         session_id: Some(action.origin.session_id),
         turn_id: action.origin.turn_id,
-        approval_id: None,
+        approval_id: action.approval_id,
         approval_kind: if standing {
             APPROVAL_STANDING
         } else {
@@ -794,6 +797,7 @@ mod tests {
                 turn_id: Some("t".into()),
                 approval: None,
             },
+            approval_id: None,
             tool: "DeleteAlert".into(),
             op: Op::Delete,
             resource_type: "alert".into(),
@@ -814,6 +818,18 @@ mod tests {
             .await
             .unwrap();
         (status, serde_json::from_slice(&bytes).unwrap())
+    }
+
+    #[test]
+    fn a_ledger_row_keeps_the_approval_it_ran_under() {
+        let approved = Recorded {
+            approval_id: Some("ap1".into()),
+            ..action()
+        };
+        let row = ledger_row(approved, false, NOW);
+        assert_eq!(row.approval_id.as_deref(), Some("ap1"));
+        assert_eq!(row.approval_kind, APPROVAL_NONE);
+        assert!(ledger_row(action(), false, NOW).approval_id.is_none());
     }
 
     #[test]

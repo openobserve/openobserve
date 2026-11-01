@@ -695,14 +695,6 @@ const placeholder = computed<I18nText>(() => {
     : t("assistant.composer.placeholder");
 });
 
-const recallHint = computed(() => {
-  const key = store.state.userOrgKey;
-  if (!key || hasContent.value || recallEntries.value.length === 0 || readHints(key).recall)
-    return null;
-  const count = recallEntries.value.length;
-  return t("assistant.composer.recallHint", { count }, count);
-});
-
 const creditsRefusedAbove = computed(() => {
   const turn = session.value?.turn;
   return turn?.state === "refused" && isCreditsRefusal(turn.error.code);
@@ -757,7 +749,7 @@ const helper = computed<I18nText | null>(() => {
   if (store.state.capability.creditMode === "exhausted" && !creditsRefusedAbove.value)
     return t("assistant.credits.predictedExhausted", { org: raw(org.value) });
   if (voice.show.value && voice.offline.value) return t("assistant.composer.offline");
-  return answeringLine.value ?? pendingLine.value ?? threadLine.value ?? recallHint.value;
+  return answeringLine.value ?? pendingLine.value ?? threadLine.value;
 });
 
 const helperFailed = computed(() => helper.value === voice.helperLine.value && voice.failure.value);
@@ -771,15 +763,35 @@ function measureRows(): void {
     narrow: width.narrow.value,
     extras: (attached.value && !replying.value) || voiceExtra.value,
     text: shownText.value,
-    textWidth: width.width.value > 0 ? textWidthOf(field, shownText.value) : 0,
+    textWidth: width.width.value > 0 ? textWidthOf(field, shownText.value || placeholder.value) : 0,
     frameWidth: width.width.value > 0 ? (field?.parentElement?.clientWidth ?? 0) : 0,
     controlsWidth: controlsWidthOf(controls.value),
   });
 }
 
 watch(
-  [shownText, width.width, width.narrow, attached, replying, voiceExtra, inertKind],
+  [shownText, placeholder, width.width, width.narrow, attached, replying, voiceExtra, inertKind],
   () => void nextTick(measureRows),
+  { flush: "post" },
+);
+
+// The picker, the mic and the time label change the row's width with no draft change.
+watch(controls, (row, _, onCleanup) => {
+  if (!row) return;
+  const observer = new MutationObserver(measureRows);
+  observer.observe(row, { childList: true, subtree: true, characterData: true });
+  onCleanup(() => observer.disconnect());
+});
+
+// OTextarea sizes itself on a value change only, and a row flip changes the field's padding and width.
+watch(
+  twoRows,
+  () => {
+    const field = el();
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = field.scrollHeight ? `${field.scrollHeight}px` : "";
+  },
   { flush: "post" },
 );
 
@@ -1181,7 +1193,6 @@ function recall(direction: "older" | "newer"): boolean {
   store.recall(id, direction);
   const after = store.state.sessions[id]?.composer.recallIndex ?? -1;
   if (after === before) return false;
-  markHintSeen(key, "recall");
   trackAssistant("ai_composer_recall", { direction, index: after });
   if (after >= 0)
     say(t("assistant.composer.recalled", { n: after + 1, count: readRecall(key).length }));
@@ -1681,14 +1692,11 @@ watch(
   (keys) => forgetComposerUi(new Set(keys.split("\n"))),
 );
 
-watch(recallHint, (hint) => {
-  const key = store.state.userOrgKey;
-  if (hint && key && props.visible) markHintSeen(key, "recall");
-});
-
 onMounted(() => {
   refreshRecall();
   measureRows();
+  // The canvas measures the fallback font until the real one has loaded.
+  void document.fonts?.ready.then(measureRows);
   const shell = shellRoot();
   shell?.addEventListener("dragover", onDragOver);
   shell?.addEventListener("dragleave", onDragLeave);

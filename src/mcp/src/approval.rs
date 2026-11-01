@@ -286,6 +286,11 @@ pub fn verify(
     })
 }
 
+/// The approval a well-formed assertion names, for a caller whose check verified it.
+pub fn approval_id_of(assertion: &str) -> Option<&str> {
+    assertion.split('.').next().filter(|id| !id.is_empty())
+}
+
 /// HKDF-SHA256 (empty salt, one block) of `secret` with the approval label.
 pub fn derive_key(secret: &str) -> [u8; 32] {
     let mut extract =

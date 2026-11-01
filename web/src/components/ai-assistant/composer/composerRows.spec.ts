@@ -36,6 +36,11 @@ describe("composerFitsOneRow", () => {
     expect(composerFitsOneRow({ ...ROW, text: "long", textWidth: 180 })).toBe(false);
   });
 
+  it("gives an empty draft's placeholder the same test, so it never wraps", () => {
+    expect(composerFitsOneRow({ ...ROW, textWidth: 162 })).toBe(true);
+    expect(composerFitsOneRow({ ...ROW, textWidth: 162.5 })).toBe(false);
+  });
+
   it("always takes two rows when narrow, with extras, or on a second line", () => {
     expect(composerFitsOneRow({ ...ROW, narrow: true })).toBe(false);
     expect(composerFitsOneRow({ ...ROW, extras: true })).toBe(false);

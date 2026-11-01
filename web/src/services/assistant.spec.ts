@@ -237,11 +237,25 @@ describe("listActiveChats pages", () => {
     expect(get).toHaveBeenCalledTimes(1);
   });
 
-  it("stops at its page budget", async () => {
+  it("reaches a live chat behind more than 2000 recently touched rows", async () => {
+    const pages = 25;
+    const get = vi.fn(async (_url: string, config: { params: { cursor?: string } }) => {
+      const page = Number(config.params.cursor ?? 0) + 1;
+      return page === pages
+        ? { data: { chats: [live("late")] } }
+        : { data: { chats: [], next_cursor: String(page) } };
+    });
+    (http as any).mockReturnValue({ get });
+    const page = await assistant.listActiveChats("o");
+    expect(page.chats.map((chat) => chat.session_id)).toEqual(["late"]);
+    expect(get).toHaveBeenCalledTimes(pages);
+  });
+
+  it("stops at a cursor it has already followed", async () => {
     const get = vi.fn(async () => ({ data: { chats: [], next_cursor: "c" } }));
     (http as any).mockReturnValue({ get });
     await assistant.listActiveChats("o");
-    expect(get).toHaveBeenCalledTimes(10);
+    expect(get).toHaveBeenCalledTimes(2);
   });
 });
 

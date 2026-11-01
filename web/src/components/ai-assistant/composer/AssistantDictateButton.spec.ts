@@ -16,6 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { raw } from "@/types/i18n";
 
 import AssistantDictateButton, {
@@ -52,6 +53,14 @@ describe("AssistantDictateButton", () => {
     expect(button.attributes("aria-disabled")).toBe("true");
     expect(button.attributes("aria-haspopup")).toBe("dialog");
     expect(button.attributes("disabled")).toBeUndefined();
+  });
+
+  it("crosses the mic only where a new press cannot help", () => {
+    const glyph = (state: AssistantDictateButtonProps["mic"]) =>
+      render({ mic: state }).findComponent(OIcon).props("name");
+    expect(glyph("live")).toBe("mic");
+    expect(glyph("off")).toBe("mic");
+    expect(glyph("crossed")).toBe("mic-off");
   });
 
   it("emits press with the click, for the composer to read pointer or keyboard", async () => {

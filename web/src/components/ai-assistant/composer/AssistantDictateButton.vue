@@ -26,12 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #anchor>
       <AssistantIconButton
         :label="t('assistant.voice.dictate')"
-        :icon="crossed ? assistantGlyph.dictateOff : assistantGlyph.dictate"
+        :icon="mic === 'crossed' ? assistantGlyph.dictateOff : assistantGlyph.dictate"
         :pressed="pressed"
         :disabled="mic === 'crossed'"
         :disabled-reason="disabledReason"
         :no-tooltip="primerOpen || offOpen"
-        :aria-haspopup="crossed ? 'dialog' : undefined"
+        :aria-haspopup="mic === 'live' ? undefined : 'dialog'"
         data-test="assistant-dictate"
         @click="onClick"
       >
@@ -127,8 +127,6 @@ const emit = defineEmits<AssistantDictateButtonEmits>();
 const { t } = useI18nTyped();
 const layout = useComposerLayout();
 const offOpen = ref(false);
-
-const crossed = computed(() => props.mic !== "live");
 
 const tooltip = computed(() => {
   if (props.mic === "off") return t("assistant.voice.offAdmin");

@@ -281,7 +281,7 @@ pub async fn clear_undone_with<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Marks the newest unapproved row of this chat on this object as approved; `false` if none.
+/// Marks the newest unapproved row of this chat on this object as approved, by attribution only.
 pub async fn stamp_approval(
     org_id: &str,
     session_id: &str,
@@ -325,6 +325,54 @@ pub async fn stamp_approval_with<C: ConnectionTrait>(
     };
     Entity::update_many()
         .col_expr(Column::ApprovalId, Expr::value(fit(approval_id, 128)))
+        .col_expr(Column::ApprovalKind, Expr::value(APPROVAL_APPROVED))
+        .col_expr(Column::ApprovedBy, Expr::value(fit(approved_by, 256)))
+        .filter(Column::Id.eq(row.id.clone()))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(Some(row))
+}
+
+/// Stamps the row the executor stored under `approval_id`, and no other row of the resource.
+pub async fn stamp_execution(
+    org_id: &str,
+    session_id: &str,
+    target: (&str, &str),
+    approval: (&str, &str),
+) -> Result<Option<Model>, errors::Error> {
+    stamp_execution_with(
+        get_orm_client_rw().await,
+        org_id,
+        session_id,
+        target,
+        approval,
+    )
+    .await
+}
+
+pub async fn stamp_execution_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    (resource_type, resource_id): (&str, &str),
+    (approval_id, approved_by): (&str, &str),
+) -> Result<Option<Model>, errors::Error> {
+    let Some(row) = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::ResourceType.eq(resource_type))
+        .filter(Column::ResourceId.eq(resource_id))
+        .filter(Column::ApprovalId.eq(fit(approval_id, 128)))
+        .filter(Column::UndoOf.is_null())
+        .order_by_desc(Column::CreatedAt)
+        .one(conn)
+        .await
+        .map_err(db_err)?
+    else {
+        return Ok(None);
+    };
+    Entity::update_many()
         .col_expr(Column::ApprovalKind, Expr::value(APPROVAL_APPROVED))
         .col_expr(Column::ApprovedBy, Expr::value(fit(approved_by, 256)))
         .filter(Column::Id.eq(row.id.clone()))
@@ -452,6 +500,40 @@ mod tests {
             .await
             .unwrap();
         assert!(none.is_none());
+    }
+
+    #[tokio::test]
+    async fn an_execution_stamps_its_own_row_and_never_an_earlier_action() {
+        let db = db().await;
+        let earlier = insert_with(&db, action("a@x", 1)).await.unwrap();
+        let granted = Model {
+            approval_id: Some("grant_1~n".to_string()),
+            ..action("a@x", 2)
+        };
+        let granted = insert_with(&db, granted).await.unwrap();
+        let target = ("alert", "a1");
+        let late = stamp_execution_with(&db, "o", "s", target, ("ap1", "a@x"))
+            .await
+            .unwrap();
+        assert!(late.is_none(), "the row of ap1 is not stored yet");
+
+        let own = Model {
+            approval_id: Some("ap1".to_string()),
+            ..action("a@x", 3)
+        };
+        let own = insert_with(&db, own).await.unwrap();
+        let later = insert_with(&db, action("a@x", 4)).await.unwrap();
+        let stamped = stamp_execution_with(&db, "o", "s", target, ("ap1", "a@x"))
+            .await
+            .unwrap();
+        assert_eq!(stamped.map(|row| row.id), Some(own.id.clone()));
+        let own = get_with(&db, "o", &own.id).await.unwrap().unwrap();
+        assert_eq!(own.approval_kind, APPROVAL_APPROVED);
+        assert_eq!(own.approved_by.as_deref(), Some("a@x"));
+        for other in [earlier, granted, later] {
+            let other = get_with(&db, "o", &other.id).await.unwrap().unwrap();
+            assert_eq!(other.approval_kind, APPROVAL_NONE);
+        }
     }
 
     #[tokio::test]
