@@ -1,0 +1,387 @@
+{
+  "sourceCommit": "e6d910ca91cb50a90724c41235ac6ec6bdd9d8fd",
+  "webTree": "f8c602b5c7cc9da35f01592badd7354b3e215311",
+  "selection": "Unfiltered 76-file cohort retained from controlled worker proof40871058904; refreshed hashes at pinned source.",
+  "files": [
+    {
+      "file": "src/components/DateTime.rail.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "cc8a3c6eaf97a5cb3cb72022a41a816c7901c946f82324ed915649fee7d58988"
+    },
+    {
+      "file": "src/components/O2AIChat.stream.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "e8650c5b577e9dec65572a26b41adcec4d7019f89aea3113d114c3d3fbb9f18c"
+    },
+    {
+      "file": "src/components/QueryEditor.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "b4cd9d94eaf977775210b6dcbf7188b047b1bde38f35a39df7d1d767a7b7bb25"
+    },
+    {
+      "file": "src/components/alerts/AddAlert.prefill.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "77ce74c9da63b0b93361d676c7dde55e93008e3be80d1a1e9bc5c74bcc02ff44"
+    },
+    {
+      "file": "src/components/alerts/AlertGroupChart.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "67b9e6f51ae97ac000dcdc112bae93ce290d1f8c7f1d005273e666b360fb264c"
+    },
+    {
+      "file": "src/components/alerts/AlertList.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "b15b450d90433f4042884dc31cf4e91d55227280464c0c9f9a6cf8ca6c0cf1d3"
+    },
+    {
+      "file": "src/components/alerts/AlertListSlo.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "9a1fc52225362a7d5c42e095b81dd9855188b55a73d51bef0a316eee1f8e04dd"
+    },
+    {
+      "file": "src/components/alerts/FilterCondition.suggest.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "62fcef181dc739807e010002ae973cf17ac0207cc6f9ed12d9ca38c4eaa49ebf"
+    },
+    {
+      "file": "src/components/alerts/QueryEditorDialog.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "3155b70420881047b63ebe0af8ecffb383ba3eb59d21ed9d7695a223947d1640"
+    },
+    {
+      "file": "src/components/dashboards/SelectDashboardDropdown.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "25f678494962deb11388a0e535c3faa564d2bfecbb869195502a9fb9b57a6a70"
+    },
+    {
+      "file": "src/components/dashboards/addPanel/ConfigPanel.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "f4519d603fd2259e37b4e3eaa0be221ccc108717f942e8056151d6b293da606c"
+    },
+    {
+      "file": "src/components/dashboards/addPanel/ConfigPanel.thresholds.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "b533de1e6e96a239738579d7324695aa6f4f5291654b88f3103bd76a2a16645f"
+    },
+    {
+      "file": "src/components/dashboards/addPanel/Drilldown.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "de9cc2d163f776b5da2d512f7c43d5cfe0926d4cb00bfe6774897cacddf306ab"
+    },
+    {
+      "file": "src/components/dashboards/addPanel/DrilldownUserGuide.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "82bce2af5786c4edbd95c1d1454aef9795da3e06a65d7f3624ca8a7b3691fd2d"
+    },
+    {
+      "file": "src/components/dashboards/addPanel/MarkLineConfig.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "3cd87ed5f67d9671a90077986a5193d8d0fb034d326e28c16dc99e78dbb36d75"
+    },
+    {
+      "file": "src/components/dashboards/addPanel/SortByBtnGrp.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "1232860bb2f571c6a18d09d318d00fefbfd23c7b8017b8efbddd28e9b6f289cd"
+    },
+    {
+      "file": "src/components/fleet/FleetCollectorMetrics.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "92c3c96d8dc739b2b8eec574695aadab1bcebfde581a3032e7ef0fea071f5855"
+    },
+    {
+      "file": "src/components/fleet/FleetOverview.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "1a01dbe714613207e4793c20e0b9301bd0997699c43cb2c67c45043589050736"
+    },
+    {
+      "file": "src/components/fleet/FleetTokens.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "e3297381b10a6fdea0f49b7754474e0e8a442570140fa12dc0c4d7dc38db7a46"
+    },
+    {
+      "file": "src/components/functions/AddFunction.spec.js",
+      "project": "jsdom",
+      "sourceSha256": "1fe4cc0ab5689e1190b70c4d40a06561fbbe39d4379acd7c0a84342bdba90b65"
+    },
+    {
+      "file": "src/components/functions/EnrichmentTableList.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "adf38a0b9aaf8a47623e14c53277b905c9957e59e51b7739d4450d7155869b9b"
+    },
+    {
+      "file": "src/components/functions/FunctionList.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "b700fa2b35d17e2ccc50902b4a5f20239c4b0e23096edfbe1a44d94c703b9453"
+    },
+    {
+      "file": "src/components/iam/roles/EditRole.spec.js",
+      "project": "jsdom",
+      "sourceSha256": "63b2910c76468832f7aa18987abb246f36cca9fe56af800ec272904e64022928"
+    },
+    {
+      "file": "src/components/ingestion/servers/Nginx.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "12bdfbf431968e64336faa069a64e863ebfb617b9761cb55ec174632b60e1524"
+    },
+    {
+      "file": "src/components/login/Login.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "2a0a648a015375a4c4ecd941d8263fc69f2d189695abb3db59488b19c719c61c"
+    },
+    {
+      "file": "src/components/logstream/Schema.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "18d73feda0de39c4b98d5c2cbafb3d36b12241cb7b6b5e30bb41d260bdcd9e7d"
+    },
+    {
+      "file": "src/components/oncall/OnCallRuleEditor.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "ef98f0bd4c5035ff04897006f7719b11483fed484045290702a052c622c7978f"
+    },
+    {
+      "file": "src/components/oncall/OnCallTeamAttention.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "0fdd151ea4954dcbaf16f4bbd1de5a6d1da73376e9d6071933e27cf073ff52b6"
+    },
+    {
+      "file": "src/components/pipeline/NodeForm/ConditionOrOperator.spec.js",
+      "project": "jsdom",
+      "sourceSha256": "9a5e684385c91458bc20eea911085e0267ed426e6e67a7ce1ee4d0d992a42b32"
+    },
+    {
+      "file": "src/components/rum/errorTracking/view/ErrorHeader.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "048d6778601b5c133732d7ac01323a5ec6879d32264d23d4f2eae525729a5612"
+    },
+    {
+      "file": "src/components/rum/errorTracking/view/ErrorImpactStrip.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "8098b430c4579ce0d751d65e47988043fbb7675c6bff8a0e47b80bb41ac0dd48"
+    },
+    {
+      "file": "src/components/rum/productAnalytics/AnalyticsFunnels.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "494b43be2f2132c68e067caca06c640aaea34f269bdf81439cb1c0b1c5642401"
+    },
+    {
+      "file": "src/components/rum/productAnalytics/SavedFunnelsPage.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "d925b0f4950baf09e688b17cb877dee363f5261c58493376ab03b449174d7983"
+    },
+    {
+      "file": "src/components/rum/productAnalytics/funnelParts/funnelFilterParts.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "b931298df2ea54531c2f4c178930f7da4fc497e67e463de0740d89a433e7bb41"
+    },
+    {
+      "file": "src/components/rum/sessionReplay/SessionLocationColumn.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "48dc37ffa0a664ca9bf46741d40bd918ca297fe8ddab7b9f5fb1aeabf56553b4"
+    },
+    {
+      "file": "src/components/settings/LinkedAccountsDialog.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "723f4239dbccec0e9d2395cc6af4b51c2aa81ef06aad8fd62ed66d63f1bc3848"
+    },
+    {
+      "file": "src/components/settings/ModelPricingList.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "c9504cfda167b4a8ad93e26379a6c00a673f5d727420d0946adabc8ad08a4daf"
+    },
+    {
+      "file": "src/components/settings/SlackLinkingSection.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "acceee59d777c424dc2ca47053f4b2c0838fe9cdf11dadc06014de7ad0c891f4"
+    },
+    {
+      "file": "src/enterprise/components/AIObservability/ExperimentForm.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "61e229876432b4148837c9656128fd78d2fd1d6653cf75821bfe256b69e06326"
+    },
+    {
+      "file": "src/enterprise/components/OnlineEvals.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "4f88d5fa2b6b280ba2178c3b351a58254628762763a8a60379a371074858f519"
+    },
+    {
+      "file": "src/layouts/MainLayout.nav.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "30bc9e55c5757b99c06cb4f9784c15b9feebd86d9991c6108a1f142f8441d7ad"
+    },
+    {
+      "file": "src/plugins/correlation/CorrelatedLogsTable.viewTrace.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "adea10a8069ed5c8dc7a33135b8577961f94e0737eca31d6c4c645d048b4238d"
+    },
+    {
+      "file": "src/plugins/logs/Index.buildParserLoad.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "ea165889ce88e01289a02e974780ae5d1e2f53d28e71005d9e897042871eb4c8"
+    },
+    {
+      "file": "src/plugins/logs/Index.permalink.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "2a2b1d37d75c75f81c00ad2a5116719a6bcba7a6b66caa4243cc58b9b409753e"
+    },
+    {
+      "file": "src/plugins/logs/SearchBar.heldFilter.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "74b1654d9a7bf54f5806e8b33d80605b4ddc6de98f6357a21da640f9af53b087"
+    },
+    {
+      "file": "src/plugins/logs/SearchBar.sessionValues.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "f36e3319c1d1abe1d3ca5c1ffc56ab699e976a3400e17b44a340d04626261ea8"
+    },
+    {
+      "file": "src/plugins/logs/SearchHistory.spec.js",
+      "project": "jsdom",
+      "sourceSha256": "eb2e14ecfa6bfa3ccae6d61d6b80ec134317af4e1b3b0bf2ff7da405c4326beb"
+    },
+    {
+      "file": "src/plugins/logs/SearchResult.jk.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "4997d8b83ff4e7903377ffa127015809ecd5d887ceac0a086a55cabf7948e099"
+    },
+    {
+      "file": "src/plugins/logs/SearchResult.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "13e08934f447c3e44b0ecb6b7cc3088a85fa598d8fbc45e9166dc368ccf7738a"
+    },
+    {
+      "file": "src/plugins/logs/SearchSchedulersList.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "4478605a8fb94122e4e2c3a2b789915d817f644ef6ea6259bcc0ff9353edd5a4"
+    },
+    {
+      "file": "src/plugins/metrics/explorer/MetricBreakdown.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "7ff42f188fd46896b764d439ba6edd1d9e2b97d4907c58b2222001d3be9c462e"
+    },
+    {
+      "file": "src/plugins/metrics/explorer/MetricCard.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "ba6bbee343a16c115e91611c06407a40cc2d98f8e4c8190664694d30900b2c36"
+    },
+    {
+      "file": "src/plugins/profiles/Index.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "59552554ad5b13a405181fe1aca6fb1e185fd2217d9573c72720855c475236f1"
+    },
+    {
+      "file": "src/plugins/traces/Index.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "8e13ac4d84d6ab1a8ee233aaadd58de72e3a1a0546c970ece2ca046769e95b66"
+    },
+    {
+      "file": "src/plugins/traces/TraceDetailsSidebar.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "fd061e798b722a1d44ef3b45a371f4ce432c8cdcc05b191656d4bfbc41678c28"
+    },
+    {
+      "file": "src/plugins/workflows/nodes/WorkflowBranch.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "06082617fcff9baf38740be15192e48dd29acc0a49e260c5b106a448b7f50eb1"
+    },
+    {
+      "file": "src/test/unit/HomeView.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "3e97230eacf43d09449d34e606bcf3429421150a9457c74038c2ba2876194cb2"
+    },
+    {
+      "file": "src/test/unit/plugins/pipelines/CustomNode.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "775af7a965e8df621f29a810ebe811f194faf2f59f76a9c5429901f7321c40c7"
+    },
+    {
+      "file": "src/utils/alertSourceStatus.spec.ts",
+      "project": "node",
+      "sourceSha256": "24de97d6787e4fbb28c8e5cf887342edcec8ceaa3b6fee9b467f70997ae43ede"
+    },
+    {
+      "file": "src/utils/cookies.spec.ts",
+      "project": "node",
+      "sourceSha256": "c6ededba3072473787181af6fb297f2bf7af70ef8cde41f71d38040f750bfb03"
+    },
+    {
+      "file": "src/utils/csv.spec.ts",
+      "project": "node",
+      "sourceSha256": "646fff32558d1d49e74a92991511214be050825e23ace95e49cb0c56786d70d0"
+    },
+    {
+      "file": "src/utils/dashboard/seriesOverrides.builders.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "dedd42f83a1d1e6b7ab445b45201b81cee06aa239a3b3e1958f55f2422c9e8ee"
+    },
+    {
+      "file": "src/utils/dateTimeRangeParse.spec.ts",
+      "project": "node",
+      "sourceSha256": "7f51af729dd5363a4ba765f05cbb84124150796baed88ffdc7582dbde8065cab"
+    },
+    {
+      "file": "src/utils/query/sqlDiagnostics.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "39fcd0ac46c670b7e6d65e751e491d109eb2d9b6a3c57b8084d259e54fca916e"
+    },
+    {
+      "file": "src/views/AlertLibrary/AlertLibrary.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "eade8813c55f5240873be3e158dcf2501a9beab20f884e257b0b5546da108613"
+    },
+    {
+      "file": "src/views/AzureMarketplaceSetup.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "782c6a48b09b98d4c461d1527084c5b0d17ccd35966a914ae4445c666178ac49"
+    },
+    {
+      "file": "src/views/IdentityAccessManagement.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "9fd8440c3d4e62dda1823f6256b247fb055dcebc9e1ec1e7c9e8655f4f6499b5"
+    },
+    {
+      "file": "src/views/Infrastructure/HostDetailDrawer.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "f0dde7e870556b1ce37915d90c1ce154cf0bc7dca0b5cb810331bb7382a4650c"
+    },
+    {
+      "file": "src/views/Infrastructure/kubernetes2/MapView.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "4cbaff2ca806d5cf2cab354897679e5b01fb4479152810c2a8c9a2865fd5803b"
+    },
+    {
+      "file": "src/views/Infrastructure/kubernetes2/k8sDock.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "55786c86fb164ccc0b941ba37e0ae235874c17ed75a602ea883358e7a489a8f2"
+    },
+    {
+      "file": "src/views/LogStream.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "bf86fc398a63ecdbed7f8fcbe1edc466e2bde00193fc248aebe6e54245f5f835"
+    },
+    {
+      "file": "src/views/RUM/AppAnalytics.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "70e65deb75bfb7780a1e63b410618380463fbabb1b9af02938b444e2c8aa384e"
+    },
+    {
+      "file": "src/views/RUM/NamedEventEditor.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "767ffaa0ef1a365c7f65c79f0728331bb5c1c33ea3d77cad50f343490b124c9a"
+    },
+    {
+      "file": "src/views/alerts/AlertDetail.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "7664760db1eb92e533cda11534fe77c4dea647a25f54c1c5cb5c959c292441c0"
+    },
+    {
+      "file": "src/views/synthetics/MonitorResults.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "28649b86f7ea09ccdf7f7bf9ac3f84fd0aee50110222c8d9462212a78e922b3e"
+    },
+    {
+      "file": "src/views/synthetics/MonitorRuns.spec.ts",
+      "project": "jsdom",
+      "sourceSha256": "b2e1ac95d0050e7db941bd930b77368489c69c117166a3267e7b32e7cb522ce6"
+    }
+  ]
+}
