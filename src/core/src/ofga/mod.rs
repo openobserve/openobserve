@@ -78,10 +78,51 @@ struct PendingMigrations {
     downtimes: bool,
     ai_chat_shares: bool,
     fleet: bool,
+    ownership_repair: bool,
     public_dashboards: bool,
     incident_integrations: bool,
     missing_ownership: bool,
     profiles: bool,
+}
+
+impl PendingMigrations {
+    /// Every flag `all_org_ownership_keys` reads, so the repair re-writes each `_all_` key.
+    fn every_ownership_back_fill() -> Self {
+        Self {
+            cipher_keys: true,
+            ratelimit: true,
+            service_accounts: true,
+            ai_chat_permissions: true,
+            re_pattern_permission: true,
+            license_permission: true,
+            sourcemap_permission: true,
+            service_streams: true,
+            logs_pattern_insights: true,
+            ai_toolsets: true,
+            incidents: true,
+            model_pricing: true,
+            online_eval: true,
+            llm_workbench: true,
+            billing_group: true,
+            synthetics: true,
+            workflows: true,
+            oncall: true,
+            annotation_queues_datasets: true,
+            workflow_folders: true,
+            synthetic_environments: true,
+            prompts: true,
+            prompt_folders: true,
+            query_history: true,
+            downtimes: true,
+            ai_chat_shares: true,
+            fleet: true,
+            missing_ownership: true,
+            public_dashboards: true,
+            profiles: true,
+            incident_integrations: true,
+            ..Default::default()
+        }
+    }
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -462,6 +503,11 @@ async fn run_folder_and_data_migrations(pending: &PendingMigrations) {
 /// a database sweep — pipelines, alert folders, report folders — stay as explicit
 /// branches at the call site.
 fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
+    if pending.ownership_repair {
+        let mut keys = all_org_ownership_keys(&PendingMigrations::every_ownership_back_fill());
+        keys.extend(["pipelines", "alert_folders", "report_folders"]);
+        return keys;
+    }
     let mut keys = vec![];
     if pending.cipher_keys {
         keys.push("cipher_keys");
@@ -775,6 +821,16 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] incident integrations permissions migration needed");
         pending.incident_integrations = true;
     }
+    // The 0.0.59 arm's unknown `fleet` type got its batch, and every later one, rejected.
+    let v0_0_63 = version_compare::Version::from("0.0.63").unwrap();
+    if meta_version >= v0_0_63
+        && existing_model_version >= v0_0_59
+        && existing_model_version < v0_0_63
+    {
+        log::info!("[OFGA:Local] org-ownership repair back-fill needed");
+        pending.ownership_repair = true;
+        pending.profiles = true;
+    }
 
     pending
 }
@@ -842,6 +898,84 @@ mod tests {
         assert_eq!(keys, vec!["fleets", "fleet_configs", "fleet_management"]);
         // OpenFGA rejects a batch naming an unknown type, which drops every later batch.
         assert!(keys.iter().all(|key| OFGA_MODELS.contains_key(*key)));
+    }
+
+    #[test]
+    fn ownership_repair_rewrites_every_org_key_for_installs_past_0_0_59() {
+        let mut expected = vec![
+            "cipher_keys",
+            "ratelimit",
+            "service_accounts",
+            "ai",
+            "re_patterns",
+            "license",
+            "sourcemaps",
+            "service_streams",
+            LOGS_INSIGHTS_KEY,
+            LOGS_PATTERN_KEY,
+            RESULT_LOGS_CACHE_KEY,
+            "ai_toolsets",
+            "incidents",
+            "model_pricing",
+            "providers",
+            "score_configs",
+            "scorers",
+            "eval_jobs",
+            "playground",
+            "annotation_queues",
+            "datasets",
+            "experiments",
+            "remote_tasks",
+            "billing_group",
+            "synthetic_folder",
+            "synthetics",
+            "workflows",
+            "oncall",
+            "oncall_responses",
+            "workflow_folder",
+            "synthetic_environment",
+            "prompts",
+            "prompt_labels",
+            "prompt_folders",
+            "query_history",
+            "downtime_folders",
+            "downtimes",
+            "ai_chat_shares",
+            "fleets",
+            "fleet_configs",
+            "fleet_management",
+            "db_monitoring",
+            "search_inspector",
+            "status_page",
+            "mcp",
+            "alert_calibration",
+            "slack",
+            "public_dashboards",
+            "profiles",
+            "incident_integrations",
+            "pipelines",
+            "alert_folders",
+            "report_folders",
+        ];
+        expected.sort_unstable();
+        for existing in ["0.0.59", "0.0.60", "0.0.61", "0.0.62"] {
+            let pending = pending_migrations("0.0.63", existing);
+            assert!(pending.ownership_repair && pending.profiles, "{existing}");
+            let mut keys = all_org_ownership_keys(&pending);
+            keys.sort_unstable();
+            keys.dedup();
+            assert_eq!(keys, expected, "{existing}");
+        }
+        assert!(expected.iter().all(|key| OFGA_MODELS.contains_key(*key)));
+        // No DB sweep may ride along: only the ownership tuples are re-written.
+        let pending = pending_migrations("0.0.63", "0.0.62");
+        assert!(!pending.alert_folders && !pending.report_folders && !pending.pipeline);
+        assert!(!pending.prompt_folders && !pending.workflow_folders && !pending.stream_names);
+        assert!(!pending.anomaly_detection);
+        assert!(!pending_migrations("0.0.63", "0.0.58").ownership_repair);
+        assert!(!pending_migrations("0.0.63", "0.0.63").ownership_repair);
+        assert!(!pending_migrations("0.0.62", "0.0.59").ownership_repair);
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.63", "0.0.63")).is_empty());
     }
 
     #[test]

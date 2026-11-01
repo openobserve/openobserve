@@ -639,9 +639,13 @@ pub async fn get_users_with_role(Path(_path): Path<(String, String)>) -> Respons
     )
 )]
 pub async fn get_roles_for_user(Path((org_id, user_email)): Path<(String, String)>) -> Response {
-    let res = o2_openfga::authorizer::roles::get_roles_for_org_user(&org_id, &user_email).await;
-
-    Json(res).into_response()
+    match o2_openfga::authorizer::roles::get_roles_for_org_user(&org_id, &user_email).await {
+        Ok(res) => Json(res).into_response(),
+        Err(e) => {
+            log::error!("Error getting roles for user {user_email} in org {org_id}: {e}");
+            MetaHttpResponse::internal_error("Failed to get roles for user")
+        }
+    }
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -805,16 +809,22 @@ pub async fn create_group(
 
     let mut user_grp = user_group;
     user_grp.name = format_role_name_only(user_grp.name.trim());
+    let users = user_grp.users.unwrap_or_default();
 
-    match o2_openfga::authorizer::groups::create_group(
-        &org_id,
-        &user_grp.name,
-        user_grp.users.unwrap_or_default(),
-    )
-    .await
+    if o2_openfga::authorizer::org_scoped_object("group", &org_id, &user_grp.name).is_none() {
+        return MetaHttpResponse::bad_request("Invalid group name");
+    }
+    if !users
+        .iter()
+        .all(|user| o2_openfga::authorizer::is_valid_user_id(user))
     {
+        return MetaHttpResponse::bad_request("Invalid user id in group users");
+    }
+
+    match o2_openfga::authorizer::groups::create_group(&org_id, &user_grp.name, users).await {
         Ok(_) => MetaHttpResponse::ok("Group created successfully"),
-        Err(err) => MetaHttpResponse::internal_error(err),
+        // The authorizer's error carries raw OpenFGA text, which stays in the server log.
+        Err(_) => MetaHttpResponse::internal_error("Failed to create group"),
     }
 }
 
@@ -1548,9 +1558,11 @@ mod tests {
                 "test@example.com".to_string(),
             )))
             .await;
-            // Role lookup degrades to no roles rather than failing when OpenFGA is down.
-            assert_eq!(extract_status_code(&resp), StatusCode::OK);
-            assert_eq!(response_json(resp).await, serde_json::json!([]));
+            // A failed lookup must not read as a user with no roles.
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::INTERNAL_SERVER_ERROR
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1630,6 +1642,10 @@ mod tests {
                 extract_status_code(&resp),
                 StatusCode::INTERNAL_SERVER_ERROR
             );
+            assert_eq!(
+                response_json(resp).await["message"],
+                "Failed to create group"
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1642,6 +1658,30 @@ mod tests {
 
             let resp = create_group(Path("test_org".to_string()), Json(group)).await;
             assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn create_group_rejects_invalid_input_with_400() {
+        init_ofga_test();
+        for (name, user) in [
+            ("test_group", "*"),
+            ("test_group", "a#b"),
+            ("test_group", ""),
+            ("", "user1"),
+        ] {
+            let group = UserGroup {
+                name: name.to_string(),
+                users: Some(HashSet::from([user.to_string()])),
+                roles: None,
+            };
+            let resp = create_group(Path("test_org".to_string()), Json(group)).await;
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::BAD_REQUEST,
+                "{name:?} {user:?}"
+            );
         }
     }
 

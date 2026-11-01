@@ -511,10 +511,11 @@ pub async fn update_user(
                 // Only an admin grants custom roles; a self-update may resend its own unchanged.
                 if update_mode.is_self_update()
                     && !matches!(local_user.role, UserRole::Admin | UserRole::Root)
-                    && custom_roles_differ(
-                        &cr,
-                        &o2_openfga::authorizer::roles::get_roles_for_org_user(org_id, email).await,
-                    )
+                    // An unreadable assignment counts as a change, so the self-update is refused.
+                    && o2_openfga::authorizer::roles::get_roles_for_org_user(org_id, email)
+                        .await
+                        .ok()
+                        .is_none_or(|existing| custom_roles_differ(&cr, &existing))
                 {
                     message = "Self custom roles cannot be changed";
                 } else {
@@ -634,7 +635,17 @@ pub async fn update_user(
                     }
                 }
                 if custom_roles_need_change {
-                    let existing_roles = get_roles_for_org_user(org_id, email).await;
+                    let existing_roles = match get_roles_for_org_user(org_id, email).await {
+                        Ok(roles) => roles,
+                        Err(e) => {
+                            log::error!(
+                                "Error reading custom roles for user {email} in {org_id} org : {e}"
+                            );
+                            return Ok(MetaHttpResponse::internal_error(
+                                "Failed to update custom roles for user",
+                            ));
+                        }
+                    };
                     let mut write_tuples = vec![];
                     let mut delete_tuples = vec![];
                     custom_roles.iter().for_each(|crole| {
@@ -1342,7 +1353,13 @@ pub async fn get_user_roles(user_email: &str, org_id: Option<&str>) -> Vec<Strin
         return get_user_roles_by_org_id(roles, org_id);
     }
 
-    let roles = o2_openfga::authorizer::roles::get_roles_for_user(user_email).await;
+    let roles = match o2_openfga::authorizer::roles::get_roles_for_user(user_email).await {
+        Ok(roles) => roles,
+        Err(e) => {
+            log::error!("Error reading roles for user {user_email}: {e}");
+            return vec![];
+        }
+    };
     update_cache(user_email, roles.clone()).await;
 
     get_user_roles_by_org_id(roles, org_id)

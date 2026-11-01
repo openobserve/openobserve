@@ -152,6 +152,23 @@ pub(crate) fn next_cron_in_zone(
     next_cron_across_clock_change(schedule, tz, after)
 }
 
+/// Next cron fire strictly after `after` in the named zone when it parses, else at `tz_offset`
+/// minutes.
+pub fn next_cron_after(
+    schedule: &Schedule,
+    timezone: Option<&str>,
+    tz_offset: i32,
+    after: chrono::DateTime<Utc>,
+) -> Option<chrono::DateTime<Utc>> {
+    match timezone.and_then(|name| name.parse::<Tz>().ok()) {
+        Some(tz) => next_cron_in_zone(schedule, &tz, after),
+        None => schedule
+            .after(&after.with_timezone(&fixed_offset(tz_offset)?))
+            .next()
+            .map(|t| t.with_timezone(&Utc)),
+    }
+}
+
 fn next_cron_across_clock_change(
     schedule: &Schedule,
     tz: &Tz,
@@ -429,7 +446,7 @@ impl TriggerCondition {
     /// gap between consecutive fires is not even constant (weekday-only,
     /// monthly, DST), so its deadline has to be read off the schedule itself —
     /// anchored to this row's `last_seen` so it cannot drift between sweeps.
-    pub fn group_resolve_threshold_micros(&self, last_seen: i64, k: i64) -> i64 {
+    pub fn group_resolve_threshold_micros(&self, last_seen: i64, k: i64, tz_offset: i32) -> i64 {
         use crate::meta::alerts::grouping::{
             cron_resolve_threshold_micros, resolve_threshold_micros,
         };
@@ -450,19 +467,22 @@ impl TriggerCondition {
         };
 
         let take = k.max(0) as usize;
-        let occurrences: Vec<i64> = match get_timezone_from_string(self.timezone.as_deref(), 0) {
-            Ok(tz) => std::iter::successors(next_cron_in_zone(&schedule, &tz, anchor), |prev| {
-                next_cron_in_zone(&schedule, &tz, *prev)
-            })
-            .take(take)
-            .map(|d| d.timestamp_micros())
-            .collect(),
-            Err(_) => schedule
-                .after(&anchor)
-                .take(take)
-                .map(|d| d.timestamp_micros())
-                .collect(),
-        };
+        let occurrences: Vec<i64> =
+            match get_timezone_from_string(self.timezone.as_deref(), tz_offset) {
+                Ok(tz) => {
+                    std::iter::successors(next_cron_in_zone(&schedule, &tz, anchor), |prev| {
+                        next_cron_in_zone(&schedule, &tz, *prev)
+                    })
+                    .take(take)
+                    .map(|d| d.timestamp_micros())
+                    .collect()
+                }
+                Err(fixed) => schedule
+                    .after(&anchor.with_timezone(&fixed))
+                    .take(take)
+                    .map(|d| d.timestamp_micros())
+                    .collect(),
+            };
         cron_resolve_threshold_micros(last_seen, occurrences, k)
     }
 }
@@ -2004,11 +2024,43 @@ mod test {
                 .with_timezone(&Los_Angeles);
             assert_eq!((local.hour(), local.minute()), (9, 0), "start {start}");
             assert_eq!(
-                condition.group_resolve_threshold_micros(start.timestamp_micros(), 1),
+                condition.group_resolve_threshold_micros(start.timestamp_micros(), 1, -420),
                 next - start.timestamp_micros(),
                 "start {start}"
             );
         }
+    }
+
+    #[test]
+    fn group_resolve_threshold_uses_the_offset_of_a_legacy_cron_alert() {
+        use chrono::TimeZone;
+
+        let hour = 3_600_000_000;
+        let legacy = TriggerCondition {
+            frequency_type: FrequencyType::Cron,
+            cron: "0 0 9 * * *".to_string(),
+            timezone: None,
+            ..Default::default()
+        };
+        let ist_run = Utc.with_ymd_and_hms(2026, 6, 15, 3, 30, 0).unwrap();
+        assert_eq!(
+            legacy.group_resolve_threshold_micros(ist_run.timestamp_micros(), 1, 330),
+            24 * hour
+        );
+        let edt_run = Utc.with_ymd_and_hms(2026, 7, 1, 13, 0, 0).unwrap();
+        assert_eq!(
+            legacy.group_resolve_threshold_micros(edt_run.timestamp_micros(), 3, -240),
+            72 * hour
+        );
+        let ny = TriggerCondition {
+            timezone: Some("America/New_York".to_string()),
+            ..legacy
+        };
+        let last_edt_run = Utc.with_ymd_and_hms(2026, 10, 31, 13, 0, 0).unwrap();
+        assert_eq!(
+            ny.group_resolve_threshold_micros(last_edt_run.timestamp_micros(), 1, -240),
+            25 * hour
+        );
     }
 
     #[test]
