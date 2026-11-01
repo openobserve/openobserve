@@ -525,6 +525,8 @@ export function shortReachReason(
   // Matched on the distinctive noun, not the whole sentence: the engine has
   // reworded these before, and a near-miss must degrade to the sentence rather
   // than to silence.
+  // Before "smtp": the From sentence names `ZO_SMTP_FROM_EMAIL`, which contains it.
+  if (said.includes("zo_smtp_from_email")) return t("oncall.reachShortNoFromAddress");
   if (said.includes("smtp")) return t("oncall.reachShortNoSmtp");
   if (said.includes("not a user of this organization")) return t("oncall.reachShortNoAddress");
   if (said.includes("login, not a mailbox")) return t("oncall.reachShortNotMailbox");
@@ -1085,6 +1087,11 @@ export function shiftBoundary(rule: ShiftRule, index: number, timezone: string):
   return fromLocalMicros(localAnchor + index * rule.shift_micros, timezone);
 }
 
+/** `rule`'s anchor `shifts` handovers earlier on `timezone`'s clock; mirrors `ShiftRule::offset_from`. [pure] */
+export function offsetAnchor(rule: ShiftRule, shifts: number, timezone: string): number {
+  return shiftBoundary(rule, -shifts, timezone) ?? rule.anchor_micros - shifts * rule.shift_micros;
+}
+
 /** Whether `rule` has people and a positive turn length, so its shifts can be counted. [pure] */
 function isCountable(rule: ShiftRule): boolean {
   return !!rule.members?.length && !!rule.shift_micros && rule.shift_micros > 0;
@@ -1318,14 +1325,16 @@ export function stopConsequence(
   return { takers, gap: spansOf(minutes) };
 }
 
-/** Whether the server refuses `a` and `b` side by side: same priority and identical windows. [pure] */
+/** Whether the server refuses `a` and `b` side by side: identical windows, or tied keys with hours and validity that meet. [pure] */
 export function rulesClash(a: ShiftRule, b: ShiftRule): boolean {
   const left = a.restrictions ?? [];
   const right = b.restrictions ?? [];
+  if ((a.priority ?? 0) !== (b.priority ?? 0) || left.length !== right.length) return false;
+  if (left.every((w, i) => sameWindow(w, right[i]))) return true;
   return (
-    (a.priority ?? 0) === (b.priority ?? 0) &&
-    left.length === right.length &&
-    left.every((w, i) => sameWindow(w, right[i]))
+    a.anchor_micros === b.anchor_micros &&
+    validityMeets(a, b) &&
+    spansMeet(weekCoverage(a), weekCoverage(b))
   );
 }
 
@@ -1404,6 +1413,13 @@ function sameWindow(a: TimeWindow, b: TimeWindow): boolean {
     left.length === right.length &&
     left.every((day, i) => day === right[i])
   );
+}
+
+/** Whether the two rules' `[starts_at, ends_at)` validity periods intersect; a missing bound is open. */
+function validityMeets(a: ShiftRule, b: ShiftRule): boolean {
+  const start = Math.max(a.starts_at ?? -Infinity, b.starts_at ?? -Infinity);
+  const end = Math.min(a.ends_at ?? Infinity, b.ends_at ?? Infinity);
+  return start < end;
 }
 
 /** The team-local minutes of the week a rule covers, as `[start, end)` spans. */
@@ -2083,6 +2099,25 @@ export const DEFAULT_ACTIVITY_KINDS: ResponseEventKind[] = [
   "severity_promoted",
   "flapped",
 ];
+
+/** How the engine's give-up line opens; twin of escalation.rs `GAVE_UP_MARKER`. */
+const GAVE_UP_MARKER = "nothing could be delivered to this rung";
+
+/** Whether a page that reached nobody is still retried: not once the engine gave up on its run and rung. [pure] */
+export function rungStillRetrying(
+  page: OnCallResponseEvent,
+  events: OnCallResponseEvent[],
+): boolean {
+  if (page.kind !== "page" || page.delivered !== false) return false;
+  const run = page.ladder_run ?? 1;
+  return !events.some(
+    (e) =>
+      e.kind === "sys" &&
+      (e.ladder_run ?? 1) === run &&
+      (e.rung_micros ?? null) === (page.rung_micros ?? null) &&
+      e.body.startsWith(GAVE_UP_MARKER),
+  );
+}
 
 /** What the Phone card shows; `empty` is also the form that Change reopens. */
 export type PhoneCardState = "empty" | "codeSent" | "verified" | "noProvider" | "changed";

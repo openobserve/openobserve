@@ -210,6 +210,9 @@ const options = computed(() => {
     grid: { left: 4, right: 4, top: 6, bottom: 20 },
     tooltip: {
       trigger: "axis",
+      // An overflow-hidden card ancestor clips a tooltip rendered inside the chart.
+      appendToBody: true,
+      className: "o2-echarts-tooltip",
       axisPointer: { type: "shadow" },
       backgroundColor: chartColor("--color-tooltip-bg"),
       borderWidth: 0,

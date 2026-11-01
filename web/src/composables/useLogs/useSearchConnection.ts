@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { isExplainQuery } from "@/utils/query/sqlUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import type { TranslateFn } from "@/types/i18n";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
@@ -233,7 +234,12 @@ export const useSearchConnection = (t: TranslateFn) => {
         let initialHistogramErrorMsg = "";
         if (searchObj.meta.sqlMode && searchObj.meta.showHistogram) {
           const parsedSQL = fnParsedSQL();
-          if (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL)) {
+          if (
+            isLimitQuery(parsedSQL) ||
+            isDistinctQuery(parsedSQL) ||
+            isWithQuery(parsedSQL) ||
+            isExplainQuery(searchObj.data.query)
+          ) {
             initialHistogramErrorCode = -1;
             initialHistogramErrorMsg = t("search.histogramUnavailableForQueries");
           }
