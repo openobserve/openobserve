@@ -14,8 +14,13 @@ import os
 import uuid
 import zipfile
 
+import pytest
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Counts every sourcemap in the org, so a concurrent upload elsewhere would move the count.
+pytestmark = pytest.mark.serial
 
 ORG_ID = os.environ.get("TEST_ORG_ID", "default")
 
