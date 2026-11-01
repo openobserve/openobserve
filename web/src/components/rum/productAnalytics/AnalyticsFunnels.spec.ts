@@ -3204,12 +3204,13 @@ describe("AnalyticsFunnels", () => {
     });
 
     it("the Interval select shows Auto for a pick the range rules out, keeping the pick", async () => {
-      await mountFunnels({ fv: "trend" });
+      // Sixty days is always past the daily bucket cap, whatever today's date.
+      await mountFunnels({ fv: "trend", period: "60d" });
       await setSteps(fourSteps);
-      useProductAnalytics().funnelInterval.value = "month";
+      useProductAnalytics().funnelInterval.value = "day";
       await settle();
       expect(sel("rum-analytics-funnel-trend-interval-select").props("modelValue")).toBe("auto");
-      expect(useProductAnalytics().funnelInterval.value).toBe("month");
+      expect(useProductAnalytics().funnelInterval.value).toBe("day");
     });
 
     it("an attribute breakdown's lines rank at its pinned step, or wait for the funnel's start step", async () => {
