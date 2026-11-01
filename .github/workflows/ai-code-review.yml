@@ -161,6 +161,7 @@ jobs:
           BRANCH: ${{ steps.pr.outputs.head_ref }}
           MARKER: ${{ matrix.provider.marker }}
           IGNORE_PASS_LIMIT: ${{ inputs.ignore_pass_limit || 'false' }}
+          FORCE_REVIEW: ${{ inputs.force_full || 'false' }}
         run: |
           set -uo pipefail
           if [ -z "$ENT_TOKEN" ]; then
@@ -184,6 +185,7 @@ jobs:
           if [ "$ent_ready" = "true" ]; then
             bypass=()
             if [ "$IGNORE_PASS_LIMIT" = "true" ]; then bypass=(-f ignore_pass_limit=true); fi
+            if [ "$FORCE_REVIEW" = "true" ]; then bypass+=(-f force_full=true); fi
             if ! GH_TOKEN="$ENT_TOKEN" gh workflow run ai-code-review.yml --repo "$ent_repo" --ref main -f pr_number="$ent_pr" "${bypass[@]}"; then
               echo "::warning::Could not dispatch the $ent_repo review; reviewing here."
               exit 0

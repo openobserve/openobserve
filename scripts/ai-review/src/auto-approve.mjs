@@ -1,3 +1,4 @@
+import { removeRepeatedly } from "./comments.mjs";
 import { LOADER_DIRS, LOADER_FILES } from "./sanitize.mjs";
 
 export const MAX_APPROVE_LINES = 100;
@@ -171,9 +172,12 @@ export function hasLookalikeLetters(texts) {
   return texts.some(raw => LOOKALIKE_LETTER_RE.test(String(raw ?? "").normalize("NFKC")));
 }
 
-// Only an approved callout may lead the review, so a body that disagrees with an empty findings block cannot approve.
+// Only an approved callout may lead the review and no other may render, so a body that disagrees with an empty findings block cannot approve; a fence ahead of it may be hiding the callout.
 export function isApprovedReview(text) {
-  return /^> \[!TIP\]/.test(/^> \[![A-Z]+\]/m.exec(String(text ?? ""))?.[0] ?? "");
+  const visible = removeRepeatedly(String(text ?? ""), /<!--[\s\S]*?--!?>/g, "");
+  const callouts = [...visible.matchAll(/^ {0,3}> ?\[!([A-Z]+)\]/gm)];
+  if (callouts.length === 0 || callouts.some(callout => callout[1] !== "TIP")) return false;
+  return !/^ {0,3}(?:`{3,}|~{3,})/m.test(visible.slice(0, callouts[0].index));
 }
 
 function coverageReasons({ diff, diffPinned, filteredFileCount, reviewedChars, pr }) {

@@ -223,7 +223,7 @@ function* removalPasses(text, pattern, replacement = "") {
   } while (out !== previous);
 }
 
-function removeRepeatedly(text, pattern, replacement) {
+export function removeRepeatedly(text, pattern, replacement) {
   let last = text;
   for (const pass of removalPasses(text, pattern, replacement)) last = pass;
   return last;
