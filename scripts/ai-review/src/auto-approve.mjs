@@ -172,12 +172,13 @@ export function hasLookalikeLetters(texts) {
   return texts.some(raw => LOOKALIKE_LETTER_RE.test(String(raw ?? "").normalize("NFKC")));
 }
 
-// Only an approved callout may lead the review and no other may render, so a body that disagrees with an empty findings block cannot approve; a fence ahead of it may be hiding the callout.
+// Only the exact approved block may render, alone, so a body that disagrees with an empty findings block cannot approve; a fence or HTML block ahead of it would turn it into quoted text.
 export function isApprovedReview(text) {
   const visible = removeRepeatedly(String(text ?? ""), /<!--[\s\S]*?--!?>/g, "");
-  const callouts = [...visible.matchAll(/^ {0,3}> ?\[!([A-Z]+)\]/gm)];
-  if (callouts.length === 0 || callouts.some(callout => callout[1] !== "TIP")) return false;
-  return !/^ {0,3}(?:`{3,}|~{3,})/m.test(visible.slice(0, callouts[0].index));
+  const callouts = [...visible.matchAll(/^ {0,3}> ?\[![A-Za-z]+\]/gm)];
+  const decision = /^> \[!TIP\]\n> ### ✅ Approved[ \t]*$/m.exec(visible);
+  if (callouts.length !== 1 || decision?.index !== callouts[0].index) return false;
+  return !/^ {0,3}(?:`{3,}|~{3,}|<)/m.test(visible.slice(0, decision.index));
 }
 
 function coverageReasons({ diff, diffPinned, filteredFileCount, reviewedChars, pr }) {

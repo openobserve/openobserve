@@ -171,7 +171,7 @@ jobs:
           ent_repo=openobserve/o2-enterprise
           # Any lookup error falls back to reviewing here: a missed pairing costs a duplicate review, a failed step costs the review.
           if ! ent_json="$(GH_TOKEN="$ENT_TOKEN" gh api -X GET "repos/$ent_repo/pulls" -f state=open -f head="${ent_repo%%/*}:$BRANCH" \
-            --jq '.[0] // {} | {number, isDraft: .draft, labels}')"; then
+            --jq "[.[] | select(.head.repo.full_name == \"$ent_repo\")][0] // {} | {number, isDraft: .draft, labels}")"; then
             echo "::warning::Could not look up a paired $ent_repo PR; reviewing here."
             exit 0
           fi
