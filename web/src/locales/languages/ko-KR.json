@@ -15142,6 +15142,7 @@
       "noStreamsDetected": "스트림이 감지되지 않았습니다.서비스 그래프 메트릭에 stream_name 레이블이 포함되어 있는지 확인하세요.",
       "borderColor": "테두리 색상",
       "borderColorMetric": "오류",
+      "dashedRingInferred": "점선 테두리: 추론된 종속성",
       "nodeSize": "노드 크기",
       "nodeSizeMetric": "요청",
       "sizeLow": "낮음",
