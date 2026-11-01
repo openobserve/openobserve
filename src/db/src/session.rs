@@ -21,10 +21,25 @@ use infra::db::{delete_from_db_coordinator, put_into_db_coordinator};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
+/// Returns whether a session has exceeded the configured idle period.
+/// Timestamps are Unix epoch microseconds; a zero timeout disables idle expiration.
+/// A session exactly at the timeout boundary is considered expired.
+fn is_idle_expired(last_activity_micros: i64, now_micros: i64, timeout_seconds: i64) -> bool {
+    if timeout_seconds <= 0 {
+        return false;
+    }
+    let timeout_micros = timeout_seconds.saturating_mul(1_000_000);
+    now_micros.saturating_sub(last_activity_micros) >= timeout_micros
+}
+
 // Key prefix for session events in coordinator
 pub const USER_SESSION_KEY: &str = "/user_sessions/";
 
 pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
+    let idle_timeout = config::get_config().auth.session_idle_timeout;
+    // Until last activity is persisted, cached tokens cannot establish idleness.
+    // Validate against the authoritative DB timestamp whenever idle timeout is enabled.
+    if idle_timeout <= 0 {
     // Check cache first for performance
     if let Some(token) = USER_SESSIONS.get(session_id) {
         let token_value = token.to_string();
@@ -35,7 +50,7 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
             let expires_at = *expires_at_ref;
             drop(expires_at_ref); // Drop reference before any operations
 
-            let now = chrono::Utc::now().timestamp();
+            let now = chrono::Utc::now().timestamp_micros();
             log::debug!(
                 "Session expiry check (cached): session={}, now={}, expires_at={}, expired={}",
                 session_id,
@@ -59,14 +74,15 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
                 }
                 return Err(anyhow::anyhow!("Session expired"));
             }
+            // Token is valid only when its expiration metadata is present.
+            return Ok(token_value);
         } else {
-            log::debug!(
-                "Session found in cache but NO EXPIRY INFO cached: {}",
-                session_id
-            );
+            // Do not allow a cache entry without expiry metadata to bypass validation.
+            log::warn!("Session cache missing expiry metadata: {}", session_id);
+            USER_SESSIONS.remove(session_id);
         }
-        // Token is valid and not expired
-        return Ok(token_value);
+    }
+
     }
 
     // Cache miss - fetch from DB
@@ -80,8 +96,13 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
         Some(session) => {
             // Check if session has expired
             let expires_at = session.expires_at;
-            let now = chrono::Utc::now().timestamp();
-            if now > expires_at {
+            let now = chrono::Utc::now().timestamp_micros();
+            if is_idle_expired(session.updated_at, now, idle_timeout) {
+                log::warn!("Session idle timeout exceeded: {}", session_id);
+                delete(session_id).await?;
+                return Err(anyhow::anyhow!("Session idle timeout exceeded"));
+            }
+            if now >= expires_at {
                 log::warn!(
                     "Session expired (db): {} (expired at {})",
                     session_id,
@@ -119,7 +140,7 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
 /// # Arguments
 /// * `session_id` - Unique session identifier
 /// * `val` - Access token to store
-/// * `expires_at` - Expiration timestamp (seconds since epoch) All sessions must have an expiry -
+/// * `expires_at` - Expiration timestamp (microseconds since epoch) All sessions must have an expiry -
 ///   either from JWT or default 24 hours
 pub async fn set_with_expiry(
     session_id: &str,
@@ -147,6 +168,23 @@ pub async fn set_with_expiry(
     USER_SESSIONS_EXPIRY.insert(session_id.to_string(), expires_at);
 
     Ok(())
+}
+
+/// Refreshes a session only after a separate, authenticated user-activity request.
+/// Never call this from ordinary API polling or the session lookup path.
+pub async fn record_user_activity(session_id: &str) -> Result<bool, anyhow::Error> {
+    let idle_timeout = config::get_config().auth.session_idle_timeout;
+    if idle_timeout <= 0 {
+        return Ok(false);
+    }
+
+    let refreshed = infra::table::sessions::touch_if_active(session_id, idle_timeout).await?;
+    if !refreshed {
+        // An expired or missing session must not remain usable from either cache.
+        USER_SESSIONS.remove(session_id);
+        USER_SESSIONS_EXPIRY.remove(session_id);
+    }
+    Ok(refreshed)
 }
 
 pub async fn delete(session_id: &str) -> Result<(), anyhow::Error> {
@@ -271,7 +309,7 @@ pub async fn cleanup_expired() -> Result<u64, anyhow::Error> {
         );
 
         // Clean up cache - check all cached sessions for expiry
-        let now = chrono::Utc::now().timestamp();
+        let now = chrono::Utc::now().timestamp_micros();
         let mut expired_sessions = Vec::new();
 
         // Collect expired session IDs
@@ -303,6 +341,25 @@ pub async fn cleanup_expired() -> Result<u64, anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_idle_expiration_boundary() {
+        let now = 1_800_000_000_i64;
+        assert!(!is_idle_expired(now - 1_799_000_000, now, 1800));
+        assert!(is_idle_expired(now - 1_800_000_000, now, 1800));
+        assert!(is_idle_expired(now - 1_801_000_000, now, 1800));
+    }
+
+    #[test]
+    fn test_idle_expiration_disabled() {
+        assert!(!is_idle_expired(0, 3_600_000_000, 0));
+        assert!(!is_idle_expired(0, 3_600_000_000, -1));
+    }
+
+    #[test]
+    fn test_idle_expiration_future_activity() {
+        assert!(!is_idle_expired(2_000_000_000, 1_000_000_000, 1800));
+    }
 
     #[test]
     fn test_user_session_key_format() {

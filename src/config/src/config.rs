@@ -1744,8 +1744,12 @@ pub struct Auth {
     pub delegation_signing_key_previous: String,
     #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
     pub service_account_enabled: bool,
-    /// Session cleanup interval in seconds (default: 3600 = 1 hour)
-    /// How often to run the background job that deletes expired sessions
+    /// Maximum idle time for interactive browser sessions in seconds (0 disables).
+    /// Disabled by default for backwards compatibility; opt in with 1800 for 30 minutes.
+    #[env_config(name = "ZO_SESSION_IDLE_TIMEOUT", default = 0)]
+    pub session_idle_timeout: i64,
+
+    /// Session cleanup interval in seconds (default: 3600 = 1 hour).
     #[env_config(name = "ZO_SESSION_CLEANUP_INTERVAL", default = 3600)]
     pub session_cleanup_interval: u64,
     /// Default session expiry in hours for migration (default: 24 hours)

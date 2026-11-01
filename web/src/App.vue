@@ -21,13 +21,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialogProvider />
     <CreateAlertDialogProvider />
     <UpdatePasswordDialog />
+    <div v-if="showSessionExpiredNotice" class="session-expired-backdrop">
+      <div class="session-expired-dialog" role="alertdialog" aria-modal="true" aria-labelledby="expired-title" aria-describedby="expired-description">
+        <h2 id="expired-title">Session expired</h2>
+        <p id="expired-description">Your session has expired or is no longer valid. Please sign in again to continue.</p>
+        <button type="button" @click="dismissSessionExpiredNotice">OK</button>
+      </div>
+    </div>
   </ConfigProvider>
 </template>
 
 <script lang="ts">
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { onMounted, watch } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
+import { expireSession } from "@/utils/sessionServices";
+import auth from "@/services/auth";
 import { applyCurrentTheme } from "@/utils/themeManager";
 import { getLocale, isRtlLocale } from "@/locales";
 import { ConfigProvider } from "reka-ui";
@@ -46,12 +55,46 @@ export default {
   },
   setup() {
     const store = useStore();
+    const showSessionExpiredNotice = ref(sessionStorage.getItem("o2:session-expired-notice") === "1");
+    sessionStorage.removeItem("o2:session-expired-notice");
+    const dismissSessionExpiredNotice = () => { showSessionExpiredNotice.value = false; };
     const router = useRouter();
     const creds = localStorage.getItem("creds");
     const layoutDirection: "rtl" | "ltr" = isRtlLocale(getLocale()) ? "rtl" : "ltr";
     if (creds) {
       router.push("/logs");
     }
+
+    // Only real user interaction triggers a heartbeat; API polling never does.
+    // The server is authoritative for the configurable idle timeout.
+    // Heartbeats must be substantially more frequent than the shortest supported idle timeout.
+    const heartbeatIntervalMs = 15 * 1000;
+    let lastHeartbeat = 0;
+    let heartbeatPending = false;
+    const markInteraction = () => {
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (!store.state.loggedIn || heartbeatPending ||
+          now - lastHeartbeat < heartbeatIntervalMs) return;
+      lastHeartbeat = now;
+      heartbeatPending = true;
+      void auth.session_activity()
+        .catch((error: any) => {
+          if (error?.response?.status === 401) expireSession(store);
+        })
+        .finally(() => { heartbeatPending = false; });
+    };
+    const interactionEvents = ["pointerdown", "keydown", "touchstart", "scroll"] as const;
+    onMounted(() => {
+      interactionEvents.forEach((event) =>
+        window.addEventListener(event, markInteraction, { passive: true }),
+      );
+    });
+    onUnmounted(() => {
+      interactionEvents.forEach((event) =>
+        window.removeEventListener(event, markInteraction),
+      );
+    });
 
     // Initialize theme colors on app mount
     // This runs once when the app loads and applies the correct theme colors
@@ -88,7 +131,17 @@ export default {
     return {
       store,
       layoutDirection,
+      showSessionExpiredNotice,
+      dismissSessionExpiredNotice,
     };
   },
 };
 </script>
+
+<style scoped>
+.session-expired-backdrop { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); }
+.session-expired-dialog { width: min(420px, calc(100vw - 32px)); padding: 24px; border-radius: 12px; background: #fff; color: #222; box-shadow: 0 12px 36px rgba(0,0,0,.25); }
+.session-expired-dialog h2 { margin: 0 0 12px; font-size: 20px; font-weight: 600; }
+.session-expired-dialog p { margin: 0 0 20px; font-size: 14px; line-height: 1.5; }
+.session-expired-dialog button { display: block; margin-left: auto; padding: 8px 20px; border: 0; border-radius: 6px; background: #5969d8; color: white; cursor: pointer; }
+</style>

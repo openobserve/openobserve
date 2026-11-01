@@ -26,6 +26,8 @@ pub async fn get(session_id: &str) -> Result<Option<Model>, errors::Error> {
     let client = get_orm_client_ro().await;
     let session = Entity::find()
         .filter(Column::SessionId.eq(session_id))
+        // Session expiration timestamps are stored as epoch microseconds.
+        .filter(Column::ExpiresAt.gt(chrono::Utc::now().timestamp_micros()))
         .one(client)
         .await?;
     Ok(session)
@@ -36,7 +38,7 @@ pub async fn get(session_id: &str) -> Result<Option<Model>, errors::Error> {
 /// # Arguments
 /// * `session_id` - Unique session identifier
 /// * `access_token` - Access token to store
-/// * `expires_at` - Expiration timestamp (seconds since epoch) All sessions must have an expiry -
+/// * `expires_at` - Expiration timestamp (microseconds since epoch) All sessions must have an expiry -
 ///   either from JWT or default 24 hours
 pub async fn set_with_expiry(
     session_id: &str,
@@ -73,6 +75,25 @@ pub async fn set_with_expiry(
     }
 }
 
+/// Records explicit user activity only while the session is still valid.
+/// The conditional update prevents a stale heartbeat from reviving an expired session.
+pub async fn touch_if_active(
+    session_id: &str,
+    idle_timeout_seconds: i64,
+) -> Result<bool, errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let cutoff = now.saturating_sub(idle_timeout_seconds.saturating_mul(1_000_000));
+    let client = get_orm_client_rw().await;
+    let result = Entity::update_many()
+        .col_expr(Column::UpdatedAt, sea_orm::sea_query::Expr::value(now))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::ExpiresAt.gt(now))
+        .filter(Column::UpdatedAt.gt(cutoff))
+        .exec(client)
+        .await?;
+    Ok(result.rows_affected > 0)
+}
+
 /// Deletes a session by session_id
 pub async fn delete(session_id: &str) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
@@ -94,7 +115,7 @@ pub async fn list() -> Result<Vec<Model>, errors::Error> {
 /// This is more efficient than deleting one at a time
 pub async fn delete_expired() -> Result<u64, errors::Error> {
     let client = get_orm_client_rw().await;
-    let now = chrono::Utc::now().timestamp();
+    let now = chrono::Utc::now().timestamp_micros();
 
     let result = Entity::delete_many()
         .filter(Column::ExpiresAt.lt(now))

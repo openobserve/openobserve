@@ -944,6 +944,8 @@ pub fn basic_routes() -> Router {
         .route("/presigned-url", get(users::get_presigned_url))
         .route("/invites", get(users::list_invitations))
         .route("/invites/{token}", delete(users::decline_invitation));
+    #[cfg(not(feature = "enterprise"))]
+    let auth_routes = auth_routes.route("/activity", post(users::native_session_activity));
     router = router.nest("/auth", auth_routes);
 
     let node_routes = node_routes()
