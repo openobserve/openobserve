@@ -1,0 +1,132 @@
+name: UI dependency cache proof
+on:
+  push:
+    branches: [bench/ui-dependency-cache-proof-20261101]
+    paths:
+      - .github/workflows/ui-dependency-cache-proof.yml
+      - .github/ui-dependency-cache-proof/**
+permissions:
+  contents: read
+  actions: read
+jobs:
+  measure:
+    if: github.repository == 'openobserve/openobserve' && !github.event.repository.private
+    runs-on: ubicloud-standard-8
+    timeout-minutes: 8
+    env:
+      COLUMNS: 150
+      ZO_RESULT_CACHE_ENABLED: true
+      UI_NODE_VERSION: '24.22.0'
+      UI_NPM_VERSION: '11.19.1'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+    steps:
+      - name: Start proof budget
+        run: echo "PROOF_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/github-auth
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.22.0'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Freeze exact compatibility and proof key
+        id: identity
+        run: python3 .github/ui-dependency-cache-proof/proof.py init
+      - name: Warm install and lifecycle prerequisite
+        id: preparation
+        timeout-minutes: 2
+        run: python3 .github/ui-dependency-cache-proof/proof.py install preparation
+      - name: Start cache save measurement
+        run: python3 .github/ui-dependency-cache-proof/proof.py begin save
+      - name: Save proof-only installed tree
+        id: saved
+        uses: actions/cache/save@v6
+        timeout-minutes: 1
+        continue-on-error: true
+        with:
+          path: web/node_modules
+          key: ${{ steps.identity.outputs.key }}
+          enableCrossOsArchive: false
+      - name: Record cache save cost
+        env:
+          OUTCOME: ${{ steps.saved.outcome }}
+        run: python3 .github/ui-dependency-cache-proof/proof.py save-end "$OUTCOME"
+      - name: First clean warm-download npm ci
+        timeout-minutes: 2
+        run: python3 .github/ui-dependency-cache-proof/proof.py install install-first
+      - name: Start first restore measurement
+        run: python3 .github/ui-dependency-cache-proof/proof.py begin restore-first
+      - name: First exact installed-tree restore
+        id: restore_first
+        uses: actions/cache/restore@v6
+        timeout-minutes: 1
+        continue-on-error: true
+        with:
+          path: web/node_modules
+          key: ${{ steps.identity.outputs.key }}
+          enableCrossOsArchive: false
+      - name: Validate first restore or perform measured fallback
+        timeout-minutes: 2
+        env:
+          HIT: ${{ steps.restore_first.outputs.cache-hit }}
+          MATCHED: ${{ steps.restore_first.outputs.cache-matched-key }}
+          PRIMARY: ${{ steps.restore_first.outputs.cache-primary-key }}
+          OUTCOME: ${{ steps.restore_first.outcome }}
+        run: python3 .github/ui-dependency-cache-proof/proof.py restored restore-first "$HIT" "$MATCHED" "$PRIMARY" "$OUTCOME"
+      - name: Start second restore measurement
+        run: python3 .github/ui-dependency-cache-proof/proof.py begin restore-second
+      - name: Second exact installed-tree restore
+        id: restore_second
+        uses: actions/cache/restore@v6
+        timeout-minutes: 1
+        continue-on-error: true
+        with:
+          path: web/node_modules
+          key: ${{ steps.identity.outputs.key }}
+          enableCrossOsArchive: false
+      - name: Validate second restore or perform measured fallback
+        timeout-minutes: 2
+        env:
+          HIT: ${{ steps.restore_second.outputs.cache-hit }}
+          MATCHED: ${{ steps.restore_second.outputs.cache-matched-key }}
+          PRIMARY: ${{ steps.restore_second.outputs.cache-primary-key }}
+          OUTCOME: ${{ steps.restore_second.outcome }}
+        run: python3 .github/ui-dependency-cache-proof/proof.py restored restore-second "$HIT" "$MATCHED" "$PRIMARY" "$OUTCOME"
+      - name: Last clean warm-download npm ci
+        timeout-minutes: 2
+        run: python3 .github/ui-dependency-cache-proof/proof.py install install-last
+      - name: Start deliberate miss measurement
+        run: python3 .github/ui-dependency-cache-proof/proof.py begin cold
+      - name: Independent deliberately absent key
+        id: cold
+        uses: actions/cache/restore@v6
+        timeout-minutes: 1
+        continue-on-error: true
+        with:
+          path: web/node_modules
+          key: ${{ steps.identity.outputs.key }}-deliberate-miss
+          enableCrossOsArchive: false
+      - name: Prove cold npm ci fallback
+        timeout-minutes: 2
+        env:
+          HIT: ${{ steps.cold.outputs.cache-hit }}
+          MATCHED: ${{ steps.cold.outputs.cache-matched-key }}
+          PRIMARY: ${{ steps.cold.outputs.cache-primary-key }}
+          OUTCOME: ${{ steps.cold.outcome }}
+        run: python3 .github/ui-dependency-cache-proof/proof.py missed "$HIT" "$MATCHED" "$PRIMARY" "$OUTCOME"
+      - name: Record cache size and complete cost accounting
+        if: always()
+        timeout-minutes: 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/ui-dependency-cache-proof/proof.py finish
+      - uses: actions/upload-artifact@v4
+        if: always()
+        timeout-minutes: 1
+        with:
+          name: ui-dependency-cache-proof-${{ github.run_id }}
+          path: ${{ runner.temp }}/dependency-cache-artifact/
+          retention-days: 3
+          if-no-files-found: error
