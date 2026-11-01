@@ -1,4 +1,5 @@
 import fcntl
+import json
 import requests
 import pytest
 import os
@@ -92,6 +93,13 @@ def _ingest_seed_data_once():
     org = DEFAULT_ORG_ID
     base_url_with_slash = BASE_URL if BASE_URL.endswith('/') else BASE_URL + '/'
 
+    with open(root_dir / "test-data/logs_data.json") as f:
+        data = f.read()
+    with open(root_dir / "test-data/match_all.json") as f:
+        camel_data = f.read()
+    # A row count short of both files means a partial earlier ingest, which must not count as seeded.
+    expected_rows = len(json.loads(data)) + len(json.loads(camel_data))
+
     def _data_is_searchable():
         search_url = f"{base_url_with_slash}api/{org}/_search?type=logs"
         # Seed rows are stamped at ingest, so anything older than the tests' 1h window is stale.
@@ -111,7 +119,7 @@ def _ingest_seed_data_once():
         if r.status_code != 200:
             return False
         hits = r.json().get("hits", [])
-        return bool(hits and hits[0].get("c", 0) > 0)
+        return bool(hits and hits[0].get("c", 0) >= expected_rows)
 
     # A second ingest would double every count that tests assert on this stream.
     if _data_is_searchable():
@@ -119,15 +127,11 @@ def _ingest_seed_data_once():
         return
 
     url = f"{base_url_with_slash}api/{org}/{stream_name}/_json"
-    with open(root_dir / "test-data/logs_data.json") as f:
-        data = f.read()
     resp1 = session.post(url, data=data, headers={"Content-Type": "application/json"})
     logging.info("Main data ingested successfully, status code: %s", resp1.status_code)
     assert resp1.status_code == 200, \
         f"Failed to ingest main test data: {resp1.status_code} - {resp1.text[:500]}"
 
-    with open(root_dir / "test-data/match_all.json") as f:
-        camel_data = f.read()
     resp2 = session.post(url, data=camel_data, headers={"Content-Type": "application/json"})
     logging.info("Camel case data ingested successfully, status code: %s", resp2.status_code)
     assert resp2.status_code == 200, \
