@@ -45,6 +45,15 @@ vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
 }));
 vi.mock("@/composables/useBreakpoint", () => ({ default: () => ({ mdUp: ref(mdUp.value) }) }));
 
+const DROPDOWN = { template: "<div><slot name='trigger' /><slot /></div>" };
+
+const DROPDOWN_ITEM = {
+  emits: ["select"],
+  props: ["disabled", "description"],
+  template:
+    "<button :aria-disabled=\"disabled ? 'true' : undefined\" @click=\"$emit('select')\"><slot />{{ description }}</button>",
+};
+
 const prompt: ChatMessage = {
   role: "user",
   content: raw("why 5xx?"),
@@ -80,6 +89,7 @@ function mountActions(props: Record<string, unknown>) {
   return mount(AssistantMessageActions, {
     props: { sid: fake.current.sid, turnId: "t1", isLast: true, promptNumber: 1, ...props },
     attachTo: document.body,
+    global: { stubs: { ODropdown: DROPDOWN, ODropdownItem: DROPDOWN_ITEM } },
   });
 }
 
@@ -170,11 +180,32 @@ describe("AssistantMessageActions", () => {
     ).not.toContain("opacity-0");
   });
 
-  it("is a kebab below md (EB-09 AC 10)", () => {
+  it("keeps Copy and More at every width on an answer, and a kebab on a prompt below md (EB-09 AC 10)", () => {
     mdUp.value = false;
     const wrapper = mountActions({ message: answer, prompt });
     expect(wrapper.find('[data-test="assistant-msg-more"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="assistant-msg-actions"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-msg-copy-answer"]').exists()).toBe(true);
+    const onPrompt = mountActions({ message: prompt });
+    expect(onPrompt.find('[data-test="assistant-msg-actions"]').exists()).toBe(false);
+    expect(onPrompt.find('[data-test="assistant-msg-more"]').exists()).toBe(true);
+  });
+
+  it("drops Regenerate from More while Re-run shows", () => {
+    const wrapper = mountActions({ message: answer, prompt, canRegenerate: false });
+    expect(wrapper.find('[data-test="assistant-msg-regenerate"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-msg-copy-md"]').exists()).toBe(true);
+  });
+
+  it("copies the chat id from More", async () => {
+    const dispatch = vi.spyOn(fake.current.store, "dispatch").mockResolvedValue({ ok: true });
+    const wrapper = mountActions({ message: answer, prompt });
+    await wrapper.get('[data-test="assistant-copy-chat-id"]').trigger("click");
+    await flushPromises();
+    expect(dispatch).toHaveBeenCalledWith(fake.current.sid, {
+      kind: "copy",
+      text: fake.current.sid,
+      what: "chat_id",
+    });
   });
 
   it("edits inline: Escape cancels with nothing sent, Send starts a new turn with the chips (EB-09 AC 4)", async () => {

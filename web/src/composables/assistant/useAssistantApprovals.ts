@@ -169,6 +169,12 @@ export function useAssistantApprovals(sid: Sid): {
   };
 }
 
+/** True while the composer writes the reply or the typed answer to this card. */
+export function isReplyingTo(sid: Sid | undefined, approvalId: string): boolean {
+  const composer = sid ? runtimeHandle().value?.store.state.sessions[sid]?.composer : null;
+  return composer?.mode === "reply" && composer.replyApprovalId === approvalId;
+}
+
 /** The built runtime's approvals, for the cards and records that act on it; `null` before it exists. */
 export function assistantApprovals(): ApprovalsRuntime | null {
   return runtimeHandle().value?.approvals ?? null;
@@ -395,7 +401,21 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
       // A click answers the card it was made on, and an approve always names it; a card that changed since is never decided for it.
       const named = approvalId === undefined ? !decision.approved : pending?.id === approvalId;
       if (!pending || !named) return Promise.resolve(emptyResult("failed", "", deps.now()));
-      return run(sid, pending.id, decision);
+      // The composer's reply mode is how a question takes the user's own words.
+      const typedAnswer =
+        pending.kind === "question" && !decision.approved && decision.reason === "reply";
+      return run(
+        sid,
+        pending.id,
+        typedAnswer
+          ? {
+              approved: false,
+              reason: "answer",
+              answer: decision.reply,
+              answerLabel: decision.reply,
+            }
+          : decision,
+      );
     },
     async withdraw(sid, reason) {
       const pending = sessionOf(sid)?.pendingApproval;
@@ -524,9 +544,11 @@ export function entityKeyOf(type: string | undefined): string {
 /** The card's heading: verb, entity and name in one sentence; the raw id is never part of it (D3-n). */
 export function approvalHeading(
   t: TranslateFn,
-  card: Pick<ApprovalBlockData, "kind" | "targets" | "tool" | "args">,
+  card: Pick<ApprovalBlockData, "kind" | "targets" | "tool" | "args"> &
+    Partial<Pick<ApprovalBlockData, "question">>,
   count: number,
 ): I18nText {
+  if (card.kind === "question") return raw(card.question ?? "");
   const verb = approvalVerb(card);
   const toolset = typeof card.args?.toolset === "string" ? card.args.toolset : card.tool;
   if (verb === "delete") {
@@ -699,6 +721,8 @@ function pendingOf(
     grantable: block.grantable,
     editable: block.editable,
     question: block.question,
+    ...(block.options && { options: block.options }),
+    ...(block.allowOther !== undefined && { allowOther: block.allowOther }),
   };
 }
 
@@ -766,8 +790,7 @@ function decisionKind(
   decision: ApprovalDecision,
 ): AiEventProps["ai_approval_decided"]["decision"] | null {
   if (decision.approved) return "approve";
-  if (decision.reason === "deny" || decision.reason === "escape" || decision.reason === "reply")
-    return decision.reason;
+  if (decision.reason === "deny" || decision.reason === "reply") return decision.reason;
   return decision.reason === "edited" ? "edit_then_approve" : null;
 }
 

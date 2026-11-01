@@ -247,6 +247,22 @@ const findingsFrameSchema = z.looseObject({
   next_steps: z.array(z.string()),
 });
 
+const askUserOptionSchema = z.looseObject({ id: z.string(), label: z.string() });
+
+const askUserFrameSchema = z.looseObject({
+  type: z.literal("ask_user"),
+  request_id: z.string(),
+  question: z.string(),
+  options: z.array(askUserOptionSchema).optional(),
+  allow_other: z.boolean().optional(),
+  expires_at: z.number().optional(),
+});
+
+const followUpsFrameSchema = z.looseObject({
+  type: z.literal("follow_ups"),
+  items: z.array(z.string()),
+});
+
 const syncFrameSchema = z.looseObject({ type: z.literal("sync") });
 
 const syncStateFrameSchema = z.looseObject({ type: z.literal("sync_state") });
@@ -277,6 +293,8 @@ export const assistantFrameSchema = z.discriminatedUnion("type", [
   queryFrameSchema,
   resourceChangedFrameSchema,
   findingsFrameSchema,
+  askUserFrameSchema,
+  followUpsFrameSchema,
   syncFrameSchema,
   syncStateFrameSchema,
 ]);
@@ -309,6 +327,8 @@ export type ConfirmationResolvedFrame = FrameOf<"confirmation_resolved">;
 export type QueryFrame = FrameOf<"query">;
 export type ResourceChangedFrame = FrameOf<"resource_changed">;
 export type FindingsFrame = FrameOf<"findings">;
+export type AskUserFrame = FrameOf<"ask_user">;
+export type FollowUpsFrame = FrameOf<"follow_ups">;
 
 /** A line that is not JSON, not an object, or not a known frame; the parser counts it and moves on. */
 export interface UnknownFrame {

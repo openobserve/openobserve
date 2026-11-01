@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-w-0 flex-1 items-center gap-2">
       <span class="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
         <OIcon v-if="glyph" :name="glyph" size="xs" data-test="assistant-turn-status-glyph" />
-        <OSpinner v-else variant="dots" size="xs" data-test="assistant-turn-status-spinner" />
+        <AssistantStatusDot v-else state="working" data-test="assistant-turn-status-spinner" />
       </span>
       <span class="flex min-w-0 flex-1 flex-col">
         <OTruncatedText class="min-w-0" data-test="assistant-turn-status-text">{{
@@ -100,6 +100,7 @@ const OWN_WORDS: ReadonlySet<string> = new Set([
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 
+import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import {
   elapsedMs,
@@ -112,7 +113,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatElapsed } from "@/utils/formatters";
 
@@ -128,10 +128,6 @@ const emit = defineEmits<AssistantTurnStatusEmits>();
 
 const { t } = useI18nTyped();
 const tick = ref(0);
-const reducedMotion =
-  typeof window !== "undefined" &&
-  typeof window.matchMedia === "function" &&
-  window.matchMedia("(prefers-reduced-motion: reduce)")?.matches === true;
 
 const live = computed(() => props.turn.state !== "idle" && !isTerminal(props.turn));
 
@@ -173,13 +169,13 @@ function hostLine(now: number, shared: I18nText): I18nText | null {
     : t("assistant.rca.status.analysing", { elapsed });
 }
 
-// No motion while the turn waits on the user, and a static glyph under reduced motion (HT-01 AC 4, AC 11).
+// No motion while the turn waits on the user or the line is down (HT-01 AC 4, AC 11).
 const glyph = computed(() => {
   if (!props.ownedByThisTab) return assistantGlyph.elsewhere;
   const state = props.turn.state;
   if (state === "awaiting_approval" || state === "awaiting_consent") return assistantGlyph.waiting;
   if (status.value?.line === t("assistant.turn.caughtUp")) return assistantGlyph.done;
-  return reducedMotion ? assistantGlyph.working : null;
+  return state === "reconnecting" ? assistantGlyph.regenerate : null;
 });
 
 let timer: ReturnType<typeof setInterval> | null = null;

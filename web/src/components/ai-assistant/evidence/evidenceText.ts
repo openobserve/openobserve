@@ -15,7 +15,12 @@
 
 import type { ComputedRef, InjectionKey } from "vue";
 
-import { stepLabelOf, type QueryRef, type StepFacts } from "@/composables/assistant/pure";
+import {
+  answerDataAt,
+  stepLabelOf,
+  type QueryRef,
+  type StepFacts,
+} from "@/composables/assistant/pure";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { formatCount, formatElapsed, formatOrgRange } from "@/utils/formatters";
 
@@ -27,6 +32,21 @@ const LANGUAGE_LABELS: Record<QueryRef["language"], string> = {
 };
 
 const QUERY_KINDS: ReadonlySet<StepFacts["kind"]> = new Set(["query", "promql", "traces"]);
+
+const MINUTE_MS = 60_000;
+
+const HOUR_MS = 3_600_000;
+
+// A window that ended this close to the send is a relative one.
+const NOW_SLACK_MS = 2 * MINUTE_MS;
+
+// Up to two days an age reads in hours, then in days.
+const HOURS_SHOWN = 48;
+
+const SQL_SHAPE =
+  /^SELECT\s+([\s\S]+?)\s+FROM\s+\S+(?:\s+WHERE\s+([\s\S]+?))?(\s+(?:GROUP|ORDER|LIMIT|HAVING)\b[\s\S]*)?;?$/i;
+
+const AND_AT = /^\sAND\s$/i;
 
 /** One answer's claim numbers by `call_id`, so prose chips and findings chips agree. */
 export const claimNumbersKey: InjectionKey<ComputedRef<Map<string, number>>> =
@@ -47,6 +67,53 @@ export function explorerLabel(explorer: "logs" | "metrics" | "traces", t: Transl
   if (explorer === "metrics") return t("common.metrics");
   if (explorer === "traces") return t("common.traces");
   return t("common.logs");
+}
+
+/** The question line's range: "Last 1 h" when the window ended as it was asked, else its clock range. */
+export function lastRangeText(
+  window: { from: number; to: number },
+  sentAt: number | undefined,
+  t: TranslateFn,
+): I18nText {
+  const minutes = Math.round((window.to - window.from) / MINUTE_MS);
+  if (sentAt === undefined || Math.abs(sentAt - window.to) > NOW_SLACK_MS || minutes < 1)
+    return clockRangeText(window);
+  return minutes % 60 === 0
+    ? t("assistant.turn.lastHours", { n: minutes / 60 })
+    : t("assistant.turn.lastMinutes", { n: minutes });
+}
+
+/** The clock range of a window without its zone: "14:06–15:06". */
+export function clockRangeText(range: { from: number; to: number }): I18nText {
+  return raw(formatOrgRange(range.from, range.to).replace(/\s\S+$/, ""));
+}
+
+/** "Data from 3 h ago": the age of the newest data the steps read. */
+export function dataAgeText(steps: StepFacts[], now: number, t: TranslateFn): I18nText {
+  const at = answerDataAt(steps);
+  const ms = at === null ? 0 : Math.max(0, now - at);
+  const hours = Math.floor(ms / HOUR_MS);
+  const age =
+    hours >= HOURS_SHOWN
+      ? t("assistant.turn.ageDays", { n: Math.floor(hours / 24) })
+      : t("assistant.turn.ageHours", { n: Math.max(hours, 1) });
+  return t("assistant.turn.dataAge", { age });
+}
+
+/** The part of each query that tells it from its siblings, verbatim from the SQL; other languages stay whole. */
+export function queryFragments(queries: string[]): string[] {
+  const parts = queries.map(sqlParts);
+  const seen = new Map<string, number>();
+  for (const part of parts)
+    for (const term of new Set(part?.terms ?? [])) seen.set(term, (seen.get(term) ?? 0) + 1);
+  const [shared, count] = [...seen].sort((a, b) => b[1] - a[1])[0] ?? ["", 0];
+  // The filter most queries share is the chat's subject, not what this query asked.
+  const common = queries.length > 1 && count * 2 > queries.length ? shared : null;
+  return parts.map((part, index) => {
+    if (!part) return queries[index];
+    const own = part.terms.filter((term) => term !== common).join(" AND ");
+    return [own, part.tail].filter(Boolean).join(" ") || part.select || queries[index];
+  });
 }
 
 /** A trail row: what the step did, then its facts, composed from structured fields. */
@@ -108,7 +175,16 @@ export function stepName(step: StepFacts, t: TranslateFn): I18nText {
   return t("assistant.steps.rowName", { step: stepLine(step, t), state });
 }
 
-/** The verb and window of a step, the claim chip's and a footnote's label. */
+/** A citation's accessible name: "Citation 1, query 1, 3 rows". */
+export function citationName(n: number, step: StepFacts, t: TranslateFn): I18nText {
+  const rows =
+    step.rows !== null
+      ? t("assistant.steps.rows", { count: formatCount(step.rows) }, step.rows)
+      : stepVerb(step, t);
+  return t("assistant.claim.citation", { n, rows });
+}
+
+/** The verb and window of a step, a footnote's label. */
 export function stepCitation(step: StepFacts, t: TranslateFn): I18nText {
   return joined([stepVerb(step, t), step.range ? rangeText(step.range) : null]);
 }
@@ -138,6 +214,31 @@ function stepFactsText(step: StepFacts, t: TranslateFn): (I18nText | null)[] {
     ];
   }
   return [took];
+}
+
+// Splits on the WHERE's top-level ANDs; a quoted or bracketed AND stays inside its term.
+function sqlParts(sql: string): { select: string; terms: string[]; tail: string } | null {
+  const shape = SQL_SHAPE.exec(sql.trim());
+  if (!shape) return null;
+  const [, select, where = "", tail = ""] = shape;
+  const terms: string[] = [];
+  let depth = 0;
+  let quote = "";
+  let start = 0;
+  for (let i = 0; i < where.length; i++) {
+    const ch = where[i];
+    if (quote) quote = ch === quote ? "" : quote;
+    else if (ch === "'" || ch === '"') quote = ch;
+    else if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    else if (depth === 0 && AND_AT.test(where.slice(i, i + 5))) {
+      terms.push(where.slice(start, i).trim());
+      start = i + 5;
+      i += 4;
+    }
+  }
+  terms.push(where.slice(start).trim());
+  return { select: select.trim(), terms: terms.filter(Boolean), tail: tail.trim() };
 }
 
 // Facts are separate values of one row, never one sentence split across keys.

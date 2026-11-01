@@ -300,7 +300,7 @@ describe("AssistantTranscript", () => {
     const { wrapper, host } = mountLive(session);
     const outcome = wrapper.get('[data-test="assistant-turn-outcome"]');
     expect(outcome.attributes("data-code")).toBe("stream_dropped");
-    expect(outcome.text()).toContain("Connection lost after 40 s.");
+    expect(outcome.text()).toContain("Connection lost. The answer above is incomplete.");
     await wrapper.get('[data-test="assistant-turn-outcome-action"]').trigger("click");
     expect(host.outcomeAction).toHaveBeenCalledWith(
       "s1",
@@ -330,7 +330,9 @@ describe("AssistantTranscript", () => {
       ],
     };
     const { wrapper } = mountLive(liveSession([prompt("q", "t1"), steps]));
-    expect(wrapper.get('[data-test="assistant-turn-outcome-title"]').text()).toBe("Stopped");
+    expect(wrapper.get('[data-test="assistant-turn-outcome-title"]').text()).toBe(
+      "Stopped after 2 steps, incomplete",
+    );
   });
 
   it("says when the running turn gains an outcome, never for a chat that opens with one (U12)", async () => {
@@ -436,7 +438,7 @@ describe("AssistantTranscript: agents (MULTI-AGENT-03, 04, 05)", () => {
     ]);
     const { wrapper } = mountLive(session);
     const metas = wrapper.findAll('[data-test="assistant-agent-identity"]');
-    expect(metas.map((meta) => meta.attributes("data-agent"))).toEqual(["o2-ai", "sre"]);
+    expect(metas.map((meta) => meta.attributes("data-agent"))).toEqual(["sre"]);
     expect(wrapper.get('[data-test="assistant-answer-t2"]').attributes("aria-label")).toBe(
       "Investigator, answer to look deeper",
     );

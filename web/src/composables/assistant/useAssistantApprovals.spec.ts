@@ -437,12 +437,53 @@ describe("useAssistantApprovals", () => {
   it("tracks the decision with its latency and input, never content", async () => {
     const { sid, approvals } = setup();
     now += 4_000;
-    await approvals.decide(sid, { approved: false, reason: "escape" });
+    await approvals.decide(sid, { approved: false, reason: "deny" });
     expect(track).toHaveBeenCalledWith(
       "ai_approval_decided",
-      { decision: "escape", items_count: 0, latency_ms: 4_000, input: "click" },
+      { decision: "deny", items_count: 0, latency_ms: 4_000, input: "click" },
       expect.anything(),
     );
+  });
+
+  describe("question", () => {
+    const QUESTION = {
+      type: "confirmation_required",
+      id: "q1",
+      tool: "ask_user",
+      kind: "question",
+      message: "Which folder?",
+      options: [{ id: "payments", label: "Payments" }],
+      allow_other: true,
+    } as ConfirmationRequiredFrame;
+
+    it("posts a choice with { answer } on the request id, and records its label", async () => {
+      const { sid, env, approvals, session } = setup(QUESTION);
+      await approvals.decide(
+        sid,
+        { approved: false, reason: "answer", answer: "payments", answerLabel: "Payments" },
+        "q1",
+      );
+      expect(env.confirm).toHaveBeenCalledWith(
+        expect.anything(),
+        sid,
+        { id: "q1", answer: "payments" },
+        expect.anything(),
+      );
+      expect(session.pendingApproval).toBeNull();
+      expect(approvalOutcomeOf(session, "q1").outcome?.state).toBe("answered");
+    });
+
+    it("takes the composer's text as the answer, and sends no follow-up turn", async () => {
+      const { sid, env, approvals, session } = setup(QUESTION);
+      await approvals.decide(sid, { approved: false, reason: "reply", reply: "Platform" }, "q1");
+      expect(env.confirm).toHaveBeenCalledWith(
+        expect.anything(),
+        sid,
+        { id: "q1", answer: "Platform" },
+        expect.anything(),
+      );
+      expect(approvalOutcomeOf(session, "q1").outcome?.state).toBe("answered");
+    });
   });
 
   it("never lets Send again answer a card that arrived after the failed one", async () => {

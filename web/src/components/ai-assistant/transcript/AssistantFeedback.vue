@@ -17,14 +17,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="visible"
-    class="flex min-w-0 flex-col gap-1"
+    class="group/feedback flex min-w-0 flex-col gap-1"
     role="group"
-    :aria-label="t('assistant.feedback.groupName')"
+    :aria-label="
+      cause ? t('assistant.findings.wasThisTheCause') : t('assistant.feedback.groupName')
+    "
     data-test="assistant-feedback"
   >
     <div class="flex items-center gap-1">
+      <span
+        v-if="cause"
+        aria-hidden="true"
+        class="text-text-secondary hidden text-xs group-focus-within/feedback:inline group-hover/feedback:inline"
+        data-test="assistant-feedback-cause-word"
+      >
+        {{ t("assistant.findings.wasThisTheCause") }}
+      </span>
       <AssistantIconButton
-        :label="t('assistant.feedback.helpful')"
+        :label="upLabel"
         :icon="assistantGlyph.helpful"
         :pressed="vote === 'up'"
         data-test="assistant-feedback-up"
@@ -32,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <span v-if="isMobile" :ref="bindSheetTrigger" class="contents">
         <AssistantIconButton
-          :label="t('assistant.feedback.notHelpful')"
+          :label="downLabel"
           :icon="assistantGlyph.notHelpful"
           :pressed="vote === 'down'"
           aria-haspopup="dialog"
@@ -45,14 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-sm"
-            :aria-label="t('assistant.feedback.notHelpful')"
+            :aria-label="downLabel"
             :aria-pressed="vote === 'down'"
             :class="TOUCH_TARGET_CLASS"
             data-test="assistant-feedback-down"
           >
             <OIcon :name="assistantGlyph.notHelpful" size="sm" />
             <!-- The tooltip would sit over the dialog its button opened -->
-            <OTooltip :content="t('assistant.feedback.notHelpful')" :disabled="reasonOpen" />
+            <OTooltip :content="downLabel" :disabled="reasonOpen" />
           </OButton>
         </template>
         <div
@@ -94,39 +104,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("assistant.feedback.disclosure") }}
           </OText>
-          <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex gap-2 self-end max-md:w-full">
             <OButton
-              variant="ghost"
-              size="xs"
-              :class="TOUCH_TARGET_CLASS"
-              data-test="assistant-copy-chat-id"
-              @click="copyChatId"
+              variant="outline"
+              size="sm"
+              :class="['max-md:flex-1', TOUCH_TARGET_CLASS]"
+              data-test="assistant-feedback-cancel"
+              @click="closeReason"
             >
-              {{ t("assistant.feedback.copyChatId") }}
-              <span class="text-text-secondary font-mono">{{ shortId }}</span>
-              <OTooltip :content="fullId" />
+              {{ t("assistant.feedback.cancel") }}
             </OButton>
-            <div class="flex gap-2 max-md:w-full">
-              <OButton
-                variant="outline"
-                size="sm"
-                :class="['max-md:flex-1', TOUCH_TARGET_CLASS]"
-                data-test="assistant-feedback-cancel"
-                @click="closeReason"
-              >
-                {{ t("assistant.feedback.cancel") }}
-              </OButton>
-              <OButton
-                variant="primary"
-                size="sm"
-                :loading="sending"
-                :class="['max-md:flex-1', TOUCH_TARGET_CLASS]"
-                data-test="assistant-feedback-send"
-                @click="sendReason"
-              >
-                {{ t("assistant.feedback.send") }}
-              </OButton>
-            </div>
+            <OButton
+              variant="primary"
+              size="sm"
+              :loading="sending"
+              :class="['max-md:flex-1', TOUCH_TARGET_CLASS]"
+              data-test="assistant-feedback-send"
+              @click="sendReason"
+            >
+              {{ t("assistant.feedback.send") }}
+            </OButton>
           </div>
           <OText v-if="localOnly" variant="meta" as="p" data-test="assistant-feedback-local-only">
             {{ t("assistant.feedback.localOnlyId") }}
@@ -179,13 +176,11 @@ import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OSheet from "@/lib/overlay/Sheet/OSheet.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { ChatMessage } from "@/ts/interfaces/chat";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 const REASONS = ["wrong_data", "wrong_query", "too_slow", "wrong_action", "other"] as const;
 
 const THANKS_MS = 3_000;
-
-const SHORT_ID_CHARS = 8;
 
 const props = withDefaults(
   defineProps<{
@@ -220,14 +215,23 @@ const visible = computed(
     (props.turn?.outcome === "done" || props.turn?.outcome === "done_not_saved") &&
     !!footerOf(props.message),
 );
+// A findings answer asks whether this was the cause; an inconclusive one claims no cause to rate.
+const cause = computed(() => {
+  const findings = props.message.contentBlocks?.find((block) => block.findings)?.findings;
+  return !!findings && findings.confidence !== "inconclusive";
+});
+const upLabel = computed(() =>
+  cause.value ? t("assistant.findings.yes") : t("assistant.feedback.helpful"),
+);
+const downLabel = computed(() =>
+  cause.value ? t("assistant.findings.no") : t("assistant.feedback.notHelpful"),
+);
 const vote = computed(() => {
   if (failedVote.value) return null;
   const session = sid.value && evidence ? evidence.session(sid.value) : null;
-  const key = turnAnnotationKey(props.turn?.turnId ?? "", "feedback");
+  const key = turnAnnotationKey(props.turn?.turnId ?? "", cause.value ? "findings" : "feedback");
   return session?.annotations[key]?.feedback?.rating ?? null;
 });
-const fullId = computed(() => raw(sid.value ?? ""));
-const shortId = computed(() => raw((sid.value ?? "").slice(0, SHORT_ID_CHARS)));
 const localOnly = computed(() => evidence?.capability().persistence === false);
 
 // The sheet and the popover take different props; the one rendered gets its own set.
@@ -282,15 +286,26 @@ async function send(next: {
 
 function sendVote(next: "up" | "down"): void {
   if (vote.value === next) return;
-  void send({ vote: next });
+  void send({ vote: next, ...(cause.value && { reason: "cause:yes" }) });
 }
 
 async function sendReason(): Promise<void> {
-  const sentOk = await send({
-    vote: "down",
-    ...(reason.value && { reason: reason.value }),
-    ...(detail.value.trim() && { comment: detail.value.trim() }),
-  });
+  const note = detail.value.trim();
+  const sentOk = await send(
+    cause.value
+      ? {
+          vote: "down",
+          reason: "cause:no",
+          ...((reason.value || note) && {
+            comment: [reason.value, note].filter(Boolean).join(": "),
+          }),
+        }
+      : {
+          vote: "down",
+          ...(reason.value && { reason: reason.value }),
+          ...(note && { comment: note }),
+        },
+  );
   if (sentOk) closeReason();
 }
 
@@ -306,19 +321,6 @@ function showThanks(): void {
   thanks.value = true;
   if (thanksTimer) clearTimeout(thanksTimer);
   thanksTimer = setTimeout(() => (thanks.value = false), THANKS_MS);
-}
-
-async function copyChatId(): Promise<void> {
-  if (!sid.value || !evidence) return;
-  const result = await evidence.dispatch(sid.value, {
-    kind: "copy",
-    text: sid.value,
-    what: "chat_id",
-  });
-  evidence.announce(
-    sid.value,
-    result.ok ? t("assistant.feedback.chatIdCopied") : t("assistant.client.copyManually"),
-  );
 }
 
 // Escape closes the reason dialog before any outer Escape handler sees it.

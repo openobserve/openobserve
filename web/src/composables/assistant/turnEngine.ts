@@ -385,7 +385,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       noteHandoffFailed(session, rec);
       out.turn.push(...next.effects);
       if (session.turn.state !== "awaiting_approval") clearApproval(rec);
-      else if (frame.type === "confirmation_required")
+      else if (frame.type === "confirmation_required" || frame.type === "ask_user")
         watchApproval(rec, session.pendingApproval?.expiresAt ?? frame.expires_at);
       return out;
     };
@@ -942,9 +942,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     },
     continueTurn(sid) {
       const chips = last.get(sid)?.snapshot.chips ?? [];
-      deps
-        .store()
-        .stage(sid, { text: t("assistant.turn.continuePrefill"), chips, mode: "replace" });
+      deps.store().stage(sid, { text: t("assistant.turn.continueDraft"), chips, mode: "replace" });
     },
     async retrySave(sid, turnId) {
       const session = sessionOf(sid);

@@ -355,6 +355,21 @@ export function answerQueriesAllEmpty(
   return queries.length > 0 && queries.every((step) => step.state === "done" && step.rows === 0);
 }
 
+/** Newest data the answer's queries read, epoch ms; `null` when no query ran. */
+export function answerDataAt(steps: StepFacts[]): number | null {
+  const ends = steps.flatMap((step) => (step.range ? [step.range.to] : []));
+  return ends.length ? Math.max(...ends) : null;
+}
+
+/** Past this the answer says how old its data is, and the last turn offers Re-run. */
+export const STALE_AFTER_MS = 60 * 60_000;
+
+/** True when the data behind an answer is old enough to say so. */
+export function isStaleAnswer(steps: StepFacts[], now: number): boolean {
+  const at = answerDataAt(steps);
+  return at !== null && now - at >= STALE_AFTER_MS;
+}
+
 /** Claim numbers by distinct `call_id` in order of first citation. */
 export function claimNumbers(claims: string[]): Map<string, number> {
   const numbers = new Map<string, number>();

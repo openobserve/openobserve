@@ -595,6 +595,53 @@ describe("reduce: tool_result", () => {
   });
 });
 
+describe("reduce: ask_user and follow_ups", () => {
+  const lastBlocks = (state: StreamState) => state.messages.at(-1)?.contentBlocks ?? [];
+
+  it("holds a question as a card of kind question, and treats the options as optional", () => {
+    const state = makeState();
+    const effects = reduce(
+      state,
+      {
+        type: "ask_user",
+        request_id: "r1",
+        question: "Which folder?",
+        options: [{ id: "p", label: "Payments" }, { id: 3 }],
+        allow_other: true,
+        expires_at: 1_800_000_000,
+      },
+      makeCtx({ phase: "live" }),
+    );
+    const card = lastBlocks(state).find((block) => block.approval)?.approval;
+    expect(card).toMatchObject({
+      id: "r1",
+      kind: "question",
+      question: "Which folder?",
+      options: [{ id: "p", label: "Payments" }],
+      allowOther: true,
+      expiresAt: 1_800_000_000_000,
+    });
+    expect(effects.some((effect) => effect.kind === "approval")).toBe(true);
+    const bare = makeState();
+    reduce(
+      bare,
+      { type: "ask_user", request_id: "r2", question: "Sure?" },
+      makeCtx({ phase: "live" }),
+    );
+    expect(lastBlocks(bare).find((block) => block.approval)?.approval?.options).toEqual([]);
+  });
+
+  it("keeps at most three follow-ups and drops blanks", () => {
+    const state = makeState();
+    reduce(
+      state,
+      { type: "follow_ups", items: ["a", " ", "b", "c", "d"] },
+      makeCtx({ phase: "live" }),
+    );
+    expect(lastBlocks(state).find((block) => block.followUps)?.followUps).toEqual(["a", "b", "c"]);
+  });
+});
+
 describe("reduce: confirmation_required", () => {
   it("adds an inline confirmation block and scrolls", () => {
     const msg = assistant();

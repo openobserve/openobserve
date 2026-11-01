@@ -18,22 +18,23 @@ import { nextTick } from "vue";
 /** How long an opened step keeps its focus ring. */
 export const STEP_HIGHLIGHT_MS = 2_000;
 
-/** Fired on the answer so a trail without a store (a shared page) expands the step itself. */
+/** Fired on the answer so its queries line opens before the row is looked for. */
 export const OPEN_STEP_EVENT = "o2-assistant-open-step";
 
-const HIGHLIGHT = ["ring-2", "ring-border-strong"];
+const HIGHLIGHT = ["ring-2", "ring-assistant-focus-ring", "bg-surface-accent-hover"];
 
 const timers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
 
-/** After the store expanded a step: scroll its header into view, focus it and ring it for two seconds. */
+/** Opens the answer's queries line, then scrolls the step's row into view, focuses it and rings it for two seconds. */
 export async function revealStep(from: HTMLElement | null, callId: string): Promise<boolean> {
   const scope = from?.closest("article") ?? from?.ownerDocument;
   scope?.dispatchEvent(new CustomEvent(OPEN_STEP_EVENT, { detail: { callId } }));
   await nextTick();
   // Compared, not put in a selector, so no call id can break or widen the query.
-  const header = Array.from(scope?.querySelectorAll<HTMLElement>("[data-step-header]") ?? []).find(
+  const found = Array.from(scope?.querySelectorAll<HTMLElement>("[data-step-header]") ?? []).find(
     (candidate) => candidate.dataset.stepHeader === callId,
   );
+  const header = found?.closest("button") ?? found;
   if (!header) return false;
   header.scrollIntoView?.({ block: "nearest" });
   header.focus();

@@ -26,6 +26,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     {{ readonlyLine }}
   </OText>
+  <div
+    v-else-if="plainLine"
+    class="text-text-secondary flex min-w-0 flex-wrap items-center gap-x-1 text-xs leading-5"
+    data-test="assistant-turn-outcome"
+    :data-kind="kind"
+  >
+    <span :id="titleId" class="min-w-0 break-words" data-test="assistant-turn-outcome-title">
+      {{ title }}
+    </span>
+    <template v-if="action">
+      <span aria-hidden="true">·</span>
+      <OButton
+        variant="ghost-primary"
+        size="chip"
+        :disabled="unavailable"
+        :focusable-unavailable="unavailable"
+        :class="ACTION_CLASS"
+        :aria-describedby="disabledReason ? undefined : titleId"
+        data-test="assistant-turn-outcome-action"
+        @click="emit('action', action)"
+      >
+        {{ actionLabel }}
+        <template v-if="disabledReason" #unavailable-reason>{{ disabledReason }}</template>
+        <OTooltip v-if="disabledReason" :content="disabledReason" />
+      </OButton>
+    </template>
+    <span
+      v-for="line in lines"
+      :key="line"
+      class="w-full min-w-0 break-words"
+      data-test="assistant-turn-outcome-body"
+    >
+      {{ line }}
+    </span>
+  </div>
   <OBanner
     v-else
     :variant="look.variant"
@@ -339,6 +374,8 @@ export function outcomeActionOf(
   if (kind === "doneNotSaved") return opts.persistence ? "retry_save" : null;
   if (kind === "expired") return opts.gated ? null : "ask_again";
   if (kind === "restored" || kind === "cancelledElsewhere" || !error) return null;
+  // The unsent text is back in the composer, so Send is the retry.
+  if (kind === "refused" && error.code === "agent_unreachable") return null;
   if (error.code === "session_expired" && opts.signedIn) return "retry";
   if (error.action === "none" || error.action === "send_again") return null;
   if (ROLE_SPLIT_KINDS[error.code] && opts.role === "member") return "ask_admin";
@@ -425,6 +462,7 @@ const creditParams = computed(() => {
 const manualShown = computed(
   () =>
     !props.readonly &&
+    !connectionLost.value &&
     !!props.manualRoute &&
     !!props.manualRoute.text &&
     MANUAL_ROUTE_CODES.has(code.value ?? ""),
@@ -435,6 +473,11 @@ const manualLabel = computed(() => {
   return t("assistant.outcome.manualRoute", { explorer: explorerLabel(explorer, t) });
 });
 const look = computed(() => LOOKS[props.kind]);
+// Stopped and expired are facts about the turn, not faults, so they read as a line of the answer.
+const plainLine = computed(() => props.kind === "stopped" || props.kind === "expired");
+const connectionLost = computed(
+  () => props.kind === "failed" && code.value === "stream_dropped" && props.partial,
+);
 const refusedAgentName = computed(() =>
   agentName(agentIdOf(props.error?.agent) ?? DEFAULT_AGENT, t),
 );
@@ -455,9 +498,9 @@ const askKind = computed<AskAdminKind>(() => ROLE_SPLIT_KINDS[code.value ?? ""] 
 const title = computed<I18nText>(() => {
   switch (props.kind) {
     case "stopped":
-      return props.steps > 0 && props.partial
-        ? t("assistant.turn.stoppedWithSteps", { n: props.steps }, props.steps)
-        : t("assistant.turn.stopped");
+      return props.steps > 0
+        ? t("assistant.turn.stoppedAfter", { n: props.steps }, props.steps)
+        : t("assistant.turn.stoppedIncomplete");
     case "doneNotSaved":
       return t("assistant.turn.notSaved");
     case "restored":
@@ -465,9 +508,12 @@ const title = computed<I18nText>(() => {
     case "cancelledElsewhere":
       return t("assistant.error.cancelled_elsewhere.title");
     case "expired":
-      return t("assistant.error.approval_expired.title");
+      return t("assistant.approval.record.expired");
     default: {
       if (!props.error) return t("assistant.error.unknown.title");
+      if (connectionLost.value) return t("assistant.turn.connectionLost");
+      if (props.kind === "refused" && code.value === "agent_unreachable")
+        return t("assistant.send.unreachable");
       if (creditCopy.value) return t(creditCopy.value.titleKey, creditParams.value);
       const copy = { t, org: props.org, product, elapsedMs: props.elapsedMs ?? 0 };
       const { key, params } = errorTitle(props.error, copy);
@@ -482,6 +528,7 @@ const lines = computed<I18nText[]>(() => {
   if (props.kind === "stopped" && props.cancelUnconfirmed)
     out.push(t("assistant.turn.cancelUnconfirmed"));
   if (!error || (props.kind !== "failed" && props.kind !== "refused")) return out;
+  if (connectionLost.value) return out;
   if (creditCopy.value) return [...out, t(creditCopy.value.bodyKey, creditParams.value)];
   const bodyKey = `assistant.error.${error.code}.body`;
   const claimsFindings = FINDINGS_BODIES.has(error.code);
@@ -569,6 +616,7 @@ const unavailable = computed(() => !!disabledReason.value || countingDown.value)
 const detailsShown = computed(
   () =>
     !!props.error &&
+    !connectionLost.value &&
     (props.kind === "failed" || props.kind === "refused" || props.cancelUnconfirmed),
 );
 

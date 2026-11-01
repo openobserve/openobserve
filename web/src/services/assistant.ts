@@ -83,6 +83,8 @@ export interface ConfirmBody {
   scope?: string;
   items?: string[];
   reply?: string;
+  /** Answers the question card `id`, with a choice's id or the user's own text. */
+  answer?: string;
   /** Asks for more time on the card `id` instead of deciding. */
   id?: string;
   extend?: boolean;

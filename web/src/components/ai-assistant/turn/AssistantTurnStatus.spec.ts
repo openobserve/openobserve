@@ -186,14 +186,10 @@ describe("AssistantTurnStatus", () => {
     expect(wrapper.find('[data-test="assistant-turn-status-stall"]').exists()).toBe(false);
   });
 
-  it("shows a static glyph instead of the dots under reduced motion (HT-01 AC 11)", () => {
-    const match = vi.spyOn(window, "matchMedia").mockReturnValue({
-      matches: true,
-    } as MediaQueryList);
-    const wrapper = mountStatus({ state: "responding.thinking" });
+  it("draws the still retry glyph while reconnecting, never the pulse", () => {
+    const wrapper = mountStatus({ state: "reconnecting", attempt: 1 });
     expect(wrapper.find('[data-test="assistant-turn-status-spinner"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-turn-status-glyph"]').exists()).toBe(true);
-    match.mockRestore();
   });
 
   it("says another tab answers when this tab does not own the turn", () => {

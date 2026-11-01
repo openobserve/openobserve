@@ -46,6 +46,7 @@ export interface ContentBlock {
     | "query"
     | "link"
     | "findings"
+    | "follow_ups"
     | "footer"
     | "approval"
     | "approval_result"
@@ -57,6 +58,8 @@ export interface ContentBlock {
   message?: I18nText;
   context?: Record<string, any>;
   call_id?: string; // Unique ID for matching tool_result to tool_call
+  /** The next questions the server offers, at most three. */
+  followUps?: string[];
   // For text type:
   text?: string;
   // Confirmation state (from confirmation_required events):

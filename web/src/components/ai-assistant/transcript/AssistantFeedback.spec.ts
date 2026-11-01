@@ -135,15 +135,37 @@ describe("AssistantFeedback", () => {
     });
   });
 
-  it("copies the chat id from the reason popover and shows its first eight characters", async () => {
-    const { wrapper, host, sid } = mountBar();
-    await wrapper.get('[data-test="assistant-feedback-down"]').trigger("click");
+  it("asks whether this was the cause on findings, and sends the answer as a cause rating", async () => {
+    const { wrapper, host, sid } = mountBar(
+      {},
+      {
+        ...done,
+        contentBlocks: [
+          ...(done.contentBlocks ?? []),
+          {
+            type: "findings",
+            findings: {
+              likelyCause: "Redis",
+              confidence: "medium",
+              evidence: [],
+              ruledOut: [],
+              unknowns: [],
+              nextSteps: [],
+            },
+          },
+        ],
+      },
+    );
+    const group = wrapper.get('[data-test="assistant-feedback"]');
+    expect(group.attributes("aria-label")).toBe("Was this the cause?");
+    expect(wrapper.get('[data-test="assistant-feedback-cause-word"]').classes()).toContain(
+      "hidden",
+    );
+    await wrapper.get('[data-test="assistant-feedback-up"]').trigger("click");
     await flushPromises();
-    const copy = document.querySelector('[data-test="assistant-copy-chat-id"]') as HTMLElement;
-    expect(copy.textContent).toContain(sid.slice(0, 8));
-    copy.click();
-    await flushPromises();
-    expect(host.dispatch).toHaveBeenCalledWith(sid, { kind: "copy", text: sid, what: "chat_id" });
-    expect(host.announce).toHaveBeenCalledWith(sid, "Chat id copied");
+    expect(host.dispatch).toHaveBeenCalledWith(
+      sid,
+      expect.objectContaining({ vote: "up", reason: "cause:yes" }),
+    );
   });
 });
