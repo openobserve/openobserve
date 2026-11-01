@@ -8,7 +8,7 @@ on:
   pull_request:
     branches:
       - "**"
-    # labeled/unlabeled so adding or removing 'ready-for-ci' starts or resets CI; drafts never run paid CI.
+    # labeled/unlabeled so 'ready-for-ci' gates CI; only a new commit cancels an in-flight run (see concurrency); drafts never run paid CI.
     # auto_merge_enabled: the one full-matrix run per PR, at merge time (see generate_matrix).
     types: [opened, reopened, synchronize, labeled, unlabeled, auto_merge_enabled, ready_for_review, converted_to_draft]
   merge_group:
@@ -864,17 +864,20 @@ jobs:
     timeout-minutes: 5
     runs-on:
       labels: eks-openobserve-standard-4
-    permissions: {}
+    permissions:
+      checks: write
     needs:
       [
         check_changes,
         resolve_binary,
         build_binary,
+        generate_matrix,
         ui_integration_tests,
       ]
     if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
+        id: verdict
         run: |
           # 1. check_changes must have succeeded — if it failed, downstream jobs skipped
           #    and we must not report a false success.
@@ -912,3 +915,25 @@ jobs:
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
             exit 1
           fi
+
+      - name: Complete the auto-merge placeholder
+        # Only a full-matrix verdict (or no Playwright changes) may stand in for the run the placeholder waits on.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.check_changes.result == 'success' && (needs.check_changes.outputs.has_changes != 'true' || needs.generate_matrix.outputs.smoke_active == 'false') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          MARKER: playwright-automerge-placeholder
+          VERDICT: ${{ steps.verdict.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          CONCLUSION=$([ "$VERDICT" = "success" ] && echo success || echo failure)
+          IDS=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=playwright_summary&filter=all&per_page=100" \
+                  --jq '[.check_runs[] | select(.external_id == $ENV.MARKER) | .id] | join(" ")')
+          [ -z "$IDS" ] && { echo "No auto-merge placeholder on $SHA."; exit 0; }
+          for ID in $IDS; do
+            gh api -X PATCH "repos/$REPO/check-runs/$ID" -f status=completed -f conclusion="$CONCLUSION" \
+              -f details_url="$RUN_URL" -f "output[title]=Full matrix: $CONCLUSION" \
+              -f "output[summary]=Completed by the full-matrix run $RUN_URL" \
+              --jq '"placeholder \(.id) -> \(.conclusion)"'
+          done

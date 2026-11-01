@@ -1,0 +1,47 @@
+name: Playwright auto-merge gate
+
+# The full-matrix run queues behind any in-flight smoke run, so a pending playwright_summary stops its green summary letting auto-merge enqueue.
+on:
+  pull_request:
+    types: [auto_merge_enabled, auto_merge_disabled, labeled]
+
+concurrency:
+  group: playwright-automerge-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      checks: write
+    # Fork tokens are read-only, so forks keep the smoke-only behaviour rather than a placeholder nothing can complete.
+    if: >-
+      github.event.pull_request.head.repo.fork == false &&
+      (github.event.action != 'labeled' || (github.event.label.name == 'ready-for-ci' && github.event.pull_request.auto_merge != null))
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          ACTION: ${{ github.event.action }}
+          MARKER: playwright-automerge-placeholder
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          OPEN=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=playwright_summary&filter=all&per_page=100" \
+                   --jq '[.check_runs[] | select(.external_id == $ENV.MARKER and .status != "completed") | .id] | join(" ")')
+          if [ "$ACTION" = "auto_merge_disabled" ]; then
+            # Neutral hands the gate back to the PR's own playwright_summary, as before auto-merge was enabled.
+            for ID in $OPEN; do
+              gh api -X PATCH "repos/$REPO/check-runs/$ID" -f status=completed -f conclusion=neutral \
+                -f "output[title]=Auto-merge disabled" -f "output[summary]=No full-matrix run is awaited any more." \
+                --jq '"placeholder \(.id) -> \(.conclusion)"'
+            done
+            exit 0
+          fi
+          if [ -n "$OPEN" ]; then echo "Placeholder already pending on $SHA: $OPEN"; exit 0; fi
+          gh api -X POST "repos/$REPO/check-runs" -f name=playwright_summary -f head_sha="$SHA" \
+            -f status=in_progress -f external_id="$MARKER" -f details_url="$RUN_URL" \
+            -f "output[title]=Waiting for the full-matrix run" \
+            -f "output[summary]=Auto-merge is on; playwright.yml completes this check with the full-matrix result." \
+            --jq '"placeholder \(.id) created in check suite \(.check_suite.id)"'

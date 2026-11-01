@@ -8,7 +8,7 @@ on:
   pull_request:
     branches:
       - "**"
-    # labeled/unlabeled so adding or removing 'ready-for-ci' starts or resets CI; drafts never run paid CI.
+    # labeled/unlabeled so 'ready-for-ci' gates CI; only a new commit cancels an in-flight run (see concurrency); drafts never run paid CI.
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   merge_group:
 
