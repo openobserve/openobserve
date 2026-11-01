@@ -322,6 +322,105 @@ describe("Traces page load states", () => {
 
       expect(searchObj.data.queryResults.countPending).toBe(false);
     });
+
+    describe("error chip and pager across a re-run", () => {
+      const settleFirstRun = async () => {
+        await mountSearching();
+        lastCall("main")[1].complete(null);
+        lastCall("count")[1].data(null, countHits(42));
+        lastCall("count")[1].complete(null);
+        await wrapper!.vm.getQueryData();
+      };
+
+      it("shows no error chip or pager before the first count lands", async () => {
+        await mountSearching();
+        expect(searchObj.data.queryResults.errorCount).toBeUndefined();
+        expect(searchObj.meta.resultGrid.showPagination).toBe(false);
+      });
+
+      it("keeps the last error count and the pager while the re-run counts", async () => {
+        await settleFirstRun();
+        expect(searchObj.data.queryResults.countPending).toBe(true);
+        expect(searchObj.data.queryResults.errorCount).toBe(1);
+        expect(searchObj.meta.resultGrid.showPagination).toBe(true);
+
+        lastCall("main")[1].complete(null);
+        lastCall("count")[1].data(null, {
+          content: { results: { hits: [{ trace_count: 0, span_count: 0, error_count: 0 }] } },
+        });
+        lastCall("count")[1].complete(null);
+        expect(searchObj.data.queryResults.errorCount).toBe(0);
+        expect(searchObj.meta.resultGrid.showPagination).toBe(false);
+      });
+
+      it("drops the kept error count and pager when the re-run's count fails", async () => {
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+        await settleFirstRun();
+        lastCall("main")[1].complete(null);
+        lastCall("count")[1].error(null, new Error("boom"));
+
+        expect(searchObj.data.queryResults.errorCount).toBeUndefined();
+        expect(searchObj.meta.resultGrid.showPagination).toBe(false);
+      });
+
+      it("drops the kept error count and pager when the re-run is cancelled", async () => {
+        await settleFirstRun();
+        wrapper!.vm.cancelSearch();
+
+        expect(searchObj.data.queryResults.errorCount).toBeUndefined();
+        expect(searchObj.meta.resultGrid.showPagination).toBe(false);
+      });
+
+      const settleOnce = async () => {
+        await mountSearching();
+        lastCall("main")[1].complete(null);
+        lastCall("count")[1].data(null, countHits(42));
+        lastCall("count")[1].complete(null);
+      };
+
+      it("drops the kept error count and pager when the re-run fails to start", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        await settleOnce();
+        mockFetch.mockImplementationOnce(() => {
+          throw new Error("boom");
+        });
+        await wrapper!.vm.getQueryData();
+
+        expect(searchObj.data.queryResults.countPending).toBe(false);
+        expect(searchObj.data.queryResults.errorCount).toBeUndefined();
+        expect(searchObj.meta.resultGrid.showPagination).toBe(false);
+      });
+
+      it("keeps the shown results when the re-run's query cannot be built", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        await settleOnce();
+        searchObj.data.editorValue = null as any;
+        await wrapper!.vm.getQueryData();
+
+        expect(searchObj.data.errorMsg).toBe("");
+        expect(searchObj.data.queryResults.countPending).toBe(false);
+        expect(searchObj.data.queryResults.total).toBe(42);
+        expect(searchObj.loading).toBe(false);
+      });
+
+      it("drops the error count and pager when the stream changes", async () => {
+        await settleOnce();
+        searchObj.data.stream.selectedStream = { label: "other", value: "other" };
+        await wrapper!.vm.getQueryData();
+
+        expect(searchObj.data.queryResults.errorCount).toBeUndefined();
+        expect(searchObj.meta.resultGrid.showPagination).toBe(false);
+      });
+
+      it("drops the error count and pager when the view switches between traces and spans", async () => {
+        await settleOnce();
+        wrapper!.vm.onSearchModeChange(searchObj.meta.searchMode === "spans" ? "traces" : "spans");
+
+        expect(searchObj.data.queryResults.countPending).toBe(true);
+        expect(searchObj.data.queryResults.errorCount).toBeUndefined();
+        expect(searchObj.meta.resultGrid.showPagination).toBe(false);
+      });
+    });
   });
 
   describe("kept alive behind a trace detail page", () => {
@@ -463,6 +562,26 @@ describe("Traces page load states", () => {
 
       expect(callsOfType("main")).toHaveLength(0);
       expect(callsOfType("count")).toHaveLength(1);
+    });
+
+    it("drops the pending count when it returns to a URL that runs nothing", async () => {
+      try {
+        setRouteQuery({ stream: "default" });
+        const { show } = mountKeptAlive();
+        await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+        lastCall("main")[1].complete(null);
+        mockFetch.mockClear();
+        store.state.zoConfig.auto_query_enabled = true;
+        localStorage.setItem("oo_toggle_auto_run", "false");
+
+        await leaveAndReturn(show, { period: "1h" });
+
+        await vi.waitFor(() => expect(searchObj.data.queryResults.countPending).toBe(false));
+        expect(mockFetch).not.toHaveBeenCalled();
+      } finally {
+        delete store.state.zoConfig.auto_query_enabled;
+        localStorage.removeItem("oo_toggle_auto_run");
+      }
     });
 
     const deferred = <T>() => {

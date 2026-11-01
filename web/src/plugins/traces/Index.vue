@@ -756,11 +756,22 @@ function buildSearch(reuseLastWindow = false) {
   }
 }
 
+// The stream and view a count was taken over; a run over another dataset must not keep it.
+let countedDataset = "";
+
+// A re-run keeps the last error count and pager on screen until its own count lands.
+function dropKeptCount(results: any) {
+  results.countPending = false;
+  if (searchObj.data.queryResults !== results) return;
+  results.errorCount = undefined;
+  searchObj.meta.resultGrid.showPagination = false;
+}
+
 function fetchTracesCount() {
   const queryReq = searchObj.data.queryPayload;
   const results = searchObj.data.queryResults;
   if (!queryReq || !selectedStreamName.value) {
-    results.countPending = false;
+    dropKeptCount(results);
     return;
   }
 
@@ -781,9 +792,11 @@ function fetchTracesCount() {
   const countTraceId = generateTraceContext().traceId;
   currentCountTraceId = countTraceId;
   // A newer search replaces queryResults, so a late count must not land on it.
+  let landed = false;
   const settle = () => {
     if (currentCountTraceId === countTraceId) currentCountTraceId = null;
-    results.countPending = false;
+    if (landed) results.countPending = false;
+    else dropKeptCount(results);
   };
 
   fetchQueryDataWithHttpStream(
@@ -813,6 +826,7 @@ function fetchTracesCount() {
           results.total = count;
           results.errorCount = hits[0]?.error_count ?? 0;
           searchObj.meta.resultGrid.showPagination = count > 0;
+          landed = true;
         }
       },
       error: (_payload: any, err: any) => {
@@ -908,18 +922,23 @@ async function getQueryData(
 
     if (!isPagination) {
       queryReq = buildSearch(isSort);
+      if (queryReq == null) return false;
       searchObj.data.queryPayload = queryReq;
+      const dataset = `${selectedStreamName.value}|${searchObj.meta.searchMode}`;
+      const sameDataset = dataset === countedDataset;
+      countedDataset = dataset;
+      if (!sameDataset) searchObj.meta.resultGrid.showPagination = false;
       lastSearchCompletedAt = 0;
       // Reset hits for a fresh search
       searchObj.data.queryResults = {
         hits: [],
         total: null,
         countPending: true,
+        errorCount: sameDataset ? searchObj.data.queryResults?.errorCount : undefined,
         from: 0,
         size: queryReq.query.size,
         took: 0,
       };
-      searchObj.meta.resultGrid.showPagination = false;
     } else {
       queryReq = searchObj.data.queryPayload;
     }
@@ -1102,7 +1121,7 @@ async function getQueryData(
           if (!tracesRequestState[searchTraceId]) return;
 
           searchObj.loading = false;
-          if (!isPagination) searchObj.data.queryResults.countPending = false;
+          if (!isPagination) dropKeptCount(searchObj.data.queryResults);
           if (isPagination) noteTracesPageLoad(searchTraceId, "error");
 
           const errData = err?.content || err;
@@ -1177,6 +1196,7 @@ async function getQueryData(
   } catch (e: any) {
     console.error("Error while fetching traces", e?.message);
     searchObj.loading = false;
+    if (!isPagination) dropKeptCount(searchObj.data.queryResults);
     searchObj.data.errorMsg = e?.message || t("traces.index.searchRequestFailed");
     searchObj.data.errorDetail = "";
     if (boundTraceId) noteTracesPageLoad(boundTraceId, "error");
@@ -1219,7 +1239,7 @@ const rebuildColumns = () => {
 const cancelSearch = () => {
   // Cancel dashboard panel queries (RenderDashboardCharts via usePanelDataLoader)
   window.dispatchEvent(new Event("cancelQuery"));
-  if (currentSearchTraceId) searchObj.data.queryResults.countPending = false;
+  if (currentSearchTraceId) dropKeptCount(searchObj.data.queryResults);
   cancelMainSearch();
 };
 
@@ -1477,6 +1497,10 @@ async function loadPageData() {
     } else if ((streamFromUrl || !isAutoRunOff()) && (forcedRun || !reopensStagedEdit())) {
       searchData(false);
     }
+  }
+  // A count cut off by leaving has nothing left to land it once this load runs no search.
+  if (searchObj.data.queryResults?.countPending && !searchObj.loading && !currentCountTraceId) {
+    dropKeptCount(searchObj.data.queryResults);
   }
   pendingUrlPage = null;
 }

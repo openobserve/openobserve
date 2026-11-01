@@ -15273,6 +15273,7 @@
     "errorSpans": "Error Spans",
     "filterByErrors": "Filter by errors",
     "clearErrorFilter": "Clear error filter",
+    "updatingResults": "Updating results",
     "error": "ERROR",
     "errorCount": "{n} ERROR | {n} ERRORS",
     "success": "SUCCESS",
