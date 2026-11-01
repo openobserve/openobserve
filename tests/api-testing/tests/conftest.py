@@ -102,7 +102,7 @@ def _ingest_seed_data_once():
 
     def _data_is_searchable():
         search_url = f"{base_url_with_slash}api/{org}/_search?type=logs"
-        # Seed rows are stamped at ingest, so anything older than the tests' 1h window is stale.
+        # Seed rows are stamped at ingest; this fixture treats copies older than 1h as stale and re-ingests.
         now = datetime.now(UTC)
         end_us = int(now.timestamp() * 1_000_000)
         start_us = int((now - timedelta(hours=1)).timestamp() * 1_000_000)
