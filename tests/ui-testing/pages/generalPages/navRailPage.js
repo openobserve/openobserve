@@ -170,38 +170,6 @@ export class NavRailPage {
     return locator.evaluate((el) => getComputedStyle(el).backgroundColor);
   }
 
-  async focusedMenuRow() {
-    return this.page.evaluate(() => {
-      const el = document.activeElement;
-      return el && el.closest('[role="menu"]') ? el.getAttribute('data-test') || el.textContent.trim() : null;
-    });
-  }
-
-  // Holds the org's full /api/{org}/config (not the bootstrap /config) until release(), then serves it with patch applied.
-  async holdOrgConfig(patch) {
-    const path = `/api/${process.env.ORGNAME || 'default'}/config`;
-    let release;
-    const released = new Promise((resolve) => (release = resolve));
-    await this.page.route(
-      (url) => url.pathname.endsWith(path),
-      async (route) => {
-        await released;
-        const response = await route.fetch();
-        await route.fulfill({ response, json: { ...(await response.json()), ...patch } });
-      },
-    );
-    return { release };
-  }
-
-  // The response arriving is not enough: components only react once the store holds the values.
-  async waitForStoreConfig(patch) {
-    await this.page.waitForFunction((expected) => {
-      const store = document.querySelector('#app')?.__vue_app__?.config.globalProperties.$store;
-      const zoConfig = store?.state.zoConfig ?? {};
-      return Object.entries(expected).every(([key, value]) => zoConfig[key] === value);
-    }, patch);
-  }
-
   async openDrawer() {
     await this.drawerToggle.click();
     await this.drawerNav.waitFor({ state: 'visible' });
