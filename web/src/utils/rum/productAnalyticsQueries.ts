@@ -84,7 +84,7 @@ export interface FunnelDef {
   x?: ExclusionStep[];
   f?: FunnelFilter[];
 }
-/** Filter all steps on a built-in session field or an attribute column; `not` keeps sessions that never match. */
+/** A match on a built-in session field or an attribute column, funnel-wide in `f` or on one step in `pc`; `not` keeps sessions that never match. */
 export interface FunnelFilter {
   field: string;
   op: MatchOp;
@@ -1599,7 +1599,7 @@ const funnelCtes = (
   const firstDim = dim ? sessionDim(dim, n) : "";
   const covered = dim?.attr ? coverageCols(n) : [];
   const h = covered.map(colAlias);
-  // A later step counts from the unit's first step 1 on, so a stray earlier event cannot move its bucket.
+  // entry_ts is the unit's first step-a event at or after its first step 1, not the step-a event its sequence matched.
   if (entry !== null && entry > 1) {
     ctes.push(
       `xe AS (SELECT *, MIN(CASE WHEN m1 = 1 THEN t END) OVER (PARTITION BY ${partition}) AS t1w FROM ${source})`,
@@ -1666,9 +1666,9 @@ const breakdownField = (scope: AnalyticsScope, def: FunnelDef): DimSql | null =>
   if (!b) return null;
   if (isAttributeBreakdown(b)) {
     if (!has(scope, b.f)) return null;
-    // Empty text reads as no value, and MIN would otherwise pick it over a real one.
     // A pin past the last step can only come from a stale definition, and reads as automatic.
     const step = b.s !== undefined && b.s <= def.steps.length ? b.s : null;
+    // Empty text reads as no value, and MIN would otherwise pick it over a real one.
     return { col: `NULLIF(${filterValue(b.f)}, '')`, attr: true, step };
   }
   const field = DIMENSIONS[b];

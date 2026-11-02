@@ -71,6 +71,11 @@ describe("explorer saved views", () => {
     );
   });
 
+  it("saves the usage filters with the view", () => {
+    const data = buildExplorerViewData({ sort: "alerts", usage: "dashboards" });
+    expect(explorerViewToQuery(data)).toEqual({ sort: "alerts", usage: "dashboards" });
+  });
+
   it("keeps an absolute range as strings", () => {
     const data = buildExplorerViewData({ from: 1700000000000000, to: 1700000360000000 });
     expect(data.state).toEqual({ from: "1700000000000000", to: "1700000360000000" });

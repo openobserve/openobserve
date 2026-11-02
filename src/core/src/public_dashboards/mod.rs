@@ -5757,6 +5757,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_formula_naming_a_metric_f1_sends_it_as_promql() {
+        let search = FakeSearch {
+            series: 1,
+            ..Default::default()
+        };
+        let panel = promql_panel(
+            "line",
+            json!([
+                { "query": "x", "config": { "hide": true } },
+                { "query": "", "config": { "formula": "A + F1" } }
+            ]),
+        );
+        let run = run_one(&search, panel).await;
+        assert_eq!(run.class, Class::Fresh);
+        let sent: Vec<String> = promql_reqs(&search).into_iter().map(|r| r.0).collect();
+        assert_eq!(sent, ["(x) + F1"]);
+    }
+
+    #[tokio::test]
+    async fn a_formula_over_a_formula_sends_the_nested_expansion() {
+        let search = FakeSearch {
+            series: 1,
+            ..Default::default()
+        };
+        let panel = promql_panel(
+            "line",
+            json!([
+                { "query": "x", "config": { "hide": true } },
+                { "query": "y", "config": { "hide": true } },
+                { "query": "", "config": { "formula": "A / B", "hide": true } },
+                { "query": "", "config": { "formula": "F1 / 3" } }
+            ]),
+        );
+        run_one(&search, panel).await;
+        let sent: Vec<String> = promql_reqs(&search).into_iter().map(|r| r.0).collect();
+        assert_eq!(sent, ["((x) / (y)) / 3"]);
+    }
+
+    #[tokio::test]
     async fn a_formula_naming_a_missing_query_is_unsupported_and_refused_at_publish() {
         let missing = promql_panel(
             "line",
@@ -5787,17 +5826,17 @@ mod tests {
             "Panel \"p\" has a formula that uses B, which is not a query in this panel. Fix the \
              formula, then publish."
         );
-        let nested = promql_panel(
+        let looped = promql_panel(
             "line",
             json!([
-                { "query": "", "config": { "ref": "A", "formula": "1" } },
-                { "query": "", "config": { "formula": "A * 2" } }
+                { "query": "", "config": { "ref": "F1", "formula": "F2 + 1" } },
+                { "query": "", "config": { "ref": "F2", "formula": "F1 * 2" } }
             ]),
         );
         assert!(
-            validate_dashboard(&dash_with(nested), &BTreeMap::new(), 0)
+            validate_dashboard(&dash_with(looped), &BTreeMap::new(), 0)
                 .unwrap_err()
-                .contains("uses A, which is another formula")
+                .contains("uses formulas that refer to each other in a loop: F1 → F2 → F1")
         );
         // A hidden formula never runs, so the live view shows no error for it either.
         let hidden = promql_panel(

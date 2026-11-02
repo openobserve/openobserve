@@ -114,9 +114,7 @@ fn node(expr: &Expr, tokens: &RangeTokens) -> Value {
 
 /// `None` when the selector is plain; otherwise the construct that makes it not.
 fn selector_modifier(vs: &VectorSelector) -> Option<&'static str> {
-    if vs.offset.is_some() {
-        Some("offset")
-    } else if vs.at.is_some() {
+    if vs.at.is_some() {
         Some("@")
     } else if !vs.matchers.or_matchers.is_empty() {
         Some("or matchers")
@@ -140,7 +138,11 @@ fn selector_fields(vs: &VectorSelector) -> Value {
         ),
         _ => (vs.name.clone(), vs.matchers.matchers.iter().collect()),
     };
-    json!({ "name": name, "matchers": matchers(&rest) })
+    let mut fields = json!({ "name": name, "matchers": matchers(&rest) });
+    if let Some(offset) = &vs.offset {
+        fields["offset"] = json!(offset.to_string());
+    }
+    fields
 }
 
 fn selector_node(vs: &VectorSelector) -> Value {
@@ -177,21 +179,35 @@ fn call_node(call: &Call, tokens: &RangeTokens) -> Value {
 
 fn aggregate_node(agg: &AggregateExpr, tokens: &RangeTokens) -> Value {
     let by = match &agg.modifier {
-        Some(LabelModifier::Exclude(_)) => return unsupported("without"),
         Some(LabelModifier::Include(labels)) => labels.labels.clone(),
-        None => Vec::new(),
+        _ => Vec::new(),
     };
-    json!({
+    let mut out = json!({
         "type": "aggregate",
         "op": agg.op.to_string(),
         "by": by,
         "param": agg.param.as_ref().map(|param| node(param, tokens)),
         "expr": node(&agg.expr, tokens),
-    })
+    });
+    // Present only for `without`: `without ()` keeps every label, unlike a missing modifier.
+    if let Some(LabelModifier::Exclude(labels)) = &agg.modifier {
+        out["without"] = json!(labels.labels);
+    }
+    out
 }
 
 fn binary_node(bin: &BinaryExpr, tokens: &RangeTokens) -> Value {
     let op = bin.op.to_string();
+    let plain = bin.modifier.as_ref().is_none_or(|m| m.matching.is_none());
+    // A plain `or` is how a builder query unions its filter branches.
+    if op == "or" && plain {
+        return json!({
+            "type": "binary",
+            "op": op,
+            "lhs": node(&bin.lhs, tokens),
+            "rhs": node(&bin.rhs, tokens),
+        });
+    }
     // The parser marks every set operator many-to-many, so name it rather than its matching.
     if matches!(op.as_str(), "and" | "or" | "unless") {
         return unsupported(&op);
@@ -298,20 +314,8 @@ mod tests {
     fn marks_every_other_construct_unsupported() {
         let kind = |q: &str| tree(q);
         assert_eq!(
-            kind("max without (instance) (x)"),
-            json!({ "type": "unsupported", "kind": "without" })
-        );
-        assert_eq!(
-            kind("x offset 5m"),
-            json!({ "type": "unsupported", "kind": "offset" })
-        );
-        assert_eq!(
             kind("x @ 100"),
             json!({ "type": "unsupported", "kind": "@" })
-        );
-        assert_eq!(
-            kind("rate(x[5m] offset 1h)")["args"][0],
-            json!({ "type": "unsupported", "kind": "offset" })
         );
         assert_eq!(
             kind("max_over_time(rate(x[5m])[1h:])")["args"][0],
@@ -343,11 +347,42 @@ mod tests {
     }
 
     #[test]
-    fn names_set_operators_and_keeps_vector_matching_for_modifiers() {
+    fn serialises_offsets_on_selectors_and_matrices() {
         assert_eq!(
-            tree("sum(rate(x[5m])) or vector(0)"),
+            tree("x offset 5m"),
+            json!({ "type": "selector", "name": "x", "matchers": [], "offset": "5m" })
+        );
+        assert_eq!(
+            tree("rate(x[5m] offset 1h)")["args"][0]["selector"]["offset"],
+            json!("1h")
+        );
+        assert_eq!(tree("x offset -1h")["offset"], json!("-1h"));
+    }
+
+    #[test]
+    fn serialises_without_apart_from_by() {
+        let parsed = tree("max without (instance) (x)");
+        assert_eq!(parsed["type"], json!("aggregate"));
+        assert_eq!(parsed["by"], json!([]));
+        assert_eq!(parsed["without"], json!(["instance"]));
+        assert_eq!(tree("sum without () (x)")["without"], json!([]));
+        assert!(tree("sum by (a) (x)").get("without").is_none());
+    }
+
+    #[test]
+    fn a_plain_or_is_a_binary() {
+        let parsed = tree(r#"x{a="1"} or x{b="2"}"#);
+        assert_eq!(parsed["type"], json!("binary"));
+        assert_eq!(parsed["op"], json!("or"));
+        assert_eq!(parsed["rhs"]["matchers"][0]["label"], json!("b"));
+        assert_eq!(
+            tree("a or on(job) b"),
             json!({ "type": "unsupported", "kind": "or" })
         );
+    }
+
+    #[test]
+    fn names_set_operators_and_keeps_vector_matching_for_modifiers() {
         assert_eq!(
             tree("a unless b"),
             json!({ "type": "unsupported", "kind": "unless" })

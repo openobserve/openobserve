@@ -1315,7 +1315,6 @@
       "moreExamples": "如需更多範例，",
       "clickHere": "請按這裡"
     },
-    "legendLabel": "圖例",
     "switchToLogs": "切換回日誌",
     "savedViewsLabel": "已儲存的檢視",
     "savedViewName": "檢視名稱",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "公式 {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} 不是此面板中的查詢",
-    "formulaReferencesFormula": "{letter} 是公式，公式不得參照另一個公式",
+    "formulaCycle": "公式之間形成循環參照：{cycle}",
+    "formulaTooLong": "公式展開後超過 {limit} 個字元",
+    "formulaTooDeep": "公式巢狀層數超過 {limit} 層",
     "formulaInputNote": "用於公式時：此查詢的即時/範圍設定、圖例、步長與時間位移在該處不適用。",
     "multiSqlQueryLabel": "查詢標籤",
     "multiSqlQueryLabelHint": "此查詢在圖例中的自訂名稱（例如「Production」）",
@@ -9319,7 +9320,6 @@
     "hostmapValue": "值",
     "hostmapGroupBy": "分組依據",
     "otherColumn": "其他欄位",
-    "metric": "指標",
     "filters": "篩選條件",
     "labelFilters": "標籤篩選",
     "operations": "運算",
@@ -13599,21 +13599,6 @@
     "awsStsSelfHostedInfo": "使用 AWS STS 擔任角色並執行操作。請確保安裝環境中已設定具有此角色存取權限的 AWS 認證資訊。"
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "對於即時向量選擇器，請使用",
-      "rangeVector": "對於範圍向量選擇器，請使用",
-      "aggregate": "若要彙總資料，請使用",
-      "or": "或",
-      "rate": "對於範圍向量的速率計算，請使用",
-      "sqlTitle": "語法指南：SQL 模式",
-      "sqlFullText": "若要全文搜尋值「error」，請使用",
-      "sqlColumn": "若要欄位搜尋值「error」，請使用",
-      "sqlCode": "若要搜尋 code 欄位的值 200，請使用",
-      "sqlStream": "若要搜尋 stream 欄位的值「stderr」，請使用",
-      "sqlFunction": "若要搜尋並在 log 欄位上使用查詢函式 {fn}，請使用",
-      "sqlMoreExamples": "更多範例，",
-      "sqlClickHere": "請按這裡"
-    },
     "add": "新增",
     "runQuery": "執行查詢",
     "runQueryOptions": "執行查詢選項",
@@ -13729,7 +13714,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "加入儀表板",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "平均",
+          "sortAvgTitle": "依各值在視窗期間的平均值排序",
+          "sortOutlying": "離群",
+          "sortOutlyingTitle": "依各序列偏離其他序列的程度排序值",
+          "outlier": "離群值"
         },
         "related": {
           "empty": "沒有相關指標",
@@ -13854,9 +13844,9 @@
         "selectLabel": "選取標籤",
         "invalidLabel": "無效的標籤名稱。",
         "selectOrTypeValue": "選取或輸入值",
-        "operatorHelp": "= 完全等於此值\n!= 不等於此值\n=~ 符合正規表示式 — 使用 500{'|'}503 來匹配任一\n!~ 不符合正規表示式\n\n篩選器以 AND 結合。若要匹配兩個值中的任一個，請使用 =~ 搭配正規表示式。",
+        "operatorHelp": "=  等於此值\n!=  不等於此值\n=~  符合正規表達式 — 使用 500{'|'}503 可符合任一\n!~  不符合正規表達式\n\n篩選條件以 AND 組合。若要符合兩個值其中之一，請使用 =~ 搭配正規表達式，或新增 OR 群組。",
         "andSeparator": "且",
-        "andSeparatorTitle": "篩選器以 AND 結合 — 指標必須符合所有條件。若要匹配兩個值中的任一個，請使用 =~ 運算子搭配正規表示式。",
+        "andSeparatorTitle": "篩選條件以 AND 組合 — 指標必須符合全部條件。若要符合兩個值其中之一，請使用 =~ 運算子搭配正規表達式，或新增 OR 群組。",
         "noSuggestions": "無建議 — 請輸入值。",
         "moreFilters": "+{count} 更多",
         "moreFiltersTooltip": "按一下以顯示所有內嵌篩選器",
@@ -13896,11 +13886,16 @@
         "deleteMessage": "要為此組織中的所有使用者刪除檢視 {name} 嗎？",
         "modified": "{name}（已修改）",
         "clear": "清除檢視"
-      }
-    },
-    "index": {
-      "namePanelRequired": "面板名稱為必填",
-      "errorsFixTryAgain": "存在一些錯誤，請修正後重試"
+      },
+      "sortDashboards": "儀表板",
+      "sortDashboardsTitle": "儀表板中使用最多者優先",
+      "sortAlerts": "警示",
+      "sortAlertsTitle": "警示中使用最多者優先",
+      "usageInDashboards": "儀表板中",
+      "usageHasAlerts": "有警示",
+      "usageInSlos": "SLOs 中",
+      "usageLoading": "正在載入指標使用位置",
+      "usageFailed": "無法取得使用資訊，請重試"
     },
     "metricCard": {
       "lastRefreshed": "上次重新整理：",
@@ -13912,25 +13907,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "圖表呈現失敗"
-    },
-    "queryBuilder": {
-      "title": "PromQL 查詢建立器",
-      "subtitle": "以視覺化方式建立和測試 PromQL 查詢",
-      "generatedQuery": "產生的 PromQL 查詢：",
-      "noQueryBuilt": "尚未建立查詢",
-      "copyQuery": "複製查詢",
-      "clearAll": "全部清除",
-      "testQuery": "測試查詢",
-      "queryResultPreview": "查詢結果預覽：",
-      "queryCopied": "查詢已複製到剪貼簿！",
-      "queryCleared": "查詢已清除",
-      "testingSoon": "查詢測試功能即將實作",
-      "executionSoon": "查詢執行將在下一階段實作"
-    },
-    "metricSelector": {
-      "metricName": "指標名稱",
-      "loadingMetrics": "正在載入指標…",
-      "noMetricsFound": "找不到指標"
     },
     "labelFilterEditor": {
       "label": "標籤",
@@ -13953,8 +13929,6 @@
       "noMetric": "建構器需要對單一具名指標的查詢",
       "mismatch": "建構器無法精確顯示此查詢",
       "constructs": {
-        "without": "without (…) 分組",
-        "offset": "offset 修飾符",
         "at": "{'@'} 修飾符",
         "orMatchers": "標籤比對器之間的 or",
         "subquery": "子查詢",
@@ -13988,7 +13962,11 @@
         "byLabelsLabel": "依標籤",
         "quantileLabel": "分位數",
         "kLabel": "K",
-        "nearestMultipleLabel": "最接近的倍數"
+        "nearestMultipleLabel": "最接近的倍數",
+        "withoutLabel": "排除（捨棄這些標籤）",
+        "withoutDesc": "將選取的標籤彙總排除，並保留其他所有標籤",
+        "offsetLabel": "偏移",
+        "offsetDesc": "要往回讀取多久以前的指標，例如 1h 或 1d"
       },
       "rangeOnlyFirst": "範圍函式只能是第一步",
       "rangeOnlyFirstNote": "範圍函式會讀取原始樣本，因此只能是第一步。請移除其他步驟以新增。",
@@ -14058,6 +14036,17 @@
       "empty": "尚無查詢",
       "noMatch": "沒有查詢符合搜尋或星號篩選條件",
       "loadMore": "載入更多"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR 群組",
+      "addGroupTooltip": "新增一組篩選條件；序列符合任一組即算符合",
+      "addToGroup": "新增篩選條件至此群組",
+      "anyOf": "任一",
+      "andAnyOf": "且任一",
+      "or": "或",
+      "not": "非",
+      "notTooltip": "改為符合此整組條件未涵蓋的序列",
+      "tooManyBranches": "這些篩選條件會展開成 {count} 個獨立選取器；最多只能執行 {max} 個。請將值合併為一個正規表達式篩選條件，或移除一個群組。"
     }
   },
   "settings": {
@@ -22800,7 +22789,8 @@
       "moduloName": "模數",
       "multiplyByName": "乘以",
       "divideByName": "除以",
-      "exponentName": "冪運算"
+      "exponentName": "冪運算",
+      "offsetDoc": "讀取指標在指定時間長度之前的值"
     }
   },
   "passwordPolicy": {
