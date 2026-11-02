@@ -191,6 +191,7 @@ pub struct AlertHistoryResponse {
         (status = 200, description = "Success", content_type = "application/json", body = inline(AlertHistoryResponse)),
         (status = 400, description = "Bad Request", content_type = "application/json"),
         (status = 403, description = "Forbidden", content_type = "application/json"),
+        (status = 404, description = "Alert or anomaly config not found", content_type = "application/json"),
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
 )]
@@ -278,17 +279,15 @@ pub async fn get_alert_history(
     // The anomaly_count is stored in success_response as {"anomalies_found": N}.
     // Result is derived: "anomaly" when count > 0, "normal" when 0, "failed"/"skipped" on error.
     if let Some(ref anomaly_id) = query.anomaly_id {
-        // RBAC: this route is bypass:true and this branch returns before the
-        // alert RBAC block below, so check the config here. Fail closed: a
-        // read error or a config without a folder must deny.
+        // The route is bypass:true and this branch returns before the RBAC block below.
         #[cfg(feature = "enterprise")]
         {
-            let folder_id =
-                match openobserve_core::anomaly_detection::get_config(&org_id, anomaly_id).await {
-                    Ok(Some(cfg)) => cfg
-                        .get("folder_id")
-                        .and_then(|f| f.as_str())
-                        .map(str::to_string),
+            let conn = infra::db::get_orm_client_ro().await;
+            let folder_pk =
+                match infra::table::anomaly_detection::config::get_by_id(conn, &org_id, anomaly_id)
+                    .await
+                {
+                    Ok(Some(cfg)) => cfg.folder_id,
                     Ok(None) => {
                         return MetaHttpResponse::not_found(format!(
                             "Anomaly config '{anomaly_id}' not found"
@@ -296,7 +295,9 @@ pub async fn get_alert_history(
                     }
                     Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
                 };
-            let Some(folder_id) = folder_id else {
+            // Fail closed: never fall back to the default folder on a failed folder read.
+            let Ok(Some(folder_id)) = infra::table::folders::get_name_by_pk(&folder_pk).await
+            else {
                 return MetaHttpResponse::forbidden("Unauthorized Access");
             };
             if !openobserve_core::auth::check_permissions(

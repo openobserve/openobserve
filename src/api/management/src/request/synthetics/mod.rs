@@ -966,18 +966,21 @@ pub async fn delete_synthetics_bulk(
     #[cfg(not(feature = "enterprise"))] Headers(_user_email): Headers<UserEmail>,
     Json(body): Json<BulkDeleteSyntheticsRequestBody>,
 ) -> Response {
-    // RBAC: the route gate only checks the `?folder=` folder, and the ids in
-    // the body can come from any folder. Require DELETE on each check, the
-    // same per-id loop delete_alert_bulk runs.
+    // The route gate checks only `?folder=`, so check each id against its stored folder.
     #[cfg(feature = "enterprise")]
     for id in &body.ids {
+        let folder = match openobserve_synthetics::service::folder_of(&org_id, id).await {
+            Ok(Some(folder)) => folder,
+            Ok(None) => return MetaHttpResponse::forbidden("Forbidden"),
+            Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
+        };
         if !check_permissions(
             id,
             &org_id,
             &user_email.user_id,
             "synthetics",
             "DELETE",
-            _folder_query.folder.as_deref(),
+            Some(&folder),
             false,
             true,
             false,
