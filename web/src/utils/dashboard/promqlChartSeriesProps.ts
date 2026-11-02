@@ -144,6 +144,12 @@ export const getPropsByChartTypeForSeries = (type: string, config?: SeriesStyleC
   }
 };
 
+/** A time-shifted twin keeps its primary's colour, so its line is dashed (dotted in the Explorer) to tell the two apart. */
+export const getShiftedLineStyle = (
+  lineStyle: Record<string, unknown> | undefined,
+  type: "dashed" | "dotted" = "dashed",
+): Record<string, unknown> => ({ ...lineStyle, type });
+
 /** Item opacity for a PromQL series; a time-shifted bar or scatter twin is drawn at half its base opacity. */
 export const getSeriesItemOpacity = (
   type: string,
