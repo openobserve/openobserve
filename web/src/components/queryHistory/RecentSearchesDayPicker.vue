@@ -15,55 +15,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OInput
-    v-model="text"
-    size="sm"
-    width="sm"
-    :placeholder="placeholder"
-    :aria-label="fieldLabel"
-    :error="invalid"
-    clearable
-    :data-test="dataTest"
-    @keydown.enter.prevent="commit"
-    @blur="onBlur"
-    @clear="apply(undefined)"
-  >
-    <template #icon-right>
-      <OPopover
-        v-model:open="open"
-        side="bottom"
-        align="end"
-        :aria-label="fieldLabel"
-        content-class="p-1 shadow-lg!"
-        @open-auto-focus="focusDay"
-      >
-        <template #trigger>
-          <OButton
-            ref="triggerRef"
-            variant="ghost"
-            size="icon-xs-sq"
-            icon-left="calendar-month"
-            class="text-input-hint"
-            :aria-label="t('components.date.openCalendar')"
-            :data-test="`${dataTest}-trigger`"
-          />
-        </template>
-        <div
-          ref="calendarRef"
-          class="flex justify-center px-3 py-2"
-          :data-test="`${dataTest}-calendar`"
+  <span ref="fieldRef" class="contents" @focusout="onFocusOut">
+    <OInput
+      v-model="text"
+      size="sm"
+      width="sm"
+      :placeholder="placeholder"
+      :aria-label="fieldLabel"
+      :error="invalid"
+      clearable
+      :data-test="dataTest"
+      @keydown.enter.prevent="commit"
+      @clear="apply(undefined)"
+    >
+      <template #icon-right>
+        <OPopover
+          v-model:open="open"
+          side="bottom"
+          align="end"
+          :aria-label="fieldLabel"
+          content-class="p-1 shadow-lg!"
+          @open-auto-focus="focusDay"
         >
-          <ODateRangeCalendar
-            :start-date="selectedDay"
-            :end-date="selectedDay"
-            :min-date="MIN_DAY"
-            :max-date="today"
-            @update:pending-date="pick"
-          />
-        </div>
-      </OPopover>
-    </template>
-  </OInput>
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              icon-left="calendar-month"
+              class="text-input-hint"
+              :aria-label="t('components.date.openCalendar')"
+              :data-test="`${dataTest}-trigger`"
+            />
+          </template>
+          <div
+            ref="calendarRef"
+            class="flex justify-center px-3 py-2"
+            :data-test="`${dataTest}-calendar`"
+          >
+            <ODateRangeCalendar
+              :start-date="selectedDay"
+              :end-date="selectedDay"
+              :min-date="MIN_DAY"
+              :max-date="today"
+              @update:pending-date="pick"
+            />
+          </div>
+        </OPopover>
+      </template>
+    </OInput>
+  </span>
 </template>
 
 <script setup lang="ts">
@@ -102,13 +102,14 @@ const today = ref(todayText());
 // Read on every open, so a drawer left open past midnight still offers the new day.
 watch(open, (isOpen) => {
   if (isOpen) today.value = todayText();
+  else if (!fieldRef.value?.contains(document.activeElement)) commit();
 });
 // The calendar speaks the app's YYYY/MM/DD; the filter keeps YYYY-MM-DD.
 const selectedDay = computed(() => props.modelValue?.replace(/-/g, "/"));
 const shown = (day?: string) => (day ? DateTime.fromISO(day).toFormat("dd/MM/yyyy") : "");
 const text = ref(shown(props.modelValue));
 const invalid = ref(false);
-const triggerRef = ref<InstanceType<typeof OButton> | null>(null);
+const fieldRef = ref<HTMLElement | null>(null);
 watch(
   () => props.modelValue,
   (day) => {
@@ -144,11 +145,10 @@ const commit = () => {
   else invalid.value = true;
 };
 
-// Moving to the field's own calendar button is not leaving the field; a half-typed day stays unjudged.
-const onBlur = (event: FocusEvent) => {
-  const trigger = triggerRef.value?.$el as HTMLElement | undefined;
-  if (trigger && event.relatedTarget instanceof Node && trigger.contains(event.relatedTarget))
-    return;
+// The text, its calendar button and the open calendar are one field, so a half-typed day waits while focus stays in it.
+const onFocusOut = (event: FocusEvent) => {
+  const next = event.relatedTarget;
+  if (open.value || (next instanceof Node && fieldRef.value?.contains(next))) return;
   commit();
 };
 

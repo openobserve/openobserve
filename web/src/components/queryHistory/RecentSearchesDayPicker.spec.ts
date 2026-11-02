@@ -59,7 +59,7 @@ describe("RecentSearchesDayPicker", () => {
     await field.trigger("keydown", { key: "Enter" });
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["2026-10-05"]);
     await field.setValue("6/10/2026");
-    await field.trigger("blur");
+    await field.trigger("focusout");
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["2026-10-06"]);
   });
 
@@ -78,7 +78,7 @@ describe("RecentSearchesDayPicker", () => {
     const wrapper = mountPicker();
     const field = wrapper.find('[data-test="ran-on-field"]');
     await field.setValue("abc");
-    await field.trigger("blur");
+    await field.trigger("focusout");
     expect(field.attributes("aria-invalid")).toBe("true");
     await wrapper.find('[data-test="ran-on-clear"]').trigger("click");
     expect(field.attributes("aria-invalid")).toBeUndefined();
@@ -110,10 +110,18 @@ describe("RecentSearchesDayPicker", () => {
     const wrapper = mountPicker();
     const field = wrapper.find('[data-test="ran-on-field"]');
     await field.setValue("3/1");
-    const trigger = wrapper.find('[data-test="ran-on-trigger"]').element;
-    await field.trigger("blur", { relatedTarget: trigger });
+    const trigger = wrapper.find('[data-test="ran-on-trigger"]');
+    await field.trigger("focusout", { relatedTarget: trigger.element });
     expect(field.attributes("aria-invalid")).toBeUndefined();
-    await field.trigger("blur", { relatedTarget: document.body });
+  });
+
+  it("judges the text once focus leaves the field from its calendar button", async () => {
+    const wrapper = mountPicker();
+    const field = wrapper.find('[data-test="ran-on-field"]');
+    await field.setValue("abc");
+    const trigger = wrapper.find('[data-test="ran-on-trigger"]');
+    await field.trigger("focusout", { relatedTarget: trigger.element });
+    await trigger.trigger("focusout", { relatedTarget: document.body });
     expect(field.attributes("aria-invalid")).toBe("true");
   });
 
@@ -121,7 +129,7 @@ describe("RecentSearchesDayPicker", () => {
     const wrapper = mountPicker("2026-10-27");
     const field = wrapper.find('[data-test="ran-on-field"]');
     await field.setValue("");
-    await field.trigger("blur");
+    await field.trigger("focusout");
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([undefined]);
   });
 
