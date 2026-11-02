@@ -28,6 +28,10 @@ import {
   historyStatusOf,
   isAckEventRow,
   unackedFiringCount,
+  incidentAckToast,
+  incidentStatusToast,
+  pageAckWords,
+  refusalToast,
 } from "./ackState";
 
 const t = i18n.global.t as unknown as TranslateFn;
@@ -137,5 +141,125 @@ describe("ackState", () => {
         group_labels: { cluster: "prod-ap", region: "eu" },
       } as never),
     ).toBe("cluster=prod-ap, region=eu");
+  });
+
+  describe("the words a page's acknowledgement uses", () => {
+    it.each([
+      [
+        "Platform",
+        "alert",
+        "Stops paging Platform. Shows as acknowledged on the alert.",
+        "Restarts paging Platform at step 1",
+        "Acknowledged · paging stopped for Platform",
+        "Unacknowledged · paging restarts for Platform",
+      ],
+      [
+        "Platform",
+        "incident",
+        "Stops paging Platform. Shows as acknowledged on the incident.",
+        "Restarts paging Platform at step 1",
+        "Acknowledged · paging stopped for Platform",
+        "Unacknowledged · paging restarts for Platform",
+      ],
+      [
+        "",
+        "alert",
+        "Shows as acknowledged on the alert.",
+        "Restarts paging at step 1",
+        "Acknowledged",
+        "Unacknowledged · paging restarts",
+      ],
+      [
+        "",
+        "incident",
+        "Shows as acknowledged on the incident.",
+        "Restarts paging at step 1",
+        "Acknowledged",
+        "Unacknowledged · paging restarts",
+      ],
+    ])("team %j on an %s page", (team, subject, ackHint, unackHint, acked, unacked) => {
+      const words = pageAckWords(team, subject, t);
+      expect(words).toEqual({ ackHint, unackHint, acked, unacked });
+    });
+  });
+
+  describe("the toast after an incident acknowledge", () => {
+    const view = (who: string) => ({
+      group_key: "",
+      firing_started_at: 1,
+      acked_by: who,
+      acked_at: 1,
+      ack_source: "incident" as const,
+    });
+    it("names the incident and the teams it stopped paging", () => {
+      expect(
+        incidentAckToast(
+          {
+            changed: true,
+            acks: [view("me@acme.io")],
+            oncall: {
+              acknowledged: ["p1"],
+              still_paging: [],
+              stopped: [{ response_id: "p1", team: "Payments" }],
+            },
+            other_groups_unacked: 0,
+          },
+          "Checkout down",
+          "me@acme.io",
+          t,
+        ),
+      ).toEqual({
+        variant: "success",
+        message: "Acknowledged incident Checkout down · paging stopped for Payments",
+      });
+    });
+
+    it.each([
+      [[view("me@acme.io")], "me@acme.io", "Already acknowledged by you"],
+      [[], "me@acme.io", "Already acknowledged"],
+      [[view("ana@acme.io")], undefined, "Already acknowledged by ana@acme.io"],
+    ])("does not call an unchanged acknowledge fresh %#", (acks, me, message) => {
+      expect(
+        incidentAckToast({ changed: false, acks, other_groups_unacked: 0 }, "Checkout down", me, t),
+      ).toEqual({ variant: "info", message });
+    });
+
+    it("says an unacknowledge of an unacknowledged incident changed nothing", () => {
+      expect(
+        incidentStatusToast("open", { changed: false }, "Checkout down", "me@acme.io", t),
+      ).toEqual({ variant: "info", message: "Checkout down was not acknowledged" });
+    });
+
+    it("says who was faster when it changed nothing", () => {
+      expect(
+        incidentAckToast(
+          { changed: false, acks: [view("ana@acme.io")], other_groups_unacked: 0 },
+          "Checkout down",
+          "me@acme.io",
+          t,
+        ),
+      ).toEqual({ variant: "info", message: "Already acknowledged by ana@acme.io" });
+    });
+  });
+
+  it.each([
+    ["ack", "You can't acknowledge this."],
+    ["unack", "You can't unacknowledge this."],
+    ["takeOver", "You can't take this over."],
+    ["mute", "You can't mute this."],
+  ] as const)("titles a %s refusal with its own verb", (verb, title) => {
+    expect(
+      refusalToast(
+        {
+          code: verb === "mute" ? "mute_refused" : "ack_refused",
+          message: "m",
+          rule: "role",
+          on_call: [{ email: "bo@acme.io", team: "sre" }],
+          can_act: [],
+        },
+        verb,
+        t,
+      ),
+    ).toEqual({ variant: "error", title, message: "On call: bo@acme.io" });
   });
 });
