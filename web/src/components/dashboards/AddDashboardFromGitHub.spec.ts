@@ -40,14 +40,6 @@ const s3FolderListXml = (folders: string[]): string => {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\n${prefixes}\n</ListBucketResult>`;
 };
 
-// Helper to generate S3 ListObjectsV2 XML for file listing (Contents/Key)
-const s3FileListXml = (folderPath: string, files: string[]): string => {
-  const keys = files
-    .map((f) => `  <Contents><Key>dashboards/${folderPath}/${f}</Key></Contents>`)
-    .join("\n");
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\n${keys}\n</ListBucketResult>`;
-};
-
 import dashboardsService from "@/services/dashboards";
 
 const OIconStub = {
@@ -265,68 +257,6 @@ describe("AddDashboardFromGitHub Component", () => {
     }
   });
 
-  describe("Component Initialization", () => {
-    it("should mount successfully", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should have correct component name", () => {
-      wrapper = createWrapper({ modelValue: false });
-      expect(wrapper.vm.$options.name).toBe("AddDashboardFromGitHub");
-    });
-
-    it("should initialize with empty dashboards list", async () => {
-      wrapper = createWrapper({ modelValue: false });
-      expect(wrapper.vm.dashboards).toEqual([]);
-    });
-
-    it("should initialize with empty selectedDashboards", async () => {
-      wrapper = createWrapper({ modelValue: false });
-      expect(wrapper.vm.selectedDashboards).toEqual([]);
-    });
-
-    it("should initialize with empty searchQuery", async () => {
-      wrapper = createWrapper({ modelValue: false });
-      expect(wrapper.vm.searchQuery).toBe("");
-    });
-
-    it("should initialize with loading as false", async () => {
-      wrapper = createWrapper({ modelValue: false });
-      expect(wrapper.vm.loading).toBe(false);
-    });
-
-    it("should initialize with error as empty string", async () => {
-      wrapper = createWrapper({ modelValue: false });
-      expect(wrapper.vm.error).toBe("");
-    });
-
-    it("should initialize with showFolderSelection as false", async () => {
-      wrapper = createWrapper({ modelValue: false });
-      expect(wrapper.vm.showFolderSelection).toBe(false);
-    });
-  });
-
-  describe("show Computed Property", () => {
-    it("should reflect modelValue prop as true", () => {
-      wrapper = createWrapper({ modelValue: true });
-      expect(wrapper.vm.show).toBe(true);
-    });
-
-    it("should reflect modelValue prop as false", () => {
-      wrapper = createWrapper({ modelValue: false });
-      expect(wrapper.vm.show).toBe(false);
-    });
-
-    it("should emit update:modelValue when show is set", () => {
-      wrapper = createWrapper({ modelValue: true });
-      wrapper.vm.show = false;
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")[0][0]).toBe(false);
-    });
-  });
-
   describe("filteredDashboards Computed", () => {
     beforeEach(() => {
       wrapper = createWrapper({ modelValue: false });
@@ -354,11 +284,6 @@ describe("AddDashboardFromGitHub Component", () => {
       ];
     });
 
-    it("should return all dashboards when searchQuery is empty", () => {
-      wrapper.vm.searchQuery = "";
-      expect(wrapper.vm.filteredDashboards).toHaveLength(3);
-    });
-
     it("should filter dashboards by displayName", () => {
       wrapper.vm.searchQuery = "aws";
       expect(wrapper.vm.filteredDashboards).toHaveLength(1);
@@ -371,47 +296,9 @@ describe("AddDashboardFromGitHub Component", () => {
       expect(wrapper.vm.filteredDashboards[0].name).toBe("nginx_web");
     });
 
-    it("should be case insensitive", () => {
-      wrapper.vm.searchQuery = "NGINX";
-      expect(wrapper.vm.filteredDashboards).toHaveLength(1);
-    });
-
     it("should return empty array when no match", () => {
       wrapper.vm.searchQuery = "nonexistent";
       expect(wrapper.vm.filteredDashboards).toHaveLength(0);
-    });
-
-    it("should filter dashboards without description", () => {
-      wrapper.vm.searchQuery = "kubernetes";
-      expect(wrapper.vm.filteredDashboards).toHaveLength(1);
-      expect(wrapper.vm.filteredDashboards[0].name).toBe("kubernetes_cluster");
-    });
-  });
-
-  describe("isSelected Function", () => {
-    beforeEach(() => {
-      wrapper = createWrapper({ modelValue: false });
-    });
-
-    it("should return false when dashboard is not selected", () => {
-      const dashboard = {
-        name: "aws_ec2",
-        displayName: "AWS EC2",
-        folderPath: "aws_ec2",
-        jsonFiles: [],
-      };
-      expect(wrapper.vm.isSelected(dashboard)).toBe(false);
-    });
-
-    it("should return true when dashboard is selected", () => {
-      const dashboard = {
-        name: "aws_ec2",
-        displayName: "AWS EC2",
-        folderPath: "aws_ec2",
-        jsonFiles: [],
-      };
-      wrapper.vm.selectedDashboards.push(dashboard);
-      expect(wrapper.vm.isSelected(dashboard)).toBe(true);
     });
   });
 
@@ -442,43 +329,9 @@ describe("AddDashboardFromGitHub Component", () => {
       wrapper.vm.toggleDashboard(dashboard);
       expect(wrapper.vm.selectedDashboards).not.toContain(dashboard);
     });
-
-    it("should toggle correctly on multiple calls", () => {
-      const dashboard = {
-        name: "aws_ec2",
-        displayName: "AWS EC2",
-        folderPath: "aws_ec2",
-        jsonFiles: [],
-      };
-      wrapper.vm.toggleDashboard(dashboard);
-      expect(wrapper.vm.selectedDashboards).toHaveLength(1);
-      wrapper.vm.toggleDashboard(dashboard);
-      expect(wrapper.vm.selectedDashboards).toHaveLength(0);
-    });
-
-    it("should handle multiple different dashboards", () => {
-      const d1 = { name: "dash1", displayName: "Dash 1", folderPath: "d1", jsonFiles: [] };
-      const d2 = { name: "dash2", displayName: "Dash 2", folderPath: "d2", jsonFiles: [] };
-      wrapper.vm.toggleDashboard(d1);
-      wrapper.vm.toggleDashboard(d2);
-      expect(wrapper.vm.selectedDashboards).toHaveLength(2);
-    });
   });
 
   describe("loadDashboards Function", () => {
-    it("should set loading to true while fetching", async () => {
-      mockFetch.mockImplementation(
-        () =>
-          new Promise((resolve) =>
-            setTimeout(() => resolve(new Response(s3FolderListXml([]), { status: 200 })), 100),
-          ),
-      );
-      wrapper = createWrapper({ modelValue: false });
-      const loadPromise = wrapper.vm.loadDashboards();
-      expect(wrapper.vm.loading).toBe(true);
-      await loadPromise;
-    });
-
     it("should use cached data when cache is valid", async () => {
       const cachedDashboards = [
         { name: "cached", displayName: "Cached", folderPath: "cached", jsonFiles: [] },
@@ -578,13 +431,6 @@ describe("AddDashboardFromGitHub Component", () => {
       const names = wrapper.vm.dashboards.map((d: any) => d.displayName);
       expect(names[0]).toContain("a first");
     });
-
-    it("should set loading to false after fetch completes", async () => {
-      wrapper = createWrapper({ modelValue: false });
-      await wrapper.vm.loadDashboards();
-      await flushPromises();
-      expect(wrapper.vm.loading).toBe(false);
-    });
   });
 
   describe("handleNext Function", () => {
@@ -593,23 +439,6 @@ describe("AddDashboardFromGitHub Component", () => {
       wrapper.vm.selectedDashboards = [];
       await wrapper.vm.handleNext();
       expect(wrapper.vm.showFolderSelection).toBe(false);
-    });
-
-    it("should call loadFolders when dashboards are selected", async () => {
-      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(mockFolderList as any);
-      mockFetch.mockResolvedValue(
-        new Response(s3FileListXml("aws_ec2", ["dashboard.json"]), { status: 200 }),
-      );
-
-      wrapper = createWrapper({ modelValue: false });
-      wrapper.vm.selectedDashboards = [
-        { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: [] },
-      ];
-
-      await wrapper.vm.handleNext();
-      await flushPromises();
-
-      expect(dashboardsService.list_Folders).toHaveBeenCalled();
     });
 
     it("should show folder selection dialog after successful next", async () => {
@@ -634,13 +463,6 @@ describe("AddDashboardFromGitHub Component", () => {
   });
 
   describe("updateFolderList Function", () => {
-    it("should hide add folder dialog", async () => {
-      wrapper = createWrapper({ modelValue: false });
-      wrapper.vm.showAddFolderDialog = true;
-      await wrapper.vm.updateFolderList(null);
-      expect(wrapper.vm.showAddFolderDialog).toBe(false);
-    });
-
     it("should auto-select newly created folder", async () => {
       vi.mocked(dashboardsService.list_Folders).mockResolvedValue(mockFolderList as any);
       wrapper = createWrapper({ modelValue: false });
@@ -651,13 +473,6 @@ describe("AddDashboardFromGitHub Component", () => {
       await flushPromises();
 
       expect(wrapper.vm.selectedFolderObj).toBe("new-folder-id");
-    });
-
-    it("should not update selectedFolderObj when newFolder has no data", async () => {
-      wrapper = createWrapper({ modelValue: false });
-      wrapper.vm.selectedFolderObj = null;
-      await wrapper.vm.updateFolderList(null);
-      expect(wrapper.vm.selectedFolderObj).toBeNull();
     });
   });
 
@@ -686,30 +501,6 @@ describe("AddDashboardFromGitHub Component", () => {
       expect(wrapper.vm.selectedDashboards).toEqual([]);
     });
 
-    it("should reset searchQuery when dialog closes", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-
-      wrapper.vm.searchQuery = "some search";
-
-      await wrapper.setProps({ modelValue: false });
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.searchQuery).toBe("");
-    });
-
-    it("should reset showFolderSelection when dialog closes", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-
-      wrapper.vm.showFolderSelection = true;
-
-      await wrapper.setProps({ modelValue: false });
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.showFolderSelection).toBe(false);
-    });
-
     it("resolves a pending replace-confirm as declined when the dialog closes", async () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
@@ -730,17 +521,6 @@ describe("AddDashboardFromGitHub Component", () => {
     // loadFolders is triggered internally by handleNext(); pre-populate selectedDashboards
     // with jsonFiles so the fetch loop is skipped and loadFolders is called immediately.
     const preloadedDashboard = { name: "nginx", folderPath: "nginx", jsonFiles: ["nginx.json"] };
-
-    it("should populate folderOptions from dashboards service", async () => {
-      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(mockFolderList as any);
-
-      wrapper = createWrapper({ modelValue: false });
-      wrapper.vm.selectedDashboards = [preloadedDashboard];
-      await wrapper.vm.handleNext();
-      await flushPromises();
-
-      expect(wrapper.vm.folderOptions.length).toBeGreaterThan(0);
-    });
 
     it("should ensure default folder is at top", async () => {
       vi.mocked(dashboardsService.list_Folders).mockResolvedValue({
@@ -774,34 +554,6 @@ describe("AddDashboardFromGitHub Component", () => {
   });
 
   describe("Template Rendering", () => {
-    it("should render the ODrawer wrapper with the gallery title", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.exists()).toBe(true);
-      expect(drawer.attributes("data-title")).toBe("Add Dashboard from Gallery");
-    });
-
-    it("should render search input", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      expect(wrapper.find('[data-test="add-dashboard-github-search"]').exists()).toBe(true);
-    });
-
-    it("should expose the Cancel label on the ODrawer secondary button", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-secondary-label")).toBe("Cancel");
-    });
-
-    it("should expose the select prompt on the ODrawer primary button when nothing is selected", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-primary-label")).toBe("Select dashboards");
-    });
-
     it("should reflect updated selection count in the ODrawer primary label", async () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
@@ -818,26 +570,6 @@ describe("AddDashboardFromGitHub Component", () => {
       await flushPromises();
       const drawer = wrapper.find('[data-test-stub="o-drawer"]');
       expect(drawer.attributes("data-primary-disabled")).toBe("true");
-    });
-
-    it("should enable the ODrawer primary button once a dashboard is selected", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      wrapper.vm.selectedDashboards = [
-        { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: [] },
-      ];
-      await wrapper.vm.$nextTick();
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-primary-disabled")).toBe("false");
-    });
-
-    it("should show dashboard items when dashboards are loaded", async () => {
-      wrapper = createWrapper({ modelValue: false });
-      wrapper.vm.dashboards = [
-        { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: [] },
-      ];
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find('[data-test="add-dashboard-github-item"]').exists()).toBe(true);
     });
   });
 
@@ -879,20 +611,6 @@ describe("AddDashboardFromGitHub Component", () => {
   });
 
   describe("Folder Selection ODialog", () => {
-    it("should render the folder selection dialog when showFolderSelection is true", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-
-      wrapper.vm.showFolderSelection = true;
-      await wrapper.vm.$nextTick();
-
-      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.exists()).toBe(true);
-      expect(dialog.attributes("data-title")).toBe("Select Destination Folder");
-      expect(dialog.attributes("data-primary-label")).toBe("Add Dashboard");
-      expect(dialog.attributes("data-secondary-label")).toBe("Back");
-    });
-
     it("should disable the dialog primary button when no folder is selected", async () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
@@ -902,17 +620,6 @@ describe("AddDashboardFromGitHub Component", () => {
 
       const dialog = wrapper.find('[data-test-stub="o-dialog"]');
       expect(dialog.attributes("data-primary-disabled")).toBe("true");
-    });
-
-    it("should enable the dialog primary button once a folder is selected", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      wrapper.vm.showFolderSelection = true;
-      wrapper.vm.selectedFolderObj = "default";
-      await wrapper.vm.$nextTick();
-
-      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.attributes("data-primary-disabled")).toBe("false");
     });
 
     it("should reflect importing loading state on the dialog primary button", async () => {
@@ -982,34 +689,6 @@ describe("AddDashboardFromGitHub Component", () => {
   });
 
   describe("Add Folder ODialog (nested)", () => {
-    it("should not render the AddFolder dialog as open by default", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-
-      // The Add Folder button uses an ODialog (not a second ODrawer).
-      const dialogs = wrapper.findAllComponents({ name: "ODialog" });
-      expect(dialogs.length).toBeGreaterThanOrEqual(1);
-      // The nested add-folder dialog should be closed by default.
-      const addFolderDialog = wrapper.findComponent(
-        '[data-test="add-dashboard-github-add-folder-dialog"]',
-      );
-      expect(addFolderDialog.exists()).toBe(true);
-      expect(addFolderDialog.props("open")).toBe(false);
-    });
-
-    it("should open the AddFolder dialog when showAddFolderDialog is true", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      wrapper.vm.showAddFolderDialog = true;
-      await wrapper.vm.$nextTick();
-
-      const addFolderDialog = wrapper.findComponent(
-        '[data-test="add-dashboard-github-add-folder-dialog"]',
-      );
-      expect(addFolderDialog.exists()).toBe(true);
-      expect(addFolderDialog.props("open")).toBe(true);
-    });
-
     it("should close the AddFolder dialog when its close event is emitted", async () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();

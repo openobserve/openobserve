@@ -86,10 +86,13 @@ pub async fn do_partitioned_search(
     // [creation_time .. now]); clamping the range would drop older enrichment data, so skip it.
     let mut range_error = String::new();
     if stream_type != StreamType::EnrichmentTables
-        && max_query_range > 0
-        && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
+        && let Some(clamped) = config::utils::query_range::clamp_start_time(
+            req.query.start_time,
+            req.query.end_time,
+            max_query_range,
+        )
     {
-        req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+        req.query.start_time = clamped;
         log::info!(
             "[HTTP2_STREAM trace_id {trace_id}] Query duration is modified due to query range restriction of {max_query_range} hours, new start_time: {}",
             req.query.start_time

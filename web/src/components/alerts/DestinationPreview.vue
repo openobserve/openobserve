@@ -488,6 +488,7 @@ const getDestinationTypeName = (type: string): string => {
     pagerduty: raw("PagerDuty"),
     servicenow: raw("ServiceNow"),
     opsgenie: raw("Opsgenie"),
+    jira: raw("Jira"),
   };
   return typeNames[type] || type;
 };

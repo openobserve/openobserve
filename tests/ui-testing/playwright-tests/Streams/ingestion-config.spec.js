@@ -240,6 +240,9 @@ test.describe("Ingestion Configuration Tests", () => {
       const allBrokenLinks = [];
       let totalLinksChecked = 0;
       let totalLinksSkipped = 0;
+      let totalLinksRateLimited = 0;
+      let totalLinksVerified = 0;
+      const integrationErrors = [];
       let integrationsWithLinks = 0;
       let integrationsWithoutLinks = 0;
 
@@ -249,7 +252,8 @@ test.describe("Ingestion Configuration Tests", () => {
         try {
           await pm.ingestionConfigPage.navigateToIntegration(integration.path, orgId);
 
-          const linkCount = await pm.ingestionConfigPage.getDocumentationLinkCount();
+          const hrefs = await pm.ingestionConfigPage.getDocumentationLinkHrefs();
+          const linkCount = hrefs.length;
 
           if (linkCount === 0) {
             testLogger.info(`  ℹ No documentation links found`);
@@ -261,11 +265,18 @@ test.describe("Ingestion Configuration Tests", () => {
           totalLinksChecked += linkCount;
 
           // Check HTTP status for all links (with skip list)
-          const linkResults = await pm.ingestionConfigPage.getAllDocumentationLinksStatus(skipUrls);
+          const linkResults = await pm.ingestionConfigPage.getAllDocumentationLinksStatus(skipUrls, hrefs);
 
-          const broken = linkResults.filter(r => !r.ok && !r.skipped);
+          const broken = linkResults.filter(r => !r.ok && !r.skipped && !r.rateLimited);
           const working = linkResults.filter(r => r.ok && !r.skipped);
           const skipped = linkResults.filter(r => r.skipped);
+          const rateLimited = linkResults.filter(r => r.rateLimited);
+          totalLinksVerified += linkResults.filter(r => !r.skipped && !r.rateLimited).length;
+
+          if (rateLimited.length > 0) {
+            totalLinksRateLimited += rateLimited.length;
+            testLogger.warn(`  ⚠ ${rateLimited.length} link(s) rate-limited (429), not verified`);
+          }
 
           if (skipped.length > 0) {
             totalLinksSkipped += skipped.length;
@@ -289,6 +300,7 @@ test.describe("Ingestion Configuration Tests", () => {
           }
         } catch (error) {
           testLogger.info(`  ⚠ Error checking ${integration.label}: ${error.message}`);
+          integrationErrors.push(`${integration.label} (${integration.path}): ${error.message}`);
         }
       }
 
@@ -302,6 +314,9 @@ test.describe("Ingestion Configuration Tests", () => {
       testLogger.info(`Total links validated: ${totalLinksChecked}`);
       if (totalLinksSkipped > 0) {
         testLogger.info(`Total links skipped: ${totalLinksSkipped} (manually verified working)`);
+      }
+      if (totalLinksRateLimited > 0) {
+        testLogger.warn(`Total links rate-limited (429, not verified): ${totalLinksRateLimited}`);
       }
 
       if (allBrokenLinks.length > 0) {
@@ -318,12 +333,16 @@ test.describe("Ingestion Configuration Tests", () => {
         }
         testLogger.info('\n' + '='.repeat(80));
       } else {
-        testLogger.info(`\n✅ ALL ${totalLinksChecked} DOCUMENTATION LINKS ARE WORKING!`);
+        testLogger.info(`\n✅ No broken links: ${totalLinksVerified} verified, ${totalLinksRateLimited} rate-limited, ${totalLinksSkipped} skipped`);
         testLogger.info('='.repeat(80));
       }
 
       // Fail test if any broken links found
       expect(allBrokenLinks.length).toBe(0);
+      // An integration that errored was never checked, so it must not count as passing
+      expect(integrationErrors, integrationErrors.join('\n')).toEqual([]);
+      // Every link being rate-limited or skipped would otherwise pass without verifying anything
+      expect(totalLinksVerified).toBeGreaterThan(0);
 
       testLogger.info('\nComprehensive link validation completed');
     });

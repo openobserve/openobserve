@@ -118,7 +118,9 @@ const notify = form.useStore((s: { values: DowntimeFormValues }) => s.values.not
 const hasDestinations = computed(() => notify.value.destinations.length > 0);
 
 const destinationsList = useQuery(() =>
-  Object.assign(destinationsQuery(orgId.value, "alert"), { enabled: !!orgId.value }),
+  Object.assign(destinationsQuery(orgId.value, "alert", false, ["jira"]), {
+    enabled: !!orgId.value,
+  }),
 );
 const destinationOptions = computed(() =>
   (destinationsList.data.value ?? []).map((d: { name: string }) => d.name),

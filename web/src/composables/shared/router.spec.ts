@@ -518,18 +518,22 @@ describe("useRoutes (router.ts)", () => {
       ["/slack/link", "slackLink", "Link Slack account"],
       ["/slack/link/callback", "slackLinkCallback", "Linking Slack account"],
       ["/slack/connect/callback", "slackConnectCallback", "Signing in with Slack"],
-    ])("AC-9.6 %s is a titled route that needs a session", async (path, name, title) => {
-      const { parentRoutes } = useRoutes();
-      const route = parentRoutes.find((r: any) => r.path === path);
+    ])(
+      "AC-9.6 %s is a titled route that needs a session",
+      async (path, name, title) => {
+        const { parentRoutes } = useRoutes();
+        const route = parentRoutes.find((r: any) => r.path === path);
 
-      expect(route).toBeDefined();
-      expect(route.name).toBe(name);
-      expect(enTitle(route.meta.titleKey)).toBe(title);
-      expect(route.meta.public).toBeUndefined();
-      expect(route.beforeEnter).toBeUndefined();
-      const view = await route.component();
-      expect(view.default).toBeDefined();
-    });
+        expect(route).toBeDefined();
+        expect(route.name).toBe(name);
+        expect(enTitle(route.meta.titleKey)).toBe(title);
+        expect(route.meta.public).toBeUndefined();
+        expect(route.beforeEnter).toBeUndefined();
+        const view = await route.component();
+        expect(view.default).toBeDefined();
+      },
+      20000,
+    );
   });
 
   // =========================================================================
@@ -1761,8 +1765,18 @@ describe("useRoutes (router.ts)", () => {
   describe("homeChildRoutes — Product Analytics", () => {
     const shell = () => findRoute(useRoutes().homeChildRoutes, PA_ROUTES.shell);
 
+    // Lazy views transform slowly under CI load; eager components carry route guards, so the saved-funnels page redirects in its own guard, so keep it real.
+    const stubViews = (routes: any[]): any[] =>
+      routes.map((r) => ({
+        ...r,
+        ...(typeof r.component === "function" && r.name !== PA_ROUTES.funnels
+          ? { component: { render: () => null } }
+          : {}),
+        ...(r.children ? { children: stubViews(r.children) } : {}),
+      }));
+
     const realRouter = () => {
-      const { homeChildRoutes } = useRoutes();
+      const homeChildRoutes = stubViews(useRoutes().homeChildRoutes);
       const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
       return createRouter({
         history: createMemoryHistory(),
