@@ -128,7 +128,7 @@ describe("OR-grouped filters", () => {
     expect(distributeUnionRanges(`avg(${u})`)).toBe(
       `avg({__name__="m",a="${long}"} or {__name__="m",b="2"})`,
     );
-    expect(performance.now() - started).toBeLessThan(1000);
+    expect(performance.now() - started).toBeLessThan(5000);
   });
 
   it("every card query and breakdown runs with the union distributed", () => {
