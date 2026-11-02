@@ -119,6 +119,15 @@ file should pass strict ruff.
 | `serial` | Reads or changes server-wide state (root passcode, shared seed stream, org-wide counts). Jobs that run the default set with `-n` (OSS `api_integration_tests`, ENT `oss_in_ent`) run `-m "not serial" -n 4 --dist loadfile`, then `-m serial` alone; mark any new test of that kind. |
 | `order(N)` | Run order pin (legacy — avoid in new tests). |
 
+## Enterprise suites with their own setup
+
+CI copies `o2-enterprise/tests/*` over `tests/` and runs these two suites in their own shards, never in the full run. Locally, deselect them from `rye run pytest` with `--ignore=tests/fleet_flag_off/ --ignore=tests/fleet_collector/`.
+
+| Suite | Needs | Run |
+|---|---|---|
+| `tests/fleet_flag_off/` | An enterprise server started with `O2_FLEET_ENABLED=false` (fails otherwise) | `rye run pytest tests/fleet_flag_off/` |
+| `tests/fleet_collector/` | An enterprise server with `O2_FLEET_ENABLED=true`, a running Docker daemon, and the collector image pinned as `IMAGE_REF` in `tests/fleet_collector/collector_docker.py` (pulled on first use). Containers reach the server through `host.docker.internal`. | `rye run pytest tests/fleet_collector/` (no `-n`) |
+
 ## Troubleshooting
 
 - **`KeyError: 'ZO_BASE_URL'` on collection** — `conftest.py` reads env vars at import. Export them before running pytest (even `--collect-only`).
