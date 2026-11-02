@@ -57,8 +57,26 @@ export class IngestionConfigPage {
         // render only when GET /{org}/passcode returns 403 (enterprise-only UI state).
         this.dataSourceSetupCard = page.locator('[data-test="data-source-setup-card"]');
         this.dataSourceSetupCardForbidden = page.locator('[data-test="data-source-setup-card-passcode-forbidden"]');
+
+        // Any of these means the integration's card finished loading and its doc links are in the DOM
+        this.integrationContentReady = page
+          .locator([
+            '[data-test^="ingestion-"][data-test$="-code-block-container"]',
+            '[data-test^="ingestion-"][data-test$="-code-block-passcode-forbidden"]',
+            '[data-test^="ingestion-"][data-test$="-code-block-passcode-unavailable"]',
+            '[data-test="data-source-setup-card"]',
+            '[data-test="data-source-setup-card-passcode-forbidden"]',
+            '[data-test="data-source-setup-card-passcode-unavailable"]',
+            '[data-test="ai-integration-card"]',
+            '[data-test="ai-integration-card-passcode-forbidden"]',
+            '[data-test="ai-rich-setup-card"]',
+            '[data-test="ai-integration-detail-passcode-forbidden"]',
+          ].join(', '))
+          .first();
         this.copyContentForbidden = page.locator('[data-test^="ingestion-"][data-test$="-code-block-passcode-forbidden"]');
         this.rumContentText = this.legacyCodeBlockPre.first();
+        // Shared by every link in the test so 429 waits stay well under the test timeout
+        this.rateLimitRetryBudgetMs = 60000;
     }
 
     // ==================== Navigation ====================
@@ -328,12 +346,29 @@ export class IngestionConfigPage {
      * without exposing element-only Playwright locators ($('a[target="_blank"]')).
      */
     async getDocumentationLinkHrefs() {
+        await this.waitForDocumentationLinksStable();
+        return await this.readDocumentationLinkHrefs();
+    }
+
+    async readDocumentationLinkHrefs() {
         return await this.page.evaluate(() => {
             const anchors = document.querySelectorAll('a[target="_blank"]');
             return Array.from(anchors)
                 .map(a => a.getAttribute('href'))
                 .filter(h => !!h);
         });
+    }
+
+    async waitForDocumentationLinksStable() {
+        // Every integration route renders one of these, so a miss means a dead route or a broken page
+        await expect(this.integrationContentReady, `no integration card rendered on ${this.page.url()}`).toBeVisible({ timeout: 10000 });
+        let previous = -1;
+        await expect.poll(async () => {
+            const count = (await this.readDocumentationLinkHrefs()).length;
+            const stable = count === previous;
+            previous = count;
+            return stable;
+        }, { timeout: 10000, intervals: [250] }).toBe(true);
     }
 
     async getDocumentationLinkCount() {
@@ -376,8 +411,8 @@ export class IngestionConfigPage {
         return null;
     }
 
-    async getAllDocumentationLinksStatus(skipUrls = []) {
-        const hrefs = await this.getDocumentationLinkHrefs();
+    async getAllDocumentationLinksStatus(skipUrls = [], collectedHrefs = null) {
+        const hrefs = collectedHrefs ?? await this.getDocumentationLinkHrefs();
         const results = [];
 
         for (let i = 0; i < hrefs.length; i++) {
@@ -396,12 +431,18 @@ export class IngestionConfigPage {
             }
 
             try {
-                // 5 second timeout to prevent hanging
-                const response = await this.page.request.head(href, { timeout: 5000 });
+                const response = await this.headWithRateLimitRetry(href);
+                const status = response.status();
+                if (status === 429) {
+                    // A rate limit says nothing about whether the link exists, so it is reported, not failed
+                    console.warn(`[doc-links] RATE-LIMITED (429 after retries), not verified: ${href}`);
+                    results.push({ index: i, url: href, status, ok: false, rateLimited: true });
+                    continue;
+                }
                 results.push({
                     index: i,
                     url: href,
-                    status: response.status(),
+                    status,
                     ok: response.ok()
                 });
             } catch (error) {
@@ -416,5 +457,25 @@ export class IngestionConfigPage {
         }
 
         return results;
+    }
+
+    async headWithRateLimitRetry(href, maxRetries = 2) {
+        // 5 second timeout to prevent hanging
+        let response = await this.page.request.head(href, { timeout: 5000 });
+        for (let attempt = 0; attempt < maxRetries && response.status() === 429; attempt++) {
+            const retryAfter = Number(response.headers()['retry-after']);
+            const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2000;
+            // A long Retry-After or a spent budget would push the whole test past its timeout
+            if (waitMs > 10000 || waitMs > this.rateLimitRetryBudgetMs) break;
+            const started = Date.now();
+            await this.page.waitForTimeout(waitMs);
+            try {
+                response = await this.page.request.head(href, { timeout: 5000 });
+            } catch (error) {
+                console.warn(`[doc-links] retry after 429 failed (${error.message}), keeping the 429: ${href}`);
+            }
+            this.rateLimitRetryBudgetMs -= Date.now() - started;
+        }
+        return response;
     }
 }
