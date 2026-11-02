@@ -548,19 +548,17 @@ fn queryable_field_names(schema: &Schema) -> Vec<String> {
         .unwrap_or_default();
     let column_all = &get_config().common.column_all;
     // `_all` outlives a cleared UDS in the schema, so it is never a filter key
-    let names = schema
+    schema
         .fields()
         .iter()
-        .map(|f| f.name().as_str())
-        .filter(|name| *name != column_all);
-    if defined_schema_fields.is_empty() {
-        return names.map(str::to_string).collect();
-    }
-    names
+        .map(|f| f.name())
         .filter(|name| {
-            *name == TIMESTAMP_COL_NAME || defined_schema_fields.iter().any(|f| f == name)
+            *name != column_all
+                && (defined_schema_fields.is_empty()
+                    || *name == TIMESTAMP_COL_NAME
+                    || defined_schema_fields.contains(name))
         })
-        .map(str::to_string)
+        .cloned()
         .collect()
 }
 

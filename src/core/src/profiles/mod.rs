@@ -435,26 +435,22 @@ async fn buffer_records(
     }
 
     let packed = apply_user_defined_schema(&stream_schema_map[stream_name], &mut records);
-    check_for_schema(
+    check_profiles_schema(
         org_id,
         stream_name,
-        StreamType::Profiles,
         stream_schema_map,
-        records.iter().collect(),
+        &records,
         min_timestamp,
-        false,
     )
     .await?;
     // a check that turns the UDS on projects the schema, which would drop the unpacked columns
     if !packed && apply_user_defined_schema(&stream_schema_map[stream_name], &mut records) {
-        check_for_schema(
+        check_profiles_schema(
             org_id,
             stream_name,
-            StreamType::Profiles,
             stream_schema_map,
-            records.iter().collect(),
+            &records,
             min_timestamp,
-            false,
         )
         .await?;
     }
@@ -530,6 +526,26 @@ fn apply_user_defined_schema(
         *record = refactor_map(std::mem::take(record), &fields);
     }
     true
+}
+
+async fn check_profiles_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
+    records: &[json::Map<String, json::Value>],
+    min_timestamp: i64,
+) -> Result<(), anyhow::Error> {
+    check_for_schema(
+        org_id,
+        stream_name,
+        StreamType::Profiles,
+        stream_schema_map,
+        records.iter().collect(),
+        min_timestamp,
+        false,
+    )
+    .await?;
+    Ok(())
 }
 
 /// Redacts flattened profile records before they are buffered for the WAL.

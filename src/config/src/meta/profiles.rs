@@ -62,7 +62,7 @@ pub const EXCLUDED_TAG_DISCOVERY_KEYS: &[&str] = &[
     "linked_sample_count",
 ];
 /// Columns that link a sample to the span it was taken in.
-pub const TRACE_LINK_COLUMNS: &[&str] = &["trace_id", "span_id"];
+const TRACE_LINK_COLUMNS: &[&str] = &["trace_id", "span_id"];
 
 /// Columns the profiles query endpoints read, so a user-defined schema must never drop them.
 pub fn uds_required_columns() -> impl Iterator<Item = &'static str> {

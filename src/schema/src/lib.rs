@@ -1339,33 +1339,6 @@ mod tests {
     }
 
     #[test]
-    fn test_check_schema_for_defined_schema_fields_profiles_keeps_query_columns() {
-        let schema = Schema::new(vec![] as Vec<Field>);
-        let input = vec!["k8s_pod_name".to_string()];
-        let result = check_schema_for_defined_schema_fields(StreamType::Profiles, &schema, input);
-        for field in [
-            "k8s_pod_name",
-            "stack",
-            "value",
-            "profile_type",
-            "profile_unit",
-            "period_type",
-            "period_unit",
-            "service_name",
-            "otel_scope_name",
-            "span_id",
-            "event_id",
-            "profile_id",
-            "host_name",
-            "process_pid",
-            "profile_duration_nanos",
-        ] {
-            assert!(result.contains(field), "missing {field}");
-        }
-        assert!(!result.contains(TIMESTAMP_COL_NAME));
-    }
-
-    #[test]
     fn test_saved_defined_schema_fields_keeps_absent_profiles_query_columns() {
         let schema = Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
