@@ -9845,6 +9845,7 @@
       "navLabel": "Alert sections",
       "eyebrow": "{n} of {total}",
       "next": "Next: {title}",
+      "back": "Back",
       "needsValue": "Needs a value",
       "needsFix": "Needs a fix · {count}",
       "howItChecks": "How it checks",
@@ -9881,6 +9882,22 @@
         "name": "Name",
         "folder": "Folder",
         "unnamed": "Not named yet"
+      },
+      "cards": {
+        "source": "Data source",
+        "query": "Query",
+        "combine": "Alerts to combine",
+        "trigger": "Trigger",
+        "destinations": "Destinations",
+        "message": "Message",
+        "schedule": "Schedule",
+        "about": "About this alert"
+      },
+      "rows": {
+        "streamType": "Logs, metrics or traces",
+        "stream": "The data this alert reads",
+        "howItChecks": "On a schedule, as events arrive, or when alerts combine",
+        "name": "Shown in the alert list and in notifications"
       }
     },
     "moreActions": "More actions",
@@ -12450,7 +12467,7 @@
       "addVariable": "Add a variable",
       "rowTemplate": "Row template",
       "lookBack": "Look back over",
-      "cooldown": "At most once every",
+      "cooldown": "Quiet after alerting",
       "compareTitle": "Compare with the past",
       "compareThisCheck": "This check",
       "compareRuns": "Runs",
