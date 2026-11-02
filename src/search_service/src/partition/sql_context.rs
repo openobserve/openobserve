@@ -27,7 +27,7 @@ use infra::errors::Error;
 use proto::cluster_rpc;
 
 use crate::{
-    cache::{cacher::get_ts_col_order_by, result_utils::is_timestamp_field},
+    cache::{cacher::get_ts_col_order_by, result_utils::is_ts_order_field},
     partition::aggregate::is_streaming_aggregate,
     sql::Sql,
 };
@@ -83,7 +83,7 @@ impl PartitionSqlContext {
             .map(|(field, order_by)| {
                 if ts_column
                     .as_deref()
-                    .is_some_and(|ts| is_timestamp_field(field, ts))
+                    .is_some_and(|ts| is_ts_order_field(field, ts, &sql.aliases))
                     && order_by == &OrderBy::Asc
                 {
                     OrderBy::Asc

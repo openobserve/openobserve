@@ -54,7 +54,7 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use proto::cluster_rpc::SearchQuery;
-use result_utils::{get_ts_value, is_timestamp_field};
+use result_utils::get_ts_value;
 use tracing::Instrument;
 use transform::{get_all_transform_keys, init_vrl_runtime};
 use usage_reporting::{http_report_metrics, report_request_usage_stats};
@@ -592,7 +592,7 @@ pub async fn prepare_cache_response(
 
     // Parse SQL first to get metadata needed for normalization
     let query: SearchQuery = req.query.clone().into();
-    let sql = match crate::Sql::new(&query, org_id, stream_type, req.search_type).await {
+    let mut sql = match crate::Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {e}");
@@ -664,6 +664,9 @@ pub async fn prepare_cache_response(
             ts_column = TIMESTAMP_COL_NAME.to_string();
         }
     }
+
+    // #16175: sort, trim and cache checks compare ORDER BY with the column the hits carry
+    sql.order_by = result_utils::normalize_ts_order_by(&sql.order_by, &ts_column, &sql.aliases);
 
     // Refine is_descending for histogram queries with non-timestamp ORDER BY
     is_descending = cacher::refine_is_descending_for_histogram(&sql, &ts_column, is_descending);
@@ -932,7 +935,7 @@ fn sort_response(
 
     let compare = |a: &serde_json::Value, b: &serde_json::Value| {
         for (field, order) in order_by {
-            let cmp = if is_timestamp_field(field, ts_column) {
+            let cmp = if ts_column == field {
                 let a_ts = get_ts_value(ts_column, a);
                 let b_ts = get_ts_value(ts_column, b);
                 a_ts.partial_cmp(&b_ts).unwrap_or(std::cmp::Ordering::Equal)
@@ -1868,17 +1871,26 @@ mod tests {
     }
 
     // #16175: order_by keeps `_timestamp` while the hits carry only the alias `ts`
+    fn alias_order_by() -> Vec<(String, OrderBy)> {
+        result_utils::normalize_ts_order_by(
+            &[(TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc)],
+            "ts",
+            &[(TIMESTAMP_COL_NAME.to_string(), "ts".to_string())],
+        )
+    }
+
     #[test]
     fn test_sort_response_orders_by_aliased_timestamp() {
         let mut resp = response_with_alias_ts(&[10, 30, 20]);
-        let order_by = vec![(TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc)];
+        let order_by = alias_order_by();
+        assert_eq!(order_by, vec![("ts".to_string(), OrderBy::Desc)]);
         sort_response(true, &mut resp, "ts", &order_by);
         assert_eq!(alias_ts_of(&resp), vec![30, 20, 10]);
     }
 
     #[test]
     fn test_merge_response_orders_aliased_timestamp_newest_first() {
-        let order_by = vec![(TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc)];
+        let order_by = alias_order_by();
         let merged = merge_response(
             "t",
             vec![response_with_alias_ts(&[20, 10])],

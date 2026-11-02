@@ -31,7 +31,9 @@ use infra::cache::{
 use crate::{
     cache::{
         MultiCachedQueryResponse,
-        result_utils::{get_ts_value, has_non_timestamp_ordering, is_timestamp_field},
+        result_utils::{
+            get_ts_value, has_non_timestamp_ordering, is_timestamp_field, is_ts_order_field,
+        },
     },
     sql::Sql,
 };
@@ -643,8 +645,14 @@ pub fn get_ts_col_order_by(
                 }
             }
             // an alias of _timestamp is the only time column the hits carry
-            if !_is_aggregate
-                && ts_col.is_empty()
+            let ts_alias = parsed_sql
+                .aliases
+                .iter()
+                .find(|(original, _)| original == _ts_col)
+                .map(|(_, alias)| alias.clone());
+            if !_is_aggregate && let Some(alias) = ts_alias {
+                ts_col = alias;
+            } else if !_is_aggregate
                 && (parsed_sql
                     .columns
                     .iter()
@@ -669,7 +677,7 @@ pub fn get_ts_col_order_by(
 
     if !order_by.is_empty() && !result_ts_col.is_empty() {
         for (field, order) in order_by {
-            if is_timestamp_field(field, &result_ts_col) {
+            if is_ts_order_field(field, &result_ts_col, &parsed_sql.aliases) {
                 is_descending = order == &OrderBy::Desc;
                 break;
             }
