@@ -1,6 +1,7 @@
 // Page object for the left rail, its hover flyouts and the mobile drawer nav.
 
 import { expect } from '@playwright/test';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 const FRAME_MS = 16;
 // Minimum-jerk profile: the bell-shaped velocity of a real aimed hand movement.
@@ -22,6 +23,7 @@ export class NavRailPage {
     );
     this.contentScroll = page.locator('.o2-content-scroll');
     this.profileMenuBtn = page.locator('[data-test="header-my-account-profile-icon"]');
+    this.headerDropdown = page.locator('[data-reka-popper-content-wrapper]');
   }
 
   url(path = '/') {
@@ -178,7 +180,7 @@ export class NavRailPage {
       );
       result = { seen: [...seen], maxGapMs: await this.maxMoveGap(), attempt };
       if (result.maxGapMs <= STALL_MS) return result;
-      console.log(`[navRail] scan ${attempt}/${SCAN_ATTEMPTS} stalled: ${result.maxGapMs} ms between pointer moves`);
+      testLogger.info('Nav rail scan stalled, redoing it', { attempt, of: SCAN_ATTEMPTS, maxGapMs: result.maxGapMs });
     }
     return result;
   }

@@ -161,7 +161,7 @@ test.describe('nav rail hover intent', () => {
     expect(openedAfter).toBeLessThanOrEqual(300);
 
     // An open header dropdown is not dismissed by tiles merely passed over.
-    const dropdown = page.locator('[data-reka-popper-content-wrapper]');
+    const dropdown = rail.headerDropdown;
     const openDropdown = async () => {
       if ((await dropdown.count()) > 0) await page.keyboard.press('Escape');
       await expect(dropdown).toHaveCount(0);
