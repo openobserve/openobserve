@@ -350,6 +350,8 @@ import {
   validateSQLPanelFields,
 } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
+import useStreams from "@/composables/useStreams";
+import { getEnrichmentTableRange } from "@/utils/dashboard/streamLifetime";
 import { event } from "quasar";
 import searchService from "@/services/search";
 import { exportFile } from "quasar";
@@ -526,6 +528,7 @@ export default defineComponent({
     const store = useStore();
     const route = useRoute();
     const router = useRouter();
+    const { getStream } = useStreams();
 
     // ============================================================================
     // Hidden Queries Feature Setup
@@ -1586,7 +1589,7 @@ export default defineComponent({
       return { originalQuery, streamName };
     };
 
-    const calculateTimeRange = (
+    const calculateTimeRange = async (
       hoveredTimestamp: number | null,
       interval: number | undefined,
     ) => {
@@ -1597,6 +1600,13 @@ export default defineComponent({
           endTime: startTime + interval,
         };
       }
+      // The panel read the whole enrichment table, so the logs page opens on that same span.
+      const tableRange = await getEnrichmentTableRange(
+        getStream,
+        panelSchema.value,
+      );
+      if (tableRange)
+        return { startTime: tableRange.from, endTime: tableRange.to };
       return {
         startTime: selectedTimeObj.value.start_time.getTime(),
         endTime: selectedTimeObj.value.end_time.getTime(),
@@ -1961,7 +1971,7 @@ export default defineComponent({
             : null;
           const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 
-          const calculatedTimeRange = calculateTimeRange(
+          const calculatedTimeRange = await calculateTimeRange(
             hoveredTimestamp,
             intervalMicro.value,
           );

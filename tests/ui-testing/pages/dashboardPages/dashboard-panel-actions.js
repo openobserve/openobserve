@@ -169,4 +169,35 @@ export default class DashboardactionPage {
   getDashboardRow(dashboardName) {
     return this.page.getByRole("row", { name: new RegExp(`.*${dashboardName}`) });
   }
+
+  // The chart is canvas-painted, so read the series ChartRenderer feeds to ECharts via `_vnode` (`__vueParentComponent` is dev-only).
+  async getChartSeries(scopeSelector = '[data-test="chart-renderer"]') {
+    return this.page.evaluate((scopeSel) => {
+      const scopes = Array.from(document.querySelectorAll(scopeSel));
+      const series = [];
+      const visited = new Set();
+      const walk = (node, depth) => {
+        if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
+        visited.add(node);
+        const comp = node.component;
+        if (comp) {
+          const host = comp.setupState?.chartRef;
+          const options = comp.props?.data?.options;
+          if (options && host instanceof Element && scopes.some((scope) => scope.contains(host))) {
+            for (const s of options.series ?? []) {
+              const values = (s?.data ?? []).map((point) =>
+                Array.isArray(point) ? point[point.length - 1] : (point?.value ?? point),
+              );
+              series.push({ name: s?.name ? String(s.name) : "", values });
+            }
+          }
+          walk(comp.subTree, depth + 1);
+        }
+        if (node.suspense) walk(node.suspense.activeBranch, depth + 1);
+        if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
+      };
+      walk(document.querySelector("#app")?._vnode, 0);
+      return series;
+    }, scopeSelector);
+  }
 }

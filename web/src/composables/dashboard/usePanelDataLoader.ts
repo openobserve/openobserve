@@ -47,6 +47,8 @@ import useHttpStreamingSearch from "../useStreamingSearch";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import logsUtils from "@/composables/useLogs/logsUtils";
 import { createPromQLChunkProcessor } from "./promqlChunkProcessor";
+import useStreams from "@/composables/useStreams";
+import { getEnrichmentTableRange } from "@/utils/dashboard/streamLifetime";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -88,6 +90,7 @@ export const usePanelDataLoader = (
   let runCount = 0;
 
   const store = useStore();
+  const { getStream } = useStreams();
 
   const getRegionClusterParams = () => {
     if (
@@ -865,6 +868,16 @@ export const usePanelDataLoader = (
         endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
       } else {
         return;
+      }
+
+      // Enrichment rows carry their upload time, so the dashboard range would hide them; Explore does the same.
+      const tableRange = await getEnrichmentTableRange(
+        getStream,
+        panelSchema.value,
+      );
+      if (tableRange) {
+        startISOTimestamp = tableRange.from;
+        endISOTimestamp = tableRange.to;
       }
 
       log(

@@ -154,6 +154,21 @@ vi.mock("@/components/dashboards/addPanel/AddAnnotation.vue", () => ({
   },
 }));
 
+const { mockGetStream } = vi.hoisted(() => ({
+  mockGetStream: vi.fn().mockResolvedValue(null),
+}));
+vi.mock("@/composables/useStreams", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/composables/useStreams")>();
+  return {
+    ...actual,
+    default: (...args: Parameters<typeof actual.default>) => ({
+      ...actual.default(...args),
+      getStream: mockGetStream,
+    }),
+  };
+});
+
 vi.mock("@/components/common/LoadingProgress.vue", () => ({
   default: {
     name: "LoadingProgress",
@@ -1594,6 +1609,86 @@ describe("PanelSchemaRenderer", () => {
       expect(tableWrapper.vm.panelSchema.type).toBe("table");
       expect(sankeyWrapper.vm.panelSchema.type).toBe("sankey");
       expect(pieWrapper.vm.panelSchema.type).toBe("pie");
+    });
+  });
+
+  describe("Drilldown to logs time range", () => {
+    const drillIntoLogs = async (fields: {
+      stream: string;
+      stream_type: string;
+    }) => {
+      const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          type: "pie",
+          queries: [
+            {
+              ...defaultProps.panelSchema.queries[0],
+              fields: {
+                ...defaultProps.panelSchema.queries[0].fields,
+                ...fields,
+              },
+            },
+          ],
+          config: {
+            drilldown: [
+              {
+                name: "Logs",
+                type: "logs",
+                targetBlank: true,
+                data: { logsMode: "custom", logsQuery: 'SELECT * FROM "geo"' },
+              },
+            ],
+          },
+        },
+      });
+      wrapper.vm.metadata.value = {
+        queries: [{ query: 'SELECT * FROM "geo"' }],
+      };
+
+      await wrapper.vm.onChartClick({ name: "a", value: 5, seriesName: "a" });
+      await wrapper.vm.openDrilldown(0);
+      await flushPromises();
+
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      const logsUrl = new URL(openSpy.mock.calls[0][0] as string);
+      openSpy.mockRestore();
+      return {
+        from: Number(logsUrl.searchParams.get("from")),
+        to: Number(logsUrl.searchParams.get("to")),
+      };
+    };
+
+    it("opens logs on the enrichment table's span", async () => {
+      const tableStartUs = Date.UTC(2020, 0, 1) * 1000;
+      mockGetStream.mockResolvedValueOnce({
+        stats: { doc_time_min: tableStartUs, doc_time_max: tableStartUs },
+      });
+
+      const { from, to } = await drillIntoLogs({
+        stream: "geo",
+        stream_type: "enrichment_tables",
+      });
+
+      expect(mockGetStream).toHaveBeenCalledWith(
+        "geo",
+        "enrichment_tables",
+        false,
+      );
+      expect(from).toBe(tableStartUs - 1_000_000);
+      expect(to).toBeGreaterThanOrEqual((Date.now() - 60_000) * 1000);
+    });
+
+    it("opens logs on the dashboard range for a logs panel", async () => {
+      const { from, to } = await drillIntoLogs({
+        stream: "geo",
+        stream_type: "logs",
+      });
+
+      expect(mockGetStream).not.toHaveBeenCalled();
+      expect(from).toBe(defaultProps.selectedTimeObj.start_time.getTime());
+      expect(to).toBe(defaultProps.selectedTimeObj.end_time.getTime());
     });
   });
 

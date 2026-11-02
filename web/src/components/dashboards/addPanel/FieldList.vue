@@ -592,7 +592,15 @@ export default defineComponent({
     const data = reactive<any>({
       // schemaList: [],
       // indexOptions: [],
-      streamType: ["logs", "metrics", "traces"],
+      // Only a dashboard panel searches an enrichment table over its whole lifetime, so only it offers one.
+      streamType: [
+        "logs",
+        "metrics",
+        "traces",
+        ...(dashboardPanelDataPageKey === "dashboard"
+          ? ["enrichment_tables"]
+          : []),
+      ],
     });
     const filteredStreams = ref([]);
     const {

@@ -36,11 +36,14 @@ vi.mock("../../services/search", () => ({
   },
 }));
 
+const mockZoConfig: { sql_base64_enabled: boolean; timestamp_column?: string } =
+  vi.hoisted(() => ({ sql_base64_enabled: false }));
+
 vi.mock("vuex", () => ({
   useStore: () => ({
     state: {
       selectedOrganization: { identifier: "test-org" },
-      zoConfig: { sql_base64_enabled: false },
+      zoConfig: mockZoConfig,
       organizationData: {
         organizationSettings: { scrape_interval: 15 },
       },
@@ -154,12 +157,21 @@ vi.mock("./useAnnotations", () => ({
 // Enhanced HTTP Streaming mocking
 let mockStreamingCallbacks: any = {};
 let shouldStreamingThrow = false;
+const streamPayloads: {
+  queryReq: { query: { start_time: number; end_time: number } };
+}[] = [];
+
+const { mockGetStream } = vi.hoisted(() => ({ mockGetStream: vi.fn() }));
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: mockGetStream }),
+}));
 
 vi.mock("../useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: vi
       .fn()
       .mockImplementation((payload, callbacks) => {
+        streamPayloads.push(payload);
         mockStreamingCallbacks = callbacks;
         if (shouldStreamingThrow) {
           callbacks?.error?.(payload, { message: "Streaming error" });
@@ -258,6 +270,7 @@ const resetAllMocks = () => {
   // Reset streaming mocks
   mockStreamingCallbacks = {};
   shouldStreamingThrow = false;
+  streamPayloads.length = 0;
 
   // Reset cache mocks
   mockCacheData = null;
@@ -2833,6 +2846,78 @@ describe("usePanelDataLoader", () => {
   });
 
   // ==== COMPREHENSIVE FINAL TESTS FOR 100% COVERAGE ====
+  describe("enrichment table panels", () => {
+    // Without a timestamp column the SQL path throws before the search is sent.
+    beforeEach(() => {
+      mockZoConfig.timestamp_column = "_timestamp";
+    });
+
+    afterEach(() => {
+      delete mockZoConfig.timestamp_column;
+    });
+
+    const loadPanel = async (fields: {
+      stream: string;
+      stream_type: string;
+    }) => {
+      const selectedTimeObj = createMockSelectedTimeObj({
+        start_time: new Date(Date.now() - 3600000),
+        end_time: new Date(),
+      });
+      const loader = usePanelDataLoader(
+        createMockPanelSchema({ queryConfig: { fields } }),
+        selectedTimeObj,
+        createMockVariablesData(),
+        ref(null),
+        ref(true),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+      await loader.loadData();
+      return selectedTimeObj.value;
+    };
+
+    it("searches the table's own span instead of the dashboard range", async () => {
+      const tableStartUs = Date.UTC(2020, 0, 1) * 1000;
+      mockGetStream.mockResolvedValueOnce({
+        stats: { doc_time_min: tableStartUs, doc_time_max: tableStartUs },
+      });
+
+      await loadPanel({ stream: "geo", stream_type: "enrichment_tables" });
+
+      expect(mockGetStream).toHaveBeenCalledWith(
+        "geo",
+        "enrichment_tables",
+        false,
+      );
+      expect(streamPayloads).toHaveLength(1);
+      const { start_time, end_time } = streamPayloads[0].queryReq.query;
+      expect(start_time).toBe(tableStartUs - 1_000_000);
+      expect(end_time).toBeGreaterThanOrEqual((Date.now() - 60_000) * 1000);
+    });
+
+    it("keeps the dashboard range for a logs panel", async () => {
+      const { start_time, end_time } = await loadPanel({
+        stream: "app",
+        stream_type: "logs",
+      });
+
+      expect(mockGetStream).not.toHaveBeenCalled();
+      expect(streamPayloads).toHaveLength(1);
+      expect(streamPayloads[0].queryReq.query).toMatchObject({
+        start_time: start_time.getTime(),
+        end_time: end_time.getTime(),
+      });
+    });
+  });
+
   describe("Complete Coverage Tests", () => {
     it("should achieve 100% line coverage with all scenarios", async () => {
       // Test all remaining scenarios for complete coverage

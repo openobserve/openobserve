@@ -458,6 +458,51 @@ describe("PanelContainer", () => {
     });
   });
 
+  describe("Create Alert From Panel", () => {
+    const panelOn = (streamType: string) => ({
+      ...mockPanelData,
+      queries: [
+        {
+          query: "SELECT * FROM geo",
+          queryType: "sql",
+          fields: { stream: "geo", stream_type: streamType },
+        },
+      ],
+    });
+
+    // The component's $router is the mounting mock, which wrapper.vm.$router does not expose.
+    const spyOnRouterPush = () => vi.spyOn(wrapper.vm.$.proxy.$router, "push");
+
+    it("refuses an enrichment-table panel with a notice instead of opening the alert form", () => {
+      wrapper = createWrapper({ data: panelOn("enrichment_tables") });
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      const pushSpy = spyOnRouterPush();
+
+      wrapper.vm.createAlertFromPanel();
+
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+          message: i18n.global.t("panel.enrichmentTableAlertUnsupported"),
+        }),
+      );
+      expect(pushSpy).not.toHaveBeenCalled();
+    });
+
+    it("opens the alert form for a logs panel", () => {
+      wrapper = createWrapper({ data: panelOn("logs") });
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      const pushSpy = spyOnRouterPush();
+
+      wrapper.vm.createAlertFromPanel();
+
+      expect(notifySpy).not.toHaveBeenCalled();
+      expect(pushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "addAlert" }),
+      );
+    });
+  });
+
   describe("Performance", () => {
     it("should handle component updates without errors", async () => {
       wrapper = createWrapper();
