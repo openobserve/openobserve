@@ -496,6 +496,12 @@ impl Scheduler {
         }
     }
 
+    /// Only the lanes of a region whose global jobs another region runs; None when it has none.
+    pub fn region_local(config: SchedulerConfig) -> Option<Self> {
+        let lanes = region_local_module_configs(&config);
+        (!lanes.is_empty()).then(|| Self::new_with_modules(config, lanes))
+    }
+
     /// Build the scheduler from an explicit set of per-module configs. An empty `module_configs`
     /// yields the single shared (legacy) lane; otherwise one lane per module and no shared lane.
     /// Kept separate from [`Scheduler::new`] so both paths are unit-testable without env mutation.
@@ -748,6 +754,15 @@ fn always_on_module_configs(
         lanes.push(autoobserve_module_config(base));
     }
     lanes
+}
+
+/// Each region has its own AutoObserve row, so a region the job election passed over still runs it.
+fn region_local_module_configs(base: &SchedulerConfig) -> Vec<ModuleSchedulerConfig> {
+    if autoobserve_lane_wanted() {
+        vec![autoobserve_module_config(base)]
+    } else {
+        Vec::new()
+    }
 }
 
 /// The AutoObserve lane: its region has one engine row, so one worker is all it can use.
@@ -1458,6 +1473,23 @@ mod tests {
         assert_eq!(has_lane(resolve_module_configs(&cfg, &base)), wanted);
         assert_eq!(has_lane(always_on_module_configs(&cfg, &base)), wanted);
         assert!(TriggerModule::AutoObserve.hidden_from_older_pullers());
+    }
+
+    #[test]
+    fn test_a_region_outside_the_job_election_runs_only_its_autoobserve_lane() {
+        let wanted = autoobserve_lane_wanted();
+        let modules: Vec<TriggerModule> = region_local_module_configs(&make_config())
+            .into_iter()
+            .map(|l| l.module)
+            .collect();
+        let own = if wanted {
+            vec![TriggerModule::AutoObserve]
+        } else {
+            vec![]
+        };
+        assert_eq!(modules, own);
+        let lanes = Scheduler::region_local(make_config()).map(|s| s.lanes.len());
+        assert_eq!(lanes, wanted.then_some(1), "no shared lane");
     }
 
     #[test]

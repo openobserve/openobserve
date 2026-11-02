@@ -111,6 +111,7 @@ pub trait Scheduler: Sync + Send + 'static {
     /// Makes one parked run due at `now` only while its org row is active, in one statement.
     async fn release_if_org_active(&self, parked: &Trigger, now: i64) -> Result<bool>;
     async fn watch_timeout(&self) -> Result<()>;
+    async fn watch_timeout_module(&self, module: TriggerModule) -> Result<()>;
     async fn len_module(&self, module: TriggerModule) -> usize;
     async fn len(&self) -> usize;
     async fn is_empty(&self) -> bool;
@@ -400,6 +401,12 @@ pub async fn rename_key(
 #[inline]
 pub async fn watch_timeout() -> Result<()> {
     CLIENT.watch_timeout().await
+}
+
+/// `watch_timeout` for one module's rows, for a region that runs no other lane.
+#[inline]
+pub async fn watch_timeout_module(module: TriggerModule) -> Result<()> {
+    CLIENT.watch_timeout_module(module).await
 }
 
 /// The count of jobs for the given module (Report/Alert etc.)
