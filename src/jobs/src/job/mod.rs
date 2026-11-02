@@ -507,6 +507,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if let Err(e) = db::org_status::load_from_db().await {
         log::error!("Failed to load org status cache: {e}");
     }
+    // KV reads are served from a per-node cache, so every node, routers included, must hear writes.
+    tokio::task::spawn(db::kv::watch());
+    #[cfg(feature = "enterprise")]
+    tokio::spawn(o2_enterprise::enterprise::common::settings::watch());
 
     #[cfg(feature = "cloud")]
     tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
