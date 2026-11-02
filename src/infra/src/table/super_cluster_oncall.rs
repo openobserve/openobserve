@@ -63,13 +63,55 @@ use super::entity::{
 };
 use crate::{db::get_orm_client_rw, errors};
 
-/// Applies a team exactly as the source region wrote it.
-pub async fn put_team(team: &Team) -> Result<(), errors::Error> {
+/// Applies a team as the source region wrote it; `slack_room_sent` is false for an older build,
+/// whose snapshot has no Slack room, so the stored room is kept (D46).
+pub async fn put_team(team: &Team, slack_room_sent: bool) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     let existing = oncall_teams::Entity::find_by_id(&team.id)
         .one(client)
         .await?;
-    let model = oncall_teams::Model {
+    let model = team_model(team, existing.as_ref(), slack_room_sent)?;
+    match existing {
+        Some(_) => {
+            model.into_active_model().reset_all().update(client).await?;
+        }
+        None => {
+            model.into_active_model().insert(client).await?;
+        }
+    }
+    // A replicated row is a configuration change like any other, and this path
+    // writes through the ORM rather than through the table module's own
+    // functions — so the invalidation the write path does for free has to be
+    // done by hand here, or a failover serves the losing region's teams.
+    super::oncall_teams::invalidate_and_publish_team(&team.org_id, &team.id).await;
+    Ok(())
+}
+
+/// The whole team row a snapshot writes: its Slack room when the snapshot carries one (an
+/// explicit none clears it), else the `stored` room (D46). [pure]
+fn team_model(
+    team: &Team,
+    stored: Option<&oncall_teams::Model>,
+    slack_room_sent: bool,
+) -> Result<oncall_teams::Model, errors::Error> {
+    let room = match (slack_room_sent, stored) {
+        (false, Some(stored)) => [
+            stored.slack_enterprise_id.clone(),
+            stored.slack_workspace_id.clone(),
+            stored.slack_channel_id.clone(),
+            stored.slack_channel_name.clone(),
+            stored.slack_same_room_destination.clone(),
+        ],
+        (true, _) | (false, None) => [
+            team.slack_enterprise_id.clone(),
+            team.slack_workspace_id.clone(),
+            team.slack_channel_id.clone(),
+            team.slack_channel_name.clone(),
+            team.slack_same_room_destination.clone(),
+        ],
+    };
+    let [enterprise, workspace, channel, name, same_room] = room;
+    Ok(oncall_teams::Model {
         id: team.id.clone(),
         org_id: team.org_id.clone(),
         name: team.name.clone(),
@@ -88,23 +130,14 @@ pub async fn put_team(team: &Team) -> Result<(), errors::Error> {
             .map_err(|e| {
                 errors::Error::Message(format!("team channel is not serialisable: {e}"))
             })?,
+        slack_enterprise_id: enterprise,
+        slack_workspace_id: workspace,
+        slack_channel_id: channel,
+        slack_channel_name: name,
+        slack_same_room_destination: same_room,
         created_at: team.created_at,
         updated_at: team.updated_at,
-    };
-    match existing {
-        Some(_) => {
-            model.into_active_model().reset_all().update(client).await?;
-        }
-        None => {
-            model.into_active_model().insert(client).await?;
-        }
-    }
-    // A replicated row is a configuration change like any other, and this path
-    // writes through the ORM rather than through the table module's own
-    // functions — so the invalidation the write path does for free has to be
-    // done by hand here, or a failover serves the losing region's teams.
-    super::oncall_teams::invalidate_and_publish_team(&team.org_id, &team.id).await;
-    Ok(())
+    })
 }
 
 /// Replaces a team's whole membership.
@@ -684,6 +717,75 @@ mod tests {
             incident_id: None,
             updated_at: 10,
         }
+    }
+
+    fn snapshot(room: Option<(&str, &str, &str, &str, &str)>) -> Team {
+        let (e, w, c, n, d) = match room {
+            Some((e, w, c, n, d)) => (Some(e), Some(w), Some(c), Some(n), Some(d)),
+            None => (None, None, None, None, None),
+        };
+        Team {
+            id: "team_1".into(),
+            org_id: "acme".into(),
+            name: "Platform".into(),
+            timezone: "UTC".into(),
+            description: None,
+            channel_destinations: None,
+            slack_enterprise_id: e.map(str::to_string),
+            slack_workspace_id: w.map(str::to_string),
+            slack_channel_id: c.map(str::to_string),
+            slack_channel_name: n.map(str::to_string),
+            slack_same_room_destination: d.map(str::to_string),
+            created_at: 1,
+            updated_at: 2,
+        }
+    }
+
+    fn room_of(m: &oncall_teams::Model) -> [Option<String>; 5] {
+        [
+            m.slack_enterprise_id.clone(),
+            m.slack_workspace_id.clone(),
+            m.slack_channel_id.clone(),
+            m.slack_channel_name.clone(),
+            m.slack_same_room_destination.clone(),
+        ]
+    }
+
+    /// RO-1, D45, D46: a snapshot that carries the Slack room writes it, an explicit null
+    /// clears it, and an older build's snapshot (no Slack room on the wire) keeps the stored one.
+    #[test]
+    fn test_a_team_snapshot_carries_clears_or_keeps_the_slack_room() {
+        let stored_room = ("E0", "T0", "C0", "old", "old-hook");
+        let stored = team_model(&snapshot(Some(stored_room)), None, true).unwrap();
+        let s = |v: &str| Some(v.to_string());
+        let new_room = ("E1", "T1", "C1", "oncall", "oncall-hook");
+        // (case, snapshot room, Slack room on the wire, expected room)
+        let cases = [
+            (
+                "carried",
+                Some(new_room),
+                true,
+                [s("E1"), s("T1"), s("C1"), s("oncall"), s("oncall-hook")],
+            ),
+            (
+                "explicit null clears",
+                None,
+                true,
+                [None, None, None, None, None],
+            ),
+            ("older build keeps", None, false, room_of(&stored)),
+        ];
+        for (case, room, carried, want) in cases {
+            let row = team_model(&snapshot(room), Some(&stored), carried).unwrap();
+            assert_eq!(room_of(&row), want, "{case}");
+            assert_eq!(row.updated_at, 2, "{case}: the rest is the snapshot's");
+        }
+        let fresh = team_model(&snapshot(None), None, false).unwrap();
+        assert_eq!(
+            room_of(&fresh),
+            [None, None, None, None, None],
+            "older build, new row"
+        );
     }
 
     /// The whole point of this module: a replicated record keeps its id, so the
