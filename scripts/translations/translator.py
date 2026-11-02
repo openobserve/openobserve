@@ -72,6 +72,7 @@ LANGUAGE_NAMES = {
     "ru-RU": "Russian",
     "pl-PL": "Polish",
     "vi-VN": "Vietnamese",
+    "th-TH": "Thai",
 }
 
 # The term table injected into every prompt. Strings reach the model as isolated
@@ -99,6 +100,7 @@ TERMS = {
         "ko-KR": "스트림",
         "vi-VN": "stream",
         "ar-SA": "التدفق",
+        "th-TH": "สตรีม",
     },
     "alert": {
         "sense": "a monitoring alert: an alerting rule or the notification it "
@@ -117,6 +119,7 @@ TERMS = {
         "ko-KR": "알림",
         "vi-VN": "cảnh báo",
         "ar-SA": "التنبيه",
+        "th-TH": "การแจ้งเตือน",
     },
     "filter": {
         "sense": "a condition that narrows query or list results",
@@ -133,6 +136,7 @@ TERMS = {
         "ko-KR": "필터",
         "vi-VN": "bộ lọc",
         "ar-SA": "الفلتر",
+        "th-TH": "ตัวกรอง",
     },
     "event": {
         "sense": "a recorded occurrence in the system (log event, alert event) — "
@@ -151,6 +155,7 @@ TERMS = {
         "ko-KR": "이벤트",
         "vi-VN": "sự kiện",
         "ar-SA": "الحدث",
+        "th-TH": "เหตุการณ์",
     },
     "live": {
         "sense": "updating in real time (live tail, live data) — the real-time "
@@ -168,6 +173,7 @@ TERMS = {
         "vi-VN": "trực tiếp",
         "ar-SA": "مباشر",
         "ko-KR": "실시간",
+        "th-TH": "เรียลไทม์",
     },
     "trace": {
         "sense": "a distributed trace: one request's recorded path through services",
@@ -185,6 +191,7 @@ TERMS = {
         "ko-KR": "트레이스",
         "vi-VN": "trace",
         "ar-SA": "التتبع",
+        "th-TH": "เทรซ",
     },
     "span": {
         "sense": "a single operation inside a distributed trace — the APM term of "
@@ -203,6 +210,7 @@ TERMS = {
         "ko-KR": "스팬",
         "vi-VN": "span",
         "ar-SA": "الامتداد",
+        "th-TH": "สแปน",
     },
     "function": {
         "sense": "a user-defined data-transformation function (VRL) — the "
@@ -211,6 +219,7 @@ TERMS = {
         "tr-TR": "fonksiyon",
         "vi-VN": "hàm",
         "ar-SA": "الدالة",
+        "th-TH": "ฟังก์ชัน",
     },
     "pipeline": {
         "sense": "a data-processing pipeline that routes and transforms ingested "
@@ -230,6 +239,7 @@ TERMS = {
         "ko-KR": "파이프라인",
         "vi-VN": "pipeline",
         "ar-SA": "مسار المعالجة",
+        "th-TH": "ไปป์ไลน์",
     },
     "downtime": {
         "sense": "a scheduled window that mutes alert notifications (a maintenance "
@@ -247,6 +257,7 @@ TERMS = {
         "ko-KR": "다운타임",
         "vi-VN": "thời gian bảo trì",
         "ar-SA": "فترة الصيانة",
+        "th-TH": "ช่วงเวลาปิดปรับปรุง",
     },
     "burn rate": {
         "sense": "how fast an SLO's error budget is being spent — never combustion",
@@ -297,6 +308,7 @@ TERMS = {
         "ko-KR": "호출",
         "vi-VN": "gọi trực",
         "ar-SA": "الاستدعاء",
+        "th-TH": "การแจ้งเตือนเรียกเวร",
     },
     "scorer": {
         "sense": "an evaluator that grades LLM output — never a sports scorer",
@@ -313,6 +325,7 @@ TERMS = {
         "ko-KR": "스코어러",
         "vi-VN": "bộ chấm điểm",
         "ar-SA": "أداة التقييم",
+        "th-TH": "ตัวประเมินคะแนน",
     },
     "RUM": {
         "sense": "Real User Monitoring, a product module name — keep the "
@@ -330,6 +343,7 @@ TERMS = {
         "ja-JP": "RUM",
         "ko-KR": "RUM",
         "vi-VN": "RUM",
+        "th-TH": "RUM",
     },
     "logs": {
         "sense": "log records and the Logs module — never a ship's logbook or timber",
@@ -340,6 +354,7 @@ TERMS = {
         "tr-TR": "günlükler",
         "ru-RU": "логи",
         "es-ES": "logs",
+        "th-TH": "ล็อก",
     },
     "metric": {
         "sense": "a measured time-series value — never the metric system or plain "
@@ -348,6 +363,7 @@ TERMS = {
         "ja-JP": "メトリクス",
         "ko-KR": "메트릭",
         "vi-VN": "chỉ số",
+        "th-TH": "เมทริกซ์",
     },
     "dashboard": {
         "sense": "a saved board of chart panels — never a control panel; a panel is "
@@ -358,6 +374,7 @@ TERMS = {
         "ru-RU": "дашборд",
         "vi-VN": "bảng điều khiển",
         "ar-SA": "لوحة المعلومات",
+        "th-TH": "แดชบอร์ด",
     },
     "log shipper": {
         "sense": "an agent that forwards logs (Fluent Bit, Vector, …) — never a timber "
@@ -375,6 +392,7 @@ TERMS = {
         "nl-NL": "taak",
         "ko-KR": "작업",
         "ar-SA": "المهمة",
+        "th-TH": "งานประมวลผล",
     },
     "eval job": {
         "sense": "a scheduled job that runs scorers over LLM traffic",
@@ -399,6 +417,7 @@ TERMS = {
         "ko-KR": "인시던트",
         "tr-TR": "vaka",
         "ar-SA": "الحادث",
+        "th-TH": "เหตุการณ์ขัดข้อง",
     },
     "service account": {
         "sense": "a non-human IAM identity used for API access",
@@ -410,6 +429,7 @@ TERMS = {
         "sense": "an RBAC role that grants permissions",
         "pt-PT": "função",
         "ja-JP": "ロール",
+        "th-TH": "บทบาท",
     },
     "ingestion": {
         "sense": "receiving telemetry into the system — never swallowing",
@@ -417,44 +437,52 @@ TERMS = {
         "tr-TR": "veri alımı",
         "ar-SA": "الاستيعاب",
         "es-ES": "ingesta",
+        "th-TH": "การนำเข้าข้อมูล",
     },
     "legend": {
         "sense": "the key that labels a chart's series — never a myth",
         "it-IT": "legenda",
         "tr-TR": "lejant",
         "ar-SA": "وسيلة الإيضاح",
+        "th-TH": "คำอธิบายแผนภูมิ",
     },
     "template": {
         "sense": "a reusable notification, message or dashboard template — not an AI "
         "model",
         "it-IT": "template",
         "nl-NL": "sjabloon",
+        "th-TH": "เทมเพลต",
     },
     "collapse": {
         "sense": "folding a UI section closed — never a failure",
         "de-DE": "Einklappen",
         "pt-PT": "Recolher",
         "ar-SA": "طي",
+        "th-TH": "ยุบ",
     },
     "acknowledge": {
         "sense": "a responder taking ownership of a page or incident — not admitting "
         "or recognising",
         "it-IT": "prendere in carico",
         "ko-KR": "확인",
+        "th-TH": "รับทราบ",
     },
     "mute": {
         "sense": "silencing notifications for a while — not disabling the rule",
         "ru-RU": "заглушить",
+        "th-TH": "ปิดเสียงแจ้งเตือน",
     },
     "training": {
         "sense": "fitting a detection model to data — never staff training or a "
         "workout",
         "vi-VN": "huấn luyện",
+        "th-TH": "การฝึกสอนโมเดล",
     },
     "match": {
         "sense": "a search, regex or rule match — never a sports match",
         "tr-TR": "eşleşme",
         "ar-SA": "التطابق",
+        "th-TH": "ตรงกัน",
     },
     "error budget": {
         "sense": "the failure allowance of an SLO",
@@ -464,27 +492,33 @@ TERMS = {
     "apply": {
         "sense": "applying a setting, filter or change — never applying for a job",
         "nl-NL": "toepassen",
+        "th-TH": "นำไปใช้",
     },
     "resume": {
         "sense": "continuing something paused — never a CV",
         "ar-SA": "استئناف",
+        "th-TH": "ดำเนินการต่อ",
     },
     "panel": {
         "sense": "one chart on a dashboard — never a committee or the whole dashboard",
         "ar-SA": "اللوحة",
         "vi-VN": "panel",
+        "th-TH": "พาเนล",
     },
     "check": {
         "sense": "a synthetic monitoring check — never a bank cheque",
         "ar-SA": "الفحص",
+        "th-TH": "การตรวจสอบ",
     },
     "trigger": {
         "sense": "what starts an alert or workflow — never a gun trigger",
         "ar-SA": "المُشغِّل",
+        "th-TH": "ทริกเกอร์",
     },
     "trial": {
         "sense": "one run of an experiment — never a court trial",
         "ar-SA": "المحاولة",
+        "th-TH": "การทดสอบ",
     },
     "import / export": {
         "sense": "moving configuration or data into or out of OpenObserve as a file — "
@@ -492,28 +526,33 @@ TERMS = {
     },
     "docs": {
         "sense": "the product documentation — never doctors",
+        "th-TH": "เอกสารคู่มือ",
     },
     "slice": {
         "sense": "a fixed time bucket an SLO's SLI is scored on — never a slice "
         "of food",
         "it-IT": "slice",
         "nl-NL": "slice",
+        "th-TH": "ช่วงเวลาประเมิน",
     },
     "escalation": {
         "sense": "on-call: passing an unacknowledged page to the next responder "
         "level — not a price or conflict escalation",
         "es-ES": "escalada",
         "tr-TR": "eskalasyon",
+        "th-TH": "การยกระดับการแจ้งเตือน",
     },
     "token": {
         "sense": "an auth/API/ingestion credential or an LLM usage unit — never "
         "a coin or game token",
         "tr-TR": "token",
+        "th-TH": "โทเค็น",
     },
     "run": {
         "sense": "one execution of a check, eval, job or workflow — never a round "
         "of a game or a season",
         "ar-SA": "التشغيل",
+        "th-TH": "การทำงาน",
     },
     "destination": {
         "sense": "a configured endpoint that alerts or pipeline output are "
@@ -532,11 +571,13 @@ TERMS = {
         "ko-KR": "대상",
         "vi-VN": "đích",
         "ar-SA": "الوجهة",
+        "th-TH": "ปลายทาง",
     },
     "organization": {
         "sense": "a tenant/workspace that groups users and data — the account sense",
         "tr-TR": "kuruluş",
         "ar-SA": "المؤسسة",
+        "th-TH": "องค์กร",
     },
     "firing": {
         "sense": "the state of an alert that is currently triggered",
@@ -554,14 +595,17 @@ TERMS = {
         "ko-KR": "발생",
         "vi-VN": "đang kích hoạt",
         "ar-SA": "قيد الإطلاق",
+        "th-TH": "กำลังแจ้งเตือน",
     },
     "open": {
         "sense": "as an incident/issue status: still unresolved — not the verb "
         "'to open'",
+        "th-TH": "เปิดอยู่",
     },
     "top": {
         "sense": "in rankings (Top N, Top Queries): highest-ranked; in layout "
         "and position labels it is the ordinary spatial top",
+        "th-TH": "อันดับสูงสุด",
     },
     "value": {
         "sense": "the data value of a field or metric — never worth/merit",
@@ -579,12 +623,14 @@ TERMS = {
         "ko-KR": "값",
         "vi-VN": "giá trị",
         "ar-SA": "القيمة",
+        "th-TH": "ค่า",
     },
     "breakdown": {
         "sense": "splitting a chart or metric by a dimension — never a failure "
         "or collapse",
         "ja-JP": "内訳",
         "tr-TR": "kırılım",
+        "th-TH": "การแจกแจงรายละเอียด",
     },
     "report": {
         "sense": "a scheduled or exported dashboard report document",
@@ -602,6 +648,7 @@ TERMS = {
         "ko-KR": "보고서",
         "vi-VN": "báo cáo",
         "ar-SA": "التقرير",
+        "th-TH": "รายงาน",
     },
 }
 

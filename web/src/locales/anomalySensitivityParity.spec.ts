@@ -171,6 +171,8 @@ const STALE_TOOLTIPS: Record<string, string> = {
     "Ajuste a faixa de pontuação da anomalia para controlar a sensibilidade. Pontos com pontuações fora dessa faixa não acionarão alertas. Use o gráfico para visualizar dados históricos e ajustá-los adequadamente.",
   "ru-RU":
     "Настройте диапазон оценки аномалий для управления чувствительностью. Точки с оценками вне этого диапазона не будут вызывать оповещения. Используйте график для визуализации исторических данных и настройки.",
+  "th-TH":
+    "ปรับช่วงคะแนนความผิดปกติเพื่อควบคุมความไว จุดที่มีคะแนนอยู่นอกช่วงนี้จะไม่ทำให้เกิดการแจ้งเตือน ใช้แผนภูมิเพื่อดูข้อมูลย้อนหลังและปรับให้เหมาะสม",
   "tr-TR":
     "Hassasiyeti kontrol etmek için anormallik puan aralığını ayarlayın. Bu aralığın dışında puan alan puanlar uyarıları tetiklemeyecektir. Geçmiş verileri görselleştirmek ve buna göre ayarlamak için grafiği kullanın.",
   "vi-VN":
@@ -211,6 +213,8 @@ const STALE_PERCENTILE_PROMISE_TOOLTIPS: Record<string, string> = {
     "O quão incomum um bucket deve ser antes de ser sinalizado, como um percentil das pontuações de treinamento do modelo. 97 sinaliza os 3% mais incomuns. Cada bucket sinalizado envia um alerta, por isso um valor mais baixo sinaliza mais buckets e envia mais alertas.",
   "ru-RU":
     "Насколько необычным должен быть бакет, чтобы его пометили, в виде процентиля обучающих оценок модели. 97 помечает самые необычные 3%. Каждый помеченный бакет отправляет оповещение, поэтому меньшее значение помечает больше бакетов и отправляет больше оповещений.",
+  "th-TH":
+    "ความไวกำหนดว่าชุดข้อมูลต้องผิดปกติเพียงใดจึงจะถูกระบุ เป็นเปอร์เซ็นไทล์ของคะแนนการฝึกโมเดล ค่า 97 ระบุ 3% ที่ผิดปกติที่สุด ยิ่งค่าสูง การแจ้งเตือนยิ่งน้อยและเชื่อถือได้มากขึ้น",
   "tr-TR":
     "Bir aralığın işaretlenmeden önce ne kadar olağandışı olması gerektiği, modelin eğitim puanlarının bir yüzdelik dilimi olarak ifade edilir. 97, en olağandışı %3'ü işaretler. İşaretlenen her aralık bir uyarı gönderir; bu nedenle daha düşük bir değer daha fazla aralığı işaretler ve daha fazla uyarı gönderir.",
   "vi-VN":
@@ -310,6 +314,13 @@ const PINNED_COPY: Record<string, { tooltip: string; budgetTooltip: string; hint
       "Максимальное число оповещений, которое эта конфигурация может доставить; ограничение применяется при доставке. Обнаружение продолжает оценивать каждый бакет; когда бюджет исчерпан, дальнейшие оповещения подавляются, пока он не восстановится.",
     hint: "Интервал помечается, когда выходит за пределы ожидаемого значения ± {k}σ.",
   },
+  "th-TH": {
+    tooltip:
+      "แต่ละช่วงเวลาจะถูกเปรียบเทียบกับแถบค่าที่คาดไว้ ± ระดับ × σ โดย σ คือการกระจายทั่วไปของชั่วโมงนั้น ช่วงเวลาที่อยู่นอกแถบจะถูกระบุว่าผิดปกติ แถบที่กว้างขึ้น (ระดับสูงขึ้น) จะส่งการแจ้งเตือนน้อยลง แถบที่แคบลงจะส่งมากขึ้น การเปลี่ยนแปลงมีผลโดยไม่ต้องฝึกใหม่",
+    budgetTooltip:
+      "จำนวนการแจ้งเตือนสูงสุดที่การกำหนดค่านี้ส่งได้ โดยบังคับใช้ ณ เวลาส่ง การตรวจจับยังคงให้คะแนนทุกช่วงเวลา เมื่อใช้งบประมาณหมดแล้ว การแจ้งเตือนเพิ่มเติมจะถูกระงับจนกว่างบประมาณจะเติมใหม่",
+    hint: "ช่วงเวลาจะถูกระบุเมื่ออยู่นอกค่าที่คาดไว้ ± {k}σ",
+  },
   "tr-TR": {
     tooltip:
       "Her aralık, beklenen ± seviye × σ bandıyla karşılaştırılır; σ o saat için tipik yayılımdır. Bandın dışındaki bir aralık anormal olarak işaretlenir. Daha geniş bir bant (daha yüksek seviye) daha az uyarı, daha dar bir bant daha fazla uyarı gönderir. Değişiklikler yeniden eğitim olmadan uygulanır.",
@@ -344,7 +355,7 @@ describe("anomaly sensitivity locale parity", () => {
   it("reads every locale file", () => {
     // An exact count: a glob that silently matched fewer would make every
     // per-locale assertion below vacuous.
-    expect(ALL_LOCALES.map(([name]) => name)).toHaveLength(16);
+    expect(ALL_LOCALES.map(([name]) => name)).toHaveLength(17);
   });
 
   it("knows the stale tooltips and the pinned copy for every locale it will check", () => {

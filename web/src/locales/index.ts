@@ -43,6 +43,7 @@ export const localeFileMap: Record<string, string> = {
   ru: "ru-RU",
   pl: "pl-PL",
   vi: "vi-VN",
+  th: "th-TH",
 };
 
 const RTL_LOCALES = new Set(["ar"]);
