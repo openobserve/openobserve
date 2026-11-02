@@ -115,9 +115,10 @@ test.describe('Fleet management access', { tag: ['@fleet', '@enterprise', '@all'
     }
   });
 
-  test('FL-RBAC-08 · a LIST-only member sees "You can see this fleet, but not its collectors or versions"', {
+  test('FL-RBAC-08 · a member without GET on a fleet (LIST-only grant) sees "You can see this fleet, but not its collectors or versions"', {
     tag: ['@fleetAccess', '@P2'],
   }, async ({ browser }) => {
+    // With O2_OPENFGA_LIST_ONLY_PERMITTED off (this shard), LIST adds nothing over no grant; this proves the no-GET panel only.
     const member = await seed.loginAsMember(browser, members.listOnly);
     try {
       const mpm = new PageManager(member.page);
