@@ -25,6 +25,7 @@ pub use openobserve_core::authz::{
     StreamPermissionResourceType, check_cipher_key_permissions, check_cipher_key_permissions_multi,
     check_stream_permissions,
 };
+use schema::check_schema_for_defined_schema_fields;
 use search::sql::Sql;
 
 // ============================================================================
@@ -109,6 +110,16 @@ pub async fn validate_query_fields(
             })?;
         let settings = infra::schema::get_settings(org_id, stream_name, target_stream_type).await;
         let uds_fields = infra::schema::get_stream_setting_defined_schema_fields(&settings);
+        let uds_fields = if uds_fields.is_empty() {
+            uds_fields
+        } else {
+            let mut fields =
+                check_schema_for_defined_schema_fields(target_stream_type, &schema, uds_fields)
+                    .into_iter()
+                    .collect::<Vec<_>>();
+            fields.sort_unstable();
+            fields
+        };
 
         for field in target_fields {
             if is_system_field(&field) {
@@ -369,6 +380,62 @@ JOIN "test1" AS b"#;
             "Expected error about field not in UDS, got: {}",
             err_msg
         );
+    }
+
+    #[tokio::test]
+    async fn test_validate_query_fields_allows_profiles_required_columns_outside_saved_uds() {
+        use arrow_schema::{DataType, Field, Schema};
+        use config::meta::stream::StreamSettings;
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_profiles_uds";
+        let stream_type = StreamType::Profiles;
+        let cache_key = format!("{org_id}/{stream_type}/prof");
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.insert(
+                cache_key.clone(),
+                SchemaCache::new(Schema::new(vec![
+                    Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+                    Field::new("k8s_pod_name", DataType::Utf8, true),
+                    Field::new("trace_id", DataType::Utf8, true),
+                    Field::new("custom_attr", DataType::Utf8, true),
+                ])),
+            );
+        }
+        let settings = StreamSettings {
+            defined_schema_fields: vec!["k8s_pod_name".to_string()],
+            ..Default::default()
+        };
+        infra::schema::put_stream_settings_batch(vec![(
+            cache_key.clone(),
+            std::sync::Arc::new(settings),
+        )])
+        .await;
+
+        let required = validate_query_fields(
+            org_id,
+            "prof",
+            stream_type,
+            r#"SELECT trace_id FROM "prof""#,
+        )
+        .await;
+        let packed = validate_query_fields(
+            org_id,
+            "prof",
+            stream_type,
+            r#"SELECT custom_attr FROM "prof""#,
+        )
+        .await;
+
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.remove(&cache_key);
+        }
+        infra::schema::remove_stream_settings(&cache_key).await;
+
+        assert!(required.is_ok(), "required column rejected: {required:?}");
+        assert!(packed.is_err(), "packed column accepted");
     }
 
     #[tokio::test]

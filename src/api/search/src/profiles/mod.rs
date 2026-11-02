@@ -547,7 +547,13 @@ fn queryable_field_names(schema: &Schema) -> Vec<String> {
     let defined_schema_fields = infra::schema::unwrap_stream_settings(schema)
         .map(|settings| settings.defined_schema_fields)
         .unwrap_or_default();
-    let names = schema.fields().iter().map(|f| f.name().as_str());
+    let column_all = &get_config().common.column_all;
+    // `_all` outlives a cleared UDS in the schema, so it is never a filter key
+    let names = schema
+        .fields()
+        .iter()
+        .map(|f| f.name().as_str())
+        .filter(|name| *name != column_all);
     if defined_schema_fields.is_empty() {
         return names.map(str::to_string).collect();
     }
@@ -757,8 +763,9 @@ mod tests {
             json::to_string(&settings).unwrap(),
         )]);
 
-        let plain = Schema::new(fields.to_vec());
-        assert_eq!(queryable_field_names(&plain).len(), fields.len());
+        let cleared_uds = queryable_field_names(&Schema::new(fields.to_vec()));
+        assert_eq!(cleared_uds.len(), fields.len() - 1);
+        assert!(!cleared_uds.iter().any(|name| name == "_all"));
 
         let uds = Schema::new_with_metadata(fields.to_vec(), metadata);
         let mut names = queryable_field_names(&uds);

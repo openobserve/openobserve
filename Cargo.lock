@@ -8303,6 +8303,7 @@ dependencies = [
  "promql-parser",
  "promql-service",
  "proto",
+ "schema",
  "search",
  "search_service",
  "serde",
