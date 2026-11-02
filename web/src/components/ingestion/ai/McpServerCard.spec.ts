@@ -118,7 +118,7 @@ describe("McpServerCard", () => {
       const wrapper = mountCard();
 
       expect(codeBlock(wrapper, "ai-integrations-mcp-skills-cmd").props("code")).toBe(
-        "npx skills add openobserve/skills --skill openobserve",
+        "npx @openobserve/skills add --all",
       );
     });
 

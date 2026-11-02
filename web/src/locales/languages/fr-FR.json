@@ -6118,7 +6118,7 @@
       },
       "installOneClick": "Ajouter à {client}",
       "skillsLabel": "Ajouter la compétence {brand} (facultatif)",
-      "skillsHint": "Apprend à votre assistante IA à interroger, à alerter et à créer des tableaux de bord dans {brand}, afin qu'elle tire le meilleur parti des outils MCP. Exécutez-la dans votre projet, puis choisissez les agents dans lesquels l'installer.",
+      "skillsHint": "Apprend à votre assistante IA à interroger, à alerter et à créer des tableaux de bord dans {brand}, afin qu'elle tire le meilleur parti des outils MCP. Exécutez-la dans votre projet ; elle les installe dans chaque outil d'IA qu'elle trouve sur votre machine.",
       "skillsRepo": "Voir les compétences sur {host}"
     },
     "manageTokensBtnLabel": "Gérer les jetons",
