@@ -9,6 +9,7 @@ const scorersList = vi.fn();
 const providersList = vi.fn();
 const datasetsList = vi.fn();
 const push = vi.fn();
+const routeQuery: Record<string, string> = {};
 const toast = vi.fn();
 
 vi.mock("@/services/llm-playground.service", async () => {
@@ -37,7 +38,7 @@ vi.mock("@/services/llm-datasets.service", async () => ({
 }));
 
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ query: {} }),
+  useRoute: () => ({ query: routeQuery }),
   useRouter: () => ({ push }),
 }));
 
@@ -68,6 +69,8 @@ vi.mock("@/types/i18n", async () => {
 import PlaygroundPage from "./PlaygroundPage.vue";
 import { SINGLE_ROW_KEY, type PlaygroundSample } from "./playgroundDraft";
 import type { LlmDatasetItem } from "@/services/llm-datasets.service";
+import type { PromptConfig } from "@/services/llm-prompts.service";
+import { storePromptPlaygroundHandoff } from "@/views/AIObservability/promptPlaygroundHandoff";
 
 // Structural stubs: this spec is about the run engine and draft mutations, not
 // about how the shared components paint.
@@ -97,6 +100,7 @@ const stubs = {
   PlaygroundRowDrawer: true,
   PlaygroundSampleDialog: true,
   PlaygroundAddRowDialog: true,
+  SaveAsPromptDialog: true,
 };
 
 const PROVIDER = {
@@ -136,6 +140,8 @@ function vm(wrapper: Awaited<ReturnType<typeof mountPage>>) {
     totalCells: number;
     applySample: (sample: PlaygroundSample, item: LlmDatasetItem, notify?: boolean) => void;
     clearSample: () => void;
+    openSaveAsPrompt: (variantId: string) => void;
+    savePromptConfig: PromptConfig;
   };
 }
 
@@ -512,6 +518,67 @@ describe("PlaygroundPage", () => {
     await page.scoreAll();
     expect(scorePlayground).toHaveBeenCalledTimes(2);
     expect(scorePlayground.mock.calls[1][1].expectedOutput).toBe("the golden answer");
+  });
+
+  describe("opened from a managed prompt", () => {
+    function openPrompt(config: PromptConfig) {
+      routeQuery.from = "prompt";
+      storePromptPlaygroundHandoff({
+        entityId: "prompt-1",
+        id: "version-row-1",
+        name: "triage",
+        version: 3,
+        payload: [{ role: "user", content: "Triage {{input}}" }],
+        config,
+        provenance: { type: "prompt", label: "triage@v3" },
+      });
+    }
+
+    const tuned: PromptConfig = {
+      model: "gpt-4o",
+      params: { temperature: 0.3, max_tokens: 256, top_p: 0.9, stop: ["###"] },
+      tools: null,
+      responseFormat: null,
+    };
+
+    afterEach(() => {
+      delete routeQuery.from;
+      sessionStorage.clear();
+    });
+
+    it("saves the version's settings back exactly as stored", async () => {
+      openPrompt(tuned);
+      const page = vm(await mountPage());
+
+      page.openSaveAsPrompt(page.draft.variants[0].id);
+
+      expect(page.savePromptConfig).toEqual(tuned);
+    });
+
+    // The bench still seeds the provider's default so Run is reachable, but the
+    // prompt never named a model or a temperature and must not gain either.
+    it("saves a version with no settings without a temperature or the seeded model", async () => {
+      const bare: PromptConfig = { model: null, params: null, tools: null, responseFormat: null };
+      openPrompt(bare);
+      const page = vm(await mountPage());
+      expect(page.draft.variants[0].model).toBe("gpt-4o-mini");
+
+      page.openSaveAsPrompt(page.draft.variants[0].id);
+
+      expect(page.savePromptConfig).toEqual(bare);
+    });
+
+    it("runs with every stored param, not just temperature", async () => {
+      openPrompt(tuned);
+      const page = vm(await mountPage());
+
+      page.onRunAll();
+      await flushPromises();
+
+      const request = runPlayground.mock.calls[0][1] as { model: string; params: unknown };
+      expect(request.model).toBe("gpt-4o");
+      expect(request.params).toEqual(tuned.params);
+    });
   });
 });
 

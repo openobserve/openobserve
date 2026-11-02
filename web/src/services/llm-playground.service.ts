@@ -55,7 +55,10 @@ export interface PlaygroundRunRequest {
   /** Already rendered: `{{tokens}}` are substituted client-side, so the server
    *  binds nothing and `row` is omitted from the request. */
   messages: PlaygroundRequestMessage[];
-  params: { temperature?: number; maxTokens?: number };
+  /** Sampling parameters, sent verbatim. The server reads `temperature` and
+   *  `max_tokens` (each defaulting when absent) and passes every other key —
+   *  top_p, stop, provider-specific options — through to the provider. */
+  params: Record<string, unknown>;
   /** Definitions only. The Playground never executes a tool — see `toolCall`. */
   tools?: PlaygroundRequestTool[];
   responseSchema?: unknown | null;
@@ -291,10 +294,7 @@ function wireBody(request: PlaygroundRunRequest): Record<string, unknown> {
       ...(message.toolCalls?.length ? { toolCalls: message.toolCalls } : {}),
       ...(message.toolCallId ? { toolCallId: message.toolCallId } : {}),
     })),
-    params: {
-      temperature: request.params.temperature ?? 0,
-      ...(request.params.maxTokens ? { max_tokens: request.params.maxTokens } : {}),
-    },
+    params: { ...request.params },
   };
 
   // An empty model would fail the server's model validation; omitting it lets

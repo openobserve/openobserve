@@ -13,6 +13,7 @@ import type {
   PlaygroundRequestMessage,
   PlaygroundScoreResult,
 } from "@/services/llm-playground.service";
+import type { PromptConfig } from "@/services/llm-prompts.service";
 import { TEMPLATE_VARIABLE_NAME_SOURCE } from "@/services/llm-datasets.service";
 
 /** Golden answers feed scorers only. Binding one into a task prompt would leak
@@ -51,15 +52,32 @@ export interface PlaygroundTool {
   parameters: string;
 }
 
+/** What a managed prompt stored for the settings the bench shows in its own
+ *  form, kept so saving back can tell an untouched setting from an edit. */
+export interface PlaygroundPromptBasis {
+  /** Null when the prompt names no model and the provider's default runs it. */
+  model: string | null;
+  /** `config.tools` exactly as stored, `null` included. */
+  tools: unknown;
+}
+
 export interface PlaygroundVariant {
   id: string;
   providerId: string;
   model: string;
-  /** Free text: the field accepts anything and is coerced when the run is built. */
+  /** Free text, coerced when the run is built. Blank is unset: the run leaves it
+   *  out for the server's default, and a saved prompt does not gain one. */
   temperature: string;
+  /** Every sampling parameter except `temperature` — max_tokens, top_p, stop,
+   *  provider-specific keys — carried verbatim from the prompt this variant was
+   *  opened from and sent on every run. Null when the source had no params
+   *  object; absent in drafts stored before this field existed. */
+  params?: Record<string, unknown> | null;
   messages: PlaygroundMessage[];
   tools: PlaygroundTool[];
   responseSchema: string | null;
+  /** The managed prompt this variant was opened from. Absent for any other. */
+  promptBasis?: PlaygroundPromptBasis;
 }
 
 /** Where the loaded `vars` came from, and where it sits in the dataset so the
@@ -298,6 +316,126 @@ export function withFieldInserted(variant: PlaygroundVariant, field: string): Pl
           }
         : message,
     ),
+  };
+}
+
+// ── prompt config ─────────────────────────────────────────────────
+
+/** A prompt's tool definitions in the bench's editable form. Takes the OpenAI
+ *  `{ type, function }` shape or a flat definition; an unnamed entry is not a
+ *  tool the bench can show. */
+export function promptTools(value: unknown): PlaygroundTool[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry): PlaygroundTool[] => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    const candidate =
+      "function" in entry &&
+      entry.function &&
+      typeof entry.function === "object" &&
+      !Array.isArray(entry.function)
+        ? entry.function
+        : entry;
+    const name = "name" in candidate ? String(candidate.name ?? "") : "";
+    if (!name) return [];
+    const description = "description" in candidate ? String(candidate.description ?? "") : "";
+    const parameters = "parameters" in candidate ? candidate.parameters : {};
+    return [{ name, description, parameters: JSON.stringify(parameters ?? {}, null, 2) }];
+  });
+}
+
+/**
+ * The settings a variant opens with from a prompt's config.
+ *
+ * A numeric temperature moves into the bench's own field. Everything else in
+ * `params` rides along verbatim — a non-numeric temperature included, so the
+ * run rejects it out loud instead of the bench dropping it in silence.
+ */
+export function variantSettingsFromPrompt(
+  config: PromptConfig,
+): Pick<
+  PlaygroundVariant,
+  "model" | "temperature" | "params" | "tools" | "responseSchema" | "promptBasis"
+> {
+  const stored = config.params ?? null;
+  const lifted = typeof stored?.temperature === "number";
+  const params: Record<string, unknown> | null = stored && { ...stored };
+  if (params && lifted) delete params.temperature;
+  return {
+    model: config.model ?? "",
+    temperature: lifted ? String(stored?.temperature) : "",
+    params,
+    tools: promptTools(config.tools),
+    responseSchema:
+      config.responseFormat == null ? null : JSON.stringify(config.responseFormat, null, 2),
+    promptBasis: { model: config.model ?? null, tools: config.tools ?? null },
+  };
+}
+
+/** The typed temperature, or undefined when the field is blank or not a number. */
+export function temperatureValue(variant: PlaygroundVariant): number | undefined {
+  const text = variant.temperature.trim();
+  if (!text) return undefined;
+  const value = Number(text);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+/** The sampling params one run sends: the carried ones, plus the temperature when it is set. */
+export function runParams(variant: PlaygroundVariant): Record<string, unknown> {
+  const temperature = temperatureValue(variant);
+  return { ...(variant.params ?? {}), ...(temperature === undefined ? {} : { temperature }) };
+}
+
+function sameTools(left: PlaygroundTool[], right: PlaygroundTool[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every(
+      (tool, index) =>
+        tool.name === right[index].name &&
+        tool.description === right[index].description &&
+        tool.parameters === right[index].parameters,
+    )
+  );
+}
+
+function parseJsonOrNull(value: string): unknown | null {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The prompt config Save as Prompt writes for a variant.
+ *
+ * A setting the bench left alone goes back as the prompt stored it: carried
+ * params verbatim, an unset temperature unset, the original `tools` (`null`
+ * stays `null`) while the definitions are unchanged. A prompt that named no
+ * model keeps naming none while the variant still runs `defaultModel`, the
+ * provider default the bench seeded it with — which is what an unnamed model
+ * resolves to anyway.
+ */
+export function promptConfigFor(variant: PlaygroundVariant, defaultModel = ""): PromptConfig {
+  const basis = variant.promptBasis;
+  const temperature = temperatureValue(variant);
+  const carried = variant.params ?? null;
+  const seededModel = basis !== undefined && basis.model == null && variant.model === defaultModel;
+  return {
+    model: variant.model && !seededModel ? variant.model : null,
+    params:
+      temperature === undefined ? carried && { ...carried } : { ...(carried ?? {}), temperature },
+    tools:
+      basis && sameTools(promptTools(basis.tools), variant.tools)
+        ? basis.tools
+        : variant.tools.map((tool) => ({
+            type: "function",
+            function: {
+              name: tool.name,
+              description: tool.description,
+              parameters: parseJsonOrNull(tool.parameters) ?? {},
+            },
+          })),
+    responseFormat: variant.responseSchema ? parseJsonOrNull(variant.responseSchema) : null,
   };
 }
 

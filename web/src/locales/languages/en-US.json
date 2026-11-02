@@ -18394,6 +18394,10 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "disabled": {
+      "title": "Evaluations are disabled on this server",
+      "description": "Datasets, experiments, the playground, scorers, evaluation jobs, annotation queues and LLM providers need online evaluations. Ask your administrator to enable them."
+    },
     "traceScoreChip": {
       "reasoning": "Why",
       "noReasoning": "No reasoning recorded for this score.",

@@ -364,6 +364,28 @@ const AI_OBSERVABILITY_SUB_ROUTES: AiObservabilitySubRoute[] = [
 ];
 
 /**
+ * The sections whose backend API the server registers only with online
+ * evaluations on (`O2_EVAL_ENABLED`; the `llm_eval_config.enabled` block of the
+ * HTTP router): Discovery (`/discovery`), Queues (`/annotation_queues`),
+ * Datasets (`/datasets`), Playground (`/playground/*`, `/providers`),
+ * Experiments (`/experiments`), Remote Tasks (`/tasks`) and the four Evaluate
+ * tabs (`/score_configs`, `/scorers`, `/eval_jobs`). LLM Insights, Sessions,
+ * Agent Graph, Agent Behavior and Prompts read APIs registered regardless, so
+ * they stay. With evaluations off these are left out of the rail and their
+ * routes (sub-routes included) carry `meta.requiresOnlineEvals`, which makes
+ * the shell render the disabled state instead of the page.
+ */
+export const ONLINE_EVAL_FEATURE_KEYS: Partial<Record<FeatureKey, true>> = {
+  discovery: true,
+  queues: true,
+  datasets: true,
+  playground: true,
+  experiments: true,
+  remoteTasks: true,
+  evaluations: true,
+};
+
+/**
  * Builds the full `/ai` children array — the redirect stub, every primary
  * route (deduped by `routeName`, so the four Evaluate nav entries yield ONE
  * `aiEvaluations` route), and each primary's sub-routes right after it.
@@ -391,7 +413,11 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
       path: section.path!,
       name: section.routeName,
       component: section.component!,
-      meta: { titleKey: section.metaTitleKey ?? section.labelKey, keepAlive: false },
+      meta: {
+        titleKey: section.metaTitleKey ?? section.labelKey,
+        keepAlive: false,
+        requiresOnlineEvals: !!section.featureKey && !!ONLINE_EVAL_FEATURE_KEYS[section.featureKey],
+      },
       ...(section.routeProps ? { props: section.routeProps } : {}),
       ...(section.featureKey
         ? { beforeEnter: withFeatureGate(section.featureKey, routeGuard) }
@@ -403,7 +429,11 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
         path: sub.path,
         name: sub.routeName,
         component: sub.component,
-        meta: { titleKey: sub.metaTitleKey, keepAlive: false },
+        meta: {
+          titleKey: sub.metaTitleKey,
+          keepAlive: false,
+          requiresOnlineEvals: !!ONLINE_EVAL_FEATURE_KEYS[sub.featureKey],
+        },
         beforeEnter: withFeatureGate(sub.featureKey, routeGuard),
       } as RouteRecordRaw);
     }
