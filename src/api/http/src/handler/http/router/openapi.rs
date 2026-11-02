@@ -260,17 +260,21 @@ use crate::{
         openobserve_api_management::request::dashboards::reports_history::get_report_history,
         openobserve_api_management::request::authz::fga::create_role,
         openobserve_api_management::request::authz::fga::delete_role,
+        openobserve_api_management::request::authz::fga::delete_role_bulk,
         openobserve_api_management::request::authz::fga::get_roles,
         openobserve_api_management::request::authz::fga::update_role,
         openobserve_api_management::request::authz::fga::get_role_permissions,
         openobserve_api_management::request::authz::fga::get_all_role_permissions,
+        openobserve_api_management::request::authz::fga::get_roles_for_user,
         openobserve_api_management::request::authz::fga::get_roles_for_all_users,
         openobserve_api_management::request::authz::fga::get_users_with_role,
         openobserve_api_management::request::authz::fga::create_group,
         openobserve_api_management::request::authz::fga::update_group,
+        openobserve_api_management::request::authz::fga::get_groups_for_user,
         openobserve_api_management::request::authz::fga::get_groups,
         openobserve_api_management::request::authz::fga::get_group_details,
         openobserve_api_management::request::authz::fga::delete_group,
+        openobserve_api_management::request::authz::fga::delete_group_bulk,
         keys::save,
         keys::get,
         keys::list,
@@ -1745,6 +1749,26 @@ mod tests {
             spec["paths"]["/api/{org_id}/fleet/collectors/{id}"]["get"]["responses"]["404"]
                 .is_object()
         );
+    }
+
+    #[test]
+    fn fga_bulk_deletes_and_per_user_lookups_are_published() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        for (path, method) in [
+            ("/api/{org_id}/roles/bulk", "delete"),
+            ("/api/{org_id}/groups/bulk", "delete"),
+            ("/api/{org_id}/users/{user_email}/roles", "get"),
+            ("/api/{org_id}/users/{user_email}/groups", "get"),
+        ] {
+            let op = &spec["paths"][path][method];
+            assert!(op.is_object(), "{method} {path} missing");
+            // OSS stubs answer 403 before any validation, so only enterprise can return 400.
+            assert_eq!(
+                op["responses"]["400"].is_object(),
+                cfg!(feature = "enterprise"),
+                "{method} {path}"
+            );
+        }
     }
 
     #[test]
