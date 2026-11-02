@@ -30350,7 +30350,9 @@
         "failedTitle": "Couldn't load suggestions",
         "failedDesc": "Something went wrong while loading them. Try again in a moment.",
         "emptyTitle": "No suggestions right now",
-        "emptyDesc": "I'll add one here when I find a gap in what your monitors cover."
+        "emptyDesc": "I'll add one here when I find a gap in what your monitors cover.",
+        "pageEmptyTitle": "The top suggestions were already handled",
+        "pageEmptyDesc": "Open the full list for the ones still waiting."
       }
     },
     "time": {
