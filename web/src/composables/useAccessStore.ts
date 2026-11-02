@@ -791,6 +791,8 @@ export const ACCESS_REQUEST_LIMIT = 20;
 
 const RESOURCE_LABEL_PREFIX = "accessBoundary.resources.";
 const MEMORY_PREFIX = "o2.access.memory.";
+// Bump when the classifier changes a resource or permission identity: a record from another version is dropped, never migrated.
+const MEMORY_VERSION = 2;
 // Route key of a request sent before the router's first navigation; a real route key is never empty.
 const BEFORE_NAVIGATION = "";
 const UNNAMED_RESOURCE = "_unnamed";
@@ -1297,11 +1299,13 @@ function readMemory(org: string): OrgAccessMemory {
   if (cached) return cached;
   const memory: OrgAccessMemory = { pages: {}, sections: {} };
   try {
-    const parsed: Partial<OrgAccessMemory> | null = JSON.parse(
+    const parsed: (Partial<OrgAccessMemory> & { version?: number }) | null = JSON.parse(
       sessionStorage.getItem(MEMORY_PREFIX + org) ?? "{}",
     );
-    memory.pages = parsed?.pages ?? {};
-    memory.sections = namedSections(parsed?.sections ?? {});
+    if (parsed?.version === MEMORY_VERSION) {
+      memory.pages = parsed.pages ?? {};
+      memory.sections = namedSections(parsed.sections ?? {});
+    }
   } catch {
     // Unreadable or unavailable storage starts the org with no remembered denials.
   }
@@ -1318,14 +1322,18 @@ function writeMemory(org: string, memory: OrgAccessMemory): void {
     else
       sessionStorage.setItem(
         MEMORY_PREFIX + org,
-        JSON.stringify({ ...memory, sections: namedSections(memory.sections) }),
+        JSON.stringify({
+          version: MEMORY_VERSION,
+          ...memory,
+          sections: namedSections(memory.sections),
+        }),
       );
   } catch {
     // Storage can be unavailable or full; the in-memory copy still drives this tab.
   }
 }
 
-// A record written by an older build can hold unlabelled resources, refused writes or long request lists, none of which may come back; a write is told by its request, as a GET the server checks as Update is still a read.
+// Storage keeps only labelled reads with capped request lists; a write is told by its request, as a GET the server checks as Update is still a read.
 function namedSections(
   sections: Record<string, AccessSectionEntry[]>,
 ): Record<string, AccessSectionEntry[]> {
@@ -1535,14 +1543,16 @@ function isStreamRoute(verb: string, segments: string[]): boolean {
   return !rows.some((row) => ROWS_BEFORE_STREAM_ROUTES[row]?.includes(verb));
 }
 
-// Matched only where the server puts operation words, so an item named `_search_archive` is still created.
+// Matched only where the server puts operation words, so an item named `_search_archive` is still created; an area whose POST row precedes the stream routes, such as an upload, keeps its write.
 function isSearchPost(segments: string[]): boolean {
   const [area = "", name, ...more] = afterOrg(segments);
   if (name === undefined || area === "_search")
     return ORG_READ_POST_PREFIXES.some((p) => area.startsWith(p));
+  const rows = [`${area}/{*}`, `${area}/{id}`];
   return (
     more.length === 0 &&
     area !== "streams" &&
+    !rows.some((row) => ROWS_BEFORE_STREAM_ROUTES[row]?.includes("POST")) &&
     NAMED_READ_POST_PREFIXES.some((p) => name.startsWith(p))
   );
 }

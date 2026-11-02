@@ -1037,18 +1037,20 @@ describe("access store lifecycle", () => {
     expect(Object.keys(stored.sections ?? {})).toEqual(["settings"]);
   });
 
-  it.each(["/api/acme/streams/_search_archive?type=logs", "/api/acme/_search_audit/_json"])(
-    "keeps the create card for POST %s, whose name only starts like a search",
-    async (url) => {
-      await boot("/settings");
-      document.body.innerHTML = "<button id='create'>Create</button>";
-      press("create");
-      forbidden("POST", url);
-      expect(access.actionNotice.value?.permission).toBe("create");
-      expect(accessPermission("POST", url)).toBe("create");
-      expect(sessionStorage.getItem("o2.access.memory.acme")).toBeNull();
-    },
-  );
+  it.each([
+    "/api/acme/streams/_search_archive?type=logs",
+    "/api/acme/_search_audit/_json",
+    "/api/acme/enrichment_tables/_values_archive?append=false",
+    "/api/acme/enrichment_tables/_around_archive?append=false",
+  ])("keeps the create card for POST %s, whose name only starts like a search", async (url) => {
+    await boot("/settings");
+    document.body.innerHTML = "<button id='create'>Create</button>";
+    press("create");
+    forbidden("POST", url);
+    expect(access.actionNotice.value?.permission).toBe("create");
+    expect(accessPermission("POST", url)).toBe("create");
+    expect(sessionStorage.getItem("o2.access.memory.acme")).toBeNull();
+  });
 
   it("keeps a search-style POST a stored read, even right after a click", async () => {
     await boot("/settings");
@@ -1087,11 +1089,41 @@ describe("access store lifecycle", () => {
     ]);
   });
 
-  it("drops a refused write an older build stored, by its request rather than its permission", async () => {
+  it("drops a denial an older build stored under a resource the classifier no longer uses", async () => {
+    sessionStorage.setItem(
+      "o2.access.memory.acme",
+      JSON.stringify({
+        pages: {},
+        sections: {
+          settings: [
+            {
+              resource: {
+                key: "dashboards",
+                labelKey: "accessBoundary.resources.dashboards",
+                path: "/api/acme/dashboards",
+              },
+              permission: "list",
+              requests: ["GET /api/acme/dashboards"],
+            },
+          ],
+        },
+      }),
+    );
+    await boot("/settings");
+    noteAccessSuccess({
+      method: "GET",
+      url: "/api/acme/dashboards",
+      routeKey: currentAccessRouteKey(),
+    });
+    expect(access.sectionEntries.value).toEqual([]);
+  });
+
+  it("drops a refused write from a stored record, by its request rather than its permission", async () => {
     const functions = { key: "functions", labelKey: "accessBoundary.resources.functions" };
     sessionStorage.setItem(
       "o2.access.memory.acme",
       JSON.stringify({
+        version: 2,
         pages: {},
         sections: {
           settings: [
