@@ -398,7 +398,7 @@ pub fn alert_stale_deadline_micros(
     let configured_timezone = condition
         .timezone
         .as_deref()
-        .and_then(|timezone| timezone.parse::<Tz>().ok());
+        .and_then(|timezone| super::unwrap_browser_time(timezone).parse::<Tz>().ok());
     let legacy_timezone = FixedOffset::east_opt(
         legacy_tz_offset
             .checked_mul(60)
@@ -1187,6 +1187,28 @@ mod tests {
             alert_stale_deadline_micros(level_at, &condition, legacy_offset_minutes, 3,).unwrap(),
             ordinary,
             "pre-timezone alerts remain valid children"
+        );
+    }
+
+    #[test]
+    fn cron_deadline_reads_the_zone_inside_a_browser_time_label() {
+        use chrono::{TimeZone as _, Utc};
+
+        let level_at = Utc
+            .with_ymd_and_hms(2026, 10, 31, 13, 0, 0)
+            .unwrap()
+            .timestamp_micros();
+        let labelled = cron_condition("0 0 9 * * *", Some("Browser Time (America/New_York)"));
+        let plain = cron_condition("0 0 9 * * *", Some("America/New_York"));
+        assert_eq!(
+            alert_stale_deadline_micros(level_at, &labelled, -240, 1).unwrap(),
+            Utc.with_ymd_and_hms(2026, 11, 1, 14, 0, 0)
+                .unwrap()
+                .timestamp_micros()
+        );
+        assert_eq!(
+            alert_stale_deadline_micros(level_at, &labelled, -240, 3).unwrap(),
+            alert_stale_deadline_micros(level_at, &plain, -240, 3).unwrap()
         );
     }
 
