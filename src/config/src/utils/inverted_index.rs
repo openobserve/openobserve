@@ -35,6 +35,7 @@ pub fn to_tantivy_name(from: &str) -> Option<String> {
         "logs" => StreamType::Logs,
         "metrics" => StreamType::Metrics,
         "traces" => StreamType::Traces,
+        "profiles" => StreamType::Profiles,
         "metadata" => StreamType::Metadata,
         _ => return None,
     };
@@ -84,6 +85,13 @@ mod tests {
                 "files/default/traces/quickstart1/2024/02/16/16/7164299619311026293.parquet",
                 Some(
                     "files/default/index/quickstart1_traces/2024/02/16/16/7164299619311026293.ttv"
+                        .to_string(),
+                ),
+            ),
+            (
+                "files/default/profiles/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                Some(
+                    "files/default/index/quickstart1_profiles/2024/02/16/16/7164299619311026293.ttv"
                         .to_string(),
                 ),
             ),
