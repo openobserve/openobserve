@@ -255,14 +255,14 @@ jobs:
     if: needs.check_changes.outputs.has_ui_changes == 'true'
     timeout-minutes: 45
     runs-on:
-      labels: ubicloud-standard-8
+      labels: ubicloud-standard-16
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        shardIndex: [1, 2, 3, 4, 5, 6, 7, 8]
-        shardTotal: [8]
+        shardIndex: [1, 2, 3, 4]
+        shardTotal: [4]
 
     steps:
       - name: Clone the current repo
@@ -328,6 +328,8 @@ jobs:
       - name: Merge reports
         working-directory: web
         run: npx vitest --merge-reports
+      - name: debug
+        run: echo "web" && ls . && echo "reports" && ls ./.vitest-reports
       - name: check coverage
         working-directory: web
         run: ./coverage.sh check
