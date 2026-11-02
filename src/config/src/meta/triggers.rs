@@ -61,7 +61,8 @@ pub enum TriggerModule {
     /// Slack sync of one on-call page, keyed by its response id; region-local (SY-8).
     OncallSlackSync,
     /// AutoObserve engine tick: one job per region in the `_meta` org, region-local.
-    AutoObserve,
+    // Stored by number, so the value is explicit and a variant added above cannot move it.
+    AutoObserve = 13,
 }
 
 impl TriggerModule {
@@ -407,6 +408,30 @@ mod tests {
         );
         assert_eq!(TriggerModule::AutoObserve as i32, 13);
         assert_eq!(TriggerModule::AutoObserve.to_string(), "autoobserve");
+    }
+
+    #[test]
+    fn autoobserve_keeps_slot_13_and_every_slot_is_distinct() {
+        assert_eq!(TriggerModule::AutoObserve as i32, 13);
+        let taken = [
+            TriggerModule::Report,
+            TriggerModule::Alert,
+            TriggerModule::DerivedStream,
+            TriggerModule::QueryRecommendations,
+            TriggerModule::Backfill,
+            TriggerModule::AnomalyDetection,
+            TriggerModule::Slo,
+            TriggerModule::SloBackfill,
+            TriggerModule::CompositeAlert,
+            TriggerModule::OncallEscalation,
+            TriggerModule::AlertCalibration,
+            TriggerModule::FleetRollout,
+            TriggerModule::OncallSlackSync,
+            TriggerModule::AutoObserve,
+        ]
+        .map(|m| m as i32);
+        let distinct: std::collections::HashSet<_> = taken.iter().collect();
+        assert_eq!(distinct.len(), taken.len());
     }
 
     #[test]
