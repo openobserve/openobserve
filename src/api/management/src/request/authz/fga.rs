@@ -396,7 +396,7 @@ pub async fn get_roles(Path(_org_id): Path<String>) -> Response {
     request_body(content = inline(RoleRequest), description = "RoleRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 400, description = "Invalid role name, permission or user id", content_type = "application/json", body = ()),
+        (status = 400, description = "Invalid role name, permission or user id; nothing is applied if any entry is invalid", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
