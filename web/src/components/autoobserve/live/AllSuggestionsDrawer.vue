@@ -177,6 +177,8 @@ const rows = computed<SuggestionRow[]>(() =>
   toSuggestionRows(t, zone.value, query.data.value?.suggestions ?? []),
 );
 const clampTotal = ref<number | null>(null);
+// An org switch voids the hold, so an older org's clamp can never set or clear the newer org's total.
+let clampRun = 0;
 const total = computed(() => clampTotal.value ?? query.data.value?.total ?? 0);
 const skeleton = useHeldSkeleton(() => props.open && state.value.status === "loading");
 const paging = computed(() => query.isPlaceholderData.value && query.isFetching.value);
@@ -202,16 +204,19 @@ watch(
 
 watch(org, () => {
   page.value = 1;
+  clampRun += 1;
+  clampTotal.value = null;
 });
 
 // The page it lands on may be cached from before the total shrank, so it is fetched again under the new total.
 watch(pastEnd, async (past) => {
   if (!past) return;
+  const run = ++clampRun;
   clampTotal.value = total.value;
   page.value = Math.max(1, Math.ceil(clampTotal.value / DRAWER_PAGE));
   await nextTick();
   if (!query.isPlaceholderData.value) await query.refetch();
-  clampTotal.value = null;
+  if (run === clampRun) clampTotal.value = null;
 });
 
 const columns = computed<OTableColumnDef<SuggestionRow>[]>(() => [
