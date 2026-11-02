@@ -161,14 +161,6 @@ pub trait Queue: Sync + Send + 'static {
         topic: &str,
         deliver_policy: Option<DeliverPolicy>,
     ) -> Result<Arc<mpsc::Receiver<Message>>>;
-    /// Invalidation caches cannot initialize before their broker consumer exists.
-    async fn consume_ready(
-        &self,
-        topic: &str,
-        deliver_policy: Option<DeliverPolicy>,
-    ) -> Result<Arc<mpsc::Receiver<Message>>> {
-        self.consume(topic, deliver_policy).await
-    }
     /// Pull-based consumption for shared work queues: consumers in the same
     /// `group` share one durable delivery cursor, and each message's
     /// visibility timeout starts only when [`PullConsumer::next`] hands it to

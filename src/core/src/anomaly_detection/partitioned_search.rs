@@ -1307,7 +1307,7 @@ mod tests {
                 .expect("planner response was not configured"))
         }
 
-        async fn search(&self, _trace_id: &str, _req: &Request) -> Result<Response> {
+        async fn search(&self, _trace_id: &str, req: &Request) -> Result<Response> {
             self.searched.fetch_add(1, Ordering::SeqCst);
             let batch = self
                 .batches

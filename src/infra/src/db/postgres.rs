@@ -154,11 +154,33 @@ impl super::Db for PostgresDb {
     }
 
     async fn get(&self, key: &str) -> Result<Bytes> {
-        get_with_pool(key, &CLIENT_RO).await
-    }
-
-    async fn get_from_primary(&self, key: &str) -> Result<Bytes> {
-        get_with_pool(key, &CLIENT_RW).await
+        let (module, key1, key2) = super::parse_key(key);
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
+        let query = "SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC;";
+        let value: String = match sqlx::query_scalar(query)
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .fetch_one(&pool)
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                if let sqlx::Error::RowNotFound = e {
+                    return Err(Error::from(DbError::KeyNotExists(key.to_string())));
+                } else if let sqlx::Error::Database(_) = e {
+                    // stay typed: lc_messages localizes the text but not the SQLSTATE
+                    return Err(Error::from(e));
+                } else {
+                    return Err(Error::from(DbError::DBOperError(
+                        e.to_string(),
+                        key.to_string(),
+                    )));
+                }
+            }
+        };
+        Ok(Bytes::from(value))
     }
 
     async fn put(
@@ -666,32 +688,6 @@ CREATE TABLE IF NOT EXISTS meta
     .await?;
 
     Ok(())
-}
-
-async fn get_with_pool(key: &str, pool: &Pool<Postgres>) -> Result<Bytes> {
-    let (module, key1, key2) = super::parse_key(key);
-    DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-    let query = "SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC;";
-    let value: String = match sqlx::query_scalar(query)
-        .bind(&module)
-        .bind(&key1)
-        .bind(&key2)
-        .fetch_one(pool)
-        .await
-    {
-        Ok(value) => value,
-        Err(sqlx::Error::RowNotFound) => {
-            return Err(Error::from(DbError::KeyNotExists(key.to_string())));
-        }
-        Err(error @ sqlx::Error::Database(_)) => return Err(Error::from(error)),
-        Err(error) => {
-            return Err(Error::from(DbError::DBOperError(
-                error.to_string(),
-                key.to_string(),
-            )));
-        }
-    };
-    Ok(Bytes::from(value))
 }
 
 async fn add_start_dt_column() -> Result<()> {

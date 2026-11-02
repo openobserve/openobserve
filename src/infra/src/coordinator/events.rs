@@ -65,51 +65,8 @@ impl From<MetaEvent> for crate::db::Event {
 
 /// The prefix to watch for coordinator events.
 type WatcherPrefix = (String, mpsc::Sender<crate::db::Event>);
-static COORDINATOR_WATCHER_PREFIXES: Lazy<RwLock<CoordinatorWatchers>> =
-    Lazy::new(|| RwLock::new(CoordinatorWatchers::default()));
-
-#[derive(Default)]
-struct CoordinatorWatchers {
-    prefixes: Vec<WatcherPrefix>,
-    ready_generation: Option<u64>,
-}
-
-impl CoordinatorWatchers {
-    async fn register(
-        &mut self,
-        prefix: &str,
-        generation: Option<u64>,
-    ) -> mpsc::Receiver<crate::db::Event> {
-        let (tx, rx) = mpsc::channel(65535);
-        if generation.is_some() && self.ready_generation == generation {
-            // The receiver is not exposed until registration returns.
-            tx.send(crate::db::Event::Empty)
-                .await
-                .expect("new receiver is open");
-        }
-        self.prefixes.push((prefix.to_string(), tx));
-        self.prefixes.sort_by(|a, b| a.0.cmp(&b.0));
-        rx
-    }
-
-    async fn registered(&mut self, generation: u64, current: Option<u64>) {
-        self.ready_generation = current.filter(|current| *current == generation);
-        if self.ready_generation.is_none() {
-            return;
-        }
-        for (prefix, tx) in &self.prefixes {
-            if let Err(error) = tx.send(crate::db::Event::Empty).await {
-                log::warn!("Failed to reset coordinator watcher {prefix}: {error}");
-            }
-        }
-    }
-}
-
-enum SubscriptionUpdate {
-    Meta(MetaEvent),
-    Registered(u64),
-    Disconnected,
-}
+static COORDINATOR_WATCHER_PREFIXES: Lazy<RwLock<Vec<WatcherPrefix>>> =
+    Lazy::new(|| RwLock::new(Vec::new()));
 
 pub async fn init() -> Result<()> {
     // if local node is single node or queue store is not nats, return ok
@@ -132,9 +89,9 @@ pub async fn init() -> Result<()> {
     tokio::task::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
-                SubscriptionUpdate::Meta(event) => {
+                CoordinatorEvent::Meta(event) => {
                     let r = COORDINATOR_WATCHER_PREFIXES.read().await;
-                    for (prefix, tx) in &r.prefixes {
+                    for (prefix, tx) in r.iter() {
                         if event.key.starts_with(prefix) {
                             log::debug!(
                                 "[COORDINATOR::EVENTS] sending event to watcher: {:?}:{}, start_dt: {:?}",
@@ -150,16 +107,6 @@ pub async fn init() -> Result<()> {
                         }
                     }
                 }
-                SubscriptionUpdate::Registered(generation) => {
-                    COORDINATOR_WATCHER_PREFIXES
-                        .write()
-                        .await
-                        .registered(generation, crate::db::nats::connection_generation())
-                        .await;
-                }
-                SubscriptionUpdate::Disconnected => {
-                    COORDINATOR_WATCHER_PREFIXES.write().await.ready_generation = None;
-                }
             }
         }
     });
@@ -167,11 +114,10 @@ pub async fn init() -> Result<()> {
 }
 
 pub async fn watch(prefix: &str) -> Result<Arc<mpsc::Receiver<crate::db::Event>>> {
-    let rx = COORDINATOR_WATCHER_PREFIXES
-        .write()
-        .await
-        .register(prefix, crate::db::nats::connection_generation())
-        .await;
+    let (tx, rx) = mpsc::channel(65535);
+    let mut w = COORDINATOR_WATCHER_PREFIXES.write().await;
+    w.push((prefix.to_string(), tx));
+    w.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(Arc::new(rx))
 }
 
@@ -194,84 +140,76 @@ async fn create_stream() -> Result<()> {
     q.create_with_config(COORDINATOR_STREAM, config).await
 }
 
-async fn subscribe(tx: mpsc::Sender<SubscriptionUpdate>) -> Result<()> {
+async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
     let q = queue::get_queue().await;
-    let mut connections = crate::db::nats::connection_status();
     let mut reconnect = false;
     loop {
         if config::cluster::is_offline() {
-            return Ok(());
+            break;
         }
-        let status = connections.borrow_and_update().clone();
-        let Some(generation) = status.connected_generation() else {
-            if connections.changed().await.is_err() {
-                return Ok(());
-            }
-            continue;
-        };
-        let policy = if reconnect {
+
+        let deliver_policy = if reconnect {
             queue::DeliverPolicy::All
         } else {
             queue::DeliverPolicy::New
         };
-        let result = tokio::select! {
-            changed = connections.changed() => {
-                changed.map_err(|error| Error::Message(error.to_string()))?;
-                reconnect = true;
-                continue;
-            }
-            receiver = q.consume_ready(COORDINATOR_STREAM, Some(policy)) => receiver,
-        };
-        let receiver = match result {
+        log::info!(
+            "[COORDINATOR::EVENTS] subscribing to coordinator topic with deliver policy: {:?}",
+            deliver_policy
+        );
+        let mut receiver: Arc<mpsc::Receiver<queue::Message>> = match q
+            .consume(COORDINATOR_STREAM, Some(deliver_policy))
+            .await
+        {
             Ok(receiver) => receiver,
-            Err(error) => {
-                log::error!("Failed to register coordinator consumer: {error}");
+            Err(e) => {
+                log::error!("[COORDINATOR::EVENTS] failed to subscribe to coordinator topic: {e}");
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 reconnect = true;
                 continue;
             }
         };
-        if crate::db::nats::connection_generation() != Some(generation) {
-            reconnect = true;
-            continue;
-        }
-        tx.send(SubscriptionUpdate::Registered(generation))
-            .await
-            .map_err(|error| Error::Message(error.to_string()))?;
-        let mut receiver = Arc::try_unwrap(receiver)
-            .map_err(|_| Error::Message("coordinator message receiver is shared".to_string()))?;
+        let receiver = Arc::get_mut(&mut receiver).unwrap_or_else(|| {
+            panic!("[COORDINATOR::EVENTS] failed to get mutable reference to receiver")
+        });
         loop {
-            let message = tokio::select! {
-                changed = connections.changed() => {
-                    changed.map_err(|error| Error::Message(error.to_string()))?;
+            match receiver.recv().await {
+                Some(message) => {
+                    let event: CoordinatorEvent = match serde_json::from_slice(message.message()) {
+                        Ok(event) => event,
+                        Err(e) => {
+                            log::error!(
+                                "[COORDINATOR::EVENTS] failed to deserialize coordinator event: {e}"
+                            );
+                            continue;
+                        }
+                    };
+                    match tx.send(event).await {
+                        Ok(_) => {
+                            if let Err(e) = message.ack().await {
+                                log::error!(
+                                    "[COORDINATOR::EVENTS] failed to ack coordinator event: {e}"
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            // don't ack the message if the channel is closed
+                            log::error!(
+                                "[COORDINATOR::EVENTS] failed to process coordinator event: {e}"
+                            );
+                        }
+                    }
+                }
+                None => {
+                    log::error!("[COORDINATOR::EVENTS] coordinator topic closed");
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    reconnect = true;
                     break;
                 }
-                message = receiver.recv() => message,
-            };
-            let Some(message) = message else {
-                break;
-            };
-            let event: CoordinatorEvent = match serde_json::from_slice(message.message()) {
-                Ok(event) => event,
-                Err(error) => {
-                    log::error!("Invalid coordinator event: {error}");
-                    continue;
-                }
-            };
-            let CoordinatorEvent::Meta(event) = event;
-            tx.send(SubscriptionUpdate::Meta(event))
-                .await
-                .map_err(|error| Error::Message(error.to_string()))?;
-            if let Err(error) = message.ack().await {
-                log::error!("Failed to acknowledge coordinator event: {error}");
             }
         }
-        tx.send(SubscriptionUpdate::Disconnected)
-            .await
-            .map_err(|error| Error::Message(error.to_string()))?;
-        reconnect = true;
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
+    Ok(())
 }
 
 /// `event` should be a json string. The message will be published to the coordinator stream.
@@ -323,26 +261,6 @@ pub async fn delete_event(key: &str, start_dt: Option<i64>) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[tokio::test]
-    async fn readiness_requires_current_registration_and_resets_late_watchers() {
-        let mut watchers = CoordinatorWatchers::default();
-        let mut initial = watchers.register("/branding/", Some(1)).await;
-        assert!(initial.try_recv().is_err());
-        watchers.registered(1, Some(1)).await;
-        assert_eq!(initial.recv().await, Some(crate::db::Event::Empty));
-        let mut late = watchers.register("/branding/", Some(1)).await;
-        assert_eq!(late.recv().await, Some(crate::db::Event::Empty));
-        let mut recovering = watchers.register("/branding/", Some(2)).await;
-        assert!(recovering.try_recv().is_err());
-        watchers.registered(1, Some(2)).await;
-        assert!(initial.try_recv().is_err());
-        assert!(recovering.try_recv().is_err());
-        watchers.registered(2, Some(2)).await;
-        for receiver in [&mut initial, &mut late, &mut recovering] {
-            assert_eq!(receiver.recv().await, Some(crate::db::Event::Empty));
-        }
-    }
 
     #[test]
     fn test_meta_event_put_converts_to_db_event_put() {

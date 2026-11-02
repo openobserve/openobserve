@@ -208,11 +208,6 @@ pub trait Db: Sync + Send + 'static {
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
 
-    /// Cache fills use the primary so replica lag cannot make stale values persist after eviction.
-    async fn get_from_primary(&self, key: &str) -> Result<Bytes> {
-        self.get(key).await
-    }
-
     /// Like `get`, but returns `None` when `key` is missing. Prefer it for
     /// exact-key lookups expected to miss: `get` falls back to a prefix scan,
     /// which on NATS costs a full bucket listing per miss.
@@ -297,11 +292,6 @@ pub trait Db: Sync + Send + 'static {
     ) -> Result<Vec<(i64, Bytes)>>;
     async fn count(&self, prefix: &str) -> Result<i64>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
-
-    /// Cache initialization must wait until its invalidation subscription can receive changes.
-    async fn watch_ready(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
-        self.watch(prefix).await
-    }
     async fn close(&self) -> Result<()>;
     async fn add_start_dt_column(&self) -> Result<()>;
 }

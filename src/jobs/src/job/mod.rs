@@ -587,7 +587,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // KV reads are served from a per-node cache, so every node, routers included, must hear writes.
     tokio::task::spawn(db::kv::watch());
     #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::common::settings::init_cache().await?;
+    tokio::spawn(o2_enterprise::enterprise::common::settings::watch());
     retry_with_backoff(
         "load the org status cache",
         ORG_STATUS_LOAD_ATTEMPTS,

@@ -62,49 +62,8 @@ const LOCKER_STATE_RELEASED: u8 = 2;
 const LOCKER_STATE_LOST: u8 = 3;
 
 static NATS_CLIENT: OnceCell<Client> = OnceCell::const_new();
-static CONNECTION_STATUS: Lazy<watch::Sender<ConnectionStatus>> = Lazy::new(|| {
-    watch::channel(ConnectionStatus {
-        state: async_nats::connection::State::Pending,
-        generation: 0,
-    })
-    .0
-});
 static LOCAL_LOCKER: Lazy<Mutex<HashMap<String, Arc<Mutex<bool>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
-
-#[derive(Clone)]
-pub(crate) struct ConnectionStatus {
-    state: async_nats::connection::State,
-    generation: u64,
-}
-
-impl ConnectionStatus {
-    pub(crate) fn connected_generation(&self) -> Option<u64> {
-        match self.state {
-            async_nats::connection::State::Connected => Some(self.generation),
-            async_nats::connection::State::Pending
-            | async_nats::connection::State::Disconnected => None,
-        }
-    }
-
-    fn apply(&mut self, event: NatsEvent) -> bool {
-        match event {
-            NatsEvent::Connected => {
-                self.generation += 1;
-                self.state = async_nats::connection::State::Connected;
-            }
-            NatsEvent::Disconnected | NatsEvent::Closed => {
-                self.state = async_nats::connection::State::Disconnected;
-            }
-            NatsEvent::LameDuckMode
-            | NatsEvent::Draining
-            | NatsEvent::SlowConsumer(_)
-            | NatsEvent::ServerError(_)
-            | NatsEvent::ClientError(_) => return false,
-        }
-        true
-    }
-}
 
 pub struct NatsDb {
     prefix: String,
@@ -160,30 +119,15 @@ impl NatsDb {
         let prefix = prefix.to_string();
         let self_prefix = self.prefix.to_string();
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
-            try_get_nats_client().await?;
-            let mut connections = connection_status();
+            // A recreated watcher resumes after this revision instead of dropping what was
+            // published.
             let mut last_revision: u64 = 0;
             let mut backoff = KV_WATCH_BACKOFF_MIN;
             loop {
                 if cluster::is_offline() {
                     break;
                 }
-                let status = connections.borrow_and_update().clone();
-                let Some(generation) = status.connected_generation() else {
-                    if connections.changed().await.is_err() {
-                        return Ok(());
-                    }
-                    continue;
-                };
-                let bucket_result = tokio::select! {
-                    _ = tx.closed() => return Ok(()),
-                    changed = connections.changed() => {
-                        if changed.is_err() { return Ok(()); }
-                        continue;
-                    }
-                    result = get_bucket_by_key(&self_prefix, &prefix) => result,
-                };
-                let (bucket, new_key) = match bucket_result {
+                let (bucket, new_key) = match get_bucket_by_key(&self_prefix, &prefix).await {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[NATS:kv_watch] prefix: {prefix}, get bucket error: {e}");
@@ -201,16 +145,10 @@ impl NatsDb {
                 if last_revision > bucket.stream.cached_info().state.last_sequence {
                     last_revision = 0;
                 }
-                let entries = tokio::select! {
-                    _ = tx.closed() => return Ok(()),
-                    changed = connections.changed() => {
-                        if changed.is_err() { return Ok(()); }
-                        continue;
-                    }
-                    result = async {
-                        if last_revision == 0 { bucket.watch_all().await }
-                        else { bucket.watch_all_from_revision(last_revision + 1).await }
-                    } => result,
+                let entries = if last_revision == 0 {
+                    bucket.watch_all().await
+                } else {
+                    bucket.watch_all_from_revision(last_revision + 1).await
                 };
                 let mut entries = match entries {
                     Ok(v) => v,
@@ -222,23 +160,11 @@ impl NatsDb {
                         continue;
                     }
                 };
-                if connection_generation() != Some(generation) {
-                    continue;
-                }
-                if tx.send(Event::Empty).await.is_err() {
-                    return Ok(());
-                }
+                // Each recreation leaves a server-side consumer, so only persistent errors recreate
+                // it.
                 let mut errors = 0;
                 loop {
-                    let entry = tokio::select! {
-                        _ = tx.closed() => return Ok(()),
-                        changed = connections.changed() => {
-                            if changed.is_err() { return Ok(()); }
-                            break;
-                        }
-                        entry = entries.next() => entry,
-                    };
-                    match entry {
+                    match entries.next().await {
                         None => {
                             log::error!("[NATS:kv_watch] prefix: {prefix}, watcher closed");
                             break;
@@ -648,20 +574,6 @@ impl super::Db for NatsDb {
         }
     }
 
-    async fn watch_ready(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
-        let events = self.watch(prefix).await?;
-        let mut events = Arc::try_unwrap(events)
-            .map_err(|_| Error::Message("NATS watch receiver is shared".to_string()))?;
-        while let Some(event) = events.recv().await {
-            if event == Event::Empty {
-                return Ok(Arc::new(events));
-            }
-        }
-        Err(Error::Message(
-            "NATS watch closed before registration".to_string(),
-        ))
-    }
-
     async fn close(&self) -> Result<()> {
         Ok(())
     }
@@ -873,14 +785,6 @@ pub async fn get_nats_client() -> &'static Client {
         .unwrap_or_else(|e| panic!("{e}"))
 }
 
-pub(crate) fn connection_status() -> watch::Receiver<ConnectionStatus> {
-    CONNECTION_STATUS.subscribe()
-}
-
-pub(crate) fn connection_generation() -> Option<u64> {
-    CONNECTION_STATUS.borrow().connected_generation()
-}
-
 /// Like [`get_nats_client`], but reports a failed connect instead of panicking.
 pub async fn try_get_nats_client() -> Result<&'static Client> {
     NATS_CLIENT.get_or_try_init(connect).await
@@ -946,10 +850,7 @@ async fn connect() -> Result<async_nats::Client> {
     }
 
     let mut opts = async_nats::ConnectOptions::new()
-        .connection_timeout(Duration::from_secs(cfg.nats.connect_timeout))
-        .event_callback(|event| async move {
-            CONNECTION_STATUS.send_if_modified(|status| status.apply(event));
-        });
+        .connection_timeout(Duration::from_secs(cfg.nats.connect_timeout));
     if cfg.nats.subscription_capacity > 0 {
         opts = opts.subscription_capacity(cfg.nats.subscription_capacity);
     }
@@ -1261,22 +1162,6 @@ fn use_kv_watcher(key: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn connection_generation_survives_coalesced_disconnect_and_reconnect() {
-        let mut status = ConnectionStatus {
-            state: async_nats::connection::State::Pending,
-            generation: 0,
-        };
-        assert!(status.apply(NatsEvent::Connected));
-        assert_eq!(status.connected_generation(), Some(1));
-        assert!(status.apply(NatsEvent::Disconnected));
-        assert_eq!(status.connected_generation(), None);
-        assert!(status.apply(NatsEvent::Connected));
-        assert_eq!(status.connected_generation(), Some(2));
-        assert!(!status.apply(NatsEvent::LameDuckMode));
-        assert_eq!(status.connected_generation(), Some(2));
-    }
 
     #[test]
     fn test_get_for_update_reads_only_a_missing_key_as_none() {

@@ -8,10 +8,6 @@ publish = false
 [lib]
 path = "src/lib.rs"
 
-[[example]]
-name = "config_branding_cache"
-required-features = ["enterprise"]
-
 [features]
 default = []
 enterprise = [
