@@ -27,7 +27,7 @@ use config::{
     meta::otlp::OtlpRequestType,
 };
 use ingestion_common::{
-    GCPIngestionRequest, HecResponse, HecStatus, IngestUser, IngestionRequest,
+    GCPIngestionRequest, HecResponse, HecStatus, IngestUser, IngestionRequest, IngestionResponse,
     KinesisFHIngestionResponse, KinesisFHRequest,
 };
 use openobserve_api_common::extractors::Headers;
@@ -68,6 +68,40 @@ fn kinesis_error_status(e: &infra::errors::Error) -> StatusCode {
         infra::errors::Error::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
         _ => StatusCode::BAD_REQUEST,
     }
+}
+
+/// Firehose and Pub/Sub push ack on a 200, so a write that kept nothing must not return one.
+fn undelivered_status(resp: &IngestionResponse) -> Option<(StatusCode, String)> {
+    if resp.write_failed {
+        return Some((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "write to storage failed".to_string(),
+        ));
+    }
+    if resp.stream_skipped {
+        return Some((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "stream is being deleted".to_string(),
+        ));
+    }
+    // a partial write stays 200: a retry resends the whole batch and duplicates the stored rows
+    if resp.status.iter().any(|s| s.status.successful > 0) {
+        return None;
+    }
+    // records outside the ingestion window are dropped by policy, not failed
+    let rejected = resp
+        .status
+        .iter()
+        .find(|s| s.status.failed > s.status.policy_dropped)?;
+    let reason = if rejected.status.error.is_empty() {
+        "records could not be ingested"
+    } else {
+        &rejected.status.error
+    };
+    Some((
+        StatusCode::BAD_REQUEST,
+        format!("stream {}: {reason}", rejected.name),
+    ))
 }
 
 /// _bulk ES compatible ingestion API
@@ -367,11 +401,22 @@ pub async fn handle_kinesis_request(
     )
     .await
     {
-        Ok(_) => MetaHttpResponse::json(KinesisFHIngestionResponse {
-            request_id,
-            timestamp: request_time,
-            error_message: None,
-        }),
+        Ok(v) => match undelivered_status(&v) {
+            Some((status, reason)) => (
+                status,
+                Json(KinesisFHIngestionResponse {
+                    request_id,
+                    timestamp: request_time,
+                    error_message: Some(reason),
+                }),
+            )
+                .into_response(),
+            None => MetaHttpResponse::json(KinesisFHIngestionResponse {
+                request_id,
+                timestamp: request_time,
+                error_message: None,
+            }),
+        },
         Err(e) => {
             // we do not want to log trial period expired errors
             if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
@@ -414,7 +459,12 @@ pub async fn handle_gcp_request(
     )
     .await
     {
-        Ok(v) => MetaHttpResponse::json(v),
+        Ok(v) => match undelivered_status(&v) {
+            Some((status, reason)) => {
+                (status, Json(MetaHttpResponse::error(status, reason))).into_response()
+            }
+            None => MetaHttpResponse::json(v),
+        },
         Err(e) => {
             // we do not want to log trial period expired errors
             if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
@@ -649,6 +699,7 @@ pub async fn hec(
 mod tests {
     use axum::http::header::CONTENT_TYPE;
     use config::utils::json;
+    use ingestion_common::{RecordStatus, StreamStatus};
 
     use super::*;
 
@@ -690,6 +741,46 @@ mod tests {
             status(infra::errors::Error::IngestionError("x".into())),
             StatusCode::BAD_REQUEST
         );
+    }
+
+    fn written(successful: u32, failed: u32, policy_dropped: u32) -> IngestionResponse {
+        let mut stream = StreamStatus::new("s");
+        stream.status = RecordStatus {
+            successful,
+            failed,
+            error: if failed > 0 {
+                "too long".into()
+            } else {
+                String::new()
+            },
+            policy_dropped,
+        };
+        IngestionResponse::new(200, vec![stream])
+    }
+
+    #[test]
+    fn undelivered_status_fails_only_a_write_that_kept_nothing() {
+        let status = |resp: IngestionResponse| undelivered_status(&resp).map(|(s, _)| s);
+        assert_eq!(status(written(10, 0, 0)), None);
+        assert_eq!(status(written(0, 0, 0)), None);
+        assert_eq!(status(written(5, 5, 0)), None);
+        assert_eq!(status(written(0, 5, 5)), None);
+        assert_eq!(status(written(0, 5, 0)), Some(StatusCode::BAD_REQUEST));
+        assert_eq!(status(written(0, 5, 2)), Some(StatusCode::BAD_REQUEST));
+        assert_eq!(
+            status(written(10, 0, 0).with_write_failed(true)),
+            Some(StatusCode::INTERNAL_SERVER_ERROR)
+        );
+        assert_eq!(
+            status(written(0, 0, 0).with_stream_skipped(true)),
+            Some(StatusCode::INTERNAL_SERVER_ERROR)
+        );
+    }
+
+    #[test]
+    fn undelivered_status_names_the_stream_and_its_error() {
+        let (_, reason) = undelivered_status(&written(0, 3, 0)).unwrap();
+        assert_eq!(reason, "stream s: too long");
     }
 
     #[tokio::test]
