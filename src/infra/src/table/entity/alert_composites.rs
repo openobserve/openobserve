@@ -28,6 +28,7 @@ pub struct Model {
     pub updated_at: Option<i64>,
     pub evaluation_generation: i64,
     pub pending_period_sec: i64,
+    pub incident_title_template: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -176,6 +176,7 @@ const evaluationStatus = ref<{
   wouldTrigger: boolean;
   reason: string;
 } | null>(null);
+const sampleRow = ref<Record<string, unknown> | null>(null);
 const { t } = useI18nTyped();
 
 const store = useStore();
@@ -564,6 +565,11 @@ const fetchQuerySchema = async () => {
 // Handle chart data updates from PanelSchemaRenderer
 // This receives the resultMetaData which contains the streaming response metadata
 const handleChartDataUpdate = (resultMetaData: any) => {
+  sampleRow.value =
+    (Array.isArray(resultMetaData?.[0]) ? resultMetaData[0] : [])
+      .flatMap((partition: any) => (Array.isArray(partition?.hits) ? partition.hits : []))
+      .find((hit: unknown) => hit && typeof hit === "object") ?? null;
+
   // Safety check: ensure trigger_condition exists
   if (!props.formData.trigger_condition) {
     console.warn("[PreviewAlert] No trigger_condition found, skipping evaluation");
@@ -1570,5 +1576,5 @@ const refreshDataFromParent = () => {
   refreshData();
 };
 
-defineExpose({ refreshData: refreshDataFromParent, resizeChart, evaluationStatus });
+defineExpose({ refreshData: refreshDataFromParent, resizeChart, evaluationStatus, sampleRow });
 </script>

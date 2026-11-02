@@ -255,6 +255,7 @@ mod tests {
             updated_at: None,
             evaluation_generation: 0,
             pending_period_sec: 0,
+            incident_title_template: None,
         }
     }
 

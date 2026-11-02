@@ -72,6 +72,7 @@ pub struct CompositeCreate {
     pub owner: Option<String>,
     pub last_edited_by: Option<String>,
     pub pending_period_sec: i64,
+    pub incident_title_template: Option<String>,
 }
 
 /// Errors the composite service surfaces to the API layer; each variant maps to
@@ -321,6 +322,7 @@ pub async fn clone_composite(
         owner: current.owner,
         last_edited_by: Some(editor),
         pending_period_sec: current.pending_period_sec,
+        incident_title_template: current.incident_title_template,
     })
     .await
 }
@@ -412,6 +414,7 @@ async fn persist_under_lock(
         updated_at: Set(Some(config::utils::time::now_micros())),
         evaluation_generation: Set(0),
         pending_period_sec: Set(request.pending_period_sec),
+        incident_title_template: Set(request.incident_title_template),
     };
     let children = resolved
         .into_iter()
