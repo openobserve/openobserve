@@ -6026,6 +6026,7 @@
     "resetRUMTokenLabel": "Réinitialiser le jeton RUM",
     "generateRUMTokenLabel": "Générer un jeton RUM",
     "generateRUMTokenMessage": "Générez un jeton RUM pour activer RUM pour votre organisation.",
+    "rumTokenForbiddenMessage": "Votre rôle ne permet pas de voir le jeton RUM. Demandez à un administrateur l'extrait de configuration RUM, ou le rôle nécessaire pour le voir ici.",
     "rumPlatform": "Plateforme",
     "rumPlatformBrowser": "Navigateur",
     "rumPlatformReactNative": "React Native",
@@ -6185,7 +6186,7 @@
       },
       "installOneClick": "Ajouter à {client}",
       "skillsLabel": "Ajouter la compétence {brand} (facultatif)",
-      "skillsHint": "Apprend à votre assistante IA à interroger, à alerter et à créer des tableaux de bord dans {brand}, afin qu'elle tire le meilleur parti des outils MCP. Exécutez-la dans votre projet ; elle les installe dans chaque outil d'IA qu'elle trouve sur votre machine.",
+      "skillsHint": "Apprend à votre assistante IA à interroger, à créer des alertes et à construire des tableaux de bord dans {brand}, afin qu'elle tire davantage parti des outils MCP. Exécutez-la dans votre projet ; elle installe ces outils dans chaque outil d'IA qu'elle trouve sur votre machine.",
       "skillsRepo": "Voir les compétences sur {host}"
     },
     "manageTokensBtnLabel": "Gérer les jetons",
