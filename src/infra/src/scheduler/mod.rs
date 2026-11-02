@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use config::{
     meta::{
         meta_store::MetaStore,
-        triggers::{Trigger, TriggerModule, TriggerStatus},
+        triggers::{OncallSlackSyncData, SlackSyncFinish, Trigger, TriggerModule, TriggerStatus},
     },
     utils::json,
 };
@@ -28,6 +28,8 @@ use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 use crate::errors::Result;
 
 pub mod postgres;
+#[cfg(test)]
+mod slack_sync_tests;
 pub mod sqlite;
 
 static CLIENT: Lazy<Box<dyn Scheduler>> = Lazy::new(connect);
@@ -78,6 +80,12 @@ pub trait Scheduler: Sync + Send + 'static {
     ) -> Result<bool>;
     /// Persist completion/reschedule fields only for the captured claim epoch.
     async fn complete_claim(&self, trigger: Trigger) -> Result<bool>;
+    /// SY-2.2: one upsert of the page's `OncallSlackSync` row at `t`; a row a pass holds only
+    /// notes the earliest asked-for time in `armed_for`.
+    async fn arm_slack_sync(&self, org: &str, response_id: &str, t: i64) -> Result<()>;
+    /// SY-2.3: ends a claimed sync pass, or re-queues it for an arm made during it; false when
+    /// the claim was lost.
+    async fn finish_slack_sync(&self, claim: &Trigger, finish: &SlackSyncFinish) -> Result<bool>;
     async fn pull(
         &self,
         concurrency: i64,
@@ -187,6 +195,41 @@ pub async fn keep_alive_claim(
 #[inline]
 pub async fn complete_claim(trigger: Trigger) -> Result<bool> {
     CLIENT.complete_claim(trigger).await
+}
+
+/// SY-2, C10: asks for a sync pass of the page at `at`, never before the row's backoff.
+/// [weak: a failed arm is logged by the caller and nothing is written; the next change re-arms.
+/// The read and the upsert are two statements, so an arm racing a pass's finish that sets a new
+/// backoff may run one pass before that backoff; Slack's 429 then backs it off again]
+pub async fn arm_slack_sync(org: &str, response_id: &str, at: i64) -> Result<()> {
+    let read = CLIENT
+        .get(org, TriggerModule::OncallSlackSync, response_id)
+        .await;
+    let t = slack_sync_arm_time(at, read)?;
+    CLIENT.arm_slack_sync(org, response_id, t).await
+}
+
+/// SY-2: ends a claimed sync pass with `finish`, or at an arm made during it; false when the
+/// claim was lost. [strong: one fenced update]
+pub async fn finish_slack_sync(claim: &Trigger, finish: &SlackSyncFinish) -> Result<bool> {
+    CLIENT.finish_slack_sync(claim, finish).await
+}
+
+/// The later of `at` and the `not_before` in the read sync row's `data` (no row or empty data:
+/// `at`); a failed read or unreadable data is an error. [pure]
+fn slack_sync_arm_time(at: i64, read: Result<Trigger>) -> Result<i64> {
+    let data = match read {
+        Ok(row) => row.data,
+        Err(crate::errors::Error::DbError(crate::errors::DbError::KeyNotExists(_))) => {
+            return Ok(at);
+        }
+        Err(e) => return Err(e),
+    };
+    if data.is_empty() {
+        return Ok(at);
+    }
+    let data: OncallSlackSyncData = json::from_str(&data)?;
+    Ok(at.max(data.not_before))
 }
 
 /// Acquire the scheduler row's write lock, verify the physical claim, and
@@ -762,5 +805,41 @@ mod tests {
             vec![9],
             "no event for a run left parked"
         );
+    }
+
+    /// SY-2.2, C10: the arm time is the later of the asked time and the row's backoff; a
+    /// failed read is an error, so no upsert runs.
+    #[test]
+    fn an_arm_never_beats_the_rows_backoff_and_a_failed_read_arms_nothing() {
+        use crate::errors::{DbError, Error};
+        let row = |data: &str| -> Result<Trigger> {
+            Ok(Trigger {
+                data: data.to_string(),
+                ..Default::default()
+            })
+        };
+        let backoff = r#"{"attempt":2,"not_before":30}"#;
+        // (case, asked at, the read, expected)
+        let cases = [
+            (
+                "no row",
+                10,
+                Err(Error::DbError(DbError::KeyNotExists("p1".into()))),
+                Some(10),
+            ),
+            ("a fresh row", 10, row(""), Some(10)),
+            ("backoff later", 10, row(backoff), Some(30)),
+            ("backoff over", 40, row(backoff), Some(40)),
+            ("unreadable data is an error", 10, row("{nope"), None),
+            (
+                "a failed read is an error",
+                10,
+                Err(Error::DbError(DbError::SeaORMError("down".into()))),
+                None,
+            ),
+        ];
+        for (case, at, read, want) in cases {
+            assert_eq!(slack_sync_arm_time(at, read).ok(), want, "{case}");
+        }
     }
 }

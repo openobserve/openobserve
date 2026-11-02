@@ -49,6 +49,21 @@ pub struct Team {
     /// to carry a column it cannot see.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub channel_destinations: Option<Vec<String>>,
+    /// Slack Enterprise Grid id of the team's room, if any; matched with `slack_workspace_id`
+    /// by the Slack app's team rule (D45).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack_enterprise_id: Option<String>,
+    /// Slack team id of the team's room, set by `/o2 oncall here` (RO-1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack_workspace_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack_channel_id: Option<String>,
+    /// Display only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack_channel_name: Option<String>,
+    /// The team's webhook destination that posts to the same Slack room.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack_same_room_destination: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -732,6 +747,11 @@ mod tests {
             description: None,
             // Never set, as every team created before the field reads: the policy's list stands.
             channel_destinations: None,
+            slack_enterprise_id: None,
+            slack_workspace_id: None,
+            slack_channel_id: None,
+            slack_channel_name: None,
+            slack_same_room_destination: None,
             created_at: 0,
             updated_at: 0,
         }

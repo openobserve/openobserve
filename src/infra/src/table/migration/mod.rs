@@ -247,6 +247,7 @@ mod m20261029_000001_widen_alert_dedup_fingerprint;
 mod m20261030_000001_add_suppress_repeats_to_alerts;
 mod m20261030_000001_create_org_domain_ownership_table;
 mod m20261030_000002_create_org_domain_ownership_req_table;
+mod m20261101_000001_create_oncall_slack;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -446,6 +447,14 @@ pub(crate) async fn create_slack_tables(db: &sea_orm::DatabaseConnection) -> Res
     m20261025_000005_add_held_action_to_slack_link_requests::Migration
         .up(&SchemaManager::new(db))
         .await
+}
+
+/// Builds `oncall_chat_messages` with its keys, which `create_table_from_entity` omits.
+#[cfg(test)]
+pub(crate) async fn create_oncall_chat_messages_for_test<C: sea_orm::ConnectionTrait>(
+    db: &C,
+) -> Result<(), DbErr> {
+    m20261101_000001_create_oncall_slack::create_messages(db).await
 }
 
 /// Apply only `alert_acks`, idempotently, for tests in any crate.
@@ -757,6 +766,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261030_000001_add_suppress_repeats_to_alerts::Migration),
             Box::new(m20261030_000001_create_org_domain_ownership_table::Migration),
             Box::new(m20261030_000002_create_org_domain_ownership_req_table::Migration),
+            Box::new(m20261101_000001_create_oncall_slack::Migration),
         ]
     }
 }
@@ -856,6 +866,7 @@ mod tests {
             131,
             "m20261030_000002_create_org_domain_ownership_req_table",
         ),
+        (132, "m20261101_000001_create_oncall_slack"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1025,6 +1036,10 @@ mod tests {
             (
                 "m20261018_000001_create_slack_tables",
                 "m20261025_000005_add_held_action_to_slack_link_requests",
+            ),
+            (
+                "m20260806_000001_create_oncall_tables",
+                "m20261101_000001_create_oncall_slack",
             ),
         ] {
             assert!(

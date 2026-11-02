@@ -2329,6 +2329,11 @@ fn oncall_routes(router: Router) -> Router {
             "/{org_id}/oncall/teams/{team_id}/channel",
             get(oncall::get_team_channel).put(oncall::set_team_channel),
         )
+        // RO-6: one plain test message in the team's Slack channel; on-call PUT (RB-2).
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/slack/test",
+            post(oncall::test_team_slack_channel),
+        )
         // Derived on every read, never stored: a saved list argues with the config beside it.
         .route(
             "/{org_id}/oncall/teams/{team_id}/reachability",

@@ -16,10 +16,11 @@
 use async_trait::async_trait;
 use chrono::Duration;
 use config::{
+    meta::triggers::SlackSyncFinish,
     metrics::DB_QUERY_NUMS,
     utils::{hash::Sum64, time::now_micros},
 };
-use sqlx::Row;
+use sqlx::{Pool, Postgres, Row};
 
 use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus};
 use crate::{
@@ -96,6 +97,89 @@ SET status = $1, retries = $2, next_run_at = $3,
     is_realtime = $4, is_silenced = $5, end_time = $6, data = $7
 WHERE id = $8 AND claim_epoch = $9 AND status = $10;"#;
 
+/// The scheduler table; `armed_for` is only written by the `OncallSlackSync` statements (SY-2).
+const CREATE_TABLE_QUERY: &str = r#"
+CREATE TABLE IF NOT EXISTS scheduled_jobs
+(
+    id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    org          VARCHAR(100) not null,
+    module       INT not null,
+    module_key   VARCHAR(256) not null,
+    is_realtime  BOOLEAN default false not null,
+    is_silenced  BOOLEAN default false not null,
+    status       INT not null,
+    start_time   BIGINT,
+    end_time     BIGINT,
+    retries      INT not null,
+    next_run_at  BIGINT not null,
+    data         TEXT not null,
+    claim_epoch  BIGINT default 0 not null,
+    armed_for    BIGINT
+);"#;
+
+/// SY-2.2 arm: insert at `$5`; a Waiting row moves no later, a Completed one waits again, and a
+/// row a pass holds only notes the earliest asked-for time. `$4` Waiting, `$6` Processing.
+const ARM_SLACK_SYNC_QUERY: &str = r#"INSERT INTO scheduled_jobs
+    (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, data)
+VALUES ($1, $2, $3, false, false, $4, 0, $5, '')
+ON CONFLICT (org, module, module_key) DO UPDATE SET
+    status = CASE WHEN scheduled_jobs.status = $6 THEN scheduled_jobs.status ELSE $4 END,
+    next_run_at = CASE
+        WHEN scheduled_jobs.status = $6 THEN scheduled_jobs.next_run_at
+        WHEN scheduled_jobs.status = $4 THEN LEAST(scheduled_jobs.next_run_at, $5)
+        ELSE $5 END,
+    armed_for = CASE
+        WHEN scheduled_jobs.status = $6 THEN LEAST(COALESCE(scheduled_jobs.armed_for, $5), $5)
+        ELSE scheduled_jobs.armed_for END;"#;
+
+/// SY-2.3 finish: the pass's `$1`/`$3`, or Waiting (`$2`) at the arm's time but not before the
+/// pass's new backoff `$4`; fenced on id, claim epoch and Processing (`$8`).
+const FINISH_SLACK_SYNC_QUERY: &str = r#"UPDATE scheduled_jobs SET
+    status = CASE WHEN armed_for IS NULL THEN $1 ELSE $2 END,
+    next_run_at = CASE WHEN armed_for IS NULL THEN $3 ELSE GREATEST(armed_for, $4) END,
+    data = $5,
+    armed_for = NULL
+WHERE id = $6 AND claim_epoch = $7 AND status = $8;"#;
+
+/// [`super::Scheduler::arm_slack_sync`] on `pool`.
+async fn arm_slack_sync_in(
+    pool: &Pool<Postgres>,
+    org: &str,
+    response_id: &str,
+    t: i64,
+) -> Result<()> {
+    sqlx::query(ARM_SLACK_SYNC_QUERY)
+        .bind(org)
+        .bind(TriggerModule::OncallSlackSync)
+        .bind(response_id)
+        .bind(TriggerStatus::Waiting)
+        .bind(t)
+        .bind(TriggerStatus::Processing)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// [`super::Scheduler::finish_slack_sync`] on `pool`.
+async fn finish_slack_sync_in(
+    pool: &Pool<Postgres>,
+    claim: &Trigger,
+    finish: &SlackSyncFinish,
+) -> Result<bool> {
+    let result = sqlx::query(FINISH_SLACK_SYNC_QUERY)
+        .bind(&finish.status)
+        .bind(TriggerStatus::Waiting)
+        .bind(finish.next_run_at)
+        .bind(finish.data.not_before)
+        .bind(config::utils::json::to_string(&finish.data)?)
+        .bind(claim.id)
+        .bind(claim.claim_epoch)
+        .bind(TriggerStatus::Processing)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() == 1)
+}
+
 pub struct PostgresScheduler {}
 
 impl PostgresScheduler {
@@ -118,32 +202,12 @@ impl super::Scheduler for PostgresScheduler {
         DB_QUERY_NUMS
             .with_label_values(&["create", "scheduled_jobs"])
             .inc();
-        sqlx::query(
-            r#"
-CREATE TABLE IF NOT EXISTS scheduled_jobs
-(
-    id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    org          VARCHAR(100) not null,
-    module       INT not null,
-    module_key   VARCHAR(256) not null,
-    is_realtime  BOOLEAN default false not null,
-    is_silenced  BOOLEAN default false not null,
-    status       INT not null,
-    start_time   BIGINT,
-    end_time     BIGINT,
-    retries      INT not null,
-    next_run_at  BIGINT not null,
-    data         TEXT not null,
-    claim_epoch  BIGINT default 0 not null
-);
-            "#,
-        )
-        .execute(&pool)
-        .await?;
+        sqlx::query(CREATE_TABLE_QUERY).execute(&pool).await?;
 
         // create data column for old version <= 0.10.9
         add_column("scheduled_jobs", "data", "TEXT NOT NULL DEFAULT ''").await?;
         add_column("scheduled_jobs", "claim_epoch", "BIGINT NOT NULL DEFAULT 0").await?;
+        add_column("scheduled_jobs", "armed_for", "BIGINT").await?;
 
         // drop created_at column for old version <= 0.40.0
         drop_column("scheduled_jobs", "created_at").await?;
@@ -680,6 +744,14 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(result.rows_affected() == 1)
     }
 
+    async fn arm_slack_sync(&self, org: &str, response_id: &str, t: i64) -> Result<()> {
+        arm_slack_sync_in(&CLIENT_RW.clone(), org, response_id, t).await
+    }
+
+    async fn finish_slack_sync(&self, claim: &Trigger, finish: &SlackSyncFinish) -> Result<bool> {
+        finish_slack_sync_in(&CLIENT_RW.clone(), claim, finish).await
+    }
+
     async fn complete_claim(&self, trigger: Trigger) -> Result<bool> {
         let result = sqlx::query(COMPLETE_CLAIM_QUERY)
             .bind(&trigger.status)
@@ -1002,6 +1074,163 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
 
 #[cfg(test)]
 mod tests {
+
+    use sqlx::{Pool, Postgres};
+
+    use super::{
+        ARM_SLACK_SYNC_QUERY, CREATE_TABLE_QUERY, FINISH_SLACK_SYNC_QUERY, SlackSyncFinish,
+        Trigger, TriggerModule, TriggerStatus, arm_slack_sync_in, finish_slack_sync_in,
+    };
+    use crate::scheduler::slack_sync_tests::{self as cases, KEY, ORG, SyncDb};
+
+    struct PostgresDb(Pool<Postgres>);
+
+    /// The production table plus its unique key, which the arm's upsert needs.
+    async fn with_table(pool: Pool<Postgres>) -> Pool<Postgres> {
+        sqlx::query(CREATE_TABLE_QUERY)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "CREATE UNIQUE INDEX scheduled_jobs_org_module_key_idx \
+             ON scheduled_jobs (org, module, module_key)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        pool
+    }
+
+    impl SyncDb for PostgresDb {
+        async fn fresh() -> Option<Self> {
+            // The postgres CI job sets this; elsewhere the case is skipped, saying so.
+            let Ok(url) = std::env::var("ZO_META_POSTGRES_DSN") else {
+                eprintln!("skipped: needs a postgres at ZO_META_POSTGRES_DSN");
+                return None;
+            };
+            let schema = format!("s{}", config::ider::uuid().to_lowercase());
+            let admin = sqlx::PgPool::connect(&url).await.unwrap();
+            sqlx::query(&format!("CREATE SCHEMA {schema}"))
+                .execute(&admin)
+                .await
+                .unwrap();
+            let options: sqlx::postgres::PgConnectOptions = url.parse().unwrap();
+            let pool = sqlx::postgres::PgPoolOptions::new()
+                .max_connections(2)
+                .connect_with(options.options([("search_path", schema.as_str())]))
+                .await
+                .unwrap();
+            Some(Self(with_table(pool).await))
+        }
+
+        async fn arm(&self, t: i64) {
+            arm_slack_sync_in(&self.0, ORG, KEY, t).await.unwrap();
+        }
+
+        async fn finish(&self, claim: &Trigger, finish: &SlackSyncFinish) -> bool {
+            finish_slack_sync_in(&self.0, claim, finish).await.unwrap()
+        }
+
+        async fn claim(&self, now: i64) -> Vec<Trigger> {
+            sqlx::query_as::<_, Trigger>(PULL_QUERY_BY_MODULE)
+                .bind(TriggerStatus::Processing)
+                .bind(now)
+                .bind(TriggerModule::Report)
+                .bind(now + 90_000_000)
+                .bind(now + 90_000_000)
+                .bind(TriggerStatus::Waiting)
+                .bind(now)
+                .bind(true)
+                .bind(false)
+                .bind(TriggerModule::OncallSlackSync)
+                .bind(10_i64)
+                .fetch_all(&self.0)
+                .await
+                .unwrap()
+        }
+
+        async fn set(&self, status: TriggerStatus, next_run_at: i64) {
+            sqlx::query(
+                "UPDATE scheduled_jobs SET status = $1, next_run_at = $2 WHERE module = $3",
+            )
+            .bind(status)
+            .bind(next_run_at)
+            .bind(TriggerModule::OncallSlackSync)
+            .execute(&self.0)
+            .await
+            .unwrap();
+        }
+
+        async fn row_of(&self, module: TriggerModule) -> (Trigger, Option<i64>) {
+            let row = sqlx::query_as::<_, Trigger>(
+                "SELECT * FROM scheduled_jobs WHERE module_key = $1 AND module = $2",
+            )
+            .bind(KEY)
+            .bind(module.clone())
+            .fetch_one(&self.0)
+            .await
+            .unwrap();
+            let armed: (Option<i64>,) = sqlx::query_as(
+                "SELECT armed_for FROM scheduled_jobs WHERE module_key = $1 AND module = $2",
+            )
+            .bind(KEY)
+            .bind(module)
+            .fetch_one(&self.0)
+            .await
+            .unwrap();
+            (row, armed.0)
+        }
+
+        async fn insert(&self, module: TriggerModule, next_run_at: i64) {
+            sqlx::query(
+                "INSERT INTO scheduled_jobs (org, module, module_key, status, retries, next_run_at, data) \
+                 VALUES ($1, $2, $3, $4, 0, $5, '')",
+            )
+            .bind(ORG)
+            .bind(module)
+            .bind(KEY)
+            .bind(TriggerStatus::Waiting)
+            .bind(next_run_at)
+            .execute(&self.0)
+            .await
+            .unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn an_arm_follows_sy2_on_every_row_state() {
+        cases::an_arm_follows_sy2_on_every_row_state::<PostgresDb>().await;
+    }
+
+    #[tokio::test]
+    async fn arms_during_a_pass_keep_the_earliest() {
+        cases::arms_during_a_pass_keep_the_earliest::<PostgresDb>().await;
+    }
+
+    #[tokio::test]
+    async fn a_finish_applies_the_pass_unless_an_arm_came_in() {
+        cases::a_finish_applies_the_pass_unless_an_arm_came_in::<PostgresDb>().await;
+    }
+
+    #[tokio::test]
+    async fn a_finish_of_a_reclaimed_row_changes_nothing() {
+        cases::a_finish_of_a_reclaimed_row_changes_nothing::<PostgresDb>().await;
+    }
+
+    #[tokio::test]
+    async fn another_modules_row_is_untouched() {
+        cases::another_modules_row_is_untouched::<PostgresDb>().await;
+    }
+
+    /// SY-2: no JSON operator in the sync statements (openobserve AGENTS.md).
+    #[test]
+    fn the_sync_statements_read_no_json() {
+        for q in [ARM_SLACK_SYNC_QUERY, FINISH_SLACK_SYNC_QUERY] {
+            for op in ["->", "json", "jsonb"] {
+                assert!(!q.contains(op), "{op} in {q}");
+            }
+        }
+    }
     use super::{
         COMPLETE_CLAIM_QUERY, KEEP_ALIVE_CLAIM_QUERY, PULL_QUERY, PULL_QUERY_BY_MODULE,
         PostgresScheduler, WATCH_TIMEOUT_QUERY,

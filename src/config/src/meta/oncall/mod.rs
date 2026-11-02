@@ -16,6 +16,7 @@
 //! On-call shared types — in `config` because `infra` and `o2_enterprise` both name them.
 
 pub mod agent;
+pub mod chat;
 pub mod confidence;
 pub mod contact;
 pub mod policy;
@@ -35,6 +36,10 @@ pub use agent::{
     SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict, confidence_refusal,
     gate_plan, metrics_for, promotion_note, quieter_channels, ratchet, severity_pages,
     update_channels, verdict_lines,
+};
+pub use chat::{
+    ChatMessage, ChatMessageKind, ChatMessageStatus, SlackRoomEdit, SlackRoomEditError,
+    TeamSlackView,
 };
 pub use confidence::{
     CauseGrade, ConfidenceGrade, GradeReason, SignalClass, ToolCallRecord, UnverifiedCitation,

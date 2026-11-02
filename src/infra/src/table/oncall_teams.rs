@@ -22,7 +22,7 @@ use std::{
 
 use config::{
     RwHashMap, ider,
-    meta::oncall::{Team, TeamMember},
+    meta::oncall::{SlackRoomEdit, Team, TeamMember},
     utils::time::now_micros,
 };
 use sea_orm::{
@@ -133,6 +133,11 @@ fn to_team(m: oncall_teams::Model) -> Team {
         description: m.description,
         // Carried on the struct, so a whole-row super-cluster snapshot replicates the team's room.
         channel_destinations: to_channel(m.channel_destinations),
+        slack_enterprise_id: m.slack_enterprise_id,
+        slack_workspace_id: m.slack_workspace_id,
+        slack_channel_id: m.slack_channel_id,
+        slack_channel_name: m.slack_channel_name,
+        slack_same_room_destination: m.slack_same_room_destination,
         created_at: m.created_at,
         updated_at: m.updated_at,
     }
@@ -183,6 +188,11 @@ pub async fn create(
         description: Set(description),
         // Not `[]`: an empty list means "no channel" and ignores the destinations it inherits.
         channel_destinations: Set(None),
+        slack_enterprise_id: Set(None),
+        slack_workspace_id: Set(None),
+        slack_channel_id: Set(None),
+        slack_channel_name: Set(None),
+        slack_same_room_destination: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -221,23 +231,81 @@ pub async fn set_channel(
     id: &str,
     destinations: Option<Vec<String>>,
 ) -> Result<bool, errors::Error> {
+    Ok(
+        update_channel(org_id, id, destinations, &SlackRoomEdit::Keep)
+            .await?
+            .is_some(),
+    )
+}
+
+/// Sets the team's channel like [`set_channel`] and applies `slack` to its Slack fields (RO-1);
+/// `None` when there is no such team in this org. [strong]
+pub async fn update_channel(
+    org_id: &str,
+    id: &str,
+    destinations: Option<Vec<String>>,
+    slack: &SlackRoomEdit,
+) -> Result<Option<Team>, errors::Error> {
     let client = get_orm_client_rw().await;
     let Some(existing) = oncall_teams::Entity::find_by_id(id)
         .filter(oncall_teams::Column::OrgId.eq(org_id))
         .one(client)
         .await?
     else {
-        return Ok(false);
+        return Ok(None);
     };
     let stored = destinations
         .as_ref()
         .map(|d| serde_json::to_string(d).unwrap_or_else(|_| "[]".to_string()));
     let mut model: oncall_teams::ActiveModel = existing.into();
     model.channel_destinations = Set(stored);
+    match slack {
+        SlackRoomEdit::Keep => {}
+        SlackRoomEdit::SameRoom(destination) => {
+            model.slack_same_room_destination = Set(destination.clone());
+        }
+        SlackRoomEdit::Clear => {
+            model.slack_enterprise_id = Set(None);
+            model.slack_workspace_id = Set(None);
+            model.slack_channel_id = Set(None);
+            model.slack_channel_name = Set(None);
+            model.slack_same_room_destination = Set(None);
+        }
+    }
     model.updated_at = Set(now_micros());
-    model.update(client).await?;
+    let team = to_team(model.update(client).await?);
     invalidate_and_publish_team(org_id, id).await;
-    Ok(true)
+    Ok(Some(team))
+}
+
+/// Stores the Slack channel `/o2 oncall here` named for the team (RO-1, CM-3); `None` when there
+/// is no such team in this org. [strong]
+pub async fn set_slack_room(
+    org_id: &str,
+    id: &str,
+    enterprise_id: &str,
+    workspace_id: &str,
+    channel_id: &str,
+    channel_name: &str,
+) -> Result<Option<Team>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let Some(existing) = oncall_teams::Entity::find_by_id(id)
+        .filter(oncall_teams::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let mut model: oncall_teams::ActiveModel = existing.into();
+    // An empty enterprise is a workspace outside Enterprise Grid.
+    model.slack_enterprise_id = Set(Some(enterprise_id.to_string()).filter(|e| !e.is_empty()));
+    model.slack_workspace_id = Set(Some(workspace_id.to_string()));
+    model.slack_channel_id = Set(Some(channel_id.to_string()));
+    model.slack_channel_name = Set(Some(channel_name.to_string()));
+    model.updated_at = Set(now_micros());
+    let team = to_team(model.update(client).await?);
+    invalidate_and_publish_team(org_id, id).await;
+    Ok(Some(team))
 }
 
 pub async fn get(org_id: &str, id: &str) -> Result<Option<Team>, errors::Error> {
@@ -633,10 +701,31 @@ mod tests {
             timezone: "Asia/Kolkata".into(),
             description: Some("owns queriers".into()),
             channel_destinations: None,
+            slack_enterprise_id: Some("E1".into()),
+            slack_workspace_id: Some("T1".into()),
+            slack_channel_id: Some("C1".into()),
+            slack_channel_name: Some("oncall".into()),
+            slack_same_room_destination: Some("oncall-hook".into()),
             created_at: 10,
             updated_at: 20,
         };
         let t = to_team(m.clone());
+        assert_eq!(
+            [
+                t.slack_enterprise_id.clone(),
+                t.slack_workspace_id.clone(),
+                t.slack_channel_id.clone(),
+                t.slack_channel_name.clone(),
+                t.slack_same_room_destination.clone()
+            ],
+            [
+                m.slack_enterprise_id.clone(),
+                m.slack_workspace_id.clone(),
+                m.slack_channel_id.clone(),
+                m.slack_channel_name.clone(),
+                m.slack_same_room_destination.clone()
+            ]
+        );
         assert_eq!(t.id, m.id);
         assert_eq!(t.name, "Platform");
         assert_eq!(t.timezone, "Asia/Kolkata");
@@ -704,6 +793,11 @@ mod tests {
                 timezone: "UTC".into(),
                 description: None,
                 channel_destinations: None,
+                slack_enterprise_id: None,
+                slack_workspace_id: None,
+                slack_channel_id: None,
+                slack_channel_name: None,
+                slack_same_room_destination: None,
                 created_at: 0,
                 updated_at: 0,
             })
@@ -726,5 +820,91 @@ mod tests {
         );
         assert!(ORG_HAS_TEAMS_CACHE.contains_key("inv_team_ab"));
         invalidate_org("inv_team_ab");
+    }
+
+    /// RO-1, CM-3: `here` stores the room, a channel save keeps it or sets the same-room
+    /// destination, and clear empties every Slack field.
+    #[tokio::test]
+    async fn test_slack_room_is_set_kept_and_cleared() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_slack_room");
+        let team = create(&org, "Platform", "UTC", None).await.unwrap();
+        let slack = |t: &Team| {
+            (
+                t.slack_workspace_id.clone(),
+                t.slack_channel_id.clone(),
+                t.slack_channel_name.clone(),
+                t.slack_same_room_destination.clone(),
+            )
+        };
+        let s = |v: &str| Some(v.to_string());
+
+        let set = set_slack_room(&org, &team.id, "E1", "T1", "C1", "oncall")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(slack(&set), (s("T1"), s("C1"), s("oncall"), None));
+        assert_eq!(
+            set.slack_enterprise_id,
+            s("E1"),
+            "D45: the room's enterprise is stored"
+        );
+
+        let hook = vec!["oncall-hook".to_string()];
+        let kept = update_channel(&org, &team.id, Some(hook.clone()), &SlackRoomEdit::Keep)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(slack(&kept), slack(&set));
+        assert_eq!(kept.channel_destinations, Some(hook.clone()));
+
+        let same = SlackRoomEdit::SameRoom(s("oncall-hook"));
+        let ticked = update_channel(&org, &team.id, Some(hook.clone()), &same)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            slack(&ticked),
+            (s("T1"), s("C1"), s("oncall"), s("oncall-hook"))
+        );
+
+        let cleared = update_channel(&org, &team.id, Some(hook), &SlackRoomEdit::Clear)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(slack(&cleared), (None, None, None, None));
+        assert_eq!(cleared.slack_enterprise_id, None);
+        assert_eq!(
+            get(&org, &team.id).await.unwrap().map(|t| slack(&t)),
+            Some((None, None, None, None))
+        );
+    }
+
+    /// [strong]: a team that is not in the org is not written and reads as `None`.
+    #[tokio::test]
+    async fn test_slack_room_writes_need_the_orgs_team() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("t_slack_room_owner");
+        let team = create(&org, "Platform", "UTC", None).await.unwrap();
+        let other = crate::table::testing::unique("t_slack_room_other");
+        assert!(
+            set_slack_room(&other, &team.id, "E1", "T1", "C1", "oncall")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            update_channel(&other, &team.id, None, &SlackRoomEdit::Clear)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let stored = get(&org, &team.id).await.unwrap().unwrap();
+        assert_eq!(stored.slack_channel_id, None);
+        assert_eq!(stored.updated_at, team.updated_at);
     }
 }
