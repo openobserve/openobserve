@@ -69,6 +69,8 @@ export class IngestionConfigPage {
             '[data-test="data-source-setup-card-passcode-unavailable"]',
             '[data-test="ai-integration-card"]',
             '[data-test="ai-integration-card-passcode-forbidden"]',
+            '[data-test="ai-rich-setup-card"]',
+            '[data-test="ai-integration-detail-passcode-forbidden"]',
           ].join(', '))
           .first();
         this.copyContentForbidden = page.locator('[data-test^="ingestion-"][data-test$="-code-block-passcode-forbidden"]');
@@ -409,8 +411,8 @@ export class IngestionConfigPage {
         return null;
     }
 
-    async getAllDocumentationLinksStatus(skipUrls = []) {
-        const hrefs = await this.getDocumentationLinkHrefs();
+    async getAllDocumentationLinksStatus(skipUrls = [], collectedHrefs = null) {
+        const hrefs = collectedHrefs ?? await this.getDocumentationLinkHrefs();
         const results = [];
 
         for (let i = 0; i < hrefs.length; i++) {

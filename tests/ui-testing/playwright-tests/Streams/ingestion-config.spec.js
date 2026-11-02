@@ -252,7 +252,8 @@ test.describe("Ingestion Configuration Tests", () => {
         try {
           await pm.ingestionConfigPage.navigateToIntegration(integration.path, orgId);
 
-          const linkCount = await pm.ingestionConfigPage.getDocumentationLinkCount();
+          const hrefs = await pm.ingestionConfigPage.getDocumentationLinkHrefs();
+          const linkCount = hrefs.length;
 
           if (linkCount === 0) {
             testLogger.info(`  ℹ No documentation links found`);
@@ -264,7 +265,7 @@ test.describe("Ingestion Configuration Tests", () => {
           totalLinksChecked += linkCount;
 
           // Check HTTP status for all links (with skip list)
-          const linkResults = await pm.ingestionConfigPage.getAllDocumentationLinksStatus(skipUrls);
+          const linkResults = await pm.ingestionConfigPage.getAllDocumentationLinksStatus(skipUrls, hrefs);
 
           const broken = linkResults.filter(r => !r.ok && !r.skipped && !r.rateLimited);
           const working = linkResults.filter(r => r.ok && !r.skipped);
@@ -332,7 +333,7 @@ test.describe("Ingestion Configuration Tests", () => {
         }
         testLogger.info('\n' + '='.repeat(80));
       } else {
-        testLogger.info(`\n✅ ALL ${totalLinksChecked} DOCUMENTATION LINKS ARE WORKING!`);
+        testLogger.info(`\n✅ No broken links: ${totalLinksVerified} verified, ${totalLinksRateLimited} rate-limited, ${totalLinksSkipped} skipped`);
         testLogger.info('='.repeat(80));
       }
 
