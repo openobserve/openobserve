@@ -16,6 +16,7 @@
 use std::collections::{HashMap, HashSet};
 
 use config::meta::{
+    feature::Feature,
     folder::DEFAULT_FOLDER,
     pipeline::components::NodeData,
     self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
@@ -1096,6 +1097,15 @@ pub async fn retry_run(
     res
 }
 
+// an error, not Ok, so alert history records the skipped delivery instead of a success
+fn require_workflows_license(entitled: bool) -> Result<(), anyhow::Error> {
+    if entitled {
+        return Ok(());
+    }
+    let feature: &str = Feature::Workflows.into();
+    Err(infra::errors::ErrorCodes::LicenseFeatureNotEntitled(feature.to_string()).into())
+}
+
 pub async fn send_workflow_trigger(
     trace_id: &str,
     org_id: &str,
@@ -1105,13 +1115,12 @@ pub async fn send_workflow_trigger(
     metadata: HashMap<String, Value>,
     data: &[Value],
 ) -> Result<String, anyhow::Error> {
-    if !get_o2_config().common.workflows_enabled
-        || !o2_enterprise::enterprise::license::check_features(&[
-            config::meta::feature::Feature::Workflows,
-        ])
-    {
+    if !get_o2_config().common.workflows_enabled {
         return Ok(String::new());
     }
+    require_workflows_license(o2_enterprise::enterprise::license::check_features(&[
+        Feature::Workflows,
+    ]))?;
 
     let data = serde_json::to_string(data)?;
     let run_id = config::ider::uuid();
@@ -1346,6 +1355,22 @@ pub async fn get_data_for_run(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_licensed_trigger_passes_the_license_check() {
+        assert!(require_workflows_license(true).is_ok());
+    }
+
+    #[test]
+    fn trigger_without_workflows_license_is_an_error_naming_the_feature() {
+        let err = require_workflows_license(false).unwrap_err();
+        match err.downcast_ref::<infra::errors::ErrorCodes>() {
+            Some(infra::errors::ErrorCodes::LicenseFeatureNotEntitled(f)) => {
+                assert_eq!(f, "workflows")
+            }
+            other => panic!("expected LicenseFeatureNotEntitled, got {other:?}"),
+        }
+    }
 
     #[test]
     fn history_key_for_a_manual_run_records_manual_and_the_firing_user() {
