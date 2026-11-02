@@ -60,6 +60,7 @@ test.describe("SQL Autocomplete — Logs", () => {
         // Wait for the stream-list API response so streamResults.list is set.
         // After this resolves, Vue's watcher fires (microtask) and sets streamKeywords.
         await streamsApiDone;
+        await pm.logsPage.waitForStreamFieldsLoaded('code');
 
         testLogger.info('Logs SQL test setup completed');
     });

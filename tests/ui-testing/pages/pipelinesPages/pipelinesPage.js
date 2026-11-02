@@ -872,8 +872,7 @@ export class PipelinesPage {
 
     // Method to click the input node stream save button
     async clickInputNodeStreamSave() {
-        // A stream-name popover still open (Enter path in fillDestinationStreamName) closes via
-        // interactOutside when the save button receives the pointerdown event.
+        // A stream-name popover still open (Enter path) closes via interactOutside on this click.
         await this.inputNodeStreamSaveButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.inputNodeStreamSaveButton.click();
     }
@@ -2580,10 +2579,7 @@ export class PipelinesPage {
             await matchingOption.click();
             await popover.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
         } else {
-            // For newly created names (Enter path), the popover stays open; the save
-            // button click will close it via interactOutside — do NOT press Escape
-            // here, as that would also trigger the ODrawer's escape handler and
-            // prematurely close the drawer.
+            // The popover stays open for new names until the save click; Escape here would also close the drawer.
             await this.streamNameInput.press('Enter');
         }
     }

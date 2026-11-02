@@ -11,10 +11,10 @@ export const waitForDashboardPage = async function (page) {
     await page.waitForURL(/\/web\/dashboards.*/, { timeout: 30000 });
   }
 
-  // The table, the import page, or (empty folder, no table) the New Dashboard button.
+  // List table, import page, empty-folder New Dashboard button, or the view page's Add Panel after saving.
   try {
     await page
-      .locator('[data-test="dashboard-table"], [data-test="dashboard-import"], [data-test="dashboard-new"]')
+      .locator('[data-test="dashboard-table"], [data-test="dashboard-import"], [data-test="dashboard-new"], [data-test="dashboard-panel-add"]')
       .first()
       .waitFor({ state: 'visible', timeout: 30000 });
   } catch (err) {

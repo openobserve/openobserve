@@ -466,6 +466,8 @@ export async function waitForAllPanelsToLoad(page, panelCount, timeout = 30000) 
   try {
     await page.waitForFunction(
       (count) => {
+        // Panels stay mounted during a refresh; the refresh button is what stays disabled until they finish.
+        if (document.querySelector('[data-test="dashboard-refresh-btn"]')?.disabled) return false;
         const loadedPanels = document.querySelectorAll('[data-test="chart-renderer"], [data-test="dashboard-panel-table"]');
         return loadedPanels.length >= count;
       },

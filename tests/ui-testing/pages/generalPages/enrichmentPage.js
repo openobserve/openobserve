@@ -352,10 +352,10 @@ class EnrichmentPage {
         ).catch(() => null);
         await openNavFlyoutChild(this.page, 'pipeline');
         await this.enrichmentTableTab.click();
-        // Revisits render from the streams cache without a request, so the rows are the other signal.
+        // Revisits render from the streams cache without a request, so real rows are the other signal; skeleton rows don't count.
         await Promise.race([
             listResponse,
-            this.listPage.locator('tbody tr, [data-test="o2-empty-state"]').first()
+            this.listPage.locator('tbody:not([data-test="o2-table-skeleton-body"]) tr, [data-test="o2-empty-state"]').first()
                 .waitFor({ state: 'visible', timeout: 30000 }).catch(() => null),
         ]);
         // Wait for the enrichment tables list page to be visible. Alpha nav can be slow

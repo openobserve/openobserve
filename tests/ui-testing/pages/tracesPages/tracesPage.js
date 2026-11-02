@@ -278,14 +278,8 @@ export class TracesPage {
     const wrapper = this.page.locator(this.streamSelect);
     await wrapper.waitFor({ state: 'visible', timeout: 10000 });
 
-    // The wrapper renders immediately, but its options arrive with the async
-    // stream-list fetch. Opening the popover before then finds an empty list,
-    // every retry below misses, and selection silently no-ops — which surfaces
-    // later as "Select Stream First" and zero query results. Wait for the
-    // option to exist in the DOM first.
     const optionReady = `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`;
-    // Options are only mounted while the popover is open — open it, wait, then
-    // leave it open for the selection logic below.
+    // Options mount only while the popover is open and arrive with the async stream list, so open it, then wait.
     const streamPopover = this.page.locator('[data-test="log-search-index-list-select-stream-popover"]');
     if (!(await streamPopover.isVisible().catch(() => false))) {
       await wrapper.locator('button[type="button"]').first().click({ force: false }).catch(() => {});

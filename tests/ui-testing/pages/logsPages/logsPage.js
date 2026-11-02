@@ -2065,8 +2065,7 @@ export class LogsPage {
         const option10 = this.page.locator(this.recordsPerPageOption(10)).first();
         await option10.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
         await option10.click({ force: true });
-        // Retry the pagination assertion — cloud wildcard queries can take 5s+ to re-run after changing
-        // results-per-page, and slow re-runs can miss the first check
+        // Retried because cloud wildcard queries can take 5s+ to re-run after changing results-per-page.
         const searchResult = this.page.locator(this.searchResultText);
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
