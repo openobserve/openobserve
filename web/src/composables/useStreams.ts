@@ -25,8 +25,16 @@ import { isUserDataStream } from "@/utils/internalStreams";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn, I18nText } from "@/types/i18n";
 
-// The "all" read fetches only these types; a profiles list is cached only when a page asks for that type.
-const ALL_STREAM_TYPES = ["logs", "metrics", "traces", "enrichment_tables", "index", "metadata"];
+// The "all" read fetches only these types.
+const ALL_STREAM_TYPES = [
+  "logs",
+  "metrics",
+  "traces",
+  "profiles",
+  "enrichment_tables",
+  "index",
+  "metadata",
+];
 
 // Keep the HTTP status on the rejection: callers need it to tell a denial (403)
 // apart from any other failure, and a bare Error would drop it.
