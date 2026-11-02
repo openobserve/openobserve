@@ -538,10 +538,6 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
-    sampleRow: {
-      type: Object as PropType<Record<string, unknown> | null>,
-      default: null,
-    },
   },
   emits: [
     "update:trigger",
@@ -801,18 +797,13 @@ export default defineComponent({
     });
     const hasChatRecovery = computed(() => recoveryPlan.value.some((row) => !row.isPlatform));
 
-    // Same precedence as the backend: alert fields over row values over context attributes.
+    // Row and group-by values exist only at fire time, so their placeholders stay as chips.
     const incidentTitlePreview = computed(() => {
       const template = props.formData?.incident_title_template?.trim();
       if (!template) return [];
       const live: Record<string, string> = {};
       for (const attr of props.formData?.context_attributes ?? []) {
         if (attr?.key) live[attr.key] = String(attr.value ?? "");
-      }
-      for (const [key, value] of Object.entries(props.sampleRow ?? {})) {
-        if (value !== null && value !== undefined) {
-          live[key] = typeof value === "object" ? JSON.stringify(value) : String(value);
-        }
       }
       const alertFields: Record<string, unknown> = {
         alert_name: props.formData?.name,

@@ -216,8 +216,7 @@ pub struct Alert {
     #[schema(example = "https://wiki.example.com/runbooks/checkout")]
     pub runbook_url: Option<String>,
 
-    /// Incident title template; unresolved `{var}`s render `–`, and the generated title is used if
-    /// none resolve.
+    /// Incident title template; the generated title is used when no variable resolves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(example = "{service_name} errors on {host}")]
     pub incident_title_template: Option<String>,

@@ -15,6 +15,9 @@
 
 use sea_orm_migration::prelude::*;
 
+const COLUMN: &str = "incident_title_template";
+const TABLES: [Tables; 2] = [Tables::Alerts, Tables::AlertComposites];
+
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -22,6 +25,10 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         for table in TABLES {
+            // SQLite drops IF NOT EXISTS, so a retry must skip tables already altered.
+            if manager.has_column(&table_name(table), COLUMN).await? {
+                continue;
+            }
             manager.alter_table(add_column(table)).await?;
         }
         Ok(())
@@ -29,6 +36,9 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         for table in TABLES {
+            if !manager.has_column(&table_name(table), COLUMN).await? {
+                continue;
+            }
             manager
                 .alter_table(
                     Table::alter()
@@ -41,8 +51,6 @@ impl MigrationTrait for Migration {
         Ok(())
     }
 }
-
-const TABLES: [Tables; 2] = [Tables::Alerts, Tables::AlertComposites];
 
 #[derive(DeriveIden, Clone, Copy)]
 enum Tables {
@@ -58,10 +66,14 @@ pub(super) fn get_update_stmt_composites() -> TableAlterStatement {
     add_column(Tables::AlertComposites)
 }
 
+fn table_name(table: Tables) -> String {
+    table.into_iden().to_string()
+}
+
 fn add_column(table: Tables) -> TableAlterStatement {
     Table::alter()
         .table(table)
-        .add_column_if_not_exists(ColumnDef::new(IncidentTitleTemplate).text().null())
+        .add_column(ColumnDef::new(IncidentTitleTemplate).text().null())
         .to_owned()
 }
 
@@ -75,11 +87,11 @@ mod tests {
     fn postgres() {
         collapsed_eq!(
             &add_column(Tables::Alerts).to_string(PostgresQueryBuilder),
-            r#"ALTER TABLE "alerts" ADD COLUMN IF NOT EXISTS "incident_title_template" text NULL"#
+            r#"ALTER TABLE "alerts" ADD COLUMN "incident_title_template" text NULL"#
         );
         collapsed_eq!(
             &add_column(Tables::AlertComposites).to_string(PostgresQueryBuilder),
-            r#"ALTER TABLE "alert_composites" ADD COLUMN IF NOT EXISTS "incident_title_template" text NULL"#
+            r#"ALTER TABLE "alert_composites" ADD COLUMN "incident_title_template" text NULL"#
         );
     }
 

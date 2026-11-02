@@ -12108,7 +12108,6 @@
       "incidentTitleTemplateTooltip": "Optionele titel voor incidenten die deze waarschuwing aanmaakt. Gebruik {'{'}field{'}'} voor waarden uit de activerende rij of de groeperingssleutels, plus {'{'}alert_name{'}'}, {'{'}stream_name{'}'}, {'{'}stream_type{'}'}, {'{'}org_name{'}'}, {'{'}alert_time{'}'}, {'{'}alert_start_time{'}'}, {'{'}alert_end_time{'}'} en contextattributen. Ontbrekende variabelen worden als – getoond; als er geen enkele wordt opgelost, wordt de standaardtitel gebruikt.",
       "incidentTitleTemplatePlaceholder": "bijv. {'{'}service_name{'}'}-fouten op {'{'}host{'}'}",
       "incidentTitlePreview": "Voorbeeld",
-      "incidentTitlePreviewHint": "Gebruikt de nieuwste rij van het queryvoorbeeld; gemarkeerde plaatshouders worden ingevuld wanneer de waarschuwing afgaat.",
       "helpTemplateTitle": "Sjabloon overschrijven",
       "helpVariablesTitle": "Aanvullende variabelen",
       "helpRowTemplateTitle": "Sjabloon voor rijen",

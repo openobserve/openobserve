@@ -22,7 +22,7 @@ use config::{
 
 use super::{
     alert::{format_alert_time, get_alert_start_end_time, get_row_column_map},
-    notifications::resolve::UNMATCHED_MARKER,
+    notifications::resolve::{scan_unmatched, substitute_raw_row},
 };
 
 const MAX_TITLE_CHARS: usize = 255;
@@ -81,7 +81,8 @@ pub fn render(
     ] {
         vars.insert(key.to_string(), Value::String(value.to_string()));
     }
-    let title = super::notifications::resolve::substitute_raw_row(template, &vars, &mut Vec::new());
+    let mut unknown = Vec::new();
+    let title = substitute_raw_row(template, &vars, &mut unknown);
     // Row values may hold newlines, and Postgres `title` is varchar(500).
     let title: String = title
         .split_whitespace()
@@ -91,8 +92,9 @@ pub fn render(
         .filter(|c| !c.is_control())
         .take(MAX_TITLE_CHARS)
         .collect();
-    let has_content = !title.replace(UNMATCHED_MARKER, "").trim().is_empty();
-    has_content.then_some(title)
+    let placeholders = scan_unmatched(template).len();
+    let resolved = placeholders == 0 || unknown.len() < placeholders;
+    (resolved && !title.is_empty()).then_some(title)
 }
 
 #[cfg(test)]
@@ -153,6 +155,18 @@ mod tests {
 
         alert.incident_title_template = Some("{missing} {other}".into());
         assert_eq!(render_with(&alert, &r, &none, 0), None);
+
+        alert.incident_title_template = Some("{missing} - {other}".into());
+        assert_eq!(render_with(&alert, &r, &none, 0), None);
+
+        alert.incident_title_template = Some("Errors on {missing}".into());
+        assert_eq!(render_with(&alert, &r, &none, 0), None);
+
+        alert.incident_title_template = Some("Checkout errors".into());
+        assert_eq!(
+            render_with(&alert, &r, &none, 0).as_deref(),
+            Some("Checkout errors")
+        );
 
         alert.incident_title_template = Some("   ".into());
         assert_eq!(render_with(&alert, &r, &none, 0), None);

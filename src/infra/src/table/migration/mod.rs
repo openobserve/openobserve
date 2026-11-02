@@ -254,7 +254,7 @@ mod m20261030_000002_create_org_domain_ownership_req_table;
 mod m20261101_000001_create_oncall_slack;
 mod m20261102_000001_add_workflow_run_data_run_id_index;
 mod m20261103_000001_add_status_streaks_to_synthetics;
-mod m20261024_000002_add_alert_incident_title_template;
+mod m20261104_000001_add_alert_incident_title_template;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -361,7 +361,7 @@ pub(crate) async fn create_composite_alert_tables_for_test(
         .await?;
     manager
         .alter_table(
-            m20261024_000002_add_alert_incident_title_template::get_update_stmt_composites(),
+            m20261104_000001_add_alert_incident_title_template::get_update_stmt_composites(),
         )
         .await?;
     Ok(())
@@ -387,7 +387,7 @@ pub(crate) fn composite_alert_migration_sql_for_test(
             .to_string(),
         backend
             .build(
-                &m20261024_000002_add_alert_incident_title_template::get_update_stmt_composites(),
+                &m20261104_000001_add_alert_incident_title_template::get_update_stmt_composites(),
             )
             .to_string(),
     ];
@@ -817,7 +817,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261026_000002_create_workflow_http_trigger_credentials::Migration),
             Box::new(m20261026_000003_create_workflow_http_trigger_requests::Migration),
             Box::new(m20261102_000001_add_workflow_run_data_run_id_index::Migration),
-            Box::new(m20261024_000002_add_alert_incident_title_template::Migration),
+            Box::new(m20261104_000001_add_alert_incident_title_template::Migration),
         ]
     }
 }
@@ -921,7 +921,7 @@ mod tests {
         (133, "m20261103_000001_add_status_streaks_to_synthetics"),
         (134, "m20261028_000001_add_llm_dataset_item_write_version"),
         (135, "m20261102_000001_add_workflow_run_data_run_id_index"),
-        (136, "m20261024_000002_add_alert_incident_title_template"),
+        (136, "m20261104_000001_add_alert_incident_title_template"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

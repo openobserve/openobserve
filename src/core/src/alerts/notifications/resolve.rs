@@ -367,7 +367,7 @@ fn truncate(value: &str, len: usize) -> String {
 
 /// Find every remaining `{identifier}` / `{identifier:N}` token — anything
 /// still present after all known-variable passes ran is unmatched.
-fn scan_unmatched(tpl: &str) -> Vec<String> {
+pub(crate) fn scan_unmatched(tpl: &str) -> Vec<String> {
     let mut out = Vec::new();
     let bytes = tpl.as_bytes();
     let mut i = 0usize;

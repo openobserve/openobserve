@@ -449,7 +449,7 @@ describe("AlertSettings — incident title preview", () => {
     config.isEnterprise = original;
   });
 
-  it("fills placeholders from alert fields and the sample row, keeping unknown ones", () => {
+  it("fills alert fields and keeps row placeholders as chips", () => {
     config.isEnterprise = "true";
     const host = mount(
       defineComponent({
@@ -466,18 +466,17 @@ describe("AlertSettings — incident title preview", () => {
             name: "HighErrors",
             incident_title_template: "{alert_name}: {service} on {host}",
           }),
-          sampleRow: { service: "checkout" },
         }),
         template: `
           <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
-            <AlertSettings :form-data="formData" is-real-time="false" :destinations="[]" :sample-row="sampleRow" />
+            <AlertSettings :form-data="formData" is-real-time="false" :destinations="[]" />
           </OForm>
         `,
       }),
       { global: { plugins: [makeStore({ incidents_enabled: true }), i18n] } },
     );
     expect(host.find('[data-test="alert-incident-title-preview"]').text()).toContain(
-      "HighErrors: checkout on {host}",
+      "HighErrors: {service} on {host}",
     );
   });
 });
