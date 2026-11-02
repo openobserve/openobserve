@@ -38,15 +38,6 @@ vi.mock("@/services/service_streams", () => ({
   },
 }));
 
-vi.mock("@/components/alerts/OrganizationDeduplicationSettings.vue", () => ({
-  default: {
-    name: "OrganizationDeduplicationSettings",
-    template: '<div data-test="org-deduplication-settings" />',
-    props: ["orgId", "config"],
-    emits: ["saved"],
-  },
-}));
-
 vi.mock("@/components/settings/DiscoveredServices.vue", () => ({
   default: {
     name: "DiscoveredServices",
@@ -84,9 +75,6 @@ const mockStore = createStore({
   state: {
     selectedOrganization: { identifier: "test-org" },
     theme: "light",
-    organizationSettings: {
-      deduplication_config: { enabled: true },
-    },
   },
 });
 
@@ -100,7 +88,6 @@ const mockI18n = createI18n({
           subtitle: "Configure service correlation",
           discoveredServicesTab: "Discovered Services",
           serviceDiscoveryTab: "Service Discovery",
-          alertCorrelationTab: "Alert Correlation",
           fieldAliasesTab: "Field Aliases",
         },
       },
@@ -165,11 +152,6 @@ describe("CorrelationSettings", () => {
       expect(wrapper.find('[data-name="discovery"]').exists()).toBe(true);
     });
 
-    it("should render Alert Correlation tab", () => {
-      wrapper = mountComponent();
-      expect(wrapper.find('[data-name="alert-correlation"]').exists()).toBe(true);
-    });
-
     it("should render Field Aliases tab", () => {
       wrapper = mountComponent();
       expect(wrapper.find('[data-name="field-aliases"]').exists()).toBe(true);
@@ -192,13 +174,6 @@ describe("CorrelationSettings", () => {
       expect(wrapper.find('[data-test="discovered-services"]').isVisible()).toBe(false);
     });
 
-    it("should show OrganizationDeduplicationSettings when activeTab=alert-correlation", async () => {
-      wrapper = mountComponent();
-      wrapper.vm.activeTab = "alert-correlation";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find('[data-test="org-deduplication-settings"]').exists()).toBe(true);
-    });
-
     it("should show SemanticFieldGroupsConfig when activeTab=field-aliases", async () => {
       wrapper = mountComponent();
       wrapper.vm.activeTab = "field-aliases";
@@ -214,12 +189,6 @@ describe("CorrelationSettings", () => {
       expect(wrapper.vm.activeTab).toBe("discovery");
     });
 
-    it("should switch to alert-correlation tab", () => {
-      wrapper = mountComponent();
-      wrapper.vm.onTabChange("alert-correlation");
-      expect(wrapper.vm.activeTab).toBe("alert-correlation");
-    });
-
     it("should switch back to services tab", () => {
       wrapper = mountComponent();
       wrapper.vm.onTabChange("discovery");
@@ -228,17 +197,10 @@ describe("CorrelationSettings", () => {
     });
   });
 
-  describe("onCorrelationSettingsSaved", () => {
-    it("should handle saved event without throwing", () => {
-      wrapper = mountComponent();
-      expect(() => wrapper.vm.onCorrelationSettingsSaved()).not.toThrow();
-    });
-  });
-
   describe("tabs computed", () => {
-    it("should have 4 tab entries", () => {
+    it("should have 3 tab entries", () => {
       wrapper = mountComponent();
-      expect(wrapper.vm.tabs).toHaveLength(4);
+      expect(wrapper.vm.tabs).toHaveLength(3);
     });
 
     it("should have correct tab values", () => {
@@ -246,7 +208,7 @@ describe("CorrelationSettings", () => {
       const values = wrapper.vm.tabs.map((t: any) => t.value);
       expect(values).toContain("services");
       expect(values).toContain("discovery");
-      expect(values).toContain("alert-correlation");
+      expect(values).not.toContain("alert-correlation");
       expect(values).toContain("field-aliases");
     });
   });

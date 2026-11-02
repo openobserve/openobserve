@@ -17,15 +17,15 @@ import type { PanelState } from "@/composables/rum/useAnalyticsSearch";
 import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";
 import type { AppFilterCounts } from "@/composables/rum/useAppFilterCounts";
 import type { I18nText } from "@/types/i18n";
-import type { FilterValuesState } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
+import type {
+  FilterNotice,
+  FilterValuesState,
+} from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
+import type { FieldSampleState } from "@/composables/rum/useFunnelFieldSample";
+import type { FieldSample } from "@/utils/rum/funnelFields";
 import type { FunnelResult, NamedEvent } from "@/utils/rum/productAnalyticsModel";
+import type { FunnelCompareView } from "@/utils/rum/funnelCompare";
 import type { FunnelDef, SampleRatio, StepRef } from "@/utils/rum/productAnalyticsQueries";
-
-export interface FunnelLayoutSetting {
-  id: string;
-  label: I18nText;
-  value: I18nText;
-}
 
 /** Everything a funnel layout renders; a layout reads these and never runs a query of its own. */
 export interface FunnelLayoutProps {
@@ -45,11 +45,17 @@ export interface FunnelLayoutProps {
   app: string;
   appFilters: AppFilterCounts | null;
   includeHidden: boolean;
-  settings: FunnelLayoutSetting[];
   filterFields: readonly string[];
   filterFieldTypes?: Readonly<Record<string, string>>;
   filterValues: FilterValuesState;
   failed?: boolean;
+  compare?: FunnelCompareView | null;
+  /** The card shows the `trend` slot in place of the steps table. */
+  trend?: boolean;
+  /** Fields each step's events carry, for the step menus and Property rows. */
+  fieldSample?: FieldSample | null;
+  fieldSampleState?: FieldSampleState;
+  filterNotice?: FilterNotice | null;
 }
 
 export interface FunnelLayoutEmits {
@@ -60,12 +66,18 @@ export interface FunnelLayoutEmits {
   "hide-hidden": [];
   "edit-app-filters": [];
   "filter-values": [string];
+  "load-fields": [];
+  "break-down": [string];
+  "break-down-step": [number];
+  "trend-from-step": [number];
 }
 
 /** A layout places the page's card header, its notices and its footer, so it decides where the card sits. */
 export interface FunnelLayoutSlots {
+  breakdown?: () => unknown;
   header?: () => unknown;
   actions?: () => unknown;
   notices?: () => unknown;
+  trend?: () => unknown;
   footer?: () => unknown;
 }

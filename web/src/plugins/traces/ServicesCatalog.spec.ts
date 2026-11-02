@@ -479,6 +479,29 @@ describe("ServicesCatalog", () => {
       expect(emptyDiv.exists()).toBe(true);
     });
 
+    it("does not show the empty state while the stream list is still loading", async () => {
+      mockGetStreams.mockReturnValueOnce(new Promise(() => {}));
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="services-catalog-empty"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="services-catalog-table"]').attributes("data-loading")).toBe(
+        "true",
+      );
+    });
+
+    it("shows the empty state for an org with no trace stream", async () => {
+      mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
+      mockGetStreams.mockResolvedValueOnce({ list: [] });
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="services-catalog-empty"]').exists()).toBe(true);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
     it("should not show empty state when loading", async () => {
       mockFetchQueryDataWithHttpStream.mockImplementation(() => {
         // Keep isLoading true — never calls complete

@@ -36,7 +36,7 @@ export class MetricsBuilderPage {
         this.queryTypeSelect = '[data-test="dashboard-promql-builder-query-type"]';
 
         // Run Query / Apply
-        this.runQueryButton = '[data-test="metrics-apply"]';
+        this.runQueryButton = '[data-test="metrics-explorer-run"]';
 
         // Add to Dashboard dialog selectors
         // AddToDashboard.vue is now an ODrawer with parent slug `add-to-dashboard-dialog`.
@@ -165,11 +165,6 @@ export class MetricsBuilderPage {
 
         // Step value `-field` variant (OInput inner native input)
         this.stepValueFieldInput = page.locator('[data-test="dashboard-promql-builder-step-value-field"]');
-
-        // MetricSelector component popover/option/field
-        this.metricSelectorEl = page.locator('[data-test="metric-selector"]');
-        this.metricSelectorPopover = page.locator('[data-test="metric-selector-popover"]');
-        this.metricSelectorFieldInput = page.locator('[data-test="metric-selector-field"]').first();
 
         // Dashboard dropdown OInput inner input
         this.dashboardDropdownFieldInput = page.locator('[data-test="dashboard-dropdown-dashboard-selection-field"]').first();
@@ -1086,64 +1081,6 @@ export class MetricsBuilderPage {
      */
     async hasLabelOptions() {
         return (await this.labelOptions.count()) > 0;
-    }
-
-    /**
-     * Get the MetricSelector component locator
-     */
-    getMetricSelectorLocator() {
-        return this.metricSelectorEl;
-    }
-
-    /**
-     * Per-value MetricSelector option factory.
-     */
-    getMetricSelectorOptionByValue(value) {
-        return this.page.locator(`[data-test="metric-selector-option"][data-test-value="${value}"]`).first();
-    }
-
-    /**
-     * Check if MetricSelector component is visible (builder mode metric dropdown)
-     */
-    async isBuilderMetricSelectorVisible() {
-        return await this.metricSelectorEl.isVisible({ timeout: 3000 }).catch(() => false);
-    }
-
-    /**
-     * Select a metric from the MetricSelector dropdown (builder mode)
-     * @param {string} metricName
-     */
-    async selectBuilderMetric(metricName) {
-        if (!await this.metricSelectorEl.isVisible({ timeout: 5000 })) return false;
-
-        await this.metricSelectorEl.click();
-        // MetricSelector uses OSelect (Reka Listbox)
-        await this.metricSelectorPopover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-
-        // OSelect popover search: Ctrl+A → Backspace → fill via -field
-        if (await this.metricSelectorFieldInput.isVisible({ timeout: 1500 }).catch(() => false)) {
-            await this.metricSelectorFieldInput.press('ControlOrMeta+a').catch(() => {});
-            await this.metricSelectorFieldInput.press('Backspace').catch(() => {});
-            await this.metricSelectorFieldInput.fill(metricName);
-        }
-
-        const option = this.getMetricSelectorOptionByValue(metricName);
-        if (await option.isVisible({ timeout: 5000 }).catch(() => false)) {
-            await option.click();
-            await this.metricSelectorPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Get the currently selected metric from MetricSelector
-     */
-    async getBuilderMetricValue() {
-        if (await this.metricSelectorFieldInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-            return await this.metricSelectorFieldInput.inputValue().catch(() => '');
-        }
-        return await this.metricSelectorEl.textContent().catch(() => '');
     }
 
     /**

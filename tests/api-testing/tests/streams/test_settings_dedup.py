@@ -24,6 +24,9 @@ import random
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Edits the FTS/index settings of the shared seed stream that concurrent search tests query.
+pytestmark = pytest.mark.serial
+
 ORG_ID = os.environ.get("TEST_ORG_ID", "default")
 STREAM_NAME = "stream_pytest_data"  # Reuses the seed data stream from conftest
 STREAM_TYPE = "logs"

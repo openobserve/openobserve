@@ -1457,6 +1457,7 @@ pub(super) mod tests {
             Run {
                 panels,
                 variables: vec![PublicVariable {
+                    name: "svc".into(),
                     label: "svc".into(),
                     value: json!("checkout"),
                     tab_id: None,
@@ -1952,7 +1953,12 @@ pub(super) mod tests {
         settle(flights).await;
         assert_eq!(header(&link, &rel(3600)).await, before);
         *engine.trial.lock().unwrap() = Some(false);
-        data(&read_at(engine, flights, &link, &dash, rel(3600), now + 6 * MIN).await);
+        // The rebuild this read starts may evict the file before the read fetches its body.
+        let served = read_at(engine, flights, &link, &dash, rel(3600), now + 6 * MIN).await;
+        assert!(
+            matches!(served, Served::Data { .. } | Served::Gone),
+            "{served:?}"
+        );
         settle(flights).await;
         let key = store::key(&link.org_id, &link.id, "r3600");
         assert!(store::read_header(&key).await.is_none());

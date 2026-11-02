@@ -580,6 +580,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Drops the relative Seconds unit, for a caller that accepts only whole minutes. */
+    hideSeconds: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   emits: ["on:date-change", "on:timezone-change", "hide", "show"],
@@ -678,16 +683,9 @@ export default defineComponent({
       { label: t("common.days"), value: "d" },
       { label: t("common.weeks"), value: "w" },
       { label: t("common.months"), value: "M" },
-    ];
+    ].filter((period) => !props.hideSeconds || period.value !== "s");
 
-    let relativePeriodsSelect = ref([
-      { label: t("common.seconds"), value: "s" },
-      { label: t("common.minutes"), value: "m" },
-      { label: t("common.hours"), value: "h" },
-      { label: t("common.days"), value: "d" },
-      { label: t("common.weeks"), value: "w" },
-      { label: t("common.months"), value: "M" },
-    ]);
+    let relativePeriodsSelect = ref([...relativePeriods]);
 
     const relativeDates: Record<string, number[]> = {
       s: [1, 5, 10, 15, 30, 45],

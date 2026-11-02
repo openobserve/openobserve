@@ -20,6 +20,7 @@ import {
   decodeMetricsConfig,
   applyMetricsBlob,
   applyDeepLinkOverrides,
+  legacyLinkToVisualizeQuery,
   METRICS_BLOB_VERSION,
 } from "./metricsUrlState";
 import { b64EncodeUnicode, b64DecodeUnicodeSafe } from "@/utils/zincutils";
@@ -378,5 +379,86 @@ describe("metricsUrlState · real alerts deep-link URL", () => {
 
   it("triggers auto-run on load (an inbound override param is present)", () => {
     expect(hasAnyDeepLinkParam(query, METRICS_PARAMS)).toBe(true);
+  });
+});
+
+describe("metricsUrlState · legacyLinkToVisualizeQuery", () => {
+  const blobOf = (query: Record<string, any>) =>
+    decodeMetricsConfig(legacyLinkToVisualizeQuery(query).metrics_data)!.data;
+
+  it("builds a line PromQL panel from a bare query link, keeping org and time", () => {
+    const query = {
+      org_identifier: "o",
+      from: "1",
+      to: "2",
+      query: b64EncodeUnicode("rate(up[5m])"),
+      query_type: "promql",
+    };
+    const out = legacyLinkToVisualizeQuery(query);
+    expect(Object.keys(out).sort()).toEqual([
+      "from",
+      "metrics_data",
+      "mode",
+      "org_identifier",
+      "to",
+    ]);
+    expect(out.mode).toBe("visualize");
+    const data = blobOf(query);
+    expect(data.type).toBe("line");
+    expect(data.queryType).toBe("promql");
+    expect(data.queries).toHaveLength(1);
+    expect(data.queries[0].query).toBe("rate(up[5m])");
+    expect(data.queries[0].customQuery).toBe(true);
+  });
+
+  it("maps the legacy `stream` alias and indexed queries onto their own slots", () => {
+    const data = blobOf({
+      stream: "cpu",
+      query: b64EncodeUnicode("a"),
+      "query.1": b64EncodeUnicode("b"),
+      chart_type: "bar",
+    });
+    expect(data.type).toBe("bar");
+    expect(data.queries.map((q: any) => q.query)).toEqual(["a", "b"]);
+    expect(data.queries[0].fields.stream).toBe("cpu");
+    expect(data.queries[1].fields.stream_type).toBe("metrics");
+  });
+
+  it("lays override params over a carried blob", () => {
+    const base = makePanel();
+    const blob = encodeMetricsConfig(getMetricsConfig(base));
+    const data = blobOf({ metrics_data: blob, chart_type: "area" });
+    expect(data.type).toBe("area");
+    expect(data.queries[0].query).toBe("rate(cpu[5m])");
+  });
+
+  // An empty stream is auto-filled after the first run, which flags the landed chart as not up to date.
+  it.each([
+    ["up", "up"],
+    ["sum(rate(http_requests_total[5m]))", "http_requests_total"],
+    [
+      'sum by (job) (rate({__name__="node_cpu_seconds_total",mode="idle"}[5m]))',
+      "node_cpu_seconds_total",
+    ],
+  ])("names the stream after the first metric %s selects", (promql, stream) => {
+    const fields = blobOf({ query: b64EncodeUnicode(promql) }).queries[0].fields;
+    expect(fields.stream).toBe(stream);
+    expect(fields.stream_type).toBe("metrics");
+  });
+
+  it("leaves the stream empty for a query that selects no metric", () => {
+    const data = blobOf({ query: b64EncodeUnicode("vector(1) + scalar(time()) * 2") });
+    expect(data.queries[0].fields.stream).toBe("");
+  });
+
+  it("keeps a stream the link already carries", () => {
+    const data = blobOf({ stream: "cpu", query: b64EncodeUnicode("rate(other_metric[5m])") });
+    expect(data.queries[0].fields.stream).toBe("cpu");
+  });
+
+  it("keeps a stream-only link in builder mode", () => {
+    const data = blobOf({ stream_name: "cpu" });
+    expect(data.queries[0].fields.stream).toBe("cpu");
+    expect(data.queries[0].customQuery).toBe(false);
   });
 });

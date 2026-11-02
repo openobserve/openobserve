@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent } from "vue";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, enableAutoUnmount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -8,6 +8,9 @@ import { queryClient } from "@/composables/query/queryClient";
 
 // Every test here mounts the whole role editor, which runs ~5x slower on CI than locally — the 5s default times out.
 vi.setConfig({ testTimeout: 20000 });
+
+// Every mount shares one router, store and query client, so a wrapper left mounted keeps reacting and slows each later test.
+enableAutoUnmount(afterEach);
 
 // Mock toast so we can assert notification calls
 const mockToast = vi.fn();
@@ -57,12 +60,21 @@ const ctl = vi.hoisted(() => ({
   // Mutable so a spec can shrink the org's metric streams (the zero-match case).
   metricStreams: null,
   logStreams: null,
+  // Every stream list the page reads, in order, so a test can tell an eager load from a lazy one.
+  streamCalls: [],
+  // Set to a pending promise to hold every stream list, so a test can act while a preset is still staging.
+  streamGate: null,
+  // Stream types whose list read fails, as a 403 or a dropped request would.
+  failStreamTypes: [],
 }));
 
 // Mock composable useStreams
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: vi.fn(async (type) => {
+      ctl.streamCalls.push(type);
+      await ctl.streamGate;
+      if (ctl.failStreamTypes.includes(type)) throw new Error("403");
       const map = {
         logs: { list: ctl.logStreams ?? [{ name: "app" }, { name: "sys" }] },
         metrics: {
@@ -625,6 +637,9 @@ beforeEach(() => {
   ctl.resources = RESOURCE_CATALOG;
   ctl.metricStreams = null;
   ctl.logStreams = null;
+  ctl.streamCalls = [];
+  ctl.streamGate = null;
+  ctl.failStreamTypes = [];
   router.currentRoute.value.query = {};
 });
 
@@ -922,8 +937,10 @@ describe("EditRole - save and cancel", () => {
     await wrapper.vm.saveRole();
     await flushPromises();
 
-    // toast is called with variant: "success" after a successful update
-    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "success",
+      message: "Saved 1 change in 1 module.",
+    });
     expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
   });
 });
@@ -3649,5 +3666,411 @@ describe("EditRole - all modules", () => {
       "traces",
     ]);
     expect(wrapper.find('[data-test^="edit-role-module-pane-bulk-"]').exists()).toBe(false);
+  });
+});
+
+describe("EditRole - Review Changes footer", () => {
+  const reviewButton = (wrapper) => wrapper.find('[data-test="edit-role-review-changes-btn"]');
+
+  it("disables Review Changes with no change and nothing missing", async () => {
+    const wrapper = await mountEditRole();
+
+    expect(reviewButton(wrapper).attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="edit-role-unsaved-count"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="edit-role-review-missing-icon"]').exists()).toBe(false);
+  });
+
+  it("counts the staged changes on the badge", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+    await flushPromises();
+
+    expect(reviewButton(wrapper).attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="edit-role-unsaved-count"]').text()).toBe("1");
+  });
+
+  // A saved dashboard folder with no stream grant cannot load panels, so the role is flagged with nothing staged.
+  it("enables Review Changes with a warning when a module is missing and nothing is staged", async () => {
+    const wrapper = await mountWithSaved([{ object: "dfolder:f1", permission: "AllowGet" }]);
+    await flushPromises();
+
+    expect(reviewButton(wrapper).attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="edit-role-review-missing-icon"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="edit-role-unsaved-count"]').exists()).toBe(false);
+    expect(
+      wrapper
+        .findAllComponents({ name: "OTooltip" })
+        .some(
+          (tooltip) =>
+            tooltip.props("content") ===
+            i18n.global.t("iam.editRole.reviewMissingTooltip", { count: 1 }, 1),
+        ),
+    ).toBe(true);
+  });
+
+  // A missing module is advice, not an edit, so it must not hold the user on the page.
+  it("does not count a missing module as unsaved", async () => {
+    const wrapper = await mountWithSaved([{ object: "dfolder:f1", permission: "AllowGet" }]);
+
+    expect(wrapper.vm.companionGaps.length).toBe(1);
+    expect(wrapper.vm.isAnyDirty).toBe(false);
+  });
+});
+
+describe("EditRole - review drawer wiring", () => {
+  const drawer = (wrapper) => wrapper.findComponent({ name: "UnsavedChangesDrawer" });
+
+  it("hands the drawer the grouped changes and the missing modules", async () => {
+    const wrapper = await mountWithSaved([{ object: "dfolder:f1", permission: "AllowGet" }]);
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+    await flushPromises();
+
+    expect(
+      drawer(wrapper)
+        .props("groups")
+        .map((group) => group.key),
+    ).toEqual(["stream"]);
+    expect(
+      drawer(wrapper)
+        .props("gaps")
+        .map((gap) => gap.module),
+    ).toEqual(["stream"]);
+  });
+
+  // Toggle revokes a held key, so a second Add must not take the grant back off.
+  it("adds a companion grant once, however often Add is clicked", async () => {
+    const wrapper = await mountEditRole();
+    const key = `stream:${ALL}:AllowList`;
+
+    drawer(wrapper).vm.$emit("add", [key]);
+    drawer(wrapper).vm.$emit("add", [key]);
+    await flushPromises();
+
+    expect([...wrapper.vm.selectedPermissionsHash]).toEqual([key]);
+    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([key]);
+  });
+
+  it("restores a grant staged for removal rather than adding it twice", async () => {
+    const key = `stream:${ALL}:AllowList`;
+    const wrapper = await mountWithSaved([{ object: `stream:${ALL}`, permission: "AllowList" }]);
+    wrapper.vm.updatePermissionMappings(key);
+
+    drawer(wrapper).vm.$emit("add", [key]);
+    await flushPromises();
+
+    expect(wrapper.vm.removedPermissions).toEqual({});
+    expect(wrapper.vm.addedPermissions).toEqual({});
+    expect(wrapper.vm.selectedPermissionsHash.has(key)).toBe(true);
+  });
+
+  it("closes the drawer and opens the module for Open Streams", async () => {
+    const wrapper = await mountWithSaved([{ object: "dfolder:f1", permission: "AllowGet" }]);
+    wrapper.vm.activeTab = "users";
+    wrapper.vm.unsavedDrawerOpen = true;
+
+    drawer(wrapper).vm.$emit("open-module", "stream");
+    await flushPromises();
+
+    expect(wrapper.vm.unsavedDrawerOpen).toBe(false);
+    expect(wrapper.vm.activeTab).toBe("permissions");
+    expect(wrapper.vm.activeModule).toBe("stream");
+  });
+
+  it("keeps the drawer open after Undo All while a module is still missing", async () => {
+    const wrapper = await mountWithSaved([{ object: "dfolder:f1", permission: "AllowGet" }]);
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+    wrapper.vm.unsavedDrawerOpen = true;
+    await flushPromises();
+
+    drawer(wrapper).vm.$emit("undo", ["logs:app:AllowGet"]);
+    await flushPromises();
+
+    expect(wrapper.vm.pendingChanges).toEqual([]);
+    expect(wrapper.vm.unsavedDrawerOpen).toBe(true);
+  });
+
+  it("saves through the page's save path and closes the drawer", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    vi.mocked(updateRole).mockClear();
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+    wrapper.vm.unsavedDrawerOpen = true;
+
+    drawer(wrapper).vm.$emit("save");
+    await flushPromises();
+
+    expect(wrapper.vm.unsavedDrawerOpen).toBe(false);
+    expect(vi.mocked(updateRole).mock.calls[0][0].payload.add).toEqual([
+      { object: "logs:app", permission: "AllowGet" },
+    ]);
+  });
+});
+
+describe("EditRole - save toast", () => {
+  useNavigationFixture();
+
+  const toastAfterSave = async (vm) => {
+    mockToast.mockClear();
+    await vm.saveRole();
+    await flushPromises();
+    return mockToast.mock.calls.map(([arg]) => arg);
+  };
+
+  it("names the changes and modules a save touched", async () => {
+    const vm = await mountEditRoleVm();
+    withSaved(vm, ["dfolder:f1:AllowGet"]);
+    vm.updatePermissionMappings("logs:app:AllowGet");
+    vm.updatePermissionMappings("metrics:cpu:AllowGet");
+    vm.updatePermissionMappings("dfolder:f1:AllowGet");
+
+    expect(await toastAfterSave(vm)).toEqual([
+      { variant: "success", message: "Saved 3 changes in 2 modules." },
+    ]);
+  });
+
+  it("keeps the plain success message for a members-only save", async () => {
+    const vm = await mountEditRoleVm();
+    vm.addedUsers.add("new@example.com");
+
+    expect(await toastAfterSave(vm)).toEqual([
+      { variant: "success", message: i18n.global.t("iam.editRole.updateSuccess") },
+    ]);
+  });
+});
+
+describe("EditRole - presets panel wiring", () => {
+  it("announces a preset added from the panel", async () => {
+    const wrapper = await mountEditRole();
+    mockToast.mockClear();
+
+    wrapper.findComponent({ name: "RoleSummary" }).vm.$emit("preset", "readonly");
+    await flushPromises();
+
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "success",
+        message: expect.stringContaining(i18n.global.t("iam.editRole.presetReadonlyTitle")),
+      }),
+    );
+  });
+
+  it("hands the panel the presets and a preview of each", async () => {
+    const wrapper = await mountEditRole();
+    const summary = wrapper.findComponent({ name: "RoleSummary" });
+
+    expect(summary.props("presets").map((preset) => preset.id)).toContain("readonly");
+    expect(summary.props("previewPreset")("readonly").status).toBe("ready");
+    expect(summary.props("applying")).toBe(false);
+  });
+
+  // Opening a module unmounts the overview, so only the page can remember the closed panel.
+  it("keeps the panel closed after a module is opened and left", async () => {
+    const wrapper = await mountEditRole();
+    await wrapper.find('[data-test="edit-role-presets-close"]').trigger("click");
+
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "RoleSummary" }).exists()).toBe(false);
+
+    wrapper.vm.activeModule = "";
+    await flushPromises();
+    expect(wrapper.find('[data-test="edit-role-presets-panel"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="edit-role-presets-open"]').exists()).toBe(true);
+  });
+
+  it("starts with the panel open on a fresh visit after it was closed", async () => {
+    const earlier = await mountEditRole();
+    await earlier.find('[data-test="edit-role-presets-close"]').trigger("click");
+    earlier.unmount();
+
+    const wrapper = await mountEditRole();
+
+    expect(wrapper.find('[data-test="edit-role-presets-panel"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="edit-role-presets-open"]').exists()).toBe(false);
+  });
+});
+
+describe("EditRole - presets panel stream lists", () => {
+  // Every visit would otherwise fetch the metrics and logs lists just to count the stream presets.
+  it("reads no stream list when the page opens", async () => {
+    await mountEditRole();
+    await flushPromises();
+
+    expect(ctl.streamCalls).toEqual([]);
+  });
+
+  it("reads the metrics and logs lists once the panel asks for them", async () => {
+    const wrapper = await mountEditRole();
+    await flushPromises();
+
+    wrapper.findComponent({ name: "RoleSummary" }).vm.$emit("load-streams");
+    await flushPromises();
+
+    expect([...new Set(ctl.streamCalls)].sort()).toEqual(["logs", "metrics"]);
+    expect(wrapper.vm.previewPreset("dbm").status).toBe("ready");
+  });
+});
+
+describe("EditRole - preset stream rows follow the latest read", () => {
+  // Called directly: RoleSummary, which relays the panel's request, is hidden while a module is open.
+  const loadStreams = async (wrapper) => {
+    await wrapper.vm.loadPresetStreams();
+    await flushPromises();
+  };
+
+  it("rebuilds the metrics rows when Retry succeeds after a failed refresh", async () => {
+    ctl.metricStreams = [{ name: "cpu" }];
+    const wrapper = await mountEditRole();
+    await loadStreams(wrapper);
+    expect(wrapper.vm.previewPreset("dbm").noMatchingStreams).toBe(true);
+
+    ctl.metricStreams = [{ name: "cpu" }, { name: "postgresql_backends" }];
+    ctl.failStreamTypes = ["metrics"];
+    await loadStreams(wrapper);
+    expect(wrapper.vm.previewPreset("dbm").status).toBe("failed");
+
+    ctl.failStreamTypes = [];
+    await loadStreams(wrapper);
+    expect(wrapper.vm.previewPreset("dbm").adds).toContain("metrics:postgresql_backends:AllowGet");
+  });
+
+  it("rebuilds rows the Metrics module loaded earlier on the first preset lookup", async () => {
+    ctl.metricStreams = [{ name: "cpu" }];
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+    const metrics = wrapper.vm.activeModuleView.entities.find((row) => row.name === "metrics");
+    await wrapper.vm.getResourceEntities(metrics);
+    expect(metrics.entities.map((row) => row.name)).toEqual(["cpu"]);
+
+    ctl.metricStreams = [{ name: "cpu" }, { name: "postgresql_backends" }];
+    await loadStreams(wrapper);
+
+    expect(wrapper.vm.previewPreset("dbm").adds).toContain("metrics:postgresql_backends:AllowGet");
+  });
+});
+
+describe("EditRole - save while a preset is staging", () => {
+  // DBM waits on the metrics list; a save built before it lands would commit its grants unsent.
+  it("sends the preset's grants when Save is clicked mid-apply", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    vi.mocked(updateRole).mockClear();
+
+    const applying = wrapper.vm.applyPreset("dbm");
+    expect(wrapper.vm.applyingPreset).toBe(true);
+    const saving = wrapper.vm.saveRole();
+    await Promise.all([applying, saving]);
+    await flushPromises();
+
+    expect(vi.mocked(updateRole)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(updateRole).mock.calls[0][0].payload.add).toEqual(
+      expect.arrayContaining([{ object: "metrics:postgresql_backends", permission: "AllowGet" }]),
+    );
+    expect(wrapper.vm.addedPermissions).toEqual({});
+  });
+
+  // JSON would snapshot the grants before the preset lands, and Save would then stage that stale snapshot over them.
+  it("holds the Table and JSON switch until the preset lands, then saves its grants", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    const viewSwitch = () => wrapper.findComponent({ name: "PermissionsViewSwitch" });
+    let release;
+    ctl.streamGate = new Promise((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(updateRole).mockClear();
+
+    const applying = wrapper.vm.applyPreset("dbm");
+    await flushPromises();
+    expect(wrapper.vm.applyingPreset).toBe(true);
+    expect(viewSwitch().props("disabled")).toBe(true);
+    viewSwitch().vm.$emit("update:modelValue", "json");
+    await flushPromises();
+    expect(wrapper.vm.permissionsUiType).toBe("table");
+
+    const saving = wrapper.vm.saveRole();
+    release();
+    await Promise.all([applying, saving]);
+    await flushPromises();
+
+    expect(vi.mocked(updateRole)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(updateRole).mock.calls[0][0].payload.add).toEqual(
+      expect.arrayContaining([{ object: "metrics:postgresql_backends", permission: "AllowGet" }]),
+    );
+    expect(viewSwitch().props("disabled")).toBe(false);
+  });
+
+  it("holds preset Add off while a save is in flight", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    const summary = () => wrapper.findComponent({ name: "RoleSummary" });
+    let finish;
+    vi.mocked(updateRole).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+
+    const saving = wrapper.vm.saveRole();
+    await flushPromises();
+    expect(summary().props("applying")).toBe(true);
+
+    finish({ data: { code: 200 } });
+    await saving;
+    await flushPromises();
+    expect(summary().props("applying")).toBe(false);
+  });
+});
+
+describe("EditRole - nothing stages while a save is in flight", () => {
+  // The payload is built before the PUT, so a key staged after it would be committed as saved unsent.
+  it("ignores Add All, Undo, pane clicks and a view switch until the PUT settles", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    const drawer = () => wrapper.findComponent({ name: "UnsavedChangesDrawer" });
+    const pane = () => wrapper.findComponent({ name: "ModulePane" });
+    const sent = `afolder:${ALL}:AllowAll`;
+    const streamsList = `stream:${ALL}:AllowList`;
+    let finish;
+    vi.mocked(updateRole).mockClear();
+    vi.mocked(updateRole).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+    const metrics = wrapper.vm.activeModuleView.entities.find((row) => row.name === "metrics");
+    wrapper.vm.updatePermissionMappings(sent);
+
+    const saving = wrapper.vm.saveRole();
+    await flushPromises();
+    expect(drawer().props("saving")).toBe(true);
+    drawer().vm.$emit("add", [streamsList, `destination:${ALL}:AllowList`]);
+    drawer().vm.$emit("undo", [sent]);
+    pane().vm.$emit("change", { row: metrics, permission: "AllowList", newValue: true });
+    wrapper.findComponent({ name: "PermissionsViewSwitch" }).vm.$emit("update:modelValue", "json");
+    await flushPromises();
+
+    finish({ data: { code: 200 } });
+    await saving;
+    await flushPromises();
+
+    expect(vi.mocked(updateRole)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(updateRole).mock.calls[0][0].payload.add).toEqual([
+      { object: `afolder:${ALL}`, permission: "AllowAll" },
+    ]);
+    expect([...wrapper.vm.selectedPermissionsHash]).toEqual([sent]);
+    expect(wrapper.vm.addedPermissions).toEqual({});
+    expect(wrapper.vm.removedPermissions).toEqual({});
+    expect(wrapper.vm.permissionsUiType).toBe("table");
+
+    drawer().vm.$emit("add", [streamsList]);
+    expect(drawer().props("saving")).toBe(false);
+    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([streamsList]);
   });
 });

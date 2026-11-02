@@ -987,8 +987,59 @@ describe("OTable", () => {
       });
       const all = wrapper.find('[data-test="o2-table-select-all"] [role="checkbox"]');
       expect(all.attributes("aria-label")).toBe("Select all rows");
-      const row = wrapper.find('[data-test="o2-table-select-0"] [role="checkbox"]');
-      expect(row.attributes("aria-label")).toMatch(/^Select row /);
+      const labels = wrapper
+        .findAll('[data-test="o2-table-select-cell"] [role="checkbox"]')
+        .map((c) => c.attributes("aria-label"));
+      expect(labels).toEqual([
+        "Select row 1, User 1",
+        "Select row 2, User 2",
+        "Select row 3, User 3",
+      ]);
+    });
+
+    it("keeps rows that share a title apart by their position", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: [
+            { priority: 2, title: "Disk full" },
+            { priority: 2, title: "Disk full" },
+            { priority: 3, title: "CPU high" },
+          ],
+          columns: [
+            { id: "priority", header: "Priority", accessorKey: "priority" },
+            { id: "title", header: "Title", accessorKey: "title" },
+          ],
+          selection: "multiple",
+        },
+      });
+      const labels = wrapper
+        .findAll('[data-test="o2-table-select-cell"] [role="checkbox"]')
+        .map((c) => c.attributes("aria-label"));
+      expect(labels).toEqual([
+        "Select row 1, Disk full",
+        "Select row 2, Disk full",
+        "Select row 3, CPU high",
+      ]);
+    });
+
+    it("names a row by position alone when it has no text cell, never by a number cell", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: [
+            { priority: 4, title: "" },
+            { priority: 4, title: "  " },
+          ],
+          columns: [
+            { id: "priority", header: "Priority", accessorKey: "priority" },
+            { id: "title", header: "Title", accessorKey: "title" },
+          ],
+          selection: "multiple",
+        },
+      });
+      const labels = wrapper
+        .findAll('[data-test="o2-table-select-cell"] [role="checkbox"]')
+        .map((c) => c.attributes("aria-label"));
+      expect(labels).toEqual(["Select row 1", "Select row 2"]);
     });
 
     it("does not render checkbox column when selection is none", () => {
@@ -3600,5 +3651,35 @@ describe("OTable sort header button", () => {
     });
     await trigger().trigger("click");
     expect((wrapper.vm as any).table.getState().sorting).toEqual([]);
+  });
+});
+
+describe("OTable row entrance", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("fades the body in when rows replace the loading skeleton", async () => {
+    vi.useFakeTimers();
+    wrapper = mount(OTable, { props: { data: [], columns: makeColumns(), loading: true } });
+    await wrapper.setProps({ data: makeRows(3), loading: false });
+    // The skeleton holds for a minimum time before the body replaces it.
+    await vi.runAllTimersAsync();
+    vi.useRealTimers();
+
+    const body = wrapper.find('[data-test="o2-table-body"]');
+    expect(body.exists()).toBe(true);
+    expect(body.classes()).toContain("motion-safe:animate-in");
+  });
+
+  it("keeps the same body element across a re-sort, so the fade does not replay", async () => {
+    wrapper = mount(OTable, { props: { data: makeRows(3), columns: makeColumns() } });
+    const before = wrapper.find('[data-test="o2-table-body"]').element;
+    await wrapper.setProps({ data: makeRows(3).reverse() });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="o2-table-body"]').element).toBe(before);
   });
 });

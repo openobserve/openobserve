@@ -1804,6 +1804,7 @@ watch(
     teamName.value = "";
     subjectAlert.value = null;
     priorCauses.value = [];
+    firingHistory.value = [];
     report.value = null;
     fetchResponse();
   },

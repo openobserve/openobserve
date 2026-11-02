@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    v-if="!compare"
     class="bg-progress-bar-track relative flex h-5 overflow-hidden rounded-full"
     role="progressbar"
     :aria-valuenow="Math.round(kept * 100)"
@@ -31,12 +32,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rum-analytics-funnel-bar-removed"
     />
   </div>
+  <div v-else class="flex flex-col gap-1">
+    <div
+      class="bg-progress-bar-track relative flex h-3 overflow-hidden rounded-full"
+      role="progressbar"
+      :aria-valuenow="Math.round(kept * 100)"
+      aria-valuemin="0"
+      aria-valuemax="100"
+    >
+      <div class="bg-progress-bar-default h-full rounded-full" :style="{ width: pct(kept) }" />
+      <div
+        v-if="hatched > 0"
+        class="bg-hatch h-full"
+        :style="{ width: pct(hatched) }"
+        data-test="rum-analytics-funnel-bar-removed"
+      />
+    </div>
+    <div
+      class="bg-progress-bar-track flex h-2 overflow-hidden rounded-full"
+      data-test="rum-analytics-funnel-bar-previous"
+    >
+      <div
+        v-if="previous !== null && previous !== undefined"
+        class="bg-hatch-period h-full rounded-full"
+        :style="{ width: pct(clamp01(previous)) }"
+      />
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 
-const props = defineProps<{ value: number; removed: number }>();
+const props = defineProps<{
+  value: number;
+  removed: number;
+  compare?: boolean;
+  previous?: number | null;
+}>();
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, Number.isFinite(n) ? n : 0));
 const kept = computed(() => clamp01(props.value));

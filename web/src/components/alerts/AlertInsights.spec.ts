@@ -107,7 +107,7 @@ async function mountComp(props: Record<string, any> = {}) {
         AlertInsightsContextMenu: {
           template: '<div data-test="context-menu-stub"></div>',
           props: ["x", "y", "value", "panelTitle", "panelId"],
-          emits: ["close", "filter", "configure-dedup", "edit-alert", "view-history"],
+          emits: ["close", "filter", "edit-alert", "view-history"],
         },
       },
     },

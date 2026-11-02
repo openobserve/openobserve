@@ -424,6 +424,33 @@ describe("OnCallScheduleTimeline", () => {
     expect(header).not.toContain("00:00 / 00:00");
   });
 
+  // R11-1 sweep: weekday names come from fixed UTC dates, so a browser west of UTC must not shift them a day.
+  it("names restriction days the same in a browser west of UTC", () => {
+    const before = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      const wrapper = render({
+        rotations: [
+          rotation("Weekend", [
+            {
+              name: "Weekend",
+              members: ["ana@o2.ai"],
+              shift_micros: 7 * MICROS_PER_DAY,
+              anchor_micros: start,
+              restrictions: [{ days: [5, 6], start_minute: 0, end_minute: 1440 }],
+            },
+          ]),
+        ],
+        segments: [seg({ rotation_id: rid("Weekend"), rotation: "Weekend" })],
+      });
+      expect(wrapper.find('[data-test="oncall-lane-cadence-rot_weekend"]').text()).toContain(
+        "Sat–Sun",
+      );
+    } finally {
+      process.env.TZ = before;
+    }
+  });
+
   /// A restriction ending exactly at end-of-day (`end_minute: 1440`) is not
   /// the same thing as one that wraps past midnight (`end_minute: 0`) — the
   /// two must not render identically as "00:00".
@@ -627,7 +654,8 @@ describe("OnCallScheduleTimeline", () => {
       const presets = wrapper.find('[data-test="oncall-timeline-presets"]');
       const cover = wrapper.find('[data-test="oncall-timeline-request-cover"]');
 
-      expect(cover.text()).toBe("Request cover");
+      // S14: one name for the action everywhere.
+      expect(cover.text()).toBe("Cover a shift");
       expect(presets.element.nextElementSibling).toBe(cover.element);
 
       await cover.trigger("click");

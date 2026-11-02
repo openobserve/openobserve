@@ -69,6 +69,7 @@ export async function processPromQLData(
         .filter(Boolean),
       template: panelSchema.queries?.[queryIndexOf(index)]?.config?.promql_legend,
       fallback: legendFallbackOf(panelSchema.queries, queryIndexOf(index)),
+      expr: panelSchema.queries?.[queryIndexOf(index)]?.query,
     })),
     getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );

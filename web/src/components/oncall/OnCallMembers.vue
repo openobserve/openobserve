@@ -134,8 +134,12 @@
           >
             {{ shiftLine(row) }}
           </OTruncatedText>
-          <OTruncatedText v-if="row.rotation" class="text-text-secondary text-xs">
-            {{ row.away ? t("oncall.shiftSkippedWhileAway") : raw(row.rotation) }}
+          <OTruncatedText
+            v-if="row.rotation"
+            class="text-text-secondary text-xs"
+            :data-test="`oncall-members-shift-rotation-${row.id}`"
+          >
+            {{ row.away ? t("oncall.shiftSkippedWhileAway") : raw(shiftRotation(row)) }}
           </OTruncatedText>
         </span>
       </template>
@@ -215,6 +219,10 @@
           <OUserCell v-if="awayEmail" :value="awayEmail" />
         </span>
         <p class="text-text-muted text-sm">{{ t("oncall.awayHint") }}</p>
+        <!-- The times below are the team's clock, said the way the Schedule tab says it. -->
+        <span class="text-text-secondary text-xs" data-test="oncall-members-away-zone">
+          {{ zoneCaption(timezone, localZone, Date.now() * 1000, t) }}
+        </span>
         <div class="flex flex-col gap-1">
           <span class="o-input-label text-sm leading-tight font-semibold">
             {{ t("oncall.awayFrom") }}
@@ -280,10 +288,11 @@
 
     <ConfirmDialog
       :model-value="!!memberToRemove"
-      :title="t('oncall.removeMemberTitle')"
-      message-keypath="oncall.removeMemberMessage"
-      :message-name="memberToRemove?.user_email"
+      :title="removeTitle"
+      :message="removeMessage"
+      :ok-label="t('oncall.removeMemberConfirm')"
       ok-variant="destructive"
+      focus-cancel
       @update:ok="confirmRemoveMember"
       @update:cancel="memberToRemove = null"
     />
@@ -319,7 +328,9 @@ import {
   deleteUnavailabilityMutation,
   removeTeamMemberMutation,
   resolvedScheduleQuery,
+  teamScheduleQuery,
   unavailabilityQuery,
+  whoIsOnCallQuery,
 } from "@/services/oncall.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { orgUsersQuery } from "@/services/users.queries";
@@ -334,7 +345,13 @@ import type {
   Unavailability,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
-import { formatInZone, rotationMembers } from "@/utils/oncall";
+import {
+  formatInZone,
+  fromZonedInputValue,
+  listInLocale,
+  rotationMembers,
+  zoneCaption,
+} from "@/utils/oncall";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -345,6 +362,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 const props = withDefaults(
   defineProps<{
     teamId: string;
+    /** Named in the remove confirm's title. */
+    teamName?: string;
     members: OnCallTeamMember[];
     rotations?: Rotation[];
     timezone: string;
@@ -357,8 +376,7 @@ const props = withDefaults(
     reachability?: TeamReachability | null;
     /** Pages carried per person, for the magnitude bars. */
     load?: TeamLoad | null;
-    testing?: boolean;
-    /** May change on-call configuration. Hides the test-page action when false. */
+    /** May change on-call configuration. Hides the away actions when false. */
     canConfigure?: boolean;
   }>(),
   {
@@ -366,13 +384,12 @@ const props = withDefaults(
     onCallNow: () => [],
     reachability: null,
     load: null,
-    testing: false,
     canConfigure: true,
   },
 );
-const emit = defineEmits<{ changed: []; "open-schedule": []; "test-page": [] }>();
+const emit = defineEmits<{ changed: []; "open-schedule": [] }>();
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 const { noteConfigurationDenied } = useOnCallPermissions();
 
 const store = useStore();
@@ -428,19 +445,30 @@ async function fetchAbsences() {
   }
 }
 
-/// The engine's own answer for the next fortnight, so "next shift" is the
-/// resolved schedule rather than a guess made from rotation order. Silent on
-/// failure: the column falls back to naming the rotation.
+/// The engine's own next fortnight, one read per rotation; on failure the column falls back to naming the rotation.
 async function fetchSegments() {
   try {
     const now = Date.now() * 1000;
-    segments.value = await queryClient.fetchQuery(
-      resolvedScheduleQuery(
-        orgId.value,
-        props.teamId,
-        now,
-        now + SHIFT_HORIZON_DAYS * MICROS_PER_DAY,
+    const rotations = props.rotations ?? [];
+    const answers = await Promise.all(
+      rotations.map((rotation) =>
+        queryClient.fetchQuery(
+          resolvedScheduleQuery(
+            orgId.value,
+            props.teamId,
+            now,
+            now + SHIFT_HORIZON_DAYS * MICROS_PER_DAY,
+            rotation.id,
+          ),
+        ),
       ),
+    );
+    // The primary may answer without echoing its own id.
+    segments.value = answers.flatMap((lane, index) =>
+      lane.map((segment) => ({
+        ...segment,
+        rotation_id: segment.rotation_id || rotations[index].id,
+      })),
     );
   } catch {
     segments.value = [];
@@ -455,14 +483,20 @@ function awayOf(email: string): Unavailability | null {
   return mine[0] ?? null;
 }
 
+// The team's clock, the same one the absence was entered on.
 function awayLabel(absence: Unavailability): I18nText {
   const fmt = (micros: number) =>
-    new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(
-      new Date(micros / 1000),
-    );
+    formatInZone(micros, props.timezone, { day: "numeric", month: "short" });
   return Date.now() * 1000 >= absence.start_at
     ? t("oncall.awayUntil", { date: raw(fmt(absence.end_at)) })
     : t("oncall.awayWindow", { from: raw(fmt(absence.start_at)), to: raw(fmt(absence.end_at)) });
+}
+
+const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+/// The form's date and time read on the team's clock; the Save button stays disabled until both are filled.
+function zonedMicros(date: string, time: string): number {
+  return fromZonedInputValue(`${date}T${time}`, props.timezone) ?? Number.NaN;
 }
 
 function openAway(email: string) {
@@ -480,8 +514,8 @@ async function saveAbsence() {
   try {
     await createAbsenceWrite.mutateAsync({
       user_email: awayEmail.value,
-      start_at: new Date(`${awayFromDate.value}T${awayFromTime.value}`).getTime() * 1000,
-      end_at: new Date(`${awayToDate.value}T${awayToTime.value}`).getTime() * 1000,
+      start_at: zonedMicros(awayFromDate.value, awayFromTime.value),
+      end_at: zonedMicros(awayToDate.value, awayToTime.value),
       ...(awayReason.value.trim() ? { reason: awayReason.value.trim() } : {}),
     });
     awayOpen.value = false;
@@ -647,13 +681,27 @@ function whenLabel(micros: number): string {
   );
 }
 
-function shiftLine(row: MemberRow): I18nText {
-  const mine = segmentsFor(row.user_email);
+/// Their current shift, else their earliest next one, across every rotation.
+function shiftOf(email: string): ResolvedSegment | null {
   const now = Date.now() * 1000;
-  const current = mine.find((s) => s.from <= now && now < s.to);
-  if (current) return t("oncall.shiftNowUntil", { until: raw(whenLabel(current.to)) });
-  const next = mine.find((s) => s.from > now);
-  if (next) return t("oncall.shiftStartsAt", { at: raw(whenLabel(next.from)) });
+  const mine = segmentsFor(email).filter((s) => s.to > now);
+  return mine.find((s) => s.from <= now) ?? mine[0] ?? null;
+}
+
+/// The rotation of the shift the line names, so the two lines of the cell never disagree.
+function shiftRotation(row: MemberRow): string {
+  const shift = shiftOf(row.user_email);
+  const named = props.rotations?.find((rotation) => rotation.id === shift?.rotation_id)?.name;
+  return named ?? row.rotation ?? "";
+}
+
+function shiftLine(row: MemberRow): I18nText {
+  const shift = shiftOf(row.user_email);
+  const now = Date.now() * 1000;
+  if (shift && shift.from <= now) {
+    return t("oncall.shiftNowUntil", { until: raw(whenLabel(shift.to)) });
+  }
+  if (shift) return t("oncall.shiftStartsAt", { at: raw(whenLabel(shift.from)) });
   // No resolved span for them — either the horizon is too short, or the
   // schedule never reaches them. The rotation tells us which.
   if (row.rotation) {
@@ -784,11 +832,13 @@ function addMembers() {
 async function commitMembers(emails: string[]) {
   if (!emails.length) return;
   adding.value = true;
+  const before = props.rotations ?? [];
   try {
     await addMembersWrite.mutateAsync(emails);
     selected.value = [];
     fallbackEmails.value = "";
     emit("changed");
+    await reportPlacement(emails, before);
   } catch (err: any) {
     toast({
       variant: "error",
@@ -799,7 +849,83 @@ async function commitMembers(emails: string[]) {
   }
 }
 
+/// Tells where the added people went, read from the schedule the add rewrote.
+async function reportPlacement(emails: string[], before: Rotation[]) {
+  let after: Rotation[] | null;
+  try {
+    after =
+      (await queryClient.fetchQuery(teamScheduleQuery(orgId.value, props.teamId)))?.rotations ?? [];
+  } catch {
+    after = null;
+  }
+  toast({
+    ...placementMessage(emails, before, after),
+    action: { label: t("oncall.openSchedule"), handler: () => emit("open-schedule") },
+  });
+}
+
+/// A schedule that could not be re-read makes no claim; a person on no rotation is paged by nobody, so that is a warning.
+function placementMessage(emails: string[], before: Rotation[], after: Rotation[] | null) {
+  const names = (list: string[]) => raw(listInLocale(list.map(nameOf), locale.value));
+  if (!after) {
+    return {
+      variant: "success" as const,
+      message: t("oncall.membersAdded", { names: names(emails) }, emails.length),
+    };
+  }
+  const onRotation = (email: string, rotation: Rotation) =>
+    rotationMembers(rotation).some((m) => m.toLowerCase() === email.toLowerCase());
+  const unplaced = emails.filter((email) => !after.some((rotation) => onRotation(email, rotation)));
+  if (unplaced.length) {
+    return {
+      variant: "warning" as const,
+      message: t("oncall.membersNotPlaced", { names: names(unplaced) }, unplaced.length),
+    };
+  }
+  const staffedBefore = new Set(
+    before.filter((rotation) => rotationMembers(rotation).length).map((rotation) => rotation.id),
+  );
+  const joined = after
+    .filter((rotation) => staffedBefore.has(rotation.id))
+    .filter((rotation) => emails.some((email) => onRotation(email, rotation)))
+    .map((rotation) => rotation.name);
+  return {
+    variant: "success" as const,
+    message: joined.length
+      ? t(
+          "oncall.membersJoinEnd",
+          { names: names(emails), rotations: raw(listInLocale(joined, locale.value)) },
+          emails.length,
+        )
+      : t("oncall.membersAdded", { names: names(emails) }, emails.length),
+  };
+}
+
 const memberToRemove = ref<OnCallTeamMember | null>(null);
+
+// The title names who and from where, so the body can spend its words on what happens next.
+const removeTitle = computed<I18nText>(() => {
+  const name = raw(nameOf(memberToRemove.value?.user_email ?? ""));
+  return props.teamName
+    ? t("oncall.removeMemberTitleNamed", { name, team: raw(props.teamName) })
+    : t("oncall.removeMemberTitlePerson", { name });
+});
+
+/// Who takes the shift the removed person holds now. A cover is skipped: it is not the roster handing over.
+const removeMessage = computed<I18nText>(() => {
+  const email = memberToRemove.value?.user_email.toLowerCase();
+  const leaving = raw(nameOf(memberToRemove.value?.user_email ?? ""));
+  const handovers = props.onCallNow
+    .filter((position) => position.user_email.toLowerCase() === email && !position.override_id)
+    .map((position) => {
+      const next = position.next_user_email;
+      const rotation = raw(position.rotation_name);
+      return next && next.toLowerCase() !== email
+        ? t("oncall.removeMemberHandsOver", { name: raw(nameOf(next)), leaving, rotation })
+        : t("oncall.removeMemberLeavesGap", { leaving, rotation });
+    });
+  return raw([t("oncall.removeMemberBody"), ...handovers].join(" "));
+});
 
 async function confirmRemoveMember() {
   const member = memberToRemove.value;
@@ -808,6 +934,7 @@ async function confirmRemoveMember() {
   try {
     await removeMemberWrite.mutateAsync(member.user_email);
     emit("changed");
+    await reportOnCallAfterRemove(member.user_email);
   } catch (err: any) {
     toast({
       variant: "error",
@@ -816,8 +943,41 @@ async function confirmRemoveMember() {
   }
 }
 
+/// Who holds each rotation now, read back after the remove: the confirm's prediction cannot see a second rotation's handover.
+async function reportOnCallAfterRemove(email: string) {
+  const name = raw(nameOf(email));
+  let positions: OnCallPosition[];
+  try {
+    positions = await queryClient.fetchQuery(whoIsOnCallQuery(orgId.value, props.teamId));
+  } catch {
+    toast({ variant: "success", message: t("oncall.memberRemoved", { name }) });
+    return;
+  }
+  if (!positions.length) {
+    toast({ variant: "warning", message: t("oncall.memberRemovedNobody", { name }) });
+    return;
+  }
+  const holders = positions
+    .map((position) => `${nameOf(position.user_email)} (${position.rotation_name})`)
+    .join(", ");
+  const held = new Set(positions.map((position) => position.rotation_id));
+  const empty = (props.rotations ?? [])
+    .filter((rotation) => !held.has(rotation.id))
+    .map((rotation) => rotation.name);
+  const onCall = t("oncall.memberRemovedOnCall", { name, holders: raw(holders) });
+  if (!empty.length) {
+    toast({ variant: "success", message: onCall });
+    return;
+  }
+  // A rotation the remove left empty pages nobody, which is the part worth a warning.
+  const gap = t("oncall.memberRemovedGap", { rotations: raw(listInLocale(empty, locale.value)) });
+  toast({ variant: "warning", message: raw(`${onCall} ${gap}`) });
+}
+
 // A team switched under the tab is a different roster and a different schedule.
 watch(() => props.teamId, fetchSegments);
+// Contents, not ids: a roster edit keeps every id and still moves who is next.
+watch(() => JSON.stringify(props.rotations ?? []), fetchSegments);
 
 onMounted(() => {
   fetchOrgUsers();

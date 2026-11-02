@@ -269,6 +269,17 @@ pub async fn count<C: ConnectionTrait>(
     org_id: &str,
     params: &ListSyntheticsParams,
 ) -> Result<u64, errors::Error> {
+    if has_json_filters(params) {
+        // location/tag live in JSON text columns: filter in Rust so count and
+        // page agree.
+        let models = Entity::find()
+            .filter(Column::OrgId.eq(org_id))
+            .apply_filters(params)
+            .order_by_asc(Column::Name)
+            .all(conn)
+            .await?;
+        return Ok(filter_and_paginate(models, params).1);
+    }
     let q = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .apply_filters(params);
@@ -1040,6 +1051,50 @@ async fn get_model<C: ConnectionTrait>(
         .await
 }
 
+fn has_json_filters(params: &ListSyntheticsParams) -> bool {
+    params.location.is_some() || params.tag.is_some()
+}
+
+fn json_array_contains(v: &serde_json::Value, needle: &str) -> bool {
+    v.as_array()
+        .is_some_and(|a| a.iter().any(|x| x.as_str() == Some(needle)))
+}
+
+/// Applies the `location` / `tag` exact-match filters (JSON text columns, so
+/// no DB operators) and then page/page_size over the filtered set. Returns the
+/// requested page and the filtered total; `models` must already be ordered.
+fn filter_and_paginate(
+    models: Vec<synthetics_checks::Model>,
+    params: &ListSyntheticsParams,
+) -> (Vec<synthetics_checks::Model>, u64) {
+    let filtered: Vec<_> = models
+        .into_iter()
+        .filter(|m| {
+            params
+                .location
+                .as_deref()
+                .is_none_or(|l| json_array_contains(&m.locations, l))
+                && params
+                    .tag
+                    .as_deref()
+                    .is_none_or(|t| json_array_contains(&m.tags, t))
+        })
+        .collect();
+    let total = filtered.len() as u64;
+    if let (Some(page_size), Some(page)) = (params.page_size, params.page)
+        && page_size > 0
+    {
+        let start = page.saturating_mul(page_size) as usize;
+        let page_rows = filtered
+            .into_iter()
+            .skip(start)
+            .take(page_size as usize)
+            .collect();
+        return (page_rows, total);
+    }
+    (filtered, total)
+}
+
 async fn list_models<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -1049,6 +1104,11 @@ async fn list_models<C: ConnectionTrait>(
         .filter(Column::OrgId.eq(org_id))
         .apply_filters(params)
         .order_by_asc(Column::Name);
+
+    if has_json_filters(params) {
+        let models = q.all(conn).await?;
+        return Ok(filter_and_paginate(models, params).0);
+    }
 
     if let (Some(page_size), Some(page)) = (params.page_size, params.page)
         && page_size > 0
@@ -1225,6 +1285,63 @@ pub(crate) mod tests {
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
         }
+    }
+
+    #[test]
+    fn filter_and_paginate_combined_filters_and_pages() {
+        let mk = |id: &str, locs: &[&str], tags: &[&str]| {
+            let mut m = make_model();
+            m.id = id.to_string();
+            m.locations = serde_json::json!(locs);
+            m.tags = serde_json::json!(tags);
+            m
+        };
+        let models = vec![
+            mk("a", &["l1"], &["prod"]),
+            mk("b", &["l1", "l2"], &["prod", "x"]),
+            mk("c", &["l2"], &["prod"]),
+            mk("d", &["l1"], &["dev"]),
+            mk("e", &["l1"], &["prod"]),
+        ];
+        let params = |loc: Option<&str>, tag: Option<&str>, page, size| ListSyntheticsParams {
+            location: loc.map(String::from),
+            tag: tag.map(String::from),
+            page,
+            page_size: size,
+            ..Default::default()
+        };
+        // location only
+        let (rows, total) =
+            filter_and_paginate(models.clone(), &params(Some("l2"), None, None, None));
+        assert_eq!((rows.len(), total), (2, 2));
+        // exact match, not substring
+        let (_, total) = filter_and_paginate(models.clone(), &params(Some("l"), None, None, None));
+        assert_eq!(total, 0);
+        // combined
+        let (rows, total) = filter_and_paginate(
+            models.clone(),
+            &params(Some("l1"), Some("prod"), None, None),
+        );
+        assert_eq!(total, 3);
+        assert_eq!(
+            rows.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+            ["a", "b", "e"]
+        );
+        // page boundaries: total stays 3, pages 2 + 1 + empty
+        let (rows, total) = filter_and_paginate(
+            models.clone(),
+            &params(Some("l1"), Some("prod"), Some(0), Some(2)),
+        );
+        assert_eq!((rows.len(), total), (2, 3));
+        let (rows, total) = filter_and_paginate(
+            models.clone(),
+            &params(Some("l1"), Some("prod"), Some(1), Some(2)),
+        );
+        assert_eq!((rows.len(), total), (1, 3));
+        assert_eq!(rows[0].id, "e");
+        let (rows, total) =
+            filter_and_paginate(models, &params(Some("l1"), Some("prod"), Some(2), Some(2)));
+        assert_eq!((rows.len(), total), (0, 3));
     }
 
     #[test]

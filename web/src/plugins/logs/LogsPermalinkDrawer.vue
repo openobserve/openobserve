@@ -44,12 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import DetailTable from "@/plugins/logs/DetailTable.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import { traceDetailsLocation } from "@/composables/useLogs/useViewTraceAction";
 import {
@@ -57,6 +56,9 @@ import {
   searchResultMounts,
   sharedLineRecord,
 } from "@/composables/useLogs/useLogPermalink";
+
+// DetailTable pulls in the trace and correlation views, which must not delay the Logs page load.
+const DetailTable = defineAsyncComponent(() => import("@/plugins/logs/DetailTable.vue"));
 
 const emit = defineEmits<{
   "search-around": [params: { key: unknown; size: number; body: Record<string, unknown> }];

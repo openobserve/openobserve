@@ -31,21 +31,26 @@ use super::entity::{
     status_page_audit_log, status_page_check_snoozes, status_page_component_checks,
     status_page_components, status_page_custom_domains, status_page_notice_components,
     status_page_notice_updates, status_page_notices, status_page_snapshots, status_pages,
-    synthetics_checks,
+    synthetics_checks, synthetics_runs,
 };
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
-/// The three columns the auto-incident engine needs per mapped check —
+/// The columns the auto-incident engine needs per mapped check —
 /// deliberately not the whole row (config/secrets are KB each).
 #[derive(Clone, Debug)]
 pub struct CheckStateRow {
     pub id: String,
+    pub org_id: String,
     pub last_check_status: i32,
     pub consecutive_failures: i32,
     pub last_triggered_at: i64,
+    /// `completed_at` of the check's latest completed run, filled by
+    /// [`latest_run_completions`]; `None` until read or when no run completed
+    /// inside the lookback window.
+    pub last_completed_at: Option<i64>,
 }
 
 pub async fn get_page_by_slug<C: ConnectionTrait>(
@@ -117,6 +122,7 @@ pub async fn get_check_states<C: ConnectionTrait>(
     let mut q = synthetics_checks::Entity::find()
         .select_only()
         .column(synthetics_checks::Column::Id)
+        .column(synthetics_checks::Column::OrgId)
         .column(synthetics_checks::Column::LastCheckStatus)
         .column(synthetics_checks::Column::ConsecutiveFailures)
         .column(synthetics_checks::Column::LastTriggeredAt)
@@ -126,27 +132,73 @@ pub async fn get_check_states<C: ConnectionTrait>(
         q = q.filter(synthetics_checks::Column::UpdatedAt.gt(watermark));
     }
     let rows = q
-        .into_tuple::<(String, i32, i32, i64, i64)>()
+        .into_tuple::<(String, String, i32, i32, i64, i64)>()
         .all(conn)
         .await?;
     let mut max_updated = since.unwrap_or(0);
     let out = rows
         .into_iter()
         .map(
-            |(id, last_check_status, consecutive_failures, last_triggered_at, updated_at)| {
+            |(
+                id,
+                org_id,
+                last_check_status,
+                consecutive_failures,
+                last_triggered_at,
+                updated_at,
+            )| {
                 if updated_at > max_updated {
                     max_updated = updated_at;
                 }
                 CheckStateRow {
                     id,
+                    org_id,
                     last_check_status,
                     consecutive_failures,
                     last_triggered_at,
+                    last_completed_at: None,
                 }
             },
         )
         .collect();
     Ok((out, max_updated))
+}
+
+/// Latest `synthetics_runs.completed_at` per check, for runs scheduled at or
+/// after `scheduled_since`. Keys are check ids; checks with no completed run in
+/// the window are absent.
+///
+/// Region-local like the runs table itself: it sees the runs this region's
+/// scheduler enqueued, which is the region that holds the job-cluster claim and
+/// therefore runs the incident engine. The `org_id` + `synthetics_id` +
+/// `scheduled_ts` predicates match `synthetics_runs_monitor_idx`, so the read
+/// is an index range per mapped check, not a table scan.
+pub async fn latest_run_completions<C: ConnectionTrait>(
+    conn: &C,
+    checks: &[(String, String)],
+    scheduled_since: i64,
+) -> Result<std::collections::HashMap<String, i64>, errors::Error> {
+    if checks.is_empty() {
+        return Ok(Default::default());
+    }
+    let orgs: HashSet<&str> = checks.iter().map(|(o, _)| o.as_str()).collect();
+    let ids: HashSet<&str> = checks.iter().map(|(_, id)| id.as_str()).collect();
+    let rows = synthetics_runs::Entity::find()
+        .select_only()
+        .column(synthetics_runs::Column::SyntheticsId)
+        .column_as(synthetics_runs::Column::CompletedAt.max(), "completed_at")
+        .filter(synthetics_runs::Column::OrgId.is_in(orgs.into_iter().map(str::to_owned)))
+        .filter(synthetics_runs::Column::SyntheticsId.is_in(ids.into_iter().map(str::to_owned)))
+        .filter(synthetics_runs::Column::ScheduledTs.gte(scheduled_since))
+        .filter(synthetics_runs::Column::CompletedAt.is_not_null())
+        .group_by(synthetics_runs::Column::SyntheticsId)
+        .into_tuple::<(String, Option<i64>)>()
+        .all(conn)
+        .await?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|(id, at)| at.map(|at| (id, at)))
+        .collect())
 }
 
 /// Notices the engine and snapshots need: not deleted, and open or resolved

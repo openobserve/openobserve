@@ -137,6 +137,12 @@ const stubs = {
     emits: ["update:ok", "update:cancel", "update:modelValue"],
     template: "<div v-if='modelValue'>{{ title }} {{ message }}</div>",
   },
+  OnCallRemoveRotationDialog: {
+    name: "OnCallRemoveRotationDialog",
+    props: ["open", "rotationId", "rotations", "holders", "policy"],
+    emits: ["confirm", "update:open", "open-policy"],
+    template: "<div v-if='open' />",
+  },
   OEmptyState: { name: "OEmptyState", props: ["description"], template: "<div />" },
   OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
   OCard: { name: "OCard", template: "<div><slot /></div>" },
@@ -696,6 +702,36 @@ describe("OnCallScheduleEditor", () => {
     expect((service.setSchedule.mock.calls[0][0] as any).data.rotations).toHaveLength(1);
   });
 
+  // R11-1: the away line uses the team's clock, like the roster chip (tests pin TZ=UTC).
+  it("dates an away clash in the team's zone", async () => {
+    const from = Date.UTC(2023, 10, 15, 20, 0) * 1000;
+    const to = Date.UTC(2023, 10, 16, 20, 0) * 1000;
+    service.listUnavailability.mockResolvedValue({
+      data: [
+        {
+          id: "u1",
+          org_id: "default",
+          user_email: "ana@o2.ai",
+          start_at: from,
+          end_at: to,
+          created_by: "ana@o2.ai",
+          created_at: 0,
+        },
+      ],
+    } as any);
+    const wrapper = render({ schedule: schedule([rota("Primary")]), timezone: "Asia/Kolkata" });
+    await flushPromises();
+    await openRotation(wrapper);
+
+    const day = (micros: number) =>
+      new Intl.DateTimeFormat(undefined, {
+        day: "numeric",
+        month: "short",
+        timeZone: "Asia/Kolkata",
+      }).format(new Date(micros / 1000));
+    expect(wrapper.text()).toContain(`ana@o2.ai is away ${day(from)} – ${day(to)}.`);
+  });
+
   /// The absence horizon is anchored on the clock, so an unbucketed key would
   /// miss on every open and make a drawer somebody flicks in and out of cost a
   /// request each time.
@@ -731,6 +767,51 @@ describe("OnCallScheduleEditor", () => {
     expect(rows[0].shift_rules[0].members).toEqual(["ana@o2.ai", "bob@o2.ai"]);
   });
 
+  // The row's icon button is named what the drawer button says.
+  it("names the row delete button Delete rotation", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await flushPromises();
+
+    expect(
+      wrapper
+        .find(`[data-test="oncall-schedule-remove-${rota("Primary").id}"]`)
+        .attributes("aria-label"),
+    ).toBe("Delete rotation");
+  });
+
+  // A schedule a human saved is no longer the untouched default, or the server keeps re-adding what they removed.
+  describe("the default-staffing marker", () => {
+    const defaults = () =>
+      schedule([
+        rota("Primary", [], { source: "default" }),
+        rota("Secondary", [], { source: "default" }),
+      ]);
+
+    it("is cleared from every rotation a drawer save writes", async () => {
+      const wrapper = render({ schedule: defaults() });
+      await flushPromises();
+      await openRotation(wrapper);
+      await addPerson(wrapper, 0, "bob@o2.ai");
+      await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+      await flushPromises();
+
+      const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations;
+      expect(sent.map((r: any) => r.source)).toEqual([undefined, undefined]);
+    });
+
+    it("is cleared from what is left when a rotation is deleted", async () => {
+      const wrapper = render({ schedule: defaults() });
+      await flushPromises();
+      await openRotation(wrapper, 1);
+      await wrapper.find('[data-test="oncall-rotation-delete"]').trigger("click");
+      wrapper.findComponent({ name: "OnCallRemoveRotationDialog" }).vm.$emit("confirm");
+      await flushPromises();
+
+      const sent = (service.setSchedule.mock.calls[0][0] as any).data.rotations;
+      expect(sent.map((r: any) => [r.name, r.source])).toEqual([["Primary", undefined]]);
+    });
+  });
+
   // C2: removing saves at once for everyone, so it is confirmed first.
   describe("removing a rotation", () => {
     async function askToRemove() {
@@ -742,27 +823,44 @@ describe("OnCallScheduleEditor", () => {
       return wrapper;
     }
 
+    const removeDialog = (wrapper: any) =>
+      wrapper.findComponent({ name: "OnCallRemoveRotationDialog" });
+
     it("asks first, naming the rotation, and writes nothing on cancel", async () => {
       const wrapper = await askToRemove();
-      const confirm = confirmFor(wrapper, "oncall-rotation-remove-confirm");
-      expect(confirm.text()).toBe("Remove Primary?");
-      expect(confirm.props("messageKeypath")).toBe("oncall.removeRotationMessage");
-      expect(confirm.props("messageName")).toBe("Primary");
-      expect(confirm.props("okVariant")).toBe("destructive");
+      const confirm = removeDialog(wrapper);
+      expect(confirm.props("open")).toBe(true);
+      expect(confirm.props("rotationId")).toBe(rota("Primary").id);
+      // The dialog names rotations and holders itself; it is handed every rotation and who holds each now.
+      expect(confirm.props("rotations").map((r: any) => r.name)).toEqual(["Primary", "Secondary"]);
+      expect(confirm.props("holders")).toEqual([
+        { rotation_id: rota("Primary").id, name: "ana@o2.ai" },
+        { rotation_id: rota("Secondary").id, name: "ana@o2.ai" },
+      ]);
 
-      confirm.vm.$emit("update:modelValue", false);
-      confirm.vm.$emit("update:cancel");
+      confirm.vm.$emit("update:open", false);
       await flushPromises();
 
       expect(service.setSchedule).not.toHaveBeenCalled();
       expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(true);
     });
 
+    // S11: the dialog's link to a hand-edited policy closes this drawer and hands over.
+    it("closes the drawer and asks for the policy when the dialog sends there", async () => {
+      const wrapper = await askToRemove();
+      removeDialog(wrapper).vm.$emit("open-policy");
+      await flushPromises();
+
+      expect(wrapper.emitted("open-policy")).toHaveLength(1);
+      expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(false);
+      expect(service.setSchedule).not.toHaveBeenCalled();
+    });
+
     it("writes the schedule without the rotation once confirmed", async () => {
       const wrapper = await askToRemove();
       expect(service.setSchedule).not.toHaveBeenCalled();
 
-      confirmFor(wrapper, "oncall-rotation-remove-confirm").vm.$emit("update:ok");
+      removeDialog(wrapper).vm.$emit("confirm");
       await flushPromises();
 
       expect(service.setSchedule).toHaveBeenCalledTimes(1);

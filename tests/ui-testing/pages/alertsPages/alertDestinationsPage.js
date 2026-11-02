@@ -619,7 +619,7 @@ export class AlertDestinationsPage {
         // so paginating one-by-one is unreliable. The per-row delete button uses the
         // destination name as part of its data-test, giving us a row anchor without
         // relying on getByRole / getByText.
-        const listSkeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
+        const listSkeleton = this.page.locator('[data-test="o2-table"][data-test-loading="true"]');
         const searchField = this.page.locator(this.destinationListSearchInputField);
         if (await searchField.isVisible({ timeout: 5000 }).catch(() => false)) {
             await searchField.fill('');
@@ -1834,7 +1834,7 @@ export class AlertDestinationsPage {
         // so a transient empty list ("0 of 0") re-fetches and renders the row.
         const searchField = this.page.locator(this.destinationListSearchInputField);
         const rowAnchor = this.getDeleteDestinationBtn(name);
-        const skeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
+        const skeleton = this.page.locator('[data-test="o2-table"][data-test-loading="true"]');
         for (let attempt = 1; attempt <= 5; attempt++) {
             await this.navigateToDestinations();
             await this.page.locator(this.destinationsListTable).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});

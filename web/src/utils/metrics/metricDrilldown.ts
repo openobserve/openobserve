@@ -34,6 +34,7 @@ interface LabelFilterLike {
   label: string;
   value: string;
   operator?: string;
+  group?: number;
 }
 
 interface TimeWindow {
@@ -53,7 +54,13 @@ export const contextToDimensions = (
   const skipped = new Set(inapplicableFilters.map(filterKey));
   const fields: Record<string, string> = {};
   for (const f of filters) {
-    if ((f.operator ?? "=") !== "=" || skipped.has(filterKey(f)) || NEVER_SENT.has(f.label))
+    // An OR group's value holds only for some of the series, so it is no dimension of all of them.
+    if (
+      (f.operator ?? "=") !== "=" ||
+      f.group ||
+      skipped.has(filterKey(f)) ||
+      NEVER_SENT.has(f.label)
+    )
       continue;
     fields[f.label] = f.value;
   }

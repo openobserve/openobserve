@@ -110,7 +110,8 @@
                         {{ t("common.value") }}
                       </div>
                       <OCombobox
-                        v-model="conditionModel.value"
+                        :model-value="conditionModel.value"
+                        @update:model-value="onValueInput"
                         :items="dashboardVariablesFilterItems"
                         search-regex="(?:^|[^$])\$?(\w+)"
                         :placeholder="t('common.enterValueOrVariable')"
@@ -327,6 +328,15 @@ export default defineComponent({
       conditionModel.value.column = {};
     };
 
+    // `emptyLiteral` keeps a `<> ''` that came from SQL. Once the user types a
+    // value, an empty value means "not entered yet" again. Cleared on input, not
+    // by watching the prop: chips are keyed by index, so removing one hands this
+    // component a different condition and a watcher would clear the wrong flag.
+    const onValueInput = (value: any) => {
+      conditionModel.value.value = value;
+      if (conditionModel.value.emptyLiteral) delete conditionModel.value.emptyLiteral;
+    };
+
     watch(
       () => props.condition.column,
       (newColumn, oldColumn) => {
@@ -355,6 +365,7 @@ export default defineComponent({
       emitLogicalOperatorChange,
       handleFieldChange,
       removeColumnName,
+      onValueInput,
       conditionModel,
       filteredSchemaOptions,
       sortedFilteredListOptions: filteredListOptions,

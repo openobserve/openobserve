@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { reactive, nextTick } from "vue";
+import { computed, reactive, nextTick } from "vue";
 
 const spies = vi.hoisted(() => ({
   updateAllKeywords: vi.fn(),
@@ -93,6 +93,7 @@ import DashboardQueryEditor from "@/components/dashboards/addPanel/DashboardQuer
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { RECENT_SEARCHES_EDITOR_HOST } from "@/composables/queryHistory/useRecentSearchesEditorHost";
 
 // Panel pages store Date objects whose getTime() is already in microseconds.
 const MINUTE_US = 60_000_000;
@@ -281,6 +282,47 @@ describe("DashboardQueryEditor completion inputs", () => {
       wrapper = null;
 
       expect(spies.setValuesTimeRange).toHaveBeenLastCalledWith(null);
+    });
+  });
+
+  describe("recent searches from the Metrics page", () => {
+    const QueryEditorStub = {
+      name: "QueryEditor",
+      props: ["recentQueries"],
+      emits: ["focus", "user-edit"],
+      template: "<div />",
+    };
+    const mountWith = (provide: Record<string | symbol, unknown>) =>
+      mount(DashboardQueryEditor, {
+        global: {
+          plugins: [i18n, store, router],
+          provide: { dashboardPanelDataPageKey: "metrics", ...provide },
+          stubs: { QueryTypeSelector: true, QueryEditor: QueryEditorStub },
+        },
+      });
+
+    it("offers the page's recent queries and reports focus and edits", async () => {
+      const host = {
+        queries: computed(() => ["rate(http_requests_total[5m])"]),
+        onFocus: vi.fn(),
+        onEdit: vi.fn(),
+        onKeydown: vi.fn(),
+      };
+      wrapper = mountWith({ [RECENT_SEARCHES_EDITOR_HOST as symbol]: host });
+      await flushPromises();
+      const editor = wrapper.findComponent({ name: "QueryEditor" });
+      expect(editor.props("recentQueries")).toEqual(["rate(http_requests_total[5m])"]);
+
+      editor.vm.$emit("focus");
+      expect(host.onFocus).toHaveBeenCalledWith(expect.any(HTMLElement));
+      editor.vm.$emit("user-edit");
+      expect(host.onEdit).toHaveBeenCalled();
+    });
+
+    it("offers nothing on a dashboard, which provides no host", async () => {
+      wrapper = mountWith({});
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "QueryEditor" }).props("recentQueries")).toEqual([]);
     });
   });
 });

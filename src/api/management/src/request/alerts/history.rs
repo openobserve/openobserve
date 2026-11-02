@@ -42,12 +42,13 @@ use crate::common::{
 };
 
 /// Columns a stream gains only once a row carried them, so [history_columns] adds each one present.
-const OPTIONAL_HISTORY_COLUMNS: [&str; 5] = [
+const OPTIONAL_HISTORY_COLUMNS: [&str; 6] = [
     "downtime_id",
     "acked_by",
     "ack_action",
     "ack_source",
     "taken_over_from",
+    "repeat_suppressed",
 ];
 
 /// Every column the data query reads but [OPTIONAL_HISTORY_COLUMNS].
@@ -144,6 +145,9 @@ pub struct AlertHistoryEntry {
     pub ack_source: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub taken_over_from: Option<String>,
+    /// `suppress_repeats` withheld this run because it repeated the last delivered state.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repeat_suppressed: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -437,6 +441,7 @@ pub async fn get_alert_history(
                     ack_action: None,
                     ack_source: None,
                     taken_over_from: None,
+                    repeat_suppressed: None,
                 }
             })
             .collect();
@@ -845,6 +850,7 @@ pub async fn get_alert_history(
             ack_action: hit_text(&hit, "ack_action"),
             ack_source: hit_text(&hit, "ack_source"),
             taken_over_from: hit_text(&hit, "taken_over_from"),
+            repeat_suppressed: hit.get("repeat_suppressed").and_then(|v| v.as_bool()),
         });
     }
 
@@ -1256,6 +1262,7 @@ mod tests {
             ack_action: None,
             ack_source: None,
             taken_over_from: None,
+            repeat_suppressed: None,
         };
 
         assert_eq!(entry.alert_name, "test_alert");
@@ -1315,6 +1322,7 @@ mod tests {
             ack_action: None,
             ack_source: None,
             taken_over_from: None,
+            repeat_suppressed: None,
         };
 
         let response = AlertHistoryResponse {
@@ -1363,6 +1371,7 @@ mod tests {
             ack_action: None,
             ack_source: None,
             taken_over_from: None,
+            repeat_suppressed: None,
         };
 
         assert_eq!(entry.status, "error");
@@ -1593,6 +1602,7 @@ mod tests {
             ack_action: None,
             ack_source: None,
             taken_over_from: None,
+            repeat_suppressed: None,
         };
 
         let json = serde_json::to_string(&entry).unwrap();
@@ -1637,6 +1647,7 @@ mod tests {
             ack_action: None,
             ack_source: None,
             taken_over_from: None,
+            repeat_suppressed: None,
         };
 
         let response = AlertHistoryResponse {
@@ -1688,6 +1699,7 @@ mod tests {
             ack_action: None,
             ack_source: None,
             taken_over_from: None,
+            repeat_suppressed: None,
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();
@@ -1729,6 +1741,7 @@ mod tests {
             ack_action: None,
             ack_source: None,
             taken_over_from: None,
+            repeat_suppressed: None,
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();
@@ -1825,5 +1838,18 @@ mod tests {
         let hit = serde_json::json!({"acked_by": "dana@acme.com", "ack_action": ""});
         assert_eq!(hit_text(&hit, "acked_by").as_deref(), Some("dana@acme.com"));
         assert_eq!(hit_text(&hit, "ack_action"), None);
+    }
+
+    #[test]
+    fn the_repeat_suppressed_column_is_read_once_the_stream_has_it() {
+        use arrow_schema::{DataType, Field};
+
+        let mut fields: Vec<Field> = HISTORY_COLUMNS
+            .split(", ")
+            .map(|name| Field::new(name, DataType::Utf8, true))
+            .collect();
+        assert!(!history_columns(&Schema::new(fields.clone())).contains("repeat_suppressed"));
+        fields.push(Field::new("repeat_suppressed", DataType::Boolean, true));
+        assert!(history_columns(&Schema::new(fields)).ends_with(", repeat_suppressed"));
     }
 }

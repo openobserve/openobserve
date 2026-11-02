@@ -42,6 +42,8 @@ class OpenObserveClient:
         self.org = org
         self.timeout = timeout
         self.session = requests.Session()
+        # Reused keep-alive sockets can already be closed by the server; a fresh one per request avoids that race.
+        self.session.headers["Connection"] = "close"
         auth_b64 = base64.b64encode(f"{self.email}:{self.password}".encode()).decode()
         self.session.headers["Authorization"] = f"Basic {auth_b64}"
 

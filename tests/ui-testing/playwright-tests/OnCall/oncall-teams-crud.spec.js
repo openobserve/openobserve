@@ -112,6 +112,11 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     await pm.oncallTeamsPage.goto(ORG);
     await pm.oncallTeamsPage.createTeam({ name, description: 'created by e2e' });
 
+    // A created team opens straight away; the list is one step back.
+    await expect(page, 'create must open the new team')
+      .toHaveURL(/\/oncall\/teams\/[^/?]+/, { timeout: 30000 });
+    await pm.oncallTeamsPage.goto(ORG);
+
     // Row selectors carry the team ID, not its name, so the id has to come from
     // the server rather than from what was typed.
     await pm.oncallTeamsPage.search(name);
@@ -484,11 +489,11 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     const name = uniqueName(`${workerPrefix(testInfo)}_live`);
     const users = await createOrgUsers(page, name, 2);
     const team = await createTeam(page, { name, timezone: 'UTC' });
+    await addTeamMembers(page, team.id, users);
     await setTeamSchedule(page, team.id, {
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: users })],
     });
-    await addTeamMembers(page, team.id, users);
 
     const stream = `${name}_stream`;
     await seedOnCallStream(page, stream);

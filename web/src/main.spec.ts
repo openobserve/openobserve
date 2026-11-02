@@ -7,7 +7,10 @@ const toast = vi.hoisted(() => vi.fn());
 const logsInit = vi.hoisted(() => vi.fn());
 const setInitialVersion = vi.hoisted(() => vi.fn());
 
-vi.mock("@/services/config.queries", () => ({ configQuery: () => ({}) }));
+vi.mock("@/services/config.queries", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/config.queries")>()),
+  configQuery: () => ({}),
+}));
 vi.mock("vue", async (importOriginal) => {
   const actual = await importOriginal<typeof import("vue")>();
   const app = { use: () => app, mount: vi.fn() };

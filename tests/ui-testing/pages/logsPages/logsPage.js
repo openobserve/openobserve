@@ -39,6 +39,7 @@ export class LogsPage {
         this.logsMenuItem = '[data-test="menu-link-\\/logs-item"]';
         this.homeButton = "[name ='home']";
         this.queryButton = "[data-test='logs-search-bar-refresh-btn']";
+        this.runQueryButton = "button[data-test='logs-search-bar-refresh-btn']:not([title*='Cancel'])";
         this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
         // Post UX-revamp: renamed from logs-search-bar-quick-mode-toggle-btn
         this.quickModeToggle = '[data-test="logs-search-bar-menu-quick-mode-toggle-btn"]';
@@ -124,7 +125,7 @@ export class LogsPage {
         this.savedViewDialog = '[data-test="search-bar-store-state-saved-view-dialog"]';
         this.savedViewArrow = '[data-test="logs-search-bar-utilities-menu-btn"]';
         // OInput convention §4: drive the auto-derived `-field` inner native input for fill().
-        this.savedViewSearchInput = '[data-test="logs-saved-views-dialog-search-field"]';
+        this.savedViewSearchInput = '[data-test="logs-search-bar-menu-saved-views-search"] input';
         // Matches both ConfirmDialog.vue (data-test="confirm-dialog") and SearchBar's inline
         // ODialog (data-test="search-bar-confirm-dialog") via substring selector.
         this.confirmButton = '[data-test*="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
@@ -135,7 +136,6 @@ export class LogsPage {
         this.menuTransformEditorToggleBtn = '[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]';
         this.menuListSavedViewsBtn = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
         this.menuCreateSavedViewBtn = '[data-test="logs-search-bar-menu-create-saved-view-btn"]';
-        this.savedViewsListDialogEl = '[data-test="logs-saved-views-dialog"]';
         this.menuHistogramBtn = '[data-test="logs-search-bar-menu-histogram-btn"]';
         this.menuSqlModeBtn = '[data-test="logs-search-bar-menu-sql-mode-btn"]';
         this.menuSqlModeBtnState = '[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]';
@@ -1921,7 +1921,7 @@ export class LogsPage {
 
     // Search partition methods
     async clickRunQueryButton() {
-        await this.page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
+        await this.page.locator(this.runQueryButton).click();
     }
 
     async verifySearchPartitionResponse() {
@@ -2631,7 +2631,7 @@ export class LogsPage {
         await this.enableSqlModeIfNeeded();
         await this.page.waitForTimeout(1000);
 
-        await this.page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
+        await this.page.locator(this.runQueryButton).click();
         
         // Wait for query execution and results to load
         await this.page.waitForTimeout(3000);
@@ -3078,7 +3078,7 @@ export class LogsPage {
             const isCancel = text.includes('Cancel') || title.toLowerCase().includes('cancel');
             return !disabled && !isCancel;
         }, this.queryButton, { timeout: 30000 });
-        return await btn.click();
+        return await this.page.locator(this.runQueryButton).click();
     }
 
     /**
@@ -3130,27 +3130,13 @@ export class LogsPage {
             testLogger.warn('runQueryAndWaitForResults: refresh button never exited Cancel state, force-clicking to cancel in-flight search');
         });
 
-        // Click Run query (or Cancel, if the prior search is still running)
-        await btn.click({ force: true });
-
-        // If we had to force-click a Cancel button, we cancelled the in-flight search
-        // instead of starting a new one.  Wait for the Cancel to resolve, then click
-        // the Run button again to actually submit the intended query.
         if (buttonWasInCancelState) {
             testLogger.warn('runQueryAndWaitForResults: re-clicking Run to submit the intended query after cancel');
-            await this.page.waitForFunction(
-                (selector) => {
-                    const el = document.querySelector(selector);
-                    if (!el) return false;
-                    const text = (el.textContent || '').trim();
-                    const isDisabled = el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true';
-                    return !isDisabled && !text.includes('Cancel');
-                },
-                this.queryButton,
-                { timeout: 15000 }
-            ).catch(() => {});
             await btn.click({ force: true });
         }
+
+        // The page can start its own search after the idle check; a click on the shared selector then lands on Cancel.
+        await this.page.locator(this.runQueryButton).click({ timeout });
 
         // Wait for the button to enter loading/disabled state (query started)
         await this.page.waitForFunction(
@@ -3430,22 +3416,7 @@ export class LogsPage {
     }
 
     async clickSavedViewsExpand() {
-        // CRITICAL: This method is often called after applying a saved view
-        //
-        // Problem: When a saved view is applied via applySavedView():
-        // 1. The saved views dialog closes immediately (savedViewsListDialog = false)
-        // 2. applySavedView() fetches the saved view details from API (async)
-        // 3. It updates searchObj with the saved view's query/filters
-        // 4. This triggers a NEW SEARCH which updates the logs table
-        // 5. The search also updates searchObj.data.savedViews (the saved views list)
-        //
-        // If we try to reopen the saved views dialog while the search is still running:
-        // - The dialog's table will be re-rendering as data updates
-        // - The search input element becomes "unstable" (detached/recreated)
-        // - Test clicks fail with "element was detached from DOM"
-        //
-        // Solution: Wait for the search triggered by applySavedView to complete
-        // before opening the dialog again. This ensures the dialog opens with stable data.
+        // Reopening while the search triggered by applying a view is still rendering detaches the menu's elements.
 
         try {
             // Wait for any ongoing search to complete by checking for the logs table
@@ -3472,22 +3443,15 @@ export class LogsPage {
     }
 
     async clickSaveViewButton() {
-        // Post-menu-migration: "Create saved view" moved into utilities ("More") menu.
-        // Close any open menus/dialogs first, then open the menu and click the item.
-        const listDialog = this.page.locator(this.savedViewsListDialogEl);
-        const isListOpen = await listDialog.isVisible({ timeout: 500 }).catch(() => false);
-        if (isListOpen) {
-            await listDialog.locator('[data-test="o-dialog-close-btn"]').click();
-            await listDialog.waitFor({ state: 'hidden', timeout: 5000 });
-            // The overlay has a 200ms fade-out — wait for it to fully detach so
-            // it doesn't intercept the utilities-menu click. Scoped by data-test.
-            await this.page.locator('[data-test="o-dialog-overlay"]')
-                .waitFor({ state: 'detached', timeout: 5000 });
-        }
-        const createSavedViewBtn = this.page.locator('[data-test="logs-search-bar-menu-create-saved-view-btn"]');
-        const isVisible = await createSavedViewBtn.isVisible({ timeout: 500 }).catch(() => false);
-        if (!isVisible) {
-            await this.page.locator(this.utilitiesMenuButton).click({ force: true });
+        // Create lives in the Saved views submenu, which only renders while open.
+        const createSavedViewBtn = this.page.locator(this.menuCreateSavedViewBtn);
+        if (!(await createSavedViewBtn.isVisible({ timeout: 500 }).catch(() => false))) {
+            const submenuTrigger = this.page.locator(this.menuListSavedViewsBtn);
+            if (!(await submenuTrigger.isVisible().catch(() => false))) {
+                await this.page.locator(this.utilitiesMenuButton).click({ force: true });
+                await submenuTrigger.waitFor({ state: 'visible', timeout: 5000 });
+            }
+            await submenuTrigger.click({ force: true });
             await createSavedViewBtn.waitFor({ state: 'visible', timeout: 5000 });
         }
         await createSavedViewBtn.click();
@@ -3585,12 +3549,14 @@ export class LogsPage {
         return await searchInput.fill(text);
     }
 
-    // The `-apply-` prefix keeps the favourites pane (`-favorites-apply-`) out of the match.
+    // The `-apply-` prefix keeps the favorite toggle (`-favorite-`) out of the match.
     savedViewApplyLocator(name) {
         if (typeof name !== 'string') {
             throw new TypeError(`savedViewApplyLocator expects the exact view name, got ${name}`);
         }
-        return this.page.locator(`[data-test^="logs-saved-views-dialog-apply-"][data-test-view-name="${LogsPage.escapeCssAttrValue(name)}"]`);
+        return this.page
+            .locator('[data-test^="logs-search-bar-menu-saved-views-apply-"]')
+            .filter({ has: this.page.getByText(name, { exact: true }) });
     }
 
     async clickSavedViewByTitle(title) {
@@ -3601,7 +3567,7 @@ export class LogsPage {
     }
 
     async clickDeleteButton() {
-        const deleteBtn = this.page.locator('[data-test="logs-saved-views-dialog-table"] [data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
+        const deleteBtn = this.page.locator('[data-test^="logs-search-bar-menu-saved-views-delete-"]').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
         return await deleteBtn.click();
     }
@@ -3681,12 +3647,6 @@ export class LogsPage {
     }
 
     async clickDeleteSavedViewButton(savedViewName) {
-        // The caller (clickSavedViewByTitle) closes the dialog. Wait passively for it to
-        // reach hidden state so the re-open sequence doesn't race the close animation.
-        await this.page.locator(this.savedViewsListDialogEl)
-            .waitFor({ state: 'hidden', timeout: 5000 })
-            .catch(() => {});
-
         // Re-open the saved views panel (waits for any ongoing search to settle first).
         await this.clickSavedViewsExpand();
 
@@ -3702,11 +3662,8 @@ export class LogsPage {
         // Allow OInput debounce (300 ms) to apply the filter before looking for the row.
         await this.page.waitForTimeout(1000);
 
-        // The delete button data-test uses view_id (a UUID), not the view name, so we
-        // can't build the exact selector. Instead scope to the main saved-views table
-        // (not favorites) — after filtering by name there is exactly one visible row.
-        const mainTable = this.page.locator('[data-test="logs-saved-views-dialog-table"]');
-        const deleteBtn = mainTable.locator('[data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
+        // The delete data-test uses view_id, not the name, so match by prefix; the name filter leaves one row.
+        const deleteBtn = this.page.locator('[data-test^="logs-search-bar-menu-saved-views-delete-"]').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
         await deleteBtn.scrollIntoViewIfNeeded();
         await deleteBtn.click();
@@ -9079,7 +9036,7 @@ export class LogsPage {
         if (!opened) throw new Error('Could not open saved views menu after 3 attempts');
         // force: true — ODropdown portal transiently detaches items during initial render
         await listMenuItem.click({ force: true });
-        await this.page.locator(this.savedViewsListDialogEl).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Clicked saved views dropdown arrow');
     }
 
@@ -9099,9 +9056,8 @@ export class LogsPage {
      * @param {string} name - Saved view name
      */
     async clickDeleteSavedViewByName(name) {
-        // data-test uses view_id (UUID), not name — scope to main table after filtering.
-        const mainTable = this.page.locator('[data-test="logs-saved-views-dialog-table"]');
-        const deleteBtn = mainTable.locator('[data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
+        // data-test uses view_id (UUID), not name; the caller's name filter leaves one row.
+        const deleteBtn = this.page.locator('[data-test^="logs-search-bar-menu-saved-views-delete-"]').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
         await deleteBtn.click();
         testLogger.info(`Clicked delete for saved view: ${name}`);
@@ -12745,6 +12701,17 @@ export class LogsPage {
         return false;
     }
 
+    /** Every logs stream in the org as `{ name, internal }`, read from the streams API. */
+    async getLogStreams() {
+        const fetch = (await import('node-fetch')).default;
+        const orgId = getOrgIdentifier();
+        const url = `${process.env.INGESTION_URL}/api/${orgId}/streams?type=logs`;
+        const res = await fetch(url, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error(`Listing streams failed: HTTP ${res.status}`);
+        const body = await res.json();
+        return (body.list || []).map((s) => ({ name: s.name, internal: s.is_internal === true }));
+    }
+
     /**
      * Deselects a stream from the logs stream selector's checkbox zone.
      *
@@ -13365,6 +13332,124 @@ export class LogsPage {
         );
     }
 
+    /** The Hide/Show button on the "Internal streams" header row. */
+    getStreamPickerHeaderAction() {
+        return this.page.locator(`${this.indexDropDownPopover} [data-test="log-search-index-list-select-stream-header-action"]`);
+    }
+
+    /** The "Internal streams" header row; carries `data-highlighted` while the arrow keys rest on it. */
+    getStreamPickerHeader() {
+        return this.page.locator(`${this.indexDropDownPopover} [data-test="log-search-index-list-select-stream-header"]`);
+    }
+
+    async filterStreamPicker(text) {
+        await this.page.locator(this.indexDropDownSearch).fill(text);
+    }
+
+    /** Splits the picker rows at the "Internal streams" header into the stream names above and below it. */
+    async getStreamPickerSplit() {
+        const rows = await this.getStreamPickerRows();
+        const headerIndex = rows.findIndex((r) => r.kind === 'header');
+        const names = (part) => part.filter((r) => r.kind === 'option').map((r) => r.value);
+        return {
+            headerIndex,
+            header: rows[headerIndex],
+            above: names(rows.slice(0, headerIndex)),
+            below: names(rows.slice(headerIndex + 1)),
+        };
+    }
+
+    async expectStreamPickerSearchValue(value) {
+        await expect(this.page.locator(this.indexDropDownSearch)).toHaveValue(value);
+    }
+
+    /** Presses a key with focus in the picker's search box, where the list's keyboard navigation lives. */
+    async pressInStreamPickerSearch(key) {
+        await this.page.locator(this.indexDropDownSearch).press(key);
+    }
+
+    /** Presses `key` until the "Internal streams" header is highlighted, whatever row the highlight starts on. */
+    async arrowToStreamPickerHeader(key, maxPresses) {
+        const highlighted = this.page.locator(
+            `${this.indexDropDownPopover} [data-test="log-search-index-list-select-stream-header"][data-highlighted]`
+        );
+        for (let presses = 1; presses <= maxPresses; presses++) {
+            await this.pressInStreamPickerSearch(key);
+            // The row renders a frame after the press, so each press waits briefly before judging it.
+            const reached = await highlighted.waitFor({ state: 'attached', timeout: 750 }).then(() => true, () => false);
+            if (reached) return presses;
+        }
+        throw new Error(`The Internal streams header was not highlighted within ${maxPresses} ${key} presses`);
+    }
+
+    /** Puts `count` made-up user streams ahead of the real ones in the logs stream list the page loads. */
+    async mockExtraUserStreams(count, prefix) {
+        const orgId = getOrgIdentifier();
+        await this.page.route(`**/api/${orgId}/streams?*`, async (route) => {
+            const url = new URL(route.request().url());
+            if (route.request().method() !== 'GET' || url.searchParams.get('type') !== 'logs') {
+                return route.continue();
+            }
+            const response = await route.fetch();
+            const body = await response.json();
+            const template = (body.list || []).find((s) => !s.is_internal) || {};
+            const extra = Array.from({ length: count }, (_, i) => ({
+                ...template,
+                name: `${prefix}${String(i).padStart(2, '0')}`,
+            }));
+            body.list = [...extra, ...(body.list || [])];
+            body.total = body.list.length;
+            await route.fulfill({ response, json: body });
+        });
+    }
+
+    /** Puts focus in the picker's search box and Tabs once out of it. */
+    async tabFromStreamPickerSearch() {
+        const search = this.page.locator(this.indexDropDownSearch);
+        await search.focus();
+        await search.press('Tab');
+    }
+
+    /** Every row of the open picker in order; scrolls because the list renders only rows in view. */
+    async getStreamPickerRows() {
+        const firstRow = this.getStreamPickerPopover().locator('[data-vrow]').first();
+        await firstRow.waitFor({ state: 'visible', timeout: 15000 });
+        return await firstRow.evaluate(async (row) => {
+            const scroller = row.parentElement.parentElement;
+            const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+            const words = (el) => {
+                const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+                const parts = [];
+                while (walker.nextNode()) parts.push(walker.currentNode.textContent.trim());
+                return parts.filter(Boolean).join(' ');
+            };
+            const rows = new Map();
+            const read = () => {
+                scroller.querySelectorAll('[data-vrow]').forEach((r) => {
+                    const header = r.querySelector('[data-test="log-search-index-list-select-stream-header"]');
+                    const option = r.querySelector('[data-test="log-search-index-list-select-stream-option"]');
+                    const entry = header
+                        ? { kind: 'header', text: words(header) }
+                        : { kind: option ? 'option' : 'other', value: option?.getAttribute('data-test-value') ?? null };
+                    rows.set(Number(r.getAttribute('data-vrow')), entry);
+                });
+            };
+            scroller.scrollTop = 0;
+            await frame();
+            read();
+            while (scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight) {
+                const before = scroller.scrollTop;
+                scroller.scrollTop += Math.max(1, Math.floor(scroller.clientHeight / 2));
+                await frame();
+                read();
+                if (scroller.scrollTop === before) break;
+            }
+            scroller.scrollTop = 0;
+            await frame();
+            return [...rows.entries()].sort((a, b) => a[0] - b[0]).map(([, entry]) => entry);
+        });
+    }
+
     // -----------------------------------------------------------------------
     // Results-table reads for the #15086 coverage specs.
     //
@@ -13395,7 +13480,7 @@ export class LogsPage {
                     !r.url().includes('is_ui_histogram'),
                 { timeout }
             ),
-            this.page.locator(this.searchBarRefreshButton).click(),
+            this.page.locator(this.runQueryButton).click(),
         ]);
         // A streamed (text/event-stream) response never reports finished; the Run button wait covers completion.
         if (!(await response.headerValue('content-type'))?.includes('text/event-stream')) {
@@ -13714,4 +13799,13 @@ export class LogsPage {
         await this.expectSuggestWidgetVisible();
     }
 
+    /** Field-value row (label) in the expanded field list, matched by visible text. */
+    fieldValueRow(field, text) {
+        return this.page.locator(`label${this.fieldValueLabelPrefix(field)}`).filter({ hasText: text });
+    }
+
+    /** Checkbox inside the field-value row matched by text. */
+    fieldValueCheckbox(field, text) {
+        return this.fieldValueRow(field, text).locator('input[type="checkbox"], [role="checkbox"]').first();
+    }
 }

@@ -396,6 +396,7 @@ fn reject_stream_rows(
                 .map(|(_, record)| record.get("_id").and_then(Value::as_str).map(String::from))
                 .chain(columnar.into_iter().flat_map(|mut c| c.take_bulk_ids()));
             for doc_id in doc_ids {
+                bulk_res.errors = true;
                 bulk::add_record_status(
                     stream_name.to_string(),
                     doc_id,
@@ -798,7 +799,7 @@ mod tests {
         let IngestionStatus::Bulk(bulk) = bulk else {
             unreachable!()
         };
-        assert!(!bulk.errors);
+        assert!(bulk.errors);
         let ids: Vec<&str> = bulk
             .items
             .iter()

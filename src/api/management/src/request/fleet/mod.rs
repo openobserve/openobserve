@@ -251,6 +251,7 @@ pub async fn delete_collector(
         (status = 202, description = "Queued", content_type = "application/json", body = config::meta::fleet::RestartQueued),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "The collector does not accept restart commands", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn restart_collector(
@@ -383,7 +384,7 @@ pub async fn list_fleets(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "CreateFleet",
-    summary = "Create a fleet; the creator receives full rights on it",
+    summary = "Create a fleet; roles grant access to it, as for dashboard folders",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = CreateFleetRequest, content_type = "application/json"),
@@ -1609,7 +1610,11 @@ pub async fn list_audit(
         if !allowed_on(FLEET_MANAGEMENT, &org_id, &user_email.user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match openobserve_core::fleet::list_audit(&org_id, query).await {
+        let permitted = match permitted_fleets(&org_id, &user_email.user_id).await {
+            Ok(permitted) => permitted,
+            Err(refused) => return refused,
+        };
+        match openobserve_core::fleet::list_audit(&org_id, query, permitted.as_ref()).await {
             Ok(mut list) => {
                 list.total = list.items.len();
                 MetaHttpResponse::json(list)
@@ -1808,7 +1813,7 @@ async fn desired_request(
     }
 }
 
-/// D19c: the fleets whose items an org-wide list or aggregate shows; `None` is unfiltered.
+/// D19c: the fleets an org-wide list or aggregate shows, whatever the list setting; `None` is all.
 #[cfg(feature = "enterprise")]
 async fn permitted_fleets(
     org_id: &str,
@@ -1821,7 +1826,7 @@ async fn permitted_fleets(
     if let Some(objects) = tests::listed_objects(org_id, user_id) {
         return Ok(permitted_from(org_id, key, objects));
     }
-    match db::authz::list_objects_for_user(org_id, user_id, "GET", key).await {
+    match db::authz::list_permitted_objects(org_id, user_id, "GET", key).await {
         Ok(objects) => Ok(permitted_from(org_id, key, objects)),
         Err(e) => Err(MetaHttpResponse::forbidden(e)),
     }
@@ -2272,7 +2277,7 @@ mod tests {
         assert_eq!(
             permitted_fleets(ORG, custom).await.ok(),
             Some(None),
-            "OpenFGA off, or the list flag off: unfiltered"
+            "OpenFGA off: unfiltered"
         );
         for (listed, want) in [
             (None, None),

@@ -151,7 +151,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="tab === 'alertTriggers'" #default>
               <div class="flex items-center gap-1.5">
                 <span>{{ tabLabels.alertTriggers }}</span>
-                <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
+                <OTag
+                  v-if="!loading"
+                  type="countChip"
+                  value="neutral"
+                  data-test="incident-alert-triggers-count"
+                  >{{ triggers.length }}</OTag
+                >
               </div>
             </template>
           </OTab>

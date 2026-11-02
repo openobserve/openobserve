@@ -327,6 +327,8 @@ pub enum AlertError {
     CronHasNoFutureOccurrence { cron: String },
     #[error("Realtime alerts cannot notify on recovery or keep firing")]
     RecoveryOnRealtimeAlert,
+    #[error("Realtime alerts cannot suppress repeat notifications")]
+    RepeatSuppressionOnRealtimeAlert,
     #[error("recovery destinations were set without notify_on_recovery, so nothing would use them")]
     RecoveryDestinationsWithoutRecovery,
     #[error(
@@ -894,6 +896,10 @@ async fn prepare_alert(
     // that cannot arrive.
     if alert.is_real_time && (alert.notify_on_recovery || alert.keep_firing_for != 0) {
         return Err(AlertError::RecoveryOnRealtimeAlert);
+    }
+    // A realtime alert keeps no state row, so it has no last delivered state to compare against.
+    if alert.is_real_time && alert.suppress_repeats {
+        return Err(AlertError::RepeatSuppressionOnRealtimeAlert);
     }
 
     // Multi-level thresholds (alerts_2.md Feature 1). Rejected at write time so
@@ -4310,6 +4316,17 @@ async fn build_notification_context(
             // link must not cost a notification either way.
             None => String::new(),
         }
+    } else if alert.stream_type == StreamType::Traces {
+        // The traces page takes a filter expression in `query`, not SQL, so the query is left out.
+        format!(
+            "{}{}/web/traces?stream={}&from={}&to={}&org_identifier={}&tab=spans",
+            cfg.common.web_url,
+            cfg.common.base_uri,
+            alert.stream_name,
+            alert_start_time,
+            alert_end_time,
+            alert.org_id
+        )
     } else {
         match alert.query_condition.query_type {
             QueryType::SQL => {
@@ -8854,6 +8871,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn prepare_alert_refuses_repeat_suppression_on_a_realtime_alert() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_save_repeat_realtime";
+        let key = format!("{org_id}/{}/app", StreamType::Logs);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            key.clone(),
+            SchemaCache::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+                "id",
+                DataType::Utf8,
+                true,
+            )])),
+        );
+        let mut alert = Alert::default();
+        alert.trigger_condition.frequency = 60;
+        alert.is_real_time = true;
+        alert.suppress_repeats = true;
+        let res = prepare_alert(org_id, "app", "realtime", &mut alert, true, false).await;
+        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
+
+        assert!(
+            matches!(res, Err(AlertError::RepeatSuppressionOnRealtimeAlert)),
+            "{res:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn prepare_alert_rejects_a_cron_with_no_future_occurrence() {
         let err = prepare_schedule(|a| {
             a.trigger_condition.frequency_type = FrequencyType::Cron;
@@ -9457,5 +9501,39 @@ mod rule_notification_tests {
             .await
             .unwrap_err();
         assert!(matches!(error, AlertError::PromqlMissingQuery));
+    }
+
+    #[tokio::test]
+    async fn traces_alert_url_opens_the_traces_page() {
+        let mut alert = Alert::default();
+        alert.org_id = "org".into();
+        alert.stream_type = StreamType::Traces;
+        alert.stream_name = "default".into();
+        alert.query_condition.query_type = QueryType::SQL;
+        alert.query_condition.sql = Some("SELECT span_id FROM \"default\"".into());
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+            episode_id: None,
+            resolved: false,
+        };
+        let context = build_notification_context("org", &alert, &[], &[], options, None).await;
+        let url = if let Some((_, suffix)) = context.alert_url.split_once("/web/short/") {
+            let id = suffix.split('?').next().unwrap();
+            short_url::retrieve(&alert.org_id, id).await.unwrap()
+        } else {
+            context.alert_url
+        };
+        assert!(url.contains("/web/traces?stream=default&"));
+        assert!(url.contains("&from=") && url.contains("&to="));
+        assert!(url.contains("&org_identifier=org&"));
+        assert!(url.ends_with("&tab=spans"));
+        assert!(!url.contains("/web/logs"));
+        assert!(!url.contains("sql_mode"));
+        assert!(!url.contains("query="));
     }
 }

@@ -544,7 +544,7 @@ const bulkDeleteUserRoles = async () => {
     selectedRoleNames.value = [];
     confirmBulkDelete.value = false;
   } catch (error: any) {
-    if (error.response?.status != 403 || error?.status != 403) {
+    if (error.response?.status !== 403 && error?.status !== 403) {
       toast({
         message:
           error.response?.data?.message || error?.message || t("iam.appRoles.bulkDeleteRolesError"),

@@ -102,7 +102,13 @@ const passthrough = (name: string) =>
   defineComponent({
     name,
     setup(_p: any, { slots }: any) {
-      return () => h("div", {}, [slots.default?.(), slots.actions?.(), slots.header?.()]);
+      return () =>
+        h("div", {}, [
+          slots["header-tabs"]?.(),
+          slots.default?.(),
+          slots.actions?.(),
+          slots.header?.(),
+        ]);
     },
   });
 
@@ -124,6 +130,13 @@ const drawerStub = {
   emits: ["close"],
   template:
     "<div data-test='host-drawer-stub' :data-host='hostName' :data-display-name='displayName' :data-os='osType' :data-last-seen-us='lastSeenUs' />",
+};
+
+const depsStub = {
+  name: "HostsDependenciesView",
+  props: ["orgId", "range", "refreshNonce", "knownHosts", "lowTraffic"],
+  emits: ["open", "refresh", "loading", "update:lowTraffic"],
+  template: "<div data-test='hosts-deps-stub' />",
 };
 
 const setupCardStub = {
@@ -196,6 +209,7 @@ describe("HostsPage", () => {
           DateTime: dateTimeStub,
           HostDetailDrawer: drawerStub,
           DataSourceSetupCard: setupCardStub,
+          HostsDependenciesView: depsStub,
         },
       },
     });
@@ -836,6 +850,173 @@ describe("HostsPage", () => {
       const banner = wrapper.find('[data-test="hosts-lastseen-banner"]');
       expect(banner.exists()).toBe(true);
       expect(banner.text()).toContain("Inactive hosts and last-seen are unavailable");
+    });
+  });
+
+  describe("Dependencies view", () => {
+    const deps = () => wrapper.findComponent({ name: "HostsDependenciesView" });
+
+    it("puts the table's filter back with the URL on Back across the tabs", async () => {
+      wrapper = await mountPage({ name: "a" });
+      expect(hostsListState.nameFilter.value).toBe("a");
+      const tabs = wrapper.findComponent({ name: "OTabs" });
+      tabs.vm.$emit("change", "dependencies");
+      await flushPromises();
+      tabs.vm.$emit("change", "table");
+      await flushPromises();
+      hostsListState.nameFilter.value = "b";
+      await flushPromises();
+      expect(router.currentRoute.value.query.name).toBe("b");
+      for (let i = 0; i < 2; i++) {
+        router.back();
+        await flushPromises();
+        await new Promise((r) => setTimeout(r, 0));
+        await flushPromises();
+      }
+      expect(router.currentRoute.value.query).toMatchObject({ name: "a" });
+      expect(router.currentRoute.value.query.view).toBeUndefined();
+      expect(hostsListState.nameFilter.value).toBe("a");
+    });
+
+    it("keeps the map's low-traffic switch in the URL", async () => {
+      wrapper = await mountPage({ view: "dependencies" });
+      expect(deps().props("lowTraffic")).toBe(false);
+      deps().vm.$emit("update:lowTraffic", true);
+      await flushPromises();
+      expect(router.currentRoute.value.query).toMatchObject({
+        view: "dependencies",
+        lowTraffic: "true",
+      });
+      expect(deps().props("lowTraffic")).toBe(true);
+      deps().vm.$emit("update:lowTraffic", false);
+      await flushPromises();
+      expect(router.currentRoute.value.query.lowTraffic).toBeUndefined();
+    });
+
+    it("drops the low-traffic switch on leaving the map", async () => {
+      wrapper = await mountPage({ view: "dependencies", lowTraffic: "true" });
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", "table");
+      await flushPromises();
+      expect(router.currentRoute.value.query.lowTraffic).toBeUndefined();
+    });
+
+    it("spins the page's Refresh while the map reloads", async () => {
+      wrapper = await mountPage({ view: "dependencies" });
+      const refresh = () =>
+        wrapper
+          .findAllComponents({ name: "OButton" })
+          .find((b) => b.attributes("data-test") === "hosts-refresh")!;
+      deps().vm.$emit("loading", true);
+      await flushPromises();
+      expect(refresh().props("loading")).toBe(true);
+      deps().vm.$emit("loading", false);
+      await flushPromises();
+      expect(refresh().props("loading")).toBe(false);
+    });
+
+    it("swaps the table for the dependency map from ?view=dependencies", async () => {
+      wrapper = await mountPage({ view: "dependencies" });
+      expect(wrapper.find('[data-test="hosts-table-stub"]').exists()).toBe(false);
+      expect(deps().props("orgId")).toBe("test-org");
+      expect(deps().props("range")).toMatchObject({ relative: true });
+      expect(deps().props("knownHosts")).toEqual(["web-01", "web-02", "db-01"]);
+    });
+
+    it("writes the chosen view into the URL and drops it for the table", async () => {
+      wrapper = await mountPage({ name: "web" });
+      const tabs = wrapper.findComponent({ name: "OTabs" });
+      tabs.vm.$emit("change", "dependencies");
+      await flushPromises();
+      expect(router.currentRoute.value.query).toMatchObject({ view: "dependencies", name: "web" });
+      expect(deps().exists()).toBe(true);
+      tabs.vm.$emit("change", "table");
+      await flushPromises();
+      expect(router.currentRoute.value.query.view).toBeUndefined();
+      expect(wrapper.find('[data-test="hosts-table-stub"]').exists()).toBe(true);
+      // Each switch is a history entry, so Back returns to the map.
+      router.back();
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(router.currentRoute.value.query.view).toBe("dependencies");
+    });
+
+    it("marks each view's container as a tab panel named like its tab", async () => {
+      wrapper = await mountPage();
+      const panel = () => wrapper.find('[role="tabpanel"]');
+      const tabLabels = wrapper.findAll('[role="tab"]').map((tab) => tab.text());
+      expect(tabLabels).toEqual(["Table", "Dependencies"]);
+      expect(panel().attributes("aria-label")).toBe("Table");
+      expect(panel().find('[data-test="hosts-table-stub"]').exists()).toBe(true);
+      hostsListState.pageError.value = "boom";
+      await flushPromises();
+      expect(panel().attributes()).toMatchObject({
+        "aria-label": "Table",
+        "data-test": "hosts-page-error",
+      });
+      await router.replace({ query: { view: "dependencies" } });
+      await flushPromises();
+      expect(wrapper.findAll('[role="tabpanel"]')).toHaveLength(1);
+      expect(panel().attributes()).toMatchObject({
+        "aria-label": "Dependencies",
+        "data-test": "hosts-deps-stub",
+      });
+    });
+
+    it("offers no view tabs before hosts are detected", async () => {
+      workloadStates.value = { ...workloadStates.value, hosts: "undetected" };
+      wrapper = await mountPage({ view: "dependencies" });
+      expect(wrapper.findComponent({ name: "OTabs" }).exists()).toBe(false);
+      expect(deps().exists()).toBe(false);
+    });
+
+    it("reloads the map on a time change and on Refresh, not on the picker's mount replay", async () => {
+      wrapper = await mountPage({ view: "dependencies" });
+      const picker = wrapper.findComponent({ name: "DateTime" });
+      picker.vm.$emit("on:date-change", { startTime: 1, endTime: 2, userChangedValue: false });
+      await flushPromises();
+      expect(deps().props("refreshNonce")).toBe(0);
+      picker.vm.$emit("on:date-change", { startTime: 3, endTime: 4, valueType: "absolute" });
+      await flushPromises();
+      expect(deps().props("refreshNonce")).toBe(1);
+      expect(deps().props("range")).toEqual({ start: 3, end: 4, relative: false });
+      deps().vm.$emit("refresh");
+      await flushPromises();
+      expect(deps().props("refreshNonce")).toBe(2);
+    });
+
+    it("reloads only the map on its tab, and the table when switched back", async () => {
+      wrapper = await mountPage({ view: "dependencies" });
+      // Opening on the map still loads the list once, for the drawer and the host names.
+      expect(hostsListState.refresh).toHaveBeenCalledTimes(1);
+      expect(deps().props("knownHosts")).toEqual(["web-01", "web-02", "db-01"]);
+      hostsListState.refresh.mockClear();
+      const picker = wrapper.findComponent({ name: "DateTime" });
+      picker.vm.$emit("on:date-change", { startTime: 3, endTime: 4, valueType: "absolute" });
+      await flushPromises();
+      deps().vm.$emit("refresh");
+      await flushPromises();
+      expect(deps().props("refreshNonce")).toBe(2);
+      expect(hostsListState.refresh).not.toHaveBeenCalled();
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", "table");
+      await flushPromises();
+      expect(hostsListState.refresh).toHaveBeenCalledTimes(1);
+      expect(hostsListState.refresh).toHaveBeenCalledWith({ orgId: "test-org", start: 3, end: 4 });
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", "dependencies");
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabs" }).vm.$emit("change", "table");
+      await flushPromises();
+      expect(hostsListState.refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("opens a host's drawer from the map", async () => {
+      wrapper = await mountPage({ view: "dependencies" });
+      deps().vm.$emit("open", "web-01");
+      await flushPromises();
+      expect(router.currentRoute.value.query).toMatchObject({
+        view: "dependencies",
+        host: "web-01",
+      });
+      expect(wrapper.find('[data-test="host-drawer-stub"]').attributes("data-host")).toBe("web-01");
     });
   });
 });

@@ -34,6 +34,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
       </OButton>
       <div class="min-w-0 flex-1">
+        <!-- A slot-less OTooltip anchors to its previous sibling, so this must not sit between OSelect and it. -->
+        <span
+          aria-live="polite"
+          data-test="log-search-index-list-stream-picker-announcement"
+          class="sr-only"
+          >{{ streamPickerAnnouncement }}</span
+        >
         <OSelect
           ref="streamSelect"
           :aria-label="t('search.selectStream')"
@@ -47,8 +54,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="raw(placeHolderText)"
           :multiple="selectionMode === 'multi'"
           :row-click-single-select="selectionMode === 'multi'"
+          pin-selected-in-groups
+          :search-debounce="150"
           class="w-full"
           @update:model-value="handleStreamSelection"
+          @open="streamPickerOpen = true"
+          @close="onStreamPickerClose"
+          @search="onStreamPickerSearch"
+          @header-action="onStreamPickerHeaderAction"
         >
           <template #empty>{{ t("search.noResult") }}</template>
         </OSelect>
@@ -69,33 +82,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="inline"
         icon="database"
       >
-        <template v-if="quickPickStreams.length" #extra>
+        <template v-if="quickPickGroups.length" #extra>
           <div data-test="logs-search-stream-quick-pick" class="flex w-full flex-col gap-1">
-            <span class="text-text-secondary mb-0.5 text-center text-xs font-medium">
-              {{ t("search.quickPickStreamsLabel") }}
-            </span>
-            <OButton
-              v-for="stream in quickPickStreams"
-              :key="stream.value"
-              :data-test="`logs-search-stream-quick-pick-${stream.value}`"
-              variant="outline"
-              size="sm"
-              icon-left="database"
-              class="w-full justify-start"
-              @click="quickSelectStream(stream.value)"
-            >
-              <OTruncatedText class="flex-1 text-left">{{ stream.label }}</OTruncatedText>
-            </OButton>
+            <template v-for="group in quickPickGroups" :key="group.id">
+              <OSelectHeaderRow
+                v-if="group.header"
+                :data-test="`logs-search-stream-group-header-${group.id}`"
+                :label="group.header.label"
+                :count="group.header.headerCount"
+                :action="group.header.headerAction"
+                :action-aria-label="group.header.headerActionAriaLabel"
+                @action="onStreamPickerHeaderAction(group.header)"
+              />
+              <span
+                v-else
+                :data-test="`logs-search-stream-group-label-${group.id}`"
+                class="text-text-secondary mb-0.5 text-center text-xs font-medium"
+              >
+                {{ group.label }}
+              </span>
+              <OButton
+                v-for="stream in group.streams"
+                :key="stream.value"
+                :data-test="`logs-search-stream-quick-pick-${stream.value}`"
+                variant="outline"
+                size="sm"
+                icon-left="database"
+                class="w-full justify-start"
+                @click="quickSelectStream(stream.value)"
+              >
+                <OTruncatedText class="flex-1 text-left">{{ stream.label }}</OTruncatedText>
+              </OButton>
+            </template>
             <span
-              v-if="streamList.length > quickPickStreams.length"
+              v-if="quickPickMoreCount > 0"
               data-test="logs-search-stream-quick-pick-more"
               class="text-text-secondary mt-0.5 text-center text-xs"
             >
-              {{
-                t("search.quickPickMoreStreams", {
-                  count: streamList.length - quickPickStreams.length,
-                })
-              }}
+              {{ t("search.quickPickMoreStreams", { count: quickPickMoreCount }) }}
             </span>
           </div>
         </template>
@@ -106,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="fieldListRef"
         :fields="streamFieldsRows"
         :search="searchObj.data.stream.filterField"
-        :loading="searchObj.loadingStream"
+        :loading="showFieldListSkeleton"
         :theme="store.state.theme"
         :show-pagination="true"
         :page-size="pagination.rowsPerPage"
@@ -251,16 +275,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  type Ref,
-  watch,
-  computed,
-  nextTick,
-  defineAsyncComponent,
-  onUnmounted,
-} from "vue";
+import { unescapeSqlLiteral } from "@/utils/query/sqlFilterBuilder";
+import { defineComponent, ref, type Ref, watch, computed, nextTick, onUnmounted } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -291,7 +307,13 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import GroupedFieldList from "@/components/common/GroupedFieldList.vue";
+import FieldRow from "@/components/common/FieldRow.vue";
+import FieldExpansion from "@/components/common/FieldExpansion.vue";
+import GroupedFieldListPagination from "@/components/common/FieldListPagination.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSelectHeaderRow from "@/lib/forms/Select/OSelectHeaderRow.vue";
+import { useStreamPickerOptions, type PickerStream } from "@/composables/useStreamPickerOptions";
 import { captureFromValuesApi } from "@/composables/fieldValueStore";
 import { saveLogsStreamType } from "@/utils/streamPersist";
 import { bumpSelectionToken, currentSelectionToken } from "@/composables/useLogs/useSearchBar";
@@ -313,14 +335,10 @@ export default defineComponent({
     },
   },
   components: {
-    GroupedFieldList: defineAsyncComponent(
-      () => import("@/components/common/GroupedFieldList.vue"),
-    ),
-    FieldRow: defineAsyncComponent(() => import("@/components/common/FieldRow.vue")),
-    FieldExpansion: defineAsyncComponent(() => import("@/components/common/FieldExpansion.vue")),
-    GroupedFieldListPagination: defineAsyncComponent(
-      () => import("@/components/common/FieldListPagination.vue"),
-    ),
+    GroupedFieldList,
+    FieldRow,
+    FieldExpansion,
+    GroupedFieldListPagination,
     OButton,
     OSelect,
     OIcon,
@@ -328,6 +346,7 @@ export default defineComponent({
     OTruncatedText,
     OEmptyState,
     OSkeleton,
+    OSelectHeaderRow,
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
@@ -476,23 +495,97 @@ export default defineComponent({
       return searchObj.data.stream.streamLists;
     });
 
-    // First few streams surfaced as one-click picks in the no-stream empty
-    // state. Ordered by most recently ingested data (stats.doc_time_max desc)
-    // so the streams most likely worth exploring sit at the top. Capped so a
-    // narrow panel stays scannable; the rest stay reachable through the
-    // dropdown's search. Falls back to the plain stream-list order when
-    // ingestion stats aren't available.
-    const QUICK_PICK_LIMIT = 8;
-    const quickPickStreams = computed(() => {
-      const detailed = searchObj.data.streamResults?.list;
-      if (Array.isArray(detailed) && detailed.length) {
-        return [...detailed]
-          .sort(compareStreamsByLatest)
-          .slice(0, QUICK_PICK_LIMIT)
-          .map((item: any) => ({ label: item.name, value: item.name }));
-      }
-      return (streamList.value || []).slice(0, QUICK_PICK_LIMIT);
+    const pickerStreams = computed<PickerStream[]>(() =>
+      (streamList.value || []).map((option: { value: string; internal?: boolean }) => ({
+        name: option.value,
+        is_internal: option.internal === true,
+      })),
+    );
+
+    const streamPickerOpen = ref(false);
+    const streamPickerSearch = ref("");
+    const {
+      options: streamPickerOptions,
+      hideInternalStreams,
+      internalHeader,
+      onHeaderAction: onStreamPickerHeaderAction,
+      announcement: streamPickerAnnouncement,
+    } = useStreamPickerOptions({
+      streams: pickerStreams,
+      selected: () => searchObj.data.stream.selectedStream,
+      open: streamPickerOpen,
+      search: streamPickerSearch,
     });
+
+    // A debounced search can land after the popover closed and would stick until the next open.
+    const onStreamPickerSearch = (term: string) => {
+      if (streamPickerOpen.value) streamPickerSearch.value = term;
+    };
+
+    const onStreamPickerClose = () => {
+      streamPickerOpen.value = false;
+      streamPickerSearch.value = "";
+    };
+
+    // First few streams surfaced as one-click picks in the no-stream empty
+    // state. User streams come first, internal ones last, each ordered by most
+    // recently ingested data (stats.doc_time_max desc). Capped so a narrow
+    // panel stays scannable; the rest stay reachable through the dropdown's
+    // search. Falls back to the plain stream-list order when ingestion stats
+    // aren't available.
+    const QUICK_PICK_LIMIT = 8;
+    const quickPickOrdered = computed(() => {
+      const detailed = searchObj.data.streamResults?.list;
+      const ordered: PickerStream[] =
+        Array.isArray(detailed) && detailed.length
+          ? [...detailed].sort(compareStreamsByLatest)
+          : pickerStreams.value;
+      return {
+        user: ordered.filter((s) => !s.is_internal),
+        internal: ordered.filter((s) => s.is_internal),
+      };
+    });
+
+    // Same rule as the dropdown, so "+N more" counts only streams a search there can reach.
+    const quickPickCandidates = computed<PickerStream[]>(() => {
+      const { user, internal } = quickPickOrdered.value;
+      return hideInternalStreams.value ? user : [...user, ...internal];
+    });
+
+    const quickPickStreams = computed(() =>
+      quickPickCandidates.value.slice(0, QUICK_PICK_LIMIT).map((s) => ({
+        label: s.name,
+        value: s.name,
+        internal: s.is_internal === true,
+      })),
+    );
+
+    const quickPickGroups = computed(() => {
+      const { user, internal } = quickPickOrdered.value;
+      // Only while internal streams would win a slot, so Show always reveals a stream.
+      const internalRow = internal.length > 0 && user.length < QUICK_PICK_LIMIT;
+      const internalListed = quickPickStreams.value.filter((s) => s.internal);
+      const internalGroupHeader = hideInternalStreams.value
+        ? internalHeader("hidden", internal.length)
+        : internalHeader("shown", internalListed.length);
+      return [
+        {
+          id: "user",
+          label: t("search.quickPickStreamsLabel"),
+          header: undefined,
+          streams: quickPickStreams.value.filter((s) => !s.internal),
+        },
+        {
+          id: "internal",
+          header: internalRow ? internalGroupHeader : undefined,
+          streams: internalListed,
+        },
+      ].filter((group) => group.header || group.streams.length > 0);
+    });
+
+    const quickPickMoreCount = computed(
+      () => quickPickCandidates.value.length - quickPickStreams.value.length,
+    );
 
     const checkSelectedFields = computed(() => {
       return (
@@ -549,7 +642,7 @@ export default defineComponent({
             if (node.left?.type === "column_ref") {
               const colName = extractColName(node.left.column);
               if (colName && node.right?.value != null) {
-                const val = String(node.right.value);
+                const val = unescapeSqlLiteral(node.right.value);
                 if (!result[colName]) result[colName] = [];
                 if (!result[colName].includes(val)) result[colName].push(val);
               }
@@ -600,7 +693,7 @@ export default defineComponent({
             if (node.left?.type === "column_ref") {
               const colName = extractColName(node.left.column);
               if (colName && node.right?.value != null) {
-                const val = String(node.right.value);
+                const val = unescapeSqlLiteral(node.right.value);
                 if (!result[colName]) result[colName] = [];
                 if (!result[colName].includes(val)) result[colName].push(val);
               }
@@ -627,14 +720,34 @@ export default defineComponent({
     // and the list stays empty. OSelect handles search filtering internally over
     // these options.
     watch(
-      () => streamList.value,
-      () => {
-        streamOptions.value = [...streamList.value];
+      streamPickerOptions,
+      (options) => {
+        streamOptions.value = options;
       },
-      {
-        deep: true,
-        immediate: true,
+      { immediate: true },
+    );
+
+    // A re-run refetches the schema of the same streams, so their fields stay up instead of flashing to the skeleton.
+    const streamsKey = () =>
+      `${searchObj.data.stream.streamType}:${searchObj.data.stream.selectedStream.join(",")}`;
+    const fieldsStreamsKey = ref("");
+    // A stream switch first assigns the raw schema, then the grouped list; only the settled list belongs to the streams.
+    watch(
+      () =>
+        [
+          searchObj.data.stream.selectedStreamFields,
+          searchObj.loadingStream || searchObj.loadingFieldGroups,
+        ] as const,
+      ([fields, loading]) => {
+        if (fields?.length && !loading) fieldsStreamsKey.value = streamsKey();
       },
+      { immediate: true },
+    );
+    const showFieldListSkeleton = computed(
+      () =>
+        (searchObj.loadingStream || searchObj.loadingFieldGroups) &&
+        (!searchObj.data.stream.selectedStreamFields?.length ||
+          fieldsStreamsKey.value !== streamsKey()),
     );
 
     const resetFields = async () => {
@@ -1886,6 +1999,7 @@ export default defineComponent({
       toggleInterestingFields,
       fieldListRef,
       streamSelect,
+      showFieldListSkeleton,
       toggleFieldGroup,
       streamFieldsRows: computed(() => {
         const source = showOnlyInterestingFields.value
@@ -1936,6 +2050,14 @@ export default defineComponent({
       getValuesPartition,
       streamList,
       quickPickStreams,
+      quickPickGroups,
+      quickPickMoreCount,
+      streamPickerOpen,
+      streamPickerSearch,
+      onStreamPickerSearch,
+      onStreamPickerClose,
+      onStreamPickerHeaderAction,
+      streamPickerAnnouncement,
       hasUserDefinedSchemas,
       setPage,
       resetPagination,

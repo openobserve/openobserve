@@ -111,7 +111,8 @@ describe("searchPalette", () => {
   it("shows problems first, then a few views, for an empty query", () => {
     const result = searchPalette(items, "  ").items;
     expect(result[0].id).toBe("pod/prod/payments/checkout-2");
-    expect(result.filter((i) => i.group === "goTo")).toHaveLength(6);
+    const views = result.filter((i) => i.group === "goTo").map((i) => (i.target as any).view);
+    expect(views).toEqual(["cluster", "map", "nodes", "namespaces", "events", "workloads"]);
     expect(result.some((i) => i.group === "pods")).toBe(false);
   });
 

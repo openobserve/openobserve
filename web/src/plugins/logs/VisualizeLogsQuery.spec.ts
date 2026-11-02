@@ -200,6 +200,7 @@ vi.mock("lodash-es", () => ({
 // Mock sqlUtils with isSimpleSelectAllQuery function
 vi.mock("@/utils/query/sqlUtils", () => {
   return {
+    isExplainQuery: vi.fn(() => false),
     isSimpleSelectAllQuery: vi.fn((query: string) => {
       if (!query || typeof query !== "string") return false;
       const normalizedQuery = query.trim().replace(/\s+/g, " ");

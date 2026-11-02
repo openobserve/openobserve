@@ -60,13 +60,14 @@ describe("dashboardReadyStep", () => {
 
 describe("host agent cards include the dashboard step", () => {
   it.each([
-    ["linux", linuxCard],
-    ["windows", windowsCard],
-    ["macos", macosCard],
-  ])("%s card ends install → verify → dashboard", (_name, builder: any) => {
+    // Linux has an optional network flows step between install and verify.
+    ["linux", linuxCard, ["install", "network", "verify", "dashboard"]],
+    ["windows", windowsCard, ["install", "verify", "dashboard"]],
+    ["macos", macosCard, ["install", "verify", "dashboard"]],
+  ])("%s card ends verify → dashboard", (_name, builder: any, ids: string[]) => {
     const card = builder(SUBS, gt);
-    expect(card.steps.map((s: any) => s.id)).toEqual(["install", "verify", "dashboard"]);
-    expect(card.steps[2].completeOn).toBe("detect");
+    expect(card.steps.map((s: any) => s.id)).toEqual(ids);
+    expect(card.steps.at(-1).completeOn).toBe("detect");
   });
 });
 

@@ -36,8 +36,8 @@ export const PREVIEW_CACHE_SIZE = 200;
 /** Cache TTL when auto-refresh is off. */
 export const DEFAULT_CACHE_TTL_MS = 60_000;
 
-/** Dialog tiles outrank background grid work while the dialog is open. */
-export const PRIORITY = { DIALOG: 0, VISIBLE: 1, PREFETCH: 2 };
+/** Dialog tiles outrank background grid work while the dialog is open; BACKGROUND runs only when no chart waits. */
+export const PRIORITY = { DIALOG: 0, VISIBLE: 1, PREFETCH: 2, BACKGROUND: 3 };
 
 interface CacheEntry {
   value: any;

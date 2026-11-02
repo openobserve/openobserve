@@ -146,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :loading="loading"
+            :loading-reset-key="activeFolderId"
             :forbidden="forbidden"
             :frame="false"
             :default-columns="false"
@@ -1005,7 +1006,7 @@ export default defineComponent({
       try {
         await getFoldersList(store);
       } catch {
-        // Already reported by the grouped access toast; the empty rail stands in.
+        // The empty rail stands in; the access boundary reports a 403.
       }
 
       // Load favorites BEFORE picking the landing view — the favorites-first
@@ -1083,7 +1084,6 @@ export default defineComponent({
           if (isCancelledError(error)) return;
           console.error("Error loading dashboards:", error);
           forbidden.value = asCaughtError(error).response?.status === 403;
-          // The grouped access toast already reports a 403; a second red toast adds nothing.
           if (!forbidden.value) {
             showErrorNotification(
               raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
@@ -1361,6 +1361,8 @@ export default defineComponent({
       // on screen keeps them and spins the button instead.
       refreshing.value = true;
       loading.value = dashboardList.value.length === 0;
+      forbidden.value = false;
+      const target = `${showFavoritesOnly.value}|${activeFolderId.value}`;
       try {
         if (showFavoritesOnly.value) {
           // Refresh in the favorites view: re-read the favorites setting and
@@ -1401,9 +1403,14 @@ export default defineComponent({
           stampFolders([folderId]);
         }
       } catch (err) {
-        showErrorNotification(
-          raw(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad")),
-        );
+        // A late failure for a folder the user already left must not lock the folder now on screen.
+        if (target !== `${showFavoritesOnly.value}|${activeFolderId.value}`) return;
+        forbidden.value = asCaughtError(err).response?.status === 403;
+        if (!forbidden.value) {
+          showErrorNotification(
+            raw(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad")),
+          );
+        }
       } finally {
         dismiss();
         loading.value = false;
@@ -1631,6 +1638,7 @@ export default defineComponent({
 
         return migratedDashboards;
       } catch (error) {
+        if (asCaughtError(error).response?.status === 403) return;
         showErrorNotification(
           raw(asCaughtError(error).message ?? t("dashboard.dashboards.errorFetchingSearch")),
         );
@@ -1917,7 +1925,7 @@ export default defineComponent({
           caught.response?.data?.message ||
           caught.message ||
           t("dashboard.dashboards.errorDeleting");
-        if (caught.response?.status != 403 || caught.status != 403) {
+        if (caught.response?.status !== 403 && caught.status !== 403) {
           toast({
             variant: "error",
             message: raw(errorMessage),

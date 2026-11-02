@@ -288,4 +288,69 @@ describe("useLogsUrl (4c C7b)", () => {
       expect(router.push).not.toHaveBeenCalled();
     });
   });
+
+  describe("first search write after arriving on Logs", () => {
+    const Stub = { render: () => null };
+    const makeAppRouter = () =>
+      createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/traces", name: "traces", component: Stub },
+          { path: "/logs", name: "logs", component: Stub },
+        ],
+      });
+    const handoff = { stream: "app", type: "trace_explorer", query: "dHJhY2U=" };
+    const normalized = { ...handoff, sql_mode: "false", quick_mode: "false", period: "15m" };
+    const navigated = (router: ReturnType<typeof makeAppRouter>) =>
+      new Promise<void>((resolve) => {
+        const stop = router.afterEach(() => {
+          stop();
+          resolve();
+        });
+      });
+
+    it("replaces the handoff URL, so Back returns to the trace", async () => {
+      const router = makeAppRouter();
+      bindLogsUrlRouter(router);
+      await router.push("/traces");
+      await router.push({ path: "/logs", query: handoff });
+      const mode = urlWriteMode(router.currentRoute.value.query, normalized);
+      expect(mode).toBe("replace");
+      await writeLogsUrl(mode, normalized);
+
+      const back = navigated(router);
+      router.back();
+      await back;
+      expect(router.currentRoute.value.name).toBe("traces");
+    });
+
+    it("still pushes the searches that follow", async () => {
+      const router = makeAppRouter();
+      bindLogsUrlRouter(router);
+      await router.push("/traces");
+      await router.push({ path: "/logs", query: handoff });
+      await writeLogsUrl(urlWriteMode(router.currentRoute.value.query, normalized), normalized);
+      const next = { ...normalized, period: "1h" };
+      expect(urlWriteMode(router.currentRoute.value.query, next)).toBe("push");
+    });
+
+    it("treats the Logs entry as an arrival when Logs binds the router after landing", async () => {
+      const router = makeAppRouter();
+      await router.push("/traces");
+      await router.push({ path: "/logs", query: handoff });
+      bindLogsUrlRouter(router);
+      expect(urlWriteMode(router.currentRoute.value.query, normalized)).toBe("replace");
+    });
+
+    it("does not re-arm on navigation inside Logs", async () => {
+      const router = makeAppRouter();
+      bindLogsUrlRouter(router);
+      await router.push("/traces");
+      await router.push({ path: "/logs", query: handoff });
+      await writeLogsUrl(urlWriteMode(router.currentRoute.value.query, normalized), normalized);
+      await router.push({ path: "/logs", query: { ...normalized, stream: "web" } });
+      const next = { ...normalized, stream: "web", period: "1h" };
+      expect(urlWriteMode(router.currentRoute.value.query, next)).toBe("push");
+    });
+  });
 });

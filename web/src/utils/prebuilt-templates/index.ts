@@ -32,7 +32,12 @@ export { opsgenieTemplate, opsgenieConfig, opsgenieDestinationType } from "./ops
 import { slackAppDestinationTile, slackConfig, slackDestinationType } from "./slack";
 import { discordConfig, discordDestinationType } from "./discord";
 import { msteamsConfig, msteamsDestinationType } from "./msteams";
-import { pagerdutyConfig, pagerdutyDestinationType } from "./pagerduty";
+import {
+  pagerdutyConfig,
+  pagerdutyDestinationType,
+  PAGERDUTY_EU_EVENTS_URL,
+  PAGERDUTY_US_EVENTS_URL,
+} from "./pagerduty";
 import { servicenowConfig, servicenowDestinationType } from "./servicenow";
 import { emailConfig, emailDestinationType } from "./email";
 import { opsgenieConfig, opsgenieDestinationType } from "./opsgenie";
@@ -145,7 +150,7 @@ export function generateDestinationUrl(type: string, credentials: Record<string,
     case "servicenow":
       return credentials.instanceUrl || "";
     case "pagerduty":
-      return "https://events.pagerduty.com/v2/enqueue";
+      return credentials.euRegion ? PAGERDUTY_EU_EVENTS_URL : PAGERDUTY_US_EVENTS_URL;
     case "opsgenie":
       return credentials.euRegion
         ? "https://api.eu.opsgenie.com/v2/alerts"

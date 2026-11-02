@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { ref } from "vue";
+import { ref, type Ref } from "vue";
 
 const organizationDataLocal: any = ref({});
 
@@ -160,3 +160,7 @@ export const useLocalWrapTracesContent = (val = "", isDelete = false) => {
   const wrapcontent: any = useLocalStorage("wrapTracesContent", val, isDelete);
   return wrapcontent.value;
 };
+
+/** Reads (no `val`) or writes the hide-internal-streams flag under `key`; the ref follows other tabs' writes, `undefined` when storage is unavailable. */
+export const useLocalHideInternalStreams = (key: string, val: "" | "true" | "false" = "") =>
+  useLocalStorage(key, val) as Ref<string | null> | undefined;

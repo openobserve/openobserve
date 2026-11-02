@@ -182,6 +182,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTab name="steps" data-test="synthetics-run-detail-tab-steps">
             {{ t("synthetics.runs.tabSteps") }}
             <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
+            <OBadge
+              v-if="skippedStepCount > 0"
+              variant="default"
+              size="sm"
+              data-test="synthetics-run-detail-skipped-count"
+              >{{ t("synthetics.runDetail.skippedCount", { n: skippedStepCount }) }}</OBadge
+            >
           </OTab>
           <OTab name="evidence" data-test="synthetics-run-detail-tab-evidence">
             {{ t("synthetics.runDetail.evidenceSection") }}
@@ -332,6 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       detail-key="detail"
                       icon-key="icon"
                       :dot-state-fn="stepDotState"
+                      :step-badge-fn="stepStatusBadge"
                       :expanded-ids="expandedStepIdsArr"
                       @update:expanded-ids="handleUpdateExpanded"
                     >
@@ -435,20 +443,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ t("synthetics.runDetail.detailAction") }}
                               </dt>
                               <dd class="text-text-secondary">{{ row.action }}</dd>
-                              <dt
-                                class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
-                              >
-                                {{ t("synthetics.runDetail.detailSelector") }}
-                              </dt>
-                              <dd class="text-text-secondary">{{ row.detail }}</dd>
-                              <dt
-                                class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
-                              >
-                                {{ t("synthetics.runDetail.detailUrl") }}
-                              </dt>
-                              <OTruncatedText as="dd" class="text-text-secondary">
-                                {{ row.url || currentRun.url }}
-                              </OTruncatedText>
+                              <template v-if="row.selector">
+                                <dt
+                                  class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
+                                >
+                                  {{ t("synthetics.runDetail.detailSelector") }}
+                                </dt>
+                                <OTruncatedText
+                                  as="dd"
+                                  class="text-text-secondary font-mono"
+                                  data-test="synthetics-run-detail-step-selector"
+                                >
+                                  {{ row.selector }}
+                                </OTruncatedText>
+                              </template>
+                              <!-- The configured navigation target, not the page the
+                                   step observed: the probe does not report that yet. -->
+                              <template v-if="row.url">
+                                <dt
+                                  class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
+                                >
+                                  {{ t("synthetics.runDetail.detailTargetUrl") }}
+                                </dt>
+                                <OTruncatedText
+                                  as="dd"
+                                  class="text-text-secondary"
+                                  data-test="synthetics-run-detail-step-target-url"
+                                >
+                                  {{ row.url }}
+                                </OTruncatedText>
+                              </template>
+                              <template v-if="row.stepId && row.id > 0">
+                                <dt
+                                  class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
+                                >
+                                  {{ t("synthetics.runDetail.detailStepId") }}
+                                </dt>
+                                <OTruncatedText
+                                  as="dd"
+                                  class="text-text-secondary font-mono"
+                                  data-test="synthetics-run-detail-step-id"
+                                >
+                                  {{ row.stepId }}
+                                </OTruncatedText>
+                              </template>
+                              <template v-if="row.status === 'skipped' || row.status === 'unknown'">
+                                <dt
+                                  class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
+                                >
+                                  {{ t("synthetics.runDetail.detailStatus") }}
+                                </dt>
+                                <dd
+                                  class="text-text-secondary"
+                                  data-test="synthetics-run-detail-step-status"
+                                >
+                                  {{
+                                    row.status === "skipped"
+                                      ? t("synthetics.runDetail.stepStatusSkipped")
+                                      : t("synthetics.runDetail.stepStatusUnknown")
+                                  }}
+                                </dd>
+                              </template>
+                              <template v-if="row.status === 'skipped' && row.error">
+                                <dt
+                                  class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
+                                >
+                                  {{ t("synthetics.runDetail.detailSkipReason") }}
+                                </dt>
+                                <dd
+                                  class="text-text-secondary break-words whitespace-pre-wrap"
+                                  data-test="synthetics-run-detail-step-skip-reason"
+                                >
+                                  {{ row.error }}
+                                </dd>
+                              </template>
                               <dt
                                 class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
                               >
@@ -631,7 +699,11 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import { buildAttemptViews, stepOwnDetail } from "@/composables/synthetics/syntheticResultsSchema";
+import {
+  buildAttemptViews,
+  effectiveSelector,
+  stepOwnDetail,
+} from "@/composables/synthetics/syntheticResultsSchema";
 import type {
   AttemptView,
   EvidenceEvent,
@@ -815,7 +887,13 @@ interface StepRow {
    * When the probe starts emitting `start_time`, this becomes a read of it.
    */
   offsetMs: number;
-  status: "pass" | "fail";
+  status: StepRowStatus;
+  /**
+   * The locator the step acted on, from this run's recorded snapshot via
+   * `effectiveSelector`. Null for actions without a locator (navigate, wait),
+   * so the Selector row is omitted instead of showing the step ID.
+   */
+  selector: string | null;
   icon: string;
   statusIcon: string;
   durStr: string;
@@ -829,6 +907,27 @@ interface StepRow {
   /** Bundle events attributed to this step, ranked worst-first. Empty until loaded. */
   bundleEvents: EvidenceEvent[];
 }
+
+/**
+ * A step's outcome as shown. Skipped and unknown stay distinct: a skipped
+ * optional step is neutral, not passed, and a status the UI does not know
+ * must never be shown as a pass.
+ */
+type StepRowStatus = "pass" | "fail" | "skipped" | "unknown";
+
+function stepRowStatus(raw: unknown): StepRowStatus {
+  if (raw === "ok" || raw === "passed" || raw === "pass") return "pass";
+  if (raw === "fail" || raw === "failed") return "fail";
+  if (raw === "skipped" || raw === "skip") return "skipped";
+  return "unknown";
+}
+
+const STEP_STATUS_ICON: Record<StepRowStatus, string> = {
+  pass: "check-circle",
+  fail: "cancel",
+  skipped: "do-not-disturb-on",
+  unknown: "help",
+};
 
 function fmtDur(ms: number): string {
   return ms >= 1000 ? (ms / 1000).toFixed(1) + "s" : ms + "ms";
@@ -857,21 +956,25 @@ function buildSteps(
   let elapsedMs = 0;
   return steps.map((ex, idx) => {
     const recorded = recordedMap.get(ex.step_id);
-    const isFail = ex.status === "fail";
+    const status = stepRowStatus(ex.status);
+    const isFail = status === "fail";
+    const selector = recorded ? effectiveSelector(recorded) : null;
     const offsetMs = elapsedMs;
     elapsedMs += ex.duration_ms ?? 0;
     return {
       id: idx + 1,
       stepId: ex.step_id,
       action: recorded?.action ?? "step",
-      name: recorded?.name || recorded?.selector || recorded?.url || ex.step_id.slice(0, 8),
-      detail: recorded?.selector ?? recorded?.url ?? ex.step_id,
+      name: recorded?.name || selector || recorded?.url || ex.step_id.slice(0, 8),
+      // The step ID is shown only under "Step ID", never as the locator.
+      detail: selector ?? recorded?.url ?? "",
+      selector,
       url: recorded?.url ?? "",
       duration: ex.duration_ms,
       offsetMs,
-      status: isFail ? ("fail" as const) : ("pass" as const),
+      status,
       icon: recorded ? actionIcon(recorded.action) : "radio_button_checked",
-      statusIcon: isFail ? "cancel" : "check-circle",
+      statusIcon: STEP_STATUS_ICON[status],
       durStr: fmtDur(ex.duration_ms),
       durColor: isFail ? "var(--color-status-error-text)" : "var(--color-text-secondary)",
       error: ex.error,
@@ -915,6 +1018,7 @@ function buildStartRow(
     action: "navigate",
     name: t("synthetics.runDetail.startLoadLabel", { url: load.url }),
     detail: load.url,
+    selector: null,
     url: load.url,
     duration: load.duration_ms,
     offsetMs: 0,
@@ -1256,7 +1360,28 @@ watch(
 );
 
 function stepDotState(row: any): StepDotState | undefined {
-  return row.status === "fail" ? "fail" : "pass";
+  switch (row.status as StepRowStatus) {
+    case "fail":
+      return "fail";
+    case "pass":
+      return "pass";
+    case "skipped":
+      return "skip";
+    default:
+      // Unknown: the neutral outline, never the pass colour.
+      return undefined;
+  }
+}
+
+/** Text label for the outcomes the dot colour alone cannot carry. */
+function stepStatusBadge(row: any): { label: string; variant: "default" | "error" } | null {
+  if (row.status === "skipped") {
+    return { label: t("synthetics.runDetail.stepStatusSkipped"), variant: "default" };
+  }
+  if (row.status === "unknown") {
+    return { label: t("synthetics.runDetail.stepStatusUnknown"), variant: "default" };
+  }
+  return null;
 }
 
 /**
@@ -1359,6 +1484,8 @@ const steps = computed<StepRow[]>(() => {
   }
   return [];
 });
+
+const skippedStepCount = computed(() => steps.value.filter((s) => s.status === "skipped").length);
 
 const startRow = computed<StepRow | null>(() => {
   const detail = synthetics.runDetail.value;

@@ -241,6 +241,10 @@ pub struct Alert {
     #[serde(default)]
     #[schema(example = 0)]
     pub keep_firing_for: i64,
+
+    /// Notify once per state change instead of on every firing evaluation. Enterprise only.
+    #[serde(default)]
+    pub suppress_repeats: bool,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -638,6 +642,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             pending_period_sec: alert.pending_period_sec,
             notify_on_recovery: alert.notify_on_recovery,
             keep_firing_for: alert.keep_firing_for,
+            suppress_repeats: alert.suppress_repeats,
         }
     }
 }
@@ -847,6 +852,7 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.notify_on_recovery = value.notify_on_recovery;
         alert.recovery_destinations = value.recovery_destinations;
         alert.keep_firing_for = value.keep_firing_for.max(0);
+        alert.suppress_repeats = value.suppress_repeats;
         alert.normalize_promql_rule_mode();
 
         alert

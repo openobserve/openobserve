@@ -1194,7 +1194,7 @@ export default defineComponent({
         confirmBulkDelete.value = false;
         await getServiceAccountsUsers(true);
       } catch (err: any) {
-        if (err.response?.status != 403 || err?.status != 403) {
+        if (err.response?.status !== 403 && err?.status !== 403) {
           toast({
             message:
               err?.response?.data?.message ||

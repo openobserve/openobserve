@@ -238,13 +238,13 @@ import FleetRevokeTokenDialog from "./FleetRevokeTokenDialog.vue";
 import FleetTokenForm from "./FleetTokenForm.vue";
 import {
   isForbidden,
-  serverMessage,
   tokenExpiresSoon,
   tokenState,
   useFleetCollectors,
   useFleetTokens,
   type TokenRow,
   type TokenState,
+  failureText,
 } from "./useFleetApi";
 
 const props = defineProps<{ open: boolean; fleetId: string; fleetName: I18nText }>();
@@ -388,7 +388,7 @@ async function revoke(row: TokenRow) {
   } catch (err) {
     toast({
       variant: "error",
-      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
+      message: failureText(err, t),
     });
   }
 }

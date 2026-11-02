@@ -217,6 +217,7 @@ const i18n = createI18n({
         wellGroup: "Group",
         wellSubgroup: "Sub-group",
         wellSize: "Size",
+        wellCategory: "Category",
         joins: "Joins",
         addJoin: "Add Join",
       },
@@ -584,6 +585,15 @@ describe("DashboardQueryBuilder", () => {
       expect(text).toContain("Sub-group");
       expect(text).toContain("Size");
       expect(text).not.toContain("X-Axis");
+    });
+
+    it("names the box plot wells by their job", () => {
+      const wells = (type: string) => {
+        wrapper?.unmount();
+        wrapper = createWrapper({ "data.type": type });
+        return [wrapper.vm.currentXLabel, wrapper.vm.currentYLabel];
+      };
+      expect(wells("boxplot")).toEqual(["Category", "Value"]);
     });
 
     it("should handle x-axis field removal", async () => {
@@ -1527,6 +1537,36 @@ describe("DashboardQueryBuilder", () => {
       expect(query.query).toBe(
         'sum by (job, instance) (rate(http_requests_total{code=~"5.."}[5m]))',
       );
+
+      try {
+        wrapper.unmount();
+      } catch {
+        // jsdom cannot unmount the builder subtree a post-mount flip renders; not under test.
+      }
+      wrapper = null as any;
+    });
+
+    it("keeps the last query when the labels arrive past the branch cap", async () => {
+      const written = slot("rate(http_requests_total{}[5m])");
+      written.fields.promql_operations = [{ id: "rate", params: ["5m"] }] as any;
+      promqlPanel([written]);
+
+      wrapper = createWrapper();
+      await flushPromises();
+      const query = live().data.queries[0];
+      wrapper.vm.promqlBuilderQuery.labels = Array.from({ length: 17 }, (_, i) => ({
+        label: `l${i}`,
+        op: "=",
+        value: "v",
+        group: 1,
+        negate: true,
+      }));
+      await flushPromises();
+      expect(query.query).toBe("rate(http_requests_total{}[5m])");
+
+      wrapper.vm.promqlBuilderQuery.labels = [{ label: "code", op: "=", value: "500" }];
+      await flushPromises();
+      expect(query.query).toBe('rate(http_requests_total{code="500"}[5m])');
 
       try {
         wrapper.unmount();

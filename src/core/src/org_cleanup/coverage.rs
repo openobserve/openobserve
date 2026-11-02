@@ -230,6 +230,8 @@ pub const COVERAGE: &[Coverage] = &[
     table("workflow_errors", DB),
     table("workflow_run_data", DB),
     table("workflows", DB),
+    table("org_domain_ownership", DB),
+    table("org_domain_requests", DB),
     covered(Kind::KvPrefix, "/cipher_keys/{org}/", DB),
     covered(Kind::KvPrefix, "/compact/downsampling/{org}/", DB),
     covered(Kind::KvPrefix, "/compact/files/{org}/", DB),

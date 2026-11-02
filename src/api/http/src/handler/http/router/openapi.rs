@@ -120,6 +120,7 @@ use crate::{
         openobserve_api_search::search::saved_view::update_view,
         openobserve_api_management::request::query_history::record,
         openobserve_api_management::request::query_history::list,
+        openobserve_api_management::request::query_history::clear,
         openobserve_api_management::request::query_history::star,
         openobserve_api_management::request::query_history::delete,
         openobserve_api_management::request::folders::delete_folder,
@@ -310,6 +311,7 @@ use crate::{
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
         openobserve_api_management::request::metrics_usage::get_metric_usage,
+        openobserve_api_management::request::metrics_usage::get_org_metric_usage,
         openobserve_api_management::request::slos::list_slos,
         openobserve_api_management::request::slos::get_slo,
         openobserve_api_management::request::slos::create_slo,
@@ -698,6 +700,9 @@ use crate::{
             openobserve_api_management::request::query_history::QueryHistoryRequest,
             openobserve_api_management::request::query_history::QueryHistoryStarRequest,
             openobserve_api_management::request::query_history::QueryHistoryEntry,
+            openobserve_api_management::request::query_history::QueryHistoryCountResponse,
+            openobserve_api_management::request::query_history::QueryHistoryListResponse,
+            openobserve_api_management::request::query_history::QueryHistoryClearResponse,
             meta::user::UpdateUser,
             meta::user::UserRoleRequest,
             meta::user::PostUserRequest,
@@ -1618,6 +1623,7 @@ mod tests {
         for (path, method) in [
             ("/api/{org_id}/query_history", "post"),
             ("/api/{org_id}/query_history", "get"),
+            ("/api/{org_id}/query_history", "delete"),
             ("/api/{org_id}/query_history/{id}", "patch"),
             ("/api/{org_id}/query_history/{id}", "delete"),
         ] {
@@ -1849,6 +1855,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "enterprise"))]
     #[test]
     fn prompt_paths_are_absent_from_oss_openapi() {
         let api = ApiDoc::openapi();
@@ -2077,11 +2084,11 @@ mod tests {
         let by_id = "/api/{org_id}/workflows/{id}";
         assert_documented_statuses(&[
             (base, "post", &["200", "400", "403", "500"]),
-            (base, "get", &["200", "403", "500"]),
+            (base, "get", &["200", "403", "404", "500"]),
             (
                 "/api/v2/{org_id}/workflows/move",
                 "patch",
-                &["200", "400", "403", "500"],
+                &["200", "400", "403", "404", "500"],
             ),
             (by_id, "delete", &["200", "400", "404", "500"]),
             (by_id, "put", &["200", "400", "500"]),
