@@ -103,7 +103,6 @@ const today = ref(todayText());
 // Read on every open, so a drawer left open past midnight still offers the new day.
 watch(open, (isOpen) => {
   if (isOpen) today.value = todayText();
-  else judgeLater();
 });
 // The calendar speaks the app's YYYY/MM/DD; the filter keeps YYYY-MM-DD.
 const selectedDay = computed(() => props.modelValue?.replace(/-/g, "/"));
