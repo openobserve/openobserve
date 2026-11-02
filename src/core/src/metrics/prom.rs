@@ -71,6 +71,37 @@ const SAMPLES_WRITTEN_HEADER: &str = "X-Prometheus-Remote-Write-Samples-Written"
 const HISTOGRAMS_WRITTEN_HEADER: &str = "X-Prometheus-Remote-Write-Histograms-Written";
 const EXEMPLARS_WRITTEN_HEADER: &str = "X-Prometheus-Remote-Write-Exemplars-Written";
 
+/// The result of a remote-write request that was decoded and processed.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct RemoteWriteOutcome {
+    pub written: WrittenCounts,
+    /// Set when part of the request was dropped: the spec requires a 400 for a partial write.
+    pub rejected: Option<String>,
+}
+
+impl RemoteWriteOutcome {
+    fn new(total: WrittenCounts, written: WrittenCounts, reason: Option<String>) -> Self {
+        let rejected = reason.filter(|_| written != total).map(|reason| {
+            format!(
+                "not written (samples: {}, histograms: {}, exemplars: {}): {reason}",
+                total.samples - written.samples,
+                total.histograms - written.histograms,
+                total.exemplars - written.exemplars,
+            )
+        });
+        Self { written, rejected }
+    }
+}
+
+impl From<WrittenCounts> for RemoteWriteOutcome {
+    fn from(written: WrittenCounts) -> Self {
+        Self {
+            written,
+            rejected: None,
+        }
+    }
+}
+
 /// What a remote-write request stored, in the units Prometheus counts what it sent.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct WrittenCounts {
@@ -80,7 +111,7 @@ pub struct WrittenCounts {
 }
 
 impl WrittenCounts {
-    /// Prometheus (>= 2.54) counts the shortfall against these as failed, even on a 2xx.
+    /// Prometheus (>= 2.54) reads these on a 400 too, so only the shortfall counts as failed.
     pub fn response_headers(self) -> [(&'static str, String); 3] {
         [
             (SAMPLES_WRITTEN_HEADER, self.samples.to_string()),
@@ -126,7 +157,7 @@ pub async fn remote_write(
     org_id: &str,
     body: Bytes,
     user: IngestUser,
-) -> std::result::Result<WrittenCounts, anyhow::Error> {
+) -> std::result::Result<RemoteWriteOutcome, anyhow::Error> {
     // check system resource
     check_ingestion_allowed(org_id, StreamType::Metrics, None).await?;
 
@@ -166,7 +197,7 @@ pub async fn remote_write(
     // check if stream is deleting from cache
     let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
     let mut skipped_records: u32 = 0;
-    // remote write has no partial success: a 4xx drops the whole batch, a 5xx retries it forever
+    // an over-long stream is skipped, not failed: a partial-write 400 keeps the rest, unretried
     let mut stream_key_checks = ingest::StreamKeyChecks::default();
 
     // parse metadata
@@ -205,7 +236,7 @@ pub async fn remote_write(
     // maybe empty, we can return immediately
     if request.timeseries.is_empty() {
         ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
-        return Ok(WrittenCounts::default());
+        return Ok(RemoteWriteOutcome::default());
     }
 
     // parse timeseries
@@ -253,6 +284,7 @@ pub async fn remote_write(
     unique_metrics.retain(|name| stream_key_checks.violation(org_id, name).is_none());
     // every deduction below is of items counted once in `total`, so none can underflow
     let mut written = total;
+    let mut rejection: Option<String> = None;
 
     let mut preload_pipeline_time = 0u128;
     let mut preload_uds_time = 0u128;
@@ -415,10 +447,11 @@ pub async fn remote_write(
             continue;
         }
 
-        if stream_key_checks.violation(org_id, &metric_name).is_some() {
+        if let Some(reason) = stream_key_checks.violation(org_id, &metric_name) {
             written.samples -= event.samples.len();
             written.histograms -= event.histograms.len();
             written.exemplars -= event.exemplars.len();
+            rejection.get_or_insert_with(|| reason.to_string());
             continue;
         }
 
@@ -451,7 +484,7 @@ pub async fn remote_write(
             if has_writable && !gate.admit().await {
                 ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
                 // deduplicated data counts as written, or every non-leader request reads as failed
-                return Ok(total);
+                return Ok(total.into());
             }
             for sample in &event.samples {
                 if let Some(value) = sample_cell(sample.value, schema) {
@@ -490,7 +523,7 @@ pub async fn remote_write(
             if !gate.admit().await {
                 // do not accept any entries for this request
                 ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
-                return Ok(total);
+                return Ok(total.into());
             }
 
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
@@ -513,11 +546,14 @@ pub async fn remote_write(
 
         if !event.histograms.is_empty() {
             // `_sum` may still be stored, but a histogram missing its buckets is not written
-            if CLASSIC_HISTOGRAM_SUFFIXES.iter().any(|suffix| {
+            if let Some(reason) = CLASSIC_HISTOGRAM_SUFFIXES.iter().find_map(|suffix| {
                 let stream = format!("{metric_name}{suffix}");
-                stream_key_checks.violation(org_id, &stream).is_some()
+                stream_key_checks
+                    .violation(org_id, &stream)
+                    .map(str::to_string)
             }) {
                 written.histograms -= event.histograms.len();
+                rejection.get_or_insert(reason);
             }
             match buffer_native_histograms(
                 &event.histograms,
@@ -532,7 +568,7 @@ pub async fn remote_write(
                 Some(counted) => sample_count += counted,
                 None => {
                     ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
-                    return Ok(total);
+                    return Ok(total.into());
                 }
             }
         }
@@ -544,17 +580,15 @@ pub async fn remote_write(
         exemplar_count += event.exemplars.len();
         let exemplars_stream =
             exemplars_stream_for_series(&metric_name, labels.contains_key(BUCKET_LABEL));
-        if stream_key_checks
-            .violation(org_id, &exemplars_stream)
-            .is_some()
-        {
+        if let Some(reason) = stream_key_checks.violation(org_id, &exemplars_stream) {
             written.exemplars -= event.exemplars.len();
+            rejection.get_or_insert_with(|| reason.to_string());
             continue;
         }
         let rows = exemplar_records(std::mem::take(&mut labels), &event.exemplars);
         if !rows.is_empty() && !gate.admit().await {
             ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
-            return Ok(total);
+            return Ok(total.into());
         }
         for (record, timestamp) in rows {
             buffer_metric_record(
@@ -708,7 +742,7 @@ pub async fn remote_write(
         log::info!("[remote_write] org: {org_id}, total time: {total_ms} ms");
     }
 
-    Ok(written)
+    Ok(RemoteWriteOutcome::new(total, written, rejection))
 }
 
 pub async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<ResponseMetadata> {
@@ -2530,7 +2564,7 @@ mod tests {
         let body = snap::raw::Encoder::new()
             .compress_vec(&request.encode_to_vec())
             .unwrap();
-        let written = remote_write(
+        let outcome = remote_write(
             org_id,
             Bytes::from(body),
             IngestUser::User("root@example.com".to_string()),
@@ -2555,7 +2589,17 @@ mod tests {
                 exemplars: 2,
             }
         };
-        assert_eq!(written, expected_written);
+        assert_eq!(outcome.written, expected_written);
+        match outcome.rejected {
+            Some(reason) => assert!(
+                bounded
+                    && reason.starts_with(
+                        "not written (samples: 1, histograms: 2, exemplars: 2): Stream name too long"
+                    ),
+                "{reason}"
+            ),
+            None => assert!(!bounded),
+        }
         let expected = [
             ("test_prom_key_len_ok".to_string(), true),
             (format!("{histogram_name}_sum"), true),
@@ -2568,6 +2612,17 @@ mod tests {
             let exists = infra::schema::exists(org_id, StreamType::Metrics, &name).await;
             assert_eq!(exists, created, "{name}");
         }
+    }
+
+    #[test]
+    fn a_rejection_that_dropped_nothing_is_not_a_partial_write() {
+        let counts = WrittenCounts {
+            samples: 2,
+            histograms: 0,
+            exemplars: 1,
+        };
+        let outcome = RemoteWriteOutcome::new(counts, counts, Some("too long".to_string()));
+        assert_eq!(outcome, RemoteWriteOutcome::from(counts));
     }
 
     #[test]
