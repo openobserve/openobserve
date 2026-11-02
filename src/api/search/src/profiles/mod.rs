@@ -24,9 +24,8 @@ pub mod tag_values;
 use arrow_schema::Schema;
 use axum::{Json, extract::rejection::JsonRejection, http::Method, response::Response};
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
-        profiles::uds_write_columns,
         search::{Query, Request, RequestEncoding, Response as SearchResponse, SearchEventType},
         stream::StreamType,
         traces::session::{quote_identifier, quote_sql_string},
@@ -557,9 +556,10 @@ fn queryable_field_names(schema: &Schema) -> Vec<String> {
     if defined_schema_fields.is_empty() {
         return names.map(str::to_string).collect();
     }
-    let keep = uds_write_columns(&defined_schema_fields);
     names
-        .filter(|name| keep.contains(*name))
+        .filter(|name| {
+            *name == TIMESTAMP_COL_NAME || defined_schema_fields.iter().any(|f| f == name)
+        })
         .map(str::to_string)
         .collect()
 }
@@ -742,7 +742,7 @@ mod tests {
     #[test]
     fn queryable_field_names_follow_the_user_defined_schema() {
         use arrow_schema::{DataType, Field};
-        use config::{TIMESTAMP_COL_NAME, meta::stream::StreamSettings};
+        use config::meta::stream::StreamSettings;
 
         let fields = [
             TIMESTAMP_COL_NAME,
@@ -755,7 +755,9 @@ mod tests {
         ]
         .map(|name| Field::new(name, DataType::Utf8, true));
         let settings = StreamSettings {
-            defined_schema_fields: vec!["k8s_pod_name".to_string()],
+            defined_schema_fields: ["k8s_pod_name", "service_name", "stack", "value"]
+                .map(str::to_string)
+                .to_vec(),
             ..Default::default()
         };
         let metadata = std::collections::HashMap::from([(

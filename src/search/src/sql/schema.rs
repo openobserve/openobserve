@@ -61,11 +61,7 @@ pub fn generate_select_star_schema(
                     let mut columns = columns.get(&name).cloned();
                     // filter columns by defined schema fields
                     if !defined_schema_fields.is_empty() {
-                        let uds_columns = check_schema_for_defined_schema_fields(
-                            name.get_stream_type(stream_type),
-                            schema.schema(),
-                            defined_schema_fields.clone(),
-                        );
+                        let uds_columns = defined_schema_fields.iter().collect::<HashSet<_>>();
                         if let Some(columns) = columns.as_mut() {
                             columns.retain(|column| uds_columns.contains(column));
                         }
@@ -98,28 +94,26 @@ pub fn generate_select_star_schema(
                 used_schemas.insert(name, schema);
             }
         } else {
-            let schema = generate_user_defined_schema(
-                name.get_stream_type(stream_type),
-                schema.as_ref(),
-                defined_schema_fields,
-                need_all_column,
+            used_schemas.insert(
+                name,
+                generate_user_defined_schema(
+                    schema.as_ref(),
+                    defined_schema_fields,
+                    need_all_column,
+                ),
             );
-            used_schemas.insert(name, schema);
         }
     }
     used_schemas
 }
 
 pub fn generate_user_defined_schema(
-    stream_type: StreamType,
     schema: &SchemaCache,
     defined_schema_fields: Vec<String>,
     need_all_column: bool,
 ) -> Arc<SchemaCache> {
     let cfg = get_config();
-    // the files keep the stream type's required columns, including ones the saved list predates
-    let mut fields =
-        check_schema_for_defined_schema_fields(stream_type, schema.schema(), defined_schema_fields);
+    let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
     fields.insert(TIMESTAMP_COL_NAME.to_string());
     fields.insert(ID_COL_NAME.to_string());
 
@@ -679,7 +673,7 @@ mod tests {
         let schema_cache = SchemaCache::new(Schema::new(fields));
         let defined = vec!["custom_field".to_string()];
 
-        let result = generate_user_defined_schema(StreamType::Logs, &schema_cache, defined, false);
+        let result = generate_user_defined_schema(&schema_cache, defined, false);
         let schema = result.schema();
         let names: HashSet<_> = schema.fields().iter().map(|f| f.name().as_str()).collect();
         assert!(names.contains(TIMESTAMP_COL_NAME));
@@ -697,7 +691,7 @@ mod tests {
         let schema_cache = SchemaCache::new(Schema::new(fields));
         let defined = vec!["nonexistent_field".to_string()];
 
-        let result = generate_user_defined_schema(StreamType::Logs, &schema_cache, defined, false);
+        let result = generate_user_defined_schema(&schema_cache, defined, false);
         let schema = result.schema();
         let names: HashSet<_> = schema.fields().iter().map(|f| f.name().as_str()).collect();
         assert!(!names.contains("nonexistent_field"));
@@ -718,38 +712,11 @@ mod tests {
         let schema_cache = SchemaCache::new(Schema::new(fields));
         let defined = vec!["f1".to_string()];
 
-        let result = generate_user_defined_schema(StreamType::Logs, &schema_cache, defined, true);
+        let result = generate_user_defined_schema(&schema_cache, defined, true);
         let schema = result.schema();
         let names: HashSet<_> = schema.fields().iter().map(|f| f.name().as_str()).collect();
         assert!(names.contains(all_col));
         assert!(names.contains("f1"));
-    }
-
-    #[test]
-    fn test_generate_user_defined_schema_keeps_stream_type_required_columns() {
-        let fields = vec![
-            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
-            Arc::new(Field::new("k8s_pod_name", DataType::Utf8, true)),
-            Arc::new(Field::new("trace_id", DataType::Utf8, true)),
-            Arc::new(Field::new("custom_attr", DataType::Utf8, true)),
-        ];
-        let schema_cache = SchemaCache::new(Schema::new(fields));
-        let names = |stream_type| {
-            let defined = vec!["k8s_pod_name".to_string()];
-            generate_user_defined_schema(stream_type, &schema_cache, defined, false)
-                .schema()
-                .fields()
-                .iter()
-                .map(|f| f.name().to_string())
-                .collect::<HashSet<_>>()
-        };
-
-        let profiles = names(StreamType::Profiles);
-        assert!(profiles.contains("trace_id"));
-        assert!(profiles.contains("k8s_pod_name"));
-        assert!(!profiles.contains("custom_attr"));
-
-        assert!(!names(StreamType::Logs).contains("trace_id"));
     }
 
     #[test]

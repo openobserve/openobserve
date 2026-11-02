@@ -289,25 +289,16 @@ async fn persist_stream_settings(
     mut settings: StreamSettings,
 ) -> std::result::Result<SavedStreamSettings, StreamSettingsError> {
     let cfg = get_config();
-    let schema_fields = schema
-        .fields()
-        .iter()
-        .map(|field| field.name())
-        .collect::<HashSet<_>>();
     let previous_settings = unwrap_stream_settings(schema);
 
     normalize_stream_settings(&mut settings);
 
     if !settings.defined_schema_fields.is_empty() {
-        let fields = check_schema_for_defined_schema_fields(
+        settings.defined_schema_fields = saved_defined_schema_fields(
             stream_type,
             schema,
             std::mem::take(&mut settings.defined_schema_fields),
         );
-        let mut fields = fields.into_iter().collect::<Vec<_>>();
-        fields.sort_unstable();
-        fields.retain(|field| schema_fields.contains(field));
-        settings.defined_schema_fields = fields;
     }
 
     let uds_user_fields = settings
@@ -449,6 +440,25 @@ async fn persist_stream_settings(
         settings,
         previous_settings,
     })
+}
+
+fn saved_defined_schema_fields(
+    stream_type: StreamType,
+    schema: &Schema,
+    fields: Vec<String>,
+) -> Vec<String> {
+    let mut fields = check_schema_for_defined_schema_fields(stream_type, schema, fields)
+        .into_iter()
+        .collect::<Vec<_>>();
+    fields.sort_unstable();
+    // profiles ingest keeps only the saved list, and a query column can first arrive after this
+    // save
+    fields.retain(|field| {
+        schema.field_with_name(field).is_ok()
+            || (matches!(stream_type, StreamType::Profiles)
+                && config::meta::profiles::uds_required_columns().any(|name| name == field))
+    });
+    fields
 }
 
 /// Make stream settings internally consistent before validation and persistence.
@@ -1345,6 +1355,24 @@ mod tests {
             assert!(result.contains(field), "missing {field}");
         }
         assert!(!result.contains(TIMESTAMP_COL_NAME));
+    }
+
+    #[test]
+    fn test_saved_defined_schema_fields_keeps_absent_profiles_query_columns() {
+        let schema = Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("k8s_pod_name", DataType::Utf8, true),
+        ]);
+        let requested = ["k8s_pod_name", "typo_field"].map(str::to_string).to_vec();
+
+        let profiles =
+            saved_defined_schema_fields(StreamType::Profiles, &schema, requested.clone());
+        assert!(profiles.contains(&"k8s_pod_name".to_string()));
+        assert!(profiles.contains(&"trace_id".to_string()));
+        assert!(!profiles.contains(&"typo_field".to_string()));
+
+        let traces = saved_defined_schema_fields(StreamType::Traces, &schema, requested);
+        assert_eq!(traces, ["k8s_pod_name"]);
     }
 
     #[test]

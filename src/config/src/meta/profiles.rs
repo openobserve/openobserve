@@ -15,8 +15,6 @@
 
 //! Profiles stream columns shared by the ingest, schema and query paths.
 
-use std::collections::HashSet;
-
 use crate::TIMESTAMP_COL_NAME;
 
 /// Profiled time of one OTLP Profile, on one row per (profile, instance) so sums count it once.
@@ -77,15 +75,6 @@ pub fn uds_required_columns() -> impl Iterator<Item = &'static str> {
         .filter(|name| *name != TIMESTAMP_COL_NAME)
 }
 
-/// Columns a profiles UDS stream writes; required ones may appear after the UDS was saved.
-pub fn uds_write_columns(defined_schema_fields: &[String]) -> HashSet<String> {
-    uds_required_columns()
-        .chain([TIMESTAMP_COL_NAME])
-        .map(str::to_string)
-        .chain(defined_schema_fields.iter().cloned())
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,14 +98,5 @@ mod tests {
             assert!(columns.contains(&name), "missing {name}");
         }
         assert!(!columns.contains(&TIMESTAMP_COL_NAME));
-    }
-
-    #[test]
-    fn uds_write_columns_add_required_and_timestamp() {
-        let columns = uds_write_columns(&["k8s_pod_name".to_string()]);
-        assert!(columns.contains("k8s_pod_name"));
-        assert!(columns.contains("stack"));
-        assert!(columns.contains(TIMESTAMP_COL_NAME));
-        assert!(!columns.contains("k8s_node_name"));
     }
 }
