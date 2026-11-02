@@ -138,6 +138,13 @@ pub struct UnackRequest {
     pub firing_started_at: Option<i64>,
 }
 
+/// The optional body of the page and incident acknowledge routes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(default)]
+pub struct ProblemAckRequest {
+    pub take_over: bool,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct AckIncidentRef {
     pub id: String,
@@ -156,6 +163,9 @@ pub struct AckOncallOutcome {
     pub acknowledged: Vec<String>,
     #[serde(default)]
     pub still_paging: Vec<StillPaging>,
+    /// The pages this ack stopped or moved, with their teams, for "paging stopped for {team}".
+    #[serde(default)]
+    pub stopped: Vec<StillPaging>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

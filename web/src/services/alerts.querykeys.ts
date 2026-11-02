@@ -16,6 +16,8 @@
 import { orgKey } from "@/composables/query/keys";
 import { stableFilters } from "@/composables/query/queryClient";
 import type { AlertHistoryQuery } from "./alerts";
+import { incidentKeys } from "./incidents.querykeys";
+import { oncallKeys } from "./oncall.querykeys";
 
 /**
  * Keys only, dependency-free apart from `orgKey`, so a write in another domain
@@ -47,3 +49,11 @@ export const alertKeys = {
       stableFilters(query as Record<string, unknown>),
     ),
 };
+
+/** One ack writes the alert rows, the incident and every page, so an ack from any screen drops all their reads. */
+export const oneAckScopes = (org: string) => [
+  alertKeys.all(org),
+  incidentKeys.all(org),
+  oncallKeys.responsesAll(org),
+  oncallKeys.myAll(org),
+];

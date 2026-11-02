@@ -36,9 +36,9 @@ const chip = (source: AckSource, ackedBy = "bob@acme.io") =>
 const plain = (s: string | undefined) => (s ?? "").replace(/\s/g, " ");
 
 describe("AckChip", () => {
-  it("says who acknowledged, through what, and when", () => {
+  it("says who acknowledged and when, the same words on every surface", () => {
     const wrapper = chip("slack");
-    expect(plain(wrapper.text())).toContain("Acked by bob via Slack · 2:08 PM");
+    expect(plain(wrapper.text())).toContain("Acknowledged by bob@acme.io · 2:08 PM");
     expect(wrapper.get('[data-test="ack-chip"]').exists()).toBe(true);
   });
 
@@ -50,12 +50,14 @@ describe("AckChip", () => {
   });
 
   it.each([
-    ["ui", "via OpenObserve"],
-    ["api", "via API"],
-    ["oncall", "via on-call"],
-    ["incident", "via incident"],
-  ] as [AckSource, string][])("labels the %s source", (source, label) => {
-    expect(plain(chip(source).text())).toContain(label);
+    ["ui", "from OpenObserve"],
+    ["api", "from API"],
+    ["oncall", "from on-call"],
+    ["incident", "from incident"],
+  ] as [AckSource, string][])("keeps the %s source in the hover only", (source, label) => {
+    const wrapper = chip(source);
+    expect(plain(wrapper.findComponent(OTooltip).props("content"))).toContain(label);
+    expect(plain(wrapper.text())).not.toContain(label);
   });
 
   it("renders as the acknowledged state badge", () => {
@@ -65,6 +67,6 @@ describe("AckChip", () => {
   });
 
   it("shows a non-email actor as it is", () => {
-    expect(plain(chip("oncall", "o2-engine").text())).toContain("Acked by o2-engine via on-call");
+    expect(plain(chip("oncall", "o2-engine").text())).toContain("Acknowledged by o2-engine ·");
   });
 });

@@ -58,6 +58,11 @@ export class AlertAckPage {
   }
 
   ackButton() { return this.page.locator(this.detail.ack); }
+  /** The header Acknowledge button's hint tooltip (the firing-group count on a multi-group alert). */
+  async ackHint() {
+    await this.ackButton().hover();
+    return this.page.locator('[data-test="o-tooltip-content"]');
+  }
   ackChip() { return this.page.locator(this.detail.ackChip); }
   mutedChip() { return this.page.locator(this.detail.mutedChip); }
 

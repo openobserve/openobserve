@@ -12936,7 +12936,7 @@
       "acknowledgeGroups": "تأكيد استلام {count} مجموعة قيد الإطلاق | تأكيد استلام {count} مجموعات قيد الإطلاق",
       "unacknowledge": "إلغاء تأكيد الاستلام",
       "takeOver": "تولّي",
-      "chip": "تم تأكيد الاستلام بواسطة {who} عبر {source} · {time}",
+      "chip": "تم تأكيد الاستلام بواسطة {who} · {time}",
       "chipTooltip": "تم تأكيد الاستلام بواسطة {who} في {time} من {source}",
       "firingAcknowledged": "قيد الإطلاق · تم تأكيد الاستلام",
       "tile": "تم تأكيد الاستلام",

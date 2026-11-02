@@ -12936,7 +12936,7 @@
       "acknowledgeGroups": "Prendre en charge {count} groupe en alerte | Prendre en charge {count} groupes en alerte",
       "unacknowledge": "Annuler la prise en charge",
       "takeOver": "Prendre le relais",
-      "chip": "Pris en charge par {who} via {source} · {time}",
+      "chip": "Pris en charge par {who} · {time}",
       "chipTooltip": "Pris en charge par {who} à {time} depuis {source}",
       "firingAcknowledged": "En alerte · prise en charge",
       "tile": "Pris en charge",

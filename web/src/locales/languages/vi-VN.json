@@ -12936,7 +12936,7 @@
       "acknowledgeGroups": "Tiếp nhận {count} nhóm đang kích hoạt | Tiếp nhận {count} nhóm đang kích hoạt",
       "unacknowledge": "Hủy tiếp nhận",
       "takeOver": "Tiếp quản",
-      "chip": "Đã tiếp nhận bởi {who} qua {source} · {time}",
+      "chip": "Đã tiếp nhận bởi {who} · {time}",
       "chipTooltip": "Đã tiếp nhận bởi {who} lúc {time} từ {source}",
       "firingAcknowledged": "Đang kích hoạt · đã tiếp nhận",
       "tile": "Đã tiếp nhận",

@@ -12936,7 +12936,7 @@
       "acknowledgeGroups": "{count} tetiklenmiş grubu üstlen | {count} tetiklenmiş grubu üstlen",
       "unacknowledge": "Üstlenmeyi geri al",
       "takeOver": "Devral",
-      "chip": "{who} tarafından {source} üzerinden üstlenildi · {time}",
+      "chip": "{who} tarafından üstlenildi · {time}",
       "chipTooltip": "{who} tarafından {source} kaynağından {time} zamanında üstlenildi",
       "firingAcknowledged": "Tetiklenmiş · üstlenildi",
       "tile": "Üstlenildi",

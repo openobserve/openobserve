@@ -12936,7 +12936,7 @@
       "acknowledgeGroups": "Принять {count} срабатывающую группу | Принять {count} срабатывающих групп",
       "unacknowledge": "Отменить принятие",
       "takeOver": "Перехватить",
-      "chip": "Принято {who} через {source} · {time}",
+      "chip": "Принято {who} · {time}",
       "chipTooltip": "Принято {who} в {time} из {source}",
       "firingAcknowledged": "Срабатывает · принято",
       "tile": "Принято",

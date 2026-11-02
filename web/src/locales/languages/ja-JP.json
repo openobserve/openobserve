@@ -12936,7 +12936,7 @@
       "acknowledgeGroups": "{count} 件の発火グループを確認 | {count} 件の発火グループを確認",
       "unacknowledge": "確認を取り消す",
       "takeOver": "引き継ぐ",
-      "chip": "{who} が {source} 経由で確認 · {time}",
+      "chip": "{who} が確認 · {time}",
       "chipTooltip": "{who} が {time} に {source} から確認",
       "firingAcknowledged": "発火 · 確認済み",
       "tile": "確認済み",

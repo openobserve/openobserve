@@ -12936,7 +12936,7 @@
       "acknowledgeGroups": "Prendi in carico {count} gruppo attivo | Prendi in carico {count} gruppi attivi",
       "unacknowledge": "Annulla presa in carico",
       "takeOver": "Subentra",
-      "chip": "Preso in carico da {who} tramite {source} · {time}",
+      "chip": "Preso in carico da {who} · {time}",
       "chipTooltip": "Preso in carico da {who} alle {time} da {source}",
       "firingAcknowledged": "Attivo · preso in carico",
       "tile": "Preso in carico",

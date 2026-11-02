@@ -31,12 +31,12 @@ import { downtimeDetailQuery } from "@/services/downtimes.queries";
 import type {
   AckAlertRequest,
   AlertActionError,
-  AlertActionPerson,
-  AlertActionRefusal,
   ExtendAlertMuteRequest,
   MuteAlertResponse,
+  MutedPage,
 } from "@/ts/interfaces/alert";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { refusalToast, teamsOf, unchangedAckToast, type AckVerb } from "@/utils/alerts/ackState";
 import { buildAlertMuteRequest, endTimeText, type AlertMuteEnd } from "@/utils/downtimes/quickMute";
 
 /** The alert an action is for; `folderId` is the alert's own folder, which the route check reads. */
@@ -61,8 +61,6 @@ export interface AlertMuteScope {
   /** The downtimes folder the mute is filed in; the server picks one when absent. */
   folderId?: string;
 }
-
-const personName = (p: AlertActionPerson) => p.name || p.email;
 
 const extendBody = (version: number, end: AlertMuteEnd): ExtendAlertMuteRequest =>
   "untilClear" in end
@@ -98,31 +96,22 @@ export function useAlertActions() {
   const timeOf = (micros: number): I18nText =>
     endTimeText(micros, Date.now() * 1000, zone.value, t);
 
-  const refusalToast = (refusal: AlertActionRefusal) => {
-    const onCall = raw(refusal.on_call.map(personName).join(", "));
-    const canAct = raw(refusal.can_act.map(personName).join(", "));
-    const reason =
-      refusal.code === "mute_refused" ? t("alerts.ack.refused.mute") : t("alerts.ack.refused.ack");
-    const people: I18nText | null =
-      onCall && canAct
-        ? t("alerts.ack.refused.people", { onCall, canAct })
-        : onCall
-          ? t("alerts.ack.refused.onCall", { people: onCall })
-          : canAct
-            ? t("alerts.ack.refused.canAct", { people: canAct })
-            : null;
-    toast(
-      people
-        ? { variant: "error", title: reason, message: people }
-        : { variant: "error", message: reason },
-    );
+  const pageLine = (page: MutedPage): I18nText => {
+    const team = raw(page.team);
+    if (page.snoozed_until !== undefined && !page.refused) {
+      return t("toastMessages.downtimes.pageSnoozed", { team, time: timeOf(page.snoozed_until) });
+    }
+    const why = raw(page.refused ?? "");
+    return page.team
+      ? t("toastMessages.downtimes.pageNotSnoozed", { team, why })
+      : t("toastMessages.downtimes.teamlessPageNotSnoozed", { why });
   };
 
   /** Toasts the typed refusals every route shares; false when the error is not one of them. */
-  const sharedErrorToast = (error: AlertActionError | null): boolean => {
+  const sharedErrorToast = (error: AlertActionError | null, verb: AckVerb): boolean => {
     if (!error) return false;
     if (error.code === "ack_refused" || error.code === "mute_refused") {
-      refusalToast(error);
+      toast(refusalToast(error, error.code === "mute_refused" ? "mute" : verb, t));
       return true;
     }
     if (error.code === "not_a_quick_mute") {
@@ -135,7 +124,7 @@ export function useAlertActions() {
   const sendAck = async (
     target: AlertActionTarget,
     body: AckAlertRequest,
-    takeOver: boolean,
+    takingOver: boolean,
   ): Promise<boolean> => {
     const name = raw(target.name);
     try {
@@ -145,13 +134,59 @@ export function useAlertActions() {
         folderId: target.folderId,
       });
       const holder = result.acks.find((a) => a.acked_by !== me.value);
-      if (!result.changed && holder) {
+      const previous = result.acks.find((a) => a.taken_over_from)?.taken_over_from;
+      const stopped = teamsOf(result.oncall?.stopped);
+      const stillPaged = teamsOf(result.oncall?.still_paging);
+      const count = result.other_groups_unacked;
+      if (!result.changed && !holder) {
+        toast(unchangedAckToast(me.value, me.value, t));
+      } else if (!result.changed && holder) {
         toast({
-          variant: "info",
-          message: t("toastMessages.alerts.ack.alreadyAcked", { who: raw(holder.acked_by) }),
+          ...unchangedAckToast(holder.acked_by, me.value, t),
+          action: {
+            label: t("toastMessages.alerts.ack.takeOver"),
+            handler: () =>
+              void takeOver(
+                target,
+                body.all_groups
+                  ? { allGroups: true }
+                  : { groupKey: body.group_key ?? "", firingStartedAt: body.firing_started_at },
+              ),
+          },
         });
-      } else if (takeOver) {
-        toast({ variant: "success", message: t("toastMessages.alerts.ack.takenOver", { name }) });
+      } else if (takingOver) {
+        toast({
+          variant: "success",
+          message: previous
+            ? t("toastMessages.alerts.ack.tookOverFrom", { who: raw(previous) })
+            : t("toastMessages.alerts.ack.takenOver", { name }),
+        });
+      } else if (!body.all_groups && count > 0) {
+        toast({
+          variant: "success",
+          message: stillPaged
+            ? t("toastMessages.alerts.ack.oneGroupPaged", { count, teams: stillPaged })
+            : t("toastMessages.alerts.ack.oneGroup", { count }),
+          action: {
+            label: t("toastMessages.alerts.ack.ackAll"),
+            handler: () => void acknowledge(target, { allGroups: true }),
+          },
+        });
+      } else if (stopped && body.all_groups) {
+        const count = result.acks.length;
+        toast({
+          variant: "success",
+          message: t(
+            "toastMessages.alerts.ack.ackedGroupsPaging",
+            { count, name, teams: stopped },
+            count,
+          ),
+        });
+      } else if (stopped) {
+        toast({
+          variant: "success",
+          message: t("toastMessages.alerts.ack.ackedPaging", { name, teams: stopped }),
+        });
       } else if (body.all_groups) {
         const count = result.acks.length;
         toast({
@@ -164,7 +199,7 @@ export function useAlertActions() {
       return true;
     } catch (err: unknown) {
       const error = alertActionErrorOf(err);
-      if (sharedErrorToast(error)) return false;
+      if (sharedErrorToast(error, takingOver ? "takeOver" : "ack")) return false;
       const message =
         error?.code === "not_firing"
           ? t("alerts.ack.errors.notFiring")
@@ -191,10 +226,14 @@ export function useAlertActions() {
 
   const takeOver = (
     target: AlertActionTarget,
-    opts: { groupKey: string; firingStartedAt?: number },
+    opts: { groupKey?: string; firingStartedAt?: number; allGroups?: boolean },
   ) => {
-    const body: AckAlertRequest = { group_key: opts.groupKey, take_over: true };
-    if (opts.firingStartedAt !== undefined) body.firing_started_at = opts.firingStartedAt;
+    const body: AckAlertRequest = opts.allGroups
+      ? { all_groups: true, take_over: true }
+      : { group_key: opts.groupKey ?? "", take_over: true };
+    if (!opts.allGroups && opts.firingStartedAt !== undefined) {
+      body.firing_started_at = opts.firingStartedAt;
+    }
     return sendAck(target, body, true);
   };
 
@@ -212,7 +251,7 @@ export function useAlertActions() {
       toast({ variant: "success", message: t("toastMessages.alerts.ack.unacked", { name }) });
       return true;
     } catch (err: unknown) {
-      if (sharedErrorToast(alertActionErrorOf(err))) return false;
+      if (sharedErrorToast(alertActionErrorOf(err), "unack")) return false;
       toast({ variant: "error", message: t("toastMessages.alerts.ack.unackFailed", { name }) });
       return false;
     }
@@ -232,17 +271,18 @@ export function useAlertActions() {
         folderId: target.folderId,
       });
       const time = timeOf(result.ends_at);
+      const muted =
+        "untilClear" in end
+          ? t("toastMessages.downtimes.mutedUntilClear", { name, time })
+          : t("toastMessages.downtimes.mutedOne", { name, time });
       toast({
         variant: "success",
-        message:
-          "untilClear" in end
-            ? t("toastMessages.downtimes.mutedUntilClear", { name, time })
-            : t("toastMessages.downtimes.mutedOne", { name, time }),
+        message: raw([muted, ...(result.pages ?? []).map(pageLine)].join(" · ")),
       });
       return result;
     } catch (err: unknown) {
       const error = alertActionErrorOf(err);
-      if (sharedErrorToast(error)) return null;
+      if (sharedErrorToast(error, "mute")) return null;
       const message =
         error?.code === "already_muted"
           ? t("toastMessages.downtimes.alreadyMuted", { name, time: timeOf(error.ends_at) })
@@ -295,7 +335,7 @@ export function useAlertActions() {
       return true;
     } catch (err: unknown) {
       const error = alertActionErrorOf(err);
-      if (sharedErrorToast(error)) return false;
+      if (sharedErrorToast(error, "mute")) return false;
       const message =
         error?.code === "version_changed"
           ? t("toastMessages.downtimes.muteChanged", { time: timeOf(error.ends_at) })
@@ -315,7 +355,7 @@ export function useAlertActions() {
       toast({ variant: "success", message: t("toastMessages.downtimes.muteEnded") });
       return true;
     } catch (err: unknown) {
-      if (sharedErrorToast(alertActionErrorOf(err))) return false;
+      if (sharedErrorToast(alertActionErrorOf(err), "mute")) return false;
       toast({ variant: "error", message: t("toastMessages.downtimes.cancelFailed") });
       return false;
     }

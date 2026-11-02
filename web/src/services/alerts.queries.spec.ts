@@ -25,6 +25,14 @@ import {
   cancelAlertMuteMutation,
 } from "./alerts.queries";
 import { alertKeys } from "./alerts.querykeys";
+import { incidentKeys } from "./incidents.querykeys";
+import { oncallKeys } from "./oncall.querykeys";
+import { updateIncidentStatusMutation } from "./incidents.queries";
+import {
+  acknowledgeResponseMutation,
+  takeOverResponseMutation,
+  unacknowledgeResponseMutation,
+} from "./oncall.queries";
 import { downtimeKeys } from "./downtimes.querykeys";
 import { announcementKeys } from "./announcements.querykeys";
 import alerts from "./alerts";
@@ -147,9 +155,27 @@ describe("ack and mute queries", () => {
     const result = await run({ alertId: "a1", body: { all_groups: true }, folderId: "f1" });
     expect(alerts.ackAlert).toHaveBeenCalledWith(ORG, "a1", { all_groups: true }, "f1");
     expect(result).toEqual({ changed: true, acks: [ACK] });
-    expect(options.meta?.invalidates).toEqual([alertKeys.all(ORG)]);
     expect(options.meta?.silentError).toBe(true);
-    expect(unackAlertMutation(ORG).meta?.invalidates).toEqual([alertKeys.all(ORG)]);
+  });
+
+  // One ack writes the alert rows, the incident and every page, whichever screen sent it.
+  it.each([
+    ["an alert ack", ackAlertMutation(ORG)],
+    ["an alert unack", unackAlertMutation(ORG)],
+    ["an incident status change", updateIncidentStatusMutation(ORG)],
+    ["a page ack", acknowledgeResponseMutation(ORG)],
+    ["a page take-over", takeOverResponseMutation(ORG)],
+    ["a page unack", unacknowledgeResponseMutation(ORG)],
+  ])("%s expires the alert, incident and on-call reads", (_, mutation) => {
+    const scopes = mutation.meta?.invalidates ?? [];
+    for (const key of [
+      alertKeys.all(ORG),
+      incidentKeys.all(ORG),
+      oncallKeys.responsesAll(ORG),
+      oncallKeys.myAll(ORG),
+    ]) {
+      expect(scopes).toContainEqual(key);
+    }
   });
 
   it("refreshes alerts and downtimes after a mute, and the banner after extend or cancel", async () => {
@@ -160,7 +186,13 @@ describe("ack and mute queries", () => {
       body: { minutes: 60 },
     });
     expect(alerts.muteAlert).toHaveBeenCalledWith(ORG, "a1", { minutes: 60 }, undefined);
-    expect(mute.meta?.invalidates).toEqual([alertKeys.all(ORG), downtimeKeys.all(ORG)]);
+    // A mute also snoozes the alert's open pages.
+    expect(mute.meta?.invalidates).toEqual([
+      alertKeys.all(ORG),
+      downtimeKeys.all(ORG),
+      oncallKeys.responsesAll(ORG),
+      oncallKeys.myAll(ORG),
+    ]);
     expect(mute.meta?.silentError).toBe(true);
 
     vi.mocked(alerts.extendAlertMute).mockResolvedValue({ data: { version: 3 } } as never);

@@ -99,6 +99,40 @@ describe("incidents service", () => {
     });
   });
 
+  describe("acknowledge and unacknowledge", () => {
+    it("acknowledges through the one-ack route and reads the incident back", async () => {
+      mockHttp.post.mockResolvedValue({ data: { changed: true } });
+      mockHttp.get.mockResolvedValue({ data: { id: "incident-123", status: "acknowledged" } });
+      const res = await incidents.acknowledge("test-org", "incident-123");
+      expect(mockHttp.post).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/incident-123/acknowledge",
+      );
+      expect(res.data.status).toBe("acknowledged");
+    });
+
+    it("reports a successful acknowledge even when reading the incident back fails", async () => {
+      const ack = { changed: true, acks: [], other_groups_unacked: 0 };
+      mockHttp.post.mockResolvedValue({ data: ack });
+      mockHttp.get.mockRejectedValue(new Error("read failed"));
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const res = await incidents.acknowledge("test-org", "incident-123");
+      expect(res.ack).toEqual(ack);
+      expect(res.data).toBeUndefined();
+      expect(error).toHaveBeenCalled();
+      error.mockRestore();
+    });
+
+    it("unacknowledges through its own route, not the PATCH", async () => {
+      mockHttp.post.mockResolvedValue({ data: { changed: true } });
+      mockHttp.get.mockResolvedValue({ data: { id: "incident-123", status: "open" } });
+      await incidents.unacknowledge("test-org", "incident-123");
+      expect(mockHttp.post).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/incident-123/unacknowledge",
+      );
+      expect(mockHttp.patch).not.toHaveBeenCalled();
+    });
+  });
+
   describe("updateStatus", () => {
     it("should call http.patch with correct URL and status", () => {
       mockHttp.patch.mockResolvedValue({ data: { id: "incident-123" } });

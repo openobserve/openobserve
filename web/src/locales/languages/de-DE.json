@@ -12936,7 +12936,7 @@
       "acknowledgeGroups": "{count} ausgelöste Gruppe quittieren | {count} ausgelöste Gruppen quittieren",
       "unacknowledge": "Quittierung aufheben",
       "takeOver": "Übernehmen",
-      "chip": "Quittiert von {who} über {source} · {time}",
+      "chip": "Quittiert von {who} · {time}",
       "chipTooltip": "Quittiert von {who} am {time} aus {source}",
       "firingAcknowledged": "Ausgelöst · quittiert",
       "tile": "Quittiert",
