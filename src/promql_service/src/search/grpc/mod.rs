@@ -458,8 +458,7 @@ pub async fn search_inner(
     Ok((value, result_type, scan_stats, took, warnings))
 }
 
-/// Converts the request's microsecond window into the evaluator's types, rejecting values it cannot
-/// hold.
+/// The request's microsecond window as evaluator times, rejecting values they cannot hold.
 fn eval_window(
     query: &cluster_rpc::MetricsQueryStmt,
 ) -> Result<(SystemTime, SystemTime, Duration)> {
@@ -478,7 +477,12 @@ fn eval_window(
         ))
         .into());
     }
-    Ok((UNIX_EPOCH + start, UNIX_EPOCH + end, step))
+    let to_time = |name: &str, d: Duration| {
+        UNIX_EPOCH.checked_add(d).ok_or_else(|| {
+            DataFusionError::Execution(format!("promql {name} is out of range, got {d:?}"))
+        })
+    };
+    Ok((to_time("start", start)?, to_time("end", end)?, step))
 }
 
 async fn get_max_file_list(
@@ -981,7 +985,11 @@ mod tests {
         let (start, end, step) = eval_window(&stmt(5, 5, 0)).unwrap();
         assert_eq!(start, end);
         assert_eq!(step, Duration::ZERO);
-        assert!(eval_window(&stmt(0, i64::MAX, 1)).is_ok());
+        // Whether a max end fits SystemTime is platform dependent; it must error, never panic.
+        let max_end_fits = UNIX_EPOCH
+            .checked_add(Duration::from_micros(i64::MAX as u64))
+            .is_some();
+        assert_eq!(eval_window(&stmt(0, i64::MAX, 1)).is_ok(), max_end_fits);
     }
 
     #[test]
