@@ -1923,7 +1923,7 @@ async function fetchContext(force = false) {
     read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force),
     read<CoverageGaps | null>(coverageGapsQuery(orgId.value), force),
     read<OwnershipRule[]>(ownershipRulesQuery(orgId.value), force),
-    read<any[]>(destinationsQuery(orgId.value, "alert"), force),
+    read<any[]>(destinationsQuery(orgId.value, "alert", false, ["jira"]), force),
   ]);
 
   teamsAvailable.value = teamRes.status === "fulfilled";

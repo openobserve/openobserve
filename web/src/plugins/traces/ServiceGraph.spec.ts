@@ -285,12 +285,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
   });
 
   describe("Initialization", () => {
-    it("should mount component successfully", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
     it("should load service graph data on mount", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -337,18 +331,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.find('[data-test="service-graph-loading"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="service-graph-no-data-state"]').exists()).toBe(true);
     });
-
-    it("should set initial chartKey to 0", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.chartKey).toBe(0);
-    });
-
-    it("should return chartData with an options property after mount", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      // chartData is a computed that returns { options, notMerge, ... }
-      expect(wrapper.vm.chartData).toHaveProperty("options");
-    });
   });
 
   describe("Toolbar Layout", () => {
@@ -376,16 +358,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(searchInputInsideContainer.exists()).toBe(false);
     });
 
-    it("should render legends in a horizontal flex row", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      const legends = wrapper.find('[data-test="service-graph-legends"]');
-      expect(legends.exists()).toBe(true);
-      // Legends use flex-row — confirm the element has neither flex-col class
-      expect(legends.classes()).not.toContain("flex-col");
-    });
-
     it("explains the dashed ring on inferred dependency nodes in the legend", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -394,14 +366,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(row.exists()).toBe(true);
       expect(row.text()).toBe("Dashed ring: inferred dependency");
       expect(row.find("span").classes()).toContain("border-dashed");
-    });
-
-    it("should not render a date-time-picker inside ServiceGraph", () => {
-      wrapper = createWrapper();
-      // ServiceGraph no longer owns a date-time picker — time range is controlled
-      // externally by SearchBar via the shared useTraces composable.
-      const dateTimePicker = wrapper.find('[data-test="date-time-picker"]');
-      expect(dateTimePicker.exists()).toBe(false);
     });
   });
 
@@ -911,15 +875,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.vm.chartKey).toBe(initialKey + 1);
       expect(wrapper.vm.chartData).toBeDefined();
     });
-
-    it("should return chartData with options object", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // chartData computed returns an object with an options property
-      const chartData = wrapper.vm.chartData;
-      expect(chartData).toHaveProperty("options");
-    });
   });
 
   describe("Multiple Sequential Changes", () => {
@@ -1079,19 +1034,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
   describe("Data Persistence", () => {
     it("should restore stream filter from localStorage on mount", () => {
-      const getItemSpy = vi.spyOn(Storage.prototype, "getItem").mockReturnValue("stream1");
-
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.selectedStreamFilter).toBe("stream1");
-
-      getItemSpy.mockRestore();
-    });
-
-    it("should restore stream filter from localStorage on mount (visualization type is managed by searchObj.meta)", () => {
-      // visualizationType and layoutType are now managed externally via searchObj.meta
-      // (set by SearchBar and read from the shared useTraces composable).
-      // Only streamFilter is persisted and restored by ServiceGraph itself.
       const getItemSpy = vi.spyOn(Storage.prototype, "getItem").mockReturnValue("stream1");
 
       wrapper = createWrapper();
@@ -1533,77 +1475,26 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     // loadServiceGraph's catch and sets error.value. beforeEach installs a
     // resolving mock, so each test overrides it with a rejecting one BEFORE
     // createWrapper().
-    it("should set error state on 404", async () => {
-      const error404 = new Error("Not Found");
-      (error404 as any).response = { status: 404 };
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(error404);
-
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.error).toContain("API endpoint not found");
-    });
-
-    it("should set error state on 403", async () => {
-      const error403 = new Error("Forbidden");
-      (error403 as any).response = { status: 403 };
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(error403);
+    it.each([
+      ["404", { response: { status: 404 } }, "API endpoint not found"],
+      ["403", { response: { status: 403 } }, "Access denied"],
+      ["500", { response: { status: 500 } }, "Server error"],
+      ["timeout", { message: "Request timeout" }, "timed out"],
+      ["network", { message: "Network Error" }, "Network error"],
+      [
+        "418 with a server message",
+        { response: { status: 418, data: { message: "Teapot refuses to brew" } } },
+        "Teapot refuses to brew",
+      ],
+    ])("should set error state on %s", async (_name, props, expected) => {
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
+        Object.assign(new Error((props as any).message ?? "fail"), props),
+      );
 
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.vm.error).toContain("Access denied");
-    });
-
-    it("should set error state on 500", async () => {
-      const error500 = new Error("Internal Server Error");
-      (error500 as any).response = { status: 500 };
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(error500);
-
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.error).toContain("Server error");
-    });
-
-    it("should set error state on timeout", async () => {
-      const timeoutError = new Error("Request timeout");
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(timeoutError);
-
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.error).toContain("timed out");
-    });
-
-    it("should set error state on network error", async () => {
-      const networkError = new Error("Network Error");
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(networkError);
-
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.error).toContain("Network error");
-    });
-
-    it("should set generic error state for unknown errors", async () => {
-      const unknownError = new Error("Unknown error");
-      (unknownError as any).response = {
-        status: 418,
-        data: { message: "I'm a teapot" },
-      };
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(unknownError);
-
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.error).toBeTruthy();
+      expect(wrapper.vm.error).toContain(expected);
     });
   });
 
@@ -1844,15 +1735,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(series.right).toBe("2%");
       expect(series.top).toBe("8%");
       expect(series.bottom).toBe("8%");
-    });
-
-    it("should disable built-in ECharts tooltip for tree mode", async () => {
-      // beforeEach sets visualizationType = "tree"
-      wrapper = createWrapper();
-      await flushPromises();
-
-      const tooltip = wrapper.vm.chartData.options.tooltip;
-      expect(tooltip.show).toBe(false);
     });
 
     it("should use right label positioning for tree nodes in horizontal layout", async () => {

@@ -29,8 +29,8 @@ import { fit } from "./hexViewport";
 import type { PodRow } from "./kubernetesModel";
 import { groupRows } from "./mapFill";
 
-// Catches a quadratic blow-up (seconds), not machine speed: CI runs this slower, under coverage.
-const LAYOUT_BUDGET_MS = 250;
+// Ceiling is ~8x the normal run, so only an algorithmic blow-up trips it, never a loaded runner.
+const LAYOUT_BUDGET_MS = 2000;
 
 const keysFor = (sizes: number[]) =>
   sizes.map((size, g) => Array.from({ length: size }, (_, i) => `c/ns-${g}/pod-${i}`));
