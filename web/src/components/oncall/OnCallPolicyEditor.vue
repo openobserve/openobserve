@@ -1201,7 +1201,9 @@ async function openMembers() {
 // rest of the policy is still worth editing.
 async function fetchDestinations() {
   try {
-    const list = await queryClient.fetchQuery(destinationsQuery(orgId.value, "alert"));
+    const list = await queryClient.fetchQuery(
+      destinationsQuery(orgId.value, "alert", false, ["jira"]),
+    );
     // A Slack app destination cannot carry a page; the team's room is a webhook (7.1).
     availableDestinations.value = list
       .filter((d: { type?: string }) => !isSlackAppDestination(d))

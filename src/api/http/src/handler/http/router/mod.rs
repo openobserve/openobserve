@@ -1504,6 +1504,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/alerts/destinations/prebuilt", get(alerts::destinations::list_prebuilt_destinations))
         .route("/{org_id}/alerts/destinations/{destination_name}", get(alerts::destinations::get_destination).put(alerts::destinations::update_destination).delete(alerts::destinations::delete_destination))
         .route("/{org_id}/alerts/destinations/test", post(alerts::destinations::test_destination))
+        .route("/{org_id}/alerts/destinations/jira/setup", post(alerts::destinations::jira_setup))
         .route("/{org_id}/alerts/destinations/{destination_name}/test_send", post(alerts::destinations::test_send))
         .route("/{org_id}/alerts/destinations/bulk", delete(alerts::destinations::delete_destination_bulk))
 
@@ -4376,6 +4377,14 @@ mod tests {
             json.contains("/{org_id}/query_functions"),
             "query_functions is missing from the OpenAPI surface"
         );
+    }
+
+    #[test]
+    fn jira_setup_is_published_with_its_403() {
+        let spec = serde_json::to_value(super::openapi::ApiDoc::openapi()).unwrap();
+        let post = &spec["paths"]["/api/{org_id}/alerts/destinations/jira/setup"]["post"];
+        assert_eq!(post["operationId"], "JiraDestinationSetup", "{post}");
+        assert!(post["responses"]["403"].is_object(), "{post}");
     }
 
     #[test]
