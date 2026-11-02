@@ -91,7 +91,9 @@ vi.mock("@/plugins/traces/ServiceGraphNodeSidePanel.vue", () => ({
     template: '<div data-test="overview-service-panel-stub" />',
   },
 }));
+// __esModule lets defineAsyncComponent unwrap `default`; without it the drawer never resolves to the stub
 vi.mock("@/components/alerts/AlertHistoryDrawer.vue", () => ({
+  __esModule: true,
   default: {
     name: "AlertHistoryDrawer",
     props: ["open", "alertDetails", "alertId", "alertType"],
@@ -777,6 +779,52 @@ describe("OverviewTab", () => {
       vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(err());
     };
 
+    it("should show the skeleton, not the empty message, while a Retry after a failed section is pending", async () => {
+      vi.mocked(alertsService.getHistory).mockRejectedValue(serverError());
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find('[data-test="overview-recent-events-load-error"]').exists()).toBe(true);
+
+      vi.mocked(alertsService.getHistory).mockReturnValue(new Promise(() => {}) as never);
+      await wrapper
+        .get('[data-test="overview-recent-events-load-error-retry-btn"]')
+        .trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-recent-events-load-error"]').exists()).toBe(false);
+      expect(visibleSkeletons()).toContain("recentEvents");
+    });
+
+    it("should show the skeleton, not no access or the empty message, while a refresh after a 403 is pending", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, anomaly_detection_enabled: true });
+      vi.mocked(anomalyService.list).mockRejectedValue(forbidden());
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find('[data-test="overview-anomalies-forbidden"]').exists()).toBe(true);
+
+      vi.mocked(anomalyService.list).mockReturnValue(new Promise(() => {}) as never);
+      await wrapper.get(REFRESH_BTN).trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-anomalies-forbidden"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-anomalies-empty"]').exists()).toBe(false);
+      expect(visibleSkeletons()).toContain("anomalies");
+    });
+
+    it("should keep an empty section's message, with no skeleton, while a plain refresh is pending", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+
+      givenRecentEventsHang();
+      await wrapper.get(REFRESH_BTN).trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+      expect(visibleSkeletons()).toEqual([]);
+    });
+
     it("should keep the cards and show an inline section error when the only OSS section fails but the overview loaded", async () => {
       vi.mocked(alertsService.getHistory).mockRejectedValue(serverError());
 
@@ -895,6 +943,9 @@ describe("OverviewTab", () => {
       expect(wrapper.find(NO_ACCESS).exists()).toBe(true);
       expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
       expect(wrapper.get('[data-test="overview-headline-firing"]').text()).toContain("No access");
+      // nothing on this page can load, so neither Refresh nor the time range has anything to act on
+      expect(wrapper.find(REFRESH_BTN).exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-date-time-stub"]').exists()).toBe(false);
     });
 
     it("should show the no-access state without the toolbar when every section answers 403 with the flag on", async () => {
@@ -1547,6 +1598,17 @@ describe("OverviewTab", () => {
       );
     });
 
+    it("should resolve a legacy Browser Time zone to its IANA zone in the refresh tooltip", async () => {
+      store.commit("setTimezone", "Browser Time (Asia/Kolkata)");
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "ORefreshButton" }).props("tooltip")).toMatch(
+        /^Data as of \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(Asia\/Kolkata\)$/,
+      );
+      store.commit("setTimezone", "UTC");
+    });
+
     it("should leave the refresh tooltip to the button when /overview failed", async () => {
       vi.mocked(overviewService.getOrgOverview).mockRejectedValue(new Error("boom"));
       wrapper = mountOverviewTab();
@@ -2109,6 +2171,39 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="home-first-data-hero"]').exists()).toBe(true);
       expect(wrapper.find('[data-test^="overview-status-"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="overview-time-range-heading"]').exists()).toBe(false);
+    });
+  });
+
+  describe("the alert history drawer across an org switch", () => {
+    it("closes the drawer and clears its alert when the organization changes", async () => {
+      vi.mocked(anomalyService.list).mockResolvedValue({
+        data: mockOverview.anomalyConfigs,
+      } as never);
+      vi.mocked(anomalyService.getAllHistory).mockResolvedValue({
+        data: mockOverview.buildAnomalyHistory(),
+      } as never);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const investigate = wrapper
+        .get(ANOMALIES)
+        .findAll("button")
+        .find((b) => b.text().includes("Investigate"));
+      await investigate!.trigger("click");
+      await flushPromises();
+      const drawer = () => wrapper.findComponent({ name: "AlertHistoryDrawer" });
+      expect(drawer().props("open")).toBe(true);
+      expect(drawer().props("alertId")).not.toBe("");
+
+      store.commit("setSelectedOrganization", {
+        ...store.state.selectedOrganization,
+        identifier: `overview-org-switched-${++orgSeq}`,
+      });
+      await flushPromises();
+
+      expect(drawer().props("open")).toBe(false);
+      expect(drawer().props("alertDetails")).toBeNull();
+      expect(drawer().props("alertId")).toBe("");
     });
   });
 });

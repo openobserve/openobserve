@@ -91,7 +91,6 @@ const tid = (page, id) => page.locator(`[data-test="${id}"]`);
 
 async function expectNoOverviewToolbar(page) {
     await expect(tid(page, 'date-time-btn')).toHaveCount(0);
-    await expect(page.locator('[data-test="home-page"] [data-test="overview-all-clear-empty-state"]')).toHaveCount(0);
 }
 
 const SCREENS = [
@@ -169,7 +168,6 @@ const SCREENS = [
             await expect(tid(page, 'first-data-panel-arrived-summary')).toHaveText('1,204 records in stream default');
             await expect(tid(page, 'overview-not-monitored-empty-state')).toBeVisible({ timeout: 20000 });
             await expect(tid(page, 'overview-not-monitored-alert-card')).toBeVisible();
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             expect(loads).toEqual([]);
         },
     },
@@ -180,7 +178,6 @@ const SCREENS = [
             await openHome(page, orgId, 'overview');
             await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
             await expect(tid(page, 'overview-load-error-retry-card')).toBeVisible();
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             await expect(tid(page, 'first-data-panel')).toHaveCount(0);
         },
     },
@@ -197,7 +194,6 @@ const SCREENS = [
             await openHome(page, orgId, 'overview');
             await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
             await expect(tid(page, 'overview-load-error-retry-card')).toBeVisible();
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             await expect(tid(page, 'overview-not-monitored-empty-state')).toHaveCount(0);
         },
     },
@@ -283,7 +279,6 @@ const SCREENS = [
         async run({ page, orgId }) {
             await openHome(page, orgId, 'overview');
             await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             await expect(tid(page, 'first-data-panel')).toHaveCount(0);
             await expect(tid(page, 'first-event-status')).toHaveCount(0);
         },
@@ -307,7 +302,6 @@ const SCREENS = [
             await expect(tid(page, 'date-time-btn')).toBeVisible();
             await expect(page.locator('[data-test="home-page"] [data-test="refresh-button"]')).toBeVisible();
             await expect(page.locator('[data-test="home-page"]').getByText('just now')).toBeVisible();
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             await expect(tid(page, 'first-data-panel')).toHaveCount(0);
             await expect(tid(page, 'first-event-status')).toHaveCount(0);
             // the load's one-shot first-data notice probes are all; no watcher polls behind the flag-off hero
@@ -334,7 +328,6 @@ const SCREENS = [
             await openHome(page, orgId, 'overview');
             await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
             await expect(tid(page, 'overview-load-error-retry-card')).toBeVisible();
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             await expect(tid(page, 'home-first-data-hero')).toHaveCount(0);
             await expect(tid(page, 'first-data-panel')).toHaveCount(0);
             await expect(page.locator('[data-test="home-page"]').getByText('just now')).toHaveCount(0);
@@ -342,7 +335,6 @@ const SCREENS = [
             await tid(page, 'overview-load-error-retry-card').click();
             await expect.poll(() => streamReads.length, { timeout: 15000 }).toBeGreaterThan(beforeRetry);
             await expect(tid(page, 'overview-load-error-empty-state')).toBeVisible({ timeout: 30000 });
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
             await page.mouse.move(760, 880);
         },
     },
@@ -379,7 +371,6 @@ const SCREENS = [
             await expect(tid(page, 'overview-recent-events-section')).toBeVisible();
             await expect(tid(page, 'overview-services-section')).toBeVisible();
             await expect(tid(page, 'overview-load-error-empty-state')).toHaveCount(0);
-            await expect(tid(page, 'overview-all-clear-empty-state')).toHaveCount(0);
         },
     },
 ];

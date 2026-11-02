@@ -399,17 +399,30 @@ async fn module_access(org_id: &str, user_id: &str) -> ModuleAccess {
         .ok()
         .flatten()
         .map_or_else(common::meta::user::get_default_user_role, |user| user.role);
-    let mut streams = Vec::new();
-    for stream_type in OVERVIEW_STREAM_TYPES {
-        let path = [org_id, "streams"];
-        if can_list(org_id, user_id, &role, &path, Some(stream_type)).await {
-            streams.push(stream_type);
-        }
-    }
+    let role = &role;
+    let stream_checks =
+        futures::future::join_all(OVERVIEW_STREAM_TYPES.map(|stream_type| async move {
+            let path = [org_id, "streams"];
+            (
+                stream_type,
+                can_list(org_id, user_id, role, &path, Some(stream_type)).await,
+            )
+        }));
+    let alerts_path = ["v2", org_id, "alerts"];
+    let pipelines_path = [org_id, "pipelines"];
+    let (stream_checks, alerts, pipelines) = tokio::join!(
+        stream_checks,
+        can_list(org_id, user_id, role, &alerts_path, None),
+        can_list(org_id, user_id, role, &pipelines_path, None),
+    );
+    let streams = stream_checks
+        .into_iter()
+        .filter_map(|(stream_type, allowed)| allowed.then_some(stream_type))
+        .collect();
     ModuleAccess {
         streams,
-        alerts: can_list(org_id, user_id, &role, &["v2", org_id, "alerts"], None).await,
-        pipelines: can_list(org_id, user_id, &role, &[org_id, "pipelines"], None).await,
+        alerts,
+        pipelines,
     }
 }
 
@@ -418,8 +431,7 @@ async fn module_access(_org_id: &str, _user_id: &str) -> ModuleAccess {
     ModuleAccess::all()
 }
 
-/// Mirrors the middleware list check; alerts need LIST on all alert folders, stricter than a
-/// folder-scoped list.
+/// Mirrors the middleware list check; alerts need LIST on all folders, stricter than one folder.
 #[cfg(feature = "enterprise")]
 async fn can_list(
     org_id: &str,
@@ -515,14 +527,27 @@ fn ttl_secs_to_micros(secs: u64) -> i64 {
 }
 
 fn cache_put(key: CacheKey, overview: Overview, ttl_micros: i64) {
-    if CACHE.len() >= CACHE_MAX_ENTRIES {
-        let now = now_micros();
-        CACHE.retain(|_, v| now - v.generated_at < ttl_micros);
-        if CACHE.len() >= CACHE_MAX_ENTRIES {
-            CACHE.clear();
-        }
-    }
+    make_room(&CACHE, now_micros(), ttl_micros, CACHE_MAX_ENTRIES);
     CACHE.insert(key, overview);
+}
+
+/// Drops expired entries, then the oldest ones, so a full cache never wipes fresh entries
+/// wholesale.
+fn make_room(cache: &DashMap<CacheKey, Overview>, now: i64, ttl_micros: i64, max: usize) {
+    if cache.len() < max {
+        return;
+    }
+    cache.retain(|_, v| now - v.generated_at < ttl_micros);
+    while cache.len() >= max {
+        let oldest = cache
+            .iter()
+            .min_by_key(|e| e.value().generated_at)
+            .map(|e| e.key().clone());
+        match oldest {
+            Some(key) => cache.remove(&key),
+            None => break,
+        };
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -1439,6 +1464,38 @@ mod tests {
         ];
         // exactly 1h is still active and exactly 7d is already forgotten
         assert_eq!(quiet_count(&streams, now), 1);
+    }
+
+    #[test]
+    fn test_make_room_evicts_oldest_entries_and_keeps_fresh_ones() {
+        let cache: DashMap<CacheKey, Overview> = DashMap::new();
+        let key = |n: usize| CacheKey {
+            org_id: "o".to_string(),
+            user_id: format!("u{n}"),
+            top_n: 5,
+        };
+        let entry = |generated_at: i64| Overview {
+            streams: Section::locked("test"),
+            alerts: Section::locked("test"),
+            pipelines: Section::locked("test"),
+            limits: Section::locked("test"),
+            generated_at,
+            cached: false,
+        };
+        let now = 1_000_000_000;
+        let ttl = 30 * 1_000_000;
+        for n in 0..4 {
+            cache.insert(key(n), entry(now - 4 + n as i64));
+        }
+        make_room(&cache, now, ttl, 4);
+        assert_eq!(cache.len(), 3);
+        assert!(!cache.contains_key(&key(0)));
+        assert!((1..4).all(|n| cache.contains_key(&key(n))));
+
+        cache.insert(key(9), entry(now - 10 * ttl));
+        make_room(&cache, now, ttl, 4);
+        assert!(!cache.contains_key(&key(9)));
+        assert_eq!(cache.len(), 3);
     }
 
     #[test]

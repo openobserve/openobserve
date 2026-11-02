@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OContent class="text-text-body flex h-full flex-col gap-0 overflow-y-auto pt-2.5 pb-2.5">
     <div
-      v-if="pageState !== 'forbidden'"
+      v-if="pageState !== 'forbidden' && !errorIsForbidden"
       class="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
     >
       <OverviewStatusLine v-if="showOverviewCards" :status="status" @select="onHeadlineSelect" />
@@ -763,6 +763,8 @@ import OverviewStatusLine from "./overview/OverviewStatusLine.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
 import { formatTimestampInTimezone } from "@/utils/date";
+import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
+import { resolveBrowserTimezone } from "@/utils/timezone";
 import {
   overviewChecks,
   overviewStatus,
@@ -922,7 +924,7 @@ const overviewForbidden = ref(false);
 const overviewRefreshFailed = ref(false);
 const generatedAtLabel = computed(() => {
   if (!overview.value) return "";
-  const zone = store.state.timezone || "UTC";
+  const zone = safeTimezone(resolveBrowserTimezone(store.state.timezone || "UTC"));
   const time = formatTimestampInTimezone(overview.value.generated_at, "YYYY-MM-DD HH:mm", zone);
   return `${time} (${zone})`;
 });
@@ -1022,6 +1024,8 @@ const slimPair = computed(() => rendersSlim("anomalies") && rendersSlim("recentE
 const runSection = async (key: SectionKey, load: (current: () => boolean) => Promise<void>) => {
   const seq = ++sectionSeq[key];
   const current = () => seq === sectionSeq[key];
+  // a retry after a failure has no valid answer on screen, so it takes the first-load placeholder again
+  if (sectionFailure[key]) sectionState[key].loaded = false;
   sectionState[key].loading = true;
   try {
     await load(current);
@@ -1047,6 +1051,9 @@ const resetLegacySections = () => {
   graphData.value = { nodes: [], edges: [] };
   selectedService.value = null;
   servicePanelVisible.value = false;
+  showAlertHistoryDrawer.value = false;
+  selectedAlertForHistory.value = null;
+  selectedAlertIdForHistory.value = "";
   for (const key of Object.keys(sectionState) as SectionKey[]) {
     sectionSeq[key]++;
     sectionState[key].loading = false;

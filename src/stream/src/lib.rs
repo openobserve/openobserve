@@ -156,7 +156,6 @@ pub async fn try_get_streams(
     Ok(indices_res)
 }
 
-// org_id is only for pattern associations, which is ent only
 pub fn stream_res(
     org_id: &str,
     stream_name: &str,

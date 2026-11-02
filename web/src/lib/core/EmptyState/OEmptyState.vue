@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ]"
     data-test="o2-empty-state"
   >
-    <!-- decorative dot-grid backdrop (hero/block only) -->
+    <!-- decorative dot-grid backdrop (hero, block and compact only) -->
     <div
       v-if="showBackdrop"
       aria-hidden="true"
@@ -324,7 +324,7 @@ onMounted(() => {
 onBeforeUnmount(() => mq?.removeEventListener?.("change", syncMotion));
 
 // --- backdrop ---------------------------------------------------------------
-const showBackdrop = computed(() => props.backdrop ?? size.value !== "inline");
+const showBackdrop = computed(() => props.backdrop ?? !isInlineCopy.value);
 const dotGridStyle =
   // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
   "background-image: radial-gradient(var(--empty-dot) 1.25px, transparent 1.25px);" +
