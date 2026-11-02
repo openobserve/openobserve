@@ -114,7 +114,7 @@ fn get_timezone_from_string(
     fallback_offset: i32,
 ) -> Result<Tz, FixedOffset> {
     if let Some(tz_str) = timezone_str
-        && let Ok(tz) = tz_str.parse::<Tz>()
+        && let Ok(tz) = unwrap_browser_time(tz_str).parse::<Tz>()
     {
         return Ok(tz);
     }
@@ -152,6 +152,91 @@ pub(crate) fn next_cron_in_zone(
     next_cron_across_clock_change(schedule, tz, after)
 }
 
+/// Next cron fire after `after` in the named zone when it parses, else at `tz_offset` minutes.
+pub fn next_cron_after(
+    schedule: &Schedule,
+    timezone: Option<&str>,
+    tz_offset: i32,
+    after: chrono::DateTime<Utc>,
+) -> Option<chrono::DateTime<Utc>> {
+    match timezone.and_then(|name| unwrap_browser_time(name).parse::<Tz>().ok()) {
+        Some(tz) => next_cron_in_zone(schedule, &tz, after),
+        None => schedule
+            .after(&after.with_timezone(&fixed_offset(tz_offset)?))
+            .next()
+            .map(|t| t.with_timezone(&Utc)),
+    }
+}
+
+/// Fires in `(after, until]` and the first after `until`, in the named zone or at `tz_offset`.
+pub fn cron_fires_between(
+    schedule: &Schedule,
+    timezone: Option<&str>,
+    tz_offset: i32,
+    after: chrono::DateTime<Utc>,
+    until: chrono::DateTime<Utc>,
+) -> Option<(Vec<chrono::DateTime<Utc>>, chrono::DateTime<Utc>)> {
+    match timezone.and_then(|name| unwrap_browser_time(name).parse::<Tz>().ok()) {
+        Some(tz) => {
+            // The on-time case: nothing is due by `until`, so the hours-wide walk is skipped.
+            let first = next_cron_in_zone(schedule, &tz, after)?;
+            if first > until {
+                return Some((vec![], first));
+            }
+            Some((
+                cron_fires_in_zone(schedule, &tz, after, until),
+                next_cron_in_zone(schedule, &tz, until.max(after))?,
+            ))
+        }
+        None => {
+            let mut fires = schedule
+                .after(&after.with_timezone(&fixed_offset(tz_offset)?))
+                .map(|t| t.with_timezone(&Utc));
+            let mut within = Vec::new();
+            loop {
+                let t = fires.next()?;
+                if t > until {
+                    return Some((within, t));
+                }
+                within.push(t);
+            }
+        }
+    }
+}
+
+/// Every fire in `(after, until]` from one walk of the readings, not one rescan per fire.
+fn cron_fires_in_zone(
+    schedule: &Schedule,
+    tz: &Tz,
+    after: chrono::DateTime<Utc>,
+    until: chrono::DateTime<Utc>,
+) -> Vec<chrono::DateTime<Utc>> {
+    let shift = Duration::hours(CLOCK_CHANGE_WINDOW_HOURS);
+    let local_after = after.with_timezone(tz).naive_local();
+    let local_until = until.with_timezone(tz).naive_local();
+    let mut fires: Vec<_> = schedule
+        .after(&Utc.from_utc_datetime(&(local_after - shift)))
+        .map(|reading| reading.naive_utc())
+        .take_while(|local| *local <= local_until + shift)
+        .flat_map(|local| reading_instants(tz, local, shift))
+        .flatten()
+        .filter(|t| *t > after && *t <= until)
+        .collect();
+    // A repeated hour maps later readings to earlier instants, so the walk is not in order.
+    fires.sort_unstable();
+    fires.dedup();
+    fires
+}
+
+/// The zone inside the UI's `Browser Time (<zone>)` option, else `name` unchanged.
+fn unwrap_browser_time(name: &str) -> &str {
+    name.get(..12)
+        .filter(|prefix| prefix.eq_ignore_ascii_case("browser time"))
+        .and_then(|_| name[12..].trim().strip_prefix('('))
+        .and_then(|zone| zone.strip_suffix(')'))
+        .map_or(name, str::trim)
+}
+
 fn next_cron_across_clock_change(
     schedule: &Schedule,
     tz: &Tz,
@@ -166,22 +251,30 @@ fn next_cron_across_clock_change(
         if best.is_some_and(|b| local > b.with_timezone(tz).naive_local() + shift) {
             break;
         }
-        let instants = match tz.from_local_datetime(&local) {
-            LocalResult::Single(t) => [Some(t.with_timezone(&Utc)), None],
-            LocalResult::Ambiguous(first, second) => [
-                Some(first.with_timezone(&Utc)),
-                Some(second.with_timezone(&Utc)),
-            ],
-            // A skipped reading runs at that reading in the offset in force before the change.
-            LocalResult::None => [skipped_reading_instant(tz, local, shift), None],
-        };
-        for t in instants.into_iter().flatten() {
+        for t in reading_instants(tz, local, shift).into_iter().flatten() {
             if t > after && best.is_none_or(|b| t < b) {
                 best = Some(t);
             }
         }
     }
     best
+}
+
+/// The instants a local wall-clock `reading` names in `tz`: two in a repeated hour, one otherwise.
+fn reading_instants(
+    tz: &Tz,
+    local: chrono::NaiveDateTime,
+    shift: Duration,
+) -> [Option<chrono::DateTime<Utc>>; 2] {
+    match tz.from_local_datetime(&local) {
+        LocalResult::Single(t) => [Some(t.with_timezone(&Utc)), None],
+        LocalResult::Ambiguous(first, second) => [
+            Some(first.with_timezone(&Utc)),
+            Some(second.with_timezone(&Utc)),
+        ],
+        // A skipped reading runs at that reading in the offset in force before the change.
+        LocalResult::None => [skipped_reading_instant(tz, local, shift), None],
+    }
 }
 
 fn skipped_reading_instant(
@@ -429,7 +522,7 @@ impl TriggerCondition {
     /// gap between consecutive fires is not even constant (weekday-only,
     /// monthly, DST), so its deadline has to be read off the schedule itself —
     /// anchored to this row's `last_seen` so it cannot drift between sweeps.
-    pub fn group_resolve_threshold_micros(&self, last_seen: i64, k: i64) -> i64 {
+    pub fn group_resolve_threshold_micros(&self, last_seen: i64, k: i64, tz_offset: i32) -> i64 {
         use crate::meta::alerts::grouping::{
             cron_resolve_threshold_micros, resolve_threshold_micros,
         };
@@ -450,19 +543,22 @@ impl TriggerCondition {
         };
 
         let take = k.max(0) as usize;
-        let occurrences: Vec<i64> = match get_timezone_from_string(self.timezone.as_deref(), 0) {
-            Ok(tz) => std::iter::successors(next_cron_in_zone(&schedule, &tz, anchor), |prev| {
-                next_cron_in_zone(&schedule, &tz, *prev)
-            })
-            .take(take)
-            .map(|d| d.timestamp_micros())
-            .collect(),
-            Err(_) => schedule
-                .after(&anchor)
-                .take(take)
-                .map(|d| d.timestamp_micros())
-                .collect(),
-        };
+        let occurrences: Vec<i64> =
+            match get_timezone_from_string(self.timezone.as_deref(), tz_offset) {
+                Ok(tz) => {
+                    std::iter::successors(next_cron_in_zone(&schedule, &tz, anchor), |prev| {
+                        next_cron_in_zone(&schedule, &tz, *prev)
+                    })
+                    .take(take)
+                    .map(|d| d.timestamp_micros())
+                    .collect()
+                }
+                Err(fixed) => schedule
+                    .after(&anchor.with_timezone(&fixed))
+                    .take(take)
+                    .map(|d| d.timestamp_micros())
+                    .collect(),
+            };
         cron_resolve_threshold_micros(last_seen, occurrences, k)
     }
 }
@@ -2004,11 +2100,170 @@ mod test {
                 .with_timezone(&Los_Angeles);
             assert_eq!((local.hour(), local.minute()), (9, 0), "start {start}");
             assert_eq!(
-                condition.group_resolve_threshold_micros(start.timestamp_micros(), 1),
+                condition.group_resolve_threshold_micros(start.timestamp_micros(), 1, -420),
                 next - start.timestamp_micros(),
                 "start {start}"
             );
         }
+    }
+
+    #[test]
+    fn group_resolve_threshold_uses_the_offset_of_a_legacy_cron_alert() {
+        use chrono::TimeZone;
+
+        let hour = 3_600_000_000;
+        let legacy = TriggerCondition {
+            frequency_type: FrequencyType::Cron,
+            cron: "0 0 9 * * *".to_string(),
+            timezone: None,
+            ..Default::default()
+        };
+        let ist_run = Utc.with_ymd_and_hms(2026, 6, 15, 3, 30, 0).unwrap();
+        assert_eq!(
+            legacy.group_resolve_threshold_micros(ist_run.timestamp_micros(), 1, 330),
+            24 * hour
+        );
+        let edt_run = Utc.with_ymd_and_hms(2026, 7, 1, 13, 0, 0).unwrap();
+        assert_eq!(
+            legacy.group_resolve_threshold_micros(edt_run.timestamp_micros(), 3, -240),
+            72 * hour
+        );
+        let ny = TriggerCondition {
+            timezone: Some("America/New_York".to_string()),
+            ..legacy
+        };
+        let last_edt_run = Utc.with_ymd_and_hms(2026, 10, 31, 13, 0, 0).unwrap();
+        assert_eq!(
+            ny.group_resolve_threshold_micros(last_edt_run.timestamp_micros(), 1, -240),
+            25 * hour
+        );
+    }
+
+    #[test]
+    fn next_cron_after_reads_the_zone_inside_browser_time() {
+        use chrono::TimeZone;
+
+        let nine_am = Schedule::from_str("0 0 9 * * *").unwrap();
+        let utc = |m, d, h| Utc.with_ymd_and_hms(2026, m, d, h, 0, 0).unwrap();
+        for wrapped in [
+            "Browser Time (America/New_York)",
+            "browser time (America/New_York)",
+        ] {
+            assert_eq!(
+                next_cron_after(&nine_am, Some(wrapped), -240, utc(11, 1, 12)),
+                Some(utc(11, 1, 14)),
+                "{wrapped}"
+            );
+            assert_eq!(
+                next_cron_after(&nine_am, Some(wrapped), -300, utc(3, 8, 12)),
+                Some(utc(3, 8, 13)),
+                "{wrapped}"
+            );
+        }
+        assert_eq!(unwrap_browser_time("Browser Time"), "Browser Time");
+        assert_eq!(unwrap_browser_time("Asia/Kolkata"), "Asia/Kolkata");
+    }
+
+    #[test]
+    fn cron_fires_between_matches_stepping_next_cron_in_zone_across_dst() {
+        use chrono::TimeZone;
+
+        let ny: Tz = "America/New_York".parse().unwrap();
+        let windows = [
+            (
+                Utc.with_ymd_and_hms(2026, 3, 7, 12, 0, 0).unwrap(),
+                Utc.with_ymd_and_hms(2026, 3, 9, 12, 0, 0).unwrap(),
+            ),
+            (
+                Utc.with_ymd_and_hms(2026, 10, 31, 12, 0, 0).unwrap(),
+                Utc.with_ymd_and_hms(2026, 11, 2, 12, 0, 0).unwrap(),
+            ),
+        ];
+        let at = |m, d, h, mi| Utc.with_ymd_and_hms(2026, m, d, h, mi, 0).unwrap();
+        // Stepping a seconds cron rescans hours per fire, so its windows only straddle the change.
+        let seconds_windows = [
+            (at(3, 8, 6, 50), at(3, 8, 7, 10)),
+            (at(11, 1, 5, 50), at(11, 1, 6, 10)),
+        ];
+        let cases = [
+            ("0/5 * * * * *", &seconds_windows),
+            ("0 */5 * * * *", &windows),
+            ("0 0 * * * *", &windows),
+            ("0 30 1 * * *", &windows),
+            ("0 30 2 * * *", &windows),
+        ];
+        for (cron, cron_windows) in cases {
+            let schedule = Schedule::from_str(cron).unwrap();
+            for &(after, until) in cron_windows {
+                let mut stepped = vec![];
+                let mut next = next_cron_in_zone(&schedule, &ny, after).unwrap();
+                while next <= until {
+                    stepped.push(next);
+                    next = next_cron_in_zone(&schedule, &ny, next).unwrap();
+                }
+                let got = cron_fires_between(&schedule, Some("America/New_York"), 0, after, until);
+                assert_eq!(got, Some((stepped, next)), "{cron} {after}");
+            }
+        }
+    }
+
+    #[test]
+    fn cron_fires_between_returns_only_the_next_fire_when_nothing_is_due() {
+        use chrono::TimeZone;
+
+        let schedule = Schedule::from_str("0 0 9 * * *").unwrap();
+        let at = |d, h| Utc.with_ymd_and_hms(2026, 11, d, h, 0, 0).unwrap();
+        for (after, until) in [(at(1, 5), at(1, 6)), (at(1, 13), at(1, 13))] {
+            assert_eq!(
+                cron_fires_between(&schedule, Some("America/New_York"), -240, after, until),
+                Some((vec![], at(1, 14))),
+                "{after}"
+            );
+        }
+        assert_eq!(
+            cron_fires_between(
+                &schedule,
+                Some("America/New_York"),
+                -240,
+                at(1, 13),
+                at(1, 14)
+            ),
+            Some((vec![at(1, 14)], at(2, 14)))
+        );
+    }
+
+    #[test]
+    fn cron_fires_between_counts_every_five_seconds_across_fall_back() {
+        use chrono::TimeZone;
+
+        let schedule = Schedule::from_str("0/5 * * * * *").unwrap();
+        let after = Utc.with_ymd_and_hms(2026, 11, 1, 5, 0, 0).unwrap();
+        let until = Utc.with_ymd_and_hms(2026, 11, 1, 8, 0, 0).unwrap();
+        let (fires, next) =
+            cron_fires_between(&schedule, Some("America/New_York"), -240, after, until).unwrap();
+        assert_eq!(fires.len(), 2160);
+        assert!(
+            fires
+                .windows(2)
+                .all(|w| w[1] - w[0] == Duration::seconds(5))
+        );
+        assert_eq!(next, until + Duration::seconds(5));
+    }
+
+    #[test]
+    fn cron_fires_between_uses_the_offset_without_a_zone_name() {
+        use chrono::TimeZone;
+
+        let schedule = Schedule::from_str("0 0 9 * * *").unwrap();
+        let at = |d, h, m| Utc.with_ymd_and_hms(2026, 6, d, h, m, 0).unwrap();
+        assert_eq!(
+            cron_fires_between(&schedule, None, 330, at(15, 3, 30), at(16, 3, 30)),
+            Some((vec![at(16, 3, 30)], at(17, 3, 30)))
+        );
+        assert_eq!(
+            cron_fires_between(&schedule, None, 1440, at(15, 0, 0), at(16, 0, 0)),
+            None
+        );
     }
 
     #[test]
@@ -3227,6 +3482,38 @@ mod test {
         let tc = cron_trigger("0 0 0 1 1 * 2020");
         assert!(tc.get_next_trigger_time(true, 0, false, None).is_err());
         assert!(tc.get_next_trigger_time(true, 0, true, None).is_err());
+    }
+
+    #[test]
+    fn a_browser_time_label_schedules_in_its_zone_like_the_catch_up() {
+        use chrono::TimeZone;
+
+        let label = "Browser Time (America/New_York)";
+        assert_eq!(
+            get_timezone_from_string(Some(label), -240),
+            Ok(chrono_tz::America::New_York)
+        );
+        let condition = TriggerCondition {
+            frequency_type: FrequencyType::Cron,
+            cron: "0 0 9 * * *".to_string(),
+            timezone: Some(label.to_string()),
+            ..Default::default()
+        };
+        let start = Utc.with_ymd_and_hms(2026, 11, 1, 12, 0, 0).unwrap();
+        let next = condition
+            .get_next_trigger_time_non_aligned(true, -240, false, Some(start.timestamp_micros()))
+            .unwrap();
+        let schedule = Schedule::from_str(&condition.cron).unwrap();
+        assert_eq!(
+            Some(next),
+            next_cron_after(&schedule, Some(label), -240, start).map(|t| t.timestamp_micros())
+        );
+        assert_eq!(
+            next,
+            Utc.with_ymd_and_hms(2026, 11, 1, 14, 0, 0)
+                .unwrap()
+                .timestamp_micros()
+        );
     }
 
     #[test]

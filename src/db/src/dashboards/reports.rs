@@ -15,8 +15,9 @@
 
 use std::str::FromStr;
 
-use chrono::FixedOffset;
+use chrono::{DateTime, Utc};
 use config::meta::{
+    alerts::next_cron_after,
     dashboards::reports::{ListReportsParams, Report, ReportFrequencyType},
     folder::{DEFAULT_FOLDER, Folder, FolderType},
 };
@@ -55,23 +56,7 @@ pub async fn create<C: ConnectionTrait + TransactionTrait>(
     report: Report,
 ) -> Result<String, anyhow::Error> {
     let org = report.org_id.clone();
-    let next_run_at = if report.frequency.frequency_type == ReportFrequencyType::Cron {
-        let tz_offset = FixedOffset::east_opt(report.tz_offset * 60)
-            .unwrap_or(FixedOffset::east_opt(0).unwrap());
-        match Schedule::from_str(&report.frequency.cron) {
-            Ok(schedule) => schedule
-                .upcoming(tz_offset)
-                .next()
-                .map(|t| t.timestamp_micros())
-                .unwrap_or(report.start),
-            Err(e) => {
-                log::error!("Failed to parse cron expression for report: {e}");
-                report.start
-            }
-        }
-    } else {
-        report.start
-    };
+    let next_run_at = first_run_at(&report, Utc::now());
 
     let report_id = create_without_updating_trigger(conn, folder_snowflake_id, report).await?;
     let trigger = db::scheduler::Trigger {
@@ -94,23 +79,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     report: Report,
 ) -> Result<(), anyhow::Error> {
     let org_id = report.org_id.clone();
-    let next_run_at = if report.frequency.frequency_type == ReportFrequencyType::Cron {
-        let tz_offset = FixedOffset::east_opt(report.tz_offset * 60)
-            .unwrap_or(FixedOffset::east_opt(0).unwrap());
-        match Schedule::from_str(&report.frequency.cron) {
-            Ok(schedule) => schedule
-                .upcoming(tz_offset)
-                .next()
-                .map(|t| t.timestamp_micros())
-                .unwrap_or(report.start),
-            Err(e) => {
-                log::error!("Failed to parse cron expression for report: {e}");
-                report.start
-            }
-        }
-    } else {
-        report.start
-    };
+    let next_run_at = first_run_at(&report, Utc::now());
 
     let report_id =
         update_without_updating_trigger(conn, folder_snowflake_id, new_folder_snowflake_id, report)
@@ -198,23 +167,7 @@ pub async fn update_by_id<C: ConnectionTrait + TransactionTrait>(
     report: Report,
 ) -> Result<(), anyhow::Error> {
     let org_id = report.org_id.clone();
-    let next_run_at = if report.frequency.frequency_type == ReportFrequencyType::Cron {
-        let tz_offset = FixedOffset::east_opt(report.tz_offset * 60)
-            .unwrap_or(FixedOffset::east_opt(0).unwrap());
-        match Schedule::from_str(&report.frequency.cron) {
-            Ok(schedule) => schedule
-                .upcoming(tz_offset)
-                .next()
-                .map(|t| t.timestamp_micros())
-                .unwrap_or(report.start),
-            Err(e) => {
-                log::error!("Failed to parse cron expression for report: {e}");
-                report.start
-            }
-        }
-    } else {
-        report.start
-    };
+    let next_run_at = first_run_at(&report, Utc::now());
 
     let id =
         update_by_id_without_updating_trigger(conn, report_id, new_folder_snowflake_id, report)
@@ -307,6 +260,23 @@ pub async fn reset<C: ConnectionTrait>(conn: &C) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// The trigger's first run: the next cron fire in the report's zone, else `report.start`.
+fn first_run_at(report: &Report, after: DateTime<Utc>) -> i64 {
+    if report.frequency.frequency_type != ReportFrequencyType::Cron {
+        return report.start;
+    }
+    let schedule = match Schedule::from_str(&report.frequency.cron) {
+        Ok(schedule) => schedule,
+        Err(e) => {
+            log::error!("Failed to parse cron expression for report: {e}");
+            return report.start;
+        }
+    };
+    let timezone = (!report.timezone.is_empty()).then_some(report.timezone.as_str());
+    next_cron_after(&schedule, timezone, report.tz_offset, after)
+        .map_or(report.start, |t| t.timestamp_micros())
+}
+
 /// Helper functions for sending events to the super cluster queue.
 #[cfg(feature = "enterprise")]
 mod super_cluster {
@@ -385,10 +355,13 @@ mod super_cluster {
 
 #[cfg(test)]
 mod tests {
+    use chrono::{TimeZone, Utc};
     use config::meta::dashboards::reports::{
         Report, ReportDashboard, ReportDestination, ReportFrequency, ReportFrequencyType,
         ReportTimerange,
     };
+
+    use super::first_run_at;
 
     fn create_test_report() -> Report {
         Report {
@@ -419,6 +392,62 @@ mod tests {
             owner: "test_owner".to_string(),
             last_edited_by: "test_editor".to_string(),
         }
+    }
+
+    fn nine_am_cron(timezone: &str, tz_offset: i32) -> Report {
+        Report {
+            frequency: ReportFrequency {
+                cron: "0 0 9 * * *".to_string(),
+                frequency_type: ReportFrequencyType::Cron,
+                ..Default::default()
+            },
+            start: 42,
+            timezone: timezone.to_string(),
+            tz_offset,
+            ..create_test_report()
+        }
+    }
+
+    fn utc(y: i32, m: u32, d: u32, h: u32, mi: u32) -> chrono::DateTime<Utc> {
+        Utc.with_ymd_and_hms(y, m, d, h, mi, 0).unwrap()
+    }
+
+    #[test]
+    fn first_run_follows_the_zone_name_across_dst() {
+        // The stored offset is the one in force when the report was saved, stale after the change.
+        let fall = nine_am_cron("America/New_York", -240);
+        assert_eq!(
+            first_run_at(&fall, utc(2026, 11, 1, 12, 0)),
+            utc(2026, 11, 1, 14, 0).timestamp_micros()
+        );
+        let spring = nine_am_cron("America/New_York", -300);
+        assert_eq!(
+            first_run_at(&spring, utc(2026, 3, 8, 12, 0)),
+            utc(2026, 3, 8, 13, 0).timestamp_micros()
+        );
+    }
+
+    #[test]
+    fn first_run_uses_the_offset_without_a_zone_name_and_start_otherwise() {
+        let legacy = nine_am_cron("", 330);
+        assert_eq!(
+            first_run_at(&legacy, utc(2026, 6, 15, 0, 0)),
+            utc(2026, 6, 15, 3, 30).timestamp_micros()
+        );
+        let bad_cron = Report {
+            frequency: ReportFrequency {
+                cron: "not a cron".to_string(),
+                frequency_type: ReportFrequencyType::Cron,
+                ..Default::default()
+            },
+            ..nine_am_cron("", 0)
+        };
+        assert_eq!(first_run_at(&bad_cron, utc(2026, 6, 15, 0, 0)), 42);
+        let weekly = Report {
+            start: 42,
+            ..create_test_report()
+        };
+        assert_eq!(first_run_at(&weekly, utc(2026, 6, 15, 0, 0)), 42);
     }
 
     #[test]

@@ -735,7 +735,11 @@ async fn map_group_to_custom_role(
             }
         }
 
-        let existing_roles = get_roles_for_user(user_email).await;
+        // Diffing against the desired roles when they cannot be read writes no role change at all.
+        let existing_roles = get_roles_for_user(user_email).await.unwrap_or_else(|e| {
+            log::error!("group_to_custom_role: Error reading roles for {user_email}: {e}");
+            custom_roles.clone()
+        });
 
         // Find roles to delete: present in existing_role but not in custom_role
         for existing_role in &existing_roles {
@@ -1031,7 +1035,16 @@ pub async fn process_domain_org_mapping(
                     roles.insert(format_role_name_only(role));
                 }
             }
-            let existing_roles = get_roles_for_org_user(&mapped.org_id, user_email).await;
+            // Diffing against the claimed roles when they cannot be read writes no role change.
+            let existing_roles = get_roles_for_org_user(&mapped.org_id, user_email)
+                .await
+                .unwrap_or_else(|e| {
+                    log::error!(
+                        "error reading roles for user {user_email} org {} : {e}",
+                        mapped.org_id
+                    );
+                    roles.iter().cloned().collect()
+                });
 
             let mut add_roles = Vec::new();
             let mut add_tuples = Vec::new();

@@ -15,11 +15,11 @@
 
 use std::collections::HashMap;
 
-use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::{
+    alerts::{fixed_offset, next_cron_after},
     downtimes::ActiveDowntime,
     synthetics_variables::{placeholder_names, substitute_placeholders},
 };
@@ -85,14 +85,10 @@ impl SyntheticFrequency {
                 }
                 let schedule = cron::Schedule::from_str(&self.cron)
                     .map_err(|e| anyhow::anyhow!("invalid cron '{}': {e}", self.cron))?;
-                let tz = FixedOffset::east_opt(tz_offset_mins * 60)
-                    .unwrap_or_else(|| FixedOffset::east_opt(0).unwrap());
+                let offset = fixed_offset(tz_offset_mins).map_or(0, |_| tz_offset_mins);
                 let from = chrono::DateTime::from_timestamp_micros(from_us)
-                    .ok_or_else(|| anyhow::anyhow!("invalid from timestamp {from_us}"))?
-                    .with_timezone(&tz);
-                schedule
-                    .after(&from)
-                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("invalid from timestamp {from_us}"))?;
+                next_cron_after(&schedule, self.timezone.as_deref(), offset, from)
                     .map(|t| t.timestamp_micros())
                     .ok_or_else(|| anyhow::anyhow!("cron '{}' has no future dates", self.cron))
             }
@@ -122,7 +118,7 @@ pub struct Synthetic {
     /// accepts and returns; it is resolved to the `folders.id` KSUID on write.
     #[serde(default)]
     pub folder_id: String,
-    /// Timezone offset in minutes from UTC (e.g. -300 = EST). Used for cron scheduling.
+    /// UTC offset in minutes, used only when `frequency.timezone` is absent or unparseable.
     #[serde(default)]
     pub tz_offset: i32,
     pub name: String,
@@ -4708,5 +4704,61 @@ mod tests {
         })
         .unwrap();
         assert_eq!(json["reference_state"], "missing");
+    }
+
+    fn cron_frequency(timezone: Option<&str>) -> SyntheticFrequency {
+        SyntheticFrequency {
+            frequency_type: SyntheticFrequencyType::Cron,
+            interval: 0,
+            cron: "0 0 9 * * *".to_string(),
+            timezone: timezone.map(str::to_string),
+        }
+    }
+
+    fn utc_micros(y: i32, m: u32, d: u32, h: u32, mi: u32) -> i64 {
+        use chrono::TimeZone;
+        chrono::Utc
+            .with_ymd_and_hms(y, m, d, h, mi, 0)
+            .unwrap()
+            .timestamp_micros()
+    }
+
+    #[test]
+    fn cron_next_run_follows_the_zone_name_across_dst() {
+        let ny = cron_frequency(Some("America/New_York"));
+        // The stored offset is the one in force when the check was saved, stale after the change.
+        assert_eq!(
+            ny.next_run_at(utc_micros(2026, 11, 1, 12, 0), -240)
+                .unwrap(),
+            utc_micros(2026, 11, 1, 14, 0)
+        );
+        assert_eq!(
+            ny.next_run_at(utc_micros(2026, 3, 8, 12, 0), -300).unwrap(),
+            utc_micros(2026, 3, 8, 13, 0)
+        );
+    }
+
+    #[test]
+    fn cron_next_run_uses_the_offset_without_a_zone_name() {
+        let legacy = cron_frequency(None);
+        assert_eq!(
+            legacy
+                .next_run_at(utc_micros(2026, 6, 15, 0, 0), 330)
+                .unwrap(),
+            utc_micros(2026, 6, 15, 3, 30)
+        );
+        assert_eq!(
+            legacy
+                .next_run_at(utc_micros(2026, 6, 15, 0, 0), 1440)
+                .unwrap(),
+            utc_micros(2026, 6, 15, 9, 0)
+        );
+        let unknown_zone = cron_frequency(Some("Not/AZone"));
+        assert_eq!(
+            unknown_zone
+                .next_run_at(utc_micros(2026, 6, 15, 0, 0), 330)
+                .unwrap(),
+            utc_micros(2026, 6, 15, 3, 30)
+        );
     }
 }
