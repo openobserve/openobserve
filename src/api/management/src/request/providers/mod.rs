@@ -17,7 +17,7 @@ use axum::{extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
+use openobserve_core::auth::{ReadCheck, UserEmail, UserReads};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -282,15 +282,10 @@ async fn require_provider_visibility(
     provider_id: &str,
     user_id: &str,
 ) -> Result<(), Response> {
-    let permitted = openobserve_api_common::auth::validator::list_objects_for_user(
-        org_id, user_id, "GET", "provider",
-    )
-    .await
-    .map_err(|error| {
-        log::warn!("[Provider] failed to load provider permissions: {error}");
-        MetaHttpResponse::forbidden("Not allowed to use this provider")
-    })?;
-    if is_ofga_object_visible(org_id, "provider", provider_id, permitted.as_deref()) {
+    if (UserReads { org_id, user_id })
+        .can_read("providers", provider_id)
+        .await
+    {
         Ok(())
     } else {
         Err(MetaHttpResponse::forbidden(

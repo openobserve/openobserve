@@ -552,7 +552,8 @@ async fn guard_activation(org_id: &str, user_id: &str, job_id: &str) -> Result<(
     eval_jobs::check_transition(org_id, &job, "active")
         .await
         .map_err(Response::from)?;
-    guard_job(org_id, user_id, &job).await
+    guard_job(org_id, user_id, &job).await?;
+    guard_scorers(org_id, user_id, &job.scorers).await
 }
 
 /// The evaluation's own read and checks answer first, so a bad request is never refused.
@@ -572,7 +573,8 @@ async fn guard_manual(
     eval_jobs::check_manual_evaluate(org_id, &job, body)
         .await
         .map_err(Response::from)?;
-    guard_job(org_id, user_id, &job).await
+    guard_job(org_id, user_id, &job).await?;
+    guard_scorers(org_id, user_id, &job.scorers).await
 }
 
 #[cfg(test)]
