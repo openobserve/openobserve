@@ -81,11 +81,13 @@ jobs:
           toolchain: nightly-2026-10-24
           targets: x86_64-unknown-linux-gnu
 
+      # Own cache: the unit-tests cache holds coverage-instrumented builds that clippy cannot reuse.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           cache-on-failure: true
-          shared-key: unit-tests
-          save-if: false
+          shared-key: clippy
+          # main only: merge-queue ref caches are invisible to PRs and would only crowd the repo cache cap
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: bash ./.github/protoc.sh
@@ -106,7 +108,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_backend_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-8
+      labels: ubicloud-standard-16
     permissions:
       contents: read
     env:
@@ -170,19 +172,35 @@ jobs:
             sleep 2
           done
 
+      # One test process per core can open three pools with idle minimums, too close to the default 100 connections.
+      - name: Raise PostgreSQL connection limit
+        run: |
+          PGPASSWORD=password psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET max_connections = 500"
+          docker restart "${{ job.services.postgres.id }}"
+          for i in {1..30}; do
+            if PGPASSWORD=password psql -h localhost -U postgres -d postgres -c "SELECT 1" > /dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          PGPASSWORD=password psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -tAc "SHOW max_connections"
+
       - name: Run PostgreSQL unit tests
         run: ./coverage.sh run-cov
         env:
           ZO_DATA_DIR: ${{ runner.temp }}/openobserve-postgres/
+          # The PR run already gated coverage; the queue only needs pass/fail.
+          COVERAGE_NO_REPORT: ${{ github.event_name == 'merge_group' }}
 
       - name: Check PostgreSQL coverage
+        if: github.event_name != 'merge_group'
         run: ./coverage.sh check
 
   backend_unit_tests_sqlite:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_backend_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-8
+      labels: ubicloud-standard-16
     permissions:
       contents: read
     env:
@@ -227,8 +245,11 @@ jobs:
         run: ./coverage.sh run-cov
         env:
           ZO_DATA_DIR: ${{ runner.temp }}/openobserve-sqlite/
+          # The PR run already gated coverage; the queue only needs pass/fail.
+          COVERAGE_NO_REPORT: ${{ github.event_name == 'merge_group' }}
 
       - name: Check SQLite coverage
+        if: github.event_name != 'merge_group'
         run: ./coverage.sh check
 
   backend_unit_tests:
