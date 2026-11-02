@@ -73,7 +73,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #empty>
           <OEmptyState
-            size="hero"
+            v-if="showNoneSelected"
+            size="block"
+            class="shrink-0"
+            preset="no-roles"
+            data-test="iam-roles-selection-none-selected"
+            :title="t('iam.groupRoles.noneSelectedTitle')"
+            :description="t('iam.groupRoles.noneSelectedDescription')"
+            :actions="[
+              {
+                id: 'show-all',
+                icon: 'list',
+                titleKey: 'iam.groupRoles.showAll',
+                descriptionKey: 'iam.groupRoles.showAllDesc',
+              },
+            ]"
+            @action="(id) => id === 'show-all' && updateUserTable('all')"
+          />
+          <OEmptyState
+            v-else
+            size="block"
+            class="shrink-0"
             preset="no-roles"
             :filtered="!!userSearchKey"
             :hide-action="!userSearchKey"
@@ -229,6 +249,11 @@ const shapeRoles = (data: any) =>
 
 // The picker is the query, not a copy of it.
 const users = computed<any[]>(() => shapeRoles(rolesList.data.value ?? []));
+
+// An org with no roles keeps the org-empty state even under Selected.
+const showNoneSelected = computed(
+  () => usersDisplay.value === "selected" && !userSearchKey.value && users.value.length > 0,
+);
 
 const getchOrgUsers = async () => {
   // Enabling the query is what performs the first read; `suspense()` waits for

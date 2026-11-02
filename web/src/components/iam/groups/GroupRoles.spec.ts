@@ -17,6 +17,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import GroupRoles from "@/components/iam/groups/GroupRoles.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -564,6 +565,128 @@ describe("GroupRoles Component", () => {
           .find('[data-test="iam-roles-selection-table-body-row-developer-checkbox"]')
           .exists(),
       ).toBe(true);
+    });
+  });
+
+  describe("Empty states (ENT#2696)", () => {
+    const mountWithGroupRoles = async (groupRoles: string[]) => {
+      const emptyGroup = mount(GroupRoles, {
+        global: { provide: { store }, plugins: [i18n] },
+        props: {
+          groupRoles,
+          activeTab: "roles",
+          addedRoles: new Set(),
+          removedRoles: new Set(),
+        },
+      });
+      await flushPromises();
+      return emptyGroup;
+    };
+
+    it("says no roles are selected, not that the org has none, when the Selected filter is empty", async () => {
+      const emptyGroup = await mountWithGroupRoles([]);
+
+      const noneSelected = emptyGroup.find('[data-test="iam-roles-selection-none-selected"]');
+      expect(noneSelected.exists()).toBe(true);
+      expect(noneSelected.text()).toContain("No roles selected");
+      expect(emptyGroup.text()).not.toContain("No roles yet");
+
+      emptyGroup.unmount();
+    });
+
+    it("switches to All from the none-selected action and lists the org's roles", async () => {
+      const emptyGroup = await mountWithGroupRoles([]);
+
+      await emptyGroup
+        .find('[data-test="iam-roles-selection-none-selected"] button')
+        .trigger("click");
+      await flushPromises();
+
+      expect((emptyGroup.vm as any).usersDisplay).toBe("all");
+      expect(
+        emptyGroup
+          .find('[data-test="iam-roles-selection-table-body-row-developer-checkbox"]')
+          .exists(),
+      ).toBe(true);
+
+      emptyGroup.unmount();
+    });
+
+    it("keeps the org-empty copy when the All filter shows the org has no roles", async () => {
+      const { getRoles } = await import("@/services/iam");
+      vi.mocked(getRoles).mockResolvedValueOnce({ data: [] });
+      queryClient.clear();
+      const emptyGroup = await mountWithGroupRoles([]);
+
+      await (emptyGroup.vm as any).updateUserTable("all");
+      await flushPromises();
+
+      expect(emptyGroup.find('[data-test="iam-roles-selection-none-selected"]').exists()).toBe(
+        false,
+      );
+      expect(emptyGroup.text()).toContain("No roles yet");
+
+      emptyGroup.unmount();
+    });
+
+    it("shows the search-filtered state when a search empties the Selected view", async () => {
+      await wrapper.find('input[type="text"]').setValue("nonexistent");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="iam-roles-selection-none-selected"]').exists()).toBe(false);
+      expect(wrapper.text()).toContain("No roles found");
+    });
+
+    it("keeps the org-empty copy under the default Selected filter when the org has no roles", async () => {
+      const { getRoles } = await import("@/services/iam");
+      vi.mocked(getRoles).mockResolvedValueOnce({ data: [] });
+      queryClient.clear();
+      const emptyGroup = await mountWithGroupRoles([]);
+
+      expect((emptyGroup.vm as any).usersDisplay).toBe("selected");
+      expect(emptyGroup.find('[data-test="iam-roles-selection-none-selected"]').exists()).toBe(
+        false,
+      );
+      expect(emptyGroup.text()).toContain("No roles yet");
+
+      emptyGroup.unmount();
+    });
+
+    const expectUnclippable = (emptyGroup: any) => {
+      const emptyState = emptyGroup.findComponent(OEmptyState);
+      expect(emptyState.props("size")).toBe("block");
+      expect(emptyState.classes()).toContain("shrink-0");
+    };
+
+    it("renders the none-selected state at block size that cannot shrink below its content", async () => {
+      const emptyGroup = await mountWithGroupRoles([]);
+
+      expect(emptyGroup.find('[data-test="iam-roles-selection-none-selected"]').exists()).toBe(
+        true,
+      );
+      expectUnclippable(emptyGroup);
+
+      emptyGroup.unmount();
+    });
+
+    it("renders the org-empty state the same way", async () => {
+      const { getRoles } = await import("@/services/iam");
+      vi.mocked(getRoles).mockResolvedValueOnce({ data: [] });
+      queryClient.clear();
+      const emptyGroup = await mountWithGroupRoles([]);
+
+      expect(emptyGroup.text()).toContain("No roles yet");
+      expectUnclippable(emptyGroup);
+
+      emptyGroup.unmount();
+    });
+
+    it("renders the search-empty state the same way", async () => {
+      await wrapper.find('input[type="text"]').setValue("nonexistent");
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("No roles found");
+      expectUnclippable(wrapper);
     });
   });
 

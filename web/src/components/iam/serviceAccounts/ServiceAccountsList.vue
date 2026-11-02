@@ -48,6 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
           sorting="client"
+          sort-by="created_at"
+          sort-order="desc"
           selection="multiple"
           :selected-ids="selectedAccountEmails"
           :is-row-selectable="isRowSelectable"

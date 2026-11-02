@@ -21,6 +21,12 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { nextTick } from "vue";
 import config from "@/aws-exports";
+import {
+  fullConfigLoad,
+  markFullConfigFailed,
+  markFullConfigLoaded,
+  registerFullConfigLoader,
+} from "@/composables/useFullConfigLoad";
 
 // Mock the useIsMetaOrg composable
 vi.mock("@/composables/useIsMetaOrg", () => ({
@@ -778,6 +784,126 @@ describe("IdentityAccessManagement.vue Component", () => {
       expectedKeys.forEach((key) => {
         expect(keys).toContain(key);
       });
+    });
+  });
+
+  describe("Config load failure (ENT#2698)", () => {
+    let unregister: () => void = () => {};
+    const loader = vi.fn(async () => {});
+
+    const mountIam = async () => {
+      const w = mount(IdentityAccessManagement, {
+        global: { provide: { store }, plugins: [i18n, router], stubs: defaultStubs },
+      });
+      await flushPromises();
+      return w;
+    };
+    const banner = (w: VueWrapper<any>) => w.find('[data-test="iam-config-load-failed"]');
+
+    beforeEach(() => {
+      loader.mockReset();
+      loader.mockImplementation(async () => {});
+      unregister = registerFullConfigLoader(loader);
+    });
+
+    afterEach(() => {
+      unregister();
+    });
+
+    it("shows a load-failed banner with retry when this org's full config failed", async () => {
+      markFullConfigFailed("test-org");
+
+      const w = await mountIam();
+
+      expect(banner(w).exists()).toBe(true);
+      expect(w.find('[data-test="iam-config-load-failed-retry"]').exists()).toBe(true);
+      w.unmount();
+    });
+
+    it("shows no banner when RBAC is really off in a loaded config", async () => {
+      store.state.zoConfig = { version: "v1", rbac_enabled: false };
+      markFullConfigLoaded("test-org");
+
+      const w = await mountIam();
+
+      expect(banner(w).exists()).toBe(false);
+      w.unmount();
+    });
+
+    it("keeps the last good config quiet when a later refetch for the same org fails", async () => {
+      markFullConfigLoaded("test-org");
+      markFullConfigFailed("test-org");
+
+      const w = await mountIam();
+
+      expect(banner(w).exists()).toBe(false);
+      w.unmount();
+    });
+
+    it("shows the banner after an org switch whose config failed, though the old org's config is loaded", async () => {
+      store.state.zoConfig = { version: "v1", rbac_enabled: true };
+      markFullConfigLoaded("other-org");
+      markFullConfigFailed("test-org");
+
+      const w = await mountIam();
+
+      expect(banner(w).exists()).toBe(true);
+      w.unmount();
+    });
+
+    it("does not lock the RBAC sections just because the config failed", async () => {
+      store.state.zoConfig = {};
+      markFullConfigFailed("test-org");
+
+      const w = await mountIam();
+
+      const groups = allItems(w.vm.sectionGroups).find((i: any) => i.key === "groups");
+      expect(groups.lockedMessage).not.toBe(i18n.global.t("enterpriseFeature.rbacDisabled"));
+      w.unmount();
+    });
+
+    it("keeps the banner steady while a retry is in flight", async () => {
+      markFullConfigFailed("test-org");
+      let finish: () => void = () => {};
+      loader.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+      const w = await mountIam();
+
+      await w.find('[data-test="iam-config-load-failed-retry"]').trigger("click");
+      await flushPromises();
+
+      expect(banner(w).exists()).toBe(true);
+      expect(w.vm.retryingConfig).toBe(true);
+      finish();
+      await flushPromises();
+      expect(w.vm.retryingConfig).toBe(false);
+      w.unmount();
+    });
+
+    it("retry runs the shared layout loader and clears the banner once it loads", async () => {
+      markFullConfigFailed("test-org");
+      loader.mockImplementation(async () => markFullConfigLoaded("test-org"));
+      const w = await mountIam();
+
+      await w.find('[data-test="iam-config-load-failed-retry"]').trigger("click");
+      await flushPromises();
+
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(banner(w).exists()).toBe(false);
+      w.unmount();
+    });
+
+    it("keeps the banner when the retry fails again", async () => {
+      markFullConfigFailed("test-org");
+      loader.mockImplementation(async () => markFullConfigFailed("test-org"));
+      const w = await mountIam();
+
+      await w.find('[data-test="iam-config-load-failed-retry"]').trigger("click");
+      await flushPromises();
+
+      expect(loader).toHaveBeenCalledTimes(1);
+      expect(banner(w).exists()).toBe(true);
+      expect(fullConfigLoad.failedOrg).toBe("test-org");
+      w.unmount();
     });
   });
 });

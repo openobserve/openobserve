@@ -36,6 +36,11 @@ vi.mock("@/services/passwordPolicy", () => ({
   },
 }));
 
+vi.mock("vue-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vue-router")>()),
+  onBeforeRouteLeave: vi.fn(),
+}));
+
 const confirmMock = vi.fn();
 vi.mock("@/composables/useConfirmDialog", () => ({
   useConfirmDialog: () => ({ confirm: confirmMock }),
@@ -47,6 +52,8 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 import passwordPolicyService from "@/services/passwordPolicy";
+import { onBeforeRouteLeave } from "vue-router";
+import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 
 // Every non-complexity feature configured: the values a complexity-only edit must carry back untouched.
 const CONFIGURED_POLICY: PasswordPolicyType = {
@@ -419,6 +426,130 @@ describe("PasswordPolicy", () => {
     expect(wrapper.find('[data-test="settings-password-policy-root-warning"]').exists()).toBe(
       false,
     );
+  });
+});
+
+describe("PasswordPolicy unsaved changes (ENT#2870)", () => {
+  const leaveGuard = () =>
+    vi.mocked(onBeforeRouteLeave).mock.calls.at(-1)?.[0] as unknown as () => unknown;
+  const cancel = async (wrapper: any) => {
+    await wrapper.find('[data-test="settings-password-policy-cancel-btn"]').trigger("click");
+    await flushPromises();
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (passwordPolicyService.getPolicy as any).mockResolvedValue({ data: CONFIGURED_POLICY });
+    (passwordPolicyService.updatePolicy as any).mockResolvedValue({
+      data: { policy: { ...CONFIGURED_POLICY, min_length: 16 }, users_flagged: 0 },
+    });
+  });
+
+  afterEach(() => {
+    wrappers.forEach((wrapper) => wrapper.unmount());
+    wrappers = [];
+  });
+
+  it("asks before Cancel discards edits and keeps them when the user stays", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+    await editMinLength(wrapper, "16");
+    confirmMock.mockResolvedValue(false);
+
+    await cancel(wrapper);
+
+    expect(confirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Your changes to the password policy have not been saved. Discard them?",
+      }),
+    );
+    expect(Number(wrapper.vm.form.state.values.min_length)).toBe(16);
+  });
+
+  it("resets the form when the user confirms the discard", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+    await editMinLength(wrapper, "16");
+    confirmMock.mockResolvedValue(true);
+
+    await cancel(wrapper);
+
+    expect(Number(wrapper.vm.form.state.values.min_length)).toBe(CONFIGURED_POLICY.min_length);
+    expect(wrapper.vm.isDirty).toBe(false);
+  });
+
+  it("lets the route change without a prompt when nothing changed", async () => {
+    mountPage();
+    await flushPromises();
+
+    expect(await leaveGuard()()).toBe(true);
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks leaving the route with edits until the user confirms", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+    await editMinLength(wrapper, "16");
+
+    confirmMock.mockResolvedValueOnce(false);
+    expect(await leaveGuard()()).toBe(false);
+    confirmMock.mockResolvedValueOnce(true);
+    expect(await leaveGuard()()).toBe(true);
+    expect(confirmMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not prompt on leave once the edits are saved", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+    await editMinLength(wrapper, "16");
+    confirmMock.mockResolvedValue(true);
+    await submit(wrapper);
+    confirmMock.mockClear();
+
+    expect(await leaveGuard()()).toBe(true);
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  it("offers only Discard during a forced sign-out, since staying cannot stop it", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+    await editMinLength(wrapper, "16");
+    confirmMock.mockResolvedValue(true);
+
+    beginDraftSignOut({ forced: true });
+    try {
+      expect(await leaveGuard()()).toBe(true);
+    } finally {
+      cancelDraftSignOut();
+    }
+
+    expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ confirmOnly: true }));
+  });
+
+  it("stops warning on reload once the page is unmounted", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+    await editMinLength(wrapper, "16");
+
+    wrapper.unmount();
+    wrappers = wrappers.filter((w) => w !== wrapper);
+    const afterUnmount = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(afterUnmount);
+
+    expect(afterUnmount.defaultPrevented).toBe(false);
+  });
+
+  it("asks the browser to warn on reload or tab close only while dirty", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+    const clean = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+
+    await editMinLength(wrapper, "16");
+    const dirty = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(dirty);
+    expect(dirty.defaultPrevented).toBe(true);
   });
 });
 

@@ -21,12 +21,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #sidebar>
       <SectionRail :groups="sectionGroups" :active-key="activeSection" :title="t('menu.iam')" />
     </template>
-    <section class="h-full min-h-0 min-w-0 overflow-y-auto">
-      <RouterView v-slot="{ Component }">
-        <OAccessBoundary>
-          <component :is="Component" />
-        </OAccessBoundary>
-      </RouterView>
+    <section class="flex h-full min-h-0 min-w-0 flex-col">
+      <OBanner
+        v-if="configLoadFailed"
+        variant="warning"
+        icon="error"
+        dense
+        inline-actions
+        class="m-2 shrink-0"
+        :content="t('iam.configLoadFailed')"
+        data-test="iam-config-load-failed"
+      >
+        <template #actions>
+          <OButton
+            variant="outline"
+            size="sm"
+            :loading="retryingConfig"
+            data-test="iam-config-load-failed-retry"
+            @click="retryConfig"
+          >
+            {{ t("common.retry") }}
+          </OButton>
+        </template>
+      </OBanner>
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <RouterView v-slot="{ Component }">
+          <OAccessBoundary>
+            <component :is="Component" />
+          </OAccessBoundary>
+        </RouterView>
+      </div>
     </section>
   </OPageLayout>
 </template>
@@ -36,7 +60,10 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import OAccessBoundary from "@/components/access/OAccessBoundary.vue";
 import { type SectionHubGroup } from "@/components/common/SectionHub.vue";
-import { computed, watch } from "vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { computed, ref, watch } from "vue";
+import { fullConfigLoad, reloadFullConfig } from "@/composables/useFullConfigLoad";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -70,6 +97,25 @@ const routeToIamTab: Record<string, string> = {
   invitations: "invitations",
 };
 const activeSection = computed(() => routeToIamTab[route.name as string] ?? "");
+
+const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+
+// A failed load leaves the gates on their defaults or on another org's config, never on a real "RBAC off".
+const configLoadFailed = computed(
+  () => fullConfigLoad.failedOrg === orgId.value && fullConfigLoad.loadedOrg !== orgId.value,
+);
+
+const retryingConfig = ref(false);
+
+const retryConfig = async () => {
+  if (retryingConfig.value) return;
+  retryingConfig.value = true;
+  try {
+    await reloadFullConfig();
+  } finally {
+    retryingConfig.value = false;
+  }
+};
 
 const sectionGroups = computed<SectionHubGroup[]>(() => {
   const isCloud = config.isCloud == "true";

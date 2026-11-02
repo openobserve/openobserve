@@ -115,7 +115,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #empty>
           <OEmptyState
-            size="hero"
+            v-if="showNoneSelected"
+            size="block"
+            class="shrink-0"
+            preset="no-users"
+            data-test="iam-users-selection-none-selected"
+            :title="t('iam.groupUsers.noneSelectedTitle')"
+            :description="t('iam.groupUsers.noneSelectedDescription')"
+            :actions="[
+              {
+                id: 'show-all',
+                icon: 'list',
+                titleKey: 'iam.groupUsers.showAll',
+                descriptionKey: 'iam.groupUsers.showAllDesc',
+              },
+            ]"
+            @action="(id) => (id === 'show-all' ? updateUserTable('all') : null)"
+          />
+          <OEmptyState
+            v-else
+            size="block"
+            class="shrink-0"
             preset="no-users"
             :filtered="!!userSearchKey"
             :hide-action="!userSearchKey"
@@ -220,6 +240,11 @@ const usersDisplayOptions = [
   },
 ];
 const userSearchKey = ref("");
+
+// An org with no users keeps the org-empty state even under Selected.
+const showNoneSelected = computed(
+  () => usersDisplay.value === "selected" && !userSearchKey.value && users.value.length > 0,
+);
 
 const hasFetchedOrgUsers = ref(false);
 
