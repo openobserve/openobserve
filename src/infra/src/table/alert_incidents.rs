@@ -1264,6 +1264,16 @@ mod tests {
 
     /// An incident in `status` that alert `a1` fired into at `fired_at`.
     async fn fired_into(db: &DatabaseConnection, status: &str, fired_at: i64) -> String {
+        alert_fired_into(db, "a1", status, fired_at).await
+    }
+
+    /// An incident in `status` that `alert_id` fired into at `fired_at`.
+    async fn alert_fired_into(
+        db: &DatabaseConnection,
+        alert_id: &str,
+        status: &str,
+        fired_at: i64,
+    ) -> String {
         let mut incident = new_incident(
             "acme",
             "P2",
@@ -1277,9 +1287,9 @@ mod tests {
         let incident = incident.insert(db).await.unwrap();
         alert_incident_alerts::ActiveModel {
             incident_id: Set(incident.id.clone()),
-            alert_id: Set("a1".to_string()),
+            alert_id: Set(alert_id.to_string()),
             alert_fired_at: Set(fired_at),
-            alert_name: Set("a1".to_string()),
+            alert_name: Set(alert_id.to_string()),
             alert_kind: Set("alert".to_string()),
             correlation_reason: Set(None),
             created_at: Set(fired_at),
@@ -1625,6 +1635,36 @@ mod tests {
             row.topology_context, None,
             "the list skips topology_context"
         );
+    }
+
+    // Security's Cases page lists only incidents a SIEM detection fired into.
+    #[tokio::test]
+    async fn the_alert_filter_lists_only_incidents_those_alerts_fired_into() {
+        let db = incidents_db().await;
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        let siem = alert_fired_into(&db, "siem-1", "open", 1).await;
+        alert_fired_into(&db, "gc-pause", "open", 2).await;
+
+        let siem_ids = ["siem-1".to_string()];
+        let rows = list_with_alerts(&db, "acme", None, Some(&siem_ids), 50, 0)
+            .await
+            .unwrap();
+        assert_eq!(
+            rows.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
+            [siem.as_str()]
+        );
+
+        let none = list_with_alerts(&db, "acme", None, Some(&[]), 50, 0)
+            .await
+            .unwrap();
+        assert!(none.is_empty(), "an org with no detections has no cases");
+
+        let all = list_with_alerts(&db, "acme", None, None, 50, 0)
+            .await
+            .unwrap();
+        assert_eq!(all.len(), 2);
     }
 
     #[test]

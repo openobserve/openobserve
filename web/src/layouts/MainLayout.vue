@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="store.state.printMode !== true && !store.state.kioskMode"
         class="max-md:hidden"
         :links-list="navLinks"
+        :flat="store.state.solutionMode === 'security'"
         :mini-mode="miniMode"
         @menu-hover="handleMenuHover"
       />
@@ -129,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ONavbar
             class="min-h-0 flex-1 overflow-y-auto"
             :links-list="navLinks"
+            :flat="store.state.solutionMode === 'security'"
             :visible="true"
             @menu-hover="handleMenuHover"
           />
@@ -263,7 +265,7 @@ import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import { ENTER_FADE } from "@/lib/styles/motion";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
-import { SECURITY_NAV_LINKS as securityNavLinks } from "@/utils/security/nav";
+import { securityNavLinks as buildSecurityNavLinks } from "@/utils/security/nav";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -651,6 +653,7 @@ export default defineComponent({
 
     // Snapshot of observability links — restored when switching back from security mode
     let _obsLinksSnapshot: NavItem[] = [];
+    const securityNavLinks = buildSecurityNavLinks(t);
 
     watch(
       () => store.state.solutionMode,

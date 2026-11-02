@@ -10,7 +10,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      installed is coverage you already paid for in ingestion and are not using. -->
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -63,6 +63,7 @@ import {
 } from "@/utils/security/severity";
 
 const { t, te } = useI18nTyped();
+const translatedOr = (key: string, fallback: string) => (te(key) ? t(key) : raw(fallback));
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -642,7 +643,7 @@ const mappingRows = computed<KeyValueRow[]>(() => {
       key: `map.${column}`,
       label: te(`siem.column.${column}`)
         ? t(`siem.column.${column}`)
-        : t(`siem.content.mapColumn.${column}`, column),
+        : translatedOr(`siem.content.mapColumn.${column}`, column),
       value: (paths as string[]).join(" · "),
       mono: true,
     });
@@ -754,7 +755,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             "
           >
             <span class="text-text-heading min-w-0 flex-1 truncate font-mono text-xs"
-              >{{ group.label }}<OTooltip :content="group.label"
+              >{{ group.label }}<OTooltip :content="raw(group.label)"
             /></span>
             <span class="text-text-secondary text-2xs tabular-nums">{{ group.count }}</span>
           </li>
@@ -855,7 +856,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             v-if="row.status"
             :variant="STATUS_VARIANT[row.status] ?? 'default-soft'"
             size="xs"
-            >{{ t(`siem.content.status.${row.status}`, row.status) }}</OTag
+            >{{ translatedOr(`siem.content.status.${row.status}`, row.status) }}</OTag
           >
           <span v-else class="text-text-secondary">—</span>
         </template>
@@ -1021,7 +1022,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
           v-if="openRule.status"
           :variant="STATUS_VARIANT[openRule.status] ?? 'default-soft'"
           size="sm"
-          >{{ t(`siem.content.status.${openRule.status}`, openRule.status) }}</OTag
+          >{{ translatedOr(`siem.content.status.${openRule.status}`, openRule.status) }}</OTag
         >
         <OTag v-if="openRule.installed" variant="success-soft" icon="check-circle" size="sm">{{
           t("siem.content.installed")

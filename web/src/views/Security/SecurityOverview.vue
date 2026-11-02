@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      open cases, and whether security sources are still reporting. -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -809,7 +809,7 @@ function nav(path: string, query: Record<string, string> = {}) {
                   size="xs"
                   class="text-status-error-text shrink-0"
                 >
-                  <OTooltip :content="row.error" />
+                  <OTooltip :content="raw(row.error)" />
                 </OIcon>
               </div>
             </template>

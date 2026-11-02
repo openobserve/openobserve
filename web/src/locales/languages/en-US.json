@@ -22555,11 +22555,9 @@
       "seconds": "{n}s",
       "yes": "Yes",
       "search": "Search detections or techniques",
-      "siemOnly": "SIEM detections only",
       "showEvaluations": "Show all evaluations",
       "count": "{n} row | {n} rows",
       "refresh": "Refresh",
-      "capped": "Showing the newest {n} of {total} evaluations in this window, back to {from}. Counts cover that span only; pick a shorter window for complete numbers.",
       "cappedRows": "The table lists the newest {n} of {total} matching runs, back to {from}. The severity counts cover the whole window.",
       "summaryPartial": "Severity counts hit the server's row limit and may be low; pick a shorter window for complete numbers.",
       "notSiem": "Not a SIEM rule",
@@ -22746,8 +22744,6 @@
       "refresh": "Refresh detections",
       "search": "Search by name, stream or technique",
       "anySeverity": "Any severity",
-      "scopeSiem": "SIEM detections",
-      "scopeAll": "All alerts",
       "notSiem": "Alert",
       "scheduleValue": "Every {every}m over {over}m",
       "minutes": "{n} minute | {n} minutes",
@@ -23582,6 +23578,25 @@
     "sources": {
       "title": "Data Sources",
       "comingSoon": "Guided onboarding with OCSF normalization templates is coming. Until then, ingest security logs as any stream; the Events page identifies and normalizes them automatically."
+    },
+    "nav": {
+      "overview": "Overview",
+      "events": "Events",
+      "detections": "Detections",
+      "alerts": "Alerts",
+      "cases": "Cases",
+      "entities": "Entities",
+      "intel": "Threat Intel",
+      "ueba": "UEBA",
+      "mitre": "MITRE ATT&CK",
+      "compliance": "Compliance",
+      "content": "Content"
+    },
+    "sigma": {
+      "notSupported": "Not supported: {fields}",
+      "cannotMatch": "Cannot match: this stream has no {fields}",
+      "compiledEmpty": "Rule compiled to nothing",
+      "assumedAbsent": "Assuming this stream never has {fields}"
     }
   },
   "promql": {

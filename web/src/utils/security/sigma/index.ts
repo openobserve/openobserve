@@ -21,6 +21,7 @@ import { matchesLogsource } from "./parse";
 import { ocsfGuardSearch, ocsfProfileFor } from "./ocsf";
 import { compileSigmaRule } from "./compile";
 import { SIGMA_LEVELS } from "./types";
+import { gt, raw, type I18nText } from "@/types/i18n";
 
 export interface ApplicableRule {
   rule: SigmaRule;
@@ -28,14 +29,16 @@ export interface ApplicableRule {
 }
 
 /** Why a rule cannot run here, in one line, or empty when it can. */
-export function blockedReason(compiled: CompiledSigma): string {
-  if (compiled.error) return compiled.error;
-  if (compiled.unsupported.length) return `Not supported: ${compiled.unsupported.join(", ")}`;
-  if (compiled.runnable) return "";
-  if (compiled.assumedAbsent.length) {
-    return `Cannot match: this stream has no ${compiled.assumedAbsent.join(", ")}`;
+export function blockedReason(compiled: CompiledSigma): I18nText {
+  if (compiled.error) return raw(compiled.error);
+  if (compiled.unsupported.length) {
+    return gt("siem.sigma.notSupported", { fields: compiled.unsupported.join(", ") });
   }
-  return "Rule compiled to nothing";
+  if (compiled.runnable) return raw("");
+  if (compiled.assumedAbsent.length) {
+    return gt("siem.sigma.cannotMatch", { fields: compiled.assumedAbsent.join(", ") });
+  }
+  return gt("siem.sigma.compiledEmpty");
 }
 
 /**
@@ -46,9 +49,9 @@ export function blockedReason(compiled: CompiledSigma): string {
  * optional filter is inert and the rule is broader here than where it was
  * written.
  */
-export function caveat(compiled: CompiledSigma): string {
-  if (!compiled.runnable || !compiled.assumedAbsent.length) return "";
-  return `Assuming this stream never has ${compiled.assumedAbsent.join(", ")}`;
+export function caveat(compiled: CompiledSigma): I18nText {
+  if (!compiled.runnable || !compiled.assumedAbsent.length) return raw("");
+  return gt("siem.sigma.assumedAbsent", { fields: compiled.assumedAbsent.join(", ") });
 }
 
 const levelRank = (rule: SigmaRule) =>

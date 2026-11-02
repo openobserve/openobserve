@@ -9,7 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      a jump into the raw events. -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -522,7 +522,7 @@ const SIGNAL_TAG: Record<EntitySignal, BadgeVariant> = {
   spread: "amber-soft",
   external: "blue-soft",
 };
-function signalHint(sig: EntitySignal): string {
+function signalHint(sig: EntitySignal): I18nText {
   if (sig === "failures")
     return t("siem.entities.signalHint.failures", {
       rate: Math.round(SIGNAL_THRESHOLDS.failureRate * 100),
@@ -1012,7 +1012,7 @@ const noSources = computed(
             size="block"
             icon="error-outline"
             :title="t('siem.entities.loadError')"
-            :description="message"
+            :description="raw(message)"
             :action-label="t('siem.entities.refresh')"
             @action="refresh"
           />

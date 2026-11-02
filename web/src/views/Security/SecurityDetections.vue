@@ -10,7 +10,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      and every recent evaluation from alert history. -->
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -23,8 +23,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -127,10 +125,7 @@ const notices = computed<SecurityNotice[]>(() => {
 
 function loadFirings() {
   const end = Date.now();
-  const alertIds =
-    scope.value === "siem"
-      ? siemRows.value.map(({ alert }) => String(alert.id ?? "")).filter(Boolean)
-      : undefined;
+  const alertIds = siemRows.value.map(({ alert }) => String(alert.id ?? "")).filter(Boolean);
   return summary24h.load(orgId.value, end - 86_400_000, end, {
     alertIds,
     bucketMs: FIRINGS_BUCKET_MS,
@@ -145,8 +140,6 @@ async function refresh() {
 
 // ── Filters ──────────────────────────────────────────────────────────────────
 const search = ref("");
-const scope = ref<"siem" | "all">("siem");
-watch(scope, () => void loadFirings());
 const severity = ref<string | null>(null);
 type Facet = "fired" | DetectionState;
 const facet = ref<Facet | null>(null);
@@ -178,7 +171,7 @@ function scheduleOf(alert: Record<string, any>): string {
 }
 
 const scoped = computed<Row[]>(() =>
-  (scope.value === "siem" ? siemRows.value : rows.value).map((entry) => {
+  siemRows.value.map((entry) => {
     const alert = entry.alert;
     const name = String(alert.name ?? "");
     const fired = alert.id ? firings.value.get(String(alert.id)) : undefined;
@@ -463,7 +456,7 @@ function openFromDetectionParam() {
 watch(() => [rows.value, loading.value, route.query.detection] as const, openFromDetectionParam);
 
 // Keep drawer and URL in step: the param leaving (back navigation) closes the
-// drawer, and a record that leaves the list (scope switch, deletion) closes it
+// drawer, and a record that leaves the list (deletion) closes it
 // and drops the param.
 watch(
   () => route.query.detection,
@@ -752,18 +745,6 @@ watch(orgId, () => void refresh());
 
         <template #toolbar>
           <div class="flex w-full items-center gap-2">
-            <OToggleGroup
-              :model-value="scope"
-              data-test="security-detections-scope"
-              @update:model-value="(v: unknown) => (scope = v === 'all' ? 'all' : 'siem')"
-            >
-              <OToggleGroupItem value="siem" size="sm" data-test="security-detections-scope-siem">{{
-                t("siem.detections.scopeSiem")
-              }}</OToggleGroupItem>
-              <OToggleGroupItem value="all" size="sm" data-test="security-detections-scope-all">{{
-                t("siem.detections.scopeAll")
-              }}</OToggleGroupItem>
-            </OToggleGroup>
             <div class="w-40 shrink-0">
               <OSelect
                 :model-value="severity"
@@ -809,7 +790,7 @@ watch(orgId, () => void refresh());
         <template #cell-title="{ row }">
           <div class="flex min-w-0 items-center gap-1.5">
             <span class="text-text-heading truncate font-medium"
-              >{{ row.title }}<OTooltip :content="row.name"
+              >{{ row.title }}<OTooltip :content="raw(row.name)"
             /></span>
             <OIcon
               v-if="row.state === 'erroring'"
@@ -1009,7 +990,7 @@ watch(orgId, () => void refresh());
           size="inline"
           icon="error-outline"
           :title="t('siem.detections.historyError')"
-          :description="historyError"
+          :description="raw(historyError)"
         />
         <OEmptyState
           v-else-if="!history.length"

@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!-- Label/value rows for a record drawer; every value copies, and pivots when `pivotable`. -->
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -85,7 +85,7 @@ const pivotField = (row: KeyValueRow) => (row.field === undefined ? row.key : ro
         <span
           class="text-text-secondary w-2/5 shrink-0 truncate text-xs"
           :class="{ 'font-mono': !row.label }"
-          >{{ row.label ?? row.key }}<OTooltip v-if="!row.label" :content="row.key"
+          >{{ row.label ?? row.key }}<OTooltip v-if="!row.label" :content="raw(row.key)"
         /></span>
         <span
           class="text-text-heading min-w-0 flex-1 text-xs break-all"

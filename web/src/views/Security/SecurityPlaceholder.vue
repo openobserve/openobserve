@@ -4,11 +4,12 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { I18nText } from "@/types/i18n";
 
 defineProps<{
-  title: string;
+  title: I18nText;
   icon?: IconName;
-  description?: string;
+  description?: I18nText;
 }>();
 </script>
 

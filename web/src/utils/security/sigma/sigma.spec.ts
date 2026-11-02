@@ -220,7 +220,9 @@ describe("compileSigmaRule", () => {
 
   it("turns a list into OR and the all modifier into AND", () => {
     const anyOf = compile(RULE("  s:\n    EventID: [4625, 4624]\n  condition: s"));
-    expect(anyOf.where).toBe(`(TRY_CAST("EventID" AS DOUBLE) = 4625 OR TRY_CAST("EventID" AS DOUBLE) = 4624)`);
+    expect(anyOf.where).toBe(
+      `(TRY_CAST("EventID" AS DOUBLE) = 4625 OR TRY_CAST("EventID" AS DOUBLE) = 4624)`,
+    );
 
     const allOf = compile(
       RULE("  s:\n    CommandLine|contains|all: ['delete', 'shadows']\n  condition: s"),
@@ -232,14 +234,18 @@ describe("compileSigmaRule", () => {
 
   it("ANDs the entries of one map", () => {
     const { where } = compile(RULE("  s: {EventID: 4625, LogonType: 3}\n  condition: s"));
-    expect(where).toBe(`(TRY_CAST("EventID" AS DOUBLE) = 4625 AND TRY_CAST("LogonType" AS DOUBLE) = 3)`);
+    expect(where).toBe(
+      `(TRY_CAST("EventID" AS DOUBLE) = 4625 AND TRY_CAST("LogonType" AS DOUBLE) = 3)`,
+    );
   });
 
   it("ORs a list of maps", () => {
     const { where } = compile(
       RULE("  s:\n    - {EventID: 4625}\n    - {EventID: 4740}\n  condition: s"),
     );
-    expect(where).toBe(`(TRY_CAST("EventID" AS DOUBLE) = 4625 OR TRY_CAST("EventID" AS DOUBLE) = 4740)`);
+    expect(where).toBe(
+      `(TRY_CAST("EventID" AS DOUBLE) = 4625 OR TRY_CAST("EventID" AS DOUBLE) = 4740)`,
+    );
   });
 
   it("compiles the string modifiers to the right side of the wildcard", () => {
@@ -290,8 +296,12 @@ describe("compileSigmaRule", () => {
   });
 
   it("compiles the numeric comparisons", () => {
-    expect(compile(RULE("  s: {status|gte: 500}\n  condition: s")).where).toBe(`TRY_CAST("status" AS DOUBLE) >= 500`);
-    expect(compile(RULE("  s: {count|lt: 3}\n  condition: s")).where).toBe(`TRY_CAST("count" AS DOUBLE) < 3`);
+    expect(compile(RULE("  s: {status|gte: 500}\n  condition: s")).where).toBe(
+      `TRY_CAST("status" AS DOUBLE) >= 500`,
+    );
+    expect(compile(RULE("  s: {count|lt: 3}\n  condition: s")).where).toBe(
+      `TRY_CAST("count" AS DOUBLE) < 3`,
+    );
   });
 
   it("compiles a regex, with the case-insensitive flag inline", () => {
@@ -363,13 +373,19 @@ describe("compileSigmaRule", () => {
 
   it("negates through COALESCE so a null column does not swallow the row", () => {
     const { where } = compile(RULE("  s: {a: 1}\n  f: {b: 2}\n  condition: s and not f"));
-    expect(where).toBe(`(TRY_CAST("a" AS DOUBLE) = 1 AND NOT COALESCE(TRY_CAST("b" AS DOUBLE) = 2, false))`);
+    expect(where).toBe(
+      `(TRY_CAST("a" AS DOUBLE) = 1 AND NOT COALESCE(TRY_CAST("b" AS DOUBLE) = 2, false))`,
+    );
   });
 
   it("compiles 1 of, all of, and N of", () => {
     const body = "  sel_a: {a: 1}\n  sel_b: {b: 2}\n  sel_c: {c: 3}\n  condition: ";
-    expect(compile(RULE(`${body}1 of sel_*`)).where).toBe(`(TRY_CAST("a" AS DOUBLE) = 1 OR TRY_CAST("b" AS DOUBLE) = 2 OR TRY_CAST("c" AS DOUBLE) = 3)`);
-    expect(compile(RULE(`${body}all of them`)).where).toBe(`(TRY_CAST("a" AS DOUBLE) = 1 AND TRY_CAST("b" AS DOUBLE) = 2 AND TRY_CAST("c" AS DOUBLE) = 3)`);
+    expect(compile(RULE(`${body}1 of sel_*`)).where).toBe(
+      `(TRY_CAST("a" AS DOUBLE) = 1 OR TRY_CAST("b" AS DOUBLE) = 2 OR TRY_CAST("c" AS DOUBLE) = 3)`,
+    );
+    expect(compile(RULE(`${body}all of them`)).where).toBe(
+      `(TRY_CAST("a" AS DOUBLE) = 1 AND TRY_CAST("b" AS DOUBLE) = 2 AND TRY_CAST("c" AS DOUBLE) = 3)`,
+    );
     expect(compile(RULE(`${body}2 of sel_*`)).where).toBe(
       `(CASE WHEN TRY_CAST("a" AS DOUBLE) = 1 THEN 1 ELSE 0 END + CASE WHEN TRY_CAST("b" AS DOUBLE) = 2 THEN 1 ELSE 0 END + CASE WHEN TRY_CAST("c" AS DOUBLE) = 3 THEN 1 ELSE 0 END) >= 2`,
     );
@@ -610,7 +626,13 @@ detection:
     Image|endswith: '\\cmd.exe'
   condition: 1 of them`);
   // Ingest flattens three levels; the parent's path stays JSON one level up.
-  const fields = ["_timestamp", "class_uid", "activity_id", "process_file_path", "process_parent_process_file"];
+  const fields = [
+    "_timestamp",
+    "class_uid",
+    "activity_id",
+    "process_file_path",
+    "process_parent_process_file",
+  ];
 
   it("applies process-creation rules to OCSF data", async () => {
     const { ruleAppliesTo, ocsf } = await load();

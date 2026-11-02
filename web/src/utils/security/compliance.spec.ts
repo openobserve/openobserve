@@ -68,9 +68,12 @@ describe("capabilities", () => {
     // Classes not read yet: nothing is claimed.
     expect(ocsf()).toEqual([]);
     expect(ocsf([3002]).sort()).toEqual(["authentication"]);
-    expect(ocsf([3002, 3001, 4001, 1007]).sort()).toEqual(
-      ["admin", "authentication", "endpoint", "network"],
-    );
+    expect(ocsf([3002, 3001, 4001, 1007]).sort()).toEqual([
+      "admin",
+      "authentication",
+      "endpoint",
+      "network",
+    ]);
     expect(ocsf([6003]).sort()).toEqual(["admin", "cloud"]);
     // Findings are verdicts, not activity; an extension class keeps its base.
     expect(ocsf([2004])).toEqual([]);

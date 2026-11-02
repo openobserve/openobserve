@@ -278,7 +278,11 @@ class Compiler {
       if (!nested) continue;
       const keys = nested.keys.map(quoteString).join(", ");
       // json_as_text, not json_get_str: the latter is NULL for numbers and booleans.
-      return { column: nested.column, known: true, sql: `json_as_text(${quoteIdent(nested.column)}, ${keys})` };
+      return {
+        column: nested.column,
+        known: true,
+        sql: `json_as_text(${quoteIdent(nested.column)}, ${keys})`,
+      };
     }
     this.assumedAbsent.add(candidates[0]);
     return plain(candidates[0], false);

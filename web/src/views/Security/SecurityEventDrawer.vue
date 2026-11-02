@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      evaluated server-side. -->
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -379,7 +379,7 @@ function copy(text: string) {
           <span
             class="text-text-heading truncate text-sm font-semibold"
             :class="{ 'font-mono': entity.mono }"
-            >{{ entity.value }}<OTooltip :content="entity.value"
+            >{{ entity.value }}<OTooltip :content="raw(entity.value)"
           /></span>
           <span v-if="entity.field" class="text-text-secondary text-2xs truncate font-mono">{{
             entity.field
@@ -428,7 +428,7 @@ function copy(text: string) {
         size="inline"
         icon="error-outline"
         :title="t('siem.drawer.matchError')"
-        :description="matchError"
+        :description="raw(matchError)"
       />
       <OEmptyState
         v-else-if="!matched.length"

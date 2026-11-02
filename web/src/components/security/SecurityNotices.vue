@@ -3,7 +3,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <script setup lang="ts">
 import { computed, ref, useId, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -80,7 +80,7 @@ const toneLabel = (tone: NoticeTone) => t(`siem.notices.tone.${tone}`);
         />
         <span v-if="expanded" class="min-w-0">{{ notice.text }}</span>
         <span v-else class="min-w-0 truncate"
-          >{{ notice.text }}<OTooltip :content="notice.text"
+          >{{ notice.text }}<OTooltip :content="raw(notice.text)"
         /></span>
         <OButton
           v-if="notice.actionLabel && notice.onAction"

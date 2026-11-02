@@ -8,7 +8,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      fires. -->
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onUnmounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -208,13 +208,13 @@ const periodError = computed(() =>
     ? t("siem.detections.validation.positive")
     : period.value < frequency.value
       ? t("siem.detections.validation.periodGap")
-      : "",
+      : undefined,
 );
 const frequencyError = computed(() =>
-  frequency.value > 0 ? "" : t("siem.detections.validation.positive"),
+  frequency.value > 0 ? undefined : t("siem.detections.validation.positive"),
 );
 const silenceError = computed(() =>
-  silence.value >= 0 ? "" : t("siem.detections.validation.nonNegative"),
+  silence.value >= 0 ? undefined : t("siem.detections.validation.nonNegative"),
 );
 
 const canSave = computed(
@@ -359,8 +359,10 @@ async function save() {
   }
 }
 
-const streamOptions = computed(() => streams.value.map((s) => ({ label: s, value: s })));
-const destinationOptions = computed(() => destinations.value.map((d) => ({ label: d, value: d })));
+const streamOptions = computed(() => streams.value.map((s) => ({ label: raw(s), value: s })));
+const destinationOptions = computed(() =>
+  destinations.value.map((d) => ({ label: raw(d), value: d })),
+);
 const toNumber = (v: string | number) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;

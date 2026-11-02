@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { displayOrder, stepRow, type NavTable } from "@/utils/security/recordNav";
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -1099,7 +1099,7 @@ async function onSaved() {
             size="block"
             icon="error-outline"
             :title="t('siem.intel.loadFailed')"
-            :description="message"
+            :description="raw(message)"
           />
         </template>
         <template #empty>
@@ -1109,14 +1109,16 @@ async function onSaved() {
             icon="task-alt"
             :title="t('siem.intel.noMatches.title')"
             :description="
-              [
-                t('siem.intel.noMatches.description', {
-                  n: formatEventCount(liveIndicators.length),
-                  streams: sweep.streams.value.length,
-                  range: t(`siem.range.${range}`),
-                }),
-                ...sweepCaveats,
-              ].join(' ')
+              raw(
+                [
+                  t('siem.intel.noMatches.description', {
+                    n: formatEventCount(liveIndicators.length),
+                    streams: sweep.streams.value.length,
+                    range: t(`siem.range.${range}`),
+                  }),
+                  ...sweepCaveats,
+                ].join(' '),
+              )
             "
             :filtered="filtered"
             @action="onEmptyAction"
@@ -1250,7 +1252,7 @@ async function onSaved() {
             size="block"
             icon="error-outline"
             :title="t('siem.intel.loadFailed')"
-            :description="message"
+            :description="raw(message)"
           />
         </template>
         <template #empty>

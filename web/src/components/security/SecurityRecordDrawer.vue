@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      beside it stays live; j/k step through that list without closing. -->
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -278,7 +278,7 @@ const shownFacts = computed(() =>
             <span
               class="text-text-heading truncate text-sm font-semibold"
               :class="{ 'font-mono': fact.mono }"
-              >{{ fact.value }}<OTooltip :content="String(fact.value)"
+              >{{ fact.value }}<OTooltip :content="raw(fact.value)"
             /></span>
           </div>
         </div>

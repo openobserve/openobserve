@@ -111,7 +111,6 @@ const customWindow = ref<{ startMs: number; endMs: number } | null>(
     ? { startMs: Math.floor(parsedFrom / 1000), endMs: Math.ceil(parsedTo / 1000) }
     : null,
 );
-const siemOnly = ref(q.all !== "1");
 const showEvaluations = ref(q.evals === "1");
 const facet = ref<Facet | null>(FACETS.includes(q.facet as Facet) ? (q.facet as Facet) : null);
 const search = ref(q.q ?? "");
@@ -125,14 +124,13 @@ function syncUrl() {
   } else {
     query.period = range.value;
   }
-  if (!siemOnly.value) query.all = "1";
   if (showEvaluations.value) query.evals = "1";
   if (facet.value) query.facet = facet.value;
   if (search.value.trim()) query.q = search.value.trim();
   if (selectedKey.value) query.firing = selectedKey.value;
   router.replace({ query });
 }
-watch([siemOnly, showEvaluations, facet, search, selectedKey], syncUrl);
+watch([showEvaluations, facet, search, selectedKey], syncUrl);
 
 const windowEndMs = ref(customWindow.value?.endMs ?? Date.now());
 const windowMs = computed(() =>
@@ -167,9 +165,7 @@ const summary = useAlertHistorySummary();
 const history = computed(() => historyWindow.rows.value as FiringRow[]);
 const historyTotal = computed(() => historyWindow.total.value);
 const loading = computed(() => historyWindow.loading.value);
-const error = computed(
-  () => historyWindow.error.value || (siemOnly.value ? summary.error.value : ""),
-);
+const error = computed(() => historyWindow.error.value || summary.error.value);
 const lastRunAt = ref<number | null>(null);
 const summaryAt = ref<number | null>(null);
 
@@ -183,14 +179,14 @@ const siemIds = computed(() => siemRows.value.map((d) => String(d.alert.id ?? ""
 async function fetchRows() {
   if (!orgId.value) return;
   await historyWindow.load(orgId.value, windowStartMs.value, windowEndMs.value, {
-    alertIds: siemOnly.value ? siemIds.value : undefined,
+    alertIds: siemIds.value,
     outcomes: outcomeFilter.value,
   });
   if (!historyWindow.error.value) lastRunAt.value = Date.now();
 }
 
 async function fetchSummary() {
-  if (!orgId.value || !siemOnly.value) return;
+  if (!orgId.value) return;
   await summary.load(orgId.value, windowStartMs.value, windowEndMs.value, {
     alertIds: siemIds.value,
     bucketMs: bucketMsFor(windowMs.value),
@@ -205,15 +201,13 @@ async function fetchAll() {
   inFlight.value += 1;
   try {
     windowEndMs.value = customWindow.value?.endMs ?? Date.now();
-    const rules = loadDetections(orgId.value);
-    // The SIEM-only fetches filter on detection ids, so they need the list first.
-    if (siemOnly.value) await rules;
-    await Promise.all([rules, fetchRows(), fetchSummary()]);
+    // Both fetches filter on detection ids, so they need the list first.
+    await loadDetections(orgId.value);
+    await Promise.all([fetchRows(), fetchSummary()]);
   } finally {
     inFlight.value -= 1;
   }
 }
-watch(siemOnly, () => void fetchAll());
 watch(
   () => outcomeFilter.value?.join(",") ?? "",
   () => void fetchRows(),
@@ -258,7 +252,7 @@ const joined = computed<Firing[]>(() =>
 const isSignal = (f: Firing) =>
   f.status === "firing" || f.status === "notify_failed" || f.status === "error";
 
-const siemScoped = computed(() => joined.value.filter((f) => !siemOnly.value || f.detection));
+const siemScoped = computed(() => joined.value.filter((f) => f.detection));
 /**
  * Everything the facet tiles count over — the facet itself is not applied.
  * Silenced runs are usually "normal", so the Silenced facet brings them in
@@ -270,10 +264,6 @@ const base = computed(() =>
       showEvaluations.value || isSignal(f) || (facet.value === "silenced" && f.row.is_silenced),
   ),
 );
-const firings = computed(() =>
-  base.value.filter((f) => f.status === "firing" || f.status === "notify_failed"),
-);
-
 const emptyCounts = (): Record<Facet, number> => ({
   critical: 0,
   high: 0,
@@ -303,28 +293,11 @@ const summaryCounts = computed(() => {
   return c;
 });
 
-const rowCounts = computed(() => {
-  const c = emptyCounts();
-  for (const f of firings.value) {
-    const facetKey = facetOfTone(f.tone);
-    if (facetKey) c[facetKey] += 1;
-  }
-  for (const f of base.value) if (f.status === "error") c.error += 1;
-  return c;
-});
-
-const counts = computed(() => {
-  if (siemOnly.value) {
-    return {
-      ...summaryCounts.value,
-      silenced: summary.rows.value.reduce((sum, row) => sum + row.silenced, 0),
-    };
-  }
-  const c = rowCounts.value;
-  c.silenced = siemScoped.value.filter((f) => f.row.is_silenced).length;
-  return c;
-});
-const statsLoading = computed(() => (siemOnly.value ? summaryAt.value : lastRunAt.value) === null);
+const counts = computed(() => ({
+  ...summaryCounts.value,
+  silenced: summary.rows.value.reduce((sum, row) => sum + row.silenced, 0),
+}));
+const statsLoading = computed(() => summaryAt.value === null);
 
 const filtered = computed(() => {
   const needle = search.value.trim().toLowerCase();
@@ -381,17 +354,6 @@ const chartSeries = computed(() =>
 );
 type ChartTone = (typeof SEVERITY_TONES)[number];
 const chartBuckets = computed(() => {
-  if (!siemOnly.value) {
-    return bucketize(
-      firings.value
-        .filter((f) => f.tone !== "unknown")
-        .map((f) => ({ timeMs: f.timeMs, key: f.tone as ChartTone })),
-      windowStartMs.value,
-      windowEndMs.value,
-      bucketMsFor(windowMs.value),
-      SEVERITY_TONES,
-    );
-  }
   // The server may widen the bucket for long windows, so its width wins.
   const width = summary.bucketMs.value || bucketMsFor(windowMs.value);
   const buckets = bucketize<ChartTone>(
@@ -411,9 +373,7 @@ const chartBuckets = computed(() => {
   }
   return buckets;
 });
-const chartLoading = computed(
-  () => rulesLoading.value || (siemOnly.value ? summary.loading.value : loading.value),
-);
+const chartLoading = computed(() => rulesLoading.value || summary.loading.value);
 
 // ── Table ────────────────────────────────────────────────────────────────────
 const SEVERITY_RANK: Record<SeverityTone, number> = {
@@ -497,8 +457,8 @@ function onEmptyAction(id?: string) {
 // the newest-rows cap, and the drawer must not vanish mid-read.
 const pinned = ref<Firing | null>(null);
 const selected = computed<Firing | null>(() => {
-  // In SIEM-only mode a link or pinned drawer must not surface an ordinary alert.
-  const inScope = (f: Firing | null) => !!f && (!siemOnly.value || !!f.detection);
+  // A link or pinned drawer must not surface an ordinary alert.
+  const inScope = (f: Firing | null) => !!f && !!f.detection;
   const live = siemScoped.value.find((f) => f.id === selectedKey.value) ?? null;
   if (live) return live;
   const kept = pinned.value && pinned.value.id === selectedKey.value ? pinned.value : null;
@@ -535,7 +495,7 @@ const notices = computed<SecurityNotice[]>(() => {
     out.push({
       key: "capped",
       tone: "warning",
-      text: t(siemOnly.value ? "siem.alerts.cappedRows" : "siem.alerts.capped", {
+      text: t("siem.alerts.cappedRows", {
         n: formatEventCount(history.value.length),
         total: formatEventCount(historyTotal.value),
         from: new Date(cappedFromMs.value).toLocaleString(),
@@ -543,7 +503,7 @@ const notices = computed<SecurityNotice[]>(() => {
       dataTest: "security-alerts-capped",
     });
   }
-  if (siemOnly.value && summary.partial.value) {
+  if (summary.partial.value) {
     out.push({
       key: "summary-partial",
       tone: "warning",
@@ -974,12 +934,6 @@ onUnmounted(() => {
               />
             </div>
             <OSwitch
-              v-model="siemOnly"
-              :label="t('siem.alerts.siemOnly')"
-              size="sm"
-              data-test="security-alerts-siem-only"
-            />
-            <OSwitch
               v-model="showEvaluations"
               :label="t('siem.alerts.showEvaluations')"
               size="sm"
@@ -1069,12 +1023,12 @@ onUnmounted(() => {
             size="block"
             icon="task-alt"
             :title="
-              siemOnly && !siemRows.length && !rulesLoading
+              !siemRows.length && !rulesLoading
                 ? t('siem.alerts.noDetections')
                 : t('siem.alerts.empty')
             "
             :description="
-              siemOnly && !siemRows.length && !rulesLoading
+              !siemRows.length && !rulesLoading
                 ? t('siem.alerts.noDetectionsHint')
                 : t('siem.alerts.emptyHint')
             "

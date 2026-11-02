@@ -121,6 +121,7 @@ const props = withDefaults(defineProps<NavbarProps>(), {
   miniMode: false,
   visible: true,
   overlay: false,
+  flat: false,
 });
 
 const emit = defineEmits<NavbarEmits>();
@@ -142,7 +143,9 @@ const { isPaywalled } = useTrialPaywall();
 // collapse into a flyout with nothing worth flying out.
 const gateContext = useNavGateContext();
 const railEntries = computed<RailEntry[]>(() =>
-  groupNavLinks(props.linksList, t, (gate) => isGateOpen(gateContext.value, gate)),
+  props.flat
+    ? props.linksList.map((item): RailEntry => ({ type: "link", item }))
+    : groupNavLinks(props.linksList, t, (gate) => isGateOpen(gateContext.value, gate)),
 );
 const topEntries = computed(() =>
   railEntries.value.filter((e) => !(e.type === "group" && e.pinBottom)),

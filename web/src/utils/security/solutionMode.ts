@@ -29,8 +29,7 @@ const SHARED_PREFIXES = [
   "/cb",
 ];
 
-const under = (path: string, prefix: string) =>
-  path === prefix || path.startsWith(`${prefix}/`);
+const under = (path: string, prefix: string) => path === prefix || path.startsWith(`${prefix}/`);
 
 /** The mode a route implies, or the current one for a shared route. */
 export function solutionModeForPath(path: string, current: SolutionMode): SolutionMode {

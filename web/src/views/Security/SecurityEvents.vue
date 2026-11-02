@@ -13,7 +13,7 @@ import {
   ref,
   watch,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -33,6 +33,7 @@ import SecurityNotices, { type SecurityNotice } from "@/components/security/Secu
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
 import DateTime from "@/components/DateTime.vue";
@@ -296,13 +297,13 @@ const visibleSuggestions = computed(() =>
     ? suggestedSources.value
     : suggestedSources.value.slice(0, SUGGESTIONS_SHOWN),
 );
-function sourceHint(name: string): string {
+function sourceHint(name: string): I18nText | undefined {
   const entry = sourceByName.value.get(name);
   if (entry?.reason === "auto" && entry.verdict) {
     const n = Math.round(entry.verdict.confidence * 100);
     return t("siem.events.autoSource", { label: entry.verdict.label, n });
   }
-  return entry?.reason === "name" ? t("siem.events.nameSource") : "";
+  return entry?.reason === "name" ? t("siem.events.nameSource") : undefined;
 }
 const otherStreamNames = computed(() =>
   allStreamNames.value.filter((n) => !secStreamNames.value.includes(n)),
@@ -320,19 +321,19 @@ const streamStats = computed(
 );
 
 const streamOptions = computed(() => {
-  const opts: { label: string; value: string; header?: boolean }[] = [];
+  const opts: SelectOption[] = [];
   if (secStreamNames.value.length) {
     opts.push({ label: t("siem.events.securityStreams"), value: "__h_sec__", header: true });
-    secStreamNames.value.forEach((n) => opts.push({ label: n, value: n }));
+    secStreamNames.value.forEach((n) => opts.push({ label: raw(n), value: n }));
   }
   if (otherStreamNames.value.length) {
     opts.push({ label: t("siem.events.otherStreams"), value: "__h_other__", header: true });
-    otherStreamNames.value.forEach((n) => opts.push({ label: n, value: n }));
+    otherStreamNames.value.forEach((n) => opts.push({ label: raw(n), value: n }));
   }
   return opts;
 });
 const addStreamOptions = computed(() =>
-  otherStreamNames.value.map((n) => ({ label: n, value: n })),
+  otherStreamNames.value.map((n) => ({ label: raw(n), value: n })),
 );
 
 function addStreamToSecurity(name: unknown) {
@@ -524,7 +525,7 @@ const SEVERITY_ID_OPTIONS = computed(() =>
     { id: 99, key: "siem.severity.other" },
   ].map(({ id, key }) => ({ label: t(key), value: id })),
 );
-const severityTextOptions = ref<{ label: string; value: string }[]>([]);
+const severityTextOptions = ref<SelectOption[]>([]);
 const severityOptions = computed(() =>
   severityIsOcsf.value ? SEVERITY_ID_OPTIONS.value : severityTextOptions.value,
 );
@@ -549,7 +550,7 @@ async function loadSeverityValues() {
     const uniq = [...new Set(vals)].filter((v) => v !== "" && v !== "null");
     // Worst first, whatever order the data came back in.
     uniq.sort((a, b) => toOcsfSeverity(b) - toOcsfSeverity(a) || a.localeCompare(b));
-    severityTextOptions.value = uniq.map((v) => ({ label: v, value: v }));
+    severityTextOptions.value = uniq.map((v) => ({ label: raw(v), value: v }));
   } catch {
     severityTextOptions.value = [];
   }
@@ -575,7 +576,7 @@ const filters = computed(() => ({
 const builderField = ref("");
 const builderOp = ref("=");
 const builderValue = ref("");
-const builderValueOptions = ref<{ label: string; value: string }[]>([]);
+const builderValueOptions = ref<SelectOption[]>([]);
 const builderValuesLoading = ref(false);
 
 const FILTER_OPS = computed(() => [
@@ -590,7 +591,7 @@ const OP_SYMBOL: Record<string, string> = {
   contains: "~",
   not_contains: "!~",
 };
-const fieldNameOptions = computed(() => fieldNames.value.map((n) => ({ label: n, value: n })));
+const fieldNameOptions = computed(() => fieldNames.value.map((n) => ({ label: raw(n), value: n })));
 
 watch(builderField, async (field) => {
   builderValue.value = "";
@@ -603,7 +604,7 @@ watch(builderField, async (field) => {
   const values = await fetchTopValues(field, 50);
   // Another field may have been picked while these loaded.
   if (builderField.value !== field) return;
-  builderValueOptions.value = values.map((v) => ({ label: v.value, value: v.value }));
+  builderValueOptions.value = values.map((v) => ({ label: raw(v.value), value: v.value }));
   builderValuesLoading.value = false;
 });
 
@@ -796,7 +797,7 @@ const columns = computed<OTableColumnDef<Row>[]>(() => {
   if (showRaw.value) {
     return visibleCols.value.map((col) => ({
       id: col === "_timestamp" ? "time" : `raw:${col}`,
-      header: col === "_timestamp" ? t("siem.column.time") : col,
+      header: col === "_timestamp" ? t("siem.column.time") : raw(col),
       accessorFn: (row: Row) => (col === "_timestamp" ? row.time : readRaw(row.raw, col)),
       size: col === "_timestamp" ? 170 : 180,
       meta: { rawField: col },
@@ -1916,7 +1917,7 @@ function widenTo(period: string) {
               >
                 <div class="flex items-center gap-1">
                   <span class="text-text-heading min-w-0 flex-1 truncate font-mono text-xs"
-                    >{{ v.value }}<OTooltip :content="v.value"
+                    >{{ v.value }}<OTooltip :content="raw(v.value)"
                   /></span>
                   <span class="text-text-secondary text-2xs tabular-nums">{{
                     formatEventCount(v.count)
@@ -2013,7 +2014,7 @@ function widenTo(period: string) {
           size="xs"
           data-test="security-events-ocsf-objects"
           >{{ t("siem.events.objects") }} · {{ detectedSummary.objects.length
-          }}<OTooltip :content="detectedSummary.objects.join(', ')"
+          }}<OTooltip :content="raw(detectedSummary.objects.join(', '))"
         /></OTag>
         <OTag
           v-if="detectedSummary.sigma"
@@ -2030,7 +2031,7 @@ function widenTo(period: string) {
         </OTag>
         <span class="text-text-secondary max-w-md truncate">
           {{ t("siem.events.matchedOn", { fields: detectedSummary.evidence }) }}
-          <OTooltip :content="detectedSummary.evidence" />
+          <OTooltip :content="raw(detectedSummary.evidence)" />
         </span>
         <div class="flex-1" />
         <OButton
@@ -2074,7 +2075,7 @@ function widenTo(period: string) {
           />
           <span class="text-text-heading truncate font-medium">
             {{ entry.rule.title }}
-            <OTooltip v-if="entry.rule.description" :content="entry.rule.description" />
+            <OTooltip v-if="entry.rule.description" :content="raw(entry.rule.description)" />
           </span>
           <OTag
             v-for="tech in entry.rule.techniques.slice(0, 3)"

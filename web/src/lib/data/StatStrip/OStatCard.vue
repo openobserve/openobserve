@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { I18nText } from "@/types/i18n";
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // OStatCard — the reusable KPI / stat tile. The ONE stat primitive across the
@@ -131,7 +131,7 @@ const displayValue = computed(() => {
 const exactTitle = computed(() => {
   const v = props.value;
   return props.compactValue && typeof v === "number" && String(v) !== displayValue.value
-    ? v.toLocaleString()
+    ? raw(v.toLocaleString())
     : undefined;
 });
 const isMuted = computed(() => {

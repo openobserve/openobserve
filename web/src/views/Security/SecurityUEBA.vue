@@ -9,7 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      these are heuristics over the chosen windows. -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -463,7 +463,7 @@ const SIGNAL_ICON: Record<UebaSignalKind, string> = {
 };
 
 /** The reason text for a signal, built from the numbers that raised it. */
-function reason(sig: UebaSignal): string {
+function reason(sig: UebaSignal): I18nText {
   const e = sig.evidence;
   switch (sig.kind) {
     case "volume":
@@ -993,7 +993,7 @@ const noUserSources = computed(
             size="block"
             icon="error-outline"
             :title="t('siem.ueba.loadError')"
-            :description="message"
+            :description="raw(message)"
             :action-label="t('siem.entities.refresh')"
             @action="refresh"
           />

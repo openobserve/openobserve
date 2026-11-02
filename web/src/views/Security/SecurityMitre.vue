@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      org's detections; green = enabled detection, hot = fired in window, dashed = not enabled. -->
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -546,7 +546,7 @@ function openDetections() {
                         : t("siem.mitrePage.cellAvailable", cell.catalogRules.length)
                     }}
                   </span>
-                  <OTooltip :content="cell.catalogRules.map((r) => r.title).join(' · ')" />
+                  <OTooltip :content="raw(cell.catalogRules.map((r) => r.title).join(' · '))" />
                 </div>
               </template>
               <span

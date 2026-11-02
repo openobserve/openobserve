@@ -8,8 +8,8 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      about them. Incident correlation is an enterprise/cloud feature, so an OSS
      build says so instead of showing an empty queue. -->
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -38,6 +38,8 @@ import SecurityRecordDrawer, {
 import SecurityKeyValues from "@/components/security/SecurityKeyValues.vue";
 import incidentsService, { type Incident, type IncidentWithAlerts } from "@/services/incidents";
 import { readableAlertName } from "@/utils/security/detection";
+import { useRcaTrigger } from "@/composables/useRcaTrigger";
+import { isLiveRca } from "@/utils/incidents/rcaCell";
 import { useSiemDetections } from "@/composables/security/useSiemDetections";
 import {
   CASE_STATUSES,
@@ -266,6 +268,11 @@ const selectedIndex = computed(() => {
 
 async function loadDetail(id: string) {
   const mine = ++detailSeq;
+  stopRcaPoll();
+  if (rcaLoaded?.incidentId !== id) {
+    rca.value = "";
+    rcaLoaded = null;
+  }
   detail.value = null;
   events.value = [];
   eventsPartial.value = false;
@@ -285,6 +292,7 @@ async function loadDetail(id: string) {
     timeline.status === "fulfilled" && !!timeline.value.data?.partial_reconstruction;
   detailLoading.value = false;
   eventsLoading.value = false;
+  syncRca(id);
 }
 
 /** True while `id` is still the open case — every await re-checks before writing. */
@@ -292,7 +300,10 @@ const stillOpen = (id: string) => selectedId.value === id;
 
 watch(selectedId, (id) => {
   if (id && available) void loadDetail(id);
-  else detail.value = null;
+  else {
+    stopRcaPoll();
+    detail.value = null;
+  }
 });
 
 function open(c: Incident) {
@@ -408,8 +419,6 @@ const entityRows = computed(() =>
     mono: true,
   })),
 );
-
-const rca = computed(() => detail.value?.topology_context?.suggested_root_cause ?? "");
 
 const tabs = computed<RecordTab[]>(() => [
   { name: "overview", label: t("siem.cases.tab.overview"), icon: "dashboard" },
@@ -530,32 +539,87 @@ async function postComment() {
   }
 }
 
-const analyzing = ref(false);
+// ── Analysis (runs in the background; poll the incident until the run ends) ──
+const RCA_POLL_MS = 5_000;
+const { requestRca } = useRcaTrigger();
+/** Report of the incident's newest completed run. */
+const rca = ref("");
+let rcaLoaded: { incidentId: string; runId: string } | null = null;
+let rcaPoll: ReturnType<typeof setTimeout> | undefined;
+const triggering = ref(false);
+const analyzing = computed(() => triggering.value || isLiveRca(detail.value?.rca));
+
+function stopRcaPoll() {
+  clearTimeout(rcaPoll);
+  rcaPoll = undefined;
+}
+
+async function loadRcaReport(id: string) {
+  const runId = detail.value?.rca?.report_run?.run_id;
+  if (!runId || (rcaLoaded?.incidentId === id && rcaLoaded.runId === runId)) return;
+  try {
+    const res = await incidentsService.getRcaRun(orgId.value, id, runId);
+    if (!stillOpen(id)) return;
+    rca.value = res.data.report ?? "";
+    rcaLoaded = { incidentId: id, runId };
+  } catch (e: any) {
+    if (stillOpen(id)) {
+      toast({
+        variant: "error",
+        message: e?.response?.data?.message ?? t("siem.cases.analysisError"),
+      });
+    }
+  }
+}
+
+/** Show the latest report, and keep polling while a run is live. */
+function syncRca(id: string) {
+  stopRcaPoll();
+  if (detail.value?.id !== id) return;
+  void loadRcaReport(id);
+  if (isLiveRca(detail.value.rca)) rcaPoll = setTimeout(() => void refreshRca(id), RCA_POLL_MS);
+}
+
+async function refreshRca(id: string, wasLive = isLiveRca(detail.value?.rca)) {
+  try {
+    const res = await incidentsService.get(orgId.value, id);
+    if (!stillOpen(id) || detail.value?.id !== id) return;
+    const next = res.data.rca ?? null;
+    detail.value = { ...detail.value, rca: next };
+    if (wasLive && next?.state === "failed") {
+      toast({
+        variant: "error",
+        message: next.summary.detail ? raw(next.summary.detail) : t("siem.cases.analysisError"),
+      });
+    }
+  } catch (e) {
+    // A failed read says nothing about the run; keep polling on the last known state.
+    console.error("Failed to refresh case analysis:", e);
+  }
+  syncRca(id);
+}
+
 async function runAnalysis() {
   const c = summary.value;
   if (!c) return;
   const id = c.id;
-  analyzing.value = true;
+  triggering.value = true;
   try {
-    const res = await incidentsService.triggerRca(orgId.value, id, { reanalysis: !!rca.value });
-    if (stillOpen(id) && detail.value?.id === id && res.data?.rca_content) {
-      detail.value = {
-        ...detail.value,
-        topology_context: {
-          ...(detail.value.topology_context ?? { nodes: [], edges: [], related_incident_ids: [] }),
-          suggested_root_cause: res.data.rca_content,
-        } as IncidentWithAlerts["topology_context"],
-      };
-    }
+    const res = await requestRca(orgId.value, id, {}, { isStillActive: () => stillOpen(id) });
+    if (res.status === "exhausted") toast({ variant: "error", message: res.notice });
+    else if (res.status === "unavailable") toast({ variant: "error", message: res.message });
+    else if (res.status === "started" && stillOpen(id)) await refreshRca(id, true);
   } catch (e: any) {
     toast({
       variant: "error",
       message: e?.response?.data?.message ?? t("siem.cases.analysisError"),
     });
   } finally {
-    analyzing.value = false;
+    triggering.value = false;
   }
 }
+
+onBeforeUnmount(stopRcaPoll);
 
 function openDetection(name: string) {
   const id = byName.value.get(name)?.alert.id;
@@ -913,7 +977,11 @@ onMounted(() => {
             :key="`${e.timestamp}-${i}`"
             :title="t(`siem.cases.event.${e.key}`, e.params)"
             :subtitle="
-              [e.actor, new Date(e.timestamp / 1000).toLocaleString()].filter(Boolean).join(' · ')
+              raw(
+                [e.actor, new Date(e.timestamp / 1000).toLocaleString()]
+                  .filter(Boolean)
+                  .join(' · '),
+              )
             "
             :icon="e.icon"
             :variant="TIMELINE_VARIANT[e.kind]"
