@@ -85,6 +85,16 @@ describe("oncall service — the request shapes the server actually accepts", ()
     });
   });
 
+  /// RO-6: no body; the team id is one path segment.
+  describe("testTeamSlackChannel", () => {
+    it("posts with no body to the team's Slack test route", () => {
+      client.post.mockResolvedValue({ data: {} });
+      oncallService.testTeamSlackChannel({ org_identifier: "default", team_id: "team/1" });
+
+      expect(client.post).toHaveBeenCalledWith("/api/default/oncall/teams/team%2F1/slack/test");
+    });
+  });
+
   describe("product analytics", () => {
     const org_identifier = "default";
     const team_id = "team_1";
