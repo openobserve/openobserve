@@ -320,6 +320,13 @@ export default function useRumSpanBuilder(
         event.type === "error" || (event.type === "resource" && event.resource_status_code >= 400)
           ? "ERROR"
           : "OK",
+      // What the span details' Error tab reads: a request's HTTP status, an error's type and message.
+      ...(event.type === "resource"
+        ? { http_response_status_code: event.resource_status_code }
+        : {}),
+      ...(event.type === "error"
+        ? { error_type: event.error_type, status_message: event.error_message }
+        : {}),
       span_kind: event.type === "resource" ? SPAN_KIND_CLIENT : SPAN_KIND_UNSPECIFIED,
       rum_event_type: event.type,
       rum_session_id: event.session_id,

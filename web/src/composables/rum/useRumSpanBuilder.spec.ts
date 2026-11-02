@@ -1240,6 +1240,21 @@ describe("useRumSpanBuilder", () => {
       expect(resSpan!.span_status).toBe("OK");
     });
 
+    it("should carry the HTTP status for the span details' Error tab", () => {
+      const traced = makeTracedResource();
+      const resource = makeOwnRequest({
+        resource_status_code: 401,
+        resource_type: "fetch",
+      });
+      const { formatRumEventsAsSpans } = buildComposable();
+
+      const spans = formatRumEventsAsSpans([traced], [], [], [resource]);
+
+      const resSpan = spans.find((s) => s.rum_event_type === "resource");
+      expect(resSpan!.span_status).toBe("ERROR");
+      expect(resSpan!.http_response_status_code).toBe(401);
+    });
+
     it("should fall back to 'Frontend' when service field is absent", () => {
       const traced = makeTracedResource();
       const resource = makeOwnRequest({
@@ -1396,6 +1411,18 @@ describe("useRumSpanBuilder", () => {
 
       const errSpan = spans.find((s) => s.rum_event_type === "error");
       expect(errSpan!.operation_name).toBe("Error: TypeError");
+    });
+
+    it("should carry the error type and message for the span details' Error tab", () => {
+      const traced = makeTracedResource();
+      const error = makeErrorEvent();
+      const { formatRumEventsAsSpans } = buildComposable();
+
+      const spans = formatRumEventsAsSpans([traced], [], [], [error]);
+
+      const errSpan = spans.find((s) => s.rum_event_type === "error");
+      expect(errSpan!.error_type).toBe("TypeError");
+      expect(errSpan!.status_message).toBe("TypeError: Cannot read property");
     });
 
     it("should show first 3 errors individually", () => {
