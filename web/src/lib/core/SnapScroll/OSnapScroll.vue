@@ -13,6 +13,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 const props = withDefaults(defineProps<OSnapScrollProps>(), {
   snap: true,
   active: undefined,
+  contentHeight: false,
 });
 
 const emit = defineEmits<OSnapScrollEmits>();
@@ -260,8 +261,12 @@ defineExpose<OSnapScrollExpose>({ scrollToSection, revealElement, pageStop, page
     :class="[
       'min-h-0',
       snap
-        ? '[container-type:size] snap-y snap-mandatory overflow-y-auto overscroll-contain [&_[data-snap-on]]:snap-start [&_[data-snap-section]]:min-h-[100cqh] [&_[data-snap-section]]:snap-start'
+        ? '[container-type:size] snap-y snap-mandatory overflow-y-auto overscroll-contain [&_[data-snap-on]]:snap-start [&_[data-snap-section]]:snap-start'
         : '',
+      snap &&
+        (contentHeight
+          ? '[&_[data-snap-section]:last-child]:min-h-[100cqh]'
+          : '[&_[data-snap-section]]:min-h-[100cqh]'),
     ]"
     @wheel="onWheel"
   >
