@@ -130,7 +130,7 @@ CI copies `o2-enterprise/tests/*` over `tests/` and runs these suites in their o
 | `tests/fleet_collector/` | An enterprise server with `O2_FLEET_ENABLED=true`, a running Docker daemon, and the collector image pinned as `IMAGE_REF` in `tests/fleet_collector/collector_docker.py` (pulled on first use). Containers reach the server through `host.docker.internal`. | `rye run pytest tests/fleet_collector/` (no `-n`) |
 | `tests/rbac/fleet/` | An enterprise server with `O2_OPENFGA_ENABLED=true`, `O2_OPENFGA_LIST_ONLY_PERMITTED=true` (the filtered-list checks need it) and a running OpenFGA server; CI runs it in the `ent_rbac` shard | `rye run pytest tests/rbac/fleet/` |
 
-Fleet runs leave empty `fl_auto_*` orgs behind, because org delete is cloud-only; remove them by hand before reusing a local server.
+Fleet runs leave `fl_auto_*` orgs behind, because org delete is cloud-only. Most are empty, but the flag-off seed org keeps its fleet and live token, and the fleet suite's orgs keep a disabled ingestion token. Remove them by hand before reusing a local server.
 
 ## Troubleshooting
 
