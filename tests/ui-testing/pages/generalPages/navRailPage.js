@@ -7,6 +7,9 @@ const FRAME_MS = 16;
 const ease = (t) => 10 * t ** 3 - 15 * t ** 4 + 6 * t ** 5;
 // The rail mask fades the last 3rem of an overflowing edge (railReveal.ts RAIL_FADE_REM).
 const RAIL_FADE_REM = 3;
+// Below ONavGroup OPEN_DELAY (120 ms): a longer gap between two moves reads to the app as a rest.
+const STALL_MS = 80;
+const SCAN_ATTEMPTS = 3;
 
 export class NavRailPage {
   constructor(page) {
@@ -155,6 +158,48 @@ export class NavRailPage {
       await this.page.waitForTimeout(FRAME_MS);
       if (onStep) await onStep(i, steps);
     }
+  }
+
+  // Glide while sampling open flyouts; a scan whose own pacing stalled is redone, and the caller asserts on the last one.
+  async scan(start, end, durationMs, { profile = 'ease', redo } = {}) {
+    let result;
+    for (let attempt = 1; attempt <= SCAN_ATTEMPTS; attempt++) {
+      if (attempt > 1 && redo) await redo();
+      const seen = new Set();
+      await this.startMoveClock();
+      await this.glide(
+        start,
+        end,
+        durationMs,
+        async () => {
+          for (const k of await this.openFlyoutKeys()) seen.add(k);
+        },
+        profile,
+      );
+      result = { seen: [...seen], maxGapMs: await this.maxMoveGap(), attempt };
+      if (result.maxGapMs <= STALL_MS) return result;
+      console.log(`[navRail] scan ${attempt}/${SCAN_ATTEMPTS} stalled: ${result.maxGapMs} ms between pointer moves`);
+    }
+    return result;
+  }
+
+  // Page-side clock, so a stall in the runner, CDP or the renderer all show up as the gap the app saw.
+  async startMoveClock() {
+    await this.page.evaluate(() => {
+      window.__navRailMoves = [];
+      if (window.__navRailMoveClock) return;
+      window.__navRailMoveClock = () => window.__navRailMoves.push(performance.now());
+      document.addEventListener('pointermove', window.__navRailMoveClock, true);
+    });
+  }
+
+  async maxMoveGap() {
+    return this.page.evaluate(() => {
+      const t = window.__navRailMoves || [];
+      let max = 0;
+      for (let i = 1; i < t.length; i++) max = Math.max(max, t[i] - t[i - 1]);
+      return Math.round(max);
+    });
   }
 
   async activeElementDataTest() {
