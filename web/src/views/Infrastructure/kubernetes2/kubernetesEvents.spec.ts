@@ -28,9 +28,6 @@ import {
 import { buildInventory, type Series, type WarningEvent } from "./kubernetesModel";
 import type { QueryId } from "./kubernetesQueries";
 
-// Catches a quadratic blow-up (seconds), not machine speed: CI runs this slower, under coverage.
-const GROUPING_BUDGET_MS = 250;
-
 const EK =
   "PARTITION BY COALESCE(json_get_str(body_object_metadata,'uid'), k8s_namespace_name || '/' || event_name)";
 
@@ -392,20 +389,85 @@ describe("Cluster overview warnings", () => {
       }
     });
 
-    it("groups 20,000 events against 5,000 pods without a blow-up", () => {
-      const pods = Array.from({ length: 5000 }, (_, i) => pod(`p${i}`, `u${i}`, "Pending"));
-      const events = Array.from({ length: 20000 }, (_, i) =>
-        event({
-          kind: i % 2 ? "Pod" : "Deployment",
-          name: `p${i % 5000}`,
-          uid: i % 3 ? `u${i % 5000}` : "",
-          lastSeen: i,
-        }),
-      );
-      const start = performance.now();
-      const rows = warningListRows({ nodes: [], pods } as any, events, "prod");
-      expect(performance.now() - start).toBeLessThanOrEqual(GROUPING_BUDGET_MS);
-      expect(rows.length).toBeGreaterThan(0);
+    it("does a fixed amount of work per pod and event, however many there are", () => {
+      // The quadratic oracle reads every pod once per event, so doubling both inputs quadruples its work.
+      const workAt = (podCount: number) => {
+        let work = 0;
+        const counted = <T extends object>(row: T): T =>
+          new Proxy(row, {
+            get(target, key, receiver) {
+              work++;
+              return Reflect.get(target, key, receiver);
+            },
+          });
+        const pods = Array.from({ length: podCount }, (_, i) =>
+          counted(pod(`p${i}`, `u${i}`, "Pending")),
+        );
+        const events = Array.from({ length: 4 * podCount }, (_, i) =>
+          counted(
+            event({
+              kind: i % 2 ? "Pod" : "Deployment",
+              name: `p${i % podCount}`,
+              uid: i % 3 ? `u${i % podCount}` : "",
+              lastSeen: i,
+            }),
+          ),
+        );
+        const counting = (fn: (...args: unknown[]) => unknown) =>
+          function (this: unknown, ...args: unknown[]) {
+            work++;
+            return fn.apply(this, args);
+          };
+        // Merged events and copied rows are plain objects the proxies never see, so every iteration step counts too.
+        const iterators = [[][Symbol.iterator](), new Map().entries()].map(Object.getPrototypeOf);
+        const callbackMethods: [any, string][] = [
+          ...[
+            "find",
+            "findIndex",
+            "findLast",
+            "findLastIndex",
+            "filter",
+            "some",
+            "every",
+            "forEach",
+            "map",
+            "flatMap",
+            "reduce",
+            "reduceRight",
+            "sort",
+          ].map((name): [any, string] => [Array.prototype, name]),
+          [Map.prototype, "forEach"],
+        ];
+        const scanMethods = ["indexOf", "includes", "lastIndexOf"];
+        const originals = [
+          ...iterators.map((proto): [any, string] => [proto, "next"]),
+          ...callbackMethods,
+          ...scanMethods.map((name): [any, string] => [Array.prototype, name]),
+        ].map(([owner, name]) => [owner, name, owner[name]] as const);
+        iterators.forEach((proto) => (proto.next = counting(proto.next)));
+        callbackMethods.forEach(([owner, name]) => {
+          const original = owner[name];
+          owner[name] = function (this: unknown, ...args: unknown[]) {
+            if (typeof args[0] === "function") args[0] = counting(args[0] as any);
+            return original.apply(this, args);
+          };
+        });
+        scanMethods.forEach((name) => {
+          const original = (Array.prototype as any)[name];
+          (Array.prototype as any)[name] = function (this: unknown[], ...args: unknown[]) {
+            work += this.length;
+            return original.apply(this, args);
+          };
+        });
+        try {
+          const rows = warningListRows({ nodes: [], pods } as any, events, "prod");
+          expect(rows.length).toBeGreaterThan(0);
+        } finally {
+          originals.forEach(([owner, name, original]) => (owner[name] = original));
+        }
+        return work;
+      };
+      expect(workAt(2000)).toBeLessThanOrEqual(2.5 * workAt(1000));
     });
   });
 
