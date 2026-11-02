@@ -1049,7 +1049,10 @@ export default defineComponent({
     watch(
       () => metadata.value?.queries?.[0]?.query || panelSchema.value?.queries?.[0]?.query,
       async (newQuery: string) => {
-        if (!store.state.zoConfig?.enable_cross_linking || !newQuery || panelSchema.value?.queryType === "promql") {
+        // Cross-linking resolves the stream as logs, so other stream types would only get a failed request.
+        const crossLinkStreamType =
+          panelSchema.value?.queries?.[0]?.fields?.stream_type ?? "logs";
+        if (!store.state.zoConfig?.enable_cross_linking || crossLinkStreamType !== "logs" || !newQuery || panelSchema.value?.queryType === "promql") {
           crossLinksData.value = { stream_links: [], org_links: [] };
           return;
         }

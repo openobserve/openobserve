@@ -141,6 +141,22 @@ export async function setCustomSQL(page, pm, query) {
   await pm.chartTypeSelector.searchAndAddField("y_axis_1", "y");
 }
 
+// A result_schema call that resolves the table as a logs stream answers 400.
+export function trackResultSchemaRequests(page) {
+  const requests = [];
+  page.on("request", (req) => {
+    if (req.url().includes("/result_schema")) requests.push(req);
+  });
+  return async () => {
+    const failed = [];
+    for (const req of requests) {
+      const res = await req.response();
+      if (res && res.status() >= 400 && res.status() < 500) failed.push(`${res.status()} ${req.url()}`);
+    }
+    expect(failed, "no result_schema request may fail").toEqual([]);
+  };
+}
+
 export async function waitForCustomQueryAxes(page, xAlias, yAlias) {
   await page.locator(`[data-test="dashboard-x-item-${xAlias}"]`).first().waitFor({ state: "attached", timeout: 15000 });
   await page.locator(`[data-test="dashboard-y-item-${yAlias}"]`).first().waitFor({ state: "attached", timeout: 15000 });

@@ -15,6 +15,7 @@ import {
   generateDashboardName,
   openOnLastWeek,
   setCustomSQL,
+  trackResultSchemaRequests,
   uploadEnrichmentTable,
   waitForCustomQueryAxes,
   waitForRowCount,
@@ -74,6 +75,7 @@ test.describe("Dashboard panel on an enrichment table", () => {
     async ({ page }) => {
       const pm = new PageManager(page);
       const dashboardName = generateDashboardName();
+      const expectNoFailedResultSchema = trackResultSchemaRequests(page);
 
       await addEnrichmentPanel(page, pm, dashboardName, tableName, "table");
       await setCustomSQL(
@@ -88,6 +90,8 @@ test.describe("Dashboard panel on an enrichment table", () => {
       await expectFirstColumn(page, ["Austin", "Bengaluru", "Berlin"]);
 
       await pm.dashboardPanelActions.savePanelAndWaitForNavigation();
+      await waitForTablePanelWithData(page);
+      await expectNoFailedResultSchema();
       await cleanupTestDashboard(page, pm, dashboardName);
     },
   );

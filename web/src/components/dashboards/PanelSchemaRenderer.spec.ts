@@ -187,6 +187,7 @@ global.console = {
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import searchService from "@/services/search";
 
 installQuasar();
 
@@ -2350,6 +2351,55 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.metadata).toBeDefined();
       expect(wrapper.vm.panelSchema.queries).toBeDefined();
       expect(wrapper.vm.panelSchema.queries.length).toBeGreaterThan(0);
+    });
+
+    describe("result_schema request for cross-links", () => {
+      let resultSchemaSpy: ReturnType<typeof vi.spyOn>;
+      let originalCrossLinking: boolean | undefined;
+
+      beforeEach(() => {
+        originalCrossLinking = store.state.zoConfig.enable_cross_linking;
+        store.state.zoConfig.enable_cross_linking = true;
+        resultSchemaSpy = vi
+          .spyOn(searchService, "result_schema")
+          .mockResolvedValue({ data: { cross_links: undefined } });
+      });
+
+      afterEach(() => {
+        store.state.zoConfig.enable_cross_linking = originalCrossLinking;
+        resultSchemaSpy.mockRestore();
+      });
+
+      it("should not request result_schema for an enrichment table panel", async () => {
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            queries: [
+              {
+                ...defaultProps.panelSchema.queries[0],
+                fields: {
+                  ...defaultProps.panelSchema.queries[0].fields,
+                  stream: "geo_ip",
+                  stream_type: "enrichment_tables",
+                },
+              },
+            ],
+          },
+        });
+        await flushPromises();
+
+        expect(resultSchemaSpy).not.toHaveBeenCalled();
+      });
+
+      it("should request result_schema for a logs panel", async () => {
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(resultSchemaSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ cross_linking: true }),
+          "dashboards",
+        );
+      });
     });
   });
 });
