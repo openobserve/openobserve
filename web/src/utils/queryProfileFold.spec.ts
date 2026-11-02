@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import {
   CARD_H,
   CARD_W,
+  LEVEL_GAP,
   FOLD_H,
   ancestorIds,
   buildProfileModel,
@@ -184,6 +185,34 @@ describe("plumbing operators fold onto edges", () => {
     expect(edge.parentId).toBe(model.operators[repartition].parentId);
     expectEveryOpAccountedFor(model, layout);
     expectNoOverlap(layout);
+  });
+
+  it("puts the label of a lone edge in the middle of the gap between the cards", () => {
+    const model = planModel();
+    const layout = layoutProfile(model, initialFold());
+    const card = (id: string) => layout.cards.find((c) => c.opId === id)!;
+    const edge = layout.edges.find((e) => e.folded.length && e.fromId)!;
+    const child = card(edge.fromId!);
+    expect(edge.labelX).toBeCloseTo(child.x + CARD_W / 2);
+    expect(edge.labelY).toBeCloseTo(child.y - LEVEL_GAP / 2);
+  });
+
+  it("keeps the chips of a crowded fan-out on their edges and apart", () => {
+    const layout = layoutProfile(unionModel(Array(6).fill(2)), initialFold());
+    const chips = layout.edges.filter((e) => e.folded.length).sort((a, b) => a.labelX - b.labelX);
+    expect(chips).toHaveLength(6);
+    for (let i = 1; i < chips.length; i++) {
+      expect(chips[i].labelX - chips[i - 1].labelX).toBeGreaterThanOrEqual(190);
+    }
+    const parent = layout.cards.find((c) => c.opId === chips[0].parentId)!;
+    for (const chip of chips) {
+      const child = layout.cards.find((c) => c.opId === chip.fromId)!;
+      const [lo, hi] = [child.x, parent.x].sort((a, b) => a - b);
+      expect(chip.labelX).toBeGreaterThanOrEqual(lo + CARD_W / 2);
+      expect(chip.labelX).toBeLessThanOrEqual(hi + CARD_W / 2);
+      expect(chip.labelY).toBeGreaterThan(parent.y + CARD_H);
+      expect(chip.labelY).toBeLessThan(child.y);
+    }
   });
 
   it("folds a chain of plumbing operators onto one edge, top first", () => {

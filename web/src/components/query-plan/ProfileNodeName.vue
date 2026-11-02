@@ -16,28 +16,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex min-w-0 gap-1"
-    :class="row.cluster ? 'flex-col items-start' : 'items-center'"
+    class="flex min-w-0 flex-col items-start gap-0.5"
     :data-test="`query-profile-node-${row.id}`"
   >
     <OTruncatedText
       class="max-w-full"
-      :class="row.active ? 'text-accent font-semibold' : 'text-text-body'"
+      :class="
+        row.active
+          ? 'text-accent font-semibold'
+          : row.count
+            ? 'text-text-heading font-semibold'
+            : 'text-text-body'
+      "
       >{{ row.name }}</OTruncatedText
     >
     <div
+      v-if="meta || row.straggler || row.skipped || row.error"
       class="flex max-w-full min-w-0 flex-wrap items-center gap-1"
-      :class="row.cluster ? '' : 'contents'"
     >
       <OTruncatedText
-        v-if="row.cluster"
+        v-if="meta"
         class="text-text-secondary text-2xs"
-        :data-test="`query-profile-node-cluster-${row.id}`"
-        >{{ clusterText }}</OTruncatedText
+        :data-test="`query-profile-node-${row.cluster ? 'cluster' : 'meta'}-${row.id}`"
+        >{{ meta }}</OTruncatedText
       >
-      <OBadge v-else-if="roleText" size="xs" shape="rounded" variant="default-soft">{{
-        roleText
-      }}</OBadge>
       <OBadge v-if="row.straggler" size="xs" shape="rounded" variant="error-soft">{{
         t("search.queryProfile.straggler")
       }}</OBadge>
@@ -57,7 +59,7 @@ import { computed } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { NodeNameRow } from "./profileStyles";
 import { roleLabel } from "./profileText";
 
@@ -65,11 +67,12 @@ const props = defineProps<{ row: NodeNameRow }>();
 
 const { t } = useI18nTyped();
 
-const roleText = computed(() => roleLabel(t, props.row.role));
-
-const clusterText = computed(() =>
-  roleText.value
-    ? t("search.queryProfile.nodeOnCluster", { cluster: props.row.cluster, role: roleText.value })
-    : raw(props.row.cluster),
-);
+const meta = computed<I18nText | null>(() => {
+  const { cluster, role, count } = props.row;
+  if (count) return t("search.queryProfile.nodesCount", { count }, count);
+  const roleText = roleLabel(t, role);
+  if (cluster && roleText)
+    return t("search.queryProfile.nodeOnCluster", { cluster, role: roleText });
+  return cluster ? raw(cluster) : roleText;
+});
 </script>

@@ -51,19 +51,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <section>
-          <h4 class="text-text-secondary m-0 mb-2 text-xs font-semibold">
-            {{ t("search.queryProfile.perNode") }}
-          </h4>
+          <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h4 class="text-text-secondary m-0 text-xs font-semibold">
+              {{ t("search.queryProfile.perNode") }}
+            </h4>
+            <OToggleGroup
+              type="single"
+              :model-value="remoteTab"
+              :aria-label="t('search.queryProfile.perNode')"
+              @update:model-value="onRemoteTab"
+            >
+              <OToggleGroupItem
+                value="returned"
+                size="sm"
+                data-test="query-profile-remote-returned"
+                >{{ t("search.queryProfile.returnedToLeader") }}</OToggleGroupItem
+              >
+              <OToggleGroupItem value="read" size="sm" data-test="query-profile-remote-read">{{
+                t("search.queryProfile.readFromStorage")
+              }}</OToggleGroupItem>
+            </OToggleGroup>
+          </div>
           <OTable
-            :data="remoteRows"
-            :columns="remoteColumns"
+            v-model:expanded-ids="remoteExpanded"
+            :data="remoteTree"
+            :columns="remoteTab === 'returned' ? returnedColumns : readColumns"
             row-key="id"
+            tree
             pagination="none"
             :show-global-filter="false"
             :fill-height="false"
             dense
             data-test="query-profile-remote-nodes"
-            @row-click="(row) => emit('scope', nodeScope(row.id))"
+            @row-click="onRemoteRow"
           >
             <template #cell-name="{ row }">
               <ProfileNodeName :row="row" />
@@ -82,28 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-heading font-semibold tabular-nums">{{ remoteSkew }}</span>
           </div>
         </section>
-
-        <section>
-          <h4 class="text-text-secondary m-0 mb-2 text-xs font-semibold">
-            {{ t("search.queryProfile.scanStats") }}
-          </h4>
-          <OTable
-            :data="remoteRows"
-            :columns="scanColumns"
-            row-key="id"
-            pagination="none"
-            :show-global-filter="false"
-            :fill-height="false"
-            dense
-            data-test="query-profile-scan-stats"
-            @row-click="(row) => emit('scope', nodeScope(row.id))"
-          >
-            <template #cell-name="{ row }">
-              <ProfileNodeName :row="row" />
-            </template>
-          </OTable>
-        </section>
-
         <div
           v-if="missingPlans"
           class="bg-surface-subtle text-text-secondary rounded-default px-2.5 py-2 text-xs"
@@ -150,21 +148,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.queryProfile.perNode") }}
           </h4>
           <OTable
-            :data="nodeRows"
+            v-model:expanded-ids="opExpanded"
+            :data="opTree"
             :columns="opColumns"
             row-key="id"
+            tree
             pagination="none"
             :show-global-filter="false"
             :fill-height="false"
             dense
             data-test="query-profile-op-nodes"
-            @row-click="(row) => emit('scope', nodeScope(row.id))"
+            @row-click="onOpRow"
           >
             <template #cell-name="{ row }">
               <ProfileNodeName :row="row" />
             </template>
             <template #cell-compute="{ row }">
+              <span v-if="row.group" class="font-semibold tabular-nums">{{
+                formatNs(row.computeNs)
+              }}</span>
               <ODataBarCell
+                v-else
                 :value="row.computeNs"
                 :max="maxNodeCompute"
                 :display="formatNs(row.computeNs)"
@@ -212,8 +216,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
@@ -237,6 +243,7 @@ import {
   stageNodeFor,
   type ProfileModel,
   type ProfileMetric,
+  type StageNode,
   type StageScope,
 } from "@/utils/queryProfile";
 import ProfileDetailHeader from "./ProfileDetailHeader.vue";
@@ -314,6 +321,25 @@ interface OpNodeRow extends NodeNameRow {
   share: number;
   files: number | null;
   cache: number | null;
+  querierFiles: number;
+  diskFiles: number;
+  group?: boolean;
+  children?: OpNodeRow[];
+}
+
+interface RemoteRow extends NodeNameRow {
+  wallUs: number;
+  firstBatch: string;
+  decode: string;
+  rows: string;
+  bytes: string;
+  files: number | string;
+  memoryCache: string;
+  diskCache: string;
+  index: string;
+  peakMemory: string;
+  group?: boolean;
+  children?: RemoteRow[];
 }
 
 const nodeRows = computed<OpNodeRow[]>(() => {
@@ -335,9 +361,38 @@ const nodeRows = computed<OpNodeRow[]>(() => {
       share: r.share,
       files: st ? st.files || 0 : null,
       cache: st?.querier_files ? st.querier_disk_cached_files / st.querier_files : null,
+      querierFiles: st?.querier_files ?? 0,
+      diskFiles: st?.querier_disk_cached_files ?? 0,
     };
   });
 });
+
+const opTree = computed<OpNodeRow[]>(() => {
+  const clusters = [...new Set(nodeRows.value.map((r) => r.cluster))].sort();
+  if (clusters.length < 2) return nodeRows.value;
+  return clusters.map((cluster) => {
+    const children = nodeRows.value
+      .filter((r) => r.cluster === cluster)
+      .map((r) => ({ ...r, cluster: "" }));
+    const sum = (f: (r: OpNodeRow) => number) => children.reduce((a, r) => a + f(r), 0);
+    const querierFiles = sum((r) => r.querierFiles);
+    return {
+      ...groupName(cluster, children.length),
+      straggler: children.some((r) => r.straggler),
+      computeNs: sum((r) => r.computeNs),
+      rows: sum((r) => r.rows),
+      share: sum((r) => r.share),
+      files: children.some((r) => r.files !== null) ? sum((r) => r.files ?? 0) : null,
+      cache: querierFiles ? sum((r) => r.diskFiles) / querierFiles : null,
+      querierFiles,
+      diskFiles: sum((r) => r.diskFiles),
+      group: true,
+      children,
+    };
+  });
+});
+
+const opExpanded = ref<string[]>([]);
 
 const maxNodeCompute = computed(() => Math.max(0, ...nodeRows.value.map((r) => r.computeNs)));
 const opSkewValue = computed(() => skew(nodeRows.value.map((r) => r.computeNs)));
@@ -346,36 +401,136 @@ function formatSkew(v: number) {
   return Number.isFinite(v) ? `${v.toFixed(1)}×` : "—";
 }
 
-const remoteRows = computed(() =>
-  (stage.value?.nodes ?? []).map((n) => {
-    const st = n.remote.scan_stats;
-    return {
-      id: n.key,
-      name: n.name,
-      cluster: n.cluster,
-      role: n.role,
-      straggler: n.straggler,
-      active: activeNode.value === n.key,
-      error: n.remote.error,
-      skipped: n.remote.skipped,
-      wallUs: n.wallUs,
-      firstBatch: n.firstBatchUs ? formatNs(n.firstBatchUs * 1000) : "—",
-      decode: formatNs(n.remote.decode_ns),
-      rows: formatRows(n.remote.output_rows),
-      bytes: formatBytes(n.remote.output_bytes),
-      files: st ? st.files || n.remote.assigned_files || 0 : n.remote.assigned_files || "—",
-      memoryCache:
-        st && st.querier_files
-          ? formatPercent(st.querier_memory_cached_files / st.querier_files)
-          : "—",
-      diskCache:
-        st && st.querier_files
-          ? formatPercent(st.querier_disk_cached_files / st.querier_files)
-          : "—",
-      index: st && st.idx_took ? formatNs(st.idx_took * 1e6) : "—",
-      peakMemory: formatBytes(Math.max(n.remote.peak_memory || 0, st?.peak_memory_usage || 0)),
-    };
-  }),
+function remoteRow(n: StageNode, underCluster = false): RemoteRow {
+  const st = n.remote.scan_stats;
+  return {
+    id: n.key,
+    name: n.name,
+    cluster: underCluster ? "" : n.cluster,
+    role: n.clusterEntry ? "" : n.role,
+    straggler: n.straggler,
+    active: activeNode.value === n.key,
+    error: n.remote.error,
+    skipped: n.remote.skipped,
+    wallUs: n.wallUs,
+    firstBatch: n.firstBatchUs ? formatNs(n.firstBatchUs * 1000) : "—",
+    decode: formatNs(n.remote.decode_ns),
+    rows: formatRows(n.remote.output_rows),
+    bytes: formatBytes(n.remote.output_bytes),
+    files: st ? st.files || n.remote.assigned_files || 0 : n.remote.assigned_files || "—",
+    memoryCache:
+      st && st.querier_files
+        ? formatPercent(st.querier_memory_cached_files / st.querier_files)
+        : "—",
+    diskCache:
+      st && st.querier_files ? formatPercent(st.querier_disk_cached_files / st.querier_files) : "—",
+    index: st && st.idx_took ? formatNs(st.idx_took * 1e6) : "—",
+    peakMemory: formatBytes(Math.max(n.remote.peak_memory || 0, st?.peak_memory_usage || 0)),
+  };
+}
+
+function groupName(cluster: string, count: number): NodeNameRow {
+  return {
+    id: `cluster:${cluster}`,
+    name: cluster,
+    cluster: "",
+    role: "",
+    count,
+    straggler: false,
+    active: false,
+    error: "",
+    skipped: false,
+  };
+}
+
+/** One cluster's subtotal over its nodes: slowest fetch, summed volume, pooled cache hits. */
+function clusterRow(cluster: string, nodes: StageNode[]): RemoteRow {
+  const children = nodes.map((n) => remoteRow(n, true));
+  const stats = nodes.flatMap((n) => (n.remote.scan_stats ? [n.remote.scan_stats] : []));
+  const sum = (f: (n: StageNode) => number) => nodes.reduce((a, n) => a + f(n), 0);
+  const querierFiles = stats.reduce((a, st) => a + st.querier_files, 0);
+  const cached = (key: "querier_memory_cached_files" | "querier_disk_cached_files") =>
+    querierFiles ? formatPercent(stats.reduce((a, st) => a + st[key], 0) / querierFiles) : "—";
+  return {
+    ...groupName(cluster, nodes.length),
+    straggler: children.some((r) => r.straggler),
+    wallUs: Math.max(0, ...nodes.map((n) => n.wallUs)),
+    firstBatch: "—",
+    decode: formatNs(sum((n) => n.remote.decode_ns)),
+    rows: formatRows(sum((n) => n.remote.output_rows)),
+    bytes: formatBytes(sum((n) => n.remote.output_bytes)),
+    files: stats.reduce((a, st) => a + st.files, 0),
+    memoryCache: cached("querier_memory_cached_files"),
+    diskCache: cached("querier_disk_cached_files"),
+    index: "—",
+    peakMemory: formatBytes(
+      Math.max(
+        0,
+        ...nodes.map((n) =>
+          Math.max(n.remote.peak_memory || 0, n.remote.scan_stats?.peak_memory_usage || 0),
+        ),
+      ),
+    ),
+    group: true,
+    children,
+  };
+}
+
+const remoteRows = computed(() => (stage.value?.nodes ?? []).map((n) => remoteRow(n)));
+
+const remoteTree = computed<RemoteRow[]>(() => {
+  const current = stage.value;
+  if (!current) return [];
+  if (current.nodes.some((n) => n.clusterEntry)) {
+    // a cluster leader's own nodes sit in the stage below, so they are listed under it
+    const below = props.model.stages
+      .filter((s) => s.parentStageId === current.id)
+      .flatMap((s) => s.nodes.filter((n) => !n.clusterEntry));
+    return current.nodes.map((n) => {
+      const pods = below.filter((p) => p.remote.cluster === n.name);
+      return pods.length
+        ? { ...remoteRow(n), count: pods.length, children: pods.map((p) => remoteRow(p, true)) }
+        : remoteRow(n);
+    });
+  }
+  const clusters = [...new Set(current.nodes.map((n) => n.cluster))].sort();
+  if (clusters.length < 2) return remoteRows.value;
+  return clusters.map((c) =>
+    clusterRow(
+      c,
+      current.nodes.filter((n) => n.cluster === c),
+    ),
+  );
+});
+
+const remoteTab = ref<"returned" | "read">("returned");
+const remoteExpanded = ref<string[]>([]);
+
+function onRemoteTab(value: unknown) {
+  if (value === "returned" || value === "read") remoteTab.value = value;
+}
+
+function toggle(list: string[], id: string): string[] {
+  return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
+}
+
+function onRemoteRow(row: RemoteRow) {
+  if (row.group) remoteExpanded.value = toggle(remoteExpanded.value, row.id);
+  else emit("scope", nodeScope(row.id));
+}
+
+function onOpRow(row: OpNodeRow) {
+  if (row.group) opExpanded.value = toggle(opExpanded.value, row.id);
+  else emit("scope", nodeScope(row.id));
+}
+
+watch(
+  () => props.opId,
+  () => {
+    remoteExpanded.value = remoteTree.value.filter((r) => r.children).map((r) => r.id);
+    opExpanded.value = opTree.value.filter((r) => r.children).map((r) => r.id);
+  },
+  { immediate: true },
 );
 
 const remoteTotals = computed(() => ({
@@ -396,7 +551,7 @@ const nameColumn: OTableColumnDef = {
   id: "name",
   header: t("search.queryProfile.node"),
   accessorKey: "name",
-  size: 120,
+  size: 150,
 };
 
 const opBaseColumns: OTableColumnDef[] = [
@@ -446,7 +601,7 @@ const opColumns = computed<OTableColumnDef[]>(() => [
   ...(nodeRows.value.some((r) => r.cache !== null) ? [cacheColumn] : []),
 ]);
 
-const remoteColumns: OTableColumnDef[] = [
+const returnedColumns: OTableColumnDef[] = [
   nameColumn,
   {
     id: "wall",
@@ -479,7 +634,7 @@ const remoteColumns: OTableColumnDef[] = [
   },
 ];
 
-const scanColumns: OTableColumnDef[] = [
+const readColumns: OTableColumnDef[] = [
   nameColumn,
   {
     id: "files",

@@ -48,5 +48,11 @@ describe("ProfileNodeName", () => {
   it("shows no cluster badge inside a single cluster", () => {
     const w = mountName(row());
     expect(w.find('[data-test="query-profile-node-cluster-n1"]').exists()).toBe(false);
+    expect(w.find('[data-test="query-profile-node-meta-n1"]').text()).toBe("Ingester");
+  });
+
+  it("names a cluster row by how many nodes it covers", () => {
+    const w = mountName(row({ name: "sc-a", role: "querier", count: 5 }));
+    expect(w.find('[data-test="query-profile-node-meta-n1"]').text()).toBe("5 nodes");
   });
 });

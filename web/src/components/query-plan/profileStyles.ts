@@ -43,6 +43,8 @@ export interface NodeNameRow {
   active: boolean;
   error: string;
   skipped: boolean;
+  /** Set on a row that stands for a whole cluster: how many of its nodes it covers. */
+  count?: number;
 }
 
 export interface AnalyzeFact {

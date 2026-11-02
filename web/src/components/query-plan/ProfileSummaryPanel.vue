@@ -75,6 +75,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
+    <section v-if="clusters" data-test="query-profile-clusters">
+      <div class="mb-1.5 flex items-center justify-between gap-2">
+        <h4 class="text-text-secondary m-0 text-xs font-semibold">
+          {{ t("search.queryProfile.clusters") }}
+        </h4>
+        <OButton
+          v-if="clusterView !== 'all'"
+          variant="ghost"
+          size="xs"
+          data-test="query-profile-clusters-all"
+          @click="emit('cluster', 'all')"
+          >{{ t("search.queryProfile.allClusters") }}</OButton
+        >
+      </div>
+      <OTable
+        :data="clusters.rows"
+        :columns="clusterColumns"
+        row-key="name"
+        pagination="none"
+        :show-global-filter="false"
+        :fill-height="false"
+        :row-class="(row) => (clusterViewOf(row.name) === clusterView ? 'bg-surface-subtle' : '')"
+        dense
+        @row-click="(row) => emit('cluster', clusterViewOf(row.name))"
+      >
+        <template v-for="(_, i) in clusters.stages" :key="i" #[`cell-wall${i}`]="{ row }">
+          <span
+            :class="
+              row.wallUs[i] !== null && row.wallUs[i] === slowestWall[i]
+                ? 'text-status-error-text font-semibold'
+                : ''
+            "
+            >{{ row.wallUs[i] === null ? "—" : formatNs(row.wallUs[i] * 1000) }}</span
+          >
+        </template>
+      </OTable>
+      <p class="text-text-secondary m-0 mt-1.5 text-xs">
+        {{ t("search.queryProfile.clustersHint") }}
+      </p>
+    </section>
+
     <section v-if="phaseSegments.length">
       <h4 class="text-text-secondary m-0 mb-2 text-xs font-semibold">
         {{ t("search.queryProfile.queryPhases") }}
@@ -179,11 +220,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatTime } from "@/utils/queryPlanParser";
 import {
+  clusterViewOf,
   formatBytes,
   formatNs,
   formatPercent,
@@ -193,6 +238,9 @@ import {
   scopeNodeKey,
   shareOfTotal,
   shareTone,
+  type ClusterSummary,
+  type ClusterSummaryRow,
+  type ClusterView,
   type ProfileModel,
   type ProfileSummary,
   type StageScope,
@@ -214,11 +262,14 @@ const props = defineProps<{
   summary: ProfileSummary;
   scope: StageScope;
   selectedId: string | null;
+  clusters?: ClusterSummary | null;
+  clusterView?: ClusterView;
 }>();
 
 const emit = defineEmits<{
   select: [opId: string];
   scope: [scope: StageScope];
+  cluster: [view: ClusterView];
 }>();
 
 const { t } = useI18nTyped();
@@ -243,6 +294,30 @@ const categorySegments = computed<StackSegment[]>(() => {
     display: formatPercent(c.ns / total),
   }));
 });
+
+const slowestWall = computed(() =>
+  (props.clusters?.stages ?? []).map((_, i) =>
+    Math.max(...(props.clusters?.rows ?? []).map((r) => r.wallUs[i] ?? 0)),
+  ),
+);
+
+const clusterColumns = computed<OTableColumnDef<ClusterSummaryRow>[]>(() => [
+  { id: "name", header: t("search.queryProfile.cluster"), accessorKey: "name", size: 72 },
+  ...(props.clusters?.stages ?? []).map((index, i) => ({
+    id: `wall${i}`,
+    header: t("search.queryProfile.stage", { index }),
+    accessorFn: (r: ClusterSummaryRow) => r.wallUs[i] ?? 0,
+    size: 68,
+    meta: { align: "right" as const, headerTooltip: t("search.queryProfile.clusterWallTooltip") },
+  })),
+  {
+    id: "files",
+    header: t("search.queryProfile.files"),
+    accessorFn: (r) => formatRows(r.files),
+    size: 48,
+    meta: { align: "right" },
+  },
+]);
 
 const nodesValue = computed(() => {
   const c = props.summary.nodeCounts;

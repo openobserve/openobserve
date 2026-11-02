@@ -17,8 +17,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { buildProfileModel } from "@/utils/queryProfile";
-import { joinProfile } from "@/utils/__fixtures__/queryProfile.fixture";
+import { buildProfileModel, modelForClusterView } from "@/utils/queryProfile";
+import { joinProfile, superClusterJoinProfile } from "@/utils/__fixtures__/queryProfile.fixture";
 import QueryProfileView from "./QueryProfileView.vue";
 
 const took = {
@@ -30,9 +30,9 @@ const took = {
   search_took: 1500,
 };
 
-function mountView() {
+function mountView(profile = joinProfile()) {
   return mount(QueryProfileView, {
-    props: { model: buildProfileModel(joinProfile()), stream: { hits: [], took_detail: took } },
+    props: { model: buildProfileModel(profile), stream: { hits: [], took_detail: took } },
     global: { plugins: [store, i18n] },
     attachTo: document.body,
   });
@@ -189,6 +189,74 @@ describe("QueryProfileView", () => {
       expect(find(`query-profile-fold-branch-${join}`).exists()).toBe(false);
       await find("query-profile-hot-path").trigger("click");
       expect(find("query-profile-fold-notice").text()).toContain("top hotspots");
+    });
+  });
+
+  describe("super-cluster views", () => {
+    const find = (test: string) => wrapper.find(`[data-test="${test}"]`);
+    const stageBoxes = () => wrapper.findAll('[data-test^="query-profile-stage-"]');
+
+    it("offers the cluster switch and the clusters table only for a super cluster", () => {
+      wrapper = mountView();
+      expect(find("query-profile-cluster-toolbar").exists()).toBe(false);
+      expect(find("query-profile-clusters").exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = mountView(superClusterJoinProfile());
+      expect(find("query-profile-cluster-toolbar").exists()).toBe(true);
+      expect(find("query-profile-clusters").text()).toContain("sc-c");
+    });
+
+    it("shows one cluster from its table row and goes back from the notice", async () => {
+      wrapper = mountView(superClusterJoinProfile());
+      expect(find("query-profile-tile-nodes").text()).toContain("9Q · 6I");
+      const row = find("query-profile-clusters")
+        .findAll("tr")
+        .find((r) => r.text().includes("sc-b"))!;
+      await row.trigger("click");
+      expect(find("query-profile-tile-nodes").text()).toContain("3Q · 2I");
+      expect(find("query-profile-fold-notice").text()).toContain(
+        "Showing only sc-b: 5 of 15 nodes",
+      );
+      await find("query-profile-fold-notice-action").trigger("click");
+      expect(find("query-profile-tile-nodes").text()).toContain("9Q · 6I");
+      expect(find("query-profile-fold-notice").exists()).toBe(false);
+    });
+
+    it("draws a branch per cluster leader when split by cluster", async () => {
+      wrapper = mountView(superClusterJoinProfile());
+      await find("query-profile-fold-plumbing").trigger("click");
+      expect(stageBoxes()).toHaveLength(4);
+      await find("query-profile-cluster-split").trigger("click");
+      expect(stageBoxes()).toHaveLength(8);
+      expect(wrapper.text()).toContain("sc-c leader");
+    });
+
+    it("names the cluster of every node in one cluster's own stage", async () => {
+      wrapper = mountView(superClusterJoinProfile());
+      await find("query-profile-cluster-split").trigger("click");
+      const split = modelForClusterView(buildProfileModel(superClusterJoinProfile()), "split");
+      const stage = split.stages.find((s) => s.cluster === "sc-b")!;
+      await find(`query-profile-card-${stage.remoteOpId}`).trigger("click");
+      await flushPromises();
+      const labels = find("query-profile-remote-nodes").findAll(
+        '[data-test^="query-profile-node-cluster-"]',
+      );
+      expect(labels).toHaveLength(5);
+      expect(labels.every((l) => l.text().startsWith("sc-b"))).toBe(true);
+    });
+
+    it("lists each cluster with its own nodes under it in one table", async () => {
+      wrapper = mountView(superClusterJoinProfile());
+      const model = buildProfileModel(superClusterJoinProfile());
+      const top = model.stages.find((s) => !s.parentStageId)!;
+      await find(`query-profile-card-${top.remoteOpId}`).trigger("click");
+      await flushPromises();
+      const table = find("query-profile-remote-nodes");
+      expect(table.find('[data-test="query-profile-node-meta-sc-a"]').text()).toContain("5 nodes");
+      expect(table.text()).toContain("querier-2");
+      expect(table.text()).toContain("Fetch");
+      await find("query-profile-remote-read").trigger("click");
+      expect(find("query-profile-remote-nodes").text()).toContain("Files");
     });
   });
 });

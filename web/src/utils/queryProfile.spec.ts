@@ -19,6 +19,8 @@ import {
   CARD_W,
   buildProfileModel,
   clusterNodes,
+  clusterSummary,
+  clusterViewOf,
   cleanPlanExpr,
   computeTimeNs,
   extractProfile,
@@ -27,6 +29,7 @@ import {
   layoutProfile,
   metricSections,
   metricsForScope,
+  modelForClusterView,
   nodeLabel,
   nodeScope,
   operatorCategory,
@@ -39,6 +42,7 @@ import {
   planFingerprint,
   planOperatorSummary,
   planScanInfo,
+  profileClusters,
   queryPhases,
   scopedValue,
   shareTone,
@@ -58,6 +62,7 @@ import {
   T0,
   TOPN_PHYSICAL_PLAN,
   joinProfile,
+  superClusterJoinProfile,
 } from "./__fixtures__/queryProfile.fixture";
 
 const MS = 1_000_000;
@@ -877,5 +882,57 @@ describe("formatElapsed", () => {
     expect(formatElapsed(7_900)).toBe("0:07");
     expect(formatElapsed(65_000)).toBe("1:05");
     expect(formatElapsed(-5)).toBe("0:00");
+  });
+});
+
+describe("cluster views of a super-cluster profile", () => {
+  const model = buildProfileModel(superClusterJoinProfile());
+  const topStages = (m: ProfileModel) => m.stages.filter((s) => !s.parentStageId);
+
+  it("lists the clusters the leader reached", () => {
+    expect(profileClusters(model)).toEqual(["sc-a", "sc-b", "sc-c"]);
+    expect(profileClusters(buildProfileModel(joinProfile()))).toEqual([]);
+  });
+
+  it("merges every cluster's nodes into one stage per exchange by default", () => {
+    expect(modelForClusterView(model, "all")).toBe(model);
+    const nested = model.stages.filter((s) => s.parentStageId);
+    expect(nested).toHaveLength(2);
+    expect(nested.every((s) => s.nodes.length === 15 && s.cluster === "")).toBe(true);
+  });
+
+  it("gives each cluster leader its own branch when split", () => {
+    const split = modelForClusterView(model, "split");
+    for (const top of topStages(split)) {
+      expect(top.variants.map((v) => v.cluster)).toEqual(["sc-a", "sc-b", "sc-c"]);
+    }
+    const nested = split.stages.filter((s) => s.parentStageId);
+    expect(nested).toHaveLength(6);
+    expect(nested.map((s) => [s.cluster, s.nodes.length])).toEqual(
+      expect.arrayContaining([
+        ["sc-a", 5],
+        ["sc-b", 5],
+        ["sc-c", 5],
+      ]),
+    );
+    expect(summarizeProfile(split).nodeCounts.total).toBe(15);
+  });
+
+  it("keeps only one cluster's nodes and numbers when one is chosen", () => {
+    const one = modelForClusterView(model, clusterViewOf("sc-c"));
+    expect(topStages(one).every((s) => s.nodes.map((n) => n.name).join() === "sc-c")).toBe(true);
+    const summary = summarizeProfile(one);
+    expect(summary.nodeCounts).toEqual({ queriers: 3, ingesters: 2, other: 0, total: 5 });
+    expect(summary.scanned?.files).toBe(summarizeProfile(model).scanned!.files / 3);
+  });
+
+  it("compares the clusters' answer times, nodes and files", () => {
+    const table = clusterSummary(model)!;
+    expect(table.stages).toEqual(topStages(model).map((s) => s.index));
+    expect(table.rows.map((r) => r.name)).toEqual(["sc-a", "sc-b", "sc-c"]);
+    const [a, , c] = table.rows;
+    expect(c.wallUs[1]).toBeGreaterThan(a.wallUs[1]!);
+    expect(a).toMatchObject({ queriers: 3, ingesters: 2, files: 24 });
+    expect(clusterSummary(buildProfileModel(joinProfile()))).toBeNull();
   });
 });

@@ -18,29 +18,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <QueryPlanLayout data-test="query-profile-view">
     <template #summary>
       <ProfileSummaryPanel
-        :model="model"
+        :model="viewModel"
+        :clusters="clusters"
+        :cluster-view="clusterView"
         :summary="summary"
         :scope="scope"
         :selected-id="selectedId"
         @select="pick"
         @scope="scope = $event"
+        @cluster="clusterView = $event"
       />
     </template>
     <template #canvas="{ leftInset }">
       <ProfileCanvas
         ref="canvasRef"
-        :model="model"
+        :model="viewModel"
         :layout="layout"
         :scope="scope"
         :selected-id="selectedId"
         :left-inset="leftInset"
         :plumbing="fold.plumbing"
-        :notice="notice"
+        :notice="clusterNotice ?? notice"
         @select="pick"
         @fold="act"
-        @notice-action="onNoticeAction"
+        @notice-action="clusterNotice ? (clusterView = 'all') : onNoticeAction()"
       >
-        <template v-if="model.stages.length" #toolbar>
+        <template v-if="viewModel.stages.length" #toolbar>
+          <div
+            v-if="clusters"
+            class="bg-surface-base border-border-default rounded-default flex items-center gap-1.5 border p-1 whitespace-nowrap shadow-sm"
+            data-test="query-profile-cluster-toolbar"
+          >
+            <span class="text-text-secondary ps-1.5 text-xs max-xl:hidden">{{
+              t("search.queryProfile.clusters")
+            }}</span>
+            <OToggleGroup
+              type="single"
+              :model-value="clusterView"
+              :aria-label="t('search.queryProfile.clusters')"
+              @update:model-value="onClusterView"
+            >
+              <OToggleGroupItem value="all" size="sm" data-test="query-profile-cluster-all">{{
+                t("search.queryProfile.allClusters")
+              }}</OToggleGroupItem>
+              <OToggleGroupItem value="split" size="sm" data-test="query-profile-cluster-split">{{
+                t("search.queryProfile.byCluster")
+              }}</OToggleGroupItem>
+              <OToggleGroupItem
+                v-for="c in clusters.rows"
+                :key="c.name"
+                :value="clusterViewOf(c.name)"
+                size="sm"
+                :data-test="`query-profile-cluster-${c.name}`"
+                >{{ c.name }}</OToggleGroupItem
+              >
+            </OToggleGroup>
+          </div>
           <div
             class="bg-surface-base border-border-default rounded-default flex items-center gap-1.5 border p-1 whitespace-nowrap shadow-sm"
             data-test="query-profile-scope-toolbar"
@@ -79,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #detail>
       <ProfileDetailPanel
-        :model="model"
+        :model="viewModel"
         :op-id="selectedId"
         :scope="scope"
         :can-focus="focusable"
@@ -101,9 +134,13 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   clusterNodes,
+  clusterSummary,
+  clusterViewOf,
+  modelForClusterView,
   nodeScope,
   scopeNodeKey,
   summarizeProfile,
+  type ClusterView,
   type ProfileModel,
   type SearchStreamResult,
   type StageScope,
@@ -111,6 +148,7 @@ import {
 import ProfileCanvas from "./ProfileCanvas.vue";
 import ProfileDetailPanel from "./ProfileDetailPanel.vue";
 import ProfileSummaryPanel from "./ProfileSummaryPanel.vue";
+import type { FoldNotice } from "./profileStyles";
 import QueryPlanLayout, { revealDetail } from "./QueryPlanLayout.vue";
 import { roleLabel } from "./profileText";
 import { useProfileFold } from "./useProfileFold";
@@ -125,16 +163,31 @@ const { t } = useI18nTyped();
 const scope = ref<StageScope>("sum");
 const selectedId = ref<string | null>(null);
 const canvasRef = ref<InstanceType<typeof ProfileCanvas> | null>(null);
+const clusterView = ref<ClusterView>("all");
 
-const summary = computed(() => summarizeProfile(props.model, props.stream ?? {}));
+const clusters = computed(() => clusterSummary(props.model));
+const viewModel = computed(() => modelForClusterView(props.model, clusterView.value));
+const summary = computed(() => summarizeProfile(viewModel.value, props.stream ?? {}));
 const { fold, layout, notice, focusable, act, reveal, onNoticeAction } = useProfileFold(
   t,
-  () => props.model,
+  () => viewModel.value,
   selectedId,
 );
 
+const clusterNotice = computed<FoldNotice | null>(() => {
+  if (clusterView.value === "all" || !clusters.value) return null;
+  const action = t("search.queryProfile.showAllClusters");
+  if (clusterView.value === "split")
+    return { text: t("search.queryProfile.byClusterNote"), action };
+  const cluster = clusterView.value.slice("cluster:".length);
+  const row = clusters.value.rows.find((r) => r.name === cluster);
+  const total = clusters.value.rows.reduce((a, r) => a + r.queriers + r.ingesters, 0);
+  const count = row ? row.queriers + row.ingesters : 0;
+  return { text: t("search.queryProfile.oneClusterNote", { cluster, count, total }), action };
+});
+
 const nodeOptions = computed(() =>
-  clusterNodes(props.model).map((n) => {
+  clusterNodes(viewModel.value).map((n) => {
     const role = n.clusterEntry ? null : roleLabel(t, n.role);
     return { label: raw([n.name, n.cluster, role].filter(Boolean).join(" · ")), value: n.key };
   }),
@@ -162,8 +215,17 @@ function onNodeSelect(value: SelectModelValue) {
   scope.value = typeof value === "string" && value ? nodeScope(value) : "sum";
 }
 
+function onClusterView(value: unknown) {
+  if (typeof value === "string" && value) clusterView.value = value as ClusterView;
+}
+
 watch(
   () => props.model,
+  () => (clusterView.value = "all"),
+);
+
+watch(
+  viewModel,
   (m) => {
     selectedId.value = summary.value.hotspots[0] ?? m.rootId;
     scope.value = "sum";

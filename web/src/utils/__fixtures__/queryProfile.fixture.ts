@@ -281,3 +281,74 @@ export const TOPN_PHYSICAL_PLAN = String.raw`SortPreservingMergeExec: [_timestam
     SortPreservingMergeExec: [_timestamp@0 DESC], fetch=100
       FilterExec: level@4 = error, fetch=100
         NewEmptyExec: name="app_logs", projection=["_timestamp", "body", "k8s_namespace_name", "k8s_pod_name", "level"], filters=["level = Utf8(\"error\")"], sort_order=timestamp_desc`;
+
+/** The same join on a super cluster: each of sc-a, sc-b, sc-c answers through its own leader. */
+export function superClusterJoinProfile(): QueryProfile {
+  const pods = (cluster: string, slowMs: number, plans: (role: string) => ProfileNode) =>
+    [
+      ["querier-0", "querier"],
+      ["querier-1", "querier"],
+      ["querier-2", "querier"],
+      ["ingester-0", "ingester"],
+      ["ingester-1", "ingester"],
+    ].map(([name, role], i) => ({
+      ...remote({
+        name,
+        role,
+        partition: i,
+        startMs: 330,
+        endMs: 420 + i * 10 + (i === 0 ? slowMs : 0),
+        plan: plans(role),
+        cache: role === "querier" ? [4, 1, 3] : undefined,
+      }),
+      cluster,
+    }));
+  const leaders = (
+    rows: number,
+    slow: Record<string, number>,
+    plans: (role: string) => ProfileNode,
+  ) =>
+    ["sc-a", "sc-b", "sc-c"].map((cluster, i) => ({
+      ...remote({
+        name: cluster,
+        role: "querier",
+        partition: i,
+        startMs: 325,
+        endMs: 480 + (slow[cluster] ?? 0),
+        plan: {
+          name: "RemoteScanExec",
+          detail: "RemoteScanExec: input_partitions=output_partitions=5",
+          partitions: 5,
+          metrics: [metric("output_rows", "count", rows)],
+          remote: pods(cluster, slow[cluster] ?? 0, plans),
+        },
+      }),
+      cluster,
+    }));
+  const remoteScan = (entries: RemoteNodeProfile[], rows: number): ProfileNode => ({
+    name: "RemoteScanExec",
+    detail: "RemoteScanExec: input_partitions=output_partitions=3",
+    partitions: 3,
+    metrics: [metric("output_rows", "count", rows)],
+    remote: entries,
+  });
+  const logs = (role: string) => (role === "querier" ? querierLogsPlan(1) : ingesterLogsPlan(1));
+  const plan = op("AggregateExec", "mode=Partial, gby=[k8s_namespace_name]", 31, 8600, [
+    op("HashJoinExec", "mode=Partitioned, join_type=Inner", 96, 310_000, [
+      remoteScan(
+        leaders(48_000, {}, () => eventsPlan(1)),
+        48_000,
+      ),
+      remoteScan(leaders(2_810_000, { "sc-c": 400 }, logs), 2_810_000),
+    ]),
+  ]);
+  return {
+    version: 1,
+    node_name: "sc-a-leader",
+    node_address: "10.2.0.1:5081",
+    start_us: T0 + 320_000,
+    end_us: T0 + 1_840_000,
+    output_rows: 10,
+    plan,
+  };
+}

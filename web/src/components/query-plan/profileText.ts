@@ -56,6 +56,7 @@ export function roleLabel(t: TranslateFn, role: string): I18nText | null {
 }
 
 export function variantLabel(t: TranslateFn, variant: StageVariant): I18nText {
+  if (variant.cluster) return t("search.queryProfile.clusterLeader", { cluster: variant.cluster });
   if (variant.role !== "mixed") return t(VARIANT_ROLE_KEY[variant.role]);
   const extra = variant.nodeNames.length - MAX_NAMES;
   const names = variant.nodeNames.slice(0, MAX_NAMES).join(", ");

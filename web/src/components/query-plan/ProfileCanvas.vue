@@ -133,8 +133,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="absolute top-3 z-10 w-max" :style="{ left: `${toolbarX}px` }" data-canvas-overlay>
+    <div
+      ref="toolbarEl"
+      class="absolute top-3 z-10 flex flex-wrap items-center gap-2"
+      :style="{ left: `${toolbarX}px`, maxWidth: `calc(100% - ${toolbarX + noticeRightGap}px)` }"
+      data-canvas-overlay
+    >
       <slot name="toolbar" />
+      <div
+        class="bg-surface-base border-border-default rounded-default flex h-9 items-center border px-2.5 shadow-sm"
+      >
+        <OSwitch
+          :model-value="plumbing"
+          :label="t('search.queryProfile.foldPlumbing')"
+          size="sm"
+          data-test="query-profile-fold-plumbing"
+          @update:model-value="emitFold({ type: 'plumbing' }, selectedAnchor())"
+        />
+      </div>
     </div>
 
     <div
@@ -168,7 +184,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('search.queryProfile.zoomIn')"
           data-test="query-profile-zoom-in"
           @click="zoomBy(ZOOM_STEP)"
-        />
+        >
+          <OTooltip side="left" :content="t('search.queryProfile.zoomIn')" />
+        </OButton>
         <OButton
           variant="ghost"
           size="icon-sm"
@@ -176,7 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('search.queryProfile.zoomOut')"
           data-test="query-profile-zoom-out"
           @click="zoomBy(1 / ZOOM_STEP)"
-        />
+        >
+          <OTooltip side="left" :content="t('search.queryProfile.zoomOut')" />
+        </OButton>
         <OButton
           variant="ghost"
           size="icon-sm"
@@ -184,7 +204,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('search.queryProfile.fitView')"
           data-test="query-profile-zoom-fit"
           @click="fit"
-        />
+        >
+          <OTooltip side="left" :content="t('search.queryProfile.fitView')" />
+        </OButton>
         <OButton
           variant="ghost"
           size="icon-sm"
@@ -194,18 +216,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="showMini ? 'text-accent' : ''"
           data-test="query-profile-minimap-toggle"
           @click="showMini = !showMini"
-        />
+        >
+          <OTooltip side="left" :content="t('search.queryProfile.overview')" />
+        </OButton>
         <div class="border-border-default mx-1 border-t" />
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="compress"
-          :aria-label="t('search.queryProfile.foldPlumbing')"
-          :aria-pressed="plumbing"
-          :class="plumbing ? 'text-accent' : ''"
-          data-test="query-profile-fold-plumbing"
-          @click="emitFold({ type: 'plumbing' }, selectedAnchor())"
-        />
         <OButton
           variant="ghost"
           size="icon-sm"
@@ -213,7 +227,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('search.queryProfile.expandAll')"
           data-test="query-profile-expand-all"
           @click="emitFold({ type: 'expandAll' })"
-        />
+        >
+          <OTooltip side="left" :content="t('search.queryProfile.expandAll')" />
+        </OButton>
         <OButton
           v-if="!model.planOnly"
           variant="ghost"
@@ -222,7 +238,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('search.queryProfile.collapseToHotPath')"
           data-test="query-profile-hot-path"
           @click="emitFold({ type: 'hotPath' })"
-        />
+        >
+          <OTooltip side="left" :content="t('search.queryProfile.collapseToHotPath')" />
+        </OButton>
       </div>
       <svg
         v-if="showMini"
@@ -288,6 +306,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
 import {
@@ -314,6 +334,7 @@ const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2;
 const MINI_PAD = 40;
 const FIT_TOP = 56;
+const TOOLBAR_GAP = 8;
 const FIT_MARGIN = 24;
 const FIT_OVERLAY_W = 56;
 // Below this a fitted card is unreadable; the graph is top-aligned instead and the rest is panned to.
@@ -342,6 +363,7 @@ const { isDesktop } = useBreakpoint();
 
 const canvasEl = ref<HTMLElement | null>(null);
 const miniEl = ref<SVGSVGElement | null>(null);
+const toolbarEl = ref<HTMLElement | null>(null);
 const view = reactive({ x: 0, y: 0, k: 1 });
 const size = reactive({ w: 0, h: 0 });
 const showMini = ref(false);
@@ -373,7 +395,7 @@ const stageBoxes = computed(() =>
       title: t("search.queryProfile.stage", { index: stage.index }),
       meta: props.model.planOnly
         ? ` · ${t("search.queryProfile.stageRunsEverywhere")}`
-        : ` · ${nodes} · ${shapes}`,
+        : ` · ${[stage.cluster, nodes, shapes].filter(Boolean).join(" · ")}`,
     };
   }),
 );
@@ -381,7 +403,8 @@ const stageBoxes = computed(() =>
 const variantLabels = computed(() =>
   (props.model.planOnly ? [] : props.layout.variantLabels).map((v) => {
     const variant = props.model.variantById[v.variantId];
-    return { ...v, text: `${variantLabel(t, variant)} · ${variant.nodeKeys.length}` };
+    const label = variantLabel(t, variant);
+    return { ...v, text: variant.cluster ? label : `${label} · ${variant.nodeKeys.length}` };
   }),
 );
 
@@ -511,7 +534,8 @@ function zoomBy(factor: number) {
 function fit() {
   const right = isDesktop.value ? FIT_OVERLAY_W : FIT_MARGIN;
   const availW = Math.max(1, size.w - props.leftInset - right);
-  const availH = Math.max(1, size.h - FIT_TOP - FIT_MARGIN);
+  const top = fitTop();
+  const availH = Math.max(1, size.h - top - FIT_MARGIN);
   // the width fits so the overlays never hide cards; only the height, or a very wide plan, scrolls
   const k = clampZoom(
     Math.max(
@@ -525,7 +549,13 @@ function fit() {
   );
   view.k = k;
   view.x = props.leftInset + Math.max(0, (availW - props.layout.width * k) / 2);
-  view.y = FIT_TOP;
+  view.y = top;
+}
+
+// a wrapped toolbar takes two rows, and fitted cards must start below it
+function fitTop() {
+  const bar = toolbarEl.value;
+  return Math.max(FIT_TOP, bar ? bar.offsetTop + bar.offsetHeight + TOOLBAR_GAP : 0);
 }
 
 function isOverlay(target: EventTarget | null) {

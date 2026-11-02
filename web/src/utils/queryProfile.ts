@@ -25,7 +25,9 @@ export const STAGE_PAD_X = 20;
 export const STAGE_PAD_TOP = 64;
 export const STAGE_PAD_BOTTOM = 20;
 export const FOLD_H = 56;
-const EDGE_LABEL_RISE = 13;
+const CHIP_ROOM = 190;
+const LABEL_ROOM = 64;
+const MIN_LABEL_SLIDE = 0.16;
 export const STRAGGLER_FACTOR = 1.8;
 
 const NODE_SCOPE_PREFIX = "node:";
@@ -135,6 +137,9 @@ export type OperatorCategory =
 /** "sum" | "max" | "node:<key>" — rescopes the numbers of operators that run on many nodes. */
 export type StageScope = string;
 
+/** Which clusters the canvas shows: all merged, one leader per cluster, or a single cluster. */
+export type ClusterView = "all" | "split" | `cluster:${string}`;
+
 export interface OperatorSample {
   nodeKey: string;
   computeNs: number;
@@ -185,6 +190,8 @@ export interface StageVariant {
   role: VariantRole;
   nodeNames: string[];
   rootOpId: string;
+  /** The cluster this variant's one leader stands for, when clusters are split. */
+  cluster: string;
 }
 
 export interface ProfileStage {
@@ -196,10 +203,14 @@ export interface ProfileStage {
   variants: StageVariant[];
   medianWallUs: number;
   maxWallUs: number;
+  /** The one cluster every node of this stage belongs to, in a multi-cluster profile. */
+  cluster: string;
 }
 
 export interface ProfileModel {
   profile: QueryProfile;
+  hits: PlanHit[];
+  options: BuildProfileOptions;
   rootId: string;
   operators: Record<string, ProfileOperator>;
   order: string[];
@@ -214,6 +225,23 @@ export interface ProfileModel {
 export interface BuildProfileOptions {
   /** The profile came from a plain EXPLAIN, so it carries no runtime numbers. */
   planOnly?: boolean;
+  /** Give each super-cluster leader its own variant instead of merging leaders by plan shape. */
+  splitClusters?: boolean;
+}
+
+export interface ClusterSummaryRow {
+  name: string;
+  /** Wall time of this cluster's answer to each top-level exchange, null where it took no part. */
+  wallUs: (number | null)[];
+  queriers: number;
+  ingesters: number;
+  files: number;
+}
+
+export interface ClusterSummary {
+  /** Index of each top-level exchange stage, in the order of `wallUs`. */
+  stages: number[];
+  rows: ClusterSummaryRow[];
 }
 
 export interface ScopedValue {
@@ -398,6 +426,7 @@ interface BuildContext {
   hits: PlanHit[];
   usedHits: Set<PlanHit>;
   multiCluster: boolean;
+  splitClusters: boolean;
 }
 
 interface Box {
@@ -892,11 +921,12 @@ function buildStage(
     variants: [],
     medianWallUs: 0,
     maxWallUs: 0,
+    cluster: "",
   };
   ctx.stages.push(stage);
   const phase = stageDepth(ctx.stages, stage);
   const used = new Set<string>();
-  const groups = new Map<string, { nodes: StageNode[]; parts: PlanPart[] }>();
+  const groups = new Map<string, { nodes: StageNode[]; parts: PlanPart[]; cluster: string }>();
   for (const remote of entries) {
     const plan = remote.plan ?? fallbackPlan(remote, phase, ctx);
     const name = remote.node_name || remote.node_address || `#${remote.partition}`;
@@ -918,13 +948,16 @@ function buildStage(
     };
     stage.nodes.push(node);
     if (!plan) continue;
-    const fp = planFingerprint(plan);
-    const group = groups.get(fp) ?? { nodes: [], parts: [] };
+    const split = ctx.splitClusters && clusterEntry;
+    const fp = split ? `${planFingerprint(plan)}@${name}` : planFingerprint(plan);
+    const group = groups.get(fp) ?? { nodes: [], parts: [], cluster: split ? name : "" };
     group.nodes.push(node);
     group.parts.push({ nodeKey: node.key, plan, remote: plan.remote ?? [] });
     groups.set(fp, group);
   }
   Object.assign(stage, markStragglers(stage.nodes));
+  const clusters = new Set(stage.nodes.map((n) => n.cluster));
+  stage.cluster = clusters.size === 1 ? [...clusters][0] : "";
   [...groups.values()].forEach((group, k) => {
     const variantId = `${stage.id}v${k}`;
     for (const n of group.nodes) n.variantId = variantId;
@@ -935,9 +968,21 @@ function buildStage(
       role: variantRole(group.nodes),
       nodeNames: group.nodes.map(nodeLabel),
       rootOpId: addOperator(variantId, group.parts, remoteOpId, stage.id, variantId, ctx),
+      cluster: group.cluster,
     });
   });
   return stage;
+}
+
+/** The plan with every other super-cluster entry dropped from its remote scans. */
+function onlyCluster(node: ProfileNode, cluster: string): ProfileNode {
+  return {
+    ...node,
+    remote: node.remote?.filter(
+      (r) => !r.cluster || r.cluster !== r.node_name || r.node_name === cluster,
+    ),
+    children: node.children?.map((c) => onlyCluster(c, cluster)),
+  };
 }
 
 /** How many remote hops below the leader a stage runs, which is the phase of its text plans. */
@@ -997,6 +1042,7 @@ export function buildProfileModel(
     hits,
     usedHits: new Set(),
     multiCluster: collectClusters(profile.plan, new Set()).size > 1,
+    splitClusters: !!options.splitClusters,
   };
   const leaderKey = profile.node_name || profile.node_address || "leader";
   const rootId = addOperator(
@@ -1012,6 +1058,8 @@ export function buildProfileModel(
   for (const s of ctx.stages) for (const v of s.variants) variantById[v.id] = v;
   return {
     profile,
+    hits,
+    options,
     rootId,
     operators: ctx.ops,
     order: ctx.order,
@@ -1022,6 +1070,50 @@ export function buildProfileModel(
     leaderKey,
     planOnly: !!options.planOnly,
   };
+}
+
+/** The super-cluster clusters this profile reached, by name; empty below two. */
+export function profileClusters(model: ProfileModel): string[] {
+  const names = model.stages
+    .filter((s) => !s.parentStageId)
+    .flatMap((s) => s.nodes.filter((n) => n.clusterEntry).map((n) => n.name));
+  const unique = [...new Set(names)].sort();
+  return unique.length > 1 ? unique : [];
+}
+
+export function clusterViewOf(cluster: string): ClusterView {
+  return `cluster:${cluster}`;
+}
+
+/** The model the canvas draws for a cluster view, rebuilt from the same profile. */
+export function modelForClusterView(model: ProfileModel, view: ClusterView): ProfileModel {
+  if (view === "all") return model;
+  if (view === "split") {
+    return buildProfileModel(model.profile, model.hits, { ...model.options, splitClusters: true });
+  }
+  const cluster = view.slice("cluster:".length);
+  const profile = { ...model.profile, plan: onlyCluster(model.profile.plan, cluster) };
+  return buildProfileModel(profile, model.hits, { ...model.options, splitClusters: false });
+}
+
+/** Per-cluster answer times, node counts and files, for comparing the clusters of one query. */
+export function clusterSummary(model: ProfileModel): ClusterSummary | null {
+  const names = profileClusters(model);
+  if (!names.length) return null;
+  const tops = model.stages.filter((s) => !s.parentStageId && s.nodes.some((n) => n.clusterEntry));
+  const pods = uniqueNodes(model).filter((n) => !n.clusterEntry);
+  const rows = names.map((name) => {
+    const entries = tops.map((s) => s.nodes.find((n) => n.clusterEntry && n.name === name));
+    const own = pods.filter((n) => n.remote.cluster === name);
+    return {
+      name,
+      wallUs: entries.map((e) => (e ? e.wallUs : null)),
+      queriers: own.filter((n) => n.role.includes("querier")).length,
+      ingesters: own.filter((n) => n.role.includes("ingester")).length,
+      files: entries.reduce((a, e) => a + (e?.remote.scan_stats?.files ?? 0), 0),
+    };
+  });
+  return { stages: tops.map((s) => s.index), rows };
 }
 
 /** The numbers an operator card shows under the current stage-metrics scope. */
@@ -1572,11 +1664,27 @@ function placeOp(
     branch: canCollapse ? (p.fold.collapsed.has(op.id) ? "collapsed" : "open") : null,
     refold: p.fold.plumbing && p.fold.shown.has(op.id),
   });
-  for (const link of links) p.out.edges.push(edgeFor(link, center, top + CARD_H, node.opId));
+  const slide = labelSlide(links.filter((l) => l.stageTop === null));
+  for (const link of links) {
+    p.out.edges.push(edgeFor(link, center, top + CARD_H, node.opId, slide));
+  }
   return center;
 }
 
-function edgeFor(link: Link, x2: number, y2: number, parentId: string): LayoutEdge {
+/** How far from the child toward the parent edge labels sit: the curve's middle unless siblings would crowd. */
+function labelSlide(links: Link[]): number {
+  const room = (l: Link) =>
+    l.child.kind !== "stage" && l.child.folded.length ? CHIP_ROOM : LABEL_ROOM;
+  let slide = 0.5;
+  for (let i = 1; i < links.length; i++) {
+    const gap = Math.abs(links[i].x - links[i - 1].x);
+    slide = Math.min(slide, 1 - (room(links[i - 1]) + room(links[i])) / 2 / gap);
+  }
+  // below this the label would sit on the child card
+  return Math.max(MIN_LABEL_SLIDE, slide);
+}
+
+function edgeFor(link: Link, x2: number, y2: number, parentId: string, slide: number): LayoutEdge {
   const { x: x1, y: y1, stageTop, child } = link;
   const fromId = child.kind === "op" ? child.opId : null;
   const folded = child.kind === "stage" ? [] : child.folded;
@@ -1584,6 +1692,8 @@ function edgeFor(link: Link, x2: number, y2: number, parentId: string): LayoutEd
   const key = childId ?? (child.kind === "fold" ? child.fold.key : parentId);
   if (stageTop === null) {
     const my = (y1 + y2) / 2;
+    // the curve's x runs as smoothstep(t), so this is the point on it a `slide` of the way across
+    const t = 0.5 - Math.sin(Math.asin(1 - 2 * slide) / 3);
     return {
       key,
       childId,
@@ -1591,9 +1701,8 @@ function edgeFor(link: Link, x2: number, y2: number, parentId: string): LayoutEd
       parentId,
       folded,
       path: `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`,
-      // on the child's own column, where sibling edges cannot crowd it the way they do near the parent
-      labelX: x1,
-      labelY: y1 - EDGE_LABEL_RISE,
+      labelX: x1 + (x2 - x1) * slide,
+      labelY: y1 * (1 - t) ** 3 + 3 * my * t * (1 - t) + y2 * t ** 3,
     };
   }
   const my = (stageTop + y2) / 2;
