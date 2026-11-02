@@ -430,6 +430,29 @@ describe("CorrelatedLogsTable.vue", () => {
       expect(fields).toContain("field2");
       expect(fields).toContain("field3");
     });
+
+    it("keeps _timestamp selected after selecting all and deselecting all fields", async () => {
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        searchResults: {
+          value: [{ _timestamp: 123, field1: "a", field2: "b" }],
+        },
+        hasResults: { value: true },
+      });
+
+      wrapper = createWrapper();
+      await nextTick();
+      wrapper.vm.visibleColumns = new Set(["_timestamp"]);
+
+      wrapper.vm.toggleSelectAll();
+      await nextTick();
+      expect([...wrapper.vm.visibleColumns].sort()).toEqual(["_timestamp", "field1", "field2"]);
+
+      wrapper.vm.toggleSelectAll();
+      await nextTick();
+      expect([...wrapper.vm.visibleColumns]).toEqual(["_timestamp"]);
+    });
   });
 
   describe("hasPendingChanges computed", () => {

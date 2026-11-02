@@ -181,6 +181,25 @@ describe("ImportRegexPattern", () => {
       ]);
     });
 
+    it("should return false for a whitespace-only name", async () => {
+      const result = await wrapper.vm.validateRegexPatternInputs({ name: "   ", pattern: ".*" }, 1);
+
+      expect(result).toBe(false);
+      expect(wrapper.vm.regexPatternErrorsToDisplay[0][0].field).toBe("regex_pattern_name");
+      expect(wrapper.vm.regexPatternErrorsToDisplay[0][0].message).toContain("name is required");
+    });
+
+    it("should return false for a whitespace-only pattern", async () => {
+      const result = await wrapper.vm.validateRegexPatternInputs(
+        { name: "test", pattern: "   " },
+        1,
+      );
+
+      expect(result).toBe(false);
+      expect(wrapper.vm.regexPatternErrorsToDisplay[0][0].field).toBe("regex_pattern");
+      expect(wrapper.vm.regexPatternErrorsToDisplay[0][0].message).toContain("is required");
+    });
+
     it("should return true for existing pattern name (duplicates allowed)", async () => {
       // Note: Duplicate pattern names are now allowed as primary key is UUID-based
       const result = await wrapper.vm.validateRegexPatternInputs(

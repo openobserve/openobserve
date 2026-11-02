@@ -1048,6 +1048,30 @@ describe("TraceDetails", () => {
         const expandBtn = wrapper.find('[data-test="trace-details-expand-btn"]');
         expect(expandBtn.exists()).toBe(false);
       });
+
+      it("renders the trace ID from the route query, not the traceIdProp, in standalone mode", async () => {
+        vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+          value: {
+            query: {
+              trace_id: "route-trace-id-xyz",
+              from: "1752490492843",
+              to: "1752490493164",
+              stream: "test-stream",
+              org_identifier: "default",
+            },
+            name: "traceDetails",
+          },
+        } as any);
+        const standalone = mount(TraceDetails, {
+          ...mountOptions,
+          props: { ...mountOptions.props, traceIdProp: "prop-trace-id-abc" },
+        });
+        await flushPromises();
+
+        const idEl = standalone.find('[data-test="trace-details-trace-id"]');
+        expect(idEl.text()).toBe("route-trace-id-xyz");
+        standalone.unmount();
+      });
     });
 
     describe("mode prop - embedded", () => {

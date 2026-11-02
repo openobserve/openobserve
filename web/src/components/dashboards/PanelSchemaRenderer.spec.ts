@@ -871,17 +871,30 @@ describe("PanelSchemaRenderer", () => {
 
   describe("Partial Data Functionality", () => {
     it("should emit is-partial-data-update when partial data state changes", async () => {
+      const isPartialData = ref(false);
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [] }),
+        resultMetaData: ref([]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData,
+        isFirstLoadSettled: ref(true),
+      } as any);
       wrapper = createWrapper();
+      await flushPromises();
 
-      // Mock the isPartialData reactive value
-      wrapper.vm.isPartialData = { value: true };
-
-      // Trigger the watcher by changing the value
-      wrapper.vm.isPartialData.value = false;
+      isPartialData.value = true;
+      await nextTick();
+      isPartialData.value = false;
       await nextTick();
 
-      // Check that the component is set up to handle partial data
-      expect(wrapper.vm.isPartialData).toBeDefined();
+      expect(wrapper.emitted("is-partial-data-update")).toEqual([[true], [false]]);
     });
   });
 

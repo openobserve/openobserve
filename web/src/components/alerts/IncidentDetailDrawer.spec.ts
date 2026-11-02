@@ -730,6 +730,26 @@ describe("IncidentDetailDrawer.vue", () => {
 
       expect(incidentsService.get).toHaveBeenCalledWith("custom-org", "test-123");
     });
+
+    it("writes status updates and RCA triggers to the custom organization", async () => {
+      wrapper = await createWrapper(
+        {},
+        { selectedOrganization: { identifier: "custom-org" } },
+        "test-123",
+      );
+      await flushPromises();
+
+      await wrapper.vm.acknowledgeIncident();
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("custom-org", "1", "acknowledged");
+
+      await wrapper.vm.triggerRca();
+      expect(incidentsService.triggerRca).toHaveBeenCalledWith(
+        "custom-org",
+        "1",
+        { build_on_previous: false },
+        expect.objectContaining({ signal: expect.anything() }),
+      );
+    });
   });
 
   describe("Unique Alerts Computation", () => {

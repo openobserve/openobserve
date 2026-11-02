@@ -1481,6 +1481,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       ["500", { response: { status: 500 } }, "Server error"],
       ["timeout", { message: "Request timeout" }, "timed out"],
       ["network", { message: "Network Error" }, "Network error"],
+      [
+        "418 with a server message",
+        { response: { status: 418, data: { message: "Teapot refuses to brew" } } },
+        "Teapot refuses to brew",
+      ],
     ])("should set error state on %s", async (_name, props, expected) => {
       vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
         Object.assign(new Error((props as any).message ?? "fail"), props),
