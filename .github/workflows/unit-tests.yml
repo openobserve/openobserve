@@ -253,10 +253,14 @@ jobs:
           done
           echo "All backend checks completed successfully"
 
-  ui_unit_tests:
+  ui_unit_test_shards:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_ui_changes == 'true'
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     runs-on:
       labels: ubicloud-standard-8
     permissions:
@@ -265,8 +269,6 @@ jobs:
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - uses: ./.github/actions/github-auth
       - name: Setup Node.js
@@ -276,14 +278,81 @@ jobs:
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
+      - name: Restore node_modules
+        id: nm
+        uses: actions/cache@v4
+        with:
+          path: web/node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.nm.outputs.cache-hit != 'true'
         working-directory: web
         timeout-minutes: 5
         run: npm ci
 
-      - name: Run frontend unit tests with coverage and check thresholds
+      - name: Run this shard with coverage
         working-directory: web
-        run: ./coverage.sh check
+        run: npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=blob \
+          --coverage.reportOnFailure --coverage.reporter=json \
+          --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
+          --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-unit-blob-${{ matrix.shard }}
+          path: web/.vitest-reports
+          include-hidden-files: true
+          retention-days: 1
+          compression-level: 1
+
+  # Keeps the required-check name `ui_unit_tests` while the work runs in shards.
+  ui_unit_tests:
+    needs: [check_changes, ui_unit_test_shards]
+    if: always() && needs.check_changes.outputs.has_ui_changes == 'true'
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Require every shard to pass
+        run: |
+          [ "${{ needs.ui_unit_test_shards.result }}" = "success" ] || { echo "shards: ${{ needs.ui_unit_test_shards.result }}"; exit 1; }
+
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Restore node_modules
+        id: nm
+        uses: actions/cache@v4
+        with:
+          path: web/node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.nm.outputs.cache-hit != 'true'
+        working-directory: web
+        timeout-minutes: 5
+        run: npm ci
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ui-unit-blob-*
+          path: web/.vitest-reports
+          merge-multiple: true
+
+      - name: Merge shard coverage and check thresholds
+        working-directory: web
+        run: ./coverage.sh merge
 
   ui_code_quality:
     needs: [check_changes]
