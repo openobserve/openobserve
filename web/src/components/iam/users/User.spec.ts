@@ -1184,8 +1184,8 @@ describe("User Component", () => {
       await flushPromises();
 
       late.findComponent(AddUserStub).vm.$emit("update:open", false);
-      await flushPromises();
-      expect(router.currentRoute.value.query.action).toBeUndefined();
+      // The real router's replace settles asynchronously, so wait for the URL rather than one flush.
+      await vi.waitFor(() => expect(router.currentRoute.value.query.action).toBeUndefined());
 
       resolveRoles({ data: [{ label: "admin", value: "admin" }] });
       await flushPromises();

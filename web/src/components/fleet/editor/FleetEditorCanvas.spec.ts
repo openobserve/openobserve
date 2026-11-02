@@ -45,7 +45,11 @@ vi.mock("@vue-flow/background", () => ({
   BackgroundVariant: { Dots: "dots" },
 }));
 
-const frames = () => new Promise((resolve) => setTimeout(resolve, 50));
+// Waits on the same two animation frames afterLayout uses, so a loaded runner cannot outrun a fixed delay.
+const frames = () =>
+  new Promise((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve))),
+  );
 
 let wrapper: VueWrapper;
 

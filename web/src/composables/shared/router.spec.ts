@@ -40,6 +40,11 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
+// Real SFCs transform slowly under CI load; the test only needs the lazy import to resolve.
+vi.mock("@/views/SlackLink.vue", () => ({ default: {} }));
+vi.mock("@/views/SlackLinkCallback.vue", () => ({ default: {} }));
+vi.mock("@/views/SlackConnectCallback.vue", () => ({ default: {} }));
+
 // ---------------------------------------------------------------------------
 // Utility mocks
 // ---------------------------------------------------------------------------
@@ -1761,8 +1766,18 @@ describe("useRoutes (router.ts)", () => {
   describe("homeChildRoutes — Product Analytics", () => {
     const shell = () => findRoute(useRoutes().homeChildRoutes, PA_ROUTES.shell);
 
+    // Lazy views transform slowly under CI load; eager components carry route guards, so the saved-funnels page redirects in its own guard, so keep it real.
+    const stubViews = (routes: any[]): any[] =>
+      routes.map((r) => ({
+        ...r,
+        ...(typeof r.component === "function" && r.name !== PA_ROUTES.funnels
+          ? { component: { render: () => null } }
+          : {}),
+        ...(r.children ? { children: stubViews(r.children) } : {}),
+      }));
+
     const realRouter = () => {
-      const { homeChildRoutes } = useRoutes();
+      const homeChildRoutes = stubViews(useRoutes().homeChildRoutes);
       const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
       return createRouter({
         history: createMemoryHistory(),
