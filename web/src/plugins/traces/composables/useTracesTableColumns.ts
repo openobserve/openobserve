@@ -213,6 +213,22 @@ export function fillLastColumn(
   last.meta = { ...last.meta, autoWidth: true, fillRemaining: true };
 }
 
+/** One column per field typed SQL returned, headed by its name or alias. */
+export function buildResultColumns(keys: string[]): OTableColumnDef<Record<string, any>>[] {
+  const cols: OTableColumnDef<Record<string, any>>[] = keys.map((key) => ({
+    id: key,
+    header: raw(key),
+    size: 160,
+    meta: {},
+    accessorFn: (row: any) => {
+      const value = row?.[key];
+      return value !== null && typeof value === "object" ? JSON.stringify(value) : value;
+    },
+  }));
+  fillLastColumn(cols, "");
+  return cols;
+}
+
 export function useTracesTableColumns() {
   /**
    * Rebuild the `columns` ref from the given parameters.

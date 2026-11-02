@@ -160,6 +160,7 @@ export const TRACES_TOOLBAR_WIDTHS = {
   reset: { text: 72, icon: 36 },
   more: 70,
   metricsPinned: 78,
+  sqlModePinned: 78,
   savedViewsPinned: 93,
 };
 

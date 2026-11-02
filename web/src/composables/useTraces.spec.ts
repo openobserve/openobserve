@@ -2231,4 +2231,42 @@ describe("useTraces", () => {
       vi.useRealTimers();
     });
   });
+
+  describe("SQL mode in the URL", () => {
+    const originalRoute = mockCurrentRoute.value;
+
+    afterEach(() => {
+      mockCurrentRoute.value = originalRoute;
+    });
+
+    const sqlState = (sqlMode: boolean, editorValue: string) => {
+      const inst = useTraces();
+      inst.resetSearchObj();
+      inst.searchObj.meta.sqlMode = sqlMode;
+      inst.searchObj.data.editorValue = editorValue;
+      return inst;
+    };
+
+    it("writes sql_mode only while SQL mode is on with a query", () => {
+      expect(sqlState(true, `SELECT * FROM "a"`).getUrlQueryParams().sql_mode).toBe("true");
+      expect(sqlState(true, `SELECT * FROM "a"`).getUrlQueryParams(true).sql_mode).toBe("true");
+      expect(sqlState(true, "  ").getUrlQueryParams()).not.toHaveProperty("sql_mode");
+      expect(sqlState(false, "a = 1").getUrlQueryParams()).not.toHaveProperty("sql_mode");
+    });
+
+    it("adds and drops sql_mode as the URL follows the mode", async () => {
+      const { searchObj, patchUrlViewState } = sqlState(true, `SELECT * FROM "a"`);
+      mockCurrentRoute.value = { name: "traces", query: { stream: "a", tab: "spans" } };
+      await patchUrlViewState();
+      expect(mockRouterReplace).toHaveBeenLastCalledWith({
+        query: expect.objectContaining({ sql_mode: "true" }),
+      });
+
+      mockCurrentRoute.value = { name: "traces", query: { stream: "a", sql_mode: "true" } };
+      searchObj.meta.sqlMode = false;
+      searchObj.data.editorValue = "a = 1";
+      await patchUrlViewState();
+      expect(mockRouterReplace.mock.lastCall?.[0].query).not.toHaveProperty("sql_mode");
+    });
+  });
 });

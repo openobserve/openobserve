@@ -783,6 +783,17 @@ describe("TracesLatencyHeatmap", () => {
       for (const item of items) expect(item.querySelector("svg")).not.toBeNull();
     });
 
+    it("offers no filter or drill down for typed SQL, by click or key", async () => {
+      wrapper = await mountAttached({ sqlMode: true });
+      await drawBox();
+      await press("f");
+      await press("d");
+      await choose("filter");
+      expect(wrapper.emitted("filter")).toBeUndefined();
+      expect(wrapper.emitted("drill-down")).toBeUndefined();
+      expect(wrapper.find('[data-test="traces-duration-actions-btn"]').exists()).toBe(false);
+    });
+
     it("moves focus into the menu when it opens", async () => {
       wrapper = await mountAttached();
       await drawBox();

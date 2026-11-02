@@ -990,6 +990,51 @@ describe("IndexList Component", () => {
     });
   });
 
+  describe("field-values query in SQL mode", () => {
+    afterEach(() => {
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.data.editorValue = "";
+    });
+
+    it("keeps the typed FROM alias so the typed WHERE resolves", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "test_stream" d WHERE d.status = '1' ORDER BY d.start_time`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream" d WHERE d.status = '1'`,
+      );
+    });
+
+    it("drops the opened field's own condition when it is written with the alias", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "test_stream" d WHERE d.status = '1' AND "d"."service_name" = 'a' AND (d.status = '2' OR d.status = '3')`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "status" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream" d WHERE "d"."service_name" = 'a'`,
+      );
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "service_name" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream" d WHERE d.status = '1' AND (d.status = '2' OR d.status = '3')`,
+      );
+    });
+
+    it("keeps a qualified condition in filter mode, as before", async () => {
+      mockSearchObj.data.editorValue = `d.status = '1' AND service_name = 'a'`;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "status" });
+      await flushPromises();
+      expect(atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql)).toBe(
+        `SELECT * FROM "test_stream" WHERE d.status = '1' AND service_name = 'a'`,
+      );
+    });
+  });
+
   // ─── onStreamChange side-effects ──────────────────────────────────────────
 
   describe("onStreamChange side-effects", () => {

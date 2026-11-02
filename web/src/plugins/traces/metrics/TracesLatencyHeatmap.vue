@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <PanelBar class="w-full justify-between gap-2" data-test="traces-latency-heatmap-title">
       <span class="truncate">{{ t("traces.latencyHeatmap.title") }}</span>
       <LatencyHeatmapColorToggle v-model="colorBy" />
-      <ODropdown side="bottom" align="end">
+      <ODropdown v-if="!sqlMode" side="bottom" align="end">
         <template #trigger>
           <OButton
             :aria-label="t('traces.redActions.durationActions')"
@@ -146,6 +146,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               icon-left="filter-alt"
               shortcut="f"
+              :disabled="sqlMode"
+              focusable-unavailable
+              :description="sqlMode ? t('traces.sqlMode.putConditionInWhere') : undefined"
               data-test="traces-latency-heatmap-selection-filter"
               @select="filterSelection"
             >
@@ -154,6 +157,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               icon-left="timeline"
               shortcut="d"
+              :disabled="sqlMode"
+              focusable-unavailable
+              :description="sqlMode ? t('traces.sqlMode.putConditionInWhere') : undefined"
               data-test="traces-latency-heatmap-selection-drill-down"
               @select="drillDown"
             >
@@ -253,6 +259,8 @@ const props = defineProps<{
   stream?: string;
   /** What the request draws from; a failed refresh keeps the grid only when it was drawn from the same source. */
   source?: string;
+  /** Typed SQL takes no inserted conditions, so the box offers no filter or drill down. */
+  sqlMode?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -565,6 +573,7 @@ const onDataZoom = (box: HeatmapBox) => {
 };
 
 const filterSelection = () => {
+  if (props.sqlMode) return;
   popoverOpen.value = false;
   filtered.value = true;
   emit("filter");
@@ -572,6 +581,7 @@ const filterSelection = () => {
 
 // The Drill down page keeps its own copy of the selection, so only the drawn box goes.
 const drillDown = () => {
+  if (props.sqlMode) return;
   popoverOpen.value = false;
   if (!filtered.value) drawn.value = null;
   emit("drill-down");

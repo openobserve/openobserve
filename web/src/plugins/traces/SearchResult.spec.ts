@@ -129,8 +129,9 @@ const mockSearchObj = reactive({
   organizationIdentifier: "test-org",
 });
 
-const { mockPatchUrlViewState } = vi.hoisted(() => ({
+const { mockPatchUrlViewState, mockTracesParser } = vi.hoisted(() => ({
   mockPatchUrlViewState: vi.fn(() => Promise.resolve()),
+  mockTracesParser: { value: null as unknown },
 }));
 
 vi.mock("@/composables/useTraces", () => ({
@@ -138,6 +139,7 @@ vi.mock("@/composables/useTraces", () => ({
     searchObj: mockSearchObj,
     updatedLocalLogFilterField: vi.fn(),
     patchUrlViewState: mockPatchUrlViewState,
+    tracesParser: mockTracesParser,
   }),
 }));
 
@@ -163,6 +165,12 @@ const globalOptions = {
       template: '<div data-test="traces-search-result-list" class="search-list w-full"></div>',
       props: ["hits", "loading", "searchPerformed", "showHeader", "wrap", "showPagination"],
       emits: ["row-click", "load-more"],
+    },
+    TracesSqlResultTable: {
+      name: "TracesSqlResultTable",
+      template: '<div data-test="traces-sql-result"></div>',
+      props: ["hits", "columns", "shape", "loading", "wrap", "offerAddTraceId", "traceHref"],
+      emits: ["open-trace", "add-trace-id"],
     },
     TracesMetricsDashboard: {
       template: '<div data-test="traces-metrics-dashboard"></div>',
@@ -528,6 +536,7 @@ describe("SearchResult", () => {
         "ask-ai",
         "send-to-ai-chat",
         "open-mobile-fields",
+        "add-trace-id",
       ];
 
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);
@@ -704,6 +713,129 @@ describe("SearchResult in a kept-alive page", () => {
     expect(scroller.scrollTop).toBe(480);
     raf.mockRestore();
     parent.unmount();
+  });
+
+  describe("SQL mode results", () => {
+    let wrapper: any;
+    const original = mockSearchObj.data.queryResults;
+
+    beforeEach(async () => {
+      const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
+      mockTracesParser.value = new mod.default.Parser();
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
+    });
+    const sqlTable = () => wrapper.findComponent({ name: "TracesSqlResultTable" });
+    const redIcon = () => wrapper.find('[data-test="traces-red-unavailable-icon"]');
+    const dashboard = () => wrapper.find('[data-test="traces-metrics-dashboard"]');
+    const showResults = async (sql: string, hits: any[], extra: Record<string, unknown> = {}) => {
+      (mockSearchObj.meta as any).sqlMode = true;
+      (mockSearchObj.meta as any).searchMode = "spans";
+      (mockSearchObj.data as any).queryResults = {
+        hits,
+        total: hits.length,
+        from: 0,
+        sql,
+        ...extra,
+      };
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      wrapper.unmount();
+      (mockSearchObj.meta as any).sqlMode = false;
+      (mockSearchObj.meta as any).searchMode = undefined;
+      (mockSearchObj.data as any).queryResults = original;
+    });
+
+    it("collapses the RED charts with an info icon and counts the rows for a GROUP BY", async () => {
+      await showResults(`SELECT service_name, count(*) AS n FROM "default" GROUP BY service_name`, [
+        { n: 4, service_name: "api" },
+        { n: 2, service_name: "db" },
+      ]);
+      expect(dashboard().exists()).toBe(false);
+      expect(redIcon().exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-sql-rows-count"]').text()).toBe("2 rows");
+      expect(wrapper.find('[data-test="traces-count-badge"]').exists()).toBe(false);
+      expect(sqlTable().props("shape")).toBe("rows");
+      expect(
+        sqlTable()
+          .props("columns")
+          .map((c: any) => c.id),
+      ).toEqual(["service_name", "n"]);
+      expect(sqlTable().props("offerAddTraceId")).toBe(false);
+    });
+
+    it("keeps the RED charts and the span table for a plain query", async () => {
+      await showResults(`SELECT * FROM "default" WHERE a = 1`, [{ trace_id: "t", span_id: "s" }]);
+      expect(dashboard().exists()).toBe(true);
+      expect(redIcon().exists()).toBe(false);
+      expect(sqlTable().exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "TracesSearchResultList" }).exists()).toBe(true);
+    });
+
+    it("collapses when the server reports the query is not histogram eligible", async () => {
+      await showResults(`SELECT * FROM "default"`, [{ trace_id: "t", span_id: "s" }], {
+        is_histogram_eligible: false,
+      });
+      expect(dashboard().exists()).toBe(false);
+      expect(redIcon().exists()).toBe(true);
+    });
+
+    it("hides the info icon while the RED band is switched off", async () => {
+      mockSearchObj.meta.showHistogram = false;
+      await showResults(`SELECT count(*) AS n FROM "default"`, [{ n: 1 }]);
+      expect(redIcon().exists()).toBe(false);
+      mockSearchObj.meta.showHistogram = true;
+    });
+
+    it("opens a trace row by trace_id inside the page time range", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      await showResults(`SELECT trace_id, max(duration) AS d FROM "default" GROUP BY trace_id`, [
+        { trace_id: "t-1", d: 3 },
+      ]);
+      expect(sqlTable().props("shape")).toBe("traces");
+
+      await sqlTable().vm.$emit("open-trace", { trace_id: "t-1", d: 3 });
+      await flushPromises();
+
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "traceDetails",
+          query: expect.objectContaining({
+            trace_id: "t-1",
+            from: mockSearchObj.data.datetime.startTime,
+            to: mockSearchObj.data.datetime.endTime,
+          }),
+        }),
+      );
+      expect(push.mock.calls[0][0]).not.toHaveProperty("query.span_id");
+      push.mockRestore();
+    });
+
+    it("offers Add trace_id for plain rows without GROUP BY and relays it", async () => {
+      await showResults(`SELECT service_name FROM "default"`, [{ service_name: "api" }]);
+      expect(sqlTable().props("offerAddTraceId")).toBe(true);
+      await sqlTable().vm.$emit("add-trace-id");
+      expect(wrapper.emitted("add-trace-id")).toHaveLength(1);
+    });
+
+    it("opens a span row without span times inside the page time range", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      await showResults(`SELECT trace_id, span_id FROM "default"`, [
+        { trace_id: "t", span_id: "s" },
+      ]);
+      await wrapper.vm.expandRowDetail({ trace_id: "t", span_id: "s" });
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            from: mockSearchObj.data.datetime.startTime,
+            to: mockSearchObj.data.datetime.endTime,
+          }),
+        }),
+      );
+      push.mockRestore();
+    });
   });
 });
 

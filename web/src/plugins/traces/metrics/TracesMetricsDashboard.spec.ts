@@ -39,7 +39,7 @@ vi.mock("./TracesLatencyHeatmap.vue", () => ({
   default: {
     name: "TracesLatencyHeatmap",
     template: '<div data-test="traces-latency-heatmap"></div>',
-    props: ["request", "selection", "aiEnabled"],
+    props: ["request", "selection", "aiEnabled", "sqlMode"],
     emits: [
       "select",
       "filter",
@@ -86,6 +86,7 @@ const mockSearchObj = reactive({
     showHistogram: true,
     metricsRangeFilters: mockMetricsRangeFilters,
     searchMode: "traces" as "traces" | "spans",
+    sqlMode: false,
   },
 });
 
@@ -260,6 +261,7 @@ describe("TracesMetricsDashboard", () => {
     mockStore.state.timezone = "UTC";
     mockSearchObj.meta.showHistogram = true;
     mockSearchObj.meta.searchMode = "traces";
+    mockSearchObj.meta.sqlMode = false;
     mockSearchObj.data.stream.selectedStream.value = "default";
     mockSearchObj.data.stream.selectedStreamFields = [];
     mockSearchObj.data.stream.userDefinedSchema = [];
@@ -1728,6 +1730,61 @@ describe("TracesMetricsDashboard", () => {
       await flushPromises();
       expect(getHeatmapSql(wrapper)).toContain("histogram(_timestamp, ");
       expect(getHeatmapSql(wrapper)).not.toMatch(/WHERE\b/);
+    });
+  });
+
+  describe("SQL mode", () => {
+    const typed = `SELECT * FROM "default" WHERE service_name = 'a OR b' AND x IN (SELECT x FROM "default" WHERE y = 1) -- note
+ORDER BY start_time DESC`;
+
+    const remountWith = async (sql: string) => {
+      wrapper.unmount();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.data.editorValue = sql;
+      wrapper = mountComponent();
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+    };
+
+    it("feeds the panels the typed SQL's top-level WHERE, bracketed and as typed", async () => {
+      await remountWith(typed);
+      const where = `(service_name = 'a OR b' AND x IN (SELECT x FROM "default" WHERE y = 1))`;
+      expect(getPanelQuery(wrapper, "Rate")).toContain(`WHERE ${where}`);
+      expect(getPanelQuery(wrapper, "Errors")).toContain(`span_status = 'ERROR' AND ${where}`);
+      expect(getHeatmapSql(wrapper)).toContain(where);
+      expect(getPanelQuery(wrapper, "Rate")).not.toContain("ORDER BY start_time");
+    });
+
+    it("keeps the typed FROM alias in every panel, so an aliased WHERE resolves", async () => {
+      await remountWith(`SELECT * FROM "default" AS d WHERE d.duration > 1`);
+      expect(getPanelQuery(wrapper, "Rate")).toContain(
+        `FROM "default" AS d WHERE (d.duration > 1)`,
+      );
+      expect(getPanelQuery(wrapper, "Errors")).toContain(
+        `FROM "default" AS d WHERE span_status = 'ERROR'`,
+      );
+      expect(getHeatmapSql(wrapper)).toContain(`FROM "default" AS d WHERE (d.duration > 1)`);
+    });
+
+    it("leaves the WHERE out when the typed SQL has none", async () => {
+      await remountWith(`SELECT * FROM "default" ORDER BY start_time DESC`);
+      expect(getPanelQuery(wrapper, "Rate")).not.toMatch(/WHERE/);
+    });
+
+    it("moves only the time picker on an Errors brush", async () => {
+      await remountWith(typed);
+      wrapper.vm.onDataZoom({ start: 1_000, end: 2_000, data: { id: "errors", title: "Errors" } });
+      await flushPromises();
+      expect(wrapper.emitted("time-range-selected")![0][0]).toEqual({ start: 1_000, end: 2_000 });
+      expect(wrapper.emitted("editor-filter-set")).toBeFalsy();
+      expect(mockMetricsRangeFilters.size).toBe(0);
+    });
+
+    it("tells the heatmap it is showing typed SQL", async () => {
+      await remountWith(typed);
+      expect(wrapper.findComponent({ name: "TracesLatencyHeatmap" }).props("sqlMode")).toBe(true);
     });
   });
 });

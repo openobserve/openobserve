@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :dashboardData="dashboardData || {}"
           :currentTimeObj="currentTimeObj"
           :allowAlertCreation="false"
-          :exploreActions="true"
+          :exploreActions="!searchObj.meta.sqlMode"
           searchType="dashboards"
           @updated:dataZoom="onDataZoom"
           @exploreCreateAlert="onExploreCreateAlert"
@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :source="heatmapSource"
           :selection="heatmapSelection"
           :ai-enabled="aiEnabled"
+          :sql-mode="!!searchObj.meta.sqlMode"
           @select="onHeatmapSelect"
           @filter="heatmapSelection && onHeatmapFilter(heatmapSelection)"
           @drill-down="onHeatmapDrillDown"
@@ -119,6 +120,7 @@ import {
 } from "./latencyHeatmap";
 import useTraces from "@/composables/useTraces";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { analyzeTracesSql } from "@/utils/traces/tracesSql";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
 import { buildTracesRedPanel, tracesBucketNotice, type TracesRedChart } from "./tracesRedPanels";
 import type { I18nText } from "@/types/i18n";
@@ -187,7 +189,18 @@ const effectiveFilter = computed(() => searchObj.data.editorValue);
 
 const decodeFilter = (text: string | undefined): string =>
   resolveTracesFilter(text, tracesParser.value, searchObj.data.stream.selectedStream.value);
-const parseEffectiveFilter = (): string => decodeFilter(effectiveFilter.value);
+// Typed SQL feeds the panels only its top-level WHERE, bracketed so the panels' own conditions bind outside it.
+const parseEffectiveFilter = (): string => {
+  if (!searchObj.meta.sqlMode) return decodeFilter(effectiveFilter.value);
+  const where = analyzeTracesSql(effectiveFilter.value ?? "", tracesParser.value).where;
+  return where ? `(${where})` : "";
+};
+// Typed SQL may alias its stream, and its WHERE refers to that alias.
+const panelFrom = (streamName: string): string => {
+  const quoted = `"${streamName}"`;
+  if (!searchObj.meta.sqlMode) return quoted;
+  return analyzeTracesSql(effectiveFilter.value ?? "", tracesParser.value).fromClause || quoted;
+};
 
 const effectiveTimeRange = computed<TimeRange>(() => ({
   startTime: searchObj.data.datetime.startTime,
@@ -276,6 +289,7 @@ const loadDashboard = async () => {
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const baseFilters: string[] = getBaseFilters();
     const streamName = searchObj.data.stream.selectedStream.value;
+    const fromClause = panelFrom(streamName);
     const interval = chartInterval(
       effectiveTimeRange.value.startTime,
       effectiveTimeRange.value.endTime,
@@ -284,7 +298,7 @@ const loadDashboard = async () => {
     const source = tracesChartSource(searchObj);
     heatmapSource.value = source;
     heatmapRequest.value = {
-      sql: buildLatencyHeatmapSql(streamName, baseFilters, interval.sql),
+      sql: buildLatencyHeatmapSql(streamName, baseFilters, interval.sql, fromClause),
       startTime: effectiveTimeRange.value.startTime,
       endTime: effectiveTimeRange.value.endTime,
     };
@@ -319,7 +333,7 @@ const loadDashboard = async () => {
 
         // Build the final query: substitute placeholders then apply mode transforms
         let query = panel["queries"][0].query
-          .replace("[STREAM_NAME]", () => `"${streamName}"`)
+          .replace("[STREAM_NAME]", () => fromClause)
           .replace("[WHERE_CLAUSE]", () => whereClause)
           .replace("[INTERVAL]", interval.sql)
           // The range clips the first and last buckets, so their per-second value dips, as their heatmap columns thin.
@@ -503,7 +517,10 @@ const onHeatmapAskAi = ({ selection, count, band, window }: LatencyHeatmapAskAi)
   const from = new Date(timeStartUs / 1000).toISOString();
   const to = new Date(timeEndUs / 1000).toISOString();
   // Model input, not screen copy: kept English, like the traces page's other Ask AI prompts.
-  const query = `I selected a box on the traces latency heatmap. Spans in the box: ${count}. Duration: ${band}. Time: ${from} to ${to} (shown as ${window}). I am searching ${mode}. Stream: ${stream}. The filter expression is: ${chartsFilter.trim() || "(none)"}. This is a WHERE-clause filter — not a full SQL query. What do these spans have in common, and what explains their duration?`;
+  const queryText = searchObj.meta.sqlMode
+    ? `The SQL query is: ${chartsFilter.trim()}.`
+    : `The filter expression is: ${chartsFilter.trim() || "(none)"}. This is a WHERE-clause filter — not a full SQL query.`;
+  const query = `I selected a box on the traces latency heatmap. Spans in the box: ${count}. Duration: ${band}. Time: ${from} to ${to} (shown as ${window}). I am searching ${mode}. Stream: ${stream}. ${queryText} What do these spans have in common, and what explains their duration?`;
   emit("send-to-ai-chat", {
     query,
     chipName: t(
@@ -568,6 +585,12 @@ const applySelection = async (
       ? existing
       : undefined;
   const baselineFilter = current?.baselineFilter ?? searchObj.data.editorValue ?? "";
+
+  // Typed SQL takes no inserted conditions, so a brush only moves the time picker.
+  if (searchObj.meta.sqlMode) {
+    emit("time-range-selected", pickerRange);
+    return;
+  }
 
   if (!current || !originalTimeRangeBeforeSelection.value) {
     // The charts show the last search's range; in manual mode the picker may already hold an unsearched box.

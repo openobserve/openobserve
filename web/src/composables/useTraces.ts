@@ -391,6 +391,8 @@ const useTraces = () => {
 
     query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
 
+    Object.assign(query, sqlModeUrlState());
+
     query["org_identifier"] = store.state.selectedOrganization.identifier;
 
     if (router.currentRoute.value.query.trace_id)
@@ -405,6 +407,11 @@ const useTraces = () => {
     copyAnomalyLinkParams(router.currentRoute.value.query, query);
 
     return query;
+  }
+
+  // Only a non-empty SQL query is worth reopening in SQL mode.
+  function sqlModeUrlState(): { sql_mode?: "true" } {
+    return searchObj.meta.sqlMode && searchObj.data.editorValue?.trim() ? { sql_mode: "true" } : {};
   }
 
   function listUrlState() {
@@ -443,7 +450,10 @@ const useTraces = () => {
     // run-query is one-shot; kept in the entry, Back to it would run whatever edit was staged there.
     delete query["run-query"];
     for (const key of TRACES_LIST_URL_KEYS) delete query[key];
-    Object.assign(query, listUrlState(), { query: b64EncodeUnicode(searchObj.data.editorValue) });
+    delete query.sql_mode;
+    Object.assign(query, listUrlState(), sqlModeUrlState(), {
+      query: b64EncodeUnicode(searchObj.data.editorValue),
+    });
     // Columns belong to the URL's stream, which only a run moves to the selected one.
     if (route.query.stream !== searchObj.data.stream.selectedStream.value) {
       if (route.query.columns === undefined) delete query.columns;
@@ -462,6 +472,7 @@ const useTraces = () => {
     const stop = watch(
       () => [
         searchObj.data.editorValue,
+        searchObj.meta.sqlMode,
         searchObj.meta.resultGrid.rowsPerPage,
         searchObj.data.resultGrid.currentPage,
         searchObj.meta.showHistogram,
