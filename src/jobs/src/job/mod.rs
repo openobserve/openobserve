@@ -928,6 +928,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if let Err(e) = alerts::alert_calibration::backfill_org_configs().await {
         log::error!("[alert_calibration] default config backfill failed: {e}");
     }
+    #[cfg(feature = "enterprise")]
+    if let Err(e) = openobserve_core::autoobserve::init().await {
+        log::error!("[autoobserve] engine start-up failed: {e}");
+    }
 
     // cache alerts (this will include the system templates we just created)
     db::alerts::templates::cache()

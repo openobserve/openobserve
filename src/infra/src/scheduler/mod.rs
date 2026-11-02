@@ -127,7 +127,7 @@ pub async fn init() -> Result<()> {
 /// Pushes a Trigger job into the queue
 #[inline]
 pub async fn push(trigger: Trigger) -> Result<()> {
-    CLIENT.push(trigger).await
+    CLIENT.push(shaped(trigger)).await
 }
 
 /// Deletes the Trigger job matching the given parameters
@@ -159,7 +159,7 @@ pub async fn update_status(
 /// Use `pull()` method to set the status of the job from `Waiting` to `Processing`.
 #[inline]
 pub async fn update_trigger(trigger: Trigger, clone: bool) -> Result<()> {
-    CLIENT.update_trigger(trigger, clone).await
+    CLIENT.update_trigger(shaped(trigger), clone).await
 }
 
 /// Bulk updates multiple triggers at once for better performance
@@ -202,7 +202,7 @@ pub async fn keep_alive_claim(
 
 #[inline]
 pub async fn complete_claim(trigger: Trigger) -> Result<bool> {
-    CLIENT.complete_claim(trigger).await
+    CLIENT.complete_claim(shaped(trigger)).await
 }
 
 /// SY-2, C10: asks for a sync pass of the page at `at`, never before the row's backoff.
@@ -321,13 +321,14 @@ pub async fn arm_with<C: ConnectionTrait>(
     trigger: &Trigger,
 ) -> std::result::Result<(), sea_orm::DbErr> {
     let sql = "INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, \
-               status, retries, next_run_at, data) VALUES (?, ?, ?, false, false, ?, 0, ?, '') \
+               status, retries, next_run_at, data) VALUES (?, ?, ?, ?, false, ?, 0, ?, '') \
                ON CONFLICT (org, module, module_key) DO UPDATE SET status = excluded.status, \
                next_run_at = excluded.next_run_at, retries = 0";
     let values = [
         trigger.org.clone().into(),
         (trigger.module.clone() as i32).into(),
         trigger.module_key.clone().into(),
+        trigger.module.hidden_from_older_pullers().into(),
         (TriggerStatus::Waiting as i32).into(),
         trigger.next_run_at.into(),
     ];
@@ -458,6 +459,23 @@ pub fn get_scheduler_max_retries() -> i32 {
         .limit
         .scheduler_max_retries
         .saturating_abs()
+}
+
+/// The `(is_realtime, is_silenced)` a pull skips; a hidden module's own lane flips them.
+pub(crate) fn pull_skip_binds(module: Option<&TriggerModule>) -> (bool, bool) {
+    if module.is_some_and(TriggerModule::hidden_from_older_pullers) {
+        (false, true)
+    } else {
+        (true, false)
+    }
+}
+
+fn shaped(mut trigger: Trigger) -> Trigger {
+    if trigger.module.hidden_from_older_pullers() {
+        trigger.is_realtime = true;
+        trigger.is_silenced = false;
+    }
+    trigger
 }
 
 /// Realtime alert triggers are cached on every node; the trigger rides in the

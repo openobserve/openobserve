@@ -850,6 +850,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         } else {
             PULL_QUERY
         };
+        let (skip_realtime, skip_silenced) = super::pull_skip_binds(module.as_ref());
 
         let mut tx = pool.begin().await?;
 
@@ -888,8 +889,8 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             .bind(alert_max_time)
             .bind(TriggerStatus::Waiting)
             .bind(now)
-            .bind(true)
-            .bind(false);
+            .bind(skip_realtime)
+            .bind(skip_silenced);
         if let Some(m) = module {
             q = q.bind(m);
         }

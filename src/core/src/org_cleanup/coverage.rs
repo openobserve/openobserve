@@ -327,6 +327,11 @@ pub const COVERAGE: &[Coverage] = &[
         "files/_meta/ usage, audit and trigger rows",
         "the _meta org's own history, kept for billing and audit",
     ),
+    exempt(
+        Kind::ObjectPrefix,
+        "files/_meta/ autoobserve_* engine rows, keyed by org_id",
+        "the engine's regional history in the _meta org, kept 35 days unless an operator set its retention; per-org engine reads start at the org's creation and a node drops what it remembers of an org whose creation time changed, so an org re-created under the same id is served none of it; the region-wide stream-silence reads are not clamped",
+    ),
     covered(Kind::LocalDisk, "enrichment_table_cache/{org}/", DB),
     covered(Kind::LocalDisk, "metrics_results/{org}/", DB),
     covered(Kind::LocalDisk, "results/{org}/", DB),
