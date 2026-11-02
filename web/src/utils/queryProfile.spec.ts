@@ -51,6 +51,7 @@ import {
   type ProfileNode,
   type QueryProfile,
   type RemoteNodeProfile,
+  type RemoteScanStats,
 } from "./queryProfile";
 import {
   AGG_PHYSICAL_PLAN,
@@ -504,6 +505,21 @@ describe("layoutProfile", () => {
 });
 
 describe("super-cluster node identity", () => {
+  const ZERO_SCAN: RemoteScanStats = {
+    files: 0,
+    records: 0,
+    original_size: 0,
+    compressed_size: 0,
+    querier_files: 0,
+    querier_memory_cached_files: 0,
+    querier_disk_cached_files: 0,
+    idx_scan_size: 0,
+    idx_took: 0,
+    file_list_took: 0,
+    aggs_cache_ratio: 0,
+    peak_memory_usage: 0,
+    wait_in_queue: 0,
+  };
   const PODS: [string, string][] = [
     ["o2-ingester-0", "ingester"],
     ["o2-ingester-1", "ingester"],
@@ -568,6 +584,53 @@ describe("super-cluster node identity", () => {
   it("counts only real nodes, not the cluster entries", () => {
     const summary = summarizeProfile(buildProfileModel(joinOfClusters()));
     expect(summary.nodeCounts).toEqual({ queriers: 9, ingesters: 6, other: 0, total: 15 });
+  });
+
+  it("takes each cluster entry's scans from its pods and counts them once in the totals", () => {
+    const stats = (files: number): RemoteScanStats => ({
+      ...ZERO_SCAN,
+      files,
+      records: files * 100,
+      original_size: files * 1000,
+    });
+    const profile = joinOfClusters();
+    for (const scan of profile.plan.children!) {
+      for (const entry of scan.remote!) {
+        entry.scan_stats = stats(1);
+        for (const pod of entry.plan!.remote!)
+          if (pod.role === "ingester") pod.scan_stats = stats(2);
+      }
+    }
+    const model = buildProfileModel(profile);
+    const entry = model.stages[0].nodes.find((n) => n.name === "cluster-b")!;
+    expect(entry.remote.scan_stats).toMatchObject({ files: 4, records: 400 });
+    expect(summarizeProfile(model).scanned).toEqual({ files: 24, bytes: 24_000, rows: 2400 });
+  });
+
+  it("does not count the cluster entry of a query that reached one cluster", () => {
+    const one = clusterScanExec();
+    one.remote = one.remote!.slice(0, 1);
+    const model = buildProfileModel({ ...singleStageProfile([]), plan: one });
+    expect(model.stages[0].nodes[0].clusterEntry).toBe(true);
+    expect(summarizeProfile(model).nodeCounts.total).toBe(5);
+  });
+
+  it("never gives a pod its cluster leader's text plan", () => {
+    const profile = joinOfClusters();
+    const pods = profile.plan.children![0].remote![0].plan!.remote!;
+    pods[3] = { ...pods[3], plan: undefined, skipped: true };
+    pods[4] = { ...pods[4], plan: undefined };
+    const leaderPlan = "RemoteScanExec: input_partitions=5, metrics=[output_rows=1]";
+    const hits = [
+      { phase: 1, node_name: "o2-querier-1", plan: leaderPlan },
+      { phase: 1, node_name: "o2-querier-2", plan: leaderPlan },
+      { phase: 2, node_name: "o2-querier-2", plan: "DataSourceExec: x, metrics=[output_rows=7]" },
+    ];
+    const model = buildProfileModel(profile, hits);
+    expect(model.stages).toHaveLength(4);
+    const nested = model.stages[1].nodes;
+    expect(nested.find((n) => n.key === "cluster-a/o2-querier-1")?.planSource).toBe("none");
+    expect(nested.find((n) => n.key === "cluster-a/o2-querier-2")?.planSource).toBe("text");
   });
 
   it("keeps plain node keys inside a single cluster", () => {

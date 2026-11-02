@@ -315,7 +315,6 @@ const MAX_ZOOM = 2;
 const MINI_PAD = 40;
 const FIT_TOP = 56;
 const FIT_MARGIN = 24;
-// Keeps fitted cards clear of the zoom button column, which only shows on lg viewports.
 const FIT_OVERLAY_W = 56;
 // Below this a fitted card is unreadable; the graph is top-aligned instead and the rest is panned to.
 const MIN_FIT_ZOOM = 0.85;

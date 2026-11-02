@@ -17,6 +17,7 @@ import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n
 import { RELATIVE_PERIOD_PATTERN, formatToTimeCompact } from "@/utils/date";
 import {
   isPlaceholderScan,
+  nodeLabel,
   operatorLabel,
   planAggregate,
   planOperatorSummary,
@@ -43,7 +44,7 @@ const PAST_PERIOD_KEY: Record<string, I18nKey> = {
 export function nodeName(model: ProfileModel, nodeKey: string): string {
   for (const s of model.stages) {
     const node = s.nodes.find((n) => n.key === nodeKey);
-    if (node) return node.name;
+    if (node) return nodeLabel(node);
   }
   return nodeKey;
 }

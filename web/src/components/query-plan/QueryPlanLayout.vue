@@ -113,7 +113,6 @@ import { useI18nTyped } from "@/types/i18n";
 
 const MOBILE_INSET = 16;
 const PANEL_GAP = 24;
-// the canvas keeps clear of the show-summary button that replaces the hidden panel
 const COLLAPSED_INSET = 56;
 
 const { t } = useI18nTyped();

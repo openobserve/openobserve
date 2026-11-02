@@ -135,7 +135,7 @@ const { fold, layout, notice, focusable, act, reveal, onNoticeAction } = useProf
 
 const nodeOptions = computed(() =>
   clusterNodes(props.model).map((n) => {
-    const role = roleLabel(t, n.role);
+    const role = n.clusterEntry ? null : roleLabel(t, n.role);
     return { label: raw([n.name, n.cluster, role].filter(Boolean).join(" · ")), value: n.key };
   }),
 );

@@ -337,7 +337,7 @@ const resultModel = computed(() =>
   profile.value ? buildProfileModel(profile.value, streamResult.value?.hits ?? []) : null,
 );
 const resultNodes = computed(() =>
-  resultModel.value ? clusterNodes(resultModel.value).length : 0,
+  resultModel.value ? clusterNodes(resultModel.value).filter((n) => !n.clusterEntry).length : 0,
 );
 
 const analyzeText = computed<string | null>(() => {

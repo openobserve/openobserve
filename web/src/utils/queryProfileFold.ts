@@ -100,15 +100,19 @@ export function autoFold(model: ProfileModel, fold: FoldState): { fold: FoldStat
       grouped.add(childId);
     }
   }
-  const count = grouped.size - fold.grouped.size;
-  return { fold: count ? { ...fold, grouped } : fold, count };
+  const added = [...grouped].filter((id) => !fold.grouped.has(id));
+  if (!added.length) return { fold, count: 0 };
+  // branches nested inside another folded branch are not on screen, so they are not counted
+  const count = added.filter((id) => !ancestorIds(model, id).some((a) => grouped.has(a))).length;
+  return { fold: { ...fold, grouped }, count };
 }
 
 /** Opens whatever hides `opId`; returns the same state when it is already visible. */
 export function revealOp(model: ProfileModel, fold: FoldState, opId: string): FoldState {
   const op = model.operators[opId];
   if (!op) return fold;
-  const path = [opId, ...ancestorIds(model, opId)];
+  const ancestors = ancestorIds(model, opId);
+  const path = [opId, ...ancestors];
   const stageIds = path.map((id) => model.operators[id].stageId).filter((s): s is string => !!s);
   const outsideFocus =
     !!fold.focusId &&
@@ -118,13 +122,15 @@ export function revealOp(model: ProfileModel, fold: FoldState, opId: string): Fo
   const changed =
     outsideFocus ||
     unfold ||
-    path.some((id) => fold.collapsed.has(id) || fold.grouped.has(id)) ||
+    ancestors.some((id) => fold.collapsed.has(id)) ||
+    path.some((id) => fold.grouped.has(id)) ||
     stageIds.some((s) => fold.stages.has(s));
   if (!changed) return fold;
   return {
     ...fold,
     shown: unfold ? withAll(fold.shown, [opId]) : fold.shown,
-    collapsed: without(fold.collapsed, path),
+    // a collapsed card is still drawn, so only collapses above it hide the operator
+    collapsed: without(fold.collapsed, ancestors),
     grouped: without(fold.grouped, path),
     stages: without(fold.stages, stageIds),
     focusId: outsideFocus ? null : fold.focusId,

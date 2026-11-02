@@ -746,11 +746,17 @@ export function physicalPlanToProfile(planText: string): QueryProfile | null {
   };
 }
 
-function fallbackPlan(remote: RemoteNodeProfile, ctx: BuildContext): ProfileNode | null {
+function fallbackPlan(
+  remote: RemoteNodeProfile,
+  phase: number,
+  ctx: BuildContext,
+): ProfileNode | null {
+  // a skipped node never ran, and a cluster leader's own plan shares its pod name one phase up
+  if (remote.skipped) return null;
   const hit = ctx.hits.find(
     (h) =>
       !ctx.usedHits.has(h) &&
-      (h.phase ?? 0) >= 1 &&
+      (typeof h.phase === "number" ? h.phase === phase : true) &&
       typeof h.plan === "string" &&
       h.plan.trim() !== "" &&
       ((!!remote.node_address && h.node_address === remote.node_address) ||
@@ -888,13 +894,14 @@ function buildStage(
     maxWallUs: 0,
   };
   ctx.stages.push(stage);
+  const phase = stageDepth(ctx.stages, stage);
   const used = new Set<string>();
   const groups = new Map<string, { nodes: StageNode[]; parts: PlanPart[] }>();
   for (const remote of entries) {
-    const plan = remote.plan ?? fallbackPlan(remote, ctx);
+    const plan = remote.plan ?? fallbackPlan(remote, phase, ctx);
     const name = remote.node_name || remote.node_address || `#${remote.partition}`;
     // pod names repeat across clusters deployed from one chart, so the cluster tells them apart
-    const clusterEntry = ctx.multiCluster && remote.cluster === remote.node_name;
+    const clusterEntry = !!remote.cluster && remote.cluster === remote.node_name;
     const cluster = ctx.multiCluster && !clusterEntry ? (remote.cluster ?? "") : "";
     const node: StageNode = {
       key: stageNodeKey(remote, cluster, used),
@@ -926,11 +933,56 @@ function buildStage(
       stageId: stage.id,
       nodeKeys: group.nodes.map((n) => n.key),
       role: variantRole(group.nodes),
-      nodeNames: group.nodes.map((n) => n.name),
+      nodeNames: group.nodes.map(nodeLabel),
       rootOpId: addOperator(variantId, group.parts, remoteOpId, stage.id, variantId, ctx),
     });
   });
   return stage;
+}
+
+/** How many remote hops below the leader a stage runs, which is the phase of its text plans. */
+function stageDepth(stages: ProfileStage[], stage: ProfileStage): number {
+  let depth = 1;
+  for (let id = stage.parentStageId; id; depth++) {
+    id = stages.find((s) => s.id === id)?.parentStageId ?? null;
+  }
+  return depth;
+}
+
+// a cluster leader sends its scan stats with its first batch, before all of its pods finish
+function rollUpClusterEntries(stages: ProfileStage[]) {
+  for (const stage of stages) {
+    const pods = stages.filter((s) => s.parentStageId === stage.id).flatMap((s) => s.nodes);
+    for (const entry of stage.nodes) {
+      if (!entry.clusterEntry) continue;
+      const stats = pods
+        .filter((p) => p.remote.cluster === entry.name)
+        .flatMap((p) => (p.remote.scan_stats ? [p.remote.scan_stats] : []));
+      if (stats.length) entry.remote = { ...entry.remote, scan_stats: stats.reduce(addScanStats) };
+    }
+  }
+}
+
+/** Same merge as the backend's `ScanStats::add`. */
+function addScanStats(a: RemoteScanStats, b: RemoteScanStats): RemoteScanStats {
+  const sum = (k: keyof RemoteScanStats) => (a[k] || 0) + (b[k] || 0);
+  const max = (k: keyof RemoteScanStats) => Math.max(a[k] || 0, b[k] || 0);
+  const ratios = [a.aggs_cache_ratio, b.aggs_cache_ratio].filter((r) => r);
+  return {
+    files: sum("files"),
+    records: sum("records"),
+    original_size: sum("original_size"),
+    compressed_size: sum("compressed_size"),
+    querier_files: sum("querier_files"),
+    querier_memory_cached_files: sum("querier_memory_cached_files"),
+    querier_disk_cached_files: sum("querier_disk_cached_files"),
+    idx_scan_size: sum("idx_scan_size"),
+    idx_took: max("idx_took"),
+    file_list_took: max("file_list_took"),
+    aggs_cache_ratio: ratios.length ? Math.min(...ratios) : 0,
+    peak_memory_usage: max("peak_memory_usage"),
+    wait_in_queue: max("wait_in_queue"),
+  };
 }
 
 export function buildProfileModel(
@@ -955,6 +1007,7 @@ export function buildProfileModel(
     null,
     ctx,
   );
+  rollUpClusterEntries(ctx.stages);
   const variantById: Record<string, StageVariant> = {};
   for (const s of ctx.stages) for (const v of s.variants) variantById[v.id] = v;
   return {
@@ -1095,16 +1148,19 @@ function countRoles(all: StageNode[]): ProfileSummary["nodeCounts"] {
   return counts;
 }
 
+/** Stage nodes to total, leaving out cluster entries whose pods report the same work. */
+function measuredNodes(model: ProfileModel): StageNode[] {
+  const all = model.stages.flatMap((s) => s.nodes);
+  const pods = all.filter((n) => !n.clusterEntry && n.remote.scan_stats);
+  const podClusters = new Set(pods.map((n) => n.remote.cluster));
+  return all.filter((n) => !n.clusterEntry || !podClusters.has(n.name));
+}
+
 function peakMemory(model: ProfileModel): ProfileSummary["peakMemory"] {
   let best: ProfileSummary["peakMemory"] = null;
-  for (const s of model.stages) {
-    for (const n of s.nodes) {
-      const bytes = Math.max(
-        n.remote.peak_memory || 0,
-        n.remote.scan_stats?.peak_memory_usage || 0,
-      );
-      if (bytes > 0 && (!best || bytes > best.bytes)) best = { bytes, node: nodeLabel(n) };
-    }
+  for (const n of measuredNodes(model)) {
+    const bytes = Math.max(n.remote.peak_memory || 0, n.remote.scan_stats?.peak_memory_usage || 0);
+    if (bytes > 0 && (!best || bytes > best.bytes)) best = { bytes, node: nodeLabel(n) };
   }
   return best;
 }
@@ -1115,15 +1171,13 @@ function scannedTotals(
 ): ProfileSummary["scanned"] {
   const totals = { files: 0, bytes: 0, rows: 0 };
   let any = false;
-  for (const s of model.stages) {
-    for (const n of s.nodes) {
-      const st = n.remote.scan_stats;
-      if (!st) continue;
-      any = true;
-      totals.files += st.files || 0;
-      totals.bytes += st.original_size || 0;
-      totals.rows += st.records || 0;
-    }
+  for (const n of measuredNodes(model)) {
+    const st = n.remote.scan_stats;
+    if (!st) continue;
+    any = true;
+    totals.files += st.files || 0;
+    totals.bytes += st.original_size || 0;
+    totals.rows += st.records || 0;
   }
   if (any) return totals;
   if (!stream.scan_size && !stream.scan_records) return null;
@@ -1262,12 +1316,13 @@ export function summarizePlan(model: ProfileModel): PlanSummary {
 
 export function clusterNodes(
   model: ProfileModel,
-): { key: string; name: string; cluster: string; role: string }[] {
+): { key: string; name: string; cluster: string; role: string; clusterEntry: boolean }[] {
   return uniqueNodes(model).map((n) => ({
     key: n.key,
     name: n.name,
     cluster: n.cluster,
     role: n.role,
+    clusterEntry: n.clusterEntry,
   }));
 }
 

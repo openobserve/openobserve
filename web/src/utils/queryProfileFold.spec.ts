@@ -93,9 +93,17 @@ function remote(name: string, plan: ProfileNode, partition = 0): RemoteNodeProfi
   };
 }
 
-/** A union over `costs.length` streams, each a projection over a remote scan of filter + scan. */
-function unionModel(costs: number[]): ProfileModel {
-  const branch = (ms: number, i: number): ProfileNode => ({
+/** A union over streams, each a projection over a remote scan of filter + scan; an array nests a union. */
+function unionModel(costs: (number | number[])[]): ProfileModel {
+  const branch = (ms: number | number[], i: number): ProfileNode =>
+    Array.isArray(ms)
+      ? timed(
+          "UnionExec",
+          0.01,
+          ms.map((m, j) => stream(m, i * 10 + j)),
+        )
+      : stream(ms, i);
+  const stream = (ms: number, i: number): ProfileNode => ({
     ...timed("ProjectionExec", 0.01),
     children: [
       {
@@ -316,6 +324,13 @@ describe("automatic folding of large plans", () => {
     expectNoOverlap(layout);
   });
 
+  it("counts only the folded branches that are on screen", () => {
+    const model = unionModel([400, 260, ...Array(11).fill(2), [1, 1, 1]]);
+    const { fold, count } = autoFold(model, initialFold());
+    expect(fold.grouped.size).toBe(15);
+    expect(count).toBe(12);
+  });
+
   it("leaves small plans and plain plans alone", () => {
     expect(autoFold(joinModel(), initialFold()).count).toBe(0);
     expect(autoFold(planModel(), initialFold()).count).toBe(0);
@@ -371,6 +386,12 @@ describe("revealing a selected operator", () => {
     const model = joinModel();
     const fold = initialFold();
     expect(revealOp(model, fold, model.rootId)).toBe(fold);
+  });
+
+  it("keeps a collapsed operator collapsed when it is selected", () => {
+    const model = joinModel();
+    const fold = run(model, { type: "branch", opId: idOf(model, "HashJoinExec") });
+    expect(revealOp(model, fold, idOf(model, "HashJoinExec"))).toBe(fold);
   });
 
   it("drops focus when the operator lies outside it", () => {

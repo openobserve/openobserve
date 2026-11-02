@@ -47,7 +47,7 @@ export function useProfileFold(
         action: t("search.queryProfile.showWholePlan"),
       };
     }
-    if (!reason.value) return null;
+    if (!reason.value || (reason.value.kind === "auto" && !fold.value.grouped.size)) return null;
     const text =
       reason.value.kind === "hot"
         ? t("search.queryProfile.hotPathNote")
@@ -60,13 +60,21 @@ export function useProfileFold(
   );
 
   function act(action: FoldAction) {
-    fold.value = applyFold(model(), fold.value, action);
-    reason.value = action.type === "hotPath" ? { kind: "hot" } : null;
+    const next = applyFold(model(), fold.value, action);
+    if (action.type === "hotPath") {
+      if (next !== fold.value) reason.value = { kind: "hot" };
+    } else if (reason.value?.kind !== "auto" || action.type === "expandAll") {
+      // the auto note holds while groups remain; the hot-path note only until the next change
+      reason.value = null;
+    }
+    fold.value = next;
   }
 
   function reveal(opId: string) {
     const next = revealOp(model(), fold.value, opId);
-    if (next !== fold.value) fold.value = next;
+    if (next === fold.value) return;
+    if (reason.value?.kind === "hot") reason.value = null;
+    fold.value = next;
   }
 
   function onNoticeAction() {
