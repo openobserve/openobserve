@@ -19,6 +19,7 @@ use axum::{
     http::{StatusCode, header::CONTENT_TYPE},
     response::{IntoResponse, Response},
 };
+#[cfg(feature = "enterprise")]
 use config::meta::autoobserve::{KV_PREFIX, is_reserved_kv_key};
 use hashbrown::HashMap;
 
@@ -101,6 +102,7 @@ pub async fn get(Path((org_id, key)): Path<(String, String)>) -> Response {
 )]
 pub async fn set(Path((org_id, key)): Path<(String, String)>, body: Bytes) -> Response {
     let key = key.trim();
+    #[cfg(feature = "enterprise")]
     if is_reserved_kv_key(key) {
         return reserved_key_refused();
     }
@@ -153,6 +155,7 @@ pub async fn set(Path((org_id, key)): Path<(String, String)>, body: Bytes) -> Re
     )
 )]
 pub async fn delete(Path((org_id, key)): Path<(String, String)>) -> Response {
+    #[cfg(feature = "enterprise")]
     if is_reserved_kv_key(&key) {
         return reserved_key_refused();
     }
@@ -215,6 +218,7 @@ pub async fn list(
 }
 
 /// Marks under the prefix gate alert investigations, so only the engine's own route may write them.
+#[cfg(feature = "enterprise")]
 fn reserved_key_refused() -> Response {
     MetaHttpResponse::forbidden(format!(
         "keys under `{KV_PREFIX}` are reserved for AutoObserve and cannot be written or deleted through /kv"
@@ -224,6 +228,7 @@ fn reserved_key_refused() -> Response {
 #[cfg(test)]
 mod tests {
     use axum::{Router, body::Body, http::Request, routing};
+    #[cfg(feature = "enterprise")]
     use config::meta::autoobserve::marks::protected_key;
     use infra::table::{entity::kv_store::Entity, kv_store};
     use sea_orm::{ConnectionTrait, Schema};
@@ -267,6 +272,7 @@ mod tests {
         kv_store::get(org, key).await.unwrap().map(|m| m.value)
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn setting_a_reserved_key_is_forbidden_and_stores_nothing() {
         let org = setup().await;
@@ -280,6 +286,7 @@ mod tests {
         assert_eq!(stored(&org, &key).await, None);
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn deleting_a_reserved_key_is_forbidden_and_keeps_it() {
         let org = setup().await;
@@ -290,6 +297,7 @@ mod tests {
         assert_eq!(stored(&org, &key).await.as_deref(), Some(&b"mark"[..]));
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_reserved_key_can_still_be_read() {
         let org = setup().await;
@@ -318,6 +326,21 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn a_build_without_enterprise_reserves_no_key() {
+        let org = setup().await;
+        let uri = format!("/{org}/kv/_o2_ao%2Fmark%2Fx");
+        assert_eq!(send("POST", &uri, "v").await.0, StatusCode::OK);
+        assert_eq!(
+            stored(&org, "_o2_ao/mark/x").await.as_deref(),
+            Some(&b"v"[..])
+        );
+        assert_eq!(send("DELETE", &uri, "").await.0, StatusCode::OK);
+        assert_eq!(stored(&org, "_o2_ao/mark/x").await, None);
+    }
+
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn encoded_cased_and_padded_reserved_keys_are_forbidden() {
         let org = setup().await;
