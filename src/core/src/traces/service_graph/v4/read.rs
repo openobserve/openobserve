@@ -404,7 +404,7 @@ async fn run_query(
         step,
         query_exemplars: false,
         use_cache: None,
-        search_type: None,
+        search_type: Some(config::meta::search::SearchEventType::Other),
         search_event_context: None,
         regions: vec![],
         clusters: vec![],
