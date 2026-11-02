@@ -1121,7 +1121,7 @@ pub fn basic_routes() -> Router {
     // handlers are pure meta-store point-reads (no search, storage, or
     // cross-node calls on this plane).
     if get_config().synthetics.enabled {
-        router = router
+        let public = Router::new()
             .route(
                 "/api/status_pages_public/{slug}",
                 get(status_pages::public::snapshot),
@@ -1140,12 +1140,16 @@ pub fn basic_routes() -> Router {
                 "/api/status_pages_public/{slug}/feed.xml",
                 get(status_pages::public::feed),
             )
-            .route("/status/{slug}", get(status_pages::public::page));
+            .route("/status/{slug}", get(status_pages::public::page))
+            .route_layer(middleware::from_fn(|req, next| {
+                require_features(&[Feature::Synthetics], req, next)
+            }));
+        router = router.merge(public);
     }
 
     // Not on routers: they have no result files, so these paths fall to the slug-keyed proxy.
     if !config::cluster::LOCAL_NODE.is_router() {
-        router = router
+        let public = Router::new()
             .route(
                 "/api/public_dashboards/{slug}",
                 get(public_dashboards::public::config),
@@ -1153,7 +1157,11 @@ pub fn basic_routes() -> Router {
             .route(
                 "/api/public_dashboards/{slug}/data",
                 get(public_dashboards::public::data),
-            );
+            )
+            .route_layer(middleware::from_fn(|req, next| {
+                require_features(&[Feature::Dashboards], req, next)
+            }));
+        router = router.merge(public);
     }
 
     // Unauthenticated like status pages: the share token is checked in the handler.
@@ -1161,7 +1169,11 @@ pub fn basic_routes() -> Router {
     if get_config().public_ai_chat.enabled {
         router = router.route(
             "/api/public/ai_chats/{token}",
-            get(openobserve_api_management::request::ai::shares::get_public),
+            get(openobserve_api_management::request::ai::shares::get_public).route_layer(
+                middleware::from_fn(|req, next| {
+                    require_features(&[Feature::AiAssistant], req, next)
+                }),
+            ),
         );
     }
 
