@@ -235,7 +235,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="snapScrollRef"
           v-model:active="activeSection"
           :snap="lgUp"
-          content-height
           class="min-w-0 flex-1 max-lg:flex-none"
           data-test="add-alert-sections"
         >
@@ -433,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 section="condition"
                 :view="tiers.view('condition')"
                 @add="onTierAdd"
-                @toggle="tiers.toggle('condition')"
+                @toggle="onTierToggle('condition')"
               />
             </OFormSection>
           </AlertFormSection>
@@ -504,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 section="notify"
                 :view="tiers.view('notify')"
                 @add="onTierAdd"
-                @toggle="tiers.toggle('notify')"
+                @toggle="onTierToggle('notify')"
               />
             </OFormSection>
           </AlertFormSection>
@@ -653,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 section="details"
                 :view="tiers.view('details')"
                 @add="onTierAdd"
-                @toggle="tiers.toggle('details')"
+                @toggle="onTierToggle('details')"
               />
             </OFormSection>
             <div
@@ -873,7 +872,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { raw } from "@/types/i18n";
-import { defineComponent, computed, watch, provide, ref, reactive, onMounted } from "vue";
+import {
+  defineComponent,
+  computed,
+  watch,
+  provide,
+  ref,
+  reactive,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+} from "vue";
 import { useStore } from "vuex";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
@@ -1467,6 +1476,66 @@ export default defineComponent({
     const focusNameField = () =>
       (alertForm.step1Ref.value as { focus?: () => void } | null)?.focus?.();
 
+    // A full-height step opens its tucked settings while they still fit the view; a group the user toggled is left alone.
+    const userToggledTiers = new Set<AlertSectionId>();
+    const autoOpenedTiers = new Set<AlertSectionId>();
+    const onTierToggle = (section: AlertSectionId) => {
+      userToggledTiers.add(section);
+      autoOpenedTiers.delete(section);
+      tiers.toggle(section);
+    };
+    const sectionsScroller = () => (snapScrollRef.value as { $el?: HTMLElement } | null)?.$el;
+    const overflowsView = (id: AlertSectionId, scroller: HTMLElement): boolean => {
+      const section = scroller.querySelector<HTMLElement>(`[data-snap-section="${id}"]`);
+      const body = section?.lastElementChild;
+      if (!section || !body) return false;
+      const top = section.getBoundingClientRect().top;
+      const bottoms = Array.from(body.children).map(
+        (child) => child.getBoundingClientRect().bottom,
+      );
+      return Math.max(top, ...bottoms) - top > scroller.clientHeight;
+    };
+    const closeOverflowingTiers = () => {
+      const scroller = sectionsScroller();
+      if (!scroller) return;
+      for (const id of autoOpenedTiers) {
+        if (!overflowsView(id, scroller)) continue;
+        autoOpenedTiers.delete(id);
+        tiers.collapse(id);
+      }
+    };
+    const openTuckedSettingsThatFit = async () => {
+      if (!lgUp.value || !sectionsScroller() || alertForm.isAnomalyMode.value) return;
+      for (const { id } of ALERT_SECTIONS) {
+        const view = tiers.view(id);
+        if (userToggledTiers.has(id) || !view.tucked.length || view.expanded) continue;
+        tiers.expand(id);
+        autoOpenedTiers.add(id);
+      }
+      await nextTick();
+      closeOverflowingTiers();
+    };
+    let tierResizeObserver: ResizeObserver | null = null;
+    onMounted(() => {
+      nextTick(openTuckedSettingsThatFit);
+      const content = sectionsScroller()?.firstElementChild;
+      if (content && typeof ResizeObserver !== "undefined") {
+        tierResizeObserver = new ResizeObserver(closeOverflowingTiers);
+        tierResizeObserver.observe(content);
+      }
+    });
+    onBeforeUnmount(() => tierResizeObserver?.disconnect());
+    watch(
+      () => [
+        lgUp.value,
+        alertForm.formData.value.stream_name,
+        alertForm.formData.value.is_real_time,
+        alertForm.formData.value.query_condition?.type,
+      ],
+      openTuckedSettingsThatFit,
+      { flush: "post" },
+    );
+
     // A one-click link adds the setting itself, so the click is never only a reveal.
     const onTierAdd = (id: AlertSettingId) => {
       tiers.reveal(id);
@@ -1580,6 +1649,7 @@ export default defineComponent({
       RAIL_VERDICT_ICONS,
       tiers,
       onTierAdd,
+      onTierToggle,
       settingFind,
       focusNameField,
       activeFolderName,

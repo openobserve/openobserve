@@ -44,6 +44,15 @@ const STREAM_SCHEMA = {
 };
 getStreamMock.mockResolvedValue(STREAM_SCHEMA);
 
+// Desktop by default; a test sets it false to read the form as it renders below lg.
+const breakpoint = vi.hoisted(() => ({ lgUp: null as { value: boolean } | null }));
+vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/useBreakpoint")>();
+  const { ref } = await import("vue");
+  breakpoint.lgUp = ref(true);
+  return { ...actual, default: () => ({ ...actual.default(), lgUp: breakpoint.lgUp }) };
+});
+
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStream: getStreamMock,
@@ -1133,6 +1142,28 @@ describe("AddAlert (OForm owner)", () => {
   });
 
   describe("sections layout", () => {
+    afterEach(() => {
+      breakpoint.lgUp!.value = true;
+    });
+
+    it("opens the tucked settings on a full-height step when they fit the view", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.vm.tiers.view("condition").expanded).toBe(true);
+      expect(
+        wrapper.find('[data-test="add-alert-section-condition-more"]').attributes("aria-expanded"),
+      ).toBe("true");
+    });
+
+    it("leaves a group the user closed closed", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      await wrapper.find('[data-test="add-alert-section-condition-more"]').trigger("click");
+      wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
+      await flushPromises();
+      expect(wrapper.vm.tiers.view("condition").expanded).toBe(false);
+    });
+
     it("renders the five sections in order beside the section list", async () => {
       wrapper = mountAlert();
       await flushPromises();
@@ -1203,6 +1234,7 @@ describe("AddAlert (OForm owner)", () => {
     });
 
     it("tucks the rare condition settings behind one link that expands in place", async () => {
+      breakpoint.lgUp!.value = false;
       wrapper = mountAlert();
       await flushPromises();
       const more = () => wrapper.find('[data-test="add-alert-section-condition-more"]');
@@ -1220,6 +1252,7 @@ describe("AddAlert (OForm owner)", () => {
     });
 
     it("shows a tucked setting that holds a value and drops it from the count", async () => {
+      breakpoint.lgUp!.value = false;
       wrapper = mountAlert();
       await flushPromises();
       wrapper.vm.form.setFieldValue("pending_period_sec", 5);
@@ -1231,6 +1264,7 @@ describe("AddAlert (OForm owner)", () => {
     });
 
     it("keeps the message settings one click away, shows tags and tucks priority", async () => {
+      breakpoint.lgUp!.value = false;
       wrapper = mountAlert();
       await flushPromises();
       expect(wrapper.vm.tiers.isVisible("template")).toBe(false);
@@ -1247,6 +1281,8 @@ describe("AddAlert (OForm owner)", () => {
 
     it("finds a setting by its old name and expands its tucked group when picked", async () => {
       wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.tiers.collapse("notify");
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-find-setting"]').exists()).toBe(true);
       wrapper.vm.settingFind.query.value = "dedup";
