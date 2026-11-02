@@ -15,8 +15,8 @@
 
 use config::meta::pipeline::components::{Edge, Node};
 use sea_orm::{
-    ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set,
-    TransactionTrait, prelude::Expr, sea_query::Func,
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect,
+    Set, TransactionTrait, prelude::Expr, sea_query::Func,
 };
 use serde::{Deserialize, Serialize};
 
@@ -794,34 +794,19 @@ pub async fn save_draft(draft: Workflow) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn update_draft(draft: Workflow) -> Result<(), anyhow::Error> {
-    let client = get_orm_client_rw().await;
-
-    let now = chrono::Utc::now().timestamp_millis();
-    let model = workflow_drafts::ActiveModel {
-        updated_at: Set(now),
-        name: Set(draft.name),
-        description: Set(draft.description),
-        nodes: Set(serde_json::to_string(&draft.nodes)?),
-        edges: Set(serde_json::to_string(&draft.edges)?),
-        ..Default::default()
-    };
-    workflow_drafts::Entity::update_many()
-        .filter(workflow_drafts::Column::Id.eq(draft.id))
-        .set(model)
-        .exec(client)
-        .await?;
-    Ok(())
+/// Returns the number of drafts updated, 0 when `org_id` does not own the draft.
+pub async fn update_draft(org_id: &str, draft: Workflow) -> Result<u64, anyhow::Error> {
+    update_draft_in(get_orm_client_rw().await, org_id, draft).await
 }
 
-pub async fn delete_draft(id: &str) -> Result<(), anyhow::Error> {
-    let client = get_orm_client_rw().await;
+/// Returns the number of drafts deleted, 0 when `org_id` does not own the draft.
+pub async fn delete_draft(org_id: &str, id: &str) -> Result<u64, anyhow::Error> {
+    delete_draft_in(get_orm_client_rw().await, org_id, id).await
+}
 
-    workflow_drafts::Entity::delete_many()
-        .filter(workflow_drafts::Column::Id.eq(id))
-        .exec(client)
-        .await?;
-    Ok(())
+/// Org that owns draft `id`, for the super-cluster replay whose delete message carries no org.
+pub async fn get_draft_org_id(id: &str) -> Result<Option<String>, anyhow::Error> {
+    get_draft_org_id_in(get_orm_client_ro().await, id).await
 }
 
 pub async fn delete_drafts_by_org(org_id: &str) -> Result<(), anyhow::Error> {
@@ -888,4 +873,177 @@ pub async fn promote_draft_to_workflow(org_id: &str, draft: Workflow) -> Result<
     }
 
     Ok(())
+}
+
+async fn update_draft_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    draft: Workflow,
+) -> Result<u64, anyhow::Error> {
+    let now = chrono::Utc::now().timestamp_millis();
+    let model = workflow_drafts::ActiveModel {
+        updated_at: Set(now),
+        name: Set(draft.name),
+        description: Set(draft.description),
+        nodes: Set(serde_json::to_string(&draft.nodes)?),
+        edges: Set(serde_json::to_string(&draft.edges)?),
+        ..Default::default()
+    };
+    let res = workflow_drafts::Entity::update_many()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .filter(workflow_drafts::Column::Id.eq(draft.id))
+        .set(model)
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
+}
+
+async fn delete_draft_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+) -> Result<u64, anyhow::Error> {
+    let res = workflow_drafts::Entity::delete_many()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .filter(workflow_drafts::Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
+}
+
+async fn get_draft_org_id_in<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+) -> Result<Option<String>, anyhow::Error> {
+    let res = workflow_drafts::Entity::find()
+        .select_only()
+        .column(workflow_drafts::Column::OrgId)
+        .filter(workflow_drafts::Column::Id.eq(id))
+        .into_tuple::<String>()
+        .one(conn)
+        .await?;
+    Ok(res)
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{ConnectOptions, Database, DatabaseConnection, Schema};
+
+    use super::*;
+
+    const DRAFT_ID: &str = "draft-1";
+    const OWNER_ORG: &str = "owner";
+    const OTHER_ORG: &str = "other";
+
+    async fn db_with_draft() -> DatabaseConnection {
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(workflow_drafts::Entity)))
+            .await
+            .unwrap();
+        workflow_drafts::Entity::insert(workflow_drafts::ActiveModel {
+            id: Set(DRAFT_ID.to_string()),
+            org_id: Set(OWNER_ORG.to_string()),
+            folder_id: Set("folder".to_string()),
+            created_at: Set(1),
+            updated_at: Set(1),
+            created_by: Set("user".to_string()),
+            name: Set("original".to_string()),
+            description: Set("original".to_string()),
+            nodes: Set("[]".to_string()),
+            edges: Set("[]".to_string()),
+        })
+        .exec(&db)
+        .await
+        .unwrap();
+        db
+    }
+
+    async fn stored_draft(db: &DatabaseConnection) -> Option<workflow_drafts::Model> {
+        workflow_drafts::Entity::find_by_id(DRAFT_ID)
+            .one(db)
+            .await
+            .unwrap()
+    }
+
+    fn renamed_draft(org_id: &str) -> Workflow {
+        Workflow {
+            id: DRAFT_ID.to_string(),
+            org_id: org_id.to_string(),
+            folder_id: "folder".to_string(),
+            created_at: 1,
+            updated_at: 1,
+            created_by: "user".to_string(),
+            enabled: true,
+            name: "renamed".to_string(),
+            description: "renamed".to_string(),
+            nodes: vec![],
+            edges: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn update_draft_from_another_org_changes_nothing() {
+        let db = db_with_draft().await;
+
+        let updated = update_draft_in(&db, OTHER_ORG, renamed_draft(OTHER_ORG))
+            .await
+            .unwrap();
+
+        assert_eq!(updated, 0);
+        assert_eq!(stored_draft(&db).await.unwrap().name, "original");
+    }
+
+    #[tokio::test]
+    async fn update_draft_from_owning_org_applies() {
+        let db = db_with_draft().await;
+
+        let updated = update_draft_in(&db, OWNER_ORG, renamed_draft(OWNER_ORG))
+            .await
+            .unwrap();
+
+        assert_eq!(updated, 1);
+        assert_eq!(stored_draft(&db).await.unwrap().name, "renamed");
+    }
+
+    #[tokio::test]
+    async fn delete_draft_from_another_org_removes_nothing() {
+        let db = db_with_draft().await;
+
+        let deleted = delete_draft_in(&db, OTHER_ORG, DRAFT_ID).await.unwrap();
+
+        assert_eq!(deleted, 0);
+        assert!(stored_draft(&db).await.is_some());
+    }
+
+    #[tokio::test]
+    async fn delete_draft_from_owning_org_removes_it() {
+        let db = db_with_draft().await;
+
+        let deleted = delete_draft_in(&db, OWNER_ORG, DRAFT_ID).await.unwrap();
+
+        assert_eq!(deleted, 1);
+        assert!(stored_draft(&db).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn get_draft_org_id_returns_the_owning_org() {
+        let db = db_with_draft().await;
+
+        let org = get_draft_org_id_in(&db, DRAFT_ID).await.unwrap();
+
+        assert_eq!(org.as_deref(), Some(OWNER_ORG));
+    }
+
+    #[tokio::test]
+    async fn get_draft_org_id_returns_none_for_an_unknown_draft() {
+        let db = db_with_draft().await;
+
+        let org = get_draft_org_id_in(&db, "missing").await.unwrap();
+
+        assert_eq!(org, None);
+    }
 }
