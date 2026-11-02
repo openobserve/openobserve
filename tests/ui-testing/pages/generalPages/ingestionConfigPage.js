@@ -73,6 +73,8 @@ export class IngestionConfigPage {
           .first();
         this.copyContentForbidden = page.locator('[data-test^="ingestion-"][data-test$="-code-block-passcode-forbidden"]');
         this.rumContentText = this.legacyCodeBlockPre.first();
+        // Shared by every link in the test so 429 waits stay well under the test timeout
+        this.rateLimitRetryBudgetMs = 60000;
     }
 
     // ==================== Navigation ====================
@@ -356,11 +358,8 @@ export class IngestionConfigPage {
     }
 
     async waitForDocumentationLinksStable() {
-        try {
-            await expect(this.integrationContentReady).toBeVisible({ timeout: 10000 });
-        } catch {
-            console.warn(`[doc-links] no integration card rendered on ${this.page.url()}; reading links once the count settles`);
-        }
+        // Every integration route renders one of these, so a miss means a dead route or a broken page
+        await expect(this.integrationContentReady, `no integration card rendered on ${this.page.url()}`).toBeVisible({ timeout: 10000 });
         let previous = -1;
         await expect.poll(async () => {
             const count = (await this.readDocumentationLinkHrefs()).length;
@@ -463,9 +462,17 @@ export class IngestionConfigPage {
         let response = await this.page.request.head(href, { timeout: 5000 });
         for (let attempt = 0; attempt < maxRetries && response.status() === 429; attempt++) {
             const retryAfter = Number(response.headers()['retry-after']);
-            const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter, 10) * 1000 : 2000;
+            const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2000;
+            // A long Retry-After or a spent budget would push the whole test past its timeout
+            if (waitMs > 10000 || waitMs > this.rateLimitRetryBudgetMs) break;
+            const started = Date.now();
             await this.page.waitForTimeout(waitMs);
-            response = await this.page.request.head(href, { timeout: 5000 });
+            try {
+                response = await this.page.request.head(href, { timeout: 5000 });
+            } catch (error) {
+                console.warn(`[doc-links] retry after 429 failed (${error.message}), keeping the 429: ${href}`);
+            }
+            this.rateLimitRetryBudgetMs -= Date.now() - started;
         }
         return response;
     }

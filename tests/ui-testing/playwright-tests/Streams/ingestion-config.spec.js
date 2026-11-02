@@ -241,6 +241,8 @@ test.describe("Ingestion Configuration Tests", () => {
       let totalLinksChecked = 0;
       let totalLinksSkipped = 0;
       let totalLinksRateLimited = 0;
+      let totalLinksVerified = 0;
+      const integrationErrors = [];
       let integrationsWithLinks = 0;
       let integrationsWithoutLinks = 0;
 
@@ -268,6 +270,7 @@ test.describe("Ingestion Configuration Tests", () => {
           const working = linkResults.filter(r => r.ok && !r.skipped);
           const skipped = linkResults.filter(r => r.skipped);
           const rateLimited = linkResults.filter(r => r.rateLimited);
+          totalLinksVerified += linkResults.filter(r => !r.skipped && !r.rateLimited).length;
 
           if (rateLimited.length > 0) {
             totalLinksRateLimited += rateLimited.length;
@@ -296,6 +299,7 @@ test.describe("Ingestion Configuration Tests", () => {
           }
         } catch (error) {
           testLogger.info(`  ⚠ Error checking ${integration.label}: ${error.message}`);
+          integrationErrors.push(`${integration.label} (${integration.path}): ${error.message}`);
         }
       }
 
@@ -334,8 +338,10 @@ test.describe("Ingestion Configuration Tests", () => {
 
       // Fail test if any broken links found
       expect(allBrokenLinks.length).toBe(0);
+      // An integration that errored was never checked, so it must not count as passing
+      expect(integrationErrors, integrationErrors.join('\n')).toEqual([]);
       // Every link being rate-limited or skipped would otherwise pass without verifying anything
-      expect(totalLinksChecked - totalLinksSkipped - totalLinksRateLimited).toBeGreaterThan(0);
+      expect(totalLinksVerified).toBeGreaterThan(0);
 
       testLogger.info('\nComprehensive link validation completed');
     });
