@@ -268,7 +268,7 @@ export default defineComponent({
     const confirmUpdate = ref<boolean>(false);
     const confirmRUMUpdate = ref<boolean>(false);
     // A viewer may not read the RUM token, so it may neither generate nor reset one.
-    const rumTokenForbidden = ref(false);
+    const rumTokenForbidden = computed(() => !!store.state.organizationData.rumTokenForbidden);
     const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
     const ingestTabType = ref("recommended");
     const globalSearchQuery = ref("");
@@ -399,15 +399,22 @@ export default defineComponent({
       });
 
     // A 403 hides the token actions; any other read failure falls back to the Generate action.
+    // staleTime 0: a cached token must not outlive a role that can no longer read it.
     const getRUMToken = () => {
+      const org = store.state.selectedOrganization.identifier;
       return queryClient
-        .fetchQuery(rumTokensQuery(store.state.selectedOrganization.identifier))
+        .fetchQuery({ ...rumTokensQuery(org), staleTime: 0 })
         .then((res: any) => {
-          rumTokenForbidden.value = false;
+          store.dispatch("setRUMTokenForbidden", false);
           store.dispatch("setRUMToken", res.data);
         })
         .catch((e: any) => {
-          rumTokenForbidden.value = e?.response?.status === 403;
+          const forbidden = e?.response?.status === 403;
+          store.dispatch("setRUMTokenForbidden", forbidden);
+          if (forbidden) {
+            store.dispatch("setRUMToken", { rum_token: "" });
+            queryClient.removeQueries({ queryKey: rumTokensQuery(org).queryKey });
+          }
         });
     };
 
@@ -489,7 +496,6 @@ export default defineComponent({
 
     const orgIdForWrites = useOrgId();
     const createRumToken = useMutation(() => createRumTokenMutation(orgIdForWrites.value));
-    // `getRUMToken` below is a bare fetchQuery, so only the mutation's invalidation stops it re-serving the old token.
     const updateRumToken = useMutation(() => updateRumTokenMutation(orgIdForWrites.value));
     const resetPasscode = useMutation(() => resetPasscodeMutation(orgIdForWrites.value));
 
