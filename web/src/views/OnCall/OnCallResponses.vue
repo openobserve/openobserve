@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :has-staffed-rotation="setup.hasStaffedRotation"
       :has-routing="setup.hasRouting"
       :has-destinations="setup.hasDestinations"
-      :compact="hasPages"
+      :compact="!setupOnly"
       :can-configure="canConfigure"
       :first-team-id="teams[0]?.id ?? null"
       @create-team="createTeam"
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!unavailable && !setupOnly"
       ref="oTableRef"
       :frame="false"
-      :data="rows"
+      :data="visibleRows"
       :columns="columns"
       row-key="rowKey"
       :loading="loading || !setupLoaded"
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-responses-table"
       :row-tone="rowTone"
       :row-rail-tone="rowRailTone"
-      :row-section="visibleRowSection"
+      :row-section="rowSection"
       :section-order="SECTION_ORDER"
       selection="multiple"
       v-model:selected-ids="selectedIds"
@@ -1184,6 +1184,7 @@ const isFiltered = computed(
     teamFilter.value !== "all" ||
     priorityFilter.value !== "all" ||
     mineScope.value ||
+    !!causeFilter.value ||
     activeFilter.value !== "all",
 );
 
@@ -1208,6 +1209,9 @@ const showChecklist = computed(
     ),
 );
 
+/// Team and cause narrow the fetch itself, so an empty answer says nothing about whether the org has pages.
+const serverFiltered = computed(() => teamFilter.value !== "all" || !!causeFilter.value);
+
 /// Whether this org has ever paged anybody — read from what was FETCHED, not
 /// from the filtered rows, so narrowing the table to nothing does not swap the
 /// page's whole shape underneath the reader.
@@ -1220,7 +1224,7 @@ const hasPages = computed(() => responses.value.length > 0);
 /// under it would only offer "no pages yet" as if that were healthy. Once a
 /// single page exists the checklist has to give the screen back — it becomes
 /// one bar over a live list.
-const setupOnly = computed(() => showChecklist.value && !hasPages.value);
+const setupOnly = computed(() => showChecklist.value && !hasPages.value && !serverFiltered.value);
 
 const columns = computed<OTableColumnDef<PageRow>[]>(() => [
   {
@@ -1425,6 +1429,11 @@ function toRows(records: OnCallResponse[]): PageRow[] {
 /// headings and the header's own "mine" toggle, so the list narrows from the
 /// header controls alone.
 const rows = computed(() => toRows(scopedResponses.value));
+
+/// The visible tab's rows, filtered before the table pages them, so the footer count and pages describe that tab.
+const visibleRows = computed(() =>
+  rows.value.filter((row) => sectionVisibility.value[rowSection(row)]),
+);
 
 const causeOptions = computed(() => [
   { label: t("oncall.causeFilterAny"), value: "" },
@@ -1761,15 +1770,6 @@ function rowSection(row: PageRow): SectionKey {
   if (row.escalating.some((r) => !r.acked_by && !isSnoozed(r))) return "ringing";
   if (row.firings.some((r) => isSnoozed(r))) return "snoozed";
   return "handled";
-}
-
-/// What `OTable` groups by. Unlike `rowSection`, a section the filters
-/// dropdown unchecked returns null here — `OTable` drops a row entirely when
-/// its section is null, which is how "hide Handled" hides Handled rows
-/// without touching `rows`, `sectionCounts`, or anything counted off it.
-function visibleRowSection(row: PageRow): SectionKey | null {
-  const section = rowSection(row);
-  return sectionVisibility.value[section] ? section : null;
 }
 
 /// Counted over the filtered set, not the page: a heading reading "3" on page
@@ -2132,11 +2132,15 @@ function openResponse(row: PageRow) {
 
 function onEmptyAction(id?: string) {
   if (id === "clear-filters") {
+    const refetch = serverFiltered.value;
     search.value = "";
     teamFilter.value = "all";
     priorityFilter.value = "all";
+    causeFilter.value = "";
     mineOnly.value = false;
     selectFilterTab("all");
+    // The loaded rows are the filtered server answer, so clearing team or cause must ask again.
+    if (refetch) void fetchResponses();
   }
 }
 

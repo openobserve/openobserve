@@ -1093,6 +1093,12 @@ export function offsetAnchor(rule: ShiftRule, shifts: number, timezone: string):
   return shiftBoundary(rule, -shifts, timezone) ?? rule.anchor_micros - shifts * rule.shift_micros;
 }
 
+/** How many shifts before `rule`'s anchor the shift containing `nowMicros` starts; zero or negative once the anchor has passed. [pure] */
+export function shiftsBackToNow(rule: ShiftRule, nowMicros: number, timezone: string): number {
+  if (!rule.shift_micros || rule.shift_micros <= 0) return 0;
+  return -localShiftIndex(rule, nowMicros, timezone);
+}
+
 /** Whether `rule` has people and a positive turn length, so its shifts can be counted. [pure] */
 function isCountable(rule: ShiftRule): boolean {
   return !!rule.members?.length && !!rule.shift_micros && rule.shift_micros > 0;

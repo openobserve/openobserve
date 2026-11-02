@@ -367,6 +367,29 @@ describe("OnCallResponses", () => {
     ]);
   });
 
+  // C13: the table pages only the visible tab, so a later page cannot hide its rows.
+  it("hands the table only the rows of the visible tab", async () => {
+    const wrapper = await withPages([
+      page({ id: "a", acked_by: "engineer@example.com", state: "acknowledged" }),
+      page({ id: "c" }, "al_ord"),
+    ]);
+    const table = () => wrapper.findComponent({ name: "OTable" });
+    expect(table().props("data")).toHaveLength(2);
+
+    wrapper
+      .findAllComponents({ name: "OToggleGroup" })
+      .find((c) => c.attributes("data-test") === "oncall-responses-filter-tabs")!
+      .vm.$emit("update:modelValue", "ringing");
+    await flushPromises();
+
+    expect(
+      table()
+        .props("data")
+        .map((row: any) => row.latest.id),
+    ).toEqual(["c"]);
+    expect(sections(wrapper)).toEqual({ ringing: 1 });
+  });
+
   /// Snoozed rows recede rather than shouting; the loud treatment is reserved
   /// for something you must act on now.
   it("mutes a snoozed row", async () => {
@@ -1005,6 +1028,32 @@ describe("OnCallResponses", () => {
       expect(checklist.exists()).toBe(true);
       expect(checklist.props("compact")).toBe(true);
       expect(wrapper.find('[data-test="oncall-responses-table"]').exists()).toBe(true);
+    });
+
+    // C4: a server-side filter that matches nothing is a filtered empty list, not an unpaged org.
+    it.each([
+      ["team", "oncall-responses-team-filter", "team_1"],
+      ["cause", "oncall-responses-cause-filter", "genuine_defect"],
+    ])("keeps the list when the %s filter matches nothing", async (_, test, value) => {
+      service.listResponses.mockImplementation(((params: any) =>
+        Promise.resolve({ data: params.team_id || params.cause ? [] : [page()] })) as any);
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-setup-banner"]').exists()).toBe(true);
+
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find((c: any) => c.attributes("data-test") === test)!
+        .vm.$emit("update:modelValue", value);
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-responses-table"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OEmptyState" }).props("filtered")).toBe(true);
+
+      wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "clear-filters");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
     });
   });
 
