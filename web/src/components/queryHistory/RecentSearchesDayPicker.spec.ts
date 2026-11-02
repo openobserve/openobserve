@@ -43,17 +43,43 @@ const openCalendar = async (wrapper: ReturnType<typeof mountPicker>) => {
 };
 
 describe("RecentSearchesDayPicker", () => {
-  it("reads as a date field: the dd/mm/yyyy placeholder, then the chosen day in that format", () => {
-    const empty = mountPicker();
-    const emptyValue = empty.find('[data-test="ran-on-value"]');
-    expect(emptyValue.text()).toBe("dd/mm/yyyy");
-    expect(emptyValue.classes()).toContain("text-input-placeholder");
-    expect(empty.find('[data-test="ran-on-trigger"]').attributes("aria-label")).toBe(
-      "Filter by date run",
-    );
-    const picked = mountPicker("2026-10-29").find('[data-test="ran-on-value"]');
-    expect(picked.text()).toBe("29/10/2026");
-    expect(picked.classes()).toContain("text-input-text");
+  it("is a text field with the dd/mm/yyyy placeholder that shows the chosen day in that format", () => {
+    const empty = mountPicker().find<HTMLInputElement>('[data-test="ran-on-field"]');
+    expect(empty.element.tagName).toBe("INPUT");
+    expect(empty.attributes("placeholder")).toBe("dd/mm/yyyy");
+    expect(empty.element.value).toBe("");
+    const picked = mountPicker("2026-10-29").find<HTMLInputElement>('[data-test="ran-on-field"]');
+    expect(picked.element.value).toBe("29/10/2026");
+  });
+
+  it("applies a typed day on Enter and on leaving the field", async () => {
+    const wrapper = mountPicker();
+    const field = wrapper.find('[data-test="ran-on-field"]');
+    await field.setValue("05/10/2026");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["2026-10-05"]);
+    await field.setValue("6/10/2026");
+    await field.trigger("blur");
+    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["2026-10-06"]);
+  });
+
+  it("refuses a typed day that is not a date or is after today, and marks the field", async () => {
+    const wrapper = mountPicker();
+    const field = wrapper.find('[data-test="ran-on-field"]');
+    await field.setValue("31/02/2026");
+    await field.trigger("keydown", { key: "Enter" });
+    await field.setValue(DateTime.local().plus({ days: 1 }).toFormat("dd/MM/yyyy"));
+    await field.trigger("keydown", { key: "Enter" });
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+    expect(field.attributes("aria-invalid")).toBe("true");
+  });
+
+  it("clears the day when the typed text is emptied", async () => {
+    const wrapper = mountPicker("2026-10-27");
+    const field = wrapper.find('[data-test="ran-on-field"]');
+    await field.setValue("");
+    await field.trigger("blur");
+    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([undefined]);
   });
 
   it("opens the shared range calendar and picks one day with a single click", async () => {
@@ -107,21 +133,7 @@ describe("RecentSearchesDayPicker", () => {
     }
   });
 
-  it("joins the field and its clear button in a button group, without overriding the buttons' box", () => {
-    const wrapper = mountPicker("2026-10-27");
-    const group = wrapper.find('[data-test="ran-on"]');
-    expect(group.attributes("role")).toBe("group");
-    const buttons = group.findAll(":scope > button");
-    expect(buttons.map((b) => b.attributes("data-test"))).toEqual([
-      "ran-on-trigger",
-      "ran-on-clear",
-    ]);
-    const forced = /^(h|rounded|border)(-\S*)?!$/;
-    buttons.forEach((b) => expect(b.classes().filter((c) => forced.test(c))).toEqual([]));
-  });
-
-  it("clears the day with its own button, shown only while a day is set", async () => {
-    expect(mountPicker().find('[data-test="ran-on-clear"]').exists()).toBe(false);
+  it("clears the day with the field's clear button", async () => {
     const wrapper = mountPicker("2026-10-27");
     await wrapper.find('[data-test="ran-on-clear"]').trigger("click");
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([undefined]);
