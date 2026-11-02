@@ -13075,7 +13075,9 @@
       "firingFor": "firing for {duration}",
       "incident": "Incident"
     },
-    "priorityUnsetPagesAs": "ไม่ได้ตั้งค่า (แจ้งเตือนเรียกเวรเป็น P2)"
+    "priorityUnsetPagesAs": "ไม่ได้ตั้งค่า (แจ้งเตือนเรียกเวรเป็น P2)",
+    "importAlert": "นำเข้าการแจ้งเตือน",
+    "alertLibrary": "คลังการแจ้งเตือน"
   },
   "alert_dependencies": {
     "actionOpen": "Open",
@@ -13137,7 +13139,6 @@
     "statReady": "Ready to use",
     "statNeedsData": "Not ingested",
     "statAll": "ทั้งหมด",
-    "notIngested": "Not ingested: {stream}",
     "notIngestedHint": "This organization is not receiving {stream}, so this alert would never fire. Add it anyway and it will start working once the data arrives.",
     "alertCount": "{count} alert | {count} alerts",
     "noCollectorTitle": "Nothing here matches your data yet",
@@ -13164,6 +13165,9 @@
     "alertTypeAnomaly": "Anomaly",
     "enterprise": "Enterprise",
     "enterpriseHint": "Anomaly detection alerts need OpenObserve Enterprise.",
+    "card": {
+      "customizeTooltip": "เปิดตัวแก้ไขการแจ้งเตือนที่กรอกข้อมูลไว้ล่วงหน้า"
+    },
     "drawer": {
       "dataAvailable": "Data available",
       "streamNotFound": "Stream not found",
@@ -13195,20 +13199,10 @@
     "install": {
       "title": "Add alerts from the library",
       "subtitle": "Choose which alerts to add, where they are filed, and optionally where they notify.",
-      "stepDestination": "Destination",
       "stepAlerts": "Alerts",
       "stepFolder": "Folder",
       "stepTune": "Tune",
       "stepInstall": "เพิ่ม",
-      "destinationIntro": "Every alert in this batch notifies the destination you choose here. Library files name the destinations of the organization they were exported from, which do not exist in yours. This step is optional: skip it and the alerts are added without one.",
-      "destinationLabel": "Destination",
-      "destinationsLoadFailed": "Your existing destinations could not be loaded.",
-      "retry": "Try again",
-      "destinationsNoneBody": "This organization has no alert destinations yet. Create one on the Destinations page whenever you are ready.",
-      "openDestinations": "Open Destinations",
-      "selectAll": "เลือกทั้งหมด",
-      "clear": "ล้าง",
-      "selectedCount": "{count} of {total} selected",
       "folderIntro": "Added alerts are filed here. Create a folder from the + button if this batch deserves its own.",
       "tuneToggle": "Set these for every alert in this batch",
       "tuneHint": "Only “{frequency}” and “{silence}” are safe to set for a whole batch. Thresholds stay per-alert — change one by opening that alert and adding it on its own.",
@@ -13227,7 +13221,6 @@
       "next": "ถัดไป",
       "cancel": "ยกเลิก",
       "done": "Done",
-      "confirmLarge": "I understand this creates {count} alerts in {folder}, each notifying {destination}.",
       "tuneThresholdOnly": "Applies to threshold alerts only.",
       "anomalyTrainingNote": "Anomaly alerts start alerting once they have trained on enough of the stream's history.",
       "anomalyUnavailable": "Anomaly alerts need OpenObserve Enterprise with anomaly detection turned on, so this one was skipped.",
