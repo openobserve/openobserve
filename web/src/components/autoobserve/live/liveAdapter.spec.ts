@@ -329,4 +329,15 @@ describe("toCoverageSource service names", () => {
       "web",
     ]);
   });
+
+  it("never numbers a label onto the name another service really has", () => {
+    const labels = names([
+      svc("api", "prod"),
+      svc("api", "prod", "other"),
+      svc("api (prod/ns)", "elsewhere"),
+      svc("api (prod/ns) #1", "elsewhere"),
+    ]);
+    expect(new Set(labels).size).toBe(4);
+    expect(labels[3]).toBe("api (prod/ns) #1");
+  });
 });
