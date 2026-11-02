@@ -22,6 +22,16 @@
   before considering the task done. If it flags a file, fix it with
   `npx prettier --write <file>` (not a full-repo `--write`) and re-run
   `format:check` to confirm it's clean.
+- New UI features fetch search results over the HTTP streaming endpoints, not
+  the one-shot ones. Logs and other SQL searches use
+  `POST /api/{org}/_search_stream`, or `_search_multi_stream` for several
+  streams. Traces use `GET /api/{org}/{stream}/traces/latest_stream`. Call them
+  through `useHttpStreaming` in `web/src/composables/useStreamingSearch.ts`,
+  which handles chunking, cancellation and the `trace_id`. Do not add new UI
+  callers of `_search`, `_search_multi` or `traces/latest`. Wherever a
+  streaming endpoint is supported for a call, the UI uses it, in existing code
+  as well as new code. The one-shot endpoints are for the public API and for
+  the few UI calls that have no streaming equivalent yet.
 
 ## Rust code organization
 
@@ -69,7 +79,13 @@ reworded:
 
 ## Database schema (migrations / SeaORM entities)
 
-Applies to every NEW table and column (sqlite, MySQL and PostgreSQL alike):
+Applies to every NEW table and column (SQLite and PostgreSQL alike):
+
+- MySQL is not a supported meta store. Support was removed in #10522
+  (`src/infra/src/db/mysql.rs` is gone). Do not add MySQL branches, MySQL-only
+  migrations, MySQL feature flags or MySQL test matrices. Remaining `mysql`
+  mentions in the tree belong to the database monitoring feature, which watches
+  customers' MySQL servers, not to the meta store.
 
 - No `json` / `jsonb` columns (sea-orm `.json()` / `.json_binary()`). JSON is
   stored in a `.text()` column holding the serialized string; Rust

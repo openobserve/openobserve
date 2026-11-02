@@ -137,12 +137,9 @@ pub async fn update_provider(
         return Err(ProviderError::MissingName);
     }
 
-    let existing = table::providers::get(provider_id)
+    let existing = table::providers::get(org_id, provider_id)
         .await?
         .ok_or(ProviderError::NotFound)?;
-    if existing.org_id != org_id {
-        return Err(ProviderError::NotFound);
-    }
     provider.auth_config =
         resolve_updated_auth_config(&provider.auth_config, &existing.auth_config);
 
@@ -190,23 +187,16 @@ pub async fn get_provider(
     org_id: &str,
     provider_id: &str,
 ) -> Result<table::providers::Provider, ProviderError> {
-    let provider = table::providers::get(provider_id)
+    table::providers::get(org_id, provider_id)
         .await?
-        .ok_or(ProviderError::NotFound)?;
-    if provider.org_id != org_id {
-        return Err(ProviderError::NotFound);
-    }
-    Ok(provider)
+        .ok_or(ProviderError::NotFound)
 }
 
 #[tracing::instrument()]
 pub async fn delete_provider(org_id: &str, provider_id: &str) -> Result<(), ProviderError> {
-    let provider = table::providers::get(provider_id)
+    table::providers::get(org_id, provider_id)
         .await?
         .ok_or(ProviderError::NotFound)?;
-    if provider.org_id != org_id {
-        return Err(ProviderError::NotFound);
-    }
 
     let dependent_scorers: Vec<_> = table::scorers::get_all_by_org(org_id)
         .await?

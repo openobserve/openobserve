@@ -1112,6 +1112,24 @@ export const useVariablesManager = (t: TranslateFn) => {
     scheduleChildrenOfRestored(restoredKeys);
   };
 
+  /** Takes global values another view already loaded, so they are not fetched again, and starts their children's loads. */
+  const adoptLoadedValues = (passed: Partial<VariableRuntimeState>[]) => {
+    const adopted = passed.flatMap((p) => {
+      // A query value mid-fetch or due to reload after its parent changed is not a value to keep.
+      if (p.type === "query_values" && (!p.isVariablePartialLoaded || p.isVariableLoadingPending))
+        return [];
+      const v = variablesData.global.find((g) => g.name === p.name);
+      if (!v) return [];
+      v.value = p.value;
+      v.isVariablePartialLoaded = true;
+      v.isLoading = false;
+      v.isVariableLoadingPending = false;
+      return [v];
+    });
+    recordLoadedAgainst(adopted);
+    scheduleChildrenOfRestored(adopted.map((v) => getVariableKey(v.name, v.scope)));
+  };
+
   interface ParsedUrlKey {
     name: string;
     scope: "global" | "tabs" | "panels";
@@ -1262,6 +1280,7 @@ export const useVariablesManager = (t: TranslateFn) => {
     isVariableReady,
     getDependentVariables,
     loadFromUrl,
+    adoptLoadedValues,
     getUrlParams,
   };
 };

@@ -20,13 +20,15 @@ use axum::{
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::UserEmail;
+use openobserve_core::auth::{UserEmail, UserReads};
 #[cfg(test)]
 use openobserve_core::llm_evaluations::eval_jobs::EvalJobError;
 use openobserve_core::llm_evaluations::eval_jobs::{
     self, ManualEvalJobRequestBody, ManualEvalJobResponseBody,
 };
 
+#[cfg(feature = "enterprise")]
+use crate::request::scorers::{MAX_SCORERS_PER_REQUEST, authorize_references};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     models::eval_jobs::{
@@ -118,12 +120,20 @@ pub async fn create_eval_job(
         Err(err) => return MetaHttpResponse::bad_request(err),
     };
     #[cfg(feature = "enterprise")]
+    if let Err(resp) = limit_scorers(&job.scorers) {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
     let job = match eval_jobs::prepare_new_job(&org_id, job).await {
         Ok(job) => job,
         Err(err) => return err.into(),
     };
     #[cfg(feature = "enterprise")]
     if let Err(resp) = guard_job(&org_id, &user_email.user_id, &job).await {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_scorers(&org_id, &user_email.user_id, &job.scorers).await {
         return resp;
     }
     #[cfg(feature = "enterprise")]
@@ -205,12 +215,27 @@ pub async fn update_eval_job(
         Err(err) => return MetaHttpResponse::bad_request(err),
     };
     #[cfg(feature = "enterprise")]
+    let scorers_changed = match eval_jobs::get_job(&org_id, &job_id).await {
+        Ok(existing) => existing.scorers != job.scorers,
+        Err(_) => true,
+    };
+    #[cfg(feature = "enterprise")]
+    if scorers_changed && let Err(resp) = limit_scorers(&job.scorers) {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
     let job = match eval_jobs::prepare_job_update(&org_id, &job_id, job).await {
         Ok(job) => job,
         Err(err) => return err.into(),
     };
     #[cfg(feature = "enterprise")]
     if let Err(resp) = guard_job(&org_id, &user_email.user_id, &job).await {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
+    if scorers_changed
+        && let Err(resp) = guard_scorers(&org_id, &user_email.user_id, &job.scorers).await
+    {
         return resp;
     }
     #[cfg(feature = "enterprise")]
@@ -485,6 +510,36 @@ async fn guard_job(
     openobserve_core::background_access::guard_write(org_id, user_id, &sources).await
 }
 
+#[cfg(feature = "enterprise")]
+fn limit_scorers(
+    scorers: &[config::meta::pipeline::components::ScorerRef],
+) -> Result<(), Response> {
+    if scorers.len() > MAX_SCORERS_PER_REQUEST {
+        return Err(MetaHttpResponse::bad_request(format!(
+            "At most {MAX_SCORERS_PER_REQUEST} scorers can be named in one request"
+        )));
+    }
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn guard_scorers(
+    org_id: &str,
+    user_id: &str,
+    scorers: &[config::meta::pipeline::components::ScorerRef],
+) -> Result<(), Response> {
+    let objects: Vec<_> = scorers
+        .iter()
+        .map(|scorer| ("scorers", scorer.id.as_str()))
+        .collect();
+    let definitions = async {
+        eval_jobs::scorer_definitions(org_id, scorers)
+            .await
+            .map_err(Response::from)
+    };
+    authorize_references(&objects, &UserReads { org_id, user_id }, definitions).await
+}
+
 /// The transition's own read and checks answer first, so a bad job is never reported as refused.
 #[cfg(feature = "enterprise")]
 async fn guard_activation(org_id: &str, user_id: &str, job_id: &str) -> Result<(), Response> {
@@ -497,7 +552,8 @@ async fn guard_activation(org_id: &str, user_id: &str, job_id: &str) -> Result<(
     eval_jobs::check_transition(org_id, &job, "active")
         .await
         .map_err(Response::from)?;
-    guard_job(org_id, user_id, &job).await
+    guard_job(org_id, user_id, &job).await?;
+    guard_scorers(org_id, user_id, &job.scorers).await
 }
 
 /// The evaluation's own read and checks answer first, so a bad request is never refused.
@@ -517,7 +573,8 @@ async fn guard_manual(
     eval_jobs::check_manual_evaluate(org_id, &job, body)
         .await
         .map_err(Response::from)?;
-    guard_job(org_id, user_id, &job).await
+    guard_job(org_id, user_id, &job).await?;
+    guard_scorers(org_id, user_id, &job.scorers).await
 }
 
 #[cfg(test)]
@@ -635,5 +692,32 @@ mod tests {
         infra::table::online_eval_jobs::delete(&job.id)
             .await
             .unwrap();
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn scorer_refs(count: usize) -> Vec<config::meta::pipeline::components::ScorerRef> {
+        (0..count)
+            .map(|i| config::meta::pipeline::components::ScorerRef {
+                id: format!("scorer-{i}"),
+                version: None,
+            })
+            .collect()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_job_naming_a_scorer_the_caller_cannot_read_is_refused() {
+        let denied = guard_scorers("org1", &denied_user().0.user_id, &scorer_refs(1))
+            .await
+            .unwrap_err();
+        assert_eq!(denied.status().as_u16(), 403);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_job_naming_more_scorers_than_the_maximum_is_refused() {
+        assert!(limit_scorers(&scorer_refs(MAX_SCORERS_PER_REQUEST)).is_ok());
+        let resp = limit_scorers(&scorer_refs(MAX_SCORERS_PER_REQUEST + 1)).unwrap_err();
+        assert_eq!(resp.status().as_u16(), 400);
     }
 }

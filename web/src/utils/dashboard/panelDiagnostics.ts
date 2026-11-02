@@ -57,7 +57,8 @@ export const toPartitions = (entry: unknown): Record<string, any>[] => {
   return entry && typeof entry === "object" ? [entry as Record<string, any>] : [];
 };
 
-const toMessages = (value: unknown): string[] => {
+/** The backend sends `function_error` as a list; blank and non-text entries are dropped. */
+export const toMessages = (value: unknown): string[] => {
   if (Array.isArray(value)) {
     return value.filter((m): m is string => typeof m === "string" && m.trim() !== "");
   }
