@@ -21,13 +21,13 @@ use std::fmt;
 use config::meta::destinations as meta_dest;
 use db::alerts::destinations::DestinationError;
 use hashbrown::HashMap;
-use openobserve_core::alerts::destination_usage;
+use openobserve_core::alerts::{destination_usage, notifications::jira};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 impl From<meta_dest::Destination> for Destination {
     fn from(value: meta_dest::Destination) -> Self {
-        match value.module {
+        let mut dest = match value.module {
             meta_dest::Module::Alert {
                 template,
                 destination_type,
@@ -80,7 +80,14 @@ impl From<meta_dest::Destination> for Destination {
                 metadata: endpoint.metadata,
                 ..Default::default()
             },
+        };
+        // The Jira token is write-only: a save without one keeps the stored token.
+        if dest.destination_type_name.as_deref() == Some(jira::DESTINATION_TYPE)
+            && let Some(headers) = dest.headers.as_mut()
+        {
+            headers.retain(|key, _| !key.eq_ignore_ascii_case("authorization"));
         }
+        dest
     }
 }
 
@@ -729,6 +736,52 @@ mod tests {
         };
         let result = d.into("org1".to_string(), true);
         assert!(result.is_err());
+    }
+
+    fn alert_http(destination_type: &str, headers: &[(&str, &str)]) -> meta_dest::Destination {
+        meta_dest::Destination {
+            name: "Jira OPS".to_string(),
+            module: meta_dest::Module::Alert {
+                template: None,
+                destination_type: meta_dest::DestinationType::Http(meta_dest::Endpoint {
+                    url: "https://acme.atlassian.net".to_string(),
+                    headers: Some(
+                        headers
+                            .iter()
+                            .map(|(k, v)| (k.to_string(), v.to_string()))
+                            .collect(),
+                    ),
+                    destination_type: Some(destination_type.to_string()),
+                    ..Default::default()
+                }),
+            },
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_jira_response_omits_the_authorization_header_in_any_case() {
+        for name in ["Authorization", "authorization", "AUTHORIZATION"] {
+            let d = Destination::from(alert_http(
+                "jira",
+                &[
+                    (name, "Basic b3BzQGFjbWUuY29tOnNlY3JldA=="),
+                    ("Content-Type", "application/json"),
+                ],
+            ));
+            let headers = d.headers.unwrap();
+            assert!(!headers.contains_key(name), "{name} was sent back");
+            assert_eq!(headers["Content-Type"], "application/json");
+        }
+    }
+
+    #[test]
+    fn test_non_jira_response_keeps_the_authorization_header() {
+        let d = Destination::from(alert_http(
+            "opsgenie",
+            &[("Authorization", "GenieKey 0f1e2d3c")],
+        ));
+        assert_eq!(d.headers.unwrap()["Authorization"], "GenieKey 0f1e2d3c");
     }
 
     #[test]

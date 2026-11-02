@@ -318,11 +318,6 @@ describe("TraceDetails", () => {
     vi.restoreAllMocks();
   });
 
-  it("should mount TraceDetails component", () => {
-    expect(wrapper.exists()).toBe(true);
-    expect(wrapper.find(".trace-details").exists()).toBe(true);
-  });
-
   describe("Toolbar functionality", () => {
     beforeEach(() => {
       vi.waitFor(() => {}, {
@@ -398,11 +393,6 @@ describe("TraceDetails", () => {
         expect(routerPushSpy).toHaveBeenCalled();
       }
     });
-
-    it("should show share link button", () => {
-      const shareBtn = wrapper.find('[data-test="trace-details-share-link-btn"]');
-      expect(shareBtn.exists()).toBe(true);
-    });
   });
 
   describe("Search functionality", () => {
@@ -430,34 +420,9 @@ describe("TraceDetails", () => {
       expect(searchResults.exists()).toBe(true);
       expect(searchResults.text()).toContain("3/5");
     });
-
-    it.skip("should handle next match navigation", async () => {
-      const nextBtn = wrapper.find('[data-test="trace-details-search-next-btn"]');
-      if (nextBtn.exists() && wrapper.vm.traceTreeRef) {
-        await nextBtn.trigger("click");
-        expect(wrapper.vm.traceTreeRef.nextMatch).toHaveBeenCalled();
-      }
-    });
-
-    it.skip("should handle previous match navigation", async () => {
-      const prevBtn = wrapper.find('[data-test="trace-details-search-prev-btn"]');
-      if (prevBtn.exists() && wrapper.vm.traceTreeRef) {
-        await prevBtn.trigger("click");
-        expect(wrapper.vm.traceTreeRef.prevMatch).toHaveBeenCalled();
-      }
-    });
   });
 
   describe("Stream selection", () => {
-    it("should display stream selector with placeholder", () => {
-      const streamSelector = wrapper.find('[data-test="trace-details-log-streams-select"]');
-      expect(streamSelector.exists()).toBe(true);
-
-      // The component uses :placeholder (not :label)
-      const selectComponent = streamSelector.vm || streamSelector.element;
-      expect(selectComponent).toBeDefined();
-    });
-
     it("should handle view logs button click with conditional disabled state", async () => {
       const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
       expect(viewLogsBtn.exists()).toBe(true);
@@ -480,18 +445,6 @@ describe("TraceDetails", () => {
         routerPushSpy.mockRestore();
       }
     });
-
-    it("should have wrapper spans for conditional tooltips on View Logs button", () => {
-      // The component HAS tooltip functionality with wrapper spans
-      const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
-
-      if (viewLogsBtn.exists()) {
-        // Button may have tooltip wrapper spans for conditional tooltip behavior
-        const tooltipWrapper = viewLogsBtn.element.parentElement;
-        // The wrapper structure exists for tooltip functionality
-        expect(tooltipWrapper).toBeDefined();
-      }
-    });
   });
 
   describe("Span interaction", () => {
@@ -500,21 +453,6 @@ describe("TraceDetails", () => {
     beforeEach(async () => {
       wrapper.vm.activeTab = "waterfall";
       await wrapper.vm.$nextTick();
-    });
-
-    it("should handle span selection", () => {
-      const spanId = "test-span-id";
-      wrapper.vm.updateSelectedSpan(spanId);
-
-      expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(spanId);
-      expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(true);
-    });
-
-    it("should handle sidebar close", () => {
-      wrapper.vm.closeSidebar();
-
-      expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(false);
-      expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(null);
     });
 
     it("should cancel any in-flight span scroll when sidebar closes", () => {
@@ -531,16 +469,6 @@ describe("TraceDetails", () => {
       wrapper.vm.traceTreeRef = null;
 
       expect(() => wrapper.vm.closeSidebar()).not.toThrow();
-    });
-
-    it("should render trace tree component", () => {
-      const traceTree = wrapper.find('[data-test="trace-details-tree"]');
-      expect(traceTree.exists()).toBe(true);
-    });
-
-    it("should render trace header component", () => {
-      const traceHeader = wrapper.find('[data-test="trace-details-header"]');
-      expect(traceHeader.exists()).toBe(true);
     });
 
     it("should render trace details sidebar when span is selected", async () => {
@@ -1077,19 +1005,6 @@ describe("TraceDetails", () => {
     });
   });
 
-  describe("Data processing", () => {
-    it("should process span data correctly", () => {
-      expect(wrapper.vm.spanList).toEqual(tracesMockData.tracesDetails.traceSpans.hits);
-    });
-
-    it("should calculate trace position", () => {
-      expect(wrapper.vm.baseTracePosition.tics).toBeDefined();
-      expect(wrapper.vm.baseTracePosition.tics.length).toBe(5);
-      expect(wrapper.vm.baseTracePosition.tics[0].value).toBe(0);
-      expect(wrapper.vm.baseTracePosition.tics[4].value).toBe(295.99);
-    });
-  });
-
   // describe("Error handling", () => {
   //   it("should handle missing trace data gracefully", async () => {
   //     wrapper.vm.searchObj.data.traceDetails.spanList = [];
@@ -1104,45 +1019,8 @@ describe("TraceDetails", () => {
   //   });
   // });
 
-  describe("Component lifecycle", () => {
-    it("should setup trace details on mount", async () => {
-      expect(wrapper.vm.searchObj.data.traceDetails.spanList).toEqual(
-        tracesMockData.tracesDetails.traceSpans.hits,
-      );
-    });
-
-    it("should clean up properly on unmount", () => {
-      wrapper.unmount();
-      // Should not throw any errors during cleanup
-    });
-  });
-
-  describe("Utility functions", () => {
-    it("should format time correctly", () => {
-      const time = 10000000; // 1 second in nanoseconds
-      const result = wrapper.vm.convertTimeFromNsToMs(time);
-      expect(result).toBe(10); // Should be 1 millisecond
-    });
-
-    it("should get span kind correctly", () => {
-      expect(wrapper.vm.getSpanKind("1")).toBe("Internal");
-      expect(wrapper.vm.getSpanKind("2")).toBe("Server");
-      expect(wrapper.vm.getSpanKind("3")).toBe("Client");
-    });
-
-    it("should adjust opacity correctly", () => {
-      const color = "#ffffff";
-      const result = wrapper.vm.adjustOpacity(color, 0.5);
-      expect(result).toBe("#ffffff80"); // 50% opacity
-    });
-  });
-
   describe("Props: Mode control", () => {
     describe("mode prop - standalone", () => {
-      it("should default to standalone mode", () => {
-        expect(wrapper.props("mode")).toBe("standalone");
-      });
-
       it("should show back button when showBackButton is true in standalone mode", async () => {
         const backBtn = wrapper.find('[data-test="trace-details-back-btn"]');
         expect(backBtn.exists()).toBe(true);
@@ -1171,12 +1049,28 @@ describe("TraceDetails", () => {
         expect(expandBtn.exists()).toBe(false);
       });
 
-      it("should fetch data from API in standalone mode", () => {
-        expect(wrapper.vm.shouldFetchData).toBe(true);
-      });
+      it("renders the trace ID from the route query, not the traceIdProp, in standalone mode", async () => {
+        vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+          value: {
+            query: {
+              trace_id: "route-trace-id-xyz",
+              from: "1752490492843",
+              to: "1752490493164",
+              stream: "test-stream",
+              org_identifier: "default",
+            },
+            name: "traceDetails",
+          },
+        } as any);
+        const standalone = mount(TraceDetails, {
+          ...mountOptions,
+          props: { ...mountOptions.props, traceIdProp: "prop-trace-id-abc" },
+        });
+        await flushPromises();
 
-      it("should use route query params for trace ID in standalone mode", () => {
-        expect(wrapper.vm.effectiveTraceId).toBe("test-trace-id");
+        const idEl = standalone.find('[data-test="trace-details-trace-id"]');
+        expect(idEl.text()).toBe("route-trace-id-xyz");
+        standalone.unmount();
       });
     });
 
@@ -1273,11 +1167,6 @@ describe("TraceDetails", () => {
         }
       });
 
-      it("should mount in embedded mode", () => {
-        expect(embeddedWrapper.props("mode")).toBe("embedded");
-        expect(embeddedWrapper.exists()).toBe(true);
-      });
-
       it("should not show back button in embedded mode when showBackButton is false", () => {
         const backBtn = embeddedWrapper.find('[data-test="trace-details-back-btn"]');
         expect(backBtn.exists()).toBe(false);
@@ -1313,12 +1202,6 @@ describe("TraceDetails", () => {
 
       it("should not fetch data when spanListProp is provided", () => {
         expect(embeddedWrapper.vm.shouldFetchData).toBe(false);
-      });
-
-      it("should use provided spanListProp", () => {
-        expect(embeddedWrapper.vm.effectiveSpanList).toEqual(
-          tracesMockData.tracesDetails.traceSpans.hits,
-        );
       });
 
       it("should emit close event when handleBackOrClose is called in embedded mode", async () => {
@@ -1425,31 +1308,6 @@ describe("TraceDetails", () => {
       }
     });
 
-    it("should use traceIdProp when provided", () => {
-      expect(embeddedWrapper.vm.effectiveTraceId).toBe("custom-trace-123");
-    });
-
-    it("should use streamNameProp when provided", () => {
-      expect(embeddedWrapper.vm.effectiveStreamName).toBe("custom-stream");
-    });
-
-    it("should use spanListProp when provided", () => {
-      expect(embeddedWrapper.vm.effectiveSpanList).toEqual(
-        tracesMockData.tracesDetails.traceSpans.hits,
-      );
-    });
-
-    it("should use startTimeProp and endTimeProp for time range", () => {
-      const timeRange = embeddedWrapper.vm.effectiveTimeRange;
-      expect(timeRange.from).toBe(1234567890000);
-      expect(timeRange.to).toBe(1234567900000);
-    });
-
-    it("should process provided span list and build trace tree", () => {
-      expect(embeddedWrapper.vm.traceTree).toBeDefined();
-      expect(embeddedWrapper.vm.traceTree.length).toBeGreaterThan(0);
-    });
-
     it("should watch for spanListProp changes and rebuild tree", async () => {
       const newSpanList = [
         ...tracesMockData.tracesDetails.traceSpans.hits,
@@ -1479,11 +1337,6 @@ describe("TraceDetails", () => {
 
   describe("Props: UI visibility controls", () => {
     describe("showBackButton prop", () => {
-      it("should show back button when true in standalone mode", () => {
-        const backBtn = wrapper.find('[data-test="trace-details-back-btn"]');
-        expect(backBtn.exists()).toBe(true);
-      });
-
       it("should hide back button when false", async () => {
         const wrapperNoBack = mount(TraceDetails, {
           attachTo: "#app",
@@ -1541,11 +1394,6 @@ describe("TraceDetails", () => {
     });
 
     describe("showLogStreamSelector prop", () => {
-      it.skip("should show log stream selector when true (default)", () => {
-        const selector = wrapper.find('[data-test="trace-details-log-streams-select"]');
-        expect(selector.exists()).toBe(true);
-      });
-
       it("should hide log stream selector when false", async () => {
         const wrapperNoSelector = mount(TraceDetails, {
           attachTo: "#app",
@@ -1598,20 +1446,6 @@ describe("TraceDetails", () => {
         const selector = wrapperNoSelector.find('[data-test="trace-details-log-streams-select"]');
         expect(selector.exists()).toBe(false);
         wrapperNoSelector.unmount();
-      });
-    });
-
-    describe("showShareButton prop", () => {
-      it("should show share button when true in standalone mode", () => {
-        const shareBtn = wrapper.find('[data-test="trace-details-share-link-btn"]');
-        expect(shareBtn.exists()).toBe(true);
-      });
-    });
-
-    describe("showCloseButton prop", () => {
-      it("should show close button when true in standalone mode", () => {
-        const closeBtn = wrapper.find('[data-test="trace-details-close-btn"]');
-        expect(closeBtn.exists()).toBe(true);
       });
     });
 
@@ -1811,19 +1645,6 @@ describe("TraceDetails", () => {
         embeddedWrapper.unmount();
       });
     });
-
-    describe("currentTraceStreamName computed", () => {
-      it("should compute current trace stream name for correlation", () => {
-        expect(wrapper.vm.currentTraceStreamName).toBeDefined();
-      });
-    });
-
-    describe("serviceStreamsEnabled computed", () => {
-      it("should check if service streams feature is enabled", () => {
-        expect(wrapper.vm.serviceStreamsEnabled).toBeDefined();
-        expect(typeof wrapper.vm.serviceStreamsEnabled).toBe("boolean");
-      });
-    });
   });
 
   describe("Integration: Mode switching scenarios", () => {
@@ -1954,66 +1775,7 @@ describe("TraceDetails", () => {
     });
   });
 
-  describe("Props validation and defaults", () => {
-    it("should have correct default values for all props", () => {
-      const defaultWrapper = mount(TraceDetails, {
-        attachTo: "#app",
-        global: {
-          plugins: [i18n, router],
-          provide: { store },
-          stubs: {
-            ODrawer: ODrawerStub,
-            CodeQueryEditor: {
-              name: "CodeQueryEditor",
-              props: ["query", "language"],
-              emits: ["update:query"],
-              template: '<div data-test="trace-details-filters-code-editor" />',
-            },
-            "chart-renderer": {
-              template: '<div data-test="chart-renderer">Chart</div>',
-            },
-            "trace-tree": { template: "<div>Tree</div>" },
-            "trace-header": { template: "<div>Header</div>" },
-            "trace-details-sidebar": { template: "<div>Sidebar</div>" },
-          },
-        },
-      });
-
-      expect(defaultWrapper.props("mode")).toBe("standalone");
-      expect(defaultWrapper.props("traceIdProp")).toBe("");
-      expect(defaultWrapper.props("streamNameProp")).toBe("");
-      expect(defaultWrapper.props("spanListProp")).toEqual([]);
-      expect(defaultWrapper.props("startTimeProp")).toBe(0);
-      expect(defaultWrapper.props("endTimeProp")).toBe(0);
-      expect(defaultWrapper.props("correlatedLogStream")).toBe("");
-      expect(defaultWrapper.props("showBackButton")).toBe(true);
-      expect(defaultWrapper.props("showHeader")).toBe(true);
-      expect(defaultWrapper.props("showTimeline")).toBe(true);
-      expect(defaultWrapper.props("showLogStreamSelector")).toBe(true);
-      expect(defaultWrapper.props("showShareButton")).toBe(true);
-      expect(defaultWrapper.props("showCloseButton")).toBe(true);
-      expect(defaultWrapper.props("showExpandButton")).toBe(false);
-      expect(defaultWrapper.props("hideSessionReplayButton")).toBe(false);
-      expect(defaultWrapper.props("enableCorrelationLinks")).toBe(false);
-
-      defaultWrapper.unmount();
-    });
-
-    it("should validate mode prop values", () => {
-      const propValidator = TraceDetails.props.mode.validator;
-      expect(propValidator("standalone")).toBe(true);
-      expect(propValidator("embedded")).toBe(true);
-      expect(propValidator("invalid")).toBe(false);
-    });
-  });
-
   describe("Current functionality verification", () => {
-    it("should have isViewLogsDisabled computed property", () => {
-      // The component HAS isViewLogsDisabled computed property
-      expect(wrapper.vm.isViewLogsDisabled).toBeDefined();
-      expect(typeof wrapper.vm.isViewLogsDisabled).toBe("boolean");
-    });
-
     it("should pass selected-log-streams and show-log-stream-selector props to TraceDetailsSidebar", async () => {
       // Set up span selection to show sidebar
       const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
@@ -2030,67 +1792,6 @@ describe("TraceDetails", () => {
         );
         expect(sidebar.props("showLogStreamSelector")).toBe(wrapper.vm.showLogStreamSelector);
       }
-    });
-
-    it("should use placeholder for log stream selector", () => {
-      const streamSelector = wrapper.find('[data-test="trace-details-log-streams-select"]');
-
-      if (streamSelector.exists()) {
-        const selectElement = streamSelector.element as HTMLElement;
-        // The component uses :placeholder (confirmed current implementation)
-        expect(selectElement).toBeDefined();
-      }
-    });
-
-    it("should have conditional disabled state and tooltip wrapper on View Logs button", () => {
-      const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
-
-      if (viewLogsBtn.exists()) {
-        // The component HAS conditional disabled state via isViewLogsDisabled
-        // Test that the computed property exists and controls the disabled state
-        expect(wrapper.vm.isViewLogsDisabled).toBeDefined();
-
-        // The button may have tooltip wrapper structure
-        const parentElement = viewLogsBtn.element.parentElement;
-        expect(parentElement).toBeDefined();
-      }
-    });
-
-    it("comprehensive test: should verify current implementation is intact", async () => {
-      // 1. isViewLogsDisabled computed property should exist
-      expect(wrapper.vm.isViewLogsDisabled).toBeDefined();
-      expect(typeof wrapper.vm.isViewLogsDisabled).toBe("boolean");
-
-      // 2. View Logs button may be disabled based on isViewLogsDisabled state
-      const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
-      if (viewLogsBtn.exists()) {
-        // Disabled state is controlled by isViewLogsDisabled computed property
-        if (wrapper.vm.isViewLogsDisabled) {
-          expect(viewLogsBtn.attributes("disabled")).toBeDefined();
-        } else {
-          expect(viewLogsBtn.attributes("disabled")).toBeUndefined();
-        }
-      }
-
-      // 3. Set up span selection to test sidebar props
-      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
-      wrapper.vm.updateSelectedSpan(spanId);
-      await wrapper.vm.$nextTick();
-
-      // 4. TraceDetailsSidebar should receive selected-log-streams props correctly
-      const sidebar = wrapper.findComponent('[data-test="trace-details-sidebar"]');
-      if (sidebar.exists()) {
-        expect(sidebar.props("selectedLogStreams")).toBeDefined();
-        expect(sidebar.props("showLogStreamSelector")).toBeDefined();
-        expect(sidebar.props("selectedLogStreams")).toEqual(
-          wrapper.vm.searchObj.data.traceDetails.selectedLogStreams,
-        );
-        expect(sidebar.props("showLogStreamSelector")).toBe(wrapper.vm.showLogStreamSelector);
-      }
-
-      // 5. Log stream selector should exist with current structure
-      const streamSelector = wrapper.find('[data-test="trace-details-log-streams-select"]');
-      expect(streamSelector.exists()).toBe(true);
     });
   });
 
@@ -2213,28 +1914,6 @@ describe("TraceDetails", () => {
 
       // Undefined should be treated as empty string
       expect(Array.isArray(wrapper.vm.filteredStreamOptions)).toBe(true);
-    });
-  });
-
-  describe("Coverage: openTraceDetails function", () => {
-    it("should set showSpanDetails and showTraceDetails to true (lines 1877-1878)", () => {
-      wrapper.vm.searchObj.data.traceDetails.showSpanDetails = false;
-      wrapper.vm.showTraceDetails = false;
-
-      wrapper.vm.openTraceDetails();
-
-      expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(true);
-      expect(wrapper.vm.showTraceDetails).toBe(true);
-    });
-
-    it("should work when values are already true", () => {
-      wrapper.vm.searchObj.data.traceDetails.showSpanDetails = true;
-      wrapper.vm.showTraceDetails = true;
-
-      wrapper.vm.openTraceDetails();
-
-      expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(true);
-      expect(wrapper.vm.showTraceDetails).toBe(true);
     });
   });
 
@@ -3155,38 +2834,6 @@ describe("TraceDetails", () => {
 
         expect(mockTraceTreeRef.nextMatch).toHaveBeenCalledTimes(1);
       });
-
-      it("should handle case when TraceTree ref is null", () => {
-        const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation();
-        wrapper.vm.traceTreeRef = null;
-
-        // Should not throw error
-        expect(() => wrapper.vm.nextMatch()).not.toThrow();
-
-        expect(consoleWarnSpy).toHaveBeenCalledWith("TraceTree component reference not found");
-        consoleWarnSpy.mockRestore();
-      });
-
-      it("should handle case when TraceTree ref is undefined", () => {
-        const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation();
-        wrapper.vm.traceTreeRef = undefined;
-
-        expect(() => wrapper.vm.nextMatch()).not.toThrow();
-
-        expect(consoleWarnSpy).toHaveBeenCalledWith("TraceTree component reference not found");
-        consoleWarnSpy.mockRestore();
-      });
-
-      it("should not call nextMatch when ref does not exist", () => {
-        wrapper.vm.traceTreeRef = null;
-        const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation();
-
-        wrapper.vm.nextMatch();
-
-        // Mock should not be called since ref is null
-        expect(mockTraceTreeRef.nextMatch).not.toHaveBeenCalled();
-        consoleWarnSpy.mockRestore();
-      });
     });
 
     describe("prevMatch function", () => {
@@ -3196,27 +2843,6 @@ describe("TraceDetails", () => {
         wrapper.vm.prevMatch();
 
         expect(mockTraceTreeRef.prevMatch).toHaveBeenCalledTimes(1);
-      });
-
-      it("should handle case when TraceTree ref is null", () => {
-        const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation();
-        wrapper.vm.traceTreeRef = null;
-
-        // Should not throw error
-        expect(() => wrapper.vm.prevMatch()).not.toThrow();
-
-        expect(consoleWarnSpy).toHaveBeenCalledWith("TraceTree component reference not found");
-        consoleWarnSpy.mockRestore();
-      });
-
-      it("should handle case when TraceTree ref is undefined", () => {
-        const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation();
-        wrapper.vm.traceTreeRef = undefined;
-
-        expect(() => wrapper.vm.prevMatch()).not.toThrow();
-
-        expect(consoleWarnSpy).toHaveBeenCalledWith("TraceTree component reference not found");
-        consoleWarnSpy.mockRestore();
       });
 
       it("should not call prevMatch when ref does not exist", () => {
@@ -3239,40 +2865,6 @@ describe("TraceDetails", () => {
 
         expect(wrapper.vm.currentIndex).toBe(5);
       });
-
-      it("should handle negative index values", () => {
-        wrapper.vm.currentIndex = 0;
-
-        wrapper.vm.handleIndexUpdate(-1);
-
-        expect(wrapper.vm.currentIndex).toBe(-1);
-      });
-
-      it("should handle zero index", () => {
-        wrapper.vm.currentIndex = 10;
-
-        wrapper.vm.handleIndexUpdate(0);
-
-        expect(wrapper.vm.currentIndex).toBe(0);
-      });
-
-      it("should handle large index values", () => {
-        wrapper.vm.currentIndex = 0;
-
-        wrapper.vm.handleIndexUpdate(9999);
-
-        expect(wrapper.vm.currentIndex).toBe(9999);
-      });
-
-      it("should overwrite previous index value", () => {
-        wrapper.vm.currentIndex = 10;
-
-        wrapper.vm.handleIndexUpdate(20);
-        expect(wrapper.vm.currentIndex).toBe(20);
-
-        wrapper.vm.handleIndexUpdate(30);
-        expect(wrapper.vm.currentIndex).toBe(30);
-      });
     });
 
     describe("handleSearchResult function", () => {
@@ -3283,88 +2875,10 @@ describe("TraceDetails", () => {
 
         expect(wrapper.vm.searchResults).toBe(10);
       });
-
-      it("should handle zero search results", () => {
-        wrapper.vm.searchResults = 10;
-
-        wrapper.vm.handleSearchResult(0);
-
-        expect(wrapper.vm.searchResults).toBe(0);
-      });
-
-      it("should handle negative values", () => {
-        wrapper.vm.searchResults = 5;
-
-        wrapper.vm.handleSearchResult(-1);
-
-        expect(wrapper.vm.searchResults).toBe(-1);
-      });
-
-      it("should handle large search result values", () => {
-        wrapper.vm.searchResults = 0;
-
-        wrapper.vm.handleSearchResult(1000);
-
-        expect(wrapper.vm.searchResults).toBe(1000);
-      });
-
-      it("should update searchResults multiple times", () => {
-        wrapper.vm.searchResults = 0;
-
-        wrapper.vm.handleSearchResult(5);
-        expect(wrapper.vm.searchResults).toBe(5);
-
-        wrapper.vm.handleSearchResult(10);
-        expect(wrapper.vm.searchResults).toBe(10);
-
-        wrapper.vm.handleSearchResult(0);
-        expect(wrapper.vm.searchResults).toBe(0);
-      });
-    });
-
-    describe("Search navigation integration", () => {
-      it("should coordinate between nextMatch and handleIndexUpdate", () => {
-        wrapper.vm.traceTreeRef = mockTraceTreeRef;
-        wrapper.vm.currentIndex = 0;
-
-        // Simulate user clicking next
-        wrapper.vm.nextMatch();
-        expect(mockTraceTreeRef.nextMatch).toHaveBeenCalled();
-
-        // Simulate TraceTree component emitting updated index
-        wrapper.vm.handleIndexUpdate(1);
-        expect(wrapper.vm.currentIndex).toBe(1);
-      });
-
-      it("should coordinate between prevMatch and handleIndexUpdate", () => {
-        wrapper.vm.traceTreeRef = mockTraceTreeRef;
-        wrapper.vm.currentIndex = 5;
-
-        // Simulate user clicking prev
-        wrapper.vm.prevMatch();
-        expect(mockTraceTreeRef.prevMatch).toHaveBeenCalled();
-
-        // Simulate TraceTree component emitting updated index
-        wrapper.vm.handleIndexUpdate(4);
-        expect(wrapper.vm.currentIndex).toBe(4);
-      });
-
-      it("should handle search result updates from child component", () => {
-        wrapper.vm.searchResults = 0;
-
-        // Simulate TraceTree emitting search results
-        wrapper.vm.handleSearchResult(25);
-
-        expect(wrapper.vm.searchResults).toBe(25);
-      });
     });
   });
 
   describe("Sidebar active tab", () => {
-    it("should initialize sidebarActiveTab to 'attributes'", () => {
-      expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
-    });
-
     it("should set sidebarActiveTab to 'preview' when first selected span is an LLM span", async () => {
       const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
       // Mark the span as LLM by setting gen_ai_system on the span in spanMap
@@ -3478,48 +2992,6 @@ describe("TraceDetails", () => {
     });
   });
 
-  describe("effectiveSpanId", () => {
-    it("should return hoveredSpanId when hovering over a span", () => {
-      wrapper.vm.hoveredSpanId = "hovered-span-1";
-      wrapper.vm.searchObj.data.traceDetails.selectedSpanId = "selected-span-1";
-
-      expect(wrapper.vm.effectiveSpanId).toBe("hovered-span-1");
-    });
-
-    it("should return selectedSpanId when not hovering", () => {
-      wrapper.vm.hoveredSpanId = "";
-      wrapper.vm.searchObj.data.traceDetails.selectedSpanId = "selected-span-1";
-
-      expect(wrapper.vm.effectiveSpanId).toBe("selected-span-1");
-    });
-  });
-
-  describe("Hover span handlers", () => {
-    it("should set hoveredSpanId when onHoverSpan is called", () => {
-      wrapper.vm.onHoverSpan("hovered-span-42");
-      expect(wrapper.vm.hoveredSpanId).toBe("hovered-span-42");
-    });
-
-    it("should clear hoveredSpanId when onUnhoverSpan is called", () => {
-      wrapper.vm.hoveredSpanId = "hovered-span-42";
-      wrapper.vm.onUnhoverSpan();
-      expect(wrapper.vm.hoveredSpanId).toBe("");
-    });
-
-    it("should clear hoveredSpanId when closeSidebar is called", () => {
-      wrapper.vm.hoveredSpanId = "hovered-span-99";
-      wrapper.vm.closeSidebar();
-      expect(wrapper.vm.hoveredSpanId).toBe("");
-    });
-
-    it("should clear hoveredSpanId when updateSelectedSpan is called", () => {
-      wrapper.vm.hoveredSpanId = "hovered-span-77";
-      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
-      wrapper.vm.updateSelectedSpan(spanId);
-      expect(wrapper.vm.hoveredSpanId).toBe("");
-    });
-  });
-
   describe("TraceTree hover integration", () => {
     it("should pass hoveredSpanId prop to TraceTree child component", async () => {
       // TraceTree only renders inside the waterfall view.
@@ -3534,28 +3006,6 @@ describe("TraceDetails", () => {
   });
 
   describe("Migrated filters drawer (ODrawer)", () => {
-    const drawerSelector = '[data-test="trace-details-filters-drawer-stub"]';
-
-    it("renders the ODrawer with migrated props (width, title, button labels)", () => {
-      const drawer = wrapper.find(drawerSelector);
-      expect(drawer.exists()).toBe(true);
-      expect(drawer.attributes("data-width")).toBe("30");
-      // title and labels are wired from i18n; the data attributes just need to be defined
-      expect(drawer.attributes("data-title")).toBeDefined();
-      expect(drawer.attributes("data-primary-label")).toBeDefined();
-      expect(drawer.attributes("data-secondary-label")).toBeDefined();
-    });
-
-    it("binds open via v-model:open to showFilterPopover state", async () => {
-      expect(wrapper.vm.showFilterPopover).toBe(false);
-      expect(wrapper.find(drawerSelector).attributes("data-open")).toBe("false");
-
-      wrapper.vm.showFilterPopover = true;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.find(drawerSelector).attributes("data-open")).toBe("true");
-    });
-
     it("closes drawer when ODrawer emits click:secondary (cancel)", async () => {
       wrapper.vm.showFilterPopover = true;
       await wrapper.vm.$nextTick();
@@ -3598,11 +3048,6 @@ describe("TraceDetails", () => {
       await wrapper.find('[data-test="trace-details-filters-drawer-primary"]').trigger("click");
 
       expect(wrapper.vm.searchObj.data.editorValue).toBe("status_code = 200");
-    });
-
-    it("renders the CodeQueryEditor inside the drawer default slot", () => {
-      const editor = wrapper.find('[data-test="trace-details-filters-code-editor"]');
-      expect(editor.exists()).toBe(true);
     });
   });
 

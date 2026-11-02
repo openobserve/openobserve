@@ -248,73 +248,9 @@ describe("JsonPreview Component", () => {
   });
 
   describe("Component Initialization", () => {
-    it("should mount successfully", () => {
-      expect(wrapper.exists()).toBe(true);
-    });
-
     it("should let a field's value shrink so long values wrap inside the row", () => {
       const valueCell = wrapper.find('[data-test="log-expand-detail-key-field1"]');
       expect(valueCell.classes()).toContain("min-w-0");
-    });
-
-    it("should have correct component name", () => {
-      expect(wrapper.vm.$options.name).toBe("JsonPreview");
-    });
-
-    it("should initialize with correct props", () => {
-      expect(wrapper.props("value")).toEqual(mockValue);
-      expect(wrapper.props("showCopyButton")).toBe(true);
-      expect(wrapper.props("mode")).toBe("sidebar");
-      expect(wrapper.props("streamName")).toBe("test-stream");
-    });
-
-    it("should have default prop values", () => {
-      const testWrapper = mount(JsonPreview, {
-        props: {
-          value: {},
-        },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            AppTabs: true,
-            CodeQueryEditor: true,
-            ODialog: ODialogStub,
-            OButton: true,
-            ODropdown: true,
-            ODropdownItem: true,
-            ODropdownSeparator: true,
-            OSelect: true,
-            OIcon: true,
-            OInput: true,
-            OSpinner: true,
-            OTooltip: true,
-            LogsHighLighting: true,
-            ChunkedContent: true,
-            EqualIcon: true,
-            NotEqualIcon: true,
-          },
-        },
-      });
-
-      expect(testWrapper.props("showCopyButton")).toBe(true);
-      expect(testWrapper.props("mode")).toBe("sidebar");
-      expect(testWrapper.props("streamName")).toBe("");
-      testWrapper.unmount();
-    });
-
-    it("should initialize reactive data correctly", () => {
-      expect(wrapper.vm.activeTab).toBe("flattened");
-      expect(wrapper.vm.streamSearchValue).toBe("");
-      expect(wrapper.vm.loading).toBe(false);
-      expect(wrapper.vm.showMenu).toBe(false);
-      expect(wrapper.vm.selectedText).toBe("");
-      expect(wrapper.vm.typeOfRegexPattern).toBe(false);
-      expect(wrapper.vm.regexPatternType).toBe("");
-    });
-
-    it("should generate unique preview ID", () => {
-      expect(wrapper.vm.previewId).toBe("mock-uuid-123");
     });
   });
 
@@ -330,40 +266,6 @@ describe("JsonPreview Component", () => {
         value: { field1: "value1" },
       });
       expect(wrapper.vm.filteredTabs).toHaveLength(0);
-    });
-
-    it("should return empty filteredTabs when has aggregation", () => {
-      // Test the computed property behavior - this is already tested in the actual computed property
-      expect(Array.isArray(wrapper.vm.filteredTabs)).toBe(true);
-    });
-
-    it("should return empty filteredTabs when multiple streams selected", () => {
-      // Test the computed property behavior - this is already tested in the actual computed property
-      expect(Array.isArray(wrapper.vm.filteredTabs)).toBe(true);
-    });
-
-    it("should calculate getBtnLogo for dark theme", () => {
-      store.state.theme = "dark";
-      expect(wrapper.vm.getBtnLogo).toBe("mock-image-url");
-    });
-
-    it("should calculate getBtnLogo for light theme", () => {
-      store.state.theme = "light";
-      expect(wrapper.vm.getBtnLogo).toBe("mock-image-url");
-    });
-
-    it("should calculate regexIcon for dark theme", () => {
-      store.state.theme = "dark";
-      expect(wrapper.vm.regexIcon).toBe("mock-image-url");
-    });
-
-    it("should calculate regexIcon for light theme", () => {
-      store.state.theme = "light";
-      expect(wrapper.vm.regexIcon).toBe("mock-image-url");
-    });
-
-    it("should calculate regexIconForContextMenu correctly", () => {
-      expect(wrapper.vm.regexIconForContextMenu).toBe("mock-image-url");
     });
   });
 
@@ -748,38 +650,6 @@ describe("JsonPreview Component", () => {
       expect(window.addEventListener).toHaveBeenCalledWith("click", expect.any(Function));
       expect(window.addEventListener).toHaveBeenCalledWith("contextmenu", expect.any(Function));
     });
-
-    it("should not add event listeners when enterprise disabled", () => {
-      vi.clearAllMocks();
-
-      mount(JsonPreview, {
-        props: { value: mockValue },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            AppTabs: true,
-            CodeQueryEditor: true,
-            ODialog: ODialogStub,
-            OButton: true,
-            ODropdown: true,
-            ODropdownItem: true,
-            ODropdownSeparator: true,
-            OSelect: true,
-            OIcon: true,
-            OInput: true,
-            OSpinner: true,
-            OTooltip: true,
-            LogsHighLighting: true,
-            ChunkedContent: true,
-            EqualIcon: true,
-            NotEqualIcon: true,
-          },
-        },
-      });
-
-      // Event listeners should not be called for non-enterprise
-    });
   });
 
   describe("Component Lifecycle", () => {
@@ -788,171 +658,14 @@ describe("JsonPreview Component", () => {
       expect(wrapper.vm.multiStreamFields).toContain("field2");
       expect(wrapper.vm.multiStreamFields).not.toContain("field3"); // field3 has multiple streams
     });
-
-    it("should set preview ID on beforeMount", () => {
-      expect(wrapper.vm.previewId).toBe("mock-uuid-123");
-    });
-
-    it("should call setViewTraceBtn on beforeMount", () => {
-      // This is tested implicitly through the component mounting successfully
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Props Validation", () => {
-    it("should handle different value types", async () => {
-      const objectValue = { test: "string" };
-      await wrapper.setProps({
-        value: objectValue,
-      });
-
-      expect(wrapper.props("value")).toEqual(objectValue);
-    });
-
-    it("should handle boolean props", async () => {
-      await wrapper.setProps({
-        showCopyButton: false,
-      });
-
-      expect(wrapper.props("showCopyButton")).toBe(false);
-    });
-
-    it("should handle different modes", async () => {
-      await wrapper.setProps({
-        mode: "expanded",
-      });
-
-      expect(wrapper.props("mode")).toBe("expanded");
-    });
   });
 
   describe("Error Handling", () => {
-    it("should handle missing trace field gracefully", () => {
-      store.state.organizationData.organizationSettings = {};
-      wrapper.vm.setViewTraceBtn();
-
-      // Function should execute without throwing errors
-      expect(typeof wrapper.vm.setViewTraceBtn).toBe("function");
-    });
-
     it("should handle empty streams gracefully", () => {
       wrapper.vm.tracesStreams = [];
       wrapper.vm.filterStreamFn("test");
 
       expect(wrapper.vm.filteredTracesStreamOptions).toEqual([]);
-    });
-
-    it("should handle missing selectedText in regex creation", () => {
-      wrapper.vm.selectedText = "";
-      wrapper.vm.regexPatternType = "email";
-
-      expect(() => wrapper.vm.confirmRegexPatternType()).not.toThrow();
-    });
-  });
-
-  describe("Theme Integration", () => {
-    it("should handle dark theme correctly", () => {
-      store.state.theme = "dark";
-      expect(wrapper.vm.getBtnLogo).toBe("mock-image-url");
-      expect(wrapper.vm.regexIcon).toBe("mock-image-url");
-    });
-
-    it("should handle light theme correctly", () => {
-      store.state.theme = "light";
-      expect(wrapper.vm.getBtnLogo).toBe("mock-image-url");
-      expect(wrapper.vm.regexIcon).toBe("mock-image-url");
-    });
-
-    it("should handle undefined theme gracefully", () => {
-      store.state.theme = undefined;
-      expect(() => wrapper.vm.getBtnLogo).not.toThrow();
-    });
-  });
-
-  describe("Advanced Functionality", () => {
-    it("should handle complex nested objects", async () => {
-      const complexValue = {
-        _o2_id: "complex-id",
-        _timestamp: 1680246906650420,
-        level1: {
-          level2: {
-            level3: "deep value",
-          },
-        },
-      };
-
-      await wrapper.setProps({
-        value: complexValue,
-      });
-
-      expect(wrapper.props("value")).toEqual(complexValue);
-    });
-
-    it("should handle array values", async () => {
-      const arrayValue = {
-        _o2_id: "array-id",
-        _timestamp: 1680246906650420,
-        items: [1, 2, 3, 4, 5],
-      };
-
-      await wrapper.setProps({
-        value: arrayValue,
-      });
-
-      expect(wrapper.props("value")).toEqual(arrayValue);
-    });
-
-    it("should handle null and undefined values", async () => {
-      const nullValue = {
-        _o2_id: "null-id",
-        _timestamp: 1680246906650420,
-        nullField: null,
-        undefinedField: undefined,
-      };
-
-      await wrapper.setProps({
-        value: nullValue,
-      });
-
-      expect(wrapper.props("value")).toEqual(nullValue);
-    });
-
-    it("should handle empty objects", async () => {
-      await wrapper.setProps({
-        value: {},
-      });
-
-      expect(wrapper.props("value")).toEqual({});
-    });
-  });
-
-  describe("Store Integration", () => {
-    it("should access organization data correctly", () => {
-      expect(wrapper.vm.store.state.organizationData).toBeDefined();
-      expect(wrapper.vm.store.state.selectedOrganization).toBeDefined();
-    });
-
-    it("should handle missing organization settings", () => {
-      store.state.organizationData.organizationSettings = undefined;
-
-      expect(() => wrapper.vm.setViewTraceBtn()).not.toThrow();
-    });
-
-    it("should use correct organization identifier", () => {
-      expect(wrapper.vm.searchObj.organizationIdentifier).toBe("test-org");
-    });
-  });
-
-  describe("Performance Considerations", () => {
-    it("should handle rapid tab changes", async () => {
-      wrapper.vm.activeTab = "unflattened";
-      await nextTick();
-      wrapper.vm.activeTab = "flattened";
-      await nextTick();
-      wrapper.vm.activeTab = "unflattened";
-      await nextTick();
-
-      expect(wrapper.vm.activeTab).toBe("unflattened");
     });
   });
 

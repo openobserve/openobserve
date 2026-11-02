@@ -1376,7 +1376,7 @@ function expirePageReads() {
     queryClient.invalidateQueries({ queryKey, exact, refetchType: "none" });
   void expire(oncallKeys.all(org), false);
   void expire(userKeys.users(org), true);
-  void expire(destinationKeys.list(org, "alert"), true);
+  void expire(destinationKeys.list(org, "alert", false, ["jira"]), true);
   void expire(serviceStreamKeys.all(org), false);
 }
 

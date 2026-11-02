@@ -28,21 +28,27 @@ export const destinationsQuery = (
   org: string,
   module?: DestinationModule,
   includeUsage?: boolean,
+  excludeTypes?: readonly string[],
 ) =>
   queryOptions({
-    queryKey: destinationKeys.list(org, module, includeUsage),
-    queryFn: async (): Promise<any[]> =>
-      (
-        await destination.list({
-          page_num: 1,
-          page_size: 100000,
-          sort_by: "name",
-          desc: false,
-          org_identifier: org,
-          module,
-          include_usage: includeUsage,
-        })
-      ).data ?? [],
+    queryKey: destinationKeys.list(org, module, includeUsage, excludeTypes),
+    queryFn: async (): Promise<any[]> => {
+      const list: any[] =
+        (
+          await destination.list({
+            page_num: 1,
+            page_size: 100000,
+            sort_by: "name",
+            desc: false,
+            org_identifier: org,
+            module,
+            include_usage: includeUsage,
+          })
+        ).data ?? [];
+      return excludeTypes?.length
+        ? list.filter((d) => !excludeTypes.includes(d?.destination_type_name))
+        : list;
+    },
     // A catalogue read by every alert form and by pipelines, not alert state — so the normal tier, not the live one.
     staleTime: NORMAL_STALE_TIME,
   });

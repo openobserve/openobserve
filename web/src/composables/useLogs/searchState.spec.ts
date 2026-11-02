@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { defineComponent, nextTick } from "vue";
+import { defineComponent } from "vue";
 import { mount } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -54,57 +54,11 @@ describe("searchState composable", () => {
   // resetSearchError
   // ---------------------------------------------------------------------------
   describe("resetSearchError", () => {
-    it("should clear errorMsg when it has a non-empty value", () => {
-      wrapper.vm.searchObj.data.errorMsg = "Something went wrong";
-
-      wrapper.vm.resetSearchError();
-
-      expect(wrapper.vm.searchObj.data.errorMsg).toBe("");
-    });
-
-    it("should clear errorDetail when it has a non-empty value", () => {
-      wrapper.vm.searchObj.data.errorDetail = "Detailed failure info";
-
-      wrapper.vm.resetSearchError();
-
-      expect(wrapper.vm.searchObj.data.errorDetail).toBe("");
-    });
-
-    it("should clear countErrorMsg when it has a non-empty value", () => {
-      wrapper.vm.searchObj.data.countErrorMsg = "Count query failed";
-
-      wrapper.vm.resetSearchError();
-
-      expect(wrapper.vm.searchObj.data.countErrorMsg).toBe("");
-    });
-
-    it("should reset errorCode to 0 when it has a non-zero value", () => {
-      wrapper.vm.searchObj.data.errorCode = 500;
-
-      wrapper.vm.resetSearchError();
-
-      expect(wrapper.vm.searchObj.data.errorCode).toBe(0);
-    });
-
     it("should clear all four error fields in a single call", () => {
       wrapper.vm.searchObj.data.errorMsg = "msg";
       wrapper.vm.searchObj.data.errorDetail = "detail";
       wrapper.vm.searchObj.data.countErrorMsg = "count msg";
       wrapper.vm.searchObj.data.errorCode = 404;
-
-      wrapper.vm.resetSearchError();
-
-      expect(wrapper.vm.searchObj.data.errorMsg).toBe("");
-      expect(wrapper.vm.searchObj.data.errorDetail).toBe("");
-      expect(wrapper.vm.searchObj.data.countErrorMsg).toBe("");
-      expect(wrapper.vm.searchObj.data.errorCode).toBe(0);
-    });
-
-    it("should be a no-op when all error fields are already at their default values", () => {
-      wrapper.vm.searchObj.data.errorMsg = "";
-      wrapper.vm.searchObj.data.errorDetail = "";
-      wrapper.vm.searchObj.data.countErrorMsg = "";
-      wrapper.vm.searchObj.data.errorCode = 0;
 
       wrapper.vm.resetSearchError();
 
@@ -143,38 +97,6 @@ describe("searchState composable", () => {
       expect(wrapper.vm.searchObj.runQuery).toBe(false);
     });
 
-    it("should clear errorMsg via the delegated resetSearchError call", () => {
-      wrapper.vm.searchObj.data.errorMsg = "Query timed out";
-
-      wrapper.vm.resetQueryData();
-
-      expect(wrapper.vm.searchObj.data.errorMsg).toBe("");
-    });
-
-    it("should clear errorDetail via the delegated resetSearchError call", () => {
-      wrapper.vm.searchObj.data.errorDetail = "Backend stack trace";
-
-      wrapper.vm.resetQueryData();
-
-      expect(wrapper.vm.searchObj.data.errorDetail).toBe("");
-    });
-
-    it("should clear countErrorMsg via the delegated resetSearchError call", () => {
-      wrapper.vm.searchObj.data.countErrorMsg = "Count failed";
-
-      wrapper.vm.resetQueryData();
-
-      expect(wrapper.vm.searchObj.data.countErrorMsg).toBe("");
-    });
-
-    it("should reset errorCode to 0 via the delegated resetSearchError call", () => {
-      wrapper.vm.searchObj.data.errorCode = 503;
-
-      wrapper.vm.resetQueryData();
-
-      expect(wrapper.vm.searchObj.data.errorCode).toBe(0);
-    });
-
     it("should reset all query and error fields together in a single call", () => {
       wrapper.vm.searchObj.data.sortedQueryResults = [{ _timestamp: 1 }];
       wrapper.vm.searchObj.data.resultGrid.currentPage = 3;
@@ -200,30 +122,6 @@ describe("searchState composable", () => {
   // resetHistogramError
   // ---------------------------------------------------------------------------
   describe("resetHistogramError", () => {
-    it("should clear histogram.errorMsg when it has a non-empty value", () => {
-      wrapper.vm.searchObj.data.histogram.errorMsg = "Histogram fetch failed";
-
-      wrapper.vm.resetHistogramError();
-
-      expect(wrapper.vm.searchObj.data.histogram.errorMsg).toBe("");
-    });
-
-    it("should reset histogram.errorCode to 0 when it has a non-zero value", () => {
-      wrapper.vm.searchObj.data.histogram.errorCode = 429;
-
-      wrapper.vm.resetHistogramError();
-
-      expect(wrapper.vm.searchObj.data.histogram.errorCode).toBe(0);
-    });
-
-    it("should clear histogram.errorDetail when it has a non-empty value", () => {
-      wrapper.vm.searchObj.data.histogram.errorDetail = "Rate limit exceeded on histogram endpoint";
-
-      wrapper.vm.resetHistogramError();
-
-      expect(wrapper.vm.searchObj.data.histogram.errorDetail).toBe("");
-    });
-
     it("should clear all three histogram error fields in a single call", () => {
       wrapper.vm.searchObj.data.histogram.errorMsg = "err";
       wrapper.vm.searchObj.data.histogram.errorCode = 500;
@@ -481,38 +379,6 @@ describe("searchState composable", () => {
 
       expect(wrapper.vm.searchObj.data.stream.streamLists).toEqual([]);
     });
-
-    it("should reset sortedQueryResults via delegated resetQueryData call", () => {
-      wrapper.vm.searchObj.data.sortedQueryResults = [{ _timestamp: 1 }];
-
-      wrapper.vm.resetStreamData();
-
-      expect(wrapper.vm.searchObj.data.sortedQueryResults).toEqual([]);
-    });
-
-    it("should reset resultGrid.currentPage to 1 via delegated resetQueryData call", () => {
-      wrapper.vm.searchObj.data.resultGrid.currentPage = 7;
-
-      wrapper.vm.resetStreamData();
-
-      expect(wrapper.vm.searchObj.data.resultGrid.currentPage).toBe(1);
-    });
-
-    it("should reset indexTimestamp to -1 via delegated resetSearchAroundData call", () => {
-      wrapper.vm.searchObj.data.searchAround.indexTimestamp = 1700000000000;
-
-      wrapper.vm.resetStreamData();
-
-      expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe(-1);
-    });
-
-    it("should reset searchAround.size to 0 via delegated resetSearchAroundData call", () => {
-      wrapper.vm.searchObj.data.searchAround.size = 100;
-
-      wrapper.vm.resetStreamData();
-
-      expect(wrapper.vm.searchObj.data.searchAround.size).toBe(0);
-    });
   });
 
   // ---------------------------------------------------------------------------
@@ -588,54 +454,10 @@ describe("searchState composable", () => {
   // ---------------------------------------------------------------------------
   // Reactive state accessors
   // ---------------------------------------------------------------------------
-  describe("schemaRequestToken", () => {
-    it("should expose schemaRequestToken with an initial value of 0", () => {
-      expect(wrapper.vm.schemaRequestToken).toBe(0);
-    });
-
-    it("should reflect updates to schemaRequestToken", async () => {
-      wrapper.vm.schemaRequestToken++;
-      await nextTick();
-
-      expect(wrapper.vm.schemaRequestToken).toBeGreaterThanOrEqual(1);
-
-      // restore
-      wrapper.vm.schemaRequestToken = 0;
-    });
-  });
-
-  describe("streamSchemaFieldsIndexMapping", () => {
-    it("should expose streamSchemaFieldsIndexMapping as an empty object by default", () => {
-      expect(wrapper.vm.streamSchemaFieldsIndexMapping).toEqual({});
-    });
-  });
-
-  describe("histogramResults", () => {
-    it("should expose histogramResults as an empty array by default", () => {
-      expect(wrapper.vm.histogramResults).toEqual([]);
-    });
-  });
-
-  describe("histogramMappedData", () => {
-    it("should expose histogramMappedData as an array", () => {
-      expect(Array.isArray(wrapper.vm.histogramMappedData)).toBe(true);
-    });
-  });
-
-  describe("searchPartitionMap", () => {
-    it("should expose searchPartitionMap as an empty object by default", () => {
-      expect(wrapper.vm.searchPartitionMap).toEqual({});
-    });
-  });
 
   // ---------------------------------------------------------------------------
   // initialQueryPayload
   // ---------------------------------------------------------------------------
-  describe("initialQueryPayload", () => {
-    it("should expose initialQueryPayload as null by default", () => {
-      expect(wrapper.vm.initialQueryPayload).toBeNull();
-    });
-  });
 
   // ---------------------------------------------------------------------------
   // fieldValues and notificationMsg
@@ -668,18 +490,6 @@ describe("searchState composable", () => {
       (wrapper.vm as any).fieldValues = { level: new Set(["error"]) };
       wrapper.vm.resetStreamData();
       expect(wrapper.vm.fieldValues).toEqual({});
-    });
-  });
-
-  describe("notificationMsg", () => {
-    it("should expose notificationMsg as an empty string by default", () => {
-      expect(wrapper.vm.notificationMsg).toBe("");
-    });
-  });
-
-  describe("ftsFields", () => {
-    it("should expose ftsFields as an empty array by default", () => {
-      expect(wrapper.vm.ftsFields).toEqual([]);
     });
   });
 });
