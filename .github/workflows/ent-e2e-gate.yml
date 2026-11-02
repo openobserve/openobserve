@@ -41,8 +41,8 @@ on:
 
 # PR-scoped: a new push/label supersedes the previous gate attempt for the same PR.
 concurrency:
-  # A non-approval review does nothing, so it must not cancel a running gate.
-  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && format('-{0}', github.run_id) || '' }}
+  # A non-approval review or an unrelated label may not dispatch, so it must not cancel a running gate.
+  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ ((github.event_name == 'pull_request_review' && github.event.review.state != 'approved') || ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'ready-for-ci' && github.event.label.name != 'skip-ent-e2e')) && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -302,7 +302,8 @@ jobs:
             # Genuine failure — distinguish an enterprise BUILD failure (compile) from SPEC failures,
             # and for specs list the failing files from the engine's failed-specs artifact.
             BUILD_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="build_binary")|.conclusion' 2>/dev/null || echo "")
-            TEST_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="ent_gate_tests")|.conclusion' 2>/dev/null || echo "")
+            # Any failed shard fails the tests even if the aggregate job never reported.
+            TEST_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '[.jobs[]|select(.name=="ent_gate_tests" or (.name|startswith("ent_gate_tests (")))|.conclusion]|if index("failure") then "failure" elif length > 0 then .[0] else "" end' 2>/dev/null || echo "")
             # A test job or "ent_gate_tests (i/n)" shard that failed with no failed step lost its runner; it was not a spec failure.
             TEST_LOST=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '[.jobs[]|select(.name=="ent_gate_tests" or (.name|startswith("ent_gate_tests (")))|select(.conclusion=="failure" and ([.steps[]|select(.conclusion=="failure")]|length)==0)]|length' 2>/dev/null || echo "")
             TEST_LOST=${TEST_LOST:-0}
