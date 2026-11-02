@@ -17,8 +17,14 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SpanBlock from "@/plugins/traces/SpanBlock.vue";
 import i18n from "@/locales";
-import router from "@/test/unit/helpers/router";
+import { createMemoryHistory, createRouter } from "vue-router";
 import { createStore } from "vuex";
+
+// The app router lazy-loads whole views on push, which times out under CI load.
+const router = createRouter({
+  history: createMemoryHistory(),
+  routes: [{ path: "/:pathMatch(.*)*", component: { render: () => null } }],
+});
 
 const mockStore = createStore({
   state: {

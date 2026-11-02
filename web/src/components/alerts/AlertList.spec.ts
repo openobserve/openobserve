@@ -209,12 +209,14 @@ let alertsDB: AlertV2[] = [];
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 
-async function mountAlertList() {
+// Tests that only call vm methods skip the table: its render is the slowest part of a mount.
+async function mountAlertList({ renderTable = true } = {}) {
   const wrapper = mount(AlertList, {
     attachTo: node,
     global: {
       plugins: [i18n, store, router],
       stubs: {
+        OTable: !renderTable,
         FolderList: {
           template: '<div data-test="stub-folder-list"></div>',
         },
@@ -1767,7 +1769,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
   // its group history and the cap banner do not fit a drawer, and a routed
   // page is linkable and back-navigable. Clicking a row now navigates.
   it("row click routes to the alert detail page instead of opening a drawer", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     expect(wrapper.findComponent({ name: "AlertHistoryDrawer" }).exists()).toBe(false);
@@ -1787,7 +1789,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
   });
 
   it("row click opens the alert in its own folder, not the selected one", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined as any);
@@ -1801,7 +1803,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
   });
 
   it("row click without an alert id does not navigate", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined as any);

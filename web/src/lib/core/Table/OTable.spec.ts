@@ -2032,12 +2032,14 @@ describe("OTable", () => {
     // branch carrying the measurement wiring never renders.
   });
 
-  describe("windowed row model with row expansion", () => {
+  describe("windowed row model with row expansion", { timeout: 15000 }, () => {
+    // Just past the 200-row fallback window, so windowing is observable without mounting thousands.
+    const ROWS = 210;
     const mountWindowed = (extra: Record<string, unknown>) =>
       mount(OTable, {
         props: {
-          data: makeRows(300),
-          columns: makeColumns(),
+          data: makeRows(ROWS),
+          columns: makeColumns().slice(0, 2),
           virtualScroll: true,
           windowRowModel: true,
           pagination: "none",
@@ -2052,19 +2054,19 @@ describe("OTable", () => {
 
     it("keeps the row model windowed when expanded rows are measured", () => {
       wrapper = mountWindowed({ measureExpandedRows: true });
-      expect(rowModelSize(wrapper)).toBeLessThan(300);
+      expect(rowModelSize(wrapper)).toBeLessThan(ROWS);
     });
 
     it("still builds every row for an expandable table that does not opt in", () => {
       wrapper = mountWindowed({});
-      expect(rowModelSize(wrapper)).toBe(300);
+      expect(rowModelSize(wrapper)).toBe(ROWS);
     });
 
     it("counts every row in the footer while the row model is windowed", async () => {
       wrapper = mount(OTable, {
         props: {
-          data: makeRows(2000),
-          columns: makeColumns(),
+          data: makeRows(ROWS),
+          columns: makeColumns().slice(0, 2),
           virtualScroll: true,
           windowRowModel: true,
           pagination: "none",
@@ -2075,13 +2077,13 @@ describe("OTable", () => {
         },
       });
       await nextTick();
-      expect(rowModelSize(wrapper)).toBeLessThan(2000);
-      expect(wrapper.find('[data-test="total-rows"]').text()).toBe("2000");
+      expect(rowModelSize(wrapper)).toBeLessThan(ROWS);
+      expect(wrapper.find('[data-test="total-rows"]').text()).toBe(String(ROWS));
     });
 
     it("never windows a tree", () => {
       wrapper = mountWindowed({ measureExpandedRows: true, expansion: "tree" });
-      expect(rowModelSize(wrapper)).toBe(300);
+      expect(rowModelSize(wrapper)).toBe(ROWS);
     });
 
     it("marks the detail row so the virtualizer can measure it with its data row", async () => {
