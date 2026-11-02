@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </i18n-t>
           <span v-else data-test="workflow-http-last-call">{{
-            t(isDraftOnly ? "workflow.http.lastCallNoneDraft" : "workflow.http.lastCallNone")
+            t(refusal ? "workflow.http.lastCallNoneRefused" : "workflow.http.lastCallNone")
           }}</span>
         </OText>
         <OText v-else variant="meta" as="p" :data-test="metaTestId">{{ metaText }}</OText>

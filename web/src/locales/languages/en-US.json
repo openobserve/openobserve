@@ -5250,7 +5250,7 @@
       "disableConfirm": "Turn off",
       "lastCall": "On · Last call: {status} · {time} · {link}",
       "lastCallNone": "On · No calls yet — send a test request",
-      "lastCallNoneDraft": "On · No calls yet",
+      "lastCallNoneRefused": "On · No calls yet",
       "viewRun": "View run",
       "lastCallStatus": {
         "queued": "queued",

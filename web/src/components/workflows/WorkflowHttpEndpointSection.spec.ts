@@ -566,8 +566,17 @@ describe("WorkflowHttpEndpointSection", () => {
     it("a draft with no calls drops the send-a-test-request hint", async () => {
       const w = await mountSection({ isDraftOnly: true });
       expect(byTest(w, "workflow-http-last-call").text()).toBe(
-        t("workflow.http.lastCallNoneDraft"),
+        t("workflow.http.lastCallNoneRefused"),
       );
+    });
+
+    it("a paused workflow with no calls drops the send-a-test-request hint", async () => {
+      const w = await mountSection({ workflowEnabled: false });
+      expect(byTest(w, "workflow-http-disabled-banner").exists()).toBe(true);
+      expect(byTest(w, "workflow-http-last-call").text()).toBe(
+        t("workflow.http.lastCallNoneRefused"),
+      );
+      expect(byTest(w, "workflow-http-last-call").text()).not.toBe(t("workflow.http.lastCallNone"));
     });
 
     it("both modes show workflow-http-secret-storage-warning when secrets_encrypted_at_rest is false", async () => {
