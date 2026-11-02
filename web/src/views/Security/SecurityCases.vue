@@ -572,7 +572,6 @@ async function loadRcaReport(id: string) {
   }
 }
 
-/** Show the latest report, and keep polling while a run is live. */
 function syncRca(id: string) {
   stopRcaPoll();
   if (detail.value?.id !== id) return;

@@ -55,12 +55,6 @@ export const securityNavLinks = (t: TranslateFn): NavItem[] => [
     name: "securityMitre",
   },
   {
-    title: t("siem.nav.compliance"),
-    icon: "verified-user",
-    link: "/security/compliance",
-    name: "securityCompliance",
-  },
-  {
     title: t("siem.nav.content"),
     icon: "menu-book",
     link: "/security/content",

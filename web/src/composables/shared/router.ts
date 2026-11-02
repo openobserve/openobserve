@@ -1535,15 +1535,6 @@ const useRoutes = () => {
       },
     },
     {
-      path: "security/compliance",
-      name: "securityCompliance",
-      component: () => import("@/views/Security/SecurityCompliance.vue"),
-      meta: { title: "Compliance" },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
-    {
       path: "security/sources",
       name: "securitySources",
       component: () => import("@/views/Security/SecuritySources.vue"),
