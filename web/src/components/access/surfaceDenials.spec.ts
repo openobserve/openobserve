@@ -14,8 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
+import { defineComponent, h, KeepAlive, nextTick, ref } from "vue";
+import { mount } from "@vue/test-utils";
 import { viewDenial } from "@/composables/useAccessStore";
-import { tableDenials } from "@/components/access/surfaceDenials";
+import { coverDenials, tableDenials, withoutCovered } from "@/components/access/surfaceDenials";
 
 const keys = (denials: { resource: { key: string } }[]) => denials.map((d) => d.resource.key);
 
@@ -40,5 +42,36 @@ describe("tableDenials", () => {
 
   it("names nothing when several lists were refused and the table names no resource", () => {
     expect(tableDenials([alertsList, templatesList])).toEqual([]);
+  });
+});
+
+describe("coverDenials", () => {
+  it("stops covering a denial while its cached page is off screen, and covers it again on return", async () => {
+    const denial = viewDenial("streams", "list", ["GET /api/default/streams?type=traces"]);
+    const showTraces = ref(true);
+    const CachedTraces = defineComponent({
+      name: "AppTraces",
+      setup() {
+        coverDenials(() => [denial]);
+        return () => h("div", "Traces");
+      },
+    });
+    const OtherPage = defineComponent({ render: () => h("div", "Other page") });
+    const wrapper = mount(
+      defineComponent({
+        setup: () => () =>
+          h(KeepAlive, null, { default: () => h(showTraces.value ? CachedTraces : OtherPage) }),
+      }),
+    );
+    expect(withoutCovered([denial])).toHaveLength(0);
+    showTraces.value = false;
+    await nextTick();
+    expect(wrapper.text()).toBe("Other page");
+    expect(withoutCovered([denial])).toHaveLength(1);
+    showTraces.value = true;
+    await nextTick();
+    expect(withoutCovered([denial])).toHaveLength(0);
+    wrapper.unmount();
+    expect(withoutCovered([denial])).toHaveLength(1);
   });
 });

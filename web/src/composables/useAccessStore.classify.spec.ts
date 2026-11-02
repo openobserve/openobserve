@@ -743,6 +743,27 @@ describe("access store classification", () => {
       "Create",
       "Enrichment tables",
     ],
+    // The server checks `streams/{name}` and `enrichment_tables/{name}/url` before any stream route.
+    ["POST", "/api/acme/streams/traces?type=logs", "streams", "create", "Create", "Streams"],
+    ["POST", "/api/acme/streams/profiles?type=logs", "streams", "create", "Create", "Streams"],
+    ["POST", "/api/acme/streams/_values?type=logs", "streams", "create", "Create", "Streams"],
+    ["POST", "/api/acme/streams/_around?type=logs", "streams", "create", "Create", "Streams"],
+    [
+      "POST",
+      "/api/acme/enrichment_tables/traces/url",
+      "enrichment_tables",
+      "create",
+      "Create",
+      "Enrichment tables",
+    ],
+    [
+      "POST",
+      "/api/acme/enrichment_tables/profiles/url",
+      "enrichment_tables",
+      "create",
+      "Create",
+      "Enrichment tables",
+    ],
     ["GET", "/api/acme/metrics/cpu_usage/usage", "metrics", "get", "Get", "Metrics"],
     ["GET", "/api/acme/traces/service_graph/topology/current", "traces", "get", "Get", "Traces"],
     ["POST", "/api/acme/traces/agent_signals/compare", "traces", "get", "Get", "Traces"],
@@ -796,12 +817,38 @@ describe("access store lifecycle", () => {
     expect(access.sectionEntries.value.map((e) => e.permission)).toEqual(["list"]);
   });
 
-  it("caps the request lines one entry keeps, newest last", async () => {
+  it("caps the request lines Copy details prints and storage keeps, newest last", async () => {
     await boot("/settings");
     for (let i = 0; i < 40; i++) forbidden("GET", `/api/acme/functions/fn_${i}`);
-    const requests = access.sectionEntries.value[0].requests;
-    expect(requests.length).toBeLessThanOrEqual(20);
-    expect(requests.at(-1)).toBe("GET /api/acme/functions/fn_39");
+    const printed = accessDetails(access.sectionEntries.value).match(
+      /GET \/api\/acme\/functions\/fn_\d+/g,
+    );
+    expect(printed).toHaveLength(20);
+    expect(printed?.at(-1)).toBe("GET /api/acme/functions/fn_39");
+    const stored = JSON.parse(sessionStorage.getItem("o2.access.memory.acme") ?? "{}");
+    expect(stored.sections.settings[0].requests).toHaveLength(20);
+  });
+
+  it("keeps a denial whose request fell off Copy details until that request succeeds", async () => {
+    await boot("/settings");
+    const fn = (i: number) => `/api/acme/functions/fn_${i}`;
+    const ok = (url: string) =>
+      noteAccessSuccess({ method: "GET", url, routeKey: currentAccessRouteKey() });
+    for (let i = 0; i <= 20; i++) forbidden("GET", fn(i));
+    for (let i = 1; i <= 20; i++) ok(fn(i));
+    expect(access.sectionEntries.value.map((e) => e.requests)).toEqual([[`GET ${fn(0)}`]]);
+    ok(fn(0));
+    expect(access.sectionEntries.value).toEqual([]);
+  });
+
+  it("keeps a refused save on screen when the user cancels leaving the page", async () => {
+    await boot("/settings");
+    forbidden("PUT", "/api/acme/pipelines/pipeline-a");
+    expect(access.sectionEntries.value).toHaveLength(1);
+    router.beforeEach(() => false);
+    await router.push("/users");
+    expect(router.currentRoute.value.path).toBe("/settings");
+    expect(access.sectionEntries.value.map((e) => e.permission)).toEqual(["update"]);
   });
 
   it("keeps refused writes on different unnamed areas apart and prints no internal key", async () => {
@@ -910,6 +957,8 @@ describe("access store lifecycle", () => {
   it.each([
     "/api/acme/_search_stream?type=logs&search_type=ui&use_cache=true",
     "/api/acme/_search_multi_stream?type=logs",
+    "/api/acme/_search_partition?type=logs",
+    "/api/acme/service_streams/_correlate",
     "/api/acme/web_logs/_values_stream?fields=level&type=logs",
     "/api/acme/prometheus/api/v1/query_range?use_streaming=true",
     "/api/acme/sourcemaps/stacktrace",
@@ -925,6 +974,19 @@ describe("access store lifecycle", () => {
     const stored = JSON.parse(sessionStorage.getItem("o2.access.memory.acme") ?? "{}");
     expect(Object.keys(stored.sections ?? {})).toEqual(["settings"]);
   });
+
+  it.each(["/api/acme/streams/_search_archive?type=logs", "/api/acme/_search_audit/_json"])(
+    "keeps the create card for POST %s, whose name only starts like a search",
+    async (url) => {
+      await boot("/settings");
+      document.body.innerHTML = "<button id='create'>Create</button>";
+      press("create");
+      forbidden("POST", url);
+      expect(access.actionNotice.value?.permission).toBe("create");
+      expect(accessPermission("POST", url)).toBe("create");
+      expect(sessionStorage.getItem("o2.access.memory.acme")).toBeNull();
+    },
+  );
 
   it("keeps a search-style POST a stored read, even right after a click", async () => {
     await boot("/settings");

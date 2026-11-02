@@ -248,14 +248,10 @@ const RESOURCE_ALIASES: Record<string, string> = {
   "fleet/settings": "fleet_management",
 };
 
-// A path word followed by one of these is a stream name, a value of Streams, never a resource of its own.
-const STREAM_SCOPED_SEGMENTS = new Set([
-  "_values",
-  "_around",
-  "_around_multi",
-  "traces",
-  "profiles",
-]);
+// What follows a stream name on the server's stream routes; any other word after a name is an item of its own.
+const STREAM_OPERATION =
+  "(?:_values|_around|_around_multi)$|traces/(?:latest|latest_stream|session|user|time_range)(?:/|$)|traces/[^/]+/(?:details|dag)$|profiles/(?:meta|tag_values|series|merge|diff)$";
+const STREAM_OPERATION_RE = new RegExp(`^(?:${STREAM_OPERATION})`);
 
 const ITEM_PERMISSIONS: RouteOverride["permissions"] = {
   GET: "get",
@@ -716,8 +712,9 @@ const DENIED_TITLE_KEYS: Record<AccessPermission, I18nKey> = {
   delete: "accessBoundary.denied.delete",
 };
 
-// Path-word prefixes of POSTs that only read data, so the `_stream` and `_multi` variants count too.
-const READ_POST_PREFIXES = ["_search", "_values", "_around", "_correlate"];
+// Prefixes of read-only POST words, so the `_stream` and `_multi` variants count too: org-level ones right after the org, the rest right after one name.
+const ORG_READ_POST_PREFIXES = ["_search", "_values"];
+const NAMED_READ_POST_PREFIXES = ["_values", "_around", "_correlate"];
 
 // A POST that toggles an existing item is checked against Update on the server, not Create.
 const UPDATE_POST_ACTIONS = new Set(["enable", "disable"]);
@@ -727,7 +724,7 @@ const PERMISSION_ORDER: AccessPermission[] = ["list", "get", "create", "update",
 /** Resources a collapsed list names before it folds the rest into "N more". */
 export const ACCESS_LIST_LIMIT = 4;
 
-/** Request lines one denial keeps for "Copy details"; older ones drop off first. */
+/** Request lines "Copy details" prints and storage keeps per denial; older ones drop off first. */
 export const ACCESS_REQUEST_LIMIT = 20;
 
 const RESOURCE_LABEL_PREFIX = "accessBoundary.resources.";
@@ -981,7 +978,7 @@ export function accessDetails(denials: AccessDenial[]): string {
   return [
     ...identityLines(),
     ...groupDenials(denials).map(({ permission, denials: inGroup }) => {
-      const requests = inGroup.flatMap((d) => d.requests).join(", ");
+      const requests = inGroup.flatMap((d) => cappedRequests(d.requests)).join(", ");
       const keys = inGroup.filter((d) => !isUnnamed(d.resource)).map((d) => d.resource.key);
       if (!keys.length) return `denied ${permission}: ${requests}`;
       return `denied ${permission}: ${keys.join(", ")}${requests ? ` (${requests})` : ""}`;
@@ -1059,7 +1056,9 @@ export function bindAccess(router: Router, store: AccessShellStore): void {
   shellStore = store;
   if (routerRef.value === router) return;
   routerRef.value = router;
-  router.afterEach((to, from) => {
+  router.afterEach((to, from, failure) => {
+    // A cancelled or failed navigation leaves the user on the page whose denials are on screen.
+    if (failure) return;
     const leaving = routeKey(from);
     if (leaving === routeKey(to)) return;
     dismissAction();
@@ -1140,7 +1139,7 @@ function mergeDenials(
   return added.reduce((merged, d) => {
     const found = merged.find((m) => entryId(m) === entryId(d) && m.permission === d.permission);
     if (!found) return [...merged, d];
-    const requests = cappedRequests([...new Set([...found.requests, ...d.requests])]);
+    const requests = [...new Set([...found.requests, ...d.requests])];
     return merged.map((m) => (m === found ? { ...m, requests } : m));
   }, open);
 }
@@ -1177,9 +1176,7 @@ function addSectionEntry(
     key,
     write,
     found
-      ? entries.map((e) =>
-          e === found ? { ...e, requests: cappedRequests([...e.requests, denied.request]) } : e,
-        )
+      ? entries.map((e) => (e === found ? { ...e, requests: [...e.requests, denied.request] } : e))
       : [...entries, { resource, permission: denied.permission, requests: [denied.request] }],
   );
 }
@@ -1231,7 +1228,12 @@ function writeMemory(org: string, memory: OrgAccessMemory): void {
   try {
     const empty = !Object.keys(memory.pages).length && !Object.keys(memory.sections).length;
     if (empty) sessionStorage.removeItem(MEMORY_PREFIX + org);
-    else sessionStorage.setItem(MEMORY_PREFIX + org, JSON.stringify(memory));
+    // Every denied request stays in memory to judge recovery; storage keeps only what Copy details prints.
+    else
+      sessionStorage.setItem(
+        MEMORY_PREFIX + org,
+        JSON.stringify({ ...memory, sections: namedSections(memory.sections) }),
+      );
   } catch {
     // Storage can be unavailable or full; the in-memory copy still drives this tab.
   }
@@ -1353,7 +1355,7 @@ function collectionRoutes(area: string, resource: string): RouteOverride[] {
 // A stream that shares the area's name keeps its stream reads.
 function itemRoute(area: string, resource: string): RouteOverride {
   return {
-    path: new RegExp(`^/[^/]+/${area}/(?!(${[...STREAM_SCOPED_SEGMENTS].join("|")})(/|$)).+$`),
+    path: new RegExp(`^/[^/]+/${area}/(?!(?:${STREAM_OPERATION})).+$`),
     resource,
     permissions: ITEM_PERMISSIONS,
   };
@@ -1414,9 +1416,8 @@ function inferPermission(
 
 // The segment after the optional version is the org (or a `_` system scope), never the resource; the first named word wins, so `users/<id>/roles` is Users and a stream called `alerts` stays a stream.
 function locateResource(segments: string[]): LocatedResource | null {
-  const rest = segments.slice((/^v\d+$/.test(segments[0] ?? "") ? 1 : 0) + 1);
-  if (rest.length > 1 && STREAM_SCOPED_SEGMENTS.has(rest[1]))
-    return { matched: "streams", after: rest, streamScoped: true };
+  const rest = afterOrg(segments);
+  if (isStreamOperation(rest)) return { matched: "streams", after: rest, streamScoped: true };
   for (let start = 0; start < rest.length; start++) {
     if (isIdSegment(rest[start])) continue;
     for (let end = rest.length; end > start; end--) {
@@ -1431,8 +1432,22 @@ function locateResource(segments: string[]): LocatedResource | null {
   return null;
 }
 
+// The server checks `streams/{name}` before any stream route, so `streams/_around` names a stream, not an operation.
+function isStreamOperation(rest: string[]): boolean {
+  if (rest.length < 2 || (rest[0] === "streams" && rest.length === 2)) return false;
+  return STREAM_OPERATION_RE.test(rest.slice(1).join("/"));
+}
+
+// Matched only where the server puts operation words, so an item named `_search_archive` is still created.
 function isSearchPost(segments: string[]): boolean {
-  return segments.some((s) => READ_POST_PREFIXES.some((p) => s.startsWith(p)));
+  const [area = "", name, ...more] = afterOrg(segments);
+  if (name === undefined || area === "_search")
+    return ORG_READ_POST_PREFIXES.some((p) => area.startsWith(p));
+  return (
+    more.length === 0 &&
+    area !== "streams" &&
+    NAMED_READ_POST_PREFIXES.some((p) => name.startsWith(p))
+  );
 }
 
 // Keyed by the path area after the org, so two unnamed resources stay two rows.
@@ -1444,7 +1459,7 @@ function unnamedResource(url: string, grantable = true): AccessResource {
     // The request line in Copy details then omits the path.
   }
   const segments = apiSegments(path);
-  const rest = segments.slice((/^v\d+$/.test(segments[0] ?? "") ? 1 : 0) + 1);
+  const rest = afterOrg(segments);
   const area = (rest[0] === "folders" ? rest.slice(0, 2) : rest.slice(0, 1)).join("/");
   return {
     key: `${UNNAMED_RESOURCE}/${area || segments[0] || ""}`,
@@ -1482,9 +1497,13 @@ function apiSegments(pathname: string): string[] {
   return apiAt >= 0 ? segments.slice(apiAt + 1) : segments;
 }
 
+function afterOrg(segments: string[]): string[] {
+  return segments.slice((/^v\d+$/.test(segments[0] ?? "") ? 1 : 0) + 1);
+}
+
 // The org segment is skipped: a generated org id would otherwise read as an item id.
 function hasItemId(segments: string[]): boolean {
-  const rest = segments.slice((/^v\d+$/.test(segments[0] ?? "") ? 1 : 0) + 1);
+  const rest = afterOrg(segments);
   const first = rest.findIndex((s) => !isIdSegment(s));
   return first >= 0 && rest.slice(first + 1).some(isIdSegment);
 }

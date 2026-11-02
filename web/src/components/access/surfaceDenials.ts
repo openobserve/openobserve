@@ -13,7 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { onBeforeUnmount, shallowReactive, watchEffect } from "vue";
+import {
+  onActivated,
+  onBeforeUnmount,
+  onDeactivated,
+  ref,
+  shallowReactive,
+  watchEffect,
+} from "vue";
 import { viewDenial, type AccessDenial } from "@/composables/useAccessStore";
 
 // What each mounted inline lock names, by lock; the chip leaves these out so one 403 reads once.
@@ -21,10 +28,17 @@ const coveredByLock = shallowReactive(new Map<symbol, Set<string>>());
 
 const denialId = (d: AccessDenial) => `${d.resource.key}|${d.permission}`;
 
-/** Keeps `denials` out of the access chip while the calling component is mounted. */
+/** Keeps `denials` out of the access chip while the calling component is mounted and active. */
 export function coverDenials(denials: () => AccessDenial[]): void {
   const lock = Symbol("accessLock");
-  watchEffect(() => coveredByLock.set(lock, new Set(denials().map(denialId))));
+  // A KeepAlive-cached page stays mounted while another page is on screen; its lock must not hide that page's denials.
+  const active = ref(true);
+  watchEffect(() => {
+    if (active.value) coveredByLock.set(lock, new Set(denials().map(denialId)));
+    else coveredByLock.delete(lock);
+  });
+  onActivated(() => (active.value = true));
+  onDeactivated(() => (active.value = false));
   onBeforeUnmount(() => coveredByLock.delete(lock));
 }
 
