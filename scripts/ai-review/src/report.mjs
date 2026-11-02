@@ -8,10 +8,19 @@ const MAX_FALLBACK_FINDINGS = 15;
 const NEARBY_LINES = 5;
 const NO_ISSUES_RE = /<no-issues(?:\s[^<>]*)?>[\s\S]*?<\/no-issues>|<no-issues(?:\s[^<>]*)?\/>/;
 const FINDING_BLOCK_RE = /<finding>([\s\S]*?)<\/finding>/g;
+const FINDING_PLACEHOLDER = "\u0000finding\u0000";
 // Prose outside the report that admits the review did not happen; a false hit only costs the area its "finished" mark.
 const INABILITY_RE = /\b(?:could ?n[o']t|can ?n[o']t|can't|unable to|was ?n[o']t able|were ?n[o']t able|failed to|no access|do(?:es)? ?n[o']t have access|did ?n[o']t have access|not able to)\b/i;
-// Inside a no-issues body only an inability to do the review itself counts: "could not find any problem" is a clean result.
-const REVIEW_INABILITY_RE = /\b(?:could ?n[o']t|couldn't|can ?n[o']t|can't|unable to|(?:was|were) ?n[o']t able to|wasn't able to|weren't able to|not able to|failed to)\s+(?:(?:fully|actually|properly|successfully|even|really)\s+)?(?:read|access|open|inspect|perform|review|complete|run|load|fetch|view|examine|analy[sz]e|retrieve|get)\b|\bno access\b|\b(?:do|does|did) ?n[o']t have access\b|\b(?:don't|doesn't|didn't) have access\b|\bwithout access\b|\btools? (?:call )?(?:failed|errored|was unavailable|is unavailable)\b/i;
+// Inside a no-issues body only an inability to see the inputs or do the review counts: "could not find any problem" or "could not run the tests" is a clean result.
+const CANNOT = String.raw`\b(?:could ?n[o']t|couldn't|can ?n[o']t|can't|unable to|(?:was|were) ?n[o']t able to|wasn't able to|weren't able to|not able to|failed to)\s+(?:(?:fully|actually|properly|successfully|even|really)\s+)?(?:(?:[\w'-]+\s+){1,5}?(?:or|and|nor)\s+(?:also\s+)?)?`;
+const INPUT_NOUN = String.raw`\b(?:files?|diffs?|patch(?:es)?|repo(?:sitory)?|PR|pull request|code|changes|sources?|hunks?|commits?|contents?)\b`;
+const REVIEW_INABILITY_RE = new RegExp([
+  String.raw`${CANNOT}(?:read|access|inspect|review|examine|analy[sz]e|view)(?![\w-])`,
+  String.raw`${CANNOT}(?:open|load|fetch|retrieve|get|obtain)\b[^.;:!?\n]{0,40}?${INPUT_NOUN}`,
+  String.raw`${CANNOT}(?:perform|complete|finish|do|conduct|carry out)\b[^.;:!?\n]{0,30}?\b(?:review|analysis)\b`,
+  String.raw`\bno access\b|\b(?:do|does|did) ?n[o']t have access\b|\b(?:don't|doesn't|didn't) have access\b|\bwithout access\b`,
+  String.raw`\btools? (?:call )?(?:failed|errored|was unavailable|is unavailable)\b`,
+].join("|"), "i");
 const SEVERITY_GLYPH = { p0: "🔴", p1: "🟠", p2: "🟡", p3: "🔵" };
 const SEVERITY_SECTION = {
   p0: "#### 🔴 P0 · Blockers",
@@ -94,15 +103,27 @@ function quotesReportInFence(text) {
   return [...text.matchAll(/```[\s\S]*?(?:```|$)/g)].some(([fence]) => /<\/?findings\b|<no-issues\b|<finding\b/.test(fence));
 }
 
-// "No findings" must be stated in full: empty, free-form or cut-off output is a reviewer that said nothing, not one that found nothing, and an unread block could be the blocker.
+// Neither a renderer nor a reader sees a report inside code or a comment, so it cannot be the answer.
+function withoutQuotedText(text) {
+  return text.replace(/```[\s\S]*?(?:```|$)/g, "").replace(/(`+)[\s\S]*?\1|`/g, "");
+}
+
+// Finding blocks become placeholders first, so code a finding quotes cannot hide its closing tag.
+function hasReport(outside, findingCount) {
+  return [...withoutQuotedText(outside).matchAll(/<findings(?:\s[^<>]*)?>([\s\S]*?)<\/findings>/g)]
+    .some(([, body]) => (findingCount > 0 ? body.includes(FINDING_PLACEHOLDER) : NO_ISSUES_RE.test(body)));
+}
+
+// "No findings" must be stated in full, inside the <findings> wrapper the prompt asks for: empty, free-form, quoted or cut-off output is a reviewer that said nothing, not one that found nothing, and an unread block could be the blocker.
 export function reviewerReported(text, findings) {
-  const output = unwrapWholeFence(String(text ?? ""));
+  const output = unwrapWholeFence(String(text ?? "").replace(/<!--[\s\S]*?(?:-->|$)/g, ""));
   if (outputCutOff(output) || (output.match(FINDING_BLOCK_RE)?.length ?? 0) !== findings.length) return false;
-  const outside = output.replace(FINDING_BLOCK_RE, "");
+  const outside = output.replace(FINDING_BLOCK_RE, FINDING_PLACEHOLDER);
   if (quotesReportInFence(outside)) return false;
-  if (INABILITY_RE.test(outside.replace(new RegExp(NO_ISSUES_RE.source, "g"), ""))) return false;
-  if ([...outside.matchAll(new RegExp(NO_ISSUES_RE.source, "g"))].some(([block]) => REVIEW_INABILITY_RE.test(block))) return false;
-  return findings.length > 0 || NO_ISSUES_RE.test(output);
+  const prose = withoutQuotedText(outside);
+  if (INABILITY_RE.test(prose.replace(new RegExp(NO_ISSUES_RE.source, "g"), ""))) return false;
+  if ([...prose.matchAll(new RegExp(NO_ISSUES_RE.source, "g"))].some(([block]) => REVIEW_INABILITY_RE.test(block))) return false;
+  return hasReport(outside, findings.length);
 }
 
 // Same shape as an entry of the coordinator's inline block.

@@ -134,7 +134,7 @@ All of these are required:
    counted (one inline block, every entry with a title and a known severity), the coordinator did not fall back, and the decision callout of the sanitized text, the one that gets posted, is an approval.
 6. The Security and Correctness reviewers ran and finished, as did every other selected reviewer,
    and each one that ran saw the whole filtered diff. Finished means the output parsed into findings
-   or held a complete `<no-issues>` element, with no `<finding>` or `<findings>` left open and no
+   or held a complete `<no-issues>` element, inside a `<findings>` report that is not in a code span or an HTML comment, with no `<finding>` or `<findings>` left open and no
    `<finding>` block left unread; empty, free-form or cut-off text does not count, even after an earlier
    finding parsed, and also keeps confidence below High. A PR within the size limit is forced to the `full` tier with `fileFocus` bypassed whenever
    the mode is not `off`; agents that require focus may still opt out when no file is in their domain.

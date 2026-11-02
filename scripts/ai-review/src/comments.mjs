@@ -37,6 +37,8 @@ const BOUNDARY_TAGS = ["mr_input", "mr_body", "mr_comments", "mr_details",
   "reviewers_ran", "failed_reviewers", "reviewer", "findings", "finding", "no-issues",
   "category", "severity", "file", "line", "description", "suggestion"];
 const BOUNDARY_TAG_RE = new RegExp(`</?(${BOUNDARY_TAGS.join("|")})[^>]*>`, "gi");
+// Cyrillic and Greek letters that render like Latin ones; NFKC leaves them alone.
+const LOOKALIKES = new Map([..."аеорсухіјѕԁһӏԛԝɡαονριкАВЕКМНОРСТХІЈЅΑΒΕΖΗΙΚΜΝΟΡΤΥΧ"].map((ch, i) => [ch, "aeopcyxijsdhlqwgaovpikABEKMHOPCTXIJSABEZHIKMNOPTYX"[i]]));
 
 export function selectOwnReviewComment(comments, botLogin, markerPattern) {
   if (!botLogin) return null;
@@ -244,8 +246,17 @@ export function removeRepeatedly(text, pattern, replacement) {
   return last;
 }
 
+// Markdown renders a numeric reference as its character, so "Merg&#101;" reads as "Merge"; named ones are already stripped by MARKUP_RE and none spells a Latin letter.
+function decodeCharRefs(text) {
+  return text.replace(/&#x([0-9a-f]{1,6});?|&#(\d{1,7});?/gi, (ref, hex, dec) => {
+    const code = hex ? Number.parseInt(hex, 16) : Number(dec);
+    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : ref;
+  });
+}
+
 function lettersOf(text) {
-  return text.normalize("NFKC").toLowerCase().replace(/[^a-z]/g, "");
+  const canonical = [...decodeCharRefs(text).normalize("NFKC")].map(ch => LOOKALIKES.get(ch) ?? ch).join("");
+  return canonical.toLowerCase().replace(/[^a-z]/g, "");
 }
 
 // Every pass is judged, not only the last: a renderer does not rescan, so a comment rebuilt by one pass, which the next would swallow, is visible text.

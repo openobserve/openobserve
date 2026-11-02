@@ -667,7 +667,7 @@ test("a reviewer counts as finished only when its output parsed", () => {
     [`<findings>${finding}<finding><summary>no severity</summary></finding></findings>`, false], [`<no-issues/><finding>`, false],
     [`<findings>${finding}</findings>`, true], [`<findings>${finding}${finding}</findings>`, true],
     [`<findings><finding><severity>p3</severity><summary>the regex misses <finding> and <findings></summary></finding></findings>`, true],
-    [noIssues, true], ["<no-issues/>", true], ["<no-issues />", true], [finding, true],
+    [noIssues, true], ["<no-issues/>", false], ["<no-issues />", false], [finding, false], [`<findings>${finding}</findings>`, true],
   ];
   for (const [text, parsed] of table) {
     assert.equal(reviewerReported(text, parseFindings(text ?? "")), parsed, String(text));
@@ -1230,6 +1230,26 @@ test("a no-issues report quoted as an example inside failure prose is not a fini
   for (const [text, parsed] of table) assert.equal(reviewerReported(text, parseFindings(text)), parsed, text);
 });
 
+test("a report that is only quoted, commented out or unwrapped is not a finished review", () => {
+  const finding = "<finding><severity>p3</severity><summary>x</summary></finding>";
+  const table = [
+    ["Expected response format: `<no-issues/>`.", false],
+    ["<!-- <no-issues/> -->", false],
+    ["<!-- <findings><no-issues/></findings> -->", false],
+    ["Expected: `<findings><no-issues/></findings>`.", false],
+    ["Expected: ``<findings><no-issues>LGTM</no-issues></findings>``", false],
+    [`<!-- <findings>${finding}</findings> -->`, false],
+    ["<findings><!-- <no-issues/> --></findings>", false],
+    ["<findings>`<no-issues/>`</findings>", false],
+    ["<no-issues>LGTM</no-issues>", false],
+    ["<findings>\n  <no-issues>LGTM</no-issues>\n  <!-- Repeat for each finding -->\n</findings>", true],
+    ["```xml\n<findings>\n  <no-issues>LGTM</no-issues>\n</findings>\n```", true],
+    [`<findings>${finding}</findings>`, true],
+    [`<findings><finding><severity>p3</severity><summary>uses \`x\`</summary><description>see \`<no-issues/>\`</description></finding></findings>`, true],
+  ];
+  for (const [text, parsed] of table) assert.equal(reviewerReported(text, parseFindings(text)), parsed, text);
+});
+
 test("a no-issues body saying the review could not be done is not a finished review", () => {
   const wrap = body => `<findings><no-issues>${body}</no-issues></findings>`;
   const unfinished = [
@@ -1245,6 +1265,11 @@ test("a no-issues body saying the review could not be done is not a finished rev
     "The read tool failed on every file.",
     "Failed to load the diff.",
     "I could not run the tests or read the sources.",
+    "I could not run the tests or access the repository.",
+    "I was unable to get the diff.",
+    "Failed to fetch the PR files.",
+    "I could not finish the review.",
+    "I couldn't perform a full review of the changes.",
   ];
   const finished = [
     "I could not find any problem.",
@@ -1254,6 +1279,13 @@ test("a no-issues body saying the review could not be done is not a finished rev
     "Reviewed all files; nothing to report.",
     "I could not find any review-worthy issue.",
     "",
+    "Reviewed every changed file and caller; no defects found. I could not run tests in this read-only session.",
+    "Unable to run the build locally; the code reads correctly.",
+    "I couldn't execute the linters, but every changed line was reviewed.",
+    "Could not run cargo test; reviewed the code statically.",
+    "I was not able to run the app or its commands.",
+    "I failed to complete the build in this sandbox.",
+    "No problems found. I cannot open the app here.",
   ];
   for (const body of unfinished) assert.equal(reviewerReported(wrap(body), []), false, body);
   for (const body of finished) assert.equal(reviewerReported(wrap(body), []), true, body);
