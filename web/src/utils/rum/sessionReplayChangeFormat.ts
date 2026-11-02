@@ -31,8 +31,10 @@
  *     the string table and the stylesheet table are all reset before EVERY full snapshot
  *     (`scope.resetIds()`), so decoding stays deterministic as long as records are
  *     processed in order and each snapshot begins with a FullSnapshot record.
- *   - Strings are de-duplicated via a string table; `AddString` changes append to it and
- *     other changes reference entries by numeric index.
+ *   - Strings are de-duplicated via a string table; `AddString` and `AddRoleAnnotatedStrings`
+ *     changes append to it, `ClearStrings` empties it (ids restart at 0), and other changes
+ *     reference entries by numeric index. SDK v7.10+ always uses `AddRoleAnnotatedStrings`.
+ *     The role only tells the intake what kind of data a string is, so playback ignores it.
  *   - An `AddNode` change is `[insertionPoint, nodeName, ...attributeAssignments]`. The
  *     insertion point encodes position relative to already-assigned ids:
  *        null  -> root node (the #document)
@@ -74,6 +76,17 @@ const ChangeType = {
   AttachedStyleSheets: 8,
   MediaPlaybackState: 9,
   VisualViewport: 10,
+  AddRoleAnnotatedStrings: 11,
+  InputValue: 12,
+  InputSelection: 13,
+  ClearStrings: 14,
+  // ImageContent (15) points at a canvas image the SDK uploads to a Datadog-only resource endpoint, so it is skipped.
+} as const;
+
+// InputSelection states.
+const InputSelectionState = {
+  Selected: 0,
+  Deselected: 1,
 } as const;
 
 const IncrementalSource = {
@@ -170,12 +183,26 @@ export function createRecordConverter(): RecordConverter {
     inputs = new Map();
   }
 
-  // Resolve a value that may be a string literal or a numeric string-table reference.
-  function decodeStr(value: string | number): string {
+  // Resolve a value that may be a string literal, a role-annotated literal ({ role, string }) or a numeric string-table reference.
+  function decodeStr(value: string | number | { string: string }): string {
     if (typeof value === "number") {
       return stringTable[value] ?? "";
     }
+    if (value !== null && typeof value === "object") {
+      return value.string ?? "";
+    }
     return value;
+  }
+
+  // AddRoleAnnotatedStrings: each group is [role, ...strings]; ids stay positional, as with AddString.
+  function addRoleAnnotatedStrings(change: any[]) {
+    for (let i = 1; i < change.length; i++) {
+      const roleGroup = change[i];
+      if (!Array.isArray(roleGroup)) continue;
+      for (let j = 1; j < roleGroup.length; j++) {
+        stringTable.push(roleGroup[j] as string);
+      }
+    }
   }
 
   function rulesToCssText(rules: string | string[]): string {
@@ -404,6 +431,14 @@ export function createRecordConverter(): RecordConverter {
           }
           break;
 
+        case ChangeType.AddRoleAnnotatedStrings:
+          addRoleAnnotatedStrings(group);
+          break;
+
+        case ChangeType.ClearStrings:
+          stringTable = [];
+          break;
+
         case ChangeType.AddNode:
           for (let i = 1; i < group.length; i++) {
             const change = group[i];
@@ -476,8 +511,9 @@ export function createRecordConverter(): RecordConverter {
           break;
 
         default:
-          // Attribute / Text / RemoveNode / VisualViewport are not expected inside a
-          // full snapshot; ignore them here (handled in the incremental path).
+          // Attribute / Text / RemoveNode / VisualViewport / InputValue / InputSelection are not
+          // expected inside a full snapshot, and unknown types are skipped; ignore them here
+          // (handled in the incremental path).
           break;
       }
     }
@@ -513,6 +549,14 @@ export function createRecordConverter(): RecordConverter {
           for (let i = 1; i < group.length; i++) {
             stringTable.push(group[i] as string);
           }
+          break;
+
+        case ChangeType.AddRoleAnnotatedStrings:
+          addRoleAnnotatedStrings(group);
+          break;
+
+        case ChangeType.ClearStrings:
+          stringTable = [];
           break;
 
         case ChangeType.AddNode:
@@ -666,6 +710,49 @@ export function createRecordConverter(): RecordConverter {
             }
           }
           break;
+
+        case ChangeType.InputValue:
+          for (let i = 1; i < group.length; i++) {
+            const [nodeId, value] = group[i];
+            const input = {
+              type: RecordType.IncrementalSnapshot,
+              timestamp,
+              data: {
+                source: IncrementalSource.Input,
+                id: nodeId,
+                text: decodeStr(value),
+                isChecked: false,
+              },
+            };
+            trackClassic(input);
+            extraRecords.push(input);
+          }
+          break;
+
+        case ChangeType.InputSelection: {
+          // Only checkboxes and radios have a classic equivalent (isChecked). <option> and indeterminate have none.
+          const state = group[1];
+          if (state !== InputSelectionState.Selected && state !== InputSelectionState.Deselected)
+            break;
+          for (let i = 2; i < group.length; i++) {
+            const nodeId = group[i];
+            const attrs = nodes.get(nodeId)?.node?.attributes;
+            if (attrs?.type !== "checkbox" && attrs?.type !== "radio") continue;
+            const input = {
+              type: RecordType.IncrementalSnapshot,
+              timestamp,
+              data: {
+                source: IncrementalSource.Input,
+                id: nodeId,
+                text: attrs.value ?? "",
+                isChecked: state === InputSelectionState.Selected,
+              },
+            };
+            trackClassic(input);
+            extraRecords.push(input);
+          }
+          break;
+        }
 
         case ChangeType.VisualViewport:
           for (let i = 1; i < group.length; i++) {

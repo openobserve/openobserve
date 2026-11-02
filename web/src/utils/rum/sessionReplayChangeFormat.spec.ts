@@ -32,6 +32,11 @@ const SCROLL_POSITION = 6;
 const ADD_STYLESHEET = 7;
 const ATTACHED_STYLESHEETS = 8;
 const MEDIA_PLAYBACK_STATE = 9;
+const ADD_ROLE_ANNOTATED_STRINGS = 11;
+const INPUT_VALUE = 12;
+const INPUT_SELECTION = 13;
+const CLEAR_STRINGS = 14;
+const IMAGE_CONTENT = 15;
 
 function fullSnapshot(data: any[]) {
   return { type: 2, format: 1, timestamp: 1000, data };
@@ -652,6 +657,151 @@ describe("sessionReplayChangeFormat", () => {
       expect(nodeWithId(converter.snapshot()!.node, 3).attributes).not.toHaveProperty(
         "rr_scrollTop",
       );
+    });
+  });
+  describe("SDK v7.10+ change types (11-15)", () => {
+    const change = (timestamp: number, data: any[]) => ({ type: 12, timestamp, data });
+    const nodeWithId = (node: any, id: number): any =>
+      node.id === id
+        ? node
+        : (node.childNodes ?? []).map((c: any) => nodeWithId(c, id)).find(Boolean);
+
+    it("fills the string table from AddRoleAnnotatedStrings, in order across role groups", () => {
+      // Roles: 1 node name, 2 attribute name, 3 attribute value. Ids are positional across groups.
+      const record = fullSnapshot([
+        [ADD_ROLE_ANNOTATED_STRINGS, [3, "foo"], [1, "#document", "div"], [2, "id"]],
+        // table: 0=foo 1=#document 2=div 3=id
+        [ADD_NODE, [null, 1], [1, 2, [3, 0]]],
+      ]);
+      const [out] = createRecordConverter().convert(record);
+      expect(out.data.node.type).toBe(0);
+      const div = out.data.node.childNodes[0];
+      expect(div.tagName).toBe("div");
+      expect(div.attributes).toEqual({ id: "foo" });
+    });
+
+    it("keeps AddString and AddRoleAnnotatedStrings in one table", () => {
+      const record = fullSnapshot([
+        [ADD_STRING, "#document"],
+        [ADD_ROLE_ANNOTATED_STRINGS, [1, "span"]],
+        [ADD_NODE, [null, 0], [1, 1]],
+      ]);
+      const [out] = createRecordConverter().convert(record);
+      expect(out.data.node.childNodes[0].tagName).toBe("span");
+    });
+
+    it("decodes role-annotated literals that sit outside the string table", () => {
+      const record = fullSnapshot([
+        [
+          ADD_NODE,
+          [null, { role: 1, string: "#document" }],
+          [
+            1,
+            { role: 1, string: "DIV" },
+            [
+              { role: 2, string: "id" },
+              { role: 3, string: "a" },
+            ],
+          ],
+        ],
+      ]);
+      const [out] = createRecordConverter().convert(record);
+      const div = out.data.node.childNodes[0];
+      expect(div.tagName).toBe("div");
+      expect(div.attributes).toEqual({ id: "a" });
+    });
+
+    it("restarts string ids at 0 after ClearStrings", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([
+          [ADD_ROLE_ANNOTATED_STRINGS, [1, "#document", "div"]],
+          [ADD_NODE, [null, 0], [1, 1]],
+        ]),
+      );
+      const out = converter.convert(
+        change(1100, [
+          [ADD_ROLE_ANNOTATED_STRINGS, [1, "p"]], // table: 0=#document 1=div 2=p
+          [ADD_NODE, [1, 2]],
+          [CLEAR_STRINGS],
+          [ADD_ROLE_ANNOTATED_STRINGS, [1, "b", "i"]], // table restarts: 0=b 1=i
+          [ADD_NODE, [2, 1], [0, 0]],
+        ]),
+      );
+      const adds = out[0].data.adds;
+      expect(adds.map((a: any) => a.node.tagName)).toEqual(["p", "i", "b"]);
+      expect(adds.map((a: any) => a.node.id)).toEqual([2, 3, 4]);
+    });
+
+    it("emits a classic Input record for InputValue", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([
+          [ADD_ROLE_ANNOTATED_STRINGS, [1, "#document", "INPUT"], [2, "type"], [3, "text"]],
+          [ADD_NODE, [null, 0], [1, 1, [2, 3]]],
+        ]),
+      );
+      const out = converter.convert(
+        change(1100, [
+          [ADD_ROLE_ANNOTATED_STRINGS, [5, "typed"]], // 4=typed
+          [INPUT_VALUE, [1, 4], [1, "literal"]],
+        ]),
+      );
+      expect(out).toEqual([
+        { type: 3, timestamp: 1100, data: { source: 5, id: 1, text: "typed", isChecked: false } },
+        { type: 3, timestamp: 1100, data: { source: 5, id: 1, text: "literal", isChecked: false } },
+      ]);
+      // Later snapshot rebuilds carry the value.
+      expect(nodeWithId(converter.snapshot()!.node, 1).attributes.value).toBe("literal");
+    });
+
+    it("maps InputSelection on checkboxes and radios to isChecked, and skips anything else", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([
+          [
+            ADD_NODE,
+            [null, "#document"],
+            [1, "INPUT", ["type", "checkbox"]],
+            [0, "INPUT", ["type", "radio"]],
+            [0, "OPTION"],
+            [0, "INPUT", ["type", "text"]],
+          ],
+        ]),
+      );
+      const out = converter.convert(
+        change(1100, [
+          [INPUT_SELECTION, 0, 1, 3], // selected: checkbox, option
+          [INPUT_SELECTION, 1, 2], // deselected: radio
+          [INPUT_SELECTION, 2, 1], // indeterminate: no classic equivalent
+          [INPUT_SELECTION, 0, 4], // text input is not checkable
+        ]),
+      );
+      expect(out.map((r: any) => r.data)).toEqual([
+        { source: 5, id: 1, text: "", isChecked: true },
+        { source: 5, id: 2, text: "", isChecked: false },
+      ]);
+      expect(nodeWithId(converter.snapshot()!.node, 1).attributes.checked).toBe(true);
+    });
+
+    it("skips ImageContent and unknown change types without dropping the rest of the record", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([
+          [ADD_NODE, [null, "#document"], [1, "DIV"], [1, "#text", "old"]],
+          [99, "whatever"], // unknown inside a full snapshot
+        ]),
+      );
+      const out = converter.convert(
+        change(1100, [
+          [IMAGE_CONTENT, [1, "resource-id"]],
+          [99, [1, 2, 3]],
+          [TEXT, [2, "new"]],
+        ]),
+      );
+      expect(out).toHaveLength(1);
+      expect(out[0].data.texts).toEqual([{ id: 2, value: "new" }]);
+      expect(nodeWithId(converter.snapshot()!.node, 2).textContent).toBe("new");
     });
   });
 });
