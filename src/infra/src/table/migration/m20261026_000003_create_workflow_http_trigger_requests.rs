@@ -22,6 +22,8 @@ const RUN_ID_IDX: &str = "workflow_http_trigger_requests_run_id_idx";
 const STATUS_ORG_RECEIVED_IDX: &str = "workflow_http_trigger_requests_status_org_received_idx";
 const WORKFLOW_RECEIVED_IDX: &str = "workflow_http_trigger_requests_workflow_received_idx";
 const RECEIVED_IDX: &str = "workflow_http_trigger_requests_received_idx";
+const TRIGGER_RECEIVED_IDX: &str = "workflow_http_trigger_requests_trigger_received_idx";
+const ORG_FINISHED_IDX: &str = "workflow_http_trigger_requests_org_finished_idx";
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -45,6 +47,8 @@ impl MigrationTrait for Migration {
             STATUS_ORG_RECEIVED_IDX,
             WORKFLOW_RECEIVED_IDX,
             RECEIVED_IDX,
+            TRIGGER_RECEIVED_IDX,
+            ORG_FINISHED_IDX,
         ] {
             manager
                 .drop_index(
@@ -236,6 +240,22 @@ fn create_indexes() -> Vec<IndexCreateStatement> {
             .table(WorkflowHttpTriggerRequests::Table)
             .col(WorkflowHttpTriggerRequests::ReceivedAt)
             .to_owned(),
+        // The endpoint view reads a trigger's newest call on every load.
+        Index::create()
+            .if_not_exists()
+            .name(TRIGGER_RECEIVED_IDX)
+            .table(WorkflowHttpTriggerRequests::Table)
+            .col(WorkflowHttpTriggerRequests::TriggerId)
+            .col(WorkflowHttpTriggerRequests::ReceivedAt)
+            .to_owned(),
+        // Every accepted call reads the org's newest finished runs for its queue-wait estimate.
+        Index::create()
+            .if_not_exists()
+            .name(ORG_FINISHED_IDX)
+            .table(WorkflowHttpTriggerRequests::Table)
+            .col(WorkflowHttpTriggerRequests::OrgId)
+            .col(WorkflowHttpTriggerRequests::FinishedAt)
+            .to_owned(),
     ]
 }
 
@@ -283,6 +303,8 @@ mod tests {
                 r#"CREATE INDEX IF NOT EXISTS "workflow_http_trigger_requests_status_org_received_idx" ON "workflow_http_trigger_requests" ("status", "org_id", "received_at")"#,
                 r#"CREATE INDEX IF NOT EXISTS "workflow_http_trigger_requests_workflow_received_idx" ON "workflow_http_trigger_requests" ("workflow_id", "received_at")"#,
                 r#"CREATE INDEX IF NOT EXISTS "workflow_http_trigger_requests_received_idx" ON "workflow_http_trigger_requests" ("received_at")"#,
+                r#"CREATE INDEX IF NOT EXISTS "workflow_http_trigger_requests_trigger_received_idx" ON "workflow_http_trigger_requests" ("trigger_id", "received_at")"#,
+                r#"CREATE INDEX IF NOT EXISTS "workflow_http_trigger_requests_org_finished_idx" ON "workflow_http_trigger_requests" ("org_id", "finished_at")"#,
             ]
         );
     }
@@ -336,6 +358,8 @@ mod tests {
             "workflow_http_trigger_requests_status_org_received_idx",
             "workflow_http_trigger_requests_workflow_received_idx",
             "workflow_http_trigger_requests_received_idx",
+            "workflow_http_trigger_requests_trigger_received_idx",
+            "workflow_http_trigger_requests_org_finished_idx",
         ] {
             assert!(
                 manager

@@ -132,7 +132,7 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 132: create oncall_chat_messages; add oncall_teams slack columns.
 // 133: add status page run streaks to synthetics.
 // 134: add write_version to llm_dataset_items, so one write request is one Dataset version.
-// 135: create the three workflow HTTP trigger tables.
+// 135: create the three workflow HTTP trigger tables; index workflow_run_data.run_id.
 pub const DB_SCHEMA_VERSION: u64 = 135;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 

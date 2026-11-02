@@ -252,6 +252,7 @@ mod m20261030_000001_add_suppress_repeats_to_alerts;
 mod m20261030_000001_create_org_domain_ownership_table;
 mod m20261030_000002_create_org_domain_ownership_req_table;
 mod m20261101_000001_create_oncall_slack;
+mod m20261102_000001_add_workflow_run_data_run_id_index;
 mod m20261103_000001_add_status_streaks_to_synthetics;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
@@ -557,6 +558,9 @@ pub(crate) async fn create_workflow_http_trigger_tables(
         .await?;
     m20261026_000003_create_workflow_http_trigger_requests::Migration
         .up(&manager)
+        .await?;
+    m20261102_000001_add_workflow_run_data_run_id_index::Migration
+        .up(&manager)
         .await
 }
 
@@ -801,6 +805,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261026_000001_create_workflow_http_triggers::Migration),
             Box::new(m20261026_000002_create_workflow_http_trigger_credentials::Migration),
             Box::new(m20261026_000003_create_workflow_http_trigger_requests::Migration),
+            Box::new(m20261102_000001_add_workflow_run_data_run_id_index::Migration),
         ]
     }
 }
@@ -903,10 +908,7 @@ mod tests {
         (132, "m20261101_000001_create_oncall_slack"),
         (133, "m20261103_000001_add_status_streaks_to_synthetics"),
         (134, "m20261028_000001_add_llm_dataset_item_write_version"),
-        (
-            135,
-            "m20261026_000003_create_workflow_http_trigger_requests",
-        ),
+        (135, "m20261102_000001_add_workflow_run_data_run_id_index"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1080,6 +1082,10 @@ mod tests {
             (
                 "m20260806_000001_create_oncall_tables",
                 "m20261101_000001_create_oncall_slack",
+            ),
+            (
+                "m20260720_000001_create_workflow_run_data_table",
+                "m20261102_000001_add_workflow_run_data_run_id_index",
             ),
         ] {
             assert!(

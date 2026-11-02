@@ -422,35 +422,7 @@ pub async fn delete_terminal_before<C: TransactionTrait>(
     db: &C,
     before_us: i64,
 ) -> Result<u64, DbErr> {
-    let txn = db.begin().await?;
-    let rows: Vec<(i64, String)> = requests::Entity::find()
-        .select_only()
-        .column(requests::Column::Id)
-        .column(requests::Column::RunId)
-        .filter(requests::Column::Status.is_in([
-            HookRunStatus::Succeeded.as_str(),
-            HookRunStatus::Failed.as_str(),
-            HookRunStatus::Expired.as_str(),
-        ]))
-        .filter(requests::Column::ReceivedAt.lt(before_us))
-        .into_tuple()
-        .all(&txn)
-        .await?;
-    let mut deleted = 0;
-    for batch in rows.chunks(DELETE_BATCH) {
-        let run_ids = batch.iter().map(|(_, run_id)| run_id.as_str());
-        workflow_run_data::Entity::delete_many()
-            .filter(workflow_run_data::Column::RunId.is_in(run_ids))
-            .exec(&txn)
-            .await?;
-        deleted += requests::Entity::delete_many()
-            .filter(requests::Column::Id.is_in(batch.iter().map(|(id, _)| *id)))
-            .exec(&txn)
-            .await?
-            .rows_affected;
-    }
-    txn.commit().await?;
-    Ok(deleted)
+    delete_terminal_in_batches(db, before_us, DELETE_BATCH).await
 }
 
 /// Deletes the trigger's queued rows and their payloads; running rows finish on their own.
@@ -490,6 +462,48 @@ pub async fn create_tables_for_tests(db: &sea_orm::DatabaseConnection) -> Result
 }
 
 /// The cap is counted inside the insert's transaction, so concurrent calls cannot overshoot it.
+/// One transaction per batch, so a large backlog never holds one long write transaction.
+async fn delete_terminal_in_batches<C: TransactionTrait>(
+    db: &C,
+    before_us: i64,
+    batch: usize,
+) -> Result<u64, DbErr> {
+    let mut deleted = 0;
+    loop {
+        let txn = db.begin().await?;
+        let rows: Vec<(i64, String)> = requests::Entity::find()
+            .select_only()
+            .column(requests::Column::Id)
+            .column(requests::Column::RunId)
+            .filter(requests::Column::Status.is_in([
+                HookRunStatus::Succeeded.as_str(),
+                HookRunStatus::Failed.as_str(),
+                HookRunStatus::Expired.as_str(),
+            ]))
+            .filter(requests::Column::ReceivedAt.lt(before_us))
+            .limit(batch as u64)
+            .into_tuple()
+            .all(&txn)
+            .await?;
+        if !rows.is_empty() {
+            let run_ids = rows.iter().map(|(_, run_id)| run_id.as_str());
+            workflow_run_data::Entity::delete_many()
+                .filter(workflow_run_data::Column::RunId.is_in(run_ids))
+                .exec(&txn)
+                .await?;
+            deleted += requests::Entity::delete_many()
+                .filter(requests::Column::Id.is_in(rows.iter().map(|(id, _)| *id)))
+                .exec(&txn)
+                .await?
+                .rows_affected;
+        }
+        txn.commit().await?;
+        if rows.len() < batch {
+            return Ok(deleted);
+        }
+    }
+}
+
 async fn write_queued<C: TransactionTrait>(
     db: &C,
     expired_id: Option<i64>,
@@ -982,6 +996,24 @@ mod tests {
         assert!(get_run(&db, "t1", "succeeded").await.unwrap().is_none());
         assert!(get_run(&db, "t1", "recent").await.unwrap().is_some());
         assert_eq!(payloads(&db).await, 1);
+    }
+
+    #[tokio::test]
+    async fn the_purge_walks_a_backlog_larger_than_one_batch() {
+        let db = db().await;
+        let old = NOW - 31 * 24 * 3600 * 1_000_000;
+        for run_id in ["a", "b", "c", "d", "e"] {
+            let id = enqueue_one(&db, run_id, old).await;
+            assert!(
+                finish_unclaimed(&db, id, HookRunStatus::Succeeded, None, old + 1)
+                    .await
+                    .unwrap()
+            );
+        }
+        enqueue_one(&db, "queued", old).await;
+        assert_eq!(delete_terminal_in_batches(&db, NOW, 2).await.unwrap(), 5);
+        assert_eq!(payloads(&db).await, 1);
+        assert_eq!(status_of(&db, "queued").await.0, "queued");
     }
 
     #[tokio::test]
