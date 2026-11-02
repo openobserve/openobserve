@@ -274,7 +274,7 @@ const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchServic
 
 /// Every production fn that calls a search entry point, as (file, fn), and how it is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, &str, Caller); 65] = [
+const SEARCH_CALLERS: [(&str, &str, Caller); 66] = [
     ("api/management/src/request/alert_calibration/digests.rs", "read", Caller::Operational),
     ("api/management/src/request/alerts/history.rs", "get_alert_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history.rs", "get_all_anomaly_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
@@ -312,6 +312,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 65] = [
     ("api/search/src/traces/user.rs", "get_latest_users", Caller::InHandler),
     ("core/src/ai_chat.rs", "search_window", Caller::Operational),
     ("core/src/alerts/alert_calibration/mod.rs", "search", Caller::Background("calibration runs")),
+    ("core/src/alerts/auto_investigate_decisions.rs", "query", Caller::Exempt("the org's own auto-investigate decision log from the meta org; its route stays open")),
     ("core/src/alerts/mod.rs", "evaluate_scheduled", Caller::Background("alert evaluation")),
     ("core/src/alerts/mod.rs", "run_alert_count_query", Caller::Background("alert evaluation")),
     ("core/src/alerts/notifications/chart/mod.rs", "fetch_series", Caller::Background("notification charts")),
