@@ -85,9 +85,12 @@ Applies to every NEW table and column (sqlite, MySQL and PostgreSQL alike):
 
 - Any new feature that uses OpenObserve itself to ingest and query its own
   operational or result data must name its feature-owned streams with the
-  `_o2_` prefix, for example `_o2_synthetics_results` and
-  `_o2_synthetics_step_results`. Apply this to every stream the feature creates,
-  including execution-level and step-level results.
+  `_o2_` prefix. Existing examples: `_o2_dbm_server` (`DBM_SERVER_STREAM` in
+  `src/config/src/meta/db_monitoring.rs`), `_o2_ai_chat_events`
+  (`AI_CHAT_EVENTS_STREAM` in `src/config/src/meta/self_reporting/ai_chat.rs`)
+  and `_o2_alert_calibration_digests` (`DIGEST_STREAM` in
+  `src/core/src/alerts/alert_calibration/sink.rs`). Apply this to every stream
+  the feature creates, including execution-level and step-level results.
 - Reuse shared stream-name constants within each code layer. Keep writers,
   readers, runner configuration, ingestion grants and internal-stream
   classification consistent. Verify that the actual ingestion path accepts
