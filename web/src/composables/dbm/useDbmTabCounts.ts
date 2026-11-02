@@ -128,6 +128,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { activitySampleTotal } from "@/utils/dbm/activity";
 import { dedupeServerInstanceRefs, type DbmServerInstanceRef } from "@/utils/dbm/fleetRows";
 import { countClaim, overlapClaim, type DbmCountClaim } from "@/utils/dbm/format";
+import { instanceKey } from "@/utils/dbm/instanceRows";
 
 /**
  * Everything the tab strips need, from one request.
@@ -300,7 +301,18 @@ export const fetchDbmTabCounts = async (
   const { databases, queries, activity, deadlocks, blocking, table_health: tableHealth } = badges;
 
   const counts: DbmTabCounts = {
-    databaseCount: databases ? (databases.hits?.length ?? 0) : null,
+    // Servers, not rows: the member arrives at (system, instance, namespace)
+    // grain, while the Overview folds each server's schemas into one row. A
+    // raw length would badge seventeen for one RDS host with seventeen schemas.
+    // The databases endpoint takes no namespace, so the Schema filter the
+    // Overview applies client-side is applied here too.
+    databaseCount: databases
+      ? new Set(
+          (databases.hits ?? [])
+            .filter((row) => !filters.namespace || (row.db_namespace ?? "") === filters.namespace)
+            .map((row) => instanceKey(row)),
+        ).size
+      : null,
     // The same databases member, summed instead of counted: its rows carry
     // the rollup's EXACT per-instance `calls` totals, and instances partition
     // calls, so the sum is the window's finished-call population. A row without

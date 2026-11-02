@@ -37,6 +37,7 @@
  */
 
 import type { DbmBreakdown, DbmBreakdownNode } from "@/utils/dbm/breakdown";
+import type { DbTotalsRow } from "@/services/db_monitoring";
 import { errorRate } from "@/utils/dbm/format";
 
 /**
@@ -186,6 +187,67 @@ export const toBreakdownRows = (
       queryCount: node.queryCount,
       status: null,
       children: node.children.map((child) => serviceRow(child, node.name, key)),
+    };
+  });
+};
+
+/** The exact per-schema totals a schema row is built from. */
+export type DbmSchemaTotals = Pick<
+  DbTotalsRow,
+  "db_namespace" | "calls" | "errors" | "total_time_ns" | "p50_ns" | "p95_ns" | "p99_ns"
+>;
+
+/**
+ * The child rows for one SERVER: one row per schema, from that schema's own
+ * exact totals, each holding the services the split attributes to it.
+ *
+ * The schema tier comes from `db_totals`, not from the split, because the split
+ * is top-N truncated: a quiet schema can be missing from it entirely, and a
+ * schema row summed from it would under-state the very figure the parent row
+ * states exactly. The split only supplies who called each schema.
+ *
+ * A server whose rows named no schema (Redis) has nothing to put in the tier,
+ * so it falls back to `toBreakdownRows` and its services directly.
+ */
+export const toSchemaRows = (
+  state: DbmBreakdownState | undefined,
+  schemas: DbmSchemaTotals[],
+  parentKey: string,
+): DbmBreakdownRow[] => {
+  const named = schemas.filter((schema) => !!schema.db_namespace);
+  if (!named.length) return toBreakdownRows(state, parentKey);
+  if (!state || state.loading) return [statusRow("loading", parentKey)];
+
+  const nodes = new Map<string, DbmBreakdownNode>();
+  if (!state.failed && !state.breakdown.collapsed) {
+    for (const node of state.breakdown.levels) if (node.name) nodes.set(node.name, node);
+  }
+  const total = named.reduce((acc, schema) => acc + (schema.total_time_ns ?? 0), 0);
+
+  return named.map((schema) => {
+    const name = schema.db_namespace as string;
+    const key = `${parentKey}/schema:${name}`;
+    const node = nodes.get(name);
+    const calls = schema.calls ?? 0;
+    const errors = schema.errors ?? 0;
+    const time = schema.total_time_ns ?? 0;
+    return {
+      rowKey: key,
+      kind: "schema" as const,
+      name,
+      namespace: name,
+      service: null,
+      calls,
+      errors,
+      errorRate: errorRate(errors, calls),
+      total_time_ns: time,
+      share: total > 0 ? time / total : 0,
+      p50_ns: schema.p50_ns ?? null,
+      p95_ns: schema.p95_ns ?? null,
+      p99_ns: schema.p99_ns ?? null,
+      queryCount: node?.queryCount ?? 0,
+      status: null,
+      children: (node?.children ?? []).map((child) => serviceRow(child, name, key)),
     };
   });
 };

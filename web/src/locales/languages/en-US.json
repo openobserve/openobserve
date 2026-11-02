@@ -24097,6 +24097,7 @@
     "databases": {
       "searchPlaceholder": "Search database or service…",
       "unnamedInstance": "Instance not named",
+      "schemaCount": "{count} schema | {count} schemas",
       "unnamedInstanceHint": "The database's own statement reports prove this engine is running, but they don't name a host. The row will show an address once a feed that carries one — session sampling or instance metrics — is set up.",
       "moreServices": "+{count}",
       "columns": {

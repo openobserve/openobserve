@@ -209,6 +209,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="opacity-45">·</span>
                 <OTruncatedText>{{ row.db_namespace }}</OTruncatedText>
               </template>
+              <!-- A server folded from several schemas names none of them: the
+                   count says what expanding the row will show. -->
+              <template v-else-if="namedSchemaCount(row) > 1">
+                <span class="opacity-45">·</span>
+                <span class="shrink-0" data-test="dbm-databases-schema-count">
+                  {{
+                    t(
+                      "dbm.databases.schemaCount",
+                      { count: namedSchemaCount(row) },
+                      namedSchemaCount(row),
+                    )
+                  }}
+                </span>
+              </template>
               <!-- The receiver can reach it, no application asked it anything.
                    That is a finding, not an absence — an idle replica is what
                    the client-vantage list cannot show by construction. -->
@@ -479,12 +493,14 @@ import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
 import { useDbmOwnFilterSync } from "@/composables/dbm/useDbmScopeFilters";
 import { createDbmContextProvider } from "@/composables/contextProviders";
 import { buildDatabaseBreakdown, type DbmBreakdown } from "@/utils/dbm/breakdown";
+import { rowNamespace } from "@/utils/dbm/breakdown";
 import {
   isBreakdownRow,
   showsShortfall,
-  toBreakdownRows,
+  toSchemaRows,
   type DbmBreakdownRow,
 } from "@/utils/dbm/breakdownRows";
+import { foldByInstance, type DbmInstanceTotals } from "@/utils/dbm/instanceRows";
 import {
   computeQps,
   errorRate,
@@ -553,6 +569,11 @@ const permissionOk = ref(true);
 // still return staging merged with prod — a filter that lies is worse than no
 // filter. Top queries is the grain that genuinely accepts `env`.
 const systemFilter = ref<string | null>((route.query.system as string) ?? null);
+// Client-side: the endpoint has no namespace param, and every schema of every
+// server is already in the response. It narrows which schemas fold into each
+// server row, and rides in the URL as `namespace` — the same key the sibling
+// tabs read — so the scope carries when the reader switches tabs.
+const namespaceFilter = ref<string | null>((route.query.namespace as string) ?? null);
 
 // This page is kept alive, so the seeds above run ONCE per session — a filter
 // set (or cleared) on a sibling tab would otherwise never reach these refs,
@@ -560,7 +581,7 @@ const systemFilter = ref<string | null>((route.query.system as string) ?? null);
 // activation, the same moment the range sync uses.
 useDbmOwnFilterSync(
   () => route.query,
-  { system: systemFilter },
+  { system: systemFilter, namespace: namespaceFilter },
   () => void load(),
 );
 /** Kept so the empty state can say "we haven't finished counting" rather than "no data". */
@@ -594,8 +615,10 @@ const MAX_VISIBLE_SERVICES = 3;
 interface DatabaseRow extends Partial<DbTotalsRow> {
   db_system: string;
   db_instance: string;
-  /** OTable needs a stable identity; the grain is (system, instance, namespace). */
+  /** OTable needs a stable identity; the grain is (system, instance). */
   rowKey: string;
+  /** The per-schema rows this server row was folded from — its schema children. */
+  schemas?: DbTotalsRow[];
   share: number;
   errorRate: number | null;
   /**
@@ -700,7 +723,8 @@ const summaryStats = computed<StatItem[]>(() => {
 });
 
 const isFiltered = computed(
-  () => !!search.value || !!systemFilter.value || statFilter.value !== null,
+  () =>
+    !!search.value || !!systemFilter.value || !!namespaceFilter.value || statFilter.value !== null,
 );
 
 // Every filter change publishes the scope to the URL BEFORE reloading — the
@@ -723,6 +747,15 @@ const dimensionFilters = computed<DbmScopeFilter[]>(() => [
     options: optionsFrom(rows.value.map((r) => r.db_system)),
     model: systemFilter,
   }),
+  // Options from the unfolded response, so every schema of every server is
+  // offered — including the one already selected.
+  filterEntry({
+    key: "namespace",
+    dimension: t("dbm.filters.dimension.namespace"),
+    placeholder: t("dbm.filters.allNamespaces"),
+    options: optionsFrom(clientHits.value.map((r) => r.db_namespace)),
+    model: namespaceFilter,
+  }),
 ]);
 
 /**
@@ -736,7 +769,12 @@ const visibleRows = computed(() => {
     statFilter.value === "failed" ? rows.value.filter((row) => (row.errors ?? 0) > 0) : rows.value;
   if (!needle) return scoped;
   return scoped.filter((row) =>
-    [row.db_instance, row.db_namespace, row.db_system, ...(row.calling_services ?? [])]
+    [
+      row.db_instance,
+      row.db_system,
+      ...(row.schemas ?? []).map((schema) => schema.db_namespace),
+      ...(row.calling_services ?? []),
+    ]
       .filter(Boolean)
       .some((field) => String(field).toLowerCase().includes(needle)),
   );
@@ -800,8 +838,9 @@ const treeRows = computed<TableRow[]>(() =>
       // chevron onto a fetch that can only ever come back empty.
       children: row.trafficless
         ? []
-        : toBreakdownRows(
+        : toSchemaRows(
             state && { breakdown: state.breakdown, loading: state.loading, failed: !!state.error },
+            row.schemas ?? [],
             row.rowKey,
           ),
     };
@@ -933,6 +972,9 @@ const onSortChange = ({ column, order }: { column: string; order: "asc" | "desc"
  */
 const hasShortfall = (row: TableRow): boolean => {
   if (isBreakdownRow(row)) return false;
+  // Schema children come from the exact per-schema totals, so they DO add up
+  // to the row; the caveat would be describing rows that are not shown.
+  if (namedSchemaCount(row) > 0) return false;
   const state = breakdowns.value[row.rowKey];
   return showsShortfall(
     state && { breakdown: state.breakdown, loading: state.loading, failed: !!state.error },
@@ -984,9 +1026,9 @@ const breakdownFailed = ref(false);
  *
  * The row's own exact total rides along so the aggregation can report its
  * shortfall rather than presenting a sum that silently does not reconcile. The
- * split is keyed by INSTANCE, and that is the grain it always had: the
- * per-row request scoped on `instance` alone, so two namespace rows on one
- * instance received the same response then and read the same entry now.
+ * split is keyed by INSTANCE, which is now the row's own grain. Under the
+ * Schema filter only that schema's rows are kept, so the split agrees with the
+ * folded row above it.
  */
 const fileBreakdown = (row: DatabaseRow) => {
   const section = instanceBreakdowns.value;
@@ -1007,7 +1049,12 @@ const fileBreakdown = (row: DatabaseRow) => {
       // An instance with no rows in the split is an EMPTY breakdown, not a
       // failure: nothing was attributable, which the `empty` placeholder
       // already says better than an error would.
-      breakdown: buildDatabaseBreakdown(section[row.db_instance] ?? [], row.total_time_ns),
+      breakdown: buildDatabaseBreakdown(
+        (section[row.db_instance] ?? []).filter(
+          (entry) => !namespaceFilter.value || rowNamespace(entry) === namespaceFilter.value,
+        ),
+        row.total_time_ns,
+      ),
       loading: false,
       error: null,
     },
@@ -1073,7 +1120,7 @@ watch(serverKnownInstances, () => {
  * an idle replica.
  */
 const applyInstanceMetrics = () => {
-  const hits = clientHits.value;
+  const hits: DbmInstanceTotals[] = foldByInstance(clientHits.value, namespaceFilter.value);
   const total = hits.reduce((acc, row) => acc + (row.total_time_ns ?? 0), 0);
   // With no metrics the union is the identity over the client rows, which is
   // exactly the page as it shipped.
@@ -1193,10 +1240,15 @@ const load = () =>
       topNSubset.value = data.top_n_subset;
       neverAggregated.value = data.freshness?.data_through === 0;
 
+      // Compared at the row's own grain: both windows folded per server, under
+      // the same Schema filter, so a key from one matches its row in the other.
       const drowning = data.baseline_read_failed
         ? new Set<string>()
         : new Set(
-            detectDrowningDatabases(hits, data.baseline_hits ?? []).map((d) => totalsKey(d.row)),
+            detectDrowningDatabases(
+              foldByInstance(hits, namespaceFilter.value),
+              foldByInstance(data.baseline_hits ?? [], namespaceFilter.value),
+            ).map((d) => totalsKey(d.row)),
           );
 
       clientHits.value = hits;
@@ -1281,6 +1333,10 @@ const databaseChips = (row: DbTotalsRow): DbmRowChip[] =>
  */
 const missing = (value: number | null | undefined): boolean =>
   value === null || value === undefined;
+
+/** How many named schemas a server row was folded from; 0 on a child row. */
+const namedSchemaCount = (row: TableRow): number =>
+  isBreakdownRow(row) ? 0 : (row.schemas ?? []).filter((schema) => !!schema.db_namespace).length;
 
 /** The placeholder standing in for a split that has not arrived — no figures. */
 const isStatusRow = (row: TableRow): boolean => isBreakdownRow(row) && row.kind === "status";
@@ -1615,6 +1671,7 @@ const defaultColumnVisibility = {};
 
 const clearScope = () => {
   systemFilter.value = null;
+  namespaceFilter.value = null;
   statFilter.value = null;
   // Clear the SEARCH too, the way every sibling tab's clear does
   // (TableHealthPage, SamplesPage, QueriesPage). Leaving it set makes "clear"
@@ -1650,6 +1707,7 @@ const syncUrl = ({ clearAllScope = false }: { clearAllScope?: boolean } = {}) =>
         ...route.query,
         ...queryParams.value,
         system: systemFilter.value ?? undefined,
+        namespace: namespaceFilter.value ?? undefined,
         ...(clearAllScope
           ? {
               instance: undefined,
