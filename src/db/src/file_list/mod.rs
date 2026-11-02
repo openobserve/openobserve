@@ -56,17 +56,18 @@ pub async fn set(account: &str, key: &str, meta: Option<FileMeta>, deleted: bool
     let mut last_err = None;
     // write into file_list storage
     // retry 5 times
-    for _ in 0..5 {
+    for attempt in 0..5u32 {
         match progress(account, key, meta.as_ref(), deleted).await {
             Ok(id) => {
                 file_data.id = id;
-                last_err = None;
                 break;
             }
             Err(e) => {
                 log::error!("[FILE_LIST] Error saving file to storage, retrying: {e}");
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 last_err = Some(e);
+                if attempt < 4 {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
             }
         }
     }
@@ -192,6 +193,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_progress_add_error() {
+        // "invalid_key" is rejected by parse_file_key_columns before touching the DB,
+        // which is sufficient to verify that progress() now propagates Err upward.
         let meta = create_test_file_meta();
         let result = progress("test_org", "invalid_key", Some(&meta), false).await;
         assert!(result.is_err());
@@ -199,6 +202,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_progress_delete_error() {
+        // "invalid_key" is rejected by parse_file_key_columns before touching the DB,
+        // which is sufficient to verify that progress() now propagates Err upward.
         let result = progress("test_org", "invalid_key", None, true).await;
         assert!(result.is_err());
     }
