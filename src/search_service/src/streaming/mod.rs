@@ -117,7 +117,8 @@ pub async fn process_search_stream_request(
         for stream_name in &stream_names {
             if let Ok(schema) = infra::schema::get(&org_id, stream_name, stream_type).await {
                 let stream_settings = infra::schema::unwrap_stream_settings(&schema);
-                let fts_fields = infra::schema::get_stream_setting_fts_fields(&stream_settings);
+                let fts_fields =
+                    infra::schema::get_stream_setting_fts_fields(&stream_settings, stream_type);
                 all_fts_fields.extend(fts_fields);
             }
         }

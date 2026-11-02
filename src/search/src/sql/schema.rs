@@ -66,14 +66,15 @@ pub fn generate_select_star_schema(
                             columns.retain(|column| uds_columns.contains(column));
                         }
                     }
-                    let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+                    let stream_type = name.get_stream_type(stream_type);
+                    let fts_fields = get_stream_setting_fts_fields(&stream_settings, stream_type);
                     generate_quick_mode_fields(
                         schema.schema(),
                         columns,
                         &fts_fields,
                         skip_original_column,
                         need_fst_fields,
-                        name.get_stream_type(stream_type),
+                        stream_type,
                     )
                 } else {
                     // skip selecting "_original" column if `SELECT * ...`
@@ -283,6 +284,7 @@ pub fn generate_schema_fields(
     columns: HashSet<String>,
     schema: &SchemaCache,
     has_match_all: bool,
+    stream_type: StreamType,
 ) -> Vec<FieldRef> {
     let mut columns = columns;
 
@@ -299,7 +301,7 @@ pub fn generate_schema_fields(
     // 3. add field from full text search
     if has_match_all {
         let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
-        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+        let fts_fields = get_stream_setting_fts_fields(&stream_settings, stream_type);
         for fts_field in fts_fields {
             if schema.field_with_name(&fts_field).is_none() {
                 continue;
@@ -595,7 +597,7 @@ mod tests {
         let mut columns = HashSet::new();
         columns.insert("field1".to_string());
 
-        let result = generate_schema_fields(columns, &schema_cache, false);
+        let result = generate_schema_fields(columns, &schema_cache, false, StreamType::Logs);
 
         // Should include timestamp, ID, and requested field
         let field_names: HashSet<String> = result.iter().map(|f| f.name().to_string()).collect();
@@ -619,7 +621,7 @@ mod tests {
         columns.insert("field1".to_string());
         // Note: not including timestamp or ID in columns
 
-        let result = generate_schema_fields(columns, &schema_cache, false);
+        let result = generate_schema_fields(columns, &schema_cache, false, StreamType::Logs);
 
         // Should automatically include timestamp and ID
         let field_names: HashSet<String> = result.iter().map(|f| f.name().to_string()).collect();
@@ -641,7 +643,7 @@ mod tests {
         columns.insert("existing_field".to_string());
         columns.insert("nonexistent_field".to_string());
 
-        let result = generate_schema_fields(columns, &schema_cache, false);
+        let result = generate_schema_fields(columns, &schema_cache, false, StreamType::Logs);
 
         // Should only include fields that exist in schema
         let field_names: HashSet<String> = result.iter().map(|f| f.name().to_string()).collect();
@@ -732,7 +734,7 @@ mod tests {
         let mut columns = HashSet::new();
         columns.insert("field1".to_string());
 
-        let result = generate_schema_fields(columns, &schema_cache, true);
+        let result = generate_schema_fields(columns, &schema_cache, true, StreamType::Logs);
         let names: HashSet<_> = result.iter().map(|f| f.name().as_str()).collect();
         assert!(names.contains(TIMESTAMP_COL_NAME));
         assert!(names.contains(ID_COL_NAME));

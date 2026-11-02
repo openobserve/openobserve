@@ -137,8 +137,7 @@ mod tests {
 
     #[test]
     fn test_convert_returns_none_for_unknown_stream_type() {
-        // service_graph / enrichment_tables / file_list are not handled by this
-        // converter — only logs/metrics/traces/metadata map to a tantivy index.
+        // only logs/metrics/traces/profiles/metadata map to a tantivy index
         let input = "files/default/service_graph/x/2024/02/16/16/1.parquet";
         assert_eq!(to_tantivy_name(input), None);
 

@@ -78,7 +78,7 @@ impl StreamSearchSettings {
         .await
         .unwrap_or_else(|_| arrow_schema::Schema::empty());
         let settings = unwrap_stream_settings(&db_schema);
-        let fts_fields = get_stream_setting_fts_fields(&settings)
+        let fts_fields = get_stream_setting_fts_fields(&settings, source.stream_type)
             .into_iter()
             .filter(|v| {
                 schema_fields

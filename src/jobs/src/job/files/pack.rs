@@ -351,7 +351,7 @@ async fn upload_chunk(
     let total_original_size: i64 = chunk.iter().map(|s| s.meta.original_size).sum();
 
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(stream_settings);
-    let full_text_search_fields = get_stream_setting_fts_fields(stream_settings);
+    let full_text_search_fields = get_stream_setting_fts_fields(stream_settings, stream_type);
     let index_fields = get_stream_setting_index_fields(stream_settings, stream_type);
     let (defined_schema_fields, need_original, index_original_data, index_all_values) =
         match stream_settings {

@@ -250,7 +250,7 @@ impl Sql {
         }
 
         // 6. get match_all() value
-        let mut match_visitor = MatchVisitor::new(&total_schemas);
+        let mut match_visitor = MatchVisitor::new(&total_schemas, stream_type);
         let _ = statement.visit(&mut match_visitor);
 
         // 7. check if have full text search filed in stream
@@ -281,7 +281,12 @@ impl Sql {
         } else {
             for (stream, schema) in total_schemas.iter() {
                 let columns = columns.get(stream).cloned().unwrap_or(Default::default());
-                let fields = generate_schema_fields(columns, schema, match_visitor.has_match_all);
+                let fields = generate_schema_fields(
+                    columns,
+                    schema,
+                    match_visitor.has_match_all,
+                    stream.get_stream_type(stream_type),
+                );
                 let schema = Schema::new(fields).with_metadata(schema.schema().metadata().clone());
                 used_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(schema)));
             }

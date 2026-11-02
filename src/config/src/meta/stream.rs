@@ -119,6 +119,9 @@ pub const ALL_STREAM_TYPES: [StreamType; 9] = [
     StreamType::Index,
 ];
 
+/// Profiles payload columns hold one long value per row: costly to index, rarely matched.
+const PROFILES_UNINDEXABLE_FIELDS: [&str; 2] = ["stack", "profile_blob"];
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum StreamType {
@@ -155,6 +158,11 @@ impl StreamType {
                 | StreamType::Profiles
                 | StreamType::Metadata
         )
+    }
+
+    /// False for columns this stream type never puts in a full text search or secondary index.
+    pub fn can_index_field(&self, field: &str) -> bool {
+        *self != StreamType::Profiles || !PROFILES_UNINDEXABLE_FIELDS.contains(&field)
     }
 
     pub fn support_uds(&self) -> bool {
@@ -1726,6 +1734,14 @@ mod tests {
         assert!(!StreamType::Filelist.support_index());
         assert!(!StreamType::ServiceGraph.support_index());
         assert!(!StreamType::Index.support_index());
+    }
+
+    #[test]
+    fn test_stream_type_can_index_field() {
+        assert!(!StreamType::Profiles.can_index_field("stack"));
+        assert!(!StreamType::Profiles.can_index_field("profile_blob"));
+        assert!(StreamType::Profiles.can_index_field("service_name"));
+        assert!(StreamType::Logs.can_index_field("stack"));
     }
 
     #[test]

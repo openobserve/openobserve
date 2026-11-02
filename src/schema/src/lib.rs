@@ -33,7 +33,7 @@ use config::{
             BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL,
             VALUE_LABEL,
         },
-        stream::{StreamSettings, StreamType},
+        stream::{DistinctField, StreamSettings, StreamType},
         traces::ALL_INFER_FIELDS,
     },
     metrics,
@@ -63,9 +63,6 @@ const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
 /// Shared by both ingestion-window discard messages and the test for them.
 const WINDOW_DISCARD_MARKER: &str = " data can be ingested. Data discarded.";
-/// Profiles payload columns hold one long value per row, so indexing them is costly and finds
-/// little.
-const PROFILES_UNINDEXABLE_FIELDS: [&str; 2] = ["stack", "profile_blob"];
 
 /// True when this error is an ingestion-window POLICY drop rather than a record
 /// that could not be prepared.
@@ -258,9 +255,7 @@ fn validate_stream_settings(
         )));
     }
 
-    if stream_type == StreamType::Profiles {
-        check_profiles_index_fields(settings)?;
-    }
+    check_unindexable_fields(stream_type, settings)?;
 
     if settings.data_retention > 0
         && settings.data_retention < 30
@@ -288,18 +283,26 @@ fn validate_stream_settings(
     Ok(())
 }
 
-fn check_profiles_index_fields(
+fn check_unindexable_fields(
+    stream_type: StreamType,
     settings: &StreamSettings,
 ) -> std::result::Result<(), StreamSettingsError> {
+    // distinct value fields only become index fields while the feature is enabled
+    let distinct_fields: &[DistinctField] = if settings.enable_distinct_fields {
+        &settings.distinct_value_fields
+    } else {
+        &[]
+    };
     let unindexable = settings
         .full_text_search_keys
         .iter()
         .chain(&settings.index_fields)
         .chain(&settings.bloom_filter_fields)
-        .find(|field| PROFILES_UNINDEXABLE_FIELDS.contains(&field.as_str()));
+        .chain(distinct_fields.iter().map(|field| &field.name))
+        .find(|field| !stream_type.can_index_field(field));
     match unindexable {
         Some(field) => Err(StreamSettingsError::BadRequest(format!(
-            "field [{field}] of a profiles stream cannot be used for full text search or index"
+            "field [{field}] of a {stream_type} stream cannot be used for full text search or index"
         ))),
         None => Ok(()),
     }
@@ -1293,13 +1296,17 @@ mod tests {
     }
 
     #[test]
-    fn test_check_profiles_index_fields_rejects_payload_columns() {
+    fn test_check_unindexable_fields_rejects_profiles_payload_columns() {
         let tag_index = StreamSettings {
             index_fields: vec!["service_name".to_string(), "k8s_pod_name".to_string()],
             ..Default::default()
         };
-        assert!(check_profiles_index_fields(&tag_index).is_ok());
+        assert!(check_unindexable_fields(StreamType::Profiles, &tag_index).is_ok());
 
+        let distinct_stack = vec![DistinctField {
+            name: "stack".to_string(),
+            added_ts: 1,
+        }];
         for settings in [
             StreamSettings {
                 full_text_search_keys: vec!["stack".to_string()],
@@ -1313,12 +1320,24 @@ mod tests {
                 bloom_filter_fields: vec!["stack".to_string()],
                 ..Default::default()
             },
+            StreamSettings {
+                distinct_value_fields: distinct_stack.clone(),
+                ..Default::default()
+            },
         ] {
             assert!(matches!(
-                check_profiles_index_fields(&settings),
+                check_unindexable_fields(StreamType::Profiles, &settings),
                 Err(StreamSettingsError::BadRequest(_))
             ));
+            assert!(check_unindexable_fields(StreamType::Logs, &settings).is_ok());
         }
+
+        let distinct_disabled = StreamSettings {
+            distinct_value_fields: distinct_stack,
+            enable_distinct_fields: false,
+            ..Default::default()
+        };
+        assert!(check_unindexable_fields(StreamType::Profiles, &distinct_disabled).is_ok());
     }
 
     #[test]
