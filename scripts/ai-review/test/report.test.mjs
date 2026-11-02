@@ -43,6 +43,7 @@ import * as commentsModule from "../src/comments.mjs";
 import * as confidenceModule from "../src/confidence.mjs";
 import * as reportModule from "../src/report.mjs";
 import * as passesModule from "../src/passes.mjs";
+import * as coordinatorInputModule from "../src/coordinator-input.mjs";
 import { SEVERITIES, normalizeSeverity, severityRank } from "../src/severity.mjs";
 
 test("the failed-reviewer line names each reviewer and why it did not finish", () => {
@@ -907,14 +908,15 @@ test("a dangling second block cannot read as a clean count, so the gate refuses"
 async function runCoordinatorWith(results, { modelFails = false, passResults = results, passes = 1 } = {}) {
   const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
   const body = source.slice(source.indexOf("async function runCoordinator("), source.indexOf("// ─── GitHub integration"));
-  const seen = { prompt: "" };
+  const seen = { prompt: "", calls: 0 };
   const scope = {
-    ...confidenceModule, ...reportModule, ...passesModule, REVIEW_COLD_PASSES: passes, extractInlineBlock, console: { log() {}, warn() {}, error() {} }, isoNow: () => "now",
+    ...confidenceModule, ...reportModule, ...passesModule, ...coordinatorInputModule, REVIEW_COLD_PASSES: passes, extractInlineBlock, console: { log() {}, warn() {}, error() {} }, isoNow: () => "now",
     TRACE: { startSpan: (name, attributes) => { seen.attributes = attributes; return {}; }, endSpan() {} },
     readPrompt: () => "", readRepoRules: () => "", RISK_TIERS: { full: {} }, COORDINATOR_AGENT: "coordinator", GEN_AI_PROVIDER_NAME: "test", PROVIDER_ID: "test", MODEL_ID: "test", MODEL_SLUG: "test",
     AGENT_TIMEOUT_MS: 1000, remainingRunMs: () => 1e6, POST_RESERVE_MS: 0, MIN_COORDINATOR_MS: 0, REVIEW_MARKER: "<!-- m -->",
     callOpencode: async (agent, system, prompt) => {
       seen.prompt = prompt;
+      seen.calls += 1;
       if (modelFails) throw new Error("model down");
       return { text: cleanCoordinatorOutput, responseId: "id" };
     },
@@ -923,6 +925,40 @@ async function runCoordinatorWith(results, { modelFails = false, passResults = r
   const result = await runCoordinator(results, passResults, "context", "full", null, {});
   return { ...seen, result };
 }
+
+function oversizedPasses(perReviewer) {
+  const keys = ["security", "performance", "correctness", "quality", "docs", "release", "frontend", "qa"];
+  const passResults = [1, 2].flatMap(pass => keys.map(key => ({
+    ...finishedReviewer(key),
+    pass,
+    findings: Array.from({ length: perReviewer }, (_, i) => ({
+      category: key, severity: "p2", file: `src/${key}/f${i}.rs`, line: String(i + 1),
+      summary: `${key} pass ${pass} finding ${i}`, description: `${"x".repeat(945)} ${pass}-${i}`, suggestion: "fix it",
+    })),
+  })));
+  passResults.at(-1).findings.push({ category: "qa", severity: "p0", file: "src/qa/last.rs", line: "9", summary: "last pass blocker", description: "y".repeat(945), suggestion: "stop" });
+  return passResults;
+}
+
+test("a two-pass report set over the transport limit reaches the coordinator compacted, never cut", async () => {
+  const passResults = oversizedPasses(8);
+  const run = await runCoordinatorWith(passesModule.mergePassResults(passResults), { passResults, passes: 2 });
+  assert.ok(run.prompt.length <= coordinatorInputModule.MAX_USER_PROMPT_CHARS, `prompt of ${run.prompt.length} chars`);
+  assert.ok(run.prompt.includes("<summary>last pass blocker</summary>"));
+  assert.ok(run.prompt.includes("</coordinator_task>"));
+  assert.equal(run.attributes["review.coordinator_input"], "compacted");
+  assert.equal(run.result.fallback, false);
+});
+
+test("a report set too large even compacted skips the coordinator and the fallback keeps the last pass's blocker", async () => {
+  const passResults = oversizedPasses(400);
+  const run = await runCoordinatorWith(passesModule.mergePassResults(passResults), { passResults, passes: 2 });
+  assert.equal(run.calls, 0);
+  assert.equal(run.attributes["review.coordinator_input"], "too_large");
+  assert.equal(run.result.fallback, true);
+  assert.ok(run.result.text.includes("last pass blocker"));
+  assert.ok(run.result.kept.some(f => f.title === "last pass blocker" && f.severity === "p0"));
+});
 
 test("the coordinator is told an unparsed reviewer failed, as the runner counts it", async () => {
   const results = [finishedReviewer("security"), silentReviewer("correctness"), { ...finishedReviewer("frontend"), parsed: undefined, skipped: true }];
@@ -1192,4 +1228,33 @@ test("a no-issues report quoted as an example inside failure prose is not a fini
     ["<findings><finding><severity>p2</severity><summary>s</summary><description>The handler cannot see ```<no-issues/>``` here.</description></finding></findings>", true],
   ];
   for (const [text, parsed] of table) assert.equal(reviewerReported(text, parseFindings(text)), parsed, text);
+});
+
+test("a no-issues body saying the review could not be done is not a finished review", () => {
+  const wrap = body => `<findings><no-issues>${body}</no-issues></findings>`;
+  const unfinished = [
+    "I was unable to read the repository files, so I could not perform this review.",
+    "Unable to access the diff.",
+    "I could not open the changed files.",
+    "I couldn't inspect the code.",
+    "I was not able to complete the review.",
+    "Could not review this PR: the tool failed.",
+    "I cannot fully review these changes.",
+    "I have no access to the repository.",
+    "I don't have access to the files.",
+    "The read tool failed on every file.",
+    "Failed to load the diff.",
+    "I could not run the tests or read the sources.",
+  ];
+  const finished = [
+    "I could not find any problem.",
+    "No issues found.",
+    "Unable to identify any defect in the changed lines.",
+    "I couldn't spot any correctness issue after reading every changed file.",
+    "Reviewed all files; nothing to report.",
+    "I could not find any review-worthy issue.",
+    "",
+  ];
+  for (const body of unfinished) assert.equal(reviewerReported(wrap(body), []), false, body);
+  for (const body of finished) assert.equal(reviewerReported(wrap(body), []), true, body);
 });

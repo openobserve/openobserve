@@ -10,6 +10,8 @@ const NO_ISSUES_RE = /<no-issues(?:\s[^<>]*)?>[\s\S]*?<\/no-issues>|<no-issues(?
 const FINDING_BLOCK_RE = /<finding>([\s\S]*?)<\/finding>/g;
 // Prose outside the report that admits the review did not happen; a false hit only costs the area its "finished" mark.
 const INABILITY_RE = /\b(?:could ?n[o']t|can ?n[o']t|can't|unable to|was ?n[o']t able|were ?n[o']t able|failed to|no access|do(?:es)? ?n[o']t have access|did ?n[o']t have access|not able to)\b/i;
+// Inside a no-issues body only an inability to do the review itself counts: "could not find any problem" is a clean result.
+const REVIEW_INABILITY_RE = /\b(?:could ?n[o']t|couldn't|can ?n[o']t|can't|unable to|(?:was|were) ?n[o']t able to|wasn't able to|weren't able to|not able to|failed to)\s+(?:(?:fully|actually|properly|successfully|even|really)\s+)?(?:read|access|open|inspect|perform|review|complete|run|load|fetch|view|examine|analy[sz]e|retrieve|get)\b|\bno access\b|\b(?:do|does|did) ?n[o']t have access\b|\b(?:don't|doesn't|didn't) have access\b|\bwithout access\b|\btools? (?:call )?(?:failed|errored|was unavailable|is unavailable)\b/i;
 const SEVERITY_GLYPH = { p0: "🔴", p1: "🟠", p2: "🟡", p3: "🔵" };
 const SEVERITY_SECTION = {
   p0: "#### 🔴 P0 · Blockers",
@@ -99,6 +101,7 @@ export function reviewerReported(text, findings) {
   const outside = output.replace(FINDING_BLOCK_RE, "");
   if (quotesReportInFence(outside)) return false;
   if (INABILITY_RE.test(outside.replace(new RegExp(NO_ISSUES_RE.source, "g"), ""))) return false;
+  if ([...outside.matchAll(new RegExp(NO_ISSUES_RE.source, "g"))].some(([block]) => REVIEW_INABILITY_RE.test(block))) return false;
   return findings.length > 0 || NO_ISSUES_RE.test(output);
 }
 

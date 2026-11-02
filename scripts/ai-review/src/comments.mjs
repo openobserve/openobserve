@@ -48,12 +48,12 @@ export function selectOwnReviewComment(comments, botLogin, markerPattern) {
 // Any workflow in the repository can post as github-actions[bot], so only the reviewer app's own pointer may stop a review.
 export function newestReviewIsPointer(comments, botLogin) {
   if (!botLogin || botLogin === "github-actions[bot]") return false;
-  return String(selectOwnReviewComment(comments, botLogin, ANY_REVIEW_MARKER)?.body ?? "").includes(PAIRED_POINTER_TAG);
+  return carriesRunnerTag(selectOwnReviewComment(comments, botLogin, ANY_REVIEW_MARKER)?.body, PAIRED_POINTER_TAG);
 }
 
 // untagged is what a comment from before the counter is worth: a review is one pass, a pointer or notice none.
 export function isPlaceholderComment(body) {
-  return String(body ?? "").includes(PAIRED_POINTER_TAG) || String(body ?? "").includes(NOTICE_TAG);
+  return carriesRunnerTag(body, PAIRED_POINTER_TAG) || carriesRunnerTag(body, NOTICE_TAG);
 }
 
 export function reviewPassCount(body, untagged = 1) {
@@ -309,4 +309,13 @@ export function sanitizeReviewBody(body, { marker, providerId, modelId, env }) {
   const scrubbed = scrubReviewBody(redactProviderIdentity(cleaned.trim(), { providerId, modelId }), env);
   // Stripped again because redaction can complete a marker the first pass did not recognise.
   return { text: `${marker}\n${scrubbed.text.replace(anyMarker, "").trimStart()}`, secretHits: scrubbed.secretHits };
+}
+
+// Only the runner writes a tag on its own line above the heading, and a reviewed head means a finished review, so quoted text never counts.
+function carriesRunnerTag(body, tag) {
+  const text = String(body ?? "");
+  if (new RegExp(REVIEW_SHA_TAG, "i").test(text)) return false;
+  const lines = text.split("\n");
+  const heading = lines.findIndex(line => REVIEW_HEADING_LINE_RE.test(line));
+  return heading > 0 && lines.slice(0, heading).some(line => line.trim() === tag);
 }

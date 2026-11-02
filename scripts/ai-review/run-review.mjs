@@ -57,6 +57,7 @@ import {
 import { changedCodeEvidence, mergeConfidence, reviewerFinished, severityCounts, unfinishedReviewers } from "./src/confidence.mjs";
 import { OpencodeServer, resolveOpencodeConfig, selfCheck, shouldRetry } from "./src/opencode.mjs";
 import { lostPasses, lostPassesNote, mergePassResults, parseColdPasses, passLabel, passPlan, runPooled } from "./src/passes.mjs";
+import { MAX_USER_PROMPT_CHARS, fitCoordinatorPrompt } from "./src/coordinator-input.mjs";
 import { fetchPinnedDiff, prefixDiffPaths, reviewerDiff } from "./src/pr-diff.mjs";
 import {
   buildFallbackReview,
@@ -811,7 +812,7 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
   }, traceOptions.parentSpan, SpanKind.CLIENT);
 
   const truncatedSystem = systemPrompt.slice(0, 100_000);
-  const truncatedUser = userPrompt.slice(0, 150_000);
+  const truncatedUser = userPrompt.slice(0, MAX_USER_PROMPT_CHARS);
 
   TRACE.setSpanAttributes(llmSpan, genAiRequestAttributes(truncatedSystem, truncatedUser));
 
@@ -996,21 +997,6 @@ async function runCoordinator(agentResults, passResults, prContext, tier, existi
   const coordinatorPrompt = readPrompt("agents/coordinator.md");
   const sharedRules = [readPrompt("shared-rules.md"), readRepoRules()].filter(Boolean).join("\n\n");
 
-  const findingsSections = passResults
-    .filter(r => r.findings.length > 0)
-    .map(r => {
-      const xml = r.findings.map(f => `  <finding>
-    <category>${f.category}</category>
-    <severity>${f.severity}</severity>
-    <file>${f.file}</file>
-    <line>${f.line}</line>
-    <summary>${f.summary}</summary>
-    <description>${f.description}</description>
-    <suggestion>${f.suggestion}</suggestion>
-  </finding>`).join("\n");
-      return `<reviewer name="${passLabel(r.agentName, r.pass, REVIEW_COLD_PASSES)}">\n${xml}\n</reviewer>`;
-    }).join("\n");
-
   const failedAgents = agentResults.filter(r => !r.skipped && !reviewerFinished(r));
   const failedNote = failedAgents.length > 0
     ? `\n<failed_reviewers>${failedAgents.map(r => r.agentName).join(", ")}</failed_reviewers>`
@@ -1024,7 +1010,7 @@ async function runCoordinator(agentResults, passResults, prContext, tier, existi
     ? `<cold_passes>Each reviewer ran ${REVIEW_COLD_PASSES} independent passes with no shared context; a reviewer name ending in "pass N/${REVIEW_COLD_PASSES}" is one of them. A finding raised by only one pass is still a finding: keep it. Merge findings that describe the same issue into one, keeping the higher severity. List each reviewer once in the Reviewers row, without a pass suffix.</cold_passes>`
     : "";
 
-  const userPrompt = [
+  const buildPrompt = findingsSections => [
     `<coordinator_task>`,
     `<overall_pr_context>${prContext}</overall_pr_context>`,
     `<risk_tier>${tier}</risk_tier>`,
@@ -1035,6 +1021,12 @@ async function runCoordinator(agentResults, passResults, prContext, tier, existi
     existingReview ? `<previous_review>${existingReview}</previous_review>` : "",
     `</coordinator_task>`,
   ].join("\n");
+  const fit = fitCoordinatorPrompt(passResults, REVIEW_COLD_PASSES, buildPrompt);
+  if (fit.mode === "compacted") {
+    console.warn(`[${isoNow()}] Coordinator input compacted from ${fit.fullChars} to ${fit.chars} chars to fit the ${MAX_USER_PROMPT_CHARS}-char limit`);
+  } else if (fit.mode === "too_large") {
+    console.warn(`[${isoNow()}] Coordinator input is ${fit.chars} chars and does not fit ${MAX_USER_PROMPT_CHARS} even compacted; using the deterministic fallback`);
+  }
 
   const tierConfig = RISK_TIERS[tier] || RISK_TIERS.full;
   const coordinatorAgent = tierConfig.coordinatorAgent || COORDINATOR_AGENT;
@@ -1051,15 +1043,18 @@ async function runCoordinator(agentResults, passResults, prContext, tier, existi
     "review.findings": agentResults.reduce((sum, r) => sum + r.findings.length, 0),
     "review.failed_agents": failedAgents.length,
     "review.passes": REVIEW_COLD_PASSES,
+    "review.coordinator_input": fit.mode,
+    "review.coordinator_input_chars": fit.chars,
   }, parentSpan);
 
   console.log(`[${isoNow()}] Running coordinator (${MODEL_SLUG}, ${coordinatorAgent})`);
 
   try {
+    if (fit.mode === "too_large") throw new Error(`coordinator input of ${fit.chars} chars exceeds the ${MAX_USER_PROMPT_CHARS}-char limit even compacted`);
     // Reviewer retries can eat into the run, so the coordinator gets what is left rather than a fixed slot past the watchdog.
     const timeoutMs = Math.min(AGENT_TIMEOUT_MS, remainingRunMs() - POST_RESERVE_MS);
     if (timeoutMs < MIN_COORDINATOR_MS) throw new Error(`only ${Math.round(remainingRunMs() / 1000)}s left in the run`);
-    const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, timeoutMs, {
+    const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, fit.prompt, timeoutMs, {
       parentSpan: coordinatorSpan,
       agentKey: "coordinator",
       agentName: "Coordinator",
