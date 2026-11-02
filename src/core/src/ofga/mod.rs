@@ -78,10 +78,64 @@ struct PendingMigrations {
     downtimes: bool,
     ai_chat_shares: bool,
     fleet: bool,
+    ownership_repair: bool,
     public_dashboards: bool,
     incident_integrations: bool,
     missing_ownership: bool,
     profiles: bool,
+}
+
+impl PendingMigrations {
+    /// Every flag `all_org_ownership_keys` reads, so the repair re-writes each `_all_` key.
+    fn every_ownership_back_fill() -> Self {
+        Self {
+            cipher_keys: true,
+            ratelimit: true,
+            service_accounts: true,
+            ai_chat_permissions: true,
+            re_pattern_permission: true,
+            license_permission: true,
+            sourcemap_permission: true,
+            service_streams: true,
+            logs_pattern_insights: true,
+            ai_toolsets: true,
+            incidents: true,
+            model_pricing: true,
+            online_eval: true,
+            llm_workbench: true,
+            billing_group: true,
+            synthetics: true,
+            workflows: true,
+            oncall: true,
+            annotation_queues_datasets: true,
+            workflow_folders: true,
+            synthetic_environments: true,
+            prompts: true,
+            prompt_folders: true,
+            query_history: true,
+            downtimes: true,
+            ai_chat_shares: true,
+            fleet: true,
+            missing_ownership: true,
+            public_dashboards: true,
+            profiles: true,
+            incident_integrations: true,
+            ..Default::default()
+        }
+    }
+
+    // The rejected 0.0.59 batch carried these for installs from before 0.0.30; sweeps ran apart.
+    fn writes_pipeline_tuples(&self) -> bool {
+        self.pipeline || self.ownership_repair
+    }
+
+    fn writes_alert_folder_tuples(&self) -> bool {
+        self.alert_folders || self.ownership_repair
+    }
+
+    fn writes_report_folder_tuples(&self) -> bool {
+        self.report_folders || self.ownership_repair
+    }
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -317,7 +371,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     for key in &all_org_keys {
                         get_ownership_all_org_tuple(org_name, key, &mut tuples);
                     }
-                    if pending.pipeline {
+                    if pending.writes_pipeline_tuples() {
                         get_ownership_all_org_tuple(org_name, "pipelines", &mut tuples);
                         match infra::pipeline::list_by_org(org_name).await {
                             Ok(pipelines) => {
@@ -332,11 +386,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             }
                         }
                     }
-                    if pending.alert_folders {
+                    if pending.writes_alert_folder_tuples() {
                         get_ownership_all_org_tuple(org_name, "alert_folders", &mut tuples);
                         get_ownership_tuple(org_name, "alert_folders", DEFAULT_FOLDER, &mut tuples);
                     }
-                    if pending.report_folders {
+                    if pending.writes_report_folder_tuples() {
                         get_ownership_all_org_tuple(org_name, "report_folders", &mut tuples);
                         get_ownership_tuple(
                             org_name,
@@ -456,12 +510,17 @@ async fn run_folder_and_data_migrations(pending: &PendingMigrations) {
     }
 }
 
-/// The resources a pending back-fill needs nothing but an `_all_` org tuple for.
+/// The `_all_` org keys a pending back-fill needs; the ownership repair asks for every one.
 ///
 /// Data rather than control flow. The three that also need a per-object tuple or
 /// a database sweep — pipelines, alert folders, report folders — stay as explicit
 /// branches at the call site.
 fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
+    if pending.ownership_repair {
+        let mut keys = all_org_ownership_keys(&PendingMigrations::every_ownership_back_fill());
+        keys.extend(["pipelines", "alert_folders", "report_folders"]);
+        return keys;
+    }
     let mut keys = vec![];
     if pending.cipher_keys {
         keys.push("cipher_keys");
@@ -775,6 +834,16 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] incident integrations permissions migration needed");
         pending.incident_integrations = true;
     }
+    // The 0.0.59 arm's unknown `fleet` type got its batch, and every later one, rejected.
+    let v0_0_63 = version_compare::Version::from("0.0.63").unwrap();
+    if meta_version >= v0_0_63
+        && existing_model_version >= v0_0_59
+        && existing_model_version < v0_0_63
+    {
+        log::info!("[OFGA:Local] org-ownership repair back-fill needed");
+        pending.ownership_repair = true;
+        pending.profiles = true;
+    }
 
     pending
 }
@@ -842,6 +911,96 @@ mod tests {
         assert_eq!(keys, vec!["fleets", "fleet_configs", "fleet_management"]);
         // OpenFGA rejects a batch naming an unknown type, which drops every later batch.
         assert!(keys.iter().all(|key| OFGA_MODELS.contains_key(*key)));
+    }
+
+    #[test]
+    fn ownership_repair_rewrites_every_org_key_for_installs_past_0_0_59() {
+        let mut expected = vec![
+            "cipher_keys",
+            "ratelimit",
+            "service_accounts",
+            "ai",
+            "re_patterns",
+            "license",
+            "sourcemaps",
+            "service_streams",
+            LOGS_INSIGHTS_KEY,
+            LOGS_PATTERN_KEY,
+            RESULT_LOGS_CACHE_KEY,
+            "ai_toolsets",
+            "incidents",
+            "model_pricing",
+            "providers",
+            "score_configs",
+            "scorers",
+            "eval_jobs",
+            "playground",
+            "annotation_queues",
+            "datasets",
+            "experiments",
+            "remote_tasks",
+            "billing_group",
+            "synthetic_folder",
+            "synthetics",
+            "workflows",
+            "oncall",
+            "oncall_responses",
+            "workflow_folder",
+            "synthetic_environment",
+            "prompts",
+            "prompt_labels",
+            "prompt_folders",
+            "query_history",
+            "downtime_folders",
+            "downtimes",
+            "ai_chat_shares",
+            "fleets",
+            "fleet_configs",
+            "fleet_management",
+            "db_monitoring",
+            "search_inspector",
+            "status_page",
+            "mcp",
+            "alert_calibration",
+            "slack",
+            "public_dashboards",
+            "profiles",
+            "incident_integrations",
+            "pipelines",
+            "alert_folders",
+            "report_folders",
+        ];
+        expected.sort_unstable();
+        for existing in ["0.0.59", "0.0.60", "0.0.61", "0.0.62"] {
+            let pending = pending_migrations("0.0.63", existing);
+            assert!(pending.ownership_repair && pending.profiles, "{existing}");
+            let mut keys = all_org_ownership_keys(&pending);
+            keys.sort_unstable();
+            keys.dedup();
+            assert_eq!(keys, expected, "{existing}");
+        }
+        // `get_ownership_all_org_tuple` also takes a model type name, e.g. `status_page`.
+        let model_types: HashSet<&str> = OFGA_MODELS.values().map(|model| model.key).collect();
+        let unknown: Vec<_> = expected
+            .iter()
+            .filter(|key| !OFGA_MODELS.contains_key(**key) && !model_types.contains(**key))
+            .collect();
+        assert!(unknown.is_empty(), "{unknown:?}");
+        // No DB sweep may ride along: only the ownership tuples are re-written.
+        let pending = pending_migrations("0.0.63", "0.0.62");
+        assert!(!pending.alert_folders && !pending.report_folders && !pending.pipeline);
+        assert!(!pending.prompt_folders && !pending.workflow_folders && !pending.stream_names);
+        assert!(!pending.anomaly_detection);
+        assert!(pending.writes_pipeline_tuples());
+        assert!(pending.writes_alert_folder_tuples() && pending.writes_report_folder_tuples());
+        let current = pending_migrations("0.0.63", "0.0.63");
+        assert!(!current.writes_pipeline_tuples() && !current.writes_alert_folder_tuples());
+        assert!(!current.writes_report_folder_tuples());
+        assert!(pending_migrations("0.0.30", "0.0.29").writes_report_folder_tuples());
+        assert!(!pending_migrations("0.0.63", "0.0.58").ownership_repair);
+        assert!(!pending_migrations("0.0.63", "0.0.63").ownership_repair);
+        assert!(!pending_migrations("0.0.62", "0.0.59").ownership_repair);
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.63", "0.0.63")).is_empty());
     }
 
     #[test]
