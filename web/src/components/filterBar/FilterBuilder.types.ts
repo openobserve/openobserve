@@ -37,7 +37,7 @@ export interface FilterBuilderProps {
   size?: "sm" | "md";
   /** `plain` blends the bar into the editor surface it sits in. */
   appearance?: "field" | "plain";
-  /** Prefix for every test id: `-row-<path>`, `-chip-<field>`, `-connector-<path>`, `-add-condition`, `-add-group`, `-ungroup-<path>`, `-issues`. */
+  /** Prefix for every test id: `-row-<path>`, `-chip-<field>`, `-connector-<path>`, `-add-condition`, `-add-group`, `-group-add-<path>`, `-ungroup-<path>`, `-issues`. */
   dataTest?: string;
 }
 

@@ -62,7 +62,7 @@ export interface ChipInputProps {
   inlineCaret?: boolean;
   /** Lines of chips shown before the field scrolls inside itself; it grows freely when unset. */
   maxRows?: number;
-  /** Prefix for `data-test`: `-input` caret input, `-search` popover search box, `-suggest` popover, `-suggest-item-{key}` rows. */
+  /** Prefix for `data-test`: `-input` caret input, `-search` popover search box, `-suggest` popover, `-suggest-item-{key}` rows, `-suggest-section` section headings. */
   dataTest?: string;
 }
 

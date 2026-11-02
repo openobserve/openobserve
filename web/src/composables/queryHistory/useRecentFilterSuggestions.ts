@@ -47,7 +47,7 @@ interface RecentFilterOptions {
   example: (query: string) => void;
 }
 
-/** The focus dropdown's list as rows for the filter builder's picker, which holds the same caret. */
+/** The focus dropdown's list as rows of the filter builder's picker. */
 export const useRecentFilterSuggestions = (source: HistorySource, options: RecentFilterOptions) => {
   const { t } = useI18nTyped();
   const { zone } = useRecentEntryText();
