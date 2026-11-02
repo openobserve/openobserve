@@ -2763,7 +2763,11 @@ describe("SearchBar", () => {
       await flushPromises();
       searchObjInstance.data.editorValue = "";
       searchObjInstance.meta.queryEditorPlaceholderFlag = true;
-      const vm = wrapper.vm as unknown as { recentFocusOpen: boolean };
+      const vm = wrapper.vm as unknown as {
+        recentFocusOpen: boolean;
+        toggleFilterBuilder: () => void;
+      };
+      vm.toggleFilterBuilder();
       vm.recentFocusOpen = false;
       await flushPromises();
       expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
