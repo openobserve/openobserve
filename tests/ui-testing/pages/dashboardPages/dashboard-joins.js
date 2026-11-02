@@ -111,6 +111,12 @@ export class JoinHelper {
       .click();
     await this.page.waitForTimeout(500);
 
+    // The left option's click occasionally dismisses the join popup itself; reopen it so the condition can finish.
+    if (!(await leftFieldWrapper.isVisible())) {
+      testLogger.warn('Join popup closed after selecting the left field, reopening');
+      await this.page.locator('[data-test^="dashboard-join-item-"]:not([data-test$="-remove"])').last().click();
+    }
+
     // Configure operation if not default
     if (operation !== "=") {
       const operationSelector = this.page.locator(

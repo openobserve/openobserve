@@ -70,13 +70,13 @@ test.describe("Dashboard Panel Time - Variables Time Behavior", () => {
     // Step 4: Edit the panel
     await editPanel(page, panelName);
 
+    // Armed before the time change: changing it is what fires the variable values call
+    const monitor = dashboardVariables.createVariableAPIMonitor();
+    page.on('response', monitor.handler);
+
     // Step 5: Change global time to "Last 6d" and apply
     // v4.0 CRITICAL: In add/edit mode, variables use GLOBAL time, not panel config
     await pm.dashboardPanelTime.changeGlobalTime('6-d');
-
-    // Step 6: Set up API monitoring to capture variable values request
-    const monitor = dashboardVariables.createVariableAPIMonitor();
-    page.on('response', monitor.handler);
 
     // Step 7: Open variable dropdown to trigger /values API call with current time context
     await dashboardVariables.openVariableDropdown(variableName);
@@ -142,13 +142,13 @@ test.describe("Dashboard Panel Time - Variables Time Behavior", () => {
     expect(pickerText).toContain("1");
     expect(pickerText.toLowerCase()).toContain("hour");
 
+    // Armed before the time change: changing it is what fires the variable values call
+    const monitor = dashboardVariables.createVariableAPIMonitor();
+    page.on('response', monitor.handler);
+
     // Step 6: Change global time to "Last 6 days" and apply
     // v4.0: In Edit Panel mode, variables use GLOBAL time (6d), NOT panel config (1h)
     await pm.dashboardPanelTime.changeGlobalTime('6-d');
-
-    // Step 7: Set up API monitoring to capture variable values request
-    const monitor = dashboardVariables.createVariableAPIMonitor();
-    page.on('response', monitor.handler);
 
     // Step 8: Open variable dropdown to trigger /values API call with current time context
     await dashboardVariables.openVariableDropdown(variableName);
@@ -206,13 +206,13 @@ test.describe("Dashboard Panel Time - Variables Time Behavior", () => {
     // Step 4: Edit the panel
     await editPanel(page, panelName);
 
+    // Armed before the time change: changing it is what fires the variable values call
+    const monitor = dashboardVariables.createVariableAPIMonitor();
+    page.on('response', monitor.handler);
+
     // Step 5: Change global time to "Last 3 days" and apply
     // Variables should use global time (3d)
     await pm.dashboardPanelTime.changeGlobalTime('3-d');
-
-    // Step 6: Set up API monitoring to capture variable values request
-    const monitor = dashboardVariables.createVariableAPIMonitor();
-    page.on('response', monitor.handler);
 
     // Step 7: Open variable dropdown to trigger /values API call with current time context
     await dashboardVariables.openVariableDropdown(variableName);
