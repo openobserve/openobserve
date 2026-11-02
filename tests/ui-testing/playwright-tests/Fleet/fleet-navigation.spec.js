@@ -16,6 +16,7 @@ test.describe('Fleet management navigation', { tag: ['@fleet', '@enterprise', '@
   });
 
   test.afterEach(async () => {
+    if (!pm) return;
     await pm.fleetSeed.cleanup();
     expect(await pm.fleetSeed.survivors()).toEqual([]);
   });
