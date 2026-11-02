@@ -35,7 +35,10 @@ use std::{
 
 use config::{
     get_config,
-    meta::{alerts::content_spec::ContentSpec, destinations::DestinationType},
+    meta::{
+        alerts::{content_spec::ContentSpec, notification_kind::NotificationKind},
+        destinations::DestinationType,
+    },
 };
 
 use super::{
@@ -153,7 +156,7 @@ pub fn build_test_message(
     dest_type: &DestinationType,
     spec: &ContentSpec,
 ) -> Result<RenderedMessage, TestSendError> {
-    Ok(build_test_message_with_title(dest_type, spec)?.1)
+    Ok(build_test_message_with_title(dest_type, spec, NotificationKind::Alert)?.1)
 }
 
 /// Same as [`build_test_message`], but also returns the marked title used to
@@ -163,13 +166,17 @@ pub fn build_test_message(
 fn build_test_message_with_title(
     dest_type: &DestinationType,
     spec: &ContentSpec,
+    kind: NotificationKind,
 ) -> Result<(String, RenderedMessage), TestSendError> {
     // Hold the draft to the same bar `templates::save` applies, so a
     // test-send cannot "succeed" on a template that cannot be saved.
     spec.validate().map_err(TestSendError::InvalidContent)?;
 
     let format = derive_channel_format(dest_type);
-    let ctx: NotificationContext = synthetic_context(None);
+    let ctx: NotificationContext = match kind {
+        NotificationKind::Alert => synthetic_context(None),
+        kind => super::examples::example_context(kind, false),
+    };
     let mut content = resolve_content(spec, &ctx, format.channel_family());
     content.title = format!("{TEST_MARKER}{}", content.title);
     let title = content.title.clone();
@@ -188,8 +195,9 @@ pub async fn test_send(
     org_id: &str,
     dest_type: &DestinationType,
     spec: &ContentSpec,
+    kind: NotificationKind,
 ) -> Result<String, TestSendError> {
-    let (title, rendered) = build_test_message_with_title(dest_type, spec)?;
+    let (title, rendered) = build_test_message_with_title(dest_type, spec, kind)?;
     dispatch_test_message(org_id, dest_type, &title, rendered)
         .await
         .map_err(|e| TestSendError::DispatchFailed(e.to_string()))
@@ -339,7 +347,8 @@ mod tests {
             sns_topic_arn: "arn:aws:sns:us-east-1:123456789012:topic".into(),
             aws_region: "us-east-1".into(),
         });
-        let (title, rendered) = build_test_message_with_title(&dest, &sample_spec()).unwrap();
+        let (title, rendered) =
+            build_test_message_with_title(&dest, &sample_spec(), NotificationKind::Alert).unwrap();
         assert!(title.starts_with(TEST_MARKER));
         assert_eq!(title, format!("{TEST_MARKER}Sample CPU alert fired"));
         match rendered {

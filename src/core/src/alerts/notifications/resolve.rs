@@ -32,7 +32,9 @@
 //! structure the author wrote. Title, fields, links and rows are not
 //! markdown-parsed and stay raw.
 
-use config::meta::alerts::{content_spec::ContentSpec, level::AlertLevel};
+use config::meta::alerts::{
+    content_spec::ContentSpec, level::AlertLevel, notification_kind::NotificationKind,
+};
 
 use super::{context::NotificationContext, custom::scan_and_replace_var};
 
@@ -96,6 +98,10 @@ pub fn resolve_content(
         unknown_variables.append(&mut unk);
         let (value, mut unk) = substitute_raw(&field.value, ctx);
         unknown_variables.append(&mut unk);
+        // Alerts keep an empty field so their output stays byte identical; other kinds hide it.
+        if ctx.kind != NotificationKind::Alert && value.trim().is_empty() {
+            continue;
+        }
         fields.push((label, value));
     }
 
@@ -271,6 +277,10 @@ fn substitute_with(
         scan_and_replace_var(&mut out, name, |len| esc(&truncate(value, len)));
     }
 
+    for (name, value) in extra_scalar_vars(ctx) {
+        scan_and_replace_var(&mut out, name, |len| esc(&truncate(&value, len)));
+    }
+
     for (key, values) in ctx.row_columns.iter() {
         let joined = values.join(", ");
         scan_and_replace_var(&mut out, key, |len| esc(&truncate(&joined, len)));
@@ -301,7 +311,7 @@ fn substitute_with(
 /// from the pre-substitution input, which `{name}` tokens are genuinely
 /// unknown rather than merely a substring of the raw template.
 fn is_known_var(name: &str, ctx: &NotificationContext) -> bool {
-    if scalar_vars(ctx).iter().any(|(n, _)| *n == name) {
+    if scalar_vars(ctx).iter().any(|(n, _)| *n == name) || EXTRA_SCALAR_NAMES.contains(&name) {
         return true;
     }
     if ctx.row_columns.iter().any(|(k, _)| k == name) {
@@ -446,6 +456,48 @@ pub(crate) fn scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str, &str)
     ]
 }
 
+/// Scalars added for the shared send path; kept apart so the alert webhook envelope is unchanged.
+pub(crate) fn extra_scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str, String)> {
+    let trigger_millis = ctx.alert_trigger_time / 1000;
+    vec![
+        ("notification_kind", ctx.kind.as_str().to_string()),
+        ("notification_event", ctx.event.clone()),
+        ("cluster_name", ctx.cluster_name.clone()),
+        (
+            "alert_start_time_millis",
+            ctx.alert_start_time_millis.clone(),
+        ),
+        ("alert_end_time_millis", ctx.alert_end_time_millis.clone()),
+        ("alert_trigger_time", ctx.alert_trigger_time.to_string()),
+        ("alert_trigger_time_millis", trigger_millis.to_string()),
+        (
+            "alert_trigger_time_seconds",
+            (trigger_millis / 1000).to_string(),
+        ),
+        (
+            "alert_promql_operator",
+            ctx.promql_operator.clone().unwrap_or_default(),
+        ),
+        (
+            "alert_promql_value",
+            ctx.promql_value.clone().unwrap_or_default(),
+        ),
+    ]
+}
+
+pub(crate) const EXTRA_SCALAR_NAMES: [&str; 10] = [
+    "notification_kind",
+    "notification_event",
+    "cluster_name",
+    "alert_start_time_millis",
+    "alert_end_time_millis",
+    "alert_trigger_time",
+    "alert_trigger_time_millis",
+    "alert_trigger_time_seconds",
+    "alert_promql_operator",
+    "alert_promql_value",
+];
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -509,6 +561,7 @@ mod tests {
             chart_png: None,
             alert_id: String::new(),
             incident_id: String::new(),
+            ..Default::default()
         }
     }
 

@@ -1,0 +1,216 @@
+{
+  "slack_firing": {
+    "attachments": [
+      {
+        "color": "#E01E5A",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme|Incident P2: High error rate on web-logs>*"
+            }
+          },
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "Incident *new_incident_created* for service *checkout*.\n\nError rate above 5% for 5 minutes"
+            }
+          },
+          {
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nnew_incident_created"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Severity*\nP2"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Service*\ncheckout"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Alert*\nHigh error rate"
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "`host` web-1 · `errors` 9\n`host` web-2 · `errors` 3"
+            }
+          }
+        ]
+      },
+      {
+        "color": "#E01E5A",
+        "blocks": [
+          {
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "View in OpenObserve"
+                },
+                "url": "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme",
+                "style": "primary"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "slack_resolved": {
+    "attachments": [
+      {
+        "color": "#2EB67D",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme|Incident P2: High error rate on web-logs>*"
+            }
+          },
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "Incident *resolved* for service *checkout*.\n\nAll linked alerts recovered"
+            }
+          },
+          {
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nresolved"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Severity*\nP2"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Service*\ncheckout"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Alert*\nHigh error rate"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "color": "#2EB67D",
+        "blocks": [
+          {
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "View in OpenObserve"
+                },
+                "url": "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme",
+                "style": "primary"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "webhook_firing": {
+    "version": 1,
+    "title": "Incident P2: High error rate on web-logs",
+    "body_markdown": "Incident **new\\_incident\\_created** for service **checkout**.\n\nError rate above 5\\% for 5 minutes",
+    "fields": {
+      "Event": "new_incident_created",
+      "Severity": "P2",
+      "Service": "checkout",
+      "Alert": "High error rate"
+    },
+    "rows": [
+      {
+        "host": "web-1",
+        "errors": 9
+      },
+      {
+        "host": "web-2",
+        "errors": 3
+      }
+    ],
+    "links": [
+      {
+        "label": "",
+        "url": "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme"
+      }
+    ],
+    "severity": "critical",
+    "chart_url": null,
+    "context": {
+      "org_name": "acme",
+      "stream_type": "logs",
+      "stream_name": "web-logs",
+      "alert_name": "High error rate",
+      "alert_type": null,
+      "alert_period": null,
+      "alert_operator": null,
+      "alert_threshold": null,
+      "alert_count": null,
+      "alert_agg_value": null,
+      "alert_level": "critical",
+      "alert_status": "firing",
+      "episode_id": "inc_7f3a:1762077900000000",
+      "recovery_reason": null,
+      "alert_priority": null,
+      "alert_tags": null,
+      "alert_threshold_crit": null,
+      "alert_threshold_warn": null,
+      "alert_warning_threshold": null,
+      "alert_start_time": "N/A",
+      "alert_end_time": "N/A",
+      "alert_url": "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme",
+      "alert_trigger_time_str": "2026-11-02 10:05:00",
+      "alert_time": "2026-11-02 10:05:00",
+      "alert_description": "Error rate above 5% for 5 minutes",
+      "kind": "incident",
+      "notification_kind": "incident",
+      "notification_event": "opened",
+      "cluster_name": "o2-acme",
+      "alert_start_time_millis": "N/A",
+      "alert_end_time_millis": "N/A",
+      "alert_trigger_time": "0",
+      "alert_trigger_time_millis": "0",
+      "alert_trigger_time_seconds": "0",
+      "alert_promql_operator": null,
+      "alert_promql_value": null,
+      "host": [
+        "web-1",
+        "web-2"
+      ],
+      "errors": [
+        "9",
+        "3"
+      ],
+      "incident_id": "inc_7f3a",
+      "incident_title": "High error rate on web-logs",
+      "incident_event": "new_incident_created",
+      "incident_severity": "P2",
+      "incident_service": "checkout",
+      "incident_url": "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme"
+    }
+  }
+}

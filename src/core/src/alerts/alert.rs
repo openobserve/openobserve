@@ -3255,7 +3255,7 @@ async fn build_chart_asset(
 /// A body we cannot parse is left alone and logged: saving the alert already
 /// refused this combination, so reaching here means the template changed after
 /// the fact, and dropping the firing would be the worse failure.
-fn stamp_platform_key(
+pub(crate) fn stamp_platform_key(
     dest_type: &DestinationType,
     ctx: &NotificationContext,
     msg: String,
@@ -3571,24 +3571,62 @@ fn members_to_send(kept: Vec<String>, skipped: &[String]) -> Result<Email, anyho
     Ok(Email { recipients: kept })
 }
 
-async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
+pub(crate) async fn send_http_notification(
+    endpoint: &Endpoint,
+    msg: String,
+) -> Result<String, anyhow::Error> {
+    match send_http_attempt(endpoint, msg, None).await? {
+        HttpAttempt::Answered {
+            note: Some(note), ..
+        } => Ok(note),
+        HttpAttempt::Answered {
+            status,
+            body,
+            hide_body,
+            note: None,
+        } => send_outcome(status, &body, hide_body),
+        HttpAttempt::Blocked(e) | HttpAttempt::NoAnswer(e) => Err(anyhow::anyhow!(e)),
+    }
+}
+
+/// One HTTP send as the shared path classifies it; `note` marks a Slack resend without images.
+pub(crate) enum HttpAttempt {
+    Answered {
+        status: reqwest::StatusCode,
+        body: String,
+        hide_body: bool,
+        note: Option<String>,
+    },
+    Blocked(String),
+    NoAnswer(String),
+}
+
+pub(crate) async fn send_http_attempt(
+    endpoint: &Endpoint,
+    msg: String,
+    timeout: Option<std::time::Duration>,
+) -> Result<HttpAttempt, anyhow::Error> {
     // A plain body posted at a Jira site root does nothing, so senders without a Jira branch fail.
     if jira::is_jira(endpoint) {
-        return Err(anyhow::anyhow!(jira::UNSUPPORTED_SENDER));
+        return Ok(HttpAttempt::Blocked(jira::UNSUPPORTED_SENDER.to_string()));
     }
     // Block SSRF: validate the destination URL (including DNS resolution) before
     // making any outbound request. The client is built through `build_safe_destination_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.
     if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
-        return Err(anyhow::anyhow!(
+        return Ok(HttpAttempt::Blocked(format!(
             "Destination URL blocked by SSRF guard: {e}"
-        ));
+        )));
     }
 
     let builder = if endpoint.skip_tls_verify {
         reqwest::Client::builder().danger_accept_invalid_certs(true)
     } else {
         reqwest::Client::builder()
+    };
+    let builder = match timeout {
+        Some(t) => builder.timeout(t),
+        None => builder,
     };
     let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
@@ -3640,15 +3678,18 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         Ok(v) => v,
         Err(e) => {
             log::error!("error sending request to {} with error {e:?}", endpoint.url);
-            return Err(anyhow::anyhow!(
+            return Ok(HttpAttempt::NoAnswer(format!(
                 "error sending request : {:?}",
                 e.without_url()
-            ));
+            )));
         }
     };
     let resp_status = resp.status();
     let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
-    let resp_body = resp.text().await.map_err(reqwest::Error::without_url)?;
+    let resp_body = match resp.text().await {
+        Ok(body) => body,
+        Err(e) => return Ok(HttpAttempt::NoAnswer(e.without_url().to_string())),
+    };
 
     log::debug!(
         "Alert sent to destination {} with status: {}, body:\n{}",
@@ -3693,17 +3734,27 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
                      — check the image URLs in the destination's template."
                 );
             }
-            return Ok(format!(
-                "sent status: {} (image stripped: Slack rejected it)",
-                reqwest::StatusCode::OK,
-            ));
+            return Ok(HttpAttempt::Answered {
+                status: reqwest::StatusCode::OK,
+                body: String::new(),
+                hide_body,
+                note: Some(format!(
+                    "sent status: {} (image stripped: Slack rejected it)",
+                    reqwest::StatusCode::OK,
+                )),
+            });
         }
         log::error!(
             "Alert http notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
         );
     }
 
-    send_outcome(resp_status, &resp_body, hide_body)
+    Ok(HttpAttempt::Answered {
+        status: resp_status,
+        body: resp_body,
+        hide_body,
+        note: None,
+    })
 }
 
 /// Send an email; with `text_body: None` it carries only the HTML part.
@@ -3803,15 +3854,37 @@ async fn send_discord_with_attachment(
     msg: String,
     png: std::sync::Arc<Vec<u8>>,
 ) -> Result<String, anyhow::Error> {
+    match send_discord_attempt(endpoint, msg, png, None).await? {
+        HttpAttempt::Answered {
+            status,
+            body,
+            hide_body,
+            ..
+        } => send_outcome(status, &body, hide_body),
+        HttpAttempt::Blocked(e) => Err(anyhow::anyhow!(e)),
+        HttpAttempt::NoAnswer(e) => Err(anyhow::anyhow!(e)),
+    }
+}
+
+pub(crate) async fn send_discord_attempt(
+    endpoint: &Endpoint,
+    msg: String,
+    png: std::sync::Arc<Vec<u8>>,
+    timeout: Option<std::time::Duration>,
+) -> Result<HttpAttempt, anyhow::Error> {
     if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
-        return Err(anyhow::anyhow!(
+        return Ok(HttpAttempt::Blocked(format!(
             "Destination URL blocked by SSRF guard: {e}"
-        ));
+        )));
     }
     let builder = if endpoint.skip_tls_verify {
         reqwest::Client::builder().danger_accept_invalid_certs(true)
     } else {
         reqwest::Client::builder()
+    };
+    let builder = match timeout {
+        Some(t) => builder.timeout(t),
+        None => builder,
     };
     let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
@@ -3825,21 +3898,27 @@ async fn send_discord_with_attachment(
                 .mime_str("image/png")?,
         );
 
-    let resp = client
-        .post(url)
-        .multipart(form)
-        .send()
-        .await
-        .map_err(reqwest::Error::without_url)?;
+    let resp = match client.post(url).multipart(form).send().await {
+        Ok(resp) => resp,
+        Err(e) => return Ok(HttpAttempt::NoAnswer(e.without_url().to_string())),
+    };
     let resp_status = resp.status();
     let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
-    let resp_body = resp.text().await.map_err(reqwest::Error::without_url)?;
+    let resp_body = match resp.text().await {
+        Ok(body) => body,
+        Err(e) => return Ok(HttpAttempt::NoAnswer(e.without_url().to_string())),
+    };
     if !resp_status.is_success() {
         log::error!(
             "Alert discord notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
         );
     }
-    send_outcome(resp_status, &resp_body, hide_body)
+    Ok(HttpAttempt::Answered {
+        status: resp_status,
+        body: resp_body,
+        hide_body,
+        note: None,
+    })
 }
 
 /// What the caller of a send sees; a peer only the operator allowlist admits shows its status only.
@@ -3856,7 +3935,7 @@ fn send_outcome(
     }
 }
 
-async fn send_sns_notification(
+pub(crate) async fn send_sns_notification(
     alert_name: &str,
     aws_sns: &AwsSns,
     msg: String,
@@ -4510,6 +4589,7 @@ async fn build_notification_context(
         level,
         chart_url: None,
         chart_png: None,
+        ..Default::default()
     }
 }
 pub fn get_row_column_map(rows: &[Map<String, Value>]) -> HashMap<String, HashSet<String>> {

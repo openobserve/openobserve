@@ -85,12 +85,63 @@ pub fn stamp_key(
     Ok(value.to_string())
 }
 
+/// The prefix of a resolve answer that found no open record for the key.
+pub const NOTHING_TO_CLOSE: &str = "nothing to close";
+
+/// One resolve as the delivery ledger classifies it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResolveAnswer {
+    Closed(String),
+    NothingToClose(String),
+    Rejected { status: u16, body: String },
+    Blocked(String),
+    NoAnswer(String),
+}
+
 /// Close whatever the firing opened; ServiceNow needs two, updating only by `sys_id`.
 pub async fn send_resolve(
     platform: Platform,
     endpoint: &Endpoint,
     episode_id: &str,
 ) -> Result<String> {
+    match resolve_once(platform, endpoint, episode_id, None).await? {
+        ResolveAnswer::Closed(text) | ResolveAnswer::NothingToClose(text) => Ok(text),
+        ResolveAnswer::Rejected { status, body } => Err(answer_error(status, &body)),
+        ResolveAnswer::Blocked(e) | ResolveAnswer::NoAnswer(e) => Err(anyhow::anyhow!(e)),
+    }
+}
+
+/// Like `send_resolve`, but Opsgenie's 404 on close also reads as nothing to close.
+pub async fn resolve_for_ledger(
+    platform: Platform,
+    endpoint: &Endpoint,
+    episode_id: &str,
+    timeout: Option<std::time::Duration>,
+) -> Result<ResolveAnswer> {
+    let answer = resolve_once(platform, endpoint, episode_id, timeout).await?;
+    Ok(match answer {
+        ResolveAnswer::Rejected { status: 404, body } if platform == Platform::Opsgenie => {
+            ResolveAnswer::NothingToClose(format!("{NOTHING_TO_CLOSE}: {body}"))
+        }
+        other => other,
+    })
+}
+
+fn answer_error(status: u16, body: &str) -> anyhow::Error {
+    let status = reqwest::StatusCode::from_u16(status).unwrap_or(reqwest::StatusCode::BAD_GATEWAY);
+    if body.is_empty() {
+        anyhow::anyhow!("status {status}")
+    } else {
+        anyhow::anyhow!("status {status}: {body}")
+    }
+}
+
+async fn resolve_once(
+    platform: Platform,
+    endpoint: &Endpoint,
+    episode_id: &str,
+    timeout: Option<std::time::Duration>,
+) -> Result<ResolveAnswer> {
     match platform {
         Platform::PagerDuty => {
             let body = json!({
@@ -100,13 +151,15 @@ pub async fn send_resolve(
                 "event_action": "resolve",
                 "dedup_key": episode_id,
             });
-            request(
+            let answer = request_raw(
                 endpoint,
                 reqwest::Method::POST,
                 &endpoint.url,
                 Some(body.to_string()),
+                timeout,
             )
-            .await
+            .await?;
+            Ok(answer.into_resolve())
         }
         Platform::Opsgenie => {
             let url = format!(
@@ -114,26 +167,35 @@ pub async fn send_resolve(
                 endpoint.url.trim_end_matches('/')
             );
             let body = json!({ "source": "OpenObserve" });
-            request(
+            let answer = request_raw(
                 endpoint,
                 reqwest::Method::POST,
                 &url,
                 Some(body.to_string()),
+                timeout,
             )
-            .await
+            .await?;
+            Ok(answer.into_resolve())
         }
-        Platform::ServiceNow => resolve_servicenow(endpoint, episode_id).await,
+        Platform::ServiceNow => resolve_servicenow(endpoint, episode_id, timeout).await,
     }
 }
 
-async fn resolve_servicenow(endpoint: &Endpoint, episode_id: &str) -> Result<String> {
+async fn resolve_servicenow(
+    endpoint: &Endpoint,
+    episode_id: &str,
+    timeout: Option<std::time::Duration>,
+) -> Result<ResolveAnswer> {
     let base = endpoint.url.trim_end_matches('/');
     // No dedup, so one episode leaves several records; closed ones reject a PATCH.
     let lookup = format!(
         "{base}?sysparm_query=correlation_id={episode_id}^state!={STATE_RESOLVED}^state!={STATE_CLOSED}\
          &sysparm_fields=sys_id&sysparm_limit={LOOKUP_LIMIT}"
     );
-    let found = request(endpoint, reqwest::Method::GET, &lookup, None).await?;
+    let found = match request_raw(endpoint, reqwest::Method::GET, &lookup, None, timeout).await? {
+        RawAnswer::Answered { status, text, .. } if status.is_success() => text,
+        other => return Ok(other.into_resolve()),
+    };
     let sys_ids: Vec<String> = serde_json::from_str::<Value>(&found)
         .ok()
         .and_then(|v| v["result"].as_array().cloned())
@@ -142,9 +204,10 @@ async fn resolve_servicenow(endpoint: &Endpoint, episode_id: &str) -> Result<Str
         .filter_map(|row| row["sys_id"].as_str().map(str::to_string))
         .collect();
     if sys_ids.is_empty() {
-        return Err(anyhow::anyhow!(
-            "no open incident carries correlation_id {episode_id}"
-        ));
+        return Ok(ResolveAnswer::Rejected {
+            status: 404,
+            body: format!("no open incident carries correlation_id {episode_id}"),
+        });
     }
 
     let close_code = endpoint
@@ -161,45 +224,93 @@ async fn resolve_servicenow(endpoint: &Endpoint, episode_id: &str) -> Result<Str
     .to_string();
 
     // Runs to the end: one failure must not strand the records after it.
-    let (mut closed, mut failures) = (0usize, String::new());
+    let (mut closed, mut failures, mut last) = (0usize, String::new(), None);
     for sys_id in &sys_ids {
-        match request(
+        let answer = request_raw(
             endpoint,
             reqwest::Method::PATCH,
             &format!("{base}/{sys_id}"),
             Some(body.clone()),
+            timeout,
         )
-        .await
-        {
-            Ok(_) => closed += 1,
-            Err(e) => failures = format!("{failures} {sys_id}: {e};"),
+        .await?
+        .into_resolve();
+        match answer {
+            ResolveAnswer::Closed(_) => closed += 1,
+            other => {
+                failures = format!("{failures} {sys_id}: {other:?};");
+                last = Some(other);
+            }
         }
     }
-    if failures.is_empty() {
-        Ok(format!("closed {closed} incident(s)"))
-    } else {
-        Err(anyhow::anyhow!(
+    match last {
+        None => Ok(ResolveAnswer::Closed(format!(
+            "closed {closed} incident(s)"
+        ))),
+        Some(ResolveAnswer::Rejected { status, .. }) => Ok(ResolveAnswer::Rejected {
+            status,
+            body: format!("closed {closed} of {}, failed:{failures}", sys_ids.len()),
+        }),
+        Some(ResolveAnswer::NoAnswer(_)) => Ok(ResolveAnswer::NoAnswer(format!(
             "closed {closed} of {}, failed:{failures}",
             sys_ids.len()
-        ))
+        ))),
+        Some(other) => Ok(other),
+    }
+}
+
+enum RawAnswer {
+    Answered {
+        status: reqwest::StatusCode,
+        text: String,
+        hide_body: bool,
+    },
+    Blocked(String),
+    NoAnswer(String),
+}
+
+impl RawAnswer {
+    fn into_resolve(self) -> ResolveAnswer {
+        match self {
+            RawAnswer::Answered { status, text, .. } if status.is_success() => {
+                ResolveAnswer::Closed(text)
+            }
+            RawAnswer::Answered {
+                status,
+                text,
+                hide_body,
+            } => ResolveAnswer::Rejected {
+                status: status.as_u16(),
+                body: if hide_body { String::new() } else { text },
+            },
+            RawAnswer::Blocked(e) => ResolveAnswer::Blocked(e),
+            RawAnswer::NoAnswer(e) => ResolveAnswer::NoAnswer(e),
+        }
     }
 }
 
 /// Guards the URL this module built rather than the one the operator typed.
-async fn request(
+async fn request_raw(
     endpoint: &Endpoint,
     method: reqwest::Method,
     url: &str,
     body: Option<String>,
-) -> Result<String> {
-    SsrfGuard::validate_destination_url_with_config_async(url)
-        .await
-        .map_err(|e| anyhow::anyhow!("URL blocked by SSRF guard: {e}"))?;
+    timeout: Option<std::time::Duration>,
+) -> Result<RawAnswer> {
+    if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(url).await {
+        return Ok(RawAnswer::Blocked(format!(
+            "URL blocked by SSRF guard: {e}"
+        )));
+    }
 
     let builder = if endpoint.skip_tls_verify {
         reqwest::Client::builder().danger_accept_invalid_certs(true)
     } else {
         reqwest::Client::builder()
+    };
+    let builder = match timeout {
+        Some(t) => builder.timeout(t),
+        None => builder,
     };
     let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let mut req = client.request(method, url::Url::parse(url)?);
@@ -223,17 +334,18 @@ async fn request(
         req = req.body(body);
     }
 
-    let resp = req.send().await.map_err(reqwest::Error::without_url)?;
+    let resp = match req.send().await {
+        Ok(resp) => resp,
+        Err(e) => return Ok(RawAnswer::NoAnswer(e.without_url().to_string())),
+    };
     let status = resp.status();
     let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
     let text = resp.text().await.unwrap_or_default();
-    if status.is_success() {
-        Ok(text)
-    } else if hide_body {
-        Err(anyhow::anyhow!("status {status}"))
-    } else {
-        Err(anyhow::anyhow!("status {status}: {text}"))
-    }
+    Ok(RawAnswer::Answered {
+        status,
+        text,
+        hide_body,
+    })
 }
 
 #[cfg(test)]
