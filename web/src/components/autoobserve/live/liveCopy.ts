@@ -239,6 +239,9 @@ const CHECK_NAME: Record<LiveCheck, I18nKey> = {
   absence: "autoobserveLive.classes.absence",
 };
 
+export const detectorCountText = (t: TranslateFn, count: number): I18nText =>
+  t("autoobserve.coverage.detectorCount", { count }, count);
+
 export const liveCheckName = (t: TranslateFn, check: LiveCheck): I18nText => t(CHECK_NAME[check]);
 
 export const liveCheckText = (

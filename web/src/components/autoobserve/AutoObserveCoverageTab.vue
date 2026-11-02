@@ -158,9 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="text-text-secondary ms-auto text-xs tabular-nums"
           data-test="autoobserve-coverage-detectors"
-          >{{
-            t("autoobserve.coverage.detectorCount", { count: totals.detectors }, totals.detectors)
-          }}</span
+          >{{ detectorCountText(t, totals.detectors) }}</span
         >
       </div>
 
@@ -521,6 +519,7 @@ import {
 import type { CoverageSource } from "./live/liveAdapter";
 import {
   coverageWord,
+  detectorCountText,
   emptyCoverageNotice,
   LIVE_DOT,
   liveCellLook,
@@ -856,8 +855,7 @@ const stateText = (row: CoverageRow): I18nText => {
     : t("autoobserve.coverage.stateWatched");
 };
 
-const detectorText = (row: CoverageRow) =>
-  t("autoobserve.coverage.detectorCount", { count: detectorsOf(row) }, detectorsOf(row));
+const detectorText = (row: CoverageRow) => detectorCountText(t, detectorsOf(row));
 
 const toItem = (row: CoverageRow): HexItem => ({
   key: row.service,

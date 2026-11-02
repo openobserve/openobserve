@@ -361,7 +361,14 @@ import {
   type Scenario,
   type Signal,
 } from "./fixtures";
-import { LIVE_DOT, liveCellLook, liveCellWord, liveCheckText, liveGapLines } from "./live/liveCopy";
+import {
+  detectorCountText,
+  LIVE_DOT,
+  liveCellLook,
+  liveCellWord,
+  liveCheckText,
+  liveGapLines,
+} from "./live/liveCopy";
 
 type ServiceState = "watched" | "learning" | "gap";
 
@@ -494,9 +501,7 @@ const stateLabel = computed(() => {
 });
 
 const detectors = computed(() => detectorsOf(props.row));
-const detectorText = computed(() =>
-  t("autoobserve.coverage.detectorCount", { count: detectors.value }, detectors.value),
-);
+const detectorText = computed(() => detectorCountText(t, detectors.value));
 const library = computed(() => libraryOf(props.row));
 
 const subTitle = computed(() =>
