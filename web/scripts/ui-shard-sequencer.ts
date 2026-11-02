@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { relative } from 'node:path'
 import { BaseSequencer } from 'vitest/node'
+import type { TestSpecification } from 'vitest/node'
 
 const durations: Record<string, number> = JSON.parse(
   readFileSync(new URL('./ui-shard-durations.json', import.meta.url), 'utf8'),
@@ -22,11 +23,12 @@ export function partition(paths: string[], count: number): string[][] {
 }
 
 export default class UiShardSequencer extends BaseSequencer {
-  async shard(files: any[]) {
+  async shard(files: TestSpecification[]) {
     const { root, shard } = this.ctx.config
-    const rel = (f: any) => relative(root, f.moduleId)
-    const bins = partition(files.map(rel), shard!.count)
-    const mine = new Set(bins[shard!.index - 1])
+    if (!shard) return files
+    const rel = (f: TestSpecification) => relative(root, f.moduleId)
+    const bins = partition(files.map(rel), shard.count)
+    const mine = new Set(bins[shard.index - 1])
     return files.filter((f) => mine.has(rel(f)))
   }
 }

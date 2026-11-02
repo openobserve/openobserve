@@ -1,4 +1,4 @@
-// Regenerate ui-shard-durations.json: download the ui-unit-blob-* artifacts of a green CI run, then `node scripts/ui-shard-durations.mjs <dir-with-blob-json-files>`.
+// Regenerate ui-shard-durations.json: download the ui-unit-blob-* artifacts of a green CI run (they expire after 1 day), then `node scripts/ui-shard-durations.mjs <dir-with-blob-json-files>`.
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse } from 'flatted'

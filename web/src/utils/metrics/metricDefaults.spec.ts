@@ -118,17 +118,26 @@ describe("OR-grouped filters", () => {
     );
   });
 
-  it("distributes a union over a long label value without stalling", () => {
-    const long = "x".repeat(20_000);
-    const u = `({__name__="m",a="${long}"} or {__name__="m",b="2"})`;
-    const started = performance.now();
-    expect(distributeUnionRanges(`sum(rate(${u}[5m]))`)).toBe(
-      `sum(rate({__name__="m",a="${long}"}[5m]) or rate({__name__="m",b="2"}[5m]))`,
-    );
-    expect(distributeUnionRanges(`avg(${u})`)).toBe(
-      `avg({__name__="m",a="${long}"} or {__name__="m",b="2"})`,
-    );
-    expect(performance.now() - started).toBeLessThan(5000);
+  it("distributes a union over a long label value in linear time", () => {
+    const run = (n: number) => {
+      const long = "x".repeat(n);
+      const u = `({__name__="m",a="${long}"} or {__name__="m",b="2"})`;
+      let best = Infinity;
+      for (let i = 0; i < 3; i++) {
+        const started = performance.now();
+        const out = distributeUnionRanges(`sum(rate(${u}[5m]))`);
+        best = Math.min(best, performance.now() - started);
+        expect(out).toBe(
+          `sum(rate({__name__="m",a="${long}"}[5m]) or rate({__name__="m",b="2"}[5m]))`,
+        );
+      }
+      expect(distributeUnionRanges(`avg(${u})`)).toBe(
+        `avg({__name__="m",a="${long}"} or {__name__="m",b="2"})`,
+      );
+      return best;
+    };
+    // 4x the input costs about 4x when linear and about 16x when quadratic, so the ratio ignores runner speed.
+    expect(run(80_000) / Math.max(run(20_000), 1)).toBeLessThan(10);
   });
 
   it("every card query and breakdown runs with the union distributed", () => {
