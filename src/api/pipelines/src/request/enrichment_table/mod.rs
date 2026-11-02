@@ -285,6 +285,13 @@ pub async fn save_enrichment_table_from_url(
 
     // Format the table name to normalize it (lowercase, replace special chars)
     let table_name = format_stream_name(table_name.trim().to_string());
+    if let Some(violation) = infra::file_list::stream_key_violation(
+        &org_id,
+        config::meta::stream::StreamType::EnrichmentTables,
+        &table_name,
+    ) {
+        return MetaHttpResponse::bad_request(violation);
+    }
 
     // ===== MULTI-URL SUPPORT: JOB STATUS VALIDATION =====
     // Fetch all existing jobs for this table

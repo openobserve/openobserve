@@ -415,6 +415,32 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.loading).toBe(false);
     });
 
+    it("shows no Alert Triggers count until the incident has loaded", async () => {
+      let resolveIncident: (value: any) => void = () => {};
+      (incidentsService.get as any).mockReturnValue(
+        new Promise((resolve) => {
+          resolveIncident = resolve;
+        }),
+      );
+      wrapper = await createWrapper({}, {}, "test-123");
+      await nextTick();
+      const count = () => wrapper.find('[data-test="incident-alert-triggers-count"]');
+
+      expect(count().exists()).toBe(false);
+
+      resolveIncident({
+        data: createIncidentWithAlerts({
+          id: "test-123",
+          triggers: [createAlert({ alert_id: "a1" }), createAlert({ alert_id: "a2" })],
+        }),
+      });
+      await flushPromises();
+      await flushPromises();
+      await nextTick();
+
+      expect(count().text()).toBe("2");
+    });
+
     it("should load triggers from incident", async () => {
       const triggers = [
         createAlert({ alert_id: "alert-1", alert_name: "CPU Alert" }),

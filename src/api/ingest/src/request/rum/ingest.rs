@@ -408,6 +408,15 @@ mod tests {
     }
 
     #[test]
+    fn test_rum_streams_are_system_streams() {
+        for name in [RUM_LOG_STREAM, RUM_SESSION_REPLAY_STREAM, RUM_DATA_STREAM] {
+            assert!(config::meta::self_reporting::usage::is_system_stream(
+                "acme", name
+            ));
+        }
+    }
+
+    #[test]
     fn test_event_default_values() {
         let e = Event::default();
         assert_eq!(e.raw_segment_size, 0);

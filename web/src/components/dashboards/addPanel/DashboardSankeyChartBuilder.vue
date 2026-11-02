@@ -628,6 +628,7 @@ export default defineComponent({
     const Hint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "sankey":
+        case "node-graph":
           return t("dashboard.oneFieldMessage");
         default:
           return t("dashboard.maxtwofieldMessage");

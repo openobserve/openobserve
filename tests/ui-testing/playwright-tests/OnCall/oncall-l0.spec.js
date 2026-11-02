@@ -140,9 +140,8 @@ test.describe('On-call L0 / AI SRE', {
   /**
    * A pageable team whose policy carries an L0 block.
    *
-   * Schedule before members: the first member on a rotationless team auto-creates
-   * a `source: "default"` rotation and repoints rungs P1..P3 at it, which makes a
-   * later schedule write the §8.5 replacement the server refuses.
+   * Members before schedule: a schedule naming somebody not on the team is
+   * refused with a 400.
    *
    * `mode` is per-severity and keyed by the UPPERCASE wire strings beside rung
    * priorities that are integers — both forms in one policy object, which is
@@ -163,11 +162,10 @@ test.describe('On-call L0 / AI SRE', {
     const team = await createTeam(page, { name: uniqueName(workerPrefix(testInfo)) });
 
     const rotationId = `${workerPrefix(testInfo)}_rot`;
+    await addTeamMembers(page, team.id, [memberEmail]);
     await setTeamSchedule(page, team.id, {
       rotations: [rotation({ id: rotationId, name: 'Primary', members: [memberEmail] })],
     });
-
-    await addTeamMembers(page, team.id, [memberEmail]);
 
     // Whether P4 pages is decided by the ladder, not by the severity: escalation.rs
     // arms a rung at P4 exactly when the team configured one, so §9.3 seeds both shapes.

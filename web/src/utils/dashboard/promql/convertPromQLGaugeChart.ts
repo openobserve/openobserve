@@ -194,6 +194,7 @@ export class GaugeConverter implements PromQLChartConverter {
         config?.max || 100,
         store.state.theme,
         config?.color?.colorBySeries,
+        config,
       );
     } catch (error) {
       console.warn("Failed to get gauge color:", error);

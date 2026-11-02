@@ -32,7 +32,7 @@ use infra::{
     errors::{Error, Result},
     schema::get_flatten_level,
 };
-use ingestion_common::{IngestionStatus, StreamStatus};
+use ingestion_common::{IngestionStatus, RecordStatus, StreamStatus};
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -737,14 +737,6 @@ pub async fn handle_request(
     drop(user_defined_schema_map);
     drop(streams_need_original_map);
 
-    // Update partial success
-    if stream_status.status.failed > 0 {
-        res.partial_success = Some(ExportLogsPartialSuccess {
-            rejected_log_records: stream_status.status.failed as i64,
-            error_message: stream_status.status.error.clone(),
-        });
-    }
-
     let endpoint = match req_type {
         OtlpRequestType::Grpc => "/grpc/otlp/logs",
         _ => "/api/otlp/v1/logs",
@@ -752,6 +744,7 @@ pub async fn handle_request(
 
     // if no data, fast return
     if json_data_by_stream.is_empty() {
+        res.partial_success = partial_success(&stream_status.status);
         return Ok(otlp_export_response(&res, req_type)); // just return
     }
 
@@ -818,13 +811,14 @@ pub async fn handle_request(
     }
 
     // OTLP has no field for a deleting-stream skip, so a skipped stream still answers 200
+    let mut ingestion_status = IngestionStatus::Record(stream_status.status);
     let write_result = super::write_logs_by_stream(
         thread_id,
         org_id,
         user_email,
         (started_at, &start),
         UsageType::Logs,
-        &mut IngestionStatus::Record(stream_status.status),
+        &mut ingestion_status,
         json_data_by_stream,
         size_by_stream,
         derived_streams,
@@ -863,7 +857,18 @@ pub async fn handle_request(
         ));
     }
 
+    // the write rejects rows too, e.g. ones that do not fit the stream schema
+    if let IngestionStatus::Record(status) = &ingestion_status {
+        res.partial_success = partial_success(status);
+    }
     Ok(otlp_export_response(&res, req_type))
+}
+
+fn partial_success(status: &RecordStatus) -> Option<ExportLogsPartialSuccess> {
+    (status.failed > 0).then(|| ExportLogsPartialSuccess {
+        rejected_log_records: status.failed as i64,
+        error_message: status.error.clone(),
+    })
 }
 
 #[cfg(test)]
@@ -1975,6 +1980,24 @@ mod tests {
             .as_ref()
             .unwrap();
         assert_eq!(scope.name, "b");
+    }
+
+    #[test]
+    fn test_partial_success_reports_rows_failed_at_write() {
+        let accepted = ingestion_common::RecordStatus {
+            successful: 3,
+            ..Default::default()
+        };
+        assert_eq!(super::partial_success(&accepted), None);
+        let rejected = ingestion_common::RecordStatus {
+            successful: 3,
+            failed: 2,
+            error: "boom".to_string(),
+            ..Default::default()
+        };
+        let partial = super::partial_success(&rejected).unwrap();
+        assert_eq!(partial.rejected_log_records, 2);
+        assert_eq!(partial.error_message, "boom");
     }
 
     // cloud builds reject the unknown test org at the trial check before the columns check

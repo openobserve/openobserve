@@ -1349,7 +1349,6 @@ pub static META_NUM_ALERTS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// Alert deduplication metrics
 // Alert notification chart events. Single low-cardinality `event` label —
 // deliberately NO organization/alert labels: signature failures carry
 // attacker-controlled request data, which must never become label values.
@@ -1364,45 +1363,6 @@ pub static ALERT_CHART_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &["event"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_DEDUP_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "alert_dedup_suppressed_total",
-            "Total number of alerts suppressed by deduplication",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "alert_name", "dedup_type"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_DEDUP_PASSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "alert_dedup_passed_total",
-            "Total number of alerts that passed deduplication",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "alert_name"],
-    )
-    .expect("Metric created")
-});
-
-pub static ALERT_DEDUP_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "alert_dedup_errors_total",
-            "Total deduplication processing errors",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "error_type"],
     )
     .expect("Metric created")
 });
@@ -3474,16 +3434,6 @@ pub(crate) fn register(registry: &Registry) {
         .register(Box::new(ALERT_CHART_EVENTS_TOTAL.clone()))
         .expect("Metric registered");
 
-    // alert deduplication metrics
-    registry
-        .register(Box::new(ALERT_DEDUP_SUPPRESSED_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_DEDUP_PASSED_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(ALERT_DEDUP_ERRORS_TOTAL.clone()))
-        .expect("Metric registered");
     registry
         .register(Box::new(ALERT_RUNS_SUPPRESSED_TOTAL.clone()))
         .expect("Metric registered");
@@ -3948,11 +3898,8 @@ mod tests {
     }
 
     #[test]
-    fn test_statics_alert_dedup_and_grouping() {
+    fn test_statics_alert_chart_and_suppression() {
         let _ = ALERT_CHART_EVENTS_TOTAL.clone();
-        let _ = ALERT_DEDUP_SUPPRESSED_TOTAL.clone();
-        let _ = ALERT_DEDUP_PASSED_TOTAL.clone();
-        let _ = ALERT_DEDUP_ERRORS_TOTAL.clone();
         let _ = ALERT_RUNS_SUPPRESSED_TOTAL.clone();
     }
 

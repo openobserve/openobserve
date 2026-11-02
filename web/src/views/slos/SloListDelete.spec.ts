@@ -55,6 +55,7 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import sloService from "@/services/slos";
 import alertsService from "@/services/alerts";
+import config from "@/aws-exports";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -310,5 +311,42 @@ describe("SloList — delete dialog dependent-alert count", () => {
     await openDeleteFor(wrapper, "checkout-availability");
 
     expect(dialog(wrapper).text()).toContain(i18n.global.t("slos.deleteBudgetNote"));
+  });
+});
+
+// OTable sizes the actions column from `actionCount` and clips the cell, so an undercount hides the delete button.
+describe("SloList — actions column fits its row buttons", () => {
+  let wrapper: any;
+  const isEnterprise = config.isEnterprise;
+  const downtimesEnabled = store.state.zoConfig.downtimes_enabled;
+
+  beforeEach(() => vi.clearAllMocks());
+
+  afterEach(() => {
+    wrapper?.unmount();
+    config.isEnterprise = isEnterprise;
+    store.state.zoConfig.downtimes_enabled = downtimesEnabled;
+  });
+
+  const desktopButtons = () =>
+    wrapper
+      .findAll('[data-test^="slos-slolist-"][data-test$="-checkout-availability"]')
+      .filter((b: any) => !b.classes().includes("md:hidden"));
+  const actionCount = () =>
+    wrapper
+      .findComponent({ name: "OTable" })
+      .props("columns")
+      .find((c: any) => c.id === "actions").meta.actionCount;
+
+  it.each([false, true])("matches the rendered buttons (downtimes %s)", async (downtimes) => {
+    config.isEnterprise = downtimes ? "true" : "false";
+    store.state.zoConfig.downtimes_enabled = downtimes;
+    wrapper = await mountList([sloRow()]);
+
+    const buttons = desktopButtons();
+    expect(buttons.map((b: any) => b.attributes("data-test"))).toContain(
+      "slos-slolist-delete-checkout-availability",
+    );
+    expect(actionCount()).toBe(buttons.length);
   });
 });

@@ -24,7 +24,8 @@ export type SeriesOverrideMatchBy = "name" | "regex";
 
 export type SeriesLineStyle = "solid" | "dashed" | "dotted";
 export type SeriesDrawStyle = "line" | "bars" | "points";
-export type SeriesYAxisSide = "left" | "right";
+export type SeriesYAxisSide = "left" | "right" | "hidden";
+export type SeriesTransform = "negative_y";
 
 /** Where a series is left out; an unset or false flag keeps it. */
 export interface SeriesHideFrom {
@@ -43,6 +44,7 @@ export interface SeriesStyle {
   drawStyle?: SeriesDrawStyle;
   stackGroup?: string;
   yAxis?: SeriesYAxisSide;
+  transform?: SeriesTransform;
   hideFrom?: SeriesHideFrom;
 }
 
@@ -120,7 +122,8 @@ const MAX_COMPILED_PATTERNS = 500;
 
 const LINE_STYLES: ReadonlySet<string> = new Set(["solid", "dashed", "dotted"]);
 const DRAW_STYLES: ReadonlySet<string> = new Set(["line", "bars", "points"]);
-const Y_AXIS_SIDES: ReadonlySet<string> = new Set(["left", "right"]);
+const Y_AXIS_SIDES: ReadonlySet<string> = new Set(["left", "right", "hidden"]);
+const TRANSFORMS: ReadonlySet<string> = new Set(["negative_y"]);
 const HIDE_FROM_KEYS = ["chart", "legend", "tooltip"] as const;
 
 const LEGEND_RICH_PREFIXES = ["{a|", "{b|"];
@@ -193,6 +196,9 @@ export const normalizeSeriesStyle = (style: unknown): SeriesStyle => {
   if (typeof raw.yAxis === "string" && Y_AXIS_SIDES.has(raw.yAxis)) {
     out.yAxis = raw.yAxis as SeriesYAxisSide;
   }
+  if (typeof raw.transform === "string" && TRANSFORMS.has(raw.transform)) {
+    out.transform = raw.transform as SeriesTransform;
+  }
   const hideFrom = toHideFrom(raw.hideFrom);
   if (hideFrom) out.hideFrom = hideFrom;
   return out;
@@ -210,6 +216,7 @@ export const seriesStyleConfigItems = (style: unknown): Array<{ type: string; va
   if (s.stackGroup) items.push({ type: "stack_group", value: s.stackGroup });
   if (s.yAxis) items.push({ type: "y_axis", value: s.yAxis });
   if (s.hideFrom) items.push({ type: "hide_from", value: s.hideFrom });
+  if (s.transform) items.push({ type: "transform", value: s.transform });
   return items;
 };
 
@@ -222,6 +229,7 @@ const STYLE_ITEM_KEYS: Record<string, keyof SeriesStyle> = {
   stack_group: "stackGroup",
   y_axis: "yAxis",
   hide_from: "hideFrom",
+  transform: "transform",
 };
 
 /** The style key a stored `override_config` item sets, or undefined for a non-style item. */
@@ -238,6 +246,15 @@ const isNamedSeries = (series: any): boolean =>
 
 // Time-series points are [time, value]; category points are the value itself.
 const pointValue = (value: unknown): unknown => (Array.isArray(value) ? value[1] : value);
+
+const negatePoint = (point: any): any => {
+  if (Array.isArray(point)) return [point[0], negatePoint(point[1]), ...point.slice(2)];
+  if (point && typeof point === "object") return { ...point, value: negatePoint(point.value) };
+  const numeric = typeof point === "number" ? point : Number(point);
+  return point === null || point === "" || point === "-" || !Number.isFinite(numeric)
+    ? point
+    : -numeric;
+};
 
 const recolourSeries = (
   series: any,
@@ -267,6 +284,9 @@ const applyAxisSeriesOverride = (
 ) => {
   const resolved = lookup.get(series.name);
   if (!resolved) return;
+  if (resolved.style?.transform === "negative_y" && Array.isArray(series.data)) {
+    series.data = series.data.map(negatePoint);
+  }
   if (resolved.color) recolourSeries(series, resolved.color, panelType, theme, config);
 };
 
@@ -296,8 +316,7 @@ const applyPieOverrides = (
   options: { legend?: { selected?: Record<string, boolean> } },
 ) => {
   if (!Array.isArray(series?.data)) return;
-  // `{d}%` is replaced outright; a custom label reads the lookup itself and only needs the exact share.
-  const percentLabel = series.label?.formatter === "{d}%";
+  // A label reads the lookup itself and only needs the exact share.
   const customLabel = typeof series.label?.formatter === "function" ? series.label.formatter : null;
   const items = series.data;
   // Like the legend, the share is of the slices still shown; ChartRenderer replaces legend.selected on each toggle.
@@ -321,16 +340,15 @@ const applyPieOverrides = (
     let next = item;
     if (resolved.color) next = { ...next, itemStyle: { ...next.itemStyle, color: resolved.color } };
     const decimals = resolved.decimals;
-    if ((percentLabel || customLabel) && decimals !== undefined) {
+    if (customLabel && decimals !== undefined) {
       labelOverridden = true;
       const share = () => sharePercent(item.value, visibleTotal());
       next = {
         ...next,
         label: {
           ...next.label,
-          formatter: customLabel
-            ? (params: Record<string, unknown>) => customLabel({ ...params, percent: share() })
-            : () => `${share().toFixed(decimals)}%`,
+          formatter: (params: Record<string, unknown>) =>
+            customLabel({ ...params, percent: share() }),
         },
       };
     }
@@ -412,6 +430,14 @@ const relabelTitles = (title: any, displayNames: Map<string, string>) => {
     const display = typeof item?.text === "string" ? displayNames.get(item.text) : undefined;
     if (display !== undefined) item.text = display;
   }
+};
+
+/** The magnitude of a numeric value; a negated series reads as its original values. */
+export const absValue = (value: unknown): unknown => {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return value === null || value === undefined || value === "" || !Number.isFinite(numeric)
+    ? value
+    : Math.abs(numeric);
 };
 
 /** True for an `override_config` entry that targets chart series; tables skip these. */
@@ -567,7 +593,8 @@ export const createSeriesOverrideLookup = (config: any): SeriesOverrideLookup =>
     unitArgs,
     formatValue: (value: unknown, seriesName: unknown): string => {
       const args = unitArgs(seriesName);
-      return formatUnitValue(getUnitValue(value, args.unit, args.unitCustom, args.decimals));
+      const shown = get(seriesName)?.style?.transform === "negative_y" ? absValue(value) : value;
+      return formatUnitValue(getUnitValue(shown, args.unit, args.unitCustom, args.decimals));
     },
   };
 };

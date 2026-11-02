@@ -153,4 +153,22 @@ describe("OPopover", () => {
     content.vm.$emit("open-auto-focus", event);
     expect(wrapper.emitted("open-auto-focus")?.[0]).toEqual([event]);
   });
+
+  it("forwards outside pointerdown and focus so a consumer can keep it open for a panel it owns", () => {
+    const wrapper = mount(OPopover, {
+      props: { open: true },
+      slots: {
+        trigger: "<button>Open</button>",
+        default: '<div data-testid="content">Body</div>',
+      },
+    });
+    const content = wrapper.findAllComponents(PopoverContent).at(-1)!;
+    const down = new Event("pointerdown", { cancelable: true });
+    const focus = new Event("focusin", { cancelable: true });
+    content.vm.$emit("pointer-down-outside", down);
+    content.vm.$emit("focus-outside", focus);
+    expect(wrapper.emitted("pointer-down-outside")?.[0]).toEqual([down]);
+    expect(wrapper.emitted("focus-outside")?.[0]).toEqual([focus]);
+    expect(down.defaultPrevented).toBe(false);
+  });
 });

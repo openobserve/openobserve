@@ -768,6 +768,50 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
     });
 
+    describe("a named missing value replaces No Data", () => {
+      const nullMapping = { type: "special", match: "null", text: "N/A", color: null };
+      const mountEmpty = async (panelSchema: any, data: any) => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+          data: ref(data),
+          loading: ref(false),
+          errorDetail: ref({ message: "", code: "" }),
+          metadata: ref({}),
+          resultMetaData: ref({}),
+          annotations: ref([]),
+          lastTriggeredAt: ref(null),
+          isCachedDataDifferWithCurrentTimeRange: ref(false),
+          searchRequestTraceIds: ref([]),
+          loadingProgressPercentage: ref(0),
+          isPartialData: ref(false),
+        } as any);
+        wrapper = createWrapper({ panelSchema: { ...defaultProps.panelSchema, ...panelSchema } });
+        await flushPromises();
+        wrapper.vm.panelData = { chartType: panelSchema.type, options: { series: [] } };
+        await flushPromises();
+        return wrapper.vm.noData;
+      };
+
+      it("metric with a special null mapping, no rows and a NULL value", async () => {
+        const config = { ...defaultProps.panelSchema.config, mappings: [nullMapping] };
+        expect(await mountEmpty({ type: "metric", config }, [[]])).toBe("");
+        expect(await mountEmpty({ type: "metric", config }, [[{ y_axis_1: null }]])).toBe("");
+      });
+
+      it("metric and SQL gauge with a no-value replacement", async () => {
+        const config = { ...defaultProps.panelSchema.config, no_value_replacement: "-" };
+        expect(await mountEmpty({ type: "metric", config }, [[]])).toBe("");
+        expect(await mountEmpty({ type: "gauge", config }, [[]])).toBe("");
+      });
+
+      it("keeps No Data without one, and for a PromQL gauge", async () => {
+        expect(await mountEmpty({ type: "metric" }, [[]])).toBe("No Data");
+        const config = { ...defaultProps.panelSchema.config, no_value_replacement: "-" };
+        expect(
+          await mountEmpty({ type: "gauge", queryType: "promql", config }, [{ result: [] }]),
+        ).toBe("No Data");
+      });
+    });
+
     // Guard must not over-trigger: with rows present the table keeps serving
     // the converted data (unchanged fall-through behaviour).
     // mockReturnValueOnce only overrides THIS mount, so the real-ref shape can't

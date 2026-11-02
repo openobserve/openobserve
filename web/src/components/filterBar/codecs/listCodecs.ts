@@ -26,7 +26,7 @@ import {
   joinListText,
   splitListText,
 } from "./dashboardFilterCodec";
-import { flatCodec, type FlatCondition } from "./flatCodec";
+import { flatCodec, labelGroupsCodec, type FlatCondition, type GroupedItem } from "./flatCodec";
 import { operatorFromWire, valueStrings } from "./types";
 
 const firstValue = (condition: FlatCondition) => condition.values[0] ?? "";
@@ -165,7 +165,7 @@ const writeMatcher = (condition: FlatCondition): { op: string; value: string } =
   }
 };
 
-export interface PromqlMatcher {
+export interface PromqlMatcher extends GroupedItem {
   label: string;
   op: string;
   value: string;
@@ -173,13 +173,13 @@ export interface PromqlMatcher {
 
 /** The PromQL query builder's `{label, op, value}` matchers; IN is an anchored alternation of escaped literals. */
 export const promqlLabelsCodec = () =>
-  flatCodec<PromqlMatcher>({
+  labelGroupsCodec<PromqlMatcher>({
     read: (item) => readMatcher(item.label, item.op, item.value),
     label: (item) => `${item.label}${item.op}${item.value}`,
     write: (condition, saved) => ({ ...saved, label: condition.field, ...writeMatcher(condition) }),
   });
 
-export interface MetricsLabelFilter {
+export interface MetricsLabelFilter extends GroupedItem {
   label: string;
   operator?: string;
   value: string;
@@ -187,7 +187,7 @@ export interface MetricsLabelFilter {
 
 /** The metrics explorer's `{label, operator, value}` filters. */
 export const metricsLabelsCodec = () =>
-  flatCodec<MetricsLabelFilter>({
+  labelGroupsCodec<MetricsLabelFilter>({
     read: (item) => readMatcher(item.label, item.operator, item.value),
     label: (item) => `${item.label}${item.operator ?? "="}${item.value}`,
     write: (condition, saved) => {

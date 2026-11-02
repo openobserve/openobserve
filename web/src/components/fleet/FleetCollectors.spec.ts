@@ -67,7 +67,6 @@ vi.mock("@/services/fleet", () => ({
     restartCollector: vi.fn(),
     redeliverCollector: vi.fn(),
     renameCollector: vi.fn(),
-    moveCollectors: vi.fn(),
   },
 }));
 
@@ -130,13 +129,6 @@ const DropdownItemStub = {
   template: `<button :data-test="$attrs['data-test']" :disabled="disabled" @click="$emit('select')"><slot /></button>`,
 };
 
-const MoveStub = {
-  name: "FleetMoveDialog",
-  props: ["open", "collectorIds", "sourceFleetId"],
-  emits: ["moved", "update:open"],
-  template: "<div />",
-};
-
 type ListProps = { fleetId?: string; forbidden?: boolean; allFleets?: boolean };
 
 async function mountList(path = "/", stubs: Record<string, unknown> = {}, props: ListProps = {}) {
@@ -146,7 +138,7 @@ async function mountList(path = "/", stubs: Record<string, unknown> = {}, props:
     props: { fleetId: "default", forbidden: false, allFleets: true, ...props },
     global: {
       plugins: [i18n, router, store],
-      stubs: { FleetMoveDialog: MoveStub, ...stubs },
+      stubs,
     },
   });
   await settle();
@@ -537,13 +529,16 @@ describe("FleetCollectors", () => {
       vi.mocked(fleet.listFleets).mockResolvedValue({ data: { items: [] } } as any);
     });
 
-    it("offers Move, Restart and Remove on a selection, and no unenroll anywhere", async () => {
+    it("offers Restart and Remove on a selection, and no move or unenroll anywhere", async () => {
       wrapper = await mountList("/", menu);
       (wrapper.vm as any).selectedIds = ["c1"];
       await settle();
-      for (const id of ["bulk-move", "bulk-restart", "bulk-remove", "row-remove-c1"])
+      for (const id of ["bulk-restart", "bulk-remove", "row-remove-c1"])
         expect(wrapper.find(`[data-test="fleet-collectors-${id}"]`).exists(), id).toBe(true);
-      expect(wrapper.find('[data-test^="fleet-collectors-row-unenroll"]').exists()).toBe(false);
+      for (const prefix of ["row-unenroll", "row-move", "bulk-move"])
+        expect(wrapper.find(`[data-test^="fleet-collectors-${prefix}"]`).exists(), prefix).toBe(
+          false,
+        );
     });
 
     it("offers Restart, Redeliver and Rename from a row menu, Redeliver only with a configuration", async () => {
@@ -630,28 +625,6 @@ describe("FleetCollectors", () => {
       const dialog = wrapper.findComponent({ name: "FleetNameDialog" });
       expect(dialog.props("open")).toBe(true);
       expect(dialog.props("initial")).toBe("prod-web-01");
-    });
-
-    it("moves a row from its menu, naming its fleet as the source", async () => {
-      wrapper = await mountList("/", menu);
-      await wrapper.find('[data-test="fleet-collectors-row-move-c2"]').trigger("click");
-      const move = wrapper.findComponent(MoveStub);
-      expect(move.props("open")).toBe(true);
-      expect(move.props("collectorIds")).toEqual(["c2"]);
-      expect(move.props("sourceFleetId")).toBe("f1");
-    });
-
-    it("moves a mixed selection with no source fleet and clears the selection after", async () => {
-      wrapper = await mountList();
-      (wrapper.vm as any).selectedIds = ["c1", "c2"];
-      await settle();
-      await wrapper.find('[data-test="fleet-collectors-bulk-move"]').trigger("click");
-      const move = wrapper.findComponent(MoveStub);
-      expect(move.props("collectorIds")).toEqual(["c1", "c2"]);
-      expect(move.props("sourceFleetId")).toBe("");
-      move.vm.$emit("moved");
-      await settle();
-      expect((wrapper.vm as any).selectedIds).toEqual([]);
     });
 
     it("shows a placeholder for consistency until it is computed", async () => {

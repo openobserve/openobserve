@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { colorLuminance, labelColorOn } from "./chartLabelContrast";
+import { colorLuminance, labelColorOn, withLightness } from "./chartLabelContrast";
 
 describe("chart label contrast", () => {
   it("reads hex, rgb and hsl colours and rejects anything else", () => {
@@ -32,5 +32,12 @@ describe("chart label contrast", () => {
     expect(labelColorOn("#22d3ee")).toBe("#000000");
     // An unreadable colour falls back to the inverse text token.
     expect(labelColorOn("nope")).toBe("#ffffff");
+  });
+
+  it("sets HSL lightness the way a treemap colour range does", () => {
+    expect(colorLuminance(withLightness("#ff0000", 0.9))!).toBeGreaterThan(
+      colorLuminance("#ff0000")!,
+    );
+    expect(colorLuminance(withLightness("#ff0000", 0.2))!).toBeLessThan(colorLuminance("#ff0000")!);
   });
 });

@@ -20,13 +20,13 @@ export const isRowTimeline = (type: unknown): boolean =>
   typeof type === "string" && ROW_TIMELINE_TYPES.includes(type);
 
 /** Panel types built from source, target and value fields instead of x/y/breakdown. */
-export const FLOW_TYPES: readonly string[] = ["sankey"];
+export const FLOW_TYPES: readonly string[] = ["sankey", "node-graph"];
 
 export const isFlowChart = (type: unknown): boolean =>
   typeof type === "string" && FLOW_TYPES.includes(type);
 
 /** Panel types that read raw, unaggregated y values and summarise them client-side. */
-export const RAW_VALUE_TYPES: readonly string[] = [];
+export const RAW_VALUE_TYPES: readonly string[] = ["distribution"];
 
 export const isRawValueChart = (type: unknown): boolean =>
   typeof type === "string" && RAW_VALUE_TYPES.includes(type);
@@ -35,13 +35,13 @@ export const isRawValueChart = (type: unknown): boolean =>
 export const DISTRIBUTION_ROW_LIMIT = 10000;
 
 /** Panel types drawn as HTML by their own renderer instead of an ECharts option. */
-export const HTML_PANEL_TYPES: readonly string[] = [];
+export const HTML_PANEL_TYPES: readonly string[] = ["alert-list", "flame-graph", "logs"];
 
 export const isHtmlPanel = (type: unknown): boolean =>
   typeof type === "string" && HTML_PANEL_TYPES.includes(type);
 
 /** HTML panel types that read the rows of a hand-written SQL query; the builder cannot express them. */
-export const CUSTOM_SQL_PANEL_TYPES: readonly string[] = [];
+export const CUSTOM_SQL_PANEL_TYPES: readonly string[] = ["flame-graph", "logs"];
 
 export const isCustomSqlPanel = (type: unknown): boolean =>
   typeof type === "string" && CUSTOM_SQL_PANEL_TYPES.includes(type);

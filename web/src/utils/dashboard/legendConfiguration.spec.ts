@@ -1325,10 +1325,89 @@ describe("pie and donut legend values", () => {
 
     options.legend.selected = { api: true, db: false, cache: false };
     expect(options.legend.formatter("api")).toBe("{b|api}  100%");
-    expect(options.legend.formatter("db")).toBe("{b|db}  0%");
+    expect(options.legend.formatter("db")).toBe("{b|db}  -");
 
     options.legend.selected = { api: true, db: true, cache: false };
     expect(options.legend.formatter("api")).toBe("{b|api}  50%");
+  });
+
+  it("keeps a hidden slice's value but shows no percent for it", () => {
+    const options: any = pieOptions(slices);
+    applyLegendConfiguration(
+      pieSchema({ legend_values: ["value", "percent"], decimals: 0 }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    options.legend.selected = { api: true, db: false };
+    expect(options.legend.formatter("db")).toBe("{b|db}  10  -");
+    expect(options.legend.formatter("api")).toBe("{b|api}  30  100%");
+  });
+
+  it("gives an explicit right legend width to the names instead of the values cap", () => {
+    const longName = "ziox-querier-595748494c-2vlk5";
+    const options: any = pieOptions([
+      { name: longName, value: 30 },
+      { name: "db", value: 10 },
+    ]);
+    applyLegendConfiguration(
+      pieSchema({
+        legend_values: ["value", "percent"],
+        decimals: 0,
+        legends_position: "right",
+        legend_width: { value: 450, unit: "px" },
+      }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    expect(options.legend.textStyle.width).toBe(390);
+    expect(options.legend.formatter(longName)).toBe(`{b|${longName}}  30  75%`);
+  });
+
+  it("keeps an explicit width inside a narrower panel", () => {
+    const options: any = pieOptions(slices);
+    applyLegendConfiguration(
+      pieSchema({
+        legend_values: ["value", "percent"],
+        legends_position: "right",
+        legend_width: { value: 450, unit: "px" },
+      }),
+      { value: { offsetWidth: 300, offsetHeight: 400 } },
+      hovered(),
+      options,
+    );
+    expect(options.legend.textStyle.width).toBe(240);
+  });
+
+  it("keeps room for names on a very small explicit width", () => {
+    const options: any = pieOptions(slices);
+    applyLegendConfiguration(
+      pieSchema({ legends_position: "right", legend_width: { value: 50, unit: "px" } }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    expect(options.legend.textStyle.width).toBe(60);
+  });
+
+  it("caps the entries of an auto-sized scroll legend at the values width", () => {
+    const longName = "ziox-querier-595748494c-2vlk5-with-a-very-long-pod-name-suffix";
+    const options: any = pieOptions([{ name: longName, value: 30 }]);
+    applyLegendConfiguration(
+      pieSchema({
+        legend_values: ["value", "percent"],
+        legends_position: "right",
+        legends_type: "scroll",
+      }),
+      chartPanelRef,
+      hovered(),
+      options,
+    );
+    options.legend.textStyle.width = 180;
+    const capped = options.legend.formatter(longName);
+    options.legend.textStyle.width = 400;
+    expect(options.legend.formatter(longName)).toBe(capped);
   });
 
   it("takes an override-decimals and a high-decimals percent over the visible slices too", () => {

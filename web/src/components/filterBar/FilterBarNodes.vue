@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
+import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -50,13 +51,24 @@ const caretAt = (index: number) =>
   props.groupId === props.caretGroupId &&
   props.caretIndex !== null &&
   Math.min(props.caretIndex, props.items.length) === index;
+
+const anyOfGroups = computed(() => props.connectorMode === "any-of-groups");
+const showConnector = computed(() => props.connectorMode !== "and-only" && !anyOfGroups.value);
+
+const groupJoin = (index: number) => {
+  if (props.items.slice(0, index).some((item) => item.kind === "group"))
+    return t("metrics.labelGroups.or");
+  return props.items.some((item) => item.kind !== "group")
+    ? t("metrics.labelGroups.andAnyOf")
+    : t("metrics.labelGroups.anyOf");
+};
 </script>
 
 <template>
   <template v-for="(item, index) in items" :key="item.id">
     <slot v-if="caretAt(index)" name="caret" :group-id="groupId" :index="index" />
     <OTag
-      v-if="connectorMode !== 'and-only' && index > 0"
+      v-if="showConnector && index > 0"
       clickable
       size="xs"
       shape="rounded"
@@ -68,12 +80,32 @@ const caretAt = (index: number) =>
       @click.stop="emit('toggle-connector', item.id)"
     />
     <span
+      v-if="anyOfGroups && item.kind === 'group'"
+      class="text-3xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
+      :data-test="`${dataTest}-group-join-${pathOf(index)}`"
+      >{{ groupJoin(index) }}</span
+    >
+    <span
       v-if="item.kind === 'group'"
       class="rounded-default border-border-subtle bg-surface-subtle inline-flex max-w-full min-w-min flex-wrap items-center gap-1.5 border py-0.5 ps-1.5 pe-0.5"
       :data-filter-group="item.id"
       :data-filter-index="index"
       :data-test="`${dataTest}-group-${pathOf(index)}`"
     >
+      <OButton
+        v-if="anyOfGroups"
+        variant="ghost"
+        size="xs"
+        :active="Boolean(item.negate)"
+        :aria-pressed="Boolean(item.negate)"
+        :disabled="disabled"
+        :data-test="`${dataTest}-group-not-${pathOf(index)}`"
+        @mousedown.prevent
+        @click.stop="emit('toggle-negate', item.id)"
+      >
+        {{ t("metrics.labelGroups.not") }}
+        <OTooltip :content="t('metrics.labelGroups.notTooltip')" />
+      </OButton>
       <FilterBarNodes
         :items="item.items"
         :group-id="item.id"
@@ -92,6 +124,7 @@ const caretAt = (index: number) =>
         @edit="(id, part, element) => emit('edit', id, part, element)"
         @remove="emit('remove', $event)"
         @toggle-connector="emit('toggle-connector', $event)"
+        @toggle-negate="emit('toggle-negate', $event)"
         @ungroup="emit('ungroup', $event)"
       >
         <template #caret="slotProps">

@@ -59,6 +59,11 @@ describe("IngestionDocLink.vue", () => {
     expect(wrapper.text()).toContain("to check further documentation.");
   });
 
+  it("keeps a space between the link and the default trailing text", () => {
+    wrapper = createWrapper();
+    expect(wrapper.element.textContent).toMatch(/here to check further documentation\./);
+  });
+
   it("full text contains Click and here", () => {
     wrapper = createWrapper();
     const text = wrapper.text();

@@ -57,7 +57,8 @@ import {
 export type FilterLayout = "horizontal" | "vertical";
 
 /** `per-item`: each connector toggles alone; `per-group`: one AND/OR for a whole group; `and-only`: no OR. */
-export type FilterConnectorMode = "per-item" | "per-group" | "and-only";
+/** `any-of-groups`: ANDed base items, then one level of groups joined by OR, each ANDing its items and negatable. */
+export type FilterConnectorMode = "per-item" | "per-group" | "and-only" | "any-of-groups";
 
 /** `requireComplete`: an unfinished condition makes the filter invalid; `dropIncomplete`: it is left out on save. */
 export type FilterValidationMode = "requireComplete" | "dropIncomplete" | "none";
@@ -282,8 +283,8 @@ const promql = {
   layout: "horizontal",
   dialect: "promql",
   operators: PROMQL_OPERATORS,
-  maxDepth: 1,
-  connectors: "and-only",
+  maxDepth: 2,
+  connectors: "any-of-groups",
   freeText: false,
   allowCustomFields: true,
   startWithEmptyRow: false,

@@ -702,10 +702,9 @@ mod tests {
 
     #[test]
     fn an_unknown_trigger_type_decodes_from_json_rather_than_failing_the_envelope() {
-        // `From<&str>` covers the database and the history key. The envelope is what
-        // crosses regions, and one unknown tag used to fail the whole `WorkflowTrigger`.
+        // The envelope crosses regions, so a newer node's tag must not fail the whole trigger.
         assert_eq!(
-            serde_json::from_str::<WorkflowTriggerType>(r#""AlertResolved""#).unwrap(),
+            serde_json::from_str::<WorkflowTriggerType>(r#""NotATriggerType""#).unwrap(),
             WorkflowTriggerType::Unknown
         );
         assert_eq!(

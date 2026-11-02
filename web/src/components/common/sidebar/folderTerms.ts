@@ -29,12 +29,6 @@ const FLEET_KEYS: Partial<Record<I18nKey, I18nKey>> = {
   "toastMessages.sidebar.folderAddedSuccessfully": "fleet.fleets.added",
   "common.sidebar.folderUpdateFailed": "fleet.fleets.updateFailed",
   "common.sidebar.folderCreateFailed": "fleet.fleets.createFailed",
-  "dashboard.selectFolderLabel": "fleet.fleets.select",
-  "dashboard.selectFolderPlaceholder": "fleet.fleets.selectPlaceholder",
-  "dashboard.moveToAnotherFolder": "fleet.fleets.moveTitle",
-  "dashboard.currentFolderLabel": "fleet.fleets.current",
-  "toastMessages.sidebar.movedSuccessfully": "fleet.fleets.moved",
-  "toastMessages.sidebar.moveFailed": "fleet.fleets.moveFailed",
 };
 
 export function folderKey(type: string, key: I18nKey): I18nKey {

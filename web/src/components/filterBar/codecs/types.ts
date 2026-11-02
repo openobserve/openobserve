@@ -39,7 +39,7 @@ export interface FilterCodec<T = unknown> {
 /** What the user can change on a node; a node whose state still matches its stamp is written back as loaded. */
 export const nodeSig = (node: FilterNode): string => {
   if (node.kind === "group")
-    return JSON.stringify(["g", node.connector, node.items.map((i) => i.id)]);
+    return JSON.stringify(["g", node.connector, node.items.map((i) => i.id), !!node.negate]);
   if (node.kind === "raw") return JSON.stringify(["r", node.connector]);
   return JSON.stringify(["c", node.field, node.operator, node.values, node.connector]);
 };

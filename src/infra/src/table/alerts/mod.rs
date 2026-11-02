@@ -23,7 +23,6 @@ use config::meta::{
             Alert as MetaAlert, AlertSortField as MetaAlertSortField, AlertTypeFilter,
             ListAlertsParams,
         },
-        deduplication::DeduplicationConfig as MetaDeduplicationConfig,
     },
     folder::{Folder as MetaFolder, FolderType},
     stream::StreamType as MetaStreamType,
@@ -200,16 +199,6 @@ impl TryFrom<alerts::Model> for MetaAlert {
         alert.set_last_satisfied_at(value.last_satisfied_at);
         alert.set_last_triggered_at(value.last_triggered_at);
 
-        // Load deduplication configuration if enabled
-        if value.dedup_enabled {
-            let dedup_config_json = value.dedup_config.unwrap_or_else(|| serde_json::json!({}));
-            let mut dedup_config: MetaDeduplicationConfig =
-                serde_json::from_value(dedup_config_json)?;
-            dedup_config.enabled = true;
-            dedup_config.time_window_minutes = value.dedup_time_window_minutes;
-            alert.deduplication = Some(dedup_config);
-        }
-
         alert.creates_incident = value.creates_incident;
         alert.workflows = workflows;
 
@@ -231,6 +220,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
         alert.notify_on_recovery = value.notify_on_recovery.unwrap_or(false);
         alert.recovery_destinations = recovery_destinations;
         alert.keep_firing_for = value.keep_firing_for_seconds.unwrap_or(0);
+        alert.suppress_repeats = value.suppress_repeats.unwrap_or(false);
 
         Ok(alert)
     }
@@ -969,21 +959,7 @@ fn update_mutable_fields(
         Some(serde_json::to_string(&alert.recovery_destinations)?)
     };
     let keep_firing_for_seconds = alert.keep_firing_for;
-
-    // Handle deduplication configuration
-    // Note: time_window_minutes is stored in a separate column, not in the JSON config
-    let (dedup_enabled, dedup_time_window_minutes, dedup_config) =
-        if let Some(mut dedup) = alert.deduplication {
-            let dedup_enabled = dedup.enabled;
-            let time_window = dedup.time_window_minutes;
-            // Remove time_window_minutes from the config before serializing to avoid redundancy
-            dedup.time_window_minutes = None;
-
-            let dedup_config_json = serde_json::to_value(dedup)?;
-            (dedup_enabled, time_window, Some(dedup_config_json))
-        } else {
-            (false, None, None)
-        };
+    let suppress_repeats = alert.suppress_repeats;
 
     alert_am.name = Set(name);
     alert_am.is_real_time = Set(is_real_time);
@@ -1036,15 +1012,13 @@ fn update_mutable_fields(
     alert_am.last_edited_by = Set(last_edited_by);
     alert_am.updated_at = Set(Some(updated_at));
     alert_am.align_time = Set(align_time);
-    alert_am.dedup_enabled = Set(dedup_enabled);
-    alert_am.dedup_time_window_minutes = Set(dedup_time_window_minutes);
-    alert_am.dedup_config = Set(dedup_config);
     alert_am.creates_incident = Set(alert.creates_incident);
     alert_am.workflows = Set(workflows);
     alert_am.pending_period_sec = Set(pending_periond_sec);
     alert_am.notify_on_recovery = Set(Some(notify_on_recovery));
     alert_am.recovery_destinations = Set(recovery_destinations);
     alert_am.keep_firing_for_seconds = Set(Some(keep_firing_for_seconds));
+    alert_am.suppress_repeats = Set(Some(suppress_repeats));
     Ok(())
 }
 
@@ -1125,6 +1099,7 @@ pub(super) mod tests {
             notify_on_recovery: None,
             recovery_destinations: None,
             keep_firing_for_seconds: None,
+            suppress_repeats: None,
         }
     }
 

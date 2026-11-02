@@ -70,6 +70,7 @@
       :columns="columns"
       row-key="id"
       :loading="loading"
+      :loading-reset-key="activeFolderId"
       :error="error"
       :page-size="pageSize"
       :page-size-options="[25, 50, 100]"
@@ -779,6 +780,8 @@ const typeOptions = computed<{ value: string; label: I18nText; icon: IconName }[
   { value: "alert", label: t("slos.type.alert"), icon: "shield-alert-outline" },
 ]);
 
+const downtimesEnabled = useDowntimesEnabled();
+
 const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
   {
     id: "name",
@@ -832,17 +835,14 @@ const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
     hideable: true,
     size: 140,
   },
-  // No hardcoded `size`: OTable derives an action column's width from
-  // `actionCount` (4 × 32px button + 3 × 4px gap + padding), but only when
-  // `isAction` marks it as one. Without the flag it fell through to the
-  // generic size and clipped the last two buttons.
+  // OTable sizes this column from `actionCount` and clips the cell, so it must equal the desktop buttons in `#cell-actions`.
   {
     id: "actions",
     header: t("slos.column.actions"),
     accessor: () => "",
     sortable: false,
     isAction: true,
-    meta: { align: "center", actionCount: 4 },
+    meta: { align: "center", actionCount: downtimesEnabled.value ? 6 : 5 },
   },
 ]);
 
@@ -1068,8 +1068,6 @@ async function doMove() {
 function goToNew() {
   router.push({ name: "addSlo", query: { ...route.query, org_identifier: org.value } });
 }
-
-const downtimesEnabled = useDowntimesEnabled();
 
 const activeCorrections = (row: SloListItem) =>
   (row.status?.corrections ?? []).filter((c) => c.status === "active");

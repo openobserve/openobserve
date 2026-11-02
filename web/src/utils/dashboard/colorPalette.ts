@@ -17,6 +17,7 @@ import { scaleLinear } from "d3-scale";
 import { isNumber } from "lodash-es";
 import { color as echartsColor } from "echarts/core";
 import { chartColor, chartNumber } from "../chartTheme";
+import { getSeriesThresholds, resolveStepValues, stepColorFor } from "./thresholds";
 
 export enum ColorModeWithoutMinMax {
   PALETTE_CLASSIC_BY_SERIES = "palette-classic-by-series",
@@ -55,6 +56,39 @@ export const classicColorPaletteDarkTheme = [
   "#f5d0fe", // fuchsia
   "#fef08a", // amber
 ];
+
+// d3 schemeCategory10, the categorical palette many tools default to.
+export const CATEGORY10_PALETTE = [
+  "#1f77b4",
+  "#ff7f0e",
+  "#2ca02c",
+  "#d62728",
+  "#9467bd",
+  "#8c564b",
+  "#e377c2",
+  "#7f7f7f",
+  "#bcbd22",
+  "#17becf",
+];
+
+// Tableau 10 (2016 refresh).
+export const TABLEAU10_PALETTE = [
+  "#4e79a7",
+  "#f28e2c",
+  "#e15759",
+  "#76b7b2",
+  "#59a14f",
+  "#edc949",
+  "#af7aa1",
+  "#ff9da7",
+  "#9c755f",
+  "#bab0ab",
+];
+
+const CATEGORICAL_PALETTES: Record<string, string[]> = {
+  "palette-category10": CATEGORY10_PALETTE,
+  "palette-tableau10": TABLEAU10_PALETTE,
+};
 
 // Classic dashboard series palette. The light/dark swap now lives in the
 // --color-chart-series-* tokens (base.css / dark.css); this resolves them for
@@ -258,6 +292,9 @@ interface ColorConfig {
     | "shades"
     | "palette-classic-by-series"
     | "palette-classic"
+    | "palette-category10"
+    | "palette-tableau10"
+    | "palette-from-thresholds"
     | "continuous-green-yellow-red"
     | "continuous-red-yellow-green"
     | "continuous-temperature"
@@ -294,6 +331,8 @@ export const getSeriesColor = (
   chartMax: number,
   theme: string,
   colorBySeries?: any,
+  // Only read by palette-from-thresholds, which takes the series' step colour.
+  panelConfig?: any,
 ): string | null => {
   const colorPalette = getColorPalette(theme);
 
@@ -322,6 +361,20 @@ export const getSeriesColor = (
     return colorPalette[getSeriesHash(seriesName?.toString() ?? "", colorPalette)];
   } else if (colorCfg.mode === "palette-classic") {
     return null;
+  } else if (CATEGORICAL_PALETTES[colorCfg.mode]) {
+    const palette = CATEGORICAL_PALETTES[colorCfg.mode];
+    return palette[getSeriesHash(seriesName?.toString() ?? "", palette)];
+  } else if (colorCfg.mode === "palette-from-thresholds") {
+    const fallback = colorPalette[getSeriesHash(seriesName?.toString() ?? "", colorPalette)];
+    const thresholds = getSeriesThresholds(panelConfig, String(seriesName ?? ""));
+    const resolved = thresholds && resolveStepValues(thresholds, { min: chartMin, max: chartMax });
+    if (!resolved) return fallback;
+    // PromQL values arrive as numeric strings, which the series reducer would skip.
+    const numbers = (Array.isArray(value) ? value : [value]).map((v) =>
+      v === null || v === "" ? v : Number(v),
+    );
+    const reading = getSeriesValueBasedOnSeriesBy(numbers, colorCfg?.seriesBy ?? "last");
+    return stepColorFor(reading, resolved, fallback);
   } else {
     const d3ColorObj = scaleLinear(
       getDomainPartitions(chartMin, chartMax, colorCfg?.fixedColor?.length ?? colorPalette.length),

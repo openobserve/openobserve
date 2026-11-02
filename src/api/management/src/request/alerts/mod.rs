@@ -76,7 +76,6 @@ use crate::{
 pub mod ack;
 pub mod auto_investigate;
 pub mod chart_render;
-pub mod dedup_stats;
 pub mod deduplication;
 pub mod destinations;
 pub mod external_events;

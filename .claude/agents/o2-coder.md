@@ -10,7 +10,7 @@ When the brief names a checkout path, every file you read or edit and every comm
 
 ## Ground rules
 
-- Follow the repo's `CLAUDE.md` exactly: item ordering, one-line comments, tests module last, clippy thresholds.
+- Follow the repo's `AGENTS.md` exactly: item ordering, one-line comments, tests module last, clippy thresholds.
 - Never run `git commit`, `git add`, `git reset`, `git stash`, or `git push`. The orchestrator's script freezes your working tree as a WIP commit; you only edit files.
 - Never spawn agents or split your work; if the spec needs more than one coder, that is the orchestrator's decision, and you say so in a `question:` line.
 - Never write to the ledger except the files named below, and never edit `verdict.json`.
@@ -27,7 +27,7 @@ When the brief names a checkout path, every file you read or edit and every comm
    cargo fmt --all
    cargo clippy --workspace --all-targets -- -W clippy::too_many_lines -W clippy::cognitive_complexity -W clippy::excessive_nesting -D warnings
    ```
-   If the change touches `#[cfg(feature = "enterprise")]` code, follow `CLAUDE.md`'s enterprise verification rule or say in the evidence that it was not checked.
+   If the change touches `#[cfg(feature = "enterprise")]` code, follow `AGENTS.md`'s enterprise verification rule or say in the evidence that it was not checked.
 4. Write `<ledger>/round-1/evidence.md`: the exact commands, pass or fail, test names, tails of any failure output, and anything skipped.
 5. Reply to the orchestrator with: files changed, gates run, anything you deviated from in the spec and why.
 

@@ -28,9 +28,10 @@ import { useI18nTyped } from "@/types/i18n";
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { b64EncodeStandard } from "@/utils/zincutils";
 import { isPrimaryCloudWebUrl } from "@/utils/otelCollectorConfig";
 import useIngestion from "@/composables/useIngestion";
+import { useOrgCredential } from "@/composables/useOrgCredential";
+import { basicIngestToken } from "@/composables/useCredentialSnippet";
 import { importHostMetricsDashboard } from "@/composables/useHostMetricsDashboard";
 import analytics from "@/services/product_analytics";
 import {
@@ -42,7 +43,7 @@ import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue"
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import type { CardSubstitutions } from "./types";
+import type { CardSubstitutions, IngestTokenState } from "./types";
 import { getDataSourceCard } from "./registry";
 import { HOST_AGENT_SLUGS } from "./content/osAgent";
 
@@ -63,18 +64,24 @@ const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
 const { endpoint } = useIngestion();
+// Hosts and Kubernetes embed this card outside Ingestion, so it loads the credential itself.
+const credential = useOrgCredential();
 
-// Per-org url/org/token — the same Basic-auth token every Data Sources card
-// uses: base64(email:<org ingestion passcode>) WITHOUT the "Basic " prefix.
 const subs = computed<CardSubstitutions>(() => {
   const email = store.state.userInfo?.email ?? "";
   const passcode = store.state.organizationData?.organizationPasscode ?? "";
   return {
     url: endpoint.value?.url ?? "",
     org: store.state.selectedOrganization?.identifier ?? "",
-    token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
+    token: basicIngestToken(email, passcode),
     isPrimaryCloud: isPrimaryCloudWebUrl(store.state.zoConfig?.web_url),
   };
+});
+
+// a settled read can still carry no token, so readiness alone does not make the commands usable
+const tokenState = computed<IngestTokenState>(() => {
+  if (!credential.ready.value) return "loading";
+  return store.state.organizationData?.organizationPasscode ? "ready" : "unavailable";
 });
 
 const content = computed(() => getDataSourceCard(props.slug, subs.value, t));
@@ -217,18 +224,27 @@ const onStepAction = async (actionId: string) => {
       data-test="data-source-setup-card-passcode-forbidden"
       :content="t('ingestion.passcodeForbiddenMessage')"
     />
-    <SetupCardRenderer
-      v-else-if="content"
-      :content="content"
-      :subs="subs"
-      data-test="data-source-setup-card"
-      @detected="onDetected"
-      @step-action="onStepAction"
-    >
-      <template v-if="$slots['hero-under-title']" #hero-under-title>
-        <slot name="hero-under-title" />
-      </template>
-    </SetupCardRenderer>
+    <template v-else-if="content">
+      <OBanner
+        v-if="tokenState === 'unavailable'"
+        variant="warning"
+        class="mb-2"
+        data-test="data-source-setup-card-passcode-unavailable"
+        :content="t('ingestion.passcodeUnavailableMessage')"
+      />
+      <SetupCardRenderer
+        :content="content"
+        :subs="subs"
+        :token-state="tokenState"
+        data-test="data-source-setup-card"
+        @detected="onDetected"
+        @step-action="onStepAction"
+      >
+        <template v-if="$slots['hero-under-title']" #hero-under-title>
+          <slot name="hero-under-title" />
+        </template>
+      </SetupCardRenderer>
+    </template>
     <template v-else>
       <CredentialCodeBlock v-if="fallbackContent" :slug="slug" :content="fallbackContent" />
       <IngestionDocLink v-if="fallbackDocUrl" :href="fallbackDocUrl" />

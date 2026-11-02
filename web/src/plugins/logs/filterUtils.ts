@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
+
 /**
  * Extracts the field name from a filter expression.
  * Handles single: `field = 'val'`, multi: `(field = 'x' OR field = 'y')`,
@@ -35,7 +37,7 @@ export const getFieldFromExpression = (expression: string): string | null => {
  */
 export const hasFieldCondition = (queryStr: string, fieldName: string): boolean => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
   const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
 
@@ -57,13 +59,10 @@ export const removeFieldCondition = (queryStr: string, fieldName: string): strin
   const fieldPattern = new RegExp(`^"?${esc}"?\\s*(?:[=!<>]|is\\s)`, "i");
   const multiPattern = new RegExp(`^\\(\\s*"?${esc}"?\\s*(?:[=!<>]|is\\s)`, "i");
 
-  const remaining = queryStr
-    .trim()
-    .split(/\s+AND\s+/i)
-    .filter((cond) => {
-      const trimmed = cond.trim();
-      return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
-    });
+  const remaining = splitOnAnd(queryStr.trim()).filter((cond) => {
+    const trimmed = cond.trim();
+    return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
+  });
 
   return remaining.join(" AND ");
 };
@@ -79,20 +78,20 @@ export const replaceExistingFieldCondition = (
   newExpression: string,
 ): string => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
   const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
   const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
   if (multiRegex.test(queryStr)) {
-    return queryStr.replace(multiRegex, newExpression);
+    return queryStr.replace(multiRegex, () => newExpression);
   }
 
   // Try single condition
   const singleRegex = new RegExp(condPat, "gi");
   if (singleRegex.test(queryStr)) {
-    return queryStr.replace(singleRegex, newExpression);
+    return queryStr.replace(singleRegex, () => newExpression);
   }
 
   return queryStr;

@@ -67,7 +67,7 @@ describe("linuxCard builder", () => {
     const card = linuxCard(SUBS, gt);
     expect(card.provider.name).toBe("Linux");
     expect(card.provider.metaBadges).toEqual(["Logs", "Metrics", "Traces"]);
-    expect(card.steps.map((s) => s.id)).toEqual(["install", "verify", "dashboard"]);
+    expect(card.steps.map((s) => s.id)).toEqual(["install", "network", "verify", "dashboard"]);
     // Host metrics fan out per metric, so detection is existence-based.
     expect(card.detect).toMatchObject({
       streamType: "metrics",
@@ -123,10 +123,30 @@ describe("linuxCard builder", () => {
     const card = linuxCard(SUBS, gt);
     expect(card.docLinks?.map((l) => l.url)).toEqual([
       "https://github.com/openobserve/agents/blob/main/obi.md",
+      "https://github.com/openobserve/agents/blob/main/obi.md#network-flows",
     ]);
-    expect(card.steps[1].note).toContain("traced app handles a request");
+    expect(card.steps.find((s) => s.id === "verify")!.note).toContain(
+      "traced app handles a request",
+    );
     // Detection stays on host metrics, tracing or not.
     expect(card.detect?.streamName).toBe("system_");
+  });
+
+  it("offers network flows as an optional re-run that needs at least one CIDR", () => {
+    const step = linuxCard(SUBS, gt).steps.find((s) => s.id === "network")!;
+    expect(step.required).toBeUndefined();
+    expect(step.variantToggle).toBe(false);
+    expect(step.variants).toHaveLength(1);
+    const [flows] = step.variants!;
+    if ("variants" in flows) throw new Error("network flows must not be nested");
+    expect(flows.code.raw).toBe(`${BASE_INSTALL}{flags}`);
+    expect(flows.code.masked).not.toContain(SUBS.token);
+    expect(flows.inputs?.map((i) => [i.id, i.flag, i.default])).toEqual([
+      ["networkFlows", "--network-flows", ""],
+    ]);
+    expect(flows.requireOneOf?.ids).toEqual(["networkFlows"]);
+    // Re-running the installer replaces the config, so the note says how to keep tracing.
+    expect(flows.note).toContain("`--trace-*`");
   });
 
   it("offers the uninstall command", () => {

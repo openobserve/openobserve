@@ -295,6 +295,7 @@ describe("ValueMappingPopUp", () => {
         { label: "Less than", value: "lt" },
         { label: "Greater than or equal", value: "gte" },
         { label: "Less than or equal", value: "lte" },
+        { label: "Special value", value: "special" },
       ]);
     });
 

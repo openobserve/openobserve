@@ -58,6 +58,7 @@ vi.mock("../legendConfiguration", () => ({
   calculateBottomLegendHeight: vi.fn(() => 50),
   MAX_SEATS_PRECISION: 13,
   pieLegendPercentDecimals: vi.fn(() => 2),
+  piePercentPrecision: vi.fn(() => 2),
   calculateChartDimensions: vi.fn(() => ({
     width: 800,
     height: 600,

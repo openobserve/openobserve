@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
-                  class="span-count-box text-2xs border-card-glass-border! hover:bg-interactive-hover-bg relative me-1 flex h-5 min-w-5 cursor-pointer items-center justify-center rounded-full border px-1 py-0 font-semibold transition-colors duration-200"
+                  class="span-count-box text-2xs border-card-glass-border! hover:bg-interactive-hover-bg relative me-1 flex h-5 min-w-5 shrink-0 cursor-pointer items-center justify-center rounded-full border px-1 py-0 font-semibold transition-colors duration-200"
                   :style="{
                     color: (spans as any[])[virtualRow.index].style.color,
                   }"
@@ -142,16 +142,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                 ></div>
 
-                <div
-                  class="flex justify-between"
-                  :class="
-                    (spans as any[])[virtualRow.index].hasChildSpans
-                      ? 'w-full'
-                      : 'w-[calc(100%-0.6rem)]!'
-                  "
-                >
+                <div class="flex min-w-0 flex-1 justify-between">
                   <div
-                    class="w-[calc(100%-2rem)]! cursor-pointer truncate ps-1"
+                    class="min-w-0 flex-1 cursor-pointer truncate ps-1"
                     :class="
                       isLLMTrace((spans as any[])[virtualRow.index])
                         ? 'flex-col items-start'
@@ -224,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
 
-                  <div class="sticky right-0 flex items-center gap-1">
+                  <div class="sticky end-0 flex shrink-0 items-center gap-1">
                     <!-- Hidden at rest, not merely invisible: `invisible` would keep
                          the box in layout and reserve a permanent gutter to the left
                          of the badges, which is the thing this arrangement exists to

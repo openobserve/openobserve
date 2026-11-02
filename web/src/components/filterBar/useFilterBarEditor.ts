@@ -134,7 +134,9 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   let valueTimer: ReturnType<typeof setTimeout> | undefined;
   let valueRequest = 0;
 
-  const advanced = computed(() => config.value.connectors !== "and-only");
+  const advanced = computed(
+    () => config.value.connectors !== "and-only" && config.value.connectors !== "any-of-groups",
+  );
   const fieldMap = computed(() => new Map(fields.value.map((field) => [field.name, field])));
   const typeOf = (field: string): FilterFieldType => fieldMap.value.get(field)?.type ?? "string";
   const draftType = computed<FilterFieldType>(() => typeOf(draft.value?.field ?? ""));
@@ -690,6 +692,13 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     options.commit(replaceNode(tree.value, id, { ...node, connector: next }));
   }
 
+  function toggleNegate(id: string) {
+    const node = findNode(tree.value, id);
+    if (node?.kind !== "group") return;
+    const { negate, ...rest } = node;
+    options.commit(replaceNode(tree.value, id, negate ? rest : { ...rest, negate: true }));
+  }
+
   function togglePendingConnector() {
     const next: FilterConnector = nextConnector.value === "AND" ? "OR" : "AND";
     if (groupConnector(targetGroup.value)) {
@@ -703,7 +712,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     text.value = value;
     editedValue.value = null;
     armedId.value = null;
-    if (step.value !== "field" || !advanced.value) return;
+    if (step.value !== "field" || config.value.connectors === "and-only") return;
     const typed = value.trimStart().toLowerCase();
     if (typed === "(" && canGroupIn(openGroupId.value)) {
       text.value = "";
@@ -714,7 +723,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       return closeGroup();
     }
     const connector = /^(and|or)\s$/.exec(typed)?.[1];
-    if (connector && targetGroup.value.items.length) {
+    if (connector && advanced.value && targetGroup.value.items.length) {
       text.value = "";
       const chosen = connector.toUpperCase() as FilterConnector;
       if (groupConnector(targetGroup.value) && chosen !== nextConnector.value)
@@ -833,6 +842,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
 
   /** Only offered where dropping the brackets leaves the filter meaning the same. */
   function canUngroup(id: string): boolean {
+    if (config.value.connectors === "any-of-groups") return false;
     return canUngroupNode(tree.value, id, perGroup.value);
   }
 
@@ -896,6 +906,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     canUngroup,
     canGroupIn,
     toggleConnector,
+    toggleNegate,
     togglePendingConnector,
     setPendingConnector,
     nextConnector,

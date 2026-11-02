@@ -133,7 +133,7 @@ test.describe(
       pm = new PageManager(page);
     });
 
-    test("loads the Correlation Settings page with all four tabs visible", {
+    test("loads the Correlation Settings page with all three tabs visible", {
       tag: ["@smoke", "@P0"],
     }, async () => {
       const orgId = process.env["ORGNAME"];
@@ -142,7 +142,7 @@ test.describe(
       await pm.correlationSettingsPage.expectAllTabsVisible();
     });
 
-    test("switches between all four tabs successfully", {
+    test("switches between all three tabs successfully", {
       tag: ["@smoke", "@P0"],
     }, async () => {
       const orgId = process.env["ORGNAME"];
@@ -152,8 +152,8 @@ test.describe(
       await pm.correlationSettingsPage.expectServicesContentVisible();
       await pm.correlationSettingsPage.clickServiceDiscoveryTab();
       await pm.correlationSettingsPage.expectServiceDiscoveryContentVisible();
-      await pm.correlationSettingsPage.clickAlertCorrelationTab();
-      await pm.correlationSettingsPage.expectAlertCorrelationContentVisible();
+      await pm.correlationSettingsPage.clickFieldAliasesTab();
+      await pm.correlationSettingsPage.expectFieldAliasesContentVisible();
       await pm.correlationSettingsPage.clickServicesTab();
       await pm.correlationSettingsPage.expectServicesContentVisible();
     });

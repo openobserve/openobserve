@@ -444,9 +444,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               {{
                                 patternAssociations[row.name]?.length
-                                  ? t("logStream.viewPatternsCount", {
-                                      count: patternAssociations[row.name]?.length,
-                                    })
+                                  ? t(
+                                      "logStream.viewPatternsCount",
+                                      { count: patternAssociations[row.name]?.length },
+                                      patternAssociations[row.name]?.length,
+                                    )
                                   : t("logStream.addPattern")
                               }}
                               <OIcon

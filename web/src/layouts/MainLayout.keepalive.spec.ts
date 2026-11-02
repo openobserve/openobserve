@@ -90,4 +90,47 @@ describe("MainLayout — kept-alive modules", () => {
     expect(mounts.AppAnalytics).toBe(1);
     expect(mounts.RealUserMonitoring).toBe(2);
   });
+
+  it("keeps Traces alive while the user opens a trace, so Back shows the same results without rerunning the search", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", component: StubDiv },
+        { path: "/traces", component: view("AppTraces") },
+        { path: "/trace-details", component: view("TraceDetails") },
+      ],
+    });
+    await router.push("/traces");
+    wrapper = mount(MainLayout, {
+      global: {
+        plugins: [store, i18n, router],
+        stubs: {
+          AppHeader: StubDiv,
+          ONavbar: StubDiv,
+          O2AIChat: StubDiv,
+          WebinarBanner: StubDiv,
+          AnnouncementBanner: StubDiv,
+          ShortcutCheatsheet: StubDiv,
+          GetStarted: StubDiv,
+          CommunitySlackInvite: StubDiv,
+          ThemeSwitcher: StubDiv,
+          PredefinedThemes: StubDiv,
+          SlackIcon: StubDiv,
+          ManagementIcon: StubDiv,
+          ODialog: StubDiv,
+        },
+      },
+    });
+    (wrapper.vm as unknown as { isLoading: boolean }).isLoading = true;
+    await flushPromises();
+    expect(wrapper.find('[data-test="AppTraces"]').exists()).toBe(true);
+    await router.push("/trace-details");
+    await flushPromises();
+    await router.push("/traces");
+    await flushPromises();
+    await router.push("/trace-details");
+    await flushPromises();
+    expect(mounts.AppTraces).toBe(1);
+    expect(mounts.TraceDetails).toBe(2);
+  });
 });

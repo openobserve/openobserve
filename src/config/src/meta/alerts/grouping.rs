@@ -41,12 +41,6 @@ const MICROS_PER_SEC: i64 = 1_000_000;
 /// alert's own variable in a notification.
 const GROUP_VAR_PREFIX: &str = "group.";
 
-/// Separator for the group fingerprint component (M-5). Deliberately not the
-/// `,dim=val` shape the base fingerprint uses for dimensions, so dimension
-/// parsing can never mistake the group hash for a user field — the same
-/// reasoning behind `with_level_component`'s `|level:`.
-const GROUP_FINGERPRINT_SEP: &str = "|group:";
-
 /// Default cardinality cap (M-6). Config-overridable; `0` means unlimited.
 pub const DEFAULT_MAX_GROUPS: usize = 500;
 
@@ -942,23 +936,6 @@ pub fn resolve_group_update(
     }
 }
 
-/// Append the group as an implicit fingerprint component (M-5).
-///
-/// Mirrors `with_level_component` in `core::alerts::deduplication`, and lives
-/// here rather than beside it because the base fingerprint has an OSS fallback
-/// (`alert.get_unique_key()`) — the group component has to apply on both paths,
-/// so it cannot sit in an enterprise-gated module.
-///
-/// `None` (and the rollup key) return the base **unchanged**, so every existing
-/// ungrouped alert keeps its fingerprint byte-for-byte across the upgrade and
-/// no live silence window is invalidated.
-pub fn with_group_component(base: String, group_key: Option<&str>) -> String {
-    match group_key {
-        Some(k) if k != ROLLUP_GROUP_KEY => format!("{base}{GROUP_FINGERPRINT_SEP}{k}"),
-        _ => base,
-    }
-}
-
 /// Fan one evaluation out into per-group state updates plus the rollup row
 /// (M-1, M-2, M-3).
 ///
@@ -1676,7 +1653,7 @@ mod tests {
             grouping::{
                 DEFAULT_DISAPPEARANCE_K, DEFAULT_MAX_GROUPS, GroupFate, MIN_RESOLVE_THRESHOLD_SECS,
                 group_fate, group_outcome, group_template_vars, plan_group_updates, render_labels,
-                resolve_group_update, resolve_threshold_micros, with_group_component,
+                resolve_group_update, resolve_threshold_micros,
             },
             state::{AlertState, ROLLUP_GROUP_KEY, StateUpdate},
         },
@@ -2977,85 +2954,6 @@ mod tests {
         let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0, 0);
         let updates = plan.updates;
         assert_eq!(updates.len(), 501, "500 retained groups plus the rollup");
-    }
-
-    // ── M-5: per-group notification identity ────────────────────────────────
-
-    #[test]
-    fn test_ungrouped_fingerprint_is_unchanged_byte_for_byte() {
-        // THE upgrade-safety test. Every ungrouped alert in every existing
-        // deployment must keep its fingerprint across this feature, or their
-        // in-flight silence windows all reset and every alert re-notifies at
-        // once on the deploy.
-        let base = "org|alert-1|svc=checkout".to_string();
-        assert_eq!(with_group_component(base.clone(), None), base);
-    }
-
-    #[test]
-    fn test_rollup_key_is_treated_as_ungrouped() {
-        // The rollup row is the alert-level identity — it must not pick up an
-        // empty `|group:` suffix, which would be a DIFFERENT string from the
-        // legacy fingerprint and silently break dedup continuity.
-        let base = "org|alert-1".to_string();
-        assert_eq!(
-            with_group_component(base.clone(), Some(ROLLUP_GROUP_KEY)),
-            base
-        );
-    }
-
-    #[test]
-    fn test_distinct_groups_get_distinct_fingerprints() {
-        // Without this, one group's notification dedups away another's — the
-        // exact failure multi-alerts exist to fix.
-        let base = "org|alert-1".to_string();
-        let a = with_group_component(base.clone(), Some(&group_key(&labels(&[("host", "a")]))));
-        let b = with_group_component(base, Some(&group_key(&labels(&[("host", "b")]))));
-        assert_ne!(a, b);
-    }
-
-    #[test]
-    fn test_same_group_fingerprint_is_stable() {
-        // Silence windows are keyed on this; an unstable key silences nothing.
-        let base = "org|alert-1".to_string();
-        let key = group_key(&labels(&[("host", "a")]));
-        assert_eq!(
-            with_group_component(base.clone(), Some(&key)),
-            with_group_component(base, Some(&key))
-        );
-    }
-
-    #[test]
-    fn test_group_component_cannot_be_parsed_as_a_dimension() {
-        // The base fingerprint encodes dimensions as `,dim=val`. The group
-        // component must not adopt that shape, or dimension parsing would read
-        // the group hash as a user field — the same reasoning that gave
-        // `with_level_component` its `|level:` separator.
-        let out = with_group_component(
-            "org|alert-1".to_string(),
-            Some(&group_key(&labels(&[("host", "a")]))),
-        );
-        let suffix = out.strip_prefix("org|alert-1").expect("base is preserved");
-        assert!(
-            !suffix.starts_with(','),
-            "group component must not look like a `,dim=val` pair; got `{suffix}`"
-        );
-        assert!(suffix.starts_with("|group:"), "got `{suffix}`");
-    }
-
-    #[test]
-    fn test_group_component_composes_with_the_level_component() {
-        // Level and group are independent implicit components. A Critical
-        // host-a batch must differ from a Warning host-a batch AND from a
-        // Critical host-b batch.
-        let key_a = group_key(&labels(&[("host", "a")]));
-        let key_b = group_key(&labels(&[("host", "b")]));
-
-        let crit_a = with_group_component("base|level:critical".to_string(), Some(&key_a));
-        let warn_a = with_group_component("base|level:warning".to_string(), Some(&key_a));
-        let crit_b = with_group_component("base|level:critical".to_string(), Some(&key_b));
-
-        assert_ne!(crit_a, warn_a);
-        assert_ne!(crit_a, crit_b);
     }
 
     #[test]

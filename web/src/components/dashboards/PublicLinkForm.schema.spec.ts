@@ -26,6 +26,7 @@ import {
   rangeError,
   rangeFromPicker,
   rangeKey,
+  rangesWindow,
   sortRanges,
   todayIn,
   toPublicLinkConfig,
@@ -240,5 +241,27 @@ describe("PublicLinkForm payload", () => {
       endOfDayMicros("2027-01-05", "Asia/Kolkata"),
     );
     expect(toPublicLinkConfig(named(), {}, "Asia/Kolkata", stored).expires_at).toBeNull();
+  });
+
+  describe("rangesWindow", () => {
+    const now = 10_000_000_000;
+    const span = (ranges: PublicLinkRange[]) => {
+      const { start_time, end_time } = rangesWindow(ranges, now);
+      return [start_time.getTime(), end_time.getTime()];
+    };
+
+    it("spans the widest relative range, ending now", () => {
+      expect(span([rel(3600), rel(86400)])).toEqual([now - 86_400_000, now]);
+    });
+
+    it("covers absolute ranges together with the relative ones", () => {
+      const earlier = abs(1_000_000_000, 2_000_000_000);
+      expect(span([rel(3600), earlier])).toEqual([1_000_000, now]);
+      expect(span([earlier, abs(3_000_000_000, 4_000_000_000)])).toEqual([1_000_000, 4_000_000]);
+    });
+
+    it("falls back to the default ranges when there are none", () => {
+      expect(span([])).toEqual([now - 86_400_000, now]);
+    });
   });
 });

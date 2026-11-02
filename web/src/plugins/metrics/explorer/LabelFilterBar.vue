@@ -15,9 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { raw } from "@/types/i18n";
+import { computed, ref, shallowRef, watch } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import QueryFilterBar from "@/components/filterBar/QueryFilterBar.vue";
+import {
+  compileLabelFilters,
+  filterGroupsOf,
+  MAX_FILTER_BRANCHES,
+  type LabelMatchOp,
+} from "@/components/promql/labelBoolean";
 import { useFilterHint } from "@/composables/metrics/useFilterHint";
 import { labelFilterKey, type LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
 import {
@@ -27,7 +33,6 @@ import {
   type FilterCondition,
   type FilterField,
   type FilterGroup,
-  type FilterNode,
   type FilterOperatorId,
 } from "@/utils/query/filterBar";
 
@@ -60,32 +65,75 @@ const emit = defineEmits<{
   (e: "remove", filter: LabelFilter): void;
   /** An edited chip, swapped in place. */
   (e: "replace", previous: LabelFilter, next: LabelFilter): void;
+  (e: "negate-group", group: number, negate: boolean): void;
   (e: "clear-all"): void;
   /** Each open — lets the parent lazily fetch label names. */
   (e: "focus-picker"): void;
 }>();
 
+const { t } = useI18nTyped();
+
 const focused = ref(false);
+const capError = ref("");
 
 const fields = computed<FilterField[]>(() =>
   props.labelNames.map((name) => ({ name, type: "string" })),
 );
 
-const tree = computed<FilterGroup>(() => ({
-  ...emptyFilterGroup(),
-  items: props.filters.map((filter) => {
-    const listOperator = LIST_OPERATOR[filter.operator ?? "="];
-    const list = listOperator ? splitPromRegexLiterals(filter.value) : null;
-    return {
-      kind: "condition",
-      id: labelFilterKey(filter),
+const toCondition = (filter: LabelFilter): FilterCondition => {
+  const listOperator = LIST_OPERATOR[filter.operator ?? "="];
+  const list = listOperator ? splitPromRegexLiterals(filter.value) : null;
+  return {
+    kind: "condition",
+    id: labelFilterKey(filter),
+    connector: "AND",
+    field: String(filter.label),
+    operator: list ? listOperator! : (TO_OPERATOR[filter.operator ?? "="] ?? "eq"),
+    values: list ?? [filter.value],
+  };
+};
+
+/** The group number behind each group node, so a chip edit stays in its group. */
+const groupNumbers = new Map<string, number>();
+
+const toTree = (filters: LabelFilter[]): FilterGroup => {
+  const base = filters.filter((filter) => (filter.group ?? 0) <= 0).map(toCondition);
+  const groups = filterGroupsOf(filters).map(({ group, negate, members }) => {
+    const id = `label-group-${group}`;
+    groupNumbers.set(id, group);
+    const node: FilterGroup = {
+      kind: "group",
+      id,
       connector: "AND",
-      field: String(filter.label),
-      operator: list ? listOperator! : (TO_OPERATOR[filter.operator ?? "="] ?? "eq"),
-      values: list ?? [filter.value],
+      items: members.map(toCondition),
     };
-  }),
-}));
+    if (negate) node.negate = true;
+    return node;
+  });
+  return { ...emptyFilterGroup(), items: [...base, ...groups] };
+};
+
+// What the filters mean, whatever their order: the grid keeps its own, so the echo of an edit must not rebuild.
+const signature = (filters: LabelFilter[]) =>
+  filters
+    .map((filter) => `${labelFilterKey(filter)}\u0000${filter.negate ? 1 : 0}`)
+    .sort()
+    .join("\u0001");
+
+// Held here, not derived from `filters`: a group is local until its first filter lands.
+const tree = shallowRef<FilterGroup>(toTree(props.filters));
+let lastSignature = signature(props.filters);
+
+watch(
+  () => props.filters,
+  (filters) => {
+    capError.value = "";
+    const next = signature(filters);
+    if (next === lastSignature) return;
+    lastSignature = next;
+    tree.value = toTree(filters);
+  },
+);
 
 const { placeholder: filterHint } = useFilterHint(
   computed(() => props.labelNames ?? []),
@@ -118,19 +166,50 @@ const toLabelFilter = (condition: FilterCondition): LabelFilter | null => {
   }
 };
 
-const conditionsOf = (items: FilterNode[]): FilterCondition[] =>
-  items.flatMap((item) => {
-    if (item.kind === "condition") return [item];
-    return item.kind === "group" ? conditionsOf(item.items) : [];
-  });
+const filtersOf = (root: FilterGroup): { filters: LabelFilter[]; conditions: number } => {
+  const filters: LabelFilter[] = [];
+  let conditions = 0;
+  const known = root.items.map((item) => groupNumbers.get(item.id) ?? 0);
+  let nextGroup = Math.max(0, ...known);
+  const collect = (item: FilterGroup["items"][number], grouped: Partial<LabelFilter>) => {
+    if (item.kind !== "condition") return;
+    conditions++;
+    const filter = toLabelFilter(item);
+    if (filter) filters.push({ ...filter, ...grouped });
+  };
+  for (const item of root.items) {
+    if (item.kind !== "group") {
+      collect(item, {});
+      continue;
+    }
+    const group = groupNumbers.get(item.id) ?? ++nextGroup;
+    groupNumbers.set(item.id, group);
+    item.items.forEach((child) =>
+      collect(child, { group, ...(item.negate ? { negate: true } : {}) }),
+    );
+  }
+  return { filters, conditions };
+};
 
-function onChange(next: FilterGroup) {
-  const nextFilters = conditionsOf(next.items)
-    .map(toLabelFilter)
-    .filter((filter): filter is LabelFilter => filter !== null);
-  if (!nextFilters.length && props.filters.length > 1) {
-    emit("clear-all");
-    return;
+// A query past the cap cannot render, so only a removal may land while over it.
+const refusedCount = (filters: LabelFilter[]): number => {
+  if (filters.length < props.filters.length) return 0;
+  const compiled = compileLabelFilters(
+    filters.map((filter) => ({
+      ...filter,
+      label: String(filter.label),
+      op: (filter.operator ?? "=") as LabelMatchOp,
+    })),
+  );
+  return compiled.ok ? 0 : compiled.branchCount;
+};
+
+function emitChanges(nextFilters: LabelFilter[]) {
+  const wasNegated = new Map(filterGroupsOf(props.filters).map((g) => [g.group, g.negate]));
+  for (const { group, negate } of filterGroupsOf(nextFilters)) {
+    if (wasNegated.has(group) && wasNegated.get(group) !== negate) {
+      emit("negate-group", group, negate);
+    }
   }
   const nextKeys = new Set(nextFilters.map(labelFilterKey));
   const currentKeys = new Set(props.filters.map(labelFilterKey));
@@ -142,6 +221,28 @@ function onChange(next: FilterGroup) {
   }
   removed.forEach((filter) => emit("remove", filter));
   added.forEach((filter) => emit("add", filter));
+}
+
+function onChange(next: FilterGroup) {
+  const { filters: nextFilters, conditions } = filtersOf(next);
+  const refused = refusedCount(nextFilters);
+  if (refused) {
+    capError.value = t("metrics.labelGroups.tooManyBranches", {
+      count: refused,
+      max: MAX_FILTER_BRANCHES,
+    });
+    tree.value = toTree(props.filters);
+    return;
+  }
+  capError.value = "";
+  // A chip whose label PromQL cannot name never becomes a filter, so it leaves the bar.
+  tree.value = conditions === nextFilters.length ? next : toTree(nextFilters);
+  lastSignature = signature(nextFilters);
+  if (!nextFilters.length && props.filters.length > 1) {
+    emit("clear-all");
+    return;
+  }
+  emitChanges(nextFilters);
 }
 
 // Every open, not just the first, so a list that was cleared or failed can reload.
@@ -167,5 +268,12 @@ function onFocus() {
       @update:model-value="onChange"
       @focus="onFocus"
     />
+    <span
+      v-if="capError"
+      class="text-status-error-text text-xs"
+      role="alert"
+      data-test="metrics-explorer-label-too-many-branches"
+      >{{ capError }}</span
+    >
   </div>
 </template>

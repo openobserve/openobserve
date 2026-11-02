@@ -356,8 +356,8 @@ describe("groupNavLinks", () => {
   });
 
   /// With on-call ON, SLOs is no longer alone: On-Call gives the tile its
-  /// other children, so it becomes a flyout. On-Call contributes Pages, Teams
-  /// and Routing as three entries under one category header — escalation
+  /// other children, so it becomes a flyout. On-Call contributes Pages, Teams,
+  /// Routing and My on-call (S9) under one category header — escalation
   /// policies are still edited on the team they belong to, not from the rail.
   it("collapses SLOs into Reliability once on-call supplies the other children", () => {
     const entries = groupNavLinks([link("home"), link("sloList")], undefined, oncallOn);
@@ -371,6 +371,7 @@ describe("groupNavLinks", () => {
       "onCallResponses",
       "onCallTeams",
       "onCallRouting",
+      "onCallMine",
     ]);
   });
 
@@ -775,7 +776,7 @@ describe("groupNavLinks", () => {
 });
 
 describe("ship guards (AC-15, AC-22, D-27)", () => {
-  it("keeps the Reliability flyout children exactly: no on-call My on-call or Policies rows (AC-15, D-8)", () => {
+  it("keeps the Reliability flyout children exactly: My on-call after Routing, no Policies row (AC-15, D-8, S9)", () => {
     const reliability = NAV_GROUPS.find((g) => g.key === "reliability")!;
     expect(reliability.children.map((c) => c.name)).toEqual([
       "alertList",
@@ -789,6 +790,7 @@ describe("ship guards (AC-15, AC-22, D-27)", () => {
       "onCallResponses",
       "onCallTeams",
       "onCallRouting",
+      "onCallMine",
       "alertSources",
     ]);
   });

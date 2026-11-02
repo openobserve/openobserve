@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 import { resolveBadge, normalizeKey, BADGE_GROUPS } from "./badgeGroups";
+import enUS from "@/locales/languages/en-US.json";
 
 describe("badgeGroups", () => {
   it("normalizes separators and case", () => {
@@ -279,6 +280,14 @@ describe("badgeGroups", () => {
     for (const value of ["skipped", "warning"]) {
       expect(resolveBadge("pipelineRunOutcome", value).variant, value).toBe("warning-soft");
     }
+  });
+
+  it("pipeline run outcome firing is labelled Succeeded", () => {
+    const firing = resolveBadge("pipelineRunOutcome", "firing");
+    expect(firing.labelKey).toBe("components.badge.pipelineRunOutcome.succeeded");
+    expect(enUS.components.badge.pipelineRunOutcome.succeeded).toBe("Succeeded");
+    expect(resolveBadge("pipelineRunOutcome", "succeeded").labelKey).toBe(firing.labelKey);
+    expect(resolveBadge("alertState", "firing").labelKey).not.toBe(firing.labelKey);
   });
 
   it("resolves the groups added in the OTag type/value sweep", () => {

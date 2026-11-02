@@ -459,6 +459,7 @@ const draftOperator = computed(() => {
         @edit="onEdit"
         @remove="onRemove"
         @toggle-connector="editor.toggleConnector"
+        @toggle-negate="editor.toggleNegate"
         @ungroup="onUngroup"
       >
         <template #caret>

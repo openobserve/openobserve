@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-global-filter="false"
         class="min-h-0 flex-1"
         :loading="loading && !rows.length"
+        :loading-reset-key="activeSection?.id"
         :streaming="loading && rows.length > 0"
         :error="error"
         show-index

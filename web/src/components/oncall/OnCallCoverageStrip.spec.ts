@@ -72,9 +72,9 @@ function bandsOf(wrapper: any) {
   return tracks[0]?.bands ?? [];
 }
 
-function render(rotations: Rotation[]) {
+function render(rotations: Rotation[], unreachable: string[] = []) {
   return mount(OnCallCoverageStrip, {
-    props: { rotations, timezone: "UTC", days: 14, fromMicros: FROM },
+    props: { rotations, timezone: "UTC", days: 14, fromMicros: FROM, unreachable },
     global: { plugins: [i18n], stubs },
   });
 }
@@ -234,5 +234,54 @@ describe("OnCallCoverageStrip", () => {
     expect(text).toContain("Two or more on call");
     expect(text).toContain("One on call");
     expect(text).toContain("Nobody");
+  });
+
+  // S6: time held only by people a page would not reach is its own band, never cover.
+  describe("unreachable holders", () => {
+    it("draws time held only by unreachable people as its own labelled band", () => {
+      const wrapper = render([rotation(["ana@o2.ai"])], ["ANA@o2.ai"]);
+      const bands = bandsOf(wrapper);
+
+      expect(bands).toHaveLength(1);
+      expect(bands[0].tone).toBe("unreachable");
+      expect(bands[0].label).toBe("Rostered, unreachable");
+      expect(wrapper.text()).toContain("Rostered, unreachable");
+    });
+
+    it("counts only the reachable holder when one of two cannot be reached", () => {
+      const both = [rotation(["ana@o2.ai"]), rotation(["bob@o2.ai"], {}, "Secondary")];
+
+      expect(bandsOf(render(both, ["bob@o2.ai"]))[0].tone).toBe(
+        bandsOf(render([rotation(["ana@o2.ai"])]))[0].tone,
+      );
+    });
+
+    it("does not call unreachable time covered in the summary", () => {
+      const text = render([rotation(["ana@o2.ai"])], ["ana@o2.ai"])
+        .find('[data-test="oncall-coverage-summary"]')
+        .text();
+
+      expect(text).not.toContain("the whole of the next 14 days");
+      expect(text).toContain("Nobody on call can be reached");
+    });
+
+    // A hole is every adjacent hole run, so "until" names when reachable cover really returns.
+    it("treats an unreachable stretch running into a gap as one hole", () => {
+      // Weekdays only, one unreachable person: unreachable on weekdays, nobody at weekends, so nothing reachable all window.
+      const rotations = [
+        rotation(["ana@o2.ai"], {
+          restrictions: [{ days: [0, 1, 2, 3, 4], start_minute: 0, end_minute: 1439 }],
+        }),
+      ];
+      const text = render(rotations, ["ana@o2.ai"])
+        .find('[data-test="oncall-coverage-summary"]')
+        .text();
+
+      expect(text).toBe("Nobody on call can be reached in the next 14 days");
+    });
+
+    it("keeps the legend to three states while nobody is unreachable", () => {
+      expect(render([rotation(["ana@o2.ai"])]).text()).not.toContain("Rostered, unreachable");
+    });
   });
 });

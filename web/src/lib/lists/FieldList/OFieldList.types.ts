@@ -7,6 +7,8 @@ export interface FieldItem {
   type?: string;
   isGroup?: boolean;
   groupName?: string;
+  /** Marks the row unavailable to assistive tech; the owner still decides what a click does. */
+  disabled?: boolean;
   [key: string]: any;
 }
 

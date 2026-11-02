@@ -16,11 +16,16 @@
 import { describe, it, expect } from "vitest";
 import { load } from "js-yaml";
 import {
+  CATALOG,
+  addFromCatalog,
+  catalogFor,
   graphToYaml,
   isSettingPath,
   seedGraph,
+  typeKey,
   yamlToGraph,
   type EditorGraph,
+  type EditorKind,
 } from "./editorGraph";
 import { SEEDS } from "./editorGraph.fixtures";
 
@@ -148,6 +153,71 @@ service:
     expect(load(graphToYaml(graph!))).toEqual(load(yaml));
   });
 
+  it("keeps quoted text that reads as a boolean, number or null a string", () => {
+    const yaml = `exporters:
+  otlphttp:
+    headers:
+      flag: "true"
+      code: "123"
+      nothing: "null"
+      on: true
+      port: 8080
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [otlphttp]
+receivers:
+  otlp: {}
+`;
+    const graph = yamlToGraph(yaml);
+    expect(graph?.components["exporter:otlphttp"].settings).toMatchObject({
+      "headers.flag": '"true"',
+      "headers.code": '"123"',
+      "headers.nothing": '"null"',
+      "headers.on": "true",
+      "headers.port": "8080",
+    });
+    expect(load(graphToYaml(graph!))).toEqual(load(yaml));
+    graph!.components["exporter:otlphttp"].settings["headers.typed"] = '"false"';
+    graph!.components["exporter:otlphttp"].settings["headers.label"] = '"plain text"';
+    const headers = (load(graphToYaml(graph!)) as any).exporters.otlphttp.headers;
+    expect(headers.typed).toBe("false");
+    expect(headers.label).toBe("plain text");
+  });
+
+  it("writes a quoted value's text literally and keeps quotes that are part of the value", () => {
+    const yaml = `exporters:
+  otlphttp:
+    headers:
+      etag: '"abc"'
+      single: "'x'"
+      path: 'C:\\temp'
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [otlphttp]
+receivers:
+  otlp: {}
+`;
+    const graph = yamlToGraph(yaml);
+    expect(graph).not.toBeNull();
+    expect(load(graphToYaml(graph!))).toEqual(load(yaml));
+    const settings = graph!.components["exporter:otlphttp"].settings;
+    settings["headers.pattern"] = '"^\\d+$"';
+    settings["headers.dir"] = '"C:\\temp"';
+    settings["headers.typed"] = "'true'";
+    const headers = (load(graphToYaml(graph!)) as any).exporters.otlphttp.headers;
+    expect(headers).toMatchObject({
+      etag: '"abc"',
+      single: "'x'",
+      pattern: "^\\d+$",
+      dir: "C:\\temp",
+      typed: "true",
+    });
+  });
+
   it("quotes a key that holds a dot or other path syntax and writes it back", () => {
     const yaml = `receivers:
   hostmetrics:
@@ -238,7 +308,6 @@ service:
     ["a null leaf in settings", MINIMAL.replace("debug: {}", "debug:\n    timeout: null")],
     ["connectors", MINIMAL + "connectors:\n  count: {}\n"],
     ["service.telemetry", MINIMAL + "  telemetry:\n    logs:\n      level: debug\n"],
-    ["a quoted number", MINIMAL.replace("debug: {}", 'debug:\n    sampling: "5"')],
     ["a top-level list", "- a\n- b\n"],
     ["unparseable YAML", "receivers: [otlp\n"],
   ])("cannot represent %s", (_name, src) => {
@@ -376,5 +445,99 @@ describe("graphToYaml", () => {
     expect(yaml).toContain("  pprof: {}");
     expect(yaml).toContain("    logs: {}");
     expect(load(yaml)).toEqual({ extensions: { pprof: {} }, service: { pipelines: { logs: {} } } });
+  });
+});
+
+describe("Kubernetes palette items", () => {
+  const added = (key: string) => {
+    const graph = seedGraph();
+    const item = CATALOG.find((i) => i.key === key)!;
+    const compKey = addFromCatalog(graph, item);
+    graph.pipelines[0].processors.push(graph.components[compKey].id);
+    return { graph, yaml: load(graphToYaml(graph)) as Record<string, any> };
+  };
+
+  it("adds K8s attributes matched by pod uid then IP, never by the connection", () => {
+    const { yaml } = added("k8sattributes");
+    expect(yaml.processors.k8sattributes).toEqual({
+      auth_type: "serviceAccount",
+      pod_association: [
+        { sources: [{ from: "resource_attribute", name: "k8s.pod.uid" }] },
+        { sources: [{ from: "resource_attribute", name: "k8s.pod.ip" }] },
+      ],
+      extract: {
+        metadata: [
+          "k8s.pod.name",
+          "k8s.namespace.name",
+          "k8s.deployment.name",
+          "k8s.node.name",
+          "k8s.pod.ip",
+        ],
+      },
+    });
+  });
+
+  it("adds the cluster name as a resource processor reading the chart's K8S_CLUSTER_NAME", () => {
+    const { graph, yaml } = added("k8s_cluster_name");
+    expect(yaml.processors["resource/k8s_cluster"]).toEqual({
+      attributes: [{ key: "k8s.cluster.name", value: "${env:K8S_CLUSTER_NAME}", action: "upsert" }],
+    });
+    expect(yaml.service.pipelines.logs.processors).toEqual(["resource/k8s_cluster"]);
+    expect(catalogFor(graph.components["processor:resource/k8s_cluster"])?.key).toBe(
+      "k8s_cluster_name",
+    );
+  });
+
+  it("keeps a plain resource processor on the generic Resource item", () => {
+    const { graph } = added("resource");
+    expect(catalogFor(graph.components["processor:resource"])?.key).toBe("resource");
+  });
+});
+
+describe("upstream snake_case renames", () => {
+  const itemFor = (kind: EditorKind, id: string) =>
+    catalogFor({ kind, id, type: id.split("/")[0], settings: {} })?.key;
+
+  it.each([
+    ["receiver", "file_log", "filelog"],
+    ["receiver", "fluent_forward", "fluentforward"],
+    ["receiver", "host_metrics", "hostmetrics"],
+    ["receiver", "k8s_objects", "k8sobjects"],
+    ["receiver", "kubelet_stats", "kubeletstats"],
+    ["receiver", "aws_s3", "awss3"],
+    ["receiver", "windows_event_log", "windowseventlog"],
+    ["processor", "k8s_attributes", "k8sattributes"],
+    ["processor", "resource_detection", "resourcedetection"],
+    ["exporter", "otlp_grpc", "otlp"],
+    ["exporter", "otlp_http", "otlphttp"],
+  ] as const)("shows a %s written as %s as the %s item", (kind, renamed, key) => {
+    expect(itemFor(kind, renamed)).toBe(key);
+    expect(itemFor(kind, key)).toBe(key);
+  });
+
+  it("maps otlp_grpc to otlp only for exporters, where upstream renamed it", () => {
+    expect(typeKey("exporter", "otlp_grpc")).toBe("otlp");
+    expect(typeKey("receiver", "otlp_grpc")).toBe("otlpgrpc");
+  });
+
+  it("finds a named item by its renamed id", () => {
+    expect(itemFor("exporter", "otlp_http/openobserve")).toBe("openobserve");
+    expect(itemFor("exporter", "otlp_http/other")).toBe("otlphttp");
+  });
+
+  it("keeps the name a configuration was written with", () => {
+    const yaml = `processors:
+  k8s_attributes:
+    auth_type: serviceAccount
+exporters:
+  otlp_http/openobserve:
+    endpoint: \${env:O2_ENDPOINT}
+service:
+  pipelines:
+    logs:
+      processors: [k8s_attributes]
+      exporters: [otlp_http/openobserve]
+`;
+    expect(load(graphToYaml(yamlToGraph(yaml)!))).toEqual(load(yaml));
   });
 });

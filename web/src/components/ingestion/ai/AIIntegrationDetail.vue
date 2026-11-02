@@ -20,7 +20,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import useIngestion from "@/composables/useIngestion";
-import { b64EncodeStandard } from "@/utils/zincutils";
+import { basicIngestToken } from "@/composables/useCredentialSnippet";
 import { aiCategories } from "./data";
 import type { AICategory, AIIntegration } from "./data";
 import { getAICardRaw } from "./content";
@@ -64,7 +64,7 @@ const subs = computed<CardSubstitutions>(() => {
   return {
     url: endpoint.value?.url ?? "",
     org: store.state.selectedOrganization?.identifier ?? "",
-    token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
+    token: basicIngestToken(email, passcode),
   };
 });
 

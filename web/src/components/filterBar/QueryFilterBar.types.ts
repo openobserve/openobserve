@@ -34,7 +34,7 @@ import type {
 export interface QueryFilterBarProps {
   modelValue: FilterGroup;
   fields: FilterField[];
-  /** `sql` joins chips with AND/OR and groups; `promql` ANDs label matchers only. */
+  /** `sql` joins chips with AND/OR and groups; `promql` ANDs label matchers, with OR groups. */
   dialect?: FilterDialect;
   /** Offer a "search all text" row for typed words that match no field. */
   freeText?: boolean;
@@ -104,6 +104,7 @@ export interface FilterBarNodesEmits {
   (_e: "edit", _id: string, _part: FilterTokenPart, _element: HTMLElement): void;
   (_e: "remove", _id: string): void;
   (_e: "toggle-connector", _id: string): void;
+  (_e: "toggle-negate", _id: string): void;
   /** Lift a group's items into its parent. */
   (_e: "ungroup", _id: string): void;
 }

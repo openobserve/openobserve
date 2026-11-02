@@ -702,7 +702,7 @@ pub const MAX_TRANSPORT_BACKOFF_MICROS: i64 = 4 * MICROS_PER_MINUTE;
 /// are both "nobody was reached", and they want opposite things.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RungOutcome {
-    /// At least one person was reached on at least one channel.
+    /// At least one channel landed: a person was reached, or a room or webhook post was delivered.
     Reached,
     /// The rung's targets resolved to no human at all.
     NoRecipients,
@@ -713,7 +713,7 @@ pub enum RungOutcome {
 /// The ladder's next move once a rung has gone out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AfterRung {
-    /// Somebody was woken. Come back when the next rung is due.
+    /// The rung reached somebody or landed a room post. Come back when the next rung is due.
     NextRung,
     /// §9: "if every channel for a responder fails, escalation advances to the
     /// next level immediately rather than waiting out the level timeout" —

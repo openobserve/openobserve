@@ -18,6 +18,7 @@ import { getFieldLabel } from "./fieldLabel";
 import {
   buildValueMappingCache,
   lookupValueMapping,
+  missingCellText,
   parseOverrideConfigs,
   parseTimestampValue,
   detectTimestampFields,
@@ -149,7 +150,8 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
       }
 
       obj["format"] = (val: any) => {
-        if (val === null || val === undefined || val === "") return missingValue;
+        if (val === null || val === undefined || val === "")
+          return missingCellText(val, valueMappingCache, missingValue);
         // value mapping - use cached lookup
         const valueMapping = lookupValueMapping(val, valueMappingCache);
         if (valueMapping != null) {
@@ -190,7 +192,8 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
       // Just apply value mapping if needed
       if (histogramFields.includes(it.alias)) {
         obj["format"] = (val: any) => {
-          if (val === null || val === undefined || val === "") return missingValue;
+          if (val === null || val === undefined || val === "")
+            return missingCellText(val, valueMappingCache, missingValue);
           // value mapping - use cached lookup
           const valueMapping = lookupValueMapping(val, valueMappingCache);
           if (valueMapping != null) {
@@ -288,7 +291,8 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
         );
 
         obj["format"] = (val: any) => {
-          if (val === null || val === undefined || val === "") return missingValue;
+          if (val === null || val === undefined || val === "")
+            return missingCellText(val, valueMappingCache, missingValue);
           // value mapping - use cached lookup
           const valueMapping = lookupValueMapping(val, valueMappingCache);
           if (valueMapping != null) {
@@ -312,7 +316,8 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
         // Check if it's a histogram field
         if (histogramFields.includes(it)) {
           obj["format"] = (val: any) => {
-            if (val === null || val === undefined || val === "") return missingValue;
+            if (val === null || val === undefined || val === "")
+              return missingCellText(val, valueMappingCache, missingValue);
             // value mapping - use cached lookup
             const valueMapping = lookupValueMapping(val, valueMappingCache);
             if (valueMapping != null) {

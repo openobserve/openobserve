@@ -76,11 +76,18 @@ pub fn stream_key_violation(
     stream_type: StreamType,
     stream_name: &str,
 ) -> Option<String> {
-    // only the PostgreSQL backend bounds these columns; Nats keeps file_list in SQLite
-    if MetaStore::from(get_config().common.meta_store.as_str()) != MetaStore::PostgreSQL {
+    if !file_list_keys_bounded() {
         return None;
     }
     stream_key_length_violation(org_id, stream_type, stream_name)
+}
+
+/// Why an org id cannot be stored in the file_list `org` columns, if it cannot.
+pub fn org_id_violation(org_id: &str) -> Option<String> {
+    if !file_list_keys_bounded() {
+        return None;
+    }
+    org_id_length_violation(org_id)
 }
 
 /// The two file tables an org deletion empties stream by stream.
@@ -865,19 +872,30 @@ fn validate_time_range(time_range: (i64, i64)) -> Result<()> {
     Ok(())
 }
 
+fn file_list_keys_bounded() -> bool {
+    // only the PostgreSQL backend bounds these columns; Nats keeps file_list in SQLite
+    MetaStore::from(get_config().common.meta_store.as_str()) == MetaStore::PostgreSQL
+}
+
+// VARCHAR(n) counts characters, not bytes
+fn org_id_length_violation(org_id: &str) -> Option<String> {
+    let org_len = org_id.chars().count();
+    (org_len > ORG_ID_MAX_LEN).then(|| {
+        format!(
+            "Organization id too long: {org_id} is {org_len} characters, only {ORG_ID_MAX_LEN} accepted"
+        )
+    })
+}
+
 fn stream_key_length_violation(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
 ) -> Option<String> {
-    // VARCHAR(n) counts characters, not bytes
-    let org_len = org_id.chars().count();
-    if org_len > ORG_ID_MAX_LEN {
-        return Some(format!(
-            "Organization id too long: {org_id} is {org_len} characters, only {ORG_ID_MAX_LEN} accepted"
-        ));
+    if let Some(violation) = org_id_length_violation(org_id) {
+        return Some(violation);
     }
-    let len = org_len + stream_type.as_str().len() + stream_name.chars().count() + 2;
+    let len = org_id.chars().count() + stream_type.as_str().len() + stream_name.chars().count() + 2;
     (len > STREAM_KEY_MAX_LEN).then(|| {
         format!(
             "Stream name too long: {org_id}/{stream_type}/{stream_name} is {len} characters, only {STREAM_KEY_MAX_LEN} accepted"
@@ -1131,6 +1149,9 @@ mod tests {
             bounded
         );
         assert!(stream_key_violation("org", StreamType::Logs, "s").is_none());
+        let long_org = "o".repeat(ORG_ID_MAX_LEN + 1);
+        assert_eq!(org_id_violation(&long_org).is_some(), bounded);
+        assert!(org_id_violation("org").is_none());
     }
 
     // ── FileListJobStatus::from(i32) ──────────────────────────────────────────

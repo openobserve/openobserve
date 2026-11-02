@@ -59,6 +59,24 @@ describe("UsageMeterBreakdown group-by sections", () => {
     expect(payload.unavailable).not.toContain("alert");
     expect(payload.activeId).not.toBe("dashboard");
   });
+
+  it("drops the last grouping's rows when the grouping changes, so they never sit under the new name column", async () => {
+    const wrapper = mount(UsageMeterBreakdown, {
+      props: { meterKey: "query", details: mockMeteringResponse().upcoming!, refreshToken: 0 },
+      global: { plugins: [i18n, store], stubs: { OTable: true } },
+    });
+    await flushPromises();
+    releaseSchema({
+      schema: ["stream_name", "alert_name", "event", "size"].map((name) => ({ name })),
+    });
+    await flushPromises();
+    const table = () => wrapper.findComponent({ name: "OTable" });
+    const [payload] = wrapper.emitted("sections")!.at(-1) as any[];
+    expect(table().props("loadingResetKey")).toBe(payload.activeId);
+
+    await wrapper.setProps({ group: "alert" });
+    expect(table().props("loadingResetKey")).toBe("alert");
+  });
 });
 
 describe("UsageMeterBreakdown by user before dashboards are recorded", () => {

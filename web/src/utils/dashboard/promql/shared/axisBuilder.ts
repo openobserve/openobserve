@@ -18,7 +18,8 @@ import { formatAxisTickValue } from "../../axisTickFormat";
 import { getGridLineStyle } from "../../colorPalette";
 import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
-import { createSeriesOverrideLookup } from "../../seriesOverrides";
+import { absValue, createSeriesOverrideLookup } from "../../seriesOverrides";
+import { sortTooltipParams } from "../../tooltipSort";
 import { stackTotalRows } from "../../stackTotals";
 import { TOOLTIP_SCROLL_STYLE } from "./types";
 
@@ -94,9 +95,7 @@ export function buildTooltip(
 
       // Sort by value and hoist the hovered series, matching SQL tooltips
       const hoveredName = hoveredSeriesState?.value?.hoveredSeriesName;
-      params.sort(
-        (a: any, b: any) => ((b.value?.[1] ?? b.value) || 0) - ((a.value?.[1] ?? a.value) || 0),
-      );
+      sortTooltipParams(params, config, (it: any) => it.value?.[1] ?? it.value);
       const hoveredIndex = params.findIndex((it: any) => it[seriesKey] === hoveredName);
       if (hoveredIndex > 0) {
         params.unshift(params.splice(hoveredIndex, 1)[0]);
@@ -107,8 +106,9 @@ export function buildTooltip(
         const name = param[seriesKey];
         if (name) {
           const marker = param.marker || "";
-          const value = param.value?.[1] ?? param.value;
           const override = seriesOverrides.get(name);
+          const point = param.value?.[1] ?? param.value;
+          const value = override?.style?.transform === "negative_y" ? absValue(point) : point;
 
           // Apply unit formatting
           const formattedValue = formatUnitValue(

@@ -85,7 +85,6 @@ const ALERT_ID_LITERALS: &[&str] = &[
     "auto_investigate",
     "bulk",
     "composites",
-    "dedup",
     "generate_sql",
     "history",
     "incidents",

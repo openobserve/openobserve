@@ -52,7 +52,6 @@ mod rum_analytics;
 mod scheduler;
 mod schemas;
 mod search_job;
-mod semantic_groups;
 mod service_streams;
 mod short_urls;
 mod status_pages;
@@ -142,7 +141,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let alerts_queue = AlertsQueue {
         on_alert_msg: alerts::process,
         on_scheduler_msg: scheduler::process,
-        on_semantic_groups_msg: semantic_groups::process,
         on_incident_msg: incident_msg,
         on_anomaly_detection_msg: anomaly_detection::process,
         on_alert_state_msg: alert_states::process,

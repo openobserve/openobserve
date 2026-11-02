@@ -565,7 +565,7 @@ const startRowColspan = computed(
           >{{ stepProgress(row)!.done }}/{{ stepProgress(row)!.total }}</span
         >
         <OBadge
-          v-else-if="mode === 'editor' && stepBadge(row)"
+          v-else-if="mode !== 'preview' && stepBadge(row)"
           :variant="stepBadge(row)!.variant"
           size="sm"
           :data-test="`synthetics-journey-step-badge-${rowIndex(row)}`"

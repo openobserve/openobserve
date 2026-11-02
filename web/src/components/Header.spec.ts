@@ -442,6 +442,34 @@ describe("Header Component", () => {
   });
 
   describe("AI Chat Button", () => {
+    it("holds the AI button's place until the config says whether it shows", async () => {
+      const aiWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: { state: { zoConfig: { version: "" } } },
+        configOverrides: { isEnterprise: "true" },
+        stubsOverrides: {},
+      });
+      await aiWrapper.vm.$nextTick();
+
+      expect(aiWrapper.find('[data-test="header-ai-slot-placeholder"]').exists()).toBe(true);
+      expect(aiWrapper.find('[data-test="menu-link-ai-item"]').exists()).toBe(false);
+      aiWrapper.unmount();
+    });
+
+    it("drops the held place once the config has loaded", async () => {
+      const aiWrapper = createWrapper({
+        mountType: "mount",
+        storeOverrides: { state: { zoConfig: { version: "v1", ai_enabled: true } } },
+        configOverrides: { isEnterprise: "true" },
+        stubsOverrides: {},
+      });
+      await aiWrapper.vm.$nextTick();
+
+      expect(aiWrapper.find('[data-test="header-ai-slot-placeholder"]').exists()).toBe(false);
+      expect(aiWrapper.find('[data-test="menu-link-ai-item"]').exists()).toBe(true);
+      aiWrapper.unmount();
+    });
+
     it("should display AI chat button in enterprise mode with ai_enabled", async () => {
       const aiWrapper = createWrapper({
         mountType: "mount",
@@ -1524,7 +1552,7 @@ describe("Header Component", () => {
   });
 
   describe("My on-call item (U1)", () => {
-    const mountMenu = (oncall_enabled: boolean, hasRoute: boolean) => {
+    const mountMenu = (oncall_enabled: boolean | undefined, hasRoute: boolean) => {
       const store = {
         ...mockStore,
         state: { ...mockStore.state, zoConfig: { ...mockStore.state.zoConfig, oncall_enabled } },
@@ -1570,6 +1598,7 @@ describe("Header Component", () => {
     it.each([
       ["on-call is off", false, true],
       ["the build has no on-call routes", true, false],
+      ["the full config has not loaded yet", undefined, true],
     ])("is absent when %s", (_case, oncallEnabled, hasRoute) => {
       const w = mountMenu(oncallEnabled, hasRoute);
       expect(w.find('[data-test="header-my-oncall"]').exists()).toBe(false);

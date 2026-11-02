@@ -1153,6 +1153,14 @@ describe("TraceDetails", () => {
         expect(closeBtn.exists()).toBe(true);
       });
 
+      it("renders the close button as outline with a Close tooltip", () => {
+        const closeBtn = wrapper.findComponent('[data-test="trace-details-close-btn"]');
+        expect(closeBtn.exists()).toBe(true);
+        expect(closeBtn.attributes("data-o2-variant")).toBe("outline");
+        const tooltip = closeBtn.findComponent({ name: "OTooltip" });
+        expect(tooltip.props("content")).toBe(i18n.global.t("common.close"));
+      });
+
       it("should show share button when showShareButton is true in standalone mode", () => {
         const shareBtn = wrapper.find('[data-test="trace-details-share-link-btn"]');
         expect(shareBtn.exists()).toBe(true);

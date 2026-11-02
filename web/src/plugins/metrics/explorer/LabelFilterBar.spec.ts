@@ -17,6 +17,8 @@ import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { nextTick } from "vue";
 import LabelFilterBar from "./LabelFilterBar.vue";
+import QueryFilterBar from "@/components/filterBar/QueryFilterBar.vue";
+import type { FilterGroup, FilterNode } from "@/utils/query/filterBar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { raw } from "@/types/i18n";
@@ -218,9 +220,102 @@ describe("LabelFilterBar", () => {
     expect(wrapper!.emitted("remove")).toBeUndefined();
   });
 
-  it("does not offer AND/OR: PromQL ANDs every matcher", () => {
+  it("draws no AND/OR between matchers: PromQL ANDs them", () => {
     createWrapper({ filters: [filter("job", "api"), filter("code", "200")] });
     expect(wrapper!.find('[data-test="metrics-explorer-label-mode"]').exists()).toBe(false);
     expect(wrapper!.find('[data-test^="metrics-explorer-label-connector-"]').exists()).toBe(false);
+  });
+
+  describe("OR groups", () => {
+    const DT = "metrics-explorer-label";
+    const grouped: LabelFilter[] = [
+      { label: "job", value: "api", operator: "=" } as LabelFilter,
+      { label: "code", value: "500", operator: "=", group: 1 } as LabelFilter,
+      { label: "env", value: "prod", operator: "=", group: 2, negate: true } as LabelFilter,
+    ];
+    const bar = () => wrapper!.findComponent(QueryFilterBar);
+    const treeOf = () => bar().props("modelValue") as FilterGroup;
+    const chipIn = (field: string, values: string[]): FilterNode => ({
+      kind: "condition",
+      id: `new-${field}`,
+      connector: "AND",
+      field,
+      operator: "eq",
+      values,
+    });
+    const addToGroup = async (groupIndex: number, node: FilterNode) => {
+      const tree = treeOf();
+      const items = tree.items.map((item, i) =>
+        i === groupIndex && item.kind === "group"
+          ? { ...item, items: [...item.items, node] }
+          : item,
+      );
+      bar().vm.$emit("update:modelValue", { ...tree, items });
+      await flushPromises();
+    };
+
+    it("adds the next filter as a new OR group from a typed (", async () => {
+      createWrapper({ filters: grouped });
+      await focus();
+      await type("(");
+      await type("code");
+      await press("Enter");
+      await press("Enter");
+      await type("503");
+      await press("Enter");
+      expect(wrapper!.emitted("add")![0]).toEqual([
+        { label: "code", value: "503", operator: "=", group: 3 },
+      ]);
+    });
+
+    it("keeps a group opened with no filter yet, and the base list as it was", async () => {
+      createWrapper({ filters: grouped.slice(0, 1) });
+      await focus();
+      await type("(");
+      expect(treeOf().items.some((item) => item.kind === "group")).toBe(true);
+      expect(wrapper!.emitted("add")).toBeUndefined();
+    });
+
+    it("adds into an existing group, negated when the group is", async () => {
+      createWrapper({ filters: grouped });
+      await addToGroup(2, chipIn("instance", ["a"]));
+      expect(wrapper!.emitted("add")![0]).toEqual([
+        { label: "instance", value: "a", operator: "=", group: 2, negate: true },
+      ]);
+    });
+
+    it("renders groups joined by or and emits negate-group from the NOT toggle", async () => {
+      createWrapper({ filters: grouped });
+      expect(wrapper!.find(`[data-test="${DT}-group-join-1"]`).text()).toBe("and any of");
+      expect(wrapper!.find(`[data-test="${DT}-group-join-2"]`).text()).toBe("or");
+      expect(wrapper!.find(`[data-test="${DT}-group-2"]`).text()).toContain("env");
+
+      await wrapper!.find(`[data-test="${DT}-group-not-1"]`).trigger("click");
+      await wrapper!.setProps({
+        filters: grouped.map((f) => (f.group === 1 ? { ...f, negate: true } : f)),
+      });
+      await wrapper!.find(`[data-test="${DT}-group-not-2"]`).trigger("click");
+      expect(wrapper!.emitted("negate-group")).toEqual([
+        [1, true],
+        [2, false],
+      ]);
+      expect(wrapper!.emitted("remove")).toBeUndefined();
+      expect(wrapper!.emitted("add")).toBeUndefined();
+    });
+
+    it("refuses an add that expands past the branch cap, and says so", async () => {
+      const negated = Array.from(
+        { length: 16 },
+        (_, i) =>
+          ({ label: `l${i}`, value: "x", operator: "=", group: 1, negate: true }) as LabelFilter,
+      );
+      createWrapper({ filters: negated });
+      await addToGroup(0, chipIn("job", ["api"]));
+      expect(wrapper!.emitted("add")).toBeUndefined();
+      expect(
+        wrapper!.find('[data-test="metrics-explorer-label-too-many-branches"]').text(),
+      ).toContain("17");
+      expect(wrapper!.findAll('[data-test="metrics-explorer-label-chip-job"]')).toHaveLength(0);
+    });
   });
 });

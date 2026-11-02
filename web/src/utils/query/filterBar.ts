@@ -107,6 +107,8 @@ export interface FilterGroup {
   id: string;
   connector: FilterConnector;
   items: FilterNode[];
+  /** The group matches what its items do not; only `any-of-groups` profiles offer it. */
+  negate?: boolean;
   meta?: FilterNodeMeta;
 }
 

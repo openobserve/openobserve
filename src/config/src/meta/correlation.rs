@@ -24,7 +24,7 @@ use utoipa::ToSchema;
 /// Used for:
 /// - Mapping equivalent field names across logs, traces, and metrics (e.g., `service`,
 ///   `service.name`, `app` all mean "service identity")
-/// - Alert deduplication fingerprinting
+/// - Incident correlation and alert dimensions
 /// - Populating `ServiceIdentityConfig` via the recommendations UI
 ///
 /// # Field Name Overlaps

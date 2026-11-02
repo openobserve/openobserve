@@ -53,6 +53,8 @@ export interface DashboardFilterCondition {
   value: unknown;
   logicalOperator: FilterConnector;
   values: unknown[];
+  /** A `x <> ''` that came from SQL: a real filter, unlike a value not entered yet. */
+  emptyLiteral?: boolean;
 }
 
 export interface DashboardFilterGroup {
@@ -149,7 +151,7 @@ function parseLeaf(item: Record<string, unknown>): FilterNode {
     const arity = OPERATORS[operator].arity;
     if (arity === "none" || item.operator == null) values = [];
     else if (arity === "many") values = splitListText(item.value);
-    else values = valueStrings(item.value).filter((v) => v !== "");
+    else values = valueStrings(item.value).filter((v) => v !== "" || item.emptyLiteral);
   }
   const condition: FilterCondition = {
     kind: "condition",
@@ -202,6 +204,7 @@ function serializeLeaf(node: FilterCondition, context: CodecContext): DashboardF
     column: columnOf(node, raw, context),
     logicalOperator: node.connector,
   };
+  if (node.values.length !== 1 || node.values[0] !== "") delete out.emptyLiteral;
   // A list leaf quotes each value, so a `$variable` (possibly multi-select) needs the condition form.
   const listType =
     node.operator === "in" && (!raw || raw.type === "list") && !node.values.some(hasVariable);

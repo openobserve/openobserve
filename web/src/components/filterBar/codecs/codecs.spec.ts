@@ -553,6 +553,93 @@ describe("dashboard filter codec", () => {
   });
 });
 
+describe("dashboard filter codec, an empty literal from SQL", () => {
+  const codec = dashboardFilterCodec();
+  const context = { fields: [] };
+  const leaf = {
+    type: "condition",
+    column: { field: "service", streamAlias: null },
+    filterType: "condition",
+    operator: "<>",
+    value: "",
+    logicalOperator: "AND",
+    values: [],
+    emptyLiteral: true,
+  };
+  const group = (item: unknown) => ({
+    filterType: "group",
+    logicalOperator: "AND",
+    conditions: [item],
+  });
+
+  it("reads `x <> ''` as a finished condition and saves it back as loaded", () => {
+    const saved = group(leaf);
+    const tree = codec.parse(saved as never, context);
+    expect((tree.items[0] as FilterCondition).values).toEqual([""]);
+    expect(codec.serialize(tree, context)).toEqual(saved);
+  });
+
+  it("clears the flag once the user types a value", () => {
+    const tree = codec.parse(group(leaf) as never, context);
+    (tree.items[0] as FilterCondition).values = ["api"];
+    const out = codec.serialize(tree, context) as any;
+    expect(out.conditions[0].value).toBe("api");
+    expect(out.conditions[0].emptyLiteral).toBeUndefined();
+  });
+
+  it("still reads a value not entered yet as no value", () => {
+    const { emptyLiteral: _flag, ...blank } = leaf;
+    const tree = codec.parse(group(blank) as never, context);
+    expect((tree.items[0] as FilterCondition).values).toEqual([]);
+  });
+});
+
+describe("label group codecs", () => {
+  const codec = promqlLabelsCodec();
+  const context = { fields: [] };
+  const saved = [
+    { label: "code", op: "=", value: "500", group: 3 },
+    { label: "job", op: "=", value: "api" },
+    { label: "env", op: "=", value: "prod", group: 5, negate: true },
+  ];
+
+  it("shows base matchers first, then one group per number, and saves back untouched", () => {
+    const tree = codec.parse(saved, context);
+    expect(tree.items.map((item) => item.kind)).toEqual(["condition", "group", "group"]);
+    expect((tree.items[2] as FilterGroup).negate).toBe(true);
+    expect(codec.serialize(tree, context)).toBe(saved);
+  });
+
+  it("keeps group numbers on an edit, and gives a new group the next one", () => {
+    const tree = codec.parse(saved, context);
+    const added = { ...(tree.items[0] as FilterCondition), id: "new", field: "path" };
+    tree.items.push({ kind: "group", id: "g", connector: "AND", items: [added] });
+    expect(codec.serialize(tree, context)).toEqual([
+      { label: "job", op: "=", value: "api" },
+      { label: "code", op: "=", value: "500", group: 3 },
+      { label: "env", op: "=", value: "prod", group: 5, negate: true },
+      { label: "path", op: "=", value: "api", group: 6 },
+    ]);
+  });
+
+  it("writes NOT onto every matcher of the group and off again", () => {
+    const tree = codec.parse(saved, context);
+    (tree.items[1] as FilterGroup).negate = true;
+    delete (tree.items[2] as FilterGroup).negate;
+    expect(codec.serialize(tree, context)).toEqual([
+      { label: "job", op: "=", value: "api" },
+      { label: "code", op: "=", value: "500", group: 3, negate: true },
+      { label: "env", op: "=", value: "prod", group: 5 },
+    ]);
+  });
+
+  it("the metrics explorer's filters group the same way", () => {
+    const filters = [{ label: "code", operator: "=", value: "500", group: 1 }];
+    const tree = metricsLabelsCodec().parse(filters, context);
+    expect(tree.items[0].kind).toBe("group");
+  });
+});
+
 describe("flat codecs", () => {
   it("dashboard variable filters keep text IN lists and `!=`", () => {
     const codec = dashboardVariableCodec();

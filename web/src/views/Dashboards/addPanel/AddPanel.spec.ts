@@ -5047,6 +5047,24 @@ describe("AddPanel.vue", () => {
       expect(editor.initChartData).not.toHaveBeenCalled();
     });
 
+    it("runs Apply on an alert list, which reads the alerts API and has no query", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementation(() => {});
+      const editor = { reportValidationErrors: vi.fn(), runQuery: vi.fn(), initChartData: vi.fn() };
+      wrapper.vm.panelEditorRef = editor;
+      wrapper.vm.dashboardPanelData.data.type = "alert-list";
+      const query = wrapper.vm.dashboardPanelData.data.queries[0];
+      // The mocked panel's map/sankey placeholders are objects; a real alert list has them null.
+      Object.assign(query.fields, { source: null, target: null, latitude: null, longitude: null });
+      query.query = "";
+      wrapper.vm.shouldRefreshWithoutCache = false;
+
+      wrapper.vm.runQuery(true);
+
+      expect(editor.reportValidationErrors).not.toHaveBeenCalled();
+      expect(wrapper.vm.shouldRefreshWithoutCache).toBe(true);
+    });
+
     it("still runs Apply with a filter that has no value yet, which the query drops", async () => {
       wrapper = await mountForValidation();
       validatePanelMock.mockImplementation(() => {});

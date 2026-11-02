@@ -2768,6 +2768,48 @@ describe("Schema Component Tests", () => {
     });
   });
 
+  describe("Pattern count label", () => {
+    const originalIsEnterprise = (config as any).isEnterprise;
+    let w: any;
+
+    beforeEach(() => {
+      (config as any).isEnterprise = "true";
+    });
+
+    afterEach(() => {
+      w?.unmount();
+      (config as any).isEnterprise = originalIsEnterprise;
+    });
+
+    it.each([
+      [1, "View 1 Pattern"],
+      [2, "View 2 Patterns"],
+    ])("labels %i pattern(s) as %s", async (count, label) => {
+      mockGetStream.mockResolvedValue({
+        name: "test-stream",
+        stream_type: "logs",
+        stats: {},
+        schema: [{ name: "message", type: "Utf8" }],
+        settings: { full_text_search_keys: [], index_fields: [], bloom_filter_fields: [] },
+        pattern_associations: Array.from({ length: count }, (_, i) => ({
+          field: "message",
+          pattern_name: `p${i}`,
+          pattern_id: `id${i}`,
+          policy: "Redact",
+          apply_at: "AtIngestion",
+        })),
+      });
+      w = mount(LogStream, {
+        props: { open: true, modelValue: { name: "test-stream", stream_type: "logs", schema: [] } },
+        global: { provide: { store }, plugins: [i18n], stubs: { ODrawer: ODrawerStub } },
+      });
+      await flushPromises();
+      const action = w.find('[data-test="schema-field-message-pattern-action"]');
+      expect(action.exists()).toBe(true);
+      expect(action.text().trim()).toBe(label);
+    });
+  });
+
   // ==========================================
   // Phase 2 tests — OTable selection syncing
   // ==========================================

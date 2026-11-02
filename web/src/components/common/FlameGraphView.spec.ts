@@ -347,6 +347,34 @@ describe("FlameGraphView search action", () => {
   });
 });
 
+describe("FlameGraphView profile actions", () => {
+  it("hides the callers/callees and details actions when the page cannot open them", async () => {
+    const wrapper = mount(FlameGraphView, {
+      props: {
+        root: { name: "main", self: 1, total: 4, children: [] },
+        unitLabel: "ns",
+        summaryLabel: "total",
+        summaryValue: "4",
+        hideProfileActions: true,
+      },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          ChartRenderer: ChartRendererStub,
+          OButton: { template: "<button><slot /></button>" },
+          OSwitch: true,
+          OTooltip: true,
+        },
+      },
+    });
+    await flushPromises();
+    await rightClick(wrapper);
+    expect(wrapper.find('[data-test="flame-graph-search-function"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="flame-graph-sandwich"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="flame-graph-details"]').exists()).toBe(false);
+  });
+});
+
 describe("FlameGraphView grouped frames", () => {
   const mountGraph = (root: object) =>
     mount(FlameGraphView, {
@@ -377,6 +405,7 @@ describe("FlameGraphView grouped frames", () => {
     await flushPromises();
     await nextTick();
     expect(wrapper.text()).toContain("Root at bottom");
+    expect(wrapper.find('[data-test="flame-graph-align-left"]').exists()).toBe(true);
 
     (wrapper.vm as unknown as { rootAtBottom: boolean }).rootAtBottom = true;
     await nextTick();
@@ -802,6 +831,45 @@ describe("FlameGraphView grouped frames", () => {
       };
       expect(options.options.dataZoom[0]).toMatchObject({ start: 0, end: 100 });
     });
+  });
+});
+
+describe("FlameGraphView tooltip", () => {
+  it("escapes formatted values and frame names in the hover card", async () => {
+    const payload = "<img src=x onerror=alert(1)>";
+    const wrapper = mount(FlameGraphView, {
+      props: {
+        root: { name: "total", total: 10, children: [{ name: payload, total: 10, children: [] }] },
+        unitLabel: "ns",
+        summaryLabel: "total",
+        summaryValue: "10",
+        valueFormatter: (value: number) => `${value} ${payload}`,
+      },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          ChartRenderer: ChartRendererStub,
+          OButton: { template: "<button><slot /></button>" },
+          OSwitch: true,
+          OTooltip: true,
+        },
+      },
+    });
+    await flushPromises();
+    await nextTick();
+    const options = (
+      wrapper.findComponent({ name: "ChartRenderer" }).props("data") as {
+        options: {
+          series: { data: { block: { label: string } }[] }[];
+          tooltip: { formatter: (params: unknown) => string };
+        };
+      }
+    ).options;
+    const frame = options.series[0].data.find((datum) => datum.block.label === payload);
+    expect(frame).toBeDefined();
+    const html = options.tooltip.formatter({ data: { block: frame!.block } });
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
   });
 });
 

@@ -8,14 +8,17 @@ on:
   pull_request:
     branches:
       - "**"
-    # labeled/unlabeled so adding or removing 'ready-for-ci' starts or resets CI; drafts never run paid CI.
+    # labeled/unlabeled so 'ready-for-ci' gates CI; only a new commit cancels an in-flight run (see concurrency); a draft starts no paid CI (an in-flight run still finishes).
     # auto_merge_enabled: the one full-matrix run per PR, at merge time (see generate_matrix).
     types: [opened, reopened, synchronize, labeled, unlabeled, auto_merge_enabled, ready_for_review, converted_to_draft]
   merge_group:
+  schedule:
+    - cron: '30 20 * * *'  # 2:00 AM IST
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
-  cancel-in-progress: true
+  # Only a new commit cancels: a cancelled same-SHA run leaves a failed required summary that a newer run cannot clear.
+  cancel-in-progress: ${{ github.event_name != 'pull_request' || github.event.action == 'synchronize' }}
 
 env:
   COLUMNS: 150
@@ -69,13 +72,14 @@ env:
 
 jobs:
   check_changes:
-    # Runs only on PRs carrying the 'ready-for-ci' label; the merge queue runs unit tests only (see docs/ci).
-    if: ${{ github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) }}
+    # Runs on PRs carrying the 'ready-for-ci' label and on this repo's nightly schedule; the merge queue runs unit tests only (see docs/ci).
+    if: ${{ github.event_name != 'merge_group' && (github.event_name != 'schedule' || github.repository == 'openobserve/openobserve') && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) }}
     timeout-minutes: 5
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read  # for `gh run list` (last nightly's commit and result)
     outputs:
       has_changes: ${{ steps.check.outputs.has_changes }}
     steps:
@@ -92,12 +96,38 @@ jobs:
       # this workflow file re-tests itself on top of it.
       - uses: ./.github/actions/classify-changes
         id: classify
+      # A nightly on the main commit the last nightly already passed on would only repeat its result.
+      - id: main_changed
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # On any gh failure LAST stays empty and the nightly runs (fail-safe: run rather than skip).
+          LAST=$(gh run list --workflow "$GITHUB_WORKFLOW" --event schedule --limit 50 \
+            --json databaseId,headSha,status,conclusion \
+            --jq "[.[] | select(.databaseId < $GITHUB_RUN_ID and .status == \"completed\")] | .[0] // empty | .headSha + \" \" + .conclusion" \
+            2>/dev/null || echo "")
+          read -r LAST_SHA LAST_CONCLUSION <<< "$LAST" || true
+          echo "Current main SHA: $GITHUB_SHA"
+          echo "Last nightly: ${LAST_SHA:-<none>} (${LAST_CONCLUSION:-<none>})"
+          # A red main must stay red, so only a passed nightly on the same commit lets this one skip.
+          if [ -n "$LAST_SHA" ] && [ "$LAST_SHA" = "$GITHUB_SHA" ] && [ "$LAST_CONCLUSION" = "success" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::main unchanged since the last nightly passed ($GITHUB_SHA); skipping."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
       - id: check
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          MAIN_CHANGED: ${{ steps.main_changed.outputs.changed }}
           HAS_CHANGES: ${{ steps.classify.outputs.run_playwright }}
           CHANGED_WORKFLOWS: ${{ steps.classify.outputs.changed_workflows }}
         run: |
-          if [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' playwright.yml '; then
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            echo "has_changes=$([ "$MAIN_CHANGED" = "false" ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+          elif [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' playwright.yml '; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
@@ -273,6 +303,8 @@ jobs:
       contents: read
     outputs:
       matrix: ${{ steps.gen.outputs.matrix }}
+      # Kept from the earlier attempt on "Re-run failed jobs"; equal to run_attempt on "Re-run all jobs".
+      attempt: ${{ github.run_attempt }}
       smoke_active: ${{ steps.gen.outputs.smoke_active }}
       shards_selected: ${{ steps.gen.outputs.shards_selected }}
     steps:
@@ -506,6 +538,19 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
 
+      # Expressions have no arithmetic, so the previous attempt number is computed here.
+      - name: Resolve previous attempt
+        id: prev
+        run: echo "attempt=$(( ${{ github.run_attempt }} - 1 ))" >> "$GITHUB_OUTPUT"
+
+      - name: Download previous attempt's failed-test list
+        if: ${{ github.run_attempt > 1 }}
+        continue-on-error: true
+        uses: actions/download-artifact@v5
+        with:
+          name: last-run-${{ matrix.testfolder }}-attempt-${{ steps.prev.outputs.attempt }}
+          path: tests/ui-testing/last-run-prev
+
       - name: Install dependencies and run ui-tests
         run: |
           touch .env
@@ -605,6 +650,31 @@ jobs:
               echo "DEBUG: pinning workers to ${{ matrix.workers }}"
             fi
 
+            # Re-run whole files that had a failure (a serial group needs its earlier tests).
+            PREV=last-run-prev/.last-run.json
+            if [ "$GITHUB_RUN_ATTEMPT" -gt 1 ] && [ "${{ needs.generate_matrix.outputs.attempt }}" = "$GITHUB_RUN_ATTEMPT" ]; then
+              echo "Re-run all jobs: running the full shard"
+            elif [ "$GITHUB_RUN_ATTEMPT" -gt 1 ] && [ -f "$PREV" ] \
+              && node -e "const r=require('./$PREV'); process.exit(r.status === 'failed' && (r.failedTests||[]).length ? 0 : 1)"; then
+              mkdir -p test-results && cp "$PREV" test-results/.last-run.json
+              LIST_JSON=$(mktemp)
+              read -ra SHARD_FILES <<< "$FILE_PATHS"
+              FAILED_FILES=""
+              if PLAYWRIGHT_JSON_OUTPUT_NAME="$LIST_JSON" npx playwright test "${SHARD_FILES[@]}" --last-failed --list --reporter=json > /dev/null; then
+                FAILED_FILES=$(node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')); console.log([...new Set((r.suites||[]).map(s => s.file).filter(Boolean))].sort().map(f => './playwright-tests/' + f).join(' '))" "$LIST_JSON" || true)
+              fi
+              # An attempt that dies before writing its own list must not upload the previous attempt's as its own.
+              rm -f test-results/.last-run.json
+              if [ -n "$FAILED_FILES" ]; then
+                echo "Re-run: files with failed tests from attempt ${{ steps.prev.outputs.attempt }}: $FAILED_FILES"
+                FILE_PATHS="$FAILED_FILES"
+              else
+                echo "::warning::Could not list the failed tests from attempt ${{ steps.prev.outputs.attempt }} — running the full shard"
+              fi
+            elif [ "$GITHUB_RUN_ATTEMPT" -gt 1 ]; then
+              echo "::warning::No complete failed-test list from attempt ${{ steps.prev.outputs.attempt }} — running the full shard"
+            fi
+
             echo "DEBUG: Final command: npx playwright test $FILE_PATHS $WORKERS_ARG"
             npx playwright test $FILE_PATHS $WORKERS_ARG
           else
@@ -619,6 +689,29 @@ jobs:
           path: tests/ui-testing/blob-report
           retention-days: 1
 
+      # job-status lets merge_reports tell a shard that died before writing results from one that passed.
+      - name: Record shard result
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          cd tests/ui-testing
+          rm -rf shard-record && mkdir shard-record
+          printf '%s\n' "$JOB_STATUS" > shard-record/job-status
+          if [ -f test-results/.last-run.json ]; then cp test-results/.last-run.json shard-record/; fi
+
+      - name: Upload failed-test list for re-runs
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: last-run-${{ matrix.testfolder }}-attempt-${{ github.run_attempt }}
+          path: tests/ui-testing/shard-record
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 1
+
       - name: Check OpenObserve logs
         if: always()
         run: cat o2.log
@@ -626,7 +719,7 @@ jobs:
   merge_reports:
     timeout-minutes: 20
     name: Merge Reports
-    needs: [ui_integration_tests]
+    needs: [generate_matrix, ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     # eks runner: `playwright merge-reports` silently stops mid-merge (exits 0, ~3 of N blobs, no
     # output) on the ubicloud and github-hosted runners — but works on the eks runners (same as ENT).
@@ -778,6 +871,94 @@ jobs:
           # Log a count only — avoid dumping test file paths/titles into public CI logs.
           echo "flaky/failed test count: $(printf '%s' "$FLAKY" | jq 'length' 2>/dev/null || echo '?')"
 
+      # Read by playwright-auto-rerun.yml; failed_count -1 means "no advice", so a missing or broken report still writes the file.
+      - name: Write rerun advice
+        if: always()
+        env:
+          TESTED_OSS_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p rerun-advice
+          # Report file paths are relative to playwright.config.js testDir.
+          jq -ce --arg sha "$TESTED_OSS_SHA" '
+            if (.suites | type) != "array" then error("not a Playwright report") else . end
+            | [.suites[] | recurse(.suites[]?) | . as $s | (.specs // [])[] | . as $sp
+               | (.tests // [])[] | select(.status == "unexpected") | ($sp.file // $s.file // "")]
+            | {tested_oss_sha: $sha, failed_count: length,
+               failed_files: (map(select(. != "") | "tests/ui-testing/playwright-tests/" + .) | unique)}
+          ' tests/ui-testing/playwright-results/report.json > rerun-advice/rerun-advice.json 2>/dev/null \
+            || jq -nc --arg sha "$TESTED_OSS_SHA" '{tested_oss_sha: $sha, failed_count: -1, failed_files: []}' > rerun-advice/rerun-advice.json
+          jq -c '{failed_count, failed_file_count: (.failed_files | length)}' rerun-advice/rerun-advice.json
+
+      # runner.temp is emptied per job, so a reused runner cannot supply an earlier run's records.
+      - name: Download failed-test lists
+        id: download_last_runs
+        if: ${{ always() && github.run_attempt == 1 && needs.ui_integration_tests.result != 'success' }}
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/last-runs
+          pattern: last-run-*-attempt-${{ github.run_attempt }}
+
+      # A shard that died before writing results adds nothing to the report, so the advice would miss its failure.
+      - name: Check shard results match the merged report
+        if: always()
+        env:
+          SHARDS_RESULT: ${{ needs.ui_integration_tests.result }}
+          LAST_RUNS_OUTCOME: ${{ steps.download_last_runs.outcome }}
+          MATRIX: ${{ needs.generate_matrix.outputs.matrix }}
+        run: |
+          ADVICE=rerun-advice/rerun-advice.json
+          COMPUTED=$(cat "$ADVICE" 2>/dev/null || true)
+          COUNT=$(jq '.failed_count' <<< "$COMPUTED" 2>/dev/null) && [ "$COUNT" -ge 0 ] 2>/dev/null || exit 0
+          # The bot reads advice only for a failed run.
+          [ "$SHARDS_RESULT" != "success" ] || exit 0
+          # The file says "no advice" until every check below passes, so any early exit keeps the bot's old behaviour.
+          jq -c '.failed_count = -1 | .failed_files = []' <<< "$COMPUTED" > "$ADVICE"
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ]; then
+            # The bot reads only attempt 1's advice, and a failed-jobs rerun leaves no record for shards that passed earlier.
+            echo "Rerun advice is only written for the first attempt"; exit 0
+          fi
+          if [ "$LAST_RUNS_OUTCOME" != "success" ]; then
+            echo "::warning::Could not download the shard results; no rerun advice"; exit 0
+          fi
+          if ! SHARDS=$(jq -r '.include | if type == "array" and length > 0 and all(.testfolder | type == "string") then .[].testfolder else error("not a shard matrix") end' <<< "$MATRIX" 2>/dev/null) \
+            || [ -z "$SHARDS" ]; then
+            echo "::warning::Could not read the shard list from the matrix; no rerun advice"; exit 0
+          fi
+          LISTED=0
+          FAILED_SHARDS=""
+          while IFS= read -r SHARD; do
+            RECORD="$RUNNER_TEMP/last-runs/last-run-$SHARD-attempt-$GITHUB_RUN_ATTEMPT"
+            if ! STATUS=$(cat "$RECORD/job-status" 2>/dev/null); then
+              echo "::warning::Shard $SHARD left no result record; no rerun advice"; exit 0
+            fi
+            if [ "$STATUS" != "success" ]; then
+              jq -e '.status == "failed" and (.failedTests | type == "array" and length > 0)' "$RECORD/.last-run.json" > /dev/null 2>&1 \
+                || { echo "::warning::Shard $SHARD failed without a complete failed-test list; no rerun advice"; exit 0; }
+              FAILED_SHARDS="$FAILED_SHARDS $SHARD"
+            fi
+            if [ -f "$RECORD/.last-run.json" ]; then
+              N=$(jq -e '.failedTests | if type == "array" then length else error("no failedTests array") end' "$RECORD/.last-run.json" 2>/dev/null) \
+                || { echo "::warning::Shard $SHARD left an unreadable failed-test list; no rerun advice"; exit 0; }
+              LISTED=$((LISTED + N))
+            fi
+          done <<< "$SHARDS"
+          # Catches a failed shard whose blob report never reached the merged report.
+          if [ "$LISTED" -ne "$COUNT" ]; then
+            echo "::warning::Failed-test lists hold $LISTED tests but the merged report has $COUNT; no rerun advice"; exit 0
+          fi
+          printf '%s\n' "$COMPUTED" > "$ADVICE"
+          echo "rerun advice kept; failed shards checked:$FAILED_SHARDS"
+
+      - name: Upload rerun advice
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: rerun-advice-attempt-${{ github.run_attempt }}
+          path: rerun-advice/rerun-advice.json
+          retention-days: 7
+
       - name: Upload merged report
         if: always()
         uses: actions/upload-artifact@v4
@@ -850,9 +1031,9 @@ jobs:
           if printf '%s' "$FLAKY" | jq -e 'type=="array" and length>0' >/dev/null 2>&1; then
             FLAKY_FILE=$(mktemp "${TMPDIR:-/tmp}/flaky.XXXXXX")
             trap 'rm -f "$FLAKY_FILE"' EXIT
-            printf '%s' "$FLAKY" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg repo "$GITHUB_REPOSITORY" \
+            printf '%s' "$FLAKY" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg run_attempt "$GITHUB_RUN_ATTEMPT" --arg repo "$GITHUB_REPOSITORY" \
               --arg branch "${REPORT_BRANCH:-}" --arg pr "${REPORT_PR:-}" \
-              '[.[] | {run_id:$run_id, repo:$repo, suite:"ui", workflow:"test", ingest_source:"live", status:.status, module:.module, test_title:.title, test_file:.file, branch:(if $branch=="" then null else $branch end), pr_number:(if $pr=="" then null else ($pr|tonumber) end)}]' \
+              '[.[] | {run_id:$run_id, run_attempt:($run_attempt|tonumber), repo:$repo, suite:"ui", workflow:"test", ingest_source:"live", status:.status, module:.module, test_title:.title, test_file:.file, branch:(if $branch=="" then null else $branch end), pr_number:(if $pr=="" then null else ($pr|tonumber) end)}]' \
               > "$FLAKY_FILE" 2>/dev/null || echo '[]' > "$FLAKY_FILE"
             if [ "$(jq 'length' "$FLAKY_FILE" 2>/dev/null || echo 0)" -gt 0 ]; then
               bash .github/scripts/o2-report.sh ci_test_results "$FLAKY_FILE"
@@ -863,17 +1044,21 @@ jobs:
     timeout-minutes: 5
     runs-on:
       labels: eks-openobserve-standard-4
-    permissions: {}
+    permissions:
+      checks: write
+      pull-requests: read
     needs:
       [
         check_changes,
         resolve_binary,
         build_binary,
+        generate_matrix,
         ui_integration_tests,
       ]
-    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
+    if: always() && github.event_name != 'merge_group' && (github.event_name != 'schedule' || github.repository == 'openobserve/openobserve') && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
+        id: verdict
         run: |
           # 1. check_changes must have succeeded — if it failed, downstream jobs skipped
           #    and we must not report a false success.
@@ -911,3 +1096,34 @@ jobs:
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
             exit 1
           fi
+
+      - name: Complete the auto-merge placeholder
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]' && needs.check_changes.result == 'success' }}
+        # github-script, not gh: the eks runners are not known to ship the gh CLI.
+        uses: actions/github-script@v9
+        env:
+          VERDICT: ${{ steps.verdict.outcome }}
+          SMOKE: ${{ needs.check_changes.outputs.has_changes == 'true' && needs.generate_matrix.outputs.smoke_active == 'true' }}
+          HAS_CHANGES: ${{ needs.check_changes.outputs.has_changes }}
+        with:
+          script: |
+            if (process.env.SMOKE === 'true') {
+              // A smoke verdict may stand in only once auto-merge is off, else a full run dropped from the queue strands the placeholder.
+              const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: context.payload.pull_request.number });
+              if (pr.auto_merge) { core.info('Smoke run and auto-merge is on: leaving the placeholder to the full-matrix run.'); return; }
+            }
+            const conclusion = process.env.VERDICT === 'success' ? 'success' : 'failure';
+            const scope = process.env.HAS_CHANGES !== 'true' ? 'No Playwright changes' : process.env.SMOKE === 'true' ? 'Smoke' : 'Full matrix';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const runs = await github.paginate(github.rest.checks.listForRef, {
+              ...context.repo, ref: context.payload.pull_request.head.sha, check_name: 'playwright_summary', filter: 'all', per_page: 100,
+            });
+            const placeholders = runs.filter((r) => r.external_id === 'playwright-automerge-placeholder');
+            if (!placeholders.length) core.info('No auto-merge placeholder on this SHA.');
+            for (const r of placeholders) {
+              await github.rest.checks.update({
+                ...context.repo, check_run_id: r.id, status: 'completed', conclusion, details_url: runUrl,
+                output: { title: `${scope}: ${conclusion}`, summary: `Completed by the ${scope} run ${runUrl}` },
+              });
+              core.info(`placeholder ${r.id} -> ${conclusion}`);
+            }

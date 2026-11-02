@@ -175,7 +175,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted } from "vue";
+import { defineComponent, ref, toRef, watch, onMounted } from "vue";
+import { useListViewState } from "@/composables/useListViewState";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -230,7 +231,10 @@ export default defineComponent({
     const showJoinOrganizationDialog = ref(false);
     const showOrgAPIKeyDialog = ref(false);
     const organizationAPIKey = ref("");
-    const filterQuery = ref("");
+    const filterQuery = toRef(
+      useListViewState("iam-organizations", { filterQuery: "" }),
+      "filterQuery",
+    );
     const toBeUpdatedOrganization = ref({
       id: "",
       name: "",

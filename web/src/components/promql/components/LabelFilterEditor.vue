@@ -14,6 +14,7 @@
       <span class="ms-0.5 me-0.5 flex items-center">:</span>
       <div class="m-0.5 flex min-h-8 min-w-0 flex-1 items-center">
         <FilterBuilder
+          :key="builderKey"
           profile="promql-builder"
           :model-value="props.labels"
           :fields="fields"
@@ -26,6 +27,19 @@
         />
       </div>
     </div>
+    <div
+      v-if="tooMany"
+      class="text-status-error-text ps-2 text-xs"
+      role="alert"
+      data-test="promql-labelfilter-too-many-branches"
+    >
+      {{
+        t("metrics.labelGroups.tooManyBranches", {
+          count: tooMany,
+          max: MAX_FILTER_BRANCHES,
+        })
+      }}
+    </div>
   </div>
 </template>
 
@@ -36,6 +50,7 @@ import { useI18nTyped } from "@/types/i18n";
 import type { PromqlLabelMatcher } from "@/components/promql/types";
 import type { FilterField } from "@/utils/query/filterBar";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import { compileLabelFilters, MAX_FILTER_BRANCHES } from "@/components/promql/labelBoolean";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
 import { queryClient } from "@/composables/query/queryClient";
@@ -78,6 +93,25 @@ const loadingLabels = computed<boolean>(() =>
 
 const fields = computed<FilterField[]>(() =>
   availableLabels.value.map((name) => ({ name, type: "string" })),
+);
+
+const compiled = computed(() => compileLabelFilters(props.labels));
+
+/** The branch count of an edit that was refused for passing the cap; 0 once an edit lands. */
+const refusedCount = ref(0);
+const tooMany = computed(() =>
+  compiled.value.ok ? refusedCount.value : compiled.value.branchCount,
+);
+
+// Bumped to re-read the saved labels, so a refused edit leaves the builder too.
+const builderKey = ref(0);
+
+// A new list, such as another query tab's, was never refused.
+watch(
+  () => props.labels,
+  () => {
+    refusedCount.value = 0;
+  },
 );
 
 const streamContext = (metric: string) => ({
@@ -132,7 +166,16 @@ const loadValues = async (label: string): Promise<string[]> => {
 const variableSuggestions = (): string[] =>
   (props.dashboardData?.variables?.list ?? []).map((variable: any) => `$${variable.name}`);
 
+// A query past the cap cannot render, so only a removal may land while over it.
 function onChange(next: unknown) {
-  emit("update:labels", next as PromqlLabelMatcher[]);
+  const labels = next as PromqlLabelMatcher[];
+  const compiledNext = compileLabelFilters(labels);
+  if (!compiledNext.ok && labels.length >= props.labels.length) {
+    refusedCount.value = compiledNext.branchCount;
+    builderKey.value++;
+    return;
+  }
+  refusedCount.value = 0;
+  emit("update:labels", labels);
 }
 </script>

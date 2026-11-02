@@ -185,4 +185,78 @@ describe("LabelFilterEditor", () => {
       expect(builder().props("fieldsLoading")).toBe(false);
     });
   });
+
+  describe("OR groups", () => {
+    const grouped = [
+      { label: "job", op: "=", value: "api" },
+      { label: "code", op: "=", value: "500", group: 1 },
+      { label: "env", op: "=", value: "prod", group: 2, negate: true },
+    ];
+    const negated = Array.from({ length: 16 }, (_, i) => ({
+      label: `l${i}`,
+      op: "=",
+      value: "v",
+      group: 1,
+      negate: true,
+    }));
+    const TOO_MANY = '[data-test="promql-labelfilter-too-many-branches"]';
+
+    it("renders each group in its own box, joined by or", () => {
+      mountEditor({ dashboardPanelData: panelData(), labels: grouped });
+      expect(wrapper!.find(`[data-test="${DT}-group-1"]`).text()).toContain("code");
+      expect(wrapper!.find(`[data-test="${DT}-group-2"]`).text()).toContain("env");
+      expect(wrapper!.find(`[data-test="${DT}-group-join-1"]`).text()).toBe("and any of");
+      expect(wrapper!.find(`[data-test="${DT}-group-join-2"]`).text()).toBe("or");
+    });
+
+    it("toggles NOT on every matcher of the group and no other", async () => {
+      mountEditor({ dashboardPanelData: panelData(), labels: grouped });
+      await wrapper!.find(`[data-test="${DT}-group-not-1"]`).trigger("click");
+      const labels = emitted()!.at(-1)![0] as typeof grouped;
+      expect(labels[1]).toEqual({ label: "code", op: "=", value: "500", group: 1, negate: true });
+      expect(labels[2]).toEqual(grouped[2]);
+
+      await wrapper!.setProps({ labels });
+      await wrapper!.find(`[data-test="${DT}-group-not-1"]`).trigger("click");
+      expect((emitted()!.at(-1)![0] as typeof grouped)[1]).toEqual(grouped[1]);
+    });
+
+    it("says why the query will not run past the branch cap", () => {
+      const labels = [...negated, { ...negated[0], label: "l16" }];
+      mountEditor({ dashboardPanelData: panelData(), labels });
+      expect(wrapper!.find(TOO_MANY).text()).toContain("17");
+    });
+
+    it("refuses an add that would pass the branch cap, and says why", async () => {
+      mountEditor({ dashboardPanelData: panelData(), labels: negated });
+      builder().vm.$emit("update:modelValue", [...negated, { ...negated[0], label: "l16" }]);
+      await flushPromises();
+      expect(emitted()).toBeUndefined();
+      expect(wrapper!.find(TOO_MANY).text()).toContain("17");
+    });
+
+    it("lets a removal land while over the branch cap", async () => {
+      const labels = [...negated, { ...negated[0], label: "l16" }, { ...negated[0], label: "l17" }];
+      mountEditor({ dashboardPanelData: panelData(), labels });
+      builder().vm.$emit("update:modelValue", labels.slice(1));
+      await flushPromises();
+      expect(emitted()).toHaveLength(1);
+    });
+
+    it("drops a refused edit's banner when another query's labels arrive", async () => {
+      mountEditor({ dashboardPanelData: panelData(), labels: negated });
+      builder().vm.$emit("update:modelValue", [...negated, { ...negated[0], label: "l16" }]);
+      await flushPromises();
+      expect(wrapper!.find(TOO_MANY).exists()).toBe(true);
+
+      await wrapper!.setProps({ labels: [{ label: "job", op: "=", value: "api" }] });
+      expect(wrapper!.find(TOO_MANY).exists()).toBe(false);
+    });
+
+    it("shows no group chrome for a plain AND list", () => {
+      mountEditor({ dashboardPanelData: panelData() });
+      expect(wrapper!.find(`[data-test^="${DT}-group-"]`).exists()).toBe(false);
+      expect(wrapper!.find(TOO_MANY).exists()).toBe(false);
+    });
+  });
 });

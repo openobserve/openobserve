@@ -25,10 +25,8 @@
  * cover under test. Every fixture here anchors half a shift back, which keeps
  * the whole ±1-day neighbourhood inside one person's turn.
  *
- * SCHEDULE FIRST, MEMBERS SECOND. `POST /teams/{id}/members` auto-provisions a
- * `source: "default"` rotation on a rotationless team and repoints rungs P1-P3
- * at it; a schedule written afterwards is then the §8.5 replacement the server
- * refuses. And a cover additionally requires its coverer to be a TEAM MEMBER —
+ * MEMBERS FIRST, SCHEDULE SECOND. A schedule naming somebody not on the team
+ * is refused with a 400. And a cover additionally requires its coverer to be a TEAM MEMBER —
  * being on a rotation is not enough — so both writes are mandatory and their
  * order is not negotiable. `stageTeam()` below is the only place that knows it.
  *
@@ -111,9 +109,9 @@ async function stageTeam(page, name, {
     anchor - i * Math.floor(shiftMicros / 3),
     shiftMicros,
   ));
-  await setTeamSchedule(page, team.id, { timezone, rotations });
   const everyone = [...new Set([...rosters.flat(), ...extraMembers])];
   await addTeamMembers(page, team.id, everyone);
+  await setTeamSchedule(page, team.id, { timezone, rotations });
   return { team, rotations: rotations.map((r) => r.id) };
 }
 

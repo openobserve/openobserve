@@ -337,6 +337,26 @@ export const filterDashboardBySchema = (
   };
 };
 
+/** Keeps only panels tagged for `platform`, reflowed; the Overview renders the rest natively. */
+export const keepPlatformPanels = (
+  dashboard: RumDashboard,
+  platform: RumPlatformKind,
+  gridWidth: number = DASHBOARD_GRID_COLUMNS,
+): RumDashboard => {
+  const pick = (panels: DashboardPanel[] = []) =>
+    reflowPanels(
+      panels.filter((p) => panelPlatform(p) === platform),
+      gridWidth,
+    );
+  if (Array.isArray(dashboard?.tabs) && !dashboard.panels?.length) {
+    return {
+      ...dashboard,
+      tabs: (dashboard.tabs ?? []).map((tab) => ({ ...tab, panels: pick(tab?.panels) })),
+    };
+  }
+  return { ...dashboard, panels: pick(dashboard?.panels) };
+};
+
 /**
  * Build the present-field Set from the `_rumdata` schema map held in `performanceState`
  * (`{ [fieldName]: field }`). Returns null when the schema isn't loaded, which callers

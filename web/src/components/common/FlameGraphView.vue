@@ -15,13 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="rootEl" class="relative">
+  <div ref="rootEl" class="relative" :class="{ 'h-full': fillHeight }">
     <div v-if="!hasData" class="text-text-secondary flex h-40 items-center justify-center text-sm">
       {{ emptyLabel }}
     </div>
 
     <div v-else>
-      <div class="mb-1.5 flex min-w-0 flex-nowrap items-center gap-2">
+      <div
+        v-if="!hideViewOptions"
+        class="mb-1.5 flex min-w-0 flex-nowrap items-center gap-2"
+        data-test="flame-graph-view-options"
+      >
         <div class="ms-auto flex shrink-0 items-center gap-2">
           <div
             class="border-border-default rounded-default inline-flex overflow-hidden border"
@@ -82,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="hasData"
             ref="chartRendererRef"
             :data="chartData"
+            :label="chartLabel"
             class="h-full w-full"
             @click="onChartClick"
           />
@@ -100,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        v-if="showZoomHint"
+        v-if="showZoomHint && !noZoomHint"
         class="border-border-default bg-surface-panel rounded-default absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 border px-3 py-1.5 text-xs whitespace-nowrap"
         data-test="flame-graph-zoom-hint"
       >
@@ -205,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("profiles.highlight") }}
       </OButton>
       <OButton
+        v-if="!hideProfileActions"
         variant="ghost"
         size="sm"
         class="w-full justify-start"
@@ -215,6 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("profiles.showCallersAndCallees") }}
       </OButton>
       <OButton
+        v-if="!hideProfileActions"
         variant="ghost"
         size="sm"
         class="w-full justify-start"
@@ -253,7 +260,7 @@ import { escapeHtml } from "@/utils/html";
 import { cssToken } from "@/utils/theme";
 import { paletteIndexFor } from "./flameGraphPackage";
 import { parseColor } from "@/lib/styles/tokens/colorMath";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useThemeRevision } from "@/composables/useTheme";
 import useBreakpoint from "@/composables/useBreakpoint";
 
@@ -335,6 +342,16 @@ const props = withDefaults(
     diffComparisonTotal?: number | null;
     /** What each side of a diff is called, as in "v1.4.0", for the tooltip's rows. */
     diffLabels?: { baseline: string; comparison: string };
+    /** Hide the callers/callees and function details actions, which only the profiles page can open. */
+    hideProfileActions?: boolean;
+    /** Hide the label-align and root-at-bottom controls, for hosts that cannot keep their state. */
+    hideViewOptions?: boolean;
+    /** Grow the rows so the graph fills its container's height, for a host of fixed size such as a dashboard panel. */
+    fillHeight?: boolean;
+    /** Leave out the wheel-zoom hint, for a host too small to keep a toast over the graph. */
+    noZoomHint?: boolean;
+    /** Accessible name for the graph; without one ECharts describes it by its series type. */
+    chartLabel?: I18nText;
   }>(),
   {
     root: null,
@@ -633,7 +650,21 @@ const blocks = computed(() => {
   return collected.map((block) => ({ ...block, depth: maxDepth - block.depth }));
 });
 const maxDepth = computed(() => blocks.value.reduce((max, block) => Math.max(max, block.depth), 0));
-const chartHeight = computed(() => (maxDepth.value + 1) * (BLOCK_HEIGHT + BLOCK_PADDING) + 20);
+// The container height the rows may grow into; 0 keeps the fixed row height.
+const fillableHeight = ref(0);
+const rowStep = computed(() => {
+  const fixed = BLOCK_HEIGHT + BLOCK_PADDING;
+  if (!props.fillHeight || !fillableHeight.value) return fixed;
+  return Math.max(fixed, Math.floor((fillableHeight.value - 20) / (maxDepth.value + 1)));
+});
+const blockHeight = computed(() => rowStep.value - BLOCK_PADDING);
+const chartHeight = computed(() => (maxDepth.value + 1) * rowStep.value + 20);
+const measureFillable = () => {
+  const root = rootEl.value;
+  if (!root) return;
+  const options = root.querySelector<HTMLElement>('[data-test="flame-graph-view-options"]');
+  fillableHeight.value = Math.max(0, root.clientHeight - (options?.offsetHeight ?? 0));
+};
 
 const menuStyle = computed(() => {
   if (!menu.value) return undefined;
@@ -677,7 +708,7 @@ const blockAt = (clientX: number, clientY: number) => {
   if (!box) return null;
   const share = (clientX - box.left - PLOT_INSET) / Math.max(1, box.width - 2 * PLOT_INSET);
   const left = zoomWindow.start + share * (zoomWindow.end - zoomWindow.start);
-  const depth = Math.floor((clientY - box.top - 1) / (BLOCK_HEIGHT + BLOCK_PADDING));
+  const depth = Math.floor((clientY - box.top - 1) / rowStep.value);
   return (
     blocks.value.find(
       (block) => block.depth === depth && left >= block.left && left < block.left + block.width,
@@ -781,7 +812,7 @@ const moreButton = computed(() => {
     block,
     style: {
       left: `${right - MORE_BUTTON - 2}px`,
-      top: `${block.depth * (BLOCK_HEIGHT + BLOCK_PADDING) + 1 + (BLOCK_HEIGHT - MORE_BUTTON) / 2}px`,
+      top: `${block.depth * rowStep.value + 1 + (blockHeight.value - MORE_BUTTON) / 2}px`,
     },
   };
 });
@@ -936,8 +967,10 @@ const resizeChart = () => {
 onMounted(() => {
   document.addEventListener("click", onDocumentClick, true);
   document.addEventListener("keydown", onDocumentKeydown);
+  if (props.fillHeight) measureFillable();
   if (!rootEl.value || typeof ResizeObserver === "undefined") return;
   resizeObserver = new ResizeObserver(() => {
+    if (props.fillHeight) measureFillable();
     if (!lgUp.value) return;
     if (!resizeFrame) resizeFrame = requestAnimationFrame(resizeChart);
   });
@@ -1043,8 +1076,8 @@ const chartData = computed(() => {
           const sharePercent = (share: number) => `${(share * 100).toFixed(2)}%`;
           const row = (label: string, value: string, percent: string) => `
             <span>${escapeHtml(label)}</span>
-            <span style="text-align: right;">${value}</span>
-            <span style="text-align: right; opacity: 0.75;">${percent}</span>`;
+            <span style="text-align: right;">${escapeHtml(value)}</span>
+            <span style="text-align: right; opacity: 0.75;">${escapeHtml(percent)}</span>`;
           // A diff frame shows each side's time and share of its own total, then the change.
           const rows =
             block.beforeShare != null && block.afterShare != null
@@ -1136,7 +1169,7 @@ const chartData = computed(() => {
             const x = Math.max(point1[0], plot.x);
             const right = Math.min(point2[0], plot.x + plot.width);
             if (right <= x) return null;
-            const y = depth * (BLOCK_HEIGHT + BLOCK_PADDING) + 1;
+            const y = depth * rowStep.value + 1;
             const rectWidth = Math.max(right - x, 1);
             const block = data[params.dataIndex].block as FlameBlock;
             const fill = data[params.dataIndex].itemStyle.color;
@@ -1148,7 +1181,7 @@ const chartData = computed(() => {
                 x,
                 y,
                 width: rectWidth,
-                height: BLOCK_HEIGHT,
+                height: blockHeight.value,
                 r: 2,
               },
               style: api.style({

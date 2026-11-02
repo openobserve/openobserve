@@ -46,6 +46,10 @@ pub const CHECK_STATUS_UNKNOWN: i32 = 0;
 pub const CHECK_STATUS_UP: i32 = 1;
 pub const CHECK_STATUS_WARNING: i32 = 2;
 pub const CHECK_STATUS_DOWN: i32 = 3;
+/// The probe could not produce a verdict (dispatch dead-letter, expired lease,
+/// infra fault). Says nothing about the target: it never opens an incident and
+/// never counts toward recovery. Written by the dispatcher and the reaper.
+pub const CHECK_STATUS_ERROR: i32 = 4;
 
 const MICROS_PER_MIN: i64 = 60 * 1_000_000;
 const MICROS_PER_DAY: i64 = 86_400 * 1_000_000;
@@ -120,6 +124,10 @@ pub struct EngineCheck {
     pub first_fail_at: Option<i64>,
     /// When the streak started failing, for time-based confirmation.
     pub failing_since: Option<i64>,
+    /// True only when this tick sees a run result it has not seen before.
+    /// Recovery advances on distinct results, never on rebuild ticks, so the
+    /// same UP observed over ten ticks counts once.
+    pub fresh_result: bool,
 }
 
 /// An auto-incident notice currently open (or just resolved, for the merge
@@ -536,11 +544,32 @@ pub fn incident_actions(
     th: &Thresholds,
     now: i64,
 ) -> Vec<EngineAction> {
+    incident_actions_with(
+        checks,
+        open_by_check,
+        recently_resolved,
+        snoozed,
+        |_| *th,
+        now,
+    )
+}
+
+/// [`incident_actions`] with per-check thresholds (each check is judged by the
+/// confirmation settings of the page(s) it is mapped to).
+pub fn incident_actions_with(
+    checks: &[EngineCheck],
+    open_by_check: &HashMap<String, OpenAutoIncident>,
+    recently_resolved: &HashMap<String, (String, i64)>,
+    snoozed: &HashSet<String>,
+    th_for: impl Fn(&str) -> Thresholds,
+    now: i64,
+) -> Vec<EngineAction> {
     let mut actions = Vec::new();
     for check in checks {
+        let th = th_for(&check.id);
         match open_by_check.get(&check.id) {
-            Some(open) => handle_open(check, open, th, now, &mut actions),
-            None => handle_closed(check, recently_resolved, snoozed, th, now, &mut actions),
+            Some(open) => handle_open(check, open, &th, now, &mut actions),
+            None => handle_closed(check, recently_resolved, snoozed, &th, now, &mut actions),
         }
     }
     actions
@@ -568,7 +597,16 @@ fn handle_open(
     now: i64,
     actions: &mut Vec<EngineAction>,
 ) {
-    if check.last_check_status == CHECK_STATUS_UP {
+    // UP and WARNING both mean the target answered: they advance recovery, but
+    // only on a result this loop has not counted yet.
+    let healthy = matches!(
+        check.last_check_status,
+        CHECK_STATUS_UP | CHECK_STATUS_WARNING
+    );
+    if healthy {
+        if !check.fresh_result {
+            return;
+        }
         let streak = open.recovery_streak + 1;
         if streak >= th.confirm_recovery {
             actions.push(EngineAction::Resolve {
@@ -581,8 +619,14 @@ fn handle_open(
                 streak,
             });
         }
-    } else if check.last_check_status == CHECK_STATUS_DOWN && open.recovery_streak > 0 {
-        // Failed again mid-recovery: the streak restarts from zero.
+    } else if matches!(
+        check.last_check_status,
+        CHECK_STATUS_DOWN | CHECK_STATUS_ERROR
+    ) && open.recovery_streak > 0
+    {
+        // Failed again mid-recovery: the streak restarts from zero. ERROR does
+        // the same: an unknown verdict cannot prove recovery, so UP, ERROR, UP
+        // is not two consecutive good results. The incident stays open.
         actions.push(EngineAction::RecoveryProgress {
             notice_id: open.notice_id.clone(),
             streak: 0,
@@ -761,7 +805,117 @@ mod tests {
             consecutive_failures: streak,
             first_fail_at: None,
             failing_since: None,
+            fresh_result: true,
         }
+    }
+
+    fn open_inc(streak: i32) -> HashMap<String, OpenAutoIncident> {
+        [(
+            "c1".to_string(),
+            OpenAutoIncident {
+                notice_id: "n1".into(),
+                check_id: "c1".into(),
+                recovery_streak: streak,
+            },
+        )]
+        .into()
+    }
+
+    /// Replays results against an open incident, applying RecoveryProgress
+    /// back into the streak; returns whether it resolved.
+    fn replay(statuses: &[(i32, bool)], th: Thresholds) -> bool {
+        let mut streak = 0;
+        for &(status, fresh) in statuses {
+            let mut c = check("c1", status, 0);
+            c.fresh_result = fresh;
+            let acts = incident_actions(
+                &[c],
+                &open_inc(streak),
+                &HashMap::new(),
+                &HashSet::new(),
+                &th,
+                0,
+            );
+            for a in acts {
+                match a {
+                    EngineAction::Resolve { .. } => return true,
+                    EngineAction::RecoveryProgress { streak: s, .. } => streak = s,
+                    _ => panic!("unexpected {a:?}"),
+                }
+            }
+        }
+        false
+    }
+
+    fn th(failures: i32, recovery: i32) -> Thresholds {
+        Thresholds {
+            confirm_failures: failures,
+            confirm_recovery: recovery,
+            confirm_after_micros: None,
+        }
+    }
+
+    #[test]
+    fn up_error_up_does_not_resolve_with_recovery_two() {
+        let s = CHECK_STATUS_UP;
+        let e = CHECK_STATUS_ERROR;
+        assert!(!replay(&[(s, true), (e, true), (s, true)], th(3, 2)));
+        assert!(replay(
+            &[(s, true), (e, true), (s, true), (s, true)],
+            th(3, 2)
+        ));
+    }
+
+    #[test]
+    fn error_never_opens_an_incident() {
+        let c = check("c1", CHECK_STATUS_ERROR, 50);
+        let acts = incident_actions(
+            &[c],
+            &HashMap::new(),
+            &HashMap::new(),
+            &HashSet::new(),
+            &th(1, 1),
+            0,
+        );
+        assert!(acts.is_empty());
+    }
+
+    #[test]
+    fn error_keeps_an_open_incident_open() {
+        let e = CHECK_STATUS_ERROR;
+        assert!(!replay(&[(e, true); 10], th(3, 1)));
+    }
+
+    #[test]
+    fn warning_advances_recovery() {
+        let w = CHECK_STATUS_WARNING;
+        assert!(replay(&[(w, true), (w, true)], th(3, 2)));
+    }
+
+    #[test]
+    fn the_same_result_over_many_ticks_counts_once() {
+        let mut ticks = vec![(CHECK_STATUS_UP, true)];
+        ticks.extend(std::iter::repeat_n((CHECK_STATUS_UP, false), 20));
+        assert!(!replay(&ticks, th(3, 2)));
+        ticks.push((CHECK_STATUS_UP, true));
+        assert!(replay(&ticks, th(3, 2)));
+    }
+
+    #[test]
+    fn seven_failures_four_recoveries() {
+        let t = th(7, 4);
+        let none = HashMap::new();
+        let quiet = HashSet::new();
+        let six = [check("c1", CHECK_STATUS_DOWN, 6)];
+        assert!(incident_actions(&six, &none, &HashMap::new(), &quiet, &t, 0).is_empty());
+        let seven = [check("c1", CHECK_STATUS_DOWN, 7)];
+        assert_eq!(
+            incident_actions(&seven, &none, &HashMap::new(), &quiet, &t, 0).len(),
+            1
+        );
+        let up = CHECK_STATUS_UP;
+        assert!(!replay(&[(up, true); 3], t));
+        assert!(replay(&[(up, true); 4], t));
     }
 
     #[test]

@@ -298,6 +298,9 @@ pub async fn handle_otlp_request(
         }
         return Err(ingestion_gate_error(e));
     }
+    // the write path creates a new stream's schema itself, before check_for_schema runs
+    schema::check_stream_key_len(org_id, StreamType::Profiles, &stream_name)
+        .map_err(|e| ProfilesExportError::InvalidArgument(e.to_string()))?;
 
     dictionary_compat::normalize(&mut request).map_err(ProfilesExportError::InvalidArgument)?;
     validation::validate(&request).map_err(ProfilesExportError::InvalidArgument)?;
@@ -2003,6 +2006,29 @@ mod tests {
         );
         assert!(row.get("sample_tags").is_none());
         assert!(row.get("profile_blob").is_none());
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn too_long_stream_key_is_an_invalid_argument() {
+        let name = "p".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let bounded =
+            infra::file_list::stream_key_violation("test_org_id", StreamType::Profiles, &name)
+                .is_some();
+        let result = handle_otlp_request(
+            "test_org_id",
+            ExportProfilesServiceRequest::default(),
+            OtlpRequestType::HttpProtobuf,
+            Some(&name),
+            IngestUser::from_user_email("a@a.com"),
+        )
+        .await;
+        let rejected = matches!(
+            &result,
+            Err(ProfilesExportError::InvalidArgument(msg)) if msg.starts_with("Stream name too long")
+        );
+        assert_eq!(rejected, bounded);
     }
 
     #[test]

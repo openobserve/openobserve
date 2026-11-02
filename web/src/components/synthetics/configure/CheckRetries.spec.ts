@@ -174,6 +174,18 @@ describe("CheckRetries", () => {
       const lastEmit = emitted![emitted!.length - 1][0] as BrowserCheck;
       expect(lastEmit.waitBeforeRetrySecs).toBe(30);
     });
+
+    it("round-trips 5 seconds unscaled (value is seconds, not milliseconds)", async () => {
+      wrapper = mountCheckRetries({ waitBeforeRetrySecs: 5 });
+
+      const input = wrapper.find('[data-test="synthetics-check-retries-delay-input"]');
+      expect(input.attributes("value")).toBe("5");
+      await input.setValue("5");
+
+      const emitted = wrapper.emitted("update:check");
+      const lastEmit = emitted![emitted!.length - 1][0] as BrowserCheck;
+      expect(lastEmit.waitBeforeRetrySecs).toBe(5);
+    });
   });
 
   describe("validation error", () => {

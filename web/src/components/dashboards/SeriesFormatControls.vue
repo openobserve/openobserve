@@ -285,6 +285,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
+
+      <div
+        class="flex items-start gap-2 px-3 py-2"
+        data-test="dashboard-series-format-transform-row"
+      >
+        <span :class="[LABEL_CLASS, 'min-h-5']">{{ t("dashboard.seriesOverrideTransform") }}</span>
+        <div class="min-w-0 flex-1">
+          <OSwitch
+            :model-value="override.style.transform === 'negative_y'"
+            :label="t('dashboard.seriesOverrideNegativeY')"
+            data-test="dashboard-series-format-transform"
+            @update:model-value="patchStyle({ transform: $event ? 'negative_y' : null })"
+          />
+        </div>
+      </div>
     </template>
 
     <div
@@ -365,6 +380,7 @@ import ThresholdsConfig from "./addPanel/ThresholdsConfig.vue";
 import ValueMappingList from "./addPanel/ValueMappingList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { SERIES_STYLE_CHART_TYPES } from "@/utils/dashboard/seriesStyleOverrides";
 import { valueMappingPatternErrors } from "./addPanel/valueMappingErrors";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
@@ -479,6 +495,7 @@ const yAxisOptions = computed(() => [
   { label: t("dashboard.seriesStyleYAxisDefault"), value: null },
   { label: t("dashboard.seriesStyleYAxisLeft"), value: "left" },
   { label: t("dashboard.seriesStyleYAxisRight"), value: "right" },
+  { label: t("dashboard.seriesOverrideAxisHidden"), value: "hidden" },
 ]);
 
 const hideLabels = computed(() => ({

@@ -352,35 +352,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex flex-wrap items-center gap-x-5 gap-y-2"
             data-test="metrics-detail-chart-options"
           >
-            <div v-if="compareEligible" class="flex items-center gap-1.5">
-              <label for="metrics-detail-compare" class="text-text-secondary text-xs">{{
-                t("metrics.explorer.detail.compare.label")
-              }}</label>
-              <OSelect
-                id="metrics-detail-compare"
-                :model-value="compare ?? 'off'"
-                :options="compareOptions"
-                appearance="inline"
-                size="sm"
-                :searchable="false"
-                class="min-w-20"
-                data-test="metrics-detail-compare"
-                @update:model-value="onCompareChange"
-              />
-            </div>
+            <OSelect
+              v-if="compareEligible"
+              id="metrics-detail-compare"
+              :model-value="compare ?? 'off'"
+              :options="compareOptions"
+              :label="t('metrics.explorer.detail.compare.label')"
+              label-position="inside"
+              appearance="inline"
+              size="sm"
+              :searchable="false"
+              data-test="metrics-detail-compare"
+              @update:model-value="onCompareChange"
+            />
             <template v-if="forecastEligible">
               <div class="flex items-center gap-1.5">
-                <label for="metrics-detail-forecast" class="text-text-secondary text-xs">{{
-                  t("metrics.explorer.detail.forecast.label")
-                }}</label>
                 <OSelect
                   id="metrics-detail-forecast"
                   :model-value="forecast ?? 'off'"
                   :options="forecastOptions"
+                  :label="t('metrics.explorer.detail.forecast.label')"
+                  label-position="inside"
                   appearance="inline"
                   size="sm"
                   :searchable="false"
-                  class="min-w-32"
                   data-test="metrics-detail-forecast"
                   @update:model-value="onForecastChange"
                 />
@@ -402,24 +397,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </div>
               <div v-if="forecast" class="flex items-center gap-1.5">
-                <template v-if="forecastHorizonOptions.length > 1">
-                  <label
-                    for="metrics-detail-forecast-horizon"
-                    class="text-text-secondary text-xs"
-                    >{{ t("metrics.explorer.detail.forecast.horizon") }}</label
-                  >
-                  <OSelect
-                    id="metrics-detail-forecast-horizon"
-                    :model-value="forecastHorizonChoice"
-                    :options="forecastHorizonOptions"
-                    appearance="inline"
-                    size="sm"
-                    :searchable="false"
-                    class="min-w-28"
-                    data-test="metrics-detail-forecast-horizon"
-                    @update:model-value="onForecastHorizonChange"
-                  />
-                </template>
+                <OSelect
+                  v-if="forecastHorizonOptions.length > 1"
+                  id="metrics-detail-forecast-horizon"
+                  :model-value="forecastHorizonChoice"
+                  :options="forecastHorizonOptions"
+                  :label="t('metrics.explorer.detail.forecast.horizon')"
+                  label-position="inside"
+                  appearance="inline"
+                  size="sm"
+                  :searchable="false"
+                  data-test="metrics-detail-forecast-horizon"
+                  @update:model-value="onForecastHorizonChange"
+                />
                 <template v-else>
                   <span class="text-text-secondary text-xs">{{
                     t("metrics.explorer.detail.forecast.horizon")
@@ -1151,14 +1141,15 @@ export default defineComponent({
         () => compareShift.value?.gapMs,
         () => `${activeForecast.value?.method}|${activeForecast.value?.horizon}`,
         () => props.timeRange,
+        () => props.stepSeconds,
       ],
-      // Only the window or the forecast changed: the drawn chart stays up while the new one loads.
+      // Only the window, step or forecast changed: the drawn chart stays up while the new one loads.
       (now, before) => {
         // A kept chart must not go on drawing a forecast the control no longer asks for.
         if (before && now[4] !== before[4] && overviewState.value.forecast) {
           overviewState.value = { ...overviewState.value, forecast: null };
         }
-        loadOverview(!!before && now.slice(0, -2).every((v, i) => v === before[i]));
+        loadOverview(!!before && now.slice(0, 4).every((v, i) => v === before[i]));
       },
       { immediate: true },
     );

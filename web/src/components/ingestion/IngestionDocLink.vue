@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       rel="noopener noreferrer"
       class="text-text-link hover:text-text-link-hover font-medium underline"
       >{{ t("ingestion.docLinkHere") }}</a
-    ><slot> {{ t("ingestion.docLinkDefaultText") }}</slot>
+    >{{ " " }}<slot>{{ t("ingestion.docLinkDefaultText") }}</slot>
   </div>
 </template>
 

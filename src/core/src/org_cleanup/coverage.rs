@@ -80,7 +80,7 @@ pub const COVERAGE: &[Coverage] = &[
     exempt(
         Kind::Table,
         "alert_dedup_state",
-        "expires within a day through the alert_dedup_cleanup job; no alert of a deleted org refreshes it",
+        "legacy deduplication table, no longer written; dropped in a later release",
     ),
     table("alert_eval_intervals", DB),
     table("alert_incident_alerts", DB),
@@ -230,6 +230,8 @@ pub const COVERAGE: &[Coverage] = &[
     table("workflow_errors", DB),
     table("workflow_run_data", DB),
     table("workflows", DB),
+    table("org_domain_ownership", DB),
+    table("org_domain_requests", DB),
     covered(Kind::KvPrefix, "/cipher_keys/{org}/", DB),
     covered(Kind::KvPrefix, "/compact/downsampling/{org}/", DB),
     covered(Kind::KvPrefix, "/compact/files/{org}/", DB),
