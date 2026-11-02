@@ -7,6 +7,7 @@ import {
   cleanAttributeValue,
   genAiRequestAttributes,
   genAiResponseAttributes,
+  genAiUsageAttributes,
   sha256,
 } from "../telemetry.mjs";
 
@@ -50,6 +51,7 @@ test("response content and provider-reported usage use standard attributes", () 
     },
     "Looks good.",
     "fallback-model",
+    new Date("2026-10-28T07:00:00Z"),
   );
 
   assert.deepEqual(JSON.parse(attributes["gen_ai.output.messages"]), [
@@ -121,4 +123,24 @@ test("usage of retried attempts is summed, and a missing side is skipped", () =>
   assert.deepEqual(sum.tokens, { input: 30, output: 5, reasoning: 12, cache: { read: 150, write: 1 } });
   assert.equal(addUsage(null, b), b);
   assert.equal(addUsage(a, undefined), a);
+});
+
+test("cost follows DeepSeek's peak hours, because the config holds the peak rate", () => {
+  const costAt = iso => genAiUsageAttributes({ cost: 1 }, new Date(iso));
+  for (const peak of ["2026-10-28T01:00:00Z", "2026-10-28T03:59:59Z", "2026-10-28T06:00:00Z", "2026-10-28T09:59:59Z"]) {
+    assert.equal(costAt(peak)["gen_ai.usage.cost"], 1, peak);
+    assert.equal(costAt(peak)["ai.llm.pricing_peak"], true, peak);
+  }
+  for (const offPeak of ["2026-10-28T00:59:59Z", "2026-10-28T04:00:00Z", "2026-10-28T05:59:59Z", "2026-10-28T10:00:00Z", "2026-10-31T07:00:00Z", "2026-11-01T07:00:00Z"]) {
+    assert.equal(costAt(offPeak)["gen_ai.usage.cost"], 0.5, offPeak);
+    assert.equal(costAt(offPeak)["ai.llm.pricing_peak"], false, offPeak);
+  }
+});
+
+test("both configs price Flash at DeepSeek's peak list price", () => {
+  for (const file of ["opencode.jsonc", "opencode.ci.jsonc"]) {
+    const config = readFileSync(new URL(`../../../${file}`, import.meta.url), "utf8");
+    assert.ok(config.includes('"cost": { "input": 0.3, "output": 1.2, "cache": { "read": 0.006 } }'), file);
+    assert.equal(config.includes("V4-Pro rates"), false, file);
+  }
 });

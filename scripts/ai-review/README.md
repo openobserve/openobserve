@@ -278,5 +278,7 @@ Model spans use the OpenTelemetry GenAI content attributes:
 - `gen_ai.output.messages`
 
 Token counts, cost, model, response ID, and finish reasons come from the Opencode assistant
-response. Do not put content-length metadata below `gen_ai.prompt.*`: OpenObserve recognizes that
+response. The configs hold DeepSeek's peak list price, so `gen_ai.usage.cost` is halved for a call
+that ends outside peak hours (01:00-04:00 and 06:00-10:00 UTC, Monday to Friday). Chinese public
+holidays are not modelled, and the provider bill stays the source of truth. Do not put content-length metadata below `gen_ai.prompt.*`: OpenObserve recognizes that
 prefix as legacy TraceLoop prompt content and would tokenize the metadata instead of the prompt.

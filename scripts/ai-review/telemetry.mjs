@@ -54,6 +54,8 @@ export function genAiRequestAttributes(systemInstructions, userMessage) {
   };
 }
 
+const PEAK_HOURS_UTC = [[1, 4], [6, 10]];
+
 function tokenCount(value) {
   return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : undefined;
 }
@@ -77,7 +79,15 @@ export function addUsage(a, b) {
   };
 }
 
-export function genAiUsageAttributes(usage) {
+// opencode takes one flat price, so the configs hold DeepSeek's peak rate and every other hour bills at half of it.
+export function isPeakPricing(at) {
+  const hour = at.getUTCHours();
+  const weekday = at.getUTCDay() % 6 !== 0;
+  return weekday && PEAK_HOURS_UTC.some(([start, end]) => start <= hour && hour < end);
+}
+
+export function genAiUsageAttributes(usage, at = new Date()) {
+  const peak = isPeakPricing(at);
   const nonCachedInputTokens = tokenCount(usage?.tokens?.input);
   const visibleOutputTokens = tokenCount(usage?.tokens?.output);
   const cacheReadTokens = tokenCount(usage?.tokens?.cache?.read);
@@ -99,12 +109,13 @@ export function genAiUsageAttributes(usage) {
       : undefined,
     "gen_ai.usage.cache_read.input_tokens": cacheReadTokens,
     "gen_ai.usage.cache_creation.input_tokens": cacheWriteTokens,
-    "gen_ai.usage.cost": Number.isFinite(usage?.cost) && usage.cost >= 0 ? usage.cost : undefined,
+    "gen_ai.usage.cost": Number.isFinite(usage?.cost) && usage.cost >= 0 ? usage.cost * (peak ? 1 : 0.5) : undefined,
+    "ai.llm.pricing_peak": peak,
     "ai.usage.reasoning_tokens": reasoningTokens,
   });
 }
 
-export function genAiResponseAttributes(data, text, requestedModel) {
+export function genAiResponseAttributes(data, text, requestedModel, at = new Date()) {
   const info = data?.info || {};
   const responseModel = info.modelID || requestedModel;
 
@@ -118,7 +129,7 @@ export function genAiResponseAttributes(data, text, requestedModel) {
     "gen_ai.response.id": info.id,
     "gen_ai.response.model": responseModel,
     "gen_ai.response.finish_reasons": info.finish ? [String(info.finish)] : undefined,
-    ...genAiUsageAttributes(info),
+    ...genAiUsageAttributes(info, at),
     "ai.review.output.chars": text.length,
     "ai.review.output.sha256": sha256(text),
   };

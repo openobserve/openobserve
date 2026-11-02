@@ -33,8 +33,7 @@
           "variants": [{ "id": "max", "settings": { "reasoningEffort": "max" } }],
           "limit": { "context": 1048576, "output": 393216 },
           // USD per 1M tokens at peak rate; models fetch is disabled, so without this every cost reads 0.
-          // TODO: these are still the V4-Pro rates; replace them with the Flash price list.
-          "cost": { "input": 1.32, "output": 3.96, "cache": { "read": 0.044 } }
+          "cost": { "input": 0.3, "output": 1.2, "cache": { "read": 0.006 } }
         }
       }
     }
