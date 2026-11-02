@@ -28,7 +28,7 @@ use openobserve_core::auth::check_permissions;
 use openobserve_core::{
     alerts::{
         destinations,
-        notifications::{TestSendError, check_rate_limit, test_send as core_test_send},
+        notifications::{TestSendError, check_rate_limit, jira, test_send as core_test_send},
     },
     auth::UserEmail,
     http::destination_error_response,
@@ -292,6 +292,75 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
             error: Some(format!("HTTP request failed: {}", e)),
         }),
     }
+}
+
+/// JiraDestinationSetup
+#[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/destinations/jira/setup",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "JiraDestinationSetup",
+    summary = "Look up Jira data for the destination form",
+    description = "Checks Jira credentials and returns the projects, issue types or create-screen fields \
+                   the Jira destination form needs, or creates one test issue. Nothing is stored.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    request_body(content = inline(jira::SetupRequest), description = "Jira credentials and the lookup to run", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test"}))
+    )
+)]
+pub async fn jira_setup(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<jira::SetupRequest>,
+) -> Response {
+    let _user_id = &user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    if let Some(refused) = saved_token_refusal(&req, async |name: &str| {
+        check_permissions(
+            name,
+            &org_id,
+            _user_id,
+            "destinations",
+            "PUT",
+            None,
+            false,
+            false,
+            false,
+        )
+        .await
+    })
+    .await
+    {
+        return refused;
+    }
+
+    match jira::setup(&org_id, req).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+/// 403 when a saved token's destination fails `may_edit`, since the route only checks the org.
+#[cfg(any(feature = "enterprise", test))]
+async fn saved_token_refusal(
+    req: &jira::SetupRequest,
+    may_edit: impl AsyncFnOnce(&str) -> bool,
+) -> Option<Response> {
+    let name = jira::saved_destination_name(req)?;
+    (!may_edit(name).await).then(|| MetaHttpResponse::forbidden("Unauthorized Access"))
 }
 
 /// CreateDestination
@@ -833,7 +902,7 @@ mod tests {
     use db::alerts::destinations::DestinationError;
     use openobserve_core::http::destination_error_response;
 
-    use super::{TestDestinationRequest, test_destination};
+    use super::{TestDestinationRequest, jira, saved_token_refusal, test_destination};
     use crate::models::destinations::DestinationType;
 
     fn status(err: DestinationError) -> StatusCode {
@@ -1060,10 +1129,51 @@ mod tests {
     }
 
     #[test]
+    fn test_jira_token_refusals_are_bad_request() {
+        assert_eq!(
+            status(DestinationError::JiraTokenMissing),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status(DestinationError::JiraTokenChanged),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
     fn test_email_send_failed_is_bad_request() {
         assert_eq!(
             status(DestinationError::EmailSendFailed("timeout".to_string())),
             StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[tokio::test]
+    async fn jira_setup_refuses_a_saved_token_the_caller_may_not_edit() {
+        let req = |token: &str| -> jira::SetupRequest {
+            serde_json::from_value(serde_json::json!({
+                "url": "https://acme.atlassian.net", "deployment": "cloud",
+                "email": "ops@acme.com", "token": token, "destination": "Jira OPS",
+                "action": "test_issue",
+            }))
+            .unwrap()
+        };
+        let denied = saved_token_refusal(&req(" "), async |name: &str| {
+            assert_eq!(name, "Jira OPS");
+            false
+        })
+        .await;
+        assert_eq!(denied.map(|r| r.status()), Some(StatusCode::FORBIDDEN));
+        assert!(
+            saved_token_refusal(&req(""), async |_: &str| true)
+                .await
+                .is_none()
+        );
+        // A typed token uses no saved one, so the org-level route check covers it.
+        assert!(
+            saved_token_refusal(&req("typed"), async |_: &str| false)
+                .await
+                .is_none()
         );
     }
 }

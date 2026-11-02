@@ -42,14 +42,18 @@ use crate::common::{
 };
 
 /// Columns a stream gains only once a row carried them, so [history_columns] adds each one present.
-const OPTIONAL_HISTORY_COLUMNS: [&str; 6] = [
+const OPTIONAL_HISTORY_COLUMNS: [&str; 7] = [
     "downtime_id",
     "acked_by",
     "ack_action",
     "ack_source",
     "taken_over_from",
     "repeat_suppressed",
+    "success_response",
 ];
+
+/// A webhook can answer with a body of any size, and the list returns up to 1000 rows.
+const SUCCESS_RESPONSE_MAX_CHARS: usize = 500;
 
 /// Every column the data query reads but [OPTIONAL_HISTORY_COLUMNS].
 const HISTORY_COLUMNS: &str = "_timestamp, org, key, status, level, actual_value, \
@@ -220,8 +224,10 @@ pub async fn get_alert_history(
             Some(&user_email.user_id),
         )
         .await;
-        if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
-            start_time = end_time - max_query_range * 3600 * 1_000_000;
+        if let Some(clamped) =
+            config::utils::query_range::clamp_start_time(start_time, end_time, max_query_range)
+        {
+            start_time = clamped;
             log::warn!(
                 "Start time for alert History api for org {org_id} updated as per max query range set for triggers stream"
             )
@@ -811,7 +817,7 @@ pub async fn get_alert_history(
             success_response: hit
                 .get("success_response")
                 .and_then(|v| v.as_str())
-                .map(String::from),
+                .map(capped_success_response),
             is_partial: hit.get("is_partial").and_then(|v| v.as_bool()),
             delay_in_secs: hit.get("delay_in_secs").and_then(|v| v.as_i64()),
             evaluation_took_in_secs: hit.get("evaluation_took_in_secs").and_then(|v| v.as_f64()),
@@ -957,6 +963,10 @@ fn history_columns(schema: &Schema) -> String {
         }
     }
     columns
+}
+
+fn capped_success_response(text: &str) -> String {
+    text.chars().take(SUCCESS_RESPONSE_MAX_CHARS).collect()
 }
 
 /// A non-empty text column of a history hit.
@@ -1851,5 +1861,32 @@ mod tests {
         assert!(!history_columns(&Schema::new(fields.clone())).contains("repeat_suppressed"));
         fields.push(Field::new("repeat_suppressed", DataType::Boolean, true));
         assert!(history_columns(&Schema::new(fields)).ends_with(", repeat_suppressed"));
+    }
+
+    #[test]
+    fn a_long_send_result_is_capped_in_the_list() {
+        let sent = "destination ops-jira created OPS-141;";
+        assert_eq!(capped_success_response(sent), sent);
+        let body = format!(
+            "destination hook sent status: 200 OK, body: {}",
+            "é".repeat(5_000)
+        );
+        let capped = capped_success_response(&body);
+        assert_eq!(capped.chars().count(), SUCCESS_RESPONSE_MAX_CHARS);
+        assert!(body.starts_with(&capped));
+    }
+
+    #[test]
+    fn the_destination_send_result_is_read_once_the_stream_has_it() {
+        use arrow_schema::{DataType, Field};
+
+        let field = |name: &str| Field::new(name, DataType::Utf8, true);
+        let mut fields: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        assert!(!history_columns(&Schema::new(fields.clone())).contains("success_response"));
+        fields.push(field("success_response"));
+        assert!(
+            history_columns(&Schema::new(fields)).ends_with(", success_response"),
+            "a sent row such as `destination ops-jira created OPS-141;` must reach the history"
+        );
     }
 }

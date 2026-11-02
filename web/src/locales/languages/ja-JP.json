@@ -2053,8 +2053,11 @@
       "error": "エラー",
       "action": "アクション",
       "view": "ビュー",
-      "frustration": "フラストレーション"
+      "frustration": "フラストレーション",
+      "failedRequest": "失敗したリクエスト",
+      "noResponse": "応答なし"
     },
+    "replayCanvasNotRecorded": "Canvas の内容は記録されていません",
     "actionOnTarget": "{action}（\"{target}\" に対して）",
     "errorWhileFetchingErrorEvents": "エラーイベントの取得中にエラーが発生しました",
     "errorWhileFetchingSessionReplay": "セッションリプレイデータの取得中にエラーが発生しました",
@@ -11763,6 +11766,7 @@
       "recoveryResolvesIncident": "インシデントを解決します",
       "recoveryClosesAlert": "アラートをクローズします",
       "recoveryChatMessage": "新しい「解決済み」メッセージ",
+      "recoveryJiraComment": "未解決のチケットにコメントする",
       "keepFiringFor": "発火継続時間",
       "keepFiringForTooltip": "条件が解消してから復旧するまで、この時間だけ待機します。0 にすると即座に復旧します。",
       "suppressRepeats": "繰り返し通知を抑制",
@@ -12071,7 +12075,37 @@
       "priorityP2": "P2 (高)",
       "priorityP3": "P3 (中)",
       "priorityP4": "P4 (低)",
-      "priorityP5": "P5 (情報)"
+      "priorityP5": "P5 (情報)",
+      "jiraDescription": "Jira でチケットを作成",
+      "jiraConnectSection": "Jira に接続",
+      "jiraType": "Jira の種類",
+      "jiraCloud": "Jira Cloud",
+      "jiraDataCenter": "Jira Data Center",
+      "jiraUrl": "Jira URL",
+      "jiraUrlHelp": "Jira サイトのアドレス（例: {example}）",
+      "jiraUrlFormat": "https:// または http:// で始まる URL を入力してください",
+      "jiraEmail": "メールアドレス",
+      "jiraApiToken": "API トークン",
+      "jiraPersonalAccessToken": "パーソナルアクセストークン",
+      "jiraTokenRequired": "トークンは必須です",
+      "jiraTokenTip": "このプロジェクトのみ参照できるボットアカウントを使用してください。",
+      "jiraConnect": "接続",
+      "jiraConnectedSummary": "{host} に {name} として接続しました",
+      "jiraChange": "変更",
+      "jiraConnectMissing": "上のフィールドを入力してから接続してください。",
+      "jiraTicketsSection": "チケットの作成先",
+      "jiraProject": "プロジェクト",
+      "jiraIssueType": "課題タイプ",
+      "jiraPriority": "優先度",
+      "jiraDefaultPriority": "Jira のデフォルト",
+      "jiraRequiredFields": "必須の Jira フィールド",
+      "jiraRequiredFieldHelp": "この課題タイプで Jira が必須とする項目",
+      "jiraUnsupportedField": "Jira では {issueType} に '{field}' が必要です。OpenObserve はこの種類のフィールドを入力できません。別の課題タイプを選択するか、Jira 管理者にオプションにするよう依頼してください。",
+      "jiraCreateScreenNotLoaded": "この課題タイプの作成画面が読み込まれていません。読み込みを待つか、課題タイプを選び直してください。",
+      "jiraLabelsMissing": "{project} の {issueType} の作成画面にラベルフィールドがありません。OpenObserve がチケットを検索するために必要です。Jira 管理者に追加を依頼してください。",
+      "jiraBehavior": "復旧時はコメントを追加するだけで、チケットはクローズしません。",
+      "jiraTestCreated": "{key} を作成しました。Jira で削除できます。",
+      "jiraOpenIssue": "Jira で開く"
     },
     "lastRun": "最終実行: {time}",
     "retryTraining": "モデルを再トレーニングして検知を再実行",
@@ -13512,7 +13546,14 @@
       "pagerdutyDescription": "PagerDutyでインシデントを作成",
       "opsgenieDescription": "Opsgenieでアラートを作成",
       "servicenowDescription": "ServiceNowでインシデントを作成",
-      "slackAppDescription": "スケジュールされたアラートをその場で更新します。Slack から確認応答、ミュート、調査ができます。接続済みのワークスペースが必要です。"
+      "slackAppRecommendedDescription": "アラート対応に推奨。スケジュールされたアラートをその場で更新します。Slack から確認、ミュート、調査が可能です。接続済みのワークスペースが必要です。",
+      "slackAppShort": "アラートに対応",
+      "chatPostsShort": "チャット投稿",
+      "emailShort": "HTML メール",
+      "pageOnCallShort": "オンコールを呼び出す",
+      "servicenowShort": "IT インシデント",
+      "jiraShort": "チケットを発行",
+      "customShort": "URL またはメール"
     },
     "import": {
       "title": "宛先をインポート",
@@ -13758,6 +13799,15 @@
       "allTitle": "この範囲にデータがないものも含むすべてのメトリクス",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "ダッシュボード",
+      "sortDashboardsTitle": "ダッシュボードでの使用が多い順",
+      "sortAlerts": "アラート",
+      "sortAlertsTitle": "アラートでの使用が多い順",
+      "usageInDashboards": "ダッシュボード内",
+      "usageHasAlerts": "アラートあり",
+      "usageInSlos": "SLOs 内",
+      "usageLoading": "メトリクスの使用箇所を読み込み中",
+      "usageFailed": "使用状況を取得できません。再試行してください",
       "viewGrid": "グリッド",
       "viewRows": "行",
       "modeExplore": "探索",
@@ -13891,16 +13941,7 @@
         "deleteMessage": "この組織の全員に対して {name} ビューを削除しますか？",
         "modified": "{name}（変更あり）",
         "clear": "ビューをクリア"
-      },
-      "sortDashboards": "ダッシュボード",
-      "sortDashboardsTitle": "ダッシュボードでの使用が多い順",
-      "sortAlerts": "アラート",
-      "sortAlertsTitle": "アラートでの使用が多い順",
-      "usageInDashboards": "ダッシュボード内",
-      "usageHasAlerts": "アラートあり",
-      "usageInSlos": "SLOs 内",
-      "usageLoading": "メトリクスの使用箇所を読み込み中",
-      "usageFailed": "使用状況を取得できません。再試行してください"
+      }
     },
     "metricCard": {
       "lastRefreshed": "最終更新:",
@@ -13927,6 +13968,17 @@
       "notEqualTo": "等しくない",
       "regexPattern": "正規表現パターン（例: prod.*）",
       "regexNotMatching": "正規表現不一致（例: test.*）"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR グループ",
+      "addGroupTooltip": "フィルターのグループを追加します。時系列はいずれかのグループに一致すれば一致とみなされます",
+      "addToGroup": "このグループにフィルターを追加",
+      "anyOf": "いずれか",
+      "andAnyOf": "かついずれか",
+      "or": "または",
+      "not": "否定",
+      "notTooltip": "このグループ全体が一致しない時系列を一致対象にします",
+      "tooManyBranches": "これらのフィルターは {count} 個の個別セレクターに展開されます。実行できるのは最大 {max} 個までです。値を 1 つの正規表現フィルターにまとめるか、グループを削除してください。"
     },
     "builderSwitch": {
       "unsupported": "ビルダーは{construct}を表示できません",
@@ -13967,11 +14019,11 @@
         "byLabelsLabel": "ラベル別",
         "quantileLabel": "分位数",
         "kLabel": "K",
-        "nearestMultipleLabel": "最も近い倍数",
         "withoutLabel": "Without（これらのラベルを削除）",
         "withoutDesc": "選択したラベルを集約で除外し、それ以外のラベルをすべて保持します",
         "offsetLabel": "オフセット",
-        "offsetDesc": "メトリクスをどれだけ過去まで読み取るか（例: 1h または 1d）"
+        "offsetDesc": "メトリクスをどれだけ過去まで読み取るか（例: 1h または 1d）",
+        "nearestMultipleLabel": "最も近い倍数"
       },
       "rangeOnlyFirst": "範囲関数は最初のステップにのみ使用できます",
       "rangeOnlyFirstNote": "範囲関数は生のサンプルを読み取るため、最初のステップにのみ使用できます。追加するには他のステップを削除してください。",
@@ -14041,17 +14093,6 @@
       "empty": "クエリはまだありません",
       "noMatch": "検索またはスター付きフィルターに一致するクエリはありません",
       "loadMore": "さらに読み込む"
-    },
-    "labelGroups": {
-      "addGroup": "+ OR グループ",
-      "addGroupTooltip": "フィルターのグループを追加します。時系列はいずれかのグループに一致すれば一致とみなされます",
-      "addToGroup": "このグループにフィルターを追加",
-      "anyOf": "いずれか",
-      "andAnyOf": "かついずれか",
-      "or": "または",
-      "not": "否定",
-      "notTooltip": "このグループ全体が一致しない時系列を一致対象にします",
-      "tooManyBranches": "これらのフィルターは {count} 個の個別セレクターに展開されます。実行できるのは最大 {max} 個までです。値を 1 つの正規表現フィルターにまとめるか、グループを削除してください。"
     }
   },
   "settings": {
@@ -21710,7 +21751,8 @@
         "longtask": "長時間タスク",
         "view": "表示",
         "action": "アクション",
-        "resource": "リソース"
+        "resource": "リソース",
+        "failedrequest": "失敗したリクエスト"
       },
       "subscriptionPlan": {
         "payasyougo": "従量課金",
@@ -22724,6 +22766,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "指定した期間前の時点のメトリクスを読み取ります",
       "rateDoc": "指定された時間範囲における1秒あたりの平均増加率を計算します",
       "irateDoc": "最後の2つのデータポイントに基づいて1秒あたりの瞬間増加率を計算します",
       "increaseDoc": "指定された時間範囲における合計増加量を計算します",
@@ -22794,8 +22837,7 @@
       "moduloName": "剰余",
       "multiplyByName": "乗算",
       "divideByName": "除算",
-      "exponentName": "指数",
-      "offsetDoc": "指定した期間前の時点のメトリクスを読み取ります"
+      "exponentName": "指数"
     }
   },
   "passwordPolicy": {
@@ -28177,7 +28219,6 @@
       "appTile": "{product} アプリ",
       "webhookTile": "{product} Webhook",
       "twoWay": "双方向",
-      "recommendedForAlertResponse": "アラート対応に推奨",
       "choiceHint": "呼び出しとスーパークラスタは Webhook を使用します。Slack アプリ宛先からの手動送信とリアルタイム送信は別々の投稿になります。",
       "unavailableReason": "シングルクラスタ上の Enterprise Slack アプリが必要です",
       "unavailableFlag": "このサーバーでは無効になっています。管理者に {variable} の設定を依頼してください",
@@ -28185,6 +28226,7 @@
       "unavailableCloud": "お使いのクラウドリージョンではまだ有効になっていません",
       "unavailableNoAccess": "組織の管理者に Slack アプリの有効化を依頼してください",
       "postOnly": "投稿のみ",
+      "off": "オフ",
       "switchToApp": "{product} アプリに切り替え",
       "switchThis": "この宛先を切り替え",
       "switchBack": "元に戻す",

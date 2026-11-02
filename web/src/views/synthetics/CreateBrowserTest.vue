@@ -441,7 +441,12 @@ async function fetchLocations() {
 
 async function loadDestinations(force = false) {
   try {
-    const options = destinationsQuery(store.state.selectedOrganization.identifier);
+    const options = destinationsQuery(
+      store.state.selectedOrganization.identifier,
+      undefined,
+      false,
+      ["jira"],
+    );
     // A destination created in another tab never expires this tab's cache, so refresh forces.
     if (force) {
       await queryClient.invalidateQueries({

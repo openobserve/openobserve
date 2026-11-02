@@ -892,7 +892,7 @@ async fn check_query_streams(
 
         if let Some(settings) = infra::schema::get_settings(org_id, &stream, stream_type).await {
             let max_query_range = settings.max_query_range;
-            if max_query_range > 0 && period > max_query_range * 60 {
+            if max_query_range > 0 && period > max_query_range.saturating_mul(60) {
                 return Err(anyhow::anyhow!(
                     "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
                 ));

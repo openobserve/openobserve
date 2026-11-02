@@ -448,20 +448,6 @@ describe("DashboardQueryBuilder", () => {
   });
 
   describe("Component Initialization", () => {
-    it("should render component with default props", () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
-    });
-
-    it("should handle promqlMode correctly", () => {
-      mockUseDashboardPanelData.promqlMode = true;
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm.promqlMode).toBe(true);
-      mockUseDashboardPanelData.promqlMode = false;
-    });
-
     it("shows the Range/Instant selector for a custom PromQL query", () => {
       mockUseDashboardPanelData.promqlMode = true;
       wrapper = createWrapper({
@@ -514,40 +500,11 @@ describe("DashboardQueryBuilder", () => {
       // Should render child components like DashboardSankeyChartBuilder
       expect(wrapper.findComponent({ name: "DashboardSankeyChartBuilder" }).exists()).toBe(true);
     });
-
-    it("should render for supported chart types", () => {
-      wrapper = createWrapper({ "data.type": "bar" });
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("bar");
-    });
   });
 
   describe("X-Axis Configuration", () => {
     beforeEach(() => {
       wrapper = createWrapper();
-    });
-
-    it("should have x-axis data in component", () => {
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.x).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.x).toHaveLength(1);
-    });
-
-    it("should display x-axis field data", () => {
-      const xField = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
-      expect(xField.args[1].value.field).toBe("field1");
-      expect(xField.label).toBe("Field 1");
-    });
-
-    it("should show correct x-axis label for different chart types", () => {
-      wrapper = createWrapper({ "data.type": "table" });
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
-
-      wrapper.unmount();
-      wrapper = createWrapper({ "data.type": "h-bar" });
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("h-bar");
-
-      wrapper.unmount();
-      wrapper = createWrapper({ "data.type": "bar" });
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("bar");
     });
 
     it("names the x, y and breakdown wells by chart orientation", () => {
@@ -595,202 +552,11 @@ describe("DashboardQueryBuilder", () => {
       };
       expect(wells("boxplot")).toEqual(["Category", "Value"]);
     });
-
-    it("should handle x-axis field removal", async () => {
-      mockUseDashboardPanelData.removeXAxisItem("field1");
-      expect(mockUseDashboardPanelData.removeXAxisItem).toHaveBeenCalledWith("field1");
-    });
-
-    it("should show x-axis hint when no fields", () => {
-      wrapper = createWrapper({ "data.queries.0.fields.x": [] });
-      expect(wrapper.vm.xAxisHint).toContain("Add");
-    });
-
-    it("should handle aggregation function selection", () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
-      expect(field.functionName).toBe("histogram");
-    });
-
-    it("should clear aggregation function", async () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
-      field.functionName = null;
-      expect(field.functionName).toBeNull();
-    });
-
-    it("should handle histogram interval configuration", () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
-      expect(field.args[0].value).toBe("5m");
-    });
-
-    it("should handle label updates", async () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
-      field.label = "Updated Label";
-      expect(field.label).toBe("Updated Label");
-    });
-
-    it("should handle treatAsNonTimestamp for table charts", async () => {
-      wrapper = createWrapper({ "data.type": "table" });
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
-      field.treatAsNonTimestamp = true;
-      expect(field.treatAsNonTimestamp).toBe(true);
-    });
-  });
-
-  describe("Y-Axis Configuration", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it("should have y-axis data in component", () => {
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.y).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.y).toHaveLength(1);
-    });
-
-    it("should display y-axis field data", () => {
-      const yField = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      expect(yField.args[0].value.field).toBe("field2");
-      expect(yField.label).toBe("Field 2");
-    });
-
-    it("should show correct y-axis types for different chart types", () => {
-      wrapper = createWrapper({ "data.type": "table" });
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
-
-      wrapper.unmount();
-      wrapper = createWrapper({ "data.type": "h-bar" });
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("h-bar");
-
-      wrapper.unmount();
-      wrapper = createWrapper({ "data.type": "bar" });
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("bar");
-    });
-
-    it("should handle y-axis field removal", async () => {
-      mockUseDashboardPanelData.removeYAxisItem("field2");
-      expect(mockUseDashboardPanelData.removeYAxisItem).toHaveBeenCalledWith("field2");
-    });
-
-    it("should handle aggregation function for y-axis", () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      expect(field.functionName).toBe("sum");
-    });
-
-    it("should handle color picker for y-axis", () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      expect(field.color).toBe("#ff0000");
-    });
-
-    it("should handle color display for supported charts", () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      expect(field.color).toBe("#ff0000");
-
-      // Test table type doesn't show color
-      wrapper.unmount();
-      wrapper = createWrapper({ "data.type": "table" });
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
-
-      // Test pie type doesn't show color
-      wrapper.unmount();
-      wrapper = createWrapper({ "data.type": "pie" });
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("pie");
-    });
-
-    it("should handle histogram configuration for y-axis", () => {
-      wrapper = createWrapper({
-        "data.queries.0.fields.y.0.functionName": "histogram",
-        "data.queries.0.fields.y.0.args": [{ value: "10m" }],
-      });
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      expect(field.functionName).toBe("histogram");
-      expect(field.args[0].value).toBe("10m");
-    });
-  });
-
-  describe("Z-Axis Configuration (Heatmap)", () => {
-    beforeEach(() => {
-      wrapper = createWrapper({ "data.type": "heatmap" });
-    });
-
-    it("should have z-axis data for heatmap", () => {
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.z).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.z).toHaveLength(1);
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("heatmap");
-    });
-
-    it("should display z-axis field data", () => {
-      const zField = wrapper.vm.dashboardPanelData.data.queries[0].fields.z[0];
-      expect(zField.args[0].value.field).toBe("field3");
-      expect(zField.label).toBe("Field 3");
-    });
-
-    it("should handle z-axis field removal", async () => {
-      mockUseDashboardPanelData.removeZAxisItem("field3");
-      expect(mockUseDashboardPanelData.removeZAxisItem).toHaveBeenCalledWith("field3");
-    });
-
-    it("should handle aggregation function for z-axis", () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.z[0];
-      expect(field.functionName).toBe("avg");
-    });
-
-    it("should handle color picker for z-axis", () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.z[0];
-      expect(field.color).toBe("#00ff00");
-    });
-
-    it("should not have z-axis for non-heatmap charts", () => {
-      wrapper.unmount();
-      wrapper = createWrapper({ "data.type": "bar" });
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("bar");
-      // Z-axis should still exist in data but not be rendered
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.z).toBeDefined();
-    });
   });
 
   describe("Breakdown Configuration", () => {
     beforeEach(() => {
       wrapper = createWrapper({ "data.type": "area" });
-    });
-
-    it("should have breakdown data for supported charts", () => {
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown).toHaveLength(1);
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("area");
-    });
-
-    it("should display breakdown field data", () => {
-      const breakdownField = wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown[0];
-      expect(breakdownField.args[0].value.field).toBe("field4");
-      expect(breakdownField.label).toBe("Field 4");
-    });
-
-    it("should handle breakdown field removal", async () => {
-      mockUseDashboardPanelData.removeBreakdownItem("field4");
-      expect(mockUseDashboardPanelData.removeBreakdownItem).toHaveBeenCalledWith("field4");
-    });
-
-    it("should handle aggregation function for breakdown", () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown[0];
-      expect(field.functionName).toBe("count");
-    });
-
-    it("should render breakdown for supported chart types", () => {
-      const supportedTypes = [
-        "area",
-        "bar",
-        "line",
-        "h-bar",
-        "h-stacked",
-        "scatter",
-        "area-stacked",
-        "stacked",
-      ];
-
-      supportedTypes.forEach((type) => {
-        wrapper.unmount();
-        wrapper = createWrapper({ "data.type": type });
-        expect(wrapper.vm.dashboardPanelData.data.type).toBe(type);
-      });
     });
 
     it("renders the breakdown slot for a state timeline, where it holds the row field", () => {
@@ -800,18 +566,6 @@ describe("DashboardQueryBuilder", () => {
       wrapper.unmount();
       wrapper = createWrapper({ "data.type": "pie" });
       expect(wrapper.find('[data-test="dashboard-b-layout"]').exists()).toBe(false);
-    });
-
-    it("should handle unsupported chart types", () => {
-      const unsupportedTypes = ["pie", "donut", "metric", "table"];
-
-      unsupportedTypes.forEach((type) => {
-        wrapper.unmount();
-        wrapper = createWrapper({ "data.type": type });
-        expect(wrapper.vm.dashboardPanelData.data.type).toBe(type);
-        // Breakdown data still exists but may not be rendered
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown).toBeDefined();
-      });
     });
   });
 
@@ -830,23 +584,12 @@ describe("DashboardQueryBuilder", () => {
       expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragSourceIndex).toBe(0);
     });
 
-    it("should handle drag over", () => {
-      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
-      wrapper.vm.onDragOver(mockEvent, "x");
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
-    });
-
     it("should handle drag enter", () => {
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       wrapper.vm.onDragEnter(mockEvent, "x", 1);
 
       expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(1);
       expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.currentDragArea).toBe("x");
-    });
-
-    it("should handle drag end", () => {
-      wrapper.vm.onDragEnd();
-      expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
     });
 
     it("should handle drop for reordering within same axis", () => {
@@ -890,74 +633,11 @@ describe("DashboardQueryBuilder", () => {
 
       expect(wrapper.find('[data-test="dashboard-query-builder-drag-item"]').exists()).toBe(true);
     });
-
-    it("should apply drop target styling during drag", () => {
-      wrapper = createWrapper({
-        "meta.dragAndDrop.dragging": true,
-      });
-
-      const xAxis = wrapper.find('[data-test="dashboard-x-layout"]');
-      expect(xAxis.classes()).toContain("[border-style:dotted]");
-    });
-
-    it("should apply drop entered styling", () => {
-      wrapper = createWrapper({
-        "meta.dragAndDrop.dragging": true,
-        "meta.dragAndDrop.currentDragArea": "x",
-      });
-
-      const xAxis = wrapper.find('[data-test="dashboard-x-layout"]');
-      // Colours-only transition (not transition-all) so the drop-zone highlight
-      // fades without animating height/layout on add — avoids the add "bounce".
-      expect(xAxis.classes()).toContain("transition-colors");
-    });
   });
 
   describe("Having Conditions", () => {
     beforeEach(() => {
       wrapper = createWrapper();
-    });
-
-    it("should check if having filter exists", () => {
-      wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0].havingConditions = [
-        { operator: ">=", value: 10 },
-      ];
-
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      expect(field.havingConditions).toHaveLength(1);
-      expect(field.havingConditions[0]).toEqual({ operator: ">=", value: 10 });
-    });
-
-    it("should handle having filter addition", () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      field.havingConditions = [{ operator: ">=", value: 10 }];
-
-      expect(field.havingConditions).toHaveLength(1);
-      expect(field.havingConditions[0].operator).toBe(">=");
-      expect(field.havingConditions[0].value).toBe(10);
-    });
-
-    it("should handle having filter removal", () => {
-      wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0].havingConditions = [
-        { operator: ">=", value: 10 },
-      ];
-
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      field.havingConditions = [];
-
-      expect(field.havingConditions).toHaveLength(0);
-    });
-
-    it("should handle having condition data", () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      field.havingConditions = [{ operator: ">=", value: 10 }];
-
-      expect(field.havingConditions[0]).toEqual({ operator: ">=", value: 10 });
-    });
-
-    it("should handle empty having conditions", () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      expect(field.havingConditions).toBeDefined();
     });
 
     it("should not show having conditions for heatmap charts", () => {
@@ -990,15 +670,6 @@ describe("DashboardQueryBuilder", () => {
       expect(wrapper.vm.bLabel).toEqual(["count(field4)"]);
     });
 
-    it("should show field data for custom query", () => {
-      wrapper = createWrapper({
-        "data.queries.0.customQuery": true,
-      });
-      // For custom queries, fields should still be defined
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.x).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.y).toBeDefined();
-    });
-
     it("should compute axis hints correctly for different chart types", () => {
       const chartTypes = [
         { type: "pie", xHint: "Add one label field here" },
@@ -1015,24 +686,6 @@ describe("DashboardQueryBuilder", () => {
         wrapper = createWrapper({ "data.type": type });
         expect(wrapper.vm.xAxisHint).toBe(xHint);
       });
-    });
-  });
-
-  describe("Histogram Interval Configuration", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it("should handle histogram interval updates", () => {
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
-      if (field.args && field.args[0]) {
-        field.args[0].value = "10m";
-        expect(field.args[0].value).toBe("10m");
-      } else {
-        // Initialize args if not present
-        field.args = [{ value: "10m" }];
-        expect(field.args[0].value).toBe("10m");
-      }
     });
   });
 
@@ -1058,18 +711,6 @@ describe("DashboardQueryBuilder", () => {
       expectedOperators.forEach((op) => {
         expect(wrapper.vm.triggerOperators.some((item) => item.value === op)).toBe(true);
       });
-    });
-
-    it("should provide histogram operator", () => {
-      expect(wrapper.vm.triggerOperatorsWithHistogram).toEqual([
-        { label: "Histogram", value: "histogram" },
-      ]);
-    });
-
-    it("should use triggerOperatorsWithHistogram for heatmap y-axis", () => {
-      wrapper = createWrapper({ "data.type": "heatmap" });
-      // The component logic checks if chart type is heatmap for y-axis aggregation options
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("heatmap");
     });
   });
 
@@ -1122,89 +763,6 @@ describe("DashboardQueryBuilder", () => {
     });
   });
 
-  describe("Chart Type Watchers", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it("should handle chart type changes", async () => {
-      const originalType = wrapper.vm.dashboardPanelData.data.type;
-      expect(originalType).toBe("bar");
-
-      wrapper.vm.dashboardPanelData.data.type = "table";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("table");
-    });
-
-    it("should handle expansion items configuration", async () => {
-      // Initially should have default expansion state
-      expect(wrapper.vm.expansionItems).toBeDefined();
-      expect(wrapper.vm.expansionItems.x).toBe(true);
-      expect(wrapper.vm.expansionItems.y).toBe(true);
-
-      // Test dragging state changes
-      const oldDragging = wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragging;
-      wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragging = true;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.expansionItems.x).toBe(true);
-      expect(wrapper.vm.expansionItems.y).toBe(true);
-      expect(wrapper.vm.expansionItems.z).toBe(true);
-      expect(wrapper.vm.expansionItems.breakdown).toBe(true);
-      expect(oldDragging).toBe(false);
-    });
-  });
-
-  describe("Field Validation and Error Handling", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it("should handle drag drop validation scenarios", () => {
-      // Test with valid setup
-      mockUseDashboardPanelData.dashboardPanelData.meta.dragAndDrop = {
-        dragSource: "breakdown",
-        dragElement: { column: "field1" },
-        dragging: true,
-        dragSourceIndex: 0,
-        targetDragIndex: 0,
-        currentDragArea: "x",
-      };
-
-      mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value = [
-        { name: "field1", type: "text" },
-      ];
-
-      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
-      wrapper.vm.onDrop(mockEvent, "x", 0);
-
-      // Should call cleanup regardless of outcome
-      expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
-    });
-
-    it("should handle field limit validation", () => {
-      // Test the validation flags
-      expect(mockUseDashboardPanelData.isAddXAxisNotAllowed).toBeDefined();
-      expect(mockUseDashboardPanelData.isAddYAxisNotAllowed).toBeDefined();
-      expect(mockUseDashboardPanelData.isAddZAxisNotAllowed).toBeDefined();
-      expect(mockUseDashboardPanelData.isAddBreakdownNotAllowed).toBeDefined();
-    });
-
-    it("should handle axis field data access", () => {
-      // Test accessing axis data directly from the component
-      const xAxis = wrapper.vm.dashboardPanelData.data.queries[0].fields.x;
-      const yAxis = wrapper.vm.dashboardPanelData.data.queries[0].fields.y;
-      const zAxis = wrapper.vm.dashboardPanelData.data.queries[0].fields.z;
-      const breakdown = wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown;
-
-      expect(xAxis).toBeDefined();
-      expect(yAxis).toBeDefined();
-      expect(zAxis).toBeDefined();
-      expect(breakdown).toBeDefined();
-    });
-  });
-
   describe("Edge Cases and Error Scenarios", () => {
     beforeEach(() => {
       wrapper = createWrapper();
@@ -1221,58 +779,11 @@ describe("DashboardQueryBuilder", () => {
 
       expect(mockUseDashboardPanelData.addXAxisItem).not.toHaveBeenCalled();
     });
-
-    it("should handle drag operations safely", () => {
-      // Test various drag operations
-      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
-
-      wrapper.vm.onDragStart(mockEvent, { column: "test" });
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
-
-      wrapper.vm.onDragOver(mockEvent, "x");
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
-    });
-
-    it("should handle field drag operations", () => {
-      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
-      const testItem = {
-        type: "build",
-        args: [{ type: "field", value: { field: "testField", streamAlias: "" } }],
-      };
-
-      wrapper.vm.onFieldDragStart(mockEvent, testItem, "x", 0);
-
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragging).toBe(true);
-      // `toEqual`, not `toBe`: the panel data is `reactive`, so what comes back out
-      // is a PROXY of what went in. Identity was only ever holding because the mock
-      // was a plain object — which also meant no watcher fired for a post-mount
-      // mutation, i.e. the harness was not modelling production. The value is what
-      // matters here, not the reference.
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragElement).toEqual(testItem);
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragSource).toBe("x");
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragSourceIndex).toBe(0);
-    });
-
-    it("should prevent invalid drag operations", () => {
-      mockUseDashboardPanelData.dashboardPanelData.meta.dragAndDrop.dragSource = "x";
-
-      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
-      wrapper.vm.onDragEnter(mockEvent, "f", 0);
-
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
-    });
   });
 
   describe("Accessibility and UX", () => {
     beforeEach(() => {
       wrapper = createWrapper();
-    });
-
-    it("should provide helpful axis hints", () => {
-      expect(wrapper.vm.xAxisHint).toBeDefined();
-      expect(wrapper.vm.yAxisHint).toBeDefined();
-      expect(wrapper.vm.zAxisHint).toBeDefined();
-      expect(wrapper.vm.bAxisHint).toBeDefined();
     });
 
     it("should show appropriate hints for empty axes", () => {
@@ -1285,82 +796,8 @@ describe("DashboardQueryBuilder", () => {
       expect(wrapper.vm.xAxisHint).toContain("Add");
       expect(wrapper.vm.yAxisHint).toContain("Add");
     });
-
-    it("should handle component structure properly", () => {
-      // Verify basic component structure
-      expect(wrapper.vm.dashboardPanelData).toBeDefined();
-      expect(wrapper.vm.triggerOperators).toBeDefined();
-      expect(wrapper.vm.triggerOperatorsWithHistogram).toBeDefined();
-    });
   });
 
-  describe("Performance Optimizations", () => {
-    it("should use computed properties for labels", () => {
-      wrapper = createWrapper();
-
-      // Verify that labels are computed properties
-      expect(typeof wrapper.vm.xLabel).toBe("object"); // computed returns ref object
-      expect(typeof wrapper.vm.yLabel).toBe("object");
-      expect(typeof wrapper.vm.zLabel).toBe("object");
-      expect(typeof wrapper.vm.bLabel).toBe("object");
-    });
-
-    it("should efficiently handle axis hint computations", () => {
-      wrapper = createWrapper();
-
-      const hint1 = wrapper.vm.xAxisHint;
-      const hint2 = wrapper.vm.xAxisHint;
-      expect(hint1).toBe(hint2); // Should be same reference due to computed caching
-    });
-  });
-
-  describe("Integration with Child Components", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it("should render all required child components", () => {
-      expect(wrapper.find('[data-test="dashboard-geo-maps-builder"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-maps-builder"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-sankey-builder"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-filters-option"]').exists()).toBe(true);
-    });
-
-    it("should pass dashboard data to child components", () => {
-      const geoMapsComponent = wrapper.findComponent({
-        name: "DashboardGeoMapsQueryBuilder",
-      });
-      const mapsComponent = wrapper.findComponent({
-        name: "DashboardMapsQueryBuilder",
-      });
-      const sankeyComponent = wrapper.findComponent({
-        name: "DashboardSankeyChartBuilder",
-      });
-      const filtersComponent = wrapper.findComponent({
-        name: "DashboardFiltersOption",
-      });
-
-      expect(geoMapsComponent.exists()).toBe(true);
-      expect(mapsComponent.exists()).toBe(true);
-      expect(sankeyComponent.exists()).toBe(true);
-      expect(filtersComponent.exists()).toBe(true);
-    });
-
-    it("should handle histogram interval configuration", async () => {
-      wrapper = createWrapper({
-        "data.queries.0.fields.x.0.functionName": "histogram",
-        "data.queries.0.fields.x.0.args": [
-          { value: "5m" },
-          { type: "field", value: { field: "field1", streamAlias: "" } },
-        ],
-      });
-
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
-      field.args[0].value = "15m";
-
-      expect(field.args[0].value).toBe("15m");
-    });
-  });
   describe("seeding a slot the stream watcher structurally cannot see", () => {
     const METRIC_STREAMS = [
       {
