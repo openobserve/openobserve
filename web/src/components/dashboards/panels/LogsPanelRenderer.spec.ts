@@ -102,6 +102,12 @@ describe("LogsPanelRenderer", () => {
     expect(table().props("pinnedFirstColumn")).toBe("_timestamp");
   });
 
+  it("leaves the empty state to the panel so no second No Data message stacks under it", async () => {
+    await mountPanel({}, []);
+    expect(table().exists()).toBe(false);
+    expect(wrapper!.find('[data-test="o2-table-empty"]').exists()).toBe(false);
+  });
+
   it("colours each row's severity rail from the level field, like the logs table", async () => {
     await mountPanel();
     const data = table().props("data") as any[];
