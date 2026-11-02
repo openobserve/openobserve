@@ -42,6 +42,7 @@ import * as approvalModule from "../src/auto-approve.mjs";
 import * as commentsModule from "../src/comments.mjs";
 import * as confidenceModule from "../src/confidence.mjs";
 import * as reportModule from "../src/report.mjs";
+import * as passesModule from "../src/passes.mjs";
 import { SEVERITIES, normalizeSeverity, severityRank } from "../src/severity.mjs";
 
 test("the failed-reviewer line names each reviewer and why it did not finish", () => {
@@ -610,7 +611,7 @@ test("the runner clears approvals before any reviewer starts, ahead of the cap s
   const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
   const start = source.indexOf("gate.start()");
   assert.ok(start > 0);
-  assert.ok(start < source.indexOf("Promise.allSettled("));
+  assert.ok(start < source.indexOf("runPooled(plan"));
   assert.ok(start < source.indexOf('skipReason === "pass_limit_reached"'));
   assert.ok(source.indexOf('if (skipReason !== "already_reviewed") gate.start();') > 0);
 });
@@ -649,7 +650,7 @@ test("a run that narrowed a reviewer's diff cannot approve, even if it says noth
 
 test("the runner passes the gate's size verdict into every reviewer and reports what each one saw", () => {
   const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
-  assert.ok(source.includes("rootSpan, impact, gateNeedsFullTier)"));
+  assert.ok(source.includes("rootSpan, impact, gateNeedsFullTier, pass)"));
   assert.deepEqual(reviewerFacts([{ agentKey: "security", parsed: true, fullDiff: true }]), [{ key: "security", ran: true, finished: true, fullDiff: true }]);
   assert.deepEqual(reviewerFacts([{ agentKey: "qa", skipped: true }]), [{ key: "qa", ran: false, finished: false, fullDiff: false }]);
 });
@@ -766,12 +767,13 @@ const silentReviewer = key => ({ ...finishedReviewer(key), parsed: false, rawTex
 const smallRawDiff = "diff --git a/docs/a.md b/docs/a.md\n--- a/docs/a.md\n+++ b/docs/a.md\n@@ -1 +1 @@\n-old\n+new\n";
 
 // Every default makes the run an approvable one, so a test changes the single fact it is about.
-async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, coordinatorOutput = cleanCoordinatorOutput } = {}) {
-  const run = { posted: "", approvals: [], logs: [], coordinatorCalls: 0, updates: 0, creates: 0, claims: 0, sanitized: 0 };
+async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], byPass = null, pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, coordinatorOutput = cleanCoordinatorOutput } = {}) {
+  const run = { posted: "", approvals: [], logs: [], coordinatorCalls: 0, coordinatorArgs: null, reviewerCalls: [], artifact: null, updates: 0, creates: 0, claims: 0, sanitized: 0 };
   const pr = { ...eligibleInput().pr, title: "fix a bug", body: "plain words", head: { sha: MAIN_HEAD }, changed_files: 1, additions: 1, deletions: 1, ...prNow };
   const noop = () => {};
   const scope = {
-    ...commentsModule, ...confidenceModule, ...approvalModule, ...reportModule,
+    ...commentsModule, ...confidenceModule, ...approvalModule, ...reportModule, ...passesModule,
+    REVIEW_COLD_PASSES: 2, REVIEWER_CONCURRENCY: 16,
     process: { env: { PR_NUMBER: "1", GITHUB_REPOSITORY: "test/repo", HEAD_SHA: MAIN_HEAD, MERGE_BASE_SHA: "c".repeat(40) } },
     console: { log: (...args) => run.logs.push(args.join(" ")), warn: noop, error: noop },
     TRACE: { startSpan: () => ({}), endSpan: noop, setSpanAttributes: noop }, activeRootSpan: null, isoNow: () => "now", prepareReviewTree: noop,
@@ -788,13 +790,18 @@ async function runMain({ results = [finishedReviewer("security"), finishedReview
     ghJson: () => { if (contextFails) throw new Error("no context"); return { title: "fix a bug", body: reviewedBody, files: [{}] }; },
     pairedPrContext: () => "", isPlaceholderComment: () => false, claimReviewPass: () => { run.claims += 1; return 1; }, buildImpactContext: () => "",
     AGENTS: Object.fromEntries(results.map(r => [r.agentKey, {}])),
-    runReviewer: async key => results.find(r => r.agentKey === key),
-    runCoordinator: async () => {
+    runReviewer: async (key, def, diff, context, existingReview, span, impact, unfocused, pass) => {
+      run.reviewerCalls.push([key, pass]);
+      const r = byPass ? byPass(key, pass) : results.find(x => x.agentKey === key);
+      return { ...r, pass };
+    },
+    runCoordinator: async (...args) => {
       run.coordinatorCalls += 1;
+      run.coordinatorArgs = args;
       const inline = extractInlineBlock(coordinatorOutput);
       return { text: inline.text, kept: inline.findings, findingsKnown: !inline.error, fallback: false };
     },
-    OPENCODE_CONFIG: { name: "default" }, writeFindingsArtifact: noop, UNPARSEABLE_OUTPUT: "output held neither findings nor a no-issues marker",
+    OPENCODE_CONFIG: { name: "default" }, writeFindingsArtifact: (...args) => { run.artifact = args; }, UNPARSEABLE_OUTPUT: "output held neither findings nor a no-issues marker",
     sanitizeForPosting: text => { run.sanitized += 1; return commentsModule.sanitizeReviewBody(text, { marker: "<!-- ai-code-review -->", providerId: "test-provider", modelId: "test-model", env: {} }).text; },
     updateReviewComment: (prNumber, id, body) => { run.posted = body; run.updates += 1; return { action: "update", id }; },
     postReviewComment: (prNumber, body) => { run.posted = body; run.creates += 1; return 1; },
@@ -897,12 +904,12 @@ test("a dangling second block cannot read as a clean count, so the gate refuses"
 });
 
 // The coordinator's prompt is its only view of who finished, so the real function runs against a stubbed model call.
-async function runCoordinatorWith(results, { modelFails = false } = {}) {
+async function runCoordinatorWith(results, { modelFails = false, passResults = results, passes = 1 } = {}) {
   const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
   const body = source.slice(source.indexOf("async function runCoordinator("), source.indexOf("// ─── GitHub integration"));
   const seen = { prompt: "" };
   const scope = {
-    ...confidenceModule, ...reportModule, extractInlineBlock, console: { log() {}, warn() {}, error() {} }, isoNow: () => "now",
+    ...confidenceModule, ...reportModule, ...passesModule, REVIEW_COLD_PASSES: passes, extractInlineBlock, console: { log() {}, warn() {}, error() {} }, isoNow: () => "now",
     TRACE: { startSpan: (name, attributes) => { seen.attributes = attributes; return {}; }, endSpan() {} },
     readPrompt: () => "", readRepoRules: () => "", RISK_TIERS: { full: {} }, COORDINATOR_AGENT: "coordinator", GEN_AI_PROVIDER_NAME: "test", PROVIDER_ID: "test", MODEL_ID: "test", MODEL_SLUG: "test",
     AGENT_TIMEOUT_MS: 1000, remainingRunMs: () => 1e6, POST_RESERVE_MS: 0, MIN_COORDINATOR_MS: 0, REVIEW_MARKER: "<!-- m -->",
@@ -913,7 +920,7 @@ async function runCoordinatorWith(results, { modelFails = false } = {}) {
     },
   };
   const runCoordinator = new Function(...Object.keys(scope), `${body}\nreturn runCoordinator;`)(...Object.values(scope));
-  const result = await runCoordinator(results, "context", "full", null, {});
+  const result = await runCoordinator(results, passResults, "context", "full", null, {});
   return { ...seen, result };
 }
 
@@ -930,6 +937,43 @@ test("the fallback does not list an unparsed reviewer as completed", async () =>
   const { result } = await runCoordinatorWith([{ ...finishedReviewer("security"), findings: [finding] }, silentReviewer("correctness")], { modelFails: true });
   assert.ok(result.text.includes("- Reviewers completed: security Reviewer\n"));
   assert.ok(result.text.includes("- Failed reviewers: correctness Reviewer"));
+});
+
+test("the coordinator sees each cold pass as its own report and is told to keep a finding from either", async () => {
+  const finding = summary => ({ category: "security", severity: "p1", file: "a.rs", line: "1", summary, description: "d", suggestion: "" });
+  const passResults = [
+    { ...finishedReviewer("security"), pass: 1, findings: [finding("first pass")] },
+    { ...finishedReviewer("security"), pass: 2, findings: [finding("second pass")] },
+  ];
+  const merged = passesModule.mergePassResults(passResults);
+  const run = await runCoordinatorWith(merged, { passResults, passes: 2 });
+  assert.ok(run.prompt.includes('<reviewer name="security Reviewer, pass 1/2">'));
+  assert.ok(run.prompt.includes('<reviewer name="security Reviewer, pass 2/2">'));
+  assert.match(run.prompt, /<cold_passes>Each reviewer ran 2 independent passes[^<]*keep it\.[^<]*<\/cold_passes>/);
+  assert.ok(run.prompt.includes("<reviewers_ran>security Reviewer</reviewers_ran>"));
+  const single = await runCoordinatorWith([finishedReviewer("security")]);
+  assert.equal(single.prompt.includes("<cold_passes>"), false);
+  const { result } = await runCoordinatorWith(merged, { passResults, passes: 2, modelFails: true });
+  assert.ok(result.text.includes("first pass") && result.text.includes("second pass"));
+});
+
+test("the runner reviews every area twice, and only an area whose every pass failed is called unfinished", async () => {
+  const byPass = (key, pass) => (key === "correctness" || (key === "security" && pass === 2) ? silentReviewer(key) : finishedReviewer(key));
+  const run = await runMain({ byPass });
+  assert.deepEqual(run.reviewerCalls, [["security", 1], ["correctness", 1], ["security", 2], ["correctness", 2]]);
+  assert.equal(run.coordinatorArgs[1].length, 4);
+  assert.deepEqual(run.coordinatorArgs[0].map(r => [r.agentKey, r.passesFinished]), [["security", 1], ["correctness", 0]]);
+  assert.ok(run.posted.includes("1 of 2 reviewers did not finish (correctness: failed)"));
+  assert.ok(run.posted.includes("Some reviewer passes did not finish (security: 1 of 2)"));
+  assert.deepEqual(run.artifact[2][0].passResults.map(p => p.parsed), [true, false]);
+  const covered = await runMain({ byPass: (key, pass) => (pass === 1 ? silentReviewer(key) : finishedReviewer(key)) });
+  assert.equal(covered.error, undefined);
+  assert.equal(covered.posted.includes("reviewers did not finish"), false);
+  assert.equal(covered.approvals.length, 1);
+});
+
+test("the workflow passes the cold pass count, defaulting to two", () => {
+  assert.ok(workflow().includes("REVIEW_COLD_PASSES: ${{ vars.AI_REVIEW_COLD_PASSES || '2' }}"));
 });
 
 test("a finding without a category survives sanitizing even when its text reads like a runner line", () => {

@@ -5,6 +5,7 @@ import { SEVERITIES, SEVERITY_CAPS, normalizeSeverity, severityRank } from "./se
 export { insertAfterCallout } from "./comments.mjs";
 
 const MAX_FALLBACK_FINDINGS = 15;
+const NEARBY_LINES = 5;
 const NO_ISSUES_RE = /<no-issues(?:\s[^<>]*)?>[\s\S]*?<\/no-issues>|<no-issues(?:\s[^<>]*)?\/>/;
 const FINDING_BLOCK_RE = /<finding>([\s\S]*?)<\/finding>/g;
 const SEVERITY_GLYPH = { p0: "🔴", p1: "🟠", p2: "🟡", p3: "🔵" };
@@ -98,12 +99,33 @@ export function toKeptFinding(f) {
   };
 }
 
+const TITLE_STOPWORDS = new Set(["the", "and", "for", "not", "but", "with", "from", "that", "this", "are", "was", "when", "can", "its", "into", "than", "then", "will", "has", "have"]);
+
+function titleWords(summary) {
+  return new Set((String(summary || "").toLowerCase().match(/[a-z0-9_]{3,}/g) ?? []).filter(w => !TITLE_STOPWORDS.has(w)));
+}
+
+function lineOf(f) {
+  return Number.parseInt(f.line, 10) || 0;
+}
+
+// Two cold passes word the same issue differently, so a near match on place and title is a duplicate too.
+function sameIssueNearby(a, b) {
+  const file = f => (f.file || "").replace(/^\.?\//, "");
+  if (!file(a) || file(a) !== file(b)) return false;
+  const [la, lb] = [lineOf(a), lineOf(b)];
+  if ((la === 0) !== (lb === 0) || Math.abs(la - lb) > NEARBY_LINES) return false;
+  const [wa, wb] = [titleWords(a.summary), titleWords(b.summary)];
+  const shared = [...wa].filter(w => wb.has(w)).length;
+  return shared >= 2 && shared / Math.min(wa.size, wb.size) >= 0.5;
+}
+
 function dedupeFindings(agentResults) {
   const seen = new Map();
   const deduped = [];
   for (const f of agentResults.flatMap(r => r.findings)) {
     const key = `${(f.category || "").toLowerCase()}|${(f.summary || "").toLowerCase().slice(0, 120)}`;
-    const existing = seen.get(key);
+    const existing = seen.get(key) ?? deduped.find(d => sameIssueNearby(d, f));
     if (!existing) {
       seen.set(key, { ...f });
       deduped.push(seen.get(key));

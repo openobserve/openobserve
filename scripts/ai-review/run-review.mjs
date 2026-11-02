@@ -56,6 +56,7 @@ import {
 } from "./src/inline.mjs";
 import { changedCodeEvidence, mergeConfidence, reviewerFinished, severityCounts, unfinishedReviewers } from "./src/confidence.mjs";
 import { OpencodeServer, resolveOpencodeConfig, selfCheck, shouldRetry } from "./src/opencode.mjs";
+import { lostPasses, lostPassesNote, mergePassResults, parseColdPasses, passLabel, passPlan, runPooled } from "./src/passes.mjs";
 import { fetchPinnedDiff, prefixDiffPaths, reviewerDiff } from "./src/pr-diff.mjs";
 import {
   buildFallbackReview,
@@ -139,6 +140,8 @@ const AUTO_APPROVE_MODE = parseAutoApproveMode(process.env.REVIEW_AUTO_APPROVE);
 const REVIEW_PAIR_CLEAR = process.env.REVIEW_PAIR_CLEAR === "true";
 // Where the raw findings JSON is written for the workflow to upload; unset skips it.
 const REVIEW_ARTIFACT_DIR = process.env.REVIEW_ARTIFACT_DIR || "";
+// Independent reviewer sessions per area (1..3); one cold pass misses findings a second one catches.
+const REVIEW_COLD_PASSES = parseColdPasses(process.env.REVIEW_COLD_PASSES);
 
 const MAX_DIFF_TOKENS = 150_000;
 const UNPARSEABLE_OUTPUT = "output was cut off or held neither findings nor a no-issues marker";
@@ -147,6 +150,8 @@ const OVERALL_TIMEOUT_MS = 40 * 60 * 1000;
 // Kept free at the end of the run for rendering and posting the comment.
 const POST_RESERVE_MS = 2 * 60 * 1000;
 const MIN_COORDINATOR_MS = 60 * 1000;
+// Covers every area of two passes at once (8 reviewers at most); a third pass queues instead of adding to provider rate limits.
+const REVIEWER_CONCURRENCY = 16;
 const TRACE_SERVICE_NAME = "github-actions.ai-code-review";
 const TRACE_SCOPE_NAME = "scripts/ai-review/run-review.mjs";
 const DEFAULT_TRACE_STREAM = "github_ai_code_review";
@@ -823,7 +828,7 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
           variant: MODEL_VARIANT,
           system: truncatedSystem,
           text: truncatedUser,
-          title: `ai-review:${traceOptions.agentKey || agentName}`,
+          title: `ai-review:${traceOptions.agentKey || agentName}${traceOptions.pass ? `:pass-${traceOptions.pass}` : ""}`,
           timeoutMs,
         });
         if (result.rejectedPermissions > 0) {
@@ -864,8 +869,11 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
 
 // ─── Run single reviewer ──────────────────────────────────────────────────
 
-async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, parentSpan, impact = "", unfocused = false) {
+async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, parentSpan, impact = "", unfocused = false, pass = 1) {
+  const label = passLabel(agentDef.name, pass, REVIEW_COLD_PASSES);
   const reviewerSpan = TRACE.startSpan("ai_review.reviewer", {
+    "review.pass": pass,
+    "review.passes": REVIEW_COLD_PASSES,
     "review.agent.key": agentKey,
     "review.agent.name": agentDef.name,
     "ai.agent.key": agentKey,
@@ -877,12 +885,12 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
   }, parentSpan);
 
   if (!apiKey()) {
-    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — ${API_KEY_VAR_NAME} not set`);
+    console.log(`[${isoNow()}] ${label}: SKIPPED — ${API_KEY_VAR_NAME} not set`);
     TRACE.endSpan(reviewerSpan, {
       "review.skipped": true,
       "review.error": `${API_KEY_VAR_NAME} not set`,
     });
-    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: `${API_KEY_VAR_NAME} not set`, genAIResponseId: "" };
+    return { agentKey, agentName: agentDef.name, pass, findings: [], rawText: "", error: `${API_KEY_VAR_NAME} not set`, genAIResponseId: "" };
   }
 
   const systemPrompt = [readPrompt("shared-rules.md"), readRepoRules()].filter(Boolean).join("\n\n");
@@ -896,9 +904,18 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
 
   const { diff: relevantDiff, skipped, fullDiff } = reviewerDiff(diff, agentDef, { unfocused, pathOf: logicalPath });
   if (skipped) {
-    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — no files in focus`);
+    console.log(`[${isoNow()}] ${label}: SKIPPED — no files in focus`);
     TRACE.endSpan(reviewerSpan, { "review.skipped": true, "review.skip_reason": "no_focus_files" });
-    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: null, genAIResponseId: "", skipped: true };
+    return { agentKey, agentName: agentDef.name, pass, findings: [], rawText: "", error: null, genAIResponseId: "", skipped: true };
+  }
+
+  // A pass the pool started late must still leave the coordinator its slot.
+  const timeoutMs = Math.min(AGENT_TIMEOUT_MS, remainingRunMs() - MIN_COORDINATOR_MS - POST_RESERVE_MS);
+  if (timeoutMs < MIN_COORDINATOR_MS) {
+    const error = `not started: only ${Math.round(remainingRunMs() / 1000)}s left in the run`;
+    console.error(`[${isoNow()}] ${label}: ${error}`);
+    TRACE.endSpan(reviewerSpan, { "review.not_started": true }, new Error(error));
+    return { agentKey, agentName: agentDef.name, pass, findings: [], rawText: "", error, genAIResponseId: "" };
   }
 
   const userPrompt = [
@@ -912,7 +929,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
 
   const fullSystem = `${systemPrompt}\n\n${agentPrompt}`;
 
-  console.log(`[${isoNow()}] Starting ${agentDef.name} (${MODEL_SLUG}, ${agentDef.opencodeAgent})`);
+  console.log(`[${isoNow()}] Starting ${label} (${MODEL_SLUG}, ${agentDef.opencodeAgent})`);
   const start = Date.now();
 
   try {
@@ -920,25 +937,26 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
       agentDef.opencodeAgent,
       fullSystem,
       userPrompt,
-      AGENT_TIMEOUT_MS,
+      timeoutMs,
       {
         parentSpan: reviewerSpan,
         agentKey,
         agentName: agentDef.name,
+        pass,
         operationName: "code_review",
       },
     );
     const text = completion.text;
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-    console.log(`[${isoNow()}] ${agentDef.name} completed in ${elapsed}s`);
+    console.log(`[${isoNow()}] ${label} completed in ${elapsed}s`);
 
     const findings = parseFindings(text);
     const parsed = reviewerReported(text, findings);
     if (!parsed) {
-      console.log(`[${isoNow()}] ${agentDef.name}: ${UNPARSEABLE_OUTPUT}`);
-      console.log(`[${isoNow()}] ${agentDef.name} raw output (first 500 chars): ${text.slice(0, 500)}`);
+      console.log(`[${isoNow()}] ${label}: ${UNPARSEABLE_OUTPUT}`);
+      console.log(`[${isoNow()}] ${label} raw output (first 500 chars): ${text.slice(0, 500)}`);
     } else {
-      console.log(`[${isoNow()}] ${agentDef.name}: ${findings.length} findings`);
+      console.log(`[${isoNow()}] ${label}: ${findings.length} findings`);
     }
 
     TRACE.endSpan(reviewerSpan, {
@@ -947,12 +965,12 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
       "review.raw_text_length": text.length,
       "gen_ai.response.id": completion.responseId,
     });
-    return { agentKey, agentName: agentDef.name, findings, rawText: text, error: null, genAIResponseId: completion.responseId, fullDiff, parsed };
+    return { agentKey, agentName: agentDef.name, pass, findings, rawText: text, error: null, genAIResponseId: completion.responseId, fullDiff, parsed };
   } catch (err) {
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-    console.error(`[${isoNow()}] ${agentDef.name} FAILED after ${elapsed}s: ${err.message}`);
+    console.error(`[${isoNow()}] ${label} FAILED after ${elapsed}s: ${err.message}`);
     TRACE.endSpan(reviewerSpan, { "review.elapsed_seconds": Number(elapsed) }, err);
-    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: err.message, timedOut: err?.name === "TimeoutError", genAIResponseId: "" };
+    return { agentKey, agentName: agentDef.name, pass, findings: [], rawText: "", error: err.message, timedOut: err?.name === "TimeoutError", genAIResponseId: "" };
   }
 }
 
@@ -974,11 +992,11 @@ function sanitizeForPosting(body) {
 
 // ─── Coordinator pass ─────────────────────────────────────────────────────
 
-async function runCoordinator(agentResults, prContext, tier, existingReview, parentSpan) {
+async function runCoordinator(agentResults, passResults, prContext, tier, existingReview, parentSpan) {
   const coordinatorPrompt = readPrompt("agents/coordinator.md");
   const sharedRules = [readPrompt("shared-rules.md"), readRepoRules()].filter(Boolean).join("\n\n");
 
-  const findingsSections = agentResults
+  const findingsSections = passResults
     .filter(r => r.findings.length > 0)
     .map(r => {
       const xml = r.findings.map(f => `  <finding>
@@ -990,7 +1008,7 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
     <description>${f.description}</description>
     <suggestion>${f.suggestion}</suggestion>
   </finding>`).join("\n");
-      return `<reviewer name="${r.agentName}">\n${xml}\n</reviewer>`;
+      return `<reviewer name="${passLabel(r.agentName, r.pass, REVIEW_COLD_PASSES)}">\n${xml}\n</reviewer>`;
     }).join("\n");
 
   const failedAgents = agentResults.filter(r => !r.skipped && !reviewerFinished(r));
@@ -1002,12 +1020,16 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
   // must render the "Reviewers" row from THIS, not infer it — a reviewer with no findings sends no
   // <reviewer> block, so without this the LLM guesses and can invent an agent that never ran.
   const ranReviewers = agentResults.filter(reviewerFinished).map(r => r.agentName);
+  const passesNote = REVIEW_COLD_PASSES > 1
+    ? `<cold_passes>Each reviewer ran ${REVIEW_COLD_PASSES} independent passes with no shared context; a reviewer name ending in "pass N/${REVIEW_COLD_PASSES}" is one of them. A finding raised by only one pass is still a finding: keep it. Merge findings that describe the same issue into one, keeping the higher severity. List each reviewer once in the Reviewers row, without a pass suffix.</cold_passes>`
+    : "";
 
   const userPrompt = [
     `<coordinator_task>`,
     `<overall_pr_context>${prContext}</overall_pr_context>`,
     `<risk_tier>${tier}</risk_tier>`,
     `<reviewers_ran>${ranReviewers.join(", ")}</reviewers_ran>`,
+    passesNote,
     `<all_findings>${findingsSections}</all_findings>`,
     failedNote,
     existingReview ? `<previous_review>${existingReview}</previous_review>` : "",
@@ -1028,6 +1050,7 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
     "review.risk_tier": tier,
     "review.findings": agentResults.reduce((sum, r) => sum + r.findings.length, 0),
     "review.failed_agents": failedAgents.length,
+    "review.passes": REVIEW_COLD_PASSES,
   }, parentSpan);
 
   console.log(`[${isoNow()}] Running coordinator (${MODEL_SLUG}, ${coordinatorAgent})`);
@@ -1220,6 +1243,13 @@ function writeFindingsArtifact(prNumber, tier, results, coordinatorResult, inlin
         parsed: r.parsed === true,
         error: r.error || null,
         findings: r.findings,
+        pass_results: (r.passResults || [r]).map(p => ({
+          pass: p.pass ?? 1,
+          skipped: Boolean(p.skipped),
+          parsed: p.parsed === true,
+          error: p.error || null,
+          findings: p.findings,
+        })),
       })),
       coordinator: coordinatorResult
         ? { fallback: coordinatorResult.fallback, error: coordinatorResult.error, kept: coordinatorResult.kept || [] }
@@ -1471,17 +1501,20 @@ async function main() {
       console.warn(`[${isoNow()}] Impact map skipped: ${err.message}`);
     }
     const agentsToRun = selectedAgents;
-    console.log(`[${isoNow()}] Launching ${agentsToRun.length} reviewers in parallel...`);
+    const plan = passPlan(agentsToRun, REVIEW_COLD_PASSES);
+    console.log(`[${isoNow()}] Launching ${agentsToRun.length} reviewers x ${REVIEW_COLD_PASSES} cold passes (${plan.length} sessions, up to ${REVIEWER_CONCURRENCY} at once)...`);
 
-    const agentResults = await Promise.allSettled(
-      agentsToRun.map(agentKey => {
-        const def = AGENTS[agentKey];
-        if (!def) return Promise.resolve({ agentKey, agentName: agentKey, findings: [], error: `Unknown agent: ${agentKey}`, genAIResponseId: "" });
-        return runReviewer(agentKey, def, filtered.diff, prContext, existingReview, rootSpan, impact, gateNeedsFullTier);
-      }),
-    );
+    const settled = await runPooled(plan, REVIEWER_CONCURRENCY, ({ agentKey, pass }) => {
+      const def = AGENTS[agentKey];
+      if (!def) return Promise.resolve({ agentKey, agentName: agentKey, pass, findings: [], error: `Unknown agent: ${agentKey}`, genAIResponseId: "" });
+      return runReviewer(agentKey, def, filtered.diff, prContext, existingReview, rootSpan, impact, gateNeedsFullTier, pass);
+    });
 
-    const results = agentResults.map(r => r.status === "fulfilled" ? r.value : { agentKey: "unknown", agentName: "unknown", findings: [], error: r.reason?.message || "Unknown error", genAIResponseId: "" });
+    const passResults = settled.map((r, i) => r.status === "fulfilled"
+      ? r.value
+      : { agentKey: plan[i].agentKey, agentName: AGENTS[plan[i].agentKey]?.name || plan[i].agentKey, pass: plan[i].pass, findings: [], error: r.reason?.message || "Unknown error", genAIResponseId: "" });
+    // One entry per area from here on; the coordinator alone sees each pass separately.
+    const results = mergePassResults(passResults);
     const totalFindings = results.reduce((sum, r) => sum + r.findings.length, 0);
     // A requiresFocus agent that saw no files in its domain opted out — it is neither expected
     // nor completed, so it must not count toward coverage.
@@ -1497,7 +1530,7 @@ async function main() {
     if (failedAgents.length > 0 && failedAgents.length < ranResults.length) {
       outcome = "partial_success";
     }
-    const reviewerResponseIds = results.map(r => r.genAIResponseId).filter(Boolean);
+    const reviewerResponseIds = passResults.map(r => r.genAIResponseId).filter(Boolean);
     TRACE.setSpanAttributes(rootSpan, {
       "review.total_findings": totalFindings,
       "review.failed_agents": failedAgents.length,
@@ -1508,6 +1541,8 @@ async function main() {
       "review.expected_agent_count": ranResults.length,
       "review.coverage_ratio": coverageRatio,
       "review.degraded": failedAgents.length > 0,
+      "review.cold_passes": REVIEW_COLD_PASSES,
+      "review.lost_pass_agents": lostPasses(results).map(r => r.agentName),
     });
     console.log(`[${isoNow()}] All reviewers complete. Total findings: ${totalFindings}, Failures: ${failedAgents.length}`);
 
@@ -1552,8 +1587,9 @@ async function main() {
         `</details>`,
       ].join("\n");
     } else {
-      coordinatorResult = await runCoordinator(results, prContext, tier, existingReview, rootSpan);
-      finalReview = insertAfterCallout(coordinatorResult.text, failedReviewersNote(failedAgents, ranResults.length));
+      coordinatorResult = await runCoordinator(results, passResults, prContext, tier, existingReview, rootSpan);
+      const notes = [failedReviewersNote(failedAgents, ranResults.length), lostPassesNote(ranResults)].filter(Boolean).join("\n>\n");
+      finalReview = insertAfterCallout(coordinatorResult.text, notes);
       responseIds = [...reviewerResponseIds, coordinatorResult.genAIResponseId].filter(Boolean);
       if (coordinatorResult.fallback) {
         outcome = "partial_success";

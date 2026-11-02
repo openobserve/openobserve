@@ -30,6 +30,15 @@ this repo's fix history, each with a check to run against the diff. The comment 
 fails or times out, the runner (not the model) adds a line to the comment saying which area went
 unreviewed.
 
+Each reviewer runs as several cold passes: independent opencode sessions with no shared context,
+so one pass's misses can be another's catches (backtesting on DeepSeek showed one pass misses
+findings two catch). The variable `AI_REVIEW_COLD_PASSES` sets the count (default `2`, clamped to
+1–3; `src/passes.mjs`). The coordinator gets every pass's report labelled `<Reviewer>, pass N/M`
+and keeps a finding raised by any pass, merging duplicates; the fallback comment unions the passes
+and folds findings at the same file and nearby line with a similar title. An area counts as
+reviewed when any of its passes finished, and the comment notes a lost pass. Each pass is billed,
+so the review costs about M times one pass; reviewer spans carry `review.pass`.
+
 The coordinator also lists the findings it kept in a hidden JSON block, which the runner strips
 from the comment. Kept P0, P1 and P2 findings whose `file:line` is an added or context line of the
 diff are posted as one `COMMENT` review with inline threads (at most 10, never approve or request

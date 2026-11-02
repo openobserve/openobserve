@@ -321,6 +321,8 @@ jobs:
           # Optional ceiling on automatic reviews per PR; unset means no cap, so each new commit gets one review. The manual input bypasses it for one run.
           REVIEW_MAX_PASSES: ${{ vars.AI_REVIEW_MAX_PASSES }}
           REVIEW_IGNORE_PASS_LIMIT: ${{ inputs.ignore_pass_limit || 'false' }}
+          # Independent reviewer sessions per area (1-3), merged by the coordinator; one cold pass misses findings a second catches.
+          REVIEW_COLD_PASSES: ${{ vars.AI_REVIEW_COLD_PASSES || '2' }}
           # An unknown value means off, so a typo can never start approving.
           REVIEW_AUTO_APPROVE: ${{ vars.AI_REVIEW_AUTO_APPROVE || 'shadow' }}
           # Set only when the lookup proved no paired PR is open, so a failed or skipped lookup can never approve.
