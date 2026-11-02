@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { readFileSync, existsSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs";
+import { appendFileSync, readFileSync, existsSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -17,7 +17,7 @@ import {
   genAiUsageAttributes,
   sha256,
 } from "./telemetry.mjs";
-import { REVIEW_PASS_TAG, reviewPassCount, reviewPassTag, selectOwnReviewComment } from "./src/comments.mjs";
+import { ANY_REVIEW_MARKER, REVIEW_PASS_TAG, reviewPassCount, reviewPassTag, selectOwnReviewComment } from "./src/comments.mjs";
 import {
   buildReviewPayload,
   existingFingerprints,
@@ -32,6 +32,7 @@ import { sanitizePrTree } from "./src/sanitize.mjs";
 import { scrubReviewBody, scrubSecrets } from "./src/scrub.mjs";
 import { isReleaseFile, resolveRulesFiles } from "./src/selection.mjs";
 import { buildImpactContext } from "./src/impact.mjs";
+import { verdictFromReview } from "./src/verdict.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -86,14 +87,6 @@ function apiKey() {
 
 const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
 
-// The shape of any marker a provider leg may post — matched as a pattern rather than a list so a
-// retired leg's suffixed marker (e.g. the old per-provider ones) is still claimed and rewritten
-// in place. The coordinator prompt is told not to emit markers at all, but models don't reliably
-// obey formatting instructions, so sanitizeReviewBody strips every match and re-prepends only
-// REVIEW_MARKER: exactly one marker per comment, enforced in code rather than by the prompt.
-// findExistingReviewComment matches the same pattern. Keep in sync with the `marker` values in
-// .github/workflows/ai-code-review.yml.
-const ANY_REVIEW_MARKER = "<!--\\s*ai-code-review[a-z0-9-]*\\s*-->";
 // Tags the "reviewed with the paired o2-enterprise PR" note (post-paired-pointer.sh); it is replaced in place but is not a previous review.
 const PAIRED_POINTER_TAG = "<!-- o2-paired-pointer -->";
 // Tags the "not reviewed: key not set" notice, which is likewise replaced but never fed back as a previous review.
@@ -278,6 +271,12 @@ function ghSilent(args) {
   } catch {
     return "";
   }
+}
+
+// Read by verdict-status.mjs to post the "AI review verdict" status; a run that writes nothing counts as not reviewed.
+function setVerdictOutput(basis, verdict) {
+  if (!process.env.GITHUB_OUTPUT) return;
+  appendFileSync(process.env.GITHUB_OUTPUT, `basis=${basis}\nverdict=${verdict}\n`);
 }
 
 function execErrorText(err) {
@@ -1478,6 +1477,8 @@ async function main() {
       console.log(`[${isoNow()}] PR #${prNumber} already had ${passesDone}/${REVIEW_MAX_PASSES} reviews; skipping. Dispatch the workflow with ignore_pass_limit to review again.`);
       outcome = "skipped";
       TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "pass_limit_reached" });
+      // Carried forward so pushing past the pass limit cannot clear a blocking verdict.
+      setVerdictOutput("pass_limit", verdictFromReview(existingComment?.body));
       return;
     }
 
@@ -1541,6 +1542,7 @@ async function main() {
 
     if (changedLines === 0) {
       console.log("No meaningful changes to review after filtering. Skipping.");
+      setVerdictOutput("no_changes", "none");
       outcome = "skipped";
       TRACE.setSpanAttributes(rootSpan, {
         "review.skipped": true,
@@ -1751,6 +1753,7 @@ async function main() {
         console.log(`[${isoNow()}] Posting new review comment`);
         commentResult = { action: "create", id: postReviewComment(prNumber, finalReview) };
       }
+      setVerdictOutput("reviewed", verdictFromReview(finalReview));
       TRACE.endSpan(commentSpan, {
         "github.pr.comment.action": commentResult.action,
         "github.pr.comment.id": commentResult.id,

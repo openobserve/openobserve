@@ -1,0 +1,58 @@
+name: AI Review Dispute
+
+# `/ai-review dispute <reason>` on a PR lifts a blocking AI review verdict on its head commit.
+# issue_comment always runs main's copy of this file and the engine; no PR code is checked out.
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  dispute:
+    if: ${{ vars.AI_REVIEW_ENABLED != 'false' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/ai-review dispute') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # The reviewer app's private key lives in this environment.
+    environment:
+      name: ai-review
+      deployment: false
+    concurrency:
+      group: ai-review-dispute-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      statuses: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Generate OpenObserve Code Reviewer app token
+        id: app_token
+        if: vars.OO_REVIEWER_APP_ID != ''
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.OO_REVIEWER_APP_ID }}
+          private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
+
+      - name: Check out review engine (trusted, from main)
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: scripts/ai-review
+
+      - name: Handle dispute
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BOT_TOKEN: ${{ steps.app_token.outputs.token }}
+          # Empty without the app, so the note is never written into a comment some other workflow posted.
+          BOT_LOGIN: ${{ steps.app_token.outputs.token && format('{0}[bot]', steps.app_token.outputs.app-slug) || '' }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          COMMENT_URL: ${{ github.event.comment.html_url }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+          COMMENTER_TYPE: ${{ github.event.comment.user.type }}
+        run: node scripts/ai-review/dispute.mjs

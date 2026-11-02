@@ -142,6 +142,29 @@ in o2-enterprise:
   the OSS PR on its own and replaces the pointer. If a paired ENT run fails, the failure shows on
   the ENT PR, not the OSS one.
 
+## Merge gate and disputes
+
+After each run the job posts the commit status `AI review verdict` on the reviewed head SHA
+(`verdict-status.mjs`, decision logic in `src/verdict.mjs`). Make it a required status on `main`
+to block merges:
+
+| Situation | Status |
+|---|---|
+| ⛔ Significant concerns | failure |
+| Any other verdict, no reviewable changes, fork PR | success |
+| ⛔ Not reviewed, a failed run or no verdict | success (infra never blocks) |
+| Paired OSS PR | success; the o2-enterprise PR carries the verdict, and the sister gate makes it merge first |
+| Pass limit reached | the last review's verdict is carried to the new head, so a push cannot clear a block |
+| `AI_REVIEW_ENABLED=false` | success, from the `verdict-review-off` job |
+| Merge queue commit | success, from `ci-gate.yml`; the PR head already passed |
+
+To override a blocker, someone with write, maintain or admin access who is not the PR author
+comments `/ai-review dispute <reason>`. `.github/workflows/ai-review-dispute.yml` (main's copy,
+no PR code) checks that the current head has a failing verdict, sets it to success as
+"Disputed by @user", reacts 👍 and appends the reason to the review comment; otherwise it replies
+with why it refused. A dispute covers that one commit: a later review of the same commit does not
+re-block it, but a new push gets a new verdict.
+
 ## The Frontend UI Reviewer
 
 `frontend` is one of the **conditional** agents (see `qa` below): it is appended to whatever the
@@ -241,7 +264,8 @@ Delete the `OO_REVIEWER_APP_ID` variable on the repo(s). The next review instant
 
 There is no text skip marker any more: `[skip ci]`, `[skip review]` and `break glass` used to
 disable the review for anyone who could comment, including the model quoting them. The review
-runs only on non-draft PRs labelled `ready-for-ci`, and it is advisory. Removing the label or
+runs only on non-draft PRs labelled `ready-for-ci`; only a ⛔ Significant concerns verdict blocks
+the merge (see the merge gate above). Removing the label or
 converting the PR to draft cancels a review in progress. An audited
 `/review skip` command arrives with v2 (WP-14).
 

@@ -1,3 +1,5 @@
+// A pattern, not a list, so a retired leg's suffixed marker is still claimed; keep in step with the workflow `marker` values.
+export const ANY_REVIEW_MARKER = "<!--\\s*ai-code-review[a-z0-9-]*\\s*-->";
 export const REVIEW_PASS_TAG = "<!--\\s*o2-review-pass:(\\d+)\\s*-->";
 
 export function selectOwnReviewComment(comments, botLogin, markerPattern) {

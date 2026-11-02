@@ -45,3 +45,9 @@ jobs:
               -f state=success -f context=ent-build-status-check -f description="gate passed on the PR head; not re-run on this commit" \
               --jq '"\(.context): \(.state)"'
           fi
+          # The AI review verdict is posted on PR heads only and was already required there; the queue commit needs it too.
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            gh api -X POST "repos/${{ github.repository }}/statuses/$SHA" \
+              -f state=success -f context="AI review verdict" -f description="verdict checked on the PR head; not re-run on this commit" \
+              --jq '"\(.context): \(.state)"'
+          fi

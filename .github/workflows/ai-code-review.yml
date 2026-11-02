@@ -56,6 +56,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+      statuses: write
     strategy:
       fail-fast: false
       matrix:
@@ -100,9 +101,11 @@ jobs:
             echo "PR #$PR_NUMBER is $state; nothing to review."
             exit 0
           fi
+          echo "gate=true" >> "$GITHUB_OUTPUT"
           # Fork PRs need the on-request review of v2 (WP-14); until then they are skipped, never run with secrets.
           if [ "$head_repo" != "$REPO" ]; then
             echo "PR #$PR_NUMBER comes from a fork ($head_repo); skipped."
+            echo "skip=fork" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           merge_base="$(gh api "repos/$REPO/compare/$base_sha...$head_sha" --jq '.merge_base_commit.sha' || true)"
@@ -134,8 +137,9 @@ jobs:
           permission-actions: write
           permission-pull-requests: read
 
+      # Also on skipped forks, which still need the verdict status the engine posts.
       - name: Check out review engine (trusted, from main)
-        if: env.REVIEW_RUN == 'true'
+        if: steps.pr.outputs.gate == 'true'
         uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
@@ -149,6 +153,7 @@ jobs:
 
       # Paired OSS+ENT changes are reviewed once, by the o2-enterprise workflow, which pulls this PR's diff in.
       - name: Defer to a paired o2-enterprise PR
+        id: defer
         if: env.REVIEW_RUN == 'true' && !inputs.ignore_paired
         env:
           ENT_TOKEN: ${{ steps.ent_token.outputs.token }}
@@ -194,6 +199,7 @@ jobs:
           fi
           bash engine/scripts/ai-review/post-paired-pointer.sh "$REPO" "$PR_NUMBER" "$MARKER" "$ent_repo#$ent_pr" "$state" "$BOT_LOGIN" \
             || echo "::warning::Could not post the pointer comment."
+          echo "paired=$ent_repo#$ent_pr" >> "$GITHUB_OUTPUT"
           echo "REVIEW_RUN=false" >> "$GITHUB_ENV"
 
       - name: Check out PR head (data only)
@@ -272,6 +278,7 @@ jobs:
         run: echo "O2_TRACE_ID=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
 
       - name: Run AI Code Review
+        id: review
         if: env.REVIEW_RUN == 'true'
         env:
           GH_TOKEN: ${{ steps.app_token.outputs.token || github.token }}
@@ -309,6 +316,19 @@ jobs:
           REVIEW_ARTIFACT_DIR: ${{ runner.temp }}/ai-review-findings
         run: node engine/scripts/ai-review/run-review.mjs
 
+      # The required "AI review verdict" status; a cancelled run is superseded by the newer run that cancelled it.
+      - name: Post AI review verdict status
+        if: ${{ !cancelled() && steps.pr.outputs.gate == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          SKIP: ${{ steps.pr.outputs.skip }}
+          PAIRED_REF: ${{ steps.defer.outputs.paired }}
+          BASIS: ${{ steps.review.outputs.basis }}
+          VERDICT: ${{ steps.review.outputs.verdict }}
+          TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node engine/scripts/ai-review/verdict-status.mjs
+
       # Parsed reviewer findings and the coordinator's kept list (model output only, scrubbed), for grading coordinator drops.
       - name: Upload review findings
         if: always() && env.REVIEW_RUN == 'true'
@@ -318,3 +338,20 @@ jobs:
           path: ${{ runner.temp }}/ai-review-findings/
           retention-days: 7
           if-no-files-found: ignore
+
+  # With the kill switch on the review job never starts, so the required status is posted here instead.
+  verdict-review-off:
+    if: ${{ vars.AI_REVIEW_ENABLED == 'false' && github.event_name == 'pull_request_target' }}
+    name: verdict (review switched off)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      statuses: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
+            -f state=success -f context="AI review verdict" -f description="AI review is switched off (AI_REVIEW_ENABLED=false); not blocking" \
+            --jq '"\(.context): \(.state)"'
