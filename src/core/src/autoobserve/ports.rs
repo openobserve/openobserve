@@ -764,7 +764,7 @@ mod tests {
     #[tokio::test]
     async fn a_recreated_engine_stream_is_bounded_again() {
         use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
-        let stream = "autoobserve_f5_recreated";
+        let stream = "_o2_autoobserve_f5_recreated";
         let key = format!("{META_ORG_ID}/{}/{stream}", StreamType::Logs);
         let calls = AtomicUsize::new(0);
         let bound = |_: &str| {
@@ -792,5 +792,40 @@ mod tests {
         keep_bounded(stream, bound).await.unwrap();
         assert_eq!(calls.load(SeqCst), 3, "re-created with default settings");
         infra::schema::remove_stream_settings(&key).await;
+    }
+
+    /// The real sink path: the engine's write lands, a user's write to the same stream is refused.
+    #[tokio::test]
+    async fn the_meta_sink_writes_every_engine_stream_and_a_user_cannot() {
+        use ingestion_common::{IngestUser, IngestionRequest};
+        use o2_enterprise::enterprise::autoobserve::names::{decision_kinds, streams};
+        let decisions = streams::decisions(decision_kinds::STREAM_SILENCE);
+        for stream in streams::ALL.iter().copied().chain([decisions.as_str()]) {
+            let row = serde_json::json!({"org_id": "acme", "probe": 1});
+            MetaSink
+                .append(stream, vec![row.clone()])
+                .await
+                .unwrap_or_else(|e| panic!("{stream}: {e}"));
+            let schema = infra::schema::get(META_ORG_ID, stream, StreamType::Logs)
+                .await
+                .unwrap();
+            assert!(
+                schema.field_with_name("probe").is_ok(),
+                "{stream} kept no row"
+            );
+            let body = bytes::Bytes::from(Value::Array(vec![row]).to_string());
+            let user = IngestUser::User("someone@example.com".to_string());
+            let written = crate::logs::ingest::ingest(
+                0,
+                META_ORG_ID,
+                stream,
+                IngestionRequest::JSON(body),
+                user,
+                None,
+                false,
+            )
+            .await;
+            assert!(written.is_err(), "{stream} took a user write");
+        }
     }
 }
