@@ -987,44 +987,43 @@ fn build_session_trace_details_sql(
         } else {
             "''".to_string()
         };
-        let total_tokens_expr = if validated.has_total_tokens {
-            "sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"
-        } else {
-            "0 as gen_ai_usage_details_total"
-        };
-        let cache_read_tokens_expr = optional_sum_expr(
+        let usage = |column: &str| validated.usage_sum(column);
+        let optional_usage =
+            |has_field: bool, column: &str| optional_usage_expr(has_field, &usage(column), column);
+        let input_tokens_expr = usage("gen_ai_usage_input_tokens");
+        let output_tokens_expr = usage("gen_ai_usage_output_tokens");
+        let cost_expr = usage("gen_ai_usage_cost");
+        let total_tokens_expr = optional_usage_expr(
+            validated.has_total_tokens,
+            &usage("gen_ai_usage_total_tokens"),
+            "gen_ai_usage_details_total",
+        );
+        let cache_read_tokens_expr = optional_usage(
             validated.has_cache_read_input_tokens,
             "gen_ai_usage_cache_read_input_tokens",
-            "gen_ai_usage_cache_read_input_tokens",
         );
-        let cache_creation_tokens_expr = optional_sum_expr(
+        let cache_creation_tokens_expr = optional_usage(
             validated.has_cache_creation_input_tokens,
             "gen_ai_usage_cache_creation_input_tokens",
-            "gen_ai_usage_cache_creation_input_tokens",
         );
-        let cost_cache_read_expr = optional_sum_expr(
+        let cost_cache_read_expr = optional_usage(
             validated.has_cost_cache_read_input,
             "gen_ai_usage_cost_cache_read_input",
-            "gen_ai_usage_cost_cache_read_input",
         );
-        let cost_cache_creation_expr = optional_sum_expr(
+        let cost_cache_creation_expr = optional_usage(
             validated.has_cost_cache_creation_input,
             "gen_ai_usage_cost_cache_creation_input",
-            "gen_ai_usage_cost_cache_creation_input",
         );
-        let cost_estimated_without_cache_expr = optional_sum_expr(
+        let cost_estimated_without_cache_expr = optional_usage(
             validated.has_cost_estimated_without_cache,
             "gen_ai_usage_cost_estimated_without_cache",
-            "gen_ai_usage_cost_estimated_without_cache",
         );
-        let cost_cache_read_savings_expr = optional_sum_expr(
+        let cost_cache_read_savings_expr = optional_usage(
             validated.has_cost_cache_read_savings,
             "gen_ai_usage_cost_cache_read_savings",
-            "gen_ai_usage_cost_cache_read_savings",
         );
-        let cost_net_cache_impact_expr = optional_sum_expr(
+        let cost_net_cache_impact_expr = optional_usage(
             validated.has_cost_net_cache_impact,
-            "gen_ai_usage_cost_net_cache_impact",
             "gen_ai_usage_cost_net_cache_impact",
         );
         let unpriced_selects = validated.unpriced_selects();
@@ -1032,10 +1031,10 @@ fn build_session_trace_details_sql(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
-            sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
+            {input_tokens_expr} as gen_ai_usage_details_input, \
+            {output_tokens_expr} as gen_ai_usage_details_output, \
             {total_tokens_expr}, \
-            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+            {cost_expr} as gen_ai_usage_cost_details, \
             {unpriced_selects}, \
             {cache_read_tokens_expr}, \
             {cache_creation_tokens_expr}, \
@@ -1225,11 +1224,40 @@ fn build_session_trace_response_item(
     Some((tid, service_count, hit))
 }
 
-fn optional_sum_expr(has_field: bool, column: &str, alias: &str) -> String {
+/// `<sum_expr> as <alias>` when the column exists, else `0 as <alias>`.
+fn optional_usage_expr(has_field: bool, sum_expr: &str, alias: &str) -> String {
     if has_field {
-        format!("sum({column}) as {alias}")
+        format!("{sum_expr} as {alias}")
     } else {
         format!("0 as {alias}")
+    }
+}
+
+/// Per-row column carrying the span's trace-level `has_leaf_usage_expr`.
+const HAS_LEAF_USAGE_COL: &str = "zo_has_leaf_usage";
+
+/// `FROM ... WHERE <predicate>` for a query that groups spans of several
+/// traces. With `with_leaf_usage` every row also carries its trace's
+/// [`HAS_LEAF_USAGE_COL`] (a window over `trace_id`), so
+/// [`session_usage_sum`] can skip aggregate spans per trace.
+fn session_span_rows_sql(stream_ident: &str, predicate: &str, with_leaf_usage: bool) -> String {
+    if with_leaf_usage {
+        format!(
+            "FROM (SELECT *, {} OVER (PARTITION BY trace_id) AS {HAS_LEAF_USAGE_COL} \
+             FROM {stream_ident} WHERE {predicate})",
+            super::schema_compat::has_leaf_usage_expr()
+        )
+    } else {
+        format!("FROM {stream_ident} WHERE {predicate}")
+    }
+}
+
+/// Usage total over rows produced by [`session_span_rows_sql`].
+fn session_usage_sum(column: &str, with_leaf_usage: bool) -> String {
+    if with_leaf_usage {
+        super::schema_compat::per_trace_usage_sum_expr(column, HAS_LEAF_USAGE_COL)
+    } else {
+        format!("sum({column})")
     }
 }
 
@@ -1487,13 +1515,20 @@ fn build_latest_session_page_sql(
         )
     };
     let direction = sort.order.sql();
+    // Usage sorts must match the totals `build_latest_sessions_sql` reports.
+    let with_leaf_usage = validated.has_gen_ai
+        && validated.has_operation_name
+        && matches!(
+            sort.field,
+            LatestSessionSortField::TotalTokens | LatestSessionSortField::Cost
+        );
     let (sort_projection, order_by) = match sort.field {
         LatestSessionSortField::EndTime => (
             String::new(),
             format!("session_last_activity {direction}, session_id {direction}"),
         ),
         field => {
-            let sort_expression = latest_session_sort_expression(field, validated);
+            let sort_expression = latest_session_sort_expression(field, validated, with_leaf_usage);
             (
                 format!(", {sort_expression} as session_sort_value"),
                 format!(
@@ -1504,11 +1539,15 @@ fn build_latest_session_page_sql(
         }
     };
     let stream_ident = traces::session::quote_identifier(stream_name);
+    let span_rows = session_span_rows_sql(
+        &stream_ident,
+        &format!("{session_id_col} IS NOT NULL AND {session_id_col} != ''"),
+        with_leaf_usage,
+    );
     format!(
         "SELECT {session_id_col} as session_id, \
          max(end_time) as session_last_activity{sort_projection} \
-         FROM {stream_ident} \
-         WHERE {session_id_col} IS NOT NULL AND {session_id_col} != '' \
+         {span_rows} \
          GROUP BY {session_id_col}{membership_filter} \
          ORDER BY {order_by}"
     )
@@ -1517,6 +1556,7 @@ fn build_latest_session_page_sql(
 fn latest_session_sort_expression(
     field: LatestSessionSortField,
     validated: &super::schema_compat::ValidatedLlmSchema,
+    with_leaf_usage: bool,
 ) -> String {
     match field {
         LatestSessionSortField::EndTime => "max(end_time)".to_string(),
@@ -1533,7 +1573,10 @@ fn latest_session_sort_expression(
             } else {
                 "llm_usage_tokens_total"
             };
-            format!("COALESCE(sum({column}), 0)")
+            format!(
+                "COALESCE({}, 0)",
+                session_usage_sum(column, with_leaf_usage)
+            )
         }
         LatestSessionSortField::TotalTokens => "0".to_string(),
         LatestSessionSortField::Cost => {
@@ -1542,7 +1585,10 @@ fn latest_session_sort_expression(
             } else {
                 "llm_usage_cost_total"
             };
-            format!("COALESCE(sum({column}), 0)")
+            format!(
+                "COALESCE({}, 0)",
+                session_usage_sum(column, with_leaf_usage)
+            )
         }
         LatestSessionSortField::Status => {
             "max(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END)".to_string()
@@ -1581,9 +1627,16 @@ fn build_latest_sessions_sql(
         )
     };
 
-    let total_tokens_expr = optional_sum_expr(
+    let with_leaf_usage = validated.has_gen_ai && validated.has_operation_name;
+    let usage = |column: &str| session_usage_sum(column, with_leaf_usage);
+    let optional_usage =
+        |has_field: bool, column: &str| optional_usage_expr(has_field, &usage(column), column);
+    let input_tokens_expr = usage(input_tokens_col);
+    let output_tokens_expr = usage(output_tokens_col);
+    let cost_expr = usage(cost_col);
+    let total_tokens_expr = optional_usage_expr(
         validated.has_total_tokens,
-        total_tokens_col,
+        &usage(total_tokens_col),
         "gen_ai_usage_total_tokens",
     );
     let first_message_expr = if validated.has_input_messages {
@@ -1596,43 +1649,41 @@ fn build_latest_sessions_sql(
         "'' as gen_ai_input_messages".to_string()
     };
 
-    let cache_read_tokens_expr = optional_sum_expr(
+    let cache_read_tokens_expr = optional_usage(
         validated.has_cache_read_input_tokens,
         "gen_ai_usage_cache_read_input_tokens",
-        "gen_ai_usage_cache_read_input_tokens",
     );
-    let cache_creation_tokens_expr = optional_sum_expr(
+    let cache_creation_tokens_expr = optional_usage(
         validated.has_cache_creation_input_tokens,
         "gen_ai_usage_cache_creation_input_tokens",
-        "gen_ai_usage_cache_creation_input_tokens",
     );
-    let cost_cache_read_expr = optional_sum_expr(
+    let cost_cache_read_expr = optional_usage(
         validated.has_cost_cache_read_input,
         "gen_ai_usage_cost_cache_read_input",
-        "gen_ai_usage_cost_cache_read_input",
     );
-    let cost_cache_creation_expr = optional_sum_expr(
+    let cost_cache_creation_expr = optional_usage(
         validated.has_cost_cache_creation_input,
         "gen_ai_usage_cost_cache_creation_input",
-        "gen_ai_usage_cost_cache_creation_input",
     );
-    let cost_estimated_without_cache_expr = optional_sum_expr(
+    let cost_estimated_without_cache_expr = optional_usage(
         validated.has_cost_estimated_without_cache,
         "gen_ai_usage_cost_estimated_without_cache",
-        "gen_ai_usage_cost_estimated_without_cache",
     );
-    let cost_cache_read_savings_expr = optional_sum_expr(
+    let cost_cache_read_savings_expr = optional_usage(
         validated.has_cost_cache_read_savings,
         "gen_ai_usage_cost_cache_read_savings",
-        "gen_ai_usage_cost_cache_read_savings",
     );
-    let cost_net_cache_impact_expr = optional_sum_expr(
+    let cost_net_cache_impact_expr = optional_usage(
         validated.has_cost_net_cache_impact,
-        "gen_ai_usage_cost_net_cache_impact",
         "gen_ai_usage_cost_net_cache_impact",
     );
     let unpriced_selects = validated.unpriced_selects();
     let stream_ident = traces::session::quote_identifier(stream_name);
+    let span_rows = session_span_rows_sql(
+        &stream_ident,
+        &format!("{session_id_col} IN ({session_ids_sql})"),
+        with_leaf_usage,
+    );
 
     format!(
         "SELECT {session_id_col} as session_id, \
@@ -1641,11 +1692,11 @@ fn build_latest_sessions_sql(
          CASE WHEN max(end_time) > min(start_time) \
               THEN max(end_time) - min(start_time) ELSE 0 END as duration, \
          count(DISTINCT trace_id) as trace_count, \
-         sum({input_tokens_col}) as gen_ai_usage_input_tokens, \
-         sum({output_tokens_col}) as gen_ai_usage_output_tokens, \
+         {input_tokens_expr} as gen_ai_usage_input_tokens, \
+         {output_tokens_expr} as gen_ai_usage_output_tokens, \
          {total_tokens_expr}, \
-         sum({cost_col}) as gen_ai_usage_cost, \
-         {unpriced_selects}, \
+        {cost_expr} as gen_ai_usage_cost, \
+        {unpriced_selects}, \
          {cache_read_tokens_expr}, \
          {cache_creation_tokens_expr}, \
          {cost_cache_read_expr}, \
@@ -1657,8 +1708,7 @@ fn build_latest_sessions_sql(
          array_agg(DISTINCT {user_id_col}) \
              FILTER (WHERE {user_id_col} IS NOT NULL AND {user_id_col} != '') as user_ids, \
          {first_message_expr} \
-         FROM {stream_ident} \
-         WHERE {session_id_col} IN ({session_ids_sql}) \
+         {span_rows} \
          GROUP BY {session_id_col}"
     )
 }
@@ -2151,23 +2201,182 @@ mod tests {
         let mut legacy = super::super::schema_compat::ValidatedLlmSchema::fallback(false);
         legacy.has_total_tokens = true;
         assert_eq!(
-            latest_session_sort_expression(LatestSessionSortField::UserId, &legacy),
+            latest_session_sort_expression(LatestSessionSortField::UserId, &legacy, false),
             "min(NULLIF(llm_user_id, ''))"
         );
         assert_eq!(
-            latest_session_sort_expression(LatestSessionSortField::TotalTokens, &legacy),
+            latest_session_sort_expression(LatestSessionSortField::TotalTokens, &legacy, false),
             "COALESCE(sum(llm_usage_tokens_total), 0)"
         );
         assert_eq!(
-            latest_session_sort_expression(LatestSessionSortField::Cost, &legacy),
+            latest_session_sort_expression(LatestSessionSortField::Cost, &legacy, false),
             "COALESCE(sum(llm_usage_cost_total), 0)"
         );
 
         legacy.has_total_tokens = false;
         assert_eq!(
-            latest_session_sort_expression(LatestSessionSortField::TotalTokens, &legacy),
+            latest_session_sort_expression(LatestSessionSortField::TotalTokens, &legacy, false),
             "0"
         );
+    }
+
+    const NON_AGGREGATE: &str = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name NOT IN \
+                                 ('invoke_agent', 'invoke_workflow', 'chain', 'task'))";
+
+    fn leaf_usage_window() -> String {
+        format!(
+            "max(CASE WHEN {NON_AGGREGATE} AND (gen_ai_usage_input_tokens > 0 OR \
+             gen_ai_usage_output_tokens > 0) THEN 1 ELSE 0 END) OVER (PARTITION BY trace_id) \
+             AS zo_has_leaf_usage"
+        )
+    }
+
+    fn with_operation_name() -> super::super::schema_compat::ValidatedLlmSchema {
+        let mut validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        validated.has_total_tokens = true;
+        validated.has_cache_read_input_tokens = true;
+        validated.has_operation_name = true;
+        validated
+    }
+
+    #[test]
+    fn session_trace_details_sql_skips_aggregate_spans_with_fallback() {
+        let sql = build_session_trace_details_sql(
+            "default",
+            &with_operation_name(),
+            false,
+            "service_name",
+            "trace_id IN ('t1')",
+        );
+        let has_leaf = format!(
+            "max(CASE WHEN {NON_AGGREGATE} AND (gen_ai_usage_input_tokens > 0 OR \
+             gen_ai_usage_output_tokens > 0) THEN 1 ELSE 0 END)"
+        );
+        for (column, alias) in [
+            ("gen_ai_usage_input_tokens", "gen_ai_usage_details_input"),
+            ("gen_ai_usage_output_tokens", "gen_ai_usage_details_output"),
+            ("gen_ai_usage_total_tokens", "gen_ai_usage_details_total"),
+            ("gen_ai_usage_cost", "gen_ai_usage_cost_details"),
+            (
+                "gen_ai_usage_cache_read_input_tokens",
+                "gen_ai_usage_cache_read_input_tokens",
+            ),
+        ] {
+            let expected = format!(
+                "CASE WHEN {has_leaf} = 1 THEN sum(CASE WHEN {NON_AGGREGATE} THEN {column} END) \
+                 ELSE sum({column}) END as {alias}"
+            );
+            assert!(sql.contains(&expected), "{alias}: {sql}");
+        }
+        assert!(sql.contains("0 as gen_ai_usage_cache_creation_input_tokens"));
+        assert!(sql.contains("GROUP BY trace_id"));
+    }
+
+    #[test]
+    fn latest_sessions_sql_sums_each_trace_without_aggregate_spans() {
+        let sql = build_latest_sessions_sql(
+            "bench_traces",
+            &["session-1".to_string()],
+            &with_operation_name(),
+        );
+        assert!(
+            sql.contains(&format!(
+                "FROM (SELECT *, {} FROM \"bench_traces\" \
+                 WHERE gen_ai_conversation_id IN ('session-1')) GROUP BY gen_ai_conversation_id",
+                leaf_usage_window()
+            )),
+            "{sql}"
+        );
+        for column in [
+            "gen_ai_usage_input_tokens",
+            "gen_ai_usage_output_tokens",
+            "gen_ai_usage_total_tokens",
+            "gen_ai_usage_cost",
+            "gen_ai_usage_cache_read_input_tokens",
+        ] {
+            let expected = format!(
+                "sum(CASE WHEN zo_has_leaf_usage = 0 OR {NON_AGGREGATE} THEN {column} END) \
+                 as {column}"
+            );
+            assert!(sql.contains(&expected), "{column}: {sql}");
+        }
+    }
+
+    #[test]
+    fn session_sql_without_operation_name_keeps_plain_sums() {
+        let mut validated = with_operation_name();
+        validated.has_operation_name = false;
+        let sessions =
+            build_latest_sessions_sql("bench_traces", &["session-1".to_string()], &validated);
+        let details = build_session_trace_details_sql(
+            "bench_traces",
+            &validated,
+            false,
+            "service_name",
+            "trace_id IN ('t1')",
+        );
+        let page = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &LatestSessionSearch::default(),
+            &sort(LatestSessionSortField::Cost, LatestSessionSortOrder::Desc),
+            &validated,
+        );
+        for sql in [&sessions, &details, &page] {
+            assert!(!sql.contains("gen_ai_operation_name"), "{sql}");
+            assert!(!sql.contains("OVER (PARTITION BY trace_id)"), "{sql}");
+        }
+        assert!(sessions.contains("sum(gen_ai_usage_input_tokens) as gen_ai_usage_input_tokens"));
+        assert!(sessions.contains("FROM \"bench_traces\" WHERE gen_ai_conversation_id IN"));
+        assert!(details.contains("sum(gen_ai_usage_cost) as gen_ai_usage_cost_details"));
+        assert!(page.contains("COALESCE(sum(gen_ai_usage_cost), 0) as session_sort_value"));
+    }
+
+    #[test]
+    fn session_page_usage_sorts_match_per_trace_totals() {
+        let validated = with_operation_name();
+        for (field, column) in [
+            (
+                LatestSessionSortField::TotalTokens,
+                "gen_ai_usage_total_tokens",
+            ),
+            (LatestSessionSortField::Cost, "gen_ai_usage_cost"),
+        ] {
+            let sql = build_latest_session_page_sql(
+                "bench_traces",
+                "",
+                &LatestSessionSearch::default(),
+                &sort(field, LatestSessionSortOrder::Desc),
+                &validated,
+            );
+            assert!(
+                sql.contains(&format!(
+                    "COALESCE(sum(CASE WHEN zo_has_leaf_usage = 0 OR {NON_AGGREGATE} \
+                     THEN {column} END), 0) as session_sort_value"
+                )),
+                "{sql}"
+            );
+            assert!(
+                sql.contains(&format!(
+                    "FROM (SELECT *, {} FROM \"bench_traces\" WHERE gen_ai_conversation_id IS \
+                     NOT NULL AND gen_ai_conversation_id != '') GROUP BY gen_ai_conversation_id",
+                    leaf_usage_window()
+                )),
+                "{sql}"
+            );
+        }
+        // Sorts that don't read usage keep the plain single-table shape.
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &LatestSessionSearch::default(),
+            &sort(
+                LatestSessionSortField::TraceCount,
+                LatestSessionSortOrder::Desc,
+            ),
+            &validated,
+        );
+        assert!(!sql.contains("zo_has_leaf_usage"), "{sql}");
     }
 
     // ── List search (`keyword`) ─────────────────────────────────────────────

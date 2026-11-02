@@ -37,8 +37,8 @@ use arrow_schema::Schema;
 use config::meta::{
     stream::StreamType,
     traces::{
-        GEN_AI_SENTINEL_COLUMN, OPTIONAL_GEN_AI_FIELDS, OPTIONAL_LLM_FIELDS,
-        REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
+        AGGREGATE_GEN_AI_OPERATIONS, GEN_AI_OPERATION_NAME_COLUMN, GEN_AI_SENTINEL_COLUMN,
+        OPTIONAL_GEN_AI_FIELDS, OPTIONAL_LLM_FIELDS, REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
     },
 };
 
@@ -94,19 +94,84 @@ pub(super) fn columns_for(schema: &Schema) -> LlmColumns {
     }
 }
 
+/// Whether a new-schema stream stores `gen_ai_operation_name`, which usage
+/// totals need to tell aggregate (agent/workflow) spans from LLM calls.
+pub(super) fn has_operation_name(schema: &Schema) -> bool {
+    has_gen_ai_fields(schema) && schema.field_with_name(GEN_AI_OPERATION_NAME_COLUMN).is_ok()
+}
+
+/// Schema facts for callers that only need the generation and usage layout.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) struct StreamLlmLayout {
+    pub(super) has_gen_ai: bool,
+    pub(super) has_operation_name: bool,
+}
+
 /// Fetch the stream's Arrow schema from cache and decide whether it uses the
-/// new `gen_ai_*` columns. Streams missing from the cache default to `false`
-/// (legacy) so query SQL never references columns that aren't there for an
-/// unknown stream.
-pub(super) async fn stream_has_gen_ai_fields(
+/// new `gen_ai_*` columns and stores the operation name. Streams missing from
+/// the cache default to legacy so query SQL never references columns that
+/// aren't there for an unknown stream.
+pub(super) async fn stream_llm_layout(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-) -> bool {
+) -> StreamLlmLayout {
     infra::schema::get_stream_schema_from_cache(org_id, stream_name, stream_type)
         .await
-        .map(|s| has_gen_ai_fields(&s))
-        .unwrap_or(false)
+        .map(|s| StreamLlmLayout {
+            has_gen_ai: has_gen_ai_fields(&s),
+            has_operation_name: has_operation_name(&s),
+        })
+        .unwrap_or_default()
+}
+
+/// Spans whose usage is their own rather than a roll-up of their children's.
+/// A span without an operation name counts as non-aggregate.
+pub(super) fn non_aggregate_span_predicate() -> String {
+    let ops = AGGREGATE_GEN_AI_OPERATIONS
+        .iter()
+        .map(|op| format!("'{op}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "({GEN_AI_OPERATION_NAME_COLUMN} IS NULL OR {GEN_AI_OPERATION_NAME_COLUMN} NOT IN ({ops}))"
+    )
+}
+
+/// `1` when the span group (trace) has a non-aggregate span reporting tokens,
+/// else `0`. When it is `1`, aggregate spans only repeat usage already counted.
+pub(super) fn has_leaf_usage_expr() -> String {
+    format!(
+        "max(CASE WHEN {} AND (gen_ai_usage_input_tokens > 0 OR gen_ai_usage_output_tokens > 0) \
+         THEN 1 ELSE 0 END)",
+        non_aggregate_span_predicate()
+    )
+}
+
+/// Sum a new-schema usage column over a span group without double-counting
+/// aggregate spans: sums non-aggregate spans when any of them reports tokens,
+/// otherwise every span (usage reported only on an agent span). Without the
+/// operation-name column aggregate spans are indistinguishable, so it is a
+/// plain sum.
+pub(super) fn usage_sum_expr(column: &str, has_operation_name: bool) -> String {
+    if !has_operation_name {
+        return format!("sum({column})");
+    }
+    format!(
+        "CASE WHEN {} = 1 THEN sum(CASE WHEN {} THEN {column} END) ELSE sum({column}) END",
+        has_leaf_usage_expr(),
+        non_aggregate_span_predicate()
+    )
+}
+
+/// Like [`usage_sum_expr`] for rows that already carry their trace's
+/// [`has_leaf_usage_expr`] value in `has_leaf_usage_col`, so the sum can span
+/// several traces (e.g. a session) while each trace keeps its own fallback.
+pub(super) fn per_trace_usage_sum_expr(column: &str, has_leaf_usage_col: &str) -> String {
+    format!(
+        "sum(CASE WHEN {has_leaf_usage_col} = 0 OR {} THEN {column} END)",
+        non_aggregate_span_predicate()
+    )
 }
 
 /// Validated schema metadata for an LLM trace stream.
@@ -135,6 +200,9 @@ pub(super) struct ValidatedLlmSchema {
     pub(super) has_cost_net_cache_impact: bool,
     /// `gen_ai_usage_cost_status` exists (ingest marks unpriced / approximate spans).
     pub(super) has_cost_status: bool,
+    /// New schema with `gen_ai_operation_name`; usage totals then skip
+    /// aggregate spans (see [`usage_sum_expr`]).
+    pub(super) has_operation_name: bool,
 }
 
 impl ValidatedLlmSchema {
@@ -198,7 +266,13 @@ impl ValidatedLlmSchema {
             has_cost_cache_read_savings: false,
             has_cost_net_cache_impact: false,
             has_cost_status: false,
+            has_operation_name: false,
         }
+    }
+
+    /// [`usage_sum_expr`] for this stream's layout.
+    pub(super) fn usage_sum(&self, column: &str) -> String {
+        usage_sum_expr(column, self.has_operation_name)
     }
 }
 
@@ -283,6 +357,7 @@ pub(super) fn validate_llm_schema(
             && schema
                 .field_with_name(config::meta::model_pricing::COST_STATUS_COLUMN)
                 .is_ok(),
+        has_operation_name: has_operation_name(schema),
     })
 }
 
