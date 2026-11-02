@@ -45,6 +45,7 @@ import type {
   Rotation,
   PutTelephonyBody,
   RoutingConfig,
+  SetTeamChannelBody,
   TeamLoad,
   TelephonyStatus,
   TelephonyView,
@@ -599,13 +600,16 @@ export const setTeamPolicyMutation = (org: string, teamId: string) =>
 
 export const setTeamChannelMutation = (org: string, teamId: string) =>
   mutationOptions({
-    mutationFn: (destinations: string[] | null) =>
-      oncallService.setTeamChannel({
-        org_identifier: org,
-        team_id: teamId,
-        data: { destinations },
-      }),
+    mutationFn: (data: SetTeamChannelBody) =>
+      oncallService.setTeamChannel({ org_identifier: org, team_id: teamId, data }),
     meta: { invalidates: [oncallKeys.team(org, teamId)], silentError: true },
+  });
+
+/** RO-6: posts one plain message and writes no row, so it expires nothing. */
+export const testTeamSlackChannelMutation = (org: string, teamId: string) =>
+  mutationOptions({
+    mutationFn: () => oncallService.testTeamSlackChannel({ org_identifier: org, team_id: teamId }),
+    meta: { silentError: true },
   });
 
 export const createOverrideMutation = (org: string, teamId: string) =>
