@@ -75,6 +75,14 @@ describe("useQueryPlaceholder", () => {
     `);
   });
 
+  it("puts the given columns in the SQL examples", () => {
+    expect(examplesFor({ excludeMatchAll: true, sqlColumns: ref("trace_id") }, true)).toEqual([
+      "SELECT trace_id FROM stream WHERE level = 'error'",
+      "SELECT trace_id FROM stream WHERE level = 'error' AND status >= 500",
+      "SELECT trace_id FROM stream WHERE level = 'error' OR status >= 500",
+    ]);
+  });
+
   it("keeps the RUM list (no options, no values) unchanged", () => {
     expect(examplesFor(undefined, false, {})).toMatchInlineSnapshot(`
       [

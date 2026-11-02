@@ -802,6 +802,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
         </div>
+        <div v-if="showSqlExamples" class="absolute end-2 top-1 z-2">
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="xs"
+                icon-right="arrow-drop-down"
+                data-test="traces-sql-examples-btn"
+              >
+                {{ t("traces.sqlMode.examples") }}
+              </OButton>
+            </template>
+            <ODropdownItem
+              v-for="tpl in sqlTemplates"
+              :key="tpl.id"
+              :description="templateDescription(tpl)"
+              data-test="traces-sql-examples-item"
+              @select="writeEditor(tpl.sql)"
+            >
+              {{ templateName(tpl) }}
+            </ODropdownItem>
+          </ODropdown>
+        </div>
       </div>
     </div>
     <RecentSearchesDrawer
@@ -847,9 +870,15 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
-import { analyzeTracesSql, buildTracesSql, sqlToFilter } from "@/utils/traces/tracesSql";
-import { isSqlQuery } from "@/utils/query/sqlUtils";
-import { looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
+import {
+  analyzeTracesSql,
+  buildTraceSelectorSql,
+  buildTracesSql,
+  sqlToFilter,
+} from "@/utils/traces/tracesSql";
+import type { TracesSqlTemplate } from "@/utils/traces/tracesSqlTemplates";
+import { useTracesSqlTemplateText } from "@/plugins/traces/composables/useTracesSqlTemplates";
+import { isAuthoredStatement, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
 import { nlSqlToTracesFilter } from "@/plugins/traces/utils/nlSqlToTracesFilter";
 import { chartInterval } from "./metrics/latencyHeatmap";
 import { buildTracesRedPanels, tracesBucketNotice } from "./metrics/tracesRedPanels";
@@ -1006,6 +1035,10 @@ export default defineComponent({
     refreshLastRunAt: {
       type: Number as PropType<number | null>,
       default: null,
+    },
+    sqlTemplates: {
+      type: Array as PropType<TracesSqlTemplate[]>,
+      default: () => [],
     },
   },
   methods: {
@@ -1272,7 +1305,7 @@ export default defineComponent({
     const updateQueryValue = (value: string) => {
       _sqlOnQueryChange();
       updateAutoComplete(value);
-      if (searchObj.meta.sqlMode && value.trim() !== "" && !isSqlQuery(value)) {
+      if (searchObj.meta.sqlMode && value.trim() !== "" && !isAuthoredStatement(value)) {
         searchObj.meta.sqlMode = false;
         return;
       }
@@ -1295,6 +1328,14 @@ export default defineComponent({
       setEditorValue(text);
     };
 
+    const { templateName, templateDescription } = useTracesSqlTemplateText();
+    const showSqlExamples = computed(
+      () =>
+        !!searchObj.meta.sqlMode &&
+        !!String(searchObj.data.editorValue ?? "").trim() &&
+        props.sqlTemplates.length > 0,
+    );
+
     // OSwitch flips its own state on click, so a refused switch off remounts it to show the mode again.
     const sqlSwitchKey = ref(0);
 
@@ -1305,18 +1346,26 @@ export default defineComponent({
       const text = String(searchObj.data.editorValue ?? "").trim();
       if (on) {
         searchObj.meta.sqlMode = true;
-        if (stream && !isSqlQuery(text)) {
+        // An empty editor keeps SQL mode on with nothing typed, so the template gallery shows.
+        if (stream && text && !isAuthoredStatement(text)) {
+          const filter = resolveTracesFilter(text, tracesParser.value, stream);
           writeEditor(
-            buildTracesSql(stream, resolveTracesFilter(text, tracesParser.value, stream)),
+            searchObj.meta.searchMode === "traces"
+              ? buildTraceSelectorSql(stream, filter)
+              : buildTracesSql(stream, filter),
           );
         }
         return;
       }
-      if (!isSqlQuery(text)) {
+      if (!isAuthoredStatement(text)) {
         searchObj.meta.sqlMode = false;
         return;
       }
-      const { filter, dropped } = sqlToFilter(analyzeTracesSql(text, tracesParser.value), stream);
+      const { filter, dropped } = sqlToFilter(
+        analyzeTracesSql(text, tracesParser.value),
+        stream,
+        searchObj.meta.searchMode === "traces",
+      );
       if (dropped.length) {
         moreMenuOpen.value = false;
         const confirmed = await confirm({
@@ -1621,7 +1670,10 @@ export default defineComponent({
       _traceSqlMode,
       _traceNoStream,
       t,
-      { excludeMatchAll: true },
+      {
+        excludeMatchAll: true,
+        sqlColumns: computed(() => (searchObj.meta.searchMode === "traces" ? "trace_id" : "*")),
+      },
     );
 
     const orgId = useOrgId();
@@ -1990,6 +2042,10 @@ export default defineComponent({
       sqlSwitchKey,
       showPinnedSavedViews,
       setSqlMode,
+      showSqlExamples,
+      templateName,
+      templateDescription,
+      writeEditor,
       tracesSavedViews,
       isSavingView,
       saveViewDialogOpen,

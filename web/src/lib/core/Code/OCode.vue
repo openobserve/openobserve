@@ -7,6 +7,7 @@ import { useI18nTyped } from "@/types/i18n";
 
 withDefaults(defineProps<CodeProps>(), {
   block: false,
+  wrap: false,
   copyable: false,
   truncate: false,
   tooltip: undefined,
@@ -48,7 +49,10 @@ const { t } = useI18nTyped();
     class="rounded-default border-code-border bg-code-block-bg text-code-block-text relative block w-full overflow-x-auto border"
   ><code
       ref="codeRef"
-      class="block px-3 py-2 text-xs font-mono leading-relaxed whitespace-pre"
+      :class="[
+        'block px-3 py-2 text-xs font-mono leading-relaxed',
+        wrap ? 'whitespace-pre-wrap wrap-anywhere' : 'whitespace-pre',
+      ]"
     ><slot /></code><button
       v-if="copyable"
       type="button"
