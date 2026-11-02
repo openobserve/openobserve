@@ -15,6 +15,7 @@
 
 use std::{
     cmp::{max, min},
+    collections::BTreeSet,
     sync::Arc,
 };
 
@@ -42,8 +43,8 @@ use infra::{
 use promql::{
     DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end,
     ast::{
-        at_modifier::resolve_query, result_order::top_level_order,
-        selector_window::selector_window, subquery_grid::max_subquery_steps,
+        at_modifier::resolve_query, name_visitor::MetricNameVisitor, result_order::top_level_order,
+        selector_window::selector_window, subquery_grid::max_subquery_steps, visitor::walk_expr,
     },
     micros,
 };
@@ -283,6 +284,7 @@ async fn search_in_cluster(
     let ast = promql::parse(&req.query.as_ref().unwrap().query)
         .map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?;
     let window = selector_window(&ast);
+    let stream_name = usage_stream_name(&ast);
 
     let &cluster_rpc::MetricsQueryStmt {
         ref query,
@@ -371,6 +373,26 @@ async fn search_in_cluster(
         } else {
             merge_matrix_query(&cached_values, &req.org_id, &mut warnings).await?
         };
+        let req_stats = RequestStats {
+            result_cache_ratio: Some(100),
+            ..request_stats(
+                &req,
+                user_email,
+                trace_id,
+                (original_start, end),
+                start_ins.elapsed().as_secs_f64(),
+            )
+        };
+        usage_reporting::report_request_usage_stats(
+            req_stats,
+            &req.org_id,
+            &stream_name,
+            StreamType::Metrics,
+            UsageType::MetricSearch,
+            0,
+            started_at,
+        )
+        .await;
 
         return Ok(SearchResponse {
             value: values,
@@ -542,21 +564,19 @@ async fn search_in_cluster(
     let req_stats = RequestStats {
         records: scan_stats.records,
         size: scan_stats.original_size as f64,
-        response_time: start_ins.elapsed().as_secs_f64(),
-        request_body: Some(query.to_string()),
-        user_email: Some(user_email.to_string()),
-        min_ts: Some(start),
-        max_ts: Some(end),
-        trace_id: Some(trace_id.to_string()),
-        search_event_context: req.search_event_context.map(Into::into),
-        search_type: req.search_event_type.parse::<SearchEventType>().ok(),
-        ..Default::default()
+        ..request_stats(
+            &req,
+            user_email,
+            trace_id,
+            (start, end),
+            start_ins.elapsed().as_secs_f64(),
+        )
     };
 
     usage_reporting::report_request_usage_stats(
         req_stats,
         &req.org_id,
-        "", // TODO see if we can add metric name
+        &stream_name,
         StreamType::Metrics,
         UsageType::MetricSearch,
         0,
@@ -606,6 +626,38 @@ fn is_root_subquery(expr: &parser::Expr) -> bool {
     match expr {
         parser::Expr::Paren(paren) => is_root_subquery(&paren.expr),
         expr => matches!(expr, parser::Expr::Subquery(_)),
+    }
+}
+
+/// The streams the query's selectors read, comma-joined as SQL searches report several streams.
+fn usage_stream_name(ast: &parser::Expr) -> String {
+    let mut visitor = MetricNameVisitor::new();
+    // a nameless selector fails the query before any usage is reported
+    if walk_expr(&mut visitor, ast).is_err() {
+        return String::new();
+    }
+    let streams: BTreeSet<String> = visitor.into_names().into_iter().collect();
+    streams.into_iter().collect::<Vec<_>>().join(",")
+}
+
+/// The usage fields every PromQL search reports, before what it scanned.
+fn request_stats(
+    req: &cluster_rpc::MetricsQueryRequest,
+    user_email: &str,
+    trace_id: &str,
+    (min_ts, max_ts): (i64, i64),
+    response_time: f64,
+) -> RequestStats {
+    RequestStats {
+        response_time,
+        request_body: req.query.as_ref().map(|stmt| stmt.query.clone()),
+        user_email: Some(user_email.to_string()),
+        min_ts: Some(min_ts),
+        max_ts: Some(max_ts),
+        trace_id: Some(trace_id.to_string()),
+        search_event_context: req.search_event_context.clone().map(Into::into),
+        search_type: req.search_event_type.parse::<SearchEventType>().ok(),
+        ..Default::default()
     }
 }
 
@@ -1077,6 +1129,26 @@ mod tests {
                     assert_eq!(row.samples[0].value, i as f64);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_usage_stream_name() {
+        for (query, expected) in [
+            ("up", "up"),
+            ("up + up", "up"),
+            ("rate(http_total[5m])", "http_total"),
+            ("max_over_time(rate(http_total[5m])[30m:1m])", "http_total"),
+            (r#"{__name__="up", job="api"}"#, "up"),
+            (
+                "mem_used / on(host) cpu_usage + up",
+                "cpu_usage,mem_used,up",
+            ),
+            ("vector(1) + 2", ""),
+            (r#"{__name__=~"up|down"}"#, ""),
+        ] {
+            let ast = promql::parse(query).unwrap();
+            assert_eq!(usage_stream_name(&ast), expected, "{query}");
         }
     }
 }

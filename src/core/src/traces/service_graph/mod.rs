@@ -67,7 +67,7 @@ pub(crate) async fn run_graph_search(
         regions: vec![],
         clusters: vec![],
         timeout: 300, // 5 minute timeout for large queries
-        search_type: None,
+        search_type: Some(config::meta::search::SearchEventType::Other),
         search_event_context: None,
         use_cache: false,
         clear_cache: false,
