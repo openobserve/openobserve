@@ -2149,6 +2149,12 @@ describe("AlertList - trigger", () => {
     expect(calls).toEqual([{ variant: "warning", message }]);
   });
 
+  it("warns with the reason when the trigger ran but something was not delivered", async () => {
+    const warning = "not paged: On-Call is not included in your license";
+    const calls = await triggerWith({ message: "Alert triggered", warning });
+    expect(calls).toEqual([{ variant: "warning", message: warning }]);
+  });
+
   it("warns instead of claiming success when a detection run already holds the claim", async () => {
     const calls = await triggerWith({ claim_lost: true, message: "already running" });
     expect(calls).toEqual([

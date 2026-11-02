@@ -3720,7 +3720,9 @@ export default defineComponent({
                   variant: "warning",
                   message: res.data.message || t("alerts.messages.triggerAlertFailed"),
                 }
-              : { variant: "success", message: t("alerts.alertTriggeredSuccess") },
+              : res?.data?.warning
+                ? { variant: "warning", message: raw(res.data.warning) }
+                : { variant: "success", message: t("alerts.alertTriggeredSuccess") },
         );
         if (row.type === "anomaly") {
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
