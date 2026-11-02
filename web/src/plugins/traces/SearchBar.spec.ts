@@ -1052,13 +1052,15 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
     });
 
-    it("should be hidden while a search is loading", async () => {
+    it("should stay in place but disabled while a search is loading", async () => {
       applySearch();
       searchObjInstance.loading = true;
       wrapper = mountSearchBar();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+      const btn = wrapper.find('[data-test="insights-button"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("disabled")).toBeDefined();
     });
 
     it("should be hidden when the org has no trace streams", async () => {

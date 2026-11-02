@@ -14,12 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The query-param keys that mark a `/metrics` URL as an *editor* deep link.
+ * The query-param keys that mark a `/metrics` URL as an editor deep link, which opens in Visualize.
  *
  * Deliberately a standalone, dependency-free module. The router guard needs
- * these keys to decide whether `/metrics` should redirect to `/metrics/editor`,
- * and importing the full `metricsParamRegistry` would drag the Vuex store into
- * the router's module graph (the registry needs it to clone a default panel).
+ * these keys on every `/metrics` visit, and importing the full
+ * `metricsParamRegistry` would drag the Vuex store into the router's module
+ * graph (the registry needs it to clone a default panel).
  *
  * `metricsParamRegistry.spec.ts` asserts this list stays in sync with the
  * registry's actual descriptors, so the two cannot drift apart.
@@ -48,5 +48,16 @@ export function hasMetricsEditorParams(query: Record<string, any> | undefined | 
   return Object.keys(query).some((raw) => {
     const base = raw.split(".")[0];
     return (METRICS_EDITOR_PARAM_KEYS as readonly string[]).includes(base);
+  });
+}
+
+/** Whether a URL carries editor params other than the `metrics_data` blob, which Visualize cannot read. */
+export function hasMetricsOverrideParams(query: Record<string, any> | undefined | null): boolean {
+  if (!query) return false;
+  return Object.keys(query).some((raw) => {
+    const base = raw.split(".")[0];
+    return (
+      base !== "metrics_data" && (METRICS_EDITOR_PARAM_KEYS as readonly string[]).includes(base)
+    );
   });
 }

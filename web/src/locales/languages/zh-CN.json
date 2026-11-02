@@ -1315,7 +1315,6 @@
       "moreExamples": "更多示例，",
       "clickHere": "请点击此处"
     },
-    "legendLabel": "图例",
     "switchToLogs": "切换回日志",
     "savedViewsLabel": "已保存的视图",
     "savedViewName": "查看名称",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "公式 {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} 不是此面板中的查询",
-    "formulaReferencesFormula": "{letter} 是公式，而公式不能引用另一个公式",
+    "formulaCycle": "公式之间形成循环引用：{cycle}",
+    "formulaTooLong": "公式展开后超过 {limit} 个字符",
+    "formulaTooDeep": "公式嵌套层数超过 {limit} 层",
     "formulaInputNote": "用于公式时，此查询的即时/范围设置、图例、步长和时间偏移均不适用。",
     "multiSqlQueryLabel": "查询标签",
     "multiSqlQueryLabelHint": "图例中此查询的自定义名称（例如，“生产”）",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "值",
     "hostmapGroupBy": "分组依据",
     "otherColumn": "其他列",
-    "metric": "指标",
     "filters": "筛选",
     "labelFilters": "标签过滤器",
     "operations": "操作",
@@ -13604,21 +13604,6 @@
     "awsStsSelfHostedInfo": "这使用 AWS sts 来代入角色并执行操作。确保您在安装环境中配置了有权访问此角色的 aws 证书。"
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "对于即时向量选择器，使用",
-      "rangeVector": "对于范围向量选择器，使用",
-      "aggregate": "要聚合数据，使用",
-      "or": "或",
-      "rate": "对于范围向量上的速率计算，使用",
-      "sqlTitle": "语法指南：SQL模式",
-      "sqlFullText": "要对值'error'进行全文搜索，使用",
-      "sqlColumn": "要对值'error'进行列搜索，使用",
-      "sqlCode": "要搜索code列的值为200，使用",
-      "sqlStream": "要搜索stream列的值为'stderr'，使用",
-      "sqlFunction": "要对log列搜索并使用查询函数{fn}，使用",
-      "sqlMoreExamples": "更多示例，",
-      "sqlClickHere": "点击此处"
-    },
     "add": "添加",
     "runQuery": "查询",
     "runQueryOptions": "查询运行选项",
@@ -13734,7 +13719,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "添加到仪表盘",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "平均值",
+          "sortAvgTitle": "按值在窗口内的平均值进行排序",
+          "sortOutlying": "离群",
+          "sortOutlyingTitle": "按序列偏离其他序列的程度对值进行排序",
+          "outlier": "离群值"
         },
         "related": {
           "empty": "无相关指标",
@@ -13859,9 +13849,9 @@
         "selectLabel": "选择一个标签",
         "invalidLabel": "无效的标签名称。",
         "selectOrTypeValue": "选择或输入一个值",
-        "operatorHelp": "=  等于此值\n!=  不等于此值\n=~  匹配正则表达式 — 使用 500{'|'}503 匹配任一\n!~  不匹配正则表达式\n\n过滤器以 AND 方式组合。要匹配两个值中的任一，请使用 =~ 并配合正则表达式。",
+        "operatorHelp": "=  精确匹配此值\n!=  匹配除此值以外的任何值\n=~  匹配正则表达式 — 使用 500{'|'}503 可匹配其中任一值\n!~  不匹配正则表达式\n\n过滤器使用 AND 组合。要匹配两个值中的任一值，请使用 =~ 配合正则表达式，或添加 OR 组。",
         "andSeparator": "和",
-        "andSeparatorTitle": "过滤器以 AND 方式组合 — 指标必须匹配所有条件。要匹配两个值中的任一，请使用 =~ 运算符配合正则表达式。",
+        "andSeparatorTitle": "过滤器使用 AND 组合 — 指标必须匹配所有过滤器。要匹配两个值中的任一值，请使用 =~ 运算符配合正则表达式，或添加 OR 组。",
         "noSuggestions": "无建议 — 请输入一个值。",
         "moreFilters": "+{count} 更多",
         "moreFiltersTooltip": "点击以在内联中显示所有过滤器",
@@ -13901,11 +13891,16 @@
         "deleteMessage": "要为本组织中的所有人删除视图 {name} 吗？",
         "modified": "{name}（已修改）",
         "clear": "清除视图"
-      }
-    },
-    "index": {
-      "namePanelRequired": "面板名称是必填项",
-      "errorsFixTryAgain": "存在一些错误，请修正后重试"
+      },
+      "sortDashboards": "仪表盘",
+      "sortDashboardsTitle": "仪表盘中用得最多的优先",
+      "sortAlerts": "告警",
+      "sortAlertsTitle": "告警中用得最多的优先",
+      "usageInDashboards": "仪表盘中",
+      "usageHasAlerts": "有告警",
+      "usageInSlos": "SLO 中",
+      "usageLoading": "正在加载指标的使用情况",
+      "usageFailed": "使用情况不可用，请重试"
     },
     "metricCard": {
       "lastRefreshed": "上次刷新时间：",
@@ -13917,25 +13912,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "渲染图表失败"
-    },
-    "queryBuilder": {
-      "title": "PromQL 查询构建器",
-      "subtitle": "可视化构建和测试 PromQL 查询",
-      "generatedQuery": "生成的 PromQL 查询：",
-      "noQueryBuilt": "尚未构建查询",
-      "copyQuery": "复制查询",
-      "clearAll": "全部清除",
-      "testQuery": "测试查询",
-      "queryResultPreview": "查询结果预览：",
-      "queryCopied": "查询已复制到剪贴板！",
-      "queryCleared": "查询已清除",
-      "testingSoon": "查询测试功能即将实现",
-      "executionSoon": "查询执行将在下一阶段实现"
-    },
-    "metricSelector": {
-      "metricName": "指标名称",
-      "loadingMetrics": "正在加载指标...",
-      "noMetricsFound": "未找到任何指标"
     },
     "labelFilterEditor": {
       "label": "标签",
@@ -13958,8 +13934,6 @@
       "noMetric": "构建器需要针对一个具名指标的查询",
       "mismatch": "构建器无法精确显示此查询",
       "constructs": {
-        "without": "一个 without (…) 分组",
-        "offset": "一个 offset 修饰符",
         "at": "一个 {'@'} 修饰符",
         "orMatchers": "标签匹配器之间的一个 or",
         "subquery": "一个子查询",
@@ -13993,7 +13967,11 @@
         "byLabelsLabel": "按标签",
         "quantileLabel": "分位数",
         "kLabel": "K",
-        "nearestMultipleLabel": "最接近的倍数"
+        "nearestMultipleLabel": "最接近的倍数",
+        "withoutLabel": "不包含（丢弃这些标签）",
+        "withoutDesc": "聚合时去除所选标签，并保留其他所有标签",
+        "offsetLabel": "偏移",
+        "offsetDesc": "读取指标时回溯多久，例如 1h 或 1d"
       },
       "rangeOnlyFirst": "范围函数只能作为第一步",
       "rangeOnlyFirstNote": "范围函数读取原始样本，因此只能作为第一步。请移除其他步骤以添加范围函数。",
@@ -14063,6 +14041,17 @@
       "empty": "暂无查询",
       "noMatch": "没有查询匹配搜索或加星过滤器",
       "loadMore": "加载更多"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR 组",
+      "addGroupTooltip": "添加一组过滤器；序列匹配任意一组即视为匹配",
+      "addToGroup": "向此组添加过滤器",
+      "anyOf": "任一",
+      "andAnyOf": "并且任一",
+      "or": "或",
+      "not": "非",
+      "notTooltip": "匹配整个组都不匹配的序列",
+      "tooManyBranches": "这些过滤器会展开为 {count} 个独立选择器；最多可运行 {max} 个。请将值合并到一个正则过滤器中，或移除一个组。"
     }
   },
   "settings": {
@@ -15081,26 +15070,37 @@
       },
       "noData": "无数据",
       "unavailable": "此搜索无法使用延迟热力图",
-      "loadFailed": "加载延迟热力图失败"
+      "loadFailed": "加载延迟热力图失败",
+      "selection": {
+        "label": "热力图选择",
+        "reopen": "显示选择操作",
+        "count": "{count} 个 Span 已选择 | {count} 个 Span 已选择",
+        "range": "{band} · {window}",
+        "filter": "筛选至选区",
+        "drillDown": "下钻",
+        "askAi": "询问 AI",
+        "askAiChip": "热力图选择 · {count} 个 Span | 热力图选择 · {count} 个 Span",
+        "clear": "清除选择"
+      }
     },
     "comparison": {
-      "title": "比较所选内容",
-      "baselineOutside": "所选范围之外",
-      "baselineBefore": "紧邻之前",
+      "baselineOutside": "范围其余部分",
+      "baselineBefore": "选区之前",
       "sampleNote": "所选：{selection} · 基线：{baseline}",
       "sampleNoteAll": "全部 {count} 个 Span | 全部 {count} 个 Span",
       "sampleCapped": "已采样 {sampled} 个，共 {total} 个 Span",
       "noiseNote": "低于 {pts} 个百分点的差异属于采样噪声",
       "loading": "正在采样 Span…",
-      "loadFailed": "无法比较所选内容",
+      "loadFailed": "无法加载下钻结果",
       "sampleOverflow": "采样结果与 Span 数量不一致，例如有延迟数据到达。请重试以重新计数。",
       "baselineCapped": "基线限制为 {range}，即所选范围前后各最多 3 小时",
       "baselineLimited": "受此数据流的 {hours} 小时查询限制，基线被限制为 {range}",
-      "rangeClamped": "服务器缩短了时间范围，因此比较结果可能不完整",
+      "rangeClamped": "服务器缩短了时间范围，因此下钻结果将不完整",
       "rangeTooLong": "所选范围超过此数据流的 {hours} 小时查询限制",
+      "presetRangeTooLong": "时间范围超过此数据流的 {hours} 小时查询上限",
       "retry": "重试",
       "noSelectionTitle": "选择要比较的 Span",
-      "noSelectionBody": "在持续时间热力图上框选，或在错误或速率图表上刷选，然后打开下钻。",
+      "noSelectionBody": "返回并在耗时热力图上框选一个区域，或在错误或速率图表上刷选。",
       "emptySelection": "所选范围内没有 Span",
       "emptyBaseline": "没有基线 Span",
       "emptyBaselineHint": "此基线没有匹配项。请改为尝试{mode}。",
@@ -15125,6 +15125,23 @@
       "summaryBand": "{window} · {band}"
     },
     "drillDownBackTarget": "结果",
+    "drillDownPanel": {
+      "counts": "{selected} 对比 {baseline}",
+      "selectedTraces": "{count} 条已选追踪 | {count} 条已选追踪",
+      "baselineTraces": "{count} 条基线追踪 | {count} 条基线追踪",
+      "selectedSpans": "{count} 个已选 Span | {count} 个已选 Span",
+      "baselineSpans": "{count} 个基线 Span | {count} 个基线 Span",
+      "baseline": "基线",
+      "presetsTitle": "或从预设开始",
+      "presetErrors": "错误对比其余",
+      "presetSlowest": "最慢 10% 对比其余",
+      "presetRecent": "近期对比早先",
+      "presetErrorsDesc": "出现错误的 Span 与所有其他 Span 对比",
+      "presetSlowestDesc": "处于或高于 p90 的 Span 与更快的 Span 对比",
+      "presetRecentDesc": "时间范围的后半段与前半段对比",
+      "presetEmpty": "此范围内没有可用于排名的 Span 耗时",
+      "presetNoMatch": "该预设在此范围内未找到可对比的 Span"
+    },
     "metrics": {
       "perSecond": {
         "traces": "追踪/秒",
@@ -15247,6 +15264,7 @@
     "errorSpans": "错误 Span",
     "filterByErrors": "按错误筛选",
     "clearErrorFilter": "清除错误过滤器",
+    "updatingResults": "正在更新结果",
     "error": "错误",
     "errorCount": "{n} 个错误 | {n} 个错误",
     "success": "成功",
@@ -21590,7 +21608,8 @@
         "resetColumnWidths": "重置列宽"
       },
       "selectAllRows": "选择所有行",
-      "selectRow": "选择行 {name}",
+      "selectRowAt": "选择第 {index} 行",
+      "selectRowAtNamed": "选择第 {index} 行，{name}",
       "removeColumnAria": "移除列",
       "formatColumnAria": "格式化列",
       "selectedOfTotal": "已选择 {selected}/{total}",
@@ -22775,7 +22794,8 @@
       "moduloName": "模运算",
       "multiplyByName": "乘以",
       "divideByName": "除以",
-      "exponentName": "指数"
+      "exponentName": "指数",
+      "offsetDoc": "读取指标在指定时长之前的值"
     }
   },
   "passwordPolicy": {
@@ -26389,6 +26409,8 @@
     "section_handled": "已处理",
     "section_resolved": "已解决",
     "sectionHint_ringing": "尚无人确认——这些仍在呼叫",
+    "sectionHint_ringingRouted": "无人确认 — 其中 {count} 个仍在呼叫 | 无人确认 — 其中 {count} 个仍在呼叫",
+    "sectionHint_ringingUnrouted": "{count} 个没有所属团队，因此不会呼叫 | {count} 个没有所属团队，因此不会呼叫",
     "sectionHint_snoozed": "呼叫已暂停——它们会自动恢复",
     "sectionHint_handled": "已确认——每项都有人负责",
     "sectionHint_resolved": "已关闭——留作记录",

@@ -1315,7 +1315,6 @@
       "moreExamples": "추가 예제는,",
       "clickHere": "여기를 클릭하세요"
     },
-    "legendLabel": "범례",
     "switchToLogs": "로그로 다시 전환",
     "savedViewsLabel": "저장된 뷰",
     "savedViewName": "뷰 이름",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "수식 {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter}은(는) 이 패널의 쿼리가 아닙니다",
-    "formulaReferencesFormula": "{letter}은(는) 수식이며, 수식은 다른 수식을 참조할 수 없습니다",
+    "formulaCycle": "수식이 서로 순환 참조합니다: {cycle}",
+    "formulaTooLong": "수식을 펼치면 {limit}자를 초과합니다",
+    "formulaTooDeep": "수식 중첩이 {limit}단계를 초과합니다",
     "formulaInputNote": "수식에 사용되는 경우: 이 쿼리의 인스턴트/범위 설정, 범례, 스텝, 시간 이동은 적용되지 않습니다.",
     "multiSqlQueryLabel": "쿼리 라벨",
     "multiSqlQueryLabelHint": "범례로 표시된 이 쿼리의 사용자 지정 이름 (예: 'Production')",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "값",
     "hostmapGroupBy": "그룹 기준",
     "otherColumn": "기타 칼럼",
-    "metric": "메트릭",
     "filters": "필터",
     "labelFilters": "라벨 필터",
     "operations": "오퍼레이션",
@@ -13604,21 +13604,6 @@
     "awsStsSelfHostedInfo": "이는 AWS sts를 사용하여 역할을 맡아 작업을 수행합니다.설치 환경에서 이 역할에 액세스할 수 있는 AWS 자격 증명을 구성했는지 확인하십시오."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "즉시 벡터 선택기의 경우 사용",
-      "rangeVector": "범위 벡터 선택기의 경우 사용",
-      "aggregate": "데이터를 집계하려면 사용",
-      "or": "또는",
-      "rate": "범위 벡터에 대한 비율 계산의 경우 사용",
-      "sqlTitle": "구문 가이드: SQL 모드",
-      "sqlFullText": "값 'error'의 전체 텍스트 검색의 경우 사용",
-      "sqlColumn": "값 'error'의 컬럼 검색의 경우 사용",
-      "sqlCode": "코드 컬럼에서 값 200을 검색하려면 사용",
-      "sqlStream": "스트림 컬럼에서 값 'stderr'을 검색하려면 사용",
-      "sqlFunction": "로그 컬럼에서 쿼리 함수 {fn}을 검색 및 사용하려면 사용",
-      "sqlMoreExamples": "추가 예시는",
-      "sqlClickHere": "여기를 클릭하세요"
-    },
     "add": "추가",
     "runQuery": "쿼리 실행",
     "runQueryOptions": "쿼리 실행 옵션",
@@ -13734,7 +13719,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "대시보드에 추가",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "평균",
+          "sortAvgTitle": "윈도우 전체 평균으로 값 순위 지정",
+          "sortOutlying": "이상치 기준",
+          "sortOutlyingTitle": "다른 시리즈에서 얼마나 벗어났는지로 값 순위 지정",
+          "outlier": "이상치"
         },
         "related": {
           "empty": "관련 메트릭 없음",
@@ -13859,9 +13849,9 @@
         "selectLabel": "레이블 선택",
         "invalidLabel": "잘못된 레이블 이름입니다.",
         "selectOrTypeValue": "값 선택 또는 입력",
-        "operatorHelp": "=  정확히 이 값\n!=  이 값이 아닌 모든 값\n=~  정규식 일치 — 500{'|'}503을 사용하여 둘 중 하나 일치\n!~  정규식 불일치\n\n필터는 AND로 결합됩니다. 두 값 중 하나를 일치시키려면 =~ 연산자를 정규식과 함께 사용하세요.",
+        "operatorHelp": "=  이 값과 정확히 일치\n!=  이 값이 아닌 모든 값\n=~  정규식과 일치 — 둘 중 하나를 일치시키려면 500{'|'}503을 사용하세요\n!~  정규식과 일치하지 않음\n\n필터는 AND로 결합됩니다. 두 값 중 하나를 일치시키려면 정규식과 함께 =~를 사용하거나 OR 그룹을 추가하세요.",
         "andSeparator": "및",
-        "andSeparatorTitle": "필터는 AND로 결합됩니다. — 메트릭은 모든 필터와 일치해야 합니다. 두 값 중 하나를 일치시키려면 =~ 연산자를 정규식과 함께 사용하세요.",
+        "andSeparatorTitle": "필터는 AND로 결합됩니다 — 메트릭은 모든 필터와 일치해야 합니다. 두 값 중 하나를 일치시키려면 정규식과 함께 =~ 연산자를 사용하거나 OR 그룹을 추가하세요.",
         "noSuggestions": "제안 없음 — 값을 입력하세요.",
         "moreFilters": "+{count}개 더",
         "moreFiltersTooltip": "클릭하여 모든 필터를 인라인으로 표시",
@@ -13901,11 +13891,16 @@
         "deleteMessage": "이 조직의 모든 사용자에 대해 {name} 보기를 삭제하시겠습니까?",
         "modified": "{name} (수정됨)",
         "clear": "뷰 초기화"
-      }
-    },
-    "index": {
-      "namePanelRequired": "패널 이름은 필수입니다.",
-      "errorsFixTryAgain": "오류가 있습니다. 수정한 후 다시 시도하세요."
+      },
+      "sortDashboards": "대시보드",
+      "sortDashboardsTitle": "대시보드에서 가장 많이 사용된 순",
+      "sortAlerts": "알림",
+      "sortAlertsTitle": "알림에서 가장 많이 사용된 순",
+      "usageInDashboards": "대시보드에서 사용",
+      "usageHasAlerts": "알림 있음",
+      "usageInSlos": "SLO에서 사용",
+      "usageLoading": "메트릭 사용 위치를 불러오는 중",
+      "usageFailed": "사용 정보를 사용할 수 없음, 다시 시도"
     },
     "metricCard": {
       "lastRefreshed": "마지막 새로고침:",
@@ -13917,25 +13912,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "차트 렌더링 실패"
-    },
-    "queryBuilder": {
-      "title": "PromQL 쿼리 빌더",
-      "subtitle": "시각적으로 PromQL 쿼리 작성 및 테스트",
-      "generatedQuery": "생성된 PromQL 쿼리:",
-      "noQueryBuilt": "아직 쿼리가 생성되지 않음",
-      "copyQuery": "쿼리 복사",
-      "clearAll": "모두 지우기",
-      "testQuery": "쿼리 테스트",
-      "queryResultPreview": "쿼리 결과 미리보기:",
-      "queryCopied": "클립보드에 쿼리 복사됨!",
-      "queryCleared": "쿼리 지워짐",
-      "testingSoon": "쿼리 테스트 기능이 곧 구현될 예정입니다",
-      "executionSoon": "쿼리 실행은 다음 단계에서 구현될 예정입니다"
-    },
-    "metricSelector": {
-      "metricName": "메트릭 이름",
-      "loadingMetrics": "메트릭 로딩 중...",
-      "noMetricsFound": "메트릭을 찾을 수 없음"
     },
     "labelFilterEditor": {
       "label": "레이블",
@@ -13958,8 +13934,6 @@
       "noMetric": "빌더에는 이름이 지정된 메트릭 하나에 대한 쿼리가 필요합니다",
       "mismatch": "빌더에서 이 쿼리를 정확히 표시할 수 없습니다",
       "constructs": {
-        "without": "without (…) 그룹화",
-        "offset": "오프셋 수정자",
         "at": "{'@'} 수정자",
         "orMatchers": "레이블 매처 사이의 or",
         "subquery": "서브쿼리",
@@ -13993,7 +13967,11 @@
         "byLabelsLabel": "레이블별",
         "quantileLabel": "분위수",
         "kLabel": "K",
-        "nearestMultipleLabel": "가장 가까운 배수"
+        "nearestMultipleLabel": "가장 가까운 배수",
+        "withoutLabel": "제외 (이 레이블 제거)",
+        "withoutDesc": "선택한 레이블을 집계에서 제외하고 나머지 레이블은 모두 유지합니다",
+        "offsetLabel": "오프셋",
+        "offsetDesc": "메트릭을 얼마나 이전 시점까지 읽을지, 예: 1h 또는 1d"
       },
       "rangeOnlyFirst": "범위 함수는 첫 번째 단계에만 올 수 있습니다",
       "rangeOnlyFirstNote": "범위 함수는 원시 샘플을 읽으므로 첫 번째 단계에만 올 수 있습니다. 추가하려면 다른 단계를 제거하세요.",
@@ -14063,6 +14041,17 @@
       "empty": "아직 쿼리가 없습니다",
       "noMatch": "검색 또는 즐겨찾기 필터와 일치하는 쿼리가 없습니다",
       "loadMore": "더 보기"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR 그룹",
+      "addGroupTooltip": "필터 그룹을 추가합니다. 시리즈는 그룹 중 하나라도 일치하면 일치합니다",
+      "addToGroup": "이 그룹에 필터 추가",
+      "anyOf": "다음 중 하나",
+      "andAnyOf": "그리고 다음 중 하나",
+      "or": "또는",
+      "not": "아님",
+      "notTooltip": "이 그룹 전체와 일치하지 않는 시리즈를 일치시킵니다",
+      "tooManyBranches": "이 필터는 {count}개의 개별 선택자로 확장됩니다. 최대 {max}개만 실행할 수 있습니다. 값을 하나의 정규식 필터로 병합하거나 그룹을 제거하세요."
     }
   },
   "settings": {
@@ -15081,26 +15070,37 @@
       },
       "noData": "데이터 없음",
       "unavailable": "이 검색에서는 지연 시간 히트맵을 사용할 수 없습니다",
-      "loadFailed": "지연 시간 히트맵을 불러오지 못했습니다"
+      "loadFailed": "지연 시간 히트맵을 불러오지 못했습니다",
+      "selection": {
+        "label": "히트맵 선택",
+        "reopen": "선택 작업 표시",
+        "count": "{count}개 스팬 선택됨 | {count}개 스팬 선택됨",
+        "range": "{band} · {window}",
+        "filter": "선택 항목으로 필터",
+        "drillDown": "드릴다운",
+        "askAi": "AI에게 질문",
+        "askAiChip": "히트맵 선택 · {count}개 스팬 | 히트맵 선택 · {count}개 스팬",
+        "clear": "선택 지우기"
+      }
     },
     "comparison": {
-      "title": "선택 항목 비교",
-      "baselineOutside": "선택 범위 밖",
-      "baselineBefore": "바로 이전",
+      "baselineOutside": "나머지 범위",
+      "baselineBefore": "선택 이전",
       "sampleNote": "선택: {selection} · 기준선: {baseline}",
       "sampleNoteAll": "전체 {count}개 스팬 | 전체 {count}개 스팬",
       "sampleCapped": "{total}개 스팬 중 {sampled}개 샘플링됨",
       "noiseNote": "{pts} pts 미만의 차이는 샘플링 노이즈 범위 내입니다",
       "loading": "스팬 샘플링 중…",
-      "loadFailed": "선택 항목을 비교할 수 없습니다",
+      "loadFailed": "드릴다운을 불러올 수 없습니다",
       "sampleOverflow": "샘플이 스팬 수와 일치하지 않습니다. 예를 들어 늦게 도착한 데이터 때문일 수 있습니다. 다시 계산하려면 재시도하세요.",
       "baselineCapped": "기준선은 선택 항목 양쪽 최대 3시간인 {range}로 제한됩니다",
       "baselineLimited": "이 스트림의 {hours}시간 쿼리 제한으로 인해 기준선이 {range}로 제한됩니다",
-      "rangeClamped": "서버가 시간 범위를 단축하여 비교가 불완전할 수 있습니다",
+      "rangeClamped": "서버가 시간 범위를 단축하여 드릴다운이 불완전할 수 있습니다",
       "rangeTooLong": "선택 범위가 이 스트림의 {hours}시간 쿼리 제한보다 깁니다",
+      "presetRangeTooLong": "시간 범위가 이 스트림의 {hours}시간 쿼리 제한보다 깁니다",
       "retry": "재시도",
       "noSelectionTitle": "비교할 스팬 선택",
-      "noSelectionBody": "지속 시간 히트맵에 상자를 그리거나 오류 또는 속도 차트를 브러시한 다음 드릴다운을 여세요.",
+      "noSelectionBody": "돌아가서 지속 시간 히트맵에서 영역을 지정하거나 오류 또는 속도 차트를 브러시하세요.",
       "emptySelection": "선택 범위에 스팬이 없습니다",
       "emptyBaseline": "기준선 스팬이 없습니다",
       "emptyBaselineHint": "이 기준선과 일치하는 항목이 없습니다. 대신 {mode}을(를) 시도하세요.",
@@ -15125,6 +15125,23 @@
       "summaryBand": "{window} · {band}"
     },
     "drillDownBackTarget": "결과",
+    "drillDownPanel": {
+      "counts": "{selected} 대 {baseline}",
+      "selectedTraces": "{count}개 선택된 트레이스 | {count}개 선택된 트레이스",
+      "baselineTraces": "{count}개 기준 트레이스 | {count}개 기준 트레이스",
+      "selectedSpans": "{count}개 선택된 스팬 | {count}개 선택된 스팬",
+      "baselineSpans": "{count}개 기준 스팬 | {count}개 기준 스팬",
+      "baseline": "기준",
+      "presetsTitle": "또는 프리셋에서 시작",
+      "presetErrors": "오류 대 나머지",
+      "presetSlowest": "가장 느린 10% 대 나머지",
+      "presetRecent": "최근 대 이전",
+      "presetErrorsDesc": "오류가 있는 스팬과 나머지 모든 스팬 비교",
+      "presetSlowestDesc": "p90 이상인 스팬과 더 빠른 스팬 비교",
+      "presetRecentDesc": "시간 범위의 후반부와 전반부 비교",
+      "presetEmpty": "이 범위에 순위를 매길 스팬 지속 시간이 없습니다",
+      "presetNoMatch": "해당 프리셋이 이 범위에서 비교할 스팬을 찾지 못했습니다"
+    },
     "metrics": {
       "perSecond": {
         "traces": "트레이스/s",
@@ -15247,6 +15264,7 @@
     "errorSpans": "오류 스팬",
     "filterByErrors": "오류별 필터링",
     "clearErrorFilter": "오류 필터 지우기",
+    "updatingResults": "결과 업데이트 중",
     "error": "오류",
     "errorCount": "{n} 오류 | {n} 오류",
     "success": "성공",
@@ -21590,7 +21608,8 @@
         "resetColumnWidths": "열 너비 재설정"
       },
       "selectAllRows": "모든 행 선택",
-      "selectRow": "행 {name} 선택",
+      "selectRowAt": "{index}행 선택",
+      "selectRowAtNamed": "행 {index}, {name} 선택",
       "removeColumnAria": "열 제거",
       "formatColumnAria": "열 서식",
       "selectedOfTotal": "{total}개 중 {selected}개 선택됨",
@@ -22775,7 +22794,8 @@
       "moduloName": "모듈로",
       "multiplyByName": "곱하기",
       "divideByName": "나누기",
-      "exponentName": "지수"
+      "exponentName": "지수",
+      "offsetDoc": "지정된 기간 전 시점의 메트릭을 읽습니다"
     }
   },
   "passwordPolicy": {
@@ -26389,6 +26409,8 @@
     "section_handled": "확인됨",
     "section_resolved": "해결됨",
     "sectionHint_ringing": "아무도 수신 확인하지 않음 — 아직 호출 중",
+    "sectionHint_ringingRouted": "아무도 확인하지 않음 — {count}건이 아직 호출 중 | 아무도 확인하지 않음 — {count}건이 아직 호출 중",
+    "sectionHint_ringingUnrouted": "{count}건은 팀이 없어 호출되지 않음 | {count}건은 팀이 없어 호출되지 않음",
     "sectionHint_snoozed": "호출 일시 중지 — 자동으로 다시 호출됨",
     "sectionHint_handled": "수신 확인됨 — 각 항목에 담당자가 있음",
     "sectionHint_resolved": "종료됨 — 기록으로 보관됨",

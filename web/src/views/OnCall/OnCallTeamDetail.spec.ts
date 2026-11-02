@@ -564,6 +564,10 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
       wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
       await flushPromises();
+      wrapper
+        .findComponent({ name: "OnCallScheduleTimeline" })
+        .vm.$emit("update:window", { from: 1_000, to: 2_000 });
+      await flushPromises();
       const before = service.listOverrides.mock.calls.length;
       expect(before).toBeGreaterThan(0);
 
@@ -617,6 +621,10 @@ describe("OnCallTeamDetail", () => {
       const wrapper = render();
       await flushPromises();
       wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await flushPromises();
+      wrapper
+        .findComponent({ name: "OnCallScheduleTimeline" })
+        .vm.$emit("update:window", { from: 1_000, to: 2_000 });
       await flushPromises();
       const before = service.listOverrides.mock.calls.length;
 

@@ -3193,6 +3193,16 @@ describe("Stream picker — internal streams", () => {
     ]);
   });
 
+  it("anchors the selected-streams tooltip to the stream select, not the live region", async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = ["default", "k8s_events"];
+    await flushPromises();
+    const announcement = wrapper.find(
+      '[data-test="log-search-index-list-stream-picker-announcement"]',
+    );
+    expect(select().element.hasAttribute("data-o-tooltip-trigger")).toBe(true);
+    expect(announcement.attributes("data-o-tooltip-trigger")).toBeUndefined();
+  });
+
   it("pins selected streams within their group in multi-select", () => {
     expect(select().props("multiple")).toBe(true);
     expect(select().props("pinSelectedInGroups")).toBe(true);

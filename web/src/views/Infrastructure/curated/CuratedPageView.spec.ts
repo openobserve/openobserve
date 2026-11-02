@@ -726,7 +726,7 @@ describe("CuratedPageView", () => {
       // convertPromQLData (:241 `startTime / 1_000_000`) then snapped the axis
       // floor back to 1970 while real data sat in 2026 — a ~56-year x-axis.
       // Every other producer of this prop feeds `new Date(getConsumableDateTime()
-      // .startTime)` UNDIVIDED: plugins/metrics/Index.vue:425 and
+      // .startTime)` UNDIVIDED: plugins/metrics/explorer/MetricsVisualize.vue and
       // views/Dashboards/ViewDashboard.vue:1002.
       vi.useFakeTimers();
       vi.setSystemTime(new Date(NOW_US / 1000));

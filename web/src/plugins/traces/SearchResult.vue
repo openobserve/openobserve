@@ -58,44 +58,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
 
-        <!-- Left: count chips -->
-        <OTag
-          data-test="traces-count-badge"
-          type="logsResultChip"
-          value="neutral"
-          class="me-[0.6rem]"
-          :aria-busy="countPending"
+        <div
+          data-test="traces-count-chips"
+          class="flex items-center transition-opacity"
+          :class="{ 'opacity-60': countPending }"
         >
-          <OSpinner v-if="countPending" size="xs" data-test="traces-count-pending" />
-          {{ countLabel }}
-        </OTag>
-        <OTag
-          v-if="
-            searchObj.data.queryResults.errorCount != null &&
-            searchObj.data.queryResults.errorCount > 0
-          "
-          data-test="traces-error-count-badge"
-          variant="error"
-          :clickable="true"
-          class="rounded-default! px-2.5! py-[0.4rem]! text-xs text-xs!"
-          :class="
-            showErrorOnly
-              ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
-              : 'bg-error-tag-bg! text-error-tag-text!'
-          "
-          @click="toggleErrorOnly"
-        >
-          {{
-            `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === "traces" ? t("traces.errorTraces") : t("traces.errorSpans")}`
-          }}
-          <OTooltip
-            :content="showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
-            side="bottom"
+          <OTag
+            data-test="traces-count-badge"
+            type="logsResultChip"
+            value="neutral"
+            class="me-[0.6rem] tabular-nums"
+            :aria-busy="countPending"
+          >
+            <template v-if="searchObj.meta.searchMode === 'spans'">
+              <OSkeleton
+                v-if="shownTotal == null"
+                type="text"
+                animation="pulse"
+                class="me-1 h-3 w-8 shrink-0"
+              />
+              {{ spansLabel }}
+            </template>
+            <i18n-t
+              v-else
+              keypath="traces.results.tracesWithMatchingSpan"
+              :plural="shownTotal ?? 2"
+              tag="span"
+              class="inline-flex items-center whitespace-pre"
+            >
+              <template #count>
+                <OSkeleton
+                  v-if="shownTotal == null"
+                  type="text"
+                  animation="pulse"
+                  class="h-3 w-8 shrink-0"
+                />
+                <template v-else>{{ formatLargeNumber(shownTotal) }}</template>
+              </template>
+            </i18n-t>
+          </OTag>
+          <OTag
+            v-if="
+              searchObj.data.queryResults.errorCount != null &&
+              searchObj.data.queryResults.errorCount > 0
+            "
+            data-test="traces-error-count-badge"
+            variant="error"
+            :clickable="true"
+            :disabled="countPending"
+            :aria-busy="countPending"
+            class="rounded-default! px-2.5! py-[0.4rem]! text-xs text-xs! tabular-nums"
+            :class="[
+              showErrorOnly
+                ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
+                : 'bg-error-tag-bg! text-error-tag-text!',
+              { 'opacity-100!': countPending },
+            ]"
+            @click="toggleErrorOnly"
+          >
+            {{
+              `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === "traces" ? t("traces.errorTraces") : t("traces.errorSpans")}`
+            }}
+            <OTooltip
+              :content="showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
+              side="bottom"
+            />
+            <template #trailing>
+              <OIcon name="filter-alt" size="xs" class="shrink-0" />
+            </template>
+          </OTag>
+          <OSpinner
+            v-if="countPending"
+            size="xs"
+            class="ms-1.5"
+            :aria-label="t('traces.updatingResults')"
+            data-test="traces-count-pending"
           />
-          <template #trailing>
-            <OIcon name="filter-alt" size="xs" class="shrink-0" />
-          </template>
-        </OTag>
+        </div>
 
         <div class="flex-1" />
 
@@ -129,11 +168,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="select-pagination ms-1 me-1 mt-0!"
             size="sm"
             :searchable="false"
+            :disabled="searchObj.loading || countPending"
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
           />
           <OPagination
-            :disable="searchObj.loading"
+            :disable="searchObj.loading || countPending"
             :model-value="searchObj.data.resultGrid.currentPage + 1"
             :max="totalPages"
             class="paginator-section float-right mt-0!"
@@ -164,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="searchObj.meta.showHistogram"
             v-if="searchObj.data.stream.selectedStream.value && searchObj.searchApplied"
             ref="metricsDashboardRef"
+            class="sticky start-0 z-1"
             :streamName="searchObj.data.stream.selectedStream.value"
             :timeRange="{
               startTime: searchObj.data.datetime.startTime,
@@ -172,9 +213,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :filter="searchObj.data.editorValue"
             :streamFields="searchObj.data.stream.selectedStreamFields"
             :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
+            :ai-enabled="aiEnabled"
             @time-range-selected="onMetricsTimeRangeSelected"
             @editor-filter-set="onMetricsEditorFilterSet"
             @editor-filter-run="onMetricsEditorFilterRun"
+            @send-to-ai-chat="(v) => $emit('send-to-ai-chat', v)"
           />
         </transition>
 
@@ -196,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :current-page="searchObj.data.resultGrid.currentPage + 1"
           :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
-          :show-pagination="searchObj.meta.resultGrid.showPagination"
+          :show-pagination="searchObj.meta.resultGrid.showPagination && !countPending"
           :sort-by="searchObj.meta.resultGrid.sortBy"
           :sort-order="searchObj.meta.resultGrid.sortOrder"
           :search-mode="searchObj.meta.searchMode"
@@ -251,6 +294,7 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -262,6 +306,7 @@ export default defineComponent({
     OPagination,
     OTag,
     OSpinner,
+    OSkeleton,
     TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
@@ -452,23 +497,30 @@ export default defineComponent({
 
     // The count runs after the rows, so until it answers there is no total to show.
     const countPending = computed(() => searchObj.data.queryResults?.countPending === true);
-    const countLabel = computed(() => {
-      const shown = countPending.value ? "—" : formatLargeNumber(resultTotal.value);
-      return searchObj.meta.searchMode === "spans"
-        ? `${shown} ${t("traces.spansFound")}`
-        : t(
-            "traces.results.tracesWithMatchingSpan",
-            { count: shown },
-            countPending.value ? 2 : resultTotal.value,
-          );
-    });
 
+    // A re-run has no total until its count lands; the pager keeps the last one meanwhile.
+    const pagerTotal = ref<number | null>(
+      countPending.value ? null : Number(searchObj.data.queryResults?.total) || 0,
+    );
+    watch(
+      () => [searchObj.data.queryResults?.total, countPending.value] as const,
+      ([total, pending]) => {
+        if (!pending) pagerTotal.value = Number(total) || 0;
+      },
+    );
+    // Index.vue clears errorCount when a run changes dataset or its count fails, so no kept total then.
+    const shownTotal = computed<number | null>(() => {
+      if (!countPending.value) return resultTotal.value;
+      return searchObj.data.queryResults?.errorCount != null ? pagerTotal.value : null;
+    });
+    const spansLabel = computed(() =>
+      shownTotal.value == null
+        ? t("traces.spansFound")
+        : `${formatLargeNumber(shownTotal.value)} ${t("traces.spansFound")}`,
+    );
     const totalPages = computed(() =>
-      searchObj.data.queryResults.total && searchObj.meta.resultGrid.rowsPerPage
-        ? Math.max(
-            1,
-            Math.ceil(searchObj.data.queryResults.total / searchObj.meta.resultGrid.rowsPerPage),
-          )
+      pagerTotal.value && searchObj.meta.resultGrid.rowsPerPage
+        ? Math.max(1, Math.ceil(pagerTotal.value / searchObj.meta.resultGrid.rowsPerPage))
         : 1,
     );
 
@@ -542,7 +594,8 @@ export default defineComponent({
       hits,
       searchPerformed,
       countPending,
-      countLabel,
+      shownTotal,
+      spansLabel,
       rememberScrollTop,
       changePage,
       changeRowsPerPage,

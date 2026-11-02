@@ -31,7 +31,7 @@ import {
   type AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
 import { sanitizeAlertNamePart, periodMinutesFromRange, warn } from "../alertPrefill";
-import { formulaRefs, isFormulaQuery, queryRefs } from "@/utils/dashboard/promql/formula";
+import { formulaLeafRefs, isFormulaQuery, queryRefs } from "@/utils/dashboard/promql/formula";
 import { selectorMetricNames } from "@/utils/dashboard/exemplars/exemplarPlacement";
 
 /** Panel types whose shape has no meaningful row count to alert on. */
@@ -209,9 +209,10 @@ const formulaInputStreams = (
   queries: any[],
   formula: string,
   metadataQueries: any[] | undefined,
+  self?: string,
 ): AlertPrefillStreamCandidate[] => {
-  const referenced = new Set(formulaRefs(formula));
   const letters = queryRefs(queries);
+  const referenced = formulaLeafRefs(queries, formula, self);
   // A code-mode query's `fields.stream` is the editor's inherited pick, not what its text reads.
   const metricsOf = (query: any, i: number): string[] =>
     query?.customQuery === false
@@ -294,7 +295,12 @@ export const buildPrefillFromPanel = (
   const inputStreams = !isPromql
     ? []
     : isFormulaQuery(query)
-      ? formulaInputStreams(input.queries ?? [], query.config.formula, input.metadataQueries)
+      ? formulaInputStreams(
+          input.queries ?? [],
+          query.config.formula,
+          input.metadataQueries,
+          queryRefs(input.queries ?? [])[queryIndex],
+        )
       : codeModeStreams(query, sourceQuery);
   // Raw text from a query that never ran may still hold dashboard variables the evaluator cannot fill.
   if (!input.executedQuery && /\$(\w|\{)/.test(sourceQuery)) {

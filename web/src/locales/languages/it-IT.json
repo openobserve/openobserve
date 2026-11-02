@@ -1315,7 +1315,6 @@
       "moreExamples": "Per ulteriori esempi,",
       "clickHere": "clicca qui"
     },
-    "legendLabel": "Legenda",
     "switchToLogs": "Torna ai Log",
     "savedViewsLabel": "Visualizzazioni salvate",
     "savedViewName": "Visualizza nome",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "Formula {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} non è una query in questo pannello",
-    "formulaReferencesFormula": "{letter} è una formula e una formula non può fare riferimento a un'altra formula",
+    "formulaCycle": "Le formule si richiamano a vicenda in un ciclo: {cycle}",
+    "formulaTooLong": "La formula espansa supera {limit} caratteri",
+    "formulaTooDeep": "Le formule sono annidate per più di {limit} livelli",
     "formulaInputNote": "Usata in una formula: in quel contesto, l'impostazione istantanea/intervallo, la legenda, lo step e lo spostamento temporale di questa query non si applicano.",
     "multiSqlQueryLabel": "Etichetta di query",
     "multiSqlQueryLabelHint": "Nome personalizzato per questa query nelle legende (ad esempio, 'Produzione')",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "Valore",
     "hostmapGroupBy": "Raggruppa per",
     "otherColumn": "Altre colonne",
-    "metric": "Metrico",
     "filters": "Filtri",
     "labelFilters": "Filtri per etichette",
     "operations": "Operazioni",
@@ -13604,21 +13604,6 @@
     "awsStsSelfHostedInfo": "Questo utilizza AWS sts per assumere ruoli ed eseguire operazioni. Assicurati di aver configurato le credenziali aws nell'ambiente di installazione che hanno accesso a questo ruolo."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "Per selettori di vettori istantanei, usa",
-      "rangeVector": "Per selettori di vettori di intervallo, usa",
-      "aggregate": "Per aggregare i dati, usa",
-      "or": "o",
-      "rate": "Per calcoli di rate su un vettore di intervallo, usa",
-      "sqlTitle": "Guida alla sintassi: Modalità SQL",
-      "sqlFullText": "Per la ricerca full-text del valore 'error', usa",
-      "sqlColumn": "Per la ricerca in colonna del valore 'error', usa",
-      "sqlCode": "Per cercare il valore 200 nella colonna code, usa",
-      "sqlStream": "Per cercare il valore 'stderr' nella colonna stream, usa",
-      "sqlFunction": "Per cercare e usare la funzione di query {fn} sulla colonna log, usa",
-      "sqlMoreExamples": "Per ulteriori esempi,",
-      "sqlClickHere": "clicca qui"
-    },
     "add": "Inserisci",
     "runQuery": "Esegui query",
     "runQueryOptions": "Opzioni di esecuzione query",
@@ -13734,7 +13719,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "Aggiungi alla dashboard",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "Media",
+          "sortAvgTitle": "Ordina i valori in base alla loro media sulla finestra",
+          "sortOutlying": "Anomali",
+          "sortOutlyingTitle": "Ordina i valori in base a quanto la loro serie si discosta dalle altre",
+          "outlier": "Anomalia"
         },
         "related": {
           "empty": "Nessuna metrica correlata",
@@ -13859,9 +13849,9 @@
         "selectLabel": "Seleziona un'etichetta",
         "invalidLabel": "Nome etichetta non valido.",
         "selectOrTypeValue": "Seleziona o digita un valore",
-        "operatorHelp": "=  è esattamente questo valore\n!=  è qualsiasi cosa tranne questo valore\n=~  corrisponde a un'espressione regolare — usa 500{'|'}503 per corrispondere a uno dei due\n!~  non corrisponde a un'espressione regolare\n\nI filtri sono combinati con AND. Per corrispondere a uno di due valori, usa =~ con un'espressione regolare.",
+        "operatorHelp": "=  corrisponde esattamente a questo valore\n!=  è qualsiasi cosa tranne questo valore\n=~  corrisponde a una regex — usa 500{'|'}503 per corrispondere a entrambi\n!~  non corrisponde a una regex\n\nI filtri sono combinati con AND. Per corrispondere a uno dei due valori, usa =~ con una regex o aggiungi un gruppo OR.",
         "andSeparator": "e",
-        "andSeparatorTitle": "I filtri sono combinati con AND — una metrica deve corrispondere a tutti. Per corrispondere a uno di due valori, usa l'operatore =~ con un'espressione regolare.",
+        "andSeparatorTitle": "I filtri sono combinati con AND — una metrica deve corrispondere a tutti. Per corrispondere a uno dei due valori, usa l'operatore =~ con una regex o aggiungi un gruppo OR.",
         "noSuggestions": "Nessun suggerimento — digita un valore.",
         "moreFilters": "+{count} altro",
         "moreFiltersTooltip": "Clicca per mostrare tutti i filtri in linea",
@@ -13901,11 +13891,16 @@
         "deleteMessage": "Eliminare la vista {name} per tutti i membri di questa organizzazione?",
         "modified": "{name} (modificata)",
         "clear": "Cancella vista"
-      }
-    },
-    "index": {
-      "namePanelRequired": "Il nome del pannello è obbligatorio",
-      "errorsFixTryAgain": "Ci sono alcuni errori, correggili e riprova"
+      },
+      "sortDashboards": "Dashboard",
+      "sortDashboardsTitle": "Prima quelli più usati nelle dashboard",
+      "sortAlerts": "Avvisi",
+      "sortAlertsTitle": "Prima quelli più usati negli avvisi",
+      "usageInDashboards": "Nelle dashboard",
+      "usageHasAlerts": "Con avvisi",
+      "usageInSlos": "Negli SLO",
+      "usageLoading": "Caricamento dei contesti d'uso delle metriche",
+      "usageFailed": "Utilizzo non disponibile, riprova"
     },
     "metricCard": {
       "lastRefreshed": "Ultimo aggiornamento:",
@@ -13917,25 +13912,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Impossibile renderizzare il grafico"
-    },
-    "queryBuilder": {
-      "title": "Costruttore query PromQL",
-      "subtitle": "Costruisci e testa query PromQL visivamente",
-      "generatedQuery": "Query PromQL generata:",
-      "noQueryBuilt": "Nessuna query ancora costruita",
-      "copyQuery": "Copia query",
-      "clearAll": "Cancella tutto",
-      "testQuery": "Testa query",
-      "queryResultPreview": "Anteprima risultato query:",
-      "queryCopied": "Query copiata negli appunti!",
-      "queryCleared": "Query cancellata",
-      "testingSoon": "Il test delle query sarà implementato presto",
-      "executionSoon": "L'esecuzione delle query sarà implementata nella prossima fase"
-    },
-    "metricSelector": {
-      "metricName": "Nome metrica",
-      "loadingMetrics": "Caricamento metriche...",
-      "noMetricsFound": "Nessuna metrica trovata"
     },
     "labelFilterEditor": {
       "label": "Etichetta",
@@ -13958,8 +13934,6 @@
       "noMetric": "Il builder richiede una query su una metrica denominata",
       "mismatch": "Il builder non può mostrare esattamente questa query",
       "constructs": {
-        "without": "un raggruppamento without (…)",
-        "offset": "un modificatore offset",
         "at": "un modificatore {'@'}",
         "orMatchers": "un or tra i matcher delle etichette",
         "subquery": "una sottoquery",
@@ -13993,7 +13967,11 @@
         "byLabelsLabel": "Per etichette",
         "quantileLabel": "Quantile",
         "kLabel": "K",
-        "nearestMultipleLabel": "Multiplo più vicino"
+        "nearestMultipleLabel": "Multiplo più vicino",
+        "withoutLabel": "Senza (elimina queste etichette)",
+        "withoutDesc": "Aggrega eliminando le etichette selezionate e mantieni tutte le altre",
+        "offsetLabel": "Offset",
+        "offsetDesc": "Quanto indietro leggere la metrica, ad es. 1h o 1d"
       },
       "rangeOnlyFirst": "Una funzione di intervallo può essere solo il primo passo",
       "rangeOnlyFirstNote": "Una funzione di intervallo legge i campioni grezzi, quindi può essere solo il primo passo. Rimuovi gli altri passi per aggiungerne una.",
@@ -14063,6 +14041,17 @@
       "empty": "Nessuna query ancora",
       "noMatch": "Nessuna query corrisponde alla ricerca o al filtro con stella",
       "loadMore": "Carica altro"
+    },
+    "labelGroups": {
+      "addGroup": "+ Gruppo OR",
+      "addGroupTooltip": "Aggiungi un gruppo di filtri; una serie corrisponde quando corrisponde a qualsiasi gruppo",
+      "addToGroup": "Aggiungi un filtro a questo gruppo",
+      "anyOf": "qualsiasi di",
+      "andAnyOf": "e qualsiasi di",
+      "or": "oppure",
+      "not": "non",
+      "notTooltip": "Corrisponde alle serie a cui questo intero gruppo non corrisponde",
+      "tooManyBranches": "Questi filtri si espandono in {count} selettori separati; al massimo {max} possono essere eseguiti. Unisci i valori in un unico filtro regex o rimuovi un gruppo."
     }
   },
   "settings": {
@@ -15081,26 +15070,37 @@
       },
       "noData": "Nessun dato",
       "unavailable": "La heatmap della latenza non è disponibile per questa ricerca",
-      "loadFailed": "Impossibile caricare la heatmap della latenza"
+      "loadFailed": "Impossibile caricare la heatmap della latenza",
+      "selection": {
+        "label": "Selezione heatmap",
+        "reopen": "Mostra azioni di selezione",
+        "count": "{count} span selezionato | {count} span selezionati",
+        "range": "{band} · {window}",
+        "filter": "Filtra sulla selezione",
+        "drillDown": "Approfondisci",
+        "askAi": "Chiedi all'AI",
+        "askAiChip": "Selezione heatmap · {count} span | Selezione heatmap · {count} span",
+        "clear": "Cancella selezione"
+      }
     },
     "comparison": {
-      "title": "Confronta selezione",
-      "baselineOutside": "Al di fuori della selezione",
-      "baselineBefore": "Subito prima",
+      "baselineOutside": "Resto dell'intervallo",
+      "baselineBefore": "Prima della selezione",
       "sampleNote": "Selezione: {selection} · Baseline: {baseline}",
       "sampleNoteAll": "tutto {count} span | tutti i {count} span",
       "sampleCapped": "{sampled} campionati di {total} span",
       "noiseNote": "Le differenze inferiori a {pts} pts rientrano nel rumore di campionamento",
       "loading": "Campionamento span…",
-      "loadFailed": "Impossibile confrontare la selezione",
+      "loadFailed": "Impossibile caricare l'approfondimento",
       "sampleOverflow": "Il campione non corrisponde al numero di span, ad esempio perché sono arrivati dati in ritardo. Riprova a contare.",
       "baselineCapped": "Baseline limitata a {range}, fino a 3 h su entrambi i lati della selezione",
       "baselineLimited": "Baseline limitata a {range} dal limite di query di {hours} ore di questo stream",
-      "rangeClamped": "Il server ha accorciato l'intervallo di tempo, quindi il confronto sarebbe incompleto",
+      "rangeClamped": "Il server ha ridotto l'intervallo di tempo, quindi l'approfondimento sarebbe incompleto",
       "rangeTooLong": "La selezione è più lunga del limite di query di {hours} ore di questo stream",
+      "presetRangeTooLong": "L'intervallo di tempo supera il limite di query di {hours} ore di questo stream",
       "retry": "Riprova",
       "noSelectionTitle": "Seleziona gli span da confrontare",
-      "noSelectionBody": "Disegna un riquadro sulla heatmap della Durata, o seleziona il grafico Errori o Rate, quindi apri Drill down.",
+      "noSelectionBody": "Torna indietro e seleziona un'area sulla heatmap della durata, oppure trascina per selezionare sul grafico Errori o Frequenza.",
       "emptySelection": "Nessuno span nella selezione",
       "emptyBaseline": "Nessuno span di baseline",
       "emptyBaselineHint": "Nessuna corrispondenza per questa baseline. Prova invece con {mode}.",
@@ -15125,6 +15125,23 @@
       "summaryBand": "{window} · {band}"
     },
     "drillDownBackTarget": "risultati",
+    "drillDownPanel": {
+      "counts": "{selected} vs {baseline}",
+      "selectedTraces": "{count} traccia selezionata | {count} tracce selezionate",
+      "baselineTraces": "{count} traccia di riferimento | {count} tracce di riferimento",
+      "selectedSpans": "{count} span selezionato | {count} span selezionati",
+      "baselineSpans": "{count} span di riferimento | {count} span di riferimento",
+      "baseline": "Riferimento",
+      "presetsTitle": "Oppure parti da un preset",
+      "presetErrors": "Errori vs resto",
+      "presetSlowest": "10% più lento vs resto",
+      "presetRecent": "Recenti vs precedenti",
+      "presetErrorsDesc": "Span con un errore rispetto a tutti gli altri span",
+      "presetSlowestDesc": "Span con durata pari o superiore al p90 rispetto agli span più veloci",
+      "presetRecentDesc": "Seconda metà dell'intervallo di tempo rispetto alla prima metà",
+      "presetEmpty": "Nessuna durata di span in questo intervallo da classificare",
+      "presetNoMatch": "Quel preset non ha trovato span da confrontare in questo intervallo"
+    },
     "metrics": {
       "perSecond": {
         "traces": "tracce/s",
@@ -15247,6 +15264,7 @@
     "errorSpans": "Span con errore",
     "filterByErrors": "Filtra per errori",
     "clearErrorFilter": "Cancella filtro errori",
+    "updatingResults": "Aggiornamento risultati",
     "error": "ERRORE",
     "errorCount": "{n} ERRORE | {n} ERRORI",
     "success": "SUCCESSO",
@@ -21590,7 +21608,8 @@
         "resetColumnWidths": "Ripristina larghezze colonne"
       },
       "selectAllRows": "Seleziona tutte le righe",
-      "selectRow": "Seleziona la riga {name}",
+      "selectRowAt": "Seleziona riga {index}",
+      "selectRowAtNamed": "Seleziona riga {index}, {name}",
       "removeColumnAria": "Rimuovi colonna",
       "formatColumnAria": "Formatta colonna",
       "selectedOfTotal": "{selected} di {total} selezionati",
@@ -22775,7 +22794,8 @@
       "moduloName": "Modulo",
       "multiplyByName": "Moltiplica per",
       "divideByName": "Dividi per",
-      "exponentName": "Esponente"
+      "exponentName": "Esponente",
+      "offsetDoc": "Legge la metrica come era alla durata indicata prima"
     }
   },
   "passwordPolicy": {
@@ -26389,6 +26409,8 @@
     "section_handled": "Gestiti",
     "section_resolved": "Risolti",
     "sectionHint_ringing": "nessuno le ha prese in carico — stanno ancora inviando notifiche",
+    "sectionHint_ringingRouted": "nessuno ha preso in carico — {count} di questi sta ancora generando notifiche | nessuno ha preso in carico — {count} di questi stanno ancora generando notifiche",
+    "sectionHint_ringingUnrouted": "{count} non ha un team, quindi non sta generando notifiche | {count} non hanno un team, quindi non stanno generando notifiche",
     "sectionHint_snoozed": "notifiche in pausa — si riattivano da sole",
     "sectionHint_handled": "presi in carico — una persona è responsabile di ciascuno",
     "sectionHint_resolved": "chiusi — conservati agli atti",

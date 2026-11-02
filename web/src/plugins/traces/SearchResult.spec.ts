@@ -153,12 +153,12 @@ const globalOptions = {
     TracesSearchResultList: {
       name: "TracesSearchResultList",
       template: '<div data-test="traces-search-result-list" class="search-list w-full"></div>',
-      props: ["hits", "loading", "searchPerformed", "showHeader", "wrap"],
+      props: ["hits", "loading", "searchPerformed", "showHeader", "wrap", "showPagination"],
       emits: ["row-click", "load-more"],
     },
     TracesMetricsDashboard: {
       template: '<div data-test="traces-metrics-dashboard"></div>',
-      props: ["streamName", "timeRange", "filter", "show"],
+      props: ["streamName", "timeRange", "filter", "show", "aiEnabled"],
       methods: {
         loadDashboard: vi.fn(),
       },
@@ -250,6 +250,11 @@ describe("SearchResult", () => {
     expect(metricsDashboard.exists()).toBe(true);
   });
 
+  it("pins the RED charts to the scroller's start edge so a sideways table scroll keeps them in view", () => {
+    const metricsDashboard = wrapper.find('[data-test="traces-metrics-dashboard"]');
+    expect(metricsDashboard.classes()).toEqual(expect.arrayContaining(["sticky", "start-0"]));
+  });
+
   it("should pass hits as a prop to TracesSearchResultList", () => {
     const list = wrapper.findComponent({ name: "TracesSearchResultList" });
     expect(list.exists()).toBe(true);
@@ -274,6 +279,22 @@ describe("SearchResult", () => {
       expect(wrapper.emitted("metrics:editor-filter-set")).toEqual([
         ["(a = '1') and duration < '1ms'"],
       ]);
+    });
+  });
+
+  describe("heatmap Ask AI relay", () => {
+    it("hands the AI gate to the metrics dashboard", async () => {
+      const dashboard = () => wrapper.findComponent('[data-test="traces-metrics-dashboard"]');
+      expect(dashboard().props("aiEnabled")).toBe(false);
+      await wrapper.setProps({ aiEnabled: true });
+      expect(dashboard().props("aiEnabled")).toBe(true);
+    });
+
+    it("relays the dashboard's send-to-ai-chat payload unchanged", async () => {
+      const payload = { query: "q", chipName: "c", newChat: true, autoSend: false, context: {} };
+      const dashboard = wrapper.findComponent('[data-test="traces-metrics-dashboard"]');
+      await dashboard.vm.$emit("send-to-ai-chat", payload);
+      expect(wrapper.emitted("send-to-ai-chat")).toEqual([[payload]]);
     });
   });
 
@@ -563,15 +584,17 @@ describe("SearchResult count chip", () => {
     delete (mockSearchObj.data.queryResults as any).countPending;
   });
 
-  it("shows a pending count instead of 0 while the count query runs", async () => {
+  it("shows a skeleton instead of a number while the first count runs", async () => {
     Object.assign(mockSearchObj.data.queryResults, { total: null, countPending: true });
     wrapper = mount(SearchResult, { global: globalOptions });
     await flushPromises();
 
-    expect(badge().find('[data-test="traces-count-pending"]').exists()).toBe(true);
+    expect(badge().findComponent({ name: "OSkeleton" }).exists()).toBe(true);
+    expect(badge().findComponent({ name: "OSpinner" }).exists()).toBe(false);
     expect(badge().attributes("aria-busy")).toBe("true");
     expect(badge().text()).not.toMatch(/\d/);
-    expect(badge().text()).toBe("— traces with a matching span");
+    expect(badge().text()).not.toContain("—");
+    expect(badge().text()).toContain("traces with a matching span");
   });
 
   it("shows the counted total once the count settles", async () => {
@@ -589,6 +612,115 @@ describe("SearchResult count chip", () => {
     await flushPromises();
 
     expect(badge().text()).toMatch(/^2\s/);
+  });
+});
+
+describe("SearchResult toolbar controls while a query runs", () => {
+  let wrapper: any;
+  const errorChip = () => wrapper.find('[data-test="traces-error-count-badge"]');
+  const pager = () => wrapper.findComponent({ name: "OPagination" });
+  const pageSize = () => wrapper.find('[data-test="traces-search-result-records-per-page"]');
+
+  const mountWith = async (results: Record<string, unknown>) => {
+    Object.assign(mockSearchObj.data.queryResults, results);
+    (mockSearchObj.meta.resultGrid as any).showPagination = true;
+    mockSearchObj.meta.resultGrid.rowsPerPage = 10;
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+  };
+
+  afterEach(() => {
+    wrapper?.unmount();
+    mockSearchObj.loading = false;
+    mockSearchObj.data.queryResults.total = 2;
+    delete (mockSearchObj.data.queryResults as any).countPending;
+    delete (mockSearchObj.data.queryResults as any).errorCount;
+    delete (mockSearchObj.meta.resultGrid as any).showPagination;
+  });
+
+  it("keeps both last counts in a dimmed row with one labelled spinner until the new count lands", async () => {
+    const countChip = () => wrapper.find('[data-test="traces-count-badge"]');
+    const chips = () => wrapper.find('[data-test="traces-count-chips"]');
+    await mountWith({ total: 50, countPending: false, errorCount: 7 });
+    expect(chips().classes()).not.toContain("opacity-60");
+    expect(wrapper.find('[data-test="traces-count-pending"]').exists()).toBe(false);
+
+    Object.assign(mockSearchObj.data.queryResults, { total: null, countPending: true });
+    await flushPromises();
+
+    expect(countChip().text()).toMatch(/^50\s/);
+    expect(countChip().findComponent({ name: "OSkeleton" }).exists()).toBe(false);
+    expect(errorChip().text()).toContain("7");
+    expect(countChip().classes()).toContain("tabular-nums");
+    expect(errorChip().classes()).toContain("tabular-nums");
+    expect(countChip().findComponent({ name: "OSpinner" }).exists()).toBe(false);
+    expect(errorChip().findComponent({ name: "OSpinner" }).exists()).toBe(false);
+    const spinners = chips().findAll('[role="status"]');
+    expect(spinners).toHaveLength(1);
+    expect(spinners[0].attributes("data-test")).toBe("traces-count-pending");
+    expect(spinners[0].attributes("aria-label")).toBe("Updating results");
+    expect(chips().classes()).toEqual(expect.arrayContaining(["opacity-60", "transition-opacity"]));
+    expect(errorChip().attributes("aria-disabled")).toBe("true");
+    expect(errorChip().attributes("disabled")).toBeDefined();
+    expect(errorChip().classes()).toContain("opacity-100!");
+
+    Object.assign(mockSearchObj.data.queryResults, {
+      total: 40,
+      countPending: false,
+      errorCount: 3,
+    });
+    await flushPromises();
+    expect(countChip().text()).toMatch(/^40\s/);
+    expect(errorChip().text()).toContain("3");
+    expect(wrapper.find('[data-test="traces-count-pending"]').exists()).toBe(false);
+    expect(chips().classes()).not.toContain("opacity-60");
+    expect(errorChip().attributes("aria-disabled")).toBeUndefined();
+  });
+
+  it("shows a skeleton, not the old count, when a run over another dataset drops the kept count", async () => {
+    const countChip = () => wrapper.find('[data-test="traces-count-badge"]');
+    await mountWith({ total: 50, countPending: false, errorCount: 7 });
+
+    Object.assign(mockSearchObj.data.queryResults, {
+      total: null,
+      countPending: true,
+      errorCount: undefined,
+    });
+    await flushPromises();
+
+    expect(countChip().findComponent({ name: "OSkeleton" }).exists()).toBe(true);
+    expect(countChip().text()).not.toMatch(/\d/);
+  });
+
+  it("keeps the last page count, disabled, while the new count is pending", async () => {
+    await mountWith({ total: 50, countPending: false });
+    expect(pager().props("max")).toBe(5);
+
+    mockSearchObj.loading = true;
+    Object.assign(mockSearchObj.data.queryResults, { total: null, countPending: true });
+    await flushPromises();
+    expect(pager().props("max")).toBe(5);
+    expect(pager().props("disable")).toBe(true);
+    expect(pageSize().exists()).toBe(true);
+
+    mockSearchObj.loading = false;
+    await flushPromises();
+    expect(pager().props("disable")).toBe(true);
+
+    Object.assign(mockSearchObj.data.queryResults, { total: 20, countPending: false });
+    await flushPromises();
+    expect(pager().props("max")).toBe(2);
+    expect(pager().props("disable")).toBe(false);
+  });
+
+  it("stops keyboard row navigation crossing pages while the new count is pending", async () => {
+    const list = () => wrapper.findComponent({ name: "TracesSearchResultList" });
+    await mountWith({ total: 50, countPending: false });
+    expect(list().props("showPagination")).toBe(true);
+
+    Object.assign(mockSearchObj.data.queryResults, { total: null, countPending: true });
+    await flushPromises();
+    expect(list().props("showPagination")).toBe(false);
   });
 });
 

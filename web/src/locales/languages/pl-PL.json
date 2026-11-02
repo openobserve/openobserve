@@ -1315,7 +1315,6 @@
       "moreExamples": "Aby zobaczyć więcej przykładów,",
       "clickHere": "kliknij tutaj"
     },
-    "legendLabel": "Legenda",
     "switchToLogs": "Przełącz z powrotem na Logi",
     "savedViewsLabel": "Zapisany widok",
     "savedViewName": "Nazwa widoku",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "Formuła {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} nie jest zapytaniem w tym panelu",
-    "formulaReferencesFormula": "{letter} to formuła, a formuła nie może odwoływać się do innej formuły",
+    "formulaCycle": "Formuły odwołują się do siebie w pętli: {cycle}",
+    "formulaTooLong": "Po rozwinięciu formuła przekracza {limit} znaków",
+    "formulaTooDeep": "Formuły są zagnieżdżone na więcej niż {limit} poziomów",
     "formulaInputNote": "Używane w formule: tam ustawienie instant/range tego zapytania, legenda, krok i przesunięcie czasu nie mają zastosowania.",
     "multiSqlQueryLabel": "Etykieta zapytania",
     "multiSqlQueryLabelHint": "Niestandardowa nazwa tego zapytania w legendach (np. 'Produkcja')",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "Wartość",
     "hostmapGroupBy": "Grupuj według",
     "otherColumn": "Inne kolumny",
-    "metric": "Metryka",
     "filters": "Filtry",
     "labelFilters": "Filtry etykiet",
     "operations": "Operacje",
@@ -13604,21 +13604,6 @@
     "awsStsSelfHostedInfo": "To używa AWS STS do przyjęcia roli i wykonania operacji. Upewnij się, że skonfigurowałeś poświadczenia AWS w środowisku instalacyjnym, które mają dostęp do tej roli."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "W przypadku selektorów wektorów natychmiastowych użyj",
-      "rangeVector": "W przypadku selektorów wektorów zakresowych użyj",
-      "aggregate": "Aby agregować dane, użyj",
-      "or": "lub",
-      "rate": "Do obliczeń tempa w wektorze zakresowym użyj",
-      "sqlTitle": "Przewodnik składni: tryb SQL",
-      "sqlFullText": "Aby wyszukać pełnotekstowo wartość 'error', użyj",
-      "sqlColumn": "Aby wyszukać w kolumnie wartość 'error', użyj",
-      "sqlCode": "Aby wyszukać wartość 200 w kolumnie code, użyj",
-      "sqlStream": "Aby wyszukać wartość 'stderr' w kolumnie stream, użyj",
-      "sqlFunction": "Aby wyszukać i użyć funkcji zapytania {fn} na kolumnie log, użyj",
-      "sqlMoreExamples": "Aby uzyskać dodatkowe przykłady,",
-      "sqlClickHere": "kliknij tutaj"
-    },
     "add": "Dodaj",
     "runQuery": "Uruchom zapytanie",
     "runQueryOptions": "Opcje uruchamiania zapytania",
@@ -13734,7 +13719,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "Dodaj do pulpitu",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "Średnia",
+          "sortAvgTitle": "Uszereguj wartości według ich średniej w oknie",
+          "sortOutlying": "Odstające",
+          "sortOutlyingTitle": "Uszereguj wartości według tego, jak bardzo ich serie odbiegają od pozostałych",
+          "outlier": "Wartość odstająca"
         },
         "related": {
           "empty": "Brak powiązanych metryk",
@@ -13859,9 +13849,9 @@
         "selectLabel": "Wybierz etykietę",
         "invalidLabel": "Nieprawidłowa nazwa etykiety.",
         "selectOrTypeValue": "Wybierz lub wpisz wartość",
-        "operatorHelp": "=  to dokładnie ta wartość\n!=  to wszystko oprócz tej wartości\n=~  dopasowuje wyrażenie regularne — użyj 500{'|'}503, aby dopasować jedno z dwóch\n!~  nie pasuje do wyrażenia regularnego\n\nFiltry są łączone za pomocą AND. Aby dopasować jedną z dwóch wartości, użyj operatora =~ z wyrażeniem regularnym.",
+        "operatorHelp": "=  oznacza dokładnie tę wartość\n!=  oznacza wszystko inne niż ta wartość\n=~  dopasowuje wyrażenie regularne — użyj 500{'|'}503, aby dopasować którąkolwiek\n!~  nie dopasowuje wyrażenia regularnego\n\nFiltry są łączone operatorem AND. Aby dopasować jedną z dwóch wartości, użyj =~ z wyrażeniem regularnym lub dodaj grupę OR.",
         "andSeparator": "i",
-        "andSeparatorTitle": "Filtry są łączone za pomocą AND — metryka musi pasować do wszystkich. Aby dopasować jedną z dwóch wartości, użyj operatora =~ z wyrażeniem regularnym.",
+        "andSeparatorTitle": "Filtry są łączone operatorem AND — metryka musi pasować do wszystkich. Aby dopasować jedną z dwóch wartości, użyj operatora =~ z wyrażeniem regularnym lub dodaj grupę OR.",
         "noSuggestions": "Brak sugestii — wpisz wartość.",
         "moreFilters": "+{count} więcej",
         "moreFiltersTooltip": "Kliknij, aby pokazać wszystkie filtry w linii",
@@ -13901,11 +13891,16 @@
         "deleteMessage": "Usunąć widok {name} dla wszystkich w tej organizacji?",
         "modified": "{name} (zmodyfikowany)",
         "clear": "Wyczyść widok"
-      }
-    },
-    "index": {
-      "namePanelRequired": "Nazwa panelu jest wymagana",
-      "errorsFixTryAgain": "Wystąpiły błędy, popraw je i spróbuj ponownie"
+      },
+      "sortDashboards": "Pulpity",
+      "sortDashboardsTitle": "Najpierw najczęściej używane w pulpitach",
+      "sortAlerts": "Alerty",
+      "sortAlertsTitle": "Najpierw najczęściej używane w alertach",
+      "usageInDashboards": "W pulpitach",
+      "usageHasAlerts": "Ma alerty",
+      "usageInSlos": "W SLO",
+      "usageLoading": "Ładowanie informacji o użyciu metryk",
+      "usageFailed": "Użycie niedostępne, spróbuj ponownie"
     },
     "metricCard": {
       "lastRefreshed": "Ostatnie odświeżenie:",
@@ -13917,25 +13912,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Nie udało się wyrenderować wykresu"
-    },
-    "queryBuilder": {
-      "title": "Kreator zapytań PromQL",
-      "subtitle": "Twórz i testuj zapytania PromQL wizualnie",
-      "generatedQuery": "Wygenerowane zapytanie PromQL:",
-      "noQueryBuilt": "Nie zbudowano jeszcze zapytania",
-      "copyQuery": "Kopiuj zapytanie",
-      "clearAll": "Wyczyść wszystko",
-      "testQuery": "Testuj zapytanie",
-      "queryResultPreview": "Podgląd wyniku zapytania:",
-      "queryCopied": "Zapytanie skopiowane do schowka!",
-      "queryCleared": "Zapytanie wyczyszczone",
-      "testingSoon": "Testowanie zapytań zostanie wkrótce zaimplementowane",
-      "executionSoon": "Wykonywanie zapytań zostanie zaimplementowane w następnej fazie"
-    },
-    "metricSelector": {
-      "metricName": "Nazwa metryki",
-      "loadingMetrics": "Ładowanie metryk...",
-      "noMetricsFound": "Nie znaleziono metryk"
     },
     "labelFilterEditor": {
       "label": "Etykieta",
@@ -13958,8 +13934,6 @@
       "noMetric": "Kreator wymaga zapytania dotyczącego jednej nazwanej metryki",
       "mismatch": "Kreator nie może dokładnie wyświetlić tego zapytania",
       "constructs": {
-        "without": "grupowanie without (…)",
-        "offset": "modyfikator offset",
         "at": "modyfikator {'@'}",
         "orMatchers": "or pomiędzy dopasowaniami etykiet",
         "subquery": "podzapytanie",
@@ -13993,7 +13967,11 @@
         "byLabelsLabel": "Według etykiet",
         "quantileLabel": "Kwantyl",
         "kLabel": "K",
-        "nearestMultipleLabel": "Najbliższa wielokrotność"
+        "nearestMultipleLabel": "Najbliższa wielokrotność",
+        "withoutLabel": "Bez (usuń te etykiety)",
+        "withoutDesc": "Agreguj z pominięciem wybranych etykiet i zachowaj wszystkie pozostałe etykiety",
+        "offsetLabel": "Przesunięcie",
+        "offsetDesc": "Jak daleko wstecz odczytać metrykę, np. 1h lub 1d"
       },
       "rangeOnlyFirst": "Funkcja zakresowa może być tylko pierwszym krokiem",
       "rangeOnlyFirstNote": "Funkcja zakresowa odczytuje surowe próbki, więc może być tylko pierwszym krokiem. Usuń pozostałe kroki, aby ją dodać.",
@@ -14063,6 +14041,17 @@
       "empty": "Brak zapytań",
       "noMatch": "Żadne zapytanie nie pasuje do wyszukiwania ani filtra oznaczonych gwiazdką",
       "loadMore": "Załaduj więcej"
+    },
+    "labelGroups": {
+      "addGroup": "+ Grupa OR",
+      "addGroupTooltip": "Dodaj grupę filtrów; seria pasuje, gdy pasuje do dowolnej grupy",
+      "addToGroup": "Dodaj filtr do tej grupy",
+      "anyOf": "dowolny z",
+      "andAnyOf": "i dowolny z",
+      "or": "lub",
+      "not": "nie",
+      "notTooltip": "Dopasuj serie, których nie obejmuje ta cała grupa",
+      "tooManyBranches": "Te filtry rozwijają się do {count} osobnych selektorów; może działać co najwyżej {max}. Scal wartości w jeden filtr wyrażenia regularnego lub usuń grupę."
     }
   },
   "settings": {
@@ -15081,26 +15070,37 @@
       },
       "noData": "Brak danych",
       "unavailable": "Mapa cieplna opóźnień nie jest dostępna dla tego wyszukiwania",
-      "loadFailed": "Nie udało się wczytać mapy cieplnej opóźnień"
+      "loadFailed": "Nie udało się wczytać mapy cieplnej opóźnień",
+      "selection": {
+        "label": "Zaznaczenie na mapie cieplnej",
+        "reopen": "Pokaż akcje zaznaczenia",
+        "count": "Zaznaczono {count} span | Zaznaczono {count} span",
+        "range": "{band} · {window}",
+        "filter": "Filtruj według zaznaczenia",
+        "drillDown": "Przejdź w głąb",
+        "askAi": "Zapytaj AI",
+        "askAiChip": "Zaznaczenie na mapie cieplnej · {count} span | Zaznaczenie na mapie cieplnej · {count} span",
+        "clear": "Wyczyść zaznaczenie"
+      }
     },
     "comparison": {
-      "title": "Porównaj wybór",
-      "baselineOutside": "Poza wyborem",
-      "baselineBefore": "Tuż przed",
+      "baselineOutside": "Reszta zakresu",
+      "baselineBefore": "Przed zaznaczeniem",
       "sampleNote": "Wybór: {selection} · Punkt odniesienia: {baseline}",
       "sampleNoteAll": "wszystkie spany ({count}) | wszystkie spany ({count})",
       "sampleCapped": "Próbkowano {sampled} z {total} spanów",
       "noiseNote": "Różnice poniżej {pts} pkt mieszczą się w szumie próbkowania",
       "loading": "Próbkowanie spanów…",
-      "loadFailed": "Nie udało się porównać wyboru",
+      "loadFailed": "Nie udało się wczytać przejścia w głąb",
       "sampleOverflow": "Próbka nie zgadza się z liczbą spanów, na przykład z powodu danych, które dotarły z opóźnieniem. Ponów, aby przeliczyć.",
       "baselineCapped": "Punkt odniesienia ograniczony do {range}, do 3 godz. po każdej stronie wyboru",
       "baselineLimited": "Punkt odniesienia ograniczony do {range} przez {hours}-godzinny limit zapytań tego strumienia",
-      "rangeClamped": "Serwer skrócił zakres czasu, więc porównanie byłoby niekompletne",
+      "rangeClamped": "Serwer skrócił zakres czasu, więc przejście w głąb byłoby niekompletne",
       "rangeTooLong": "Wybór jest dłuższy niż {hours}-godzinny limit zapytań tego strumienia",
+      "presetRangeTooLong": "Zakres czasu jest dłuższy niż {hours}-godzinny limit zapytań tego strumienia",
       "retry": "Ponów",
       "noSelectionTitle": "Wybierz spany do porównania",
-      "noSelectionBody": "Narysuj prostokąt na mapie cieplnej czasu trwania lub zaznacz obszar na wykresie błędów albo tempa, a następnie otwórz Przejdź do szczegółów.",
+      "noSelectionBody": "Wróć i zaznacz obszar na mapie cieplnej czasu trwania albo zaznacz przedział na wykresie błędów lub tempa.",
       "emptySelection": "Brak spanów w wyborze",
       "emptyBaseline": "Brak spanów punktu odniesienia",
       "emptyBaselineHint": "Nic nie pasuje do tego punktu odniesienia. Spróbuj zamiast tego {mode}.",
@@ -15125,6 +15125,23 @@
       "summaryBand": "{window} · {band}"
     },
     "drillDownBackTarget": "wyniki",
+    "drillDownPanel": {
+      "counts": "{selected} vs {baseline}",
+      "selectedTraces": "{count} zaznaczony trace | {count} zaznaczone trace",
+      "baselineTraces": "{count} trace bazowy | {count} trace bazowe",
+      "selectedSpans": "{count} zaznaczony span | {count} zaznaczone span",
+      "baselineSpans": "{count} span bazowy | {count} span bazowe",
+      "baseline": "Wartość bazowa",
+      "presetsTitle": "Lub zacznij od presetu",
+      "presetErrors": "Błędy vs reszta",
+      "presetSlowest": "Najwolniejsze 10% vs reszta",
+      "presetRecent": "Najnowsze vs wcześniejsze",
+      "presetErrorsDesc": "Span z błędem w porównaniu z wszystkimi pozostałymi span",
+      "presetSlowestDesc": "Span na poziomie p90 lub wyższym w porównaniu z szybszymi span",
+      "presetRecentDesc": "Druga połowa zakresu czasu w porównaniu z pierwszą połową",
+      "presetEmpty": "Brak czasów trwania span w tym zakresie do uszeregowania",
+      "presetNoMatch": "Ten preset nie znalazł span do porównania w tym zakresie"
+    },
     "metrics": {
       "perSecond": {
         "traces": "trace/s",
@@ -15247,6 +15264,7 @@
     "errorSpans": "Spany z błędami",
     "filterByErrors": "Filtruj według błędów",
     "clearErrorFilter": "Wyczyść filtr błędów",
+    "updatingResults": "Aktualizowanie wyników",
     "error": "BŁĄD",
     "errorCount": "{n} BŁĄD | BŁĘDY: {n}",
     "success": "SUKCES",
@@ -21590,7 +21608,8 @@
         "resetColumnWidths": "Resetuj szerokości kolumn"
       },
       "selectAllRows": "Zaznacz wszystkie wiersze",
-      "selectRow": "Zaznacz wiersz {name}",
+      "selectRowAt": "Wybierz wiersz {index}",
+      "selectRowAtNamed": "Wybierz wiersz {index}, {name}",
       "removeColumnAria": "Usuń kolumnę",
       "formatColumnAria": "Formatuj kolumnę",
       "selectedOfTotal": "Wybrano {selected} z {total}",
@@ -22775,7 +22794,8 @@
       "moduloName": "Modulo",
       "multiplyByName": "Pomnóż przez",
       "divideByName": "Podziel przez",
-      "exponentName": "Wykładnik"
+      "exponentName": "Wykładnik",
+      "offsetDoc": "Odczytuje metrykę sprzed podanego czasu"
     }
   },
   "passwordPolicy": {
@@ -26389,6 +26409,8 @@
     "section_handled": "Obsłużone",
     "section_resolved": "Rozwiązane",
     "sectionHint_ringing": "nikt nie potwierdził — te wezwania wciąż trwają",
+    "sectionHint_ringingRouted": "nikt nie potwierdził — {count} z nich nadal jest wzywane | nikt nie potwierdził — {count} z nich nadal jest wzywanych",
+    "sectionHint_ringingUnrouted": "{count} nie ma zespołu, więc nie jest wzywane | {count} nie mają zespołu, więc nie są wzywane",
     "sectionHint_snoozed": "wzywanie wstrzymane — wrócą same",
     "sectionHint_handled": "potwierdzone — każdym zajmuje się człowiek",
     "sectionHint_resolved": "zamknięte — zachowane dla dokumentacji",
