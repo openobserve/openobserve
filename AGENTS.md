@@ -28,8 +28,10 @@
   streams. Traces use `GET /api/{org}/{stream}/traces/latest_stream`. Call them
   through `useHttpStreaming` in `web/src/composables/useStreamingSearch.ts`,
   which handles chunking, cancellation and the `trace_id`. Do not add new UI
-  callers of `_search`, `_search_multi` or `traces/latest`. Those stay for the
-  API and for existing code until it is migrated.
+  callers of `_search`, `_search_multi` or `traces/latest`. Wherever a
+  streaming endpoint is supported for a call, the UI uses it, in existing code
+  as well as new code. The one-shot endpoints are for the public API and for
+  the few UI calls that have no streaming equivalent yet.
 
 ## Rust code organization
 
