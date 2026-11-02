@@ -140,17 +140,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-canvas-overlay
     >
       <slot name="toolbar" />
-      <div
-        class="bg-surface-base border-border-default rounded-default flex h-9 items-center border px-2.5 shadow-sm"
-      >
-        <OSwitch
-          :model-value="plumbing"
-          :label="t('search.queryProfile.foldPlumbing')"
-          size="sm"
-          data-test="query-profile-fold-plumbing"
-          @update:model-value="emitFold({ type: 'plumbing' }, selectedAnchor())"
-        />
-      </div>
     </div>
 
     <div
@@ -220,6 +209,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip side="left" :content="t('search.queryProfile.overview')" />
         </OButton>
         <div class="border-border-default mx-1 border-t" />
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="compress"
+          :aria-label="t('search.queryProfile.foldPlumbing')"
+          :aria-pressed="plumbing"
+          :class="plumbing ? 'text-accent' : ''"
+          data-test="query-profile-fold-plumbing"
+          @click="emitFold({ type: 'plumbing' }, selectedAnchor())"
+        >
+          <OTooltip side="left" :content="t('search.queryProfile.foldPlumbing')" />
+        </OButton>
         <OButton
           variant="ghost"
           size="icon-sm"
@@ -306,7 +307,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
