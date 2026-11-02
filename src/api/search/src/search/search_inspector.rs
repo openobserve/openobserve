@@ -181,10 +181,12 @@ pub async fn get_search_profile(
         let max_query_range =
             get_settings_max_query_range(settings.max_query_range, meta_org_id, Some(&user_id))
                 .await;
-        if max_query_range > 0
-            && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
-        {
-            req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+        if let Some(clamped) = config::utils::query_range::clamp_start_time(
+            req.query.start_time,
+            req.query.end_time,
+            max_query_range,
+        ) {
+            req.query.start_time = clamped;
             range_error = format!(
                 "Query duration is modified due to query range restriction of {max_query_range} hours"
             );

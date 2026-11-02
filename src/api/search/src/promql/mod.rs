@@ -541,6 +541,16 @@ async fn query_range(
             }
         },
     };
+    if let Err(e) = validate_range_window(start, end) {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                e,
+                Some(trace_id),
+            )),
+        )
+            .into_response();
+    }
     if step == 0 {
         step = promql::round_step((end - start) / promql::MAX_DATA_POINTS);
     }
@@ -1201,6 +1211,19 @@ fn validate_metadata_params(
     Ok((selector, start, end))
 }
 
+fn validate_range_window(start: i64, end: i64) -> Result<(), String> {
+    // `end - start` and the gRPC epoch conversion both overflow on a negative or reversed window.
+    if start < 0 {
+        return Err(format!(
+            "start must not be before the Unix epoch, got {start}"
+        ));
+    }
+    if end < start {
+        return Err(format!("end {end} must not be before start {start}"));
+    }
+    Ok(())
+}
+
 /// prometheus formatting query expressions
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#formatting-query-expressions
@@ -1749,6 +1772,15 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn validate_range_window_rejects_negative_and_inverted_windows() {
+        assert!(validate_range_window(0, 0).is_ok());
+        assert!(validate_range_window(1_000, 2_000).is_ok());
+        assert!(validate_range_window(-1, 10).is_err());
+        assert!(validate_range_window(i64::MIN, 10).is_err());
+        assert!(validate_range_window(10, 9).is_err());
+    }
 
     #[test]
     fn metric_reads_check_permission_for_every_non_root_user() {

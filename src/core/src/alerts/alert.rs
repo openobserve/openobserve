@@ -892,7 +892,7 @@ async fn prepare_alert(
             if max_query_range > 0
                 && !alert.query_condition.promql_rule_mode
                 && !alert.is_real_time
-                && alert.trigger_condition.period > max_query_range * 60
+                && alert.trigger_condition.period > max_query_range.saturating_mul(60)
             {
                 return Err(AlertError::PeriodExceedsMaxQueryRange {
                     max_query_range_hours: max_query_range,
@@ -1093,7 +1093,7 @@ async fn prepare_alert(
                     let max_query_range = settings.max_query_range;
                     if max_query_range > 0
                         && !alert.is_real_time
-                        && alert.trigger_condition.period > max_query_range * 60
+                        && alert.trigger_condition.period > max_query_range.saturating_mul(60)
                     {
                         return Err(AlertError::PeriodExceedsMaxQueryRange {
                             max_query_range_hours: max_query_range,
