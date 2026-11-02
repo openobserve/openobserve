@@ -3932,4 +3932,60 @@ export class TracesPage {
     await expect(notice).toBeVisible({ timeout: 30000 });
     await expect(notice).toContainText(message);
   }
+
+  // ===== SQL MODE =====
+
+  getSqlModePinnedSwitch() {
+    return this.page.locator('[data-test="traces-search-bar-sql-mode-pinned-btn"] [role="switch"]');
+  }
+
+  async toggleSqlModeFromToolbar() {
+    await this.page.locator('[data-test="traces-search-bar-sql-mode-pinned-btn"]').click();
+  }
+
+  async expectSqlMode(on) {
+    await expect(this.getSqlModePinnedSwitch()).toHaveAttribute('aria-checked', String(on), {
+      timeout: 10000,
+    });
+  }
+
+  // Monaco auto-closes quotes and brackets on typed input, so SQL is set through its API.
+  async setQueryEditorValue(text) {
+    await expect(this.page.locator(this.queryEditor)).toBeVisible({ timeout: 10000 });
+    await expect
+      .poll(() => this.page.evaluate(() => !!(/** @type {any} */ (window)).monaco?.editor), {
+        timeout: 10000,
+      })
+      .toBe(true);
+    await this.page.evaluate((value) => {
+      const editors = /** @type {any} */ (window).monaco.editor.getEditors();
+      const target =
+        editors.find((e) => e.getDomNode?.()?.closest('#traces-query-editor')) || editors[0];
+      target.setValue(value);
+    }, text);
+  }
+
+  async expectQueryEditorValue(text) {
+    await expect.poll(() => this.getQueryEditorContent(), { timeout: 10000 }).toBe(text);
+  }
+
+  getSqlModeConfirmDialog() {
+    return this.page.locator('[data-test="confirm-dialog-provider"]');
+  }
+
+  async cancelSqlModeSwitchOff() {
+    await this.getSqlModeConfirmDialog().locator('[data-test="o-dialog-secondary-btn"]').click();
+  }
+
+  getSqlResultTable() {
+    return this.page.locator('[data-test="traces-sql-result-table"]');
+  }
+
+  getRedUnavailableIcon() {
+    return this.page.locator('[data-test="traces-red-unavailable-icon"]');
+  }
+
+  getRedMetricsDashboard() {
+    return this.page.locator('[data-test="traces-metrics-dashboard"]');
+  }
 }

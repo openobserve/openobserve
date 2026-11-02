@@ -46,6 +46,7 @@ vi.mock("@/utils/traces/constants", () => ({
 }));
 
 import {
+  buildResultColumns,
   useTracesTableColumns,
   fillLastColumn,
   LLM_COLUMN_IDS,
@@ -621,6 +622,29 @@ describe("useTracesTableColumns", () => {
       expect(fillIds(cols)).toEqual(["duration"]);
       expect(cols[0].minSize).toBeUndefined();
       expect((cols[0].meta as Record<string, unknown>).autoWidth).toBeUndefined();
+    });
+  });
+
+  describe("buildResultColumns — typed SQL results", () => {
+    it("makes one column per returned key, in order, headed by the key", () => {
+      const cols = buildResultColumns(["service_service_version", "spans", "p95_ms"]);
+      expect(cols.map((c) => c.id)).toEqual(["service_service_version", "spans", "p95_ms"]);
+      expect(cols.map((c) => String(c.header))).toEqual([
+        "service_service_version",
+        "spans",
+        "p95_ms",
+      ]);
+    });
+
+    it("reads each cell by key and shows objects as JSON", () => {
+      const [plain, nested] = buildResultColumns(["n", "attrs"]);
+      expect((plain as any).accessorFn({ n: 4 })).toBe(4);
+      expect((nested as any).accessorFn({ attrs: { a: 1 } })).toBe('{"a":1}');
+    });
+
+    it("lets the last column fill the row", () => {
+      const cols = buildResultColumns(["a", "b"]);
+      expect((cols[1].meta as Record<string, unknown>).fillRemaining).toBe(true);
     });
   });
 });

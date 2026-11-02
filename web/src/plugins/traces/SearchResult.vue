@@ -56,6 +56,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Left: count chips -->
         <OTag
+          v-if="sqlRowsOnly"
+          data-test="traces-sql-rows-count"
+          type="logsResultChip"
+          value="neutral"
+          class="me-2.5 tabular-nums"
+          :aria-busy="countState.loading ? 'true' : undefined"
+        >
+          <span class="transition-opacity" :class="{ 'opacity-60': headerDimmed }">
+            {{ sqlRowsLabel }}
+          </span>
+        </OTag>
+        <OTag
+          v-else
           data-test="traces-count-badge"
           type="logsResultChip"
           value="neutral"
@@ -82,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-error-count-badge"
           type="logsResultChip"
           value="error"
-          :clickable="true"
+          :clickable="!searchObj.meta.sqlMode"
           class="tabular-nums transition-opacity"
           :class="[
             showErrorOnly
@@ -91,19 +104,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             { 'opacity-60': headerDimmed },
           ]"
           :aria-disabled="regionBusy ? 'true' : undefined"
-          @click="toggleErrorOnly"
+          @click="!searchObj.meta.sqlMode && toggleErrorOnly()"
         >
           {{
             `${formatLargeNumber(shownErrorCount)} ${searchObj.meta.searchMode === "traces" ? t("traces.errorTraces") : t("traces.errorSpans")}`
           }}
           <OTooltip
-            :content="showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
+            :content="
+              searchObj.meta.sqlMode
+                ? t('traces.sqlMode.putConditionInWhere')
+                : showErrorOnly
+                  ? t('traces.clearErrorFilter')
+                  : t('traces.filterByErrors')
+            "
             side="bottom"
           />
-          <template #trailing>
+          <template v-if="!searchObj.meta.sqlMode" #trailing>
             <OIcon name="filter-alt" size="xs" class="shrink-0" />
           </template>
         </OTag>
+        <span
+          v-if="!redAvailable && searchObj.meta.showHistogram"
+          class="text-warning ms-1 inline-flex shrink-0 cursor-help"
+          tabindex="0"
+          data-test="traces-red-unavailable-icon"
+        >
+          <OIcon name="info-outline" size="sm" />
+          <OTooltip :content="t('traces.sqlMode.redUnavailable')" side="top" align="center" />
+        </span>
 
         <div
           class="hidden basis-full @max-[58rem]/results:block"
@@ -185,7 +213,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <TracesMetricsDashboard
           v-show="searchObj.meta.showHistogram"
-          v-if="searchObj.data.stream.selectedStream.value && searchObj.searchApplied"
+          v-if="
+            searchObj.data.stream.selectedStream.value && searchObj.searchApplied && redAvailable
+          "
           ref="metricsDashboardRef"
           class="sticky start-0 z-1"
           :streamName="searchObj.data.stream.selectedStream.value"
@@ -204,7 +234,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <TracesMetricsPlaceholder v-else-if="pending && searchObj.meta.showHistogram" />
 
+        <TracesSqlResultTable
+          v-if="sqlShape !== 'spans'"
+          :hits="hits"
+          :columns="sqlColumns"
+          :shape="sqlShape"
+          :loading="searchObj.loading"
+          :wrap="searchObj.meta.resultGrid.wrapCells"
+          :scroll-el="scrollContainerRef"
+          :offer-add-trace-id="offerAddTraceId"
+          :trace-href="traceByIdHref"
+          @open-trace="openTraceById"
+          @add-trace-id="$emit('add-trace-id')"
+        />
         <TracesSearchResultList
+          v-else
           ref="searchResultListRef"
           :hits="hits"
           :wrap="searchObj.meta.resultGrid.wrapCells"
@@ -260,6 +304,17 @@ import useTraces from "../../composables/useTraces";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useRouter } from "vue-router";
 import TracesSearchResultList from "./components/TracesSearchResultList.vue";
+import TracesSqlResultTable from "./components/TracesSqlResultTable.vue";
+import { buildResultColumns } from "./composables/useTracesTableColumns";
+import {
+  analyzeTracesSql,
+  canAddTraceId,
+  isRedEligible,
+  isRowQuery,
+  resultKeys,
+  resultShape,
+  type TracesSqlShape,
+} from "@/utils/traces/tracesSql";
 import { formatLargeNumber } from "../../utils/zincutils";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -290,6 +345,7 @@ export default defineComponent({
     OSkeleton,
     ORegionStatus,
     TracesSearchResultList,
+    TracesSqlResultTable,
     TracesMetricsPlaceholder,
     TracesMetricsDashboard: defineAsyncComponent({
       // Its charts load as chunks of their own, so they load with it and the placeholder stays until they can draw.
@@ -343,6 +399,7 @@ export default defineComponent({
     "ask-ai",
     "send-to-ai-chat",
     "open-mobile-fields",
+    "add-trace-id",
   ],
   methods: {
     toggleErrorOnly() {
@@ -371,7 +428,7 @@ export default defineComponent({
     const router = useRouter();
     const { isMobile } = useBreakpoint();
 
-    const { searchObj, updatedLocalLogFilterField, patchUrlViewState } = useTraces();
+    const { searchObj, updatedLocalLogFilterField, patchUrlViewState, tracesParser } = useTraces();
 
     const metricsDashboardRef: any = ref(null);
 
@@ -422,7 +479,14 @@ export default defineComponent({
       },
     );
 
+    const pageTimeRange = () => ({
+      from: searchObj.data.datetime.startTime,
+      to: searchObj.data.datetime.endTime,
+    });
+
     const traceTimeRange = (props: any) => {
+      // Typed SQL may leave the span times out, so the trace is looked up in the page's range.
+      if (searchObj.meta.searchMode === "spans" && !props.start_time) return pageTimeRange();
       if (searchObj.meta.searchMode === "spans") {
         // start_time / end_time are nanoseconds in raw span rows — convert to µs
         const spanStart = Math.floor((props.start_time || 0) / 1000);
@@ -447,6 +511,27 @@ export default defineComponent({
     const traceDetailsHref = (row: any) => {
       const { from, to } = traceTimeRange(row);
       return router.resolve(traceDetailsLocation(row, from, to)).href;
+    };
+
+    const traceByIdLocation = (row: any) => {
+      const { from, to } = pageTimeRange();
+      return {
+        name: "traceDetails",
+        query: {
+          stream: router.currentRoute.value.query.stream,
+          trace_id: row.trace_id,
+          from,
+          to,
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      };
+    };
+
+    const traceByIdHref = (row: any) => router.resolve(traceByIdLocation(row)).href;
+
+    const openTraceById = async (row: any) => {
+      await patchUrlViewState();
+      router.push(traceByIdLocation(row));
     };
 
     const openTraceInNewTab = (row: any) => {
@@ -491,6 +576,35 @@ export default defineComponent({
 
     const resultTotal = computed<number>(() =>
       Number(searchObj.data.queryResults?.total ?? hits.value.length),
+    );
+
+    // Results carry the SQL they ran, so a staged edit never reshapes the table.
+    const sqlInfo = computed(() => {
+      const sql = searchObj.data.queryResults?.sql;
+      return typeof sql === "string" && sql ? analyzeTracesSql(sql, tracesParser.value) : null;
+    });
+    const redAvailable = computed(
+      () =>
+        !sqlInfo.value ||
+        isRedEligible(sqlInfo.value, searchObj.data.queryResults?.is_histogram_eligible),
+    );
+    const sqlRowsOnly = computed(() => !!sqlInfo.value && !isRowQuery(sqlInfo.value));
+    const sqlKeys = computed(() =>
+      sqlInfo.value ? resultKeys(hits.value, sqlInfo.value.selectNames) : [],
+    );
+    const sqlShape = computed<TracesSqlShape>(() =>
+      sqlInfo.value && hits.value.length ? resultShape(sqlKeys.value) : "spans",
+    );
+    const sqlColumns = computed(() => buildResultColumns(sqlKeys.value));
+    const offerAddTraceId = computed(
+      () => sqlShape.value === "rows" && !!sqlInfo.value && canAddTraceId(sqlInfo.value),
+    );
+    const sqlRowsLabel = computed(() =>
+      t(
+        "traces.sqlMode.rowsCount",
+        { count: formatLargeNumber(hits.value.length) },
+        hits.value.length,
+      ),
     );
 
     const searchPerformed = computed(() =>
@@ -646,6 +760,14 @@ export default defineComponent({
       scrollContainerRef,
       expandRowDetail,
       traceDetailsHref,
+      traceByIdHref,
+      openTraceById,
+      redAvailable,
+      sqlRowsOnly,
+      sqlShape,
+      sqlColumns,
+      offerAddTraceId,
+      sqlRowsLabel,
       openTraceInNewTab,
       onMetricsTimeRangeSelected,
       onMetricsEditorFilterSet,

@@ -26,6 +26,7 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
+import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
 import analytics from "@/services/product_analytics";
 import queryHistory from "@/services/query_history";
@@ -4869,6 +4870,219 @@ describe("Index.vue (Main Traces Page)", () => {
       await leaving;
       await flushPromises();
       expect(appRouter.currentRoute.value.fullPath).toBe("/logs");
+    });
+  });
+
+  describe("SQL mode", () => {
+    const grouped = `SELECT service_name, count(*) AS n FROM "default" WHERE a = 1 GROUP BY service_name`;
+
+    const mountSql = async () => {
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+      mockSearchObj.data.resultGrid.currentPage = 0;
+      mockSearchObj.meta.resultGrid.rowsPerPage = 25;
+      mockFetchQueryDataWithHttpStream.mockClear();
+    };
+
+    const runSql = async (sql: string) => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = sql;
+      wrapper.vm.searchData();
+      await flushPromises();
+      const [request, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      return { request, handlers, sql: b64DecodeUnicode(request.queryReq.query.sql) };
+    };
+
+    const finish = async (handlers: any, hits: any[], extra: Record<string, unknown> = {}) => {
+      handlers.data(
+        {},
+        { type: "search_response_metadata", content: { results: { hits: [], ...extra } } },
+      );
+      handlers.data({}, { type: "search_response_hits", content: { results: { hits } } });
+      handlers.complete({});
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.data.editorValue = "";
+      mockSearchObj.data.queryPayload = null;
+    });
+
+    it("sends the typed SQL as written to the spans search", async () => {
+      await mountSql();
+      const typed = `SELECT * FROM "default" WHERE duration > '5ms' AND span_kind = 'Server'`;
+      const { request, sql } = await runSql(typed);
+      expect(request.type).toBe("search");
+      expect(sql).toBe(typed);
+      expect(request.queryReq.query.from).toBe(0);
+      expect(request.queryReq.query.size).toBe(25);
+    });
+
+    it("asks for every row of a GROUP BY query with size -1", async () => {
+      await mountSql();
+      const { request, sql } = await runSql(grouped);
+      expect(sql).toBe(grouped);
+      expect(request.queryReq.query.size).toBe(-1);
+      expect(request.queryReq.query.from).toBe(0);
+    });
+
+    it("uses the LIMIT as the size", async () => {
+      await mountSql();
+      const { request } = await runSql(`SELECT * FROM "default" LIMIT 40`);
+      expect(request.queryReq.query.size).toBe(40);
+    });
+
+    it("counts a grouped query's rows instead of requesting a count", async () => {
+      await mountSql();
+      const { handlers } = await runSql(grouped);
+      await finish(handlers, [
+        { service_name: "api", n: 3 },
+        { service_name: "db", n: 1 },
+      ]);
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+      expect(mockSearchObj.data.queryResults.total).toBe(2);
+      expect(mockSearchObj.data.queryResults.countPending).toBe(false);
+      expect(mockSearchObj.data.queryResults.sql).toBe(grouped);
+    });
+
+    it("counts a row query over the typed WHERE, as typed", async () => {
+      await mountSql();
+      const { handlers } = await runSql(
+        `SELECT * FROM "default" WHERE a = 1 ORDER BY start_time DESC`,
+      );
+      await finish(handlers, [{ trace_id: "t", span_id: "s" }]);
+      const [countRequest] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      const countSql = b64DecodeUnicode(countRequest.queryReq.query.sql);
+      expect(countSql).toContain(`FROM "default" WHERE a = 1`);
+      expect(countSql).not.toContain("ORDER BY");
+    });
+
+    it("keeps the typed FROM alias in the count of a row query", async () => {
+      await mountSql();
+      const { handlers } = await runSql(`SELECT * FROM "default" AS d WHERE d.duration > 1`);
+      await finish(handlers, [{ trace_id: "t", span_id: "s" }]);
+      const [countRequest] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      const countSql = b64DecodeUnicode(countRequest.queryReq.query.sql);
+      expect(countSql).toContain(`FROM "default" AS d WHERE d.duration > 1`);
+    });
+
+    it("clears SQL results once SQL mode is switched off", async () => {
+      await mountSql();
+      const { handlers } = await runSql(
+        `SELECT trace_id, count(*) AS spans FROM "default" GROUP BY trace_id`,
+      );
+      await finish(handlers, [{ trace_id: "t", spans: 2 }]);
+      expect(mockSearchObj.data.queryResults.sql).toBeTruthy();
+
+      mockSearchObj.meta.sqlMode = false;
+      await flushPromises();
+
+      expect(mockSearchObj.data.queryResults.sql).toBeUndefined();
+      expect(mockSearchObj.data.queryResults.hits ?? []).toEqual([]);
+    });
+
+    it("keeps the server's histogram eligibility on the results", async () => {
+      await mountSql();
+      const { handlers } = await runSql(`SELECT * FROM "default" LIMIT 5`);
+      await finish(handlers, [{ trace_id: "t", span_id: "s" }], { is_histogram_eligible: false });
+      expect(mockSearchObj.data.queryResults.is_histogram_eligible).toBe(false);
+    });
+
+    it("does not send SQL from the Traces view and offers the Spans view", async () => {
+      await mountSql();
+      mockSearchObj.meta.searchMode = "traces";
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = grouped;
+      mockSearchObj.searchApplied = true;
+      wrapper.vm.searchData();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+
+      const empty = wrapper.findComponent('[data-test="traces-sql-mode-traces-view"]');
+      expect(empty.exists()).toBe(true);
+      empty.vm.$emit("action");
+      await flushPromises();
+
+      expect(mockSearchObj.meta.searchMode).toBe("spans");
+      expect(mockSearchObj.data.editorValue).toBe(grouped);
+      const [request] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      expect(b64DecodeUnicode(request.queryReq.query.sql)).toBe(grouped);
+    });
+
+    it("adds trace_id to the select list and runs", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.queryResults = { hits: [], sql: `SELECT service_name FROM "default"` };
+      wrapper.vm.onSqlAddTraceId();
+      await flushPromises();
+      expect(mockSearchObj.data.editorValue).toBe(`SELECT trace_id, service_name FROM "default"`);
+      const [request] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      expect(b64DecodeUnicode(request.queryReq.query.sql)).toBe(
+        `SELECT trace_id, service_name FROM "default"`,
+      );
+    });
+
+    it("restores SQL mode from a link only when it carries a query", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          name: "traces",
+          path: "/traces",
+          query: {
+            stream: "default",
+            tab: "spans",
+            query: b64EncodeUnicode(grouped),
+            sql_mode: "true",
+          },
+        },
+      } as any);
+      await mountSql();
+      expect(mockSearchObj.meta.sqlMode).toBe(true);
+      wrapper.unmount();
+
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          name: "traces",
+          path: "/traces",
+          query: { stream: "default", tab: "spans", query: b64EncodeUnicode("a = 1") },
+        },
+      } as any);
+      await mountSql();
+      expect(mockSearchObj.meta.sqlMode).toBe(false);
+    });
+
+    it("waits for Run when the stream changes in SQL mode, even with auto-run on", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.meta.liveMode = true;
+      store.state.zoConfig.auto_query_enabled = true;
+      await wrapper.vm.onSqlStreamChange("test-stream");
+      await flushPromises();
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("test-stream");
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      delete store.state.zoConfig.auto_query_enabled;
     });
   });
 });

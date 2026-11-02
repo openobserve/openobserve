@@ -239,6 +239,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="contextCellIsStreamField">
               <OContextMenuItem
                 data-test="trace-context-menu-include-term"
+                :disabled="!!searchObj.meta.sqlMode"
+                focusable-unavailable
+                :description="sqlModeTermReason"
                 @select="
                   addSearchTerm(
                     contextCell.columnId,
@@ -261,6 +264,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <OContextMenuItem
                 data-test="trace-context-menu-exclude-term"
+                :disabled="!!searchObj.meta.sqlMode"
+                focusable-unavailable
+                :description="sqlModeTermReason"
                 @select="
                   addSearchTerm(
                     contextCell.columnId,
@@ -485,6 +491,10 @@ const toSearchTermValue = (value: unknown): string | number | boolean => {
   if (value === null || value === undefined) return "null";
   return JSON.stringify(value);
 };
+
+const sqlModeTermReason = computed(() =>
+  searchObj.meta.sqlMode ? t("traces.sqlMode.putConditionInWhere") : undefined,
+);
 
 const contextCellIsStreamField = computed(() => {
   const columnId = contextCell.value?.columnId;

@@ -77,7 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :selected-fields="searchObj.data.stream.selectedFields"
                 :theme="store.state.theme"
                 :show-visibility-toggle="row.enableVisibility"
-                :show-filter-icon="true"
+                :show-filter-icon="!searchObj.meta.sqlMode"
+                :show-multi-select="!searchObj.meta.sqlMode"
                 :show-quick-mode="false"
                 :default-values-count="defaultValuesCount"
                 :value-mapper="getValueMapper(field.name)"
@@ -99,6 +100,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="traces-field-values-count-caption"
                   >
                     {{ t("traces.results.fieldValueCountsCaption") }}
+                    <span
+                      v-if="searchObj.meta.sqlMode"
+                      class="block"
+                      data-test="traces-field-values-sql-hint"
+                    >
+                      {{ t("traces.sqlMode.putConditionInWhere") }}
+                    </span>
                   </div>
                 </template>
                 <template v-if="field.name === 'duration'" #body>
@@ -120,10 +128,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="p.key !== 'max'"
                           variant="ghost"
                           size="icon-xs-circle"
+                          :disabled="searchObj.meta.sqlMode"
                           :title="
-                            t('common.durationGte', {
-                              value: formatPercentile(durationPercentiles[p.key]),
-                            })
+                            searchObj.meta.sqlMode
+                              ? t('traces.sqlMode.putConditionInWhere')
+                              : t('common.durationGte', {
+                                  value: formatPercentile(durationPercentiles[p.key]),
+                                })
                           "
                           @click.stop="
                             addSearchTerm(
@@ -137,10 +148,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
+                          :disabled="searchObj.meta.sqlMode"
                           :title="
-                            t('common.durationLte', {
-                              value: formatPercentile(durationPercentiles[p.key]),
-                            })
+                            searchObj.meta.sqlMode
+                              ? t('traces.sqlMode.putConditionInWhere')
+                              : t('common.durationLte', {
+                                  value: formatPercentile(durationPercentiles[p.key]),
+                                })
                           "
                           @click.stop="
                             addSearchTerm(
@@ -223,6 +237,7 @@ import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles from "@/composables/useDurationPercentiles";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { analyzeTracesSql } from "@/utils/traces/tracesSql";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
@@ -445,10 +460,16 @@ export default defineComponent({
 
     logsUtils();
 
-    const removeFieldFromWhereStr = (whereClause: string, fieldName: string): string => {
+    const removeFieldFromWhereStr = (
+      whereClause: string,
+      fieldName: string,
+      qualified = false,
+    ): string => {
       const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const fieldPattern = new RegExp(`^"?${escaped}"?\\s*[=!<>]`, "i");
-      const multiPattern = new RegExp(`^\\(\\s*"?${escaped}"?\\s*[=!<>]`, "i");
+      // Typed SQL may qualify a column with its FROM alias, as d.status or "d"."status".
+      const qualifier = qualified ? `(?:(?:"[^"]+"|\\w+)\\.)?` : "";
+      const fieldPattern = new RegExp(`^${qualifier}"?${escaped}"?\\s*[=!<>]`, "i");
+      const multiPattern = new RegExp(`^\\(\\s*${qualifier}"?${escaped}"?\\s*[=!<>]`, "i");
       const remaining = splitOnAnd(whereClause).filter((cond) => {
         const trimmed = cond.trim();
         return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
@@ -457,19 +478,21 @@ export default defineComponent({
     };
 
     const buildFieldValuesSql = (fieldName: string): string => {
+      const streamName = searchObj.data.stream.selectedStream.value;
+      // Typed SQL may alias its stream, and its WHERE refers to that alias.
+      const typed = searchObj.meta.sqlMode
+        ? analyzeTracesSql(searchObj.data.editorValue ?? "", tracesParser.value)
+        : null;
       // The whole editor value is the where clause — never split it on "|", the
       // split is quote-unaware and would truncate match_all('text | error').
-      const whereClause = resolveTracesFilter(
-        searchObj.data.editorValue,
-        tracesParser.value,
-        searchObj.data.stream.selectedStream.value,
-      );
+      const whereClause = typed
+        ? typed.where
+        : resolveTracesFilter(searchObj.data.editorValue, tracesParser.value, streamName);
 
-      const streamName = searchObj.data.stream.selectedStream.value;
-      let sql = `SELECT * FROM "${streamName}"`;
+      let sql = `SELECT * FROM ${typed?.fromClause || `"${streamName}"`}`;
 
       if (whereClause !== "") {
-        const filteredWhere = removeFieldFromWhereStr(whereClause, fieldName);
+        const filteredWhere = removeFieldFromWhereStr(whereClause, fieldName, !!typed);
         if (filteredWhere.trim() !== "") {
           sql += ` WHERE ${filteredWhere}`;
         }

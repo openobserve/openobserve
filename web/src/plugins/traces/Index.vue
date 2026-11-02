@@ -81,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
               @filter-builder-growth="filterBuilderGrowth = $event"
               @drill-down="searchResultRef?.openComparison()"
+              @sql-stream-change="onSqlStreamChange"
             />
           </div>
         </template>
@@ -195,6 +196,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @pick-stream="onPickTracesStream"
                       />
                     </div>
+                    <div v-else-if="sqlInTracesView" class="bg-card-glass-bg h-full">
+                      <OEmptyState
+                        size="hero"
+                        icon="code"
+                        :title="t('traces.sqlMode.tracesViewTitle')"
+                        :description="t('traces.sqlMode.tracesViewDescription')"
+                        :action-label="t('traces.sqlMode.openInSpans')"
+                        data-test="traces-sql-mode-traces-view"
+                        @action="onSearchModeChange('spans')"
+                      />
+                    </div>
                     <div
                       v-else-if="
                         !searchObj.loadingStream &&
@@ -239,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @ask-ai="onAskAiTracing"
                         @send-to-ai-chat="sendToAiChat"
                         @open-mobile-fields="mobileFieldsOpen = true"
+                        @add-trace-id="onSqlAddTraceId"
                       />
                     </div>
                   </div>
@@ -340,6 +353,13 @@ import {
   type FieldGroupingConfig,
 } from "@/composables/useServiceCorrelation";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import {
+  analyzeTracesSql,
+  insertTraceIdColumn,
+  isRowQuery,
+  sqlPaging,
+} from "@/utils/traces/tracesSql";
+import { isSqlQuery } from "@/utils/query/sqlUtils";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
@@ -538,8 +558,12 @@ let fieldsLoadSeq = 0;
 let parserReady: Promise<unknown> = Promise.resolve();
 // The processed WHERE clause from the last buildSearch() call — used for the count query
 let builtWhereClause = "";
+// Typed SQL may alias its stream, and the count's WHERE refers to that alias.
+let builtFromClause = "";
 // Paging must keep page 1's filter, so later editor edits never mix into it.
 let submittedFilter = "";
+// The typed SQL page 1 ran, sent as written; empty outside SQL mode.
+let submittedSql = "";
 // A link's page applies to the first search after it is read; any later Run starts at page 1.
 let pendingUrlPage: number | null = null;
 let stopUrlSync = syncUrlViewState();
@@ -728,7 +752,16 @@ function buildSearch(reuseLastWindow = false) {
     const queryFunctions = "";
     let whereClause = query.trim();
 
-    if (whereClause.trim() != "") {
+    if (searchObj.meta.sqlMode) {
+      // Typed SQL is sent as written, so the count reads its WHERE as typed.
+      const typed = analyzeTracesSql(query, tracesParser.value);
+      builtWhereClause = typed.where;
+      builtFromClause = typed.fromClause;
+      req.query.sql = req.query.sql.replace(
+        "[WHERE_CLAUSE]",
+        builtWhereClause ? " WHERE " + builtWhereClause : "",
+      );
+    } else if (whereClause.trim() != "") {
       whereClause = resolveTracesFilter(
         whereClause,
         tracesParser.value,
@@ -747,9 +780,11 @@ function buildSearch(reuseLastWindow = false) {
         .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
 
       builtWhereClause = whereClause;
+      builtFromClause = "";
       req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", " WHERE " + whereClause);
     } else {
       builtWhereClause = "";
+      builtFromClause = "";
       req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
     }
 
@@ -784,6 +819,23 @@ function dropKeptCount(results: any) {
   searchObj.meta.resultGrid.showPagination = false;
 }
 
+// A query that groups or limits rows has no WHERE count; its rows are the count.
+function settleSqlRowCount() {
+  const results = searchObj.data.queryResults;
+  results.total = results.hits?.length ?? 0;
+  results.errorCount = undefined;
+  results.countPending = false;
+  searchObj.meta.resultGrid.showPagination = false;
+}
+
+function refreshResultCount() {
+  if (submittedSql && !isRowQuery(analyzeTracesSql(submittedSql, tracesParser.value))) {
+    settleSqlRowCount();
+  } else {
+    fetchTracesCount();
+  }
+}
+
 function fetchTracesCount() {
   const queryReq = searchObj.data.queryPayload;
   const results = searchObj.data.queryResults;
@@ -794,11 +846,12 @@ function fetchTracesCount() {
 
   const streamName = selectedStreamName.value;
   const whereClause = builtWhereClause ? ` WHERE ${builtWhereClause}` : "";
+  const fromClause = builtFromClause || `"${streamName}"`;
   const isSpansMode = searchObj.meta.searchMode === "spans";
 
   const countSql = isSpansMode
-    ? `select count(*) as span_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count FROM "${streamName}"${whereClause}`
-    : `select approx_distinct(trace_id) as trace_count, (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR')) as error_count FROM "${streamName}"${whereClause}`;
+    ? `select count(*) as span_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count FROM ${fromClause}${whereClause}`
+    : `select approx_distinct(trace_id) as trace_count, (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR')) as error_count FROM ${fromClause}${whereClause}`;
 
   if (currentCountTraceId) {
     cancelStreamQueryBasedOnRequestId({
@@ -929,6 +982,8 @@ async function getQueryData(
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
     }
+    // The Traces view shows its SQL-mode state instead; the SQL runs in the Spans view.
+    if (sqlInTracesView.value) return false;
     if (!isPagination) resetTraceRowSelection();
     searchObj.data.errorMsg = "";
     searchObj.data.errorDetail = "";
@@ -958,6 +1013,7 @@ async function getQueryData(
     let queryReq;
 
     if (!isPagination) {
+      submittedSql = searchObj.meta.sqlMode ? String(searchObj.data.editorValue ?? "").trim() : "";
       queryReq = buildSearch(isSort);
       if (queryReq == null) return false;
       searchObj.data.queryPayload = queryReq;
@@ -974,6 +1030,7 @@ async function getQueryData(
         from: 0,
         size: queryReq.query.size,
         took: 0,
+        sql: submittedSql || null,
       };
     } else {
       queryReq = searchObj.data.queryPayload;
@@ -997,6 +1054,15 @@ async function getQueryData(
       searchObj.data.appliedEditorValue = String(searchObj.data.editorValue ?? "");
       dropStaleSelection();
       searchObj.meta.lastRunSignature = tracesSearchRunSignature(searchObj);
+    }
+    if (submittedSql) {
+      const paging = sqlPaging(
+        analyzeTracesSql(submittedSql, tracesParser.value),
+        searchObj.meta.resultGrid.rowsPerPage,
+        searchObj.data.resultGrid.currentPage,
+      );
+      queryReq.query.from = paging.from;
+      queryReq.query.size = paging.size;
     }
     const combinedFilter = submittedFilter;
     const historyRun = recordRun && !isPagination ? tracesHistoryRun(queryReq) : null;
@@ -1050,7 +1116,9 @@ async function getQueryData(
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
       const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
-      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${orderByCol} ${sortOrd}`;
+      const spansSql =
+        submittedSql ||
+        `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${orderByCol} ${sortOrd}`;
       return {
         query: {
           sql: b64EncodeUnicode(spansSql),
@@ -1097,6 +1165,11 @@ async function getQueryData(
             if (!requestState) return;
 
             if (response.content?.results?.is_partial === true) requestState.isPartial = true;
+
+            const eligible = response.content?.results?.is_histogram_eligible;
+            if (submittedSql && typeof eligible === "boolean") {
+              searchObj.data.queryResults.is_histogram_eligible = eligible;
+            }
 
             const rawHits: any[] = response.content?.results?.hits || [];
             if (rawHits.length === 0) return;
@@ -1252,7 +1325,7 @@ async function getQueryData(
             analytics.track("traces_search_completed", {
               hits: searchObj.data.queryResults?.hits?.length ?? 0,
             });
-            fetchTracesCount();
+            refreshResultCount();
           }
           correlationFilters.save().catch((e) => console.error("[correlation:save] error:", e));
         },
@@ -1837,7 +1910,7 @@ onActivated(async () => {
     pendingUrlPage = searchObj.data.resultGrid.currentPage;
     runQueryFn(false);
   } else if (rerunCount) {
-    fetchTracesCount();
+    refreshResultCount();
   }
   // A return keeps what it shows, but the stream's schema may have changed, so the rail refreshes behind it.
   if ((reloadFields || menuReturn) && !queryChanged) extractFields();
@@ -1890,6 +1963,8 @@ function restoreUrlQueryParams() {
 
   if (queryParams.query) {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+    searchObj.meta.sqlMode =
+      queryParams.sql_mode === "true" && !!searchObj.data.editorValue?.trim();
   }
 
   searchObj.meta.searchMode = supportedTraceSearchMode(queryParams.tab);
@@ -2035,6 +2110,28 @@ const onFiltersReset = () => {
   searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
 };
 
+const sqlInTracesView = computed(
+  () => !!searchObj.meta.sqlMode && searchObj.meta.searchMode === "traces",
+);
+
+// An emptied editor holds no SQL, however it was emptied.
+watch(
+  () => searchObj.data.editorValue,
+  (value) => {
+    if (searchObj.meta.sqlMode && !String(value ?? "").trim()) searchObj.meta.sqlMode = false;
+  },
+);
+
+// Results shaped by typed SQL do not describe the filter that replaces it.
+watch(
+  () => searchObj.meta.sqlMode,
+  (on) => {
+    if (on || !searchObj.data.queryResults?.sql) return;
+    searchObj.data.queryResults = {};
+    searchObj.data.sortedQueryResults = [];
+  },
+);
+
 const isStreamSelected = computed(() => {
   return searchObj.data.stream?.selectedStream?.value?.trim()?.length > 0;
 });
@@ -2178,10 +2275,14 @@ const onAskAiTracing = () => {
   const period = searchObj.data.datetime.relativeTimePeriod;
   const timeRange = period ? describePeriod(period) : "custom";
 
+  const queryText = searchObj.meta.sqlMode
+    ? `The SQL query is: ${filter}.`
+    : `The filter expression is: ${filter}. This is a WHERE-clause filter — not a full SQL query.`;
+  const ask = searchObj.meta.sqlMode ? "the query" : "the filter";
   emit(
     "sendToAiChat",
     raw(
-      `${outcome} I am searching ${mode}. The filter expression is: ${filter}. This is a WHERE-clause filter — not a full SQL query. Stream: ${stream}. Time range: ${timeRange}. Can you help me adjust the filter to get results?`,
+      `${outcome} I am searching ${mode}. ${queryText} Stream: ${stream}. Time range: ${timeRange}. Can you help me adjust ${ask} to get results?`,
     ),
     false,
   );
@@ -2236,10 +2337,11 @@ const extractTracesColName = (col: any): string | null => {
 const buildTracesWhereSQL = (): string => {
   const query = searchObj.data.editorValue?.trim();
   if (!query) return "";
-  const whereClause = query;
+  const typed = searchObj.meta.sqlMode ? analyzeTracesSql(query, tracesParser.value) : null;
+  const whereClause = typed ? typed.where : query;
   if (!whereClause) return "";
   const streamName = searchObj.data.stream.selectedStream?.value || "stream";
-  return `SELECT * FROM "${streamName}" WHERE ${whereClause}`;
+  return `SELECT * FROM ${typed?.fromClause || `"${streamName}"`} WHERE ${whereClause}`;
 };
 
 /**
@@ -2370,7 +2472,7 @@ const getMoreData = () => {
   });
 };
 
-const onChangeStream = async () => {
+const loadSelectedStreamFields = async () => {
   await extractFields();
   // Swap in the new stream's columns now, or the URL sync writes the old stream's columns into its URL.
   if (searchObj.meta.searchMode === "spans" || searchObj.meta.searchMode === "traces") {
@@ -2378,7 +2480,25 @@ const onChangeStream = async () => {
     rebuildColumns();
   }
   refreshOpenFieldValues();
-  if (!isAutoRunOff()) runQueryFn();
+};
+
+const onChangeStream = async () => {
+  await loadSelectedStreamFields();
+  if (!isAutoRunOff() && !searchObj.meta.sqlMode) runQueryFn();
+};
+
+// Typed SQL names its stream in FROM; the sidebar follows it, and the SQL waits for Run.
+const onSqlStreamChange = async (stream: string) => {
+  searchObj.data.stream.selectedStream = { label: stream, value: stream };
+  await loadSelectedStreamFields();
+};
+
+const onSqlAddTraceId = () => {
+  const sql = insertTraceIdColumn(String(searchObj.data.queryResults?.sql ?? ""));
+  if (!sql) return;
+  searchObj.data.editorValue = sql;
+  searchBarRef.value?.setEditorValue?.(sql);
+  searchData();
 };
 
 const syncSavedViewDateTime = async (datetime: TracesSavedView["datetime"]) => {
@@ -2431,6 +2551,8 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
   searchObj.data.datetime = { ...searchObj.data.datetime, ...view.datetime };
   await syncSavedViewDateTime(view.datetime);
   if (seq !== savedViewApplySeq) return;
+  // Version 1 views carry no mode, so the text itself says whether it is SQL.
+  searchObj.meta.sqlMode = isSqlQuery(view.editorValue ?? "");
   searchObj.data.editorValue = view.editorValue;
   searchBarRef.value?.setEditorValue?.(view.editorValue);
   searchObj.meta.resultGrid.sortBy = view.sortBy;
@@ -2623,7 +2745,8 @@ const handleServiceGraphViewTraces = (data: any) => {
   const filterQuery = buildViewTracesFilter(data);
   if (filterQuery) {
     searchObj.data.editorValue = filterQuery;
-    searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
+    // The handoff writes filter text, not SQL.
+    searchObj.meta.sqlMode = false;
   }
 
   // Set the time range
@@ -2671,7 +2794,8 @@ const applyHandoffFilter = (): boolean => {
   if (typeof filter !== "string") return false;
 
   searchObj.data.editorValue = filter;
-  searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
+  // The handoff writes filter text, not SQL.
+  searchObj.meta.sqlMode = false;
   return true;
 };
 

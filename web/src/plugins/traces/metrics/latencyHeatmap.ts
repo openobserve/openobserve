@@ -99,6 +99,7 @@ export function buildLatencyHeatmapSql(
   streamName: string,
   filters: string[],
   interval: string,
+  fromClause = `"${streamName}"`,
 ): string {
   const whens = DURATION_BOUNDS_US.map((bound, k) => `WHEN duration < ${bound} THEN ${k}`).join(
     " ",
@@ -107,7 +108,7 @@ export function buildLatencyHeatmapSql(
   return (
     `SELECT histogram(_timestamp, '${interval}') AS x_axis, CASE ${whens} ELSE ${TOP_BUCKET} END AS duration_bucket, ` +
     `count(*) AS span_count, sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count ` +
-    `FROM "${streamName}"${where} ` +
+    `FROM ${fromClause}${where} ` +
     `GROUP BY x_axis, duration_bucket LIMIT ${HEATMAP_ROW_LIMIT}`
   );
 }
