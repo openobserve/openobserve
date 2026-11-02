@@ -701,7 +701,7 @@ export default defineComponent({
     //
     // IMPORTANT: PanelSchemaRenderer is used in multiple contexts:
     // - AddPanel.vue (provides page key "addpanel") - needs hiding feature ✓
-    // - metrics/Index.vue (provides page key "metrics") - needs hiding feature ✓
+    // - MetricsVisualize.vue (provides page key "metrics") - needs hiding feature ✓
     // - ViewPanel.vue (provides page key "dashboard") - doesn't need it
     // - VisualizeLogsQuery.vue (provides page key "logs") - doesn't need it
     // - PreviewAlert.vue (no page key) - doesn't need it

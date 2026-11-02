@@ -1315,7 +1315,6 @@
       "moreExamples": "Để xem thêm các ví dụ,",
       "clickHere": "bấm vào đây"
     },
-    "legendLabel": "Chú thích",
     "switchToLogs": "Quay lại Nhật ký",
     "savedViewsLabel": "Chế độ xem đã lưu",
     "savedViewName": "Tên chế độ xem",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "Công thức {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} không phải là một truy vấn trong panel này",
-    "formulaReferencesFormula": "{letter} là một công thức, và công thức không được tham chiếu đến công thức khác",
+    "formulaCycle": "Các công thức tham chiếu lẫn nhau thành vòng lặp: {cycle}",
+    "formulaTooLong": "Công thức sau khi mở rộng dài hơn {limit} ký tự",
+    "formulaTooDeep": "Các công thức lồng nhau sâu hơn {limit} cấp",
     "formulaInputNote": "Được dùng trong công thức: ở đó, cài đặt tức thời/khoảng, chú giải, bước và dịch chuyển thời gian của truy vấn này không được áp dụng.",
     "multiSqlQueryLabel": "Nhãn truy vấn",
     "multiSqlQueryLabelHint": "Tên tùy chỉnh cho truy vấn này trong chú thích (ví dụ: 'Production')",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "Giá trị",
     "hostmapGroupBy": "Nhóm theo",
     "otherColumn": "Các cột khác",
-    "metric": "Chỉ số",
     "filters": "Bộ lọc",
     "labelFilters": "Bộ lọc nhãn",
     "operations": "Thao tác",
@@ -13604,21 +13604,6 @@
     "awsStsSelfHostedInfo": "Tính năng này sử dụng AWS sts để đảm nhận vai trò và thực hiện các thao tác. Đảm bảo bạn đã cấu hình thông tin xác thực aws trong môi trường cài đặt có quyền truy cập vào vai trò này."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "Đối với bộ chọn vector tức thời, sử dụng",
-      "rangeVector": "Đối với bộ chọn vector phạm vi, sử dụng",
-      "aggregate": "Để tổng hợp dữ liệu, sử dụng",
-      "or": "hoặc",
-      "rate": "Để tính toán tỷ lệ trên một vector phạm vi, sử dụng",
-      "sqlTitle": "Hướng dẫn Cú pháp: Chế độ SQL",
-      "sqlFullText": "Để tìm kiếm toàn văn giá trị 'error', sử dụng",
-      "sqlColumn": "Để tìm kiếm theo cột giá trị 'error', sử dụng",
-      "sqlCode": "Để tìm kiếm giá trị 200 cho cột code, sử dụng",
-      "sqlStream": "Để tìm kiếm giá trị 'stderr' cho cột stream, sử dụng",
-      "sqlFunction": "Để tìm kiếm và sử dụng hàm truy vấn {fn} trên cột log, sử dụng",
-      "sqlMoreExamples": "Để biết thêm ví dụ,",
-      "sqlClickHere": "bấm vào đây"
-    },
     "add": "Thêm",
     "runQuery": "Chạy truy vấn",
     "runQueryOptions": "Tùy chọn chạy truy vấn",
@@ -13734,7 +13719,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "Thêm vào bảng điều khiển",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "Trung bình",
+          "sortAvgTitle": "Xếp hạng giá trị theo trung bình trong cửa sổ",
+          "sortOutlying": "Ngoại lai",
+          "sortOutlyingTitle": "Xếp hạng giá trị theo mức độ lệch của chuỗi so với các chuỗi khác",
+          "outlier": "Ngoại lai"
         },
         "related": {
           "empty": "Không có chỉ số liên quan",
@@ -13859,9 +13849,9 @@
         "selectLabel": "Chọn một nhãn",
         "invalidLabel": "Tên nhãn không hợp lệ.",
         "selectOrTypeValue": "Chọn hoặc nhập giá trị",
-        "operatorHelp": "=  là giá trị chính xác này\n!=  là mọi giá trị trừ giá trị này\n=~  khớp với regex — sử dụng 500{'|'}503 để khớp một trong hai\n!~  không khớp với regex\n\nCác bộ lọc được kết hợp bằng AND. Để khớp một trong hai giá trị, hãy sử dụng toán tử =~ với regex.",
+        "operatorHelp": "=  là chính xác giá trị này\n!=  là mọi giá trị trừ giá trị này\n=~  khớp với một regex — dùng 500{'|'}503 để khớp một trong hai\n!~  không khớp với một regex\n\nCác bộ lọc được kết hợp bằng AND. Để khớp một trong hai giá trị, hãy dùng =~ với regex hoặc thêm một nhóm OR.",
         "andSeparator": "và",
-        "andSeparatorTitle": "Các bộ lọc được kết hợp bằng AND — một chỉ số phải khớp với tất cả. Để khớp một trong hai giá trị, hãy sử dụng toán tử =~ với regex.",
+        "andSeparatorTitle": "Các bộ lọc được kết hợp bằng AND — một chỉ số phải khớp tất cả. Để khớp một trong hai giá trị, hãy dùng toán tử =~ với regex hoặc thêm một nhóm OR.",
         "noSuggestions": "Không có gợi ý — hãy nhập giá trị.",
         "moreFilters": "+{count} nữa",
         "moreFiltersTooltip": "Nhấp để hiển thị tất cả bộ lọc nội tuyến",
@@ -13901,11 +13891,16 @@
         "deleteMessage": "Xóa chế độ xem {name} cho mọi người trong tổ chức này?",
         "modified": "{name} (đã sửa đổi)",
         "clear": "Bỏ chế độ xem"
-      }
-    },
-    "index": {
-      "namePanelRequired": "Tên panel là bắt buộc",
-      "errorsFixTryAgain": "Có một số lỗi, vui lòng sửa chúng và thử lại"
+      },
+      "sortDashboards": "Bảng điều khiển",
+      "sortDashboardsTitle": "Ưu tiên mục được dùng nhiều nhất trong bảng điều khiển",
+      "sortAlerts": "Cảnh báo",
+      "sortAlertsTitle": "Ưu tiên mục được dùng nhiều nhất trong cảnh báo",
+      "usageInDashboards": "Trong bảng điều khiển",
+      "usageHasAlerts": "Có cảnh báo",
+      "usageInSlos": "Trong SLO",
+      "usageLoading": "Đang tải nơi các chỉ số được sử dụng",
+      "usageFailed": "Không thể tải thông tin sử dụng, hãy thử lại"
     },
     "metricCard": {
       "lastRefreshed": "Làm mới lần cuối:",
@@ -13917,25 +13912,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Không thể hiển thị biểu đồ"
-    },
-    "queryBuilder": {
-      "title": "Trình xây dựng truy vấn PromQL",
-      "subtitle": "Xây dựng và kiểm tra truy vấn PromQL trực quan",
-      "generatedQuery": "Truy vấn PromQL đã tạo:",
-      "noQueryBuilt": "Chưa có truy vấn nào được xây dựng",
-      "copyQuery": "Sao chép truy vấn",
-      "clearAll": "Xóa tất cả",
-      "testQuery": "Kiểm tra truy vấn",
-      "queryResultPreview": "Xem trước kết quả truy vấn:",
-      "queryCopied": "Đã sao chép truy vấn vào bảng tạm!",
-      "queryCleared": "Đã xóa truy vấn",
-      "testingSoon": "Tính năng kiểm tra truy vấn sẽ sớm được triển khai",
-      "executionSoon": "Việc thực thi truy vấn sẽ được triển khai trong giai đoạn tiếp theo"
-    },
-    "metricSelector": {
-      "metricName": "Tên chỉ số",
-      "loadingMetrics": "Đang tải chỉ số...",
-      "noMetricsFound": "Không tìm thấy chỉ số"
     },
     "labelFilterEditor": {
       "label": "Nhãn",
@@ -13958,8 +13934,6 @@
       "noMetric": "Trình dựng cần một truy vấn trên một chỉ số có tên",
       "mismatch": "Trình dựng không thể hiển thị chính xác truy vấn này",
       "constructs": {
-        "without": "nhóm without (…)",
-        "offset": "một bổ ngữ offset",
         "at": "một bổ ngữ {'@'}",
         "orMatchers": "một or giữa các bộ so khớp nhãn",
         "subquery": "một truy vấn con",
@@ -13993,7 +13967,11 @@
         "byLabelsLabel": "Theo Nhãn",
         "quantileLabel": "Phân vị",
         "kLabel": "K",
-        "nearestMultipleLabel": "Bội số gần nhất"
+        "nearestMultipleLabel": "Bội số gần nhất",
+        "withoutLabel": "Không gồm (bỏ các nhãn này)",
+        "withoutDesc": "Tổng hợp loại bỏ các nhãn đã chọn và giữ mọi nhãn khác",
+        "offsetLabel": "Độ lệch",
+        "offsetDesc": "Đọc chỉ số lùi về bao xa, ví dụ 1h hoặc 1d"
       },
       "rangeOnlyFirst": "Hàm khoảng chỉ có thể là bước đầu tiên",
       "rangeOnlyFirstNote": "Hàm khoảng đọc các mẫu thô, vì vậy nó chỉ có thể là bước đầu tiên. Hãy xóa các bước khác để thêm một bước.",
@@ -14063,6 +14041,17 @@
       "empty": "Chưa có truy vấn nào",
       "noMatch": "Không có truy vấn nào khớp với tìm kiếm hoặc bộ lọc gắn sao",
       "loadMore": "Tải thêm"
+    },
+    "labelGroups": {
+      "addGroup": "+ Nhóm OR",
+      "addGroupTooltip": "Thêm một nhóm bộ lọc; một chuỗi khớp khi khớp với bất kỳ nhóm nào",
+      "addToGroup": "Thêm bộ lọc vào nhóm này",
+      "anyOf": "bất kỳ",
+      "andAnyOf": "và bất kỳ",
+      "or": "hoặc",
+      "not": "không",
+      "notTooltip": "Khớp với chuỗi mà toàn bộ nhóm này không khớp",
+      "tooManyBranches": "Các bộ lọc này mở rộng thành {count} bộ chọn riêng biệt; tối đa {max} bộ có thể chạy. Hãy gộp các giá trị vào một bộ lọc regex hoặc xóa một nhóm."
     }
   },
   "settings": {
@@ -22805,7 +22794,8 @@
       "moduloName": "Modulo",
       "multiplyByName": "Nhân với",
       "divideByName": "Chia cho",
-      "exponentName": "Lũy thừa"
+      "exponentName": "Lũy thừa",
+      "offsetDoc": "Đọc chỉ số như tại thời điểm cách đây khoảng thời gian đã cho"
     }
   },
   "passwordPolicy": {

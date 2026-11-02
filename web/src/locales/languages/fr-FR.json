@@ -1315,7 +1315,6 @@
       "moreExamples": "Pour des exemples supplémentaires,",
       "clickHere": "cliquez ici"
     },
-    "legendLabel": "Légende",
     "switchToLogs": "Revenir aux Logs",
     "savedViewsLabel": "Vues enregistrées",
     "savedViewName": "Afficher le nom",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "Formule {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} n'est pas une requête dans ce panneau",
-    "formulaReferencesFormula": "{letter} est une formule, et une formule ne peut pas référencer une autre formule",
+    "formulaCycle": "Des formules se référencent mutuellement en boucle : {cycle}",
+    "formulaTooLong": "La formule développée dépasse {limit} caractères",
+    "formulaTooDeep": "Les formules sont imbriquées sur plus de {limit} niveaux",
     "formulaInputNote": "Utilisé dans une formule : là, le paramètre instantané/plage, la légende, le pas et le décalage temporel de cette requête ne s'appliquent pas.",
     "multiSqlQueryLabel": "Libellé de requête",
     "multiSqlQueryLabelHint": "Nom personnalisé pour cette requête dans les légendes (par exemple, « Production »)",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "Valeur",
     "hostmapGroupBy": "Regrouper par",
     "otherColumn": "Autres colonnes",
-    "metric": "Métrique",
     "filters": "Filtres",
     "labelFilters": "Filtres d'étiquettes",
     "operations": "Opérations",
@@ -13604,21 +13604,6 @@
     "awsStsSelfHostedInfo": "Cela utilise AWS sts pour assumer le rôle et effectuer des opérations. Assurez-vous d'avoir configuré les informations d'identification AWS dans l'environnement d'installation qui ont accès à ce rôle."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "Pour les sélecteurs de vecteurs instantanés, utilisez",
-      "rangeVector": "Pour les sélecteurs de vecteurs de plage, utilisez",
-      "aggregate": "Pour agréger des données, utilisez",
-      "or": "ou",
-      "rate": "Pour les calculs de taux sur un vecteur de plage, utilisez",
-      "sqlTitle": "Guide de syntaxe : mode SQL",
-      "sqlFullText": "Pour une recherche en texte intégral de la valeur 'error', utilisez",
-      "sqlColumn": "Pour une recherche par colonne de la valeur 'error', utilisez",
-      "sqlCode": "Pour rechercher la valeur 200 dans la colonne code, utilisez",
-      "sqlStream": "Pour rechercher la valeur 'stderr' dans la colonne stream, utilisez",
-      "sqlFunction": "Pour rechercher et utiliser la fonction de requête {fn} sur la colonne log, utilisez",
-      "sqlMoreExamples": "Pour plus d'exemples,",
-      "sqlClickHere": "cliquez ici"
-    },
     "add": "Ajouter",
     "runQuery": "Exécuter une requête",
     "runQueryOptions": "Options d'exécution de la requête",
@@ -13734,7 +13719,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "Ajouter au tableau de bord",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "Moyenne",
+          "sortAvgTitle": "Classer les valeurs selon leur moyenne sur la fenêtre",
+          "sortOutlying": "Hors norme",
+          "sortOutlyingTitle": "Classer les valeurs selon l'écart de leur série par rapport aux autres",
+          "outlier": "Aberrant"
         },
         "related": {
           "empty": "Aucune métrique associée",
@@ -13859,9 +13849,9 @@
         "selectLabel": "Sélectionner une étiquette",
         "invalidLabel": "Nom d'étiquette invalide.",
         "selectOrTypeValue": "Sélectionner ou saisir une valeur",
-        "operatorHelp": "=  est exactement cette valeur\n!=  est tout sauf cette valeur\n=~  correspond à une regex — utiliser 500{'|'}503 pour correspondre à l'un ou l'autre\n!~  ne correspond pas à une regex\n\nLes filtres sont combinés avec ET. Pour correspondre à l'une des deux valeurs, utilisez l'opérateur =~ avec une regex.",
+        "operatorHelp": "=  correspond exactement à cette valeur\n!=  correspond à tout sauf cette valeur\n=~  correspond à une regex — utilisez 500{'|'}503 pour l'une ou l'autre\n!~  ne correspond pas à une regex\n\nLes filtres sont combinés avec AND. Pour correspondre à l'une de deux valeurs, utilisez =~ avec une regex ou ajoutez un groupe OR.",
         "andSeparator": "et",
-        "andSeparatorTitle": "Les filtres sont combinés avec ET — une métrique doit correspondre à tous. Pour correspondre à l'une des deux valeurs, utilisez l'opérateur =~ avec une regex.",
+        "andSeparatorTitle": "Les filtres sont combinés avec AND — une métrique doit correspondre à tous. Pour correspondre à l'une de deux valeurs, utilisez l'opérateur =~ avec une regex ou ajoutez un groupe OR.",
         "noSuggestions": "Aucune suggestion — saisissez une valeur.",
         "moreFilters": "+{count} de plus",
         "moreFiltersTooltip": "Cliquez pour afficher tous les filtres en ligne",
@@ -13901,11 +13891,16 @@
         "deleteMessage": "Supprimer la vue {name} pour tous les membres de cette organisation ?",
         "modified": "{name} (modifiée)",
         "clear": "Effacer la vue"
-      }
-    },
-    "index": {
-      "namePanelRequired": "Le nom du panneau est requis",
-      "errorsFixTryAgain": "Il y a des erreurs, veuillez les corriger et réessayer"
+      },
+      "sortDashboards": "Tableaux de bord",
+      "sortDashboardsTitle": "Les plus utilisés dans les tableaux de bord en premier",
+      "sortAlerts": "Alertes",
+      "sortAlertsTitle": "Les plus utilisés dans les alertes en premier",
+      "usageInDashboards": "Dans les tableaux de bord",
+      "usageHasAlerts": "A des alertes",
+      "usageInSlos": "Dans les SLO",
+      "usageLoading": "Chargement des utilisations des métriques",
+      "usageFailed": "Utilisation indisponible, réessayez"
     },
     "metricCard": {
       "lastRefreshed": "Dernière actualisation :",
@@ -13917,25 +13912,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Échec du rendu du graphique"
-    },
-    "queryBuilder": {
-      "title": "Constructeur de requête PromQL",
-      "subtitle": "Construire et tester visuellement les requêtes PromQL",
-      "generatedQuery": "Requête PromQL générée :",
-      "noQueryBuilt": "Aucune requête construite pour le moment",
-      "copyQuery": "Copier la requête",
-      "clearAll": "Tout effacer",
-      "testQuery": "Tester la requête",
-      "queryResultPreview": "Aperçu du résultat de la requête :",
-      "queryCopied": "Requête copiée dans le presse-papiers !",
-      "queryCleared": "Requête effacée",
-      "testingSoon": "Le test de requête sera bientôt implémenté",
-      "executionSoon": "L'exécution de la requête sera implémentée dans la prochaine phase"
-    },
-    "metricSelector": {
-      "metricName": "Nom de la métrique",
-      "loadingMetrics": "Chargement des métriques...",
-      "noMetricsFound": "Aucune métrique trouvée"
     },
     "labelFilterEditor": {
       "label": "Étiquette",
@@ -13958,8 +13934,6 @@
       "noMetric": "Le générateur a besoin d'une requête sur une métrique nommée",
       "mismatch": "Le générateur ne peut pas afficher cette requête exactement",
       "constructs": {
-        "without": "un regroupement without (…)",
-        "offset": "un modificateur offset",
         "at": "un modificateur {'@'}",
         "orMatchers": "un or entre les matchers de labels",
         "subquery": "une sous-requête",
@@ -13993,7 +13967,11 @@
         "byLabelsLabel": "Par étiquettes",
         "quantileLabel": "Quantile",
         "kLabel": "K",
-        "nearestMultipleLabel": "Multiple le plus proche"
+        "nearestMultipleLabel": "Multiple le plus proche",
+        "withoutLabel": "Sans (supprimer ces labels)",
+        "withoutDesc": "Agréger les labels sélectionnés et conserver tous les autres labels",
+        "offsetLabel": "Décalage",
+        "offsetDesc": "Combien de temps en arrière lire la métrique, par ex. 1h ou 1d"
       },
       "rangeOnlyFirst": "Une fonction d'intervalle ne peut être que la première étape",
       "rangeOnlyFirstNote": "Une fonction d'intervalle lit les échantillons bruts, elle ne peut donc être que la première étape. Supprimez les autres étapes pour en ajouter une.",
@@ -14063,6 +14041,17 @@
       "empty": "Aucune requête pour l'instant",
       "noMatch": "Aucune requête ne correspond à la recherche ou au filtre des favoris",
       "loadMore": "Charger plus"
+    },
+    "labelGroups": {
+      "addGroup": "+ Groupe OR",
+      "addGroupTooltip": "Ajouter un groupe de filtres ; une série correspond lorsqu'elle correspond à au moins un groupe",
+      "addToGroup": "Ajouter un filtre à ce groupe",
+      "anyOf": "l'un de",
+      "andAnyOf": "et l'un de",
+      "or": "ou",
+      "not": "non",
+      "notTooltip": "Sélectionner les séries auxquelles ce groupe entier ne correspond pas",
+      "tooManyBranches": "Ces filtres se développent en {count} sélecteurs distincts ; au maximum {max} peuvent s'exécuter. Fusionnez les valeurs dans un seul filtre regex ou supprimez un groupe."
     }
   },
   "settings": {
@@ -22805,7 +22794,8 @@
       "moduloName": "Modulo",
       "multiplyByName": "Multiplier par",
       "divideByName": "Diviser par",
-      "exponentName": "Exposant"
+      "exponentName": "Exposant",
+      "offsetDoc": "Lit la métrique telle qu'elle était il y a la durée indiquée"
     }
   },
   "passwordPolicy": {
