@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, shallowRef, watch, type Ref } from "vue";
+import { computed, ref, shallowRef, watch } from "vue";
 import type { TranslateFn } from "@/types/i18n";
 import { layoutProfile, type FoldState, type ProfileModel } from "@/utils/queryProfile";
 import {
@@ -27,13 +27,17 @@ import {
 } from "@/utils/queryProfileFold";
 import type { FoldNotice } from "./profileStyles";
 import { operatorTitle } from "./profileText";
+import { useQueryPlanPanels } from "./useQueryPlanPanels";
 
-/** Fold state, the layout it produces, and the notice explaining what is folded, for one plan view. */
+/** Selection, fold state, the layout it produces, and the notice explaining what is folded, for one plan view. */
 export function useProfileFold(
   t: TranslateFn,
   model: () => ProfileModel,
-  selectedId: Ref<string | null>,
+  firstSelection: (m: ProfileModel) => string,
 ) {
+  const { revealDetail } = useQueryPlanPanels();
+  const selectedId = ref<string | null>(null);
+  const canvasRef = ref<{ fitNext: () => void } | null>(null);
   const fold = shallowRef<FoldState>(initialFold());
   const reason = shallowRef<{ kind: "auto"; count: number } | { kind: "hot" } | null>(null);
 
@@ -81,12 +85,24 @@ export function useProfileFold(
     act(fold.value.focusId ? { type: "focus", opId: null } : { type: "expandAll" });
   }
 
+  function pick(id: string) {
+    reveal(id);
+    selectedId.value = id;
+    revealDetail();
+  }
+
+  function focusOn(opId: string | null) {
+    canvasRef.value?.fitNext();
+    act({ type: "focus", opId });
+  }
+
   watch(
     model,
     (m) => {
       const result = autoFold(m, initialFold());
       fold.value = result.fold;
       reason.value = result.count ? { kind: "auto", count: result.count } : null;
+      selectedId.value = firstSelection(m);
     },
     { immediate: true },
   );
@@ -97,5 +113,16 @@ export function useProfileFold(
       selectedId.value = nearestVisible(model(), l, id);
   });
 
-  return { fold, layout, notice, focusable, act, reveal, onNoticeAction };
+  return {
+    selectedId,
+    canvasRef,
+    fold,
+    layout,
+    notice,
+    focusable,
+    act,
+    onNoticeAction,
+    pick,
+    focusOn,
+  };
 }

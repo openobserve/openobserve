@@ -182,9 +182,8 @@ function mountDialog(props: Record<string, unknown> = {}) {
           "physicalPlan",
           "logicalPlan",
           "analyzePlan",
+          "initialTab",
         ]),
-        QueryPlanTree: stub("QueryPlanTree", "query-plan-tree", ["tree", "isAnalyze"]),
-        MetricsSummaryCard: stub("MetricsSummaryCard", "metrics-summary-card", ["metrics"]),
       },
     },
     props: { modelValue: false, searchObj: SEARCH_OBJ, ...props },
@@ -263,7 +262,7 @@ describe("QueryPlanDialog", () => {
       expect(toggle.text()).toBe("SELECT k8s_namespace_name, count(*) AS cnt FROM app_logs");
       expect(find(wrapper, "query-plan-sql-full").exists()).toBe(false);
       await toggle.trigger("click");
-      expect(find(wrapper, "query-plan-sql-full").text()).toBe(SQL);
+      expect(find(wrapper, "query-plan-sql-full").text()).toContain(SQL);
     });
 
     it("orders the tabs Plan, Text, Analyze and has no run button", async () => {
@@ -450,11 +449,12 @@ describe("QueryPlanDialog", () => {
       expect(vi.getTimerCount()).toBe(0);
     });
 
-    it("falls back to the metrics card and tree when the server sends no profile", async () => {
+    it("falls back to the analyze text when the server sends no profile", async () => {
       wrapper = await openAndRun(OLD_ANALYZE_SSE);
       expect(find(wrapper, "query-plan-analyze-fallback").exists()).toBe(true);
-      expect(find(wrapper, "metrics-summary-card").exists()).toBe(true);
-      expect(find(wrapper, "query-plan-tree").exists()).toBe(true);
+      const text = wrapper.findComponent({ name: "QueryPlanText" });
+      expect(text.props("initialTab")).toBe("analyze");
+      expect(text.props("analyzePlan")).toContain("RemoteScanExec");
       expect(find(wrapper, "query-profile-view").exists()).toBe(false);
     });
 

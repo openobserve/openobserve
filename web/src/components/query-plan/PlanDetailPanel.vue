@@ -27,9 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex flex-col gap-4 px-4 pt-3">
       <section v-if="entries.length">
-        <h4 class="text-text-secondary m-0 mb-2 text-xs font-semibold">
-          {{ t("search.queryProfile.details") }}
-        </h4>
+        <ProfileSectionTitle :title="t('search.queryProfile.details')" />
         <ODescriptionList dense data-test="query-plan-detail-entries">
           <ODescriptionItem v-for="(e, i) in entries" :key="i" :label="e.label">
             <span class="font-mono text-xs wrap-anywhere">{{ e.value }}</span>
@@ -38,15 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </section>
 
       <section>
-        <h4 class="text-text-secondary m-0 mb-2 text-xs font-semibold">
-          {{ t("search.queryProfile.raw") }}
-        </h4>
-        <div
-          class="bg-code-bg text-text-code rounded-default px-2.5 py-2 font-mono text-xs wrap-anywhere"
-          data-test="query-plan-detail-raw"
-        >
-          {{ op.detail }}
-        </div>
+        <ProfileSectionTitle :title="t('search.queryProfile.raw')" />
+        <OCodeBlock :code="op.detail" wrap padded data-test="query-plan-detail-raw" />
       </section>
 
       <div class="text-text-secondary text-xs leading-normal" data-test="query-plan-detail-note">
@@ -58,11 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatPlanValue, parsePlanDetail, type ProfileModel } from "@/utils/queryProfile";
 import ProfileDetailHeader from "./ProfileDetailHeader.vue";
+import ProfileSectionTitle from "./ProfileSectionTitle.vue";
 
 const props = defineProps<{
   model: ProfileModel;

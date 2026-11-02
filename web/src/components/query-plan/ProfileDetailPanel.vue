@@ -52,9 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <section>
           <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h4 class="text-text-secondary m-0 text-xs font-semibold">
-              {{ t("search.queryProfile.perNode") }}
-            </h4>
+            <ProfileSectionTitle :title="t('search.queryProfile.perNode')" spacing="none" />
             <OToggleGroup
               type="single"
               :model-value="remoteTab"
@@ -144,9 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <section v-if="nodeRows.length > 1">
-          <h4 class="text-text-secondary m-0 mb-2 text-xs font-semibold">
-            {{ t("search.queryProfile.perNode") }}
-          </h4>
+          <ProfileSectionTitle :title="t('search.queryProfile.perNode')" />
           <OTable
             v-model:expanded-ids="opExpanded"
             :data="opTree"
@@ -196,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </section>
 
         <section v-for="sec in metricBlocks" :key="sec.key">
-          <h4 class="text-text-secondary m-0 mb-2 text-xs font-semibold">{{ sec.title }}</h4>
+          <ProfileSectionTitle :title="sec.title" />
           <ProfileMetricList
             :metrics="sec.metrics"
             :bar="sec.bar"
@@ -206,10 +202,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <section>
-        <h4 class="text-text-secondary m-0 mb-2 text-xs font-semibold">
-          {{ t("search.queryProfile.raw") }}
-        </h4>
-        <div class="text-text-secondary font-mono text-xs wrap-anywhere">{{ op.detail }}</div>
+        <ProfileSectionTitle :title="t('search.queryProfile.raw')" />
+        <OCodeBlock :code="op.detail" wrap padded data-test="query-profile-detail-raw" />
       </section>
     </div>
   </div>
@@ -217,6 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -249,6 +244,7 @@ import {
 import ProfileDetailHeader from "./ProfileDetailHeader.vue";
 import ProfileMetricList from "./ProfileMetricList.vue";
 import ProfileNodeName from "./ProfileNodeName.vue";
+import ProfileSectionTitle from "./ProfileSectionTitle.vue";
 import ProfileStatTile from "./ProfileStatTile.vue";
 import { SHARE_BAR, type NodeNameRow } from "./profileStyles";
 import { scopeTag } from "./profileText";

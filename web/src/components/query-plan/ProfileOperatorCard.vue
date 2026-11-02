@@ -62,11 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="text-text-secondary flex min-w-0 items-center gap-1.5 text-xs tabular-nums">
         <OTruncatedText :class="model.planOnly ? 'font-mono' : ''">{{ subline }}</OTruncatedText>
-        <span
-          v-if="tag"
-          class="bg-surface-subtle rounded-default text-2xs shrink-0 px-1 font-mono whitespace-nowrap"
-          >{{ tag }}</span
-        >
+        <OBadge v-if="tag" size="xs" shape="rounded" variant="default-soft" class="shrink-0">{{
+          tag
+        }}</OBadge>
       </div>
       <template v-if="!model.planOnly">
         <ProfileNodeBars v-if="bars" :bars="bars" />

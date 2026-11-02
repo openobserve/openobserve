@@ -129,11 +129,12 @@ const props = defineProps<{
   physicalPlan: string;
   logicalPlan: string;
   analyzePlan: string | null;
+  initialTab?: "physical" | "logical" | "analyze";
 }>();
 
 const { t } = useI18nTyped();
 
-const tab = ref<string | number>("physical");
+const tab = ref<string | number>(props.initialTab ?? "physical");
 const wrap = ref(true);
 
 const text = computed(() => {

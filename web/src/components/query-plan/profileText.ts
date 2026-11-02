@@ -13,11 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
-import { RELATIVE_PERIOD_PATTERN, formatToTimeCompact } from "@/utils/date";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { periodToLabel } from "@/composables/useWidenRange";
+import { formatToTimeCompact } from "@/utils/date";
 import {
+  isIngester,
   isPlaceholderScan,
+  isQuerier,
   nodeLabel,
+  nodeNameOf,
   operatorLabel,
   planAggregate,
   planOperatorSummary,
@@ -32,15 +36,6 @@ import { CATEGORY_STYLE, VARIANT_ROLE_KEY } from "./profileStyles";
 
 const MAX_NAMES = 3;
 
-const PAST_PERIOD_KEY: Record<string, I18nKey> = {
-  s: "common.pastSecond",
-  m: "common.pastMinute",
-  h: "common.pastHour",
-  d: "common.pastDay",
-  w: "common.pastWeek",
-  M: "common.pastMonth",
-};
-
 export function nodeName(model: ProfileModel, nodeKey: string): string {
   for (const s of model.stages) {
     const node = s.nodes.find((n) => n.key === nodeKey);
@@ -50,8 +45,8 @@ export function nodeName(model: ProfileModel, nodeKey: string): string {
 }
 
 export function roleLabel(t: TranslateFn, role: string): I18nText | null {
-  if (role.includes("querier")) return t("search.queryProfile.roleQuerier");
-  if (role.includes("ingester")) return t("search.queryProfile.roleIngester");
+  if (isQuerier(role)) return t("search.queryProfile.roleQuerier");
+  if (isIngester(role)) return t("search.queryProfile.roleIngester");
   return null;
 }
 
@@ -96,7 +91,7 @@ export function operatorWhere(t: TranslateFn, model: ProfileModel, op: ProfileOp
   }
   return t("search.queryProfile.onLeader", {
     category: categoryLabel(t, op),
-    node: model.profile.node_name || model.profile.node_address,
+    node: nodeNameOf(model.profile),
   });
 }
 
@@ -106,11 +101,8 @@ export function timeRangeLabel(
   dt: { type?: string; relativeTimePeriod?: string; startTime?: number; endTime?: number } | null,
 ): I18nText | null {
   if (!dt) return null;
-  const rel = dt.type === "relative" ? dt.relativeTimePeriod?.match(RELATIVE_PERIOD_PATTERN) : null;
-  if (rel && PAST_PERIOD_KEY[rel[2]]) {
-    const count = Number(rel[1]);
-    return t(PAST_PERIOD_KEY[rel[2]], { count }, count);
-  }
+  const period = dt.type === "relative" ? periodToLabel(dt.relativeTimePeriod ?? "") : "";
+  if (period) return raw(period);
   if (!dt.startTime || !dt.endTime) return null;
   return raw(`${formatToTimeCompact(dt.startTime)} → ${formatToTimeCompact(dt.endTime)}`);
 }

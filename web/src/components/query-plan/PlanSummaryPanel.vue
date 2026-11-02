@@ -66,9 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <section v-if="summary.scans.length">
-      <h4 class="text-text-secondary m-0 mb-2 text-xs font-semibold">
-        {{ t("search.queryProfile.pushedDown") }}
-      </h4>
+      <ProfileSectionTitle :title="t('search.queryProfile.pushedDown')" />
       <div class="flex flex-col gap-2.5">
         <div
           v-for="scan in scanRows"
@@ -102,9 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </section>
 
     <section>
-      <h4 class="text-text-secondary m-0 mb-2 text-xs font-semibold">
-        {{ t("search.queryProfile.whereItRuns") }}
-      </h4>
+      <ProfileSectionTitle :title="t('search.queryProfile.whereItRuns')" />
       <div class="flex flex-col gap-1.5 text-xs">
         <div class="flex min-w-0 items-start gap-2" data-test="query-plan-where-leader">
           <OBadge size="xs" shape="rounded" variant="default-soft" class="shrink-0">{{
@@ -160,6 +156,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { PlanScanInfo, PlanSummary, ProfileModel } from "@/utils/queryProfile";
+import ProfileSectionTitle from "./ProfileSectionTitle.vue";
 import ProfileStatTile from "./ProfileStatTile.vue";
 import { CATEGORY_STYLE, stageSwatch } from "./profileStyles";
 

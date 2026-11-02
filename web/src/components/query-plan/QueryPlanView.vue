@@ -48,13 +48,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { summarizePlan, type ProfileModel } from "@/utils/queryProfile";
 import PlanDetailPanel from "./PlanDetailPanel.vue";
 import PlanSummaryPanel from "./PlanSummaryPanel.vue";
 import ProfileCanvas from "./ProfileCanvas.vue";
-import QueryPlanLayout, { revealDetail } from "./QueryPlanLayout.vue";
+import QueryPlanLayout from "./QueryPlanLayout.vue";
 import { useProfileFold } from "./useProfileFold";
 
 const props = defineProps<{
@@ -65,32 +65,21 @@ const emit = defineEmits<{ analyze: [] }>();
 
 const { t } = useI18nTyped();
 
-const selectedId = ref<string | null>(null);
-const canvasRef = ref<InstanceType<typeof ProfileCanvas> | null>(null);
-
 const summary = computed(() => summarizePlan(props.model));
-const { fold, layout, notice, focusable, act, reveal, onNoticeAction } = useProfileFold(
+const {
+  selectedId,
+  canvasRef,
+  fold,
+  layout,
+  notice,
+  focusable,
+  act,
+  onNoticeAction,
+  pick,
+  focusOn,
+} = useProfileFold(
   t,
   () => props.model,
-  selectedId,
-);
-
-function pick(id: string) {
-  reveal(id);
-  selectedId.value = id;
-  revealDetail();
-}
-
-function focusOn(opId: string | null) {
-  canvasRef.value?.fitNext();
-  act({ type: "focus", opId });
-}
-
-watch(
-  () => props.model,
-  (m) => {
-    selectedId.value = summary.value.scans[0]?.opId ?? m.rootId;
-  },
-  { immediate: true },
+  (m) => summarizePlan(m).scans[0]?.opId ?? m.rootId,
 );
 </script>

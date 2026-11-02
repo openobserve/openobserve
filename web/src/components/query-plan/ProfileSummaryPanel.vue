@@ -77,9 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <section v-if="clusters" data-test="query-profile-clusters">
       <div class="mb-1.5 flex items-center justify-between gap-2">
-        <h4 class="text-text-secondary m-0 text-xs font-semibold">
-          {{ t("search.queryProfile.clusters") }}
-        </h4>
+        <ProfileSectionTitle :title="t('search.queryProfile.clusters')" spacing="none" />
         <OButton
           v-if="clusterView !== 'all'"
           variant="ghost"
@@ -117,55 +115,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </section>
 
     <section v-if="phaseSegments.length">
-      <h4 class="text-text-secondary m-0 mb-2 text-xs font-semibold">
-        {{ t("search.queryProfile.queryPhases") }}
-      </h4>
+      <ProfileSectionTitle :title="t('search.queryProfile.queryPhases')" />
       <ProfileStackBar :segments="phaseSegments" data-test="query-profile-phases" />
     </section>
 
     <section v-if="categorySegments.length">
-      <h4 class="text-text-secondary m-0 mb-2 text-xs font-semibold">
-        {{ t("search.queryProfile.timeByType") }}
-      </h4>
+      <ProfileSectionTitle :title="t('search.queryProfile.timeByType')" />
       <ProfileStackBar :segments="categorySegments" data-test="query-profile-categories" />
     </section>
 
     <section v-if="hotspots.length">
-      <h4 class="text-text-secondary m-0 mb-1 text-xs font-semibold">
-        {{ t("search.queryProfile.hotspots") }}
-      </h4>
-      <div
+      <ProfileSectionTitle :title="t('search.queryProfile.hotspots')" spacing="tight" />
+      <OButton
         v-for="h in hotspots"
         :key="h.id"
-        role="button"
-        tabindex="0"
-        class="rounded-default hover:bg-surface-subtle focus-visible:ring-accent/40 flex cursor-pointer flex-col gap-1 px-1 py-1.5 outline-none focus-visible:ring-2"
-        :class="h.id === selectedId ? 'bg-surface-subtle' : ''"
+        variant="cell"
+        :aria-current="h.id === selectedId || undefined"
         :data-test="`query-profile-hotspot-${h.id}`"
         @click="emit('select', h.id)"
-        @keydown.enter.prevent="emit('select', h.id)"
-        @keydown.space.prevent="emit('select', h.id)"
       >
-        <div class="flex min-w-0 items-center gap-2 text-xs">
-          <OTruncatedText class="text-text-body">{{ h.label }}</OTruncatedText>
-          <span
-            v-if="h.where"
-            class="bg-surface-subtle text-text-secondary rounded-default text-2xs shrink-0 px-1"
-            >{{ h.where }}</span
-          >
-          <span class="text-text-secondary ms-auto shrink-0 whitespace-nowrap tabular-nums">{{
-            h.value
-          }}</span>
+        <div
+          class="rounded-default flex flex-col gap-1 px-1 py-1.5"
+          :class="h.id === selectedId ? 'bg-surface-subtle' : ''"
+        >
+          <div class="flex min-w-0 items-center gap-2 text-xs">
+            <OTruncatedText class="text-text-body">{{ h.label }}</OTruncatedText>
+            <OBadge
+              v-if="h.where"
+              size="xs"
+              shape="rounded"
+              variant="default-soft"
+              class="shrink-0"
+              >{{ h.where }}</OBadge
+            >
+            <span class="text-text-secondary ms-auto shrink-0 whitespace-nowrap tabular-nums">{{
+              h.value
+            }}</span>
+          </div>
+          <OProgressBar size="xs" :value="h.share" :variant="h.variant" />
         </div>
-        <OProgressBar size="xs" :value="h.share" :variant="h.variant" />
-      </div>
+      </OButton>
     </section>
 
     <section v-if="summary.timeline.rows.length">
       <div class="mb-1.5 flex items-center justify-between gap-2">
-        <h4 class="text-text-secondary m-0 text-xs font-semibold">
-          {{ t("search.queryProfile.nodeTimeline") }}
-        </h4>
+        <ProfileSectionTitle :title="t('search.queryProfile.nodeTimeline')" spacing="none" />
         <div class="text-text-secondary text-2xs flex flex-wrap items-center gap-2">
           <span v-for="s in model.stages" :key="s.id" class="flex items-center gap-1">
             <span class="size-2 rounded-full" :class="stageSwatch(s.index)" />
@@ -173,31 +167,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
       </div>
-      <div
+      <OButton
         v-for="row in timelineRows"
         :key="row.nodeKey"
-        role="button"
-        tabindex="0"
-        class="rounded-default hover:bg-surface-subtle focus-visible:ring-accent/40 grid cursor-pointer grid-cols-[3.5rem_minmax(0,1fr)_3.25rem] items-center gap-1.5 px-1 py-0.5 text-xs outline-none focus-visible:ring-2"
-        :class="row.active ? 'bg-surface-accent-active' : ''"
+        variant="cell"
         :aria-pressed="row.active"
         :data-test="`query-profile-timeline-${row.nodeKey}`"
         @click="toggleNode(row.nodeKey)"
-        @keydown.enter.prevent="toggleNode(row.nodeKey)"
-        @keydown.space.prevent="toggleNode(row.nodeKey)"
       >
-        <OTruncatedText class="text-text-body">{{ row.name }}</OTruncatedText>
-        <span class="bg-surface-subtle rounded-default relative h-2">
-          <span
-            v-for="seg in row.segments"
-            :key="seg.key"
-            class="rounded-default absolute top-0 h-full"
-            :class="seg.swatch"
-            :style="{ left: `${seg.left}%`, width: `${seg.width}%` }"
-          />
-        </span>
-        <span class="text-text-secondary text-end tabular-nums">{{ row.duration }}</span>
-      </div>
+        <div
+          class="rounded-default grid grid-cols-[3.5rem_minmax(0,1fr)_3.25rem] items-center gap-1.5 px-1 py-0.5 text-xs"
+          :class="row.active ? 'bg-surface-accent-active' : ''"
+        >
+          <OTruncatedText class="text-text-body">{{ row.name }}</OTruncatedText>
+          <span class="bg-surface-subtle rounded-default relative h-2">
+            <span
+              v-for="seg in row.segments"
+              :key="seg.key"
+              class="rounded-default absolute top-0 h-full"
+              :class="seg.swatch"
+              :style="{ left: `${seg.left}%`, width: `${seg.width}%` }"
+            />
+          </span>
+          <span class="text-text-secondary text-end tabular-nums">{{ row.duration }}</span>
+        </div>
+      </OButton>
     </section>
 
     <div
@@ -220,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -245,6 +240,7 @@ import {
   type ProfileSummary,
   type StageScope,
 } from "@/utils/queryProfile";
+import ProfileSectionTitle from "./ProfileSectionTitle.vue";
 import ProfileStackBar from "./ProfileStackBar.vue";
 import ProfileStatTile from "./ProfileStatTile.vue";
 import {
@@ -302,12 +298,12 @@ const slowestWall = computed(() =>
 );
 
 const clusterColumns = computed<OTableColumnDef<ClusterSummaryRow>[]>(() => [
-  { id: "name", header: t("search.queryProfile.cluster"), accessorKey: "name", size: 72 },
+  { id: "name", header: t("search.queryProfile.cluster"), accessorKey: "name", size: 64 },
   ...(props.clusters?.stages ?? []).map((index, i) => ({
     id: `wall${i}`,
     header: t("search.queryProfile.stage", { index }),
     accessorFn: (r: ClusterSummaryRow) => r.wallUs[i] ?? 0,
-    size: 68,
+    size: 72,
     meta: { align: "right" as const, headerTooltip: t("search.queryProfile.clusterWallTooltip") },
   })),
   {

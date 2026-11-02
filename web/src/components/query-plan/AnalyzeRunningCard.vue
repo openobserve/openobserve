@@ -35,13 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       <span class="text-text-secondary text-xs">{{ elapsedNote }}</span>
     </div>
-    <div
-      class="bg-surface-subtle relative h-1 overflow-hidden rounded-full"
-      role="progressbar"
+    <OProgressBar
+      :value="0"
+      indeterminate
+      size="xs"
       :aria-label="t('search.queryProfile.runningAria')"
-    >
-      <span class="analyze-indeterminate bg-accent absolute inset-y-0 w-[35%] rounded-full" />
-    </div>
+    />
     <p class="text-text-secondary m-0 text-sm leading-relaxed">
       {{ rerun ? t("search.queryProfile.rerunNote") : t("search.queryProfile.runningNote") }}
     </p>
@@ -61,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
@@ -83,28 +83,3 @@ const elapsedNote = computed<I18nText>(() => {
     : t("search.queryProfile.elapsedLast", { took: props.reference });
 });
 </script>
-
-<style scoped>
-/* keep(keyframes): an indeterminate progress bar has no utility or library component */
-.analyze-indeterminate {
-  animation: analyze-slide 1.3s ease-in-out infinite;
-}
-
-@keyframes analyze-slide {
-  from {
-    left: -35%;
-  }
-  to {
-    left: 100%;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .analyze-indeterminate {
-    animation: none;
-    left: 0;
-    width: 100%;
-    opacity: 0.4;
-  }
-}
-</style>

@@ -36,10 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-sm"
             icon-left="left-panel-close"
             :aria-label="t('search.queryProfile.hideSummary')"
-            :title="t('search.queryProfile.hideSummary')"
             data-test="query-plan-hide-summary"
             @click="panels.summary = false"
-          />
+          >
+            <OTooltip :content="t('search.queryProfile.hideSummary')" />
+          </OButton>
         </div>
         <slot name="summary" />
       </aside>
@@ -49,10 +50,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           icon-left="left-panel-open"
           :aria-label="t('search.queryProfile.showSummary')"
-          :title="t('search.queryProfile.showSummary')"
           data-test="query-plan-show-summary"
           @click="panels.summary = true"
-        />
+        >
+          <OTooltip :content="t('search.queryProfile.showSummary')" />
+        </OButton>
       </div>
       <div
         v-if="!detailOpen"
@@ -63,10 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           icon-left="left-panel-open"
           :aria-label="t('search.queryProfile.showDetails')"
-          :title="t('search.queryProfile.showDetails')"
           data-test="query-plan-show-detail"
           @click="panels.detail = true"
-        />
+        >
+          <OTooltip :content="t('search.queryProfile.showDetails')" />
+        </OButton>
       </div>
       <div class="min-h-0 flex-1 max-lg:h-[78vh] max-lg:flex-none">
         <slot name="canvas" :left-inset="leftInset" />
@@ -83,33 +86,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           icon-left="left-panel-close"
           :aria-label="t('search.queryProfile.hideDetails')"
-          :title="t('search.queryProfile.hideDetails')"
           data-test="query-plan-hide-detail"
           @click="panels.detail = false"
-        />
+        >
+          <OTooltip :content="t('search.queryProfile.hideDetails')" />
+        </OButton>
       </div>
       <slot name="detail" />
     </aside>
   </div>
 </template>
 
-<script lang="ts">
-import { reactive } from "vue";
-
-// shared by the Plan and Analyze views so a hidden panel stays hidden when switching modes
-const panels = reactive({ summary: true, detail: true });
-
-/** Picking an operator is a request to read about it, so a hidden detail panel comes back. */
-export function revealDetail() {
-  panels.detail = true;
-}
-</script>
-
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
+import { useQueryPlanPanels } from "./useQueryPlanPanels";
 
 const MOBILE_INSET = 16;
 const PANEL_GAP = 24;
@@ -117,6 +111,7 @@ const COLLAPSED_INSET = 56;
 
 const { t } = useI18nTyped();
 const { isDesktop } = useBreakpoint();
+const { panels } = useQueryPlanPanels();
 
 const panelEl = ref<HTMLElement | null>(null);
 const panelWidth = ref(0);

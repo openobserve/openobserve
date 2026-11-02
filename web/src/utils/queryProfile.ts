@@ -18,12 +18,12 @@ import { formatLargeNumber, formatSizeFromMB } from "@/utils/formatters";
 
 export const CARD_W = 236;
 export const CARD_H = 76;
-export const SIBLING_GAP = 28;
+const SIBLING_GAP = 28;
 export const LEVEL_GAP = 44;
-export const VARIANT_GAP = 32;
-export const STAGE_PAD_X = 20;
-export const STAGE_PAD_TOP = 64;
-export const STAGE_PAD_BOTTOM = 20;
+const VARIANT_GAP = 32;
+const STAGE_PAD_X = 20;
+const STAGE_PAD_TOP = 64;
+const STAGE_PAD_BOTTOM = 20;
 export const FOLD_H = 56;
 const CHIP_ROOM = 190;
 const LABEL_ROOM = 64;
@@ -31,9 +31,10 @@ const MIN_LABEL_SLIDE = 0.16;
 export const STRAGGLER_FACTOR = 1.8;
 
 const NODE_SCOPE_PREFIX = "node:";
+const REMOTE_EXEC = /^Remote\w*Exec/i;
 const PLACEHOLDER_SCAN = "NewEmptyExec";
 
-export type MetricKind =
+type MetricKind =
   "count" | "time" | "bytes" | "gauge" | "ratio" | "pruning" | "timestamp" | "other";
 
 export interface ProfileMetric {
@@ -102,7 +103,7 @@ export interface QueryProfile {
   plan: ProfileNode;
 }
 
-export interface TookDetail {
+interface TookDetail {
   total: number;
   cache_took: number;
   file_list_took: number;
@@ -140,7 +141,7 @@ export type StageScope = string;
 /** Which clusters the canvas shows: all merged, one leader per cluster, or a single cluster. */
 export type ClusterView = "all" | "split" | `cluster:${string}`;
 
-export interface OperatorSample {
+interface OperatorSample {
   nodeKey: string;
   computeNs: number;
   rows: number;
@@ -194,7 +195,7 @@ export interface StageVariant {
   cluster: string;
 }
 
-export interface ProfileStage {
+interface ProfileStage {
   id: string;
   index: number;
   remoteOpId: string;
@@ -222,7 +223,7 @@ export interface ProfileModel {
   planOnly: boolean;
 }
 
-export interface BuildProfileOptions {
+interface BuildProfileOptions {
   /** The profile came from a plain EXPLAIN, so it carries no runtime numbers. */
   planOnly?: boolean;
   /** Give each super-cluster leader its own variant instead of merging leaders by plan shape. */
@@ -244,7 +245,7 @@ export interface ClusterSummary {
   rows: ClusterSummaryRow[];
 }
 
-export interface ScopedValue {
+interface ScopedValue {
   computeNs: number;
   rows: number;
   on: boolean;
@@ -260,7 +261,7 @@ export interface NodeRow {
   straggler: boolean;
 }
 
-export interface MetricSections {
+interface MetricSections {
   timing: ProfileMetric[];
   pruning: ProfileMetric[];
   ratios: ProfileMetric[];
@@ -269,7 +270,7 @@ export interface MetricSections {
 
 export type PhaseId = "queue" | "fileList" | "index" | "execution" | "other";
 
-export interface QueryPhase {
+interface QueryPhase {
   id: PhaseId;
   ms: number;
 }
@@ -281,7 +282,7 @@ export interface TimelineSegment {
   straggler: boolean;
 }
 
-export interface TimelineRow {
+interface TimelineRow {
   nodeKey: string;
   name: string;
   role: string;
@@ -289,7 +290,7 @@ export interface TimelineRow {
   durationUs: number;
 }
 
-export interface StragglerInfo {
+interface StragglerInfo {
   nodeKey: string;
   name: string;
   stageIndex: number;
@@ -312,7 +313,7 @@ export interface ProfileSummary {
   stragglers: StragglerInfo[];
 }
 
-export interface LayoutCard {
+interface LayoutCard {
   opId: string;
   x: number;
   y: number;
@@ -336,7 +337,7 @@ export interface LayoutEdge {
   labelY: number;
 }
 
-export type FoldKind = "branch" | "group" | "stage";
+type FoldKind = "branch" | "group" | "stage";
 
 /** One card standing in for operators the canvas does not draw. */
 export interface LayoutFold {
@@ -353,20 +354,15 @@ export interface LayoutFold {
 }
 
 export interface FoldState {
-  /** Fold single-child plumbing operators onto the edge they sit on. */
   plumbing: boolean;
-  /** Plumbing operators the user opened back into cards. */
   shown: ReadonlySet<string>;
-  /** Operators whose branch below is hidden behind one card. */
   collapsed: ReadonlySet<string>;
-  /** Operators hidden whole; hidden siblings share one card. */
   grouped: ReadonlySet<string>;
-  /** Stages drawn as a single summary card. */
   stages: ReadonlySet<string>;
   focusId: string | null;
 }
 
-export interface LayoutStage {
+interface LayoutStage {
   stageId: string;
   x: number;
   y: number;
@@ -374,7 +370,7 @@ export interface LayoutStage {
   h: number;
 }
 
-export interface LayoutVariantLabel {
+interface LayoutVariantLabel {
   variantId: string;
   x: number;
   y: number;
@@ -391,7 +387,7 @@ export interface ProfileLayout {
   folds: LayoutFold[];
 }
 
-export interface PlanDetailEntry {
+interface PlanDetailEntry {
   key: string;
   value: string;
 }
@@ -435,7 +431,7 @@ interface Box {
 }
 
 const CATEGORY_RULES: [RegExp, OperatorCategory][] = [
-  [/^Remote\w*Exec/i, "remote"],
+  [REMOTE_EXEC, "remote"],
   [/Filter/i, "filter"],
   [/Join/i, "join"],
   [/Aggregate|Window/i, "agg"],
@@ -445,7 +441,6 @@ const CATEGORY_RULES: [RegExp, OperatorCategory][] = [
   [/DataSource|Parquet|MemTable|Memory|Scan|Empty|PlaceholderRow|Tantivy|Wal/i, "scan"],
 ];
 
-/** Classifies a DataFusion operator name into the colour/legend family it belongs to. */
 export function operatorCategory(name: string): OperatorCategory {
   for (const [re, category] of CATEGORY_RULES) {
     if (re.test(name)) return category;
@@ -507,8 +502,7 @@ function unquote(text: string): string {
   return m ? m[1].replace(/\\(.)/g, "$1") : text;
 }
 
-/** Items of a `[a, "b", c]` plan value, unquoted and cleaned. */
-export function planList(value: string): string[] {
+function planList(value: string): string[] {
   const inner = value.trim().replace(/^\[(.*)\]$/s, "$1");
   return splitTopLevel(inner).map((item) => cleanPlanExpr(unquote(item)));
 }
@@ -527,7 +521,7 @@ export function parsePlanDetail(detail: string): PlanDetailEntry[] {
   });
 }
 
-export function planFetch(detail: string): number | null {
+function planFetch(detail: string): number | null {
   const m = detail.match(/\bfetch=(\d+)/);
   return m ? Number(m[1]) : null;
 }
@@ -615,12 +609,12 @@ export function computeTimeNs(metrics: ProfileMetric[] | undefined): number {
   return m ? Number(m.value) || 0 : 0;
 }
 
-export function outputRows(metrics: ProfileMetric[] | undefined): number {
+function outputRows(metrics: ProfileMetric[] | undefined): number {
   return Number(findMetric(metrics, "output_rows")?.value) || 0;
 }
 
-export function isRemoteNode(node: ProfileNode): boolean {
-  return /^Remote\w*Exec/i.test(node.name) || (node.remote?.length ?? 0) > 0;
+function isRemoteNode(node: ProfileNode): boolean {
+  return REMOTE_EXEC.test(node.name) || (node.remote?.length ?? 0) > 0;
 }
 
 /** Plan-shape fingerprint: the tree of operator names; nested remote scans stop the walk. */
@@ -630,7 +624,7 @@ export function planFingerprint(node: ProfileNode): string {
   return kids.length ? `${node.name}(${kids.join(",")})` : node.name;
 }
 
-export function remoteWallUs(remote: RemoteNodeProfile): number {
+function remoteWallUs(remote: RemoteNodeProfile): number {
   return remote.end_us > remote.start_us ? remote.end_us - remote.start_us : 0;
 }
 
@@ -704,7 +698,7 @@ export function extractProfile(hits: PlanHit[] | undefined): QueryProfile | null
 }
 
 /** Converts an old-style text plan node into the profile shape so it can join a stage. */
-export function textPlanToProfile(node: OperatorNode): ProfileNode {
+function textPlanToProfile(node: OperatorNode): ProfileNode {
   const metrics: ProfileMetric[] = [];
   const ms = Number(node.metrics.elapsed_compute_ms);
   if (ms > 0) {
@@ -752,7 +746,7 @@ function planRoot(nodes: OperatorNode[]): ProfileNode {
 
 function planNodeToProfile(node: OperatorNode): ProfileNode {
   const base = { name: node.name, detail: node.fullText, partitions: 0 };
-  if (!/^Remote\w*Exec/i.test(node.name)) {
+  if (!REMOTE_EXEC.test(node.name)) {
     return { ...base, children: node.children.map(planNodeToProfile) };
   }
   // the text under a remote scan is the plan every remote node runs, so it becomes one stage entry
@@ -869,7 +863,7 @@ function addOperator(
 }
 
 function stageNodeKey(remote: RemoteNodeProfile, cluster: string, used: Set<string>): string {
-  const name = remote.node_name || remote.node_address || `partition-${remote.partition}`;
+  const name = nodeNameOf(remote) || `partition-${remote.partition}`;
   const base = cluster ? `${cluster}/${name}` : name;
   let key = base;
   for (let i = 1; used.has(key); i++) key = `${base}#${i}`;
@@ -888,9 +882,7 @@ function collectClusters(node: ProfileNode, out: Set<string>): Set<string> {
 
 function variantRole(nodes: StageNode[]): VariantRole {
   const roles = new Set(
-    nodes.map((n) =>
-      n.role.includes("querier") ? "querier" : n.role.includes("ingester") ? "ingester" : "other",
-    ),
+    nodes.map((n) => (isQuerier(n.role) ? "querier" : isIngester(n.role) ? "ingester" : "other")),
   );
   if (roles.size !== 1) return "mixed";
   const only = [...roles][0];
@@ -929,7 +921,7 @@ function buildStage(
   const groups = new Map<string, { nodes: StageNode[]; parts: PlanPart[]; cluster: string }>();
   for (const remote of entries) {
     const plan = remote.plan ?? fallbackPlan(remote, phase, ctx);
-    const name = remote.node_name || remote.node_address || `#${remote.partition}`;
+    const name = nodeNameOf(remote) || `#${remote.partition}`;
     // pod names repeat across clusters deployed from one chart, so the cluster tells them apart
     const clusterEntry = !!remote.cluster && remote.cluster === remote.node_name;
     const cluster = ctx.multiCluster && !clusterEntry ? (remote.cluster ?? "") : "";
@@ -1044,7 +1036,7 @@ export function buildProfileModel(
     multiCluster: collectClusters(profile.plan, new Set()).size > 1,
     splitClusters: !!options.splitClusters,
   };
-  const leaderKey = profile.node_name || profile.node_address || "leader";
+  const leaderKey = nodeNameOf(profile) || "leader";
   const rootId = addOperator(
     "op",
     [{ nodeKey: leaderKey, plan: profile.plan, remote: profile.plan.remote ?? [] }],
@@ -1085,7 +1077,6 @@ export function clusterViewOf(cluster: string): ClusterView {
   return `cluster:${cluster}`;
 }
 
-/** The model the canvas draws for a cluster view, rebuilt from the same profile. */
 export function modelForClusterView(model: ProfileModel, view: ClusterView): ProfileModel {
   if (view === "all") return model;
   if (view === "split") {
@@ -1096,27 +1087,44 @@ export function modelForClusterView(model: ProfileModel, view: ClusterView): Pro
   return buildProfileModel(profile, model.hits, { ...model.options, splitClusters: false });
 }
 
-/** Per-cluster answer times, node counts and files, for comparing the clusters of one query. */
+/** Every node any stage dispatched to, once each, in stage order. */
+export function clusterNodes(model: ProfileModel): StageNode[] {
+  const seen = new Map<string, StageNode>();
+  for (const s of model.stages) for (const n of s.nodes) if (!seen.has(n.key)) seen.set(n.key, n);
+  return [...seen.values()];
+}
+
+export function isQuerier(role: string): boolean {
+  return role.includes("querier");
+}
+
+export function isIngester(role: string): boolean {
+  return role.includes("ingester");
+}
+
+export function nodeNameOf(node: { node_name?: string; node_address?: string }): string {
+  return node.node_name || node.node_address || "";
+}
+
 export function clusterSummary(model: ProfileModel): ClusterSummary | null {
   const names = profileClusters(model);
   if (!names.length) return null;
   const tops = model.stages.filter((s) => !s.parentStageId && s.nodes.some((n) => n.clusterEntry));
-  const pods = uniqueNodes(model).filter((n) => !n.clusterEntry);
+  const pods = clusterNodes(model).filter((n) => !n.clusterEntry);
   const rows = names.map((name) => {
     const entries = tops.map((s) => s.nodes.find((n) => n.clusterEntry && n.name === name));
     const own = pods.filter((n) => n.remote.cluster === name);
     return {
       name,
       wallUs: entries.map((e) => (e ? e.wallUs : null)),
-      queriers: own.filter((n) => n.role.includes("querier")).length,
-      ingesters: own.filter((n) => n.role.includes("ingester")).length,
+      queriers: own.filter((n) => isQuerier(n.role)).length,
+      ingesters: own.filter((n) => isIngester(n.role)).length,
       files: entries.reduce((a, e) => a + (e?.remote.scan_stats?.files ?? 0), 0),
     };
   });
   return { stages: tops.map((s) => s.index), rows };
 }
 
-/** The numbers an operator card shows under the current stage-metrics scope. */
 export function scopedValue(op: ProfileOperator, scope: StageScope): ScopedValue {
   if (!op.stageId || scope === "sum") {
     return { computeNs: op.totalComputeNs, rows: op.totalRows, on: true };
@@ -1221,18 +1229,12 @@ export function skew(values: number[]): number {
   return Math.max(...values) / med;
 }
 
-function uniqueNodes(model: ProfileModel): StageNode[] {
-  const seen = new Map<string, StageNode>();
-  for (const s of model.stages) for (const n of s.nodes) if (!seen.has(n.key)) seen.set(n.key, n);
-  return [...seen.values()];
-}
-
 function countRoles(all: StageNode[]): ProfileSummary["nodeCounts"] {
   const nodes = all.filter((n) => !n.clusterEntry);
   const counts = { queriers: 0, ingesters: 0, other: 0, total: nodes.length };
   for (const n of nodes) {
-    const querier = n.role.includes("querier");
-    const ingester = n.role.includes("ingester");
+    const querier = isQuerier(n.role);
+    const ingester = isIngester(n.role);
     if (querier) counts.queriers++;
     if (ingester) counts.ingesters++;
     if (!querier && !ingester) counts.other++;
@@ -1372,14 +1374,14 @@ export function summarizeProfile(
   model: ProfileModel,
   stream: Partial<SearchStreamResult> = {},
 ): ProfileSummary {
-  const nodes = uniqueNodes(model);
+  const nodes = clusterNodes(model);
   return {
     wallMs: stream.took_detail?.total || executionMs(model.profile),
     totalComputeNs: model.totalComputeNs,
     resultRows: model.profile.output_rows,
     peakMemory: peakMemory(model),
     nodeCounts: countRoles(nodes),
-    leaderName: model.profile.node_name || model.profile.node_address,
+    leaderName: nodeNameOf(model.profile),
     scanned: scannedTotals(model, stream),
     phases: queryPhases(stream.took_detail, model.profile),
     byCategory: categoryTotals(model),
@@ -1404,18 +1406,6 @@ export function summarizePlan(model: ProfileModel): PlanSummary {
       ...new Set(leader.filter((op) => op.category !== "remote").map((op) => op.category)),
     ],
   };
-}
-
-export function clusterNodes(
-  model: ProfileModel,
-): { key: string; name: string; cluster: string; role: string; clusterEntry: boolean }[] {
-  return uniqueNodes(model).map((n) => ({
-    key: n.key,
-    name: n.name,
-    cluster: n.cluster,
-    role: n.role,
-    clusterEntry: n.clusterEntry,
-  }));
 }
 
 type FoldSpec = Omit<LayoutFold, "x" | "y">;
@@ -1446,7 +1436,7 @@ interface PlaceContext {
   out: ProfileLayout;
 }
 
-const NO_FOLD: FoldState = {
+export const NO_FOLD: FoldState = {
   plumbing: false,
   shown: new Set(),
   collapsed: new Set(),

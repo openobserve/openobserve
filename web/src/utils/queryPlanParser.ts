@@ -27,12 +27,6 @@ export interface OperatorNode {
   isRepartitionExec: boolean;
 }
 
-export interface SummaryMetrics {
-  totalTime: string;
-  totalRows: string;
-  peakMemory: string;
-}
-
 /**
  * Parse time string to milliseconds
  */
@@ -92,17 +86,6 @@ export function formatTime(ms: number): string {
   if (ms < 1000) return `${ms.toFixed(2)}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(2)}s`;
   return `${(ms / 60000).toFixed(2)}min`;
-}
-
-/**
- * Format bytes to human-readable string
- */
-export function formatMemory(bytes: number): string {
-  if (bytes === 0) return "N/A";
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)}KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)}MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)}GB`;
 }
 
 /**
@@ -216,83 +199,6 @@ export function parseQueryPlanTree(planText: string): OperatorNode {
   }
 
   return root;
-}
-
-/**
- * Calculate metrics recursively considering RepartitionExec parallel execution
- */
-function calculateNodeMetrics(node: OperatorNode): {
-  maxTime: number;
-  totalRows: number;
-  maxMemory: number;
-} {
-  // Leaf node - return its own metrics
-  if (node.children.length === 0) {
-    return {
-      maxTime: node.metrics.elapsed_compute_ms || 0,
-      totalRows: node.metrics.output_rows || 0,
-      maxMemory: node.metrics.memory_bytes || 0,
-    };
-  }
-
-  // Recursive: aggregate children first
-  const childMetrics = node.children.map((child) => calculateNodeMetrics(child));
-
-  // Check if this is a RepartitionExec (parallel execution coordinator)
-  if (node.isRepartitionExec) {
-    // Parallel execution: MAX time, SUM rows
-    return {
-      maxTime: Math.max(
-        node.metrics.elapsed_compute_ms || 0,
-        ...childMetrics.map((m) => m.maxTime),
-      ),
-      totalRows: childMetrics.reduce((sum, m) => sum + m.totalRows, 0),
-      maxMemory: Math.max(node.metrics.memory_bytes || 0, ...childMetrics.map((m) => m.maxMemory)),
-    };
-  } else {
-    // Sequential execution: SUM time, pass through rows from first child or own
-    const childTime = childMetrics.reduce((sum, m) => sum + m.maxTime, 0);
-    return {
-      maxTime: childTime + (node.metrics.elapsed_compute_ms || 0),
-      totalRows: node.metrics.output_rows || childMetrics[0]?.totalRows || 0,
-      maxMemory: Math.max(node.metrics.memory_bytes || 0, ...childMetrics.map((m) => m.maxMemory)),
-    };
-  }
-}
-
-/**
- * Calculate summary metrics from query plan text
- */
-export function calculateSummaryMetrics(planText: string): SummaryMetrics {
-  const tree = parseQueryPlanTree(planText);
-  const metrics = calculateNodeMetrics(tree);
-
-  return {
-    totalTime: formatTime(metrics.maxTime),
-    totalRows: metrics.totalRows.toLocaleString("en-US"),
-    peakMemory: formatMemory(metrics.maxMemory),
-  };
-}
-
-/**
- * Find RemoteExec or RemoteScanExec node in the operator tree
- * Used for nesting Phase 1 plans under Phase 0 Remote*Exec in EXPLAIN ANALYZE
- */
-export function findRemoteExecNode(node: OperatorNode): OperatorNode | null {
-  // Check if current node is RemoteExec, RemoteScanExec, or any Remote*Exec variant
-  if (/Remote\w*Exec/i.test(node.name)) {
-    return node;
-  }
-
-  // Recursively search children
-  for (const child of node.children) {
-    const found = findRemoteExecNode(child);
-    if (found) {
-      return found;
-    }
-  }
-
-  return null;
 }
 
 /**

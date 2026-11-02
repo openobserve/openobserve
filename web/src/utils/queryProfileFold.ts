@@ -18,6 +18,7 @@ import {
   hotspotSet,
   isPlumbing,
   layoutProfile,
+  NO_FOLD,
   subtreeIds,
   type FoldState,
   type LayoutFold,
@@ -27,7 +28,7 @@ import {
 } from "./queryProfile";
 
 export const AUTO_FOLD_CARDS = 40;
-export const AUTO_FOLD_SHARE = 0.05;
+const AUTO_FOLD_SHARE = 0.05;
 
 export type FoldAction =
   | { type: "branch"; opId: string }
@@ -40,24 +41,16 @@ export type FoldAction =
   | { type: "hotPath" }
   | { type: "focus"; opId: string | null };
 
-export interface FoldSummary {
+interface FoldSummary {
   count: number;
   computeNs: number;
   hottest: ProfileOperator | null;
 }
 
 export function initialFold(): FoldState {
-  return {
-    plumbing: true,
-    shown: new Set(),
-    collapsed: new Set(),
-    grouped: new Set(),
-    stages: new Set(),
-    focusId: null,
-  };
+  return { ...NO_FOLD, plumbing: true };
 }
 
-/** Pure reducer for every fold control on the canvas. */
 export function applyFold(model: ProfileModel, fold: FoldState, action: FoldAction): FoldState {
   switch (action.type) {
     case "branch":

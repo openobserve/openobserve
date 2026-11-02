@@ -83,9 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default bg-surface-base max-h-[30vh] shrink-0 overflow-auto border-b px-4 py-3"
         data-test="query-plan-sql-full"
       >
-        <pre
-          class="bg-code-bg text-text-code rounded-default text-compact m-0 px-3 py-2 font-mono leading-normal wrap-break-word whitespace-pre-wrap"
-          >{{ sqlQuery }}</pre>
+        <OCodeBlock :code="sqlQuery" lang="sql" wrap padded data-test="query-plan-sql-code" />
       </div>
 
       <div class="min-h-0 flex-1">
@@ -110,27 +108,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="query-plan-analyze-results"
               >
                 <QueryProfileView v-if="resultModel" :model="resultModel" :stream="streamResult" />
-                <div
+                <QueryPlanText
                   v-else
-                  class="flex h-full flex-col gap-3 overflow-y-auto p-4"
+                  :physical-plan="physicalPlan"
+                  :logical-plan="logicalPlan"
+                  :analyze-plan="analyzeText"
+                  initial-tab="analyze"
                   data-test="query-plan-analyze-fallback"
-                >
-                  <MetricsSummaryCard v-if="summaryMetrics" :metrics="summaryMetrics" />
-                  <div
-                    class="bg-card-glass-bg border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border border-solid"
-                  >
-                    <div
-                      class="border-card-glass-border bg-surface-base border-b border-solid px-4 py-2.5"
-                    >
-                      <span class="text-text-label text-xs font-semibold">{{
-                        t("search.executionPlan")
-                      }}</span>
-                    </div>
-                    <div class="flex-1 overflow-y-auto px-4 py-3">
-                      <QueryPlanTree v-if="analyzeTree" :tree="analyzeTree" :is-analyze="true" />
-                    </div>
-                  </div>
-                </div>
+                />
               </div>
               <div
                 v-if="analyzeBusy"
@@ -208,6 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -220,14 +206,7 @@ import streamingSearch from "@/services/streaming_search";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { generateTraceContext } from "@/utils/zincutils";
-import {
-  calculateSummaryMetrics,
-  findRemoteExecNode,
-  formatTime,
-  parseQueryPlanTree,
-  type OperatorNode,
-  type SummaryMetrics,
-} from "@/utils/queryPlanParser";
+import { formatTime } from "@/utils/queryPlanParser";
 import {
   buildProfileModel,
   clusterNodes,
@@ -243,9 +222,7 @@ import {
 import AnalyzeResultBar from "@/components/query-plan/AnalyzeResultBar.vue";
 import AnalyzeRunningCard from "@/components/query-plan/AnalyzeRunningCard.vue";
 import AnalyzeStartCard from "@/components/query-plan/AnalyzeStartCard.vue";
-import MetricsSummaryCard from "@/components/query-plan/MetricsSummaryCard.vue";
 import QueryPlanText from "@/components/query-plan/QueryPlanText.vue";
-import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
 import QueryPlanView from "@/components/query-plan/QueryPlanView.vue";
 import QueryProfileView from "@/components/query-plan/QueryProfileView.vue";
 import type { AnalyzeFact, AnalyzeNotice } from "@/components/query-plan/profileStyles";
@@ -298,8 +275,6 @@ const now = ref(0);
 const lastRun = ref<{ ranAt: string; tookMs: number } | null>(null);
 const streamResult = ref<SearchStreamResult | null>(null);
 const profile = ref<QueryProfile | null>(null);
-const analyzePlan = ref("");
-const analyzeTree = ref<OperatorNode | null>(null);
 // a reopened dialog must ignore responses from requests sent before it was reset
 let requestEpoch = 0;
 // bumped on cancel and reset so a response that lands afterwards is dropped
@@ -323,15 +298,11 @@ const planModel = computed(() =>
 );
 // a join reads streams the logs page did not select, so prefer the ones the plan scans
 const planStreams = computed(() => (planModel.value ? summarizePlan(planModel.value).streams : []));
-const hasResults = computed(() => !!profile.value || !!analyzePlan.value);
+const hasResults = computed(() => !!profile.value || !!analyzeText.value);
 const analyzeBusy = computed(
   () => analyzeState.value === "running" || analyzeState.value === "rerunning",
 );
 const elapsedLabel = computed(() => formatElapsed(now.value - runStartedAt.value));
-
-const summaryMetrics = computed<SummaryMetrics | null>(() =>
-  analyzePlan.value ? calculateSummaryMetrics(analyzePlan.value) : null,
-);
 
 const resultModel = computed(() =>
   profile.value ? buildProfileModel(profile.value, streamResult.value?.hits ?? []) : null,
@@ -341,12 +312,13 @@ const resultNodes = computed(() =>
 );
 
 const analyzeText = computed<string | null>(() => {
-  if (!streamResult.value || !hasResults.value) return null;
-  return [...streamResult.value.hits]
+  if (!streamResult.value) return null;
+  const text = [...streamResult.value.hits]
     .sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0))
     .map((h) => (h.plan ?? "").replace(/\s+$/, ""))
     .filter((plan) => plan.trim())
     .join("\n");
+  return text || null;
 });
 
 const lastSearchTook = computed(() => {
@@ -442,41 +414,9 @@ function parseExplainHits(hits: PlanHit[]) {
   }
 }
 
-// Phase 1+ plans are nested under the phase-0 remote scan so the old analyze tree reads top-down.
-function parseAnalyzeHits(hits: PlanHit[]) {
-  const planOf = (h: PlanHit) => String(h.plan ?? "");
-  const phase0 = hits.filter((h) => h.phase === 0);
-  const phase1 = hits.filter((h) => h.phase === 1);
-  analyzeTree.value = null;
-  if (!phase0.length || !phase1.length) {
-    analyzePlan.value = [...hits]
-      .sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0))
-      .map(planOf)
-      .filter((p) => p.trim())
-      .join("\n\n")
-      .trim();
-    analyzeTree.value = analyzePlan.value ? parseQueryPlanTree(analyzePlan.value) : null;
-    return;
-  }
-  const phase0Plan = phase0
-    .map(planOf)
-    .filter((p) => p.trim())
-    .join("\n");
-  const tree = parseQueryPlanTree(phase0Plan);
-  const remote = findRemoteExecNode(tree);
-  const children = phase1.flatMap((h) =>
-    planOf(h).trim() ? parseQueryPlanTree(planOf(h)).children : [],
-  );
-  if (remote && children.length) remote.children = children;
-  analyzePlan.value = phase0Plan.trim();
-  analyzeTree.value = tree;
-}
-
 function clearResults() {
   streamResult.value = null;
   profile.value = null;
-  analyzePlan.value = "";
-  analyzeTree.value = null;
   lastRun.value = null;
 }
 
@@ -542,7 +482,6 @@ function finishAnalyze(parsed: SearchStreamResult | null) {
   stopTicker();
   const elapsedMs = now.value - runStartedAt.value;
   if (parsed) {
-    parseAnalyzeHits(parsed.hits);
     streamResult.value = parsed;
     profile.value = extractProfile(parsed.hits);
   }

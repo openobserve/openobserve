@@ -14,15 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import {
-  formatTime,
-  formatMemory,
-  parseQueryPlanTree,
-  calculateSummaryMetrics,
-  findRemoteExecNode,
-  collapseProjections,
-  type OperatorNode,
-} from "./queryPlanParser";
+import { formatTime, parseQueryPlanTree, collapseProjections } from "./queryPlanParser";
 
 describe("queryPlanParser", () => {
   describe("formatTime", () => {
@@ -58,41 +50,6 @@ describe("queryPlanParser", () => {
     it("should handle decimal values correctly", () => {
       expect(formatTime(1.5)).toBe("1.50ms");
       expect(formatTime(1500.75)).toBe("1.50s");
-    });
-  });
-
-  describe("formatMemory", () => {
-    it("should return N/A for 0 bytes", () => {
-      expect(formatMemory(0)).toBe("N/A");
-    });
-
-    it("should format bytes", () => {
-      expect(formatMemory(1)).toBe("1B");
-      expect(formatMemory(512)).toBe("512B");
-      expect(formatMemory(1023)).toBe("1023B");
-    });
-
-    it("should format kilobytes", () => {
-      expect(formatMemory(1024)).toBe("1.00KB");
-      expect(formatMemory(2048)).toBe("2.00KB");
-      expect(formatMemory(1024 * 500)).toBe("500.00KB");
-    });
-
-    it("should format megabytes", () => {
-      expect(formatMemory(1024 * 1024)).toBe("1.00MB");
-      expect(formatMemory(1024 * 1024 * 5)).toBe("5.00MB");
-      expect(formatMemory(1024 * 1024 * 100)).toBe("100.00MB");
-    });
-
-    it("should format gigabytes", () => {
-      expect(formatMemory(1024 * 1024 * 1024)).toBe("1.00GB");
-      expect(formatMemory(1024 * 1024 * 1024 * 2.5)).toBe("2.50GB");
-      expect(formatMemory(1024 * 1024 * 1024 * 10)).toBe("10.00GB");
-    });
-
-    it("should handle decimal values correctly", () => {
-      expect(formatMemory(1536)).toBe("1.50KB");
-      expect(formatMemory(1024 * 1024 * 1.75)).toBe("1.75MB");
     });
   });
 
@@ -244,166 +201,6 @@ FileSink`;
       expect(result.children[3].name).toBe("HashJoin");
       expect(result.children[4].name).toBe("StreamSource");
       expect(result.children[5].name).toBe("FileSink");
-    });
-  });
-
-  describe("calculateSummaryMetrics", () => {
-    it("should calculate summary for single operator", () => {
-      const planText = "SortExec: elapsed_compute=100ms, output_rows=1000, memory=5MB";
-      const result = calculateSummaryMetrics(planText);
-
-      expect(result.totalTime).toBe("100.00ms");
-      expect(result.totalRows).toBe("1,000");
-      expect(result.peakMemory).toBe("5.00MB");
-    });
-
-    it("should calculate summary for sequential operators", () => {
-      const planText = `ProjectionExec: elapsed_compute=50ms, output_rows=500, memory=1MB
-  FilterExec: elapsed_compute=30ms, output_rows=500, memory=2MB
-    TableScan: elapsed_compute=20ms, output_rows=1000, memory=3MB`;
-
-      const result = calculateSummaryMetrics(planText);
-
-      // Sequential: sum of times = 50 + 30 + 20 = 100ms
-      expect(result.totalTime).toBe("100.00ms");
-      // Rows from top operator
-      expect(result.totalRows).toBe("500");
-      // Max memory across all nodes
-      expect(result.peakMemory).toBe("3.00MB");
-    });
-
-    it("should calculate summary for parallel execution with RepartitionExec", () => {
-      const planText = `RepartitionExec: elapsed_compute=10ms, output_rows=0, memory=1MB
-  SortExec: elapsed_compute=50ms, output_rows=500, memory=2MB
-  FilterExec: elapsed_compute=30ms, output_rows=300, memory=1MB`;
-
-      const result = calculateSummaryMetrics(planText);
-
-      // Parallel: max time of children (50ms) because RepartitionExec's own time is included in MAX
-      expect(result.totalTime).toBe("50.00ms");
-      // Parallel: sum of rows = 500 + 300 = 800
-      expect(result.totalRows).toBe("800");
-      // Max memory = 2MB
-      expect(result.peakMemory).toBe("2.00MB");
-    });
-
-    it("should handle empty plan", () => {
-      const result = calculateSummaryMetrics("");
-
-      expect(result.totalTime).toBe("0ms");
-      expect(result.totalRows).toBe("0");
-      expect(result.peakMemory).toBe("N/A");
-    });
-
-    it("should handle operators without metrics", () => {
-      const planText = "SortExec";
-      const result = calculateSummaryMetrics(planText);
-
-      expect(result.totalTime).toBe("0ms");
-      expect(result.totalRows).toBe("0");
-      expect(result.peakMemory).toBe("N/A");
-    });
-
-    it("should format large row counts with commas", () => {
-      const planText = "SortExec: output_rows=1234567";
-      const result = calculateSummaryMetrics(planText);
-
-      expect(result.totalRows).toBe("1,234,567");
-    });
-
-    it("should handle complex nested structure", () => {
-      const planText = `ProjectionExec: elapsed_compute=10ms, output_rows=100, memory=1MB
-  RepartitionExec: elapsed_compute=5ms
-    SortExec: elapsed_compute=40ms, output_rows=50, memory=2MB
-    FilterExec: elapsed_compute=30ms, output_rows=50, memory=1MB
-  HashJoin: elapsed_compute=20ms, output_rows=100, memory=5MB`;
-
-      const result = calculateSummaryMetrics(planText);
-
-      // 10 (Projection) + max(5, 40, 30) (Repartition with children) + 20 (HashJoin) = 70ms
-      expect(result.totalTime).toBe("70.00ms");
-    });
-  });
-
-  describe("findRemoteExecNode", () => {
-    it("should find RemoteExec node", () => {
-      const planText = `ProjectionExec: elapsed_compute=5ms
-  RemoteExec: elapsed_compute=10ms
-    TableScan: elapsed_compute=15ms`;
-
-      const tree = parseQueryPlanTree(planText);
-      const remoteNode = findRemoteExecNode(tree);
-
-      expect(remoteNode).not.toBeNull();
-      expect(remoteNode?.name).toBe("RemoteExec");
-    });
-
-    it("should find RemoteScanExec node", () => {
-      const planText = `ProjectionExec: elapsed_compute=5ms
-  RemoteScanExec: elapsed_compute=10ms`;
-
-      const tree = parseQueryPlanTree(planText);
-      const remoteNode = findRemoteExecNode(tree);
-
-      expect(remoteNode).not.toBeNull();
-      expect(remoteNode?.name).toBe("RemoteScanExec");
-    });
-
-    it("should find any Remote*Exec variant", () => {
-      const planText = "RemoteQueryExec: elapsed_compute=10ms";
-      const tree = parseQueryPlanTree(planText);
-      const remoteNode = findRemoteExecNode(tree);
-
-      expect(remoteNode).not.toBeNull();
-      expect(remoteNode?.name).toBe("RemoteQueryExec");
-    });
-
-    it("should return null if no RemoteExec found", () => {
-      const planText = `ProjectionExec: elapsed_compute=5ms
-  FilterExec: elapsed_compute=10ms`;
-
-      const tree = parseQueryPlanTree(planText);
-      const remoteNode = findRemoteExecNode(tree);
-
-      expect(remoteNode).toBeNull();
-    });
-
-    it("should find RemoteExec in deeply nested structure", () => {
-      const planText = `ProjectionExec: elapsed_compute=5ms
-  FilterExec: elapsed_compute=10ms
-    SortExec: elapsed_compute=15ms
-      RemoteExec: elapsed_compute=20ms`;
-
-      const tree = parseQueryPlanTree(planText);
-      const remoteNode = findRemoteExecNode(tree);
-
-      expect(remoteNode).not.toBeNull();
-      expect(remoteNode?.name).toBe("RemoteExec");
-    });
-
-    it("should find first RemoteExec when multiple exist", () => {
-      const planText = `RemoteExec: elapsed_compute=5ms
-  RemoteScanExec: elapsed_compute=10ms`;
-
-      const tree = parseQueryPlanTree(planText);
-      const remoteNode = findRemoteExecNode(tree);
-
-      expect(remoteNode).not.toBeNull();
-      expect(remoteNode?.name).toBe("RemoteExec");
-    });
-
-    it("should handle empty tree", () => {
-      const tree: OperatorNode = {
-        name: "Root",
-        fullText: "",
-        depth: -1,
-        metrics: {},
-        children: [],
-        isRepartitionExec: false,
-      };
-
-      const remoteNode = findRemoteExecNode(tree);
-      expect(remoteNode).toBeNull();
     });
   });
 
@@ -603,30 +400,10 @@ TableScan`;
           TableScan: table=my_table, output_rows=10000, memory=50MB, elapsed_compute=100ms`;
 
       const tree = parseQueryPlanTree(planText);
-      const summary = calculateSummaryMetrics(planText);
 
       // Verify tree structure
       expect(tree.children).toHaveLength(1);
       expect(tree.children[0].name).toBe("GlobalLimitExec");
-
-      // Verify metrics are calculated
-      expect(summary.totalTime).toBeDefined();
-      expect(summary.totalRows).toBeDefined();
-      expect(summary.peakMemory).toBe("50.00MB");
-    });
-
-    it("should handle plan with RemoteExec for distributed query", () => {
-      const planText = `CoalescePartitionsExec: elapsed_compute=1ms
-  RemoteExec: elapsed_compute=50ms
-    ProjectionExec: elapsed_compute=5ms
-      TableScan: output_rows=5000, elapsed_compute=45ms`;
-
-      const tree = parseQueryPlanTree(planText);
-      const remoteNode = findRemoteExecNode(tree);
-
-      expect(remoteNode).not.toBeNull();
-      expect(remoteNode?.name).toBe("RemoteExec");
-      expect(remoteNode?.children).toHaveLength(1);
     });
 
     it("should collapse long projection in real query", () => {

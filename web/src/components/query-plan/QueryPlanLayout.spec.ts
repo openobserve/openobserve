@@ -17,7 +17,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { computed, ref } from "vue";
 import { mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
-import QueryPlanLayout, { revealDetail } from "./QueryPlanLayout.vue";
+import QueryPlanLayout from "./QueryPlanLayout.vue";
+import { useQueryPlanPanels } from "./useQueryPlanPanels";
 
 const desktop = ref(true);
 vi.mock("@/composables/useBreakpoint", () => ({
@@ -76,7 +77,7 @@ describe("QueryPlanLayout", () => {
     wrapper = mountLayout();
     await wrapper.find('[data-test="query-plan-hide-detail"]').trigger("click");
     expect(visible("query-plan-detail-panel")).toBe(false);
-    revealDetail();
+    useQueryPlanPanels().revealDetail();
     await wrapper.vm.$nextTick();
     expect(visible("query-plan-detail-panel")).toBe(true);
   });

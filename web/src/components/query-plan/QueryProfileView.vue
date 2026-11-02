@@ -149,7 +149,7 @@ import ProfileCanvas from "./ProfileCanvas.vue";
 import ProfileDetailPanel from "./ProfileDetailPanel.vue";
 import ProfileSummaryPanel from "./ProfileSummaryPanel.vue";
 import type { FoldNotice } from "./profileStyles";
-import QueryPlanLayout, { revealDetail } from "./QueryPlanLayout.vue";
+import QueryPlanLayout from "./QueryPlanLayout.vue";
 import { roleLabel } from "./profileText";
 import { useProfileFold } from "./useProfileFold";
 
@@ -161,17 +161,26 @@ const props = defineProps<{
 const { t } = useI18nTyped();
 
 const scope = ref<StageScope>("sum");
-const selectedId = ref<string | null>(null);
-const canvasRef = ref<InstanceType<typeof ProfileCanvas> | null>(null);
 const clusterView = ref<ClusterView>("all");
 
 const clusters = computed(() => clusterSummary(props.model));
 const viewModel = computed(() => modelForClusterView(props.model, clusterView.value));
 const summary = computed(() => summarizeProfile(viewModel.value, props.stream ?? {}));
-const { fold, layout, notice, focusable, act, reveal, onNoticeAction } = useProfileFold(
+const {
+  selectedId,
+  canvasRef,
+  fold,
+  layout,
+  notice,
+  focusable,
+  act,
+  onNoticeAction,
+  pick,
+  focusOn,
+} = useProfileFold(
   t,
   () => viewModel.value,
-  selectedId,
+  (m) => summarizeProfile(m, props.stream ?? {}).hotspots[0] ?? m.rootId,
 );
 
 const clusterNotice = computed<FoldNotice | null>(() => {
@@ -196,17 +205,6 @@ const nodeOptions = computed(() =>
 const selectedNode = computed(() => scopeNodeKey(scope.value));
 const toggleValue = computed(() => (selectedNode.value ? "" : scope.value));
 
-function pick(id: string) {
-  reveal(id);
-  selectedId.value = id;
-  revealDetail();
-}
-
-function focusOn(opId: string | null) {
-  canvasRef.value?.fitNext();
-  act({ type: "focus", opId });
-}
-
 function onToggle(value: unknown) {
   if (value === "sum" || value === "max") scope.value = value;
 }
@@ -224,12 +222,5 @@ watch(
   () => (clusterView.value = "all"),
 );
 
-watch(
-  viewModel,
-  (m) => {
-    selectedId.value = summary.value.hotspots[0] ?? m.rootId;
-    scope.value = "sum";
-  },
-  { immediate: true },
-);
+watch(viewModel, () => (scope.value = "sum"));
 </script>
