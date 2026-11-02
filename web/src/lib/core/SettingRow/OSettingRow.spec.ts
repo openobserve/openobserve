@@ -80,4 +80,37 @@ describe("OSettingRow", () => {
     expect(wrapper.classes()).toContain("flex");
     expect(wrapper.find(".min-w-0").classes()).toContain("w-1/2");
   });
+  it("shows an info icon carrying the explanation only when info is set", () => {
+    const plain = mount(OSettingRow, { props: { label: raw("Look back"), dataTest: "row" } });
+    expect(plain.find('[data-test="row-info"]').exists()).toBe(false);
+
+    const wrapper = mount(OSettingRow, {
+      props: {
+        label: raw("Look back"),
+        info: raw("How much data each run reads"),
+        dataTest: "row",
+      },
+    });
+    expect(wrapper.find('[data-test="row-info"]').attributes("aria-label")).toBe(
+      "How much data each run reads",
+    );
+  });
+
+  it("marks a required setting after its label", () => {
+    const wrapper = mount(OSettingRow, { props: { label: raw("Check every"), required: true } });
+
+    expect(wrapper.text()).toContain("Check every *");
+  });
+
+  it("lets a fill row's control take the rest of the row from the top", () => {
+    const wrapper = mount(OSettingRow, {
+      props: { label: raw("Send to"), fill: true },
+      slots: { default: '<div data-test="control">wide</div>' },
+    });
+
+    expect(wrapper.classes()).toContain("items-start");
+    expect(wrapper.find('[data-test="control"]').element.parentElement?.className).toContain(
+      "flex-1",
+    );
+  });
 });
