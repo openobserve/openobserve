@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OInput
     v-model="text"
     size="sm"
-    class="w-40"
+    width="sm"
     :placeholder="placeholder"
     :aria-label="fieldLabel"
     :error="invalid"
