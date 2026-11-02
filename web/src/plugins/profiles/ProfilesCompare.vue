@@ -140,7 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :value-formatter="valueFormatter"
         :search-query="searchQuery"
         :empty-label="t('profiles.noResults')"
+        hide-profile-actions
         data-test="profiles-compare-flame"
+        @search="emit('search', $event)"
       />
     </div>
     <div
@@ -161,7 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :value-formatter="valueFormatter"
         :search-query="searchQuery"
         :empty-label="t('profiles.noResults')"
+        hide-profile-actions
         :data-test="`profiles-compare-side-${side.key}`"
+        @search="emit('search', $event)"
       />
     </div>
     <OTable
@@ -246,6 +250,7 @@ const props = defineProps<{
   unitLabel: string;
   valueFormatter: (value: number) => string;
 }>();
+const emit = defineEmits<{ search: [name: string] }>();
 const state = defineModel<CompareState>("state", { required: true });
 
 const { t } = useI18nTyped();
