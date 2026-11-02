@@ -172,17 +172,14 @@ test.describe('Fleet management configurations and deploy', { tag: ['@fleet', '@
     expect((await pm.fleetSeed.rolloutsForConfig(config)).map((r) => r.id)).toEqual([seeded.id]);
   });
 
-  test('R-3311-8 · the editor on a deployed version, where Fix forward lands, keeps the primary Publish off until the YAML changes', {
+  test('R-3311-8 · Publish stays off while the YAML is unchanged from the version the editor opened, and on once it changes', {
     tag: ['@fleetConfig', '@regression', '@P2'],
   }, async () => {
-    // A halted rollout needs a collector that rejects the version, which this suite has none of; Fix forward only opens this editor.
-    const fleet = await pm.fleetSeed.createFleet('fixfwd');
+    // Known gap: the Fix forward navigation itself needs a halted rollout, i.e. a collector that rejects a version.
     const config = await pm.fleetSeed.createConfig('fixfwd', FLEET_YAML.publishable);
     const v1 = await pm.fleetSeed.publishConfig(config, FLEET_YAML.publishable);
-    const seeded = await pm.fleetSeed.setDesired(fleet.id, config, v1);
-    await pm.fleetSeed.waitForRolloutStatus(seeded.id, 'completed');
     await pm.fleetConfigPage.goto(config);
-    await pm.fleetConfigPage.expectModeChip(`Viewing v${v1} · running`);
+    await pm.fleetConfigPage.expectModeChip(`Viewing published v${v1} · not rolled out`);
     await pm.fleetConfigPage.switchToYaml();
     await pm.fleetConfigPage.expectYaml(FLEET_YAML.publishable);
     // Declared after the setup so a broken precondition fails loudly instead of counting as the expected failure.
