@@ -288,3 +288,45 @@ describe("toCoverageSource", () => {
     expect(source.totals.total).toBe(0);
   });
 });
+
+describe("toCoverageSource service names", () => {
+  const cell = { state: "none", evidence: [], counts: {} };
+  const svc = (name: string, cluster: string, namespace = "ns") => ({
+    service_id: `${name}:${cluster}:${namespace}`,
+    service_name: name,
+    cluster,
+    namespace,
+    streams: [],
+    cells: { errors: cell, latency: cell, absence: cell },
+  });
+  const names = (rows: unknown[]) =>
+    toCoverageSource(
+      gt,
+      {
+        view: "strict",
+        pass_at: null,
+        refreshed_at: null,
+        quality: null,
+        classes: [],
+        rows,
+      } as unknown as AutoObserveCoverage,
+      { status: "ready", retry: () => undefined },
+      "en-US",
+    ).rows.map((r) => r.service);
+
+  it("keeps a service really named like a generated label apart from the one it reads like", () => {
+    expect(names([svc("api", "prod"), svc("api", "dev"), svc("api (prod)", "other")])).toEqual([
+      "api (prod/ns)",
+      "api (dev)",
+      "api (prod)",
+    ]);
+  });
+
+  it("numbers services that share a name, cluster and namespace", () => {
+    expect(names([svc("api", "prod"), svc("api", "prod"), svc("web", "prod")])).toEqual([
+      "api (prod/ns) #1",
+      "api (prod/ns) #2",
+      "web",
+    ]);
+  });
+});

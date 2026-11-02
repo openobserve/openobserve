@@ -265,17 +265,37 @@ const streamText = (row: AutoObserveCoverageRow) => {
   return streams.length > 1 ? `${streams[0].name} +${streams.length - 1}` : streams[0].name;
 };
 
-// Service names repeat across clusters, and the design keys rows by name, so repeats get their place appended.
+const NAME_TIERS = [
+  (r: AutoObserveCoverageRow) => r.service_name,
+  (r: AutoObserveCoverageRow) => `${r.service_name} (${r.cluster || "—"})`,
+  (r: AutoObserveCoverageRow) => `${r.service_name} (${r.cluster || "—"}/${r.namespace || "—"})`,
+];
+
+const groupBy = (labels: string[]) =>
+  labels.reduce<Map<string, number[]>>(
+    (m, label, i) => m.set(label, [...(m.get(label) ?? []), i]),
+    new Map(),
+  );
+
+// The design keys rows by name, so every label must be unique, even against a real name that reads like a generated one.
 const uniqueNames = (rows: AutoObserveCoverageRow[]) => {
-  const count = (key: (r: AutoObserveCoverageRow) => string) =>
-    rows.reduce<Record<string, number>>((m, r) => ((m[key(r)] = (m[key(r)] ?? 0) + 1), m), {});
-  const byName = count((r) => r.service_name);
-  const byCluster = count((r) => `${r.service_name}\u0000${r.cluster ?? ""}`);
-  return rows.map((r) => {
-    if (byName[r.service_name] === 1) return r.service_name;
-    if (byCluster[`${r.service_name}\u0000${r.cluster ?? ""}`] === 1)
-      return `${r.service_name} (${r.cluster || "—"})`;
-    return `${r.service_name} (${r.cluster || "—"}/${r.namespace || "—"})`;
+  const tier = rows.map(() => 0);
+  const labelOf = (i: number) => NAME_TIERS[Math.min(tier[i], NAME_TIERS.length - 1)](rows[i]);
+  for (let round = 0; round < NAME_TIERS.length; round++) {
+    const clashes = [...groupBy(rows.map((_, i) => labelOf(i))).values()].filter(
+      (g) => g.length > 1,
+    );
+    if (!clashes.length) return rows.map((_, i) => labelOf(i));
+    for (const group of clashes) {
+      const top = Math.max(...group.map((i) => tier[i]));
+      group.filter((i) => tier[i] === top).forEach((i) => (tier[i] += 1));
+    }
+  }
+  const labels = rows.map((_, i) => labelOf(i));
+  const groups = groupBy(labels);
+  return labels.map((label, i) => {
+    const group = groups.get(label) ?? [i];
+    return group.length > 1 ? `${label} #${group.indexOf(i) + 1}` : label;
   });
 };
 
