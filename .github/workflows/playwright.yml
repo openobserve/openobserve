@@ -375,7 +375,8 @@ jobs:
     timeout-minutes: 5
     name: prior_pass
     needs: [generate_matrix]
-    if: github.event_name == 'pull_request' && needs.generate_matrix.result == 'success'
+    # A manual re-run asks for the tests to run again, so only a first attempt may reuse a pass.
+    if: github.event_name == 'pull_request' && github.run_attempt == 1 && needs.generate_matrix.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: read

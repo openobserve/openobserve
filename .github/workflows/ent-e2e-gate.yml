@@ -302,11 +302,13 @@ jobs:
             # Genuine failure — distinguish an enterprise BUILD failure (compile) from SPEC failures,
             # and for specs list the failing files from the engine's failed-specs artifact.
             BUILD_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="build_binary")|.conclusion' 2>/dev/null || echo "")
-            # Any failed shard fails the tests even if the aggregate job never reported.
-            TEST_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '[.jobs[]|select(.name=="ent_gate_tests" or (.name|startswith("ent_gate_tests (")))|.conclusion]|if index("failure") then "failure" elif length > 0 then .[0] else "" end' 2>/dev/null || echo "")
-            # A test job or "ent_gate_tests (i/n)" shard that failed with no failed step lost its runner; it was not a spec failure.
-            TEST_LOST=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '[.jobs[]|select(.name=="ent_gate_tests" or (.name|startswith("ent_gate_tests (")))|select(.conclusion=="failure" and ([.steps[]|select(.conclusion=="failure")]|length)==0)]|length' 2>/dev/null || echo "")
-            TEST_LOST=${TEST_LOST:-0}
+            # Single-job re-runs spread shard results over attempts, so each test job counts by its latest attempt; an aggregate counts only without shards.
+            TEST_JOBS=$(gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/jobs?filter=all&per_page=100" --jq '.jobs[]' 2>/dev/null | jq -s '[.[]|select(.name=="ent_gate_tests" or (.name|startswith("ent_gate_tests (")))] | group_by(.name) | map(max_by(.run_attempt)) | (map(select(.name|startswith("ent_gate_tests (")))) as $s | if ($s|length) > 0 then $s else . end' 2>/dev/null || echo '[]')
+            TEST_CONCL=$(jq -r '[.[].conclusion]|if index("failure") then "failure" elif length > 0 then .[0] // "" else "" end' <<<"$TEST_JOBS")
+            # A test job that failed with no failed step lost its runner; one with a failed step had spec failures.
+            TEST_LOST=$(jq '[.[]|select(.conclusion=="failure" and ([.steps[]?|select(.conclusion=="failure")]|length)==0)]|length' <<<"$TEST_JOBS")
+            TEST_SPEC_FAILED=$(jq '[.[]|select(.conclusion=="failure" and ([.steps[]?|select(.conclusion=="failure")]|length)>0)]|length' <<<"$TEST_JOBS")
+            TEST_LOST=${TEST_LOST:-0}; TEST_SPEC_FAILED=${TEST_SPEC_FAILED:-0}
 
             if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_LOST" != "0" ] && [ "$ATTEMPT" = "1" ]; then
               ATTEMPT=2
@@ -335,8 +337,8 @@ jobs:
             SPEC_LIST=$(sed '/^[[:space:]]*$/d; s/^/- `/; s/$/`/' /tmp/fs/failed-specs.txt)
           fi
 
-          # Spec failures from other shards outrank a lost runner, so they are reported first.
-          if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_LOST" != "0" ] && [ -z "$SPEC_LIST" ]; then
+          # Spec failures in another shard outrank a lost runner; the artifact only lists their files.
+          if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_LOST" != "0" ] && [ "$TEST_SPEC_FAILED" = "0" ]; then
           sticky "### ⚠️ Playwright E2E Crosscheck — runner lost, re-run needed
 
           $MARKER
