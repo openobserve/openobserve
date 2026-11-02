@@ -800,6 +800,107 @@ describe("AlertList - row actions", () => {
     expect(alertsDB.length).toBeGreaterThan(6);
   });
 
+  it("names its own list to the table's no-access lock", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const table = wrapper
+      .findAllComponents({ name: "OTable" })
+      .find((c: any) => "forbidden" in c.props());
+    expect(table.props("forbiddenResource")).toBe("alert_folders");
+  });
+
+  it("closes the clone's loading toast when the clone is refused with a 403", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const row = wrapper.vm.filteredResults[0];
+    await wrapper.find(`[data-test="alert-list-${row.name}-clone-alert"]`).trigger("click");
+    await flushPromises();
+    wrapper.vm.toBeCloneAlertName = `${row.name} - Copy`;
+    wrapper.vm.toBeClonestreamType = "logs";
+    wrapper.vm.toBeClonestreamName = "default";
+    wrapper.vm.folderIdToBeCloned = "default";
+    (alertsSvc.create_by_alert_id as any).mockRejectedValueOnce({ response: { status: 403 } });
+    const dismissLoading = vi.fn();
+    vi.mocked(toast).mockClear();
+    vi.mocked(toast).mockImplementationOnce(() => dismissLoading);
+
+    await wrapper.vm.submitForm();
+    await flushPromises();
+
+    expect(dismissLoading).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).toEqual(["loading"]);
+  });
+
+  it.each([
+    ["an anomaly", { toBeClonedIsAnomaly: true, toBeClonedIsComposite: false }],
+    ["a composite", { toBeClonedIsAnomaly: false, toBeClonedIsComposite: true }],
+  ])(
+    "closes its loading toast when cloning %s alert is refused with a 403",
+    async (_kind, flags) => {
+      const wrapper: any = await mountAlertList();
+      await waitData(wrapper);
+      Object.assign(wrapper.vm, flags, {
+        toBeClonedID: "a1",
+        toBeCloneAlertName: "Copy",
+        toBeClonestreamType: "logs",
+        toBeClonestreamName: "default",
+        folderIdToBeCloned: "default",
+        showForm: true,
+      });
+      const clone = vi
+        .spyOn(alertsSvc, "clone_by_id")
+        .mockRejectedValueOnce({ response: { status: 403, data: { message: "denied" } } });
+      const dismissLoading = vi.fn();
+      vi.mocked(toast).mockClear();
+      vi.mocked(toast).mockImplementationOnce(() => dismissLoading);
+
+      await wrapper.vm.submitForm();
+      await flushPromises();
+      clone.mockRestore();
+
+      expect(dismissLoading).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).toEqual(["loading"]);
+      expect(wrapper.vm.showForm).toBe(false);
+      expect(wrapper.vm.isSubmitting).toBe(false);
+    },
+  );
+
+  it.each([
+    ["exporting an alert", "export_by_id", (vm: any, row: any) => vm.exportAlert(row)],
+    ["triggering an alert", "trigger_alert", (vm: any, row: any) => vm.triggerAlert(row)],
+    ["retraining an anomaly", "retrain_by_id", (vm: any, row: any) => vm.retrainAnomaly(row)],
+    [
+      "exporting selected alerts",
+      "export_by_id",
+      (vm: any, row: any) => {
+        vm.selectedAlertIds = [row.alert_id];
+        return vm.multipleExportAlert();
+      },
+    ],
+    [
+      "pausing or resuming selected alerts",
+      "bulkToggleState",
+      (vm: any, row: any) => {
+        vm.selectedAlertIds = [row.alert_id];
+        return vm.bulkToggleAlerts(row.enabled ? "pause" : "resume");
+      },
+    ],
+  ])("raises no error toast when %s is refused with a 403", async (_action, method, run) => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const row = wrapper.vm.filteredResults[0];
+    const refused = vi
+      .spyOn(alertsSvc, method)
+      .mockRejectedValue({ response: { status: 403, data: { message: "denied" } } });
+    vi.mocked(toast).mockClear();
+
+    await run(wrapper.vm, row);
+    await flushPromises();
+    refused.mockRestore();
+
+    expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).not.toContain("error");
+  });
+
   it("deletes an alert after confirming dialog", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -2318,6 +2419,18 @@ describe("AlertList - editor drafts", () => {
     );
   });
 
+  it("raises no error toast when its edit link is refused with a 403", async () => {
+    const { vm } = await mountDraftList();
+    alertsSvc.get_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } });
+    vm.router.currentRoute.value.query = { action: "update", alert_id: "denied-1" };
+    vi.mocked(toast).mockClear();
+
+    await vm.handleActionQuery("update");
+    await flushPromises();
+
+    expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).not.toContain("error");
+  });
+
   it("refreshes without closing the editor when the leave dialog saved", async () => {
     const { vm } = await mountDraftList();
     vm.router.currentRoute.value.query = { action: "add" };
@@ -2496,3 +2609,156 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
     );
   });
 }, 15000);
+
+describe("AlertList - first run and the alert library", () => {
+  let originalHideMenus: unknown;
+
+  beforeEach(() => {
+    originalHideMenus = (store.state as any).zoConfig.custom_hide_menus;
+  });
+
+  afterEach(() => {
+    (store.state as any).zoConfig.custom_hide_menus = originalHideMenus;
+  });
+
+  // A stale ?action= from an earlier spec's navigation can swap the whole page for the editor.
+  const mountList = async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    await wrapper.vm.handleActionQuery(undefined);
+    await flushPromises();
+    return wrapper;
+  };
+
+  /** A loaded org with no alerts at all, so the table shows its empty slot. */
+  const mountEmpty = async () => {
+    const wrapper: any = await mountList();
+    wrapper.vm.allAlerts = [];
+    wrapper.vm.filteredResults = [];
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    await flushPromises();
+    return wrapper;
+  };
+
+  const emptyState = (wrapper: any) =>
+    wrapper
+      .findAllComponents({ name: "OEmptyState" })
+      .find((c: any) => c.props("preset") === "no-alerts");
+
+  it("puts an Alert library button in the header that opens the library", async () => {
+    const wrapper: any = await mountList();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+
+    const button = wrapper.find('[data-test="alert-list-alert-library-btn"]');
+    expect(button.text()).toContain("Alert library");
+    await button.trigger("click");
+
+    expect(push).toHaveBeenCalledWith({
+      name: "alertLibrary",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+  });
+
+  it("shows the first-run empty state at block size with New alert, Alert library and Import", async () => {
+    const wrapper = await mountEmpty();
+    const state = emptyState(wrapper);
+    expect(state.props("size")).toBe("block");
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').text()).toContain("New alert");
+    expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').text()).toContain(
+      "Alert library",
+    );
+    expect(wrapper.find('[data-test="alert-list-empty-import"]').text()).toContain("Import alert");
+  });
+
+  const emptyActions = (wrapper: any) =>
+    emptyState(wrapper)
+      .findAllComponents({ name: "OButton" })
+      .filter((b: any) => (b.attributes("data-test") ?? "").startsWith("alert-list-empty-"))
+      .map((b: any) => ({
+        id: b.attributes("data-test"),
+        variant: b.props("variant"),
+        size: b.props("size"),
+      }));
+
+  it("leads the first-run actions with the library, at lg size, when the library is shown", async () => {
+    const wrapper = await mountEmpty();
+    expect(emptyActions(wrapper)).toEqual([
+      { id: "alert-list-empty-alert-library", variant: "primary", size: "lg" },
+      { id: "alert-list-empty-import", variant: "outline", size: "lg" },
+      { id: "alert-list-empty-new-alert", variant: "outline", size: "lg" },
+    ]);
+  });
+
+  it("leads with New alert as the primary action when the library is hidden", async () => {
+    (store.state as any).zoConfig.custom_hide_menus = "alertLibrary";
+    const wrapper = await mountEmpty();
+    expect(emptyActions(wrapper)).toEqual([
+      { id: "alert-list-empty-new-alert", variant: "primary", size: "lg" },
+      { id: "alert-list-empty-import", variant: "outline", size: "lg" },
+    ]);
+  });
+
+  it("starts a new alert from the empty state, as the header's New alert does", async () => {
+    const wrapper = await mountEmpty();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-empty-new-alert"]').trigger("click");
+    await flushPromises();
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertList",
+        query: expect.objectContaining({ action: "add" }),
+      }),
+    );
+  });
+
+  it("opens the library from the empty state", async () => {
+    const wrapper = await mountEmpty();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-empty-alert-library"]').trigger("click");
+    expect(push).toHaveBeenCalledWith({
+      name: "alertLibrary",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+  });
+
+  it("opens the import dialog from the empty state, as the header's Import does", async () => {
+    const wrapper = await mountEmpty();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-empty-import"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.vm.showImportAlertDialog).toBe(true);
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ action: "import" }) }),
+    );
+  });
+
+  it("keeps the filtered empty state to Clear filters alone", async () => {
+    const wrapper = await mountEmpty();
+    wrapper.vm.filterQuery = "nothing-matches";
+    await flushPromises();
+
+    expect(emptyState(wrapper).props("filtered")).toBe(true);
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-import"]').exists()).toBe(false);
+    expect(emptyState(wrapper).text()).toContain("Clear filters");
+
+    emptyState(wrapper).vm.$emit("action", "clear-filters");
+    await flushPromises();
+    expect(wrapper.vm.filterQuery).toBe("");
+  });
+
+  it("hides both library entry points when custom_hide_menus lists alertLibrary", async () => {
+    (store.state as any).zoConfig.custom_hide_menus = "billings,alertLibrary";
+    const wrapper = await mountEmpty();
+    expect(wrapper.find('[data-test="alert-list-alert-library-btn"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(true);
+  });
+
+  it("renders the summary strip compact, so its six tiles share one row", async () => {
+    const wrapper: any = await mountList();
+    expect(wrapper.findComponent({ name: "OStatStrip" }).props("compact")).toBe(true);
+  });
+});

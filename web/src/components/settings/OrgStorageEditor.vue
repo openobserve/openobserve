@@ -562,8 +562,8 @@ async function submitStorage(value: OrgStorageEditorForm) {
     }
     emit("saved");
   } catch (err: any) {
-    if (err.response?.status === 403) return;
     dismiss();
+    if (err.response?.status === 403) return;
     toast({
       variant: "error",
       message:

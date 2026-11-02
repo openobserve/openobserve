@@ -37,12 +37,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, provide, toRaw } from "vue";
+import {
+  computed,
+  h,
+  inject,
+  onBeforeUnmount,
+  provide,
+  toRaw,
+  type FunctionalComponent,
+} from "vue";
 import { matchedRouteKey, useRoute } from "vue-router";
 import { providePageHeaderStatus } from "@/lib/core/PageHeader/pageHeaderStatus";
+import { provideTableForbiddenState } from "@/lib/core/Table/tableForbiddenState";
 import OAccessActionPopover from "@/components/access/OAccessActionPopover.vue";
 import OAccessHeaderChip from "@/components/access/OAccessHeaderChip.vue";
 import OAccessLock from "@/components/access/OAccessLock.vue";
+import { tableDenials, withoutCovered } from "@/components/access/surfaceDenials";
 import {
   accessBoundaryKey,
   registerAccessBoundary,
@@ -76,12 +86,18 @@ const showsChip = computed(
     depth.value >= 0 &&
     depth.value === deepestBoundary.value &&
     !pageDenied.value &&
-    sectionEntries.value.length > 0,
+    withoutCovered(sectionEntries.value).length > 0,
 );
 providePageHeaderStatus(
   () => (showsChip.value ? OAccessHeaderChip : null),
   () => route.fullPath,
 );
+
+// A refused table list shows the same lock and wording as a refused page; the chip keeps listing it beside a create button that may still work.
+const TableAccessLock: FunctionalComponent<{ resource?: string }> = ({ resource }) =>
+  h(OAccessLock, { denials: tableDenials(sectionEntries.value, resource), size: "hero" });
+TableAccessLock.props = ["resource"];
+provideTableForbiddenState(TableAccessLock);
 
 const lockDenials = computed<AccessDenial[]>(() => (pageDenial.value ? [pageDenial.value] : []));
 </script>
