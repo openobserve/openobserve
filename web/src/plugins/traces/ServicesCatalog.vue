@@ -318,9 +318,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <div
+        v-if="!isLoading && loadError !== null"
+        class="flex flex-1 items-center justify-center"
+        data-test="services-catalog-error"
+      >
+        <OEmptyState
+          size="hero"
+          preset="load-error"
+          :description="loadError"
+          @action="loadServicesCatalog"
+        />
+      </div>
+
       <!-- Empty state (shown when not loading and no data) -->
       <div
-        v-if="!isLoading && services.length === 0"
+        v-else-if="!isLoading && services.length === 0"
         class="flex flex-1 flex-col items-center justify-center"
         data-test="services-catalog-empty"
       >
@@ -500,7 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
@@ -528,6 +541,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -640,6 +654,8 @@ const isSearching = ref(false);
 // Epoch-ms of the last completed load, shown on the page header's refresh control.
 const lastRunAt = ref<number | null>(null);
 const services = ref<ServiceRow[]>([]);
+// The failed search's server message; shown instead of the empty state so a broken query never reads as "no services".
+const loadError = ref<I18nText | null>(null);
 const viewState = useListViewState("servicesCatalog", {
   filterText: "",
   typeFilter: "service" as TypeFilter,
@@ -678,6 +694,8 @@ interface StreamSchemaFlags {
   org: string;
   stream: string;
   hasInferColumns: boolean;
+  hasInferSystemColumn: boolean;
+  hasInferTypeColumn: boolean;
   hasParentColumn: boolean;
 }
 const schemaFlags = ref<StreamSchemaFlags | null>(null);
@@ -1108,10 +1126,19 @@ async function fetchSchemaFlags(org: string, stream: string): Promise<StreamSche
       org,
       stream,
       hasInferColumns: has("infer_service_name"),
+      hasInferSystemColumn: has("infer_service_system"),
+      hasInferTypeColumn: has("infer_service_type"),
       hasParentColumn: has("reference_parent_span_id"),
     };
   } catch {
-    return { org, stream, hasInferColumns: false, hasParentColumn: false };
+    return {
+      org,
+      stream,
+      hasInferColumns: false,
+      hasInferSystemColumn: false,
+      hasInferTypeColumn: false,
+      hasParentColumn: false,
+    };
   }
 }
 
@@ -1153,19 +1180,27 @@ ORDER BY total_requests DESC`;
   }
   // infer_service_name is only set on CLIENT and PRODUCER spans (traces/inferred.rs).
   const inferPred = `((NULLIF(infer_service_name, '') IS NOT NULL AND CAST(span_kind AS VARCHAR) IN ('3','4')) OR ${requestPred})`;
+  const inferredColumn = (column: string) =>
+    `CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(${column}, '') END`;
+  // A column the stream has never seen makes the whole query fail, so absent ones select NULL and stay out of GROUP BY.
+  const systemExpr = flags.hasInferSystemColumn ? inferredColumn("infer_service_system") : null;
+  const typeExpr = flags.hasInferTypeColumn ? inferredColumn("infer_service_type") : null;
+  const groupBy = [
+    "COALESCE(NULLIF(infer_service_name, ''), service_name)",
+    "NULLIF(infer_service_name, '')",
+    systemExpr,
+    typeExpr,
+  ].filter((expr): expr is string => expr !== null);
   return `SELECT
   COALESCE(NULLIF(infer_service_name, ''), service_name) AS service_name,
   NULLIF(infer_service_name, '') AS _infer_service_name,
-  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_system, '') END AS _infer_service_system,
-  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_type, '') END AS _infer_service_type,
+  ${systemExpr ?? "NULL"} AS _infer_service_system,
+  ${typeExpr ?? "NULL"} AS _infer_service_type,
   MAX(CASE WHEN service_name IS NOT NULL AND (infer_service_name IS NULL OR infer_service_name = '') THEN 1 ELSE 0 END) AS _is_real_service,
 ${redAggregates(inferPred)}
 FROM "${streamName}"
 GROUP BY
-  COALESCE(NULLIF(infer_service_name, ''), service_name),
-  NULLIF(infer_service_name, ''),
-  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_system, '') END,
-  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_type, '') END
+${groupBy.map((expr) => `  ${expr}`).join(",\n")}
 ORDER BY total_requests DESC`;
 }
 
@@ -1315,6 +1350,7 @@ async function loadServicesCatalog() {
   // stay on screen while the next search runs rather than the panel emptying.
   isLoading.value = services.value.length === 0;
   isSearching.value = true;
+  loadError.value = null;
   const load = ++catalogLoad;
 
   const { start_time, end_time } = getTimeRange();
@@ -1423,8 +1459,14 @@ async function loadServicesCatalog() {
           if (hits.length > 0) publish();
         }
       },
-      error: () => {
+      error: (_payload: any, err: any) => {
         if (load !== catalogLoad) return;
+        const errData = err?.content ?? err;
+        loadError.value = raw(
+          errData?.message || errData?.error_detail || t("common.unknownError"),
+        );
+        // Rows from an earlier search (possibly another stream) would otherwise sit beside the error.
+        services.value = [];
         closePanelIfRowGone();
         isLoading.value = false;
         isSearching.value = false;

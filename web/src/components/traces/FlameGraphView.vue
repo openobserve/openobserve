@@ -27,7 +27,7 @@
       <!-- Ruler + chart: outer flex column, mousemove for cursor badge on ruler -->
       <div
         data-test="flame-graph-view-chart-wrapper"
-        class="flex min-h-0 flex-1 flex-col"
+        class="relative flex min-h-0 flex-1 flex-col"
         @mousemove="handleChartMouseMove"
         @mouseleave="cursorVisible = false"
       >
@@ -79,7 +79,13 @@
         </div>
 
         <!-- Scrollable chart area: grows to fit all rows, scrolls vertically -->
-        <div ref="chartScrollRef" class="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+        <div
+          ref="chartScrollRef"
+          data-test="flame-graph-view-chart-scroll"
+          class="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+          @mousedown="startPan"
+          @wheel="handleWheel"
+        >
           <div
             :style="{
               height: chartContentHeight + 'px',
@@ -102,6 +108,16 @@
             ></div>
           </div>
         </div>
+
+        <ChartZoomControls
+          v-if="hasData"
+          data-test-prefix="flame-graph"
+          @mouseenter="cursorVisible = false"
+          @mousemove.stop
+          @zoom-in="zoomIn"
+          @zoom-out="zoomOut"
+          @fit="fitToScreen"
+        />
       </div>
 
       <!-- Empty State -->
@@ -155,7 +171,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, nextTick, watch } from "vue";
+import { ref, computed, defineAsyncComponent, nextTick, watch, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import useResizer from "@/composables/useResizer";
@@ -165,6 +181,13 @@ import { maxOf } from "@/plugins/traces/threadView.utils";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { getContrastTextColor } from "@/utils/traces/traceColors";
 import { escapeHtml } from "@/utils/html";
+import ChartZoomControls from "@/components/traces/ChartZoomControls.vue";
+import {
+  CHART_ZOOM_STEP,
+  panRange,
+  zoomRange,
+  type ZoomRange,
+} from "@/composables/traces/useChartZoom";
 import {
   normalizeSpanEvents,
   toSpanEventMarkers,
@@ -248,6 +271,11 @@ const { value: bottomPanelHeight, onMouseDown: startResize } = useResizer({
 const chartScrollRef = ref<HTMLElement | null>(null);
 
 // Constants
+const FULL_RANGE: ZoomRange = { min: 0, max: 100 };
+const MIN_VISIBLE_SPAN = 1;
+// Same distance ECharts allows before a press stops counting as a click.
+const DRAG_THRESHOLD_PX = 4;
+const MIN_SPAN_WIDTH_PERCENT = 0.1;
 const BLOCK_PADDING = 2;
 const MIN_BLOCK_WIDTH = 1;
 const BLOCK_HEIGHT = 24;
@@ -371,6 +399,8 @@ defineExpose({ buildSpanEventMarkers, severityColor });
 const GRID_LEFT = 10;
 const GRID_RIGHT = 10;
 
+const viewRange = ref<ZoomRange>({ ...FULL_RANGE });
+
 // Computed
 const totalSpans = computed(() => props.spans.length);
 
@@ -389,11 +419,98 @@ const timelineTicks = computed(() => {
   const duration = props.traceDuration || 0;
   const totalPad = GRID_LEFT + GRID_RIGHT;
   return [0, 0.25, 0.5, 0.75, 1].map((fraction) => ({
-    label: formatDuration(duration * fraction),
+    label: formatDuration(duration * viewFractionToTrace(fraction)),
     left: `calc(${GRID_LEFT}px + ${fraction} * (100% - ${totalPad}px))`,
     transform: fraction === 1 ? "translateX(-100%) translateY(-50%)" : "translateY(-50%)",
   }));
 });
+
+function viewFractionToTrace(fraction: number): number {
+  const { min, max } = viewRange.value;
+  return (min + fraction * (max - min)) / 100;
+}
+
+const zoomIn = () => {
+  viewRange.value = zoomRange(viewRange.value, CHART_ZOOM_STEP, FULL_RANGE, MIN_VISIBLE_SPAN);
+};
+
+const zoomOut = () => {
+  viewRange.value = zoomRange(viewRange.value, 1 / CHART_ZOOM_STEP, FULL_RANGE, MIN_VISIBLE_SPAN);
+};
+
+const fitToScreen = () => {
+  viewRange.value = { ...FULL_RANGE };
+};
+
+const isZoomed = () => viewRange.value.max - viewRange.value.min < FULL_RANGE.max - FULL_RANGE.min;
+
+function pixelsToRange(px: number): number {
+  const plotWidth = (chartScrollRef.value?.clientWidth ?? 0) - GRID_LEFT - GRID_RIGHT;
+  if (plotWidth <= 0) return 0;
+  return (px / plotWidth) * (viewRange.value.max - viewRange.value.min);
+}
+
+let panStart: { clientX: number; range: ZoomRange; dragging: boolean } | null = null;
+
+const onPanMove = (event: MouseEvent) => {
+  if (!panStart) return;
+  const dx = event.clientX - panStart.clientX;
+  if (!panStart.dragging && Math.abs(dx) <= DRAG_THRESHOLD_PX) return;
+  panStart.dragging = true;
+  viewRange.value = panRange(panStart.range, -pixelsToRange(dx), FULL_RANGE);
+};
+
+const stopPan = () => {
+  panStart = null;
+  window.removeEventListener("mousemove", onPanMove);
+  window.removeEventListener("mouseup", stopPan);
+};
+
+const startPan = (event: MouseEvent) => {
+  if (event.button !== 0 || !isZoomed()) return;
+  stopPan();
+  panStart = { clientX: event.clientX, range: { ...viewRange.value }, dragging: false };
+  window.addEventListener("mousemove", onPanMove);
+  window.addEventListener("mouseup", stopPan);
+};
+
+const handleWheel = (event: WheelEvent) => {
+  const horizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY);
+  if (!isZoomed() || (!horizontal && !event.shiftKey)) return;
+  event.preventDefault();
+  const delta = horizontal ? event.deltaX : event.deltaY;
+  viewRange.value = panRange(viewRange.value, pixelsToRange(delta), FULL_RANGE);
+};
+
+const revealSpan = (spanId: string) => {
+  const span = props.spans.find((s) => s.span_id === spanId);
+  const duration = props.traceDuration;
+  if (!span || !duration) return;
+  const start = (span.startOffsetMs / duration) * 100;
+  const end = start + Math.max((span.durationMs / duration) * 100, MIN_SPAN_WIDTH_PERCENT);
+  const { min, max } = viewRange.value;
+  if (end > min && start < max) return;
+  const width = max - min;
+  const target = end - start < width ? (start + end) / 2 - width / 2 : start;
+  viewRange.value = panRange(viewRange.value, target - min, FULL_RANGE);
+};
+
+watch([() => props.spans, () => props.traceDuration], fitToScreen);
+
+onBeforeUnmount(stopPan);
+
+// Clips only at edges the zoom has cut; the unzoomed view keeps blocks that overhang the grid.
+function clipToVisibleRange(
+  x: number,
+  width: number,
+  coordSys?: { x: number; width: number },
+): { x: number; width: number } {
+  const { min, max } = viewRange.value;
+  const left = coordSys && min > FULL_RANGE.min ? Math.max(x, coordSys.x) : x;
+  const right =
+    coordSys && max < FULL_RANGE.max ? Math.min(x + width, coordSys.x + coordSys.width) : x + width;
+  return { x: left, width: right - left };
+}
 
 // Selected span lookup from spanMap
 const selectedSpan = computed(() => {
@@ -483,7 +600,7 @@ const flameGraphDataAndDepth = computed(() => {
 
     // Spans with durationPercent less than 0.1% are invisble in chart
     // Added min 0.1% durationPercent
-    if (durationPercent < 0.1) durationPercent = 0.1;
+    if (durationPercent < MIN_SPAN_WIDTH_PERCENT) durationPercent = MIN_SPAN_WIDTH_PERCENT;
 
     const visualRow = rowMap.get(span.span_id) ?? span.depth;
     const isSelected = span.span_id === props.selectedSpanId;
@@ -572,8 +689,8 @@ const chartOptions = computed(() => {
     },
     xAxis: {
       type: "value",
-      min: 0,
-      max: 100,
+      min: viewRange.value.min,
+      max: viewRange.value.max,
       show: false,
     },
     yAxis: {
@@ -594,9 +711,13 @@ const chartOptions = computed(() => {
           const point1 = api.coord([startX, 0]);
           const point2 = api.coord([startX + width, 0]);
 
-          const x = point1[0];
+          const fullX = point1[0];
           const y = ROW_ORIGIN_Y + depth * (BLOCK_HEIGHT + BLOCK_PADDING);
-          const rectWidth = point2[0] - point1[0];
+          const fullWidth = Math.max(point2[0] - point1[0], MIN_BLOCK_WIDTH);
+
+          // The series is not clipped (markers overhang the grid), so cut blocks at a zoomed-in edge by hand.
+          const { x, width: rectWidth } = clipToVisibleRange(fullX, fullWidth, params.coordSys);
+          if (rectWidth <= 0) return null;
 
           const blockWidth = Math.max(rectWidth, MIN_BLOCK_WIDTH);
           const span = data[params.dataIndex].spanData;
@@ -605,22 +726,27 @@ const chartOptions = computed(() => {
           // coordinate system and cannot drift from it. They are `silent` —
           // hover and click stay on the block, and per-event precision lives in
           // the sidebar mini-timeline.
-          const markerShapes = buildSpanEventMarkers(span, blockWidth).map((marker) => ({
-            type: "rect",
-            shape: {
-              x: x + (marker.isFlag ? 0 : (blockWidth * marker.left) / 100),
-              y: y - MARKER_OVERHANG_PX,
-              // 3px matches the DOM surfaces' `w-0.75` tick. The flag is wider
-              // so it stays distinguishable from a positioned marker.
-              width: marker.isFlag ? MARKER_FLAG_WIDTH_PX : MARKER_WIDTH_PX,
-              height: BLOCK_HEIGHT + 2 * MARKER_OVERHANG_PX,
-              r: 1,
-            },
-            style: {
-              fill: severityColor(marker.severity),
-            },
-            silent: true,
-          }));
+          const markerShapes = buildSpanEventMarkers(span, fullWidth)
+            .map((marker) => ({
+              marker,
+              markerX: marker.isFlag ? x : fullX + (fullWidth * marker.left) / 100,
+            }))
+            .filter(({ markerX }) => markerX >= x && markerX <= x + blockWidth)
+            .map(({ marker, markerX }) => ({
+              type: "rect",
+              shape: {
+                x: markerX,
+                y: y - MARKER_OVERHANG_PX,
+                // 3px matches the DOM surfaces' `w-0.75` tick; the wider flag stays distinct from a positioned marker.
+                width: marker.isFlag ? MARKER_FLAG_WIDTH_PX : MARKER_WIDTH_PX,
+                height: BLOCK_HEIGHT + 2 * MARKER_OVERHANG_PX,
+                r: 1,
+              },
+              style: {
+                fill: severityColor(marker.severity),
+              },
+              silent: true,
+            }));
 
           const spanRect = {
             type: "rect",
@@ -699,7 +825,7 @@ const handleChartMouseMove = (event: any) => {
   const fraction = Math.max(0, Math.min(1, (offsetX - GRID_LEFT) / gridWidth));
 
   cursorX.value = offsetX;
-  cursorTimeLabel.value = formatDuration(fraction * props.traceDuration);
+  cursorTimeLabel.value = formatDuration(viewFractionToTrace(fraction) * props.traceDuration);
   cursorVisible.value = true;
 };
 
@@ -738,7 +864,9 @@ watch(
   (newVal) => {
     if (!newVal) {
       sidebarVisible.value = false;
+      return;
     }
+    revealSpan(newVal);
   },
 );
 
