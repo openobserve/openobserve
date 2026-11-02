@@ -3330,6 +3330,7 @@ export class LogsPage {
         try {
             await this.page.waitForFunction(
                 () => document.querySelector('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]') !== null,
+                undefined,
                 { timeout },
             );
             return true;
@@ -6219,7 +6220,7 @@ export class LogsPage {
         this._queryTriggerTime = Date.now();
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
         try {
-            await this.page.waitForFunction(() => true, { timeout: 1 }).catch(() => {});
+            await this.page.waitForFunction(() => true, undefined, { timeout: 1 }).catch(() => {});
             await expect.poll(() => sawHistogram && sawSearch, { timeout: 15000, intervals: [200] }).toBe(true);
         } catch {
             // Fall through — verifyAPICallCounts will assert the failure with full context.
@@ -11195,7 +11196,7 @@ export class LogsPage {
                     }
                 }
                 return null;
-            }, { timeout });
+            }, undefined, { timeout });
 
             const chartType = await result.jsonValue();
             if (chartType) {
@@ -11650,7 +11651,7 @@ export class LogsPage {
             const widget = document.querySelector('.monaco-editor .suggest-widget');
             if (!widget) return false;
             return widget.classList.contains('visible') || widget.classList.contains('focused');
-        }, { timeout });
+        }, undefined, { timeout });
         testLogger.info('Suggestion widget became visible');
     }
 
@@ -12081,7 +12082,7 @@ export class LogsPage {
             return el.getAttribute('title') !== 'Cancel query'
                 && el.getAttribute('aria-busy') !== 'true'
                 && !el.hasAttribute('disabled');
-        }, { timeout: 30000 }).catch(() => {});
+        }, undefined, { timeout: 30000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
     }
 
@@ -12449,7 +12450,7 @@ export class LogsPage {
             } catch {
                 return false;
             }
-        }, { timeout }).catch(() => {
+        }, undefined, { timeout }).catch(() => {
             testLogger.warn('streamKeywords hydration not observed — autocomplete may still work via cached state');
         });
     }
@@ -12483,7 +12484,7 @@ export class LogsPage {
             } catch {
                 return false;
             }
-        }, { timeout }).catch(() => {
+        }, undefined, { timeout }).catch(() => {
             testLogger.warn('field keywords hydration not observed — field suggestions may be absent');
         });
     }

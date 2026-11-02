@@ -52,6 +52,7 @@ export async function selectStreamFromDropdown(page, streamNameOrVar) {
   const hasOptions = await page
     .waitForFunction(
       () => document.querySelectorAll('[data-test$="-option"]').length > 0,
+      undefined,
       { timeout: isVariable ? 8000 : 10000, polling: 100 }
     )
     .then(() => true)
@@ -118,6 +119,7 @@ export async function selectFieldFromDropdown(page, fieldNameOrVar) {
   const hasOptions = await page
     .waitForFunction(
       () => document.querySelectorAll('[data-test$="-option"]').length > 0,
+      undefined,
       { timeout: isVariable ? 5000 : 10000, polling: 100 }
     )
     .then(() => true)
@@ -198,6 +200,7 @@ export async function verifyDropdownContainsVariable(page, dropdownSelector, var
   const hasOptions = await page
     .waitForFunction(
       () => document.querySelectorAll('[data-test$="-option"]').length > 0,
+      undefined,
       { timeout: 10000, polling: 100 }
     )
     .then(() => true)
@@ -310,6 +313,7 @@ export async function getDropdownOptions(page, dropdownSelector) {
 
   await page.waitForFunction(
     () => document.querySelectorAll('[data-test$="-option"]').length > 0,
+    undefined,
     { timeout: 10000, polling: 100 }
   ).catch(() => {});
 

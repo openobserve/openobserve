@@ -352,7 +352,7 @@ export default class DashboardactionPage {
       const applyBtn = document.querySelector('[data-test="dashboard-apply"]');
       if (!applyBtn) return false;
       return !applyBtn.disabled;
-    }, { timeout: 30000 });
+    }, undefined, { timeout: 30000 });
   }
 
   // The apply button stays enabled for ~100ms after the click, so waitForChartToRender alone can pass before the query starts and the table later resets to empty.
@@ -621,6 +621,7 @@ export default class DashboardactionPage {
             cell.offsetParent !== null && cell.textContent.trim().length > 0,
         );
       },
+      undefined,
       { timeout },
     );
   }

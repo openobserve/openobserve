@@ -197,6 +197,7 @@ export default class DashboardMaxQueryRange {
         if (!refresh) return false;
         return !refresh.disabled && refresh.getAttribute("aria-disabled") !== "true";
       },
+      undefined,
       { timeout }
     );
   }

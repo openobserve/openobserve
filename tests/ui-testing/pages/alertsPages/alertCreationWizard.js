@@ -1346,7 +1346,7 @@ export class AlertCreationWizard {
         await this.page.waitForFunction(() => {
             const drawer = document.querySelector('[data-test="query-editor-dialog"]');
             return !drawer || drawer.getAttribute('data-state') === 'closed';
-        }, { timeout: 10000 }).catch(() => {
+        }, undefined, { timeout: 10000 }).catch(() => {
             testLogger.warn('ODrawer still open after back button, trying Escape key');
         });
         // Step 3: Press Escape as additional cleanup

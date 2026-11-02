@@ -559,7 +559,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForFunction(() => {
             const w = /** @type {any} */ (window);
             return !!(w.monaco && w.monaco.editor && w.monaco.editor.getEditors && w.monaco.editor.getEditors().length > 0);
-        }, { timeout: 15000 }).catch(() => {});
+        }, undefined, { timeout: 15000 }).catch(() => {});
 
         // Ensure DOM is stable after editor initialization
         await this.page.waitForLoadState('domcontentloaded');
