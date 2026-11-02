@@ -94,6 +94,7 @@ use crate::{
         openobserve_api_search::promql::remote_write,
         openobserve_api_search::promql::query_get,
         openobserve_api_search::promql::query_range_get,
+        openobserve_api_search::promql::query_exemplars_get,
         openobserve_api_search::promql::metadata,
         openobserve_api_search::promql::series_get,
         openobserve_api_search::promql::labels_get,
@@ -1707,6 +1708,19 @@ mod tests {
                     "{path} {status}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn promql_exemplars_is_published_with_its_error_codes() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/prometheus/api/v1/query_exemplars"]["get"];
+        assert_eq!(op["operationId"], "PrometheusQueryExemplars");
+        for status in ["200", "400", "403", "429", "500"] {
+            assert!(
+                op["responses"].get(status).is_some(),
+                "query_exemplars {status}"
+            );
         }
     }
 

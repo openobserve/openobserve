@@ -135,7 +135,7 @@ pub async fn remote_write(
         })),
         (status = 400, description = "Invalid query or time", content_type = "application/json", body = ()),
         (status = 403, description = "No permission on the metric stream", content_type = "application/json", body = ()),
-        (status = 429, description = "Rate limit exceeded", content_type = "application/json", body = ()),
+        (status = 429, description = "Search disabled after exceeding the licensed ingestion limit, or rate limited", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -310,7 +310,7 @@ async fn query(
         })),
         (status = 400, description = "Invalid query, time range, step or search type", content_type = "application/json", body = ()),
         (status = 403, description = "No permission on the metric stream", content_type = "application/json", body = ()),
-        (status = 429, description = "Rate limit exceeded", content_type = "application/json", body = ()),
+        (status = 429, description = "Search disabled after exceeding the licensed ingestion limit, or rate limited", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -407,7 +407,7 @@ pub async fn query_range_post(
         })),
         (status = 400, description = "Invalid query, time range, step or search type", content_type = "application/json", body = ()),
         (status = 403, description = "No permission on the metric stream", content_type = "application/json", body = ()),
-        (status = 429, description = "Rate limit exceeded", content_type = "application/json", body = ()),
+        (status = 429, description = "Search disabled after exceeding the licensed ingestion limit, or rate limited", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -753,7 +753,7 @@ pub async fn metadata(
         })),
         (status = 400, description = "Invalid match[] or time range", content_type = "application/json", body = ()),
         (status = 403, description = "No permission on the metric stream", content_type = "application/json", body = ()),
-        (status = 429, description = "Rate limit exceeded", content_type = "application/json", body = ()),
+        (status = 429, description = "Search disabled after exceeding the licensed ingestion limit, or rate limited", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
