@@ -103,7 +103,7 @@ export const ALERT_SETTING_TIERS: readonly AlertSettingTierDef[] = [
     nameKey: "alerts.tiers.names.rowTemplate",
   },
   { id: "priority", section: "details", tier: "tucked", nameKey: "alerts.tiers.names.priority" },
-  { id: "tags", section: "details", tier: "tucked", nameKey: "alerts.tiers.names.tags" },
+  { id: "tags", section: "details", tier: "shown", nameKey: "alerts.tiers.names.tags" },
 ];
 
 export interface AlertTierState {

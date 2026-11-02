@@ -50,12 +50,12 @@ describe("useAlertSettingTiers", () => {
   it("keeps a setting that gained a value during the session", async () => {
     const set = reactive<Partial<Record<AlertSettingId, boolean>>>({});
     const api = host(set);
-    expect(api().isVisible("tags")).toBe(false);
-    set.tags = true;
+    expect(api().isVisible("priority")).toBe(false);
+    set.priority = true;
     await nextTick();
-    set.tags = false;
+    set.priority = false;
     await nextTick();
-    expect(api().isVisible("tags")).toBe(true);
+    expect(api().isVisible("priority")).toBe(true);
   });
 
   it("still hides an unset setting that was never shown", async () => {
