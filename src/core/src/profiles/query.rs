@@ -21,6 +21,10 @@ use std::{
     collections::{BinaryHeap, HashMap, HashSet},
 };
 
+pub use config::meta::profiles::{
+    EXCLUDED_TAG_DISCOVERY_KEYS, INSTANCE_KEY_COLUMNS, META_DIMENSION_COLUMNS,
+    PROFILE_DURATION_COLUMN,
+};
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_MAX_NODES: usize = 2048;
@@ -34,15 +38,6 @@ pub const ROOT_NODE_NAME: &str = "total";
 /// Synthetic frame for ancestors dropped when a stack exceeds [`MAX_STACK_DEPTH`].
 pub const TRUNCATED_ANCESTORS_NAME: &str = "[truncated]";
 
-/// Profiled time of one OTLP Profile, on one row per (profile, instance) so sums count it once.
-pub const PROFILE_DURATION_COLUMN: &str = "profile_duration_nanos";
-/// Columns that identify one profiled process; profiled time is tracked per this identity.
-pub const INSTANCE_KEY_COLUMNS: &[&str] = &[
-    "service_name",
-    "service_instance_id",
-    "host_name",
-    "process_pid",
-];
 /// Columns constant within one process; filters on other columns can drop the profiled-time row.
 pub const PROCESS_LEVEL_COLUMNS: &[&str] = &[
     "service_name",
@@ -59,42 +54,6 @@ pub const PROCESS_LEVEL_COLUMNS: &[&str] = &[
     "k8s_pod_name",
     "k8s_container_name",
     "otel_scope_name",
-];
-
-/// Top-bar dimensions from `/profiles/meta`; not Tags Filter keys.
-pub const META_DIMENSION_COLUMNS: &[&str] = &["otel_scope_name", "service_name", "profile_type"];
-
-/// Internal / measurement columns that must not become Tags Filter keys.
-pub const EXCLUDED_TAG_DISCOVERY_KEYS: &[&str] = &[
-    "_timestamp",
-    "stack",
-    "value",
-    "tags",
-    "sample_tags",
-    "event_id",
-    "extractor_version",
-    "frame_count",
-    "duration_nanos",
-    PROFILE_DURATION_COLUMN,
-    "period",
-    "period_nanos",
-    "period_type",
-    "period_unit",
-    "profile_id",
-    "profile_unit",
-    "otel_scope_version",
-    // Payload / summary columns (not business tags).
-    "bytes",
-    "profile_blob",
-    "profile_encoding",
-    "has_original_payload",
-    "has_trace_link",
-    "original_payload_format",
-    "original_payload_size",
-    "sample_count",
-    "sample_value_count",
-    "sample_value_sum",
-    "linked_sample_count",
 ];
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]

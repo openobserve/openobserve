@@ -968,6 +968,9 @@ pub fn check_schema_for_defined_schema_fields(
                 }
             }
         }
+        StreamType::Profiles => {
+            fields.extend(config::meta::profiles::uds_required_columns().map(str::to_string));
+        }
         _ => {}
     }
     fields
@@ -1315,6 +1318,74 @@ mod tests {
         assert!(result.contains("llm_model"));
         // "other_field" has no gen_ai_ or llm_ prefix → not auto-included
         assert!(!result.contains("other_field"));
+    }
+
+    #[test]
+    fn test_check_schema_for_defined_schema_fields_profiles_keeps_query_columns() {
+        let schema = Schema::new(vec![] as Vec<Field>);
+        let input = vec!["k8s_pod_name".to_string()];
+        let result = check_schema_for_defined_schema_fields(StreamType::Profiles, &schema, input);
+        for field in [
+            "k8s_pod_name",
+            "stack",
+            "value",
+            "profile_type",
+            "profile_unit",
+            "period_type",
+            "period_unit",
+            "service_name",
+            "otel_scope_name",
+            "span_id",
+            "event_id",
+            "profile_id",
+            "host_name",
+            "process_pid",
+            "profile_duration_nanos",
+        ] {
+            assert!(result.contains(field), "missing {field}");
+        }
+        assert!(!result.contains(TIMESTAMP_COL_NAME));
+    }
+
+    #[test]
+    fn test_generate_schema_for_defined_schema_fields_profiles_keeps_query_columns() {
+        let mut fields = vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("stack", DataType::Utf8, true),
+            Field::new("value", DataType::Int64, true),
+            Field::new("profile_type", DataType::Utf8, true),
+            Field::new("service_name", DataType::Utf8, true),
+            Field::new("k8s_pod_name", DataType::Utf8, true),
+        ];
+        fields.extend((0..20).map(|i| Field::new(format!("attr{i}"), DataType::Utf8, true)));
+        let schema = SchemaCache::new(Schema::new(fields));
+
+        let result = generate_schema_for_defined_schema_fields(
+            StreamType::Profiles,
+            &schema,
+            &["k8s_pod_name".to_string()],
+            false,
+            false,
+            false,
+        );
+        let names = result
+            .schema()
+            .fields()
+            .iter()
+            .map(|field| field.name().as_str())
+            .collect::<HashSet<_>>();
+
+        for field in [
+            TIMESTAMP_COL_NAME,
+            "stack",
+            "value",
+            "profile_type",
+            "service_name",
+            "k8s_pod_name",
+        ] {
+            assert!(names.contains(field), "missing {field}");
+        }
+        assert!(!names.contains("attr0"));
     }
 
     #[tokio::test]

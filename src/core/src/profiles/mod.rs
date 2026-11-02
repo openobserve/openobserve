@@ -29,7 +29,10 @@ use axum::{http, response::Response as HttpResponse};
 use bytes::Bytes;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
-    meta::{otlp::OtlpRequestType, self_reporting::usage::UsageType, stream::StreamType},
+    meta::{
+        otlp::OtlpRequestType, profiles::uds_write_columns, self_reporting::usage::UsageType,
+        stream::StreamType,
+    },
     metrics,
     utils::{
         json,
@@ -61,7 +64,7 @@ use crate::{
     },
     ingestion::{
         check_ingestion_allowed, get_stream_partition_keys, get_thread_id, get_write_partition_key,
-        write_file,
+        refactor_map, write_file,
     },
 };
 
@@ -341,6 +344,7 @@ pub async fn handle_otlp_request(
 
     #[cfg(feature = "vectorscan")]
     apply_redaction(org_id, &stream_name, &mut all_records).await;
+    let all_records = apply_user_defined_schema(org_id, &stream_name, all_records).await;
 
     if !all_records.is_empty() {
         buffer_records(
@@ -498,6 +502,27 @@ fn new_stream_schema(
         schema.fields().len(),
     )?;
     Ok(schema)
+}
+
+/// Packs columns outside the stream's user-defined schema into `_all`.
+async fn apply_user_defined_schema(
+    org_id: &str,
+    stream_name: &str,
+    records: Vec<json::Map<String, json::Value>>,
+) -> Vec<json::Map<String, json::Value>> {
+    let Some(settings) =
+        infra::schema::get_settings(org_id, stream_name, StreamType::Profiles).await
+    else {
+        return records;
+    };
+    if settings.defined_schema_fields.is_empty() {
+        return records;
+    }
+    let fields = uds_write_columns(&settings.defined_schema_fields);
+    records
+        .into_iter()
+        .map(|record| refactor_map(record, &fields))
+        .collect()
 }
 
 /// Redacts flattened profile records before they are buffered for the WAL.
@@ -2784,5 +2809,40 @@ mod tests {
                 .unwrap()
                 .contains("rejected")
         );
+    }
+
+    #[test]
+    fn user_defined_schema_keeps_query_columns_and_packs_the_rest() {
+        let fields = uds_write_columns(&["k8s_pod_name".to_string()]);
+        let record = json::json!({
+            "_timestamp": 1,
+            "stack": "a;b",
+            "value": 3,
+            "profile_type": "cpu",
+            "service_name": "svc",
+            "span_id": "0102030405060708",
+            "k8s_pod_name": "pod-1",
+            "k8s_node_name": "node-1",
+        });
+        let json::Value::Object(record) = record else {
+            unreachable!()
+        };
+
+        let record = refactor_map(record, &fields);
+
+        for key in [
+            "_timestamp",
+            "stack",
+            "value",
+            "profile_type",
+            "service_name",
+            "span_id",
+            "k8s_pod_name",
+        ] {
+            assert!(record.contains_key(key), "missing {key}");
+        }
+        assert!(!record.contains_key("k8s_node_name"));
+        let all = record[&get_config().common.column_all].as_str().unwrap();
+        assert!(all.contains("node-1"));
     }
 }
