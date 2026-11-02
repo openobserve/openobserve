@@ -17,7 +17,7 @@
 
 use std::{
     collections::{BTreeSet, HashMap},
-    sync::{Arc, LazyLock},
+    sync::Arc,
     time::Duration,
 };
 
@@ -32,7 +32,6 @@ use config::{
         triggers::{Trigger, TriggerModule},
     },
 };
-use dashmap::DashSet;
 use infra::errors::{DbError, Error as InfraError};
 use o2_enterprise::enterprise::autoobserve::{
     contract::DAY_US,
@@ -58,9 +57,6 @@ const STREAM_TYPES: [StreamType; 6] = [
 const META_RETENTION_DAYS: i64 = 35;
 /// Every engine read filters one `org_id`, so it opens one bucket of files, not every org's.
 const ORG_BUCKETS: u64 = 32;
-
-/// The `_meta` streams whose retention this node has already checked.
-static RETENTION_CHECKED: LazyLock<DashSet<String>> = LazyLock::new(DashSet::new);
 
 pub struct SearchAdapter;
 
@@ -156,13 +152,8 @@ impl StreamSinkPort for MetaSink {
         }
         let params = StreamParams::new(META_ORG_ID, stream, StreamType::Logs);
         crate::self_reporting::ingest_internal_logs(rows, params).await?;
-        if !RETENTION_CHECKED.contains(stream) {
-            match bound_retention(stream).await {
-                Ok(()) => {
-                    RETENTION_CHECKED.insert(stream.to_string());
-                }
-                Err(e) => log::warn!("[autoobserve] setting {stream} retention failed: {e}"),
-            }
+        if let Err(e) = keep_bounded(stream, bound_retention).await {
+            log::warn!("[autoobserve] setting {stream} retention failed: {e}");
         }
         Ok(())
     }
@@ -371,6 +362,20 @@ fn engine_settings(settings: &mut StreamSettings) -> bool {
             .push(StreamPartition::new_hash("org_id", ORG_BUCKETS));
     }
     retention || partition
+}
+
+/// The settings cache decides, not a node-local flag: deleting a stream drops its settings.
+async fn keep_bounded<'a, F, Fut>(stream: &'a str, bound: F) -> anyhow::Result<()>
+where
+    F: FnOnce(&'a str) -> Fut,
+    Fut: Future<Output = anyhow::Result<()>>,
+{
+    let key = format!("{META_ORG_ID}/{}/{stream}", StreamType::Logs);
+    let cached = infra::schema::get_stream_settings_atomic(&key);
+    if cached.is_some_and(|s| !engine_settings(&mut (*s).clone())) {
+        return Ok(());
+    }
+    bound(stream).await
 }
 
 /// After a write, so the stream exists; `save_stream_settings` refuses a stream that does not.
@@ -753,5 +758,39 @@ mod tests {
     #[test]
     fn the_ports_leave_investigations_unwired() {
         assert!(ports().investigation.is_none());
+    }
+
+    /// Deleting a stream drops its cached settings, so the re-created stream is bounded again.
+    #[tokio::test]
+    async fn a_recreated_engine_stream_is_bounded_again() {
+        use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
+        let stream = "autoobserve_f5_recreated";
+        let key = format!("{META_ORG_ID}/{}/{stream}", StreamType::Logs);
+        let calls = AtomicUsize::new(0);
+        let bound = |_: &str| {
+            calls.fetch_add(1, SeqCst);
+            let key = key.clone();
+            async move {
+                let mut settings = StreamSettings::default();
+                engine_settings(&mut settings);
+                infra::schema::put_stream_settings(key, Arc::new(settings)).await;
+                anyhow::Ok(())
+            }
+        };
+        keep_bounded(stream, bound).await.unwrap();
+        keep_bounded(stream, bound).await.unwrap();
+        assert_eq!(calls.load(SeqCst), 1, "a bounded stream is not saved again");
+        infra::schema::remove_stream_settings(&key).await;
+        keep_bounded(stream, bound).await.unwrap();
+        assert_eq!(
+            calls.load(SeqCst),
+            2,
+            "the re-created stream was never bounded"
+        );
+        let defaults = Arc::new(StreamSettings::default());
+        infra::schema::put_stream_settings(key.clone(), defaults).await;
+        keep_bounded(stream, bound).await.unwrap();
+        assert_eq!(calls.load(SeqCst), 3, "re-created with default settings");
+        infra::schema::remove_stream_settings(&key).await;
     }
 }
