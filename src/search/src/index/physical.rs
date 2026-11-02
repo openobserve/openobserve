@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::meta::inverted_index::UNKNOWN_NAME;
+use config::{meta::inverted_index::UNKNOWN_NAME, tantivy::tokenizer::o2_token_length_limits};
 use datafusion::{
     arrow::datatypes::DataType,
     config::ConfigOptions,
@@ -181,6 +181,19 @@ pub(super) fn create_str_match_expr(
     Ok(udf_expr)
 }
 
+/// Returns `x` of a `%x%` LIKE pattern when `x` holds no LIKE wildcard or escape.
+pub(crate) fn like_substring(pattern: &str) -> Option<&str> {
+    let term = pattern.strip_prefix('%')?.strip_suffix('%')?;
+    (!term.is_empty() && !term.contains(['%', '_', '\\'])).then_some(term)
+}
+
+/// Returns `x` of a `%x%` LIKE pattern when `x` is one alphanumeric token the tokenizer indexes.
+pub(crate) fn like_contains_term(pattern: &str) -> Option<&str> {
+    let term = like_substring(pattern)?;
+    let (min_len, max_len) = o2_token_length_limits();
+    (is_alphanumeric(term) && (min_len..max_len).contains(&term.len())).then_some(term)
+}
+
 pub(super) fn is_alphanumeric(s: &str) -> bool {
     s.chars().all(|c| c.is_ascii_alphanumeric())
 }
@@ -200,6 +213,41 @@ mod tests {
         assert!(is_alphanumeric("123abc"));
         assert!(!is_alphanumeric("123 abc"));
         assert!(!is_alphanumeric("123 abc 123"));
+    }
+
+    #[test]
+    fn test_like_substring() {
+        assert_eq!(like_substring("%auth-gw%"), Some("auth-gw"));
+        assert_eq!(like_substring("%a%"), Some("a"));
+        assert_eq!(like_substring("%a b/é%"), Some("a b/é"));
+        assert_eq!(like_substring("%%"), None);
+        assert_eq!(like_substring("%"), None);
+        assert_eq!(like_substring("auth%"), None);
+        assert_eq!(like_substring("%auth"), None);
+        assert_eq!(like_substring("%au_th%"), None);
+        assert_eq!(like_substring("%au%th%"), None);
+        assert_eq!(like_substring(r"%au\%th%"), None);
+    }
+
+    #[test]
+    fn test_like_contains_term() {
+        assert_eq!(like_contains_term("%error%"), Some("error"));
+        assert_eq!(like_contains_term("%Err42%"), Some("Err42"));
+        assert_eq!(
+            like_contains_term(&format!("%{}%", "a".repeat(63))).map(str::len),
+            Some(63)
+        );
+        assert_eq!(like_contains_term(&format!("%{}%", "a".repeat(64))), None);
+        assert_eq!(like_contains_term("%e%"), None);
+        assert_eq!(like_contains_term("%%"), None);
+        assert_eq!(like_contains_term("%"), None);
+        assert_eq!(like_contains_term("error%"), None);
+        assert_eq!(like_contains_term("%error"), None);
+        assert_eq!(like_contains_term("error"), None);
+        assert_eq!(like_contains_term("%err_or%"), None);
+        assert_eq!(like_contains_term("%err or%"), None);
+        assert_eq!(like_contains_term("%err%or%"), None);
+        assert_eq!(like_contains_term("%erré%"), None);
     }
 
     #[test]

@@ -262,23 +262,19 @@ pub fn generate_physical_optimizer_rules(
     }
 
     // should after remote scan
-    let mut index_fields: HashMap<TableReference, HashSet<String>> = HashMap::new();
-    for (stream_name, schema) in sql.schemas.iter() {
-        let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
-        let idx_fields = get_stream_setting_index_fields(&stream_settings, sql.stream_type);
-        let idx_fields = idx_fields
-            .into_iter()
-            .filter_map(|index_field| {
-                if schema.contains_field(&index_field) {
-                    Some(index_field)
-                } else {
-                    None
-                }
-            })
-            .collect::<HashSet<_>>();
-        index_fields.insert(stream_name.clone(), idx_fields);
+    if sql.use_inverted_index(req) {
+        let mut index_fields: HashMap<TableReference, HashSet<String>> = HashMap::new();
+        for (stream_name, schema) in sql.schemas.iter() {
+            let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
+            let idx_fields = get_stream_setting_index_fields(&stream_settings, sql.stream_type);
+            let idx_fields = idx_fields
+                .into_iter()
+                .filter(|index_field| schema.contains_field(index_field))
+                .collect::<HashSet<_>>();
+            index_fields.insert(stream_name.clone(), idx_fields);
+        }
+        rules.push(Arc::new(LeaderIndexOptimizerRule::new(index_fields)));
     }
-    rules.push(Arc::new(LeaderIndexOptimizerRule::new(index_fields)));
 
     rules.push(Arc::new(LimitPushdown::new()));
 
@@ -394,6 +390,7 @@ mod tests {
             timezone: None,
             sorted_by_time: false,
             sampling_config: None,
+            no_index_hint: false,
         }
     }
 
@@ -659,6 +656,26 @@ mod tests {
             "DataFusion's default physical rules changed; review the order in generate_physical_optimizer_rules"
         );
         assert_eq!(rules[upstream.len()].name(), "JoinReorderRule");
+    }
+
+    #[test]
+    fn test_leader_index_rule_follows_use_inverted_index() {
+        let has_leader_index_rule = |req: &Request, sql: &Sql| {
+            generate_physical_optimizer_rules(req, sql, vec![])
+                .iter()
+                .any(|rule| rule.name() == "LeaderIndexOptimizerRule")
+        };
+        let no_index_req = Request {
+            use_inverted_index: false,
+            ..Default::default()
+        };
+        let hinted_sql = Sql {
+            no_index_hint: true,
+            ..test_sql()
+        };
+        assert!(has_leader_index_rule(&Request::default(), &test_sql()));
+        assert!(!has_leader_index_rule(&no_index_req, &test_sql()));
+        assert!(!has_leader_index_rule(&Request::default(), &hinted_sql));
     }
 
     #[tokio::test]

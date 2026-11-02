@@ -25,6 +25,7 @@ pub use condition::Condition;
 use datafusion::{arrow::datatypes::SchemaRef, physical_plan::PhysicalExpr};
 use hashbrown::HashSet;
 use physical::conjunction;
+pub(crate) use physical::{like_contains_term, like_substring};
 use tantivy::{
     query::{BooleanQuery, Occur, Query},
     schema::{Field, Schema},
@@ -155,6 +156,17 @@ impl IndexCondition {
             .all(|condition| condition.can_remove_filter())
     }
 
+    /// Drops the conditions the plan keeps in its own filter; None when nothing is left.
+    pub fn without_required_filters(&self) -> Option<IndexCondition> {
+        let conditions: Vec<_> = self
+            .conditions
+            .iter()
+            .filter(|condition| !condition.requires_filter())
+            .cloned()
+            .collect();
+        (!conditions.is_empty()).then_some(IndexCondition { conditions })
+    }
+
     // use for simple distinct optimization
     pub fn get_str_match_condition(&self) -> Option<(String, bool)> {
         match &self.conditions[0] {
@@ -265,5 +277,28 @@ mod tests {
 
         index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
         assert!(!index_condition.is_condition_all());
+    }
+
+    #[test]
+    fn test_index_condition_without_required_filters() {
+        let fts_like = Condition::Like {
+            field: "message".to_string(),
+            value: "error".to_string(),
+            case_insensitive: false,
+        };
+        let exact = Condition::Equal("service".to_string(), "a".to_string());
+        let index_condition = IndexCondition {
+            conditions: vec![exact.clone(), fts_like.clone()],
+        };
+        assert_eq!(
+            index_condition.without_required_filters(),
+            Some(IndexCondition {
+                conditions: vec![exact]
+            })
+        );
+        let only_fts = IndexCondition {
+            conditions: vec![fts_like],
+        };
+        assert_eq!(only_fts.without_required_filters(), None);
     }
 }

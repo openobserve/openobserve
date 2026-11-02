@@ -37,7 +37,7 @@ use infra::{
 use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
 use sqlparser::{
-    ast::{Statement, VisitMut},
+    ast::{SetExpr, Statement, VisitMut},
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
@@ -89,6 +89,7 @@ pub struct Sql {
     pub timezone: Option<String>,
     pub sorted_by_time: bool, // if only order by _timestamp
     pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
+    pub no_index_hint: bool, // `SELECT /*+ NO_INDEX */`, skip the inverted index for the query
 }
 
 impl Sql {
@@ -329,6 +330,7 @@ impl Sql {
         let final_schemas = finalize_schemas(&used_schemas);
 
         let is_complex = is_complex_query_stmt(&statement);
+        let no_index_hint = has_no_index_hint(&statement);
 
         Ok(Sql {
             sql: statement.to_string(),
@@ -355,7 +357,13 @@ impl Sql {
                 (query.start_time, query.end_time),
                 extract_patterns,
             ),
+            no_index_hint,
         })
+    }
+
+    /// The request flag and the SQL hint both have to allow the inverted index.
+    pub fn use_inverted_index(&self, req: &Request) -> bool {
+        req.use_inverted_index && !self.no_index_hint
     }
 
     pub fn get_first_stream_key(&self) -> String {
@@ -404,6 +412,27 @@ fn is_read_only_sql_statement(statement: &Statement) -> bool {
     match statement {
         Statement::Query(_) => true,
         Statement::Explain { statement, .. } => is_read_only_sql_statement(statement),
+        _ => false,
+    }
+}
+
+fn has_no_index_hint(statement: &Statement) -> bool {
+    match statement {
+        Statement::Query(query) => set_expr_has_no_index_hint(&query.body),
+        Statement::Explain { statement, .. } => has_no_index_hint(statement),
+        _ => false,
+    }
+}
+
+fn set_expr_has_no_index_hint(body: &SetExpr) -> bool {
+    match body {
+        SetExpr::Select(select) => select.optimizer_hints.iter().any(|hint| {
+            hint.prefix.is_empty() && hint.text.trim().eq_ignore_ascii_case("NO_INDEX")
+        }),
+        SetExpr::Query(query) => set_expr_has_no_index_hint(&query.body),
+        SetExpr::SetOperation { left, right, .. } => {
+            set_expr_has_no_index_hint(left) || set_expr_has_no_index_hint(right)
+        }
         _ => false,
     }
 }
@@ -562,5 +591,45 @@ mod tests {
         let query = SearchQuery::default();
         let result = parse_sampling_config(&query, None, (0, 0), false);
         assert!(result.is_none());
+    }
+
+    fn parse_no_index_hint(sql: &str) -> bool {
+        let statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        has_no_index_hint(&statement)
+    }
+
+    #[test]
+    fn test_has_no_index_hint() {
+        assert!(parse_no_index_hint("SELECT /*+ NO_INDEX */ * FROM t"));
+        assert!(parse_no_index_hint("select /*+no_index*/ count(*) from t"));
+        assert!(parse_no_index_hint("SELECT --+ NO_INDEX\n * FROM t"));
+        assert!(parse_no_index_hint(
+            "SELECT /*+ NO_INDEX */ a FROM t UNION ALL SELECT a FROM t2"
+        ));
+        assert!(parse_no_index_hint(
+            "WITH c AS (SELECT a FROM t) SELECT /*+ NO_INDEX */ a FROM c"
+        ));
+        assert!(parse_no_index_hint(
+            "EXPLAIN SELECT /*+ NO_INDEX */ * FROM t"
+        ));
+        assert!(!parse_no_index_hint("SELECT * FROM t"));
+        assert!(!parse_no_index_hint("SELECT /* NO_INDEX */ * FROM t"));
+        assert!(!parse_no_index_hint("SELECT /*+ NO_INDEX(t) */ * FROM t"));
+        assert!(!parse_no_index_hint("SELECT /*+ OTHER_HINT */ * FROM t"));
+        assert!(!parse_no_index_hint("SELECT /*abc+ NO_INDEX */ * FROM t"));
+        assert!(!parse_no_index_hint("SELECT * FROM t /*+ NO_INDEX */"));
+    }
+
+    #[test]
+    fn test_no_index_hint_survives_rewrite() {
+        let sql = "SELECT /*+ NO_INDEX */ * FROM t";
+        let statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(parse_no_index_hint(&statement.to_string()));
     }
 }

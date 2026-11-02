@@ -25,6 +25,7 @@ use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use hashbrown::HashSet;
 use infra::errors::Error;
 use parking_lot::Mutex;
+use proto::cluster_rpc::IndexInfo;
 
 use super::scan::StreamSearchSettings;
 use crate::{
@@ -74,15 +75,26 @@ pub(super) fn optimizer_physical_plan(
     stream_type: StreamType,
     time_range: (i64, i64),
     settings: &StreamSearchSettings,
-    index_mode: Option<IndexOptimizeMode>,
+    index_info: &IndexInfo,
 ) -> Result<(Arc<dyn ExecutionPlan>, IndexPlan), Error> {
     let index_condition_ref = Arc::new(Mutex::new(None));
+    let index_mode = index_info.index_optimize_mode.clone().map(Into::into);
     let index_optimizer_rule_ref = Arc::new(Mutex::new(index_mode));
     let index_fields: HashSet<String> = settings.index_fields.iter().cloned().collect();
 
-    let index_rule = IndexRule::new(index_fields.clone(), index_condition_ref.clone());
+    let fts_fields: HashSet<String> = settings.fts_fields.iter().cloned().collect();
+    let index_rule = IndexRule::new(
+        index_fields.clone(),
+        fts_fields,
+        index_condition_ref.clone(),
+    );
     let original_plan = Arc::clone(&plan);
-    let plan = index_rule.optimize(plan, ctx.state().config_options())?;
+    // a skipped rule leaves no condition and cannot optimize, which also drops the leader's mode
+    let plan = if index_info.skip_inverted_index {
+        plan
+    } else {
+        index_rule.optimize(plan, ctx.state().config_options())?
+    };
 
     // if the index rule can't optimize, we should take the index optimizer rule
     if !index_rule.can_optimize() {
@@ -218,7 +230,7 @@ mod tests {
                 index_fields: vec!["kubernetes_namespace_name".to_string()],
                 ..Default::default()
             },
-            None,
+            &IndexInfo::default(),
         )
         .unwrap();
 
@@ -235,6 +247,85 @@ mod tests {
             index.mode,
             Some(IndexOptimizeMode::SimpleHistogram(..))
         ));
+    }
+
+    async fn plan_with_index(
+        sql: &str,
+        use_inverted_index: bool,
+    ) -> (Arc<dyn ExecutionPlan>, IndexPlan) {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("service", DataType::Utf8, false),
+            Field::new("message", DataType::Utf8, false),
+        ]));
+        let ctx = SessionContext::new();
+        let provider = NewEmptyTable::new("default", schema.clone());
+        ctx.register_table("default", Arc::new(provider)).unwrap();
+        let logical_plan = ctx.state().create_logical_plan(sql).await.unwrap();
+        let physical_plan = ctx
+            .state()
+            .create_physical_plan(&logical_plan)
+            .await
+            .unwrap();
+        optimizer_physical_plan(
+            physical_plan,
+            &ctx,
+            &schema,
+            StreamType::Logs,
+            (0, 100),
+            &StreamSearchSettings {
+                index_fields: vec!["service".to_string()],
+                fts_fields: vec!["message".to_string()],
+                ..Default::default()
+            },
+            &IndexInfo {
+                skip_inverted_index: !use_inverted_index,
+                ..Default::default()
+            },
+        )
+        .unwrap()
+    }
+
+    fn plan_text(plan: &Arc<dyn ExecutionPlan>) -> String {
+        datafusion::physical_plan::displayable(plan.as_ref())
+            .indent(false)
+            .to_string()
+    }
+
+    #[tokio::test]
+    async fn test_optimizer_physical_plan_like_on_fts_field_keeps_filter() {
+        let (plan, index) = plan_with_index(
+            "SELECT count(*) FROM default WHERE message LIKE '%timeout%'",
+            true,
+        )
+        .await;
+        assert_eq!(
+            index.condition,
+            Some(IndexCondition {
+                conditions: vec![Condition::Like {
+                    field: "message".to_string(),
+                    value: "timeout".to_string(),
+                    case_insensitive: false,
+                }],
+            })
+        );
+        assert!(index.use_inverted_index());
+        assert_eq!(index.mode, None);
+        assert!(plan_text(&plan).contains("LIKE %timeout%"));
+    }
+
+    #[tokio::test]
+    async fn test_optimizer_physical_plan_skips_index_when_disabled() {
+        let sql = "SELECT count(*) FROM default WHERE service = 'auth'";
+        let (_plan, index) = plan_with_index(sql, true).await;
+        assert!(index.use_inverted_index());
+        assert_eq!(index.mode, Some(IndexOptimizeMode::SimpleCount));
+
+        let (plan, index) = plan_with_index(sql, false).await;
+        assert_eq!(index.condition, None);
+        assert_eq!(index.mode, None);
+        assert!(!index.use_inverted_index());
+        assert!(plan_text(&plan).contains("service@"));
     }
 
     #[test]
@@ -300,7 +391,7 @@ mod tests {
                 stream_type,
                 (0, 100),
                 &StreamSearchSettings::default(),
-                None,
+                &IndexInfo::default(),
             )
             .unwrap();
 

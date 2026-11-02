@@ -32,7 +32,7 @@ use datafusion::{
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
         ExecutionPlan, PhysicalExpr,
-        expressions::{BinaryExpr, Column, InListExpr, NotExpr},
+        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, NotExpr},
         filter::{FilterExec, FilterExecBuilder},
         limit::LocalLimitExec,
         projection::ProjectionExec,
@@ -52,12 +52,13 @@ use crate::{
             match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
         },
     },
-    index::{Condition, IndexCondition},
+    index::{Condition, IndexCondition, like_contains_term, like_substring},
 };
 
 #[derive(Default, Debug)]
 pub struct IndexRule {
     index_fields: HashSet<String>,
+    fts_fields: HashSet<String>,
     index_condition: Arc<Mutex<Option<IndexCondition>>>,
     // this set to true when all filter can be extract to
     // index condition(except _timestamp filter)
@@ -67,10 +68,12 @@ pub struct IndexRule {
 impl IndexRule {
     pub fn new(
         index_fields: HashSet<String>,
+        fts_fields: HashSet<String>,
         index_condition: Arc<Mutex<Option<IndexCondition>>>,
     ) -> Self {
         Self {
             index_fields,
+            fts_fields,
             index_condition,
             can_optimize: Arc::new(AtomicBool::new(false)),
         }
@@ -91,8 +94,11 @@ impl PhysicalOptimizerRule for IndexRule {
             return Ok(plan);
         }
 
-        let mut rewriter =
-            IndexOptimizer::new(self.index_fields.clone(), self.index_condition.clone());
+        let mut rewriter = IndexOptimizer::new(
+            self.index_fields.clone(),
+            self.fts_fields.clone(),
+            self.index_condition.clone(),
+        );
         let plan = plan.rewrite(&mut rewriter).data()?;
 
         // If no filter was found at all (e.g., SELECT count(*) FROM table),
@@ -127,6 +133,7 @@ impl PhysicalOptimizerRule for IndexRule {
 
 struct IndexOptimizer {
     index_fields: HashSet<String>,
+    fts_fields: HashSet<String>,
     index_condition: Arc<Mutex<Option<IndexCondition>>>,
     // set to true when the filter only have _timestamp filter
     can_optimize: bool,
@@ -139,10 +146,12 @@ struct IndexOptimizer {
 impl IndexOptimizer {
     pub fn new(
         index_fields: HashSet<String>,
+        fts_fields: HashSet<String>,
         index_condition: Arc<Mutex<Option<IndexCondition>>>,
     ) -> Self {
         Self {
             index_fields,
+            fts_fields,
             index_condition,
             can_optimize: false,
             has_filter: false,
@@ -158,12 +167,14 @@ impl IndexOptimizer {
     #[cfg(test)]
     fn new_with_config(
         index_fields: HashSet<String>,
+        fts_fields: HashSet<String>,
         index_condition: Arc<Mutex<Option<IndexCondition>>>,
         is_remove_filter: bool,
         optimizer_enabled: bool,
     ) -> Self {
         Self {
             index_fields,
+            fts_fields,
             index_condition,
             can_optimize: false,
             has_filter: false,
@@ -182,8 +193,11 @@ impl TreeNodeRewriter for IndexOptimizer {
             let mut index_conditions = IndexCondition::new();
             let mut other_conditions = Vec::new();
             for expr in split_conjunction(filter.predicate()) {
-                if is_expr_valid_for_index(expr, &self.index_fields) {
-                    let condition = Condition::from_physical_expr(expr);
+                if is_expr_valid_for_index(expr, &self.index_fields, &self.fts_fields) {
+                    let condition = Condition::from_physical_expr(expr, &self.index_fields);
+                    if condition.requires_filter() {
+                        other_conditions.push(expr.clone());
+                    }
                     index_conditions.add_condition(condition);
                 } else {
                     other_conditions.push(expr.clone());
@@ -253,7 +267,21 @@ fn construct_filter_exec(
 }
 
 // Check if the expression is valid for the index.
-fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<String>) -> bool {
+fn is_expr_valid_for_index(
+    expr: &Arc<dyn PhysicalExpr>,
+    index_fields: &HashSet<String>,
+    fts_fields: &HashSet<String>,
+) -> bool {
+    is_valid_for_index(expr, index_fields, fts_fields, false)
+}
+
+// `negated` is set below a NOT, where a superset index result would turn into a subset.
+fn is_valid_for_index(
+    expr: &Arc<dyn PhysicalExpr>,
+    index_fields: &HashSet<String>,
+    fts_fields: &HashSet<String>,
+    negated: bool,
+) -> bool {
     if let Some(expr) = expr.downcast_ref::<BinaryExpr>() {
         match expr.op() {
             Operator::Eq | Operator::NotEq => {
@@ -270,8 +298,8 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
                 }
             }
             Operator::And | Operator::Or => {
-                return is_expr_valid_for_index(expr.left(), index_fields)
-                    && is_expr_valid_for_index(expr.right(), index_fields);
+                return is_valid_for_index(expr.left(), index_fields, fts_fields, negated)
+                    && is_valid_for_index(expr.right(), index_fields, fts_fields, negated);
             }
             _ => return false,
         }
@@ -303,12 +331,39 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
             }
             _ => false,
         };
+    } else if let Some(expr) = expr.downcast_ref::<LikeExpr>() {
+        return is_like_valid_for_index(expr, index_fields, fts_fields, negated);
     } else if let Some(expr) = expr.downcast_ref::<NotExpr>() {
-        return is_expr_valid_for_index(expr.arg(), index_fields);
+        return is_valid_for_index(expr.arg(), index_fields, fts_fields, true);
     } else {
         return false;
     }
     true
+}
+
+// only `col [I]LIKE '%x%'` on a plain column, since the index stores the uncast value
+fn is_like_valid_for_index(
+    expr: &LikeExpr,
+    index_fields: &HashSet<String>,
+    fts_fields: &HashSet<String>,
+    negated: bool,
+) -> bool {
+    let Some(column) = expr.expr().downcast_ref::<Column>() else {
+        return false;
+    };
+    let Ok(pattern) = extract_string_literal(expr.pattern()) else {
+        return false;
+    };
+    if expr.negated() {
+        return false;
+    }
+    if index_fields.contains(column.name()) {
+        // exact like `str_match`, but the index folds ASCII case only
+        like_substring(&pattern).is_some_and(|x| !expr.case_insensitive() || x.is_ascii())
+    } else {
+        // a superset from `_all` turns into a subset under NOT
+        !negated && fts_fields.contains(column.name()) && like_contains_term(&pattern).is_some()
+    }
 }
 
 #[cfg(test)]
@@ -397,6 +452,15 @@ mod tests {
         ))
     }
 
+    fn like(field: &str, pattern: &str, negated: bool, ilike: bool) -> Arc<dyn PhysicalExpr> {
+        Arc::new(LikeExpr::new(
+            negated,
+            ilike,
+            column(field),
+            literal(pattern),
+        ))
+    }
+
     fn in_list(field: &str, list: Vec<&str>) -> Arc<dyn PhysicalExpr> {
         Arc::new(
             InListExpr::try_new(
@@ -432,6 +496,7 @@ mod tests {
     #[test]
     fn test_is_expr_valid_for_index() {
         let index_fields = HashSet::from(["name".to_string(), "id".to_string()]);
+        let fts_fields = HashSet::new();
         // PhysicalExpr, is_valid, Condition
         let case = vec![
             // name = 'test'
@@ -512,31 +577,237 @@ mod tests {
 
         for (expr, is_valid, condition) in case {
             if is_valid {
-                assert!(is_expr_valid_for_index(&expr, &index_fields));
+                assert!(is_expr_valid_for_index(&expr, &index_fields, &fts_fields));
             } else {
-                assert!(!is_expr_valid_for_index(&expr, &index_fields));
+                assert!(!is_expr_valid_for_index(&expr, &index_fields, &fts_fields));
             }
             if let Some(condition) = condition {
-                assert_eq!(Condition::from_physical_expr(&expr), condition);
+                assert_eq!(
+                    Condition::from_physical_expr(&expr, &index_fields),
+                    condition
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_is_expr_valid_for_index_like() {
+        let index_fields = HashSet::from(["name".to_string(), "both".to_string()]);
+        let fts_fields = HashSet::from(["message".to_string(), "both".to_string()]);
+        let like_condition = |field: &str, value: &str, case_insensitive| Condition::Like {
+            field: field.to_string(),
+            value: value.to_string(),
+            case_insensitive,
+        };
+        let str_match = |field: &str, value: &str, case_sensitive| {
+            Condition::StrMatch(field.to_string(), value.to_string(), case_sensitive)
+        };
+        let long_term = format!("%{}%", "a".repeat(64));
+        let max_term = format!("%{}%", "a".repeat(63));
+        let column_pattern: Arc<dyn PhysicalExpr> = Arc::new(LikeExpr::new(
+            false,
+            false,
+            column("message"),
+            column("name"),
+        ));
+        // PhysicalExpr, is_valid, Condition
+        let cases = vec![
+            (
+                like("name", "%open%", false, false),
+                true,
+                Some(str_match("name", "open", true)),
+            ),
+            (
+                like("name", "%auth-gw%", false, true),
+                true,
+                Some(str_match("name", "auth-gw", false)),
+            ),
+            (
+                like("name", "%é%", false, false),
+                true,
+                Some(str_match("name", "é", true)),
+            ),
+            (
+                like("both", "%open%", false, false),
+                true,
+                Some(str_match("both", "open", true)),
+            ),
+            (
+                not(like("name", "%err%", false, false)),
+                true,
+                Some(Condition::Not(Box::new(str_match("name", "err", true)))),
+            ),
+            (
+                like("message", "%Err42%", false, true),
+                true,
+                Some(like_condition("message", "Err42", true)),
+            ),
+            (
+                like("message", &max_term, false, false),
+                true,
+                Some(like_condition("message", &"a".repeat(63), false)),
+            ),
+            (
+                or(
+                    eq(column("name"), literal("a")),
+                    like("message", "%err%", false, false),
+                ),
+                true,
+                Some(Condition::Or(vec![
+                    Condition::Equal("name".to_string(), "a".to_string()),
+                    like_condition("message", "err", false),
+                ])),
+            ),
+            (like("name", "%é%", false, true), false, None),
+            (like("name", "%a_b%", false, false), false, None),
+            (like("name", "open%", false, false), false, None),
+            (like("name", "%err%", true, false), false, None),
+            (like("message", &long_term, false, false), false, None),
+            (like("message", "%e%", false, false), false, None),
+            (like("message", "%auth-gw%", false, false), false, None),
+            (like("message", "err%", false, false), false, None),
+            (like("message", "%err%", true, false), false, None),
+            (like("message", "%err%", true, true), false, None),
+            (not(like("message", "%err%", false, false)), false, None),
+            (
+                not(or(
+                    eq(column("name"), literal("a")),
+                    like("message", "%err%", false, false),
+                )),
+                false,
+                None,
+            ),
+            (like("status", "%err%", false, false), false, None),
+            (column_pattern, false, None),
+        ];
+
+        for (expr, is_valid, condition) in cases {
+            assert_eq!(
+                is_expr_valid_for_index(&expr, &index_fields, &fts_fields),
+                is_valid,
+                "{expr}"
+            );
+            if let Some(condition) = condition {
+                assert_eq!(
+                    Condition::from_physical_expr(&expr, &index_fields),
+                    condition
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_index_optimizer_like_keeps_fts_filter() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("message", DataType::Utf8, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["openobserve"])),
+                Arc::new(StringArray::from(vec!["an error"])),
+            ],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let name_like = Condition::StrMatch("name".to_string(), "open".to_string(), false);
+        let message_like = Condition::Like {
+            field: "message".to_string(),
+            value: "error".to_string(),
+            case_insensitive: false,
+        };
+        // sql, expected conditions, can_optimize, LIKE left in the plan
+        let cases = vec![
+            (
+                "SELECT count(*) FROM t WHERE message LIKE '%error%' AND _timestamp > 1",
+                Some(vec![message_like.clone()]),
+                false,
+                Some("LIKE %error%"),
+            ),
+            (
+                "SELECT count(*) FROM t WHERE name ILIKE '%open%' AND _timestamp > 1",
+                Some(vec![name_like.clone()]),
+                true,
+                None,
+            ),
+            (
+                "SELECT count(*) FROM t WHERE name ILIKE '%open%' AND message LIKE '%error%'",
+                Some(vec![name_like, message_like]),
+                false,
+                Some("LIKE %error%"),
+            ),
+            (
+                "SELECT count(*) FROM t WHERE message NOT LIKE '%error%'",
+                None,
+                false,
+                Some("NOT LIKE %error%"),
+            ),
+        ];
+
+        for is_remove_filter in [true, false] {
+            for (sql, conditions, can_optimize, kept_like) in cases.clone() {
+                let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+                let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+                let index_condition = Arc::new(Mutex::new(None));
+                let mut rewriter = IndexOptimizer::new_with_config(
+                    HashSet::from(["name".to_string()]),
+                    HashSet::from(["message".to_string()]),
+                    index_condition.clone(),
+                    is_remove_filter,
+                    true,
+                );
+                let plan = physical_plan.rewrite(&mut rewriter).unwrap().data;
+                let plan = datafusion::physical_plan::displayable(plan.as_ref())
+                    .indent(false)
+                    .to_string();
+
+                assert_eq!(
+                    index_condition.lock().clone().map(|c| c.conditions),
+                    conditions,
+                    "{sql}"
+                );
+                assert_eq!(rewriter.can_optimize, can_optimize, "{sql}");
+                match kept_like {
+                    Some(like) => assert!(plan.contains(like), "{sql}\n{plan}"),
+                    None => assert!(!plan.contains("LIKE"), "{sql}\n{plan}"),
+                }
             }
         }
     }
 
     #[test]
     fn test_index_rule_name_returns_expected() {
-        let rule = IndexRule::new(HashSet::new(), Arc::new(parking_lot::Mutex::new(None)));
+        let rule = IndexRule::new(
+            HashSet::new(),
+            HashSet::new(),
+            Arc::new(parking_lot::Mutex::new(None)),
+        );
         assert_eq!(rule.name(), "IndexConditionRule");
     }
 
     #[test]
     fn test_index_rule_schema_check_returns_true() {
-        let rule = IndexRule::new(HashSet::new(), Arc::new(parking_lot::Mutex::new(None)));
+        let rule = IndexRule::new(
+            HashSet::new(),
+            HashSet::new(),
+            Arc::new(parking_lot::Mutex::new(None)),
+        );
         assert!(rule.schema_check());
     }
 
     #[test]
     fn test_index_rule_can_optimize_initial_false() {
-        let rule = IndexRule::new(HashSet::new(), Arc::new(parking_lot::Mutex::new(None)));
+        let rule = IndexRule::new(
+            HashSet::new(),
+            HashSet::new(),
+            Arc::new(parking_lot::Mutex::new(None)),
+        );
         assert!(!rule.can_optimize());
     }
 
@@ -604,6 +875,7 @@ mod tests {
             let optimizer_enabled = true;
             let mut rewriter = IndexOptimizer::new_with_config(
                 index_fields,
+                HashSet::new(),
                 index_condition.clone(),
                 is_remove_filter,
                 optimizer_enabled,
@@ -686,6 +958,7 @@ mod tests {
             let optimizer_enabled = true;
             let mut rewriter = IndexOptimizer::new_with_config(
                 index_fields,
+                HashSet::new(),
                 index_condition.clone(),
                 is_remove_filter,
                 optimizer_enabled,
@@ -743,6 +1016,7 @@ mod tests {
             let index_condition = Arc::new(Mutex::new(None));
             let mut rewriter = IndexOptimizer::new_with_config(
                 index_fields,
+                HashSet::new(),
                 index_condition.clone(),
                 false,
                 optimizer_enabled,
