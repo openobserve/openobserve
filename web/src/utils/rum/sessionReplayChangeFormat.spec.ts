@@ -793,10 +793,10 @@ describe("sessionReplayChangeFormat", () => {
             ADD_NODE,
             [null, "#document"],
             [1, "SELECT"],
-            [1, "OPTION", ["value", "a"]],
+            [1, "OPTION", ["value", "a"], ["selected", ""]],
             [0, "OPTGROUP"],
             [1, "OPTION"],
-            [1, "#text", " Bee "],
+            [1, "#text", " Big \n Bee "],
           ],
         ]),
       );
@@ -804,12 +804,43 @@ describe("sessionReplayChangeFormat", () => {
       expect(out.map((r: any) => r.data)).toEqual([
         { source: 5, id: 1, text: "a", isChecked: false },
       ]);
-      // An <option> without a value attribute takes its text; a Deselected <option> is ignored.
+      // An <option> without a value attribute takes its whitespace-collapsed text; a Deselected
+      // <option> is ignored.
       const out2 = converter.convert(change(1200, [[INPUT_SELECTION, [1, 2], [0, 4]]]));
       expect(out2.map((r: any) => r.data)).toEqual([
-        { source: 5, id: 1, text: "Bee", isChecked: false },
+        { source: 5, id: 1, text: "Big Bee", isChecked: false },
       ]);
-      expect(nodeWithId(converter.snapshot()!.node, 1).attributes.value).toBe("Bee");
+      // rrweb rebuilds the choice from the options' `selected` attributes.
+      const snap = converter.snapshot()!.node;
+      expect(nodeWithId(snap, 2).attributes.selected).toBeUndefined();
+      expect(nodeWithId(snap, 4).attributes.selected).toBe(true);
+    });
+
+    it("keeps a non-breaking space in an <option>'s text value, like the DOM", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([
+          [ADD_NODE, [null, "#document"], [1, "SELECT"], [1, "OPTION"], [1, "#text", " A  B "]],
+        ]),
+      );
+      const out = converter.convert(change(1100, [[INPUT_SELECTION, [0, 2]]]));
+      expect(out.map((r: any) => r.data.text)).toEqual([" A B"]);
+    });
+
+    it("leaves a <select>'s options as recorded when the input value matches none", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([
+          [
+            ADD_NODE,
+            [null, "#document"],
+            [1, "SELECT"],
+            [1, "OPTION", ["value", "a"], ["selected", ""]],
+          ],
+        ]),
+      );
+      converter.convert(change(1100, [[INPUT_VALUE, [1, "***"]]]));
+      expect(nodeWithId(converter.snapshot()!.node, 2).attributes.selected).toBe("");
     });
 
     it("decodes references after ClearStrings across encoder runs in one record", () => {

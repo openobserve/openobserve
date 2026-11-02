@@ -225,14 +225,38 @@ export function createRecordConverter(): RecordConverter {
       parent = nodes.get(parentId)?.node;
     }
     if (parent?.tagName !== "select") return null;
-    // Like the DOM: an <option> without a value attribute takes its text as its value.
-    const text =
-      attrs?.value ??
-      (node.childNodes ?? [])
-        .map((child: any) => child.textContent ?? "")
-        .join("")
-        .trim();
-    return { id: parentId, text, isChecked: false };
+    return { id: parentId, text: optionValue(node), isChecked: false };
+  }
+
+  // Like the DOM: an <option> without a value attribute takes its text with ASCII whitespace
+  // stripped and collapsed (a non-breaking space is kept).
+  function optionValue(option: any): string {
+    if (option.attributes?.value !== undefined) return option.attributes.value;
+    return (option.childNodes ?? [])
+      .map((child: any) => child.textContent ?? "")
+      .join("")
+      .replace(/[\t\n\f\r ]+/g, " ")
+      .replace(/^ | $/g, "");
+  }
+
+  // rrweb rebuilds a <select>'s choice from its options' `selected` attributes, not from a value
+  // attribute, so mark the first option matching the value and clear the rest. No match (for
+  // example a masked value) leaves the options as recorded.
+  function selectOptionByValue(select: any, value: string) {
+    const options: any[] = [];
+    const collect = (n: any) => {
+      for (const child of n.childNodes ?? []) {
+        if (child.tagName === "option") options.push(child);
+        else if (child.tagName === "optgroup") collect(child);
+      }
+    };
+    collect(select);
+    const match = options.findIndex((option) => optionValue(option) === value);
+    if (match === -1) return;
+    options.forEach((option, i) => {
+      if (i === match) option.attributes.selected = true;
+      else delete option.attributes.selected;
+    });
   }
 
   function rulesToCssText(rules: string | string[]): string {
@@ -431,6 +455,7 @@ export function createRecordConverter(): RecordConverter {
         else delete n.attributes.checked;
       } else if (value.text !== undefined) {
         n.attributes.value = value.text;
+        if (n.tagName === "select") selectOptionByValue(n, value.text);
       }
     });
     return initialOffset;
