@@ -26,6 +26,7 @@ use crate::utils::json::Value;
 
 pub const MAX_REGEX_PATTERN_LEN: usize = 1024;
 pub const MAX_IN_LIST_VALUES: usize = 1000;
+pub const EXTENDED_OPERATORS_ENV: &str = "ZO_ALERT_EXTENDED_CONDITION_OPERATORS";
 const REGEX_CACHE_CAPACITY: usize = 1024;
 const REGEX_SIZE_LIMIT: usize = 256 * 1024;
 
@@ -148,6 +149,52 @@ pub fn eq_ci(a: &str, b: &str) -> bool {
         .eq(b.chars().flat_map(char::to_lowercase))
 }
 
+/// Extended operators named anywhere in a serialized condition tree, each listed once.
+pub fn extended_operators_in(condition: &Value) -> Vec<Operator> {
+    let mut found = Vec::new();
+    collect_extended_operators(condition, &mut found);
+    found
+}
+
+/// Extended operators in any serializable condition structure, each listed once.
+pub fn extended_operators_of<T: serde::Serialize>(conditions: &T) -> Vec<Operator> {
+    serde_json::to_value(conditions)
+        .map(|value| extended_operators_in(&value))
+        .unwrap_or_default()
+}
+
+/// [`check_extended_operators`] under the `ZO_ALERT_EXTENDED_CONDITION_OPERATORS` setting.
+pub fn check_extended_operators_enabled(
+    used: &[Operator],
+    stored: &[Operator],
+) -> Result<(), String> {
+    check_extended_operators(
+        crate::get_config()
+            .common
+            .alert_extended_condition_operators,
+        used,
+        stored,
+    )
+}
+
+/// When disabled, refuses extended operators the stored version of the entity did not use already.
+pub fn check_extended_operators(
+    enabled: bool,
+    used: &[Operator],
+    stored: &[Operator],
+) -> Result<(), String> {
+    if enabled {
+        return Ok(());
+    }
+    match used.iter().find(|op| !stored.contains(op)) {
+        None => Ok(()),
+        Some(op) => Err(format!(
+            "Condition operator '{}' is not enabled on this server; set {EXTENDED_OPERATORS_ENV}=true to allow it",
+            canonical_name(op)
+        )),
+    }
+}
+
 fn compile_regex(pattern: &str, case_insensitive: bool) -> Result<Regex, regex::Error> {
     RegexBuilder::new(pattern)
         .case_insensitive(case_insensitive)
@@ -173,6 +220,41 @@ fn cached_is_match(
     }
     cache.insert(pattern.to_string(), compiled);
     result
+}
+
+// Recurses into every value, as condition trees nest under different keys per format.
+fn collect_extended_operators(value: &Value, found: &mut Vec<Operator>) {
+    match value {
+        Value::Array(items) => items
+            .iter()
+            .for_each(|item| collect_extended_operators(item, found)),
+        Value::Object(map) => {
+            if let Some(op) = map
+                .get("operator")
+                .and_then(Value::as_str)
+                .and_then(extended_operator)
+                && !found.contains(&op)
+            {
+                found.push(op);
+            }
+            map.values()
+                .for_each(|item| collect_extended_operators(item, found));
+        }
+        _ => {}
+    }
+}
+
+fn extended_operator(name: &str) -> Option<Operator> {
+    serde_json::from_value::<Operator>(Value::String(name.to_string()))
+        .ok()
+        .filter(Operator::is_extended)
+}
+
+fn canonical_name(operator: &Operator) -> String {
+    serde_json::to_value(operator)
+        .ok()
+        .and_then(|value| value.as_str().map(str::to_string))
+        .unwrap_or_else(|| operator.to_string())
 }
 
 /// `None` when the field type cannot be compared with list items (null, array, object).
@@ -506,5 +588,55 @@ mod tests {
         let err = validate_condition_value("c", &Operator::ReMatch, &json!(over), false)
             .expect_err("over the limit");
         assert!(err.contains("characters"));
+    }
+
+    fn v2_tree(operators: &[&str]) -> Value {
+        let leaves: Vec<Value> = operators
+            .iter()
+            .map(|op| {
+                json!({"filterType": "condition", "column": "c", "operator": op,
+                             "value": "a", "logicalOperator": "AND"})
+            })
+            .collect();
+        json!({"version": 2, "conditions": {"filterType": "group", "logicalOperator": "AND",
+               "conditions": [{"filterType": "group", "logicalOperator": "OR",
+                               "conditions": leaves}]}})
+    }
+
+    #[test]
+    fn test_extended_operators_are_found_in_nested_groups_once() {
+        let found = extended_operators_in(&v2_tree(&["=", "in", "IN", "regex", "contains"]));
+        assert_eq!(found, vec![Operator::In, Operator::ReMatch]);
+        assert!(extended_operators_in(&v2_tree(&["=", "not_contains"])).is_empty());
+    }
+
+    #[test]
+    fn test_a_new_extended_operator_is_refused_while_disabled() {
+        let err = check_extended_operators(false, &[Operator::In], &[]).unwrap_err();
+        assert!(err.contains("'in'"), "{err}");
+        assert!(err.contains(EXTENDED_OPERATORS_ENV), "{err}");
+        assert!(check_extended_operators(true, &[Operator::In], &[]).is_ok());
+        assert!(check_extended_operators(false, &[], &[]).is_ok());
+    }
+
+    #[test]
+    fn test_a_stored_extended_operator_stays_saveable_while_disabled() {
+        assert!(check_extended_operators(false, &[Operator::In], &[Operator::In]).is_ok());
+        let err = check_extended_operators(
+            false,
+            &[Operator::In, Operator::ReNotMatch],
+            &[Operator::In],
+        )
+        .unwrap_err();
+        assert!(err.contains("'re_not_match'"), "{err}");
+    }
+
+    #[test]
+    fn test_the_extended_operators_are_off_by_default() {
+        assert!(
+            !crate::get_config()
+                .common
+                .alert_extended_condition_operators
+        );
     }
 }

@@ -183,6 +183,22 @@ async fn validate_online_scorers(
     Ok(())
 }
 
+/// Refuses extended condition operators new to this save unless `enabled`; ones `stored` used stay.
+fn check_condition_operators(
+    stored: Option<&table::online_eval_jobs::OnlineEvalJob>,
+    job: &table::online_eval_jobs::OnlineEvalJob,
+    enabled: bool,
+) -> Result<(), EvalJobError> {
+    config::meta::alerts::condition_ops::check_extended_operators(
+        enabled,
+        &job.extended_operators(),
+        &stored
+            .map(table::online_eval_jobs::OnlineEvalJob::extended_operators)
+            .unwrap_or_default(),
+    )
+    .map_err(EvalJobError::InvalidJob)
+}
+
 #[tracing::instrument(skip(job))]
 pub async fn create_job(
     org_id: &str,
@@ -215,6 +231,13 @@ pub async fn prepare_new_job(
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     job.validate_operator_values()
         .map_err(EvalJobError::InvalidJob)?;
+    check_condition_operators(
+        None,
+        &job,
+        config::get_config()
+            .common
+            .alert_extended_condition_operators,
+    )?;
     validate_online_scorers(org_id, &job.scorers).await?;
     validate_source_stream(org_id, &job).await?;
     Ok(job)
@@ -266,6 +289,13 @@ pub async fn prepare_job_update(
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     job.validate_operator_values()
         .map_err(EvalJobError::InvalidJob)?;
+    check_condition_operators(
+        Some(&existing),
+        &job,
+        config::get_config()
+            .common
+            .alert_extended_condition_operators,
+    )?;
     validate_online_scorers(org_id, &job.scorers).await?;
     validate_source_stream(org_id, &job).await?;
     if existing.status == "active" {
@@ -608,6 +638,43 @@ mod tests {
         let merged = merge_input_mapping(Some(existing), Some(incoming)).unwrap();
 
         assert_eq!(merged["scorer-1"]["input"], "{{new_input}}");
+    }
+
+    fn job_with_filter(operator: &str) -> table::online_eval_jobs::OnlineEvalJob {
+        serde_json::from_value(serde_json::json!({
+            "id": "j", "org_id": "o", "name": "n", "description": null, "stream": "s",
+            "stream_type": "traces", "scorers": [], "input_mapping": null,
+            "sampling_mode": "all", "sampling_value": null, "status": "draft", "version": 1,
+            "pipeline_id": null, "created_at": 0, "updated_at": 0,
+            "filter_condition": {"version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND", "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": operator,
+                     "value": ["error"], "logicalOperator": "AND"}]}}
+        }))
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_new_job_with_an_in_filter_is_refused_while_the_flag_is_off() {
+        let err = prepare_new_job("o", job_with_filter("in"))
+            .await
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("'in'")
+                && err
+                    .to_string()
+                    .contains("ZO_ALERT_EXTENDED_CONDITION_OPERATORS"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_stored_in_filter_stays_saveable_while_the_flag_is_off() {
+        let stored = job_with_filter("in");
+        assert!(check_condition_operators(Some(&stored), &job_with_filter("in"), false).is_ok());
+        let plain = job_with_filter("=");
+        assert!(check_condition_operators(Some(&plain), &stored, false).is_err());
+        assert!(check_condition_operators(None, &stored, true).is_ok());
     }
 
     #[test]

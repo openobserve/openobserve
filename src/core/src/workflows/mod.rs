@@ -16,6 +16,7 @@
 use std::collections::{HashMap, HashSet};
 
 use config::meta::{
+    alerts::condition_ops::{check_extended_operators, extended_operators_of},
     folder::DEFAULT_FOLDER,
     pipeline::components::NodeData,
     self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
@@ -275,6 +276,37 @@ fn reject_unsupported_nodes(workflow: &Workflow) -> Result<(), anyhow::Error> {
     }
 }
 
+// Drafts are rows that lists decode too, so they are gated like published workflows.
+async fn check_condition_operators(workflow: &Workflow) -> Result<(), anyhow::Error> {
+    let enabled = config::get_config()
+        .common
+        .alert_extended_condition_operators;
+    if enabled || extended_operators_of(&workflow.nodes).is_empty() {
+        return Ok(());
+    }
+    let published = db::workflows::get_workflow(&workflow.org_id, &workflow.id).await;
+    let draft = db::workflows::get_draft(&workflow.org_id, &workflow.id).await;
+    let stored: Vec<Workflow> = [published, draft]
+        .into_iter()
+        .filter_map(|row| row.ok().flatten())
+        .collect();
+    condition_operators_allowed(workflow, &stored, enabled)
+}
+
+/// Refuses extended operators new to this save unless `enabled`; ones a `stored` row used stay.
+fn condition_operators_allowed(
+    workflow: &Workflow,
+    stored: &[Workflow],
+    enabled: bool,
+) -> Result<(), anyhow::Error> {
+    let stored: Vec<_> = stored
+        .iter()
+        .flat_map(|row| extended_operators_of(&row.nodes))
+        .collect();
+    check_extended_operators(enabled, &extended_operators_of(&workflow.nodes), &stored)
+        .map_err(|e| anyhow::anyhow!(e))
+}
+
 async fn validate_workflow(workflow: &Workflow, is_draft: bool) -> Result<(), anyhow::Error> {
     reject_unsupported_nodes(workflow)?;
     for node in &workflow.nodes {
@@ -349,6 +381,7 @@ pub async fn save_workflow(
     folder_slug: Option<&str>,
 ) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow, false).await?;
+    check_condition_operators(&workflow).await?;
     let slug = normalize_folder_slug(folder_slug);
     workflow.folder_id = db::workflows::resolve_folder_pk(&workflow.org_id, slug).await?;
 
@@ -386,6 +419,7 @@ pub async fn save_draft(
     folder_slug: Option<&str>,
 ) -> Result<(), anyhow::Error> {
     reject_unsupported_nodes(&workflow)?;
+    check_condition_operators(&workflow).await?;
     let slug = normalize_folder_slug(folder_slug);
     workflow.folder_id = db::workflows::resolve_folder_pk(&workflow.org_id, slug).await?;
 
@@ -406,6 +440,7 @@ pub async fn save_draft(
 
 pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow, false).await?;
+    check_condition_operators(&workflow).await?;
     db::workflows::update_workflow_record(workflow.clone()).await?;
     db::workflows::notify_workflow_upsert(&workflow).await?;
     Ok(())
@@ -413,6 +448,7 @@ pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
 
 pub async fn update_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
     reject_unsupported_nodes(&workflow)?;
+    check_condition_operators(&workflow).await?;
     db::workflows::update_draft_record(workflow.clone()).await?;
     db::workflows::notify_draft_upsert(&workflow).await?;
     Ok(())
@@ -426,6 +462,7 @@ pub async fn promote_draft(
     folder_slug: Option<&str>,
 ) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow, false).await?;
+    check_condition_operators(&workflow).await?;
     // Resolved before the destination overwrites it: a promote into a different
     // folder has to drop the source folder's tuple, and `remove_ownership` only
     // matches when it names the OLD parent.
@@ -1318,6 +1355,39 @@ mod tests {
         assert!(err.to_string().contains("unsupported node type"), "{err}");
         let err = update_draft(workflow).await.unwrap_err();
         assert!(err.to_string().contains("unsupported node type"), "{err}");
+    }
+
+    fn workflow_with_condition(operator: &str) -> Workflow {
+        let mut workflow = workflow_with_unsupported_node();
+        workflow.nodes = serde_json::from_value(serde_json::json!([
+            {"id": "c", "io_type": "default", "position": {"x": 0.0, "y": 0.0},
+             "data": {"node_type": "condition", "version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND", "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": operator,
+                     "value": "err", "logicalOperator": "AND"}]}}}]))
+        .unwrap();
+        workflow
+    }
+
+    #[tokio::test]
+    async fn a_new_starts_with_draft_is_refused_while_the_flag_is_off() {
+        let mut workflow = workflow_with_condition("starts_with");
+        workflow.id = "extended_ops_draft".to_string();
+        let err = save_draft(workflow, None).await.unwrap_err();
+        assert!(err.to_string().contains("'starts_with'"), "{err}");
+    }
+
+    #[test]
+    fn a_stored_starts_with_stays_saveable_while_the_flag_is_off() {
+        let edited = workflow_with_condition("starts_with");
+        let stored_draft = workflow_with_condition("Starts With");
+        let stored_plain = workflow_with_condition("=");
+        assert!(
+            condition_operators_allowed(&edited, &[stored_plain.clone(), stored_draft], false)
+                .is_ok()
+        );
+        assert!(condition_operators_allowed(&edited, &[stored_plain], false).is_err());
+        assert!(condition_operators_allowed(&edited, &[], true).is_ok());
     }
 
     #[test]

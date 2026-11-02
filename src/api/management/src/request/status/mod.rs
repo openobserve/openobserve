@@ -257,6 +257,9 @@ struct ConfigResponse<'a> {
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
     auto_query_enabled: bool,
+    /// `ZO_ALERT_EXTENDED_CONDITION_OPERATORS`; the condition builders offer the new operators
+    /// only when set.
+    extended_condition_operators: bool,
     profiling_enabled: bool,
     experimental: bool,
     #[cfg(feature = "enterprise")]
@@ -678,6 +681,7 @@ pub async fn zo_config(
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled,
         auto_query_enabled: cfg.common.auto_query_enabled,
+        extended_condition_operators: cfg.common.alert_extended_condition_operators,
         profiling_enabled: cfg.common.profiling_enabled,
         experimental: cfg.common.experimental,
         #[cfg(feature = "enterprise")]
@@ -2049,6 +2053,21 @@ mod tests {
         assert_eq!(last_reported_timestamp().await, 0);
         assert!(rbac_enabled_for_config(true).await);
         assert!(!rbac_enabled_for_config(false).await);
+    }
+
+    #[tokio::test]
+    async fn the_ui_config_reports_the_extended_condition_operators_flag() {
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let config: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            config["extended_condition_operators"],
+            serde_json::json!(get_config().common.alert_extended_condition_operators)
+        );
     }
 
     #[test]

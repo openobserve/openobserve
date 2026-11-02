@@ -16,7 +16,7 @@
 use std::collections::BTreeMap;
 
 use config::meta::{
-    alerts::{ConditionGroup, ConditionList},
+    alerts::{ConditionGroup, ConditionList, Operator, condition_ops::extended_operators_of},
     pipeline::components::{ConditionParams, ScorerRef},
     self_reporting::{evaluator::EVALUATOR_STREAM, llm_scores::LLM_SCORES_STREAM},
 };
@@ -249,6 +249,23 @@ impl OnlineEvalJob {
         self.span_selectors.iter().try_for_each(|selector| {
             validate_condition_json_operator_values(&selector.filter_condition)
         })
+    }
+
+    /// Extended operators in the job filter, end signals and span selector filters.
+    pub fn extended_operators(&self) -> Vec<Operator> {
+        let mut conditions = vec![&self.filter_condition];
+        conditions.extend(
+            self.trace_config
+                .as_ref()
+                .and_then(|c| c.end_signal.as_ref()),
+        );
+        conditions.extend(
+            self.session_config
+                .as_ref()
+                .and_then(|c| c.end_signal.as_ref()),
+        );
+        conditions.extend(self.span_selectors.iter().map(|s| &s.filter_condition));
+        extended_operators_of(&conditions)
     }
 
     /// Names the first set condition this version cannot parse; an unparsed filter would match all.
@@ -821,6 +838,28 @@ mod tests {
         let mut condition = condition;
         condition["conditions"]["conditions"][0]["operator"] = serde_json::json!("future_op");
         condition
+    }
+
+    fn with_operator(operator: &str) -> serde_json::Value {
+        let mut condition = end_signal();
+        condition["conditions"]["conditions"][0]["operator"] = serde_json::json!(operator);
+        condition
+    }
+
+    #[test]
+    fn test_extended_operators_cover_filter_end_signals_and_selectors() {
+        let mut job = trace_job_with_selector();
+        assert!(job.extended_operators().is_empty());
+        job.filter_condition = with_operator("in");
+        job.trace_config = Some(TraceEvalConfig {
+            end_signal: Some(with_operator("starts_with")),
+            ..Default::default()
+        });
+        job.span_selectors[0].filter_condition = with_operator("re_match");
+        assert_eq!(
+            job.extended_operators(),
+            vec![Operator::In, Operator::StartsWith, Operator::ReMatch]
+        );
     }
 
     #[test]
