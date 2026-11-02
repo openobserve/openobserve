@@ -19,6 +19,7 @@ use axum::{
     http::{StatusCode, header::CONTENT_TYPE},
     response::{IntoResponse, Response},
 };
+use config::meta::autoobserve::{KV_PREFIX, is_reserved_kv_key};
 use hashbrown::HashMap;
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
@@ -90,6 +91,7 @@ pub async fn get(Path((org_id, key)): Path<(String, String)>) -> Response {
     request_body(content = String, description = "Value of the key", content_type = "text/plain"),
     responses(
         (status = 200, description = "Success", content_type = "text/plain", body = String),
+        (status = 403, description = "Reserved key", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "text/plain", body = String),
     ),
     extensions(
@@ -99,6 +101,9 @@ pub async fn get(Path((org_id, key)): Path<(String, String)>) -> Response {
 )]
 pub async fn set(Path((org_id, key)): Path<(String, String)>, body: Bytes) -> Response {
     let key = key.trim();
+    if is_reserved_kv_key(key) {
+        return reserved_key_refused();
+    }
     match kv::set(&org_id, key, body).await {
         Ok(_) => (
             StatusCode::OK,
@@ -139,6 +144,7 @@ pub async fn set(Path((org_id, key)): Path<(String, String)>, body: Bytes) -> Re
       ),
     responses(
         (status = 200, description = "Success",  content_type = "text/plain", body = String),
+        (status = 403, description = "Reserved key", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "text/plain", body = String),
     ),
     extensions(
@@ -147,6 +153,9 @@ pub async fn set(Path((org_id, key)): Path<(String, String)>, body: Bytes) -> Re
     )
 )]
 pub async fn delete(Path((org_id, key)): Path<(String, String)>) -> Response {
+    if is_reserved_kv_key(&key) {
+        return reserved_key_refused();
+    }
     match kv::delete(&org_id, &key).await {
         Ok(_) => (
             StatusCode::OK,
@@ -202,5 +211,137 @@ pub async fn list(
             let keys: Vec<String> = Vec::new();
             MetaHttpResponse::json(keys)
         }
+    }
+}
+
+/// Marks under the prefix gate alert investigations, so only the engine's own route may write them.
+fn reserved_key_refused() -> Response {
+    MetaHttpResponse::forbidden(format!(
+        "keys under `{KV_PREFIX}` are reserved for AutoObserve and cannot be written or deleted through /kv"
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{Router, body::Body, http::Request, routing};
+    use config::meta::autoobserve::marks::protected_key;
+    use infra::table::{entity::kv_store::Entity, kv_store};
+    use sea_orm::{ConnectionTrait, Schema};
+    use tower::ServiceExt;
+
+    use super::*;
+
+    async fn setup() -> String {
+        infra::db::create_table().await.unwrap();
+        let conn = infra::db::get_orm_client_rw().await;
+        let backend = conn.get_database_backend();
+        let mut stmt = Schema::new(backend).create_table_from_entity(Entity);
+        conn.execute(backend.build(stmt.if_not_exists()))
+            .await
+            .unwrap();
+        format!("kvguard{}", config::ider::uuid())
+    }
+
+    fn app() -> Router {
+        Router::new().route(
+            "/{org_id}/kv/{key}",
+            routing::get(get).post(set).delete(delete),
+        )
+    }
+
+    async fn send(method: &str, uri: &str, body: &str) -> (StatusCode, String) {
+        let request = Request::builder()
+            .method(method)
+            .uri(uri)
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        let response = app().oneshot(request).await.unwrap();
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, String::from_utf8_lossy(&bytes).into_owned())
+    }
+
+    async fn stored(org: &str, key: &str) -> Option<Vec<u8>> {
+        kv_store::get(org, key).await.unwrap().map(|m| m.value)
+    }
+
+    #[tokio::test]
+    async fn setting_a_reserved_key_is_forbidden_and_stores_nothing() {
+        let org = setup().await;
+        let key = protected_key("a1", "host=a");
+        let resp = set(
+            Path((org.clone(), key.clone())),
+            Bytes::from_static(b"forged"),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        assert_eq!(stored(&org, &key).await, None);
+    }
+
+    #[tokio::test]
+    async fn deleting_a_reserved_key_is_forbidden_and_keeps_it() {
+        let org = setup().await;
+        let key = protected_key("a1", "host=a");
+        kv_store::set(&org, &key, b"mark").await.unwrap();
+        let resp = delete(Path((org.clone(), key.clone()))).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        assert_eq!(stored(&org, &key).await.as_deref(), Some(&b"mark"[..]));
+    }
+
+    #[tokio::test]
+    async fn a_reserved_key_can_still_be_read() {
+        let org = setup().await;
+        let key = protected_key("a1", "host=a");
+        kv_store::set(&org, &key, b"mark").await.unwrap();
+        let encoded = key.replace('/', "%2F");
+        let (status, body) = send("GET", &format!("/{org}/kv/{encoded}"), "").await;
+        assert_eq!((status, body.as_str()), (StatusCode::OK, "mark"));
+    }
+
+    #[tokio::test]
+    async fn ordinary_keys_set_read_and_delete() {
+        let org = setup().await;
+        for (uri_key, key) in [
+            ("settings", "settings"),
+            ("dash%2Flayout", "dash/layout"),
+            ("o2_ao%2Fmark", "o2_ao/mark"),
+            ("my%2F_o2_ao%2Fmark", "my/_o2_ao/mark"),
+        ] {
+            let uri = format!("/{org}/kv/{uri_key}");
+            assert_eq!(send("POST", &uri, "v").await.0, StatusCode::OK, "{key}");
+            assert_eq!(stored(&org, key).await.as_deref(), Some(&b"v"[..]));
+            assert_eq!(send("GET", &uri, "").await, (StatusCode::OK, "v".into()));
+            assert_eq!(send("DELETE", &uri, "").await.0, StatusCode::OK, "{key}");
+            assert_eq!(stored(&org, key).await, None);
+        }
+    }
+
+    #[tokio::test]
+    async fn encoded_cased_and_padded_reserved_keys_are_forbidden() {
+        let org = setup().await;
+        let target = "_o2_ao/mark/x";
+        kv_store::set(&org, target, b"mark").await.unwrap();
+        for uri_key in [
+            "_o2_ao%2Fmark%2Fx",
+            "%5Fo2%5Fao%2Fmark%2Fx",
+            "%5fo2_ao%2fmark%2fx",
+            "_O2_AO%2Fmark%2Fx",
+            "%2F_o2_ao%2Fmark%2Fx",
+            "%2F%2F_o2_ao%2Fmark%2Fx",
+            "%20_o2_ao%2Fmark%2Fx%20",
+            "%09%2F%20_o2_ao%2Fmark%2Fx",
+            "_o2_ao%252Fmark%252Fx",
+            "%255Fo2_ao%25252Fmark",
+        ] {
+            let uri = format!("/{org}/kv/{uri_key}");
+            let (status, body) = send("POST", &uri, "forged").await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "POST {uri_key}");
+            assert!(body.contains("reserved"), "POST {uri_key}: {body}");
+            assert_eq!(send("DELETE", &uri, "").await.0, StatusCode::FORBIDDEN);
+        }
+        assert_eq!(stored(&org, target).await.as_deref(), Some(&b"mark"[..]));
+        assert_eq!(kv_store::list(&org, "").await.unwrap(), vec![target]);
     }
 }

@@ -44,10 +44,11 @@ use openobserve_api_management::request::org_domains;
 #[cfg(feature = "cpu-profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
-    ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
-    query_history, rum_analytics, sample_data, service_accounts, service_streams, short_url, slack,
-    slos, sourcemaps, status, status_pages, stream, synthetics, users,
+    alerts, announcements, authz, autoobserve, dashboards, db_monitoring, downtimes, folders,
+    gen_ai_health, ingest_rejections, kv, metrics_usage, model_pricing, organization,
+    public_dashboards, query_history, rum_analytics, sample_data, service_accounts,
+    service_streams, short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics,
+    users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -1286,13 +1287,26 @@ fn alert_calibration_routes(router: Router) -> Router {
         .route("/v2/{org_id}/alert_calibration/digests/run", post(alert_calibration::digests::run_alert_calibration))
 }
 
+// Registered in every build: without enterprise each handler answers Not Supported.
+#[rustfmt::skip]
+fn autoobserve_routes(router: Router) -> Router {
+    router
+        .route("/v2/{org_id}/autoobserve/entity_types", get(autoobserve::entity_types))
+        .route("/v2/{org_id}/autoobserve/coverage", get(autoobserve::coverage))
+        .route("/v2/{org_id}/autoobserve/coverage/history", get(autoobserve::coverage_history))
+        .route("/v2/{org_id}/autoobserve/suggestions", get(autoobserve::suggestions))
+        .route("/v2/{org_id}/autoobserve/marks", get(autoobserve::list_marks))
+        .route("/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id}", put(autoobserve::put_mark).delete(autoobserve::delete_mark))
+}
+
 #[rustfmt::skip]
 fn service_route_table() -> Router {
-    // Downtimes, Slack, search and service streams live in their own tables to keep this function under the line limit.
+    // Downtimes, Slack, search, service streams and AutoObserve live in their own tables to keep this function under the line limit.
     let mut router = Router::new()
         .merge(downtime_routes())
         .merge(slack_routes())
         .merge(search_routes());
+    router = autoobserve_routes(router);
     router = public_dashboard_admin_routes(router);
     router = router.merge(service_streams_routes());
     // Full UI configuration — authenticated counterpart of the unauthenticated

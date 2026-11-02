@@ -18,8 +18,8 @@ use config::{get_config, meta::stream::StreamType};
 use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
 use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
 use openobserve_api_management::request::{
-    gen_ai, keys, kv, rum_analytics, service_accounts, service_streams, short_url, status, stream,
-    synthetics,
+    autoobserve, gen_ai, keys, kv, rum_analytics, service_accounts, service_streams, short_url,
+    status, stream, synthetics,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::search::patterns;
@@ -218,6 +218,13 @@ use crate::{
         kv::set,
         kv::delete,
         kv::list,
+        autoobserve::entity_types,
+        autoobserve::coverage,
+        autoobserve::coverage_history,
+        autoobserve::suggestions,
+        autoobserve::list_marks,
+        autoobserve::put_mark,
+        autoobserve::delete_mark,
         clusters::list_clusters,
         short_url::shorten,
         short_url::retrieve,
@@ -1064,6 +1071,7 @@ use crate::{
         (name = "Fleet", description = "Fleet Manager: OpAMP collector inventory (enterprise)"),
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
         (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
+        (name = "AutoObserve", description = "Monitoring coverage, suggestions and entity marks from the AutoObserve engine (enterprise)"),
         (name = "Anomaly Detection", description = "Anomaly detection configs, model training and detection history (enterprise)"),
         (name = "Workflows", description = "Workflow authoring, drafts, runs and run history (enterprise)"),
         (name = "AWS Marketplace", description = "AWS Marketplace subscription linking (cloud)"),
@@ -2168,6 +2176,55 @@ mod tests {
             assert_eq!(op["x-o2-ratelimit"]["module"], "Query History");
             assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
         }
+    }
+
+    #[test]
+    fn autoobserve_paths_are_rate_limited_mcp_tagged_and_delete_has_no_body() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = &spec["paths"];
+        let mark = "/api/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id}";
+        let base = "/api/v2/{org_id}/autoobserve";
+        for (path, method, operation) in [
+            (format!("{base}/entity_types"), "get", "list"),
+            (format!("{base}/coverage"), "get", "get"),
+            (format!("{base}/coverage/history"), "get", "list"),
+            (format!("{base}/suggestions"), "get", "list"),
+            (format!("{base}/marks"), "get", "list"),
+            (mark.to_string(), "put", "update"),
+            (mark.to_string(), "delete", "delete"),
+        ] {
+            let op = &paths[path.as_str()][method];
+            assert_eq!(
+                op["x-o2-ratelimit"]["module"], "AutoObserve",
+                "{method} {path}"
+            );
+            assert_eq!(
+                op["x-o2-ratelimit"]["operation"], operation,
+                "{method} {path}"
+            );
+            assert_eq!(op["x-o2-mcp"]["category"], "autoobserve", "{method} {path}");
+            let responses = &op["responses"];
+            assert_eq!(
+                responses["403"]["description"], "Forbidden",
+                "{method} {path}"
+            );
+            assert!(
+                responses["404"]["description"]
+                    .as_str()
+                    .is_some_and(|d| d.contains("disabled")),
+                "{method} {path}: a switched-off deployment is a 404"
+            );
+        }
+        let delete = &paths[mark]["delete"];
+        assert_eq!(delete["x-o2-mcp"]["requires_confirmation"], true);
+        assert!(delete.get("requestBody").is_none(), "{delete}");
+        let params = delete["parameters"].as_array().unwrap();
+        assert!(
+            params
+                .iter()
+                .any(|p| p["name"] == "group_key" && p["in"] == "query"),
+            "{params:?}"
+        );
     }
 
     #[test]
