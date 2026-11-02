@@ -5236,6 +5236,7 @@
       "needsEdit": "Changing it needs edit access to this workflow.",
       "readOnlyOnMeta": "On · you can copy the URL. Changing it needs edit access to this workflow.",
       "offBody": "Let another system start this workflow with an HTTP request. You get a URL and a token.",
+      "offExistingBody": "Off · requests are refused (403) until you turn it on.",
       "onMeta": "On · runs start only while the workflow is enabled and published",
       "loadError": "Couldn't load the endpoint settings.",
       "draftBanner": "This workflow is a draft. Calls to the URL get 403 until you publish. You can set up the endpoint now, and Run test runs the draft's steps with a sample HTTP payload.",

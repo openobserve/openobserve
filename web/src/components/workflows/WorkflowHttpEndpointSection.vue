@@ -301,6 +301,7 @@ const metaText = computed<I18nText>(() => {
       return permissions.value.edit ? t("workflow.http.onMeta") : t("workflow.http.readOnlyOnMeta");
     default:
       if (!permissions.value.edit) return t("workflow.http.needsEdit");
+      if (config.value) return t("workflow.http.offExistingBody");
       return canTurnOn.value ? t("workflow.http.offBody") : t("workflow.http.needsAdmin");
   }
 });

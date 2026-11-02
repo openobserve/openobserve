@@ -542,6 +542,13 @@ describe("WorkflowHttpEndpointSection", () => {
       expect(w.emitted("view-run")).toEqual([["r-9"]]);
     });
 
+    it("an endpoint that is off says calls are refused, not how to create one", async () => {
+      api.getHttpTrigger.mockResolvedValue(httpConfig({ enabled: false }));
+      const w = await mountSection();
+      expect(byTest(w, "workflow-http-meta").text()).toBe(t("workflow.http.offExistingBody"));
+      expect(byTest(w, "workflow-http-meta").text()).not.toBe(t("workflow.http.offBody"));
+    });
+
     it("an endpoint that is off keeps its URL, tokens, revoke and settings", async () => {
       api.getHttpTrigger.mockResolvedValue(httpConfig({ enabled: false }));
       const w = await mountSection();
