@@ -14,7 +14,7 @@ Endpoints (context path /api, org in path):
 
 The routes exist only when the server runs with O2_WORKFLOW_HOOKS_ENABLED=true, which
 `/config` reports as `workflow_hooks_enabled`; until that is the default the module skips
-(WORKFLOW_HOOKS_REQUIRED=1 turns the skip into a failure). Invokes use `X-O2-Dry-Run: true`
+(WORKFLOW_HOOKS_REQUIRED=1 turns the skip into a failure). Invokes use `?dry_run=true`
 where only authentication matters, so no run is started.
 
 All artifacts are namespaced `wf_auto_http_*` and torn down by fixtures.
@@ -149,11 +149,10 @@ def _enable(session, base_url, wf_id, mode="token", **limits):
 
 def _invoke(base_url, trigger_id, token, dry_run=True, body=None, headers=None):
     hdrs = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    if dry_run:
-        hdrs["X-O2-Dry-Run"] = "true"
     hdrs.update(headers or {})
     return requests.post(
         f"{base_url}api/v2/{ORG_ID}/workflows/hooks/{trigger_id}",
+        params={"dry_run": "true"} if dry_run else None,
         json=body if body is not None else {"event": "pytest"},
         headers=hdrs,
     )

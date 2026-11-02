@@ -26,7 +26,7 @@ use super::{
     signature::{MAX_WEBHOOK_ID_LEN, is_printable_ascii},
 };
 
-pub const HEADER_ALLOWLIST: [&str; 14] = [
+pub const HEADER_ALLOWLIST: [&str; 13] = [
     "content-type",
     "content-length",
     "user-agent",
@@ -40,7 +40,6 @@ pub const HEADER_ALLOWLIST: [&str; 14] = [
     "x-github-event",
     "x-github-delivery",
     "x-event-type",
-    "x-o2-dry-run",
 ];
 pub const REFUSED_QUERY_NAMES: [&str; 5] = ["token", "access_token", "api_key", "apikey", "secret"];
 pub const MAX_META_HEADERS_BYTES: usize = 8 * 1024;
@@ -48,7 +47,7 @@ pub const MAX_META_QUERY_BYTES: usize = 2 * 1024;
 pub const EVENT_TYPE: &str = "webhook";
 /// Set only on HTTP runs, so a step can tell them apart from the workflow's own trigger kind.
 pub const TRIGGER_SOURCE: &str = "http";
-pub const DRY_RUN_HEADER: &str = "x-o2-dry-run";
+pub const DRY_RUN_PARAM: &str = "dry_run";
 const ENCODED_TOKEN_PREFIX: &str = "o2wh%5f";
 const ENCODED_SECRET_PREFIX: &str = "whsec%5f";
 const HOOK_SEGMENTS: &str = "/workflows/hooks/";
@@ -126,6 +125,9 @@ pub fn kept_query(query: Option<&str>) -> Map<String, Value> {
     let mut kept = Map::new();
     let mut used = 0;
     for (name, value) in url::form_urlencoded::parse(query.unwrap_or_default().as_bytes()) {
+        if name == DRY_RUN_PARAM {
+            continue;
+        }
         let size = name.len() + value.len();
         if used + size > MAX_META_QUERY_BYTES {
             continue;
@@ -189,11 +191,10 @@ pub fn idempotency_key(headers: &HeaderMap, mode: AuthMode) -> Result<Option<Str
     Ok(Some(String::from_utf8_lossy(bytes).into_owned()))
 }
 
-pub fn is_dry_run(headers: &HeaderMap) -> bool {
-    headers
-        .get(DRY_RUN_HEADER)
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|v| v.trim().eq_ignore_ascii_case("true"))
+/// A query flag, not a header, so a browser test needs no extra CORS header.
+pub fn is_dry_run(query: Option<&str>) -> bool {
+    url::form_urlencoded::parse(query.unwrap_or_default().as_bytes())
+        .any(|(name, value)| name == DRY_RUN_PARAM && value.trim().eq_ignore_ascii_case("true"))
 }
 
 /// Raw path segments are not percent-decoded, so the encoded underscore is matched too.
@@ -480,10 +481,24 @@ mod tests {
     }
 
     #[test]
-    fn the_dry_run_header_must_say_true() {
-        assert!(is_dry_run(&header_map(&[("x-o2-dry-run", "true")])));
-        assert!(is_dry_run(&header_map(&[("X-O2-Dry-Run", "TRUE")])));
-        assert!(!is_dry_run(&header_map(&[("x-o2-dry-run", "1")])));
-        assert!(!is_dry_run(&HeaderMap::new()));
+    fn the_dry_run_param_must_say_true() {
+        assert!(is_dry_run(Some("dry_run=true")));
+        assert!(is_dry_run(Some("a=1&dry_run=TRUE")));
+        assert!(!is_dry_run(Some("dry_run=1")));
+        assert!(!is_dry_run(Some("dry_run=false")));
+        assert!(!is_dry_run(None));
+    }
+
+    #[test]
+    fn the_dry_run_param_is_not_part_of_the_run_input() {
+        let kept = kept_query(Some("env=prod&dry_run=true"));
+        assert_eq!(kept.get("env"), Some(&json!("prod")));
+        assert!(!kept.contains_key("dry_run"));
+    }
+
+    #[test]
+    fn the_old_dry_run_header_is_not_kept() {
+        let kept = kept_headers(&header_map(&[("x-o2-dry-run", "true")]));
+        assert!(kept.is_empty());
     }
 }

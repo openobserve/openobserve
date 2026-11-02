@@ -63,10 +63,10 @@ fn a_hook_without_a_live_worker_is_503_worker_unavailable() {
             "nothing is enqueued without a worker"
         );
         let dry = send(post_token(
-            &a.invoke_path(),
+            &format!("{}?dry_run=true", a.invoke_path()),
             "203.0.113.40",
             &a.secret,
-            &[("x-o2-dry-run", "true")],
+            &[],
             BODY,
         ))
         .await;

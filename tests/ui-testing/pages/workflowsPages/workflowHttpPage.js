@@ -169,8 +169,8 @@ class WorkflowHttpPage {
   async invokeHook(url, { token, body = { service: 'checkout', deploy_id: 'd-4821' }, headers = {}, dryRun = false } = {}) {
     const h = { 'Content-Type': 'application/json', ...headers };
     if (token) h.Authorization = `Bearer ${token}`;
-    if (dryRun) h['X-O2-Dry-Run'] = 'true';
-    const resp = await fetch(url, { method: 'POST', headers: h, body: JSON.stringify(body) });
+    const target = dryRun ? `${url}${url.includes('?') ? '&' : '?'}dry_run=true` : url;
+    const resp = await fetch(target, { method: 'POST', headers: h, body: JSON.stringify(body) });
     const text = await resp.text();
     let json = null;
     try {

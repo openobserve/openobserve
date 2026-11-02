@@ -74,16 +74,10 @@ async fn create(workflow_id: &str) -> Reply {
 }
 
 async fn dry_run(org: &str, trigger_id: &str, token: &str) -> StatusCode {
-    let path = format!("/api/v2/{org}/workflows/hooks/{trigger_id}");
-    send(post_token(
-        &path,
-        "203.0.113.9",
-        token,
-        &[("x-o2-dry-run", "true")],
-        b"{}",
-    ))
-    .await
-    .status
+    let path = format!("/api/v2/{org}/workflows/hooks/{trigger_id}?dry_run=true");
+    send(post_token(&path, "203.0.113.9", token, &[], b"{}"))
+        .await
+        .status
 }
 
 fn credential_id(view: &Value) -> String {

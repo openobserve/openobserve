@@ -122,10 +122,6 @@ pub fn cors_layer() -> CorsLayer {
             header::ACCEPT,
             header::CONTENT_TYPE,
             header::HeaderName::from_static("idempotency-key"),
-            header::HeaderName::from_static("x-o2-dry-run"),
-            header::HeaderName::from_static("webhook-id"),
-            header::HeaderName::from_static("webhook-timestamp"),
-            header::HeaderName::from_static("webhook-signature"),
             header::HeaderName::from_static("stream-name"),
             header::HeaderName::from_static("organization"),
             header::HeaderName::from_static("traceparent"),
@@ -3883,45 +3879,6 @@ mod tests {
             StatusCode::BAD_REQUEST,
             "the hook route wins over /api/{{*path}}"
         );
-    }
-
-    #[tokio::test]
-    async fn cors_preflight_allows_the_dry_run_and_webhook_headers() {
-        let app = Router::new()
-            .route("/p", post(|| async { "" }))
-            .layer(cors_layer());
-        let origin = get_config()
-            .common
-            .web_url
-            .trim_end_matches('/')
-            .to_string();
-        let req = Request::builder()
-            .method(Method::OPTIONS)
-            .uri("/p")
-            .header(header::ORIGIN, origin)
-            .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
-            .header(
-                header::ACCESS_CONTROL_REQUEST_HEADERS,
-                "x-o2-dry-run,webhook-id,webhook-timestamp,webhook-signature,idempotency-key",
-            )
-            .body(Body::empty())
-            .unwrap();
-        let resp = app.oneshot(req).await.unwrap();
-        let allowed = resp
-            .headers()
-            .get(header::ACCESS_CONTROL_ALLOW_HEADERS)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or_default()
-            .to_ascii_lowercase();
-        for name in [
-            "x-o2-dry-run",
-            "webhook-id",
-            "webhook-timestamp",
-            "webhook-signature",
-            "idempotency-key",
-        ] {
-            assert!(allowed.contains(name), "{name} missing from {allowed:?}");
-        }
     }
 
     #[tokio::test]

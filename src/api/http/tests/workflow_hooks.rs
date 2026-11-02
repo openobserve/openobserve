@@ -291,16 +291,13 @@ fn an_org_being_deleted_answers_the_uniform_401() {
             let run_id = format!("{org}-run");
             seed_ledger_row(&a, &run_id).await;
             ORG_STATUS_CACHE.insert(org.to_string(), status);
-            let dry = [("x-o2-dry-run", "true")];
+            let dry_path = format!("{}?dry_run=true", a.invoke_path());
             for (case, req) in [
                 (
                     "invoke",
                     post_token(&a.invoke_path(), ip, &a.secret, &[], BODY),
                 ),
-                (
-                    "dry run",
-                    post_token(&a.invoke_path(), ip, &a.secret, &dry, BODY),
-                ),
+                ("dry run", post_token(&dry_path, ip, &a.secret, &[], BODY)),
                 (
                     "run status",
                     get_token(&a.poll_path(&run_id), ip, &a.secret),
@@ -364,10 +361,10 @@ fn credential_in_url_is_400_before_lookup() {
         .await;
         assert_reason(&value, StatusCode::BAD_REQUEST, "credential_in_url");
         let key_param = send(post_token(
-            &format!("{}?key=deploy", a.invoke_path()),
+            &format!("{}?key=deploy&dry_run=true", a.invoke_path()),
             ip,
             &a.secret,
-            &[("x-o2-dry-run", "true")],
+            &[],
             BODY,
         ))
         .await;
@@ -650,16 +647,16 @@ fn the_trigger_limit_answers_429_with_retry_after() {
     run(ENV, async {
         let ip = "203.0.113.12";
         let a = seed_token_trigger_with("lim", "limA", |row| row.rate_limit_per_minute = 2).await;
-        let dry = [("x-o2-dry-run", "true")];
+        let dry = format!("{}?dry_run=true", a.invoke_path());
         for _ in 0..2 {
             assert_eq!(
-                send(post_token(&a.invoke_path(), ip, &a.secret, &dry, BODY))
+                send(post_token(&dry, ip, &a.secret, &[], BODY))
                     .await
                     .status,
                 StatusCode::OK
             );
         }
-        let limited = send(post_token(&a.invoke_path(), ip, &a.secret, &dry, BODY)).await;
+        let limited = send(post_token(&dry, ip, &a.secret, &[], BODY)).await;
         assert_reason(&limited, StatusCode::TOO_MANY_REQUESTS, "rate_limited");
         assert!(
             limited
@@ -701,10 +698,10 @@ fn a_dry_run_writes_nothing_and_counts_against_the_limit() {
         let ip = "203.0.113.13";
         let a = seed_token_trigger_with("dry", "dryA", |row| row.rate_limit_per_minute = 1).await;
         let reply = send(post_token(
-            &a.invoke_path(),
+            &format!("{}?dry_run=true", a.invoke_path()),
             ip,
             &a.secret,
-            &[("x-o2-dry-run", "true")],
+            &[],
             BODY,
         ))
         .await;
@@ -723,7 +720,7 @@ fn the_dry_run_input_has_the_hook_shape() {
     run(ENV, async {
         let a = seed_token_trigger("shape", "shapeA").await;
         let reply = send(post_token(
-            &format!("{}?k=v", a.invoke_path()),
+            &format!("{}?k=v&dry_run=true", a.invoke_path()),
             "203.0.113.14",
             &a.secret,
             &[("x-o2-dry-run", "true"), ("x-custom", "dropped")],
@@ -740,7 +737,7 @@ fn the_dry_run_input_has_the_hook_shape() {
         assert!(meta["received_at"].as_i64().unwrap() > 1_000_000_000_000_000);
         assert_eq!(meta["query"], serde_json::json!({"k": "v"}));
         assert_eq!(meta["headers"]["content-type"], "application/json");
-        assert_eq!(meta["headers"]["x-o2-dry-run"], "true");
+        assert!(meta["headers"].get("x-o2-dry-run").is_none());
         assert!(meta["headers"].get("authorization").is_none());
         assert!(meta["headers"].get("x-custom").is_none());
         assert_eq!(input["data"], serde_json::json!([{"event": "deploy"}]));
@@ -809,15 +806,17 @@ fn an_alert_fired_workflow_accepts_http_runs_and_keeps_its_alert_link() {
         );
         let a = seed_token_trigger_for("kind", "kindA", "wf-kindA", |_| {}).await;
         let dry = send(post_token(
-            &a.invoke_path(),
+            &format!("{}?dry_run=true", a.invoke_path()),
             "203.0.113.40",
             &a.secret,
-            &[("x-o2-dry-run", "true")],
+            &[],
             BODY,
         ))
         .await;
         assert_eq!(dry.status, StatusCode::OK, "{:?}", dry.json());
+        assert_eq!(dry.json()["dry_run"], true);
         assert_eq!(dry.json()["input"]["meta"]["trigger_source"], "http");
+        assert_eq!(dry.json()["input"]["meta"]["query"], serde_json::json!({}));
         let reply = send(post_token(
             &a.invoke_path(),
             "203.0.113.40",
