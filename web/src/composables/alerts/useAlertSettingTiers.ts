@@ -30,6 +30,7 @@ export interface AlertSettingTiers {
   reveal: (id: AlertSettingId) => void;
   toggle: (section: AlertSectionId) => void;
   expand: (section: AlertSectionId) => void;
+  collapse: (section: AlertSectionId) => void;
 }
 
 export const ALERT_SETTING_TIERS_KEY: InjectionKey<AlertSettingTiers> = Symbol("alertSettingTiers");
@@ -64,6 +65,9 @@ export function useAlertSettingTiers(opts: {
     },
     expand: (section) => {
       expanded[section] = true;
+    },
+    collapse: (section) => {
+      expanded[section] = false;
     },
   };
 }

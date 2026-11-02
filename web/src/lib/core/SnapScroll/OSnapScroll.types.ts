@@ -7,7 +7,7 @@
  * intermediate stops with `data-snap-stop` (a `scroll-margin-top` on a stop
  * keeps it clear of a sticky header). A stop only snaps while its
  * section is taller than the scroller. While snapping, every section is at
- * least one view tall, so one section shows at a time, unless `contentHeight` is set. One wheel gesture or one
+ * least one view tall, so one section shows at a time. One wheel gesture or one
  * PageDown/Space moves one stop; Alt+Down/Up moves a whole section.
  */
 export interface OSnapScrollProps {
@@ -15,8 +15,6 @@ export interface OSnapScrollProps {
   snap?: boolean;
   /** Id of the section currently in view (v-model:active). */
   active?: string;
-  /** Sections take the height of their content; only the last fills the view, so every section can scroll to the top. Default: false */
-  contentHeight?: boolean;
 }
 
 export interface OSnapScrollEmits {
