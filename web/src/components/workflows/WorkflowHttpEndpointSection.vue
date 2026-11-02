@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :to="runsLink(lastCall.run_id)"
                 class="text-accent hover:underline"
                 data-test="workflow-http-last-call-link"
+                @click="emit('view-run', lastCall.run_id)"
               >
                 {{ t("workflow.http.viewRun") }}
               </RouterLink>
@@ -180,7 +181,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @run-test="onRunTest"
         />
       </WorkflowHttpReveal>
-      <WorkflowHttpSteady v-else-if="phase === 'steady'" :context="context" @run-test="onRunTest" />
+      <WorkflowHttpSteady
+        v-else-if="phase === 'steady' || managesOffEndpoint"
+        :context="context"
+        @run-test="onRunTest"
+      />
     </div>
   </section>
 </template>
@@ -221,7 +226,10 @@ const props = defineProps<{
   triggerNodeId?: string;
 }>();
 
-const emit = defineEmits<{ (e: "run-test", seed: unknown[], runAt?: number): void }>();
+const emit = defineEmits<{
+  (e: "run-test", seed: unknown[], runAt?: number): void;
+  (e: "view-run", runId: string): void;
+}>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -255,6 +263,8 @@ const refusal = computed<"draft" | "paused" | null>(() => {
   if (props.isDraftOnly) return "draft";
   return status.value === "paused" ? "paused" : null;
 });
+// Turning off must not hide revoke and delete, or a leaked token could only be revoked by turning it on.
+const managesOffEndpoint = computed(() => phase.value === "off" && !!config.value);
 // A draft refuses calls whether or not the endpoint is on, so the notice does not wait for it.
 const showDraftNotice = computed(() => props.isDraftOnly && phase.value !== "loading");
 const hasBody = computed(
@@ -262,6 +272,7 @@ const hasBody = computed(
     phase.value === "unsaved" ||
     phase.value === "revealing" ||
     phase.value === "steady" ||
+    managesOffEndpoint.value ||
     showDraftNotice.value ||
     !!actionError.value ||
     endpointExists.value,

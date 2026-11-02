@@ -110,7 +110,6 @@ export const RouterLinkStub = {
   template: `<a class="router-link" :data-to="JSON.stringify(to)"><slot /></a>`,
 };
 
-/** The real tooltip mounts its bubble only on hover; the stub keeps it in the DOM with its text. */
 /** Hover the element the way an entering pointer does, then wait past the tooltip's 700 ms open delay. */
 export const hoverAndWait = async (el: Element) => {
   el.dispatchEvent(new MouseEvent("mouseenter"));
@@ -119,6 +118,7 @@ export const hoverAndWait = async (el: Element) => {
   await nextTick();
 };
 
+/** The real tooltip mounts its bubble only on hover; the stub keeps it in the DOM with its text. */
 export const OTooltipStub = {
   name: "OTooltip",
   props: ["content", "side", "align", "maxWidth"],

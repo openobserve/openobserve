@@ -512,6 +512,34 @@ describe("useWorkflowHttpEndpoint", () => {
       expect(api.rotateHttpCredential).not.toHaveBeenCalled();
     });
 
+    it("a retiring credential alone does not block rotate", async () => {
+      api.getHttpTrigger.mockResolvedValue(
+        config({
+          credentials: [
+            credential({ id: "c1", state: "revoked" }),
+            credential({ id: "c0", state: "retiring", expires_at: Date.now() * 1000 + HOUR_US }),
+          ],
+        }),
+      );
+      api.rotateHttpCredential.mockResolvedValue({ ...credential({ id: "c2" }), secret: TOKEN });
+      const { endpoint } = await mountEndpoint();
+
+      expect(endpoint.rotateBlocked.value).toBe(false);
+      expect(endpoint.canRotate.value).toBe(true);
+      await endpoint.rotate(0);
+      expect(endpoint.rotateReplaced.value).toBe("none");
+    });
+
+    it("rotate records whether the active credential was kept or revoked", async () => {
+      api.rotateHttpCredential.mockResolvedValue({ ...credential({ id: "c2" }), secret: TOKEN });
+      const { endpoint } = await mountEndpoint();
+
+      await endpoint.rotate(0);
+      expect(endpoint.rotateReplaced.value).toBe("revoked");
+      endpoint.endReveal();
+      expect(endpoint.rotateReplaced.value).toBeNull();
+    });
+
     it("rotate with no live credential mints a new one", async () => {
       api.getHttpTrigger.mockResolvedValue(
         config({ credentials: [credential({ state: "revoked" })] }),

@@ -831,6 +831,19 @@ describe("WorkflowTestDialog Payload from", () => {
     expect(JSON.parse(workflowObj.testRun.input)[0].meta.event_type).toBe("resolved");
   });
 
+  it("an Incident Event workflow opens on the variant its saved input holds", () => {
+    setWorkflow(
+      [
+        { id: "t1", data: { node_type: "workflow_trigger", trigger_kind: "incident_event" } },
+        destNode,
+      ],
+      [{ source: "t1", target: "d1" }],
+    );
+    workflowObj.testRun.input = JSON.stringify([{ meta: { event_type: "resolved" }, data: [] }]);
+    const w = mountDialog();
+    expect(payloadSelect(w).props("modelValue")).toBe("resolved");
+  });
+
   it("an HTTP run used as test input selects HTTP request", () => {
     workflowObj.testRun.input = JSON.stringify([
       { meta: { trigger_source: "http", trigger_id: "t9" }, data: [] },

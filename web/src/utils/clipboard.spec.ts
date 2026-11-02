@@ -358,6 +358,30 @@ describe("clipboard", () => {
     expect(writeText).toHaveBeenCalledWith("b");
   });
 
+  it("copyPendingText leaves no unhandled rejection when the item is refused before reading", async () => {
+    vi.stubGlobal(
+      "ClipboardItem",
+      class {
+        constructor() {
+          throw new Error("unsupported");
+        }
+      },
+    );
+    setClipboard({ write: vi.fn(), writeText: vi.fn() });
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      await expect(copyPendingText(Promise.reject(new Error("fetch failed")))).rejects.toThrow(
+        "fetch failed",
+      );
+      await new Promise((r) => setTimeout(r, 0));
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("copyPendingText rethrows the value's failure and returns false when no copy works", async () => {
     setClipboard({ writeText: vi.fn().mockRejectedValue(new Error("denied")) });
     await expect(copyPendingText(Promise.reject(new Error("fetch failed")))).rejects.toThrow(

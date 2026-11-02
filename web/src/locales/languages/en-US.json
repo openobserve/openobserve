@@ -5274,6 +5274,10 @@
       "rotateBannerTitleSigned": "New signing secret created",
       "rotateBannerBody": "Callers keep the same URL and header; only the token changes. The old token keeps working until it expires and can be shown until then.",
       "rotateBannerBodySigned": "Callers keep the same URL and headers; only the secret changes. The old secret keeps working until it expires and can be shown until then.",
+      "rotateBannerBodyRevoked": "Callers keep the same URL and header; only the token changes. The old token was revoked and stops working now.",
+      "rotateBannerBodyRevokedSigned": "Callers keep the same URL and headers; only the secret changes. The old secret was revoked and stops working now.",
+      "rotateBannerBodyFresh": "Callers keep the same URL and header and send this token from now on.",
+      "rotateBannerBodyFreshSigned": "Callers keep the same URL and headers and sign with this secret from now on.",
       "snippetsLabel": "Example request",
       "sendTest": "Send test request",
       "sendTestHint": "Checks the credentials and shows what your steps would receive. No run starts, no destination is called.",
@@ -5455,7 +5459,9 @@
       "exampleActiveToken": "Active token · {prefix}",
       "exampleActiveSecret": "Active secret · {prefix}",
       "exampleHintToken": "Copy includes the token. Paste into a terminal, or import into Postman or Insomnia (Import → Raw text).",
-      "exampleHintSigned": "Run in bash: it signs with openssl, then calls curl. Copy includes the secret. Import tools cannot sign."
+      "exampleHintSigned": "Run in bash: it signs with openssl, then calls curl. Copy includes the secret. Import tools cannot sign.",
+      "exampleHintTokenPlaceholder": "Copy has a placeholder where the token goes. Paste into a terminal, or import into Postman or Insomnia (Import → Raw text).",
+      "exampleHintSignedPlaceholder": "Run in bash: it signs with openssl, then calls curl. Copy has a placeholder where the secret goes. Import tools cannot sign."
     }
   },
   "pipeline": {

@@ -47,6 +47,15 @@ const LEDGER_REASONS: ReadonlySet<string> = new Set([
   "run_timeout",
 ]);
 
+// Each of these ends a run before any step's result is stored.
+const NO_DATA_CODES: ReadonlySet<string> = new Set([
+  "worker_lost",
+  "workflow_disabled",
+  "run_timeout",
+  "payload_missing",
+  "run_failed",
+]);
+
 const KIND_SOURCES: Record<string, RunSource> = {
   alert_fired: "alert_fired",
   incident_event: "incident_event",
@@ -66,8 +75,9 @@ export function runReasonOf(row: RunOutcomeFields | null | undefined): RunReason
 export function hasStoredRunData(row: RunOutcomeFields | null | undefined): boolean {
   if (!row) return true;
   if (row.status === "queued" || row.status === "running" || row.status === "expired") return false;
-  const reason = runReasonOf(row);
-  return reason !== "worker_lost" && reason !== "workflow_disabled";
+  if (row.status !== "failed") return true;
+  const code = row.http_request?.error ?? row.error ?? null;
+  return !(code && NO_DATA_CODES.has(code));
 }
 
 export function triggerFilterSource(kind: string | null | undefined): RunSource | null {

@@ -163,6 +163,21 @@ describe("WorkflowHttpExample", () => {
     );
   });
 
+  it("the hint names a placeholder when the copy carries no credential", () => {
+    const hint = (w: ReturnType<typeof mountExample>["wrapper"]) =>
+      w.find('[data-test="workflow-http-example-hint"]').text();
+    const noReveal = mountExample({}, { edit: false, test: false, reveal: false }).wrapper;
+    expect(hint(noReveal)).toContain("placeholder where the token goes");
+    const noActive = mountExample({ credentials: [httpCredential({ state: "revoked" })] }).wrapper;
+    expect(hint(noActive)).toContain("placeholder where the token goes");
+    const signed = mountExample(
+      { auth_mode: "signature", credentials: [] },
+      { edit: false, test: false, reveal: false },
+    ).wrapper;
+    expect(hint(signed)).toContain("placeholder where the secret goes");
+    expect(hint(mountExample().wrapper)).toContain("Copy includes the token");
+  });
+
   it("without reveal permission shows placeholders and no eye", () => {
     const { wrapper } = mountExample({}, { edit: false, test: false, reveal: false });
     expect(codeOf(wrapper)).toContain("$O2_HOOK_TOKEN");

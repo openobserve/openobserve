@@ -77,6 +77,19 @@ describe("hasStoredRunData", () => {
     expect(hasStoredRunData({ status: "failed", error: "workflow_disabled" })).toBe(false);
   });
 
+  it("is false for failed runs that ended before any step result was stored", () => {
+    for (const error of ["run_timeout", "payload_missing", "run_failed"])
+      expect(hasStoredRunData({ status: "failed", error })).toBe(false);
+    expect(
+      hasStoredRunData({
+        status: "failed",
+        error: "step text",
+        http_request: { error: "run_timeout" },
+      }),
+    ).toBe(false);
+    expect(hasStoredRunData({ status: "failed", error: "node_errored" })).toBe(true);
+  });
+
   it("is true for finished runs", () => {
     expect(hasStoredRunData({ status: "succeeded", error: null })).toBe(true);
     expect(hasStoredRunData({ status: "failed", error: "boom" })).toBe(true);

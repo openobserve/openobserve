@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
@@ -159,12 +159,17 @@ import {
   httpErrorText,
   useHttpEndpoint,
 } from "@/plugins/workflows/httpEndpointUi";
-import type { EndpointContext } from "@/plugins/workflows/useWorkflowHttpEndpoint";
+import type { EndpointContext, RotateReplaced } from "@/plugins/workflows/useWorkflowHttpEndpoint";
 import WorkflowHttpSnippets from "./WorkflowHttpSnippets.vue";
 import WorkflowHttpUrl from "./WorkflowHttpUrl.vue";
 
 const BEARER_HEADER = "Authorization: Bearer <token>";
 const SIGNATURE_HEADERS = "webhook-id, webhook-timestamp, webhook-signature";
+const ROTATE_BODY_KEYS: Record<RotateReplaced, [I18nKey, I18nKey]> = {
+  retiring: ["workflow.http.rotateBannerBody", "workflow.http.rotateBannerBodySigned"],
+  revoked: ["workflow.http.rotateBannerBodyRevoked", "workflow.http.rotateBannerBodyRevokedSigned"],
+  none: ["workflow.http.rotateBannerBodyFresh", "workflow.http.rotateBannerBodyFreshSigned"],
+};
 
 const props = defineProps<{
   context: EndpointContext;
@@ -175,8 +180,16 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: "run-test"): void }>();
 
 const { t } = useI18nTyped();
-const { config, revealedSecret, revealKind, activeCredential, canRunTest, sendTest, endReveal } =
-  useHttpEndpoint();
+const {
+  config,
+  revealedSecret,
+  revealKind,
+  rotateReplaced,
+  activeCredential,
+  canRunTest,
+  sendTest,
+  endReveal,
+} = useHttpEndpoint();
 
 const sending = ref(false);
 const result = ref<DryRunResult | null>(null);
@@ -207,10 +220,10 @@ const bannerTitle = computed(() => {
   return t("workflow.http.revealBannerTitle");
 });
 const bannerBody = computed(() => {
-  if (revealKind.value === "rotated")
-    return isSigned.value
-      ? t("workflow.http.rotateBannerBodySigned")
-      : t("workflow.http.rotateBannerBody");
+  if (revealKind.value === "rotated") {
+    const [token, signed] = ROTATE_BODY_KEYS[rotateReplaced.value ?? "retiring"];
+    return t(isSigned.value ? signed : token);
+  }
   return isSigned.value
     ? t("workflow.http.revealBannerBodySigned")
     : t("workflow.http.revealBannerBody");

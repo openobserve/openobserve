@@ -59,6 +59,8 @@ export type EndpointPhase = "loading" | "error" | "off" | "unsaved" | "revealing
 export type EndpointStatus = "unsaved" | "not_configured" | "off" | "draft" | "paused" | "on";
 
 export type RevealKind = "created" | "rotated" | "switched";
+/** What a rotate did to the credential that was active: kept until expiry, revoked, or none existed. */
+export type RotateReplaced = "retiring" | "revoked" | "none";
 
 /** Where the panel is open: the editor runs tests on its canvas, the list cannot. */
 export type EndpointContext = "editor" | "list";
@@ -115,6 +117,7 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
   const revealedSecret = ref<string | null>(null);
   const revealedMode = ref<HttpAuthMode | null>(null);
   const revealKind = ref<RevealKind | null>(null);
+  const rotateReplaced = ref<RotateReplaced | null>(null);
   const endpointExists = ref(false);
   const revealedCredentials = ref<Record<string, string>>({});
   const revealing = ref<string | null>(null);
@@ -180,7 +183,7 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
     context === "list" ? "workflow.http.runTestHintList" : "workflow.http.runTestHint",
   );
 
-  const rotateBlocked = computed(() => !!retiringCredential.value);
+  const rotateBlocked = computed(() => !!retiringCredential.value && !!activeCredential.value);
   // No live credential is still a valid rotate: the server mints a new one.
   const canRotate = computed(
     () => permissions.value.edit && permissions.value.reveal && !rotateBlocked.value,
@@ -208,6 +211,7 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
     revealedSecret.value = secret;
     revealedMode.value = mode;
     revealKind.value = kind;
+    rotateReplaced.value = null;
   };
 
   const forgetRows = () => {
@@ -219,6 +223,7 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
     revealedSecret.value = null;
     revealedMode.value = null;
     revealKind.value = null;
+    rotateReplaced.value = null;
     endpointExists.value = false;
     forgetRows();
   };
@@ -352,8 +357,11 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
       );
     }
     if (!canRotate.value) throw new HttpEndpointError("workflow.http.errorNotAllowed");
+    let replaced: RotateReplaced = "none";
+    if (activeCredential.value) replaced = overlapSeconds > 0 ? "retiring" : "revoked";
     const result = await rotation.mutateAsync({ overlap_seconds: overlapSeconds });
     takeSecret(result.secret, current.auth_mode, "rotated", rotation.reset);
+    rotateReplaced.value = replaced;
   };
 
   const revoke = async (credentialId: string) => {
@@ -444,6 +452,7 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
     endpointExists: readonly(endpointExists),
     revealedSecret: readonly(revealedSecret),
     revealKind: readonly(revealKind),
+    rotateReplaced: readonly(rotateReplaced),
     revealActive: computed(() => revealedSecret.value !== null),
     revealedCredentials: readonly(revealedCredentials),
     revealing: readonly(revealing),

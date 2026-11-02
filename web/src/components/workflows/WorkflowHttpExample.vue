@@ -66,14 +66,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OCodeBlock>
     <OText variant="meta" as="p" data-test="workflow-http-example-hint">
-      {{ isSigned ? t("workflow.http.exampleHintSigned") : t("workflow.http.exampleHintToken") }}
+      {{ t(hintKey) }}
     </OText>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -98,6 +98,13 @@ const {
 
 const isSigned = computed(() => config.value?.auth_mode === "signature");
 const canReveal = computed(() => permissions.value.reveal);
+// Copy only fetches the real credential when the viewer may reveal an active one.
+const hintKey = computed<I18nKey>(() => {
+  const real = canReveal.value && !!active.value;
+  if (isSigned.value)
+    return real ? "workflow.http.exampleHintSigned" : "workflow.http.exampleHintSignedPlaceholder";
+  return real ? "workflow.http.exampleHintToken" : "workflow.http.exampleHintTokenPlaceholder";
+});
 const shown = computed(() =>
   active.value ? revealedCredentials.value[active.value.id] : undefined,
 );

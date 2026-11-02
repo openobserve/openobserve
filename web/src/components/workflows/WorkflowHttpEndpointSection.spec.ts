@@ -527,6 +527,24 @@ describe("WorkflowHttpEndpointSection", () => {
       expect(to).toMatchObject({ name: "workflowRuns", query: { id: "wf1", run_id: "r-9" } });
     });
 
+    it("View run reports the run it opens", async () => {
+      api.getHttpTrigger.mockResolvedValue(
+        httpConfig({ last_call: { run_id: "r-9", status: "failed", received_at: 1 } }),
+      );
+      const w = await mountSection();
+      await byTest(w, "workflow-http-last-call-link").trigger("click");
+      expect(w.emitted("view-run")).toEqual([["r-9"]]);
+    });
+
+    it("an endpoint that is off keeps its URL, tokens, revoke and settings", async () => {
+      api.getHttpTrigger.mockResolvedValue(httpConfig({ enabled: false }));
+      const w = await mountSection();
+      expect(byTest(w, "workflow-http-toggle").attributes("data-value")).toBe("false");
+      expect(byTest(w, "workflow-http-url").text()).toContain(httpConfig().url);
+      expect(byTest(w, "workflow-http-credential-c1-revoke").exists()).toBe(true);
+      expect(byTest(w, "workflow-http-rotate").exists()).toBe(true);
+    });
+
     it("no calls shows No calls yet — send a test request", async () => {
       const w = await mountSection();
       expect(byTest(w, "workflow-http-last-call").text()).toBe(t("workflow.http.lastCallNone"));
@@ -837,6 +855,9 @@ describe("WorkflowHttpEndpointSection", () => {
       expect(byTest(w, "workflow-http-reveal-banner").text()).toContain(
         t("workflow.http.rotateBannerTitle"),
       );
+      expect(byTest(w, "workflow-http-reveal-banner").text()).toContain(
+        t("workflow.http.rotateBannerBody"),
+      );
       expect(byTest(w, "workflow-http-reveal").text()).toContain(t("workflow.http.newTokenLabel"));
       expect(byTest(w, "workflow-http-reveal").text()).not.toContain(NEW_TOKEN);
       expect(byTest(w, "workflow-http-url").exists()).toBe(false);
@@ -865,6 +886,9 @@ describe("WorkflowHttpEndpointSection", () => {
       );
       await byTest(w, "workflow-http-rotate-confirm").trigger("click");
       await flushPromises();
+      expect(byTest(w, "workflow-http-reveal-banner").text()).toContain(
+        t("workflow.http.rotateBannerBodyFresh"),
+      );
       expect(api.rotateHttpCredential).toHaveBeenCalledWith(
         expect.objectContaining({ overlap_seconds: 0 }),
       );
@@ -881,6 +905,19 @@ describe("WorkflowHttpEndpointSection", () => {
       expect(byTest(w, "workflow-http-rotate-error").text()).toBe(
         t("workflow.http.rotateFailed", { reason: "busy" }),
       );
+    });
+
+    it("a rotate error is gone after the popover closes without Cancel", async () => {
+      api.rotateHttpCredential.mockRejectedValue({ response: { data: { message: "busy" } } });
+      const w = await mountSection();
+      await byTest(w, "workflow-http-rotate").trigger("click");
+      await byTest(w, "workflow-http-rotate-confirm").trigger("click");
+      await flushPromises();
+      expect(byTest(w, "workflow-http-rotate-error").exists()).toBe(true);
+      await byTest(w, "workflow-http-rotate").trigger("click");
+      await byTest(w, "workflow-http-rotate").trigger("click");
+      expect(byTest(w, "workflow-http-rotate-popover").exists()).toBe(true);
+      expect(byTest(w, "workflow-http-rotate-error").exists()).toBe(false);
     });
 
     it("row Revoke confirms, then revokes that credential", async () => {

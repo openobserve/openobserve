@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :before-create="beforeCreate"
         :trigger-node-id="triggerNodeId"
         @run-test="onRunTest"
+        @view-run="onViewRun"
       />
     </div>
   </ODrawer>
@@ -100,6 +101,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "update:open", open: boolean): void;
   (e: "run-test", seed: unknown[], runAt?: number): void;
+  (e: "view-run", runId: string): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -120,5 +122,11 @@ const samplePayload = computed(() => JSON.stringify(httpPreviewSample(), null, 2
 const onRunTest = (seed: unknown[], runAt?: number) => {
   emit("update:open", false);
   emit("run-test", seed, runAt);
+};
+
+// The link may name the run already open, which changes no route, so the panel closes itself.
+const onViewRun = (runId: string) => {
+  emit("update:open", false);
+  emit("view-run", runId);
 };
 </script>

@@ -209,6 +209,19 @@ describe("WorkflowHttpEndpointPanel", () => {
     expect(seed[0].meta).toMatchObject({ trigger_source: "http", trigger_id: "test" });
   });
 
+  it("View run closes the panel and reports the run", async () => {
+    api.getHttpTrigger.mockResolvedValue(
+      httpConfig({ last_call: { run_id: "r-9", status: "succeeded", received_at: 1 } }),
+    );
+    const order: string[] = [];
+    const w = await mountPanel({
+      "onUpdate:open": (v: boolean) => order.push(`open:${v}`),
+      onViewRun: (id: string) => order.push(`view:${id}`),
+    });
+    await byTest(w, "workflow-http-last-call-link").trigger("click");
+    expect(order).toEqual(["open:false", "view:r-9"]);
+  });
+
   it("list context replaces Run test with Open the workflow", async () => {
     const w = await mountPanel({ context: "list" });
     expect(byTest(w, "workflow-http-run-test").exists()).toBe(false);

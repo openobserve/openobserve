@@ -104,6 +104,13 @@ describe("WorkflowRunHttpOutcome", () => {
     );
   });
 
+  it("timed-out run shows its reason", () => {
+    const w = mountOutcome({ status: "failed", reason: "run_timeout" });
+    expect(w.find('[data-test="workflow-run-never-ran"]').text()).toContain(
+      "timed out after 15 min",
+    );
+  });
+
   it("renders nothing for a successful run", () => {
     const w = mountOutcome({ status: "succeeded" });
     expect(w.find('[data-test="workflow-run-error"]').exists()).toBe(false);

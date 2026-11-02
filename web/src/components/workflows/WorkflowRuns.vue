@@ -168,6 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :trigger-node-id="httpTriggerNodeId"
       @update:open="httpPanelOpen = $event"
       @run-test="onHttpRunTest"
+      @view-run="onPanelViewRun"
     />
   </div>
 </template>
@@ -433,6 +434,13 @@ watch(
     void onSelectRun(runId);
   },
 );
+
+// A run already in the URL changes no route, so the watch above never reloads it.
+const onPanelViewRun = (runId: string) => {
+  if (runId === router.currentRoute.value.query.run_id && runId !== selectedRunId.value) {
+    void onSelectRun(runId);
+  }
+};
 
 onMounted(async () => {
   // Read-only inspection surface — no editing on the canvas.

@@ -66,6 +66,8 @@ export async function copyPendingText(text: Promise<string>): Promise<boolean> {
   if (typeof ClipboardItem !== "undefined" && typeof navigator.clipboard?.write === "function") {
     try {
       const blob = text.then((value) => new Blob([value], { type: "text/plain" }));
+      // The fallback below rethrows the same failure from `text`, so this copy of it is dropped.
+      blob.catch(() => undefined);
       await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
       return true;
     } catch {

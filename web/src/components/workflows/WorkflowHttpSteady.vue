@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -245,6 +245,10 @@ const switchOpen = ref(false);
 const pendingMode = ref<HttpAuthMode>("token");
 const rotateOpen = ref(false);
 const rotateError = ref<string | null>(null);
+// Escape and outside clicks close the popover without a cancel event.
+watch(rotateOpen, (open) => {
+  if (!open) rotateError.value = null;
+});
 const advancedOpen = ref(false);
 const advanced = ref<InstanceType<typeof WorkflowHttpAdvanced> | null>(null);
 const actionError = ref<I18nText | null>(null);

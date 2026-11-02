@@ -204,10 +204,18 @@ const HTTP_CHOICE: PayloadFrom = "http";
 const KIND_CHOICE: PayloadFrom = "trigger";
 const kindVariants = triggerDef(currentTriggerKind()).sampleVariants ?? [];
 const firstKindChoice = kindVariants[0]?.key ?? KIND_CHOICE;
+const savedVariant = (): string | undefined => {
+  try {
+    const event = JSON.parse(workflowObj.testRun.input || "[]")?.[0]?.meta?.event_type;
+    return kindVariants.find((v) => v.key === event)?.key;
+  } catch {
+    return undefined;
+  }
+};
 const startsAsHttp =
   props.payloadFrom === HTTP_CHOICE ||
   (!props.payloadFrom && isHttpRequestInput(workflowObj.testRun.input));
-const payloadChoice = ref<string>(startsAsHttp ? HTTP_CHOICE : firstKindChoice);
+const payloadChoice = ref<string>(startsAsHttp ? HTTP_CHOICE : (savedVariant() ?? firstKindChoice));
 const payloadFromOptions = computed(() => {
   const kindOptions = kindVariants.length
     ? kindVariants.map((v) => ({ label: v.labelKey ? t(v.labelKey) : raw(v.key), value: v.key }))
