@@ -62,14 +62,19 @@ const liveRow = (cells: Record<string, ReturnType<typeof cell>>) =>
     "en-US",
   ).rows[0];
 
-const mountDrawer = (row: CoverageRow, state: "watched" | "gap", live = true) =>
+const mountDrawer = (
+  row: CoverageRow,
+  state: "watched" | "gap",
+  live = true,
+  expanded: "absence" | null = null,
+) =>
   mount(CoverageServiceDrawer, {
     props: {
       row,
       serviceStates: { [row.service]: state },
       scenario: "demo",
       ledger: [],
-      expanded: null,
+      expanded,
       anchor: "body",
       fix: null,
       message: "",
@@ -169,8 +174,29 @@ describe("CoverageServiceDrawer in live mode", () => {
     const chip = wrapper.find('[data-test="autoobserve-coverage-drawer-chip-absence"]');
     expect(wrapper.find(DETAIL).exists()).toBe(false);
     await chip.trigger("click");
+    expect(wrapper.emitted("expand")?.at(-1)).toEqual(["absence"]);
+    await wrapper.setProps({ expanded: "absence" });
     expect(wrapper.find(DETAIL).exists()).toBe(true);
     expect(chip.attributes("aria-expanded")).toBe("true");
+    await chip.trigger("click");
+    expect(wrapper.emitted("expand")?.at(-1)).toEqual([null]);
+  });
+
+  it("arrives with the absence detail open when the table's Absence cell opened it", () => {
+    const row = liveRow({
+      errors: cell("none"),
+      latency: cell("none"),
+      absence: cell("covered", "checkout-heartbeat"),
+    });
+    const wrapper = mountDrawer(row, "watched", true, "absence");
+    expect(wrapper.find('[data-test="autoobserve-coverage-drawer-absence-detail"]').exists()).toBe(
+      true,
+    );
+    expect(
+      wrapper
+        .find('[data-test="autoobserve-coverage-drawer-chip-absence"]')
+        .attributes("aria-expanded"),
+    ).toBe("true");
   });
 });
 

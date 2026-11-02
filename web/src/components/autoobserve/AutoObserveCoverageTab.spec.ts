@@ -298,4 +298,17 @@ describe("AutoObserveCoverageTab in live mode", () => {
     await wrapper.setProps({ source: live(FEW), skeleton: false });
     expect(announce().text()).toBe("Coverage loaded");
   });
+
+  it("opens the drawer on the clicked check, Absence included", async () => {
+    routeQuery.cov = "table";
+    const wrapper = mountTab(live(coverage([row("api", "covered"), row("web", "none")])));
+    const drawer = () => wrapper.findComponent({ name: "CoverageServiceDrawer" });
+    const absence = '[data-test="autoobserve-coverage-cell-web-absence"]';
+    await wrapper.find('[data-test="autoobserve-coverage-cell-api-errors"]').trigger("click");
+    expect(drawer().props("expanded")).toBe("errors");
+    await wrapper.find(absence).trigger("click");
+    expect(drawer().props("row").service).toBe("web");
+    expect(drawer().props("expanded")).toBe("absence");
+    expect(wrapper.find(absence).attributes("aria-pressed")).toBe("true");
+  });
 });

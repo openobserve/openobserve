@@ -373,11 +373,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :title="row.checks[check].state === 'gap' ? row.checks[check].reason : undefined"
               :aria-label="liveCellAria(row, check)"
-              :aria-pressed="check !== 'absence' && isSelected(row.service, check)"
+              :aria-pressed="isSelected(row.service, check)"
               :data-test="`autoobserve-coverage-cell-${row.service}-${check}`"
-              @click="
-                selected = { service: row.service, signal: check === 'absence' ? null : check }
-              "
+              @click="selected = { service: row.service, signal: check }"
             >
               <span
                 class="size-2 shrink-0 rounded-full"
@@ -752,8 +750,12 @@ const fill = ref<CoverageFill>(pick(route.query.fill, fills.value, "state"));
 const highlight = ref<HexClass[]>([]);
 
 const initialService = typeof route.query.service === "string" ? route.query.service : null;
-const initialSignal = pick<Signal | "">(route.query.signal, SIGNALS, "");
-const selected = ref<{ service: string; signal: Signal | null } | null>(
+const initialSignal = pick<Signal | LiveCheck | "">(
+  route.query.signal,
+  [...SIGNALS, "absence"],
+  "",
+);
+const selected = ref<{ service: string; signal: Signal | LiveCheck | null } | null>(
   initialService ? { service: initialService, signal: initialSignal || null } : null,
 );
 
@@ -902,7 +904,7 @@ const selectedRow = computed(() =>
   selected.value ? allRows.value.find((r) => r.service === selected.value?.service) : undefined,
 );
 
-const isSelected = (service: string, signal: Signal) =>
+const isSelected = (service: string, signal: Signal | LiveCheck) =>
   selected.value?.service === service && selected.value.signal === signal;
 
 const railTone = (row: CoverageRow): RowRailTone | null =>
