@@ -183,13 +183,14 @@ Also do not flag:
 
 These are convention and consistency findings, not outages. Calibrate accordingly:
 
-- **critical** — reserve for a real user-facing break you can describe: a nav gate mismatch that
+- **p0** — reserve for a default path broken for all users or an exploitable security hole.
+- **p1** — reserve for a real user-facing break you can describe: a nav gate mismatch that
   makes a page reachable without the entitlement, a sortable column that silently orders by the
   wrong field, a translated string that breaks a code comparison, an unregistered token that
   makes a control invisible in dark mode.
-- **warning** — a house-rule violation with a concrete consequence: a hand-rolled header that
+- **p2** — a house-rule violation with a concrete consequence: a hand-rolled header that
   will drift from every other page, a form container that is wrong for the interaction's weight,
   a duplicated formatter, a `raw()` on real copy.
-- **suggestion** — everything else.
+- **p3** — a likely bug with one unverified step. Anything with no concrete failure is not a finding.
 
-Do not manufacture a `critical` to be heard. A frontend reviewer that cries wolf gets muted.
+Do not manufacture a `p0` or `p1` to be heard. A frontend reviewer that cries wolf gets muted.
