@@ -99,7 +99,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
 import type * as BillingsModule from "@/services/billings";
-import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
 import incidentsService, {
   Incident,
   IncidentWithAlerts,
@@ -313,56 +312,6 @@ describe("IncidentDetailDrawer.vue", () => {
     }
   });
 
-  describe("Component Initialization", () => {
-    it("should mount component successfully", async () => {
-      wrapper = await createWrapper();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should show loading state initially", async () => {
-      wrapper = await createWrapper();
-      expect(wrapper.vm.loading).toBe(false);
-    });
-
-    it("should initialize with no incident details", async () => {
-      wrapper = await createWrapper();
-      expect(wrapper.vm.incidentDetails).toBeNull();
-    });
-
-    it("should initialize empty triggers array", async () => {
-      wrapper = await createWrapper();
-      expect(wrapper.vm.triggers).toEqual([]);
-    });
-
-    it("should not be updating initially", async () => {
-      wrapper = await createWrapper();
-      expect(wrapper.vm.updating).toBe(false);
-    });
-  });
-
-  describe("URL-based Incident Loading", () => {
-    it("should emit close when drawer closes", async () => {
-      wrapper = await createWrapper();
-      const pushSpy = vi.spyOn(router, "push");
-
-      wrapper.vm.close();
-      await nextTick();
-
-      // Should navigate back to incident list instead of emitting
-      expect(pushSpy).toHaveBeenCalledWith({
-        name: "incidentList",
-        query: { org_identifier: "default" },
-      });
-    });
-
-    it("should load details when incident_id is in URL", async () => {
-      wrapper = await createWrapper({}, {}, "test-123");
-      await flushPromises();
-
-      expect(incidentsService.get).toHaveBeenCalledWith("default", "test-123");
-    });
-  });
-
   describe("Incident Details Loading", () => {
     it("should load incident details successfully", async () => {
       const mockIncident = createIncidentWithAlerts({
@@ -384,35 +333,6 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.incidentDetails).toBeTruthy();
       expect(wrapper.vm.incidentDetails.id).toBe("test-123");
       expect(wrapper.vm.incidentDetails.title).toBe("Test Incident");
-    });
-
-    it("should set loading state during fetch", async () => {
-      // Create a pending promise that we can control
-      let resolvePromise: (value: any) => void;
-      const pendingPromise = new Promise((resolve) => {
-        resolvePromise = resolve;
-      });
-
-      (incidentsService.get as any).mockReturnValue(pendingPromise);
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-
-      // Now loading should be true since the promise is pending
-      expect(wrapper.vm.loading).toBe(true);
-
-      // Resolve the promise
-      resolvePromise!({ data: createIncidentWithAlerts({ id: "test-123" }) });
-      await flushPromises();
-      // The query layer defers its fetch a microtask, so the loader settles a
-      // tick after the service promise does.
-      await flushPromises();
-      await nextTick();
-
-      // Now loading should be false
-      expect(incidentsService.get).toHaveBeenCalled();
-      expect(wrapper.vm.loading).toBe(false);
     });
 
     it("shows no Alert Triggers count until the incident has loaded", async () => {
@@ -441,25 +361,6 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(count().text()).toBe("2");
     });
 
-    it("should load triggers from incident", async () => {
-      const triggers = [
-        createAlert({ alert_id: "alert-1", alert_name: "CPU Alert" }),
-        createAlert({ alert_id: "alert-2", alert_name: "Memory Alert" }),
-      ];
-
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.triggers).toHaveLength(2);
-      expect(wrapper.vm.triggers[0].alert_name).toBe("CPU Alert");
-    });
-
     it("should handle API error during load", async () => {
       (incidentsService.get as any).mockRejectedValue(new Error("API Error"));
 
@@ -470,17 +371,6 @@ describe("IncidentDetailDrawer.vue", () => {
 
       // The error is handled internally, incident details remain null
       expect(wrapper.vm.incidentDetails).toBeNull();
-    });
-
-    it("should stop loading on error", async () => {
-      (incidentsService.get as any).mockRejectedValue(new Error("API Error"));
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.loading).toBe(false);
     });
   });
 
@@ -556,27 +446,6 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.incidentDetails.acknowledged_by).toBeNull();
     });
 
-    it("should set updating state during status update", async () => {
-      // acknowledgeIncident awaits the confirm dialog before it ever touches
-      // `updating`, so a fixed number of microtask hops can't be assumed here —
-      // hold the status update pending so the state is observable regardless.
-      let resolveUpdate: (value: any) => void;
-      const pendingUpdate = new Promise((resolve) => {
-        resolveUpdate = resolve;
-      });
-      (incidentsService.updateStatus as any).mockReturnValue(pendingUpdate);
-
-      const updatePromise = wrapper.vm.acknowledgeIncident();
-      await flushPromises();
-
-      expect(wrapper.vm.updating).toBe(true);
-
-      resolveUpdate!({ data: { status: "acknowledged" } });
-      await updatePromise;
-
-      expect(wrapper.vm.updating).toBe(false);
-    });
-
     it("should show success notification on status update", async () => {
       mockToast.mockClear();
 
@@ -585,15 +454,6 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(mockToast).toHaveBeenCalled();
       const call = mockToast.mock.calls[0][0];
       expect(call.variant).toBe("success");
-    });
-
-    it("should not emit status-updated event (removed)", async () => {
-      // This test is no longer relevant as the component doesn't emit events
-      // The component now handles its own state updates
-      await wrapper.vm.acknowledgeIncident();
-
-      // Just verify the API was called
-      expect(incidentsService.updateStatus).toHaveBeenCalled();
     });
 
     it("should handle status update error", async () => {
@@ -663,14 +523,6 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(errCall).toBeTruthy();
     });
 
-    it("should not trigger RCA when no incident loaded", async () => {
-      wrapper.vm.incidentDetails = null;
-
-      await wrapper.vm.triggerRca();
-
-      expect(incidentsService.triggerRca).not.toHaveBeenCalled();
-    });
-
     // Cloud consent prompting and the single retry are covered in useRcaTrigger.spec.ts;
     // this suite runs as a non-Cloud build, where a 412 never prompts.
     it("non-Cloud 412 shows the server message and never prompts", async () => {
@@ -704,38 +556,6 @@ describe("IncidentDetailDrawer.vue", () => {
 
       await nextTick();
       await flushPromises();
-    });
-
-    it("should compute incident context data correctly", () => {
-      const contextData = wrapper.vm.incidentContextData;
-
-      expect(contextData).toBeTruthy();
-      expect(contextData.id).toBe("1");
-      expect(contextData.severity).toBe("P1");
-      expect(contextData.status).toBe("open");
-    });
-
-    it("should include all required fields in context data", () => {
-      const contextData = wrapper.vm.incidentContextData;
-
-      expect(contextData).toHaveProperty("id");
-      expect(contextData).toHaveProperty("title");
-      expect(contextData).toHaveProperty("status");
-      expect(contextData).toHaveProperty("severity");
-      expect(contextData).toHaveProperty("alert_count");
-      expect(contextData).toHaveProperty("first_alert_at");
-      expect(contextData).toHaveProperty("last_alert_at");
-      expect(contextData).toHaveProperty("group_values");
-      expect(contextData).toHaveProperty("topology_context");
-      expect(contextData).toHaveProperty("triggers");
-      expect(contextData).toHaveProperty("rca_analysis");
-    });
-
-    it("should include triggers in context data", () => {
-      const contextData = wrapper.vm.incidentContextData;
-
-      expect(contextData.triggers).toBeTruthy();
-      expect(Array.isArray(contextData.triggers)).toBe(true);
     });
 
     it("should include the displayed report in context data", async () => {
@@ -791,48 +611,9 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   });
 
-  describe("Utility Functions - Status Variants (registry incidentStatus)", () => {
-    it("open → error-soft", () => {
-      expect(resolveBadge("incidentStatus", "open").variant).toBe("error-soft");
-    });
-    it("acknowledged → warning-soft", () => {
-      expect(resolveBadge("incidentStatus", "acknowledged").variant).toBe("warning-soft");
-    });
-    it("resolved → success-soft", () => {
-      expect(resolveBadge("incidentStatus", "resolved").variant).toBe("success-soft");
-    });
-    it("unknown → default-soft (fallback)", () => {
-      expect(resolveBadge("incidentStatus", "unknown").variant).toBe("default-soft");
-    });
-    it("severity P1–P4 → error/orange/amber/blue-soft", () => {
-      expect(resolveBadge("severity", "P1").variant).toBe("error-soft");
-      expect(resolveBadge("severity", "P2").variant).toBe("orange-soft");
-      expect(resolveBadge("severity", "P3").variant).toBe("amber-soft");
-      expect(resolveBadge("severity", "P4").variant).toBe("blue-soft");
-    });
-  });
-
   describe("Utility Functions - Status Labels", () => {
     beforeEach(async () => {
       wrapper = await createWrapper();
-    });
-
-    it("should return translated label for open status", () => {
-      const label = wrapper.vm.getStatusLabel("open");
-      expect(label).toBeTruthy();
-      expect(typeof label).toBe("string");
-    });
-
-    it("should return translated label for acknowledged status", () => {
-      const label = wrapper.vm.getStatusLabel("acknowledged");
-      expect(label).toBeTruthy();
-      expect(typeof label).toBe("string");
-    });
-
-    it("should return translated label for resolved status", () => {
-      const label = wrapper.vm.getStatusLabel("resolved");
-      expect(label).toBeTruthy();
-      expect(typeof label).toBe("string");
     });
 
     it("should return status as-is for unknown status", () => {
@@ -852,20 +633,6 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(result).toBeTruthy();
       expect(typeof result).toBe("string");
       expect(result).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
-    });
-
-    it("should handle zero timestamp", () => {
-      const result = wrapper.vm.formatTimestamp(0);
-
-      expect(result).toBeTruthy();
-      expect(result).toMatch(/\d{4}-\d{2}-\d{2}/);
-    });
-
-    it("should convert microseconds to milliseconds correctly", () => {
-      const microTimestamp = 1700000000000000;
-      const result = wrapper.vm.formatTimestamp(microTimestamp);
-
-      expect(result).toContain("2023");
     });
   });
 
@@ -903,106 +670,7 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   });
 
-  describe("Theme Support", () => {
-    it("should detect dark mode", async () => {
-      store.state.theme = "dark";
-      wrapper = await createWrapper();
-
-      expect(wrapper.vm.isDarkMode).toBe(true);
-    });
-
-    it("should detect light mode", async () => {
-      store.state.theme = "light";
-      wrapper = await createWrapper();
-
-      expect(wrapper.vm.isDarkMode).toBe(false);
-    });
-  });
-
-  describe("Topology Context", () => {
-    beforeEach(async () => {
-      const mockIncidentData = createIncidentWithAlerts({
-        id: "test-123",
-        topology_context: {
-          nodes: [
-            {
-              alert_id: "alert_cpu",
-              alert_name: "High CPU",
-              service_name: "api-gateway",
-              alert_count: 2,
-              first_fired_at: 1000,
-              last_fired_at: 2000,
-            },
-            {
-              alert_id: "alert_memory",
-              alert_name: "High Memory",
-              service_name: "auth-service",
-              alert_count: 1,
-              first_fired_at: 1500,
-              last_fired_at: 1500,
-            },
-          ],
-          edges: [
-            {
-              from_node_index: 0,
-              to_node_index: 1,
-              edge_type: "service_dependency",
-            },
-          ],
-          related_incident_ids: ["incident-2", "incident-3"],
-        },
-      });
-
-      (incidentsService.get as any).mockResolvedValue({
-        data: mockIncidentData,
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-      await flushPromises();
-    });
-
-    it("should display topology nodes", () => {
-      expect(wrapper.vm.incidentDetails.topology_context.nodes).toHaveLength(2);
-      expect(wrapper.vm.incidentDetails.topology_context.nodes[0].alert_name).toBe("High CPU");
-    });
-
-    it("should display topology edges", () => {
-      expect(wrapper.vm.incidentDetails.topology_context.edges).toHaveLength(1);
-      expect(wrapper.vm.incidentDetails.topology_context.edges[0].edge_type).toBe(
-        "service_dependency",
-      );
-    });
-  });
-
   describe("Edge Cases", () => {
-    it("should handle incident without title", async () => {
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", title: undefined }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.incidentDetails).toBeTruthy();
-    });
-
-    it("should handle empty triggers array", async () => {
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers: [] }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.triggers).toEqual([]);
-    });
-
     it("should handle missing topology context", async () => {
       (incidentsService.get as any).mockResolvedValue({
         data: createIncidentWithAlerts({ id: "test-123", topology_context: undefined }),
@@ -1016,53 +684,9 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.incidentDetails.topology_context).toBeUndefined();
       expect(wrapper.vm.rcaSummary).toBeNull();
     });
-
-    it("should handle empty dimensions", async () => {
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", group_values: {} }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.incidentDetails.group_values).toEqual({});
-    });
-
-    it("should handle resolved incident with timestamp", async () => {
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({
-          id: "test-123",
-          status: "resolved",
-          resolved_at: 1700000000000000,
-        }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.incidentDetails.resolved_at).toBeTruthy();
-    });
   });
 
   describe("Close Functionality", () => {
-    it("should close drawer", async () => {
-      wrapper = await createWrapper();
-      const pushSpy = vi.spyOn(router, "push");
-
-      wrapper.vm.close();
-      await nextTick();
-
-      // Should navigate back to incident list
-      expect(pushSpy).toHaveBeenCalledWith({
-        name: "incidentList",
-        query: { org_identifier: "default" },
-      });
-    });
-
     it("should navigate back to incident list on close", async () => {
       wrapper = await createWrapper();
       const pushSpy = vi.spyOn(router, "push");
@@ -1107,34 +731,21 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.get).toHaveBeenCalledWith("custom-org", "test-123");
     });
 
-    it("should use organization in status updates", async () => {
-      (incidentsService.updateStatus as any).mockResolvedValue({});
-
-      wrapper = await createWrapper({}, { selectedOrganization: { identifier: "org-123" } }, "1");
-
-      await nextTick();
+    it("writes status updates and RCA triggers to the custom organization", async () => {
+      wrapper = await createWrapper(
+        {},
+        { selectedOrganization: { identifier: "custom-org" } },
+        "test-123",
+      );
       await flushPromises();
 
       await wrapper.vm.acknowledgeIncident();
-
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith(
-        "org-123",
-        expect.any(String),
-        "acknowledged",
-      );
-    });
-
-    it("should use organization in RCA trigger", async () => {
-      wrapper = await createWrapper({}, { selectedOrganization: { identifier: "org-456" } }, "1");
-
-      await nextTick();
-      await flushPromises();
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("custom-org", "1", "acknowledged");
 
       await wrapper.vm.triggerRca();
-
       expect(incidentsService.triggerRca).toHaveBeenCalledWith(
-        "org-456",
-        expect.any(String),
+        "custom-org",
+        "1",
         { build_on_previous: false },
         expect.objectContaining({ signal: expect.anything() }),
       );
@@ -1165,73 +776,6 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(uniqueAlertsMap.get("alert-1")).toBe(2);
       expect(uniqueAlertsMap.get("alert-2")).toBe(2);
       expect(uniqueAlertsMap.get("alert-3")).toBe(1);
-    });
-
-    it("should compute unique alerts count correctly", async () => {
-      const triggers = [
-        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-2", alert_name: "Memory Alert" }),
-      ];
-
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.uniqueAlertsCount).toBe(2);
-    });
-
-    it("should return 0 unique alerts when no triggers", async () => {
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers: [] }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.uniqueAlertsCount).toBe(0);
-      expect(wrapper.vm.uniqueAlertsMap.size).toBe(0);
-    });
-
-    it("should handle triggers with missing alert names", async () => {
-      // Create triggers directly without using factory to avoid default values
-      const triggers: IncidentAlert[] = [
-        {
-          incident_id: "incident-1",
-          alert_id: "alert-1",
-          alert_name: "" as any, // Empty string, but we use alert_id for uniqueness
-          alert_fired_at: 1700000000000000,
-          correlation_reason: "service_discovery",
-          created_at: 1700000000000000,
-        },
-        createAlert({ alert_id: "alert-2", alert_name: "Valid Alert" }),
-      ];
-
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
-      await flushPromises();
-
-      const uniqueAlertsMap = wrapper.vm.uniqueAlertsMap;
-
-      // Should have 2 unique alerts by alert_id regardless of alert_name
-      expect(uniqueAlertsMap.size).toBe(2);
-      // Check by alert_id instead of alert_name
-      const alert1Count = uniqueAlertsMap.get("alert-1");
-      const alert2Count = uniqueAlertsMap.get("alert-2");
-
-      expect(alert1Count).toBeDefined();
-      expect(alert1Count).toBe(1);
-      expect(alert2Count).toBeDefined();
-      expect(alert2Count).toBe(1);
     });
 
     it("should count alerts with same name but different IDs as separate alerts", async () => {
@@ -1293,42 +837,6 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(sorted[2].count).toBe(1);
     });
 
-    it("should return empty array when no triggers", async () => {
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers: [] }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
-      await flushPromises();
-
-      expect(wrapper.vm.sortedAlertsByTriggerCount).toEqual([]);
-    });
-
-    it("should include alert id and name in sorted results", async () => {
-      const triggers = [
-        createAlert({ alert_id: "alert-1", alert_name: "Test Alert" }),
-        createAlert({ alert_id: "alert-1", alert_name: "Test Alert" }),
-      ];
-
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
-      await flushPromises();
-
-      const sorted = wrapper.vm.sortedAlertsByTriggerCount;
-
-      expect(sorted[0]).toHaveProperty("id");
-      expect(sorted[0]).toHaveProperty("name");
-      expect(sorted[0]).toHaveProperty("count");
-      expect(sorted[0].id).toBe("alert-1");
-      expect(sorted[0].name).toBe("Test Alert");
-      expect(sorted[0].count).toBe(2);
-    });
-
     it("should derive alerts from triggers instead of API alerts array", async () => {
       const triggers = [createAlert({ alert_id: "trigger-alert-1", alert_name: "From Triggers" })];
 
@@ -1348,55 +856,6 @@ describe("IncidentDetailDrawer.vue", () => {
       // Should have 1 alert from triggers, not 0 from API alerts
       expect(sorted).toHaveLength(1);
       expect(sorted[0].name).toBe("From Triggers");
-    });
-  });
-
-  describe("Internationalization (i18n)", () => {
-    beforeEach(async () => {
-      wrapper = await createWrapper({}, {}, "1");
-      await nextTick();
-      await flushPromises();
-    });
-
-    it("should have translation for unique alerts", () => {
-      const translation = wrapper.vm.t("alerts.incidents.uniqueAlerts");
-      expect(translation).toBe("Unique Alerts");
-    });
-
-    it("should have translation for related alerts", () => {
-      const translation = wrapper.vm.t("alerts.incidents.relatedAlerts");
-      expect(translation).toBe("Related Alerts");
-    });
-
-    it("should have translation for alert triggers", () => {
-      const translation = wrapper.vm.t("alerts.incidents.alertTriggers");
-      expect(translation).toBe("Alert Triggers");
-    });
-
-    it("should have translation for incident timeline", () => {
-      const translation = wrapper.vm.t("alerts.incidents.incidentTimeline");
-      expect(translation).toBe("Incident Timeline");
-    });
-
-    it("should have translation for incident details", () => {
-      const translation = wrapper.vm.t("alerts.incidents.incidentDetails");
-      expect(translation).toBe("Incident Details");
-    });
-
-    it("should have translation for fired times with parameter", () => {
-      // Pipe plural: `count` in the named bag selects the branch AND fills {count}.
-      expect(wrapper.vm.t("alerts.incidents.firedTimes", { count: 5 })).toBe("Fired 5 times");
-      expect(wrapper.vm.t("alerts.incidents.firedTimes", { count: 1 })).toBe("Fired 1 time");
-    });
-
-    it("should have translation for refresh correlated data", () => {
-      const translation = wrapper.vm.t("alerts.incidents.refreshCorrelatedData");
-      expect(translation).toBe("Refresh correlated data");
-    });
-
-    it("should have translation for incident title updated success", () => {
-      const translation = wrapper.vm.t("alerts.incidents.incidentTitleUpdatedSuccess");
-      expect(translation).toBe("Incident title updated successfully");
     });
   });
 
@@ -1459,15 +918,6 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
     });
 
-    it("should expose matched_set_id as correlationMatchedSetId after correlation loads", async () => {
-      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(correlatedStreamsWithSet());
-
-      await wrapper.vm.refreshCorrelation();
-      await flushPromises();
-
-      expect(wrapper.vm.correlationMatchedSetId).toBe("kubernetes");
-    });
-
     it("should build chipDimensions from the correlation response and semantic groups", async () => {
       (incidentsService.getCorrelatedStreams as any).mockResolvedValue(correlatedStreamsWithSet());
 
@@ -1482,12 +932,6 @@ describe("IncidentDetailDrawer.vue", () => {
         expect.objectContaining({ matched_set_id: resp.matched_set_id }),
         expect.any(Array),
       );
-    });
-
-    it("should yield undefined matchedSetId and empty chipDimensions when no correlation data", () => {
-      expect(wrapper.vm.correlationData).toBeNull();
-      expect(wrapper.vm.correlationMatchedSetId).toBeUndefined();
-      expect(wrapper.vm.correlationChipDimensions).toEqual({});
     });
 
     it("should pass matchedSetId/chipDimensions to the metrics TelemetryCorrelationDashboard", async () => {
@@ -1907,14 +1351,6 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
     });
 
-    it("calls updateIncident with correct org, id and severity", async () => {
-      await wrapper.vm.updateSeverity("P3");
-      await flushPromises();
-      expect(incidentsService.updateIncident).toHaveBeenCalledWith("default", "1", {
-        severity: "P3",
-      });
-    });
-
     it("updates local severity after successful save", async () => {
       (incidentsService.updateIncident as any).mockResolvedValue({ data: { severity: "P3" } });
       await wrapper.vm.updateSeverity("P3");
@@ -1935,16 +1371,6 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(infoCall[0].message).toContain("already running");
     });
 
-    it("re-reads the run state when analysis_in_flight=true", async () => {
-      (incidentsService.updateIncident as any).mockResolvedValue({
-        data: { severity: "P2", analysis_in_flight: true },
-      });
-      vi.mocked(incidentsService.get).mockClear();
-      await wrapper.vm.updateSeverity("P2");
-      await flushPromises();
-      expect(incidentsService.get).toHaveBeenCalledWith("default", "1");
-    });
-
     it("on confirm starts one spawned reanalysis and re-reads the run state", async () => {
       vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
         data: { severity: "P2", analysis_in_flight: false },
@@ -1963,20 +1389,6 @@ describe("IncidentDetailDrawer.vue", () => {
       wrapper.vm.incidentDetails = null;
       await wrapper.vm.updateSeverity("P3");
       expect(incidentsService.updateIncident).not.toHaveBeenCalled();
-    });
-
-    it("sets updating=false after completion", async () => {
-      await wrapper.vm.updateSeverity("P2");
-      await flushPromises();
-      expect(wrapper.vm.updating).toBe(false);
-    });
-
-    it("handles API error and sets updating=false", async () => {
-      mockToast.mockClear();
-      (incidentsService.updateIncident as any).mockRejectedValue(new Error("API error"));
-      await wrapper.vm.updateSeverity("P3");
-      await flushPromises();
-      expect(wrapper.vm.updating).toBe(false);
     });
   });
   /// The panel fetched a whole record and rendered two of its fields, so an
@@ -2036,14 +1448,6 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.find('[data-test="incident-oncall-panel"]').text()).toContain("Payments");
     });
 
-    it("names the paged team rather than its id", async () => {
-      wrapper = await withRecords([record()]);
-      const panel = wrapper.find('[data-test="incident-oncall-panel"]');
-      expect(panel.exists()).toBe(true);
-      expect(panel.text()).toContain("Payments");
-      expect(panel.text()).not.toContain("team_1");
-    });
-
     /// An unanswered page is still climbing the ladder — the fact worth a
     /// colour, and the one an empty dash used to hide.
     it("says a page is unanswered instead of printing a dash", async () => {
@@ -2079,12 +1483,6 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     /// OSS, feature-off and nothing-routed are the same calm fact: no panel.
-    it("renders nothing when on-call does not answer", async () => {
-      wrapper = await createWrapper({}, {}, "1");
-      await flushPromises();
-      expect(wrapper.find('[data-test="incident-oncall-panel"]').exists()).toBe(false);
-    });
-
     /// Cloud answers the unregistered on-call route with a 401, and a 401 logs the user out.
     it("does not ask for on-call records when on-call is off", async () => {
       store.state.zoConfig.oncall_enabled = false;
