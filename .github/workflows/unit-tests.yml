@@ -283,7 +283,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: web/node_modules
-          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json') }}
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
 
       - name: Install dependencies
         if: steps.nm.outputs.cache-hit != 'true'
@@ -297,7 +297,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: web/node_modules
-          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json') }}
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
 
       - name: Run this shard with coverage
         working-directory: web
@@ -347,7 +347,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: web/node_modules
-          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json') }}
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
 
       - name: Install dependencies
         if: steps.nm.outputs.cache-hit != 'true'

@@ -56,7 +56,7 @@ cmd_check() {
 
 cmd_merge() {
     echo "Merging shard reports from .vitest-reports..."
-    npx vitest --merge-reports --coverage
+    npx vitest --merge-reports --coverage --run
     check_thresholds
 }
 
