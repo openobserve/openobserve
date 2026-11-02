@@ -68,7 +68,7 @@ describe("HTTP_REQUEST_PAYLOAD_FIELDS", () => {
   });
 
   it("offers every allowlisted header as meta.headers.<name>", () => {
-    expect(HTTP_HEADER_ALLOWLIST).toHaveLength(14);
+    expect(HTTP_HEADER_ALLOWLIST).toHaveLength(13);
     for (const name of HTTP_HEADER_ALLOWLIST) {
       expect(HTTP_REQUEST_PAYLOAD_FIELDS.map((f) => String(f.label))).toContain(
         `meta.headers.${name}`,

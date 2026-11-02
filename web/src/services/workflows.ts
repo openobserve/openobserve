@@ -15,7 +15,6 @@
 
 import http from "./http";
 import analytics from "./product_analytics";
-import { newWebhookId, signWebhook } from "@/plugins/workflows/httpSigning";
 
 // HTTP endpoint shapes mirror src/core/src/workflows/http_trigger/manage.rs and request/workflows/{http_trigger,mod}.rs.
 export type HttpAuthMode = "token" | "signature";
@@ -472,29 +471,16 @@ const workflows = {
   ...httpTriggerApi,
 };
 
-/** Calls the public hook URL with `X-O2-Dry-Run`; plain fetch, so a 401/403 never reaches the app client's logout, refresh or 403 toast. */
+/** Calls the public hook URL with `dry_run=true`; plain fetch, so a 401/403 never reaches the app client's logout, refresh or 403 toast. */
 export async function dryRunHook(args: {
   url: string;
-  auth: { mode: "token"; token: string } | { mode: "signature"; secret: string };
+  token: string;
   body: string;
   contentType: string;
 }): Promise<DryRunResult> {
-  const headers: Record<string, string> = {
-    "Content-Type": args.contentType,
-    "X-O2-Dry-Run": "true",
-  };
-  if (args.auth.mode === "token") {
-    headers.Authorization = `Bearer ${args.auth.token}`;
-  } else {
-    const id = newWebhookId();
-    const timestamp = Math.floor(Date.now() / 1000);
-    headers["webhook-id"] = id;
-    headers["webhook-timestamp"] = String(timestamp);
-    headers["webhook-signature"] = await signWebhook(args.auth.secret, id, timestamp, args.body);
-  }
-  const res = await fetch(args.url, {
+  const res = await fetch(`${args.url}${args.url.includes("?") ? "&" : "?"}dry_run=true`, {
     method: "POST",
-    headers,
+    headers: { "Content-Type": args.contentType, Authorization: `Bearer ${args.token}` },
     body: args.body,
     credentials: "omit",
   });

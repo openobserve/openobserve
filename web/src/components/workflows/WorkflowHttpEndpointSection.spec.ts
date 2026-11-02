@@ -364,7 +364,7 @@ describe("WorkflowHttpEndpointSection", () => {
       expect(blocks.find((b) => b.props("lang") === "json")?.props("wrap")).toBe(true);
       expect(vi.mocked(dryRunHook).mock.calls[0][0]).toMatchObject({
         url: httpConfig().url,
-        auth: { mode: "token", token: HTTP_TOKEN },
+        token: HTTP_TOKEN,
       });
     });
 
@@ -400,30 +400,36 @@ describe("WorkflowHttpEndpointSection", () => {
       );
     });
 
-    it("signed mode maps 403 to the same mode-neutral copy", async () => {
-      api.putHttpTrigger.mockImplementation(async () => {
-        api.getHttpTrigger.mockResolvedValue(httpConfig({ auth_mode: "signature" }));
-        return { ...httpConfig({ auth_mode: "signature" }), secret: HTTP_SECRET };
-      });
+    it("paused maps 403 to the paused copy", async () => {
       vi.mocked(dryRunHook).mockResolvedValue({
         status: 403,
         reason: "workflow_disabled",
         input: null,
         bodyBytes: 2,
       });
-      const w = await mountSection({ workflowEnabled: false });
-      await w.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "signature");
-      await byTest(w, "workflow-http-auth-switch-confirm").trigger("click");
-      await flushPromises();
+      const w = await reveal({ workflowEnabled: false });
       await byTest(w, "workflow-http-send-test").trigger("click");
       await flushPromises();
-      expect(vi.mocked(dryRunHook).mock.calls[0][0].auth).toEqual({
-        mode: "signature",
-        secret: HTTP_SECRET,
-      });
       expect(byTest(w, "workflow-http-test-result").text()).toContain(
         t("workflow.http.dryRunRefusedPaused"),
       );
+    });
+
+    it("signed mode offers no Send test request and points to the example request", async () => {
+      api.putHttpTrigger.mockImplementation(async () => {
+        api.getHttpTrigger.mockResolvedValue(httpConfig({ auth_mode: "signature" }));
+        return { ...httpConfig({ auth_mode: "signature" }), secret: HTTP_SECRET };
+      });
+      const w = await mountSection();
+      await w.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "signature");
+      await byTest(w, "workflow-http-auth-switch-confirm").trigger("click");
+      await flushPromises();
+      expect(byTest(w, "workflow-http-reveal").exists()).toBe(true);
+      expect(byTest(w, "workflow-http-send-test").exists()).toBe(false);
+      expect(byTest(w, "workflow-http-send-test-hint").text()).toBe(
+        t("workflow.http.sendTestSigned"),
+      );
+      expect(dryRunHook).not.toHaveBeenCalled();
     });
 
     it("the hint depends on the workflow state", async () => {

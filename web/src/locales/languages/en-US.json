@@ -5282,6 +5282,7 @@
       "sendTest": "Send test request",
       "sendTestHint": "Checks the credentials and shows what your steps would receive. No run starts, no destination is called.",
       "sendTestHintPaused": "Checks the credentials. The workflow is paused, so the call is refused before any input is built; Run test runs the steps.",
+      "sendTestSigned": "Browsers can't sign requests, so test with the example request above. Add ?dry_run=true to its URL to check the signature without starting a run.",
       "dryRunAccepted": "Dry run accepted",
       "dryRunMeta": "credentials valid · {size} body",
       "dryRunInput": "Input your steps would receive",

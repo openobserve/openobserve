@@ -31,7 +31,6 @@ export const HTTP_HEADER_ALLOWLIST = [
   "x-github-event",
   "x-github-delivery",
   "x-event-type",
-  "x-o2-dry-run",
 ] as const;
 
 const SAMPLE_RECEIVED_AT = 1792575542418000;

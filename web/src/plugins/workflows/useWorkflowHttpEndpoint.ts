@@ -379,24 +379,21 @@ export function useWorkflowHttpEndpoint(args: UseWorkflowHttpEndpointArgs) {
     endReveal();
   };
 
-  /** Dry run from the browser with the value on screen, else the active one fetched for this call only. */
+  /** Dry run from the browser with the token on screen, else the active one fetched for this call only. */
   const sendTest = async (body: string = DEFAULT_SAMPLE_BODY): Promise<DryRunResult> => {
     const current = config.value;
     if (!current) throw new HttpEndpointError("workflow.http.errorNotConfigured");
-    let mode = revealedMode.value ?? current.auth_mode;
-    let secret = revealedSecret.value;
-    if (secret === null) {
+    const mode =
+      revealedSecret.value === null ? current.auth_mode : (revealedMode.value ?? current.auth_mode);
+    // The signing secret never goes into browser code, so signed endpoints test with the example script.
+    if (mode !== "token") throw new HttpEndpointError("workflow.http.sendTestSigned");
+    let token = revealedSecret.value;
+    if (token === null) {
       const active = activeCredential.value;
       if (!active) throw new HttpEndpointError("workflow.http.errorNoLiveCredential");
-      mode = current.auth_mode;
-      secret = revealedCredentials.value[active.id] ?? (await fetchSecret(active.id));
+      token = revealedCredentials.value[active.id] ?? (await fetchSecret(active.id));
     }
-    return dryRunHook({
-      url: current.url,
-      auth: mode === "token" ? { mode, token: secret } : { mode, secret },
-      body,
-      contentType: "application/json",
-    });
+    return dryRunHook({ url: current.url, token, body, contentType: "application/json" });
   };
 
   /** The trigger step's records of a stored run; null when the run holds none or cannot be read. */

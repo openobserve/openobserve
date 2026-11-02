@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import workflows, { dryRunHook } from "@/services/workflows";
-import { signWebhook } from "@/plugins/workflows/httpSigning";
 import http from "@/services/http";
 import analytics from "@/services/product_analytics";
 
@@ -930,7 +929,7 @@ describe("workflows HTTP endpoint transport", () => {
 
     const result = await dryRunHook({
       url: "https://o2.example.com/api/v2/acme/workflows/hooks/t1",
-      auth: { mode: "token", token: "o2wh_secret" },
+      token: "o2wh_secret",
       body: '{"a":1}',
       contentType: "application/json",
     });
@@ -938,11 +937,10 @@ describe("workflows HTTP endpoint transport", () => {
     expect(http).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("https://o2.example.com/api/v2/acme/workflows/hooks/t1");
+    expect(url).toBe("https://o2.example.com/api/v2/acme/workflows/hooks/t1?dry_run=true");
     expect(init).toMatchObject({ method: "POST", credentials: "omit", body: '{"a":1}' });
     expect(init.headers).toEqual({
       "Content-Type": "application/json",
-      "X-O2-Dry-Run": "true",
       Authorization: "Bearer o2wh_secret",
     });
     expect(result).toEqual({ status: 200, reason: null, input, bodyBytes: 7 });
@@ -960,7 +958,7 @@ describe("workflows HTTP endpoint transport", () => {
 
     const result = await dryRunHook({
       url: "/api/v2/acme/workflows/hooks/t1",
-      auth: { mode: "token", token: "o2wh_wrong" },
+      token: "o2wh_wrong",
       body: "{}",
       contentType: "application/json",
     });
@@ -977,7 +975,7 @@ describe("workflows HTTP endpoint transport", () => {
 
     const result = await dryRunHook({
       url: "/h",
-      auth: { mode: "token", token: "o2wh_t" },
+      token: "o2wh_t",
       body: '{"name":"é"}',
       contentType: "application/json",
     });
@@ -998,7 +996,7 @@ describe("workflows HTTP endpoint transport", () => {
 
     const result = await dryRunHook({
       url: "/h",
-      auth: { mode: "token", token: "o2wh_t" },
+      token: "o2wh_t",
       body: "{}",
       contentType: "application/json",
     });
@@ -1006,27 +1004,18 @@ describe("workflows HTTP endpoint transport", () => {
     expect(result).toEqual({ status: 502, reason: null, input: null, bodyBytes: 2 });
   });
 
-  it("dryRunHook signs a signed-mode request with the webhook headers", async () => {
+  it("dryRunHook appends the dry-run flag to a URL that already has a query", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { input: null }));
     vi.stubGlobal("fetch", fetchMock);
-    vi.spyOn(Date, "now").mockReturnValue(1614265330_000);
-    const secret = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw";
-    const body = '{"test": 2432232314}';
 
     await dryRunHook({
-      url: "/h",
-      auth: { mode: "signature", secret },
-      body,
+      url: "/h?env=prod",
+      token: "o2wh_t",
+      body: "{}",
       contentType: "application/json",
     });
 
-    const headers = fetchMock.mock.calls[0][1].headers;
-    expect(headers.Authorization).toBeUndefined();
-    expect(headers["webhook-id"]).toMatch(/^msg_[0-9a-f]{24}$/);
-    expect(headers["webhook-timestamp"]).toBe("1614265330");
-    expect(headers["webhook-signature"]).toBe(
-      await signWebhook(secret, headers["webhook-id"], 1614265330, body),
-    );
+    expect(fetchMock.mock.calls[0][0]).toBe("/h?env=prod&dry_run=true");
   });
 
   it("dryRunHook never logs the token", async () => {
@@ -1037,7 +1026,7 @@ describe("workflows HTTP endpoint transport", () => {
 
     await dryRunHook({
       url: "/h",
-      auth: { mode: "token", token: "o2wh_never_logged" },
+      token: "o2wh_never_logged",
       body: "{}",
       contentType: "application/json",
     });

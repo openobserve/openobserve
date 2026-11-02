@@ -856,32 +856,35 @@ describe("useWorkflowHttpEndpoint", () => {
 
       expect(dryRunHook).toHaveBeenCalledWith({
         url: "https://o2.example.com/api/v2/default/workflows/hooks/t1",
-        auth: { mode: "token", token: TOKEN },
+        token: TOKEN,
         body: "{}",
         contentType: "application/json",
       });
     });
 
-    it("signs with the revealed secret after a switch to signed requests", async () => {
+    it("refuses a signed endpoint without calling the hook", async () => {
       api.putHttpTrigger.mockResolvedValue({
         ...config({ auth_mode: "signature" }),
         secret: "whsec_NEW",
       });
-      vi.mocked(dryRunHook).mockResolvedValue({
-        status: 200,
-        reason: null,
-        input: null,
-        bodyBytes: 2,
-      });
       const { endpoint } = await mountEndpoint();
       await endpoint.switchMode("signature");
 
-      await endpoint.sendTest("{}");
-
-      expect(vi.mocked(dryRunHook).mock.calls[0][0].auth).toEqual({
-        mode: "signature",
-        secret: "whsec_NEW",
+      await expect(endpoint.sendTest("{}")).rejects.toMatchObject({
+        key: "workflow.http.sendTestSigned",
       });
+      expect(dryRunHook).not.toHaveBeenCalled();
+    });
+
+    it("never fetches a signing secret for a test request", async () => {
+      api.getHttpTrigger.mockResolvedValue(config({ auth_mode: "signature" }));
+      const { endpoint } = await mountEndpoint();
+
+      await expect(endpoint.sendTest("{}")).rejects.toMatchObject({
+        key: "workflow.http.sendTestSigned",
+      });
+      expect(api.revealHttpCredentialSecret).not.toHaveBeenCalled();
+      expect(dryRunHook).not.toHaveBeenCalled();
     });
 
     it("without a revealed value it fetches the active credential and keeps nothing", async () => {

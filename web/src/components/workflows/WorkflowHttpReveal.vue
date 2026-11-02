@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- A draft's URL can only answer 403, so the dry run has nothing to show -->
     <div v-if="!rotated && refusal !== 'draft'" class="flex flex-wrap items-center gap-3">
       <OButton
+        v-if="!isSigned"
         variant="outline"
         size="sm-action"
         icon-left="send"
@@ -80,11 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("workflow.http.sendTest") }}
       </OButton>
       <OText variant="meta" class="min-w-0 flex-1" data-test="workflow-http-send-test-hint">
-        {{
-          refusal === "paused"
-            ? t("workflow.http.sendTestHintPaused")
-            : t("workflow.http.sendTestHint")
-        }}
+        {{ sendTestHint }}
       </OText>
     </div>
 
@@ -234,6 +231,12 @@ const secretLabel = computed(() => {
   return rotated.value ? t("workflow.http.newTokenLabel") : t("workflow.http.tokenLabel");
 });
 
+const sendTestHint = computed(() => {
+  if (isSigned.value) return t("workflow.http.sendTestSigned");
+  return props.refusal === "paused"
+    ? t("workflow.http.sendTestHintPaused")
+    : t("workflow.http.sendTestHint");
+});
 const accepted = computed(() => !!result.value && result.value.status < 300);
 const refusedByState = computed(
   () =>

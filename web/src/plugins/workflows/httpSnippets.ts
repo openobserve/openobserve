@@ -187,7 +187,7 @@ const BUILDERS: Record<SnippetLang, Record<HttpAuthMode, (input: SnippetInput) =
   python: { token: pythonToken, signature: pythonSigned },
 };
 
-/** The real call (never the dry-run header), so a copied snippet starts a run. */
+/** The real call (never `dry_run=true`), so a copied snippet starts a run. */
 export function buildSnippet(lang: SnippetLang, input: SnippetInput): string {
   return BUILDERS[lang][input.mode](input);
 }
