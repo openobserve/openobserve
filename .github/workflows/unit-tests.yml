@@ -327,7 +327,7 @@ jobs:
 
       - name: Merge reports
         working-directory: web
-        run: npx vitest --merge-reports
+        run: npx vitest --merge-reports --coverage
       - name: debug
         run: echo "web" && ls -a ./web && echo "reports" && ls -a ./web/.vitest-reports
       - name: check coverage
