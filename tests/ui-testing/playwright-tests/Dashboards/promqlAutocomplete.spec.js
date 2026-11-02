@@ -18,7 +18,7 @@
  * METRICS PAGE ELEMENTS (verified data-test attributes):
  *   [data-test="dashboard-promql-query-type"]    — PromQL mode button (same component)
  *   [data-test="dashboard-custom-query-type"]    — Custom mode button (same component)
- *   [data-test="metrics-apply"]                  — Run Query button
+ *   [data-test="metrics-explorer-run"]           — Run Query button
  *
  * Selectors / Monaco access live in the PO (pages/dashboardPages/dashboard-promql-editor.js);
  * this spec only calls PO methods so it complies with the data-test-only selector policy.

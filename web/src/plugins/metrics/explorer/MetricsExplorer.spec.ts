@@ -46,6 +46,10 @@ const grid = vi.hoisted(() => {
     selectedTypes: { value: new Set() },
     labelFilters: { value: [] },
     sortBy: { value: "a-z" },
+    usageFilters: { value: new Set() },
+    usageLoading: { value: false },
+    usageError: { value: false },
+    retryUsage: vi.fn(),
     viewMode: { value: "grid" },
     activeRail: { value: "prefix" },
     showFavoritesOnly: { value: false },
@@ -98,6 +102,7 @@ const grid = vi.hoisted(() => {
     loadStreams: vi.fn(async () => {}),
     isLabelEligible: vi.fn(() => true),
     inapplicableLabelFilters: vi.fn(() => []),
+    setLabelGroupNegated: vi.fn(),
     setTimeRange: vi.fn(),
     setRefreshInterval: vi.fn(),
     onOrgChange: vi.fn(),
@@ -146,6 +151,10 @@ vi.mock("vue-router", () => ({
   }),
 }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
+const showErrorNotification = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({ showErrorNotification }),
+}));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@tanstack/vue-virtual", () => ({
   useVirtualizer: () =>
@@ -305,6 +314,47 @@ describe("MetricsExplorer wiring", () => {
       expect(wrapper.find('[data-test="metrics-explorer-sort-a-z"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="metrics-explorer-sort-z-a"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="metrics-explorer-sort-recent"]').exists()).toBe(false);
+    });
+
+    it("offers the usage sorts and the usage filter chips", () => {
+      const wrapper = mountExplorer();
+      for (const id of ["sort-dashboards", "sort-alerts", "usage-dashboards", "usage-alerts"]) {
+        expect(wrapper.find(`[data-test="metrics-explorer-${id}"]`).exists()).toBe(true);
+      }
+      expect(wrapper.find('[data-test="metrics-explorer-usage-slos"]').exists()).toBe(true);
+    });
+
+    it("hands a chip selection to the grid", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).onUsageFilterChange(["alerts", "slos"]);
+      expect([...grid.usageFilters.value]).toEqual(["alerts", "slos"]);
+      (wrapper.vm as any).onUsageFilterChange(undefined);
+      expect(grid.usageFilters.value.size).toBe(0);
+    });
+
+    it("shows the scan loading, and a retry once it fails", async () => {
+      grid.usageLoading.value = true;
+      const loading = mountExplorer();
+      expect(loading.find('[data-test="metrics-explorer-usage-loading"]').exists()).toBe(true);
+      expect(loading.find('[data-test="metrics-explorer-usage-retry"]').exists()).toBe(false);
+
+      grid.usageLoading.value = false;
+      grid.usageError.value = true;
+      const failed = mountExplorer();
+      expect(failed.find('[data-test="metrics-explorer-usage-loading"]').exists()).toBe(false);
+      expect(failed.find('[data-test="metrics-explorer-usage-retry"]').exists()).toBe(true);
+      grid.usageError.value = false;
+    });
+
+    it("restores a usage sort and chips from the URL, and writes them back", () => {
+      routerState.query = { sort: "alerts", usage: "slos,dashboards" };
+      const wrapper = mountExplorer();
+      expect(grid.sortBy.value).toBe("alerts");
+      expect([...grid.usageFilters.value].sort()).toEqual(["dashboards", "slos"]);
+      const state = wrapper.findComponent('[data-test="metrics-explorer-views"]').props("state");
+      expect(state).toMatchObject({ sort: "alerts", usage: "dashboards,slos" });
+      grid.sortBy.value = "a-z";
+      grid.usageFilters.value = new Set();
     });
   });
 
@@ -900,6 +950,29 @@ describe("MetricsExplorer wiring", () => {
         expect(blob?.data?.type).toBe("line");
       });
 
+      it("freezes a relative window into the picker's absolute from/to, in µs", async () => {
+        routerState.query = { period: "15m" };
+        window.history.replaceState({}, "", "/metrics?period=15m");
+        const wrapper = mountExplorer({
+          DateTimePickerDashboard: {
+            setup: () => ({
+              getConsumableDateTime: () => ({
+                startTime: 1_700_000_000_000_000,
+                endTime: 1_700_000_900_000_000,
+              }),
+            }),
+            template: "<div />",
+          },
+        });
+        await enterVisualizeWith(wrapper, "up");
+
+        const params = new URL((wrapper.vm as any).shareUrl).searchParams;
+        expect(params.get("period")).toBeNull();
+        expect(params.get("from")).toBe("1700000000000000");
+        expect(params.get("to")).toBe("1700000900000000");
+        window.history.replaceState({}, "", "/");
+      });
+
       it("omits metrics_data on a blank Visualize (no query yet)", async () => {
         const wrapper = mountExplorer();
         visualizePanel = reactive({
@@ -949,6 +1022,15 @@ describe("MetricsExplorer wiring", () => {
         routerState.query = { mode: "visualize" };
         const wrapper = mountExplorer();
         expect((wrapper.vm as any).visualizeSeed).toBeNull();
+      });
+
+      it("says once that a link's label groups were dropped for passing the branch cap", () => {
+        showErrorNotification.mockClear();
+        const groups = Array.from({ length: 17 }, (_, i) => `${i + 1}:l${i}=v`);
+        routerState.query = { labels: ["job=api", ...groups] };
+        mountExplorer();
+        expect(showErrorNotification).toHaveBeenCalledTimes(1);
+        expect(grid.labelFilters.value).toEqual([{ label: "job", operator: "=", value: "api" }]);
       });
 
       it("ignores a malformed blob rather than throwing", () => {
@@ -1043,6 +1125,78 @@ describe("MetricsExplorer wiring", () => {
         expect(routerState.push).not.toHaveBeenCalled();
       });
 
+      it("remounts Visualize on the URL's chart when Back/Forward moves between two blobs", async () => {
+        const first = encodeMetricsConfig(
+          getMetricsConfig({ data: { type: "line", queries: [{ query: "up", fields: {} }] } }),
+        );
+        const second = encodeMetricsConfig(
+          getMetricsConfig({
+            data: { type: "bar", queries: [{ query: "node_load1", fields: {} }] },
+          }),
+        );
+        visualizePanel = null;
+        routerState.query = { mode: "visualize", metrics_data: first };
+        const wrapper = mountExplorer();
+        const vm = wrapper.vm as any;
+        const mounted = vm.visualizeMount;
+
+        routerState.query = { mode: "visualize", metrics_data: second };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeSeed?.queries?.[0]?.query).toBe("node_load1");
+        expect(vm.visualizeMount).toBe(mounted + 1);
+
+        routerState.query = { mode: "visualize", metrics_data: first };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeSeed?.queries?.[0]?.query).toBe("up");
+        expect(vm.visualizeMount).toBe(mounted + 2);
+      });
+
+      it("does not remount on the blob the page itself wrote", async () => {
+        const wrapper = mountExplorer();
+        const vm = wrapper.vm as any;
+        await enterVisualizeWith(wrapper, "node_load1");
+        vi.advanceTimersByTime(300);
+        const wrote = blobWrites().at(-1);
+        expect(wrote).toBeTruthy();
+        const mounted = vm.visualizeMount;
+        vm.visualizeSeed = null;
+        // An edit inside the debounce means the chart has moved on from what was written.
+        visualizePanel.data.queries[0].query = "node_load5";
+        await wrapper.vm.$nextTick();
+
+        routerState.query = { mode: "visualize", metrics_data: wrote };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeMount).toBe(mounted);
+        expect(vm.visualizeSeed).toBeNull();
+      });
+
+      it("rehydrates on Back to a chart the page wrote itself before a shared link replaced it", async () => {
+        const wrapper = mountExplorer();
+        const vm = wrapper.vm as any;
+        await enterVisualizeWith(wrapper, "chart_b");
+        vi.advanceTimersByTime(300);
+        const written = blobWrites().at(-1);
+        expect(written).toBeTruthy();
+        routerState.query = { mode: "visualize", metrics_data: written };
+        vm.onRouteQueryChange();
+
+        const shared = encodeMetricsConfig(
+          getMetricsConfig({ data: { type: "bar", queries: [{ query: "chart_c", fields: {} }] } }),
+        );
+        routerState.query = { mode: "visualize", metrics_data: shared };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeSeed?.queries?.[0]?.query).toBe("chart_c");
+        visualizePanel.data.queries[0].query = "chart_c";
+        vm.visualizeSeed = null;
+        await wrapper.vm.$nextTick();
+        const mounted = vm.visualizeMount;
+
+        routerState.query = { mode: "visualize", metrics_data: written };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeSeed?.queries?.[0]?.query).toBe("chart_b");
+        expect(vm.visualizeMount).toBe(mounted + 1);
+      });
+
       it("does not touch metrics_data while in a grid mode", async () => {
         const wrapper = mountExplorer();
         // A pure grid interaction (sort change) fires syncUrlState, never the
@@ -1071,6 +1225,7 @@ describe("MetricsExplorer wiring", () => {
       grid.labelFilters.value = [];
       grid.hideEmptyPanels.value = true;
       grid.sortBy.value = "a-z";
+      grid.usageFilters.value = new Set();
       grid.viewMode.value = "grid";
     });
     afterEach(() => {

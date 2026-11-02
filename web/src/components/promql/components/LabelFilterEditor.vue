@@ -13,133 +13,197 @@
       </div>
       <span class="ms-0.5 me-0.5 flex items-center">:</span>
       <div class="scroll m-0.5 flex min-h-8 flex-wrap items-center gap-2">
-        <!-- Label Filter Items -->
-        <div
-          v-for="(label, index) in props.labels"
-          :key="index"
-          data-test="promql-labelfilter-item"
-          class="flex items-center"
-        >
-          <OButtonGroup
-            class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
-            radius="sm"
-            :divided="true"
+        <template v-for="section in sections" :key="section.group">
+          <span
+            v-if="section.group > 0"
+            class="text-3xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
+            :data-test="`promql-labelfilter-group-join-${section.group}`"
+            >{{
+              section.position > 0
+                ? t("metrics.labelGroups.or")
+                : section.hasBase
+                  ? t("metrics.labelGroups.andAnyOf")
+                  : t("metrics.labelGroups.anyOf")
+            }}</span
           >
-            <ODropdown>
-              <template #trigger>
-                <OButton
-                  variant="ghost"
-                  size="chip-12"
-                  class="!ps-1 !pe-1"
-                  :data-test="`promql-label-filter-${index}`"
-                >
-                  <span class="leading-normal font-normal whitespace-nowrap">
-                    <template v-if="!label.label">
-                      <span class="text-text-secondary">{{ computedLabel(label) }}</span>
-                    </template>
-                    <!-- PromQL editor colours: maroon labels, string/number values -->
-                    <template v-else>
-                      <span class="text-promql-label">{{ label.label }}</span>
-                      <template v-if="label.value">
-                        <span class="text-text-secondary px-1">{{ label.op }}</span>
-                        <span
-                          :class="
-                            /^-?[\d.]+$/.test(String(label.value).trim())
-                              ? 'text-promql-number'
-                              : 'text-promql-string'
-                          "
-                          >{{ label.value }}</span
-                        >
-                      </template>
-                    </template>
-                  </span>
-                  <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
-                </OButton>
-              </template>
-              <div class="p-3" :data-test="`promql-label-filter-${index}-menu`">
-                <div class="w-86 [&_.o-input-label]:text-xs [&_.o-input-label]:font-normal">
-                  <!-- Label Selection -->
-                  <OSelect
-                    v-model="label.label"
-                    :options="availableLabelOptions"
-                    :label="t('metrics.labelFilterEditor.label')"
-                    class="label-filter-label-select showLabelOnTop mb-1.5 normal-case!"
-                    searchable
-                    clearable
-                    data-test="promql-label-select"
-                  >
-                    <template #empty>
-                      <span class="text-text-secondary px-3 py-2">{{
-                        loadingLabels
-                          ? t("metrics.labelFilterEditor.loadingLabels")
-                          : t("metrics.labelFilterEditor.noLabelsFound")
-                      }}</span>
-                    </template>
-                  </OSelect>
-
-                  <!-- Operator Selection -->
-                  <OSelect
-                    v-model="label.op"
-                    :options="operatorOptions"
-                    :label="t('metrics.labelFilterEditor.operator')"
-                    class="label-filter-operator-select showLabelOnTop mb-1.5"
-                    data-test="promql-operator-select"
-                  />
-
-                  <!-- Value Selection -->
-                  <OSelect
-                    v-model="label.value"
-                    :options="getLabelValueOptions(label.label)"
-                    :label="t('metrics.labelFilterEditor.value')"
-                    class="label-filter-value-select showLabelOnTop"
-                    :value-key="'value'"
-                    :label-key="'label'"
-                    :disabled="!label.label"
-                    searchable
-                    clearable
-                    data-test="promql-value-select"
-                  >
-                    <template #empty>
-                      <span class="text-text-secondary px-3 py-2">{{
-                        !label.label
-                          ? t("metrics.labelFilterEditor.selectLabelFirst")
-                          : t("metrics.labelFilterEditor.noValuesFound")
-                      }}</span>
-                    </template>
-                  </OSelect>
-                </div>
-              </div>
-            </ODropdown>
+          <div
+            :class="
+              section.group > 0
+                ? 'border-border-default rounded-default flex flex-wrap items-center gap-2 border border-dashed p-0.5'
+                : 'contents'
+            "
+            :data-test="section.group > 0 ? `promql-labelfilter-group-${section.group}` : undefined"
+          >
             <OButton
-              :aria-label="t('common.remove')"
+              v-if="section.group > 0"
+              variant="ghost"
+              size="chip-12"
+              :active="section.negate"
+              :aria-pressed="section.negate"
+              :data-test="`promql-labelfilter-group-not-${section.group}`"
+              @click="toggleNegate(section.group)"
+            >
+              {{ t("metrics.labelGroups.not") }}
+              <OTooltip :content="t('metrics.labelGroups.notTooltip')" side="top" />
+            </OButton>
+            <div
+              v-for="{ label, index } in section.items"
+              :key="index"
+              data-test="promql-labelfilter-item"
+              class="flex items-center"
+            >
+              <OButtonGroup
+                class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+                radius="sm"
+                :divided="true"
+              >
+                <ODropdown>
+                  <template #trigger>
+                    <OButton
+                      variant="ghost"
+                      size="chip-12"
+                      class="!ps-1 !pe-1"
+                      :data-test="`promql-label-filter-${index}`"
+                    >
+                      <span class="leading-normal font-normal whitespace-nowrap">
+                        <template v-if="!label.label">
+                          <span class="text-text-secondary">{{ computedLabel(label) }}</span>
+                        </template>
+                        <template v-else>
+                          <span class="text-promql-label">{{ label.label }}</span>
+                          <template v-if="label.value">
+                            <span class="text-text-secondary px-1">{{ label.op }}</span>
+                            <span
+                              :class="
+                                /^-?[\d.]+$/.test(String(label.value).trim())
+                                  ? 'text-promql-number'
+                                  : 'text-promql-string'
+                              "
+                              >{{ label.value }}</span
+                            >
+                          </template>
+                        </template>
+                      </span>
+                      <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                    </OButton>
+                  </template>
+                  <div class="p-3" :data-test="`promql-label-filter-${index}-menu`">
+                    <div class="w-86 [&_.o-input-label]:text-xs [&_.o-input-label]:font-normal">
+                      <OSelect
+                        v-model="label.label"
+                        :options="labelOptionsFor(section.group)"
+                        :label="t('metrics.labelFilterEditor.label')"
+                        class="label-filter-label-select showLabelOnTop mb-1.5 normal-case!"
+                        searchable
+                        clearable
+                        data-test="promql-label-select"
+                      >
+                        <template #empty>
+                          <span class="text-text-secondary px-3 py-2">{{
+                            loadingLabels
+                              ? t("metrics.labelFilterEditor.loadingLabels")
+                              : t("metrics.labelFilterEditor.noLabelsFound")
+                          }}</span>
+                        </template>
+                      </OSelect>
+
+                      <OSelect
+                        v-model="label.op"
+                        :options="operatorOptions"
+                        :label="t('metrics.labelFilterEditor.operator')"
+                        class="label-filter-operator-select showLabelOnTop mb-1.5"
+                        data-test="promql-operator-select"
+                      />
+
+                      <OSelect
+                        v-model="label.value"
+                        :options="getLabelValueOptions(label.label)"
+                        :label="t('metrics.labelFilterEditor.value')"
+                        class="label-filter-value-select showLabelOnTop"
+                        :value-key="'value'"
+                        :label-key="'label'"
+                        :disabled="!label.label"
+                        searchable
+                        clearable
+                        data-test="promql-value-select"
+                      >
+                        <template #empty>
+                          <span class="text-text-secondary px-3 py-2">{{
+                            !label.label
+                              ? t("metrics.labelFilterEditor.selectLabelFirst")
+                              : t("metrics.labelFilterEditor.noValuesFound")
+                          }}</span>
+                        </template>
+                      </OSelect>
+                    </div>
+                  </div>
+                </ODropdown>
+                <OButton
+                  :aria-label="t('common.remove')"
+                  variant="ghost"
+                  size="icon-chip"
+                  class="!w-4"
+                  @click="removeLabel(index)"
+                  :data-test="`promql-label-filter-remove-${index}`"
+                >
+                  <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
+                </OButton>
+              </OButtonGroup>
+            </div>
+            <OButton
+              v-if="section.group > 0"
               variant="ghost"
               size="icon-chip"
-              class="!w-4"
-              @click="removeLabel(index)"
-              :data-test="`promql-label-filter-remove-${index}`"
+              :aria-label="t('metrics.labelGroups.addToGroup')"
+              :data-test="`promql-labelfilter-group-add-${section.group}`"
+              @click="addLabel(section.group)"
             >
-              <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
+              <OIcon name="add" size="sm" />
+              <OTooltip :content="t('metrics.labelGroups.addToGroup')" side="top" />
             </OButton>
-          </OButtonGroup>
-        </div>
+            <OButton
+              v-else
+              variant="outline"
+              size="icon-chip"
+              @click="addLabel(0)"
+              data-test="promql-add-label-filter"
+            >
+              <OIcon name="add" size="sm" />
+              <OTooltip :content="t('metrics.labelFilterEditor.addLabelFilter')" side="top" />
+            </OButton>
+          </div>
+        </template>
 
-        <!-- Add Button -->
         <OButton
-          variant="outline"
-          size="icon-chip"
-          @click="addLabel"
-          data-test="promql-add-label-filter"
+          v-if="props.labels.length"
+          variant="ghost"
+          size="xs"
+          data-test="promql-add-label-group"
+          @click="addGroup"
         >
-          <OIcon name="add" size="sm" />
-          <OTooltip :content="t('metrics.labelFilterEditor.addLabelFilter')" side="top" />
+          {{ t("metrics.labelGroups.addGroup") }}
+          <OTooltip :content="t('metrics.labelGroups.addGroupTooltip')" side="top" />
         </OButton>
       </div>
+    </div>
+    <div
+      v-if="tooMany"
+      class="text-status-error-text ps-2 text-xs"
+      role="alert"
+      data-test="promql-labelfilter-too-many-branches"
+    >
+      {{
+        t("metrics.labelGroups.tooManyBranches", {
+          count: tooMany,
+          max: MAX_FILTER_BRANCHES,
+        })
+      }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, watch } from "vue";
+import { computed, inject, ref, watch } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -148,6 +212,11 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { PromqlLabelMatcher } from "@/components/promql/types";
+import {
+  compileLabelFilters,
+  filterGroupsOf,
+  MAX_FILTER_BRANCHES,
+} from "@/components/promql/labelBoolean";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
 const props = defineProps<{
@@ -183,10 +252,52 @@ const loadingLabels = computed(
 
 const operatorOptions = ["=", "!=", "=~", "!~"];
 
-// Computed: available labels minus ones already selected in other rows
-const availableLabelOptions = computed(() => {
-  const selectedLabels: string[] = props.labels.map((l) => l.label);
+// Labels already picked in the same group are hidden; another group may reuse them.
+const labelOptionsFor = (group: number) => {
+  const selectedLabels: string[] = props.labels
+    .filter((l) => (l.group ?? 0) === group)
+    .map((l) => l.label);
   return availableLabels.value.filter((label) => !selectedLabels.includes(label));
+};
+
+const compiled = computed(() => compileLabelFilters(props.labels));
+
+/** The branch count of an add or NOT toggle that was refused for passing the cap; 0 once an edit lands. */
+const refusedCount = ref(0);
+const tooMany = computed(() =>
+  compiled.value.ok ? refusedCount.value : compiled.value.branchCount,
+);
+
+/** Emits `labels` unless they would expand past the cap, which leaves the query unrenderable. */
+const emitWithinCap = (labels: PromqlLabelMatcher[]) => {
+  const next = compileLabelFilters(labels);
+  if (!next.ok) {
+    refusedCount.value = next.branchCount;
+    return;
+  }
+  refusedCount.value = 0;
+  emit("update:labels", labels);
+};
+
+// A new list, such as another query tab's, was never refused.
+watch(
+  () => props.labels,
+  () => {
+    refusedCount.value = 0;
+  },
+);
+
+const sections = computed(() => {
+  const items = props.labels.map((label, index) => ({ label, index }));
+  const base = items.filter(({ label }) => (label.group ?? 0) <= 0);
+  const groups = filterGroupsOf(props.labels).map(({ group, negate }, position) => ({
+    group,
+    negate,
+    position,
+    hasBase: base.length > 0,
+    items: items.filter(({ label }) => label.group === group),
+  }));
+  return [{ group: 0, negate: false, position: 0, hasBase: false, items: base }, ...groups];
 });
 
 const computedLabel = (label: PromqlLabelMatcher): string => {
@@ -235,20 +346,38 @@ watch(
   { immediate: true },
 );
 
-const addLabel = () => {
-  const newLabels: PromqlLabelMatcher[] = [
-    ...props.labels,
-    {
-      label: raw(""),
-      op: "=",
-      value: "",
-    },
-  ];
-  emit("update:labels", newLabels);
+const emptyMatcher = (group: number): PromqlLabelMatcher => {
+  const matcher: PromqlLabelMatcher = { label: raw(""), op: "=", value: "" };
+  if (group > 0) matcher.group = group;
+  if (group > 0 && props.labels.some((l) => l.group === group && l.negate)) matcher.negate = true;
+  return matcher;
+};
+
+const addLabel = (group = 0) => {
+  emitWithinCap([...props.labels, emptyMatcher(group)]);
+};
+
+const addGroup = () => {
+  const next = Math.max(0, ...props.labels.map((l) => l.group ?? 0)) + 1;
+  emitWithinCap([...props.labels, emptyMatcher(next)]);
+};
+
+const toggleNegate = (group: number) => {
+  const negate = !props.labels.some((l) => l.group === group && l.negate);
+  emitWithinCap(
+    props.labels.map((l) => {
+      if (l.group !== group) return l;
+      const next = { ...l };
+      if (negate) next.negate = true;
+      else delete next.negate;
+      return next;
+    }),
+  );
 };
 
 const removeLabel = (index: number) => {
   const newLabels = props.labels.filter((_, idx) => idx !== index);
+  refusedCount.value = 0;
   emit("update:labels", newLabels);
 };
 

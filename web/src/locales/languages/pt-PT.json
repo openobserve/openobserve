@@ -1315,7 +1315,6 @@
       "moreExamples": "Para obter mais exemplos,",
       "clickHere": "clique aqui"
     },
-    "legendLabel": "Legenda",
     "switchToLogs": "Voltar aos Logs",
     "savedViewsLabel": "Visualizações guardadas",
     "savedViewName": "Nome da visualização",
@@ -7110,7 +7109,9 @@
     "formulaNumber": "Fórmula {index}",
     "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} não é uma consulta neste painel",
-    "formulaReferencesFormula": "{letter} é uma fórmula, e uma fórmula não pode referenciar outra fórmula",
+    "formulaCycle": "As fórmulas referenciam-se mutuamente em ciclo: {cycle}",
+    "formulaTooLong": "A fórmula expandida excede {limit} caracteres",
+    "formulaTooDeep": "As fórmulas estão aninhadas em mais de {limit} níveis",
     "formulaInputNote": "Usada numa fórmula: neste caso, a definição de instantâneo/intervalo, a legenda, o passo e o deslocamento temporal desta consulta não se aplicam.",
     "multiSqlQueryLabel": "Rótulo de consulta",
     "multiSqlQueryLabelHint": "Nome personalizado para esta consulta em legendas (por exemplo, 'Produção')",
@@ -9324,7 +9325,6 @@
     "hostmapValue": "Valor",
     "hostmapGroupBy": "Agrupar por",
     "otherColumn": "Outras colunas",
-    "metric": "Métrica",
     "filters": "Filtros",
     "labelFilters": "Filtros de etiqueta",
     "operations": "Operações",
@@ -13604,21 +13604,6 @@
     "awsStsSelfHostedInfo": "Isto usa o AWS sts para assumir funções e realizar operações. Certifique-se de que configurou, no ambiente de instalação, credenciais da AWS que têm acesso a esta função."
   },
   "metrics": {
-    "syntaxGuide": {
-      "instantVector": "Para seletores de vetor instantâneo, use",
-      "rangeVector": "Para seletores de vetor de intervalo, use",
-      "aggregate": "Para agregar dados, use",
-      "or": "ou",
-      "rate": "Para cálculos de taxa num vetor de intervalo, use",
-      "sqlTitle": "Guia de Sintaxe: Modo SQL",
-      "sqlFullText": "Para pesquisa de texto completo do valor 'error', use",
-      "sqlColumn": "Para pesquisa em coluna do valor 'error', use",
-      "sqlCode": "Para pesquisar o valor 200 na coluna 'code', use",
-      "sqlStream": "Para pesquisar o valor 'stderr' na coluna 'stream', use",
-      "sqlFunction": "Para pesquisar e usar a função de consulta {fn} na coluna 'log', use",
-      "sqlMoreExamples": "Para exemplos adicionais,",
-      "sqlClickHere": "clique aqui"
-    },
     "add": "Adicionar",
     "runQuery": "Executar consulta",
     "runQueryOptions": "Opções de execução da consulta",
@@ -13734,7 +13719,12 @@
           "colP90": "p90",
           "colP99": "p99",
           "addToDashboard": "Adicionar ao dashboard",
-          "panelTitle": "{title} · {metric}"
+          "panelTitle": "{title} · {metric}",
+          "sortAvg": "Média",
+          "sortAvgTitle": "Ordenar valores pela sua média na janela",
+          "sortOutlying": "Atípicos",
+          "sortOutlyingTitle": "Ordenar valores pelo afastamento da respetiva série em relação às outras",
+          "outlier": "Valor atípico"
         },
         "related": {
           "empty": "Nenhuma métrica relacionada",
@@ -13859,9 +13849,9 @@
         "selectLabel": "Selecione um rótulo",
         "invalidLabel": "Nome de rótulo inválido.",
         "selectOrTypeValue": "Selecione ou introduza um valor",
-        "operatorHelp": "=  é exatamente este valor\n!=  é qualquer coisa menos este valor\n=~  corresponde a uma regex — use 500{'|'}503 para corresponder a um ou outro\n!~  não corresponde a uma regex\n\nOs filtros são combinados com AND. Para corresponder a um de dois valores, use =~ com uma regex.",
+        "operatorHelp": "=  é exatamente este valor\n!=  é qualquer valor exceto este valor\n=~  corresponde a uma expressão regular — use 500{'|'}503 para corresponder a qualquer um\n!~  não corresponde a uma expressão regular\n\nOs filtros são combinados com AND. Para corresponder a qualquer um de dois valores, use =~ com uma expressão regular ou adicione um grupo OR.",
         "andSeparator": "e",
-        "andSeparatorTitle": "Os filtros são combinados com AND — uma métrica deve corresponder a todos eles. Para corresponder a um de dois valores, use o operador =~ com uma regex.",
+        "andSeparatorTitle": "Os filtros são combinados com AND — uma métrica tem de corresponder a todos eles. Para corresponder a qualquer um de dois valores, use o operador =~ com uma expressão regular ou adicione um grupo OR.",
         "noSuggestions": "Nenhuma sugestão — introduza um valor.",
         "moreFilters": "+{count} mais",
         "moreFiltersTooltip": "Clique para mostrar todos os filtros inline",
@@ -13901,11 +13891,16 @@
         "deleteMessage": "Eliminar a vista {name} para todos nesta organização?",
         "modified": "{name} (modificada)",
         "clear": "Limpar vista"
-      }
-    },
-    "index": {
-      "namePanelRequired": "O nome do painel é obrigatório",
-      "errorsFixTryAgain": "Há alguns erros, corrija-os e tente novamente"
+      },
+      "sortDashboards": "Dashboards",
+      "sortDashboardsTitle": "Mais utilizados em dashboards primeiro",
+      "sortAlerts": "Alertas",
+      "sortAlertsTitle": "Mais utilizados em alertas primeiro",
+      "usageInDashboards": "Em dashboards",
+      "usageHasAlerts": "Tem alertas",
+      "usageInSlos": "Em SLOs",
+      "usageLoading": "A carregar onde as métricas são utilizadas",
+      "usageFailed": "Utilização indisponível, tente novamente"
     },
     "metricCard": {
       "lastRefreshed": "Última atualização:",
@@ -13917,25 +13912,6 @@
     },
     "functionConfigDialog": {
       "failedToRenderChart": "Falha ao renderizar gráfico"
-    },
-    "queryBuilder": {
-      "title": "Construtor de Consultas PromQL",
-      "subtitle": "Construa e teste consultas PromQL visualmente",
-      "generatedQuery": "Consulta PromQL Gerada:",
-      "noQueryBuilt": "Ainda nenhuma consulta construída",
-      "copyQuery": "Copiar Consulta",
-      "clearAll": "Limpar Tudo",
-      "testQuery": "Testar Consulta",
-      "queryResultPreview": "Pré-visualização do Resultado da Consulta:",
-      "queryCopied": "Consulta copiada para a área de transferência!",
-      "queryCleared": "Consulta limpa",
-      "testingSoon": "O teste de consulta será implementado em breve",
-      "executionSoon": "A execução da consulta será implementada na próxima fase"
-    },
-    "metricSelector": {
-      "metricName": "Nome da Métrica",
-      "loadingMetrics": "A carregar métricas...",
-      "noMetricsFound": "Nenhuma métrica encontrada"
     },
     "labelFilterEditor": {
       "label": "Rótulo",
@@ -13958,8 +13934,6 @@
       "noMetric": "O construtor precisa de uma consulta sobre uma única métrica nomeada",
       "mismatch": "O construtor não pode exibir esta consulta exatamente",
       "constructs": {
-        "without": "um agrupamento without (…)",
-        "offset": "um modificador de offset",
         "at": "um modificador {'@'}",
         "orMatchers": "um or entre correspondências de rótulos",
         "subquery": "uma subconsulta",
@@ -13993,7 +13967,11 @@
         "byLabelsLabel": "Por Rótulos",
         "quantileLabel": "Quantil",
         "kLabel": "K",
-        "nearestMultipleLabel": "Múltiplo mais próximo"
+        "nearestMultipleLabel": "Múltiplo mais próximo",
+        "withoutLabel": "Sem (remover estas etiquetas)",
+        "withoutDesc": "Agregar excluindo as etiquetas selecionadas e manter todas as restantes etiquetas",
+        "offsetLabel": "Deslocamento",
+        "offsetDesc": "Quanto recuar para ler a métrica, por exemplo 1h ou 1d"
       },
       "rangeOnlyFirst": "Uma função de intervalo só pode ser a primeira etapa",
       "rangeOnlyFirstNote": "Uma função de intervalo lê as amostras brutas, portanto só pode ser a primeira etapa. Remova as outras etapas para adicionar uma.",
@@ -14063,6 +14041,17 @@
       "empty": "Ainda não há consultas",
       "noMatch": "Nenhuma consulta corresponde à pesquisa ou ao filtro de favoritas",
       "loadMore": "Carregar mais"
+    },
+    "labelGroups": {
+      "addGroup": "+ grupo OR",
+      "addGroupTooltip": "Adicionar um grupo de filtros; uma série corresponde quando corresponde a qualquer um dos grupos",
+      "addToGroup": "Adicionar um filtro a este grupo",
+      "anyOf": "qualquer um de",
+      "andAnyOf": "e qualquer um de",
+      "or": "ou",
+      "not": "não",
+      "notTooltip": "Corresponder às séries a que este grupo, no seu todo, não corresponde",
+      "tooManyBranches": "Estes filtros expandem-se para {count} seletores separados; no máximo {max} podem ser executados. Combine os valores num único filtro de expressão regular ou remova um grupo."
     }
   },
   "settings": {
@@ -22805,7 +22794,8 @@
       "moduloName": "Módulo",
       "multiplyByName": "Multiplicar por",
       "divideByName": "Dividir por",
-      "exponentName": "Expoente"
+      "exponentName": "Expoente",
+      "offsetDoc": "Lê a métrica tal como estava há a duração indicada"
     }
   },
   "passwordPolicy": {

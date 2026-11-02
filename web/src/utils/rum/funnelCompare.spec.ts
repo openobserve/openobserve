@@ -308,6 +308,29 @@ describe("compareBreakdown", () => {
     });
   });
 
+  it("keeps named and unnamed previous units apart for an any-step attribute breakdown", () => {
+    const hits = [
+      ...["a", "b", "c", "d", "e", "f"].map((dim, i) => ({ dim, c1: 20 - i, c2: 10 })),
+      { dim: null, c1: 10, c2: 5 },
+    ];
+    const cur = foldBreakdown(hits, 2, 5, { f: "plan" });
+    expect(cur.start?.anyStep).toBe(true);
+    const res = compareBreakdown(
+      cur,
+      hits,
+      [
+        { dim: "f", c1: 5, c2: 1 },
+        { dim: null, c1: 4, c2: 2 },
+      ],
+      2,
+    );
+    expect(res.rows.find((r) => r.other && !r.prevOnly)?.prev).toMatchObject({ first: 5, last: 1 });
+    expect(res.rows.find((r) => r.notSet && !r.prevOnly)?.prev).toMatchObject({
+      first: 4,
+      last: 2,
+    });
+  });
+
   it("caps previous-only rows and folds the overflow into a previous-only Other", () => {
     const prev = ["p1", "p2", "p3", "p4", "p5", "p6", "p7"].map((dim, i) => ({
       dim,

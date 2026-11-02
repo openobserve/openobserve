@@ -122,7 +122,6 @@ export class RumProductAnalyticsPage {
 
         this.funnelAlertBtn = page.locator('[data-test="rum-analytics-funnel-alert-btn"]');
         this.funnelLeftOut = page.locator('[data-test="rum-analytics-funnel-left-out"]');
-        this.funnelWindowFixed = page.locator('[data-test="rum-analytics-funnel-window-fixed"]');
         this.funnelWindowTrigger = page.locator('[data-test="rum-analytics-funnel-window-select-trigger"]');
         this.funnelSuggestionsError = page.locator('[data-test="rum-analytics-funnel-suggestions-error"]');
         this.funnelSuggestionsRetryBtn = page.locator('[data-test="rum-analytics-funnel-suggestions-retry-btn"]');
