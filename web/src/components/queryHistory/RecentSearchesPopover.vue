@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             :name="row.starred ? 'star' : 'history'"
             size="xs"
-            :class="row.starred ? 'text-accent' : 'text-select-item-selected-text'"
+            :class="row.starred ? 'text-favorite' : 'text-select-item-selected-text'"
           />
         </span>
         <OTruncatedText :tooltip="false" class="flex-1 font-mono text-xs">
