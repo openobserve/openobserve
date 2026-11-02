@@ -33,7 +33,7 @@ use config::{
             BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL,
             VALUE_LABEL,
         },
-        stream::{DistinctField, StreamSettings, StreamType},
+        stream::{StreamSettings, StreamType},
         traces::ALL_INFER_FIELDS,
     },
     metrics,
@@ -255,8 +255,6 @@ fn validate_stream_settings(
         )));
     }
 
-    check_unindexable_fields(stream_type, settings)?;
-
     if settings.data_retention > 0
         && settings.data_retention < 30
         && settings.storage_type.is_compliance()
@@ -281,31 +279,6 @@ fn validate_stream_settings(
     }
 
     Ok(())
-}
-
-fn check_unindexable_fields(
-    stream_type: StreamType,
-    settings: &StreamSettings,
-) -> std::result::Result<(), StreamSettingsError> {
-    // distinct value fields only become index fields while the feature is enabled
-    let distinct_fields: &[DistinctField] = if settings.enable_distinct_fields {
-        &settings.distinct_value_fields
-    } else {
-        &[]
-    };
-    let unindexable = settings
-        .full_text_search_keys
-        .iter()
-        .chain(&settings.index_fields)
-        .chain(&settings.bloom_filter_fields)
-        .chain(distinct_fields.iter().map(|field| &field.name))
-        .find(|field| !stream_type.can_index_field(field));
-    match unindexable {
-        Some(field) => Err(StreamSettingsError::BadRequest(format!(
-            "field [{field}] of a {stream_type} stream cannot be used for full text search or index"
-        ))),
-        None => Ok(()),
-    }
 }
 
 async fn persist_stream_settings(
@@ -1293,51 +1266,6 @@ mod tests {
         assert!(names.contains("field0"));
         assert!(names.contains("field1"));
         assert!(!names.contains("field2"));
-    }
-
-    #[test]
-    fn test_check_unindexable_fields_rejects_profiles_payload_columns() {
-        let tag_index = StreamSettings {
-            index_fields: vec!["service_name".to_string(), "k8s_pod_name".to_string()],
-            ..Default::default()
-        };
-        assert!(check_unindexable_fields(StreamType::Profiles, &tag_index).is_ok());
-
-        let distinct_stack = vec![DistinctField {
-            name: "stack".to_string(),
-            added_ts: 1,
-        }];
-        for settings in [
-            StreamSettings {
-                full_text_search_keys: vec!["stack".to_string()],
-                ..Default::default()
-            },
-            StreamSettings {
-                index_fields: vec!["profile_blob".to_string()],
-                ..Default::default()
-            },
-            StreamSettings {
-                bloom_filter_fields: vec!["stack".to_string()],
-                ..Default::default()
-            },
-            StreamSettings {
-                distinct_value_fields: distinct_stack.clone(),
-                ..Default::default()
-            },
-        ] {
-            assert!(matches!(
-                check_unindexable_fields(StreamType::Profiles, &settings),
-                Err(StreamSettingsError::BadRequest(_))
-            ));
-            assert!(check_unindexable_fields(StreamType::Logs, &settings).is_ok());
-        }
-
-        let distinct_disabled = StreamSettings {
-            distinct_value_fields: distinct_stack,
-            enable_distinct_fields: false,
-            ..Default::default()
-        };
-        assert!(check_unindexable_fields(StreamType::Profiles, &distinct_disabled).is_ok());
     }
 
     #[test]

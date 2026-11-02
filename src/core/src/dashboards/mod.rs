@@ -241,7 +241,7 @@ async fn update_distinct_variables(
                 .unwrap_or_default();
             let mut _new_added = false;
 
-            let _fts = get_stream_setting_fts_fields(&Some(stream_settings.clone()), typ);
+            let _fts = get_stream_setting_fts_fields(&Some(stream_settings.clone()));
             for f in fields.iter() {
                 // we ignore full text search no matter what
                 if _fts.contains(f) {

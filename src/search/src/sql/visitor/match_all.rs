@@ -15,7 +15,6 @@
 
 use std::{ops::ControlFlow, sync::Arc};
 
-use config::meta::{sql::TableReferenceExt, stream::StreamType};
 use datafusion::{common::TableReference, sql::planner::object_name_to_table_reference};
 use hashbrown::HashMap;
 use infra::schema::{SchemaCache, get_stream_setting_fts_fields};
@@ -39,17 +38,11 @@ pub struct MatchVisitor {
 }
 
 impl MatchVisitor {
-    pub fn new(
-        total_schemas: &HashMap<TableReference, Arc<SchemaCache>>,
-        stream_type: StreamType,
-    ) -> Self {
+    pub fn new(total_schemas: &HashMap<TableReference, Arc<SchemaCache>>) -> Self {
         let mut has_fst_fields = HashMap::new();
         for (table_name, schema) in total_schemas {
             let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
-            let fts_fields = get_stream_setting_fts_fields(
-                &stream_settings,
-                table_name.get_stream_type(stream_type),
-            );
+            let fts_fields = get_stream_setting_fts_fields(&stream_settings);
             // check if schema don't have full text search field
             if fts_fields
                 .into_iter()

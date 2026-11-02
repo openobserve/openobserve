@@ -451,10 +451,9 @@ pub fn get_stream_setting_defined_schema_fields<T: std::borrow::Borrow<StreamSet
 // `Option<Arc<StreamSettings>>` returned by [`get_settings`].
 pub fn get_stream_setting_fts_fields<T: std::borrow::Borrow<StreamSettings>>(
     settings: &Option<T>,
-    stream_type: StreamType,
 ) -> Vec<String> {
     let default_fields = SQL_FULL_TEXT_SEARCH_FIELDS.clone();
-    let mut fields = match settings {
+    match settings {
         Some(settings) => {
             let settings = settings.borrow();
             let mut fields = settings.full_text_search_keys.clone();
@@ -465,15 +464,12 @@ pub fn get_stream_setting_fts_fields<T: std::borrow::Borrow<StreamSettings>>(
             if settings.index_all_values {
                 fields.push(ALL_VALUES_COL_NAME.to_string());
             }
+            fields.sort();
+            fields.dedup();
             fields
         }
         None => default_fields,
-    };
-    // settings saved before a field became unindexable still list it
-    fields.retain(|field| stream_type.can_index_field(field));
-    fields.sort();
-    fields.dedup();
-    fields
+    }
 }
 
 pub fn get_stream_setting_index_fields<T: std::borrow::Borrow<StreamSettings>>(
@@ -528,7 +524,6 @@ pub fn get_stream_setting_index_fields<T: std::borrow::Borrow<StreamSettings>>(
         }
         None => default_fields,
     };
-    fields.retain(|field| stream_type.can_index_field(field));
     fields.sort();
     fields.dedup();
     fields
@@ -1199,7 +1194,7 @@ mod tests {
     fn test_get_stream_setting_fts_fields() {
         let schema = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
         let settings = unwrap_stream_settings(&schema);
-        let res = get_stream_setting_fts_fields(&settings, StreamType::Logs);
+        let res = get_stream_setting_fts_fields(&settings);
         assert!(!res.is_empty());
     }
 
@@ -1345,7 +1340,7 @@ mod tests {
             ..Default::default()
         };
 
-        let fields = get_stream_setting_fts_fields(&Some(settings), StreamType::Logs);
+        let fields = get_stream_setting_fts_fields(&Some(settings));
         assert!(fields.contains(&"custom_field".to_string()));
         assert!(fields.contains(&ORIGINAL_DATA_COL_NAME.to_string()));
         assert!(fields.contains(&ALL_VALUES_COL_NAME.to_string()));
@@ -1452,35 +1447,6 @@ mod tests {
         let fields = get_stream_setting_index_fields(&Some(settings), StreamType::Logs);
         assert!(fields.contains(&"index_field".to_string()));
         assert!(!fields.contains(&"svc".to_string()));
-    }
-
-    #[test]
-    fn test_get_stream_setting_fields_skip_profiles_payload_columns() {
-        use config::meta::stream::DistinctField;
-
-        let settings = Some(StreamSettings {
-            full_text_search_keys: vec!["stack".to_string()],
-            index_fields: vec!["profile_blob".to_string(), "k8s_pod_name".to_string()],
-            bloom_filter_fields: vec!["stack".to_string()],
-            distinct_value_fields: vec![DistinctField {
-                name: "profile_blob".to_string(),
-                added_ts: 1,
-            }],
-            ..Default::default()
-        });
-        let payload = ["stack".to_string(), "profile_blob".to_string()];
-
-        let fts = get_stream_setting_fts_fields(&settings, StreamType::Profiles);
-        assert!(!fts.iter().any(|f| payload.contains(f)));
-        let index = get_stream_setting_index_fields(&settings, StreamType::Profiles);
-        assert!(!index.iter().any(|f| payload.contains(f)));
-        assert!(index.contains(&"k8s_pod_name".to_string()));
-
-        // the same column names stay indexable on other stream types
-        let fts = get_stream_setting_fts_fields(&settings, StreamType::Logs);
-        assert!(fts.contains(&"stack".to_string()));
-        let index = get_stream_setting_index_fields(&settings, StreamType::Logs);
-        assert!(index.contains(&"profile_blob".to_string()));
     }
 
     #[test]
