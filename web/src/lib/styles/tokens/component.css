@@ -479,6 +479,71 @@
   --color-badge-indigo-soft-bg: var(--color-indigo-50);
   --color-badge-indigo-soft-text: var(--color-indigo-700);
 
+  /* Segmented bar ranks: one categorical hue, rank 1 first; light darkens so each step keeps 3:1 on the card */
+  --color-segment-blue-1: color-mix(
+    in srgb,
+    var(--color-badge-blue-solid-bg),
+    var(--color-black) 30%
+  );
+  --color-segment-blue-2: color-mix(
+    in srgb,
+    var(--color-badge-blue-solid-bg),
+    var(--color-black) 22%
+  );
+  --color-segment-blue-3: color-mix(
+    in srgb,
+    var(--color-badge-blue-solid-bg),
+    var(--color-black) 15%
+  );
+  --color-segment-blue-4: color-mix(
+    in srgb,
+    var(--color-badge-blue-solid-bg),
+    var(--color-black) 7%
+  );
+  --color-segment-blue-5: var(--color-badge-blue-solid-bg);
+  --color-segment-purple-1: color-mix(
+    in srgb,
+    var(--color-badge-purple-solid-bg),
+    var(--color-black) 30%
+  );
+  --color-segment-purple-2: color-mix(
+    in srgb,
+    var(--color-badge-purple-solid-bg),
+    var(--color-black) 22%
+  );
+  --color-segment-purple-3: color-mix(
+    in srgb,
+    var(--color-badge-purple-solid-bg),
+    var(--color-black) 15%
+  );
+  --color-segment-purple-4: color-mix(
+    in srgb,
+    var(--color-badge-purple-solid-bg),
+    var(--color-black) 7%
+  );
+  --color-segment-purple-5: var(--color-badge-purple-solid-bg);
+  --color-segment-teal-1: color-mix(
+    in srgb,
+    var(--color-badge-teal-solid-bg),
+    var(--color-black) 30%
+  );
+  --color-segment-teal-2: color-mix(
+    in srgb,
+    var(--color-badge-teal-solid-bg),
+    var(--color-black) 22%
+  );
+  --color-segment-teal-3: color-mix(
+    in srgb,
+    var(--color-badge-teal-solid-bg),
+    var(--color-black) 15%
+  );
+  --color-segment-teal-4: color-mix(
+    in srgb,
+    var(--color-badge-teal-solid-bg),
+    var(--color-black) 7%
+  );
+  --color-segment-teal-5: var(--color-badge-teal-solid-bg);
+
   /* Badge — shared */
   --color-badge-focus-ring: var(--color-focus-ring-accent);
 
@@ -1274,6 +1339,23 @@
 
 /* ── Register ALL tokens for Tailwind utility generation ── */
 @theme inline {
+  /* Segmented bar ranks */
+  --color-segment-blue-1: var(--color-segment-blue-1);
+  --color-segment-blue-2: var(--color-segment-blue-2);
+  --color-segment-blue-3: var(--color-segment-blue-3);
+  --color-segment-blue-4: var(--color-segment-blue-4);
+  --color-segment-blue-5: var(--color-segment-blue-5);
+  --color-segment-purple-1: var(--color-segment-purple-1);
+  --color-segment-purple-2: var(--color-segment-purple-2);
+  --color-segment-purple-3: var(--color-segment-purple-3);
+  --color-segment-purple-4: var(--color-segment-purple-4);
+  --color-segment-purple-5: var(--color-segment-purple-5);
+  --color-segment-teal-1: var(--color-segment-teal-1);
+  --color-segment-teal-2: var(--color-segment-teal-2);
+  --color-segment-teal-3: var(--color-segment-teal-3);
+  --color-segment-teal-4: var(--color-segment-teal-4);
+  --color-segment-teal-5: var(--color-segment-teal-5);
+
   /* Derived blend colours (see :root above) */
   --color-tag-chip-bg: var(--color-tag-chip-bg);
   --color-card-glass-tint-medium: var(--color-card-glass-tint-medium);

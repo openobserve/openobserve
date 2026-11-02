@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { SEGMENT_SWATCH } from "./OSegmentedBar.types";
+import { SEGMENT_SWATCH, segmentFill } from "./OSegmentedBar.types";
 import type { SegmentedBarProps, SegmentedBarVariant } from "./OSegmentedBar.types";
 
 const props = withDefaults(defineProps<SegmentedBarProps>(), {
@@ -12,6 +12,7 @@ const props = withDefaults(defineProps<SegmentedBarProps>(), {
 const sizeClasses: Record<NonNullable<SegmentedBarProps["size"]>, string> = {
   sm: "h-2",
   md: "h-2.5",
+  lg: "h-3",
 };
 
 const clampPct = (n: number) => `${Math.min(100, Math.max(0, n))}%`;
@@ -20,19 +21,27 @@ const fill = (variant: SegmentedBarVariant | undefined) => SEGMENT_SWATCH[varian
 
 <template>
   <div
-    class="bg-border-default relative flex w-full min-w-0 rounded-full"
-    :class="sizeClasses[props.size]"
+    class="relative flex w-full min-w-0 rounded-full"
+    :class="[sizeClasses[props.size], props.gapped ? '' : 'bg-border-default']"
     :role="props.label ? 'img' : undefined"
     :aria-label="props.label"
     :aria-hidden="props.label ? undefined : 'true'"
   >
-    <div class="flex h-full w-full overflow-hidden rounded-full">
+    <div
+      class="flex h-full w-full overflow-hidden rounded-full"
+      :class="props.gapped ? 'gap-0.5' : ''"
+    >
+      <!-- a gapped bar lets segments shrink so the gaps and minimum widths still fit the track -->
       <div
         v-for="segment in props.segments"
         :key="segment.id"
-        class="h-full shrink-0 transition-[width] duration-300"
-        :class="fill(segment.variant)"
+        class="h-full transition-[width] duration-300"
+        :class="[
+          segmentFill(segment.variant, segment.shade),
+          props.gapped ? (segment.pct > 0 ? 'min-w-1 shrink' : 'hidden') : 'shrink-0',
+        ]"
         :style="{ width: clampPct(segment.pct) }"
+        :title="segment.title"
         :data-test="`o-segmented-bar-segment-${segment.id}`"
       />
     </div>

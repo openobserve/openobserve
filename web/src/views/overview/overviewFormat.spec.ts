@@ -15,23 +15,32 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  LIMIT_APPROACHING_PERCENT,
+  LIMIT_OVER_PERCENT,
+  SIGNAL_VARIANT,
+  attentionCount,
   checkState,
+  dataSizeBreakdown,
   elapsedParts,
   firingTotal,
+  groupHealthRows,
   hasKnownSince,
   levelCount,
+  limitBarVariant,
+  limitStatus,
   mergeTopStreams,
+  nameList,
   oldestKnownFiring,
   isUnderOnePercent,
   overviewChecks,
   overviewStatus,
   percentOf,
   percentToFraction,
-  percentVariant,
   sectionView,
   signalSplit,
-  signalVariant,
-  sizeShare,
+  signalTotalMb,
+  unknownCount,
+  type HealthState,
 } from "./overviewFormat";
 import { buildHealthyOverview, buildOverview } from "./overviewFixtures";
 import type { OverviewStreamTypeSummary } from "@/ts/interfaces/overview";
@@ -68,10 +77,20 @@ describe("sectionView", () => {
 });
 
 describe("limit helpers", () => {
-  it("picks the bar colour by percent", () => {
-    expect(percentVariant(10)).toBe("default");
-    expect(percentVariant(80)).toBe("warning");
-    expect(percentVariant(100)).toBe("danger");
+  it("calls usage out from 75 percent and over the limit from 100", () => {
+    expect(LIMIT_APPROACHING_PERCENT).toBe(75);
+    expect(LIMIT_OVER_PERCENT).toBe(100);
+    expect(limitStatus(74.9)).toBe("ok");
+    expect(limitStatus(75)).toBe("approaching");
+    expect(limitStatus(99.9)).toBe("approaching");
+    expect(limitStatus(100)).toBe("over");
+    expect(limitStatus(250)).toBe("over");
+  });
+
+  it("picks the bar colour from the same thresholds", () => {
+    expect(limitBarVariant(10)).toBe("default");
+    expect(limitBarVariant(75)).toBe("warning");
+    expect(limitBarVariant(100)).toBe("danger");
   });
 
   it("clamps the bar fraction", () => {
@@ -104,10 +123,50 @@ describe("top streams", () => {
       "traces/t1",
     ]);
   });
+});
 
-  it("scales the share against total storage, zero for an empty total", () => {
-    expect(sizeShare(450, 900)).toBe(0.5);
-    expect(sizeShare(5, 0)).toBe(0);
+describe("dataSizeBreakdown", () => {
+  const typed = (
+    stream_type: string,
+    storage_size_mb: number,
+    top: Array<[string, number]>,
+  ): OverviewStreamTypeSummary => ({ ...summary(stream_type, top), storage_size_mb });
+
+  it("ranks the top signal streams against the signal total and shades each signal by rank", () => {
+    const result = dataSizeBreakdown([
+      typed("logs", 600, [
+        ["app", 500],
+        ["web", 100],
+      ]),
+      typed("metrics", 1000, [
+        ["cpu", 900],
+        ["mem", 50],
+      ]),
+      typed("traces", 400, [["spans", 300]]),
+      typed("enrichment_tables", 9999, [["lookup", 9999]]),
+    ]);
+    expect(result.totalMb).toBe(2000);
+    expect(result.streams.map((s) => [s.key, s.pct, s.shade])).toEqual([
+      ["metrics-cpu", 45, 0],
+      ["logs-app", 25, 0],
+      ["traces-spans", 15, 0],
+      ["logs-web", 5, 1],
+      ["metrics-mem", 2.5, 1],
+    ]);
+    expect(result.otherMb).toBe(150);
+    expect(result.otherPct).toBe(7.5);
+  });
+
+  it("never reports a negative remainder or a share past 100", () => {
+    const result = dataSizeBreakdown([typed("logs", 100, [["app", 400]])]);
+    expect(result.otherMb).toBe(0);
+    expect(result.streams[0].pct).toBe(100);
+    expect(dataSizeBreakdown([]).streams).toEqual([]);
+    expect(dataSizeBreakdown([typed("logs", 0, [["app", 0]])]).streams[0].pct).toBe(0);
+  });
+
+  it("totals only the three signals", () => {
+    expect(signalTotalMb([typed("logs", 10, []), typed("index", 90, [])])).toBe(10);
   });
 });
 
@@ -161,10 +220,8 @@ describe("signalSplit", () => {
     expect(signalSplit([]).map((r) => r.sizeMb)).toEqual([0, 0, 0]);
   });
 
-  it("gives each signal a distinct colour and unknown types a neutral grey", () => {
-    const variants = ["logs", "metrics", "traces"].map(signalVariant);
-    expect(new Set(variants).size).toBe(3);
-    expect(signalVariant("enrichment_tables")).toBe("muted");
+  it("gives each signal the colour of its stream type tag", () => {
+    expect(SIGNAL_VARIANT).toEqual({ logs: "blue", metrics: "purple", traces: "teal" });
   });
 });
 
@@ -360,5 +417,62 @@ describe("overviewStatus", () => {
     for (const view of ["error", "forbidden", "locked"] as const) {
       expect(checkState(view)).toBe("unavailable");
     }
+  });
+});
+
+describe("data health groups", () => {
+  const row = (key: string, tone: HealthState["tone"], notSetUp = false) => ({
+    key,
+    tone,
+    notSetUp,
+  });
+  const keys = (rows: Array<{ key: string }>) => rows.map((r) => r.key);
+
+  it("puts problems first by tier, keeps the written order within a tier, and splits the rest", () => {
+    const groups = groupHealthRows([
+      row("quiet", "warning"),
+      row("failing", "success"),
+      row("schema", "info"),
+      row("pipelines", "error"),
+      row("compaction", "neutral"),
+      row("delivery", "error"),
+      row("absent", "neutral", true),
+    ]);
+    expect(keys(groups.problems)).toEqual([
+      "pipelines",
+      "delivery",
+      "quiet",
+      "schema",
+      "compaction",
+    ]);
+    expect(keys(groups.healthy)).toEqual(["failing"]);
+    expect(keys(groups.notSetUp)).toEqual(["absent"]);
+  });
+
+  it("never calls a source that is not set up healthy", () => {
+    const groups = groupHealthRows([row("failing", "success", true)]);
+    expect(groups.healthy).toEqual([]);
+    expect(keys(groups.notSetUp)).toEqual(["failing"]);
+  });
+
+  it("counts only needs-action and warning rows as needing attention", () => {
+    const rows = [
+      row("a", "error"),
+      row("b", "warning"),
+      row("c", "info"),
+      row("d", "neutral"),
+      row("e", "success"),
+      row("f", "error", true),
+    ];
+    expect(attentionCount(rows)).toBe(2);
+    expect(unknownCount(rows)).toBe(1);
+    expect(attentionCount([])).toBe(0);
+  });
+
+  it("joins names as a list in the reader's language", () => {
+    expect(nameList(["Failing rules", "Pipeline errors"], "en-us")).toBe(
+      "Failing rules, Pipeline errors",
+    );
+    expect(nameList(["Quiet streams"], "en-us")).toBe("Quiet streams");
   });
 });

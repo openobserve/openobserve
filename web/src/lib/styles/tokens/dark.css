@@ -366,6 +366,71 @@
   --color-badge-indigo-solid-bg: var(--color-indigo-400);
   --color-badge-indigo-ol-text: var(--color-indigo-300);
   --color-badge-indigo-soft-bg: color-mix(in srgb, var(--color-indigo-400) 15%, transparent);
+
+  /* Segmented bar ranks: dark lightens instead, so lower ranks never fade into the card */
+  --color-segment-blue-1: var(--color-badge-blue-solid-bg);
+  --color-segment-blue-2: color-mix(
+    in srgb,
+    var(--color-badge-blue-solid-bg),
+    var(--color-white) 15%
+  );
+  --color-segment-blue-3: color-mix(
+    in srgb,
+    var(--color-badge-blue-solid-bg),
+    var(--color-white) 30%
+  );
+  --color-segment-blue-4: color-mix(
+    in srgb,
+    var(--color-badge-blue-solid-bg),
+    var(--color-white) 45%
+  );
+  --color-segment-blue-5: color-mix(
+    in srgb,
+    var(--color-badge-blue-solid-bg),
+    var(--color-white) 60%
+  );
+  --color-segment-purple-1: var(--color-badge-purple-solid-bg);
+  --color-segment-purple-2: color-mix(
+    in srgb,
+    var(--color-badge-purple-solid-bg),
+    var(--color-white) 15%
+  );
+  --color-segment-purple-3: color-mix(
+    in srgb,
+    var(--color-badge-purple-solid-bg),
+    var(--color-white) 30%
+  );
+  --color-segment-purple-4: color-mix(
+    in srgb,
+    var(--color-badge-purple-solid-bg),
+    var(--color-white) 45%
+  );
+  --color-segment-purple-5: color-mix(
+    in srgb,
+    var(--color-badge-purple-solid-bg),
+    var(--color-white) 60%
+  );
+  --color-segment-teal-1: var(--color-badge-teal-solid-bg);
+  --color-segment-teal-2: color-mix(
+    in srgb,
+    var(--color-badge-teal-solid-bg),
+    var(--color-white) 15%
+  );
+  --color-segment-teal-3: color-mix(
+    in srgb,
+    var(--color-badge-teal-solid-bg),
+    var(--color-white) 30%
+  );
+  --color-segment-teal-4: color-mix(
+    in srgb,
+    var(--color-badge-teal-solid-bg),
+    var(--color-white) 45%
+  );
+  --color-segment-teal-5: color-mix(
+    in srgb,
+    var(--color-badge-teal-solid-bg),
+    var(--color-white) 60%
+  );
   --color-badge-indigo-soft-text: var(--color-indigo-400);
 
   /* Button — ghost-warning / outline-warning (bright yellow for readability on dark bg) */

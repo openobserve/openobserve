@@ -194,6 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @retry="() => loadOverview(true)"
         @open="goToAlertList"
         @create="goToAddAlert"
+        @select="onHeadlineSelect"
       />
       <OverviewDataHealthCard
         :overview="overview"
@@ -565,26 +566,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="ev in recentEvents"
               :key="ev.id"
-              class="border-b-border-default flex items-center gap-3 border-b border-b-[0.0625em] px-3.5 py-2.5 last:border-b-0"
+              class="border-b-border-default flex items-center gap-3 border-b border-b-[0.0625em] px-3.5 py-2.5 last:border-b-0 max-sm:flex-wrap max-sm:gap-y-1"
+              data-test="overview-recent-events-row"
             >
-              <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0" />
-              <OTruncatedText class="text-text-body max-w-[12.5em] min-w-[7.5em] text-sm">{{
-                ev.service
-              }}</OTruncatedText>
-              <OTruncatedText class="text-text-secondary flex-1">{{
-                ev.description
-              }}</OTruncatedText>
+              <!-- a phone puts status and age on one line and gives the name the whole second line -->
+              <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0 max-sm:order-1" />
+              <OTruncatedText
+                :class="[
+                  'text-text-body max-w-[12.5em] min-w-[7.5em] text-sm max-sm:order-5 max-sm:min-w-0',
+                  hasEventStream(ev) ? '' : 'max-sm:hidden',
+                ]"
+                >{{ ev.service }}</OTruncatedText
+              >
+              <OTruncatedText
+                class="text-text-secondary flex-1 max-sm:order-4 max-sm:min-w-0"
+                data-test="overview-recent-events-name"
+                >{{ ev.description }}</OTruncatedText
+              >
               <OTag
                 v-if="ev.failCount > 1"
                 type="countChip"
                 value="error"
-                class="shrink-0"
+                class="shrink-0 max-sm:order-2"
                 :title="t('common.failedTimesInWindow', { count: ev.failCount })"
                 >{{ t("overview.timesSymbol") }}{{ ev.failCount }}</OTag
               >
-              <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap">{{
-                ev.timeAgo
-              }}</span>
+              <span
+                class="text-text-secondary shrink-0 text-xs whitespace-nowrap max-sm:order-2 max-sm:ms-auto"
+                >{{ ev.timeAgo }}</span
+              >
+              <span class="hidden h-0 basis-full max-sm:order-3 max-sm:block" aria-hidden="true" />
             </div>
           </div>
         </section>
@@ -610,31 +621,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </section>
 
-    <div
+    <OverviewDataSizeCard
       v-if="showOverviewCards"
-      class="mb-4 grid grid-cols-3 gap-4 max-lg:grid-cols-1"
-      data-test="overview-streams-limit-grid"
-    >
-      <OverviewStreamsCard
-        class="col-span-2 max-lg:col-span-1"
-        :section="overview?.streams"
-        :pending="overviewPending"
-        :failed="overviewFailed"
-        :forbidden="overviewForbidden"
-        @retry="() => loadOverview(true)"
-        @open="goToStreams"
-        @start-ingesting="goToIngestion"
-      />
-      <OverviewLimitCard
-        :limits="overview?.limits"
-        :streams="overview?.streams"
-        :pending="overviewPending"
-        :failed="overviewFailed"
-        :forbidden="overviewForbidden"
-        @retry="() => loadOverview(true)"
-        @unlock="openUpgradeDialog"
-      />
-    </div>
+      class="mb-4"
+      :streams="overview?.streams"
+      :limits="overview?.limits"
+      :pending="overviewPending"
+      :failed="overviewFailed"
+      :forbidden="overviewForbidden"
+      @retry="() => loadOverview(true)"
+      @open="goToStreams"
+      @start-ingesting="goToIngestion"
+    />
 
     <OverviewSignalCards
       v-if="showOverviewCards"
@@ -756,8 +754,7 @@ import OverviewHeadlineStrip, {
 } from "./overview/OverviewHeadlineStrip.vue";
 import OverviewAlertsCard from "./overview/OverviewAlertsCard.vue";
 import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
-import OverviewStreamsCard from "./overview/OverviewStreamsCard.vue";
-import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
+import OverviewDataSizeCard from "./overview/OverviewDataSizeCard.vue";
 import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
 import OverviewStatusLine from "./overview/OverviewStatusLine.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -1663,6 +1660,9 @@ const goToIncident = (inc: any) => {
 // ever offering a card the user has no way to actually land on.
 const showAlertsCard = computed(() => router.hasRoute("alertList"));
 const showLogsCard = computed(() => router.hasRoute("logs"));
+
+// events without a stream carry a dash placeholder, which a phone row has no room to repeat
+const hasEventStream = (ev: { service: string }) => ev.service !== "—";
 
 const goToAlertList = () => {
   router.push({ name: "alertList", query: { org_identifier: orgId.value } });

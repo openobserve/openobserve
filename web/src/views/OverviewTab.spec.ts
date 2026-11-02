@@ -1439,7 +1439,7 @@ describe("OverviewTab", () => {
       expect(wrapper.get('[data-test="overview-limit-usage"]').text()).toContain("85.50 GB");
       expect(wrapper.get('[data-test="overview-limit-usage"]').text()).toContain("of 100.00 GB");
       expect(wrapper.get(tile("quiet")).text()).toContain("3");
-      expect(wrapper.get('[data-test="overview-storage-total"]').text()).toBe("2.00 GB");
+      expect(wrapper.get('[data-test="overview-streams-total"]').text()).toBe("2.00 GB");
       expect(wrapper.find('[data-test="overview-signal-logs-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="overview-stale-notice"]').exists()).toBe(false);
     });
@@ -1514,10 +1514,10 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      for (const section of ["alerts", "data-health", "streams", "limit"]) {
+      for (const section of ["alerts", "data-health", "streams"]) {
         expect(wrapper.find(`[data-test="overview-${section}-error"]`).exists()).toBe(true);
       }
-      expect(wrapper.find('[data-test="overview-storage-error"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-limit-row"]').exists()).toBe(false);
       expect(wrapper.get(tile("firing")).text()).toContain("—");
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
       expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(false);
@@ -1532,7 +1532,7 @@ describe("OverviewTab", () => {
       expect(wrapper.get(tile("firing")).text()).toContain("3");
     });
 
-    it("should show the limit card as locked on OSS without rendering the API reason", async () => {
+    it("should leave the ingest limit row out on OSS without rendering the API reason", async () => {
       vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
         data: buildOverview({ limits: { status: "locked", reason: "enterprise only, english" } }),
       } as never);
@@ -1540,18 +1540,20 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="overview-limit-locked"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-streams-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-limit-row"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-limit-locked"]').exists()).toBe(false);
       expect(wrapper.text()).not.toContain("enterprise only, english");
     });
 
-    it("should not render the ingest limit card on cloud", async () => {
+    it("should not render the ingest limit row on cloud", async () => {
       config.isCloud = "true";
 
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="overview-limit-card"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="overview-storage-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-limit-row"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-streams-card"]').exists()).toBe(true);
     });
 
     it("should show forbidden on the alerts card for a forbidden section", async () => {
@@ -1718,7 +1720,7 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      for (const section of ["alerts", "data-health", "streams", "limit"]) {
+      for (const section of ["alerts", "data-health", "streams"]) {
         expect(wrapper.find(`[data-test="overview-${section}-forbidden"]`).exists()).toBe(true);
         expect(wrapper.find(`[data-test="overview-${section}-retry-btn"]`).exists()).toBe(false);
       }
@@ -1988,7 +1990,7 @@ describe("OverviewTab", () => {
       wrapper.get(a).element.compareDocumentPosition(wrapper.get(b).element) &
       Node.DOCUMENT_POSITION_FOLLOWING;
 
-    it("orders status, headline, alerts and health, time range, streams and limit, then signals", async () => {
+    it("orders status, headline, alerts and health, time range, data size, then signals", async () => {
       givenRecentEvents();
       await mountWith(buildOverview());
 
@@ -1997,22 +1999,21 @@ describe("OverviewTab", () => {
         '[data-test="overview-headline-strip"]',
         '[data-test="overview-alerts-health-grid"]',
         '[data-test="overview-time-range-group"]',
-        '[data-test="overview-streams-limit-grid"]',
+        '[data-test="overview-streams-card"]',
         '[data-test="overview-signal-cards"]',
       ];
       for (let i = 1; i < order.length; i++) {
         expect(follows(order[i - 1], order[i])).toBeTruthy();
       }
-      expect(wrapper.get('[data-test="overview-streams-limit-grid"]').text()).toContain(
-        "Ingest limit and data size",
-      );
-      expect(wrapper.find('[data-test="overview-storage-card"]').exists()).toBe(false);
+      const dataSize = wrapper.get('[data-test="overview-streams-card"]');
+      expect(dataSize.text()).toContain("Data size by stream");
+      expect(dataSize.find('[data-test="overview-limit-row"]').exists()).toBe(true);
     });
 
     it("stretches side-by-side cards to one height on the same gap", async () => {
       await mountWith(buildOverview());
 
-      for (const id of ["overview-alerts-health-grid", "overview-streams-limit-grid"]) {
+      for (const id of ["overview-alerts-health-grid"]) {
         const classes = wrapper.get(`[data-test="${id}"]`).classes();
         expect(classes).not.toContain("items-start");
         expect(classes).toContain("gap-4");
@@ -2084,6 +2085,17 @@ describe("OverviewTab", () => {
       ]);
       await wrapper.get('[data-test="overview-status-item-pipelines"]').trigger("click");
       expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "pipelines" }));
+      push.mockRestore();
+    });
+
+    it("sends the alerts card counts where their headline tiles go", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      await mountWith(buildOverview());
+
+      await wrapper.get('[data-test="overview-alerts-count-failing"]').trigger("click");
+      expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alertList" }));
+      await wrapper.get('[data-test="overview-alerts-level-critical"]').trigger("click");
+      expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alertList" }));
       push.mockRestore();
     });
 

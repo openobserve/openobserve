@@ -9946,32 +9946,35 @@
     "level": {
       "critical": "Critical",
       "warning": "Warning",
-      "ok": "Normal",
-      "okFiring": "Firing",
-      "no_data": "No data",
-      "unclassified": "Unclassified"
+      "okFiring": "Firing"
     },
     "sections": {
       "alerts": "Alerts",
       "dataHealth": "Data health",
-      "topStreams": "Top streams by data size",
-      "storage": "Data size",
       "alertsAndIncidents": "Alerts and incidents",
-      "limitAndStorage": "Ingest limit and data size"
+      "dataSize": "Data size by stream"
     },
     "alerts": {
-      "criticalLevel": "Firing at critical",
-      "warningLevel": "Firing at warning",
-      "otherLevel": "Firing at other levels",
-      "failing": "Failing rules",
-      "firingNow": "Firing now, oldest first",
       "firingFor": "Firing for",
       "showMore": "Show {count} more firing alert | Show {count} more firing alerts",
-      "allClear": "No alerts are firing right now.",
       "emptyTitle": "No alert rules yet",
       "emptyDesc": "Rules you create show here, with what is firing by level and what is failing to run.",
       "emptyAction": "Create an alert",
-      "viewAllAria": "View all alerts"
+      "viewAllAria": "View all alerts",
+      "firingLabel": "alert firing | alerts firing",
+      "severityBar": "Firing by severity: {critical} critical, {warning} warning, {other} other",
+      "levelCount": {
+        "critical": "{count} critical",
+        "warning": "{count} warning",
+        "other": "{count} other"
+      },
+      "openIncidents": "{count} open incident | {count} open incidents",
+      "failingRules": "{count} failing rule | {count} failing rules",
+      "columns": {
+        "severity": "Severity",
+        "alert": "Alert",
+        "stream": "Stream"
+      }
     },
     "dataHealth": {
       "viewPipelines": "View pipelines",
@@ -9994,14 +9997,16 @@
         "info": "Info"
       },
       "compaction": "Compaction jobs pending",
-      "compactionNote": "Across stream types you can see"
+      "compactionNote": "Across stream types you can see",
+      "attentionLabel": "check needs attention | checks need attention",
+      "unknownNote": "({count} could not load)",
+      "healthySummary": "{count} healthy: {names}",
+      "notSetUpSummary": "{count} not set up: {names}"
     },
     "streams": {
       "emptyTitle": "No streams yet",
       "emptyDesc": "Streams appear here once data starts arriving.",
       "startIngesting": "Start ingesting",
-      "shareOfTotal": "{percent}% of total",
-      "shareUnderOne": "<{percent}% of total",
       "allStreams": "All streams"
     },
     "signals": {
@@ -10021,27 +10026,21 @@
       "stored": "Data size"
     },
     "storage": {
-      "used": "Data size",
-      "bySignal": "Data size by signal",
-      "splitNote": "The split covers logs, metrics and traces only.",
       "emptyTitle": "No data yet"
     },
     "limit": {
-      "used": "Ingested today (UTC)",
+      "used": "Ingested today (UTC), whole deployment",
       "ofLimit": "of {limit}",
-      "noLimit": "No daily limit",
-      "resets": "Resets at 00:00 UTC, in {countdown}",
-      "scope": "Across the whole deployment, not just this organization.",
       "daysOver": "Days over the limit this month",
-      "daysOverOf": "{days} of {allowed} allowed",
       "license": "License",
       "expired": "Expired",
       "valid": "Valid",
       "approachingLimit": "Approaching limit",
-      "nearLimit": "Near limit",
-      "blockNote": "Search is blocked once the days over the limit pass the number your license allows.",
       "overLimit": "Over limit",
-      "lockedMessage": "Track ingestion against your license limit with an enterprise license."
+      "resetsIn": "Resets in",
+      "ofUnlimited": "of unlimited",
+      "ofAllowed": "of {allowed} allowed",
+      "unavailable": "Ingest limit unavailable"
     },
     "empty": {
       "incidents": "No open incidents",
@@ -10071,6 +10070,12 @@
     },
     "timeRange": {
       "heading": "In the selected time range"
+    },
+    "dataSize": {
+      "acrossAll": "across all streams",
+      "otherStreams": "All other streams",
+      "segmentTitle": "{name}: {size}, {share}",
+      "barLabel": "Data size by stream: {name} is the largest at {share}"
     }
   },
   "chatHistory": {

@@ -44,6 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @retry="emit('retry')"
         @unlock="emit('unlock')"
       />
+      <!-- a footer reads a different source than the body, so it renders whatever state the body is in -->
+      <slot name="footer" />
     </OCardSection>
   </OCard>
 </template>

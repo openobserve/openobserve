@@ -21,72 +21,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @retry="emit('retry')"
     @view-all="emit('open', 'pipelines')"
   >
-    <ul class="-mx-2 flex flex-col" data-test="overview-data-health-rows">
-      <li v-for="row in rows" :key="row.key">
-        <OverviewRowButton
-          :data-test="`overview-data-health-row-${row.key}`"
-          :disabled="!row.ok"
-          @click="emit('open', row.destination)"
+    <div class="flex flex-col gap-3">
+      <p class="flex flex-wrap items-baseline gap-x-2" data-test="overview-data-health-hero">
+        <span
+          :class="['text-3xl font-semibold tabular-nums', hero.tone]"
+          data-test="overview-data-health-attention-count"
+          >{{ hero.count }}</span
         >
-          <span
-            class="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 whitespace-normal"
-          >
-            <span class="flex min-w-0 flex-1 basis-40 flex-col text-start">
-              <span class="text-text-body text-sm">{{ row.label }}</span>
-              <span class="text-text-secondary text-xs">{{ row.note }}</span>
-            </span>
+        <span class="text-text-secondary text-sm">{{
+          t("overview.dataHealth.attentionLabel", { count: hero.count }, hero.count)
+        }}</span>
+        <span
+          v-if="hero.unknown > 0"
+          class="text-text-secondary text-sm"
+          data-test="overview-data-health-unknown"
+          >{{ t("overview.dataHealth.unknownNote", { count: hero.unknown }) }}</span
+        >
+      </p>
+      <div class="divide-border-default -mx-2 flex flex-col divide-y">
+        <ul
+          v-if="groups.problems.length > 0"
+          class="divide-border-default flex flex-col divide-y"
+          data-test="overview-data-health-rows"
+        >
+          <li v-for="row in groups.problems" :key="row.key">
+            <OverviewDataHealthRow :row="row" @open="emit('open', $event)" />
+          </li>
+        </ul>
+        <OCollapsible
+          v-for="group in collapsedGroups"
+          :key="group.key"
+          :data-test="`overview-data-health-${group.key}`"
+        >
+          <template #trigger="{ open }">
+            <OIcon
+              v-if="group.key === 'healthy'"
+              name="check-circle-outline"
+              size="sm"
+              class="text-status-positive shrink-0"
+            />
             <span
-              v-if="row.notSetUp"
-              class="text-text-muted shrink-0 text-xs"
-              :data-test="`overview-data-health-status-${row.key}`"
-              >{{ row.word }}</span
+              :class="[
+                'min-w-0 flex-1 text-sm',
+                group.key === 'healthy' ? 'text-text-body' : 'text-text-secondary',
+              ]"
+              :data-test="`overview-data-health-${group.key}-summary`"
+              >{{ group.summary }}</span
             >
-            <span v-else class="flex shrink-0 items-center gap-3">
-              <OTag
-                type="countChip"
-                :value="row.tone"
-                :data-test="`overview-data-health-status-${row.key}`"
-                >{{ row.word }}</OTag
-              >
-              <span
-                class="text-text-heading min-w-8 text-end text-sm font-semibold tabular-nums"
-                :data-test="`overview-data-health-value-${row.key}`"
-                >{{ row.value }}</span
-              >
-            </span>
-          </span>
-        </OverviewRowButton>
-      </li>
-    </ul>
+            <OIcon
+              name="expand-more"
+              size="sm"
+              :class="[
+                'text-text-secondary shrink-0 transition-transform duration-200',
+                open ? 'rotate-180' : '',
+              ]"
+            />
+          </template>
+          <ul class="divide-border-default border-border-default flex flex-col divide-y border-t">
+            <li v-for="row in group.rows" :key="row.key">
+              <OverviewDataHealthRow :row="row" @open="emit('open', $event)" />
+            </li>
+          </ul>
+        </OCollapsible>
+      </div>
+    </div>
   </OverviewSectionCard>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { OrgOverview, OverviewSection } from "@/ts/interfaces/overview";
-import OverviewRowButton from "./OverviewRowButton.vue";
+import OverviewDataHealthRow, { type HealthRow } from "./OverviewDataHealthRow.vue";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
-import { sectionView, type OverviewDestination, type OverviewView } from "./overviewFormat";
-
-type HealthTone = "error" | "warning" | "success" | "info" | "neutral";
-
-interface HealthRow {
-  key: string;
-  label: I18nText;
-  note: I18nText;
-  destination: OverviewDestination;
-  tone: HealthTone;
-  word: I18nText;
-  value: I18nText;
-  ok: boolean;
-  notSetUp: boolean;
-}
-
-// a row that needs action sorts above healthy ones; a row that could not load is unknown, so it sits above healthy too
-const TIER: Record<HealthTone, number> = { error: 0, warning: 1, info: 2, neutral: 3, success: 4 };
-const NOT_SET_UP_TIER = 5;
+import {
+  attentionCount,
+  groupHealthRows,
+  nameList,
+  sectionView,
+  unknownCount,
+  type HealthTone,
+  type OverviewDestination,
+  type OverviewView,
+} from "./overviewFormat";
 
 const props = defineProps<{
   overview: OrgOverview | null;
@@ -97,7 +116,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ retry: []; open: [destination: OverviewDestination] }>();
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 
 const view = computed<OverviewView>(() => {
   if (props.pending) return "loading";
@@ -267,8 +286,48 @@ const healthRows = (): HealthRow[] => {
   ];
 };
 
-const tierOf = (row: HealthRow) => (row.notSetUp ? NOT_SET_UP_TIER : TIER[row.tone]);
+const rows = computed<HealthRow[]>(() => healthRows());
 
-// Array.prototype.sort is stable, so rows in one tier keep the order written above
-const rows = computed<HealthRow[]>(() => healthRows().sort((a, b) => tierOf(a) - tierOf(b)));
+// Array.prototype.sort is stable, so problem rows in one tier keep the order written above
+const groups = computed(() => groupHealthRows(rows.value));
+
+// zero problems is only good news when every source answered
+const hero = computed(() => {
+  const count = attentionCount(rows.value);
+  const unknown = count === 0 ? unknownCount(rows.value) : 0;
+  let tone = "text-text-heading";
+  if (count === 0) tone = unknown > 0 ? "text-text-secondary" : "text-status-positive";
+  return { count, unknown, tone };
+});
+
+const collapsedGroups = computed(() => {
+  const names = (list: HealthRow[]) =>
+    raw(
+      nameList(
+        list.map((row) => row.label),
+        String(locale.value),
+      ),
+    );
+  const { healthy, notSetUp } = groups.value;
+  return [
+    {
+      key: "healthy",
+      rows: healthy,
+      summary: t(
+        "overview.dataHealth.healthySummary",
+        { count: healthy.length, names: names(healthy) },
+        healthy.length,
+      ),
+    },
+    {
+      key: "not-set-up",
+      rows: notSetUp,
+      summary: t(
+        "overview.dataHealth.notSetUpSummary",
+        { count: notSetUp.length, names: names(notSetUp) },
+        notSetUp.length,
+      ),
+    },
+  ].filter((group) => group.rows.length > 0);
+});
 </script>
