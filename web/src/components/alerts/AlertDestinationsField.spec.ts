@@ -126,6 +126,19 @@ describe("AlertDestinationsField status line", () => {
     expect(mountField().text()).not.toContain("*");
   });
 
+  it("renders as a setting row when asked, keeping its label and status line", () => {
+    const wrapper = mountField({ settingRow: true, notifiesNobody: true, showStatus: true });
+    const row = wrapper.findComponent({ name: "OSettingRow" });
+    expect(row.exists()).toBe(true);
+    expect(row.props("label")).toBe(t("alerts.destination"));
+    expect(row.props("fill")).toBe(true);
+    expect(wrapper.find(NOTE).exists()).toBe(true);
+  });
+
+  it("keeps its own side label when not a setting row", () => {
+    expect(mountField().findComponent({ name: "OSettingRow" }).exists()).toBe(false);
+  });
+
   it("says no destination is notified when the alert has nowhere to send", () => {
     const wrapper = mountField({ notifiesNobody: true, showStatus: true });
     expect(wrapper.find(NOTE).text()).toBe(t("alerts.alertSettings.noDestinationNote"));
