@@ -126,7 +126,7 @@ CI copies `o2-enterprise/tests/*` over `tests/` and runs these suites in their o
 | Suite | Needs | Run |
 |---|---|---|
 | `tests/fleet/` | An enterprise server with `O2_FLEET_ENABLED=true` (the default) | `rye run pytest tests/fleet/ -n 4 --dist loadfile` |
-| `tests/fleet_flag_off/` | An enterprise server started with `O2_FLEET_ENABLED=false` (fails otherwise) | `rye run pytest tests/fleet_flag_off/` |
+| `tests/fleet_flag_off/` | Two starts over the same `./data`: first with `O2_FLEET_ENABLED=true` to seed a real token, then with `O2_FLEET_ENABLED=false` (fails otherwise) | `FLEET_FLAG_OFF_SEED=/tmp/seed.json PYTHONPATH=.:tests rye run python -m fleet_flag_off.seed_token`, restart the server with the flag off, then `FLEET_FLAG_OFF_SEED=/tmp/seed.json rye run pytest tests/fleet_flag_off/` |
 | `tests/fleet_collector/` | An enterprise server with `O2_FLEET_ENABLED=true`, a running Docker daemon, and the collector image pinned as `IMAGE_REF` in `tests/fleet_collector/collector_docker.py` (pulled on first use). Containers reach the server through `host.docker.internal`. | `rye run pytest tests/fleet_collector/` (no `-n`) |
 | `tests/rbac/fleet/` | An enterprise server with `O2_OPENFGA_ENABLED=true`, `O2_OPENFGA_LIST_ONLY_PERMITTED=true` (the filtered-list checks need it) and a running OpenFGA server; CI runs it in the `ent_rbac` shard | `rye run pytest tests/rbac/fleet/` |
 
