@@ -8,6 +8,8 @@ const MAX_FALLBACK_FINDINGS = 15;
 const NEARBY_LINES = 5;
 const NO_ISSUES_RE = /<no-issues(?:\s[^<>]*)?>[\s\S]*?<\/no-issues>|<no-issues(?:\s[^<>]*)?\/>/;
 const FINDING_BLOCK_RE = /<finding>([\s\S]*?)<\/finding>/g;
+// Prose outside the report that admits the review did not happen; a false hit only costs the area its "finished" mark.
+const INABILITY_RE = /\b(?:could ?n[o']t|can ?n[o']t|can't|unable to|was ?n[o']t able|were ?n[o']t able|failed to|no access|do(?:es)? ?n[o']t have access|did ?n[o']t have access|not able to)\b/i;
 const SEVERITY_GLYPH = { p0: "🔴", p1: "🟠", p2: "🟡", p3: "🔵" };
 const SEVERITY_SECTION = {
   p0: "#### 🔴 P0 · Blockers",
@@ -80,10 +82,23 @@ function outputCutOff(text) {
   return unclosed || /<finding\b/.test(rest) || rest.lastIndexOf("<findings") > rest.lastIndexOf("</findings>");
 }
 
+// A fence holding nothing but the report is a formatting habit; anything else around the fence makes it a quoted example.
+function unwrapWholeFence(text) {
+  const m = text.match(/^\s*```[\w-]*[ \t]*\n([\s\S]*?)\n?[ \t]*```\s*$/);
+  return m && !m[1].includes("```") ? m[1] : text;
+}
+
+function quotesReportInFence(text) {
+  return [...text.matchAll(/```[\s\S]*?(?:```|$)/g)].some(([fence]) => /<\/?findings\b|<no-issues\b|<finding\b/.test(fence));
+}
+
 // "No findings" must be stated in full: empty, free-form or cut-off output is a reviewer that said nothing, not one that found nothing, and an unread block could be the blocker.
 export function reviewerReported(text, findings) {
-  const output = String(text ?? "");
+  const output = unwrapWholeFence(String(text ?? ""));
   if (outputCutOff(output) || (output.match(FINDING_BLOCK_RE)?.length ?? 0) !== findings.length) return false;
+  const outside = output.replace(FINDING_BLOCK_RE, "");
+  if (quotesReportInFence(outside)) return false;
+  if (INABILITY_RE.test(outside.replace(new RegExp(NO_ISSUES_RE.source, "g"), ""))) return false;
   return findings.length > 0 || NO_ISSUES_RE.test(output);
 }
 
@@ -102,7 +117,16 @@ export function toKeptFinding(f) {
 const TITLE_STOPWORDS = new Set(["the", "and", "for", "not", "but", "with", "from", "that", "this", "are", "was", "when", "can", "its", "into", "than", "then", "will", "has", "have"]);
 
 function titleWords(summary) {
-  return new Set((String(summary || "").toLowerCase().match(/[a-z0-9_]{3,}/g) ?? []).filter(w => !TITLE_STOPWORDS.has(w)));
+  const words = (String(summary || "").toLowerCase().match(/[a-z0-9_]{3,}/g) ?? []).filter(w => !TITLE_STOPWORDS.has(w));
+  return new Set(words.map(w => (w.length > 4 ? w.replace(/(?:ing|ed|es|s)$/, "") : w)));
+}
+
+function normalizedTitle(summary) {
+  return (String(summary || "").toLowerCase().match(/[a-z0-9_]+/g) ?? []).join(" ");
+}
+
+function isBlocker(f) {
+  return ["p0", "p1"].includes(normalizeSeverity(f.severity));
 }
 
 function lineOf(f) {
@@ -115,9 +139,13 @@ function sameIssueNearby(a, b) {
   if (!file(a) || file(a) !== file(b)) return false;
   const [la, lb] = [lineOf(a), lineOf(b)];
   if ((la === 0) !== (lb === 0) || Math.abs(la - lb) > NEARBY_LINES) return false;
+  // A wrong merge loses a bug while a missed one only repeats a line, so two blockers merge only on the same title.
+  if (isBlocker(a) && isBlocker(b)) return normalizedTitle(a.summary) === normalizedTitle(b.summary);
   const [wa, wb] = [titleWords(a.summary), titleWords(b.summary)];
   const shared = [...wa].filter(w => wb.has(w)).length;
-  return shared >= 2 && shared / Math.min(wa.size, wb.size) >= 0.5;
+  // A content word on each side that the other lacks names a different subject ("organization" vs "stream" filter).
+  const subset = shared === Math.min(wa.size, wb.size);
+  return subset && shared >= 2 && shared / Math.max(wa.size, wb.size) >= 0.5;
 }
 
 function dedupeFindings(agentResults) {

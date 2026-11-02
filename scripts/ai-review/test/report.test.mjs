@@ -1176,3 +1176,20 @@ test("an outer findings wrapper left open is a cut-off report", () => {
   assert.equal(reviewerReported("<findings><findings><no-issues>No problems.</no-issues></findings>", []), false);
   assert.equal(reviewerReported("<findings><no-issues>No problems.</no-issues></findings>", []), true);
 });
+
+test("a no-issues report quoted as an example inside failure prose is not a finished review", () => {
+  const fenced = "```xml\n<findings><no-issues/></findings>\n```";
+  const table = [
+    [`I could not inspect the repository. A clean report would look like:\n\n${fenced}`, false],
+    [`Here is an example of the expected format:\n${fenced}\nI was unable to read the diff.`, false],
+    [`Example:\n${fenced}`, false],
+    ["I was unable to access the files.\n<findings><no-issues/></findings>", false],
+    ["Failed to load the diff, so: <no-issues/>", false],
+    [`<findings><no-issues/></findings>\n\n${fenced}`, false],
+    [fenced, true],
+    ["```\n<findings><finding><severity>p3</severity><summary>x</summary></finding></findings>\n```", true],
+    ["<findings><no-issues>I could not find any problem.</no-issues></findings>", true],
+    ["<findings><finding><severity>p2</severity><summary>s</summary><description>The handler cannot see ```<no-issues/>``` here.</description></finding></findings>", true],
+  ];
+  for (const [text, parsed] of table) assert.equal(reviewerReported(text, parseFindings(text)), parsed, text);
+});

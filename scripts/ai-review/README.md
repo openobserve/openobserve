@@ -35,7 +35,7 @@ so one pass's misses can be another's catches (backtesting on DeepSeek showed on
 findings two catch). The variable `AI_REVIEW_COLD_PASSES` sets the count (default `2`, clamped to
 1–3; `src/passes.mjs`). The coordinator gets every pass's report labelled `<Reviewer>, pass N/M`
 and keeps a finding raised by any pass, merging duplicates; the fallback comment unions the passes
-and folds findings at the same file and nearby line with a similar title. An area counts as
+and folds findings at the same file and nearby line when one title's words contain the other's (two P0/P1 blockers fold only on the same title). An area counts as
 reviewed when any of its passes finished, and the comment notes a lost pass. Each pass is billed,
 so the review costs about M times one pass; reviewer spans carry `review.pass`.
 
@@ -267,7 +267,7 @@ in o2-enterprise:
   gets a paid run through its OSS twin. Either way it replaces this PR's review comment with a
   pointer (`post-paired-pointer.sh`). This uses a reviewer-app token scoped to o2-enterprise
   (Pull requests read, Actions write); if it cannot be minted or the lookup fails, the OSS review
-  runs as usual unless the PR already carries the bot's pointer, which only a review replaces. If the dispatch fails, the OSS review runs. To force an OSS review anyway, dispatch this workflow with `ignore_paired`.
+  runs as usual unless the reviewer app's newest review comment on the PR is its pointer (a pointer posted under the shared `github-actions[bot]` identity never counts). If the dispatch fails, the OSS review runs. To force an OSS review anyway, dispatch this workflow with `ignore_paired`.
 - **ENT side.** The o2-enterprise workflow checks out this engine pinned by commit SHA, finds the
   open same-named OSS PR, checks it out to `./pr/openobserve`, and reviews both diffs in one run.
   OSS files appear with an `openobserve/` prefix in the review, and the OSS `AGENTS.md` and

@@ -164,12 +164,10 @@ jobs:
           FORCE_REVIEW: ${{ inputs.force_full || 'false' }}
         run: |
           set -uo pipefail
-          # A review replaces the pointer in place, so a pointer still standing means the last successful lookup found a pair.
+          # A review replaces the pointer in place, so the app bot's newest review comment being a pointer means the last successful lookup found a pair.
           review_here_unless_pointed() {
-            local pointer
-            pointer="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
-              --jq ".[] | select(.user.login == \"$BOT_LOGIN\" and (.body | contains(\"<!-- o2-paired-pointer -->\"))) | .id" 2>/dev/null || true)"
-            if [ -n "$pointer" ]; then
+            if gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate 2>/dev/null | jq -cs '[.[][]]' \
+              | node engine/scripts/ai-review/newest-review-is-pointer.mjs "$BOT_LOGIN"; then
               echo "::warning::$1; this PR already carries the paired pointer, so it is not reviewed here."
               echo "REVIEW_RUN=false" >> "$GITHUB_ENV"
             else

@@ -114,3 +114,26 @@ test("the fallback keeps distinct issues apart even at the same place", () => {
   ]);
   assert.equal(selectFallbackFindings(results).length, 4);
 });
+
+test("the fallback never merges two different blockers that share most of their title", () => {
+  const results = mergePassResults([
+    done("correctness", 1, [finding("Delete query ignores the organization filter", { line: "40" })]),
+    done("correctness", 2, [finding("Delete query ignores the stream filter", { line: "42" })]),
+  ]);
+  assert.equal(selectFallbackFindings(results).length, 2);
+  const minor = mergePassResults([
+    done("correctness", 1, [finding("Delete query ignores the organization filter", { severity: "p2", line: "40" })]),
+    done("correctness", 2, [finding("Delete query ignores the stream filter", { severity: "p3", line: "42" })]),
+  ]);
+  assert.equal(selectFallbackFindings(minor).length, 2);
+  const reworded = mergePassResults([
+    done("correctness", 1, [finding("Retry loop on 429 is unbounded", { line: "40" })]),
+    done("correctness", 2, [finding("Unbounded retry loop never gives up on 429", { line: "42" })]),
+  ]);
+  assert.equal(selectFallbackFindings(reworded).length, 2);
+  const same = mergePassResults([
+    done("correctness", 1, [finding("Delete query ignores the stream filter.", { line: "40", category: "security" })]),
+    done("correctness", 2, [finding("delete query  ignores the stream filter", { line: "42" })]),
+  ]);
+  assert.equal(selectFallbackFindings(same).length, 1);
+});

@@ -45,6 +45,12 @@ export function selectOwnReviewComment(comments, botLogin, markerPattern) {
   return own.at(-1) ?? null;
 }
 
+// Any workflow in the repository can post as github-actions[bot], so only the reviewer app's own pointer may stop a review.
+export function newestReviewIsPointer(comments, botLogin) {
+  if (!botLogin || botLogin === "github-actions[bot]") return false;
+  return String(selectOwnReviewComment(comments, botLogin, ANY_REVIEW_MARKER)?.body ?? "").includes(PAIRED_POINTER_TAG);
+}
+
 // untagged is what a comment from before the counter is worth: a review is one pass, a pointer or notice none.
 export function isPlaceholderComment(body) {
   return String(body ?? "").includes(PAIRED_POINTER_TAG) || String(body ?? "").includes(NOTICE_TAG);
