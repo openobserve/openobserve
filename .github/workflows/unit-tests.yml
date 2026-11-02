@@ -293,10 +293,11 @@ jobs:
 
       - name: Run this shard with coverage
         working-directory: web
-        run: npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=blob \
-          --coverage.reportOnFailure --coverage.reporter=json \
-          --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
-          --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
+        run: |
+          npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=blob \
+            --coverage.reportOnFailure --coverage.reporter=json \
+            --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
+            --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
 
       - uses: actions/upload-artifact@v4
         if: always()
