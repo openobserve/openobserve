@@ -21,7 +21,7 @@ use db::authz::{remove_ownership, set_ownership};
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
+use openobserve_core::auth::{UserEmail, check_permissions, is_ofga_object_visible};
 
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
@@ -53,6 +53,49 @@ fn scorer_error_response(value: ScorerError) -> Response {
         | ScorerError::InvalidProviderConfig(_) => MetaHttpResponse::bad_request(value),
         ScorerError::DuplicateName => MetaHttpResponse::conflict(value),
         ScorerError::InUseByEvalJob => MetaHttpResponse::conflict(value),
+    }
+}
+
+/// Per-scorer PUT checks in flight at once when the org-wide one fails.
+const PERMISSION_CONCURRENCY: usize = 16;
+
+/// Remote scorer credentials stay with those who may change the scorer: one org-wide check for
+/// standard writers and `_all_` grants, then one check per scorer that has something to redact.
+async fn redact_unwritable(org_id: &str, user_id: &str, scorers: &mut [ScorerResponseBody]) {
+    use futures::StreamExt;
+
+    let mut ids: Vec<String> = scorers
+        .iter()
+        .filter(|s| s.has_credentials())
+        .map(|s| s.entity_id.clone())
+        .collect();
+    if ids.is_empty()
+        || check_permissions(
+            org_id, org_id, user_id, "scorers", "PUT", None, true, false, false,
+        )
+        .await
+    {
+        return;
+    }
+    ids.sort_unstable();
+    ids.dedup();
+    let writable: std::collections::HashSet<String> = futures::stream::iter(ids)
+        .map(|id| async move {
+            check_permissions(
+                &id, org_id, user_id, "scorers", "PUT", None, false, false, true,
+            )
+            .await
+            .then_some(id)
+        })
+        .buffer_unordered(PERMISSION_CONCURRENCY)
+        .filter_map(|id| async move { id })
+        .collect()
+        .await;
+    for scorer in scorers
+        .iter_mut()
+        .filter(|s| s.has_credentials() && !writable.contains(&s.entity_id))
+    {
+        scorer.redact_credentials();
     }
 }
 
@@ -109,7 +152,8 @@ pub async fn list_scorers(
                     )
                 })
                 .collect();
-            let body: ListScorersResponseBody = list.into();
+            let mut body: ListScorersResponseBody = list.into();
+            redact_unwritable(&org_id, &user_email.user_id, &mut body.list).await;
             MetaHttpResponse::json(body)
         }
         Err(err) => scorer_error_response(err),
@@ -174,10 +218,19 @@ pub async fn create_scorer(
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "get"})),
     ),
 )]
-pub async fn get_scorer(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
+pub async fn get_scorer(
+    Path((org_id, entity_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     match scorers::get_scorer(&org_id, &entity_id).await {
         Ok(s) => {
-            let resp: ScorerResponseBody = s.into();
+            let mut resp: ScorerResponseBody = s.into();
+            redact_unwritable(
+                &org_id,
+                &user_email.user_id,
+                std::slice::from_mut(&mut resp),
+            )
+            .await;
             MetaHttpResponse::json(resp)
         }
         Err(err) => scorer_error_response(err),
@@ -205,10 +258,14 @@ pub async fn get_scorer(Path((org_id, entity_id)): Path<(String, String)>) -> Re
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "list_versions"})),
     ),
 )]
-pub async fn list_scorer_versions(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
+pub async fn list_scorer_versions(
+    Path((org_id, entity_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     match scorers::get_scorer_versions(&org_id, &entity_id).await {
         Ok(versions) => {
-            let body: ListScorerVersionsResponseBody = versions.into();
+            let mut body: ListScorerVersionsResponseBody = versions.into();
+            redact_unwritable(&org_id, &user_email.user_id, &mut body.versions).await;
             MetaHttpResponse::json(body)
         }
         Err(err) => scorer_error_response(err),

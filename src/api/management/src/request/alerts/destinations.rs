@@ -415,9 +415,9 @@ pub async fn update_destination(
     tag = "Alerts",
     operation_id = "GetDestination",
     summary = "Get alert destination",
-    description = "Retrieves the configuration details for a specific alert destination. Returns the complete destination \
-                   setup including delivery method, authentication credentials, notification settings, and other \
-                   configuration parameters. Used for reviewing and managing existing destination configurations.",
+    description = "Retrieves the configuration details for a specific alert destination: delivery method, notification \
+                   settings and other configuration parameters. Callers without PUT on the destination get the URL \
+                   cut to its origin and header values and credential metadata blanked.",
     security(
         ("Authorization"= [])
     ),
@@ -434,9 +434,18 @@ pub async fn update_destination(
         ("x-o2-mcp" = json!({"description": "Get destination details", "category": "alerts"}))
     )
 )]
-pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Response {
+pub async fn get_destination(
+    Path((org_id, name)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     match destinations::get(&org_id, &name).await {
-        Ok(data) => MetaHttpResponse::json(Destination::from(data)),
+        Ok(data) => {
+            let mut dest = Destination::from(data);
+            if !can_write_destination(&org_id, &user_email.user_id, &name).await {
+                dest.redact_secrets();
+            }
+            MetaHttpResponse::json(dest)
+        }
         Err(e) => MetaHttpResponse::not_found(e),
     }
 }
@@ -452,7 +461,8 @@ pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Re
     description = "Retrieves a list of all alert destinations configured for an organization. Optionally filter by module \
                    type (alert or pipeline) to get specific destination categories. Returns destination names, types, and \
                    basic configuration details to help administrators manage notification routing and review available \
-                   delivery options.",
+                   delivery options. Destinations the caller may not PUT come with the URL cut to its origin and header \
+                   values and credential metadata blanked.",
     security(
         ("Authorization"= [])
     ),
@@ -477,7 +487,7 @@ pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Re
 pub async fn list_destinations(
     Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let module = query.get("module").map(|s| s.as_str());
     // Opt-in, mirroring ListAlerts' `include_dependencies`: off the hot list path by default.
@@ -509,6 +519,7 @@ pub async fn list_destinations(
     match destinations::list(&org_id, module, _permitted).await {
         Ok(data) => {
             let mut items: Vec<Destination> = data.into_iter().map(Destination::from).collect();
+            redact_unwritable(&org_id, &user_email.user_id, &mut items).await;
             if include_usage {
                 // Same all_usage() the delete guard uses, attached only to this response's rows.
                 match destinations::all_usage(&org_id).await {
@@ -822,6 +833,88 @@ pub async fn test_send(
             message,
         }),
         Err(e) => MetaHttpResponse::bad_request(e.to_string()),
+    }
+}
+
+/// Per-destination PUT checks in flight at once when the org-wide one fails.
+const PERMISSION_CONCURRENCY: usize = 16;
+
+/// The URL and headers can post as the org, so only a destination writer reads them whole.
+async fn can_write_destination(org_id: &str, user_id: &str, name: &str) -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        check_permissions(
+            name,
+            org_id,
+            user_id,
+            "destinations",
+            "PUT",
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, user_id, name);
+        true
+    }
+}
+
+/// Blanks the secrets of every destination the caller may not PUT: one org-wide check, then at
+/// most `PERMISSION_CONCURRENCY` checks at a time for destinations that hold something to redact.
+async fn redact_unwritable(org_id: &str, user_id: &str, items: &mut [Destination]) {
+    use futures::StreamExt;
+
+    let names: Vec<String> = items
+        .iter()
+        .filter(|d| d.has_secrets())
+        .map(|d| d.name.clone())
+        .collect();
+    if names.is_empty() || can_write_every_destination(org_id, user_id).await {
+        return;
+    }
+    let writable: std::collections::HashSet<String> = futures::stream::iter(names)
+        .map(|name| async move {
+            can_write_destination(org_id, user_id, &name)
+                .await
+                .then_some(name)
+        })
+        .buffer_unordered(PERMISSION_CONCURRENCY)
+        .filter_map(|name| async move { name })
+        .collect()
+        .await;
+    for item in items
+        .iter_mut()
+        .filter(|d| d.has_secrets() && !writable.contains(&d.name))
+    {
+        item.redact_secrets();
+    }
+}
+
+/// One check for standard writers and `_all_` grants.
+async fn can_write_every_destination(org_id: &str, user_id: &str) -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        check_permissions(
+            org_id,
+            org_id,
+            user_id,
+            "destinations",
+            "PUT",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, user_id);
+        true
     }
 }
 

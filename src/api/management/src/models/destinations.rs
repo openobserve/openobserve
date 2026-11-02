@@ -18,7 +18,7 @@
 
 use std::fmt;
 
-use config::meta::destinations as meta_dest;
+use config::{meta::destinations as meta_dest, utils::str::url_origin};
 use db::alerts::destinations::DestinationError;
 use hashbrown::HashMap;
 use openobserve_core::alerts::destination_usage;
@@ -225,7 +225,7 @@ pub struct Destination {
     #[serde(default)]
     #[schema(example = "my_alert_webhook")]
     pub name: String,
-    /// Webhook URL for HTTP destinations. Required when `type` is `http`.
+    /// Webhook URL, required for `http`; without PUT, its origin, or empty for a keyed host.
     #[serde(default)]
     #[schema(example = "https://example.com/webhook")]
     pub url: String,
@@ -236,7 +236,7 @@ pub struct Destination {
     /// Whether to skip TLS certificate verification for HTTP destinations.
     #[serde(default)]
     pub skip_tls_verify: bool,
-    /// Optional HTTP headers to include with webhook requests.
+    /// Optional HTTP headers for webhook requests; values read back blank without PUT.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
     /// REQUIRED for alert destinations. Name of the template to use for formatting alert messages.
@@ -277,6 +277,26 @@ pub struct Destination {
 }
 
 impl Destination {
+    /// Whether [`Self::redact_secrets`] has anything to change, so a caller can skip the check.
+    pub fn has_secrets(&self) -> bool {
+        !self.url.is_empty()
+            || self.headers.as_ref().is_some_and(|h| !h.is_empty())
+            || !self.metadata.is_empty()
+            || self.slack_app.previous_webhook.is_some()
+    }
+
+    /// Keeps the URL origin and field names; a full URL, header or routing key posts as the org.
+    pub fn redact_secrets(&mut self) {
+        self.url = url_origin(&self.url);
+        clear(self.headers.iter_mut().flat_map(|h| h.values_mut()));
+        redact_metadata(&mut self.metadata);
+        if let Some(previous) = self.slack_app.previous_webhook.as_mut() {
+            previous.url = url_origin(&previous.url);
+            clear(previous.headers.iter_mut().flat_map(|h| h.values_mut()));
+            redact_metadata(&mut previous.metadata);
+        }
+    }
+
     fn with_slack_app(mut self, target: meta_dest::SlackAppTarget) -> Self {
         self.slack_app = SlackAppFields::from_target(target);
         self
@@ -476,6 +496,26 @@ impl From<destination_usage::DestinationUse> for DestinationUseResponse {
             folder_id: value.folder_id,
         }
     }
+}
+
+/// Metadata credentials: PagerDuty's `routing_key`, and the `credential_<field>` copies older
+/// prebuilt destinations kept, such as `credential_webhookUrl`; a URL keeps its origin.
+fn redact_metadata(metadata: &mut HashMap<String, String>) {
+    for (key, value) in metadata.iter_mut() {
+        let key = key.to_ascii_lowercase();
+        if ["key", "token", "secret", "password"]
+            .iter()
+            .any(|part| key.contains(part))
+        {
+            value.clear();
+        } else if key.contains("url") || key.contains("webhook") {
+            *value = url_origin(value);
+        }
+    }
+}
+
+fn clear<'a>(values: impl Iterator<Item = &'a mut String>) {
+    values.for_each(String::clear);
 }
 
 #[cfg(test)]
@@ -856,5 +896,41 @@ mod tests {
             DestinationType::SlackApp
         );
         assert_eq!(DestinationType::SlackApp.to_string(), "slack_app");
+    }
+
+    #[test]
+    fn redaction_keeps_the_url_origin_and_field_names_only() {
+        let mut d: Destination = serde_json::from_value(web_slack_app_body()).unwrap();
+        d.url = "https://user:pw@hooks.example.com:8443/services/T1/B1/secret?token=abc#x".into();
+        d.headers = Some(HashMap::from([(
+            "Authorization".to_string(),
+            "Bearer s3cr3t".to_string(),
+        )]));
+        d.metadata = HashMap::from([
+            ("routing_key".to_string(), "R0UT1NG".to_string()),
+            ("render_format".to_string(), "slack".to_string()),
+            (
+                "credential_webhookUrl".to_string(),
+                "https://hooks.slack.com/services/T1/B1/s3cr3t".to_string(),
+            ),
+            ("credential_channel".to_string(), "#operations".to_string()),
+        ]);
+        d.redact_secrets();
+        let json = serde_json::to_value(&d).unwrap();
+        assert_eq!(json["url"], "https://hooks.example.com:8443");
+        assert_eq!(json["headers"]["Authorization"], "");
+        assert_eq!(json["metadata"]["routing_key"], "");
+        assert_eq!(json["metadata"]["render_format"], "slack");
+        assert_eq!(
+            json["metadata"]["credential_webhookUrl"],
+            "https://hooks.slack.com"
+        );
+        assert_eq!(json["metadata"]["credential_channel"], "#operations");
+        assert_eq!(json["previous_webhook"]["url"], "https://hooks.slack.com");
+        assert_eq!(
+            json["previous_webhook"]["metadata"]["slack_channel_id"],
+            "C0FAKE00001"
+        );
+        assert_eq!(json["channel_id"], "C0FAKE00001", "non-secret fields stay");
     }
 }
