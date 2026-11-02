@@ -28,7 +28,7 @@ describe("ALERT_SETTING_TIERS", () => {
     const ids = ALERT_SETTING_TIERS.map((d) => d.id);
     expect(new Set(ids).size).toBe(ids.length);
     const count = (tier: string) => ALERT_SETTING_TIERS.filter((d) => d.tier === tier).length;
-    expect([count("shown"), count("one"), count("tucked")]).toEqual([3, 3, 10]);
+    expect([count("shown"), count("one"), count("tucked")]).toEqual([4, 3, 9]);
   });
 
   it("puts every one-click setting in a labelled row", () => {
@@ -116,12 +116,12 @@ describe("moreLinkLabel", () => {
 describe("useAlertSettingTiers", () => {
   it("expands and collapses a section in place", () => {
     const tiers = useAlertSettingTiers({ available: () => true, isSet: () => false });
-    expect(tiers.isVisible("tags")).toBe(false);
+    expect(tiers.isVisible("priority")).toBe(false);
     tiers.toggle("details");
     expect(tiers.view("details").expanded).toBe(true);
-    expect(tiers.isVisible("tags")).toBe(true);
+    expect(tiers.isVisible("priority")).toBe(true);
     tiers.toggle("details");
-    expect(tiers.isVisible("tags")).toBe(false);
+    expect(tiers.isVisible("priority")).toBe(false);
   });
 
   it("keeps an added one-click setting in place", () => {
