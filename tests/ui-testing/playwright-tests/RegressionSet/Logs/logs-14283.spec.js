@@ -39,6 +39,7 @@ test.describe('Regression: Search History re-apply retains the query (#14283)', 
     await page.waitForTimeout(2000);
 
     await pm.logsPage.selectIndexStream('e2e_automate');
+    await pm.logsPage.enableSqlModeIfNeeded();
     await page.waitForTimeout(1000);
 
     for (const query of [EARLIER_QUERY, LATEST_QUERY]) {

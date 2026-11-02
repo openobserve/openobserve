@@ -173,7 +173,6 @@ export class CommonActions {
 
     async navigateToAlerts() {
         await this.page.locator(this.alertsMenuItem).click();
-        await this.page.waitForTimeout(2000);
         // Check for alerts page loaded - use alert list page element
         await expect(this.page.locator('[data-test="alert-list-page"]')).toBeVisible();
     }

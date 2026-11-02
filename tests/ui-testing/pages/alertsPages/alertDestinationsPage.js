@@ -437,7 +437,6 @@ export class AlertDestinationsPage {
 
         try {
             await this.page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
-            await this.page.waitForTimeout(1000);
 
             // Try URL-based navigation first (more reliable than menu clicking)
             const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
@@ -447,11 +446,10 @@ export class AlertDestinationsPage {
             try {
                 await this.page.goto(destinationsUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
                 await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
-                await this.page.waitForTimeout(2000);
 
                 // Check if destinations page loaded
                 const title = this.page.locator(this.destinationsListTitle);
-                const titleVisible = await title.isVisible({ timeout: 5000 }).catch(() => false);
+                const titleVisible = await title.waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false);
 
                 if (titleVisible) {
                     testLogger.info('Navigated to destinations via URL');
@@ -1501,7 +1499,6 @@ export class AlertDestinationsPage {
      * @param {string} name - Destination name
      */
     async fillDestinationName(name) {
-        await this.page.waitForTimeout(5000);
         const field = this.page.locator(this.destinationNameInputField);
         // Prebuilt forms scroll the name field around as sections (webhook, template,
         // headers) render; scroll it into view and retry so a transient re-render can't
@@ -1509,7 +1506,7 @@ export class AlertDestinationsPage {
         let ready = false;
         for (let attempt = 1; attempt <= 3 && !ready; attempt++) {
             await field.scrollIntoViewIfNeeded().catch(() => {});
-            ready = await field.isVisible({ timeout: 10000 }).catch(() => false);
+            ready = await field.waitFor({ state: 'visible', timeout: 10000 }).then(() => true, () => false);
             if (!ready) {
                 testLogger.warn('Destination name field not visible yet, retrying', { attempt });
                 await this.page.waitForTimeout(1000);
@@ -1556,10 +1553,13 @@ export class AlertDestinationsPage {
         await saveBtn.waitFor({ state: 'visible', timeout: 15000 });
         await expect(saveBtn).toBeEnabled({ timeout: 15000 });
         // force-click bypasses any residual toast overlay still occupying pointer events.
+        // The create/update API can lag under load; client-side validation sends no request, hence the cap.
+        const saved = this.page.waitForResponse(
+            (resp) => resp.url().includes('/alerts/destinations') && resp.request().method() !== 'GET',
+            { timeout: 5000 },
+        ).catch(() => null);
         await saveBtn.click({ force: true, timeout: 10000 });
-        // Hard settle: the create/update API + form-close (expectSuccessNotification waits
-        // for the title to hide) can lag under load; give the request time to complete.
-        await this.page.waitForTimeout(5000);
+        await saved;
         testLogger.debug('Clicked Save button');
     }
 
@@ -1860,7 +1860,7 @@ export class AlertDestinationsPage {
                 // scoped search itself is the thing failing to surface the (confirmed) row.
                 if (attempt < 5) await searchField.fill(name);
             }
-            if (await rowAnchor.isVisible({ timeout: 8000 }).catch(() => false)) {
+            if (await rowAnchor.waitFor({ state: 'visible', timeout: 8000 }).then(() => true, () => false)) {
                 testLogger.debug('Destination found in list', { name, attempt });
                 return;
             }

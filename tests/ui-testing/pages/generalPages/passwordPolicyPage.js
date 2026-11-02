@@ -63,6 +63,10 @@ export class PasswordPolicyPage {
   // redirect to general settings, so a crash, hung load, or auth redirect throws instead.
   async navigateToPasswordPolicy() {
     const baseUrl = process.env["ZO_BASE_URL"] || "http://localhost:5080";
+    // OSS has no such page, so there's nothing to load before the caller skips.
+    const config = await this.page.request.get(`${baseUrl}/config`).then((r) => r.json()).catch(() => null);
+    if (config?.build_type === "opensource") return false;
+
     await this.page.goto(`${baseUrl}/web/settings/password_policy?org_identifier=_meta`);
     await this.page.waitForLoadState("networkidle", { timeout: 12000 }).catch(() => {});
 

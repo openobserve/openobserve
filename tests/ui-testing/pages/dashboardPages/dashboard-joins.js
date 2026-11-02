@@ -25,9 +25,6 @@ export class JoinHelper {
     await addJoinBtn.waitFor({ state: "visible", timeout: 10000 });
     await addJoinBtn.click();
 
-    // Wait for the new join item to appear in the list
-    await this.page.waitForTimeout(1000);
-
     // Click on the new join item to open the configuration popup
     const newJoinItem = this.page.locator(`[data-test="dashboard-join-item-${expectedIndex}"]`);
     await newJoinItem.waitFor({ state: "visible", timeout: 10000 });
@@ -113,6 +110,12 @@ export class JoinHelper {
       .first()
       .click();
     await this.page.waitForTimeout(500);
+
+    // The left option's click occasionally dismisses the join popup itself; reopen it so the condition can finish.
+    if (!(await leftFieldWrapper.isVisible())) {
+      testLogger.warn('Join popup closed after selecting the left field, reopening');
+      await this.page.locator('[data-test^="dashboard-join-item-"]:not([data-test$="-remove"])').last().click();
+    }
 
     // Configure operation if not default
     if (operation !== "=") {
@@ -351,11 +354,10 @@ export class JoinHelper {
  * @returns {Promise<number>} Number of data rows
  */
 export async function getTableRowCount(page) {
-  // Wait for table data to load
-  await page.waitForTimeout(3000);
-
   // Count rows - exclude empty rows (header/footer rows within tbody)
   const rows = page.locator('[data-test="dashboard-panel-table"] tbody tr');
+  // Wait for table data to load; a query can legitimately return nothing, hence the cap
+  await rows.first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
   const totalRows = await rows.count();
 
   // Filter out empty rows by checking if they have actual content

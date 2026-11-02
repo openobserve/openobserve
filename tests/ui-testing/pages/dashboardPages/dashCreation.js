@@ -9,31 +9,12 @@ export const waitForDashboardPage = async function (page) {
     await page.waitForURL(/\/web\/dashboards.*/, { timeout: 30000 });
   }
 
-  // Additional wait for page to stabilize
-  await page.waitForTimeout(1000);
-
-  // Wait for either the API response or the dashboard table to appear
-  // Use Promise.race to succeed on whichever happens first
+  // List table, import page, empty-folder New Dashboard button, or the view page's Add Panel after saving.
   try {
-    await Promise.race([
-      // Wait for API response
-      page.waitForResponse(
-        (response) =>
-          /\/api\/.*\/dashboards/.test(response.url()) &&
-          response.status() === 200,
-        { timeout: 30000 }
-      ),
-      // OR wait for dashboard table to be visible
-      page.waitForSelector('[data-test="dashboard-table"]', {
-        state: 'visible',
-        timeout: 30000
-      }),
-      // OR wait for import button to be visible (in case we're on import page)
-      page.waitForSelector('[data-test="dashboard-import"]', {
-        state: 'visible',
-        timeout: 30000
-      }),
-    ]);
+    await page
+      .locator('[data-test="dashboard-table"], [data-test="dashboard-import"], [data-test="dashboard-new"], [data-test="dashboard-panel-add"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 30000 });
   } catch (err) {
     // If all options fail, log the error but check if we're actually on the page
     testLogger.warn("Dashboard page load check failed, verifying page state", { error: err.message });
@@ -46,8 +27,6 @@ export const waitForDashboardPage = async function (page) {
     }
   }
 
-  // Final wait for stability
-  await page.waitForTimeout(1000);
 };
 
 export const applyQueryButton = async function (page) {
@@ -114,6 +93,7 @@ export async function deleteDashboard(page, dashboardName) {
 
       return isStable;
     },
+    null,
     { timeout: 15000, polling: 100 }
   );
 

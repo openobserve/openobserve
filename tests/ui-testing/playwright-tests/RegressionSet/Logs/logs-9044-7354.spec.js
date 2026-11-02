@@ -16,6 +16,7 @@ test.describe('Regression: Scroll Retention on Logs page (#9044)', () => {
     await page.waitForTimeout(2000);
 
     await pm.logsPage.selectIndexStream('e2e_automate');
+    await pm.logsPage.enableSqlModeIfNeeded();
     await page.waitForTimeout(1000);
 
     await pm.logsPage.typeQuery('SELECT * FROM "e2e_automate"');

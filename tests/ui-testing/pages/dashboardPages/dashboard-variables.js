@@ -557,6 +557,7 @@ export default class DashboardVariables {
         const options = document.querySelectorAll('[data-test="dashboard-variable-field-select-option"]');
         return options.length > 0;
       },
+      null,
       { timeout: 10000, polling: 100 }
     );
 
@@ -608,10 +609,12 @@ export default class DashboardVariables {
           const postData = request.postData();
           if (postData) {
             const data = JSON.parse(postData);
-            if (data.query?.start_time && data.query?.end_time) {
+            // `_values_stream` sends the range at the top level; `_values` nests it under `query`.
+            const range = data.query ?? data;
+            if (range.start_time && range.end_time) {
               apiCallDetected = true;
-              capturedStartTime = data.query.start_time;
-              capturedEndTime = data.query.end_time;
+              capturedStartTime = range.start_time;
+              capturedEndTime = range.end_time;
               console.log('Variable API captured:', {
                 startTime: capturedStartTime,
                 endTime: capturedEndTime,
@@ -664,32 +667,19 @@ export default class DashboardVariables {
   }
 
   /**
-   * Verify variable API call time range by waiting for /values API response
+   * Verify the time range of the variable values call captured by the monitor
    * @param {Object} monitor - Monitor object from createVariableAPIMonitor()
    * @param {number} expectedDurationMs - Expected duration in milliseconds
    * @param {string} successMessage - Message to log on success
    * @param {number} timeout - Timeout in milliseconds (default: 5000)
    */
   async verifyVariableTimeRange(monitor, expectedDurationMs, successMessage, timeout = 10000) {
-    // Wait for the /values API response (longer timeout for parallel test execution)
-    try {
-      await this.page.waitForResponse(
-        response => (response.url().includes('/_values') || response.url().includes('/values')) && response.status() === 200,
-        { timeout }
-      );
-    } catch (error) {
-      console.log('⚠️ Warning: No variable API call detected within timeout');
-      return;
-    }
-
-    const { apiCallDetected, capturedStartTime, capturedEndTime } = monitor.getResults();
-
-    if (apiCallDetected) {
+    // Retried because a call still in flight from the previous range can arrive first; the latest call wins.
+    await expect(() => {
+      const { capturedStartTime, capturedEndTime } = monitor.getResults();
       this.assertTimeRangeMatches(capturedStartTime, capturedEndTime, expectedDurationMs);
-      console.log(`✅ ${successMessage}`);
-    } else {
-      console.log('⚠️ Warning: No variable API call detected, variable may not exist or be loaded');
-    }
+    }).toPass({ timeout });
+    console.log(`✅ ${successMessage}`);
   }
 }
 

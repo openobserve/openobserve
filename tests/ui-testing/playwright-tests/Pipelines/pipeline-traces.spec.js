@@ -80,7 +80,7 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
         status: traceResult.status
       });
       // Wait for traces to be indexed
-      await page.waitForTimeout(5000);
+      await pageManager.logsPage.waitForStreamAvailable(TRACES_STREAM, 15000, 500, 'traces');
     } catch (error) {
       testLogger.warn('Trace ingestion failed, tests may fail if traces stream does not exist', {
         error: error.message,

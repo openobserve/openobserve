@@ -79,7 +79,7 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
       });
       // Wait for metrics to be indexed - metrics streams need time to appear in UI dropdown
       testLogger.info('Waiting for metrics stream to be indexed...');
-      await page.waitForTimeout(5000);
+      await pageManager.logsPage.waitForStreamAvailable(METRICS_STREAM, 15000, 500, 'metrics');
     } catch (error) {
       testLogger.warn('Metrics ingestion failed, tests may fail if metrics stream does not exist', {
         error: error.message,

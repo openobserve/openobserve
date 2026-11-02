@@ -277,7 +277,7 @@ test.describe("dashboard favorites testcases", {
     // be gone if the test deleted it itself.
     await pm.dashboardFolder.searchFolder(folderName).catch(() => {});
     await pm.dashboardFolder.openFolderByName(folderName).catch(() => {});
-    await pm.dashboardFavorites.searchDashboard(dashboardName).catch(() => {});
+    await pm.dashboardFavorites.searchDashboard(dashboardName, { timeout: 5000 }).catch(() => {});
     await pm.dashboardFavorites.unfavoriteIfFavorited(dashboardName).catch(() => {});
 
     // Best-effort cleanup: the folder may already be gone if the test deleted

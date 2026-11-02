@@ -60,12 +60,7 @@ test.describe("SQL Autocomplete — Logs", () => {
         // Wait for the stream-list API response so streamResults.list is set.
         // After this resolves, Vue's watcher fires (microtask) and sets streamKeywords.
         await streamsApiDone;
-        // Deterministic gate for streamKeywords hydration via the Vue watcher.
-        await pm.logsPage.waitForStreamKeywordsHydration(8000);
-        // Also wait for the stream schema (field list) to hydrate. Without this,
-        // WHERE-clause tests that check for specific field names (code, floatvalue, job)
-        // can fail because fieldKeywords is still empty when Ctrl+Space fires.
-        await pm.logsPage.waitForFieldKeywordsHydration(8000);
+        await pm.logsPage.waitForStreamFieldsLoaded('code');
 
         testLogger.info('Logs SQL test setup completed');
     });
@@ -129,10 +124,6 @@ test.describe("SQL Autocomplete — Logs", () => {
 
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             await pm.logsPage.dismissSuggestions();
-            if (attempt > 1) {
-                // Between retries, wait for streamKeywords to fully hydrate
-                await pm.logsPage.waitForStreamKeywordsHydration(3000);
-            }
 
             await pm.logsPage.setQueryEditorContentAndTriggerSuggestions('SELECT * FROM ');
             // Ensure the widget actually rendered at least once before scraping
@@ -195,10 +186,6 @@ test.describe("SQL Autocomplete — Logs", () => {
 
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             await pm.logsPage.dismissSuggestions();
-            if (attempt > 1) {
-                // Between retries, give the Vue watcher another chance to hydrate
-                await pm.logsPage.waitForStreamKeywordsHydration(3000);
-            }
 
             // Type the partial stream with a double-quote (simulating what the user types)
             // Monaco may auto-insert the closing " — the feature handles both cases

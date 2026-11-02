@@ -207,13 +207,10 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
       const severitySelect = pm.alertsPage.getTemplatePreviewSeveritySelect();
       await severitySelect.click();
       await page.waitForTimeout(300);
-      await pm.alertsPage.getElementByText(/^Critical$/i).first().click().catch(async () => {
-        await pm.alertsPage.getTemplatePreviewSeverityCriticalValue().click();
-      });
+      await pm.alertsPage.getTemplatePreviewSeverityCriticalValue().click();
       await page.waitForTimeout(800);
 
-      const hasFieldAtCritical = await fieldsBlock.getByText('CriticalOnlyField').isVisible({ timeout: 8000 }).catch(() => false);
-      expect(hasFieldAtCritical).toBe(true);
+      await expect(fieldsBlock.getByText('CriticalOnlyField')).toBeVisible({ timeout: 8000 });
       testLogger.info('Confirmed critical-only field visible at severity=critical');
 
       // Reset back to single_level so it doesn't leak into subsequent steps.

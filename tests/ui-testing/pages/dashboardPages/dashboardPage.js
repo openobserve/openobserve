@@ -294,16 +294,12 @@ export class DashboardPage {
       return;
     }
 
-    // Wait for Vue components to mount
-    await this.page.waitForTimeout(2000);
-
     // Wait for and click the "Add Panel" button
     await this.addPanelBtn.waitFor({ state: 'visible', timeout: 15000 });
     await this.addPanelBtn.click();
 
     // Wait for panel configuration to load
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await this.page.waitForTimeout(3000);
 
     // Click on Stream dropdown — OSelect opens a popover with a search input
     // and option list.
@@ -358,12 +354,12 @@ export class DashboardPage {
     // so no key press is needed to "commit" the name.
     await expect(this.applyButton).toBeVisible();
     await this.applyButton.click();
-    await this.page.waitForTimeout(5000);
+    await this.page.locator('[data-test="chart-renderer"]').first()
+      .waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   }
   async deleteDashboard() {
     await this.page.reload();
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await this.page.waitForTimeout(5000);
 
     // Search for the dashboard before deleting. `dashboardSearch` is the
     // OInput wrapper <div> (not fillable); fill the inner `-field` native
@@ -372,7 +368,6 @@ export class DashboardPage {
     await this.page.waitForTimeout(2000);
 
     await this.dashboardDelete.click({ force: true });
-    await this.page.waitForTimeout(2000);
     await this.confirmButton.click();
     // Toast appears after the dashboard is deleted — assert via data-test
     // hook rather than role="alert".

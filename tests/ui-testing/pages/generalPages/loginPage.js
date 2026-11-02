@@ -61,6 +61,10 @@ export class LoginPage {
 
     const loginAsInternalLink = this.page.locator('[data-test="login-as-internal-user"]');
 
+    // The link only renders when SSO is on, and the app doesn't wait for config before rendering, so ask directly.
+    const config = await this.page.request.get(`${process.env["ZO_BASE_URL"]}/config`).then((r) => r.json()).catch(() => null);
+    if (config && !config.sso_enabled) return;
+
     // Wait for the link with a reasonable timeout
     try {
       await loginAsInternalLink.waitFor({ state: 'visible', timeout: 10000 });
@@ -136,7 +140,6 @@ export class LoginPage {
     }
 
     await waitForLogin;
-    await this.page.waitForTimeout(2000);
     await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
       waitUntil: "domcontentloaded",
       timeout: 60000

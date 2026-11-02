@@ -434,6 +434,7 @@ class SchemaPage {
         // Drive the Monaco editor via window.monaco — clicking `.monaco-editor` is banned (§2)
         await this.page.waitForFunction(
             () => Boolean(window.monaco?.editor?.getEditors()?.length),
+            null,
             { timeout: 15000 },
         );
         await this.page.evaluate((text) => {
@@ -551,10 +552,9 @@ class SchemaPage {
 
         // Dismiss the OSelect popover with Escape and confirm by waiting on its detachment.
         await this.page.keyboard.press('Escape').catch(() => {});
-        // Wait until the timestamp field shows up in the stream-fields table, signalling
-        // the new stream's schema has been loaded.
-        await this.logSearchIndexFieldsTable
-            .locator('[data-test="log-search-expand-_timestamp-field"]')
+        // A field row in the logs sidebar signals the new stream's schema has loaded.
+        await this.page.locator('[data-test="logs-search-index-list"] [data-test^="log-search-expand-"]')
+            .first()
             .waitFor({ state: 'visible', timeout: 15000 })
             .catch(() => {});
     }

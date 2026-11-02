@@ -872,12 +872,7 @@ export class PipelinesPage {
 
     // Method to click the input node stream save button
     async clickInputNodeStreamSave() {
-        // If the stream-name popover is still open (Enter path in fillDestinationStreamName),
-        // wait for it to detach. It will close via interactOutside when the save button receives
-        // the pointerdown event. The .catch keeps this non-blocking if already detached.
-        await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
-            .waitFor({ state: 'detached', timeout: 5000 })
-            .catch(() => {});
+        // A stream-name popover still open (Enter path) closes via interactOutside on this click.
         await this.inputNodeStreamSaveButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.inputNodeStreamSaveButton.click();
     }
@@ -1571,7 +1566,7 @@ export class PipelinesPage {
             const text = table.textContent || '';
             const hasFooter = /Showing \d+ - \d+/.test(text) || text.includes('No data available');
             return hasRow || hasEmpty || hasFooter;
-        }, { timeout }).catch(() => {});
+        }, null, { timeout }).catch(() => {});
     }
 
     /**
@@ -2582,15 +2577,11 @@ export class PipelinesPage {
         const optionVisible = await matchingOption.isVisible({ timeout: 2000 }).catch(() => false);
         if (optionVisible) {
             await matchingOption.click();
+            await popover.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
         } else {
+            // The popover stays open for new names until the save click; Escape here would also close the drawer.
             await this.streamNameInput.press('Enter');
         }
-        // Wait for the popover to close if it was dismissed by an option click.
-        // For newly created names (Enter path), the popover stays open; the save
-        // button click will close it via interactOutside — do NOT press Escape
-        // here, as that would also trigger the ODrawer's escape handler and
-        // prematurely close the drawer.
-        await popover.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
     }
 
     /**
@@ -3126,7 +3117,7 @@ export class PipelinesPage {
         await this.page.waitForFunction(() => {
             const editor = document.querySelector('.monaco-editor');
             return editor !== null;
-        }, { timeout: 3000 });
+        }, null, { timeout: 3000 });
         // Additional small wait for query update to complete
         await this.page.waitForTimeout(500);
         testLogger.info('Watcher processing complete');
