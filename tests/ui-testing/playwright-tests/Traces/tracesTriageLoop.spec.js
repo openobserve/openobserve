@@ -3,7 +3,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { ingestTraces } = require('../utils/trace-ingestion.js');
+const { ingestTraces, ingestBrushWindowTraces } = require('../utils/trace-ingestion.js');
 
 const USER_FILTER = "duration >= '1ms'";
 const DURATION_UNIT_US = { us: 1, ms: 1000, s: 1000000 };
@@ -37,23 +37,24 @@ function bandSql(editorBand) {
   return [lo ? `duration >= ${lo}` : '', hi !== null ? `duration < ${hi}` : ''].filter(Boolean).join(' AND ');
 }
 
+test.beforeAll(async ({ browser }) => {
+  test.setTimeout(120000);
+  const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
+  const page = await context.newPage();
+  try {
+    for (const scenario of [{ count: 6, forceScenario: 'error' }, { count: 10, forceScenario: 'success' }]) {
+      const seeded = await ingestTraces(page, scenario.count, { forceScenario: scenario.forceScenario });
+      expect(seeded.failed, `Seeding ${scenario.forceScenario} traces must succeed`).toBe(0);
+    }
+    expect(await ingestBrushWindowTraces(page), 'Seeding backdated traces must succeed').toBe(0);
+  } finally {
+    await context.close();
+  }
+});
+
 test.describe('Traces triage loop', () => {
   let pm;
   let queries;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120000);
-    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
-    const page = await context.newPage();
-    try {
-      for (const scenario of [{ count: 6, forceScenario: 'error' }, { count: 10, forceScenario: 'success' }]) {
-        const seeded = await ingestTraces(page, scenario.count, { forceScenario: scenario.forceScenario });
-        expect(seeded.failed, `Seeding ${scenario.forceScenario} traces must succeed`).toBe(0);
-      }
-    } finally {
-      await context.close();
-    }
-  });
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
