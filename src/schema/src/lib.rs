@@ -63,6 +63,9 @@ const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
 /// Shared by both ingestion-window discard messages and the test for them.
 const WINDOW_DISCARD_MARKER: &str = " data can be ingested. Data discarded.";
+/// Profiles payload columns hold one long value per row, so indexing them is costly and finds
+/// little.
+const PROFILES_UNINDEXABLE_FIELDS: [&str; 2] = ["stack", "profile_blob"];
 
 /// True when this error is an ingestion-window POLICY drop rather than a record
 /// that could not be prepared.
@@ -255,6 +258,10 @@ fn validate_stream_settings(
         )));
     }
 
+    if stream_type == StreamType::Profiles {
+        check_profiles_index_fields(settings)?;
+    }
+
     if settings.data_retention > 0
         && settings.data_retention < 30
         && settings.storage_type.is_compliance()
@@ -279,6 +286,23 @@ fn validate_stream_settings(
     }
 
     Ok(())
+}
+
+fn check_profiles_index_fields(
+    settings: &StreamSettings,
+) -> std::result::Result<(), StreamSettingsError> {
+    let unindexable = settings
+        .full_text_search_keys
+        .iter()
+        .chain(&settings.index_fields)
+        .chain(&settings.bloom_filter_fields)
+        .find(|field| PROFILES_UNINDEXABLE_FIELDS.contains(&field.as_str()));
+    match unindexable {
+        Some(field) => Err(StreamSettingsError::BadRequest(format!(
+            "field [{field}] of a profiles stream cannot be used for full text search or index"
+        ))),
+        None => Ok(()),
+    }
 }
 
 async fn persist_stream_settings(
@@ -1266,6 +1290,35 @@ mod tests {
         assert!(names.contains("field0"));
         assert!(names.contains("field1"));
         assert!(!names.contains("field2"));
+    }
+
+    #[test]
+    fn test_check_profiles_index_fields_rejects_payload_columns() {
+        let tag_index = StreamSettings {
+            index_fields: vec!["service_name".to_string(), "k8s_pod_name".to_string()],
+            ..Default::default()
+        };
+        assert!(check_profiles_index_fields(&tag_index).is_ok());
+
+        for settings in [
+            StreamSettings {
+                full_text_search_keys: vec!["stack".to_string()],
+                ..Default::default()
+            },
+            StreamSettings {
+                index_fields: vec!["profile_blob".to_string()],
+                ..Default::default()
+            },
+            StreamSettings {
+                bloom_filter_fields: vec!["stack".to_string()],
+                ..Default::default()
+            },
+        ] {
+            assert!(matches!(
+                check_profiles_index_fields(&settings),
+                Err(StreamSettingsError::BadRequest(_))
+            ));
+        }
     }
 
     #[test]
