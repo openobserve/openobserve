@@ -383,9 +383,18 @@ test("the paired key counts as new when only the OSS head moved", () => {
 test("a claim on the same head or on a comment with no confidence line adds nothing", () => {
   const body = finished(SHA_A, 1, 0);
   assert.ok(claimedReviewBody(body, 2, SHA_A).includes("🟢 High"));
-  const placeholder = withPassTag(`<!-- ai-code-review -->\n${REVIEW_HEADING}\n\n> [!NOTE]\n> Review in progress.`, 1);
+  const placeholder = withPassTag(`<!-- ai-code-review -->\n<!-- o2-review-notice -->\n${REVIEW_HEADING}\n\n> [!NOTE]\n> Review in progress.`, 1);
   assert.equal(claimedReviewBody(placeholder, 2, SHA_B).includes("Merge confidence"), false);
   assert.equal(reviewPassCount(claimedReviewBody(placeholder, 2, SHA_B)), 2);
+});
+
+test("a legacy review with no confidence line loses its approval look when a new head is claimed", () => {
+  const legacy = withPassTag(`<!-- ai-code-review -->\n${REVIEW_HEADING}\n\n> [!TIP]\n> ### ✅ Approved\n> LGTM.\n\n**🔴 0 blockers · 🟡 0 warnings**`, 1);
+  const claimed = claimedReviewBody(legacy, 2, SHA_B);
+  assert.ok(claimed.includes("> LGTM.\n\n**Merge confidence: 🟡 Reviewing** — `bbbbbbb` is being reviewed"), claimed);
+  assert.equal(claimed.match(/Merge confidence/g).length, 1);
+  assert.equal(reviewPassCount(claimed), 2);
+  assert.equal(claimedReviewBody(claimed, 2, SHA_B), claimed);
 });
 
 test("the gate line comes off at the claim along with the old confidence", () => {

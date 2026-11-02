@@ -270,7 +270,7 @@ in o2-enterprise:
   pointer (`post-paired-pointer.sh`, which replaces the same comment the runner would: the reviewer
   app's newest comment carrying any review marker). This uses a reviewer-app token scoped to o2-enterprise
   (Pull requests read, Actions write); if it cannot be minted or the lookup fails, the OSS review
-  runs as usual unless the reviewer app's newest review comment on the PR is its pointer (a pointer posted under the shared `github-actions[bot]` identity never counts). If the dispatch fails, the OSS review runs. To force an OSS review anyway, dispatch this workflow with `ignore_paired`.
+  runs as usual, even when the PR still carries an older pointer. If the dispatch fails, the OSS review runs. To force an OSS review anyway, dispatch this workflow with `ignore_paired`.
 - **ENT side.** The o2-enterprise workflow checks out this engine pinned by commit SHA, finds the
   open same-named OSS PR, checks it out to `./pr/openobserve`, and reviews both diffs in one run.
   OSS files appear with an `openobserve/` prefix in the review, and the OSS `AGENTS.md` and

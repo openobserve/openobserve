@@ -122,7 +122,7 @@ jobs:
           app-id: ${{ vars.OO_REVIEWER_APP_ID }}
           private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
 
-      # Without it (app not installed on o2-enterprise, or no actions:write) the PR is reviewed here unless it already carries the paired pointer.
+      # Without it (app not installed on o2-enterprise, or no actions:write) the PR is reviewed here.
       - name: Generate app token for the paired o2-enterprise lookup
         id: ent_token
         if: env.REVIEW_RUN == 'true' && vars.OO_REVIEWER_APP_ID != '' && !inputs.ignore_paired
@@ -164,25 +164,19 @@ jobs:
           FORCE_REVIEW: ${{ inputs.force_full || 'false' }}
         run: |
           set -uo pipefail
-          # A review replaces the pointer in place, so the app bot's newest review comment being a pointer means the last successful lookup found a pair.
-          review_here_unless_pointed() {
-            if gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate 2>/dev/null | jq -cs '[.[][]]' \
-              | node engine/scripts/ai-review/newest-review-is-pointer.mjs "$BOT_LOGIN"; then
-              echo "::warning::$1; this PR already carries the paired pointer, so it is not reviewed here."
-              echo "REVIEW_RUN=false" >> "$GITHUB_ENV"
-            else
-              echo "::warning::$1; reviewing here."
-            fi
+          # An old pointer cannot prove the paired PR is still open, so only a successful lookup may skip the review.
+          review_here() {
+            echo "::warning::$1; reviewing here."
             exit 0
           }
           if [ -z "$ENT_TOKEN" ]; then
-            review_here_unless_pointed "No app token for o2-enterprise, so no paired PR lookup"
+            review_here "No app token for o2-enterprise, so no paired PR lookup"
           fi
           ent_repo=openobserve/o2-enterprise
           # Any lookup error falls back to reviewing here: a missed pairing costs a duplicate review, a failed step costs the review.
           if ! ent_json="$(GH_TOKEN="$ENT_TOKEN" gh api -X GET "repos/$ent_repo/pulls" -f state=open -f head="${ent_repo%%/*}:$BRANCH" \
             --jq "[.[] | select(.head.repo.full_name == \"$ent_repo\")][0] // {} | {number, isDraft: .draft, labels}")"; then
-            review_here_unless_pointed "Could not look up a paired $ent_repo PR"
+            review_here "Could not look up a paired $ent_repo PR"
           fi
           ent_pr="$(jq -r '.number // ""' <<<"$ent_json")"
           if [ -z "$ent_pr" ]; then

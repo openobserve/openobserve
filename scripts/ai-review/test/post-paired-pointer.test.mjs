@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ANY_REVIEW_MARKER, newestReviewIsPointer, selectOwnReviewComment } from "../src/comments.mjs";
+import { ANY_REVIEW_MARKER, isPlaceholderComment, selectOwnReviewComment } from "../src/comments.mjs";
 
 const SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), "../post-paired-pointer.sh");
 const MARKER = "<!-- ai-code-review -->";
@@ -60,7 +60,7 @@ test("the pointer replaces the same comment the runner and the fallback reader p
   assert.equal(calls, `PATCH repos/o/r/issues/comments/${selected.id}`);
   assert.match(t.body, /<!-- o2-review-pass:3 -->$/);
   const after = pages.flat().map(c => (c.id === selected.id ? { ...c, body: t.body } : c));
-  assert.equal(newestReviewIsPointer(after, BOT), true);
+  assert.equal(isPlaceholderComment(selectOwnReviewComment(after, BOT, ANY_REVIEW_MARKER).body), true);
 });
 
 test("the pointer never adopts a comment when the bot login is empty", t => {

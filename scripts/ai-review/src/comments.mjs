@@ -47,12 +47,6 @@ export function selectOwnReviewComment(comments, botLogin, markerPattern) {
   return own.at(-1) ?? null;
 }
 
-// Any workflow in the repository can post as github-actions[bot], so only the reviewer app's own pointer may stop a review.
-export function newestReviewIsPointer(comments, botLogin) {
-  if (!botLogin || botLogin === "github-actions[bot]") return false;
-  return carriesRunnerTag(selectOwnReviewComment(comments, botLogin, ANY_REVIEW_MARKER)?.body, PAIRED_POINTER_TAG);
-}
-
 // untagged is what a comment from before the counter is worth: a review is one pass, a pointer or notice none.
 export function isPlaceholderComment(body) {
   return carriesRunnerTag(body, PAIRED_POINTER_TAG) || carriesRunnerTag(body, NOTICE_TAG);
@@ -184,10 +178,10 @@ function withHeldVerdict(body) {
   return `${body.slice(0, body.length - tags.length)}\n<!-- o2-review-held:${Buffer.from(line, "utf-8").toString("base64url")} -->${tags}`;
 }
 
-// The old verdict must not read as the new head's while the run works; a cancelled run leaving "Reviewing" behind is still true of what happened.
+// The old verdict must not read as the new head's while the run works, legacy reviews with no confidence line included; a cancelled run leaving "Reviewing" behind is still true.
 export function claimedReviewBody(body, count, key) {
   const bare = withoutAutoApproveLine(body);
-  const newHead = key && reviewedKey(body) !== key && bare.search(MERGE_CONFIDENCE_LINE_RE) !== -1;
+  const newHead = key && reviewedKey(body) !== key && (bare.search(MERGE_CONFIDENCE_LINE_RE) !== -1 || !isPlaceholderComment(bare));
   return withPassTag(newHead ? withConfidenceLine(withHeldVerdict(bare), reviewingConfidenceLine(shortKey(key))) : bare, count);
 }
 

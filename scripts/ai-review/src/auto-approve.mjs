@@ -182,7 +182,21 @@ export function isApprovedReview(text) {
   const callouts = [...visible.matchAll(/^ {0,3}> ?\[![A-Za-z]+\]/gm)];
   const decision = /^> \[!TIP\]\n> ### ✅ Approved[ \t]*$/m.exec(visible);
   if (callouts.length !== 1 || decision?.index !== callouts[0].index) return false;
+  if (showsBlocker(visible)) return false;
   return !/^[ >]*(?:`{3,}|~{3,}|<)/m.test(visible.slice(0, decision.index));
+}
+
+// The callout is model-written, so a P0/P1 section or a non-zero blocker count anywhere below it vetoes the approval.
+function showsBlocker(visible) {
+  const text = visible
+    .replace(/&#x([0-9a-f]{1,6});?|&#(\d{1,7});?/gi, (ref, hex, dec) => {
+      const code = hex ? Number.parseInt(hex, 16) : Number(dec);
+      return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : ref;
+    })
+    .normalize("NFKC");
+  const withoutZeroCounts = text.replace(/\bp[01][ \t]*:[ \t]*0(?![\d.,])/gi, "").replace(/\b(?:0|no)[ \t]+blockers?\b/gi, "");
+  if (/\b(?:p[01]|blockers?)\b/i.test(withoutZeroCounts)) return true;
+  return /^[ \t>]*(?:#{1,6}[ \t]|\*\*|<summary>)[^\n]*\bcritical\b/im.test(text);
 }
 
 function coverageReasons({ diff, diffPinned, filteredFileCount, reviewedChars, pr }) {

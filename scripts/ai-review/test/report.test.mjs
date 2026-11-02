@@ -461,6 +461,25 @@ test("only the callout that leads the review counts as its decision", () => {
   assert.equal(isApprovedReview("## R"), false);
 });
 
+test("an approved callout over a visible blocker section or count never approves", () => {
+  const head = "## 🔎 OpenObserve Code Review\n\n> [!TIP]\n> ### ✅ Approved\n> LGTM.\n\n";
+  const clean = `${head}**🔴 P0: 0 · 🟠 P1: 0 · 🟡 P2: 0 · 🔵 P3: 0**\n\n<details>\n<summary>🧾 Review details</summary>\n\n| **Risk tier** | full |\n\n</details>`;
+  assert.equal(isApprovedReview(clean), true);
+  assert.equal(isApprovedReview(`${head}**🔴 0 blockers · 🟡 0 warnings · 🔵 0 suggestions**`), true);
+  assert.equal(isApprovedReview(`${clean}\n\n**Merge confidence: 🟢 High** — no blockers; all reviewers finished`), true);
+  const blocked = [
+    `${clean}\n\n#### 🔴 P0 · Blockers\n- \`a.rs:1\` **[Security]** Leaks a token.`,
+    `${clean}\n\n<details open>\n\n#### 🟠 P1 · Blockers\n- \`a.rs:1\` **[Correctness]** Crashes.\n</details>`,
+    `${head}**🔴 P0: 1 · 🟠 P1: 0 · 🟡 P2: 0 · 🔵 P3: 0**`,
+    `${head}**🔴 P0: 0 · 🟠 P1: 2 · 🟡 P2: 0 · 🔵 P3: 0**`,
+    `${head}**🔴 1 blocker · 🟡 0 warnings**`,
+    `${clean}\n\n#### 🔴 Critical\n- \`a.rs:1\` **[Security]** Leaks a token.`,
+    `${clean}\n\n#### 🔴 &#80;0 · Blockers`,
+    `${clean}\n\n#### 🔴 Ｐ１ section`,
+  ];
+  for (const body of blocked) assert.equal(isApprovedReview(body), false, body);
+});
+
 function fakeApi(change = {}) {
   const calls = [];
   const record = name => (...args) => { calls.push(name); change[`${name}Hook`]?.(...args); };
