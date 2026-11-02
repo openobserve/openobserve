@@ -937,14 +937,22 @@ async fn rotate_locked<C: ConnectionTrait>(
         .into_iter()
         .filter(|c| row_is_live(c, now))
         .collect();
-    if live
-        .iter()
-        .any(|c| c.state == CredentialState::Retiring.as_str())
-    {
+    let retiring = |c: &credentials::Model| c.state == CredentialState::Retiring.as_str();
+    // A revoked active credential leaves only the retiring one, and its replacement must be
+    // mintable.
+    if live.iter().any(retiring) && live.iter().any(|c| !retiring(c)) {
         return Err(ManageError::CredentialRetiring);
     }
-    let newest = live.iter().map(|c| c.created_at).max();
+    let newest = live
+        .iter()
+        .filter(|c| !retiring(c))
+        .map(|c| c.created_at)
+        .max();
     for credential in &live {
+        // It already carries its own expiry, which the caller chose on the earlier rotate.
+        if retiring(credential) {
+            continue;
+        }
         let keep = overlap_seconds > 0 && Some(credential.created_at) == newest;
         if keep {
             retire_in(txn, credential, now + overlap_seconds * 1_000_000, now).await?;
@@ -1692,6 +1700,63 @@ mod tests {
                 .await
                 .unwrap_err(),
             ManageError::InvalidOverlap
+        );
+    }
+
+    #[tokio::test]
+    async fn rotate_after_revoking_the_active_credential_keeps_the_retiring_one() {
+        let db = db().await;
+        let stored = Stored::default();
+        let written = create(&db, AuthMode::Token, &stored).await;
+        let (_, active, _) = rotate_in(&db, &at(NOW + 1), 3600, preparer(stored.clone()))
+            .await
+            .unwrap();
+        revoke_in(&db, &at(NOW + 2), &active.id).await.unwrap();
+        let retiring_before = credentials_of(&db, &written.trigger_id)
+            .await
+            .into_iter()
+            .find(|c| c.state == "retiring")
+            .unwrap();
+
+        let (_, minted, _) = rotate_in(&db, &at(NOW + 3), 86400, preparer(stored.clone()))
+            .await
+            .unwrap();
+        let rows = credentials_of(&db, &written.trigger_id).await;
+        let retiring = rows.iter().find(|c| c.id == retiring_before.id).unwrap();
+        assert_eq!(
+            (retiring.state.as_str(), retiring.expires_at),
+            ("retiring", retiring_before.expires_at)
+        );
+        assert_eq!(
+            rows.iter().find(|c| c.id == minted.id).unwrap().state,
+            "active"
+        );
+
+        let refused = rotate_in(&db, &at(NOW + 4), 3600, preparer(stored.clone())).await;
+        assert_eq!(refused.unwrap_err(), ManageError::CredentialRetiring);
+    }
+
+    #[tokio::test]
+    async fn an_immediate_rotate_with_only_a_retiring_credential_keeps_it() {
+        let db = db().await;
+        let stored = Stored::default();
+        let written = create(&db, AuthMode::Token, &stored).await;
+        let (_, active, _) = rotate_in(&db, &at(NOW + 1), 3600, preparer(stored.clone()))
+            .await
+            .unwrap();
+        revoke_in(&db, &at(NOW + 2), &active.id).await.unwrap();
+        rotate_in(&db, &at(NOW + 3), 0, preparer(stored))
+            .await
+            .unwrap();
+        let rows = credentials_of(&db, &written.trigger_id).await;
+        let mut live = live_state(&rows, NOW + 3);
+        live.sort();
+        assert_eq!(
+            live,
+            vec![
+                ("token".to_string(), "active".to_string()),
+                ("token".to_string(), "retiring".to_string())
+            ]
         );
     }
 
