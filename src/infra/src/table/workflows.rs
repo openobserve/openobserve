@@ -806,8 +806,7 @@ pub async fn delete_draft(org_id: &str, id: &str) -> Result<u64, anyhow::Error> 
 
 /// Org that owns draft `id`, for the super-cluster replay whose delete message carries no org.
 pub async fn get_draft_org_id(id: &str) -> Result<Option<String>, anyhow::Error> {
-    // rw, not ro: a lagging replica would hide a just-written draft and skip its delete
-    get_draft_org_id_in(get_orm_client_rw().await, id).await
+    get_draft_org_id_in(get_orm_client_ro().await, id).await
 }
 
 pub async fn delete_drafts_by_org(org_id: &str) -> Result<(), anyhow::Error> {
