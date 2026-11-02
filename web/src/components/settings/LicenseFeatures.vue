@@ -258,11 +258,14 @@ const split = computed(() => {
   const license = props.license;
   if (!license?.features) return null;
   const states: FeatureStates = store.state.zoConfig?.features ?? {};
-  const unlocked = [...license.features].sort();
   const definition = license.feature_definition?.features;
   const gated = definition
     ? Object.keys(definition).filter((key) => definition[key].gate && !definition[key].plumbing)
     : Object.keys(states).filter((key) => states[key] === "locked");
+  // The backend reads a list of only "all" as every feature, so the page does the same.
+  const listsOnlyAll =
+    license.features.length > 0 && license.features.every((key) => key === "all");
+  const unlocked = (listsOnlyAll ? [...gated] : [...license.features]).sort();
   // A listed key counts as paid even when ungated, so "unlocked of paid" never exceeds the total.
   const paid = new Set([...gated, ...unlocked]);
   const missing = [...paid].filter((key) => !unlocked.includes(key)).sort();
