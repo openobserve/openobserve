@@ -94,6 +94,7 @@ use crate::{
         openobserve_api_search::promql::remote_write,
         openobserve_api_search::promql::query_get,
         openobserve_api_search::promql::query_range_get,
+        openobserve_api_search::promql::query_exemplars_get,
         openobserve_api_search::promql::metadata,
         openobserve_api_search::promql::series_get,
         openobserve_api_search::promql::labels_get,
@@ -168,6 +169,8 @@ use crate::{
         openobserve_api_management::request::alerts::enable_alert,
         openobserve_api_management::request::alerts::ack::ack_alert,
         openobserve_api_management::request::alerts::ack::unack_alert,
+        openobserve_api_management::request::alerts::ack::ack_incident,
+        openobserve_api_management::request::alerts::ack::unack_incident,
         openobserve_api_management::request::alerts::ack::list_alert_acks,
         openobserve_api_management::request::alerts::mute::mute_alert,
         openobserve_api_management::request::alerts::mute::extend_alert_mute,
@@ -537,6 +540,7 @@ use crate::{
             config::meta::alerts::auto_investigate::BudgetCheck,
             config::meta::alerts::level::AlertLevel,
             config::meta::alerts::ack::AckResponse,
+            config::meta::alerts::ack::ProblemAckRequest,
             config::meta::alerts::ack::UnackRequest,
             config::meta::alerts::ack::UnackResponse,
             config::meta::alerts::ack::AckListResponse,
@@ -1708,6 +1712,19 @@ mod tests {
                     "{path} {status}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn promql_exemplars_is_published_with_its_error_codes() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/prometheus/api/v1/query_exemplars"]["get"];
+        assert_eq!(op["operationId"], "PrometheusQueryExemplars");
+        for status in ["200", "400", "403", "429", "500"] {
+            assert!(
+                op["responses"].get(status).is_some(),
+                "query_exemplars {status}"
+            );
         }
     }
 

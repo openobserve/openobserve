@@ -50,6 +50,10 @@ const RESPONSES: &str = "oncall_responses";
 const SETTINGS: &str = "settings";
 
 #[cfg(feature = "enterprise")]
+const HANDOFF_NEEDS_A_TARGET: &str =
+    "a handoff needs either `to` (a person) or `to_team_id` (another team)";
+
+#[cfg(feature = "enterprise")]
 const VOICE_ORG_INACTIVE: &str = "<Response><Say>This organization is no longer active. \
      The page was not acknowledged.</Say><Hangup/></Response>";
 
@@ -611,6 +615,142 @@ fn refusal_response(
         body["retry_after_secs"] = n.into();
     }
     (status, axum::Json(body)).into_response()
+}
+
+/// The one rule on a page action (D26); the page alone once its alert is gone.
+#[cfg(feature = "enterprise")]
+async fn page_problem(
+    org_id: &str,
+    response_id: &str,
+    actor: &str,
+) -> Result<Option<openobserve_core::alerts::ack::Problem>, Response> {
+    use openobserve_core::alerts::ack::AckError;
+
+    page_problem_of(org_id, response_id, actor)
+        .await
+        .map_err(|e| match e {
+            AckError::NotFound => MetaHttpResponse::not_found("Response not found"),
+            e => crate::request::alerts::ack::error_response(e),
+        })
+}
+
+/// [`page_problem`] with a typed error: `Refused`, `NotFound` (no such page) or `Internal`.
+#[cfg(feature = "enterprise")]
+async fn page_problem_of(
+    org_id: &str,
+    response_id: &str,
+    actor: &str,
+) -> Result<Option<openobserve_core::alerts::ack::Problem>, openobserve_core::alerts::ack::AckError>
+{
+    use openobserve_core::alerts::ack::{self, AckError, Act};
+
+    match ack::problem_of_page(org_id, response_id).await {
+        Ok(problem) => ack::authorize_problem(&problem, actor, Act::Ack)
+            .await
+            .map(|_| Some(problem)),
+        Err(AckError::NotFound) => {
+            match infra::table::oncall_responses::get(org_id, response_id).await? {
+                Some(page) => ack::authorize_orphan_page(&page, actor, Act::Ack)
+                    .await
+                    .map(|_| None)
+                    .map_err(AckError::Refused),
+                None => Err(AckError::NotFound),
+            }
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Whether the page is closed: after the rule, a press on it answers from the record (N1, R3-1).
+#[cfg(feature = "enterprise")]
+async fn page_is_closed(
+    org_id: &str,
+    response_id: &str,
+) -> Result<bool, openobserve_core::alerts::ack::AckError> {
+    Ok(infra::table::oncall_responses::get(org_id, response_id)
+        .await?
+        .is_some_and(|r| r.closed_at.is_some() || r.state.is_terminal()))
+}
+
+/// A refusal is heard on the call; a failure to run the rule is an error the call logs.
+#[cfg(feature = "enterprise")]
+fn phone_answer_to(
+    e: openobserve_core::alerts::ack::AckError,
+) -> Result<o2_enterprise::enterprise::oncall::notify::PressOutcome, anyhow::Error> {
+    use o2_enterprise::enterprise::oncall::notify::PressOutcome;
+    use openobserve_core::alerts::ack::AckError;
+
+    match e {
+        AckError::Refused(_) | AckError::NotFound => Ok(PressOutcome::Refused),
+        e @ (AckError::Conflict(_) | AckError::Internal(_)) => {
+            Err(anyhow::anyhow!("the rule could not be run: {e:?}"))
+        }
+    }
+}
+
+/// The answer of a press that changed nothing, such as one on a closed page (N1).
+#[cfg(feature = "enterprise")]
+fn unchanged() -> serde_json::Value {
+    serde_json::json!({ "changed": false })
+}
+
+/// The page record with the verb's answer beside it under `ack`.
+#[cfg(feature = "enterprise")]
+async fn page_with_ack(org_id: &str, response_id: &str, ack: serde_json::Value) -> Response {
+    match infra::table::oncall_responses::get(org_id, response_id).await {
+        Ok(Some(record)) => {
+            let mut body = serde_json::to_value(record).unwrap_or_default();
+            body["ack"] = ack;
+            MetaHttpResponse::json(body)
+        }
+        Ok(None) => MetaHttpResponse::not_found("Response not found"),
+        Err(e) => internal_error("page read", &e),
+    }
+}
+
+/// Acknowledges a page's problem as `actor`; a page whose alert is gone is stopped on its own.
+#[cfg(feature = "enterprise")]
+async fn acknowledge_page(
+    org_id: &str,
+    response_id: &str,
+    problem: Option<&openobserve_core::alerts::ack::Problem>,
+    actor: &str,
+    verb: openobserve_core::alerts::ack::Verb,
+    source: config::meta::alerts::ack::AckSource,
+) -> Result<serde_json::Value, Response> {
+    use crate::request::alerts::ack::{act, error_response};
+
+    let Some(problem) = problem else {
+        use o2_enterprise::enterprise::oncall::escalation;
+
+        let before = infra::table::oncall_responses::get(org_id, response_id)
+            .await
+            .map_err(|e| internal_error("page read", &e))?;
+        let holder = before
+            .as_ref()
+            .and_then(|b| b.acked_by.as_deref())
+            .filter(|h| !h.eq_ignore_ascii_case(actor));
+        let after = match (verb, holder) {
+            (openobserve_core::alerts::ack::Verb::TakeOver, Some(holder)) => {
+                escalation::take_over_as(org_id, response_id, holder, actor)
+                    .await
+                    .map_err(to_response)?;
+                infra::table::oncall_responses::get(org_id, response_id)
+                    .await
+                    .map_err(|e| internal_error("page read", &e))?
+                    .ok_or_else(|| MetaHttpResponse::not_found("Response not found"))?
+            }
+            _ => escalation::acknowledge_as(org_id, response_id, actor)
+                .await
+                .map_err(to_response)?,
+        };
+        let changed =
+            before.is_some_and(|b| (b.acked_by, b.acked_at) != (after.acked_by, after.acked_at));
+        return Ok(serde_json::json!({ "changed": changed }));
+    };
+    act(problem, actor, verb, source)
+        .await
+        .map_err(error_response)
 }
 
 #[utoipa::path(
@@ -1437,6 +1577,19 @@ pub async fn set_policy(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        let nodes = infra::cluster::get_cached_online_nodes()
+            .await
+            .unwrap_or_default();
+        if let Err(e) =
+            openobserve_core::alerts::slack_destination::slack_step_guard(&body.rungs, &nodes)
+        {
+            return match e {
+                db::alerts::destinations::DestinationError::SlackApp(r) => {
+                    MetaHttpResponse::error(r.status, r.message).into_response()
+                }
+                other => internal_error("set_policy node versions", &other),
+            };
+        }
         match o2_enterprise::enterprise::oncall::service::set_policy(
             &org_id,
             &team_id,
@@ -1462,6 +1615,12 @@ pub async fn set_policy(
 pub struct SetTeamChannelRequest {
     #[serde(default)]
     pub destinations: Option<Vec<String>>,
+    /// RO-1: the team's webhook that posts to its Slack room; omitted keeps it, `""` unticks it.
+    #[serde(default)]
+    pub slack_same_room_destination: Option<String>,
+    /// Empties the team's Slack channel and its same-room destination.
+    #[serde(default)]
+    pub clear_slack: bool,
 }
 
 /// A team's channel and where the answer came from.
@@ -1471,6 +1630,49 @@ pub struct TeamChannelResponse {
     pub destinations: Vec<String>,
     /// `team` or `policy`, or "pages still go to the old room" is unanswerable from the API.
     pub source: &'static str,
+    #[serde(flatten)]
+    pub slack: config::meta::oncall::TeamSlackView,
+}
+
+/// The team's channel read, its Slack part included (RO-2).
+#[cfg(feature = "enterprise")]
+async fn team_channel_response(team: config::meta::oncall::Team) -> Response {
+    let policy = match o2_enterprise::enterprise::oncall::service::get_policy(
+        &team.org_id,
+        &team.id,
+    )
+    .await
+    {
+        Ok(p) => p.destinations,
+        Err(e) => return to_response(e),
+    };
+    // An empty list while pages go to the policy's room would be a lie of omission.
+    let destinations =
+        config::meta::oncall::policy::team_channel(team.channel_destinations.as_deref(), &policy)
+            .to_vec();
+    let source = if team.channel_destinations.is_some() {
+        "team"
+    } else {
+        "policy"
+    };
+    let off_text = openobserve_core::alerts::slack_publish::unavailable_reason(&team.org_id)
+        .unwrap_or_default();
+    let slack = match o2_enterprise::enterprise::oncall::chat::room::team_slack_view(
+        &team,
+        &destinations,
+        &off_text,
+    )
+    .await
+    {
+        Ok(view) => view,
+        Err(e) => return internal_error("team channel Slack view", &e),
+    };
+    MetaHttpResponse::json(TeamChannelResponse {
+        team_id: team.id,
+        destinations,
+        source,
+        slack,
+    })
 }
 
 #[utoipa::path(
@@ -1496,23 +1698,11 @@ pub async fn get_team_channel(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        let team = match infra::table::oncall_teams::get_channel(&org_id, &team_id).await {
-            Ok(t) => t,
-            Err(e) => return internal_error("get_team_channel", &e),
-        };
-        // An empty list while pages go to the policy's room would be a lie of omission.
-        let policy =
-            match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id).await {
-                Ok(p) => p.destinations,
-                Err(e) => return to_response(e),
-            };
-        let source = if team.is_some() { "team" } else { "policy" };
-        MetaHttpResponse::json(TeamChannelResponse {
-            team_id,
-            destinations: config::meta::oncall::policy::team_channel(team.as_deref(), &policy)
-                .to_vec(),
-            source,
-        })
+        match infra::table::oncall_teams::get(&org_id, &team_id).await {
+            Ok(Some(team)) => team_channel_response(team).await,
+            Ok(None) => MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
+            Err(e) => internal_error("get_team_channel", &e),
+        }
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1534,7 +1724,11 @@ pub async fn get_team_channel(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     request_body(content = SetTeamChannelRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = TeamChannelResponse)),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = TeamChannelResponse),
+        (status = 400, description = "Not one of the team's webhook destinations", content_type = "application/json", body = Object),
+        (status = 404, description = "Team not found", content_type = "application/json", body = Object),
+    ),
 )]
 pub async fn set_team_channel(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1560,37 +1754,99 @@ pub async fn set_team_channel(
         {
             return to_response(e);
         }
-        match infra::table::oncall_teams::set_channel(&org_id, &team_id, requested.clone()).await {
-            Ok(false) => MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
-            Err(e) => internal_error("set_team_channel", &e),
-            Ok(true) => {
-                let policy =
-                    match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id)
-                        .await
-                    {
-                        Ok(p) => p.destinations,
-                        Err(e) => return to_response(e),
-                    };
-                let source = if requested.is_some() {
-                    "team"
-                } else {
-                    "policy"
-                };
-                MetaHttpResponse::json(TeamChannelResponse {
-                    team_id,
-                    destinations: config::meta::oncall::policy::team_channel(
-                        requested.as_deref(),
-                        &policy,
-                    )
-                    .to_vec(),
-                    source,
-                })
-            }
+        let saved = o2_enterprise::enterprise::oncall::chat::room::save_channel(
+            &org_id,
+            &team_id,
+            requested,
+            body.slack_same_room_destination,
+            body.clear_slack,
+        )
+        .await;
+        match saved {
+            Ok(team) => team_channel_response(team).await,
+            Err(e) => to_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, team_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// RO-6: what a test post to the team's Slack channel found.
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct TeamSlackTestResponse {
+    pub ok: bool,
+    /// `ok`, `channel_problem`, `not_connected` or `no_channel`.
+    pub class: String,
+    pub advice: String,
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/teams/{team_id}/slack/test",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "TestOnCallTeamSlackChannel",
+    summary = "Post a test message to a team's Slack channel",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = TeamSlackTestResponse),
+        (status = 404, description = "Team not found", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn test_team_slack_channel(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::{oncall::chat::room, slack};
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let team = match infra::table::oncall_teams::get(&org_id, &team_id).await {
+            Ok(Some(team)) => team,
+            Ok(None) => return MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
+            Err(e) => return internal_error("test_team_slack_channel", &e),
+        };
+        let repo = slack::repo::LiveRepo;
+        let (plan, installation) = match room::team_room(&repo, &org_id, Some(&team), &[]).await {
+            Ok(read) => read,
+            Err(e) => return internal_error("test_team_slack_channel", &e.message),
+        };
+        let api = match slack::client::live() {
+            Ok(api) => api,
+            Err(e) => return internal_error("test_team_slack_channel", &e.message),
+        };
+        let off_text = openobserve_core::alerts::slack_publish::unavailable_reason(&org_id)
+            .unwrap_or_default();
+        let test = room::test_room(
+            api.as_ref(),
+            installation,
+            plan.native.as_ref(),
+            &team,
+            &off_text,
+        )
+        .await;
+        let class = serde_json::to_value(test.class)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_string))
+            .unwrap_or_default();
+        MetaHttpResponse::json(TeamSlackTestResponse {
+            ok: test.ok,
+            class,
+            advice: test.advice,
+        })
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -1677,7 +1933,7 @@ pub async fn acknowledge(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::oncall::{escalation, service, token};
+        use o2_enterprise::enterprise::oncall::{service, token};
 
         // Through the service, not `token::verify`: membership is read once for both entry points.
         let claims = match service::ack_claims(
@@ -1704,32 +1960,44 @@ pub async fn acknowledge(
             config::utils::time::now_micros(),
         )
         .await;
-        let acked = if this_click {
-            escalation::acknowledge(&claims.org_id, &claims.response_id, &claims.user_email)
+        // The one rule, then the core; a second click only shows the page as it stands.
+        let just_acked = if this_click {
+            let problem =
+                match page_problem(&claims.org_id, &claims.response_id, &claims.user_email).await {
+                    Ok(p) => p,
+                    Err(resp) => return resp,
+                };
+            match page_is_closed(&claims.org_id, &claims.response_id).await {
+                Ok(true) => false,
+                Ok(false) => match acknowledge_page(
+                    &claims.org_id,
+                    &claims.response_id,
+                    problem.as_ref(),
+                    &claims.user_email,
+                    openobserve_core::alerts::ack::Verb::Acknowledge,
+                    config::meta::alerts::ack::AckSource::Oncall,
+                )
                 .await
-                // The token is already spent, so the page below shows the record as it stands.
-                .map_err(|e| tracing::error!("[oncall] ack link for {}: {e}", claims.response_id))
-                .ok()
-        } else {
-            None
-        };
-        let just_acked = acked.is_some();
-        let record = match acked {
-            Some(r) => r,
-            None => {
-                match infra::table::oncall_responses::get(&claims.org_id, &claims.response_id).await
                 {
-                    Ok(Some(r)) => r,
-                    Ok(None) => {
-                        return broken_link(
-                            StatusCode::NOT_FOUND,
-                            "the page this link points at no longer exists",
-                        );
-                    }
-                    Err(e) => return internal_error("acknowledge", &e),
-                }
+                    Ok(ack) => ack["changed"].as_bool() == Some(true),
+                    Err(resp) => return resp,
+                },
+                Err(e) => return crate::request::alerts::ack::error_response(e),
             }
+        } else {
+            false
         };
+        let record =
+            match infra::table::oncall_responses::get(&claims.org_id, &claims.response_id).await {
+                Ok(Some(r)) => r,
+                Ok(None) => {
+                    return broken_link(
+                        StatusCode::NOT_FOUND,
+                        "the page this link points at no longer exists",
+                    );
+                }
+                Err(e) => return internal_error("acknowledge", &e),
+            };
         let team = team_of(&record).await;
         html_page(
             StatusCode::OK,
@@ -1881,6 +2149,7 @@ async fn voice_ack_if_active(
                 token,
                 form.digits.as_deref().unwrap_or_default(),
                 config::utils::time::now_micros(),
+                act_by_phone,
             )
             .await
         }
@@ -1891,6 +2160,58 @@ async fn voice_ack_if_active(
         .body(axum::body::Body::from(twiml))
         .unwrap()
         .into_response()
+}
+
+/// A phone key acts under the one rule, as the page's buttons do; a refusal is heard, not thrown.
+#[cfg(feature = "enterprise")]
+async fn act_by_phone(
+    org_id: String,
+    response_id: String,
+    actor: String,
+    action: o2_enterprise::enterprise::oncall::notify::PhoneAction,
+) -> Result<o2_enterprise::enterprise::oncall::notify::PressOutcome, anyhow::Error> {
+    use o2_enterprise::enterprise::oncall::{notify::PhoneAction, service};
+    use openobserve_core::alerts::ack::{self, AckError};
+
+    let problem = match page_problem_of(&org_id, &response_id, &actor).await {
+        Ok(problem) => problem,
+        Err(e) => return phone_answer_to(e),
+    };
+    if page_is_closed(&org_id, &response_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e:?}"))?
+    {
+        return match action {
+            PhoneAction::Acknowledge => {
+                service::phone_ack_outcome(&org_id, &response_id, &actor).await
+            }
+            PhoneAction::Resolve | PhoneAction::Escalate => {
+                Ok(o2_enterprise::enterprise::oncall::notify::PressOutcome::Closed)
+            }
+        };
+    }
+    match action {
+        PhoneAction::Acknowledge => {
+            let source = config::meta::alerts::ack::AckSource::Oncall;
+            let acked = match problem.as_ref() {
+                Some(p) => ack::acknowledge(p, &actor, source).await.map(|_| ()),
+                None => o2_enterprise::enterprise::oncall::escalation::acknowledge_as(
+                    &org_id,
+                    &response_id,
+                    &actor,
+                )
+                .await
+                .map(|_| ())
+                .map_err(|e| AckError::Internal(e.to_string())),
+            };
+            if let Err(e) = acked {
+                anyhow::bail!("acknowledge by phone: {e:?}");
+            }
+            service::phone_ack_outcome(&org_id, &response_id, &actor).await
+        }
+        PhoneAction::Resolve => service::phone_resolve(&org_id, &response_id, &actor).await,
+        PhoneAction::Escalate => service::phone_escalate(&org_id, &response_id, &actor).await,
+    }
 }
 
 /// TwiML refusal for an inactive or unreadable org, as `inactive_org_response` refuses email acks.
@@ -2157,6 +2478,9 @@ pub async fn resolve_response(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
+        }
         let body = body.unwrap_or_default();
         match o2_enterprise::enterprise::oncall::escalation::resolve(
             &org_id,
@@ -2202,6 +2526,9 @@ pub async fn add_note(
     {
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
         }
         match o2_enterprise::enterprise::oncall::escalation::add_note(
             &org_id,
@@ -2378,33 +2705,128 @@ pub async fn get_response_report(
     context_path = "/api",
     tag = "OnCall",
     operation_id = "AcknowledgeOnCallResponse",
-    summary = "Acknowledge a response record",
+    summary = "Acknowledge a page's problem",
+    description = "Acknowledges the problem the page is for (its incident, else every firing group of its alert), which stops every page of it. `take_over` moves an acknowledgement held by someone else to the caller. Returns the page record with the acknowledgement under `ack`.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("response_id" = String, Path, description = "Response record ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    request_body(content = config::meta::alerts::ack::ProblemAckRequest, description = "Optional", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Refused, with who is on call and who can act", content_type = "application/json", body = config::meta::alerts::ack::ActRefusal),
+    ),
 )]
 pub async fn acknowledge_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
+    body: axum::body::Bytes,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        use openobserve_core::alerts::ack::Verb;
+
+        use crate::request::alerts::ack::{ack_source, take_over_of};
+
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::oncall::escalation::acknowledge(
+        let verb = match take_over_of(&body) {
+            Ok(true) => Verb::TakeOver,
+            Ok(false) => Verb::Acknowledge,
+            Err(resp) => return resp,
+        };
+        let problem = match page_problem(&org_id, &response_id, &user_email.user_id).await {
+            Ok(p) => p,
+            Err(resp) => return resp,
+        };
+        match page_is_closed(&org_id, &response_id).await {
+            Ok(true) => return page_with_ack(&org_id, &response_id, unchanged()).await,
+            Ok(false) => {}
+            Err(e) => return crate::request::alerts::ack::error_response(e),
+        }
+        let source = ack_source(delegated.as_deref(), &headers);
+        match acknowledge_page(
             &org_id,
             &response_id,
+            problem.as_ref(),
             &user_email.user_id,
+            verb,
+            source,
         )
         .await
         {
-            Ok(r) => MetaHttpResponse::json(r),
-            Err(e) => to_response(e),
+            Ok(ack) => page_with_ack(&org_id, &response_id, ack).await,
+            Err(resp) => resp,
         }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/responses/{response_id}/unacknowledge",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "UnacknowledgeOnCallResponse",
+    summary = "Remove the acknowledgement of a page's problem",
+    description = "Clears the acknowledgement of the problem the page is for, on every record, and restarts the pages it stopped at step 1. Returns the page record with the unacknowledgement under `ack`.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Refused, with who is on call and who can act", content_type = "application/json", body = config::meta::alerts::ack::ActRefusal),
+    ),
+)]
+pub async fn unacknowledge_response(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use openobserve_core::alerts::ack::Verb;
+
+        use crate::request::alerts::ack::{ack_source, act, error_response};
+
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let problem = match page_problem(&org_id, &response_id, &user_email.user_id).await {
+            Ok(p) => p,
+            Err(resp) => return resp,
+        };
+        match page_is_closed(&org_id, &response_id).await {
+            Ok(true) => return page_with_ack(&org_id, &response_id, unchanged()).await,
+            Ok(false) => {}
+            Err(e) => return error_response(e),
+        }
+        let source = ack_source(delegated.as_deref(), &headers);
+        // A page whose alert is gone holds no acknowledgement but its own, so there is nothing to
+        // clear.
+        let ack = match problem.as_ref() {
+            Some(p) => match act(p, &user_email.user_id, Verb::Unack, source).await {
+                Ok(body) => body,
+                Err(e) => return error_response(e),
+            },
+            None => unchanged(),
+        };
+        page_with_ack(&org_id, &response_id, ack).await
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -2437,6 +2859,9 @@ pub async fn snooze_response(
     {
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
         }
         match o2_enterprise::enterprise::oncall::escalation::snooze(
             &org_id,
@@ -2486,6 +2911,37 @@ pub async fn handoff_response(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        let problem = match page_problem(&org_id, &response_id, &user_email.user_id).await {
+            Ok(p) => p,
+            Err(resp) => return resp,
+        };
+        if body.to_team_id.is_none() && body.to.is_none() {
+            return MetaHttpResponse::bad_request(HANDOFF_NEEDS_A_TARGET);
+        }
+        // Checked before the release, so a refused hand-off leaves the ack and the page alone.
+        let checked = match (body.to_team_id.as_deref(), body.to.as_deref()) {
+            (Some(team), _) => escalation::check_handoff_to_team(&org_id, &response_id, team)
+                .await
+                .map(|_| ()),
+            (None, Some(person)) => escalation::check_handoff(&org_id, &response_id, person)
+                .await
+                .map(|_| ()),
+            (None, None) => return MetaHttpResponse::bad_request(HANDOFF_NEEDS_A_TARGET),
+        };
+        if let Err(e) = checked {
+            return to_response(e);
+        }
+        // D27: the ack clears everywhere first; only the hand-off restarts a page.
+        if let Some(problem) = problem.as_ref()
+            && let Err(e) = openobserve_core::alerts::ack::release_for_hand_off(
+                problem,
+                &user_email.user_id,
+                config::meta::alerts::ack::AckSource::Oncall,
+            )
+            .await
+        {
+            return crate::request::alerts::ack::error_response(e);
+        }
         let result = match (body.to_team_id.as_deref(), body.to.as_deref()) {
             (Some(team), _) => {
                 escalation::handoff_to_team(
@@ -2507,13 +2963,7 @@ pub async fn handoff_response(
                 )
                 .await
             }
-            (None, None) => {
-                return MetaHttpResponse::error(
-                    StatusCode::BAD_REQUEST.as_u16(),
-                    "a handoff needs either `to` (a person) or `to_team_id` (another team)",
-                )
-                .into_response();
-            }
+            (None, None) => return MetaHttpResponse::bad_request(HANDOFF_NEEDS_A_TARGET),
         };
         match result {
             Ok(record) => MetaHttpResponse::json(record),
@@ -2554,6 +3004,9 @@ pub async fn confirm_recovery(
     {
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
         }
         // Looked up here so "no such record" stays a 404 and the wrong kind stays a 400.
         match infra::table::oncall_responses::get(&org_id, &response_id).await {
@@ -2620,6 +3073,9 @@ pub async fn escalate_response(
 
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
         }
         if infra::table::oncall_responses::get(&org_id, &response_id)
             .await
@@ -4626,15 +5082,9 @@ pub async fn promote_to_incident(
                 return internal_error("promote lookup", &e);
             }
         };
-        // Checked before the incident opens: `add_note`'s check comes too late for a stranger.
-        if let Err(e) = o2_enterprise::enterprise::oncall::service::refuse_if_not_on_the_paged_team(
-            &org_id,
-            record.team(),
-            &user_email.user_id,
-        )
-        .await
-        {
-            return to_response(e);
+        // Before the incident opens (D26): the same rule as every other page action.
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
         }
         if let Some(existing) = record.incident_id.as_deref() {
             return MetaHttpResponse::error(
@@ -5050,11 +5500,29 @@ mod tests {
             "tok",
             "",
             config::utils::time::now_micros(),
+            act_by_phone,
         )
         .await;
         assert_eq!(twiml, expected);
         assert_ne!(twiml, VOICE_ORG_INACTIVE);
         assert_ne!(twiml, VOICE_ORG_UNREADABLE);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_phone_key_hears_a_refusal_and_logs_a_failure() {
+        use o2_enterprise::enterprise::oncall::notify::PressOutcome;
+        use openobserve_core::alerts::ack::AckError;
+
+        assert_eq!(
+            phone_answer_to(AckError::Refused(Default::default())).unwrap(),
+            PressOutcome::Refused
+        );
+        assert_eq!(
+            phone_answer_to(AckError::NotFound).unwrap(),
+            PressOutcome::Refused
+        );
+        assert!(phone_answer_to(AckError::Internal("db down".into())).is_err());
     }
 
     #[test]
@@ -6037,5 +6505,76 @@ mod tests {
     #[tokio::test]
     async fn test_delete_telephony_is_not_supported_without_enterprise() {
         assert_not_supported(delete_telephony(Path("default".to_string())).await).await;
+    }
+
+    /// DM-8: a policy ticking Slack is refused with 409 while a node runs another version,
+    /// before anything is saved.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_slack_policy_is_refused_while_a_node_is_on_another_version() {
+        use config::meta::{
+            alerts::priority::AlertPriority,
+            cluster::{Node, NodeStatus},
+            oncall::Channel,
+        };
+        let root = "root-dm8@example.com";
+        common::infra::config::ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                org_id: config::DEFAULT_ORG.to_string(),
+                email: root.to_string(),
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+        infra::cluster::add_node_to_cache(Node {
+            uuid: "dm8-old".into(),
+            name: "dm8-old".into(),
+            version: "v0.80.0-fake".into(),
+            status: NodeStatus::Online,
+            ..Default::default()
+        })
+        .await;
+        let body = SetPolicyRequest {
+            rungs: vec![PriorityRung {
+                priority: AlertPriority::P2,
+                steps: vec![],
+                channels: vec![Channel::Email, Channel::Slack],
+            }],
+            destinations: None,
+            l0: None,
+        };
+        let response = set_policy(
+            Path(("acme".to_string(), "t_dm8".to_string())),
+            Headers(UserEmail {
+                user_id: root.to_string(),
+            }),
+            ValidatedJson(body),
+        )
+        .await;
+        // The guard returns before the save; a save here would answer 200 or 500.
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(
+            String::from_utf8_lossy(&body).contains("Upgrade every node first"),
+            "{body:?}"
+        );
+    }
+
+    /// RB-3: an OSS build answers the Slack channel test with 403 "Not Supported".
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_rb3_the_slack_test_is_not_supported_without_enterprise() {
+        let response = test_team_slack_channel(Path(("acme".to_string(), "t1".to_string()))).await;
+        assert_eq!(response.status(), axum::http::StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(String::from_utf8_lossy(&body).contains("Not Supported"));
     }
 }
