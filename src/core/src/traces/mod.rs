@@ -80,7 +80,7 @@ use crate::{
         evaluate_trigger, get_thread_id, grpc::get_val, write_file,
     },
     logs::IngestJsonData,
-    traces::otel::{OtelIngestionProcessor, is_llm_trace},
+    traces::otel::{OtelIngestionProcessor, SpanContext, is_llm_trace},
 };
 
 const SERVICE_NAME: &str = "service.name";
@@ -972,7 +972,14 @@ pub async fn handle_otlp_request(
                         scope_name,
                         &events,
                         org_pricing_entries.as_deref().map(Vec::as_slice),
-                        start_time,
+                        SpanContext {
+                            name: &span.name,
+                            start_nanos: start_time,
+                            is_error: span
+                                .status
+                                .as_ref()
+                                .is_some_and(|s| s.code == StatusCode::Error as i32),
+                        },
                         &gen_ai_agent_mapping_config,
                     );
 

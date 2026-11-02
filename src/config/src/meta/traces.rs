@@ -16,6 +16,14 @@
 /// Sentinel column whose presence indicates the new `gen_ai_*` schema.
 pub const GEN_AI_SENTINEL_COLUMN: &str = "gen_ai_usage_input_tokens";
 
+/// Stored column holding a span's Gen-AI operation (`chat`, `invoke_agent`, ...).
+pub const GEN_AI_OPERATION_NAME_COLUMN: &str = "gen_ai_operation_name";
+
+/// Gen-AI operations whose spans may carry the summed usage of their child
+/// spans. Trace and session totals skip them unless no other span reports usage.
+pub const AGGREGATE_GEN_AI_OPERATIONS: &[&str] =
+    &["invoke_agent", "invoke_workflow", "chain", "task"];
+
 /// Required fields for the new (gen_ai_*) schema. If any are missing, the
 /// query is rejected with a clear error.
 pub const REQUIRED_GEN_AI_FIELDS: &[&str] = &[
