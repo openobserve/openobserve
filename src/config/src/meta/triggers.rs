@@ -60,6 +60,8 @@ pub enum TriggerModule {
     FleetRollout,
     /// Slack sync of one on-call page, keyed by its response id; region-local (SY-8).
     OncallSlackSync,
+    /// AutoObserve engine tick: one job per region in the `_meta` org, region-local.
+    AutoObserve,
 }
 
 impl TriggerModule {
@@ -69,7 +71,8 @@ impl TriggerModule {
             Self::CompositeAlert
             | Self::AlertCalibration
             | Self::FleetRollout
-            | Self::OncallSlackSync => true,
+            | Self::OncallSlackSync
+            | Self::AutoObserve => true,
             Self::Report
             | Self::Alert
             | Self::DerivedStream
@@ -79,6 +82,26 @@ impl TriggerModule {
             | Self::Slo
             | Self::SloBackfill
             | Self::OncallEscalation => false,
+        }
+    }
+
+    /// Exhaustive; a hidden module's rows are stored realtime, which every older shared pull skips.
+    pub fn hidden_from_older_pullers(&self) -> bool {
+        match self {
+            Self::AutoObserve => true,
+            Self::Report
+            | Self::Alert
+            | Self::DerivedStream
+            | Self::QueryRecommendations
+            | Self::Backfill
+            | Self::AnomalyDetection
+            | Self::Slo
+            | Self::SloBackfill
+            | Self::CompositeAlert
+            | Self::OncallEscalation
+            | Self::AlertCalibration
+            | Self::FleetRollout
+            | Self::OncallSlackSync => false,
         }
     }
 }
@@ -99,6 +122,7 @@ impl std::fmt::Display for TriggerModule {
             Self::AlertCalibration => write!(f, "alert_calibration"),
             Self::FleetRollout => write!(f, "fleet_rollout"),
             Self::OncallSlackSync => write!(f, "oncall_slack_sync"),
+            Self::AutoObserve => write!(f, "autoobserve"),
         }
     }
 }
@@ -333,6 +357,21 @@ mod tests {
             TriggerModule::OncallSlackSync.to_string(),
             "oncall_slack_sync"
         );
+        assert_eq!(TriggerModule::AutoObserve as i32, 13);
+        assert_eq!(TriggerModule::AutoObserve.to_string(), "autoobserve");
+    }
+
+    #[test]
+    fn autoobserve_module_round_trips_by_name_and_completes_by_claim() {
+        let encoded = serde_json::to_string(&TriggerModule::AutoObserve).unwrap();
+        assert_eq!(encoded, r#""AutoObserve""#);
+        assert_eq!(
+            serde_json::from_str::<TriggerModule>(&encoded).unwrap(),
+            TriggerModule::AutoObserve
+        );
+        assert!(TriggerModule::AutoObserve.completes_by_claim());
+        assert!(TriggerModule::AutoObserve.hidden_from_older_pullers());
+        assert!(!TriggerModule::Alert.hidden_from_older_pullers());
     }
 
     #[test]
