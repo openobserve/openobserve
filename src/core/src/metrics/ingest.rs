@@ -248,6 +248,9 @@ pub(super) async fn resolve_batch_schema(
             false, // is_derived is false for metrics
         )
         .await?;
+    } else {
+        // this batch skips check_for_schema, which holds the stream key check
+        schema::check_stream_key_len(org_id, StreamType::Metrics, stream_name)?;
     }
 
     let schema = stream_schema_map
@@ -659,6 +662,25 @@ mod tests {
             assert_eq!(dropped[0].2, 2);
         } else {
             assert!(dropped.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_resolve_batch_schema_skipping_the_schema_check_still_checks_the_stream_key() {
+        let long_name = "m".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let mut map = HashMap::from([(long_name.clone(), value_schema(None))]);
+        let record = json::json!({ NAME_LABEL: "up" });
+        let records = vec![record.as_object().unwrap()];
+        let result = resolve_batch_schema("org", &long_name, &mut map, &records, 1, false).await;
+        let bounded =
+            infra::file_list::stream_key_violation("org", StreamType::Metrics, &long_name)
+                .is_some();
+        match result {
+            Err(e) => assert!(
+                bounded && e.to_string().contains("Stream name too long"),
+                "{e}"
+            ),
+            Ok(_) => assert!(!bounded),
         }
     }
 

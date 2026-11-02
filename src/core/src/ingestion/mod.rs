@@ -52,7 +52,7 @@ use infra::{
 };
 use ingestion_common::IngestionRequest;
 use proto::cluster_rpc::IngestionType;
-use schema::{check_for_schema, check_request_columns_limit};
+use schema::{check_for_schema, check_request_columns_limit, check_stream_key_len};
 use usage_reporting::publish_triggers_usage;
 use vrl::compiler::runtime::Runtime;
 
@@ -404,6 +404,8 @@ pub async fn check_batch_schema<'r>(
         check_request_columns_limit(org_id, stream_type, stream_name, seen.len())?;
     }
     if evolving.is_empty() {
+        // this batch skips check_for_schema, which holds the stream key check
+        check_stream_key_len(org_id, stream_type, stream_name)?;
         let evolution = SchemaEvolution {
             is_schema_changed: false,
             types_delta: None,
@@ -1727,6 +1729,33 @@ mod tests {
                 .err()
                 .expect("over the limit");
         assert!(err.to_string().contains("columns"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn test_resolve_batch_schema_skipping_the_schema_check_still_checks_the_stream_key() {
+        let long_name = "s".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let schema = Schema::new(vec![Field::new(TIMESTAMP_COL_NAME, DataType::Int64, true)]);
+        let mut map = HashMap::from([(long_name.clone(), SchemaCache::new(schema))]);
+        let records = vec![log_record(json!({"_timestamp": 1}))];
+        let result = resolve_batch_schema(
+            "o",
+            &long_name,
+            StreamType::Logs,
+            &mut map,
+            &records,
+            false,
+            false,
+        )
+        .await;
+        let bounded =
+            infra::file_list::stream_key_violation("o", StreamType::Logs, &long_name).is_some();
+        match result {
+            Err(e) => assert!(
+                bounded && e.to_string().contains("Stream name too long"),
+                "{e}"
+            ),
+            Ok((evolution, _)) => assert!(!bounded && !evolution.is_schema_changed),
+        }
     }
 
     #[test]

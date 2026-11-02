@@ -516,6 +516,8 @@ pub async fn check_for_schema(
     record_ts: i64,
     is_derived: bool,
 ) -> Result<(SchemaEvolution, Option<Schema>)> {
+    // the last gate before a schema is saved, for any entry point that misses the check
+    check_stream_key_len(org_id, stream_type, stream_name)?;
     if !stream_schema_map.contains_key(stream_name) {
         let schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
         stream_schema_map.insert(stream_name.to_string(), schema);
@@ -1345,6 +1347,35 @@ mod tests {
         .await
         .unwrap();
         assert!(!result.is_schema_changed);
+    }
+
+    #[tokio::test]
+    async fn test_check_for_schema_rejects_a_stream_key_too_long() {
+        let org_name = "nexus";
+        let stream_name = "s".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let record: json::Value = json::from_str(r#"{"_timestamp": 1234234234234}"#).unwrap();
+        let schema = Schema::new(vec![Field::new("_timestamp", DataType::Int64, false)]);
+        let mut map = HashMap::from([(stream_name.clone(), SchemaCache::new(schema))]);
+        let result = check_for_schema(
+            org_name,
+            &stream_name,
+            StreamType::Logs,
+            &mut map,
+            vec![record.as_object().unwrap()],
+            1234234234234,
+            false,
+        )
+        .await;
+        let bounded =
+            infra::file_list::stream_key_violation(org_name, StreamType::Logs, &stream_name)
+                .is_some();
+        match result {
+            Err(e) => assert!(
+                bounded && e.to_string().starts_with("Stream name too long"),
+                "{e}"
+            ),
+            Ok((evolution, _)) => assert!(!bounded && !evolution.is_schema_changed),
+        }
     }
 
     /// The loser of a create race must adopt the winner's schema, not keep its empty one.
