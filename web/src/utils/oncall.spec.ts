@@ -1269,6 +1269,7 @@ describe("CHANNEL_WAKES", () => {
   // how a team discovers at 3 a.m. that their P1 only ever sent an email.
   it.each([
     ["email", false],
+    ["slack", false],
     ["sms", true],
     ["voice", true],
     ["webhook", false],
@@ -2556,8 +2557,8 @@ describe("channelList", () => {
   const t = ((k: string) => k) as any;
 
   it("says the channels in the fixed order, whatever order they are stored in", () => {
-    expect(channelList(["voice", "email", "sms"], t)).toBe(
-      "oncall.channel_email, oncall.channel_sms, oncall.channel_voice",
+    expect(channelList(["voice", "slack", "email", "sms"], t)).toBe(
+      "oncall.channel_email, oncall.channel_slack, oncall.channel_sms, oncall.channel_voice",
     );
   });
 

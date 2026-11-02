@@ -204,6 +204,7 @@ export function priorityTone(priority: number): RowRailTone {
 /** Whether a channel reaches a locked, silenced phone: texts and calls do; email and webhook land in apps a night-mode phone does not ring for. */
 export const CHANNEL_WAKES: Record<Channel, boolean> = {
   email: false,
+  slack: false,
   sms: true,
   voice: true,
   webhook: false,
@@ -569,7 +570,7 @@ export function rungProblem(
 }
 
 /// The order a priority's channels are said in, whatever order they are stored in.
-const CHANNEL_ORDER: Channel[] = ["email", "sms", "voice", "webhook"];
+const CHANNEL_ORDER: Channel[] = ["email", "slack", "sms", "voice", "webhook"];
 
 /** A priority's channels as one phrase, "Email, SMS, Voice call". [pure] */
 export function channelList(channels: readonly Channel[] | undefined, t: TranslateFn): string {
@@ -711,7 +712,7 @@ export function dimensionsSentence(dimensions: Record<string, string>): string {
 }
 
 /** Mirrors `Channel::deliverable()` on the server — add to this list only when a new channel's provider actually sends. */
-export const DELIVERABLE_CHANNELS: Channel[] = ["email", "sms", "voice", "webhook"];
+export const DELIVERABLE_CHANNELS: Channel[] = ["email", "slack", "sms", "voice", "webhook"];
 
 export function isDeliverableChannel(channel: Channel): boolean {
   return DELIVERABLE_CHANNELS.includes(channel);
