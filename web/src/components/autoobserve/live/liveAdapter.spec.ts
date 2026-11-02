@@ -18,6 +18,7 @@ import "@/locales";
 import { gt } from "@/types/i18n";
 import type { AutoObserveCoverage, AutoObserveSuggestion } from "@/services/autoobserve";
 import { toCoverageSource, toRequests, toSuggestionRows } from "./liveAdapter";
+import { detectorsOf } from "../fixtures";
 
 const DAY_US = 86_400_000_000;
 // The snapshot that first missed coverage: 2026-10-30T02:30Z.
@@ -256,6 +257,39 @@ describe("toCoverageSource", () => {
       "en-US",
     );
     expect(source.totals.detectors).toBe(1);
+  });
+
+  it("counts each service's detectors as the distinct monitors the header counts", () => {
+    const covered = (...ids: string[]) => ({
+      state: "covered",
+      evidence: ids.map((id) => ({
+        monitor_kind: "alert",
+        monitor_id: id,
+        monitor_name: id,
+        predicate: "",
+      })),
+      counts: {},
+    });
+    const service = (name: string, cells: Record<string, unknown>) => ({
+      service_name: name,
+      cluster: null,
+      namespace: null,
+      streams: [],
+      cells,
+    });
+    const source = toCoverageSource(
+      gt,
+      coverage({
+        rows: [
+          service("checkout", { errors: covered("m1", "m2"), saturation: covered("cpu") }),
+          service("cart", { errors: covered("m3"), latency: covered("m3") }),
+        ] as never,
+      }),
+      { status: "ready", retry },
+      "en-US",
+    );
+    expect(source.totals.detectors).toBe(3);
+    expect(source.rows.map(detectorsOf)).toEqual([2, 1]);
   });
 
   it("reads Last checked with the page's relative time, never a raw minute count", () => {

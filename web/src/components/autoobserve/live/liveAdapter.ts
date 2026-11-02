@@ -306,6 +306,11 @@ const uniqueNames = (rows: AutoObserveCoverageRow[]) => {
   });
 };
 
+const coveringMonitors = (row: AutoObserveCoverageRow) =>
+  GAP_CLASSES.map((cls) => row.cells[cls])
+    .filter((c) => c?.state === "covered")
+    .flatMap((c) => (c?.evidence ?? []).map((ev) => ev.monitor_id));
+
 const minutesSince = (passAt: number | null, now: number) =>
   passAt ? Math.max(0, Math.floor((now - passAt / 1000) / 60_000)) : null;
 
@@ -341,6 +346,7 @@ const toRow = (
       minutes === null ? t("autoobserve.coverage.notScanned") : agoText(t, locale, minutes),
     cells,
     checks,
+    detectors: new Set(coveringMonitors(row)).size,
     status: watched
       ? { state: "watched", label: coverageWord(t, "watched") }
       : { state: "gap", label: coverageWord(t, "gap") },
@@ -357,13 +363,7 @@ const cannotWatch = (row: AutoObserveCoverageRow) =>
 
 const totalsOf = (data: AutoObserveCoverage, rows: CoverageRow[]): CoverageTotals => {
   const gaps = rows.filter((r) => r.status?.state === "gap").length;
-  const detectors = new Set(
-    data.rows.flatMap((r) =>
-      GAP_CLASSES.map((cls) => r.cells[cls])
-        .filter((c) => c?.state === "covered")
-        .flatMap((c) => (c?.evidence ?? []).map((ev) => ev.monitor_id)),
-    ),
-  ).size;
+  const detectors = new Set(data.rows.flatMap(coveringMonitors)).size;
   return { ...EMPTY_TOTALS, total: rows.length, gaps, fullyWatched: rows.length - gaps, detectors };
 };
 

@@ -246,6 +246,7 @@ export interface CoverageRow {
   // Live preview only: the engine's own service rollup, which replaces the per-signal one.
   status?: { state: "watched" | "gap"; label: I18nText };
   checks?: Record<LiveCheck, CoverageCell>;
+  detectors?: number;
 }
 
 export interface StreamScan {
@@ -883,11 +884,9 @@ export const coverageStats = (scenario: Scenario) => {
   };
 };
 
-// A live row counts only the engine's three checks, so the drawer, the map and the table agree.
+// A live row carries the distinct monitors over its three checks, the same set the header counts.
 export const detectorsOf = (row: CoverageRow): number =>
-  row.checks
-    ? LIVE_CHECKS.filter((check) => row.checks?.[check].detector).length
-    : SIGNALS.filter((signal) => row.cells[signal].detector).length;
+  row.detectors ?? SIGNALS.filter((signal) => row.cells[signal].detector).length;
 
 export const gapServices = (scenario: Scenario): string[] =>
   scenarioFacts(scenario)
