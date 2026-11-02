@@ -1622,7 +1622,6 @@
     "autoRunGuardNarrowWithSize": "Narrow to {period} (~{size})",
     "autoRunGuardSearchJob": "Run as search job",
     "autoRunGuardSelectStream": "Select a stream",
-    "searchJobNoPermission": "You do not have permission to create search jobs",
     "missingStreamAndNoFts": "One or more filter fields do not exist in \"{missingStreams}\", hence no search is performed in the mentioned stream.\n Not searched: {noFtsStreams} (no full-text fields).",
     "freeTextChooseFirst": "Choose how to search text first",
     "freeTextScanLogsOnly": "Scan mode works in the logs view only; set a full-text field to use text search here",

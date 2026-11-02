@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading"
               :loading-reset-key="`${activeFolderId}:${activeTab}`"
               :forbidden="forbidden"
+              forbidden-resource="alert_folders"
               pagination="client"
               :page-size="pageSize"
               :page-size-options="pageSizeOptions"
@@ -2744,8 +2745,9 @@ export default defineComponent({
           if (!(await divertSloAlert(alert))) {
             showAddUpdateFn({ row: alert });
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("AlertList: Failed to load alert", error);
+          if (error?.response?.status === 403) return;
           const draftDropped =
             isNotFoundError(error) &&
             dropDraftOfMissingAlert({
@@ -2962,6 +2964,10 @@ export default defineComponent({
           activeFolderId.value = folderIdToBeCloned.value;
         } catch (e: any) {
           dismiss();
+          if (e?.response?.status === 403) {
+            showForm.value = false;
+            return;
+          }
           toast({
             variant: "error",
             message: e?.response?.data?.message || t("alerts.messages.cloneAnomalyFailed"),
@@ -3005,6 +3011,10 @@ export default defineComponent({
           activeFolderId.value = folderIdToBeCloned.value;
         } catch (e: any) {
           dismiss();
+          if (e?.response?.status === 403) {
+            showForm.value = false;
+            return;
+          }
           toast({
             variant: "error",
             message: e?.response?.data?.message,
@@ -3083,12 +3093,12 @@ export default defineComponent({
             }
           })
           .catch((e: any) => {
+            dismiss();
             if (e.response?.status == 403) {
               showForm.value = false;
               isSubmitting.value = false;
               return;
             }
-            dismiss();
             toast({
               variant: "error",
               message: e.response.data.message,
@@ -3467,6 +3477,7 @@ export default defineComponent({
         alertsToExport.value = [alert];
         showExportDialog.value = true;
       } catch (error: any) {
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message:
@@ -3509,6 +3520,7 @@ export default defineComponent({
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
         }
       } catch (error: any) {
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message: error?.response?.data?.message || t("alerts.messages.triggerAlertFailed"),
@@ -3527,6 +3539,7 @@ export default defineComponent({
           message: t("toastMessages.alerts.retrainingTriggered"),
         });
       } catch (error: any) {
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message: error?.response?.data?.message || t("alerts.messages.triggerRetrainingFailed"),
@@ -3821,8 +3834,9 @@ export default defineComponent({
             }),
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error exporting alerts:", error);
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message: t("toastMessages.alerts.errorExportingAlertsPleaseTryAgain"),
@@ -3956,9 +3970,10 @@ export default defineComponent({
         if (filterQuery.value) {
           filterAlertsByQuery(filterQuery.value);
         }
-      } catch (error) {
+      } catch (error: any) {
         dismiss();
         console.error(`Error ${action}ing alerts:`, error);
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message:
