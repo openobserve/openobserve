@@ -2358,6 +2358,18 @@ pub(crate) fn with_incident_notify_error(
     }
 }
 
+/// A failure, not a skip, so alert history says why on-call stayed silent.
+#[cfg(feature = "enterprise")]
+pub(crate) fn with_unlicensed_page_reason(
+    notify_error: Option<String>,
+    unlicensed: Option<&str>,
+) -> Option<String> {
+    match unlicensed {
+        None => notify_error,
+        Some(reason) => Some(with_incident_notify_error(reason.to_string(), notify_error)),
+    }
+}
+
 /// Whether a send tried any destination or workflow; an `Err` is a failed delivery, so it counts.
 pub(crate) fn send_attempted(result: &Result<NotificationOutcome, AlertError>) -> bool {
     result.as_ref().map_or(true, |outcome| outcome.attempted)
@@ -2476,6 +2488,11 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     if o2_enterprise::enterprise::oncall::is_enabled() && !incident_notified {
         crate::alerts::scheduler::handlers::page_for_alert_firing(&trace_id, &alert, &rows).await;
     }
+    #[cfg(feature = "enterprise")]
+    let incident_notify_error = with_unlicensed_page_reason(
+        incident_notify_error,
+        o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(&alert.org_id).await,
+    );
     let outcome = alert
         .send_notification(
             &trace_id,

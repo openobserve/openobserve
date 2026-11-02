@@ -1111,6 +1111,13 @@ async fn handle_oncall_escalation_triggers(
 
     let response_id = trigger.module_key.clone();
     if !oncall::is_enabled() {
+        if oncall::is_unlicensed()
+            && let Err(e) =
+                oncall::escalation::note_unlicensed_pause(&trigger.org, &response_id, now_micros())
+                    .await
+        {
+            log::error!("[ONCALL] could not note the license pause on {response_id}: {e}");
+        }
         // Turned off mid-ladder: drop the job rather than hold a timer nobody will service.
         db::scheduler::delete(
             &trigger.org,
@@ -4216,6 +4223,12 @@ async fn handle_alert_triggers(
                 page_for_alert_identity(&scheduler_trace_id, &alert, &identity).await;
             }
         }
+        #[cfg(feature = "enterprise")]
+        let incident_notify_error = crate::alerts::alert::with_unlicensed_page_reason(
+            incident_notify_error,
+            o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(&alert.org_id)
+                .await,
+        );
 
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
@@ -9660,6 +9673,34 @@ mod tests {
         let kept =
             record_incident_notify_failure(&mut workflow_failed, "slack: http 500".to_string());
         assert_eq!(kept, RunOutcome::NotifyFailed);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_unlicensed_page_is_recorded_in_alert_history() {
+        use o2_enterprise::enterprise::oncall::escalation::UNLICENSED_PAGE_REASON;
+
+        use crate::alerts::alert::with_unlicensed_page_reason;
+
+        assert_eq!(with_unlicensed_page_reason(None, None), None);
+        let mut fired = TriggerData {
+            status: RunOutcome::Firing,
+            ..Default::default()
+        };
+        let error = with_unlicensed_page_reason(None, Some(UNLICENSED_PAGE_REASON)).unwrap();
+        let kept = record_incident_notify_failure(&mut fired, error);
+        assert_eq!(kept, RunOutcome::Firing);
+        assert_eq!(fired.status, RunOutcome::NotifyFailed);
+        assert_eq!(fired.error.as_deref(), Some(UNLICENSED_PAGE_REASON));
+
+        let both = with_unlicensed_page_reason(
+            Some("slack: http 500".to_string()),
+            Some(UNLICENSED_PAGE_REASON),
+        );
+        assert_eq!(
+            both.as_deref(),
+            Some(format!("slack: http 500; {UNLICENSED_PAGE_REASON}").as_str())
+        );
     }
 
     const PARK_NOW: i64 = 10_000_000_000;
