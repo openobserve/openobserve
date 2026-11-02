@@ -150,7 +150,7 @@ pub async fn create_role(
     )
 )]
 pub async fn delete_role(Path((org_id, role_name)): Path<(String, String)>) -> Response {
-    if !is_storable_name("role", &org_id, &role_name) {
+    if !is_deletable_role(&org_id, &role_name) {
         return MetaHttpResponse::bad_request("Invalid role name");
     }
     match o2_openfga::authorizer::roles::delete_role(&org_id, &role_name).await {
@@ -193,7 +193,7 @@ pub async fn delete_role_bulk(
     if let Some(name) = req
         .ids
         .iter()
-        .find(|name| !is_storable_name("role", &org_id, name))
+        .find(|name| !is_deletable_role(&org_id, name))
     {
         return MetaHttpResponse::bad_request(format!("Invalid role name: {name}"));
     }
@@ -1408,6 +1408,15 @@ fn is_storable_name(object_type: &str, org_id: &str, name: &str) -> bool {
 }
 
 #[cfg(feature = "enterprise")]
+fn is_deletable_role(org_id: &str, name: &str) -> bool {
+    // Deleting reads the `#has` role user back; an overlong one fails every read.
+    is_storable_name("role", org_id, name)
+        && o2_openfga::authorizer::is_valid_tuple_user(
+            &o2_openfga::authorizer::roles::format_role_user(org_id, name),
+        )
+}
+
+#[cfg(feature = "enterprise")]
 async fn bulk_delete<F, Fut>(ids: Vec<String>, delete: F, failure: &str) -> BulkDeleteResponse
 where
     F: Fn(String) -> Fut,
@@ -1737,6 +1746,20 @@ mod tests {
         let bulk = |name: &str| BulkDeleteRequest {
             ids: vec!["fine".to_string(), name.to_string()],
         };
+        // Fits the `role:` object but not the `#has` role user a delete reads back.
+        let too_long = "r".repeat(240);
+        assert!(is_storable_name("role", "test_org", &too_long));
+        for resp in [
+            delete_role(path(&too_long)).await,
+            delete_role_bulk(
+                Path("test_org".to_string()),
+                mock_user_email(),
+                Json(bulk(&too_long)),
+            )
+            .await,
+        ] {
+            assert_eq!(extract_status_code(&resp), StatusCode::BAD_REQUEST);
+        }
         for name in ["a#b", "a b", "a:b"] {
             let responses = [
                 delete_role(path(name)).await,
