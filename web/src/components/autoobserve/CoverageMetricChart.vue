@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
       <span
-        v-if="cell.state !== 'gap'"
+        v-if="cell.state !== 'gap' && !noData"
         class="text-text-heading text-xl leading-tight font-semibold tabular-nums"
         :data-test="`autoobserve-coverage-chart-value-${def.signal}`"
         >{{ valueText }}</span
@@ -64,11 +64,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      v-if="cell.state === 'gap'"
+      v-if="cell.state === 'gap' && !noData"
       class="bg-hatch-unavailable border-border-default rounded-default text-text-secondary flex h-16 items-center justify-center border border-dashed text-sm"
       :data-test="`autoobserve-coverage-chart-gap-${def.signal}`"
     >
       {{ t("autoobserve.coverage.badgeNotWatched") }}
+    </div>
+    <div
+      v-else-if="noData"
+      class="bg-hatch-unavailable border-border-default rounded-default text-text-secondary flex h-16 items-center justify-center border border-dashed text-sm"
+      :data-test="`autoobserve-coverage-chart-nodata-${def.signal}`"
+    >
+      {{ t("autoobserveLive.drawer.chartNoData") }}
     </div>
     <template v-else>
       <div
@@ -109,6 +116,7 @@ import {
   type MetricSeries,
 } from "./coverageSeries";
 import type { CoverageCell } from "./fixtures";
+import { liveCellWord } from "./live/liveCopy";
 
 const props = defineProps<{
   def: MetricDef;
@@ -119,6 +127,7 @@ const props = defineProps<{
   end: number;
   expanded: boolean;
   readyOn: I18nText | null;
+  noData?: boolean;
 }>();
 
 const emit = defineEmits<{ toggle: [] }>();
@@ -135,7 +144,7 @@ const valueText = computed(() => raw(formatValue(props.def, props.series.current
 // Against the start of the window; requests carry no good-or-bad colour.
 const delta = computed(() => {
   const { current, previous } = props.series;
-  if (props.cell.state === "gap" || !previous) return null;
+  if (props.cell.state === "gap" || props.noData || !previous) return null;
   const change = (current - previous) / previous;
   const pct = raw(`${Math.round(Math.abs(change) * 100)}%`);
   if (Math.round(Math.abs(change) * 100) === 0)
@@ -168,7 +177,10 @@ const badge = computed<{ icon: IconName; label: I18nText; tone: string }>(() => 
   if (props.cell.state === "gap")
     return {
       icon: "warning-amber",
-      label: t("autoobserve.coverage.badgeNotWatched"),
+      label:
+        props.noData && props.cell.engine
+          ? liveCellWord(t, props.cell.engine.stateKey)
+          : t("autoobserve.coverage.badgeNotWatched"),
       tone: "text-status-warning-text",
     };
   if (props.cell.state === "learning")
@@ -176,6 +188,12 @@ const badge = computed<{ icon: IconName; label: I18nText; tone: string }>(() => 
       icon: "psychology",
       label: t("autoobserve.coverage.badgeLearning", { days, total }),
       tone: "text-status-info-text",
+    };
+  if (props.noData && props.cell.engine?.detectorKind)
+    return {
+      icon: anomaly.value ? "insights" : "rule",
+      label: props.cell.engine.detectorKind,
+      tone: anomaly.value ? "text-status-success-text" : "text-text-secondary",
     };
   if (anomaly.value)
     return {

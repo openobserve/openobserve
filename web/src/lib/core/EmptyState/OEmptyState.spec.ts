@@ -281,6 +281,26 @@ describe("OEmptyState", () => {
       // Assert — the inline icon wrapper + OIcon stub should be present
       expect(wrapper.find('[data-test="o-icon-stub"]').exists()).toBe(true);
     });
+
+    it("keeps the inline icon grey for an error unless toneIcon is set", () => {
+      wrapper = buildWrapper({ size: "inline", variant: "error" });
+      const icon = wrapper.find(".o2-empty-state__inline-icon");
+      expect(icon.classes()).toContain("bg-surface-subtle");
+      expect(icon.classes()).not.toContain("bg-status-error-bg");
+    });
+
+    it("tints the inline icon red for an error when toneIcon is set", () => {
+      wrapper = buildWrapper({ size: "inline", variant: "error", toneIcon: true });
+      const icon = wrapper.find(".o2-empty-state__inline-icon");
+      expect(icon.classes()).toContain("bg-status-error-bg");
+      expect(icon.classes()).toContain("text-status-error-text");
+      expect(icon.classes()).not.toContain("bg-surface-subtle");
+    });
+
+    it("keeps a neutral inline icon grey even with toneIcon", () => {
+      wrapper = buildWrapper({ size: "inline", variant: "neutral", toneIcon: true });
+      expect(wrapper.find(".o2-empty-state__inline-icon").classes()).toContain("bg-surface-subtle");
+    });
   });
 
   // ── filtered state ──────────────────────────────────────────────────────────

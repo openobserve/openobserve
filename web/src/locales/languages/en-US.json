@@ -28419,6 +28419,187 @@
       "fullReportHint": "Everything above as one document, ready to copy or download"
     }
   },
+  "autoobserveLive": {
+    "where": "{cluster} / {namespace}",
+    "retry": "Retry",
+    "classes": {
+      "errors": "Errors",
+      "latency": "Latency",
+      "saturation": "Saturation",
+      "absence": "Absence",
+      "external_probe": "External probe",
+      "workload_health": "Workload health",
+      "node": "Node"
+    },
+    "classesInline": {
+      "errors": "errors",
+      "latency": "latency",
+      "saturation": "saturation",
+      "absence": "absence",
+      "external_probe": "external probes",
+      "workload_health": "workload health",
+      "node": "node health"
+    },
+    "states": {
+      "covered": "Covered",
+      "weak": "Weak",
+      "silent": "Silent",
+      "blind": "Blind",
+      "unmapped": "Unmapped",
+      "none": "None"
+    },
+    "monitorKinds": {
+      "alert": "Alert",
+      "anomaly_detector": "Anomaly detector",
+      "slo": "SLO",
+      "synthetic": "Synthetic"
+    },
+    "coverage": {
+      "summaryWatched": "{watched} of {total} watched · {pct}%",
+      "splitLabel": "{watched} watched, {gaps} with a coverage gap",
+      "stateWatched": "Watched",
+      "stateGap": "Coverage gap",
+      "columns": {
+        "where": "Where",
+        "state": "State",
+        "lastChecked": "Last checked"
+      },
+      "loading": "Loading coverage",
+      "loaded": "Coverage loaded",
+      "sentence": {
+        "allWatched": "I'm watching your 1 service. | I'm watching all {total} of your services.",
+        "allGaps": "Your 1 service has a coverage gap. | All {total} of your services have a coverage gap.",
+        "watching": "I'm watching {watched} of your {total} services.",
+        "gaps": "{count} has a coverage gap. | {count} have a coverage gap.",
+        "mixed": "{watching} {gaps}"
+      },
+      "gapNone": "No monitor watches {checks}",
+      "searchPlaceholder": "Search service, cluster or namespace"
+    },
+    "cell": {
+      "noClass": "AutoObserve doesn't check this signal yet",
+      "tipNoClass": "{signal}: AutoObserve doesn't check this yet",
+      "noMonitor": "No monitor",
+      "gap": {
+        "weak": "{signal}: only {monitor}, a broad monitor, may notice a problem; it isn't scoped to this service",
+        "silent": "{signal}: {monitor} matches, but it notifies no one",
+        "blind": "{signal}: {monitor} matches, but it can't see its data",
+        "unmapped": "{signal}: {monitor} may match, but its scope couldn't be tied to a service",
+        "none": "{signal}: no monitor watches this"
+      },
+      "fallsShort": "Monitor falls short"
+    },
+    "drawer": {
+      "moreChecks": "Other checks",
+      "chartNoData": "Chart not available yet",
+      "notAvailable": "Not available",
+      "monitors": "Monitors",
+      "monitorLine": "{kind} · {state}",
+      "noMonitor": "No monitor matches"
+    },
+    "suggestions": {
+      "serviceMeta": "{where}, about {traffic} events an hour",
+      "kinds": {
+        "coverage_gap": "Coverage gap",
+        "no_absence_check": "No absence check",
+        "silent_coverage": "Silent coverage",
+        "coverage_lost": "Coverage lost",
+        "blind_guardrail": "Blind monitor",
+        "discovery_unusable": "Discovery quality",
+        "other": "Other"
+      },
+      "severity": {
+        "high": "High",
+        "medium": "Medium"
+      },
+      "confidence": {
+        "sufficient": "Strong evidence",
+        "suggestive": "Some evidence",
+        "insufficient": "Weak evidence"
+      },
+      "body": {
+        "coverageGap": "Nothing fully covers {classes} on {service}",
+        "noAbsenceNone": "Nothing alerts if {service} stops sending data",
+        "noAbsenceWeak": "Only a broad monitor would notice if {service} stops sending data",
+        "noAbsenceSilent": "The check that would notice {service} going quiet notifies no one",
+        "noAbsenceBlind": "The check that would notice {service} going quiet can't see its data",
+        "silentCoverage": "{monitor} watches {classes} on {count} service but notifies no one | {monitor} watches {classes} on {count} services but notifies no one",
+        "coverageLost": "{service} lost {classes} coverage on {day}",
+        "blindStreamMissing": "{monitor} reads {detail}, which doesn't exist",
+        "blindNoData": "{monitor} reads {detail}, which has no recent data",
+        "blindEmptyScope": "{monitor} filters to rows that never arrive",
+        "blindUnknownField": "{monitor} filters on {field}, a field its stream doesn't have",
+        "blindIgnoredMatcher": "{monitor} matches on {label}, a label no series has, so it watches every series",
+        "discovery": "Only {good} of {active} discovered services are usable, so gap rankings are partial",
+        "other": "I found something this page can't show yet"
+      },
+      "detail": {
+        "cell": "{check}: {state}",
+        "cells": "What the engine found: {cells}.",
+        "services": "Services it matches include {services}.",
+        "text": "Engine detail: {detail}",
+        "quality": "Discovery is running in {mode} mode.",
+        "none": "The engine sent no more detail."
+      },
+      "neverFired": "Never fired",
+      "lastFired": "Last fired {time}",
+      "accept": "Accept",
+      "dismiss": "Dismiss",
+      "accepted": "Accepted in this preview; nothing was sent",
+      "dismissed": "Dismissed in this preview; nothing was sent",
+      "loading": "Loading suggestions",
+      "loaded": "Suggestions loaded",
+      "more": "and {count} more | and {count} more",
+      "seeAll": "See all {total} | See all {total}",
+      "drawerTitle": "Suggestions",
+      "drawerLine": "Ranked by what matters most first. Open a row for what I found.",
+      "columns": {
+        "suggestion": "Suggestion",
+        "where": "Where",
+        "kind": "Kind",
+        "severity": "Severity"
+      }
+    },
+    "notice": {
+      "offTitle": "AutoObserve isn't turned on",
+      "details": "Details",
+      "refreshFailed": "Refresh failed at {failedAt} · showing {what} from {dataAt}",
+      "what": {
+        "coverage": "coverage",
+        "suggestions": "suggestions"
+      },
+      "coverage": {
+        "deniedTitle": "You don't have permission to see coverage",
+        "deniedDesc": "Coverage lists the monitors that watch each service, so it needs permission to view alerts in this organization. Ask an organization admin for it.",
+        "offDesc": "An administrator turns it on for this deployment. Coverage appears here after its first check.",
+        "unavailableTitle": "Coverage is temporarily unavailable",
+        "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
+        "failedTitle": "Couldn't load coverage",
+        "failedDesc": "Something went wrong while loading it. Try again in a moment.",
+        "noPassTitle": "No check has finished in the last day",
+        "noPassDesc": "Coverage appears here after my next check of your services finishes. If AutoObserve was just turned on, the first check can take a while.",
+        "noPassAction": "How I check coverage",
+        "noServicesTitle": "No services found yet",
+        "noServicesDesc": "My last check, {when}, found no services. Services appear here once they send logs, metrics or traces that name a service.",
+        "noServicesAction": "How I find services"
+      },
+      "suggestions": {
+        "deniedTitle": "You don't have permission to see suggestions",
+        "deniedDesc": "Seeing them needs permission to view alerts in this organization. Ask an organization admin for it.",
+        "offDesc": "Suggestions appear here after an administrator turns it on for this deployment.",
+        "unavailableTitle": "Suggestions are temporarily unavailable",
+        "unavailableDesc": "AutoObserve isn't answering right now. This usually clears within a minute or two.",
+        "failedTitle": "Couldn't load suggestions",
+        "failedDesc": "Something went wrong while loading them. Try again in a moment.",
+        "emptyTitle": "No suggestions right now",
+        "emptyDesc": "I'll add one here when I find a gap in what your monitors cover."
+      }
+    },
+    "time": {
+      "justNow": "just now",
+      "ago": "{time} ago"
+    }
+  },
   "autoobserve2": {
     "demoTag": "Demo",
     "scenarioLabel": "Demo scenario",

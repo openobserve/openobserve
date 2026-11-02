@@ -23,13 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="!page"
       class="mx-auto flex max-w-[47.5rem] flex-col gap-6 px-4 pt-6 pb-12 sm:pt-8"
-      :class="suggestions.length ? '@min-[60rem]:max-w-[68rem] @min-[60rem]:px-6' : ''"
+      :class="railShown ? '@min-[60rem]:max-w-[68rem] @min-[60rem]:px-6' : ''"
     >
       <TopBar @open="openNamed" @search="searchIssues" />
       <!-- Below the breakpoint both columns dissolve into one ordered list, so suggestions follow the problems. -->
       <div
         class="grid grid-cols-1 gap-6 @min-[60rem]:items-start @min-[60rem]:justify-center @min-[60rem]:gap-8"
-        :class="suggestions.length ? '@min-[60rem]:grid-cols-[minmax(0,44rem)_20rem]' : ''"
+        :class="railShown ? '@min-[60rem]:grid-cols-[minmax(0,44rem)_20rem]' : ''"
       >
         <div
           class="contents @min-[60rem]:flex @min-[60rem]:min-w-0 @min-[60rem]:flex-col @min-[60rem]:gap-6"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <aside
-          v-if="suggestions.length"
+          v-if="railShown"
           class="contents @min-[60rem]:sticky @min-[60rem]:top-6 @min-[60rem]:block"
           data-test="autoobserve2-rail"
         >
@@ -80,14 +80,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="autoobserve2-rail-scroll"
             @scroll="measureRail"
           >
-            <Suggestions class="order-2 shrink-0" :requests="suggestions" />
+            <LiveSuggestions
+              v-if="live"
+              class="order-2 shrink-0"
+              :rail="liveData.rail.value"
+              :skeleton="liveData.railSkeleton.value"
+              @see-all="allOpen = true"
+            />
+            <Suggestions v-else class="order-2 shrink-0" :requests="suggestions" />
           </div>
           <div
-            v-if="railMore"
+            v-if="railMore && !live"
             class="from-surface-subtle pointer-events-none absolute inset-x-0 bottom-0 hidden h-16 bg-linear-to-t to-transparent @min-[60rem]:block"
           />
           <button
-            v-if="railMore"
+            v-if="railMore && !live"
             type="button"
             class="bg-surface-base border-border-default text-text-secondary hover:text-text-heading focus-visible:ring-focus-ring-accent absolute bottom-2 left-1/2 hidden -translate-x-1/2 items-center gap-1 rounded-full border px-3 py-1 text-xs shadow-sm transition-colors focus-visible:ring-2 focus-visible:outline-none @min-[60rem]:flex"
             data-test="autoobserve2-rail-more"
@@ -127,16 +134,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </h1>
             <p
               class="text-text-body max-w-[70ch] text-sm leading-relaxed text-pretty"
+              :class="live ? 'min-h-6' : ''"
               data-test="autoobserve2-coverage-sentence"
             >
-              {{ coverageSentence }}
+              <OSkeleton
+                v-if="live && liveData.coverageSkeleton.value"
+                animation="none"
+                class="mt-1 h-4 w-80 max-w-full"
+                data-test="autoobserve2-coverage-sentence-skeleton"
+              />
+              <template v-else>{{ coverageSentence }}</template>
             </p>
           </div>
+          <div
+            v-if="live"
+            class="flex min-h-10 w-full shrink-0 items-end @min-[60rem]:max-w-[26rem]"
+          >
+            <div
+              v-if="liveData.coverageSkeleton.value"
+              class="flex w-full flex-col gap-2"
+              aria-hidden="true"
+            >
+              <OSkeleton animation="none" class="h-2 w-full" />
+              <div class="flex gap-4">
+                <OSkeleton animation="none" class="h-3 w-20" />
+                <OSkeleton animation="none" class="h-3 w-26" />
+              </div>
+            </div>
+            <CoverageBar
+              v-else-if="coverageSegments.watching + coverageSegments.gaps > 0"
+              class="w-full"
+              :watching="coverageSegments.watching"
+              :learning="0"
+              :gaps="coverageSegments.gaps"
+              live
+              @select="(f) => openCoverage({ filter: f }, false)"
+            />
+          </div>
           <CoverageBar
+            v-else
             class="w-full shrink-0 @min-[60rem]:max-w-[26rem]"
             :watching="coverageSegments.watching"
             :learning="coverageSegments.learning"
-            :unseen="coverageSegments.unseen"
+            :gaps="coverageSegments.gaps"
             @select="(f) => openCoverage({ filter: f }, false)"
           />
         </div>
@@ -149,6 +189,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :ledger="ledger"
           :scenario="scenario"
           :initial="coverageInitial"
+          :source="live ? liveData.source.value : undefined"
+          :skeleton="live && liveData.coverageSkeleton.value"
+          explain
+          @how-it-works="howOpen = true"
         />
       </div>
     </div>
@@ -255,6 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <SettingsDrawer v-model:open="settingsOpen" />
     <HowItWorksDrawer v-model:open="howOpen" />
+    <AllSuggestionsDrawer v-if="live" v-model:open="allOpen" />
   </div>
 </template>
 
@@ -266,6 +311,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import TopBar from "@/components/autoobserve/v2/TopBar.vue";
@@ -278,6 +324,10 @@ import CoverageBar from "@/components/autoobserve/v2/CoverageBar.vue";
 import AutoObserveCoverageTab from "@/components/autoobserve/AutoObserveCoverageTab.vue";
 import AutoObserveIssuesTab from "@/components/autoobserve/AutoObserveIssuesTab.vue";
 import ChangesPage from "@/components/autoobserve/v2/ChangesPage.vue";
+import { useLiveAutoObserve, useLiveMode } from "@/components/autoobserve/live/liveModel";
+import { coverageSentence as liveSentence } from "@/components/autoobserve/live/liveCopy";
+import LiveSuggestions from "@/components/autoobserve/live/LiveSuggestions.vue";
+import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
 import {
   SIGNALS,
   coverageFor,
@@ -342,6 +392,10 @@ const data = computed(() => scenarioData(scenario.value));
 const byId = computed(() => problemsFor(overrides.value));
 // Fix asks sit on their problem row, so only the rest are suggestions.
 const suggestions = computed(() => data.value.requests.filter((r) => r.kind !== "fixNow"));
+const live = useLiveMode();
+const liveData = useLiveAutoObserve();
+const railShown = computed(() => live.value || suggestions.value.length > 0);
+const allOpen = ref(false);
 
 const problems = computed(() => data.value.problems.map((id) => byId.value[id]).sort(byPriority));
 const issuesRange = computed<IssuesRange>(() => {
@@ -406,9 +460,19 @@ const openIssue = (issue: Issue) => {
 };
 
 const summary = computed(() => coverageSummary(scenario.value));
-const coverageSegments = computed(() => summary.value.segments);
+
+// The engine has no learning state, and a gap is a missing scoped monitor, not an unseen service.
+const coverageSegments = computed(() => {
+  if (!live.value) {
+    const { watching, learning, unseen } = summary.value.segments;
+    return { watching, learning, gaps: unseen };
+  }
+  const { total, gaps } = liveData.source.value.totals;
+  return { watching: total - gaps, learning: 0, gaps };
+});
 
 const coverageSentence = computed(() => {
+  if (live.value) return liveSentence(t, locale.value, liveData.source.value.totals) ?? raw("");
   const head = say(t, summary.value.head);
   const clauses = summary.value.clauses.map((m) => say(t, m));
   if (!clauses.length) return head;

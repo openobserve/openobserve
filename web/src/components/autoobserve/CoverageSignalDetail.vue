@@ -24,9 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="mono" class="block">{{ cell.detector }}</OText>
         <span class="text-text-secondary block text-xs">
           {{
-            cell.method === "anomaly"
+            cell.engine?.detectorKind ??
+            (cell.method === "anomaly"
               ? t("autoobserve.coverage.methodAnomaly")
-              : t("autoobserve.coverage.methodThreshold")
+              : t("autoobserve.coverage.methodThreshold"))
           }}
         </span>
       </ODescriptionItem>
@@ -47,11 +48,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </ODescriptionItem>
       <ODescriptionItem
-        v-if="cell.reason && cell.state !== 'gap'"
+        v-if="cell.reason && (cell.state !== 'gap' || cell.engine)"
         stacked
         :label="t('autoobserve.coverage.reason')"
       >
         {{ cell.reason }}
+      </ODescriptionItem>
+      <ODescriptionItem
+        v-if="cell.engine"
+        stacked
+        :label="t('autoobserveLive.drawer.monitors')"
+        data-test="autoobserve-coverage-detail-monitors"
+      >
+        <span v-if="!cell.engine.monitors.length" class="text-text-secondary">{{
+          t("autoobserveLive.drawer.noMonitor")
+        }}</span>
+        <div
+          v-for="monitor in cell.engine.monitors"
+          :key="`${monitor.id}-${monitor.stateKey}`"
+          class="flex flex-col gap-0.5 py-0.5"
+        >
+          <span class="flex flex-wrap items-center gap-2">
+            <OText variant="mono" class="break-all">{{ monitor.name }}</OText>
+            <span class="text-text-secondary text-xs">{{
+              t("autoobserveLive.drawer.monitorLine", {
+                kind: monitor.kind,
+                state: monitor.state,
+              })
+            }}</span>
+          </span>
+          <span v-if="monitor.predicate" class="text-text-secondary text-xs break-words">{{
+            monitor.predicate
+          }}</span>
+        </div>
       </ODescriptionItem>
       <ODescriptionItem
         v-if="cell.alsoWatchedBy"
@@ -113,12 +142,12 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import { seed } from "./coverageSeries";
-import { LEDGER_STATUS, type CoverageCell, type LedgerEntry, type Signal } from "./fixtures";
+import { LEDGER_STATUS, type CoverageCell, type EngineMonitor, type LedgerEntry } from "./fixtures";
 
 const props = defineProps<{
   cell: CoverageCell;
   service: string;
-  signal: Signal;
+  signal: string;
   ledger: LedgerEntry[];
 }>();
 
@@ -132,6 +161,7 @@ const ledgerTag = (id: string) => {
 };
 
 const lastFired = computed(() => {
+  if (props.cell.engine) return t("autoobserveLive.drawer.notAvailable");
   if (props.cell.state !== "watched") return t("autoobserve.coverage.never");
   const n = seed(`${props.service}:${props.signal}:fired`) % 6;
   if (n === 0) return t("autoobserve.coverage.never");
@@ -140,8 +170,22 @@ const lastFired = computed(() => {
     : t("autoobserve.coverage.daysAgo", { count: n }, n);
 });
 
+const engineConfig = (monitors: EngineMonitor[]) =>
+  monitors
+    .map((m) =>
+      [
+        `- monitor: ${m.name}`,
+        `  kind: ${m.kindKey}`,
+        `  id: ${m.id}`,
+        `  state: ${m.stateKey}`,
+        `  matched_by: ${JSON.stringify(m.predicate)}`,
+      ].join("\n"),
+    )
+    .join("\n");
+
 const config = computed(() => {
   const cell = props.cell;
+  if (cell.engine) return engineConfig(cell.engine.monitors);
   if (!cell.detector) return "";
   const baseline =
     cell.state === "learning" && cell.progress

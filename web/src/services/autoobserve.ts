@@ -1,0 +1,152 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import http from "./http";
+
+export type AutoObserveClass =
+  "errors" | "latency" | "saturation" | "absence" | "external_probe" | "workload_health" | "node";
+
+export type AutoObserveCellState = "covered" | "weak" | "silent" | "blind" | "unmapped" | "none";
+
+export type AutoObserveCoverageView = "strict" | "weak";
+
+export type AutoObserveSuggestionKind =
+  | "coverage_gap"
+  | "no_absence_check"
+  | "silent_coverage"
+  | "coverage_lost"
+  | "blind_guardrail"
+  | "discovery_unusable";
+
+export interface AutoObserveEvidence {
+  monitor_kind: string;
+  monitor_id: string;
+  monitor_name: string;
+  predicate: string;
+  last_data_at: number | null;
+}
+
+export interface AutoObserveStatedEvidence extends AutoObserveEvidence {
+  state: AutoObserveCellState;
+}
+
+export interface AutoObserveCell {
+  state: AutoObserveCellState;
+  evidence: AutoObserveEvidence[];
+  counts: Partial<Record<AutoObserveCellState, number>>;
+  // Every matching monitor with the state it alone would give, so a losing blind one stays visible.
+  all_evidence?: AutoObserveStatedEvidence[];
+}
+
+export interface AutoObserveCoverageRow {
+  service_id: string;
+  service_name: string;
+  cluster: string | null;
+  namespace: string | null;
+  streams: { type: string; name: string }[];
+  traffic_per_hour: number | null;
+  // The engine raises findings only for good services while discovery is partial.
+  good?: boolean;
+  cells: Partial<Record<AutoObserveClass, AutoObserveCell>>;
+}
+
+export interface AutoObserveQuality {
+  good: number;
+  active: number;
+  score: number;
+  mode: "full" | "partial" | "unusable";
+  stale_since: number | null;
+}
+
+// pass_at, refreshed_at and quality are null when the engine wrote no pass in the last day.
+export interface AutoObserveCoverage {
+  view: AutoObserveCoverageView;
+  pass_at: number | null;
+  refreshed_at: number | null;
+  quality: AutoObserveQuality | null;
+  classes: AutoObserveClass[];
+  rows: AutoObserveCoverageRow[];
+}
+
+export type AutoObserveTier = "A" | "B" | "C";
+
+export type AutoObserveReviewFocus = "settings" | "threshold" | "query" | "grouping";
+
+export interface AutoObserveReviewAlertAction {
+  type: "review_alert";
+  alert_id: string;
+  focus?: AutoObserveReviewFocus;
+}
+
+export interface AutoObserveReviewSourceAction {
+  type: "review_source";
+  stream_type: string;
+  stream_name: string;
+}
+
+export type AutoObserveInsightAction = AutoObserveReviewAlertAction | AutoObserveReviewSourceAction;
+
+export interface AutoObserveInsightQuality {
+  level: "unavailable" | "partial" | "usable";
+  reasons: string[];
+}
+
+export interface AutoObserveSuggestion {
+  id: string;
+  org: string;
+  analyzer: string;
+  kind: AutoObserveSuggestionKind | string;
+  subject: { kind: string; key_dims: Record<string, string> };
+  evidence: Record<string, unknown>;
+  score: number | null;
+  confidence: string;
+  status: string;
+  decided_score: number | null;
+  on_accept: unknown;
+  last_seen_at?: number;
+  // Rows written before the v2 insight fields have none of these.
+  tier?: AutoObserveTier | null;
+  limitations?: string[];
+  advice?: string | null;
+  actions?: AutoObserveInsightAction[];
+  quality?: AutoObserveInsightQuality | null;
+}
+
+export interface AutoObserveSuggestionParams {
+  entity_type?: string;
+  kind?: string;
+  status?: string;
+  subject?: string;
+  sort?: "score" | "priority";
+  limit?: number;
+  offset?: number;
+}
+
+// total counts every match before paging.
+export interface AutoObserveSuggestionList {
+  suggestions: AutoObserveSuggestion[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+const autoobserve = {
+  coverage: (org: string, view: AutoObserveCoverageView) =>
+    http().get<AutoObserveCoverage>(`/api/v2/${org}/autoobserve/coverage`, { params: { view } }),
+  suggestions: (org: string, params: AutoObserveSuggestionParams) =>
+    http().get<AutoObserveSuggestionList>(`/api/v2/${org}/autoobserve/suggestions`, { params }),
+};
+
+export default autoobserve;
