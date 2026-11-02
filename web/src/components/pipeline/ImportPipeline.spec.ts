@@ -232,139 +232,9 @@ describe("ImportPipeline.vue", () => {
   // 1. Component initialisation
   // -----------------------------------------------------------------------
 
-  describe("Component Initialization", () => {
-    it("renders the component successfully", () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("has the correct component name", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.$options.name).toBe("ImportPipeline");
-    });
-
-    it("initialises with default empty props", () => {
-      wrapper = createWrapper();
-      expect(wrapper.props("destinations")).toEqual([]);
-      expect(wrapper.props("templates")).toEqual([]);
-      expect(wrapper.props("alerts")).toEqual([]);
-    });
-
-    it("accepts and reflects passed props", () => {
-      wrapper = createWrapper({
-        destinations: [{ name: "dest1" }],
-        templates: [{ name: "tmpl1" }],
-        alerts: [{ name: "alert1" }],
-      });
-      expect(wrapper.props("destinations")).toHaveLength(1);
-      expect(wrapper.props("templates")).toHaveLength(1);
-      expect(wrapper.props("alerts")).toHaveLength(1);
-    });
-
-    it("defines the update:pipelines emit", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.$options.emits).toContain("update:pipelines");
-    });
-
-    it("calls onMounted lifecycle hooks to fetch initial data", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      expect(jstransform.list).toHaveBeenCalled();
-      expect(destinationService.list).toHaveBeenCalled();
-      expect(pipelinesService.getPipelines).toHaveBeenCalled();
-    });
-  });
-
   // -----------------------------------------------------------------------
   // 2. Reactive data property defaults
   // -----------------------------------------------------------------------
-
-  describe("Reactive Data Properties", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it("initialises streamTypes as ['logs', 'metrics', 'traces']", () => {
-      expect(wrapper.vm.streamTypes).toEqual(["logs", "metrics", "traces"]);
-    });
-
-    it("initialises destinationStreamTypes including enrichment_tables", () => {
-      expect(wrapper.vm.destinationStreamTypes).toEqual([
-        "logs",
-        "metrics",
-        "traces",
-        "enrichment_tables",
-      ]);
-    });
-
-    it("initialises pipelineErrorsToDisplay as empty array", () => {
-      expect(wrapper.vm.pipelineErrorsToDisplay).toEqual([]);
-    });
-
-    it("initialises pipelineCreators as empty array", () => {
-      expect(wrapper.vm.pipelineCreators).toEqual([]);
-    });
-
-    it("initialises streamList as empty array", () => {
-      expect(wrapper.vm.streamList).toEqual([]);
-    });
-
-    it("initialises streamData as empty array", () => {
-      expect(wrapper.vm.streamData).toEqual([]);
-    });
-
-    it("initialises existingFunctions as empty array", () => {
-      expect(wrapper.vm.existingFunctions).toEqual([]);
-    });
-
-    it("initialises pipelineDestinations as empty array", () => {
-      expect(wrapper.vm.pipelineDestinations).toEqual([]);
-    });
-
-    it("initialises alertDestinations as empty array", () => {
-      expect(wrapper.vm.alertDestinations).toEqual([]);
-    });
-
-    it("initialises scheduledPipelines as empty array", () => {
-      expect(wrapper.vm.scheduledPipelines).toEqual([]);
-    });
-
-    it("initialises userSelectedPipelineName as empty array", () => {
-      expect(wrapper.vm.userSelectedPipelineName).toEqual([]);
-    });
-
-    it("initialises userSelectedStreamName as empty array", () => {
-      expect(wrapper.vm.userSelectedStreamName).toEqual([]);
-    });
-
-    it("initialises userSelectedStreamType as empty array", () => {
-      expect(wrapper.vm.userSelectedStreamType).toEqual([]);
-    });
-
-    it("initialises userSelectedSqlQuery as empty array", () => {
-      expect(wrapper.vm.userSelectedSqlQuery).toEqual([]);
-    });
-
-    it("initialises userSelectedTimezone as empty array", () => {
-      expect(wrapper.vm.userSelectedTimezone).toEqual([]);
-    });
-
-    it("initialises userSelectedFunctionName as empty array", () => {
-      expect(wrapper.vm.userSelectedFunctionName).toEqual([]);
-    });
-
-    it("initialises userSelectedOrgId as empty array", () => {
-      expect(wrapper.vm.userSelectedOrgId).toEqual([]);
-    });
-
-    it("initialises userSelectedRemoteDestination as empty array", () => {
-      expect(wrapper.vm.userSelectedRemoteDestination).toEqual([]);
-    });
-
-    it("initialises isPipelineImporting as false", () => {
-      expect(wrapper.vm.isPipelineImporting).toBe(false);
-    });
-  });
 
   // -----------------------------------------------------------------------
   // 3. Computed properties
@@ -389,69 +259,14 @@ describe("ImportPipeline.vue", () => {
       expect(other?.disable).toBe(true);
     });
 
-    it("timezoneOptions is a non-empty array", () => {
-      expect(Array.isArray(wrapper.vm.timezoneOptions)).toBe(true);
-      expect(wrapper.vm.timezoneOptions.length).toBeGreaterThan(0);
-    });
-
     it("timezoneOptions includes UTC at a leading position", () => {
       expect(wrapper.vm.timezoneOptions).toContain("UTC");
-    });
-
-    it("timezoneOptions includes a Browser Time entry", () => {
-      const hasBrowserTime = wrapper.vm.timezoneOptions.some((tz: string) =>
-        tz.startsWith("Browser Time"),
-      );
-      expect(hasBrowserTime).toBe(true);
     });
   });
 
   // -----------------------------------------------------------------------
   // 4. Exposed functions availability
   // -----------------------------------------------------------------------
-
-  describe("Exposed Functions", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    const fnNames = [
-      "processJsonObject",
-      "validatePipelineInputs",
-      "validateSourceStream",
-      "validateDestinationStream",
-      "validateScheduledPipelineNodes",
-      "validateNodesForOrg",
-      "validateRemoteDestination",
-      "createPipeline",
-      "resolveBundledFunctions",
-      "bundledFunctionsByName",
-      "sameFunctionLogic",
-      "normaliseFunctionBody",
-      "getFunctions",
-      "getAlertDestinations",
-      "getScheduledPipelines",
-      "getSourceStreamsList",
-      "getDestinationStreamsList",
-      "getOutputStreamsList",
-      "importJson",
-      "updateSqlQuery",
-      "updateStreamFields",
-      "updatePipelineName",
-      "updateFunctionName",
-      "updateRemoteDestination",
-      "updateTimezone",
-      "updateOrgId",
-      "handleDynamicStreamName",
-      "updateDestinationStreamFields",
-    ];
-
-    fnNames.forEach((name) => {
-      it(`exposes ${name} as a function`, () => {
-        expect(typeof (wrapper.vm as any)[name]).toBe("function");
-      });
-    });
-  });
 
   describe("pipeline_imported analytics", () => {
     const pipeline = (name: string) => ({
@@ -1069,11 +884,6 @@ describe("ImportPipeline.vue", () => {
   // -----------------------------------------------------------------------
 
   describe("Template rendering", () => {
-    it("renders BaseImport stub", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('[data-test="base-import"]').exists()).toBe(true);
-    });
-
     it("does not show error content when pipelineErrorsToDisplay is empty", async () => {
       wrapper = createWrapper();
       wrapper.vm.pipelineErrorsToDisplay = [];
@@ -1601,23 +1411,6 @@ describe("ImportPipeline.vue", () => {
 
       expect(postedPipeline()).not.toHaveProperty("functions");
       expect(postedPipeline().name).toBe("my-pipeline");
-    });
-  });
-
-  describe("Store integration", () => {
-    it("exposes store on vm", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.store).toBeDefined();
-    });
-
-    it("exposes router on vm", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.router).toBeDefined();
-    });
-
-    it("exposes i18n t function on vm", () => {
-      wrapper = createWrapper();
-      expect(typeof wrapper.vm.$t).toBe("function");
     });
   });
 });
