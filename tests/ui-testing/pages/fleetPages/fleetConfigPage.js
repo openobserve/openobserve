@@ -90,7 +90,13 @@ class FleetConfigPage {
       (node, { action, text }) => {
         const editor = window.monaco?.editor?.getEditors?.().find((e) => node.contains(e.getDomNode()));
         if (!editor) return null;
-        if (action === 'set') editor.setValue(text);
+        if (action === 'set') {
+          editor.setValue(text);
+          // The editor emits after a 500ms debounce that only a text blur flushes; unflushed, a quick switch to Visual drops the edit.
+          editor.focus();
+          if (!node.contains(document.activeElement)) throw new Error('YAML editor did not take focus');
+          document.activeElement.blur();
+        }
         return editor.getValue();
       },
       { action, text },
