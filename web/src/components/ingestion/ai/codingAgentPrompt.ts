@@ -14,11 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The openobserve-instrument skill, served from the openobserve repo so any
- * coding agent can fetch and follow it without installing a plugin.
+ * The openobserve-instrument skill, published in the `@openobserve/skills` npm
+ * package (source: o2-ai `skills/coding-agent/`). Served by the npm CDN so any coding
+ * agent can fetch and follow it without installing a plugin.
  */
 export const INSTRUMENT_SKILL_URL =
-  "https://raw.githubusercontent.com/openobserve/openobserve/main/skills/openobserve-instrument/SKILL.md";
+  "https://cdn.jsdelivr.net/npm/@openobserve/skills@1/skills/openobserve-instrument/SKILL.md";
 
 /** `?tab=` value that opens an AI integration on its "With a coding agent" tab. */
 export const CODING_AGENT_TAB = "agent";
