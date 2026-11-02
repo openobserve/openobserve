@@ -4456,6 +4456,7 @@
   },
   "iam": {
     "sectionAccess": "Access",
+    "configLoadFailed": "This organization's configuration could not be loaded, so some sections may not reflect your real access. Retry to load it again.",
     "sectionPermissions": "Permissions",
     "sectionOrganization": "Organization",
     "usersDesc": "People with access to this organization",
@@ -4803,7 +4804,11 @@
       "show": "Show",
       "searchRoles": "Search Roles",
       "all": "All",
-      "selected": "Selected"
+      "selected": "Selected",
+      "noneSelectedTitle": "No roles selected",
+      "noneSelectedDescription": "None of the roles in this organization are selected here. Switch to All to select one.",
+      "showAll": "Show all roles",
+      "showAllDesc": "List every role in this organization"
     },
     "groupServiceAccounts": {
       "show": "Show",
@@ -4817,7 +4822,11 @@
       "organizations": "Organizations",
       "show": "Show",
       "searchUser": "Search User",
-      "selectOrganization": "Select Organization"
+      "selectOrganization": "Select Organization",
+      "noneSelectedTitle": "No users selected",
+      "noneSelectedDescription": "None of the users in this organization are selected here. Switch to All to select one.",
+      "showAll": "Show all users",
+      "showAllDesc": "List every user in this organization"
     },
     "addUpdateOrganization": {
       "updateFailed": "Organization Update failed.",
