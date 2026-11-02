@@ -278,6 +278,46 @@ pub async fn get_alert_history(
     // The anomaly_count is stored in success_response as {"anomalies_found": N}.
     // Result is derived: "anomaly" when count > 0, "normal" when 0, "failed"/"skipped" on error.
     if let Some(ref anomaly_id) = query.anomaly_id {
+        // RBAC: this route is bypass:true and this branch returns before the
+        // alert RBAC block below, so check the config here. Fail closed: a
+        // read error or a config without a folder must deny.
+        #[cfg(feature = "enterprise")]
+        {
+            let folder_id =
+                match openobserve_core::anomaly_detection::get_config(&org_id, anomaly_id).await {
+                    Ok(Some(cfg)) => cfg
+                        .get("folder_id")
+                        .and_then(|f| f.as_str())
+                        .map(str::to_string),
+                    Ok(None) => {
+                        return MetaHttpResponse::not_found(format!(
+                            "Anomaly config '{anomaly_id}' not found"
+                        ));
+                    }
+                    Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
+                };
+            let Some(folder_id) = folder_id else {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            };
+            if !openobserve_core::auth::check_permissions(
+                anomaly_id,
+                &org_id,
+                &user_email.user_id,
+                "alerts",
+                "GET",
+                Some(&folder_id),
+                false,
+                true,
+                false,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden(format!(
+                    "Access denied to anomaly config '{anomaly_id}'"
+                ));
+            }
+        }
+
         let escaped_id = escape_like(anomaly_id);
         let where_clause = format!(
             "module = 'anomaly_detection' AND key LIKE '%/{escaped_id}' \
