@@ -951,9 +951,7 @@ pub fn basic_routes() -> Router {
     // Auth routes (no authentication required)
     let auth_routes = Router::new()
         .route("/login", post(users::authentication).get(users::get_auth))
-        .route("/presigned-url", get(users::get_presigned_url))
-        .route("/invites", get(users::list_invitations))
-        .route("/invites/{token}", delete(users::decline_invitation));
+        .route("/presigned-url", get(users::get_presigned_url));
     router = router.nest("/auth", auth_routes);
 
     let node_routes = node_routes()
@@ -5457,6 +5455,28 @@ mod tests {
             .unwrap();
         let status = app.oneshot(req).await.unwrap().status();
         assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn invites_are_not_served_unauthenticated_with_a_forged_identity_header() {
+        let app = Router::new()
+            .merge(basic_routes())
+            .nest("/api", service_routes());
+        for (method, uri, expected) in [
+            (Method::GET, "/auth/invites", StatusCode::NOT_FOUND),
+            (Method::DELETE, "/auth/invites/x", StatusCode::NOT_FOUND),
+            (Method::GET, "/api/invites", StatusCode::UNAUTHORIZED),
+            (Method::DELETE, "/api/invites/x", StatusCode::UNAUTHORIZED),
+        ] {
+            let req = Request::builder()
+                .method(method.clone())
+                .uri(uri)
+                .header("user_id", "someone@example.com")
+                .body(Body::empty())
+                .unwrap();
+            let status = app.clone().oneshot(req).await.unwrap().status();
+            assert_eq!(status, expected, "{method} {uri}");
+        }
     }
 
     #[tokio::test]
