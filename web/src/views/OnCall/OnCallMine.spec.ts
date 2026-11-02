@@ -31,6 +31,7 @@ const service = vi.mocked(oncallService);
 
 // The page's Refresh calls this through a template ref; the stub has to expose it or that call throws.
 const deliveriesRefresh = vi.fn().mockResolvedValue(undefined);
+const slackRefresh = vi.fn().mockResolvedValue(undefined);
 
 const stubs = {
   OPageLayout: {
@@ -54,6 +55,12 @@ const stubs = {
     name: "OnCallPhoneCard",
     template: "<div data-test='oncall-phone-card' />",
     methods: { refresh: vi.fn().mockResolvedValue(undefined) },
+  },
+  // Stubbed out: it reads its own Slack endpoint; its own spec covers what it shows.
+  OnCallSlackCard: {
+    name: "OnCallSlackCard",
+    template: "<div data-test='oncall-slack-card' />",
+    methods: { refresh: slackRefresh },
   },
 };
 
@@ -147,6 +154,38 @@ describe("OnCallMine", () => {
 
     expect(wrapper.find('[data-test="oncall-mine-teams-error"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-mine-team-team_1"]').exists()).toBe(true);
+  });
+
+  /// Shown only while Slack is on; members hear nothing about Slack otherwise.
+  it.each([
+    [{ slack_enabled: true }, true],
+    [{ slack_enabled: false, slack_disabled_reason: "flag" }, false],
+    [{}, false],
+  ])("Slack box for zoConfig %j shown: %s", async (slackConfig, shown) => {
+    const saved = store.state.zoConfig;
+    store.state.zoConfig = { ...saved, slack_enabled: undefined, ...slackConfig };
+    try {
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-slack-card"]').exists()).toBe(shown);
+    } finally {
+      store.state.zoConfig = saved;
+    }
+  });
+
+  /// A link just made with /o2 link shows after Refresh.
+  it("reads the Slack link again on Refresh", async () => {
+    const saved = store.state.zoConfig;
+    store.state.zoConfig = { ...saved, slack_enabled: true };
+    try {
+      const wrapper = render();
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-mine-refresh"]').trigger("click");
+      await flushPromises();
+      expect(slackRefresh).toHaveBeenCalledTimes(1);
+    } finally {
+      store.state.zoConfig = saved;
+    }
   });
 
   /// Opened from the avatar menu or a channel chip, so Back returns there rather than to Pages.
