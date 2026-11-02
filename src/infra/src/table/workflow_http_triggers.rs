@@ -708,12 +708,15 @@ async fn apply_locked<C: ConnectionTrait>(
         write_snapshot(txn, snapshot, local.is_some(), prepared, false, now).await?;
         return Ok(ApplyOutcome::Applied);
     };
+    // A live endpoint outranks a tombstone, or a region's delete could leave none anywhere.
     let incoming = (
+        !snapshot.deleted,
         snapshot.trigger.created_at,
         snapshot.origin_cluster.as_str(),
         snapshot.trigger.id.as_str(),
     );
     let held = (
+        rival.deleted_at.is_none(),
         rival.created_at,
         rival.origin_cluster.as_str(),
         rival.id.as_str(),
@@ -1676,6 +1679,42 @@ mod tests {
         assert_eq!(credential_row(&db, "cC").await.state, "revoked");
         assert_eq!(secret_count(&db, "cC").await, 0);
         assert_eq!(secret_count(&db, "cB").await, 1);
+    }
+
+    #[tokio::test]
+    async fn a_tombstone_never_displaces_a_live_endpoint_in_a_collision() {
+        let db = db().await;
+        insert_trigger(&db, trigger("tA", "wf-1")).await.unwrap();
+        let mut deleted = trigger("tB", "wf-1");
+        deleted.created_at = NOW + 1;
+        deleted.origin_cluster = "r2".to_string();
+        deleted.deleted_at = Some(NOW + 2);
+        let lost = apply_snapshot_in(&db, snapshot(&deleted, &[], &[]), Vec::new()).await;
+        assert_eq!(lost.unwrap(), ApplyOutcome::CollisionLost);
+        let live = get_by_workflow(&db, "acme", "wf-1").await.unwrap().unwrap();
+        assert_eq!((live.id.as_str(), live.deleted_at), ("tA", None));
+
+        let db = db_with_tombstone().await;
+        let older = trigger("tC", "wf-1");
+        let won = apply_snapshot_in(&db, snapshot(&older, &[], &[]), Vec::new()).await;
+        assert_eq!(
+            won.unwrap(),
+            ApplyOutcome::CollisionWon {
+                loser: "tB".to_string()
+            }
+        );
+        let live = get_by_workflow(&db, "acme", "wf-1").await.unwrap().unwrap();
+        assert_eq!((live.id.as_str(), live.deleted_at), ("tC", None));
+    }
+
+    async fn db_with_tombstone() -> DatabaseConnection {
+        let db = db().await;
+        let mut tombstone = trigger("tB", "wf-1");
+        tombstone.created_at = NOW + 1;
+        tombstone.origin_cluster = "r2".to_string();
+        tombstone.deleted_at = Some(NOW + 2);
+        insert_trigger(&db, tombstone).await.unwrap();
+        db
     }
 
     #[tokio::test]
