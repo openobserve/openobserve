@@ -811,6 +811,19 @@ describe("SearchResult in a kept-alive page", () => {
       expect(wrapper.emitted("add-trace-id")).toHaveLength(1);
     });
 
+    it("lists the traces a Traces view query picks as trace rows, with the RED charts on", async () => {
+      await showResults(`SELECT trace_id FROM "default" GROUP BY trace_id HAVING count(*) > 200`, [
+        { trace_id: "t-1", start_time: 1, spans: [3, 0] },
+      ]);
+      (mockSearchObj.meta as any).searchMode = "traces";
+      await flushPromises();
+      expect(sqlTable().exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "TracesSearchResultList" }).exists()).toBe(true);
+      expect(dashboard().exists()).toBe(true);
+      expect(redIcon().exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-sql-rows-count"]').exists()).toBe(false);
+    });
+
     it("opens a span row without span times inside the page time range", async () => {
       const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
       await showResults(`SELECT trace_id, span_id FROM "default"`, [

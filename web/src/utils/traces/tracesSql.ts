@@ -19,6 +19,9 @@ import type { ParsedSQLResult } from "@/ts/interfaces";
 
 export type TracesSqlShape = "spans" | "traces" | "rows";
 
+/** Why the Traces view cannot run typed SQL as a trace selector. */
+export type TraceSelectorProblem = "quotedMarker" | "notSingleSelect" | "selectAll" | "noTraceId";
+
 export type SqlDroppedPart =
   "columns" | "grouping" | "joins" | "limit" | "distinct" | "with" | "union" | "stream" | "other";
 
@@ -31,6 +34,8 @@ export interface TracesSqlInfo {
   fromClause: string;
   selectAll: boolean;
   plainSelectAll: boolean;
+  /** `SELECT trace_id FROM <stream> [WHERE ...]` and nothing else: the Traces view prefill's shape. */
+  plainTraceIdSelect: boolean;
   groupBy: boolean;
   aggregate: boolean;
   join: boolean;
@@ -42,6 +47,12 @@ export interface TracesSqlInfo {
   fromSubquery: boolean;
   explain: boolean;
   selectNames: string[];
+}
+
+export interface TraceSelector {
+  /** The traces/latest filter, empty when a problem blocks the run. */
+  filter: string;
+  problem: TraceSelectorProblem | null;
 }
 
 interface Token {
@@ -196,6 +207,7 @@ export function analyzeTracesSql(sql: string, parser: any): TracesSqlInfo {
     fromClause: sliceFrom(text, top, fromIdx),
     selectAll,
     plainSelectAll: false,
+    plainTraceIdSelect: false,
     groupBy: groupBy || having,
     aggregate,
     join,
@@ -210,6 +222,14 @@ export function analyzeTracesSql(sql: string, parser: any): TracesSqlInfo {
   };
   info.plainSelectAll =
     firstWord === "select" && selectAll && stream !== null && cleanAfterTarget && isRowQuery(info);
+  info.plainTraceIdSelect =
+    firstWord === "select" &&
+    selectList.length === 1 &&
+    isWord(selectList[0], "trace_id") &&
+    stream !== null &&
+    (!next || isWord(next, "where") || (next.kind === "punct" && next.text === ";")) &&
+    !hasTop("order") &&
+    isRowQuery(info);
   return info;
 }
 
@@ -252,12 +272,20 @@ export function buildTracesSql(stream: string, filter: string): string {
   return `SELECT * FROM "${stream.replaceAll('"', '""')}"${where} ORDER BY start_time DESC`;
 }
 
+/** The Traces view's starting statement: the trace_id of every span the filter matches. */
+export function buildTraceSelectorSql(stream: string, filter: string): string {
+  const where = filter.trim() ? ` WHERE ${filter.trim()}` : "";
+  return `SELECT trace_id FROM "${stream.replaceAll('"', '""')}"${where}`;
+}
+
 /** The filter text a statement turns into, and what filter mode cannot keep. */
 export function sqlToFilter(
   info: TracesSqlInfo,
   selectedStream: string,
+  tracesView = false,
 ): { filter: string; dropped: SqlDroppedPart[] } {
-  if (info.plainSelectAll && info.stream === selectedStream) {
+  const plain = info.plainSelectAll || (tracesView && info.plainTraceIdSelect);
+  if (plain && info.stream === selectedStream) {
     return { filter: info.where, dropped: [] };
   }
   const dropped: SqlDroppedPart[] = [];
@@ -291,6 +319,69 @@ export function insertTraceIdColumn(sql: string): string | null {
       ? next
       : top[selectIdx];
   return `${sql.slice(0, anchor.end)} trace_id,${sql.slice(anchor.end)}`;
+}
+
+/** Typed SQL without comments or trailing semicolons; the streaming trace list deletes every -- and ; left, even quoted. */
+export function cleanTraceSelectorSql(sql: string): {
+  sql: string;
+  quotedMarker: boolean;
+  extraStatement: boolean;
+} {
+  const text = stripSqlComments(sql ?? "")
+    .trim()
+    .replace(/(\s*;)+$/, "")
+    .trim();
+  let quotedMarker = false;
+  let extraStatement = false;
+  let i = 0;
+  while (i < text.length) {
+    const end = maskedSpanEnd(text, i);
+    if (end === null) {
+      if (text[i] === ";") extraStatement = true;
+      i++;
+      continue;
+    }
+    const span = text.slice(i, end);
+    if (span.includes("--") || span.includes(";")) quotedMarker = true;
+    i = end;
+  }
+  return { sql: text, quotedMarker, extraStatement };
+}
+
+/** The Traces view filter for typed SQL: trace_id IN (the query), or why it cannot run. */
+export function traceSelector(sql: string, parser: any): TraceSelector {
+  const blocked = (problem: TraceSelectorProblem): TraceSelector => ({ filter: "", problem });
+  const cleaned = cleanTraceSelectorSql(sql);
+  if (cleaned.quotedMarker) return blocked("quotedMarker");
+  const info = analyzeTracesSql(cleaned.sql, parser);
+  if (!info.isStatement || info.with || info.explain || info.union || cleaned.extraStatement) {
+    return blocked("notSingleSelect");
+  }
+  if (info.selectAll) return blocked("selectAll");
+  const parsed = parseTracesSql(cleaned.sql, parser);
+  const columns: any[] = Array.isArray(parsed.columns) ? parsed.columns : [];
+  // Text the parser cannot read may still be valid DataFusion, so the server decides.
+  if (parsed.type !== "select" || columns.length === 0) {
+    return { filter: `trace_id IN (${cleaned.sql})`, problem: null };
+  }
+  if (!info.selectNames.includes("trace_id")) return blocked("noTraceId");
+  // An IN subquery must return one column, so a wider select list is read through a derived table.
+  const filter =
+    columns.length === 1
+      ? `trace_id IN (${cleaned.sql})`
+      : `trace_id IN (SELECT trace_id FROM (${cleaned.sql}))`;
+  return { filter, problem: null };
+}
+
+/** The SELECT line before and after trace_id goes first, for the suggested change. */
+export function traceIdSuggestion(sql: string): { before: string; after: string } | null {
+  const after = insertTraceIdColumn(sql);
+  const selectTok = tokenize(sql).find(
+    (tok) => tok.depth === 0 && tok.kind === "word" && tok.text.toLowerCase() === "select",
+  );
+  if (after === null || !selectTok) return null;
+  const line = sql.slice(0, selectTok.start).split("\n").length - 1;
+  return { before: sql.split("\n")[line], after: after.split("\n")[line] };
 }
 
 /** Result shape from the returned columns: span rows open a span, trace rows open a trace. */

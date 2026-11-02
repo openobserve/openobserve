@@ -3988,4 +3988,31 @@ export class TracesPage {
   getRedMetricsDashboard() {
     return this.page.locator('[data-test="traces-metrics-dashboard"]');
   }
+
+  getSqlTemplateGallery() {
+    return this.page.locator('[data-test="traces-sql-template-gallery"]');
+  }
+
+  async useSqlTemplate(name) {
+    await this.getSqlTemplateGallery()
+      .locator('[data-test="traces-sql-template-card"]', { hasText: name })
+      .locator('[data-test="traces-sql-template-use-btn"]')
+      .click();
+  }
+
+  getSqlSelectorProblem() {
+    return this.page.locator('[data-test="traces-sql-selector-problem"]');
+  }
+
+  getSqlSuggestedChange() {
+    return this.page.locator('[data-test="traces-sql-suggested-change"]');
+  }
+
+  async addTraceIdAndRun() {
+    await this.page.locator('[data-test="traces-sql-add-trace-id-run-card"]').click();
+  }
+
+  getTraceResultRows() {
+    return this.page.locator(this.searchResultItem);
+  }
 }

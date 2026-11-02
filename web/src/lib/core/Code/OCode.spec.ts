@@ -50,4 +50,18 @@ describe("OCode", () => {
     expect(wrapper.findComponent(OTooltip).exists()).toBe(false);
     expect(wrapper.findComponent(OTruncatedText).attributes("data-o-tooltip-off")).toBe("");
   });
+
+  it("wraps long block lines with wrap, and keeps them on one scrolling line without it", () => {
+    const scrolled = mount(OCode, { props: { block: true }, slots: { default: "SELECT 1" } });
+    expect(scrolled.find("code").classes()).toContain("whitespace-pre");
+
+    const wrapped = mount(OCode, {
+      props: { block: true, wrap: true },
+      slots: { default: "SELECT 1" },
+    });
+    expect(wrapped.find("code").classes()).toEqual(
+      expect.arrayContaining(["whitespace-pre-wrap", "wrap-anywhere"]),
+    );
+    expect(wrapped.find("code").classes()).not.toContain("whitespace-pre");
+  });
 });

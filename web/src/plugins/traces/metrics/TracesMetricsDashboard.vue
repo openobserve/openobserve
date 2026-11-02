@@ -120,7 +120,7 @@ import {
 } from "./latencyHeatmap";
 import useTraces from "@/composables/useTraces";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
-import { analyzeTracesSql } from "@/utils/traces/tracesSql";
+import { analyzeTracesSql, traceSelector } from "@/utils/traces/tracesSql";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
 import { buildTracesRedPanel, tracesBucketNotice, type TracesRedChart } from "./tracesRedPanels";
 import type { I18nText } from "@/types/i18n";
@@ -189,16 +189,20 @@ const effectiveFilter = computed(() => searchObj.data.editorValue);
 
 const decodeFilter = (text: string | undefined): string =>
   resolveTracesFilter(text, tracesParser.value, searchObj.data.stream.selectedStream.value);
-// Typed SQL feeds the panels only its top-level WHERE, bracketed so the panels' own conditions bind outside it.
+const sqlInTracesView = () => !!searchObj.meta.sqlMode && searchObj.meta.searchMode === "traces";
+// Typed SQL feeds the panels only its top-level WHERE, or in the Traces view its trace selector, bracketed so the panels' own conditions bind outside it.
 const parseEffectiveFilter = (): string => {
   if (!searchObj.meta.sqlMode) return decodeFilter(effectiveFilter.value);
-  const where = analyzeTracesSql(effectiveFilter.value ?? "", tracesParser.value).where;
+  const sql = effectiveFilter.value ?? "";
+  const where = sqlInTracesView()
+    ? traceSelector(sql, tracesParser.value).filter
+    : analyzeTracesSql(sql, tracesParser.value).where;
   return where ? `(${where})` : "";
 };
-// Typed SQL may alias its stream, and its WHERE refers to that alias.
+// Typed SQL may alias its stream, and its WHERE refers to that alias; the Traces view selector reads the stream itself.
 const panelFrom = (streamName: string): string => {
   const quoted = `"${streamName}"`;
-  if (!searchObj.meta.sqlMode) return quoted;
+  if (!searchObj.meta.sqlMode || sqlInTracesView()) return quoted;
   return analyzeTracesSql(effectiveFilter.value ?? "", tracesParser.value).fromClause || quoted;
 };
 
@@ -689,6 +693,9 @@ const clearOriginalTimeRange = () => {
 };
 
 onMounted(() => {
+  // Typed SQL waits for Run, so a remount over an unrun edit draws no panels yet.
+  const applied = String(searchObj.data.appliedEditorValue ?? "").trim();
+  if (searchObj.meta.sqlMode && String(searchObj.data.editorValue ?? "").trim() !== applied) return;
   loadDashboard();
 });
 

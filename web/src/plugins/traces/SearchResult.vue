@@ -578,9 +578,10 @@ export default defineComponent({
       Number(searchObj.data.queryResults?.total ?? hits.value.length),
     );
 
-    // Results carry the SQL they ran, so a staged edit never reshapes the table.
+    // Results carry the SQL they ran, so a staged edit never reshapes the table; Traces view rows stay traces.
     const sqlInfo = computed(() => {
       const sql = searchObj.data.queryResults?.sql;
+      if (searchObj.meta.searchMode !== "spans") return null;
       return typeof sql === "string" && sql ? analyzeTracesSql(sql, tracesParser.value) : null;
     });
     const redAvailable = computed(

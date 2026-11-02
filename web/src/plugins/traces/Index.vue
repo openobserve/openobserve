@@ -81,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
               @filter-builder-growth="filterBuilderGrowth = $event"
               @drill-down="searchResultRef?.openComparison()"
+              :sql-templates="sqlTemplates"
               @sql-stream-change="onSqlStreamChange"
             />
           </div>
@@ -169,6 +170,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                       </TracesNoDataState>
                     </FirstDataPanel>
+                    <TracesSqlTemplateGallery
+                      v-else-if="!searchObj.loadingStream && sqlEditorEmpty && isStreamSelected"
+                      :view="searchObj.meta.searchMode === 'spans' ? 'spans' : 'traces'"
+                      :templates="sqlTemplates"
+                      @use="onUseSqlTemplate"
+                    />
                     <div
                       v-else-if="searchObj.data.errorMsg !== '' && !searchObj.loading"
                       data-test="traces-search-error-message"
@@ -196,15 +203,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @pick-stream="onPickTracesStream"
                       />
                     </div>
-                    <div v-else-if="sqlInTracesView" class="bg-card-glass-bg h-full">
+                    <div
+                      v-else-if="traceSqlProblem && sqlInTracesView"
+                      class="bg-card-glass-bg h-full"
+                    >
+                      <TracesSqlSelectorProblem
+                        :problem="traceSqlProblem.problem"
+                        :suggestion="traceSqlProblem.suggestion"
+                        :ai-enabled="isAiEnabled"
+                        @add-trace-id="onSqlAddTraceId(traceSqlProblem.sql)"
+                        @open-spans="onSearchModeChange('spans')"
+                        @ask-ai="onAskAiTraceSql"
+                      />
+                    </div>
+                    <div
+                      v-else-if="sqlAwaitingRun"
+                      class="bg-card-glass-bg h-full"
+                      data-test="traces-sql-awaiting-run"
+                    >
                       <OEmptyState
+                        illustration="query"
+                        variant="neutral"
                         size="hero"
-                        icon="code"
-                        :title="t('traces.sqlMode.tracesViewTitle')"
-                        :description="t('traces.sqlMode.tracesViewDescription')"
-                        :action-label="t('traces.sqlMode.openInSpans')"
-                        data-test="traces-sql-mode-traces-view"
-                        @action="onSearchModeChange('spans')"
+                        :title="
+                          searchObj.meta.searchMode === 'spans'
+                            ? t('traces.sqlMode.awaitingRun.spansTitle')
+                            : t('traces.sqlMode.awaitingRun.tracesTitle')
+                        "
+                        :description="t('traces.sqlMode.awaitingRun.description')"
+                        :action-label="t('emptyState.noQueryApplied.action')"
+                        action-icon="play-arrow"
+                        @action="() => searchData()"
                       />
                     </div>
                     <div
@@ -355,11 +384,18 @@ import {
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import {
   analyzeTracesSql,
+  canAddTraceId,
   insertTraceIdColumn,
   isRowQuery,
   sqlPaging,
+  traceIdSuggestion,
+  traceSelector,
+  type TraceSelectorProblem,
 } from "@/utils/traces/tracesSql";
-import { isSqlQuery } from "@/utils/query/sqlUtils";
+import { useTracesSqlTemplates } from "./composables/useTracesSqlTemplates";
+import TracesSqlTemplateGallery from "./components/TracesSqlTemplateGallery.vue";
+import TracesSqlSelectorProblem from "./components/TracesSqlSelectorProblem.vue";
+import { isAuthoredStatement } from "@/utils/query/freeTextFilter";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
@@ -494,6 +530,18 @@ watch([filterBuilderGrowth, isMobile], ([growth, mobile]) => {
   }
   autoSplitterHeight = target;
 });
+// The 90px bar shows two editor lines of 18px; SQL grows it to show up to six, and never shrinks a taller bar.
+const SQL_BAR_MAX_LINES = 6;
+const EDITOR_LINE_PX = 18;
+watch(
+  () => (searchObj.meta.sqlMode ? String(searchObj.data.editorValue ?? "").split("\n").length : 0),
+  (lines) => {
+    const fit = 90 + (Math.min(lines, SQL_BAR_MAX_LINES) - 2) * EDITOR_LINE_PX;
+    if (splitterModel.value >= fit) return;
+    splitterModel.value = fit;
+    onSplitterUpdate();
+  },
+);
 // md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
 let preTabletSplitter: number | null = null;
 watch(
@@ -564,6 +612,12 @@ let builtFromClause = "";
 let submittedFilter = "";
 // The typed SQL page 1 ran, sent as written; empty outside SQL mode.
 let submittedSql = "";
+// The last Run's Traces view SQL that cannot pick traces, with the fix to offer.
+const traceSqlProblem = ref<{
+  sql: string;
+  problem: TraceSelectorProblem;
+  suggestion: { before: string; after: string } | null;
+} | null>(null);
 // A link's page applies to the first search after it is read; any later Run starts at page 1.
 let pendingUrlPage: number | null = null;
 let stopUrlSync = syncUrlViewState();
@@ -752,7 +806,12 @@ function buildSearch(reuseLastWindow = false) {
     const queryFunctions = "";
     let whereClause = query.trim();
 
-    if (searchObj.meta.sqlMode) {
+    if (searchObj.meta.sqlMode && searchObj.meta.searchMode === "traces") {
+      // The count covers the traces the selector picks, over the selected stream.
+      builtWhereClause = traceSelector(query, tracesParser.value).filter;
+      builtFromClause = "";
+      req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", " WHERE " + builtWhereClause);
+    } else if (searchObj.meta.sqlMode) {
       // Typed SQL is sent as written, so the count reads its WHERE as typed.
       const typed = analyzeTracesSql(query, tracesParser.value);
       builtWhereClause = typed.where;
@@ -819,6 +878,21 @@ function dropKeptCount(results: any) {
   searchObj.meta.resultGrid.showPagination = false;
 }
 
+// Empty SQL waits for a template or typing; a Traces view query that cannot pick traces says why instead.
+function sqlRunBlocked(): boolean {
+  const sql = String(searchObj.data.editorValue ?? "").trim();
+  traceSqlProblem.value = null;
+  if (!sql) return true;
+  if (searchObj.meta.searchMode !== "traces") return false;
+  const { problem } = traceSelector(sql, tracesParser.value);
+  if (!problem) return false;
+  const addable =
+    problem === "noTraceId" && canAddTraceId(analyzeTracesSql(sql, tracesParser.value));
+  traceSqlProblem.value = { sql, problem, suggestion: addable ? traceIdSuggestion(sql) : null };
+  searchObj.data.errorMsg = "";
+  return true;
+}
+
 // A query that groups or limits rows has no WHERE count; its rows are the count.
 function settleSqlRowCount() {
   const results = searchObj.data.queryResults;
@@ -829,7 +903,11 @@ function settleSqlRowCount() {
 }
 
 function refreshResultCount() {
-  if (submittedSql && !isRowQuery(analyzeTracesSql(submittedSql, tracesParser.value))) {
+  if (
+    submittedSql &&
+    searchObj.meta.searchMode === "spans" &&
+    !isRowQuery(analyzeTracesSql(submittedSql, tracesParser.value))
+  ) {
     settleSqlRowCount();
   } else {
     fetchTracesCount();
@@ -982,8 +1060,13 @@ async function getQueryData(
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
     }
-    // The Traces view shows its SQL-mode state instead; the SQL runs in the Spans view.
-    if (sqlInTracesView.value) return false;
+    if (!isPagination && searchObj.meta.sqlMode && sqlRunBlocked()) {
+      // A blocked run answers with its reason, so the Run button no longer waits on it.
+      searchObj.data.appliedEditorValue = String(searchObj.data.editorValue ?? "");
+      searchObj.meta.lastRunSignature = tracesSearchRunSignature(searchObj);
+      sqlRanView.value = null;
+      return false;
+    }
     if (!isPagination) resetTraceRowSelection();
     searchObj.data.errorMsg = "";
     searchObj.data.errorDetail = "";
@@ -1050,12 +1133,15 @@ async function getQueryData(
 
     // A search or sort reads the editor and the resolved window; a page fetch keeps page 1's, so its selection still holds.
     if (!isPagination) {
-      submittedFilter = buildEditorFilter();
+      submittedFilter = sqlInTracesView.value
+        ? traceSelector(submittedSql, tracesParser.value).filter
+        : buildEditorFilter();
       searchObj.data.appliedEditorValue = String(searchObj.data.editorValue ?? "");
+      sqlRanView.value = searchObj.meta.sqlMode ? searchObj.meta.searchMode : null;
       dropStaleSelection();
       searchObj.meta.lastRunSignature = tracesSearchRunSignature(searchObj);
     }
-    if (submittedSql) {
+    if (submittedSql && searchObj.meta.searchMode === "spans") {
       const paging = sqlPaging(
         analyzeTracesSql(submittedSql, tracesParser.value),
         searchObj.meta.resultGrid.rowsPerPage,
@@ -2114,19 +2200,36 @@ const sqlInTracesView = computed(
   () => !!searchObj.meta.sqlMode && searchObj.meta.searchMode === "traces",
 );
 
-// An emptied editor holds no SQL, however it was emptied.
-watch(
-  () => searchObj.data.editorValue,
-  (value) => {
-    if (searchObj.meta.sqlMode && !String(value ?? "").trim()) searchObj.meta.sqlMode = false;
-  },
+const sqlEditorEmpty = computed(
+  () => !!searchObj.meta.sqlMode && !String(searchObj.data.editorValue ?? "").trim(),
 );
+
+// The view whose results came from a run of SQL; anything else on screen in SQL mode did not run yet.
+const sqlRanView = ref<string | null>(null);
+const sqlAwaitingRun = computed(
+  () => !!searchObj.meta.sqlMode && sqlRanView.value !== searchObj.meta.searchMode,
+);
+// Sync, so a run started in the same tick as the switch keeps its view.
+watch(
+  () => searchObj.meta.sqlMode,
+  () => {
+    sqlRanView.value = null;
+  },
+  { flush: "sync" },
+);
+watch(sqlEditorEmpty, (empty) => {
+  if (empty) sqlRanView.value = null;
+});
+
+const { sqlTemplates } = useTracesSqlTemplates();
 
 // Results shaped by typed SQL do not describe the filter that replaces it.
 watch(
   () => searchObj.meta.sqlMode,
   (on) => {
-    if (on || !searchObj.data.queryResults?.sql) return;
+    if (on) return;
+    traceSqlProblem.value = null;
+    if (!searchObj.data.queryResults?.sql) return;
     searchObj.data.queryResults = {};
     searchObj.data.sortedQueryResults = [];
   },
@@ -2283,6 +2386,27 @@ const onAskAiTracing = () => {
     "sendToAiChat",
     raw(
       `${outcome} I am searching ${mode}. ${queryText} Stream: ${stream}. Time range: ${timeRange}. Can you help me adjust ${ask} to get results?`,
+    ),
+    false,
+  );
+};
+
+// Model input, not screen copy: kept English, like the page's other Ask AI prompts.
+const TRACE_SQL_PROBLEM_PROMPTS: Record<TraceSelectorProblem, string> = {
+  noTraceId: "The query does not return a trace_id column.",
+  selectAll: "The query uses SELECT *, but it must name trace_id in its SELECT list.",
+  notSingleSelect: "The query must be a single SELECT, without WITH, UNION or EXPLAIN.",
+  quotedMarker: "The query has -- or ; inside quoted text, which the Traces view removes.",
+};
+
+const onAskAiTraceSql = () => {
+  const blocked = traceSqlProblem.value;
+  if (!blocked) return;
+  const stream = searchObj.data.stream.selectedStream?.value || "unknown";
+  emit(
+    "sendToAiChat",
+    raw(
+      `In the traces explorer's Traces view my SQL runs as the filter trace_id IN (<query>), so the query must be one SELECT that returns trace_id. ${TRACE_SQL_PROBLEM_PROMPTS[blocked.problem]} The SQL query is: ${blocked.sql}. Stream: ${stream}. Can you rewrite the query so it returns the trace_id of the traces I want?`,
     ),
     false,
   );
@@ -2493,12 +2617,18 @@ const onSqlStreamChange = async (stream: string) => {
   await loadSelectedStreamFields();
 };
 
-const onSqlAddTraceId = () => {
-  const sql = insertTraceIdColumn(String(searchObj.data.queryResults?.sql ?? ""));
+const onSqlAddTraceId = (source?: string) => {
+  const sql = insertTraceIdColumn(String(source ?? searchObj.data.queryResults?.sql ?? ""));
   if (!sql) return;
   searchObj.data.editorValue = sql;
   searchBarRef.value?.setEditorValue?.(sql);
   searchData();
+};
+
+// A template fills the editor only; typed SQL always waits for Run.
+const onUseSqlTemplate = (sql: string) => {
+  searchObj.data.editorValue = sql;
+  searchBarRef.value?.setEditorValue?.(sql);
 };
 
 const syncSavedViewDateTime = async (datetime: TracesSavedView["datetime"]) => {
@@ -2552,7 +2682,7 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
   await syncSavedViewDateTime(view.datetime);
   if (seq !== savedViewApplySeq) return;
   // Version 1 views carry no mode, so the text itself says whether it is SQL.
-  searchObj.meta.sqlMode = isSqlQuery(view.editorValue ?? "");
+  searchObj.meta.sqlMode = isAuthoredStatement(view.editorValue ?? "");
   searchObj.data.editorValue = view.editorValue;
   searchBarRef.value?.setEditorValue?.(view.editorValue);
   searchObj.meta.resultGrid.sortBy = view.sortBy;

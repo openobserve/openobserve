@@ -75,6 +75,7 @@ const mockSearchObj = reactive({
   loading: false,
   data: {
     editorValue: "",
+    appliedEditorValue: null as string | null,
     datetime: { startTime: 1_000_000, endTime: 2_000_000 },
     stream: {
       selectedStream: { value: "default" },
@@ -90,10 +91,12 @@ const mockSearchObj = reactive({
   },
 });
 
+const { mockTracesParser } = vi.hoisted(() => ({ mockTracesParser: { value: null as any } }));
+
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
     searchObj: mockSearchObj,
-    tracesParser: { value: null },
+    tracesParser: mockTracesParser,
   }),
 }));
 
@@ -257,6 +260,7 @@ describe("TracesMetricsDashboard", () => {
     mockMetricsRangeFilters.clear();
     mockSearchObj.loading = false;
     mockSearchObj.data.editorValue = "";
+    mockSearchObj.data.appliedEditorValue = null;
     mockSearchObj.data.datetime = { startTime: 1_000_000, endTime: 2_000_000 };
     mockStore.state.timezone = "UTC";
     mockSearchObj.meta.showHistogram = true;
@@ -1780,6 +1784,54 @@ ORDER BY start_time DESC`;
       expect(wrapper.emitted("time-range-selected")![0][0]).toEqual({ start: 1_000, end: 2_000 });
       expect(wrapper.emitted("editor-filter-set")).toBeFalsy();
       expect(mockMetricsRangeFilters.size).toBe(0);
+    });
+
+    it.each(["traces", "spans"] as const)(
+      "waits for Run when it mounts over unrun SQL in the %s view",
+      async (mode) => {
+        wrapper.unmount();
+        mockSearchObj.meta.sqlMode = true;
+        mockSearchObj.meta.searchMode = mode;
+        mockSearchObj.data.appliedEditorValue = `SELECT trace_id FROM "default"`;
+        mockSearchObj.data.editorValue = `SELECT trace_id FROM "default" WHERE duration > 1`;
+        wrapper = mountComponent();
+        await flushPromises();
+        expect(wrapper.vm.dashboardData).toBeNull();
+        expect(wrapper.vm.heatmapRequest).toBeNull();
+
+        wrapper.unmount();
+        mockSearchObj.data.appliedEditorValue = mockSearchObj.data.editorValue;
+        wrapper = mountComponent();
+        await flushPromises();
+        expect(getPanelQuery(wrapper, "Rate")).not.toBe("");
+      },
+    );
+
+    it("loads on mount in filter mode even with an unrun edit", async () => {
+      wrapper.unmount();
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.data.appliedEditorValue = "duration > 1";
+      mockSearchObj.data.editorValue = "duration > 2";
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(getPanelQuery(wrapper, "Rate")).toContain("duration > 2");
+    });
+
+    it("feeds the Traces view panels the trace selector over the selected stream", async () => {
+      const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
+      mockTracesParser.value = new mod.default.Parser();
+      const selector = `SELECT t.trace_id, count(*) AS n FROM "default" t GROUP BY t.trace_id HAVING count(*) > 200`;
+      await remountWith(`${selector};`);
+      mockSearchObj.meta.searchMode = "traces";
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      mockTracesParser.value = null;
+
+      const where = `(trace_id IN (SELECT trace_id FROM (${selector})))`;
+      expect(getPanelQuery(wrapper, "Rate")).toContain(`FROM "default" WHERE ${where}`);
+      expect(getPanelQuery(wrapper, "Rate")).toContain("approx_distinct(trace_id)");
+      expect(getPanelQuery(wrapper, "Errors")).toContain(`span_status = 'ERROR' AND ${where}`);
+      expect(getHeatmapSql(wrapper)).toContain(`FROM "default" WHERE ${where}`);
     });
 
     it("tells the heatmap it is showing typed SQL", async () => {

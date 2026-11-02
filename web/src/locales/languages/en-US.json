@@ -17159,12 +17159,69 @@
       "putConditionInWhere": "In SQL mode, put the condition in your WHERE clause",
       "rowsCount": "{count} row | {count} rows",
       "redUnavailable": "RED charts are off for queries that group, aggregate, join, limit or use DISTINCT, WITH or UNION: they would not describe the rows in the table.",
-      "tracesViewTitle": "SQL mode runs in the Spans view for now",
-      "tracesViewDescription": "Your SQL is kept. Open the Spans view to run it.",
       "openInSpans": "Open in Spans view",
+      "openInSpansDesc": "Runs the query as written and shows its rows",
+      "examples": "Examples",
+      "gallery": {
+        "tracesTitle": "Find traces with SQL",
+        "tracesLede": "Your query picks the traces. The list shows each trace in full, with its spans, services and duration. Start from a template or write your own.",
+        "spansTitle": "Summarize spans with SQL",
+        "spansLede": "Your query runs over spans, and the result shows as a table with one column per field. Start from a template or write your own.",
+        "useTemplate": "Use template"
+      },
+      "templates": {
+        "slowTraces": { "name": "Slow traces", "description": "Whole trace longer than 2 s" },
+        "bigTraces": { "name": "Big traces", "description": "More than 200 spans" },
+        "errorsInTwoServices": {
+          "name": "Errors in two services",
+          "description": "{first} fails and {second} is called"
+        },
+        "nPlusOne": {
+          "name": "N+1 database calls",
+          "description": "One parent with more than 50 client spans"
+        },
+        "missingSpan": {
+          "name": "Missing span",
+          "description": "Calls {first} but never reaches {second}"
+        },
+        "manyServices": {
+          "name": "Crosses 5+ services",
+          "description": "Five or more services in one trace"
+        },
+        "p95ByVersion": {
+          "name": "p95 by version",
+          "description": "Compare releases by p95 duration"
+        },
+        "p95ByOperation": { "name": "p95 by operation", "description": "Top 10 slow operations" },
+        "spansPerMinute": {
+          "name": "Spans per service per minute",
+          "description": "Span volume over time"
+        },
+        "nullAudit": {
+          "name": "Null and cardinality audit",
+          "description": "Data quality per service"
+        },
+        "tokensByModel": { "name": "Tokens by model", "description": "Input tokens per model" }
+      },
+      "selector": {
+        "title": "This Query Can't Be Shown as Traces",
+        "quotedMarkerTitle": "This Query Can't Run in the Traces View",
+        "noTraceId": "The Traces view groups spans by trace_id, and this query does not return it.",
+        "selectAll": "The Traces view needs trace_id named in the SELECT list. SELECT * returns every column, so it runs in the Spans view.",
+        "notSingleSelect": "The Traces view runs one SELECT that returns trace_id. WITH, UNION, EXPLAIN and several statements run in the Spans view.",
+        "quotedMarker": "The Traces view removes every -- and ; from the query, even inside quoted text. Take them out of the quoted text, or run the query in the Spans view.",
+        "suggestedChange": "Suggested change",
+        "addTraceIdAndRun": "Add trace_id and Run",
+        "addTraceIdAndRunDesc": "Applies the change above, then runs the query"
+      },
       "noTraceIdHint": "These rows have no trace_id, so they do not open a trace.",
       "addTraceId": "Add trace_id",
-      "openTrace": "Open trace"
+      "openTrace": "Open trace",
+      "awaitingRun": {
+        "tracesTitle": "Run the query to see traces",
+        "spansTitle": "Run the query to see results",
+        "description": "Nothing has run yet. Run query sends the SQL in the editor."
+      }
     },
     "redActions": {
       "menuGroupDashboards": "Dashboards",

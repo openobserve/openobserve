@@ -383,6 +383,25 @@ vi.mock("@/services/product_analytics", () => ({
   },
 }));
 
+const { mockSqlTemplates } = vi.hoisted(() => ({
+  mockSqlTemplates: [
+    {
+      id: "bigTraces",
+      sql: `SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200`,
+      services: [],
+    },
+  ],
+}));
+
+vi.mock("@/plugins/traces/composables/useTracesSqlTemplates", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  const { computed } = await import("vue");
+  return {
+    ...actual,
+    useTracesSqlTemplates: () => ({ sqlTemplates: computed(() => mockSqlTemplates) }),
+  };
+});
+
 // Mock SQL parser
 vi.mock("@/composables/useParser", () => ({
   default: () => ({
@@ -5009,27 +5028,224 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.queryResults.is_histogram_eligible).toBe(false);
     });
 
-    it("does not send SQL from the Traces view and offers the Spans view", async () => {
+    const useRealParser = async () => {
+      const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
+      const real = new mod.default.Parser();
+      for (const created of createdTracesParsers as any[]) {
+        created.astify.mockImplementation((sql: string) => real.astify(sql));
+      }
+    };
+
+    const runTracesSql = async (sql: string) => {
       await mountSql();
+      await useRealParser();
       mockSearchObj.meta.searchMode = "traces";
       mockSearchObj.meta.sqlMode = true;
-      mockSearchObj.data.editorValue = grouped;
+      mockSearchObj.data.editorValue = sql;
       mockSearchObj.searchApplied = true;
       wrapper.vm.searchData();
       await flushPromises();
-      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
       for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
       await nextTick();
+    };
 
-      const empty = wrapper.findComponent('[data-test="traces-sql-mode-traces-view"]');
-      expect(empty.exists()).toBe(true);
-      empty.vm.$emit("action");
+    const big = `SELECT trace_id FROM "default" GROUP BY trace_id HAVING count(*) > 200`;
+
+    it("sends Traces view SQL as trace_id IN (...) to the trace list, paged and sorted by the server", async () => {
+      await runTracesSql(`-- big ones\n${big};`);
+      const [request] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      expect(request.type).toBe("traces");
+      expect(request.queryReq).toMatchObject({
+        stream_name: "default",
+        filter: `trace_id IN (${big})`,
+        from: 0,
+        size: 25,
+        sort_by: "start_time",
+        sort_order: "desc",
+      });
+    });
+
+    it("counts the traces the Traces view SQL picks over the selected stream", async () => {
+      await runTracesSql(big);
+      const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      await finish(handlers, [{ trace_id: "t1", start_time: 1 }]);
+      const [countRequest] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      const countSql = b64DecodeUnicode(countRequest.queryReq.query.sql);
+      expect(countSql).toContain(`approx_distinct(trace_id)`);
+      expect(countSql).toContain(`FROM "default" WHERE trace_id IN (${big})`);
+    });
+
+    it("shows why a query without trace_id cannot run, and Add trace_id and Run fixes it", async () => {
+      const spans = `SELECT service_name, duration\nFROM "default"\nWHERE duration > 2000000`;
+      await runTracesSql(spans);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      const state = wrapper.findComponent({ name: "TracesSqlSelectorProblem" });
+      expect(state.props("problem")).toBe("noTraceId");
+      expect(state.props("suggestion")).toEqual({
+        before: "SELECT service_name, duration",
+        after: "SELECT trace_id, service_name, duration",
+      });
+
+      state.vm.$emit("add-trace-id");
+      await flushPromises();
+
+      const fixed = `SELECT trace_id, service_name, duration\nFROM "default"\nWHERE duration > 2000000`;
+      expect(mockSearchObj.data.editorValue).toBe(fixed);
+      const [request] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      expect(request.queryReq.filter).toBe(`trace_id IN (SELECT trace_id FROM (${fixed}))`);
+    });
+
+    it("offers no change for a grouped query, and Open in Spans view runs it there", async () => {
+      await runTracesSql(grouped);
+      const state = wrapper.findComponent({ name: "TracesSqlSelectorProblem" });
+      expect(state.props("problem")).toBe("noTraceId");
+      expect(state.props("suggestion")).toBeNull();
+
+      state.vm.$emit("open-spans");
       await flushPromises();
 
       expect(mockSearchObj.meta.searchMode).toBe("spans");
       expect(mockSearchObj.data.editorValue).toBe(grouped);
       const [request] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
       expect(b64DecodeUnicode(request.queryReq.query.sql)).toBe(grouped);
+    });
+
+    it.each([
+      `SELECT service_name FROM "default"`,
+      `SELECT trace_id FROM "default" WHERE a = 'x;y'`,
+    ])("counts a blocked run of %s as applied, so Run is not left pending", async (sql) => {
+      mockSearchObj.meta.lastRunSignature = null;
+      mockSearchObj.data.appliedEditorValue = null;
+      await runTracesSql(sql);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      expect(wrapper.findComponent({ name: "TracesSqlSelectorProblem" }).exists()).toBe(true);
+      expect(mockSearchObj.data.appliedEditorValue).toBe(sql);
+      expect(mockSearchObj.meta.lastRunSignature).toBe(tracesSearchRunSignature(mockSearchObj));
+    });
+
+    it("grows the query bar to fit up to six lines of SQL, and never for a filter", async () => {
+      await mountSql();
+      // Only meta is reactive in this mock, so each text is set with SQL off and shown by turning SQL on.
+      const showSql = async (text: string, sqlMode = true) => {
+        mockSearchObj.meta.sqlMode = false;
+        await flushPromises();
+        mockSearchObj.data.editorValue = text;
+        mockSearchObj.meta.sqlMode = sqlMode;
+        await flushPromises();
+      };
+      await showSql("a = 1\nAND b = 2\nAND c = 3", false);
+      expect(wrapper.vm.splitterModel).toBe(90);
+
+      await showSql(`SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200`);
+      expect(wrapper.vm.splitterModel).toBe(108);
+
+      await showSql(Array.from({ length: 9 }, (_, i) => `-- ${i}`).join("\n"));
+      expect(wrapper.vm.splitterModel).toBe(162);
+
+      await showSql("SELECT 1");
+      expect(wrapper.vm.splitterModel).toBe(162);
+    });
+
+    it.each([
+      ["traces", "traces.sqlMode.awaitingRun.tracesTitle"],
+      ["spans", "traces.sqlMode.awaitingRun.spansTitle"],
+    ] as const)(
+      "in the %s view, unrun SQL shows a Run prompt instead of results, until Run",
+      async (mode, titleKey) => {
+        await mountSql();
+        mockSearchObj.meta.searchMode = mode;
+        mockSearchObj.searchApplied = true;
+        mockSearchObj.data.editorValue = big;
+        mockSearchObj.meta.sqlMode = true;
+        await flushPromises();
+        for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+        await nextTick();
+
+        const prompt = wrapper.find('[data-test="traces-sql-awaiting-run"]');
+        expect(prompt.exists()).toBe(true);
+        expect(prompt.text()).toContain(i18n.global.t(titleKey));
+        expect(wrapper.find('[data-test="logs-search-search-result"]').exists()).toBe(false);
+
+        wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action");
+        await flushPromises();
+        for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+        await nextTick();
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+        expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="logs-search-search-result"]').exists()).toBe(true);
+      },
+    );
+
+    it("asks for Run again when the view changes or SQL is turned off and on", async () => {
+      await runTracesSql(big);
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(false);
+
+      mockSearchObj.meta.searchMode = "spans";
+      await flushPromises();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(true);
+
+      mockSearchObj.meta.searchMode = "traces";
+      mockSearchObj.meta.sqlMode = false;
+      await flushPromises();
+      mockSearchObj.meta.sqlMode = true;
+      await flushPromises();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(true);
+    });
+
+    it("never shows the SQL Run prompt in filter mode", async () => {
+      await mountSql();
+      mockSearchObj.meta.searchMode = "traces";
+      mockSearchObj.searchApplied = true;
+      mockSearchObj.data.editorValue = "duration > 1";
+      mockSearchObj.meta.sqlMode = false;
+      await flushPromises();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(false);
+    });
+
+    it("rejects SELECT * in the Traces view", async () => {
+      await runTracesSql(`SELECT * FROM "default" WHERE a = 1`);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      const state = wrapper.findComponent({ name: "TracesSqlSelectorProblem" });
+      expect(state.props("problem")).toBe("selectAll");
+      expect(state.props("suggestion")).toBeNull();
+    });
+
+    it("asks AI with the query and why it cannot run", async () => {
+      await runTracesSql(`SELECT service_name FROM "default"`);
+      wrapper.findComponent({ name: "TracesSqlSelectorProblem" }).vm.$emit("ask-ai");
+      const [prompt, append] = wrapper.emitted("sendToAiChat")!.at(-1) as any[];
+      expect(String(prompt)).toContain(`The SQL query is: SELECT service_name FROM "default".`);
+      expect(String(prompt)).toContain("does not return a trace_id column");
+      expect(append).toBe(false);
+    });
+
+    it("shows the template gallery for an empty SQL editor, and a template fills it without running", async () => {
+      await mountSql();
+      mockSearchObj.meta.searchMode = "traces";
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = "";
+      wrapper.vm.searchData();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+
+      const gallery = wrapper.findComponent({ name: "TracesSqlTemplateGallery" });
+      expect(gallery.props("view")).toBe("traces");
+      expect(gallery.props("templates")).toEqual(mockSqlTemplates);
+
+      gallery.vm.$emit("use", mockSqlTemplates[0].sql);
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe(mockSqlTemplates[0].sql);
+      expect(mockSearchObj.meta.sqlMode).toBe(true);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
     });
 
     it("adds trace_id to the select list and runs", async () => {

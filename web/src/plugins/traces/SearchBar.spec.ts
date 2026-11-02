@@ -3307,6 +3307,7 @@ describe("SearchBar", () => {
     });
 
     it("pre-fills SQL from the filter on switching on, without running it", async () => {
+      searchObjInstance.meta.searchMode = "spans";
       searchObjInstance.data.editorValue = "service_name = 'api'";
       wrapper = mountSearchBar();
       await flushPromises();
@@ -3321,7 +3322,20 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("searchdata")).toBeUndefined();
     });
 
-    it("resolves duration units in the pre-filled WHERE and leaves it out for an empty filter", async () => {
+    it("pre-fills a trace selector from the filter in the Traces view", async () => {
+      searchObjInstance.meta.searchMode = "traces";
+      searchObjInstance.data.editorValue = "duration > '5ms'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await (wrapper.vm as any).setSqlMode(true);
+      expect(searchObjInstance.data.editorValue).toBe(
+        `SELECT trace_id FROM "default" WHERE duration > 5000`,
+      );
+      expect(wrapper.emitted("searchdata")).toBeUndefined();
+    });
+
+    it("resolves duration units in the pre-filled WHERE and leaves an empty editor empty", async () => {
+      searchObjInstance.meta.searchMode = "spans";
       searchObjInstance.data.editorValue = "duration > '5ms'";
       wrapper = mountSearchBar();
       await flushPromises();
@@ -3333,9 +3347,40 @@ describe("SearchBar", () => {
       await (wrapper.vm as any).setSqlMode(false);
       searchObjInstance.data.editorValue = "";
       await (wrapper.vm as any).setSqlMode(true);
-      expect(searchObjInstance.data.editorValue).toBe(
-        `SELECT * FROM "default" ORDER BY start_time DESC`,
-      );
+      expect(searchObjInstance.meta.sqlMode).toBe(true);
+      expect(searchObjInstance.data.editorValue).toBe("");
+    });
+
+    it("offers the view's templates under Examples once the editor has SQL, and fills it without running", async () => {
+      const templates = [
+        { id: "bigTraces", sql: `SELECT trace_id FROM "default" GROUP BY trace_id`, services: [] },
+        { id: "slowTraces", sql: `SELECT trace_id FROM "default"`, services: [] },
+      ];
+      searchObjInstance.meta.sqlMode = true;
+      searchObjInstance.data.editorValue = "";
+      wrapper = mountSearchBar({ sqlTemplates: templates });
+      await flushPromises();
+      expect(wrapper.find('[data-test="traces-sql-examples-btn"]').exists()).toBe(false);
+
+      searchObjInstance.data.editorValue = `SELECT trace_id FROM "default" WHERE a = 1`;
+      await flushPromises();
+      const items = wrapper.findAll('[data-test="traces-sql-examples-item"]');
+      expect(items).toHaveLength(2);
+
+      await items[1].trigger("click");
+      expect(searchObjInstance.data.editorValue).toBe(templates[1].sql);
+      expect(searchObjInstance.meta.sqlMode).toBe(true);
+      expect(wrapper.emitted("searchdata")).toBeUndefined();
+    });
+
+    it("shows no Examples outside SQL mode", async () => {
+      searchObjInstance.meta.sqlMode = false;
+      searchObjInstance.data.editorValue = "a = 1";
+      wrapper = mountSearchBar({
+        sqlTemplates: [{ id: "bigTraces", sql: "SELECT trace_id FROM x", services: [] }],
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="traces-sql-examples-btn"]').exists()).toBe(false);
     });
 
     it("keeps an already typed statement on switching on", async () => {
@@ -3413,6 +3458,32 @@ describe("SearchBar", () => {
       expect(searchObjInstance.data.editorValue).toBe("a = 1");
     });
 
+    it("turns the Traces view selector back into its filter without asking", async () => {
+      searchObjInstance.meta.searchMode = "traces";
+      searchObjInstance.data.editorValue = "duration > '5ms'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await (wrapper.vm as any).setSqlMode(true);
+      await (wrapper.vm as any).setSqlMode(false);
+
+      expect(mockConfirm).not.toHaveBeenCalled();
+      expect(searchObjInstance.meta.sqlMode).toBe(false);
+      expect(searchObjInstance.data.editorValue).toBe("duration > 5000");
+    });
+
+    it("still asks before turning the same selector off in the Spans view", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      searchObjInstance.meta.sqlMode = true;
+      searchObjInstance.data.editorValue = `SELECT trace_id FROM "default" WHERE a = 1`;
+      mockConfirm.mockResolvedValueOnce(false);
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await (wrapper.vm as any).setSqlMode(false);
+
+      expect(mockConfirm).toHaveBeenCalledTimes(1);
+      expect(searchObjInstance.meta.sqlMode).toBe(true);
+    });
+
     it("shows an SQL indicator on More only while SQL mode is on and unpinned", async () => {
       setPinned(false);
       wrapper = mountSearchBar();
@@ -3445,6 +3516,30 @@ describe("SearchBar", () => {
       expect(searchObjInstance.meta.sqlMode).toBe(false);
       expect(searchObjInstance.data.editorValue).toBe("a = 1");
     });
+
+    it.each(["traces", "spans"] as const)(
+      "keeps SQL mode on for a statement that starts with a comment in the %s view",
+      async (mode) => {
+        searchObjInstance.meta.searchMode = mode;
+        wrapper = mountSearchBar();
+        await flushPromises();
+        const vm = wrapper.vm as any;
+
+        const lineComment = `-- slow ones\nSELECT trace_id FROM "default"`;
+        vm.updateQueryValue(lineComment);
+        expect(searchObjInstance.meta.sqlMode).toBe(true);
+
+        const blockComment = `/* slow */ SELECT trace_id FROM "default"`;
+        searchObjInstance.data.editorValue = blockComment;
+        vm.updateQueryValue(blockComment);
+        expect(searchObjInstance.meta.sqlMode).toBe(true);
+
+        await vm.setSqlMode(false);
+        searchObjInstance.data.editorValue = lineComment;
+        await vm.setSqlMode(true);
+        expect(searchObjInstance.data.editorValue).toBe(lineComment);
+      },
+    );
 
     it("asks to switch the stream when FROM names another real stream", async () => {
       searchObjInstance.meta.sqlMode = true;
