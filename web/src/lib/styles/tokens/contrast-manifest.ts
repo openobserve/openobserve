@@ -898,18 +898,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["dark"],
   },
   {
-    fg: "--color-text-label",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-  },
-  {
-    fg: "--color-text-muted",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-  },
-  {
     fg: "--color-thread-tool-link",
     category: "pending",
     why: "fails the threshold against the page surface it is painted on",

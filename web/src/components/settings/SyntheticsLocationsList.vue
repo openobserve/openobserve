@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #toolbar-trailing>
               <OButton
                 variant="outline"
-                size="icon-sm"
+                size="icon-xs-sq"
                 icon-left="refresh"
                 :loading="listLoading"
                 data-test="synthetics-locations-refresh-btn"
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-else
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   class="max-md:hidden"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   :data-test="`synthetics-locations-${row.id}-${row.enabled ? 'disable' : 'enable'}-btn`"
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`synthetics-locations-${row.id}-edit-btn`"
                   data-row-action="edit"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   class="max-md:hidden"
                   :title="t('common.edit')"
                   @click.stop="openEditDialog(row)"
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`synthetics-locations-${row.id}-delete-btn`"
                   data-row-action="delete"
                   variant="ghost-destructive"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   class="max-md:hidden"
                   :title="t('common.delete')"
                   @click.stop="confirmDelete(row)"

@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #title>
         {{ t("modelPricing.header") }}
-        <OButton variant="ghost" size="icon-sm" class="-ms-1" data-test="model-pricing-info-btn">
+        <OButton variant="ghost" size="icon-xs-sq" class="-ms-1" data-test="model-pricing-info-btn">
           <OIcon name="info-outline" size="sm" />
           <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
         </OButton>
@@ -339,21 +339,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                           <div
                             v-if="tier.utc_windows?.length"
-                            class="text-2xs font-mono opacity-70"
+                            class="text-2xs text-text-secondary font-mono"
                           >
                             {{ formatUtcWindows(tier.utc_windows) }}
                           </div>
-                          <div v-if="tierWindowsLocal(tier)" class="text-2xs font-mono opacity-70">
+                          <div
+                            v-if="tierWindowsLocal(tier)"
+                            class="text-2xs text-text-secondary font-mono"
+                          >
                             {{ t("modelPricing.localTimeHint", { range: tierWindowsLocal(tier) }) }}
                           </div>
                           <div
                             v-for="(rule, rIdx) in tier.rules ?? []"
                             :key="rIdx"
-                            class="text-2xs font-mono opacity-70"
+                            class="text-2xs text-text-secondary font-mono"
                           >
                             {{ formatTierRule(rule, t) }}
                           </div>
-                          <div v-if="isUnrestrictedTier(tier)" class="text-2xs opacity-70">
+                          <div v-if="isUnrestrictedTier(tier)" class="text-2xs text-text-secondary">
                             {{ t("modelPricing.tierAlwaysActive") }}
                           </div>
                           <table class="mt-0.5 w-full border-collapse">
@@ -383,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="!isReadOnly(row)">
                 <OButton
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   class="max-md:hidden"
                   :title="
                     row.enabled ? t('modelPricing.actionDisable') : t('modelPricing.actionEnable')
@@ -395,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   class="max-md:hidden"
                   :title="t('modelPricing.actionEdit')"
                   @click.stop="openEditor(row)"
@@ -425,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       icon-left="more-vert"
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon-xs-sq"
                       :aria-label="duplicateActionLabel(row, t('modelPricing.moreActions'))"
                       data-test="model-pricing-row-more-actions"
                       @click.stop
@@ -481,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else>
                 <OButton
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   :aria-label="duplicateActionLabel(row, t('modelPricing.actionClone'))"
                   @click.stop="duplicateModel(row)"
                   data-test="model-pricing-clone-btn"
@@ -627,13 +630,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                   </div>
                   <div v-if="tier.utc_windows?.length" class="mt-2">
-                    <div class="text-2xs mb-1.5 opacity-55">
+                    <div class="text-2xs text-text-secondary mb-1.5">
                       {{ t("modelPricing.timeWindows") }}
                       <span class="ms-1 font-mono">{{ formatUtcWindows(tier.utc_windows) }}</span>
                     </div>
                     <div
                       v-if="tierWindowsLocal(tier)"
-                      class="text-2xs mb-1.5 opacity-55"
+                      class="text-2xs text-text-secondary mb-1.5"
                       data-test="model-pricing-drawer-tier-local-hint"
                     >
                       {{ t("modelPricing.localTimeHint", { range: tierWindowsLocal(tier) }) }}
@@ -648,7 +651,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OCode>{{ formatTierRule(rule, t) }}</OCode>
                   </div>
-                  <div v-if="isUnrestrictedTier(tier)" class="text-2xs mt-0.5 opacity-55">
+                  <div v-if="isUnrestrictedTier(tier)" class="text-2xs text-text-secondary mt-0.5">
                     {{ t("modelPricing.tierAlwaysActive") }}
                   </div>
                 </div>

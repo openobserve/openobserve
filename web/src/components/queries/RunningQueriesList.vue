@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #toolbar-trailing>
         <OButton
           variant="outline"
-          size="icon-sm"
+          size="icon-xs-sq"
           class="shrink-0"
           icon-left="refresh"
           data-test="running-queries-refresh-btn"
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           icon-left="format-list-bulleted"
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           class="max-md:hidden"
           :title="t('queries.queryList')"
           data-test="queryList-btn"
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           icon-left="close"
           variant="ghost-destructive"
-          size="icon-sm"
+          size="icon-xs-sq"
           class="max-md:hidden"
           :title="t('queries.cancelQuery')"
           data-test="cancelQuery-btn"

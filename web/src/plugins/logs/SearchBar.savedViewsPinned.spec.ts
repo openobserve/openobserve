@@ -38,7 +38,9 @@ describe("SearchBar — pinned saved views", () => {
       vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
         this: HTMLElement,
       ) {
-        const isToolbarBar = this.classList.contains("border-b-card-glass-border");
+        const isToolbarBar =
+          this.classList.contains("border-border-default") &&
+          this.classList.contains("overflow-hidden");
         return { width: isToolbarBar ? toolbarWidth : 0 } as DOMRect;
       });
     }
@@ -66,14 +68,14 @@ describe("SearchBar — pinned saved views", () => {
     vi.restoreAllMocks();
   });
 
-  it("gives the list trigger the grouped xs size with an icon and a caret", async () => {
+  it("gives the list trigger the toolbar size with an icon and a caret", async () => {
     wrapper = mountSearchBar(1600);
     await flushPromises();
 
     const trigger = group()
       .findAllComponents({ name: "OButton" })
       .find((b) => b.attributes("data-test") === "logs-search-bar-saved-views-pinned-list-btn")!;
-    expect(trigger.props("size")).toBe("xs-grouped");
+    expect(trigger.props("size")).toBe("sm-toolbar");
     const icons = trigger.findAllComponents({ name: "OIcon" }).map((c) => c.props("name"));
     expect(icons).toEqual(["saved-search", "arrow-drop-down"]);
   });
@@ -104,7 +106,7 @@ describe("SearchBar — pinned saved views", () => {
       group().find('[data-test="logs-search-bar-saved-views-pinned-create-btn"]').classes(),
     ).toContain("size-8!");
     expect(wrapper!.find('[data-test="logs-search-bar-reset-filters-btn"]').classes()).toContain(
-      "h-[2.125rem]!",
+      "h-8.5",
     );
   });
 
@@ -255,12 +257,12 @@ describe("SearchBar — pinned saved views", () => {
     expect(group().exists()).toBe(false);
   });
 
-  // 89px = 1px border + 54px list trigger + 1px separator + 32px create button + 1px border.
+  // 93px = 1px border + 58px list trigger + 1px separator + 32px create button + 1px border.
   it.each([
-    [698, false],
-    [699, true],
+    [680, false],
+    [681, true],
   ])(
-    "budgets the group at its rendered 89px width (toolbar %ipx → shown: %s)",
+    "budgets the group at its rendered 93px width (toolbar %ipx → shown: %s)",
     async (width, shown) => {
       const otherPins = (["histogram", "sqlMode", "quickMode", "syntaxGuide"] as const).filter(
         (key) => isPinned(key),
