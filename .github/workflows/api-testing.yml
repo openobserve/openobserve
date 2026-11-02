@@ -82,8 +82,6 @@ jobs:
 
       - name: Checkout git repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
