@@ -1293,10 +1293,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :fields="filterBuilderFields"
                   :load-values="loadFilterBuilderValues"
                   :fields-loading="searchObj.loadingStream"
+                  :extra-suggestions="recentFilterSection"
                   data-test="logs-search-bar-filter-builder"
                   @update:query="onFilterBuilderQuery"
                   @submit="handleRunQueryFn()"
                   @exit="toggleFilterBuilder"
+                  @focus="onFilterBuilderFocus"
+                  @extra-select="pickRecentFilterRow"
                 />
               </div>
               <!-- Unified Query Editor (with built-in AI bar) -->
@@ -1745,6 +1748,7 @@ import {
   useRecentSearches,
   useRecentSearchesList,
 } from "@/composables/queryHistory/useRecentSearches";
+import { useRecentFilterSuggestions } from "@/composables/queryHistory/useRecentFilterSuggestions";
 import { useLogsHistoryRecorder } from "@/composables/queryHistory/useLogsHistoryRecorder";
 import {
   recentQueryList,
@@ -4607,6 +4611,22 @@ export default defineComponent({
       focusEditor();
     };
 
+    const { section: recentFilterSection, pick: pickRecentFilterRow } = useRecentFilterSuggestions(
+      "logs",
+      {
+        active: recentListActive,
+        examples: recentExamples,
+        run: (entry, when) => restoreRecent(entry, when, true),
+        load: (entry, when) => restoreRecent(entry, when, false),
+        viewAll: openRecentSearches,
+        example: applyRecentExample,
+      },
+    );
+
+    const onFilterBuilderFocus = () => {
+      if (recentSearchesEnabled.value) recentListActive.value = true;
+    };
+
     const cancelRun = () => {
       autoRun.engine.cancelGeneration(null, { cause: "user" });
       toast({
@@ -5192,6 +5212,9 @@ export default defineComponent({
       recentFocusRef,
       recentDrawerRef,
       recentFocusOpen,
+      recentFilterSection,
+      pickRecentFilterRow,
+      onFilterBuilderFocus,
       recentQueries,
       recentExamples,
       onRecentEditorKeydown,

@@ -26,6 +26,10 @@ export interface ChipInputSuggestion {
   icon?: IconName;
   /** Marks the current choice, or a checked row when `multiple`. */
   selected?: boolean;
+  /** Heading the row sits under; neighbouring rows sharing one form that section. */
+  section?: I18nText;
+  /** Sets the label in the monospace face, for code such as a query. */
+  mono?: boolean;
 }
 
 export interface ChipInputProps {
@@ -64,7 +68,8 @@ export interface ChipInputProps {
 
 export interface ChipInputEmits {
   (_e: "update:modelValue", _value: string): void;
-  (_e: "select", _key: string): void;
+  /** A row was picked; the event carries modifiers such as Shift. */
+  (_e: "select", _key: string, _event: MouseEvent | KeyboardEvent): void;
   /** Enter with no suggestion highlighted. */
   (_e: "enter"): void;
   /** Backspace while the text is empty. */

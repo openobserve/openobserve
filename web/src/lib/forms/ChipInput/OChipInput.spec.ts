@@ -15,7 +15,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import { defineComponent, h, ref, type Component } from "vue";
+import { defineComponent, h, nextTick, ref, type Component } from "vue";
 import OChipInput from "./OChipInput.vue";
 import { raw } from "@/types/i18n";
 
@@ -114,7 +114,31 @@ describe("OChipInput", () => {
     await key(" ");
     await input.setProps({ autoHighlight: false });
     await key(" ");
-    expect(input.emitted("select")).toEqual([["b"], ["b"]]);
+    expect(input.emitted("select")!.map(([key]) => key)).toEqual(["b", "b"]);
+  });
+
+  it("heads a section once and rules it off from the rows after it", async () => {
+    mountInput({
+      open: true,
+      suggestions: [
+        { key: "r1", label: "one", section: "Recent" },
+        { key: "r2", label: "two", section: "Recent" },
+        { key: "f", label: "field" },
+      ],
+    });
+    await nextTick();
+    const list = document.body.querySelector('[role="listbox"]')!;
+    const presentation = list.querySelectorAll('[role="presentation"]');
+    expect(presentation).toHaveLength(2);
+    expect(presentation[0].textContent).toContain("Recent");
+    expect(presentation[0].nextElementSibling!.textContent).toContain("one");
+    expect(presentation[1].nextElementSibling!.textContent).toContain("field");
+  });
+
+  it("passes the pick's modifiers along", async () => {
+    const input = mountInput({ open: true });
+    await key("Enter", { shiftKey: true });
+    expect((input.emitted("select")![0][1] as KeyboardEvent).shiftKey).toBe(true);
   });
 
   it("keeps the typed character when typing opens the list", async () => {

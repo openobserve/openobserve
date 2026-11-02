@@ -302,6 +302,8 @@ vi.mock("@/composables/useTraces", () => ({
 
 // ---------------------------------------------------------------------------
 // Import the component AFTER all vi.mock declarations.
+import queryHistory from "@/services/query_history";
+import { queryClient } from "@/composables/query/queryClient";
 // ---------------------------------------------------------------------------
 import SearchBar from "@/plugins/traces/SearchBar.vue";
 import analytics from "@/services/product_analytics";
@@ -2779,6 +2781,53 @@ describe("SearchBar", () => {
       vm.recentFocusOpen = false;
       await flushPromises();
       expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
+    });
+  });
+
+  describe("recent searches with the filter builder on", () => {
+    const entry = {
+      id: "a",
+      source: "traces",
+      query: "service_name = 'api'",
+      status: "ok",
+      starred: false,
+      context: {},
+      updated_at: Date.now() * 1000,
+      created_at: Date.now() * 1000,
+      run_count: 1,
+    };
+    const DT = "traces-search-bar-filter-builder-bar";
+    const row = (key: string) =>
+      document.body.querySelector<HTMLElement>(`[data-test="${DT}-suggest-item-${key}"]`);
+
+    it("lists them above the fields and hands the picked row to the page", async () => {
+      const list = vi
+        .spyOn(queryHistory, "list")
+        .mockResolvedValue({ data: [entry] } as Awaited<ReturnType<typeof queryHistory.list>>);
+      const count = vi
+        .spyOn(queryHistory, "count")
+        .mockResolvedValue({ data: { count: 0 } } as Awaited<
+          ReturnType<typeof queryHistory.count>
+        >);
+      store.state.zoConfig.query_history_enabled = true;
+      queryClient.clear();
+      localStorage.removeItem("o2.traces.queryInput");
+      searchObjInstance.data.editorValue = "";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      document.body.querySelector<HTMLInputElement>(`[data-test="${DT}-input"]`)!.click();
+      await vi.waitFor(() => expect(row("extra-recent-a")).not.toBeNull());
+      row("extra-recent-a")!.click();
+      await flushPromises();
+
+      expect(wrapper.emitted("recent-restore")![0].slice(0, 1)).toEqual([
+        expect.objectContaining({ id: "a" }),
+      ]);
+      expect(wrapper.emitted("recent-restore")![0][2]).toBe(true);
+      delete store.state.zoConfig.query_history_enabled;
+      list.mockRestore();
+      count.mockRestore();
     });
   });
 

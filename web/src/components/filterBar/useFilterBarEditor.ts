@@ -43,6 +43,7 @@ import {
 import { parseShorthand } from "@/utils/query/filterBarParser";
 import { leafConditions } from "./codecs/types";
 import { arityFor, type FilterEditorConfig } from "./filterProfiles";
+import type { FilterBarExtraSection } from "./QueryFilterBar.types";
 
 export type FilterBarStep = "field" | "operator" | "value";
 
@@ -73,6 +74,9 @@ export interface FilterBarEditorOptions {
   loadValues: Ref<((field: string, search: string) => Promise<string[]>) | undefined>;
   /** Values offered before the loaded ones for every field, e.g. dashboard `$variables`. */
   extraValues?: Ref<((field: string) => string[]) | undefined>;
+  /** Host rows listed above the fields while the bar is empty and nothing is typed. */
+  extraSuggestions?: Ref<FilterBarExtraSection | undefined>;
+  selectExtra?: (key: string, event: MouseEvent | KeyboardEvent) => void;
   t: TranslateFn;
   commit: (next: FilterGroup) => void;
   submit: () => void;
@@ -85,6 +89,7 @@ const SHORTHAND_KEY = "\u0000shorthand";
 const CUSTOM_KEY = "\u0000custom";
 const CUSTOM_FIELD_KEY = "\u0000custom-field";
 const GROUP_KEY = "\u0000group";
+const EXTRA_KEY_PREFIX = "extra-";
 const PROMQL_LABEL_NAME = /^[A-Za-z_]\w*$/;
 // Engine pages take dotted payload paths (a workflow's `meta.severity`), so SQL names allow what the shorthand parser does.
 const SQL_FIELD_NAME = /^[A-Za-z_@][\w.@-]*$/;
@@ -347,10 +352,21 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     return rows;
   });
 
+  const extraRows = computed<ChipInputSuggestion[]>(() => {
+    const extra = options.extraSuggestions?.value;
+    if (!extra || text.value.trim() || editingId.value || draft.value || tree.value.items.length)
+      return [];
+    return extra.rows.map((row) => ({
+      ...row,
+      key: `${EXTRA_KEY_PREFIX}${row.key}`,
+      section: extra.title,
+    }));
+  });
+
   const suggestions = computed(() => {
     if (step.value === "operator") return operatorSuggestions.value;
     if (step.value === "value") return valueSuggestions.value;
-    return fieldSuggestions.value;
+    return [...extraRows.value, ...fieldSuggestions.value];
   });
 
   const autoHighlight = computed(() => {
@@ -532,8 +548,12 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     startDraft(field);
   }
 
-  function select(key: string) {
+  function select(key: string, event: MouseEvent | KeyboardEvent) {
     armedId.value = null;
+    if (extraRows.value.some((row) => row.key === key)) {
+      open.value = false;
+      return options.selectExtra?.(key.slice(EXTRA_KEY_PREFIX.length), event);
+    }
     if (step.value === "field") return selectField(key);
     if (step.value === "operator") return pickOperator(key as FilterOperatorId);
     addValue(key === CUSTOM_KEY ? text.value.trim() : key);

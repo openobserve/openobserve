@@ -28,6 +28,7 @@ const props = withDefaults(defineProps<SqlFilterBuilderProps>(), {
   loadValues: undefined,
   fieldsLoading: false,
   freeText: true,
+  extraSuggestions: undefined,
   dataTest: "sql-filter-builder",
 });
 const emit = defineEmits<SqlFilterBuilderEmits>();
@@ -98,6 +99,7 @@ function clearAndBuild() {
         :model-value="tree"
         :fields="fields"
         :free-text="freeText"
+        :extra-suggestions="extraSuggestions"
         :load-values="loadValues"
         :fields-loading="fieldsLoading"
         size="sm"
@@ -106,6 +108,8 @@ function clearAndBuild() {
         :data-test="`${dataTest}-bar`"
         @update:model-value="onTreeChange"
         @submit="emit('submit')"
+        @focus="emit('focus')"
+        @extra-select="(key, event) => emit('extra-select', key, event)"
       />
     </template>
   </div>

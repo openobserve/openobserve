@@ -16,6 +16,7 @@
 import type { InjectionKey } from "vue";
 import type { I18nText } from "@/types/i18n";
 import type { FilterTokenPart } from "@/lib/core/Badge/OFilterToken.types";
+import type { ChipInputSuggestion } from "@/lib/forms/ChipInput/OChipInput.types";
 import type {
   FilterConnector,
   FilterDialect,
@@ -30,6 +31,14 @@ import type {
   FilterLayout,
   FilterProfileName,
 } from "./filterProfiles";
+
+export type FilterBarExtraRow = Omit<ChipInputSuggestion, "section" | "selected">;
+
+/** Rows from the host, not filters; each picks through `extra-select` with its own key. */
+export interface FilterBarExtraSection {
+  title: I18nText;
+  rows: FilterBarExtraRow[];
+}
 
 export interface QueryFilterBarProps {
   modelValue: FilterGroup;
@@ -48,6 +57,8 @@ export interface QueryFilterBarProps {
   loadValues?: (field: string, search: string) => Promise<string[]>;
   /** Values listed first for every field, e.g. dashboard `$variables`. */
   extraValueSuggestions?: (field: string) => string[];
+  /** Listed above the fields while the bar is empty and nothing is typed. */
+  extraSuggestions?: FilterBarExtraSection;
   /** Problems to mark on their chips, from FilterBuilder's validation. */
   issues?: FilterIssue[];
   /** A soft warning for a chip's value, e.g. one not seen in recent data. */
@@ -69,6 +80,8 @@ export interface QueryFilterBarEmits {
   (_e: "submit"): void;
   /** The field list is about to be shown; lazy pages load fields here. */
   (_e: "focus"): void;
+  /** A row of `extraSuggestions` was picked; the event carries modifiers such as Shift. */
+  (_e: "extra-select", _key: string, _event: MouseEvent | KeyboardEvent): void;
 }
 
 export interface QueryFilterBarExpose {

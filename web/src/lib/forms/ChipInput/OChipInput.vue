@@ -137,6 +137,14 @@ function focus() {
   caretRef.value?.focus();
 }
 
+const startsSection = (index: number) => {
+  const { section } = props.suggestions[index];
+  return Boolean(section) && section !== props.suggestions[index - 1]?.section;
+};
+
+const endsSection = (index: number) =>
+  index > 0 && !props.suggestions[index].section && Boolean(props.suggestions[index - 1].section);
+
 // Deep chips scroll sideways inside the field; whatever takes focus or anchors the list is brought into view there.
 function revealInLines(target: Element | null | undefined) {
   const lines = linesRef.value;
@@ -366,7 +374,7 @@ function onEnter(event: KeyboardEvent) {
     emit("enter");
     return;
   }
-  emit("select", active.key);
+  emit("select", active.key, event);
   // Enter ticks one value and lets the next Enter apply; Space keeps the row for further ticking.
   if (props.multiple) {
     navigated = false;
@@ -423,7 +431,7 @@ function onKeydown(event: KeyboardEvent) {
       // With nothing typed, Space ticks the highlighted value of a multi-select like a checkbox.
       if (props.multiple && props.modelValue === "" && props.suggestions[highlighted.value]) {
         event.preventDefault();
-        emit("select", props.suggestions[highlighted.value].key);
+        emit("select", props.suggestions[highlighted.value].key, event);
       }
       return;
     case ",":
@@ -588,51 +596,66 @@ function onFieldFocusOut() {
           :aria-label="searchPlaceholder ?? ariaLabel"
           class="min-h-0 flex-1 overflow-y-auto p-1"
         >
-          <div
-            v-for="(suggestion, index) in suggestions"
-            :id="`${listId}-${index}`"
-            :key="suggestion.key"
-            role="option"
-            :aria-selected="multiple ? Boolean(suggestion.selected) : index === highlighted"
-            :data-index="index"
-            :data-active="index === highlighted ? '' : undefined"
-            :data-test="testId(`suggest-item-${suggestion.key}`)"
-            class="rounded-default text-select-item-text data-active:bg-select-item-hover-bg flex cursor-pointer items-center gap-2 px-2 py-1 text-xs select-none"
-            @mousedown.prevent
-            @pointermove="highlighted = index"
-            @click="emit('select', suggestion.key)"
-          >
-            <slot name="suggestion" :suggestion="suggestion" :active="index === highlighted">
-              <span
-                v-if="multiple"
-                aria-hidden="true"
-                :class="[
-                  'rounded-checkbox flex size-3.5 shrink-0 items-center justify-center border transition-colors',
-                  suggestion.selected
-                    ? 'bg-checkbox-checked-bg border-checkbox-checked-border text-checkbox-checked-fg'
-                    : 'bg-checkbox-bg border-checkbox-border',
-                ]"
-              >
-                <OIcon v-if="suggestion.selected" name="check" size="xs" class="size-3!" />
-              </span>
-              <OIcon
-                v-if="suggestion.icon"
-                :name="suggestion.icon"
-                size="xs"
-                class="text-text-secondary shrink-0"
-              />
-              <OTruncatedText class="min-w-0 flex-1">{{ suggestion.label }}</OTruncatedText>
-              <span v-if="suggestion.detail" class="text-text-secondary ms-3 shrink-0">{{
-                suggestion.detail
-              }}</span>
-              <OIcon
-                v-if="suggestion.selected && !multiple"
-                name="check"
-                size="xs"
-                class="text-theme-accent shrink-0"
-              />
-            </slot>
-          </div>
+          <template v-for="(suggestion, index) in suggestions" :key="suggestion.key">
+            <div
+              v-if="startsSection(index)"
+              role="presentation"
+              class="text-dropdown-label text-2xs px-2 pt-0.5 pb-1 font-semibold select-none"
+              :data-test="testId('suggest-section')"
+            >
+              {{ suggestion.section }}
+            </div>
+            <div
+              v-else-if="endsSection(index)"
+              role="presentation"
+              class="border-select-content-border my-1 border-t"
+            />
+            <div
+              :id="`${listId}-${index}`"
+              role="option"
+              :aria-selected="multiple ? Boolean(suggestion.selected) : index === highlighted"
+              :data-index="index"
+              :data-active="index === highlighted ? '' : undefined"
+              :data-test="testId(`suggest-item-${suggestion.key}`)"
+              class="rounded-default text-select-item-text data-active:bg-select-item-hover-bg flex cursor-pointer items-center gap-2 px-2 py-1 text-xs select-none"
+              @mousedown.prevent
+              @pointermove="highlighted = index"
+              @click="emit('select', suggestion.key, $event)"
+            >
+              <slot name="suggestion" :suggestion="suggestion" :active="index === highlighted">
+                <span
+                  v-if="multiple"
+                  aria-hidden="true"
+                  :class="[
+                    'rounded-checkbox flex size-3.5 shrink-0 items-center justify-center border transition-colors',
+                    suggestion.selected
+                      ? 'bg-checkbox-checked-bg border-checkbox-checked-border text-checkbox-checked-fg'
+                      : 'bg-checkbox-bg border-checkbox-border',
+                  ]"
+                >
+                  <OIcon v-if="suggestion.selected" name="check" size="xs" class="size-3!" />
+                </span>
+                <OIcon
+                  v-if="suggestion.icon"
+                  :name="suggestion.icon"
+                  size="xs"
+                  class="text-text-secondary shrink-0"
+                />
+                <OTruncatedText :class="['min-w-0 flex-1', suggestion.mono ? 'font-mono' : '']">{{
+                  suggestion.label
+                }}</OTruncatedText>
+                <span v-if="suggestion.detail" class="text-text-secondary ms-3 shrink-0">{{
+                  suggestion.detail
+                }}</span>
+                <OIcon
+                  v-if="suggestion.selected && !multiple"
+                  name="check"
+                  size="xs"
+                  class="text-theme-accent shrink-0"
+                />
+              </slot>
+            </div>
+          </template>
           <div
             v-if="!suggestions.length && !loading && emptyText"
             class="text-text-secondary w-0 min-w-full px-2 py-1 text-xs"

@@ -551,6 +551,61 @@ describe("QueryFilterBar", () => {
     expect(rowKeys()).toContain("level");
   });
 
+  describe("extra suggestions", () => {
+    const extraSuggestions = {
+      title: "Recent searches",
+      rows: [{ key: "one", label: "level = 'a'" }],
+    };
+    const EXTRA = "extra-one";
+
+    it("lists them first while the bar is empty and hides them on typing", async () => {
+      mountBar({ extraSuggestions });
+      await openBar();
+      expect(rowKeys()[0]).toBe(EXTRA);
+      expect(rowKeys()).toContain("level");
+      await type("l");
+      expect(rowKeys()).not.toContain(EXTRA);
+    });
+
+    it("leaves them out once the bar holds a filter", async () => {
+      mountBar({ extraSuggestions, modelValue: parseSqlFilter("level = 'a'")! });
+      await openBar();
+      expect(rowKeys()).not.toContain(EXTRA);
+    });
+
+    it("reaches a row with the keyboard and hands the host its own key", async () => {
+      const onExtraSelect = vi.fn();
+      mountBar({ extraSuggestions, onExtraSelect });
+      await openBar();
+      await press("ArrowDown");
+      await press("Enter");
+      expect(onExtraSelect).toHaveBeenCalledExactlyOnceWith("one", expect.any(KeyboardEvent));
+      expect(rows()).toHaveLength(0);
+    });
+
+    it("leaves Enter on an empty caret running the query", async () => {
+      const onSubmit = vi.fn();
+      mountBar({ extraSuggestions, onSubmit });
+      await openBar();
+      await press("Enter");
+      expect(onSubmit).toHaveBeenCalledOnce();
+    });
+
+    it("treats a field that looks like an extra row as a field", async () => {
+      const onExtraSelect = vi.fn();
+      mountBar({
+        fields: [{ name: "extra-two", type: "string" }],
+        extraSuggestions,
+        onExtraSelect,
+      });
+      await openBar();
+      await type("extra");
+      await press("Enter");
+      expect(onExtraSelect).not.toHaveBeenCalled();
+      expect(wrapper!.find('[data-test="query-filter-bar-draft"]').exists()).toBe(true);
+    });
+  });
+
   it("draws no OR group controls outside any-of-groups bars", () => {
     mountBar({ modelValue: parseSqlFilter("level = 'a' AND (level = 'b' OR status = 1)")! });
     expect(wrapper!.find('[data-test="query-filter-bar-add-group"]').exists()).toBe(false);

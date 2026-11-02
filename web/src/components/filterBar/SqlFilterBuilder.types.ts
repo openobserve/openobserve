@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { FilterField } from "@/utils/query/filterBar";
+import type { FilterBarExtraSection } from "./QueryFilterBar.types";
 
 export interface SqlFilterBuilderProps {
   /** The page's WHERE text; the builder parses it and writes it back. */
@@ -23,6 +24,8 @@ export interface SqlFilterBuilderProps {
   fieldsLoading?: boolean;
   /** Offer `match_all` full-text search for typed words. */
   freeText?: boolean;
+  /** Listed above the fields while the bar is empty and nothing is typed. */
+  extraSuggestions?: FilterBarExtraSection;
   dataTest?: string;
 }
 
@@ -31,4 +34,7 @@ export interface SqlFilterBuilderEmits {
   (_e: "submit"): void;
   /** The user chose to keep editing an unparsable query as text. */
   (_e: "exit"): void;
+  /** The field list is about to be shown. */
+  (_e: "focus"): void;
+  (_e: "extra-select", _key: string, _event: MouseEvent | KeyboardEvent): void;
 }

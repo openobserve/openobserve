@@ -553,10 +553,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :fields="filterBuilderFields"
             :load-values="loadFilterBuilderValues"
             :fields-loading="searchObj.loading"
+            :extra-suggestions="recentFilterSection"
             data-test="traces-search-bar-filter-builder"
             @update:query="(sql: string) => onFilterBuilderQuery(sql) && searchData()"
             @submit="searchData"
             @exit="toggleFilterBuilder"
+            @focus="onFilterBuilderFocus"
+            @extra-select="pickRecentFilterRow"
           />
         </div>
         <CodeQueryEditor
@@ -707,6 +710,7 @@ import {
   useRecentSearches,
   useRecentSearchesList,
 } from "@/composables/queryHistory/useRecentSearches";
+import { useRecentFilterSuggestions } from "@/composables/queryHistory/useRecentFilterSuggestions";
 import {
   recentQueryList,
   recentsOpenAfterEdit,
@@ -876,6 +880,22 @@ export default defineComponent({
       setEditorValue(query);
       focusEditor();
     };
+    const { section: recentFilterSection, pick: pickRecentFilterRow } = useRecentFilterSuggestions(
+      "traces",
+      {
+        active: recentListActive,
+        examples: recentExamples,
+        run: (entry, when) => emit("recent-restore", entry, when, true),
+        load: (entry, when) => emit("recent-restore", entry, when, false),
+        viewAll: openRecentSearches,
+        example: applyRecentExample,
+      },
+    );
+
+    const onFilterBuilderFocus = () => {
+      if (recentSearchesEnabled.value) recentListActive.value = true;
+    };
+
     const onQueryEditorBlur = async () => {
       searchObj.meta.queryEditorPlaceholderFlag = true;
       await _sqlOnBlur();
@@ -1530,6 +1550,9 @@ export default defineComponent({
       recentFocusRef,
       recentDrawerRef,
       recentFocusOpen,
+      recentFilterSection,
+      pickRecentFilterRow,
+      onFilterBuilderFocus,
       showRunQueryPending,
       recentQueries,
       recentExamples,
