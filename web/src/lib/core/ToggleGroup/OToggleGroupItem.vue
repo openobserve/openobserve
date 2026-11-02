@@ -74,9 +74,9 @@ const dropIndicatorClass = computed<string>(() => {
 });
 
 const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
-  md: "h-9 px-3 text-sm max-md:px-2",
-  sm: "h-7 px-2.5 text-xs max-md:px-1.5",
-  xs: "h-5 px-1.5 text-xs max-md:px-1",
+  md: "h-9 gap-2 px-3 text-sm max-md:px-2",
+  sm: "h-7 gap-1.5 px-2.5 text-xs max-md:px-1.5",
+  xs: "h-5 gap-2 px-1.5 text-xs max-md:px-1",
 };
 
 // Icon size mirrors the toggle size
@@ -138,7 +138,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
       :aria-hidden="unavailable || undefined"
       :class="[
         // Layout
-        'inline-flex items-center justify-center gap-2',
+        'inline-flex items-center justify-center',
         sizeClasses[props.size],
         // Base state - inactive (transparent on track)
         'bg-toggle-item-bg text-toggle-item-text font-medium whitespace-nowrap',

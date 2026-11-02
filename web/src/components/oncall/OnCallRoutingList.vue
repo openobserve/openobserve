@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OButton
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs-sq"
               icon-left="edit"
               class="shrink-0"
               :aria-label="t('oncall.edit')"

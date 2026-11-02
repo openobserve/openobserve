@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OButton
           variant="outline"
-          size="icon-sm"
+          size="icon-xs-sq"
           class="shrink-0"
           @click="refreshJobs"
           :disabled="loading"
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="canPauseJob(row)"
                 variant="ghost-destructive"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 @click="confirmPauseJob(row)"
                 data-test="pause-job-btn"
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="canResumeJob(row)"
                 variant="ghost-success"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 @click="confirmResumeJob(row)"
                 data-test="resume-job-btn"
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="canEditJob(row.status)"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 @click="editJob(row)"
                 data-test="edit-job-btn"
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 @click="viewJob(row)"
                 data-test="view-job-btn"
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="canDeleteJob(row.status)"
                 variant="ghost-destructive"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 @click="confirmDeleteJob(row)"
                 data-test="delete-job-btn"
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="row.error"
                 variant="ghost-destructive"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 @click="showErrorDialog(row)"
                 data-test="error-indicator-btn"

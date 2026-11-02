@@ -521,7 +521,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="error" size="sm" class="text-status-error-text" />
       </template>
       <template #header-right>
-        <div class="text-compact ms-9 flex items-center text-xs opacity-70">
+        <div class="text-compact text-text-secondary ms-9 flex items-center text-xs">
           <span class="me-1">{{ t("alerts.lastError") }}</span>
           <OIcon name="schedule" size="xs" class="me-1" />
           {{
@@ -532,7 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div class="mb-4">
-        <div class="mb-2 text-sm font-semibold tracking-[0.02em] opacity-80">
+        <div class="text-text-secondary mb-2 text-sm font-semibold tracking-[0.02em]">
           {{ t("alerts.errorSummary") }}
         </div>
         <div

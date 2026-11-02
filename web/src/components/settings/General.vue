@@ -42,10 +42,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="t('settings.scrapintervalLabel')"
               type="number"
               min="0"
-              class="ms-2 w-30!"
+              class="w-52!"
               data-test="general-settings-scrape-interval"
             />
-            <span class="individual-setting-description text-compact opacity-70">
+            <span class="individual-setting-description text-compact text-text-secondary">
               {{ t("settings.scrapeIntervalDescription") }}
             </span>
           </div>
@@ -62,8 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :min="1000"
               :max="1000000"
-              class="ms-2 w-52!"
-              :placeholder="raw('40000 (' + t('settings.systemDefault') + ')')"
+              class="w-52!"
+              :placeholder="raw('40000')"
               :aria-label="t('settings.maxSeriesPerQueryLabel')"
               data-test="general-settings-max-series-per-query"
             >
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OIcon>
               </template>
             </OFormInput>
-            <span class="individual-setting-description text-compact opacity-70">
+            <span class="individual-setting-description text-compact text-text-secondary">
               {{ t("settings.maxSeriesPerQueryDescription") }}
             </span>
           </div>
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.manageTheme") }}
             </span>
-            <div class="-ms-15 flex items-center gap-2 max-lg:ms-0 max-lg:flex-wrap">
+            <div class="flex items-center gap-2 max-lg:flex-wrap">
               <!-- Light Mode Theme -->
               <div
                 class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 ps-1.5 pe-3 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
@@ -104,10 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
-                <span class="chip-label text-2xs font-semibold tracking-wider opacity-50">{{
+                <span class="chip-label text-text-body text-xs font-semibold">{{
                   t("settings.light")
                 }}</span>
-                <span class="chip-value text-2xs font-mono font-medium tracking-tight opacity-70">{{
+                <span class="chip-value text-text-body font-mono text-xs font-medium">{{
                   customLightColor
                 }}</span>
               </div>
@@ -130,10 +130,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
-                <span class="chip-label text-2xs font-semibold tracking-wider opacity-50">{{
+                <span class="chip-label text-text-body text-xs font-semibold">{{
                   t("settings.dark")
                 }}</span>
-                <span class="chip-value text-2xs font-mono font-medium tracking-tight opacity-70">{{
+                <span class="chip-value text-text-body font-mono text-xs font-medium">{{
                   customDarkColor
                 }}</span>
               </div>
@@ -152,7 +152,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
               </div>
             </div>
-            <span class="individual-setting-description text-compact self-start opacity-70">
+            <span
+              class="individual-setting-description text-compact text-text-secondary self-start"
+            >
               {{ t("settings.themeManagementDescription") }}
             </span>
           </div>
@@ -255,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </template>
-          <span class="individual-setting-description text-compact opacity-70">
+          <span class="individual-setting-description text-compact text-text-secondary">
             {{ t("settings.customLogoTextDescription") }}
           </span>
         </div>
@@ -343,7 +345,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
-          <span class="individual-setting-description text-compact -translate-y-1.25 opacity-70">
+          <span
+            class="individual-setting-description text-compact text-text-secondary -translate-y-1.25"
+          >
             {{ t("settings.customLogoLightDescription") }}
           </span>
         </div>
@@ -432,7 +436,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
-          <span class="individual-setting-description text-compact -translate-y-1.25 opacity-70">
+          <span
+            class="individual-setting-description text-compact text-text-secondary -translate-y-1.25"
+          >
             {{ t("settings.customLogoDarkDescription") }}
           </span>
         </div>

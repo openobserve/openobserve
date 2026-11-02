@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alert_templates.exportTemplate')"
               class="ms-1 max-md:hidden"
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs-sq"
               @click.stop="exportTemplate(row)"
               data-test="destination-export"
               data-row-action="export"
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`alert-template-list-${row.name}-update-template`"
               class="ms-1 max-md:hidden"
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs-sq"
               :title="
                 row.isPrebuilt ? t('alert_templates.systemReadOnlyEdit') : t('alert_templates.edit')
               "
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`alert-template-list-${row.name}-clone-template`"
               class="ms-1 max-md:hidden"
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs-sq"
               :aria-label="cloneActionLabel(row, t('alert_templates.clone'))"
               @click="cloneTemplate(row)"
               data-row-action="duplicate"
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`alert-template-list-${row.name}-delete-template`"
               class="ms-1 max-md:hidden"
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs-sq"
               :title="
                 row.isPrebuilt
                   ? t('alert_templates.systemReadOnlyDelete')

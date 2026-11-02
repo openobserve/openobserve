@@ -163,6 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :items="summaryStats"
                     :loading="loading"
                     compact
+                    stacked
                     selectable
                     :selected-key="stateFilter"
                     default-key="total"
@@ -592,7 +593,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`alert-list-${row.name}-pause-start-alert`"
                     class="ms-1 max-md:hidden"
                     :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-                    size="icon-sm"
+                    size="icon-xs-sq"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                     @click.stop="toggleAlertState(row)"
                   >
@@ -606,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-row-action="edit"
                     :data-test="`alert-list-${row.name}-update-alert`"
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-xs-sq"
                     icon-left="edit"
                     class="max-md:hidden"
                     @click.stop="editAlert(row)"
@@ -631,7 +632,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       data-row-action="duplicate"
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon-xs-sq"
                       icon-left="content-copy"
                       :disabled="isSloRow(row)"
                       :aria-label="isSloRow(row) ? t('alerts.sloCloneDisabled') : t('alerts.clone')"
@@ -669,7 +670,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #trigger>
                       <OButton
                         variant="ghost"
-                        size="icon-sm"
+                        size="icon-xs-sq"
                         icon-left="more-vert"
                         :aria-label="t('alerts.moreActions')"
                         @click.stop="openMenu($event, row)"

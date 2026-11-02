@@ -38,6 +38,7 @@ function handleUpdate(val: CheckboxModelValue) {
     :model-value="checkboxModel"
     :data-test="`o2-table-select-${rowId ?? 'header'}`"
     size="sm"
+    class="align-middle"
     :aria-label="label"
     :disabled="disabled"
     @update:model-value="handleUpdate"

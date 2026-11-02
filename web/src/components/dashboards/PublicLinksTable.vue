@@ -198,7 +198,7 @@
           <OButton
             v-if="row.slug"
             variant="ghost"
-            size="icon-sm"
+            size="icon-xs-sq"
             icon-left="content-copy"
             class="max-md:hidden"
             :aria-label="t('dashboard.publicDashboard.copyLink')"
@@ -210,7 +210,7 @@
           <OButton
             v-if="row.slug"
             variant="ghost"
-            size="icon-sm"
+            size="icon-xs-sq"
             icon-left="open-in-new"
             class="max-md:hidden"
             :aria-label="t('dashboard.publicLinks.openPublicPage')"
@@ -228,7 +228,7 @@
             />
             <OButton
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs-sq"
               icon-left="edit"
               :aria-label="t('dashboard.publicLinks.editSettings')"
               :disabled="!hasDashboard(row)"
@@ -245,7 +245,7 @@
           <OButton
             v-if="!noDashboardAccess(row) && takeOverReplacesResume(row, userId)"
             variant="ghost-success"
-            size="icon-sm"
+            size="icon-xs-sq"
             icon-left="how-to-reg"
             class="max-md:hidden"
             :aria-label="t('dashboard.publicLinks.takeOver')"
@@ -261,7 +261,7 @@
             <OTooltip v-if="!canPause(row)" side="bottom" :content="pauseBlockedReason(row, t)" />
             <OButton
               :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-              size="icon-sm"
+              size="icon-xs-sq"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
               :aria-label="
                 row.enabled ? t('dashboard.publicLinks.pause') : t('dashboard.publicLinks.resume')
@@ -285,7 +285,7 @@
               <OButton
                 icon-left="more-vert"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 :title="t('dashboard.moreActions')"
                 :aria-label="t('dashboard.moreActions')"
                 :loading="busyRows.get(row.id) === 'menu'"

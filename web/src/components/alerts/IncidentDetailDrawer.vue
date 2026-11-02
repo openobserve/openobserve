@@ -363,7 +363,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
-                <!-- SECTION 2: Main Content (2:1 Ratio Layout) with calc(100vh - 236px) height (was 276px) -->
                 <div class="flex h-[calc(100vh-23.75rem)] flex-1 gap-3">
                   <!-- PART 1: Primary Content (66.67% width) -->
                   <div class="flex w-2/3 flex-col gap-3">

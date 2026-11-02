@@ -298,7 +298,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:pending-date="pendingDay = $event"
                     />
                   </div>
-                  <div class="text-3xs ps-6 pe-6">{{ t("common.datetimeMessage") }}</div>
+                  <div class="text-text-secondary ps-6 pe-6 text-xs">
+                    {{ t("common.datetimeMessage") }}
+                  </div>
                   <OSeparator v-if="!disableRelative" class="my-2" />
 
                   <table

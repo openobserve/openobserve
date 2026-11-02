@@ -86,15 +86,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="pipeline-list-tabs"
               >
                 <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                  <template #icon-left><OIcon name="format-list-bulleted" size="xs" /></template>
                   {{ t("pipeline_list.tab_all") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-                  <template #icon-left><OIcon name="schedule" size="sm" /></template>
+                  <template #icon-left><OIcon name="schedule" size="xs" /></template>
                   {{ t("pipeline_list.tab_scheduled") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="realtime" size="sm" data-test="tab-realtime">
-                  <template #icon-left><OIcon name="bolt" size="sm" /></template>
+                  <template #icon-left><OIcon name="bolt" size="xs" /></template>
                   {{ t("pipeline_list.tab_realtime") }}
                 </OToggleGroupItem>
               </OToggleGroup>
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`pipeline-list-${row.name}-pause-start-action`"
                 :data-row-action="row.enabled ? 'pause' : 'resume'"
                 :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                size="icon-sm"
+                size="icon-xs-sq"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                 class="max-md:hidden"
                 @click.stop="togglePipeline(row)"
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 :data-test="`pipeline-list-${row.name}-view-pipeline`"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 :title="t('pipeline.view')"
                 class="max-md:hidden"
                 icon-left="visibility"
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`pipeline-list-${row.name}-update-pipeline`"
                 data-row-action="edit"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 @click.stop="editPipeline(row)"
                 icon-left="edit"
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     :aria-label="t('common.moreActions')"
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-xs-sq"
                     @click.stop
                     :data-test="`pipeline-list-${row.name}-more-options`"
                     icon-left="more-vert"

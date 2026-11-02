@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #toolbar-trailing>
       <OButton
         variant="outline"
-        size="icon-sm"
+        size="icon-xs-sq"
         class="shrink-0"
         icon-left="refresh"
         data-test="summary-list-refresh-btn"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #cell-actions="{ row }">
       <OButton
         variant="ghost-destructive"
-        size="icon-sm"
+        size="icon-xs-sq"
         :title="t('queries.cancelQuery')"
         data-test="cancelQuery-btn"
         @click.stop="confirmDeleteAction({ row })"

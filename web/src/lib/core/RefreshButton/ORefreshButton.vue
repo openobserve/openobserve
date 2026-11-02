@@ -95,12 +95,10 @@ function handleClick(e: MouseEvent) {
 </script>
 
 <template>
-  <!-- `h-8!` beats sm-toolbar's own 30px, so this matches the 32px icon-sm buttons beside it. -->
   <OButton
     v-if="layout === 'inline'"
     :variant="variant"
     size="sm-toolbar"
-    class="h-8!"
     icon-left="refresh"
     :loading="loading"
     :disabled="disabled"

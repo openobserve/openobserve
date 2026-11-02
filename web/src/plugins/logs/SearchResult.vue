@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
           variant="outline"
-          size="icon-xs-sq"
+          size="icon-chip"
           class="ms-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
           @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
@@ -64,8 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-left transition-opacity max-md:min-w-32"
-          :class="{ 'opacity-60': summaryDimmed }"
+          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-left max-md:min-w-32"
           data-test="logs-search-result-title"
           :data-search-state="
             searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
@@ -78,14 +77,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag
                 type="logsResultChip"
                 value="neutral"
-                class="min-w-[26ch] tabular-nums"
+                class="tabular-nums transition-opacity"
+                :class="{ 'opacity-60': summaryDimmed }"
                 data-test="logs-result-records-chip"
                 >{{ recordsChips.records }}</OTag
               >
               <OTag
                 type="logsResultChip"
                 value="info"
-                class="min-w-[10ch] tabular-nums max-md:hidden"
+                class="tabular-nums transition-opacity max-md:hidden"
+                :class="{ 'opacity-60': summaryDimmed }"
                 data-test="logs-result-time-chip"
                 >{{ recordsChips.time }}</OTag
               >
@@ -93,7 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="recordsChips.scan"
                 type="logsResultChip"
                 value="warn"
-                class="max-md:hidden"
+                class="transition-opacity max-md:hidden"
+                :class="{ 'opacity-60': summaryDimmed }"
                 data-test="logs-result-scan-chip"
                 >{{ recordsChips.scan }}</OTag
               >
@@ -457,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @keydown.esc="closePinnedTooltip"
             tabindex="-1"
           >
-            <div class="oo-pin-tooltip__time">
+            <div class="oo-pin-tooltip__time text-text-secondary">
               {{ pinnedTooltip.timestamp }}
             </div>
             <div v-for="row in pinnedTooltip.rows" :key="row.rawValue" class="oo-pin-tooltip__row">
@@ -3435,7 +3437,6 @@ export default defineComponent({
 .oo-pin-tooltip__time {
   font-size: var(--text-2xs);
   font-weight: 500;
-  opacity: 0.65;
   padding: 0 0.625rem 0.25rem;
   margin-bottom: 0;
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */

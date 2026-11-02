@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="examples-table border-card-glass-border rounded-default overflow-hidden border"
             >
               <div
-                class="bg-surface-subtle border-card-glass-border text-3xs grid grid-cols-[11.25rem_1fr_auto] gap-3 border-b px-3 py-1.5 font-bold tracking-[0.06em] uppercase opacity-45"
+                class="bg-surface-subtle border-card-glass-border text-2xs text-text-secondary grid grid-cols-[11.25rem_1fr_auto] gap-3 border-b px-3 py-1.5 font-bold tracking-[0.06em] uppercase"
               >
                 <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
                 <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="flex items-center gap-2">
                     <span
-                      class="tier-name-label shrink-0 text-xs font-medium whitespace-nowrap opacity-50"
+                      class="tier-name-label text-text-secondary shrink-0 text-xs font-medium whitespace-nowrap"
                       >{{ t("modelPricing.tierName") }}</span
                     >
                     <OFormInput
@@ -331,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OText variant="section">
                       {{ t("modelPricing.timeWindows") }}
                     </OText>
-                    <div class="text-2xs mt-px mb-2 opacity-55">
+                    <div class="text-2xs text-text-secondary mt-px mb-2">
                       {{ t("modelPricing.timeWindowsDesc") }}
                     </div>
                     <!-- Key by INDEX to match the index-based field names — see the
@@ -370,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </OButton>
                           <span
                             v-if="windowWraps(win)"
-                            class="text-2xs whitespace-nowrap opacity-55"
+                            class="text-2xs text-text-secondary whitespace-nowrap"
                             :data-test="`model-pricing-tier-window-wrap-hint-${idx}-${winIdx}`"
                           >
                             {{ t("modelPricing.timeWindowWrapsHint") }}
@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- The same window in the viewer's timezone -->
                       <div
                         v-if="windowLocalHint(win)"
-                        class="text-2xs mt-1 opacity-55"
+                        class="text-2xs text-text-secondary mt-1"
                         :data-test="`model-pricing-tier-window-local-hint-${idx}-${winIdx}`"
                       >
                         {{ t("modelPricing.localTimeHint", { range: windowLocalHint(win) }) }}
@@ -403,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OText variant="section">
                       {{ t("modelPricing.attributeRules") }}
                     </OText>
-                    <div class="text-2xs mt-px mb-2 opacity-55">
+                    <div class="text-2xs text-text-secondary mt-px mb-2">
                       {{ t("modelPricing.attributeRulesDesc") }}
                     </div>
                     <!-- Index keys: form fields bind to their name once, see the price-row note below. -->
@@ -582,7 +582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Column headers (only when rows exist) -->
                       <div
                         v-if="tier.prices.length"
-                        class="price-table-head text-2xs grid grid-cols-[1fr_10rem_auto] gap-2 px-3 py-1.5 font-semibold tracking-[0.01em] opacity-45 max-lg:grid-cols-[1fr_6rem_auto]"
+                        class="price-table-head text-2xs text-text-secondary grid grid-cols-[1fr_10rem_auto] gap-2 px-3 py-1.5 font-semibold tracking-[0.01em] max-lg:grid-cols-[1fr_6rem_auto]"
                       >
                         <span>{{ t("modelPricing.usageKeyCol") }}</span>
                         <span>{{ t("modelPricing.colPrice") }}</span>

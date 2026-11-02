@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-for="section in sections" :key="section.group">
       <span
         v-if="section.group > 0"
-        class="text-3xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
+        class="text-2xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
         :data-test="`metrics-explorer-label-group-join-${section.group}`"
         >{{
           section.position > 0
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Said, not inferred: two adjacent chips read as either one, but they are always AND. -->
           <span
             v-if="i > 0"
-            class="text-3xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
+            class="text-2xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
             :title="t('metrics.explorer.labels.andSeparatorTitle')"
             data-test="metrics-explorer-label-and"
             >{{ t("metrics.explorer.labels.andSeparator") }}</span

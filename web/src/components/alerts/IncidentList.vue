@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="row.status === 'open'"
               variant="ghost-warning"
-              size="icon-sm"
+              size="icon-xs-sq"
               :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
               class="max-md:hidden"
               @click.stop="acknowledgeIncident(row)"
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="row.status !== 'resolved'"
               variant="ghost-primary"
-              size="icon-sm"
+              size="icon-xs-sq"
               class="max-md:hidden"
               @click.stop="resolveIncident(row)"
               data-test="incident-resolve-btn"
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="row.status === 'resolved'"
               variant="ghost-warning"
-              size="icon-sm"
+              size="icon-xs-sq"
               class="max-md:hidden"
               @click.stop="reopenIncident(row)"
               data-test="incident-reopen-btn"

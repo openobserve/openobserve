@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="selectedDate"
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            class="dashboard-icons h-7.5 [transition:all_0.2s_ease] max-md:[&_.date-time-label]:hidden"
+            class="dashboard-icons max-md:[&_.date-time-label]:hidden"
             size="sm"
             :modelValue="pickedDate ?? selectedDate"
             :auto-apply-dashboard="true"
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
             @trigger="onAutoRefreshTick"
-            class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
+            class="dashboard-icons hideOnPrintMode"
             size="sm"
           />
           <OButtonGroup v-show="store.state.printMode !== true">
@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
             @trigger="onAutoRefreshTick"
-            class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
+            class="dashboard-icons hideOnPrintMode"
             size="sm"
           />
           <!-- These save, print or reload outside the draft, so edit mode hides them until Save or Discard. -->

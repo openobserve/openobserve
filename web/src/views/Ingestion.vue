@@ -45,14 +45,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="tokenOptions"
         label-key="label"
         value-key="value"
-        class="max-w-xs max-md:order-last max-md:max-w-full max-md:min-w-0! max-md:basis-full"
-        style="min-width: 13.75rem"
+        class="max-w-xs min-w-55 max-md:order-last max-md:max-w-full max-md:min-w-0! max-md:basis-full"
         @update:model-value="onTokenSelected"
       />
       <OButton
         v-if="!isRUMPage"
         variant="primary"
-        size="sm"
+        size="sm-action"
+        class="shrink-0"
         icon-left="key"
         :title="isMobile ? t('ingestion.manageTokensBtnLabel') : undefined"
         @click="navigateToIngestionTokens"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.organizationData.rumToken.rum_token != ''
         "
         variant="primary"
-        size="sm"
+        size="sm-action"
         data-test="ingestion-reset-token-btn"
         @click="showRUMUpdateDialogFn"
       >
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.organizationData.rumToken.rum_token == ''
         "
         variant="primary"
-        size="sm"
+        size="sm-action"
         data-test="ingestion-reset-token-btn"
         @click="generateRUMToken"
       >

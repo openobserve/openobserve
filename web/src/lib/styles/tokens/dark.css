@@ -76,8 +76,8 @@
   --color-text-soft: var(--color-grey-200); /* feeds --color-select-text (OSelect trigger value) */
   --color-text-body: var(--color-grey-300); /* paragraphs, default body */
   --color-text-secondary: var(--color-grey-400); /* supporting text, descriptions */
-  --color-text-label: var(--color-grey-500); /* form labels, metadata */
-  --color-text-muted: var(--color-grey-500); /* de-emphasized */
+  --color-text-label: var(--color-grey-400); /* form labels, metadata */
+  --color-text-muted: var(--color-grey-400); /* de-emphasized */
   --color-text-disabled: var(--color-grey-600); /* dimmer than labels so disabled reads disabled */
   /* Between grey-500 and grey-400: the lowest grey that clears 4.5:1 on the dark canvas without matching secondary text. */
   --color-text-placeholder: #7c7c7c;
@@ -525,7 +525,7 @@
   --color-dialog-close-active-bg: var(--d-border);
 
   /* Pagination */
-  --color-pagination-item-active-bg: var(--color-primary-500);
+  --color-pagination-item-active-bg: var(--color-primary-800);
 
   /* Timeline */
   --color-timeline-dot-primary: var(--color-primary-500);

@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
         <button
-          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
+          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap hover:underline"
           @click="goToIncidentList"
         >
           {{ t("overview.viewAll") }} {{ "→" }}
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
         <button
-          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
+          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap hover:underline"
           @click="goToServiceGraph"
         >
           {{ t("overview.viewAll") }} {{ "→" }}
@@ -353,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
         </div>
         <button
-          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
+          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap hover:underline"
           @click="goToAnomalies"
         >
           {{ t("overview.viewAll") }} {{ "→" }}
@@ -410,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
         </div>
         <button
-          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
+          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap hover:underline"
           @click="goToAlertList"
         >
           {{ t("overview.viewAll") }} {{ "→" }}

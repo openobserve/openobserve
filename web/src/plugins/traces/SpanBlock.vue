@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="wrap bg-surface-base flex items-center justify-start"
-    :class="dimmed ? 'opacity-30' : ''"
     :style="{
       zIndex: 2,
     }"
@@ -53,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the bar itself — that would rebase them onto the span. -->
       <div
         class="relative flex w-full cursor-pointer flex-nowrap items-center"
-        :class="dimmed ? 'opacity-30' : ''"
         @click="selectSpan(span.spanId)"
         data-test="span-block-select-trigger"
       >
@@ -64,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             left: leftPosition + '%',
           }"
           class="relative flex flex-nowrap items-center justify-start"
-          :class="startsInWindow ? 'min-w-0.5' : ''"
+          :class="[startsInWindow ? 'min-w-0.5' : '', dimmed ? 'opacity-30' : '']"
           ref="spanMarkerRef"
           data-test="span-marker"
         >

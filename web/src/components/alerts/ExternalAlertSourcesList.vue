@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="row.integration" class="flex items-center gap-1">
               <OButton
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 icon-left="edit"
                 class="max-md:hidden"
                 :title="t('alert_sources.edit')"
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 icon-left="autorenew"
                 class="max-md:hidden"
                 :title="t('alert_sources.rotateToken')"
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 :variant="row.integration.enabled ? 'ghost-destructive' : 'ghost-success'"
-                size="icon-sm"
+                size="icon-xs-sq"
                 :icon-left="row.integration.enabled ? 'pause' : 'play-arrow'"
                 class="max-md:hidden"
                 :title="
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 variant="ghost-destructive"
-                size="icon-sm"
+                size="icon-xs-sq"
                 icon-left="delete"
                 class="max-md:hidden"
                 :disabled="row.integration.name === 'default'"

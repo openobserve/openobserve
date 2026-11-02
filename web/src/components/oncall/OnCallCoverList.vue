@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <OButton
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="delete-outline"
           :aria-label="t('oncall.coverRemove')"
           :data-test="`oncall-cover-remove-${row.id}`"

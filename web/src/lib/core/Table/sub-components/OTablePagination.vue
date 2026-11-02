@@ -137,7 +137,7 @@ const selectionLabel = computed(() => {
           v-model="pageSizeModel"
           :options="pageSizeSelectOptions"
           :searchable="false"
-          size="sm"
+          size="xs"
           :aria-label="t('search.recordsPerPage')"
           data-test="o2-table-page-size-select"
         />
@@ -146,7 +146,7 @@ const selectionLabel = computed(() => {
       <nav class="flex items-center gap-1" :aria-label="t('components.pagination.pagination')">
         <OButton
           variant="outline"
-          size="icon"
+          size="icon-xs-sq"
           :disabled="isFirstPage"
           :aria-label="t('search.firstPage')"
           data-test="o2-table-first-page-btn"
@@ -156,7 +156,7 @@ const selectionLabel = computed(() => {
         </OButton>
         <OButton
           variant="outline"
-          size="icon"
+          size="icon-xs-sq"
           :disabled="isFirstPage"
           :aria-label="t('components.pagination.previousPage')"
           data-test="o2-table-prev-page-btn"
@@ -166,7 +166,7 @@ const selectionLabel = computed(() => {
         </OButton>
         <OButton
           variant="outline"
-          size="icon"
+          size="icon-xs-sq"
           :disabled="isLastPage"
           :aria-label="t('components.pagination.nextPage')"
           data-test="o2-table-next-page-btn"
@@ -177,7 +177,7 @@ const selectionLabel = computed(() => {
         <OButton
           v-if="totalCountExact"
           variant="outline"
-          size="icon"
+          size="icon-xs-sq"
           :disabled="isLastPage"
           :aria-label="t('search.lastPage')"
           data-test="o2-table-last-page-btn"

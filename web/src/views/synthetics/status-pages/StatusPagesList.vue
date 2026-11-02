@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #toolbar-trailing>
         <OButton
           variant="outline"
-          size="icon-sm"
+          size="icon-xs-sq"
           icon-left="refresh"
           :loading="loading"
           data-test="status-pages-refresh-btn"
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-0.5" @click.stop>
           <OButton
             variant="ghost"
-            size="icon-sm"
+            size="icon-xs-sq"
             icon-left="edit"
             class="max-md:hidden"
             :data-test="`status-pages-edit-btn-${(row as any).id}`"
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #trigger>
               <OButton
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 icon-left="more-vert"
                 :data-test="`status-pages-more-btn-${(row as any).id}`"
                 @click.stop

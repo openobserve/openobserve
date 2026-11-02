@@ -51,7 +51,13 @@ describe("SearchBar — toolbar controls are spaced only by the row gap", () => 
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
       this: HTMLElement,
     ) {
-      return { width: this.classList.contains("border-b-card-glass-border") ? 1600 : 0 } as DOMRect;
+      return {
+        width:
+          this.classList.contains("border-border-default") &&
+          this.classList.contains("overflow-hidden")
+            ? 1600
+            : 0,
+      } as DOMRect;
     });
   });
 
@@ -65,7 +71,7 @@ describe("SearchBar — toolbar controls are spaced only by the row gap", () => 
   const marginClassesOf = (el: Element) =>
     [...el.classList].filter((c) => UNPREFIXED_HORIZONTAL_MARGIN.test(c));
 
-  it("adds no horizontal margin on top of the gap-1 between adjacent controls", async () => {
+  it("adds no horizontal margin on top of the row gap between adjacent controls", async () => {
     wrapper = mount(SearchBar, {
       attachTo: document.body,
       global: {
@@ -78,8 +84,8 @@ describe("SearchBar — toolbar controls are spaced only by the row gap", () => 
 
     const left = wrapper.vm.$refs.toolbarLeftRef as HTMLElement;
     const collapsible = left.firstElementChild as HTMLElement;
-    expect(left.classList).toContain("gap-1");
-    expect(collapsible.classList).toContain("gap-1");
+    expect(left.classList).toContain("gap-2");
+    expect(collapsible.classList).toContain("gap-2");
 
     const more = wrapper.get('[data-test="logs-search-bar-utilities-menu-btn"]');
     expect(marginClassesOf(more.element)).toEqual([]);

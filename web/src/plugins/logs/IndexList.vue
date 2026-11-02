@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-else
                 :data-test="`logs-search-stream-group-label-${group.id}`"
-                class="text-text-secondary mb-0.5 text-center text-xs font-medium"
+                class="text-text-secondary mb-0.5 text-left text-xs font-medium"
               >
                 {{ group.label }}
               </span>

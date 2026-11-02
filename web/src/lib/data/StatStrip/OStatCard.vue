@@ -31,6 +31,8 @@ const { lgUp } = useBreakpoint();
 
 const props = withDefaults(
   defineProps<{
+    /** Puts the label under the value, so a narrow tile keeps its full label. */
+    stacked?: boolean;
     label?: I18nText;
     value?: string | number;
     /**
@@ -154,7 +156,7 @@ const trendClass = computed(() =>
     :is="clickable ? 'button' : 'div'"
     :type="clickable ? 'button' : undefined"
     :aria-pressed="clickable ? String(selected) : undefined"
-    class="rounded-default bg-surface-base flex min-w-0 flex-col justify-center gap-1 overflow-hidden border px-2.5 py-1 text-left transition-colors max-lg:px-1.5"
+    class="rounded-default bg-surface-base flex min-w-0 flex-col justify-center gap-1.5 overflow-hidden border px-2.5 py-2 text-left transition-colors max-lg:px-1.5"
     :class="[
       selected ? 'border-accent' : 'border-border-default',
       clickable ? 'cursor-pointer' : '',
@@ -164,7 +166,10 @@ const trendClass = computed(() =>
     :data-test="dataTest"
   >
     <div class="flex min-w-0 items-center justify-between gap-2">
-      <div class="flex min-w-0 items-baseline gap-1.5">
+      <div
+        class="flex min-w-0"
+        :class="stacked ? 'flex-col items-start gap-1' : 'items-baseline gap-1.5'"
+      >
         <!-- The VALUE never shrinks: it is the payload, and a clipped "499.51…" is
              a useless number. When the tile is too narrow (5 tiles on a laptop),
              the squeeze is absorbed by the label, which truncates but stays: a

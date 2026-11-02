@@ -15,8 +15,8 @@
   --color-text-heading: var(--color-grey-800); /* h1-h6, modal titles, page/panel titles */
   --color-text-body: var(--color-grey-700); /* paragraphs, default body */
   --color-text-secondary: var(--color-grey-500); /* supporting text, descriptions, captions */
-  --color-text-label: var(--color-grey-400); /* form labels, metadata, badges */
-  --color-text-muted: var(--color-grey-300); /* disabled, placeholder, de-emphasized */
+  --color-text-label: var(--color-grey-500); /* form labels, metadata, badges */
+  --color-text-muted: var(--color-grey-500); /* disabled, absent, de-emphasized */
   /* label, disabled, border-strong and scrollbar-thumb-hover share grey-400 but stay separate tokens so each can diverge. */
   --color-text-disabled: var(--color-grey-400);
   /* grey-500, not grey-400: placeholder text must clear 4.5:1 on white. */

@@ -38,7 +38,7 @@
 
   /* Button — outline */
   --color-button-outline-text: var(--color-text-heading);
-  --color-button-outline-border: var(--color-border-default);
+  --color-button-outline-border: var(--color-border-control);
   --color-button-outline-hover-bg: var(--color-interactive-hover-bg);
   --color-button-outline-hover-border: var(--color-primary-300);
   --color-button-outline-active-bg: var(--color-surface-accent-active);
@@ -191,7 +191,7 @@
 
   /* Tabs */
   --color-tabs-indicator: var(--color-primary-600);
-  --color-tabs-active-text: var(--color-primary-600);
+  --color-tabs-active-text: var(--color-primary-700);
   --color-tabs-active-bg: var(--color-surface-accent-active);
   --color-tabs-inactive-text: var(--color-text-heading);
   --color-tabs-hover-text: var(--color-text-heading);

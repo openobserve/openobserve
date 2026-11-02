@@ -41,6 +41,8 @@ const props = withDefaults(
      * Leave off for the standard strip — long labels need the wider basis.
      */
     compact?: boolean;
+    /** Puts each label under its value, for strips too narrow to fit them side by side. */
+    stacked?: boolean;
   }>(),
   {
     items: () => [],
@@ -86,6 +88,7 @@ const onCardClick = (item: StatItem) => {
       :key="item.key"
       class="grow max-lg:shrink-0 max-lg:basis-auto"
       :class="compact ? 'basis-36' : 'basis-52'"
+      :stacked="stacked"
       :label="item.label"
       :value="item.value"
       :sub="item.sub"

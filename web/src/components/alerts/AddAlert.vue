@@ -499,7 +499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("alerts.wouldNotTrigger")
                   }}
                 </span>
-                <span class="text-xs opacity-60">{{ activeEvaluationStatus.reason }}</span>
+                <span class="text-text-secondary text-xs">{{ activeEvaluationStatus.reason }}</span>
               </template>
             </div>
             <div class="min-h-0 flex-1 overflow-hidden">
