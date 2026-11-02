@@ -330,12 +330,12 @@ jobs:
 
       - name: Mint the translations App token
         id: app_token
-        if: "!cancelled() && steps.check_changes.outputs.changes == 'true' && vars.TRANSLATIONS_APP_ID != ''"
+        if: "!cancelled() && steps.check_changes.outputs.changes == 'true'"
         # Pinned to a full commit SHA because this action receives the app's signing private key.
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.TRANSLATIONS_APP_ID }}
-          private-key: ${{ secrets.TRANSLATIONS_APP_PRIVATE_KEY }}
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
           permission-contents: write
 
       - name: Commit translations onto the PR branch

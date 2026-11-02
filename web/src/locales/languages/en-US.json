@@ -683,6 +683,7 @@
     }
   },
   "common": {
+    "i18nPushTokenProbe": "Translation push probe",
     "dismiss": "Dismiss",
     "exitFullscreen": "Exit full screen",
     "moreActions": "More actions",
