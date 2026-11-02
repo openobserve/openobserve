@@ -117,6 +117,66 @@ describe("useStreamFields Composable", () => {
       }
     });
 
+    it("refetches a cached stream list that lacks a stream the URL names", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamType = "logs";
+      searchObj.data.stream.selectedStream = ["fresh"];
+      searchObj.data.filterErrMsg = "";
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValueOnce([{ name: "old", stream_type: "logs" }] as any)
+        .mockResolvedValueOnce([
+          { name: "old", stream_type: "logs" },
+          { name: "fresh", stream_type: "logs" },
+        ] as any);
+
+      try {
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        expect(fetchQuery).toHaveBeenCalledTimes(2);
+        expect(searchObj.data.stream.selectedStream).toEqual(["fresh"]);
+        expect(searchObj.data.filterErrMsg).toBe("");
+      } finally {
+        fetchQuery.mockRestore();
+      }
+    });
+
+    it("still reports a URL stream that a fresh list does not have", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamType = "logs";
+      searchObj.data.stream.selectedStream = ["gone"];
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValue([{ name: "old", stream_type: "logs" }] as any);
+
+      try {
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        expect(fetchQuery).toHaveBeenCalledTimes(2);
+        expect(searchObj.data.stream.selectedStream).toEqual([]);
+        expect(searchObj.data.filterErrMsg).toContain("gone");
+      } finally {
+        fetchQuery.mockRestore();
+      }
+    });
+
+    it("does not refetch when the streams are not from the URL", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamType = "logs";
+      searchObj.data.stream.selectedStream = ["fresh"];
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValue([{ name: "old", stream_type: "logs" }] as any);
+
+      try {
+        await wrapper.vm.getStreamList(false);
+        expect(fetchQuery).toHaveBeenCalledTimes(1);
+      } finally {
+        fetchQuery.mockRestore();
+      }
+    });
+
     it("should have loadStreamFields function", () => {
       expect(typeof wrapper.vm.loadStreamFields).toBe("function");
     });

@@ -109,6 +109,12 @@ export function pickInitialLogsStreams(input: InitialStreamInput): InitialStream
   return { selected: [], missing: [], source: "none" };
 }
 
+/** True when a named stream is absent from a fetched stream list. */
+export function namesUnlisted(streamData: { list?: { name: string }[] } | null, names: string[]) {
+  const listed = new Set((streamData?.list ?? []).map((entry) => entry.name));
+  return names.some((name) => !!name && !listed.has(name));
+}
+
 export const useStreamFields = () => {
   const { t } = useI18nTyped();
   const { getStreams, getStream, prefetchStreamSchema } = useStreams(t);
@@ -1012,7 +1018,11 @@ export const useStreamFields = () => {
       // resetStreamData();
       const streamType = searchObj.data.stream.streamType || "logs";
       const requestOrg = store.state.selectedOrganization.identifier;
-      const streamData: any = await getStreams(streamType, false);
+      let streamData: any = await getStreams(streamType, false);
+      // The list is cached for minutes, so a URL stream created since then would read as missing.
+      if (options.fromUrl && namesUnlisted(streamData, initialStreamInput(options).current)) {
+        streamData = await getStreams(streamType, false, true, true);
+      }
       if (store.state.selectedOrganization.identifier !== requestOrg) return;
       if (options.isCurrent && !options.isCurrent()) return;
       searchObj.data.streamResults = {

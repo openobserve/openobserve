@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="icon-toolbar"
-        icon-left="history"
+        icon-left="manage-search"
         v-bind="$attrs"
         :aria-label="t('recentSearches.title')"
         :data-test="dataTest"
