@@ -30,12 +30,14 @@ describe("getVariableSuggestions", () => {
         { name: "env", type: "constant" },
         { name: "q", type: "textbox" },
         { name: "pick", type: "custom" },
+        { name: "from", type: "date" },
       ]),
     ).toEqual([
       { name: "cdu", description: "Query values" },
       { name: "env", description: "Constant" },
       { name: "q", description: "Text box" },
       { name: "pick", description: "Custom" },
+      { name: "from", description: "Date" },
     ]);
   });
 

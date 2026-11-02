@@ -23,7 +23,7 @@ export interface VariableSuggestionContext {
 }
 
 // Ad hoc filters hold filter objects, not a printable value.
-const TEXT_VARIABLE_TYPES = ["query_values", "custom", "constant", "textbox"] as const;
+const TEXT_VARIABLE_TYPES = ["query_values", "custom", "constant", "textbox", "date"] as const;
 
 const LIST_EXAMPLE = raw("a, b");
 
@@ -52,6 +52,7 @@ export const getVariableSuggestions = (
     custom: t("panel.variableSuggestion.custom"),
     constant: t("panel.variableSuggestion.constant"),
     textbox: t("panel.variableSuggestion.textbox"),
+    date: t("panel.variableSuggestion.date"),
   };
   const formatLabels: Record<VariableFormat, I18nText> = {
     csv: t("panel.variableSuggestion.csv", { example: FORMAT_EXAMPLES.csv }),

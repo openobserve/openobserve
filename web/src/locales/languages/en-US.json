@@ -9270,6 +9270,7 @@
       "constant": "Constant",
       "textbox": "Text box",
       "custom": "Custom",
+      "date": "Date",
       "list": "{type} · {example}",
       "csv": "Commas: {example}",
       "pipe": "Pipes: {example}",
