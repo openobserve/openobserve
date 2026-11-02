@@ -592,6 +592,7 @@ def test_http_trigger_test_suppresses_destinations_by_default(create_session, ba
     assert '"event_type":"webhook"' in text.replace(" ", "")
     assert created["id"] in text
     assert "deploy" in text
+    assert '"suppressed":true' in text.replace(" ", "")
 
 
 def test_history_lists_a_finished_http_run(create_session, base_url, make_workflow):

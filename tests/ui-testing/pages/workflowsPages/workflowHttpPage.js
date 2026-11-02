@@ -68,7 +68,8 @@ class WorkflowHttpPage {
     this.listMenuCopy = (n) => `[data-test="workflow-list-${n}-copy-endpoint"]`;
     this.runsTable = '[data-test="workflow-runs-table"]';
     this.runsHttpFilter = '[data-test="workflow-runs-trigger-filter-http_request"]';
-    this.runsSearch = '[data-test="workflow-runs-search-field"]';
+    this.runsSearch = '[data-test="workflow-runs-search"]';
+    this.runTestListHint = '[data-test="workflow-http-run-test-list-hint"]';
   }
 
   // ---------- API seeding ----------
@@ -85,6 +86,53 @@ class WorkflowHttpPage {
 
   async deleteDestination(name) {
     await seed.deleteDestination(this.page, `${name}_dest`).catch(() => {});
+  }
+
+  /** Deletes the published workflow or, failing that, the draft saved under `name`. */
+  async deleteWorkflowNamed(name) {
+    const rows = await seed.listWorkflows(this.page).catch(() => []);
+    const row = rows.find((r) => r.name === name);
+    if (!row) return;
+    const published = await seed.deleteWorkflow(this.page, row.id).catch(() => null);
+    if (published?.ok()) return;
+    await this.page.request
+      .delete(`${api()}/${getOrgIdentifier()}/workflows/${row.id}?draft=true`, {
+        headers: getAuthHeaders(),
+      })
+      .catch(() => {});
+  }
+
+  /** Creates an org viewer over REST; returns its email and password. */
+  async createViewer(suffix) {
+    const email = `wf_auto_viewer_${suffix}@example.com`;
+    const password = `Vw#${suffix}Pass2026!`;
+    const created = await this.page.request.post(`${api()}/${getOrgIdentifier()}/users`, {
+      headers: getAuthHeaders(),
+      data: { email, password, role: 'viewer', first_name: 'wf', last_name: 'viewer' },
+    });
+    expect(created.ok(), await created.text()).toBeTruthy();
+    return { email, password };
+  }
+
+  async deleteUser(email) {
+    const resp = await this.page.request.delete(
+      `${api()}/${getOrgIdentifier()}/users/${encodeURIComponent(email)}`,
+      { headers: getAuthHeaders() }
+    );
+    expect.soft(resp.ok(), `viewer ${email} not deleted: ${resp.status()}`).toBeTruthy();
+  }
+
+  /** Signs `email` in on a fresh page of `ctx` and returns that page. */
+  async loginInContext(ctx, email, password) {
+    const vp = await ctx.newPage();
+    await vp.goto(`${process.env.ZO_BASE_URL}/web/login?org_identifier=${getOrgIdentifier()}`);
+    const internal = vp.locator('[data-test="login-as-internal-user"]');
+    if (await internal.isVisible().catch(() => false)) await internal.click();
+    await vp.locator('[data-test="login-user-id-field"]').fill(email);
+    await vp.locator('[data-test="login-password-field"]').fill(password);
+    await vp.locator('[data-test="login-sign-in"]').click();
+    await vp.waitForURL((u) => !u.pathname.endsWith('/login'), { timeout: 30000 });
+    return vp;
   }
 
   /** Turn the endpoint on over REST; the 201 body carries the new token once as `secret`. */

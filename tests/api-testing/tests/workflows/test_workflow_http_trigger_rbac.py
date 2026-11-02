@@ -141,7 +141,7 @@ def env(create_session, base_url, rbac_enabled):
         json={"enabled": True, "auth_mode": "token"},
     )
     assert created.status_code == 201, created.text[:300]
-    yield {"wf_id": wf_id, "users": users, "created": created.json()}
+    yield {"wf_id": wf_id, "users": users, "created": created.json(), "dest": dest}
     root.delete(f"{base_url}api/{ORG_ID}/workflows/{wf_id}/http_trigger")
     root.delete(f"{base_url}api/{ORG_ID}/workflows/{wf_id}")
     root.delete(f"{base_url}api/{ORG_ID}/alerts/destinations/{dest}")
@@ -149,6 +149,21 @@ def env(create_session, base_url, rbac_enabled):
         root.delete(f"{base_url}api/{ORG_ID}/users/{users[f'{role}_email']}")
     if member_email:
         root.delete(f"{base_url}api/{ORG_ID}/service_accounts/{member_email}")
+
+
+def _own_endpoint(root, base_url, dest):
+    """A second workflow with a token endpoint, for a test that changes its credentials."""
+    resp = root.post(
+        f"{base_url}api/{ORG_ID}/workflows", json=_workflow_payload(f"wf_auto_httprbac_{_suffix()}", dest)
+    )
+    assert resp.status_code == 200, resp.text[:300]
+    wf_id = resp.json()["id"]
+    created = root.put(
+        f"{base_url}api/{ORG_ID}/workflows/{wf_id}/http_trigger",
+        json={"enabled": True, "auth_mode": "token"},
+    )
+    assert created.status_code == 201, created.text[:300]
+    return {"wf_id": wf_id, "created": created.json()}
 
 
 def _url(base_url, wf_id, rest=""):
@@ -216,10 +231,16 @@ def test_permissions_flags_match_the_role(env, base_url, rbac_enabled):
         assert body["permissions"] == flags, role
 
 
-def test_editor_can_manage_the_endpoint(env, base_url, rbac_enabled):
+def test_editor_can_manage_the_endpoint(env, base_url, rbac_enabled, create_session):
     if not rbac_enabled:
         pytest.skip("needs OpenFGA on (rbac_enabled)")
-    got = _attempts(env["users"]["editor"], base_url, env)
+    # Its rotate revokes the credential, so it runs on its own endpoint, not the shared one.
+    own = _own_endpoint(create_session, base_url, env["dest"])
+    try:
+        got = _attempts(env["users"]["editor"], base_url, own)
+    finally:
+        create_session.delete(f"{base_url}api/{ORG_ID}/workflows/{own['wf_id']}/http_trigger")
+        create_session.delete(f"{base_url}api/{ORG_ID}/workflows/{own['wf_id']}")
     for action, status in {"get": 200, "reveal": 200, "test": 200, "update": 200, "rotate": 201, "revoke": 404}.items():
         assert got[action] == status, (action, got)
 

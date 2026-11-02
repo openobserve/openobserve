@@ -3,7 +3,6 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 const seed = require('../../pages/workflowsPages/workflowFolderSeed.js');
 
 const uniq = () => `${Date.now().toString(36).slice(-5)}${Math.random().toString(36).slice(2, 5)}`;
@@ -33,7 +32,8 @@ test.describe(
     test.afterEach(async () => {
       while (cleanup.length) {
         const { id, name } = cleanup.pop();
-        await http.deleteWorkflow(id);
+        if (id) await http.deleteWorkflow(id);
+        else await http.deleteWorkflowNamed(name);
         await http.deleteDestination(name);
       }
     });
@@ -113,6 +113,9 @@ test.describe(
     test('HTTP-03: unsaved workflow saves a draft with its endpoint, is refused until published', async ({ page }) => {
       const id = uniq();
       const name = `wf_auto_http_d_${id}`;
+      // Registered before anything exists, so a failure at any step still removes what was made.
+      const created = { id: null, name };
+      cleanup.push(created);
       const destName = await seed.createPipelineDestination(page, `${name}_dest`);
       await pm.workflowsPage.goToAdd('alert_fired');
       await pm.workflowsPage.setName(name);
@@ -135,7 +138,7 @@ test.describe(
       const rows = await seed.listWorkflows(page);
       const draft = rows.find((r) => r.name === name);
       expect(draft, 'draft row saved with the endpoint').toBeTruthy();
-      cleanup.push({ id: draft.id, name });
+      created.id = draft.id;
       const { secret, url } = await http.activeSecret(draft.id);
       expect((await http.invokeHook(url, { token: secret })).status).toBe(403);
 
@@ -228,7 +231,7 @@ test.describe(
 
       await http.openFromList(wf.name);
       await page.locator(http.steady).waitFor({ state: 'visible', timeout: 25000 });
-      await expect(page.locator('[data-test="workflow-http-run-test-list-hint"]')).toBeVisible();
+      await expect(page.locator(http.runTestListHint)).toBeVisible();
     });
 
     test('HTTP-07: an HTTP-sourced run shows in the runs view under the HTTP filter', async ({ page }) => {
@@ -247,28 +250,13 @@ test.describe(
       expect(await http.runsTableText()).toContain(runId.slice(0, 8));
     });
 
-    test('HTTP-08: a viewer sees the endpoint read-only', async ({ page, browser }) => {
+    test('HTTP-08: a viewer sees the endpoint read-only', async ({ browser }) => {
       const wf = await seeded({ name: `wf_auto_http_v_${uniq()}` });
       await http.enableEndpointApi(wf.id);
-      const email = `wf_auto_viewer_${uniq()}@example.com`;
-      const password = `Vw#${uniq()}Pass2026!`;
-      const users = `${process.env.ZO_BASE_URL}/api/${getOrgIdentifier()}/users`;
-      const created = await page.request.post(users, {
-        headers: getAuthHeaders(),
-        data: { email, password, role: 'viewer', first_name: 'wf', last_name: 'viewer' },
-      });
-      expect(created.ok(), await created.text()).toBeTruthy();
+      const { email, password } = await http.createViewer(uniq());
       const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
       try {
-        const vp = await ctx.newPage();
-        await vp.goto(`${process.env.ZO_BASE_URL}/web/login?org_identifier=${getOrgIdentifier()}`);
-        const internal = vp.locator('[data-test="login-as-internal-user"]');
-        if (await internal.isVisible().catch(() => false)) await internal.click();
-        await vp.locator('[data-test="login-user-id-field"]').fill(email);
-        await vp.locator('[data-test="login-password-field"]').fill(password);
-        await vp.locator('[data-test="login-sign-in"]').click();
-        await vp.waitForURL((u) => !u.pathname.endsWith('/login'), { timeout: 30000 });
-
+        const vp = await http.loginInContext(ctx, email, password);
         const vpm = new PageManager(vp);
         const vhttp = vpm.workflowHttpPage;
         await vpm.workflowsPage.goToList();
@@ -283,7 +271,7 @@ test.describe(
         await expect(vp.locator(vhttp.url)).toBeVisible();
       } finally {
         await ctx.close();
-        await page.request.delete(`${users}/${encodeURIComponent(email)}`, { headers: getAuthHeaders() });
+        await http.deleteUser(email);
       }
     });
   }
