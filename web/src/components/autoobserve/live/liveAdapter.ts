@@ -293,9 +293,16 @@ const uniqueNames = (rows: AutoObserveCoverageRow[]) => {
   }
   const labels = rows.map((_, i) => labelOf(i));
   const groups = groupBy(labels);
-  return labels.map((label, i) => {
-    const group = groups.get(label) ?? [i];
-    return group.length > 1 ? `${label} #${group.indexOf(i) + 1}` : label;
+  const taken = new Set(labels);
+  const lastNumber = new Map<string, number>();
+  return labels.map((label) => {
+    if ((groups.get(label)?.length ?? 1) < 2) return label;
+    let n = (lastNumber.get(label) ?? 0) + 1;
+    while (taken.has(`${label} #${n}`)) n += 1;
+    const numbered = `${label} #${n}`;
+    lastNumber.set(label, n);
+    taken.add(numbered);
+    return numbered;
   });
 };
 
