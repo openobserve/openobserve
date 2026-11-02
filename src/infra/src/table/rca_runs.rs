@@ -1447,6 +1447,7 @@ mod tests {
             acknowledged_by: Set(None),
             acknowledged_at: Set(None),
             created_at: Set(T0),
+            episode_opened_at: Set(T0),
             updated_at: Set(T0),
             muted_by_downtime_id: Set(None),
             rca_run_id: Set(None),

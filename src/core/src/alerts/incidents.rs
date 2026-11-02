@@ -439,8 +439,8 @@ async fn send_incident_notifications_inner(
         return None;
     }
 
-    // Load incident to get severity, title and service_name.
-    let (severity, title, service_name) =
+    // Load incident to get severity, title, service_name and the episode it is in.
+    let (severity, title, service_name, episode_opened_at) =
         match infra::table::alert_incidents::get(org_id, incident_id).await {
             Ok(Some(model)) => {
                 let gv: std::collections::HashMap<String, String> =
@@ -451,10 +451,12 @@ async fn send_incident_notifications_inner(
                     .cloned()
                     .unwrap_or_default();
                 let title_str = model.title.unwrap_or_default();
-                (model.severity, title_str, svc)
+                (model.severity, title_str, svc, model.episode_opened_at)
             }
-            _ => ("P3".to_string(), String::new(), String::new()),
+            _ => ("P3".to_string(), String::new(), String::new(), 0),
         };
+    let incident_template = incident_override(org_id).await;
+    let ledger_event = incident_ledger_event(event, chrono::Utc::now().timestamp_micros());
 
     let cfg = config::get_config();
     let incident_url = format!(
@@ -476,17 +478,27 @@ async fn send_incident_notifications_inner(
             &service_name,
             &incident_url,
         );
+        mark_incident_send(&mut send.ctx, incident_id, episode_opened_at, &ledger_event);
+        let candidates: Vec<config::meta::destinations::Template> = incident_template
+            .iter()
+            .chain(send.alert_template)
+            .cloned()
+            .collect();
         for dest_name in &send.dest_names {
-            match crate::alerts::alert::send_templated_to_destination(
+            let sent = match crate::alerts::notifications::notify::notify(
                 org_id,
-                &subject,
                 dest_name,
-                send.alert_template,
+                &candidates,
+                Some(&subject),
                 &mut send.ctx,
             )
             .await
             {
-                Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
+                Ok(_) => Ok(()),
+                Err(e) => skip_is_not_an_error(e),
+            };
+            match sent {
+                Ok(()) => success_parts.push(format!("{dest_name}: sent")),
                 Err(e) => {
                     log::error!(
                         "[incidents] Failed to notify {dest_name} for incident {org_id}/{incident_id}: {e}"
@@ -509,6 +521,50 @@ async fn send_incident_notifications_inner(
             "[incidents] Notification partially failed for incident {org_id}/{incident_id} ({event}): {error}"
         );
         Some(error)
+    }
+}
+
+/// The org's `default_templates.incident`, loaded once per batch as precedence level 1a.
+#[cfg(feature = "enterprise")]
+async fn incident_override(org_id: &str) -> Option<config::meta::destinations::Template> {
+    let defaults = crate::alerts::notifications::org_default::get_default_templates(org_id).await;
+    let name = defaults.get(config::meta::alerts::notification_kind::NotificationKind::Incident)?;
+    crate::db::alerts::templates::get(org_id, name).await.ok()
+}
+
+/// `opened` for a new incident, else `updated:{incident_event}:{event_time_us}`.
+fn incident_ledger_event(event: &str, event_time_us: i64) -> String {
+    match event {
+        "new_incident_created" => "opened".to_string(),
+        "resolved" => "resolved".to_string(),
+        other => format!("updated:{other}:{event_time_us}"),
+    }
+}
+
+/// Kind, owner, episode key and ledger event of one incident send.
+#[cfg(feature = "enterprise")]
+fn mark_incident_send(
+    ctx: &mut crate::alerts::notifications::NotificationContext,
+    incident_id: &str,
+    episode_opened_at: i64,
+    ledger_event: &str,
+) {
+    ctx.kind = config::meta::alerts::notification_kind::NotificationKind::Incident;
+    ctx.object_id = incident_id.to_string();
+    ctx.episode_id = Some(format!("{incident_id}:{episode_opened_at}"));
+    ctx.event = ledger_event.to_string();
+    ctx.cluster_name = config::get_cluster_name();
+}
+
+/// A skip the ledger handles, or one already delivered, is not a failed notification.
+#[cfg(feature = "enterprise")]
+fn skip_is_not_an_error(
+    e: crate::alerts::notifications::notify::NotifyError,
+) -> Result<(), crate::alerts::notifications::notify::NotifyError> {
+    use crate::alerts::notifications::notify::{NotifyError, SkipOutcome};
+    match e {
+        NotifyError::Skipped(reason) if reason.outcome() != SkipOutcome::Unsuccessful => Ok(()),
+        other => Err(other),
     }
 }
 
@@ -3191,7 +3247,11 @@ pub async fn update_status_as(
     ) && infra::table::alert_incidents::get(org_id, incident_id)
         .await?
         .is_some_and(|m| m.muted_by_downtime_id.is_some());
-    let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
+    let updated = if status == "resolved" {
+        resolve_status(org_id, incident_id, quiet || muted_before).await?
+    } else {
+        infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
+    };
 
     let muted = status_change_is_muted(
         quiet || muted_before,
@@ -3246,6 +3306,186 @@ pub async fn update_status_as(
 
     publish_status(org_id, incident_id, status).await;
     model_to_incident(updated).await
+}
+
+/// Write the resolve and close the episode in one transaction; a muted resolve sends nothing.
+#[cfg(feature = "enterprise")]
+async fn resolve_status(
+    org_id: &str,
+    incident_id: &str,
+    muted: bool,
+) -> Result<infra::table::entity::alert_incidents::Model, anyhow::Error> {
+    use config::meta::alerts::notification_kind::NotificationKind;
+    use infra::table::notification_deliveries::{CLOSED_BY_PRODUCER, CLOSED_BY_RESOLVE};
+
+    use crate::alerts::notifications::delivery;
+
+    let Some(before) = infra::table::alert_incidents::get(org_id, incident_id).await? else {
+        anyhow::bail!("Incident not found");
+    };
+    let episode_id = format!("{incident_id}:{}", before.episode_opened_at);
+    let (current, recorded) = if muted {
+        (Vec::new(), Vec::new())
+    } else {
+        incident_resolve_rows(org_id, incident_id, &before, &episode_id).await
+    };
+    let written = std::sync::Arc::new(tokio::sync::Mutex::new(None));
+    let slot = written.clone();
+    let (org, id) = (org_id.to_string(), incident_id.to_string());
+    let state_change: delivery::StateChange = Box::new(move |txn| {
+        Box::pin(async move {
+            let model =
+                infra::table::alert_incidents::update_status_with(txn, &org, &id, "resolved")
+                    .await?;
+            *slot.lock().await = Some(model);
+            Ok(())
+        })
+    });
+    let results = delivery::resolve_episode(
+        org_id,
+        NotificationKind::Incident,
+        &episode_id,
+        incident_id,
+        current,
+        recorded,
+        if muted {
+            CLOSED_BY_PRODUCER
+        } else {
+            CLOSED_BY_RESOLVE
+        },
+        !muted,
+        state_change,
+    )
+    .await?;
+    for failed in results.iter().filter_map(|r| r.as_ref().err()) {
+        log::warn!("[incidents] resolved notification for {org_id}/{incident_id}: {failed}");
+    }
+    written
+        .lock()
+        .await
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("Incident not found"))
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn resolve_status(
+    org_id: &str,
+    incident_id: &str,
+    _muted: bool,
+) -> Result<infra::table::entity::alert_incidents::Model, anyhow::Error> {
+    Ok(infra::table::alert_incidents::update_status(org_id, incident_id, "resolved").await?)
+}
+
+/// The resolve rows: today's alert destination merge, then destinations only the episode recorded.
+#[cfg(feature = "enterprise")]
+async fn incident_resolve_rows(
+    org_id: &str,
+    incident_id: &str,
+    incident: &infra::table::entity::alert_incidents::Model,
+    episode_id: &str,
+) -> (
+    Vec<infra::table::notification_deliveries::FanoutDestination>,
+    Vec<infra::table::notification_deliveries::FanoutDestination>,
+) {
+    use config::meta::alerts::notification_kind::NotificationKind;
+
+    use crate::alerts::notifications::delivery;
+
+    let first_alert = match infra::table::alert_incidents::get_incident_alerts(incident_id).await {
+        Ok(alerts) => match alerts.first() {
+            Some(ia) => crate::db::alerts::alert::get_alert_from_cache(org_id, &ia.alert_id)
+                .await
+                .map(|(_, alert)| alert),
+            None => None,
+        },
+        Err(_) => None,
+    };
+    let now = chrono::Utc::now().timestamp_micros();
+    let (mut ctx, destinations, alert_template) = match &first_alert {
+        Some(alert) => {
+            let ctx = crate::alerts::alert::build_send_context(
+                alert,
+                &[],
+                now,
+                None,
+                now,
+                Some(config::meta::alerts::level::AlertLevel::Ok),
+                None,
+                None,
+                None,
+                true,
+            )
+            .await;
+            let destinations =
+                collect_incident_destinations(org_id, incident_id, &alert.destinations).await;
+            let template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
+                Some(name) => crate::db::alerts::templates::get(org_id, name).await.ok(),
+                None => None,
+            };
+            (ctx, destinations, template)
+        }
+        None => (
+            subject_notification_context(org_id, incident.title.as_deref().unwrap_or(""), now)
+                .await,
+            Vec::new(),
+            None,
+        ),
+    };
+    let gv: std::collections::HashMap<String, String> =
+        serde_json::from_value(incident.group_values.clone()).unwrap_or_default();
+    let service = gv
+        .get("service_name")
+        .or_else(|| gv.get("service"))
+        .cloned()
+        .unwrap_or_default();
+    let incident_url = format!(
+        "{}/web/alerts/incidents/{incident_id}?org_identifier={org_id}",
+        config::get_config().common.web_url
+    );
+    let title = incident.title.clone().unwrap_or_default();
+    apply_incident_to_context(
+        &mut ctx,
+        incident_id,
+        "resolved",
+        &title,
+        &incident.severity,
+        &service,
+        &incident_url,
+    );
+    mark_incident_send(
+        &mut ctx,
+        incident_id,
+        incident.episode_opened_at,
+        "resolved",
+    );
+    ctx.alert_status = crate::alerts::notifications::STATUS_RESOLVED.to_string();
+    ctx.alert_description = "All linked alerts recovered".to_string();
+    let candidates: Vec<config::meta::destinations::Template> = incident_override(org_id)
+        .await
+        .into_iter()
+        .chain(alert_template)
+        .collect();
+    let subject = format!("[resolved] {title}");
+    let mut current = Vec::new();
+    for dest in &destinations {
+        match delivery::fanout_destination(org_id, dest, &candidates, Some(&subject), &ctx).await {
+            Ok(d) => current.push(d),
+            Err(e) => log::warn!("[incidents] no resolve row for {dest} on {incident_id}: {e}"),
+        }
+    }
+    let mut recorded = Vec::new();
+    for dest in delivery::recorded_destinations(org_id, NotificationKind::Incident, episode_id)
+        .await
+        .into_iter()
+        .filter(|d| !destinations.contains(d))
+    {
+        if let Ok(d) =
+            delivery::fanout_destination(org_id, &dest, &candidates, Some(&subject), &ctx).await
+        {
+            recorded.push(d);
+        }
+    }
+    (current, recorded)
 }
 
 /// Runs the one rule when the status change is the one ack's (AK-2, D20). [strong] (reads)
@@ -3663,6 +3903,7 @@ mod tests {
             acknowledged_by: None,
             acknowledged_at: None,
             created_at: 1,
+            episode_opened_at: 1,
             updated_at: 1,
             muted_by_downtime_id: muted_by.map(str::to_string),
             rca_run_id: None,

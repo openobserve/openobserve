@@ -2492,6 +2492,7 @@ mod tests {
             acknowledged_by: None,
             acknowledged_at: None,
             created_at: now,
+            episode_opened_at: now,
             updated_at: now,
             muted_by_downtime_id: None,
             rca_run_id: None,

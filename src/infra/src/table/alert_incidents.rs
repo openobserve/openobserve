@@ -83,6 +83,7 @@ fn new_incident(
         acknowledged_by: Set(None),
         acknowledged_at: Set(None),
         created_at: Set(now),
+        episode_opened_at: Set(now),
         updated_at: Set(now),
         muted_by_downtime_id: Set(muted_by_downtime_id),
         rca_run_id: Set(None),
@@ -347,6 +348,7 @@ pub async fn update_status_with<C: ConnectionTrait>(
     if status == "acknowledged" && incident.status != "open" {
         return Ok(incident);
     }
+    let was_resolved = incident.status == "resolved";
     let mut active: alert_incidents::ActiveModel = incident.into();
     active.status = Set(status.to_string());
     active.updated_at = Set(now);
@@ -356,6 +358,10 @@ pub async fn update_status_with<C: ConnectionTrait>(
         // A manual reopen must run as a live incident, not stay muted forever.
         active.muted_by_downtime_id = Set(None);
     } else if status == "open" {
+        // A reopen starts a new notification episode, so its key differs from the resolved one.
+        if was_resolved {
+            active.episode_opened_at = Set(now);
+        }
         active.resolved_at = Set(None);
         active.acknowledged_by = Set(None);
         active.acknowledged_at = Set(None);
@@ -636,6 +642,7 @@ pub async fn list_with<C: ConnectionTrait>(
         .column(alert_incidents::Column::AssignedTo)
         .column(alert_incidents::Column::CreatedAt)
         .column(alert_incidents::Column::UpdatedAt)
+        .column(alert_incidents::Column::EpisodeOpenedAt)
         .column(alert_incidents::Column::MutedByDowntimeId)
         .column(alert_incidents::Column::RcaRunId)
         .column(alert_incidents::Column::RcaState)

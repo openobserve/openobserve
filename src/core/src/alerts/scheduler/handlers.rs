@@ -2122,6 +2122,11 @@ pub(crate) fn anomaly_success_response(
     .to_string()
 }
 
+/// A partial delivery opened the episode for the destinations that accepted it.
+fn partial_delivery_stores_key(succeeded: &[String]) -> bool {
+    !succeeded.is_empty()
+}
+
 /// The model executed: anomalies found (delivered or not), none found, or muted by a downtime.
 #[cfg(feature = "enterprise")]
 fn detection_ran(outcome: &RunOutcome) -> bool {
@@ -4466,6 +4471,8 @@ async fn handle_alert_triggers(
                         // destinations already received.
                         trigger_data.notified_destinations =
                             merge_ledger(&trigger_data.notified_destinations, &succeeded);
+                        // Store the key the delivered destinations saw, or the retry mints another.
+                        episode_delivered |= partial_delivery_stores_key(&succeeded);
                         log::warn!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{}: {} of {} \
                              destinations failed, retrying only those; ledger now {:?}",
@@ -9820,5 +9827,11 @@ mod tests {
             Some(&(PARK_NOW + UNREADABLE_ORG_RECHECK_MICROS)),
             "{written:?}"
         );
+    }
+
+    #[test]
+    fn a_partial_delivery_stores_the_minted_episode_key() {
+        assert!(partial_delivery_stores_key(&["slack".to_string()]));
+        assert!(!partial_delivery_stores_key(&[]));
     }
 }

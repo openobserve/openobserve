@@ -34,6 +34,8 @@ pub struct Model {
 
     pub created_at: i64,
     pub updated_at: i64,
+    /// Start of the current notification episode: created_at, then each reopen; keys the ledger.
+    pub episode_opened_at: i64,
 
     /// Set while a downtime mutes this incident; nothing about it notifies.
     pub muted_by_downtime_id: Option<String>,
@@ -89,6 +91,7 @@ mod tests {
             acknowledged_by: None,
             acknowledged_at: None,
             created_at: 1000,
+            episode_opened_at: 1000,
             updated_at: 2000,
             muted_by_downtime_id: None,
             rca_run_id: None,
@@ -129,6 +132,7 @@ mod tests {
             acknowledged_by: Some("user@example.com".to_string()),
             acknowledged_at: Some(1500),
             created_at: 1000,
+            episode_opened_at: 1000,
             updated_at: 1500,
             muted_by_downtime_id: Some("2f9K".to_string()),
             rca_run_id: None,

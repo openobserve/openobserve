@@ -3418,47 +3418,6 @@ async fn send_to_destination_type(
     }
 }
 
-/// Render `ctx` with the alert's template, else the destination's, else the org default, and send
-/// it.
-#[cfg(feature = "enterprise")]
-pub(crate) async fn send_templated_to_destination(
-    org_id: &str,
-    sns_subject: &str,
-    dest_name: &str,
-    alert_template: Option<&Template>,
-    ctx: &mut NotificationContext,
-) -> Result<String, anyhow::Error> {
-    let (dest, dest_template) = destinations::get_with_template(org_id, dest_name).await?;
-    let Module::Alert {
-        destination_type, ..
-    } = dest.module
-    else {
-        anyhow::bail!("not an alert destination");
-    };
-    let explicit = choose_template(alert_template, dest_template.as_ref()).cloned();
-    let effective =
-        crate::alerts::notifications::org_default::resolve_effective_template(org_id, explicit)
-            .await;
-    if let DestinationType::SlackApp(target) = &destination_type {
-        return crate::alerts::slack_publish::send_templated_post(
-            &crate::alerts::slack_publish::QueueSink,
-            org_id,
-            target,
-            effective.template(),
-            ctx,
-        )
-        .await;
-    }
-    send_to_destination_type(
-        org_id,
-        sns_subject,
-        &destination_type,
-        effective.template(),
-        ctx,
-    )
-    .await
-}
-
 /// Send a pre-built message string to a single destination type.
 ///
 /// Used by synthetics and downtime notifications, which build their own

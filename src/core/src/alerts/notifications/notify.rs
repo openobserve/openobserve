@@ -229,6 +229,9 @@ pub async fn send(
     ctx: &mut NotificationContext,
 ) -> Result<DeliveryRow, NotifyError> {
     apply_destination_metadata(&resolved.destination_type, ctx);
+    if let Some(sent) = send_outside_ledger(org_id, resolved, ctx).await {
+        return sent;
+    }
     super::delivery::send_on_ledger(org_id, resolved, subject, ctx).await
 }
 
