@@ -183,13 +183,7 @@ pub async fn assume_service_account(
         Ok(r) => r,
         Err(e) => {
             log::error!("Assume service account failed: {}", e);
-            if let Some(msg) = e.strip_prefix("BADREQUEST:") {
-                return MetaHttpResponse::bad_request(msg);
-            } else if let Some(msg) = e.strip_prefix("FORBIDDEN:") {
-                return MetaHttpResponse::forbidden(msg);
-            } else {
-                return MetaHttpResponse::forbidden(e);
-            }
+            return assume_error_response(&e);
         }
     };
 
@@ -245,4 +239,41 @@ pub async fn assume_service_account(
         })),
     )
         .into_response()
+}
+
+/// Maps the enterprise error's `BADREQUEST:` / `FORBIDDEN:` / `INTERNAL:` prefix to a status.
+#[cfg(feature = "enterprise")]
+fn assume_error_response(e: &str) -> Response {
+    if let Some(msg) = e.strip_prefix("BADREQUEST:") {
+        MetaHttpResponse::bad_request(msg)
+    } else if let Some(msg) = e.strip_prefix("FORBIDDEN:") {
+        MetaHttpResponse::forbidden(msg)
+    } else if let Some(msg) = e.strip_prefix("INTERNAL:") {
+        MetaHttpResponse::internal_error(msg)
+    } else {
+        MetaHttpResponse::forbidden(e)
+    }
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assume_error_prefix_picks_the_status() {
+        for (error, status) in [
+            ("BADREQUEST:no such account", StatusCode::BAD_REQUEST),
+            ("FORBIDDEN:not allowed", StatusCode::FORBIDDEN),
+            (
+                "INTERNAL:roles unreadable",
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ),
+            (
+                "Only service accounts can assume service accounts",
+                StatusCode::FORBIDDEN,
+            ),
+        ] {
+            assert_eq!(assume_error_response(error).status(), status, "{error}");
+        }
+    }
 }
