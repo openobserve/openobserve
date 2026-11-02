@@ -180,6 +180,7 @@ pub struct AlertHistoryResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("alert_id" = Option<String>, Query, description = "Filter by specific alert id"),
+        ("anomaly_id" = Option<String>, Query, description = "Return history for this anomaly detection config"),
         ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds"),
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds"),
         ("from" = Option<i64>, Query, description = "Pagination offset (default: 0)"),

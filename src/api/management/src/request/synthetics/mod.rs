@@ -956,6 +956,7 @@ pub async fn delete_synthetic(
     request_body(content = BulkDeleteSyntheticsRequestBody, description = "IDs to delete", content_type = "application/json"),
     responses(
         (status = 200, description = "Deleted"),
+        (status = 403, description = "Forbidden"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
 )]
