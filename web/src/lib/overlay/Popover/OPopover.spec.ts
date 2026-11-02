@@ -83,6 +83,22 @@ describe("OPopover", () => {
     wrapper.unmount();
   });
 
+  it("stays open on an outside scroll when closeOnScroll is false", async () => {
+    const wrapper = mount(OPopover, {
+      attachTo: document.body,
+      props: { open: false, closeOnScroll: false },
+      slots: {
+        trigger: "<button>Open</button>",
+        default: '<div data-testid="content">Body</div>',
+      },
+    });
+    await wrapper.setProps({ open: true });
+    document.dispatchEvent(new Event("scroll"));
+    const emitted = wrapper.emitted("update:open") ?? [];
+    expect(emitted.some((args) => args[0] === false)).toBe(false);
+    wrapper.unmount();
+  });
+
   it("ignores scrolls inside its own content", async () => {
     const wrapper = mount(OPopover, {
       attachTo: document.body,

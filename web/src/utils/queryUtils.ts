@@ -4,6 +4,7 @@ import config from "../aws-exports";
 import { useStore } from "vuex";
 import CronExpressionParser from "cron-parser";
 import { getFunctionErrorMessage } from "@/utils/timezone";
+import { toMessages } from "@/utils/dashboard/panelDiagnostics";
 import { gt, type TranslateFn } from "@/types/i18n";
 
 export const getPath = () => {
@@ -479,7 +480,7 @@ export const processQueryMetadataErrors = (metadata: any, timezone: string = "UT
           );
           combinedWarnings.push(combinedMessage);
         } else if (chunk?.function_error) {
-          combinedWarnings.push(...chunk.function_error);
+          combinedWarnings.push(...toMessages(chunk.function_error));
         }
       });
     });
@@ -494,7 +495,7 @@ export const processQueryMetadataErrors = (metadata: any, timezone: string = "UT
       );
       combinedWarnings.push(combinedMessage);
     } else if (query?.function_error) {
-      combinedWarnings.push(query.function_error);
+      combinedWarnings.push(...toMessages(query.function_error));
     }
   }
 

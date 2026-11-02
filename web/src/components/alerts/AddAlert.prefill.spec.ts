@@ -25,7 +25,7 @@
 // assertions are about the FORM, not the library.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -34,15 +34,18 @@ import { normalizePrefill } from "@/utils/alerts/alertPrefill";
 import { ALERT_PREFILL_KEY } from "@/utils/alerts/alertPrefillStorage";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 
+const streamSchema = {
+  schema: [
+    { name: "event_count", type: "int" },
+    { name: "k8s_cluster", type: "string" },
+    { name: "value", type: "float" },
+  ],
+};
+const getStreamMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
-    getStream: vi.fn().mockResolvedValue({
-      schema: [
-        { name: "event_count", type: "int" },
-        { name: "k8s_cluster", type: "string" },
-        { name: "value", type: "float" },
-      ],
-    }),
+    getStream: getStreamMock,
     getStreams: vi
       .fn()
       .mockResolvedValue({ list: [{ name: "k8s_events" }, { name: "eth_rpc_status" }] }),
@@ -249,11 +252,28 @@ const previewConfig = (wrapper: any) =>
 describe("AddAlert — a prefill seeds the form", () => {
   let wrapper: any;
 
+  beforeEach(() => {
+    getStreamMock.mockResolvedValue(streamSchema);
+  });
+
   afterEach(() => {
     wrapper?.unmount();
     wrapper = null;
     sessionStorage.clear();
     vi.clearAllMocks();
+  });
+
+  describe("a source whose stream this org has not ingested yet", () => {
+    it("still applies the name, query and trigger when the stream lookup fails", async () => {
+      getStreamMock.mockRejectedValue(new Error("stream not found"));
+      wrapper = await openWithPrefill(sqlEntry(), sqlFile());
+      const data = wrapper.vm.formData;
+
+      expect(data.name).toBe("high_warning_event_rate");
+      expect(data.stream_name).toBe("k8s_events");
+      expect(data.query_condition.sql).toBe(sqlFile().query_condition!.sql);
+      expect(data.trigger_condition.silence).toBe(30);
+    });
   });
 
   describe("a SQL alert whose source carries a real trigger", () => {

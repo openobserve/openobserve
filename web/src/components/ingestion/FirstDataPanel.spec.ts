@@ -28,6 +28,8 @@ import type {
   FirstEventState,
 } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstDataPanel from "./FirstDataPanel.vue";
+import { viewDenial } from "@/composables/useAccessStore";
+import { withoutCovered } from "@/components/access/surfaceDenials";
 
 const fake = {
   state: ref<FirstEventState>("waiting"),
@@ -328,6 +330,17 @@ describe("FirstDataPanel — full panel on Logs, Traces and Metrics", () => {
     expect(q("first-data-panel").exists()).toBe(false);
     expect(q("page-empty-state").exists()).toBe(false);
     expect(watchArgs).not.toHaveBeenCalled();
+  });
+
+  it("keeps the stream denial its lock names out of the access chip while the lock shows", async () => {
+    window.localStorage.setItem(PICK_KEY, "kubernetes");
+    await failList("logs", 403);
+    const entries = [viewDenial("streams", "list"), viewDenial("templates", "list")];
+    await mountPanel({ signal: "logs", variant: "full" });
+    expect(q("first-data-panel-no-access").exists()).toBe(true);
+    expect(withoutCovered(entries).map((e) => e.resource.key)).toEqual(["templates"]);
+    wrapper.unmount();
+    expect(withoutCovered(entries)).toEqual(entries);
   });
 
   it("keeps the panel when the list failed for another reason", async () => {

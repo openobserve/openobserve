@@ -174,10 +174,15 @@ async fn provider_active_model(provider: &Provider) -> Result<ActiveModel, error
     })
 }
 
-pub async fn get(id: &str) -> Result<Option<Provider>, errors::Error> {
+/// A provider in another organization is reported as absent.
+pub async fn get(org_id: &str, id: &str) -> Result<Option<Provider>, errors::Error> {
     let client = get_orm_client_ro().await;
 
-    let model = Entity::find().filter(Column::Id.eq(id)).one(client).await?;
+    let model = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.eq(id))
+        .one(client)
+        .await?;
 
     match model {
         Some(m) => {

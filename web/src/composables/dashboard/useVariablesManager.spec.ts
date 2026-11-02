@@ -1260,6 +1260,40 @@ describe("useVariablesManager live apply and commit-once", () => {
     expect(pod.isVariableLoadingPending).toBe(true);
   });
 
+  describe("adoptLoadedValues", () => {
+    const adopt = async (passed: Partial<VariableConfig> & Record<string, unknown>) => {
+      const manager = useVariablesManager(gt);
+      await manager.initialize(queryChainConfig(), {});
+      manager.adoptLoadedValues([{ name: "ns", type: "query_values", ...passed }]);
+      return manager.variablesData.global;
+    };
+
+    it("keeps a loaded value and schedules its children", async () => {
+      const [ns, pod] = await adopt({ value: "a", isVariablePartialLoaded: true });
+      expect(ns.value).toBe("a");
+      expect(ns.isVariableLoadingPending).toBe(false);
+      expect(pod.isVariableLoadingPending).toBe(true);
+    });
+
+    it("keeps a loaded value that is only being refreshed", async () => {
+      const [ns] = await adopt({ value: "a", isVariablePartialLoaded: true, isLoading: true });
+      expect(ns.value).toBe("a");
+    });
+
+    it.each([
+      ["still loading", { value: null, isVariablePartialLoaded: false, isLoading: true }],
+      [
+        "waiting to reload",
+        { value: "a", isVariablePartialLoaded: true, isVariableLoadingPending: true },
+      ],
+    ])("leaves a value that is %s to its own fetch", async (_case, passed) => {
+      const [ns, pod] = await adopt(passed);
+      expect(ns.value).toBe(null);
+      expect(ns.isVariableLoadingPending).toBe(true);
+      expect(pod.isVariableLoadingPending).toBe(false);
+    });
+  });
+
   it("an aborted dependent load releases the commit", async () => {
     const { manager, service, commits } = await setupSettled();
     manager.setLiveMode(true);
