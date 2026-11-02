@@ -1010,6 +1010,7 @@ mod tests {
         .await
         .unwrap();
         let stored = get().await.unwrap();
+        assert_eq!(stored.module, TriggerModule::AutoObserve);
         assert!(stored.is_realtime && !stored.is_silenced);
 
         // Older releases run this same shared query, so they never decode the row.
