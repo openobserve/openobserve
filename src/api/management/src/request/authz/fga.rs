@@ -181,12 +181,12 @@ pub async fn delete_role_bulk(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<BulkDeleteRequest>,
 ) -> Response {
-    if req
+    if let Some(name) = req
         .ids
         .iter()
-        .any(|name| !is_storable_name("role", &org_id, name))
+        .find(|name| !is_storable_name("role", &org_id, name))
     {
-        return MetaHttpResponse::bad_request("Invalid role name");
+        return MetaHttpResponse::bad_request(format!("Invalid role name: {name}"));
     }
     let user_id = user_email.user_id;
 
@@ -1261,12 +1261,12 @@ pub async fn delete_group_bulk(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<BulkDeleteRequest>,
 ) -> Response {
-    if req
+    if let Some(name) = req
         .ids
         .iter()
-        .any(|name| !is_storable_name("group", &org_id, name))
+        .find(|name| !is_storable_name("group", &org_id, name))
     {
-        return MetaHttpResponse::bad_request("Invalid group name");
+        return MetaHttpResponse::bad_request(format!("Invalid group name: {name}"));
     }
     let user_id = user_email.user_id;
 
@@ -1406,17 +1406,16 @@ where
 {
     let mut successful = Vec::with_capacity(ids.len());
     let mut unsuccessful = Vec::with_capacity(ids.len());
-    let mut err = None;
     for name in ids {
         match delete(name.clone()).await {
             Ok(_) => successful.push(name),
             Err(e) => {
                 log::error!("{failure} {name}: {e}");
                 unsuccessful.push(name);
-                err = Some(failure.to_string());
             }
         }
     }
+    let err = (!unsuccessful.is_empty()).then(|| format!("{failure}: {}", unsuccessful.join(", ")));
     BulkDeleteResponse {
         successful,
         unsuccessful,
@@ -1756,6 +1755,26 @@ mod tests {
                     "{name:?}"
                 );
             }
+            let roles = delete_role_bulk(
+                Path("test_org".to_string()),
+                mock_user_email(),
+                Json(bulk(name)),
+            )
+            .await;
+            assert_eq!(
+                response_json(roles).await["message"],
+                format!("Invalid role name: {name}")
+            );
+            let groups = delete_group_bulk(
+                Path("test_org".to_string()),
+                mock_user_email(),
+                Json(bulk(name)),
+            )
+            .await;
+            assert_eq!(
+                response_json(groups).await["message"],
+                format!("Invalid group name: {name}")
+            );
         }
         for user in ["*", "a#b", ""] {
             for resp in [
@@ -1825,7 +1844,7 @@ mod tests {
         .await;
         assert_eq!(resp.successful, vec!["kept".to_string()]);
         assert_eq!(resp.unsuccessful, vec!["broken".to_string()]);
-        assert_eq!(resp.err.as_deref(), Some("Failed to delete role"));
+        assert_eq!(resp.err.as_deref(), Some("Failed to delete role: broken"));
     }
 
     #[tokio::test]
