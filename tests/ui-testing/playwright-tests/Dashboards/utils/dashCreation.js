@@ -140,6 +140,7 @@ export async function deleteDashboard(page, dashboardName) {
 
       return isStable;
     },
+    null,
     { timeout: 15000, polling: 100 }
   );
 
@@ -201,7 +202,7 @@ export async function deleteDashboard(page, dashboardName) {
   }
 
   // Verify the success toast appears
-  await page.locator('[data-test-variant="success"]').waitFor({
+  await page.locator('[data-test-variant="success"]').first().waitFor({
     state: 'visible',
     timeout: 10000
   }).catch(() => {

@@ -895,21 +895,8 @@ export class LogsPage {
     }
 
     async selectIndexStream(streamName) {
-        testLogger.debug(`selectIndexStream: Starting selection for stream: ${streamName}`);
-        try {
-            await this.page.locator(this.indexDropDown).waitFor({ timeout: 10000 });
-            await this.page.locator(this.indexDropDown).click();
-            testLogger.debug(`selectIndexStream: Clicked dropdown`);
-            await this.page.waitForTimeout(2000);
-
-            await this.page.locator(this.streamToggle).waitFor({ timeout: 10000 });
-            await this.page.locator(this.streamToggle).click();
-            testLogger.debug(`selectIndexStream: Successfully selected stream with default method`);
-        } catch (error) {
-            testLogger.debug(`Failed to select stream with default method, trying alternative approach: ${error.message}`);
-            // Fallback to the old method
-            await this.selectIndexStreamOld(streamName);
-        }
+        // Caller is already on the logs page; selectStream throws if the stream can't be selected.
+        await this.selectStream(streamName, 5, 0, true);
     }
 
     /**
@@ -1295,36 +1282,6 @@ export class LogsPage {
         const timestampColumn = this.page.locator('[data-test="o2-table-row-1"] [data-test="o2-table-cell-_timestamp"]');
         await expect(timestampColumn, 'Timestamp column should be visible').toBeVisible({ timeout: 5000 });
         testLogger.info('Timestamp column visible in table');
-    }
-
-    async selectIndexStreamOld(streamName) {
-        testLogger.debug(`selectIndexStreamOld: Starting selection for stream: ${streamName}`);
-        try {
-            // Click the dropdown
-            const selectTrigger = this.page.locator('[data-test="log-search-index-list-select-stream"]').locator('[role="button"]').first();
-            await selectTrigger.click();
-            testLogger.debug(`selectIndexStreamOld: Clicked dropdown`);
-            await this.page.waitForTimeout(2000);
-
-            // Quick attempt to find and click the stream by text
-            testLogger.debug(`selectIndexStreamOld: Trying to find stream by text: ${streamName}`);
-            await this.page.getByText(streamName, { exact: true }).first().click({ timeout: 5000 });
-            testLogger.debug(`selectIndexStreamOld: Successfully selected stream by text: ${streamName}`);
-
-        } catch (error) {
-            testLogger.debug(`selectIndexStreamOld: Failed to select stream ${streamName}: ${error.message}`);
-
-            // Quick fallback: just select the first available stream
-            testLogger.debug(`selectIndexStreamOld: Trying to select first available stream as fallback`);
-            try {
-                await this.page.locator('[data-test*="log-search-index-list-stream-toggle-"]').first().click({ timeout: 5000 });
-                testLogger.debug(`selectIndexStreamOld: Selected first available stream as fallback`);
-            } catch (fallbackError) {
-                testLogger.debug(`selectIndexStreamOld: Fallback also failed: ${fallbackError.message}`);
-                // Don't throw error, just log it and continue
-                testLogger.debug(`selectIndexStreamOld: Continuing without stream selection`);
-            }
-        }
     }
 
     // Helper method to ensure query editor is ready
@@ -3330,6 +3287,7 @@ export class LogsPage {
         try {
             await this.page.waitForFunction(
                 () => document.querySelector('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]') !== null,
+                null,
                 { timeout },
             );
             return true;
@@ -6219,7 +6177,6 @@ export class LogsPage {
         this._queryTriggerTime = Date.now();
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
         try {
-            await this.page.waitForFunction(() => true, { timeout: 1 }).catch(() => {});
             await expect.poll(() => sawHistogram && sawSearch, { timeout: 15000, intervals: [200] }).toBe(true);
         } catch {
             // Fall through — verifyAPICallCounts will assert the failure with full context.
@@ -11195,7 +11152,7 @@ export class LogsPage {
                     }
                 }
                 return null;
-            }, { timeout });
+            }, null, { timeout });
 
             const chartType = await result.jsonValue();
             if (chartType) {
@@ -11650,7 +11607,7 @@ export class LogsPage {
             const widget = document.querySelector('.monaco-editor .suggest-widget');
             if (!widget) return false;
             return widget.classList.contains('visible') || widget.classList.contains('focused');
-        }, { timeout });
+        }, null, { timeout });
         testLogger.info('Suggestion widget became visible');
     }
 
@@ -12081,7 +12038,7 @@ export class LogsPage {
             return el.getAttribute('title') !== 'Cancel query'
                 && el.getAttribute('aria-busy') !== 'true'
                 && !el.hasAttribute('disabled');
-        }, { timeout: 30000 }).catch(() => {});
+        }, null, { timeout: 30000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
     }
 
@@ -12414,77 +12371,6 @@ export class LogsPage {
         ).catch(() => {
             testLogger.warn('streams API response not captured — streamKeywords may still load via cache');
             return null;
-        });
-    }
-
-    /**
-     * Wait for streamKeywords to populate inside the searchObj store. This is
-     * the deterministic gate that replaces a fixed sleep after the streams API
-     * resolves — Vue's watcher fires in a microtask after the API response, so
-     * we poll the in-page store until at least one keyword shows up.
-     * @param {number} timeout
-     */
-    async waitForStreamKeywordsHydration(timeout = 8000) {
-        await this.page.waitForFunction(() => {
-            try {
-                // Look for the streamKeywords array on any logged Vue searchObj.
-                // Different stores expose it differently; check Pinia first, then window.
-                const w = /** @type {any} */ (window);
-                const candidates = [
-                    w.__OO_STREAM_KEYWORDS__,
-                    w.searchObj?.data?.stream?.streamLists,
-                    w.searchObj?.data?.streamList,
-                ];
-                if (candidates.some((c) => Array.isArray(c) && c.length > 0)) return true;
-                // Fallback: app store / Pinia stream module
-                const stores = w.__pinia_stores__;
-                if (stores) {
-                    for (const key of Object.keys(stores)) {
-                        const s = stores[key]?.();
-                        const list = s?.data?.stream?.streamLists || s?.streamLists;
-                        if (Array.isArray(list) && list.length > 0) return true;
-                    }
-                }
-                return false;
-            } catch {
-                return false;
-            }
-        }, { timeout }).catch(() => {
-            testLogger.warn('streamKeywords hydration not observed — autocomplete may still work via cached state');
-        });
-    }
-
-    /**
-     * Wait for the field keyword list to be populated inside the SQL autocomplete
-     * composable. This is the deterministic gate for WHERE-clause field suggestions:
-     * the stream schema API populates searchObj.data.stream.selectedStreamFields,
-     * which triggers the Vue watcher that calls updateFieldKeywords(). Without this
-     * wait, Ctrl+Space may fire before field names are in autoCompleteKeywords and
-     * the suggestion widget will show only functions + SQL keywords instead of fields.
-     * @param {number} timeout
-     */
-    async waitForFieldKeywordsHydration(timeout = 8000) {
-        await this.page.waitForFunction(() => {
-            try {
-                const w = /** @type {any} */ (window);
-                // Primary: selectedStreamFields in the Vuex/composable searchObj
-                const fields = w.searchObj?.data?.stream?.selectedStreamFields;
-                if (Array.isArray(fields) && fields.length > 0) return true;
-                // Fallback: check Pinia stores for the same data
-                const stores = w.__pinia_stores__;
-                if (stores) {
-                    for (const key of Object.keys(stores)) {
-                        const s = stores[key]?.();
-                        const f = s?.data?.stream?.selectedStreamFields;
-                        if (Array.isArray(f) && f.length > 0) return true;
-                    }
-                }
-                return false;
-            } catch {
-                return false;
-            }
-        }, { timeout }).catch(() => {
-            testLogger.warn('field keywords hydration not observed — field suggestions may be absent');
         });
     }
 

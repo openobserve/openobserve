@@ -207,9 +207,7 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
       const severitySelect = pm.alertsPage.getTemplatePreviewSeveritySelect();
       await severitySelect.click();
       await page.waitForTimeout(300);
-      await pm.alertsPage.getElementByText(/^Critical$/i).first().click().catch(async () => {
-        await pm.alertsPage.getTemplatePreviewSeverityCriticalValue().click();
-      });
+      await pm.alertsPage.getTemplatePreviewSeverityCriticalValue().click();
       await page.waitForTimeout(800);
 
       const hasFieldAtCritical = await fieldsBlock.getByText('CriticalOnlyField').isVisible({ timeout: 8000 }).catch(() => false);

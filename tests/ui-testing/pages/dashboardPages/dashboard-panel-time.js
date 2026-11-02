@@ -18,7 +18,6 @@ export default class DashboardPanelTime {
     this.dateTimeMenu = page.locator('#date-time-menu').first();
     this.globalDateTimePickerBtn = page.locator('[data-test="dashboard-global-date-time-picker"] [data-test="date-time-btn"]');
     this.globalDateTimePicker = page.locator('[data-test="dashboard-global-date-time-picker"]');
-    this.dashboardNameLocator = page.locator('[data-test="dashboard-name"]');
     this.oDropdownContent = page.locator('[data-test="o-dropdown-content"]');
     this.panelBar = page.locator('[data-test="dashboard-panel-bar"]');
     this.panelFullscreenBtn = page.locator('[data-test="dashboard-panel-fullscreen-btn"]');
@@ -224,14 +223,12 @@ export default class DashboardPanelTime {
     await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
 
     // Select the time range within the dialog
-    // Config panel picker has auto-apply enabled, so selecting auto-saves and closes
+    // Config panel picker has auto-apply enabled, so selecting saves; a relative pick leaves the menu open
     const timeOptionLocator = this.timeRangeBtn(timeRange);
     await timeOptionLocator.waitFor({ state: "visible", timeout: 5000 });
     await timeOptionLocator.click();
 
     // No apply button needed — config panel picker has auto-apply enabled
-    // Wait for the date time dialog to close after auto-apply
-    await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
   }
 
@@ -495,9 +492,6 @@ export default class DashboardPanelTime {
 
     // Wait for network to settle before clicking
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-    // Wait for dashboard to be fully loaded - check for dashboard header
-    await this.dashboardNameLocator.waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
 
     await this.globalDateTimePickerBtn.waitFor({ state: "visible", timeout: 10000 });
     await this.globalDateTimePickerBtn.scrollIntoViewIfNeeded();

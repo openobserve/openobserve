@@ -352,7 +352,12 @@ class EnrichmentPage {
         ).catch(() => null);
         await openNavFlyoutChild(this.page, 'pipeline');
         await this.enrichmentTableTab.click();
-        await listResponse;
+        // Revisits render from the streams cache without a request, so the rows are the other signal.
+        await Promise.race([
+            listResponse,
+            this.listPage.locator('tbody tr, [data-test="o2-empty-state"]').first()
+                .waitFor({ state: 'visible', timeout: 30000 }).catch(() => null),
+        ]);
         // Wait for the enrichment tables list page to be visible. Alpha nav can be slow
         // under load; if the tab click didn't land or the page didn't render in time,
         // re-open the nav flyout and re-click the tab once before failing (the
@@ -559,7 +564,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForFunction(() => {
             const w = /** @type {any} */ (window);
             return !!(w.monaco && w.monaco.editor && w.monaco.editor.getEditors && w.monaco.editor.getEditors().length > 0);
-        }, { timeout: 15000 }).catch(() => {});
+        }, null, { timeout: 15000 }).catch(() => {});
 
         // Ensure DOM is stable after editor initialization
         await this.page.waitForLoadState('domcontentloaded');

@@ -476,6 +476,7 @@ export class MetricsBuilderPage {
                     const l = tr.getAttribute('data-test-selected-label') || '';
                     return (v && v.length > 0) ? v : ((l && l.length > 0) ? l : null);
                 },
+                null,
                 { timeout: 5000 }
             ).then(handle => handle.jsonValue()).catch(() => null);
             if (value) return value;
@@ -1042,6 +1043,7 @@ export class MetricsBuilderPage {
                 if (btn.getAttribute('data-disabled') !== null) return false;
                 return true;
             },
+            null,
             { timeout: 5000 }
         ).then(() => true).catch(() => false);
         if (!enabled) return false;

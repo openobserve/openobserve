@@ -284,21 +284,17 @@ export class TracesPage {
     // later as "Select Stream First" and zero query results. Wait for the
     // option to exist in the DOM first.
     const optionReady = `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`;
+    // Options are only mounted while the popover is open — open it, wait, then
+    // leave it open for the selection logic below.
+    const streamPopover = this.page.locator('[data-test="log-search-index-list-select-stream-popover"]');
+    if (!(await streamPopover.isVisible().catch(() => false))) {
+      await wrapper.locator('button[type="button"]').first().click({ force: false }).catch(() => {});
+    }
     await this.page
       .locator(optionReady)
       .first()
       .waitFor({ state: 'attached', timeout: 15000 })
-      .catch(async () => {
-        // Options are only mounted while the popover is open — open it, wait,
-        // then leave it open for the selection logic below.
-        const t = wrapper.locator('button[type="button"]').first();
-        await t.click({ force: false }).catch(() => {});
-        await this.page
-          .locator(optionReady)
-          .first()
-          .waitFor({ state: 'attached', timeout: 15000 })
-          .catch(() => {});
-      });
+      .catch(() => {});
 
     // Check the popover-trigger button's aria-expanded state — already
     // selected streams will reflect in the trigger button text.
