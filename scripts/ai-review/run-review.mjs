@@ -28,6 +28,7 @@ import {
 } from "./src/auto-approve.mjs";
 import {
   ANY_REVIEW_MARKER,
+  NOTICE_TAG,
   REVIEW_HEADING,
   REVIEW_TITLE,
   bodyAtPassLimit,
@@ -35,6 +36,7 @@ import {
   bodyAtUnreviewedHead,
   claimedReviewBody,
   finishReviewBody,
+  isPlaceholderComment,
   parseMaxPasses,
   previousReviewText,
   redactProviderIdentity,
@@ -124,10 +126,6 @@ function apiKey() {
 
 const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
 
-// Tags the "reviewed with the paired o2-enterprise PR" note (post-paired-pointer.sh); it is replaced in place but is not a previous review.
-const PAIRED_POINTER_TAG = "<!-- o2-paired-pointer -->";
-// Tags the "not reviewed: key not set" notice, which is likewise replaced but never fed back as a previous review.
-const NOTICE_TAG = "<!-- o2-review-notice -->";
 // Login of the token that posts the review; anyone else's comment carrying the marker must never become <previous_review>.
 const REVIEW_BOT_LOGIN = process.env.REVIEW_BOT_LOGIN || "";
 // Inline review comments are opt-in; the summary comment is posted either way.
@@ -1094,10 +1092,6 @@ function findExistingReviewComment(prNumber) {
     console.warn(`[${isoNow()}] Could not list PR comments, so no previous review is used: ${execErrorText(err).slice(0, 300)}`);
     return { comment: null, ok: false };
   }
-}
-
-function isPlaceholderComment(body) {
-  return body.includes(PAIRED_POINTER_TAG) || body.includes(NOTICE_TAG);
 }
 
 function passesDoneIn(comment) {

@@ -122,7 +122,7 @@ jobs:
           app-id: ${{ vars.OO_REVIEWER_APP_ID }}
           private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
 
-      # Without it (app not installed on o2-enterprise, or no actions:write) the pairing check is skipped and the PR is reviewed here.
+      # Without it (app not installed on o2-enterprise, or no actions:write) the PR is reviewed here unless it already carries the paired pointer.
       - name: Generate app token for the paired o2-enterprise lookup
         id: ent_token
         if: env.REVIEW_RUN == 'true' && vars.OO_REVIEWER_APP_ID != '' && !inputs.ignore_paired
@@ -164,16 +164,27 @@ jobs:
           FORCE_REVIEW: ${{ inputs.force_full || 'false' }}
         run: |
           set -uo pipefail
-          if [ -z "$ENT_TOKEN" ]; then
-            echo "::warning::No app token for o2-enterprise; cannot look for a paired PR, reviewing here."
+          # A review replaces the pointer in place, so a pointer still standing means the last successful lookup found a pair.
+          review_here_unless_pointed() {
+            local pointer
+            pointer="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+              --jq ".[] | select(.user.login == \"$BOT_LOGIN\" and (.body | contains(\"<!-- o2-paired-pointer -->\"))) | .id" 2>/dev/null || true)"
+            if [ -n "$pointer" ]; then
+              echo "::warning::$1; this PR already carries the paired pointer, so it is not reviewed here."
+              echo "REVIEW_RUN=false" >> "$GITHUB_ENV"
+            else
+              echo "::warning::$1; reviewing here."
+            fi
             exit 0
+          }
+          if [ -z "$ENT_TOKEN" ]; then
+            review_here_unless_pointed "No app token for o2-enterprise, so no paired PR lookup"
           fi
           ent_repo=openobserve/o2-enterprise
           # Any lookup error falls back to reviewing here: a missed pairing costs a duplicate review, a failed step costs the review.
           if ! ent_json="$(GH_TOKEN="$ENT_TOKEN" gh api -X GET "repos/$ent_repo/pulls" -f state=open -f head="${ent_repo%%/*}:$BRANCH" \
             --jq "[.[] | select(.head.repo.full_name == \"$ent_repo\")][0] // {} | {number, isDraft: .draft, labels}")"; then
-            echo "::warning::Could not look up a paired $ent_repo PR; reviewing here."
-            exit 0
+            review_here_unless_pointed "Could not look up a paired $ent_repo PR"
           fi
           ent_pr="$(jq -r '.number // ""' <<<"$ent_json")"
           if [ -z "$ent_pr" ]; then

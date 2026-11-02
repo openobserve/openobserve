@@ -236,7 +236,7 @@ test("at a set cap a skipped push names both commits, once, and marks confidence
   assert.equal(next.includes("bbbbbbb"), false);
 });
 
-test("a head the last review did not cover loses the verdict once, and a covered head or a placeholder is left alone", () => {
+test("a head the last review did not cover loses the verdict once, and a covered head is left alone", () => {
   const body = finishReviewBody(sanitize(REVIEW), { key: SHA_A, passes: 1, maxPasses: 0, reviewed: true, confidence: HIGH, gateLine: "**Auto-approved** — small change, all gates passed." });
   const stale = bodyAtUnreviewedHead(body, SHA_B);
   assert.equal(stale.includes("Auto-approved"), false);
@@ -246,7 +246,17 @@ test("a head the last review did not cover loses the verdict once, and a covered
   assert.equal(reviewPassCount(stale), 1);
   assert.equal(bodyAtUnreviewedHead(stale, SHA_B), stale);
   assert.equal(bodyAtUnreviewedHead(body, SHA_A), body);
-  assert.equal(bodyAtUnreviewedHead(REVIEW, SHA_B), REVIEW);
+});
+
+test("a legacy review with no sha tag or confidence line is marked stale, a placeholder is not", () => {
+  const stale = bodyAtUnreviewedHead(REVIEW, SHA_B);
+  assert.ok(stale.includes("> LGTM.\n\n**Merge confidence: 🔴 Low** — `bbbbbbb` has not been reviewed"));
+  assert.equal(stale.match(/Merge confidence/g).length, 1);
+  assert.equal(bodyAtUnreviewedHead(stale, SHA_B), stale);
+  for (const tag of ["<!-- o2-paired-pointer -->", "<!-- o2-review-notice -->"]) {
+    const placeholder = `<!-- ai-code-review -->\n${tag}\n${REVIEW_HEADING}\n\n> [!NOTE]\n> Review in progress.`;
+    assert.equal(bodyAtUnreviewedHead(placeholder, SHA_B), placeholder);
+  }
 });
 
 test("a full review replaces the stale line and the limit note", () => {

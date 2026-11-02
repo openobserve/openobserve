@@ -6,11 +6,13 @@ Automated PR review that posts a single consolidated comment on every pull reque
 The posted comment is branded **OpenObserve Code Reviewer**. Branding is *cosmetic + identity
 only* — it does not change what the reviewer finds or decides.
 
-The posted comment never names the model or provider behind the review — the heading carries no
-model label, the comment marker is provider-neutral, and `redactProviderIdentity` in
-`run-review.mjs` strips the provider/model ids out of anything on its way to the PR (a model
-naming itself, or an upstream error echoing the slug). Naming the model in this repo and in the
-Actions logs is fine; naming it in the comment is not.
+The visible comment never names the model or provider behind the review — the heading carries no
+model label, and `redactProviderIdentity` in `run-review.mjs` strips the provider/model ids out of
+anything on its way to the PR (a model naming itself, or an upstream error echoing the slug).
+Naming the model in this repo and in the Actions logs is fine; naming it in the comment is not.
+The one exception is the hidden comment marker, which each workflow sets and the runner posts
+verbatim (see below): this repo's `<!-- ai-code-review -->` is provider-neutral, while a workflow
+whose marker still names the provider, such as o2-enterprise's older one, keeps that name in it.
 
 ## How it works (one paragraph)
 
@@ -37,11 +39,13 @@ off by default; set the variable `AI_REVIEW_INLINE` to `true` to turn them on.
 
 Findings are graded `p0` to `p3`. P0 and P1 are blockers and give the decision `blocked`; P2 and P3
 do not block, and only those give `approved_with_comments`; no findings gives `approved`. A review
-keeps at most 3 P2 and 2 P3 findings. Legacy severity words from a reviewer are mapped in
-`src/severity.mjs`. The review stays advisory: the check does not go red on a blocker.
+keeps at most 3 P2 and 2 P3 findings: the coordinator is told to drop the rest, and the runner
+enforces the cap itself only in the fallback comment it renders when the coordinator fails. Legacy
+severity words from a reviewer are mapped in `src/severity.mjs`. The review stays advisory: the check does not go red on a blocker.
 
-Every new commit gets one review and the same commit is never reviewed twice. A finished review
-records what it covered in a hidden `o2-review-sha` tag (the head SHA, plus the paired head in a
+Every new commit gets one review, and the last reviewed commit is not reviewed again. Only the
+latest review is recorded, so a force-push back to an older reviewed head is reviewed again. A
+finished review records what it covered in a hidden `o2-review-sha` tag (the head SHA, plus the paired head in a
 paired review, so a new commit on either side is new) and shows it in a visible `Reviewed commit`
 line with the review number. A run whose head matches the tag skips before any model call, which
 covers a queued run, a re-label and a plain dispatch, including the paired dispatch from
@@ -253,8 +257,8 @@ in o2-enterprise:
   o2-enterprise review; otherwise it waits for that PR to become ready, so a draft ENT PR never
   gets a paid run through its OSS twin. Either way it replaces this PR's review comment with a
   pointer (`post-paired-pointer.sh`). This uses a reviewer-app token scoped to o2-enterprise
-  (Pull requests read, Actions write); if it cannot be minted, or any lookup or dispatch fails,
-  the OSS review runs as usual. To force an OSS review anyway, dispatch this workflow with `ignore_paired`.
+  (Pull requests read, Actions write); if it cannot be minted or the lookup fails, the OSS review
+  runs as usual unless the PR already carries the bot's pointer, which only a review replaces. If the dispatch fails, the OSS review runs. To force an OSS review anyway, dispatch this workflow with `ignore_paired`.
 - **ENT side.** The o2-enterprise workflow checks out this engine pinned by commit SHA, finds the
   open same-named OSS PR, checks it out to `./pr/openobserve`, and reviews both diffs in one run.
   OSS files appear with an `openobserve/` prefix in the review, and the OSS `AGENTS.md` and

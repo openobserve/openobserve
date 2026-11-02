@@ -8,6 +8,9 @@ export const REVIEW_SHA_TAG = "<!--\\s*o2-review-sha:([^\\s<>]+)\\s*-->";
 export const REVIEW_HELD_TAG = "<!--\\s*o2-review-held:([^\\s<>]+)\\s*-->";
 // Matched as a pattern so a retired leg's comment is still adopted; `[redacted]` is what redaction left in comments whose marker named the provider.
 export const ANY_REVIEW_MARKER = "<!--\\s*ai-code-review[a-z0-9-]*(?:\\[redacted\\])?\\s*-->";
+// Tags a comment that stands in for a review (post-paired-pointer.sh, the "key not set" notice, the in-progress claim); it is replaced in place but is not a previous review.
+export const PAIRED_POINTER_TAG = "<!-- o2-paired-pointer -->";
+export const NOTICE_TAG = "<!-- o2-review-notice -->";
 export const REVIEW_TITLE = "OpenObserve Code Review";
 export const REVIEW_HEADING = `## 🔎 ${REVIEW_TITLE}`;
 // Tolerates a missing glyph and the old "AI Code Review" heading so prompt drift still normalizes.
@@ -43,6 +46,10 @@ export function selectOwnReviewComment(comments, botLogin, markerPattern) {
 }
 
 // untagged is what a comment from before the counter is worth: a review is one pass, a pointer or notice none.
+export function isPlaceholderComment(body) {
+  return String(body ?? "").includes(PAIRED_POINTER_TAG) || String(body ?? "").includes(NOTICE_TAG);
+}
+
 export function reviewPassCount(body, untagged = 1) {
   const m = (body || "").match(new RegExp(REVIEW_PASS_TAG, "i"));
   return m ? Number(m[1]) : untagged;
@@ -176,10 +183,10 @@ export function claimedReviewBody(body, count, key) {
   return withPassTag(newHead ? withConfidenceLine(withHeldVerdict(bare), reviewingConfidenceLine(shortKey(key))) : bare, count);
 }
 
-// A head the review did not cover must not keep showing that review's confidence.
+// A head the review did not cover must not keep showing that review's confidence; an untagged review covers no head, only a placeholder claims none.
 export function bodyAtUnreviewedHead(body, head) {
   const reviewed = reviewedKey(body);
-  const covered = reviewed ? reviewed === head : body.search(MERGE_CONFIDENCE_LINE_RE) === -1;
+  const covered = reviewed ? reviewed === head : isPlaceholderComment(body);
   return head && !covered ? withConfidenceLine(withHeldVerdict(body), staleConfidenceLine(shortKey(head))) : body;
 }
 
