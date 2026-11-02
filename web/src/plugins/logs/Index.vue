@@ -1749,6 +1749,8 @@ export default defineComponent({
     async function applyReAppliedQuery() {
       resetRunStateForReapply();
       searchObj.meta.searchApplied = false;
+      // The run-query prompt needs a `hits` array; set before the awaits so an Auto Run search that lands meanwhile keeps its hits.
+      searchObj.data.queryResults.hits = [];
       await getStreamList(true, { fromUrl: true });
       await getFunctions();
       await extractFields();
