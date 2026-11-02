@@ -16,7 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full min-h-0 w-full flex-col" data-test="dashboard-logs-panel">
+    <!-- Without rows PanelSchemaRenderer draws the No Data state; an empty slot would not stop OTable's own. -->
     <OTable
+      v-if="rows.length > 0"
       class="logs-panel-table min-h-0 w-full flex-1"
       :columns="columns"
       :data="sourceRows"
