@@ -568,11 +568,7 @@ async fn clamp_to_max_query_range(org_id: &str, user_id: &str, start: i64, end: 
     };
     let max_hours =
         get_settings_max_query_range(settings.max_query_range, org_id, Some(user_id)).await;
-    if max_hours > 0 && (end - start) > max_hours * 3600 * 1_000_000 {
-        end - max_hours * 3600 * 1_000_000
-    } else {
-        start
-    }
+    config::utils::query_range::clamp_start_time(start, end, max_hours).unwrap_or(start)
 }
 
 #[cfg(feature = "enterprise")]

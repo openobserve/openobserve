@@ -2433,9 +2433,10 @@ async fn clamp_start(
 }
 
 fn clamped_start(stream_type: StreamType, start: i64, end: i64, max_hours: i64) -> Option<i64> {
-    let max = max_hours * 3600 * 1_000_000;
-    (stream_type != StreamType::EnrichmentTables && max_hours > 0 && end - start > max)
-        .then_some(end - max)
+    if stream_type == StreamType::EnrichmentTables {
+        return None;
+    }
+    config::utils::query_range::clamp_start_time(start, end, max_hours)
 }
 
 /// The shifts the live renderer runs; PromQL takes fixed units only and none when instant.

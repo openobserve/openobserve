@@ -15,7 +15,7 @@
 
 use std::{
     sync::Arc,
-    time::{Duration, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use async_trait::async_trait;
@@ -400,16 +400,13 @@ pub async fn search_inner(
     let org_id = &req.org_id;
     let query = req.query.as_ref().unwrap();
     let prom_expr = promql::parse(&query.query).map_err(DataFusionError::Execution)?;
+    let (eval_start, eval_end, interval) = eval_window(query)?;
 
     let eval_stmt = parser::EvalStmt {
         expr: prom_expr,
-        start: UNIX_EPOCH
-            .checked_add(Duration::from_micros(query.start as _))
-            .unwrap(),
-        end: UNIX_EPOCH
-            .checked_add(Duration::from_micros(query.end as _))
-            .unwrap(),
-        interval: Duration::from_micros(query.step as _),
+        start: eval_start,
+        end: eval_end,
+        interval,
         lookback_delta: DEFAULT_LOOKBACK,
     };
 
@@ -459,6 +456,29 @@ pub async fn search_inner(
     scan_stats.format_to_mb();
     let took = start.elapsed().as_millis() as i64;
     Ok((value, result_type, scan_stats, took, warnings))
+}
+
+/// Converts the request's microsecond window into the evaluator's types, rejecting values it cannot
+/// hold.
+fn eval_window(
+    query: &cluster_rpc::MetricsQueryStmt,
+) -> Result<(SystemTime, SystemTime, Duration)> {
+    let to_duration = |name: &str, v: i64| {
+        u64::try_from(v).map(Duration::from_micros).map_err(|_| {
+            DataFusionError::Execution(format!("promql {name} must not be negative, got {v}"))
+        })
+    };
+    let start = to_duration("start", query.start)?;
+    let end = to_duration("end", query.end)?;
+    let step = to_duration("step", query.step)?;
+    if end < start {
+        return Err(DataFusionError::Execution(format!(
+            "promql end {} must not be before start {}",
+            query.end, query.start
+        ))
+        .into());
+    }
+    Ok((UNIX_EPOCH + start, UNIX_EPOCH + end, step))
 }
 
 async fn get_max_file_list(
@@ -940,6 +960,43 @@ mod tests {
                 nothing,
                 "{query}"
             );
+        }
+    }
+
+    fn stmt(start: i64, end: i64, step: i64) -> cluster_rpc::MetricsQueryStmt {
+        cluster_rpc::MetricsQueryStmt {
+            start,
+            end,
+            step,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn eval_window_converts_a_valid_window() {
+        let (start, end, step) = eval_window(&stmt(1_000_000, 61_000_000, 15_000_000)).unwrap();
+        assert_eq!(start, UNIX_EPOCH + Duration::from_secs(1));
+        assert_eq!(end, UNIX_EPOCH + Duration::from_secs(61));
+        assert_eq!(step, Duration::from_secs(15));
+        let (start, end, step) = eval_window(&stmt(5, 5, 0)).unwrap();
+        assert_eq!(start, end);
+        assert_eq!(step, Duration::ZERO);
+        assert!(eval_window(&stmt(0, i64::MAX, 1)).is_ok());
+    }
+
+    #[test]
+    fn eval_window_rejects_negative_times_and_inverted_ranges() {
+        for (start, end, step, needle) in [
+            (-1, 10, 1, "start must not be negative"),
+            (i64::MIN, 10, 1, "start must not be negative"),
+            (0, -1, 1, "end must not be negative"),
+            (0, 10, -1, "step must not be negative"),
+            (10, 5, 1, "end 5 must not be before start 10"),
+        ] {
+            let err = eval_window(&stmt(start, end, step))
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains(needle), "{start},{end},{step}: {err}");
         }
     }
 }

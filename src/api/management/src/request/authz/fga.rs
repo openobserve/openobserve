@@ -396,6 +396,7 @@ pub async fn get_roles(Path(_org_id): Path<String>) -> Response {
     request_body(content = inline(RoleRequest), description = "RoleRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid role name, permission or user id", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -407,6 +408,16 @@ pub async fn update_role(
     Path((org_id, role_id)): Path<(String, String)>,
     Json(update_role): Json<RoleRequest>,
 ) -> Response {
+    if let Err(msg) = o2_openfga::authorizer::roles::validate_role_update(
+        &org_id,
+        &role_id,
+        &update_role.add,
+        &update_role.remove,
+        update_role.add_users.as_ref(),
+        update_role.remove_users.as_ref(),
+    ) {
+        return MetaHttpResponse::bad_request(msg);
+    }
     match o2_openfga::authorizer::roles::update_role(
         &org_id,
         &role_id,
@@ -1478,28 +1489,34 @@ mod tests {
         #[cfg(feature = "enterprise")]
         {
             init_ofga_test();
-            let role_request = o2_dex::meta::auth::RoleRequest {
-                add: vec![o2_dex::meta::auth::O2EntityAuthorization {
-                    object: "permission1".to_string(),
-                    permission: o2_dex::meta::auth::Permission::AllowAll,
-                }],
-                remove: vec![o2_dex::meta::auth::O2EntityAuthorization {
-                    object: "permission2".to_string(),
-                    permission: o2_dex::meta::auth::Permission::AllowAll,
-                }],
+            let grant = |object: &str| o2_dex::meta::auth::O2EntityAuthorization {
+                object: object.to_string(),
+                permission: o2_dex::meta::auth::Permission::AllowAll,
+            };
+            let role_request = |object: &str| o2_dex::meta::auth::RoleRequest {
+                add: vec![grant(object)],
+                remove: vec![grant("stream:permission2")],
                 add_users: Some(HashSet::from_iter(vec!["user1".to_string()])),
                 remove_users: Some(HashSet::from_iter(vec!["user2".to_string()])),
             };
 
             let resp = update_role(
                 Path(("test_org".to_string(), "test_role".to_string())),
-                Json(role_request),
+                Json(role_request("stream:permission1")),
             )
             .await;
             assert_eq!(
                 extract_status_code(&resp),
                 StatusCode::INTERNAL_SERVER_ERROR
             );
+
+            // A type the model lacks is the client's error, not OpenFGA's 400 surfaced as a 500.
+            let resp = update_role(
+                Path(("test_org".to_string(), "test_role".to_string())),
+                Json(role_request("no_such_type:permission1")),
+            )
+            .await;
+            assert_eq!(extract_status_code(&resp), StatusCode::BAD_REQUEST);
         }
 
         #[cfg(not(feature = "enterprise"))]

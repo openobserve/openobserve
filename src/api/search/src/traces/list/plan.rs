@@ -198,8 +198,10 @@ impl TraceListOptions {
     }
 
     pub fn restrict_range(&mut self, max_hours: i64) {
-        if max_hours > 0 && (self.range.1 - self.range.0) > max_hours * 3600 * 1_000_000 {
-            self.range.0 = self.range.1 - max_hours * 3600 * 1_000_000;
+        if let Some(clamped) =
+            config::utils::query_range::clamp_start_time(self.range.0, self.range.1, max_hours)
+        {
+            self.range.0 = clamped;
             self.range_error = format!(
                 "Query duration is modified due to query range restriction of {max_hours} hours"
             );
