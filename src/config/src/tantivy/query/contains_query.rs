@@ -128,13 +128,18 @@ impl Query for ContainsQuery {
 #[derive(Debug, Clone)]
 pub struct ContainsAutomaton {
     keyword: Vec<u8>,
+    /// KMP failure table: `fail[i]` is the longest proper border length of `keyword[..=i]`.
+    fail: Vec<usize>,
     case_sensitive: bool,
 }
 
 impl ContainsAutomaton {
     pub fn new(keyword: &str, case_sensitive: bool) -> Self {
+        let keyword = keyword.as_bytes().to_vec();
+        let fail = build_failure_table(&keyword);
         ContainsAutomaton {
-            keyword: keyword.as_bytes().to_vec(),
+            keyword,
+            fail,
             case_sensitive,
         }
     }
@@ -165,28 +170,20 @@ impl Automaton for ContainsAutomaton {
                     byte.to_ascii_lowercase()
                 };
 
-                if *pos < self.keyword.len() && compare_byte == self.keyword[*pos] {
-                    // Continue matching the keyword
-                    if *pos + 1 == self.keyword.len() {
-                        ContainsState::Found
-                    } else {
-                        ContainsState::Searching { pos: pos + 1 }
+                let mut pos = *pos;
+                loop {
+                    if compare_byte == self.keyword[pos] {
+                        pos += 1;
+                        return if pos == self.keyword.len() {
+                            ContainsState::Found
+                        } else {
+                            ContainsState::Searching { pos }
+                        };
                     }
-                } else if *pos > 0 {
-                    // We were in the middle of matching, but this byte doesn't match
-                    // Try to restart the match from the beginning
-                    if compare_byte == self.keyword[0] {
-                        ContainsState::Searching { pos: 1 }
-                    } else {
-                        ContainsState::Searching { pos: 0 }
+                    if pos == 0 {
+                        return ContainsState::Searching { pos: 0 };
                     }
-                } else {
-                    // We haven't started matching yet, keep searching
-                    if compare_byte == self.keyword[0] {
-                        ContainsState::Searching { pos: 1 }
-                    } else {
-                        ContainsState::Searching { pos: 0 }
-                    }
+                    pos = self.fail[pos - 1];
                 }
             }
         }
@@ -199,6 +196,21 @@ pub enum ContainsState {
     Searching { pos: usize },
     /// Found the keyword
     Found,
+}
+
+fn build_failure_table(keyword: &[u8]) -> Vec<usize> {
+    let mut fail = vec![0; keyword.len()];
+    let mut len = 0;
+    for i in 1..keyword.len() {
+        while len > 0 && keyword[i] != keyword[len] {
+            len = fail[len - 1];
+        }
+        if keyword[i] == keyword[len] {
+            len += 1;
+        }
+        fail[i] = len;
+    }
+    fail
 }
 
 #[cfg(test)]
@@ -371,7 +383,7 @@ mod test {
     mod automaton_tests {
         use tantivy_fst::Automaton;
 
-        use super::super::{ContainsAutomaton, ContainsState};
+        use super::super::{ContainsAutomaton, ContainsState, build_failure_table};
 
         #[test]
         fn test_automaton_start_is_searching_pos_zero() {
@@ -455,6 +467,48 @@ mod test {
             let s3 = auto.accept(&s2, b'b');
             assert_eq!(s3, ContainsState::Found);
             assert!(auto.is_match(&s3));
+        }
+
+        fn contains(keyword: &str, term: &str, case_sensitive: bool) -> bool {
+            let auto = ContainsAutomaton::new(keyword, case_sensitive);
+            let state = term
+                .bytes()
+                .fold(auto.start(), |state, byte| auto.accept(&state, byte));
+            auto.is_match(&state)
+        }
+
+        #[test]
+        fn test_automaton_self_overlapping_keyword() {
+            assert!(contains("aab", "aaab", true));
+            assert!(contains("abab", "ababab", true));
+            assert!(contains("abab", "abaabab", true));
+            assert!(contains("abcab", "abcabcab", true));
+            assert!(!contains("aab", "aaaa", true));
+            assert!(!contains("abcab", "abcaabca", true));
+        }
+
+        #[test]
+        fn test_automaton_plain_keyword() {
+            assert!(contains("error", "xerrorx", true));
+            assert!(contains("error", "eerror", true));
+            assert!(!contains("error", "erro", true));
+            assert!(!contains("error", "xerorr", true));
+        }
+
+        #[test]
+        fn test_automaton_self_overlapping_case_insensitive() {
+            assert!(contains("aab", "AAAB", false));
+            assert!(contains("abab", "AbAbAb", false));
+            assert!(contains("abcab", "ABCabcAB", false));
+            assert!(contains("error", "xERRORx", false));
+            assert!(!contains("aab", "AAAB", true));
+        }
+
+        #[test]
+        fn test_failure_table() {
+            assert_eq!(build_failure_table(b"aab"), vec![0, 1, 0]);
+            assert_eq!(build_failure_table(b"abab"), vec![0, 0, 1, 2]);
+            assert_eq!(build_failure_table(b"abcab"), vec![0, 0, 0, 1, 2]);
         }
     }
 }

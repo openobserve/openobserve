@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OEmptyState
     preset="no-access"
     :size="size"
-    :title="message.title"
+    :title="named ? message.title : undefined"
     :description="description"
-    :action-label="actionLabel ?? copyLabel"
+    :action-label="actionLabel ?? (named ? copyLabel : undefined)"
     :action-icon="actionLabel ? actionIcon : 'content-copy'"
-    :secondary-action-label="actionLabel ? copyLabel : undefined"
+    :secondary-action-label="actionLabel && named ? copyLabel : undefined"
     @action="actionLabel ? emit('action') : copyDetails()"
     @secondary-action="copyDetails"
   >
@@ -43,6 +43,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { useAccessCopy } from "@/components/access/useAccessCopy";
+import { coverDenials } from "@/components/access/surfaceDenials";
 import {
   accessDeniedMessage,
   accessDetails,
@@ -53,7 +54,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 const props = withDefaults(
   defineProps<{
-    /** What the lock names; one denial gives the "You can't ..." title and its missing-permission line. */
+    /** What the lock names; one denial gives the "You can't ..." title and its missing-permission line, none the general no-access wording. */
     denials: AccessDenial[];
     /** Read when Copy details is pressed, since a page's denied requests keep arriving after it locks. */
     requests?: () => string[];
@@ -61,16 +62,27 @@ const props = withDefaults(
     /** The view's own next step; Copy details then moves to the secondary button. */
     actionLabel?: I18nText;
     actionIcon?: IconName;
+    /** The access chip leaves these denials out while the lock shows, for a lock whose page would otherwise list them a second time. */
+    covers?: boolean;
   }>(),
-  { size: "block", requests: undefined, actionLabel: undefined, actionIcon: undefined },
+  {
+    size: "block",
+    requests: undefined,
+    actionLabel: undefined,
+    actionIcon: undefined,
+    covers: false,
+  },
 );
 const emit = defineEmits<{ (e: "action"): void }>();
 
 const { t } = useI18nTyped();
+if (props.covers) coverDenials(() => props.denials);
+const named = computed(() => props.denials.length > 0);
 const message = computed(() => accessDeniedMessage(props.denials, t));
-const description = computed(() =>
-  message.value.groups[0] ? accessReason(message.value.groups[0], t) : undefined,
-);
+const description = computed(() => {
+  if (message.value.groups[0]) return accessReason(message.value.groups[0], t);
+  return message.value.askAdmin ? t("accessBoundary.denied.askAdmin") : undefined;
+});
 const { copied, copyDetails } = useAccessCopy(() => {
   const requests = props.requests;
   return accessDetails(

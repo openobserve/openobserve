@@ -12,6 +12,7 @@ usage() {
 Usage: $0 [-h | --help] [<command>]
 
 Commands:
+  merge             Merge sharded blob reports and verify thresholds
   check             Run frontend tests with coverage and verify thresholds
   html              Generate coverage report in HTML format
   show-env          Show the coverage thresholds
@@ -50,7 +51,16 @@ EOF
 cmd_check() {
     echo "Running frontend tests with coverage..."
     npm run test:unit:coverage
-    
+    check_thresholds
+}
+
+cmd_merge() {
+    echo "Merging shard reports from .vitest-reports..."
+    npx vitest --merge-reports --coverage --run
+    check_thresholds
+}
+
+check_thresholds() {
     if [ -f "coverage/coverage-summary.json" ]; then
         echo "Checking coverage thresholds..."
         python3 <(
@@ -118,6 +128,10 @@ main() {
     test)
         shift
         cmd_test "$@"
+        ;;
+    merge)
+        shift
+        cmd_merge "$@"
         ;;
     html)
         shift
