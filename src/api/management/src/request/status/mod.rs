@@ -272,6 +272,8 @@ struct ConfigResponse<'a> {
     #[cfg(feature = "enterprise")]
     workflows_enabled: bool,
     workflow_hooks_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    feature_revision: u32,
     features: HashMap<Feature, FeatureState>,
     feature_names: HashMap<String, String>,
 }
@@ -785,6 +787,8 @@ pub async fn zo_config(
         #[cfg(feature = "enterprise")]
         workflows_enabled,
         workflow_hooks_enabled,
+        #[cfg(feature = "enterprise")]
+        feature_revision: runtime_definition().feature_revision,
         features: featuremap,
         feature_names,
     })
