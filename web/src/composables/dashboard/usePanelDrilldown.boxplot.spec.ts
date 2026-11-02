@@ -193,8 +193,6 @@ describe("drilldown on a box plot", () => {
         }),
       );
 
-      // Rendering is queued to the next frame; flush so the display list is complete under load.
-      chart.getZr().flush();
       const point = dataItemPoint(chart);
       expect(point, `${type} draws a clickable data item`).not.toBeNull();
       const event = {

@@ -40,11 +40,6 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-// Real SFCs transform slowly under CI load; the test only needs the lazy import to resolve.
-vi.mock("@/views/SlackLink.vue", () => ({ default: {} }));
-vi.mock("@/views/SlackLinkCallback.vue", () => ({ default: {} }));
-vi.mock("@/views/SlackConnectCallback.vue", () => ({ default: {} }));
-
 // ---------------------------------------------------------------------------
 // Utility mocks
 // ---------------------------------------------------------------------------
@@ -523,18 +518,22 @@ describe("useRoutes (router.ts)", () => {
       ["/slack/link", "slackLink", "Link Slack account"],
       ["/slack/link/callback", "slackLinkCallback", "Linking Slack account"],
       ["/slack/connect/callback", "slackConnectCallback", "Signing in with Slack"],
-    ])("AC-9.6 %s is a titled route that needs a session", async (path, name, title) => {
-      const { parentRoutes } = useRoutes();
-      const route = parentRoutes.find((r: any) => r.path === path);
+    ])(
+      "AC-9.6 %s is a titled route that needs a session",
+      async (path, name, title) => {
+        const { parentRoutes } = useRoutes();
+        const route = parentRoutes.find((r: any) => r.path === path);
 
-      expect(route).toBeDefined();
-      expect(route.name).toBe(name);
-      expect(enTitle(route.meta.titleKey)).toBe(title);
-      expect(route.meta.public).toBeUndefined();
-      expect(route.beforeEnter).toBeUndefined();
-      const view = await route.component();
-      expect(view.default).toBeDefined();
-    });
+        expect(route).toBeDefined();
+        expect(route.name).toBe(name);
+        expect(enTitle(route.meta.titleKey)).toBe(title);
+        expect(route.meta.public).toBeUndefined();
+        expect(route.beforeEnter).toBeUndefined();
+        const view = await route.component();
+        expect(view.default).toBeDefined();
+      },
+      20000,
+    );
   });
 
   // =========================================================================
