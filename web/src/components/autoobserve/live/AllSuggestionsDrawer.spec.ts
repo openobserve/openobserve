@@ -221,4 +221,27 @@ describe("AllSuggestionsDrawer (journey 3)", () => {
     setLocale(before);
     expect(headers[0]).toBe("Proposal");
   });
+
+  it("goes back to the last page that exists when the total shrinks, without an empty flash", async () => {
+    api.mockResolvedValueOnce(page(["a1"], 30));
+    const wrapper = mountDrawer();
+    await flushPromises();
+    api.mockResolvedValueOnce(page([], 24));
+    let release: (value: unknown) => void = () => undefined;
+    api.mockReturnValueOnce(new Promise((resolve) => (release = resolve)) as never);
+    wrapper.findComponent(OTable).vm.$emit("pagination-change", { page: 2, pageSize: 25 });
+    await flushPromises();
+    expect(api).toHaveBeenLastCalledWith("org-a", expect.objectContaining({ offset: 0 }));
+    expect(wrapper.findComponent(OTable).props("currentPage")).toBe(1);
+    expect(wrapper.findComponent(OTable).props("loading")).toBe(true);
+    expect(wrapper.find(COUNT).text()).toBe("24");
+    expect(wrapper.find('[data-test="autoobserve2-suggestions-drawer-empty"]').exists()).toBe(
+      false,
+    );
+    release(page(["a1"], 24));
+    await flushPromises();
+    expect(rows(wrapper).map((r) => r.id)).toEqual(["a1"]);
+    expect(wrapper.find(COUNT).text()).toBe("24");
+    expect(wrapper.findComponent(OTable).props("loading")).toBe(false);
+  });
 });
