@@ -447,6 +447,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-critical-path-toggle"
               @update:model-value="setShowCriticalPath"
             />
+            <OButton
+              v-if="activeTab === 'waterfall' && askAiVisible"
+              variant="outline"
+              size="sm"
+              class="h-8! text-xs font-normal!"
+              data-test="trace-explain-trace-btn"
+              @click="explainTrace"
+            >
+              <template #icon-left>
+                <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+              </template>
+              {{ t("traces.askAi.explainTrace") }}
+              <OTooltip side="bottom" :content="t('traces.askAi.explainTraceHint')" />
+            </OButton>
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
@@ -685,6 +699,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
                   :show-annotate-buttons="canAnnotate"
+                  :show-ask-ai="askAiVisible"
+                  @send-to-ai-chat="relayToAiChat"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
@@ -749,6 +765,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
                   :show-annotate-buttons="canAnnotate"
+                  :show-ask-ai="askAiVisible"
+                  @send-to-ai-chat="relayToAiChat"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
@@ -829,6 +847,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
                   :show-annotate-buttons="canAnnotate"
+                  :show-ask-ai="askAiVisible"
+                  @send-to-ai-chat="relayToAiChat"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
@@ -998,6 +1018,8 @@ import TraceDAG from "./TraceDAG.vue";
 import TraceHeader from "./TraceHeader.vue";
 import TraceErrorSpansMenu from "./components/TraceErrorSpansMenu.vue";
 import { errorSpansDeepestFirst } from "./utils/traceErrorSummary";
+import { buildTraceAiPayload, type AiChatHandoff } from "./utils/traceAiPayload";
+import { useAiIcon } from "@/composables/useAiIcon";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
@@ -1288,6 +1310,11 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    // Only the routed Traces page has a listener for sendToAiChat; embeds leave this off.
+    showAskAi: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     ShareButton,
@@ -1322,7 +1349,7 @@ export default defineComponent({
     AddToDatasetDrawer,
   },
 
-  emits: ["searchQueryUpdated", "close", "spanSelected"],
+  emits: ["searchQueryUpdated", "close", "spanSelected", "sendToAiChat"],
   setup(props, { emit }) {
     const serviceDetectionConfig = ref<ServiceDetectionConfig | null>(null);
     provide(TRACE_SERVICE_DETECTION_KEY, serviceDetectionConfig);
@@ -2121,6 +2148,29 @@ export default defineComponent({
         }
       },
     );
+
+    const { aiIconSrc } = useAiIcon();
+    const askAiVisible = computed(
+      () => props.showAskAi && config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
+    );
+
+    const relayToAiChat = (payload: AiChatHandoff) => emit("sendToAiChat", payload);
+
+    const explainTrace = () => {
+      const trace = searchObj.data.traceDetails.selectedTrace;
+      const criticalPath = computeCriticalPathForRoots(traceTree.value.map(toCriticalPathNode));
+      relayToAiChat(
+        buildTraceAiPayload(t, {
+          spans: effectiveSpanList.value,
+          criticalPathSpanIds: criticalPath.map((section) => section.spanId),
+          rootOperation: String(traceTree.value[0]?.operationName ?? ""),
+          traceId: effectiveTraceId.value,
+          stream: currentTraceStreamName.value,
+          traceStartTime: Number(trace?.trace_start_time) || 0,
+          traceEndTime: Number(trace?.trace_end_time) || 0,
+        }),
+      );
+    };
 
     const setShowCriticalPath = (value: unknown) => {
       showCriticalPath.value = value === true;
@@ -3431,6 +3481,10 @@ export default defineComponent({
       raw,
       showCriticalPath,
       setShowCriticalPath,
+      aiIconSrc,
+      askAiVisible,
+      relayToAiChat,
+      explainTrace,
       traceGraphView,
       setTraceGraphView,
       traceGraphSearch,

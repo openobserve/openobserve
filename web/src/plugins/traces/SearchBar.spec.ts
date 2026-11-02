@@ -18,6 +18,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { ref, computed, reactive } from "vue";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import config from "@/aws-exports";
 
 // ---------------------------------------------------------------------------
 // Module-level mocks — vi.mock is hoisted by Vitest; never use vi.doMock here
@@ -33,6 +34,13 @@ vi.mock("@/services/product_analytics", () => ({
 
 vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "true" },
+}));
+
+const nlFilterMock = vi.hoisted(() =>
+  vi.fn((_sql: string, _parser: unknown): string | null => null),
+);
+vi.mock("@/plugins/traces/utils/nlSqlToTracesFilter", () => ({
+  nlSqlToTracesFilter: nlFilterMock,
 }));
 
 // getImageURL is called by the metricsIcon computed; stub to avoid asset loading.
@@ -359,7 +367,7 @@ const sharedStubs = {
       };
     },
   },
-  CodeQueryEditor: {
+  UnifiedQueryEditor: {
     // Monaco's caret element: the recent-searches dropdown opens at it.
     template:
       '<div data-test="code-query-editor-stub"><div class="monaco-editor"><div class="cursors-layer"><div class="cursor" /></div></div></div>',
@@ -376,8 +384,11 @@ const sharedStubs = {
       "filterMode",
       "debounceTime",
       "fieldValueResolver",
+      "hideNlToggle",
+      "nlpMode",
+      "transformGeneratedQuery",
     ],
-    emits: ["update:query", "run-query", "focus", "blur", "user-edit"],
+    emits: ["update:query", "run-query", "focus", "blur", "user-edit", "update:nlpMode"],
     setup(_: unknown, { emit }: { emit: (event: "focus") => void }) {
       return {
         setValue: vi.fn(),
@@ -1686,6 +1697,67 @@ describe("SearchBar", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="code-query-editor-stub"]').exists()).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("plain-English filter (Ask AI) on the query editor", () => {
+    const editor = () => wrapper.findComponent({ ref: "queryEditorRef" });
+
+    afterEach(() => {
+      config.isEnterprise = "true";
+      delete store.state.zoConfig.ai_enabled;
+      nlFilterMock.mockReset();
+    });
+
+    it("keeps the Monaco host id the e2e helpers look for", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(editor().props("editorId")).toBe("traces-query-editor");
+    });
+
+    it("shows the AI toggle on an enterprise build with AI enabled", async () => {
+      store.state.zoConfig.ai_enabled = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(editor().props("hideNlToggle")).toBe(false);
+    });
+
+    it("hides the AI toggle when AI is off", async () => {
+      store.state.zoConfig.ai_enabled = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(editor().props("hideNlToggle")).toBe(true);
+    });
+
+    it("hides the AI toggle on a non-enterprise build", async () => {
+      store.state.zoConfig.ai_enabled = true;
+      config.isEnterprise = "false";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(editor().props("hideNlToggle")).toBe(true);
+    });
+
+    it("writes only the WHERE part of the generated SQL into the editor", async () => {
+      nlFilterMock.mockReturnValue("service_name = 'querier'");
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const sql = "SELECT * FROM default WHERE service_name = 'querier' LIMIT 100";
+      expect(editor().props("transformGeneratedQuery")(sql)).toBe("service_name = 'querier'");
+      expect(nlFilterMock).toHaveBeenCalledWith(sql, tracesParserRef.value);
+      expect(toastMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps the user's text and says the question needs SQL when no filter fits", async () => {
+      nlFilterMock.mockReturnValue(null);
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const sql = "SELECT service_name, count(*) FROM default GROUP BY service_name";
+      expect(editor().props("transformGeneratedQuery")(sql)).toBeNull();
+      expect(toastMock).toHaveBeenCalledWith({
+        message: "traces.nlNeedsSql",
+        variant: "warning",
+      });
     });
   });
 

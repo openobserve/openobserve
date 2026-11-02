@@ -597,17 +597,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="relative flex h-full w-full flex-col overflow-hidden"
         @keydown.capture="onRecentEditorKeydown"
       >
-        <CodeQueryEditor
+        <UnifiedQueryEditor
           ref="queryEditorRef"
           editor-id="traces-query-editor"
+          data-test-prefix="traces-search-bar"
           v-model:query="searchObj.data.editorValue"
+          v-model:nlp-mode="nlpMode"
           :keywords="effectiveKeywords"
           :suggestions="effectiveSuggestions"
           :field-value-resolver="resolveFieldValues"
           :recent-queries="recentQueries"
           :debounce-time="100"
           :filter-mode="!searchObj.meta.sqlMode"
-          language="sql"
+          :hide-nl-toggle="!isAiEnabled"
+          :transform-generated-query="toTracesFilter"
+          editor-height="100%"
           @update:query="updateQueryValue"
           @user-edit="onRecentEditorEdit"
           @run-query="searchData"
@@ -630,7 +634,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="
             searchObj.data.editorValue === '' &&
             searchObj.meta.queryEditorPlaceholderFlag &&
-            !recentFocusOpen
+            !recentFocusOpen &&
+            !nlpMode
           "
           class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
         >
@@ -680,6 +685,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { nlSqlToTracesFilter } from "@/plugins/traces/utils/nlSqlToTracesFilter";
 import { chartInterval } from "./metrics/latencyHeatmap";
 import { buildTracesRedPanels, tracesBucketNotice } from "./metrics/tracesRedPanels";
 import { useI18nTyped } from "@/types/i18n";
@@ -782,7 +788,7 @@ export default defineComponent({
     OSwitch,
     OSelect,
     OTooltip,
-    CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
+    UnifiedQueryEditor: defineAsyncComponent(() => import("@/components/QueryEditor.vue")),
     SyntaxGuide,
     RecentSearchesButton,
     RecentSearchesDrawer,
@@ -834,6 +840,16 @@ export default defineComponent({
 
     const { searchObj, tracesShareURL, tracesParser } = useTraces();
     const queryEditorRef = ref(null);
+
+    const nlpMode = ref(false);
+    const isAiEnabled = computed(
+      () => config.isEnterprise === "true" && Boolean(store.state.zoConfig.ai_enabled),
+    );
+    const toTracesFilter = (sql: string): string | null => {
+      const filter = nlSqlToTracesFilter(sql, tracesParser.value);
+      if (filter === null) toast({ message: t("traces.nlNeedsSql"), variant: "warning" });
+      return filter;
+    };
 
     const {
       onFocus: _sqlOnFocus,
@@ -1586,6 +1602,9 @@ export default defineComponent({
       store,
       searchObj,
       queryEditorRef,
+      nlpMode,
+      isAiEnabled,
+      toTracesFilter,
       onQueryEditorFocus,
       onQueryEditorBlur,
       queryEditorBoxRef,

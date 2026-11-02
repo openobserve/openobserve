@@ -20,6 +20,7 @@ import { getManager } from "@/lib/vue-shortcut-manager";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import config from "@/aws-exports";
 import router from "@/test/unit/helpers/router";
 import { http, HttpResponse } from "msw";
 import tracesMockData from "@/test/unit/mockData/traces";
@@ -3245,6 +3246,94 @@ describe("TraceDetails", () => {
       await pending;
 
       expect(viewSpanLogs).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Ask AI: Explain trace and the span relay", () => {
+    const EXPLAIN = '[data-test="trace-explain-trace-btn"]';
+    const sidebarStub = () => ({
+      ...mountOptions.global.stubs["trace-details-sidebar"],
+      props: [...mountOptions.global.stubs["trace-details-sidebar"].props, "showAskAi"],
+      emits: [...mountOptions.global.stubs["trace-details-sidebar"].emits, "sendToAiChat"],
+    });
+    let savedEnterprise: string;
+    let savedAiEnabled: unknown;
+
+    async function mountAskAi(showAskAi: boolean, { enterprise = true, ai = true } = {}) {
+      config.isEnterprise = enterprise ? "true" : "false";
+      store.state.zoConfig.ai_enabled = ai;
+      wrapper.unmount();
+      wrapper = mount(TraceDetails, {
+        ...mountOptions,
+        props: { ...mountOptions.props, showAskAi },
+        global: {
+          ...mountOptions.global,
+          stubs: { ...mountOptions.global.stubs, "trace-details-sidebar": sidebarStub() },
+        },
+      });
+      await flushPromises();
+      wrapper.vm.activeTab = "waterfall";
+      await flushPromises();
+    }
+
+    async function openSidebar() {
+      wrapper.vm.updateSelectedSpan(tracesMockData.tracesDetails.traceSpans.hits[0].span_id);
+      await flushPromises();
+      return wrapper.findComponent('[data-test="trace-details-sidebar"]');
+    }
+
+    beforeEach(() => {
+      savedEnterprise = config.isEnterprise;
+      savedAiEnabled = store.state.zoConfig.ai_enabled;
+    });
+
+    afterEach(() => {
+      config.isEnterprise = savedEnterprise;
+      store.state.zoConfig.ai_enabled = savedAiEnabled;
+    });
+
+    it.each([
+      ["the parent leaves showAskAi off", false, {}],
+      ["the build is not enterprise", true, { enterprise: false }],
+      ["AI is disabled on the server", true, { ai: false }],
+    ])("hides Explain trace and the span button when %s", async (_label, show, gate) => {
+      await mountAskAi(show, gate);
+      expect(wrapper.find(EXPLAIN).exists()).toBe(false);
+      expect((await openSidebar()).props("showAskAi")).toBe(false);
+    });
+
+    it("shows Explain trace beside the Critical path toggle on the Waterfall tab only", async () => {
+      await mountAskAi(true);
+      expect(wrapper.find(EXPLAIN).exists()).toBe(true);
+      wrapper.vm.activeTab = "flame-graph";
+      await flushPromises();
+      expect(wrapper.find(EXPLAIN).exists()).toBe(false);
+    });
+
+    it("emits sendToAiChat with the trace summary when Explain trace is clicked", async () => {
+      await mountAskAi(true);
+      await wrapper.find(EXPLAIN).trigger("click");
+      const [payload] = wrapper.emitted("sendToAiChat")![0] as [Record<string, any>];
+      expect(payload.chipName).toBe(`Trace · ${wrapper.vm.traceTree[0].operationName}`);
+      expect(payload).toMatchObject({ newChat: true, autoSend: false });
+      expect(payload.context).toMatchObject({
+        currentPage: "traces",
+        streamType: "traces",
+        selectedStreams: ["test-stream"],
+        traceId: "test-trace-id",
+      });
+      const summary = payload.context.trace_summary;
+      expect(summary.total_spans).toBe(tracesMockData.tracesDetails.traceSpans.hits.length);
+      expect(summary.critical_path.length).toBeGreaterThan(0);
+    });
+
+    it("turns the span button on and relays its sendToAiChat", async () => {
+      await mountAskAi(true);
+      const sidebar = await openSidebar();
+      expect(sidebar.props("showAskAi")).toBe(true);
+      const payload = { query: "q", chipName: "Span · x", newChat: true, autoSend: false };
+      sidebar.vm.$emit("sendToAiChat", payload);
+      expect(wrapper.emitted("sendToAiChat")![0]).toEqual([payload]);
     });
   });
 });

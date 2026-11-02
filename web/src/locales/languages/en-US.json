@@ -15532,6 +15532,7 @@
     "searchTypeOthers": "Others"
   },
   "traces": {
+    "nlNeedsSql": "This question needs SQL; open it in Logs",
     "redActions": {
       "menuGroupDashboards": "Dashboards",
       "addRedToDashboard": "Add RED charts to dashboard",
@@ -15775,6 +15776,13 @@
     "nextMatch": "Next match",
     "searchInSpans": "Search in spans",
     "criticalPath": "Critical path",
+    "askAi": {
+      "explainTrace": "Explain trace",
+      "explainTraceHint": "Ask AI about the slowest spans on the critical path and every error span",
+      "askAboutSpan": "Ask AI about this span",
+      "spanChip": "Span · {operation}",
+      "traceChip": "Trace · {operation}"
+    },
     "spansTableView": "Spans Table View",
     "comingSoon": "Coming soon...",
     "fetchingTrace": "Fetching your trace.",
