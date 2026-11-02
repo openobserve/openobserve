@@ -96,7 +96,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="autoobserve-coverage-drawer-state"
           />
         </div>
-        <div class="flex flex-wrap gap-1.5">
+        <div v-if="liveChecks" class="flex flex-wrap gap-1.5">
+          <button
+            v-for="chip in liveChips"
+            :key="chip.check"
+            type="button"
+            :class="[CHIP, 'hover:border-border-strong cursor-pointer']"
+            :aria-pressed="chip.check === 'absence' ? undefined : chip.open"
+            :aria-expanded="chip.check === 'absence' ? chip.open : undefined"
+            :data-test="`autoobserve-coverage-drawer-chip-${chip.check}`"
+            @click="openCheck(chip.check)"
+          >
+            <span
+              class="size-2 shrink-0 rounded-full"
+              :class="LIVE_DOT[chip.look]"
+              aria-hidden="true"
+            />
+            <span class="text-text-heading">{{ chip.text }}</span>
+          </button>
+        </div>
+        <CoverageSignalDetail
+          v-if="liveChecks && absenceOpen"
+          :cell="liveChecks.absence"
+          :service="row.service"
+          signal="absence"
+          :ledger="ledger"
+          data-test="autoobserve-coverage-drawer-absence-detail"
+        />
+        <div v-if="!liveChecks" class="flex flex-wrap gap-1.5">
           <template v-for="chip in chips" :key="chip.signal">
             <button
               v-if="chip.target"
@@ -135,11 +162,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ learningLine }}
         </p>
         <div
-          v-if="gapReason"
+          v-if="gapLines.length"
           class="flex flex-wrap items-center gap-x-3 gap-y-2"
           data-test="autoobserve-coverage-drawer-gap"
         >
-          <span class="text-text-body min-w-0 flex-1 text-sm">{{ gapReason }}</span>
+          <ul class="text-text-body flex min-w-0 flex-1 flex-col gap-1 text-sm">
+            <li
+              v-for="line in gapLines"
+              :key="line"
+              data-test="autoobserve-coverage-drawer-gap-line"
+            >
+              {{ line }}
+            </li>
+          </ul>
           <OButton
             v-if="fix"
             variant="outline"
@@ -155,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-2">
           <h3 :class="HEADING">{{ t("autoobserve.coverage.signals") }}</h3>
           <OToggleGroup
+            v-if="!live"
             :model-value="range"
             class="ms-auto"
             :aria-label="t('autoobserve.coverage.rangeLabel')"
@@ -184,6 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :end="timeWindow.end"
               :expanded="expanded === chart.def.signal"
               :ready-on="readyOn"
+              :no-data="live"
               @toggle="toggle(chart.def.signal)"
             >
               <!-- One column on a phone keeps the detail under its own chart instead of under the row. -->
@@ -212,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </section>
 
-      <section :class="CARD" data-test="autoobserve-coverage-drawer-logs">
+      <section v-if="!live" :class="CARD" data-test="autoobserve-coverage-drawer-logs">
         <div class="flex flex-col gap-2">
           <button
             type="button"
@@ -244,6 +281,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </section>
+
+      <section v-if="row.extra?.length" :class="CARD" data-test="autoobserve-coverage-drawer-extra">
+        <h3 :class="HEADING">{{ t("autoobserveLive.drawer.moreChecks") }}</h3>
+        <div class="flex flex-col gap-2">
+          <template v-for="item in row.extra" :key="item.key">
+            <button
+              type="button"
+              :class="ROW"
+              :aria-expanded="extraOpen === item.key"
+              :data-test="`autoobserve-coverage-drawer-row-${item.key}`"
+              @click="extraOpen = extraOpen === item.key ? null : item.key"
+            >
+              <span
+                class="size-2 shrink-0 rounded-full"
+                :class="LIVE_DOT[liveCellLook(item.cell.engine?.stateKey ?? 'none')]"
+              />
+              <span class="text-text-heading text-sm font-medium">{{ item.label }}</span>
+              <OTruncatedText class="text-text-body min-w-0 flex-1 text-sm">{{
+                extraValue(item.cell)
+              }}</OTruncatedText>
+              <OIcon
+                :name="extraOpen === item.key ? 'expand-less' : 'expand-more'"
+                size="sm"
+                class="text-text-secondary"
+              />
+            </button>
+            <CoverageSignalDetail
+              v-if="extraOpen === item.key"
+              :cell="item.cell"
+              :service="row.service"
+              :signal="item.key"
+              :ledger="ledger"
+            />
+          </template>
+        </div>
+      </section>
     </div>
   </ODrawer>
 </template>
@@ -259,6 +332,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
@@ -272,16 +346,22 @@ import {
   seed,
   seriesFor,
   type ChartRange,
+  type MetricSeries,
 } from "./coverageSeries";
 import {
+  detectorsOf,
+  LIVE_CHECKS,
   SIGNAL_LABEL,
   SIGNALS,
   type CellState,
+  type CoverageCell,
   type CoverageRow,
   type LedgerEntry,
+  type LiveCheck,
   type Scenario,
   type Signal,
 } from "./fixtures";
+import { LIVE_DOT, liveCellLook, liveCellWord, liveCheckText, liveGapLines } from "./live/liveCopy";
 
 type ServiceState = "watched" | "learning" | "gap";
 
@@ -294,6 +374,7 @@ const props = defineProps<{
   anchor: string;
   fix: I18nText | null;
   message: I18nText | "";
+  live?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -303,7 +384,7 @@ const emit = defineEmits<{
   select: [service: string];
 }>();
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 const router = useRouter();
 const tracesLock = useLicenseLock("traces");
 const store = useStore();
@@ -315,7 +396,19 @@ const CHIP =
   "bg-surface-base border-border-subtle focus-visible:outline-focus-ring-accent inline-flex items-center gap-1.5 rounded-full border py-1 ps-1.5 pe-2.5 text-xs focus-visible:outline-2";
 const ROW =
   "hover:bg-surface-subtle-hover focus-visible:outline-focus-ring-accent rounded-default flex w-full cursor-pointer items-center gap-2 px-1 py-1.5 text-start focus-visible:outline-2";
+// The engine sends no metric series, so live charts get an empty one and render their no-data state.
+const NO_SERIES: MetricSeries = {
+  points: [],
+  band: null,
+  anomalies: [],
+  current: 0,
+  previous: 0,
+  low: null,
+  high: null,
+};
 const RANGES: ChartRange[] = ["1h", "24h", "7d"];
+// Of the three checks that decide a live state, only errors and latency have a metric to chart.
+const LIVE_CHARTED: Signal[] = ["errors", "latency"];
 const RANGE_MS: Record<ChartRange, number> = {
   "1h": 59 * 60_000,
   "24h": 95 * 15 * 60_000,
@@ -369,10 +462,14 @@ provide("hoveredSeriesState", hoveredSeriesState);
 
 const range = ref<ChartRange>("24h");
 const body = ref<HTMLElement | null>(null);
+const extraOpen = ref<string | null>(null);
+const absenceOpen = ref(false);
 
 watch(
   () => props.row.service,
   () => {
+    extraOpen.value = null;
+    absenceOpen.value = false;
     const scroller = body.value?.parentElement;
     if (scroller) scroller.scrollTop = 0;
   },
@@ -387,6 +484,7 @@ const progress = computed(
 );
 
 const stateLabel = computed(() => {
+  if (props.row.status) return props.row.status.label;
   if (state.value === "gap") return t("autoobserve.coverage.stateGap");
   if (state.value === "learning" && progress.value)
     return t("autoobserve.coverage.stateLearning", {
@@ -396,7 +494,7 @@ const stateLabel = computed(() => {
   return t("autoobserve.coverage.stateWatched");
 });
 
-const detectors = computed(() => Object.values(props.row.cells).filter((c) => c.detector).length);
+const detectors = computed(() => detectorsOf(props.row));
 const detectorText = computed(() =>
   t("autoobserve.coverage.detectorCount", { count: detectors.value }, detectors.value),
 );
@@ -406,7 +504,7 @@ const subTitle = computed(() =>
   t("autoobserve.coverage.drawerSubtitle", {
     stream: raw(props.row.stream),
     detectors: detectorText.value,
-    library: raw(library.value),
+    library: props.row.where ?? raw(library.value),
   }),
 );
 
@@ -418,22 +516,25 @@ const readyOn = computed(() => {
   );
 });
 
+const liveChecks = computed(() => (props.live ? (props.row.checks ?? null) : null));
+
 const charts = computed(() =>
   metricsFor(props.row)
-    .filter((def) => CHART_SIGNALS.includes(def.signal))
+    .filter((def) => (liveChecks.value ? LIVE_CHARTED : CHART_SIGNALS).includes(def.signal))
     .map((def) => ({
-      def,
-      cell: props.row.cells[def.signal],
-      series: seriesFor(props.scenario, props.row, def, range.value),
+      def: props.live ? { ...def, titleKey: SIGNAL_LABEL[def.signal] } : def,
+      cell: liveChecks.value?.[def.signal as LiveCheck] ?? props.row.cells[def.signal],
+      series: props.live ? NO_SERIES : seriesFor(props.scenario, props.row, def, range.value),
     }))
     .filter((chart) => chart.cell.state !== "na"),
 );
 
-const gapReason = computed(() =>
-  state.value === "gap"
-    ? (SIGNALS.map((s) => props.row.cells[s]).find((c) => c.state === "gap")?.reason ?? "")
-    : "",
-);
+const gapLines = computed<I18nText[]>(() => {
+  if (state.value !== "gap") return [];
+  if (liveChecks.value) return liveGapLines(t, locale.value, liveChecks.value);
+  const reason = SIGNALS.map((s) => props.row.cells[s]).find((c) => c.state === "gap")?.reason;
+  return reason ? [reason] : [];
+});
 
 const learningLine = computed(() =>
   state.value === "learning" && progress.value
@@ -449,20 +550,35 @@ const chips = computed(() => {
   const charted = new Set(charts.value.map((c) => c.def.signal));
   return SIGNALS.map((signal) => {
     const label = t(SIGNAL_LABEL[signal]);
-    const cellState = props.row.cells[signal].state;
+    const cell = props.row.cells[signal];
+    const cellState = cell.state;
+    const word =
+      props.live && cell.engine ? liveCellWord(t, cell.engine.stateKey) : t(CELL_LABEL[cellState]);
     return {
       signal,
       label,
       state: cellState,
       // Only charted signals and log patterns have a section to open; dependencies is state only.
       target: charted.has(signal) || signal === "logPatterns",
-      aria: t("autoobserve.coverage.chipAria", { signal: label, state: t(CELL_LABEL[cellState]) }),
+      aria: t("autoobserve.coverage.chipAria", { signal: label, state: word }),
     };
   });
 });
 
+const liveChips = computed(() =>
+  LIVE_CHECKS.map((check) => {
+    const stateKey = liveChecks.value?.[check].engine?.stateKey ?? "none";
+    return {
+      check,
+      look: liveCellLook(stateKey),
+      open: check === "absence" ? absenceOpen.value : props.expanded === check,
+      text: liveCheckText(t, check, stateKey),
+    };
+  }),
+);
+
 const logValue = computed(() => {
-  if (props.row.cells.logPatterns.state === "gap") return raw("—");
+  if (props.live || props.row.cells.logPatterns.state === "gap") return raw("—");
   const known = 12 + (seed(`${props.row.service}:patterns`) % 60);
   return t("autoobserve.coverage.logPatternsValue", { known, fresh: 0 });
 });
@@ -483,6 +599,14 @@ const openRow = computed(() =>
 const openSignal = (signal: Signal) => emit("expand", signal);
 
 const toggle = (signal: Signal) => emit("expand", props.expanded === signal ? null : signal);
+
+const openCheck = (check: LiveCheck) => {
+  if (check === "absence") absenceOpen.value = !absenceOpen.value;
+  else openSignal(check);
+};
+
+const extraValue = (cell: CoverageCell): I18nText =>
+  cell.detector ? raw(cell.detector) : liveCellWord(t, cell.engine?.stateKey ?? "none");
 
 const openTraces = (tab?: string) => {
   const org = store.state.selectedOrganization?.identifier;

@@ -73,6 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="tab === 'coverage'"
         :ledger="ledger"
         :scenario="scenario"
+        :source="live ? liveData.source.value : undefined"
+        :skeleton="live && liveData.coverageSkeleton.value"
       />
       <AutoObserveActivityTab
         v-else-if="tab === 'activity'"
@@ -108,6 +110,7 @@ import AutoObserveActivityTab from "@/components/autoobserve/AutoObserveActivity
 import AutoObservePolicyTab from "@/components/autoobserve/AutoObservePolicyTab.vue";
 import AutoObserveIssueDrawer from "@/components/autoobserve/AutoObserveIssueDrawer.vue";
 import ViewSwitch from "@/components/autoobserve/v2/ViewSwitch.vue";
+import { useLiveAutoObserve, useLiveMode } from "@/components/autoobserve/live/liveModel";
 import { issuesFor, type Issue, type Scenario } from "@/components/autoobserve/fixtures";
 import { problemsIn } from "@/components/autoobserve/data/facts";
 import { useIssueLedger } from "@/components/autoobserve/useIssueLedger";
@@ -121,6 +124,8 @@ const { t } = useI18nTyped();
 const scenario = computed<Scenario>(() => "demo");
 const route = useRoute();
 const router = useRouter();
+const live = useLiveMode();
+const liveData = useLiveAutoObserve();
 const linkedTab = route.query.tab;
 const tab = ref<NerdTab>(NERD_TABS.find((name) => name === linkedTab) ?? "issues");
 const { overrides, ledger, updateEntry, issueByIncident } = useIssueLedger(scenario, t);

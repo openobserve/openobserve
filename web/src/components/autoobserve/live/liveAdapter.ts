@@ -1,0 +1,614 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { formatLargeNumber } from "@/utils/formatters";
+import type {
+  AutoObserveCell,
+  AutoObserveCellState,
+  AutoObserveClass,
+  AutoObserveCoverage,
+  AutoObserveCoverageRow,
+  AutoObserveStatedEvidence,
+  AutoObserveSuggestion,
+} from "@/services/autoobserve";
+import {
+  SIGNALS,
+  type CoverageCell,
+  type CoverageRow,
+  type EngineMonitor,
+  type LiveCheck,
+  type Signal,
+} from "../fixtures";
+import type { Msg, Request, RequestCopy } from "../v2/fixtures";
+import type { ChangeKind } from "../v2/changes";
+import { agoText, coverageWord, formatDay, type LiveFailure, type LiveStale } from "./liveCopy";
+
+export type SourceStatus = "loading" | "error" | "ready";
+
+export interface CoverageTotals {
+  total: number;
+  learning: number;
+  gaps: number;
+  fullyWatched: number;
+  added: number;
+  detectors: number;
+}
+
+export interface SourceState {
+  status: SourceStatus;
+  retry: () => void;
+  busy?: boolean;
+  failure?: LiveFailure | null;
+  detail?: I18nText;
+  stale?: LiveStale | null;
+}
+
+export interface CoverageSource extends Required<SourceState> {
+  rows: CoverageRow[];
+  totals: CoverageTotals;
+  planned: Set<string>;
+  // Null when the engine finished no pass in the last day.
+  passMinutes: number | null;
+}
+
+export interface Zone {
+  locale: string;
+  timeZone: string;
+}
+
+export interface SuggestionRow {
+  id: string;
+  headline: I18nText;
+  where: I18nText;
+  kind: I18nText;
+  severity: { label: I18nText; variant: BadgeVariant } | null;
+  detail: Msg;
+}
+
+type GapState = Exclude<AutoObserveCellState, "covered">;
+
+// Only these three design signals have an engine class; the rest render as not checked.
+const SIGNAL_CLASS: Partial<Record<Signal, AutoObserveClass>> = {
+  errors: "errors",
+  latency: "latency",
+  saturation: "saturation",
+};
+
+const EXTRA_CLASSES: AutoObserveClass[] = [
+  "saturation",
+  "external_probe",
+  "workload_health",
+  "node",
+];
+
+// The engine raises a coverage gap only when none of these three is covered.
+const GAP_CLASSES: LiveCheck[] = ["errors", "latency", "absence"];
+
+const CLASS_LABEL: Record<AutoObserveClass, I18nKey> = {
+  errors: "autoobserveLive.classes.errors",
+  latency: "autoobserveLive.classes.latency",
+  saturation: "autoobserveLive.classes.saturation",
+  absence: "autoobserveLive.classes.absence",
+  external_probe: "autoobserveLive.classes.external_probe",
+  workload_health: "autoobserveLive.classes.workload_health",
+  node: "autoobserveLive.classes.node",
+};
+
+const CLASS_INLINE: Record<AutoObserveClass, I18nKey> = {
+  errors: "autoobserveLive.classesInline.errors",
+  latency: "autoobserveLive.classesInline.latency",
+  saturation: "autoobserveLive.classesInline.saturation",
+  absence: "autoobserveLive.classesInline.absence",
+  external_probe: "autoobserveLive.classesInline.external_probe",
+  workload_health: "autoobserveLive.classesInline.workload_health",
+  node: "autoobserveLive.classesInline.node",
+};
+
+const STATE_LABEL: Record<AutoObserveCellState, I18nKey> = {
+  covered: "autoobserveLive.states.covered",
+  weak: "autoobserveLive.states.weak",
+  silent: "autoobserveLive.states.silent",
+  blind: "autoobserveLive.states.blind",
+  unmapped: "autoobserveLive.states.unmapped",
+  none: "autoobserveLive.states.none",
+};
+
+const GAP_REASON: Record<GapState, I18nKey> = {
+  weak: "autoobserveLive.cell.gap.weak",
+  silent: "autoobserveLive.cell.gap.silent",
+  blind: "autoobserveLive.cell.gap.blind",
+  unmapped: "autoobserveLive.cell.gap.unmapped",
+  none: "autoobserveLive.cell.gap.none",
+};
+
+const MONITOR_KIND_LABEL: Record<string, I18nKey> = {
+  alert: "autoobserveLive.monitorKinds.alert",
+  anomaly_detector: "autoobserveLive.monitorKinds.anomaly_detector",
+  slo: "autoobserveLive.monitorKinds.slo",
+  synthetic: "autoobserveLive.monitorKinds.synthetic",
+};
+
+const SUGGESTION_KIND: Record<string, { label: I18nKey; look: ChangeKind }> = {
+  discovery_unusable: {
+    label: "autoobserveLive.suggestions.kinds.discovery_unusable",
+    look: "watching",
+  },
+  blind_guardrail: { label: "autoobserveLive.suggestions.kinds.blind_guardrail", look: "fix" },
+  coverage_gap: { label: "autoobserveLive.suggestions.kinds.coverage_gap", look: "watching" },
+  no_absence_check: {
+    label: "autoobserveLive.suggestions.kinds.no_absence_check",
+    look: "watching",
+  },
+  silent_coverage: { label: "autoobserveLive.suggestions.kinds.silent_coverage", look: "tuning" },
+  coverage_lost: { label: "autoobserveLive.suggestions.kinds.coverage_lost", look: "watching" },
+};
+
+const NO_ABSENCE_KEY: Record<AutoObserveCellState, I18nKey> = {
+  covered: "autoobserveLive.suggestions.body.noAbsenceNone",
+  weak: "autoobserveLive.suggestions.body.noAbsenceWeak",
+  silent: "autoobserveLive.suggestions.body.noAbsenceSilent",
+  blind: "autoobserveLive.suggestions.body.noAbsenceBlind",
+  unmapped: "autoobserveLive.suggestions.body.noAbsenceNone",
+  none: "autoobserveLive.suggestions.body.noAbsenceNone",
+};
+
+const BLIND_KEY: Record<string, I18nKey> = {
+  stream_missing: "autoobserveLive.suggestions.body.blindStreamMissing",
+  no_data: "autoobserveLive.suggestions.body.blindNoData",
+  empty_scope: "autoobserveLive.suggestions.body.blindEmptyScope",
+  unknown_field: "autoobserveLive.suggestions.body.blindUnknownField",
+  ignored_matcher: "autoobserveLive.suggestions.body.blindIgnoredMatcher",
+};
+
+const CONFIDENCE_KEY: Record<string, I18nKey> = {
+  sufficient: "autoobserveLive.suggestions.confidence.sufficient",
+  suggestive: "autoobserveLive.suggestions.confidence.suggestive",
+  insufficient: "autoobserveLive.suggestions.confidence.insufficient",
+};
+
+const SEVERITY_KEY: Record<"high" | "medium", I18nKey> = {
+  high: "autoobserveLive.suggestions.severity.high",
+  medium: "autoobserveLive.suggestions.severity.medium",
+};
+
+const STATE_ORDER: Record<string, number> = {
+  covered: 0,
+  weak: 1,
+  silent: 2,
+  unmapped: 3,
+  blind: 4,
+  none: 5,
+};
+
+const STREAM_ORDER: Record<string, number> = { traces: 0, logs: 1, metrics: 2 };
+
+const EMPTY_CELL: AutoObserveCell = { state: "none", evidence: [], counts: {} };
+
+const EMPTY_TOTALS: CoverageTotals = {
+  total: 0,
+  learning: 0,
+  gaps: 0,
+  fullyWatched: 0,
+  added: 0,
+  detectors: 0,
+};
+
+const str = (value: unknown) => (typeof value === "string" ? value : "");
+const num = (value: unknown) => (typeof value === "number" ? value : null);
+
+const kindLabel = (t: TranslateFn, kind: string): I18nText =>
+  MONITOR_KIND_LABEL[kind] ? t(MONITOR_KIND_LABEL[kind]) : raw(kind);
+
+const evidenceOf = (cell: AutoObserveCell): AutoObserveStatedEvidence[] =>
+  cell.all_evidence ?? cell.evidence.map((ev) => ({ ...ev, state: cell.state }));
+
+const toMonitor = (t: TranslateFn, ev: AutoObserveStatedEvidence): EngineMonitor => ({
+  id: ev.monitor_id,
+  name: ev.monitor_name,
+  kind: kindLabel(t, ev.monitor_kind),
+  kindKey: ev.monitor_kind,
+  state: t(STATE_LABEL[ev.state]),
+  stateKey: ev.state,
+  predicate: ev.predicate,
+});
+
+// Covered is the only engine state the design can call watched; every other state is a gap with its cause.
+const toCell = (
+  t: TranslateFn,
+  found: AutoObserveCell | undefined,
+  label: I18nText,
+): CoverageCell => {
+  const cell = found ?? EMPTY_CELL;
+  const lead = cell.evidence[0];
+  const engine = {
+    state: t(STATE_LABEL[cell.state]),
+    stateKey: cell.state,
+    detectorKind: lead ? kindLabel(t, lead.monitor_kind) : undefined,
+    monitors: evidenceOf(cell)
+      .map((ev) => toMonitor(t, ev))
+      .sort((a, b) => STATE_ORDER[a.stateKey] - STATE_ORDER[b.stateKey]),
+  };
+  if (cell.state === "covered" && lead)
+    return {
+      state: "watched",
+      detector: lead.monitor_name,
+      method: lead.monitor_kind === "anomaly_detector" ? "anomaly" : "threshold",
+      engine,
+    };
+  const state: GapState = cell.state === "covered" ? "none" : cell.state;
+  return {
+    state: "gap",
+    reason: t(GAP_REASON[state], { signal: label, monitor: raw(lead?.monitor_name ?? "") }),
+    engine,
+  };
+};
+
+const streamText = (row: AutoObserveCoverageRow) => {
+  const streams = [...(row.streams ?? [])].sort(
+    (a, b) => (STREAM_ORDER[a.type] ?? 3) - (STREAM_ORDER[b.type] ?? 3),
+  );
+  if (!streams.length) return "—";
+  return streams.length > 1 ? `${streams[0].name} +${streams.length - 1}` : streams[0].name;
+};
+
+// Service names repeat across clusters, and the design keys rows by name, so repeats get their place appended.
+const uniqueNames = (rows: AutoObserveCoverageRow[]) => {
+  const count = (key: (r: AutoObserveCoverageRow) => string) =>
+    rows.reduce<Record<string, number>>((m, r) => ((m[key(r)] = (m[key(r)] ?? 0) + 1), m), {});
+  const byName = count((r) => r.service_name);
+  const byCluster = count((r) => `${r.service_name}\u0000${r.cluster ?? ""}`);
+  return rows.map((r) => {
+    if (byName[r.service_name] === 1) return r.service_name;
+    if (byCluster[`${r.service_name}\u0000${r.cluster ?? ""}`] === 1)
+      return `${r.service_name} (${r.cluster || "—"})`;
+    return `${r.service_name} (${r.cluster || "—"}/${r.namespace || "—"})`;
+  });
+};
+
+const minutesSince = (passAt: number | null) =>
+  passAt ? Math.max(0, Math.floor((Date.now() - passAt / 1000) / 60_000)) : null;
+
+const toRow = (
+  t: TranslateFn,
+  row: AutoObserveCoverageRow,
+  service: string,
+  minutes: number | null,
+  locale: string,
+): CoverageRow => {
+  const cells = Object.fromEntries(
+    SIGNALS.map((signal) => {
+      const cls = SIGNAL_CLASS[signal];
+      const cell: CoverageCell = cls
+        ? toCell(t, row.cells[cls], t(CLASS_LABEL[cls]))
+        : { state: "na", reason: t("autoobserveLive.cell.noClass") };
+      return [signal, cell];
+    }),
+  ) as Record<Signal, CoverageCell>;
+  const watched = GAP_CLASSES.some((cls) => row.cells[cls]?.state === "covered");
+  const checks = Object.fromEntries(
+    GAP_CLASSES.map((cls) => [cls, toCell(t, row.cells[cls], t(CLASS_LABEL[cls]))]),
+  ) as Record<LiveCheck, CoverageCell>;
+  return {
+    service,
+    stream: streamText(row),
+    where: t("autoobserveLive.where", {
+      cluster: raw(row.cluster || "—"),
+      namespace: raw(row.namespace || "—"),
+    }),
+    scannedMinutes: minutes,
+    lastScanned:
+      minutes === null ? t("autoobserve.coverage.notScanned") : agoText(t, locale, minutes),
+    cells,
+    checks,
+    status: watched
+      ? { state: "watched", label: coverageWord(t, "watched") }
+      : { state: "gap", label: coverageWord(t, "gap") },
+    extra: EXTRA_CLASSES.map((cls) => {
+      const label = t(CLASS_LABEL[cls]);
+      return { key: cls, label, cell: toCell(t, row.cells[cls], label) };
+    }),
+  };
+};
+
+// Closest engine match for the design's "can't watch": a monitor exists but can't see or reach the service.
+const cannotWatch = (row: AutoObserveCoverageRow) =>
+  Object.values(row.cells).some((cell) => cell?.state === "blind" || cell?.state === "unmapped");
+
+const totalsOf = (data: AutoObserveCoverage, rows: CoverageRow[]): CoverageTotals => {
+  const gaps = rows.filter((r) => r.status?.state === "gap").length;
+  const detectors = new Set(
+    data.rows.flatMap((r) =>
+      GAP_CLASSES.map((cls) => r.cells[cls])
+        .filter((c) => c?.state === "covered")
+        .flatMap((c) => (c?.evidence ?? []).map((ev) => ev.monitor_id)),
+    ),
+  ).size;
+  return { ...EMPTY_TOTALS, total: rows.length, gaps, fullyWatched: rows.length - gaps, detectors };
+};
+
+export const toCoverageSource = (
+  t: TranslateFn,
+  data: AutoObserveCoverage | undefined,
+  state: SourceState,
+  locale: string,
+): CoverageSource => {
+  const base = { busy: false, failure: null, detail: raw(""), stale: null, ...state };
+  if (!data)
+    return { ...base, rows: [], totals: EMPTY_TOTALS, planned: new Set(), passMinutes: null };
+  const names = uniqueNames(data.rows);
+  const minutes = minutesSince(data.pass_at);
+  const rows = data.rows.map((row, i) => toRow(t, row, names[i], minutes, locale));
+  const planned = new Set(data.rows.flatMap((row, i) => (cannotWatch(row) ? [names[i]] : [])));
+  return { ...base, rows, totals: totalsOf(data, rows), planned, passMinutes: minutes };
+};
+
+const listOf = (locale: string, parts: I18nText[]): I18nText =>
+  raw(new Intl.ListFormat(locale, { type: "conjunction" }).format(parts));
+
+const classList = (t: TranslateFn, locale: string, classes: string[]) =>
+  listOf(
+    locale,
+    classes.map((c) =>
+      CLASS_INLINE[c as AutoObserveClass] ? t(CLASS_INLINE[c as AutoObserveClass]) : raw(c),
+    ),
+  );
+
+const serviceName = (s: AutoObserveSuggestion) =>
+  raw(
+    str(s.evidence.service_name) || s.subject.key_dims.service_name || s.subject.key_dims.entity_id,
+  );
+
+const serviceMeta = (t: TranslateFn, s: AutoObserveSuggestion): I18nText => {
+  const dims = s.subject.key_dims;
+  const where = t("autoobserveLive.where", {
+    cluster: raw(dims.k8s_cluster_name || "—"),
+    namespace: raw(dims.k8s_namespace_name || "—"),
+  });
+  const traffic = num(s.evidence.traffic_per_hour);
+  return traffic === null
+    ? where
+    : t("autoobserveLive.suggestions.serviceMeta", {
+        where,
+        traffic: raw(formatLargeNumber(Math.round(traffic))),
+      });
+};
+
+const cellsOf = (s: AutoObserveSuggestion) =>
+  (s.evidence.cells ?? {}) as Partial<Record<AutoObserveClass, AutoObserveCell>>;
+
+const cellsMsg = (t: TranslateFn, locale: string, s: AutoObserveSuggestion): Msg => {
+  const cells = cellsOf(s);
+  const parts = GAP_CLASSES.map((c) =>
+    t("autoobserveLive.suggestions.detail.cell", {
+      check: t(CLASS_LABEL[c]),
+      state: t(STATE_LABEL[cells[c]?.state ?? "none"]),
+    }),
+  );
+  return {
+    key: "autoobserveLive.suggestions.detail.cells",
+    params: { cells: listOf(locale, parts) },
+  };
+};
+
+const blindReason = (s: AutoObserveSuggestion) => {
+  const reason = s.evidence.reason;
+  const key = typeof reason === "string" ? reason : (Object.keys(reason ?? {})[0] ?? "");
+  const value =
+    reason && typeof reason === "object" ? str((reason as Record<string, unknown>)[key]) : "";
+  return { key, value };
+};
+
+const formatMicros = (us: number, locale: string, timeZone: string): I18nText =>
+  raw(
+    new Date(us / 1000).toLocaleString(locale, {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone,
+    }),
+  );
+
+// lost_at is the snapshot that first missed the coverage; older rows carry only since_day, a UTC day start.
+const lostDay = (s: AutoObserveSuggestion, locale: string, timeZone: string): I18nText => {
+  const lostAt = num(s.evidence.lost_at);
+  if (lostAt !== null) return formatDay(lostAt, locale, timeZone);
+  const sinceDay = num(s.evidence.since_day);
+  return sinceDay === null ? raw(str(s.evidence.since_day)) : formatDay(sinceDay, locale, "UTC");
+};
+
+const NO_DETAIL: Msg = { key: "autoobserveLive.suggestions.detail.none" };
+
+interface Parts {
+  headline: I18nText;
+  why: I18nText | null;
+  body: Msg;
+}
+
+const blindParts = (
+  t: TranslateFn,
+  { locale, timeZone }: Zone,
+  s: AutoObserveSuggestion,
+): Parts => {
+  const { key, value } = blindReason(s);
+  const monitor = raw(str(s.evidence.monitor_name));
+  const detail = raw(str(s.evidence.detail));
+  const lastFired = num(s.evidence.last_fired_at);
+  return {
+    headline: BLIND_KEY[key]
+      ? t(BLIND_KEY[key], { monitor, detail, field: raw(value), label: raw(value) })
+      : monitor,
+    why: lastFired
+      ? t("autoobserveLive.suggestions.lastFired", {
+          time: formatMicros(lastFired, locale, timeZone),
+        })
+      : t("autoobserveLive.suggestions.neverFired"),
+    body: detail
+      ? { key: "autoobserveLive.suggestions.detail.text", params: { detail } }
+      : NO_DETAIL,
+  };
+};
+
+const silentParts = (t: TranslateFn, locale: string, s: AutoObserveSuggestion): Parts => {
+  const count = num(s.evidence.service_count) ?? 0;
+  const services = ((s.evidence.services ?? []) as string[]).map((name) => raw(name));
+  return {
+    headline: t(
+      "autoobserveLive.suggestions.body.silentCoverage",
+      {
+        monitor: raw(str(s.evidence.monitor_name)),
+        classes: classList(t, locale, (s.evidence.classes ?? []) as string[]),
+        count,
+      },
+      count,
+    ),
+    why: null,
+    body: services.length
+      ? {
+          key: "autoobserveLive.suggestions.detail.services",
+          params: { services: listOf(locale, services) },
+        }
+      : NO_DETAIL,
+  };
+};
+
+const partsFor = (t: TranslateFn, zone: Zone, s: AutoObserveSuggestion): Parts => {
+  const { locale, timeZone } = zone;
+  if (s.kind === "blind_guardrail") return blindParts(t, zone, s);
+  if (s.kind === "silent_coverage") return silentParts(t, locale, s);
+  if (s.kind === "discovery_unusable")
+    return {
+      headline: t("autoobserveLive.suggestions.body.discovery", {
+        good: num(s.evidence.good) ?? 0,
+        active: num(s.evidence.active) ?? 0,
+      }),
+      why: null,
+      body: {
+        key: "autoobserveLive.suggestions.detail.quality",
+        params: { mode: raw(str(s.evidence.mode)) },
+      },
+    };
+  const service = serviceName(s);
+  const why = serviceMeta(t, s);
+  const body = cellsMsg(t, locale, s);
+  if (s.kind === "coverage_gap") {
+    const missing = GAP_CLASSES.filter((c) => cellsOf(s)[c]?.state !== "covered");
+    return {
+      headline: t("autoobserveLive.suggestions.body.coverageGap", {
+        service,
+        classes: classList(t, locale, missing),
+      }),
+      why,
+      body,
+    };
+  }
+  if (s.kind === "no_absence_check")
+    return {
+      headline: t(NO_ABSENCE_KEY[cellsOf(s).absence?.state ?? "none"], { service }),
+      why,
+      body,
+    };
+  if (s.kind === "coverage_lost")
+    return {
+      headline: t("autoobserveLive.suggestions.body.coverageLost", {
+        service,
+        classes: classList(t, locale, Object.keys((s.evidence.lost ?? {}) as object)),
+        day: lostDay(s, locale, timeZone),
+      }),
+      why,
+      body: NO_DETAIL,
+    };
+  return { headline: t("autoobserveLive.suggestions.body.other"), why: null, body: NO_DETAIL };
+};
+
+const kindOf = (t: TranslateFn, s: AutoObserveSuggestion): I18nText => {
+  const kind = SUGGESTION_KIND[s.kind];
+  return kind ? t(kind.label) : t("autoobserveLive.suggestions.kinds.other");
+};
+
+// A coverage gap is a warning, never a failure, so High is amber and Medium neutral.
+const severityTag = (t: TranslateFn, s: AutoObserveSuggestion) => {
+  const severity = str(s.evidence.severity);
+  if (severity !== "high" && severity !== "medium") return null;
+  const variant: BadgeVariant = severity === "high" ? "warning-soft" : "default-soft";
+  return { label: t(SEVERITY_KEY[severity]), variant };
+};
+
+const tagsFor = (t: TranslateFn, s: AutoObserveSuggestion): RequestCopy["tags"] => {
+  const tags: { label: I18nText; variant: BadgeVariant }[] = [];
+  const severity = severityTag(t, s);
+  if (severity) tags.push(severity);
+  if (CONFIDENCE_KEY[s.confidence])
+    tags.push({ label: t(CONFIDENCE_KEY[s.confidence]), variant: "default-soft" });
+  return tags;
+};
+
+// Offset pages over a moving score order can repeat an id, and each card's key is its id.
+const firstOfEachId = (suggestions: AutoObserveSuggestion[]) => {
+  const seen = new Set<string>();
+  return suggestions.filter((s) => !seen.has(s.id) && !!seen.add(s.id));
+};
+
+// The server ranks with sort=priority; the rail keeps that order so it matches the drawer row for row.
+export const toRequests = (
+  t: TranslateFn,
+  zone: Zone,
+  suggestions: AutoObserveSuggestion[],
+): Request[] =>
+  firstOfEachId(suggestions).map((s) => {
+    const parts = partsFor(t, zone, s);
+    return {
+      id: s.id,
+      kind: "fromNowOn",
+      body: parts.body,
+      yes: "autoobserveLive.suggestions.accept",
+      no: "autoobserveLive.suggestions.dismiss",
+      doneYes: { key: "autoobserveLive.suggestions.accepted" },
+      doneNo: { key: "autoobserveLive.suggestions.dismissed" },
+      copy: {
+        label: kindOf(t, s),
+        headline: parts.headline,
+        why: parts.why,
+        tags: tagsFor(t, s),
+        look: SUGGESTION_KIND[s.kind]?.look ?? "watching",
+      },
+    };
+  });
+
+const whereOf = (t: TranslateFn, s: AutoObserveSuggestion): I18nText => {
+  const dims = s.subject.key_dims;
+  if (!dims.k8s_cluster_name && !dims.k8s_namespace_name) return raw("—");
+  return t("autoobserveLive.where", {
+    cluster: raw(dims.k8s_cluster_name || "—"),
+    namespace: raw(dims.k8s_namespace_name || "—"),
+  });
+};
+
+export const toSuggestionRows = (
+  t: TranslateFn,
+  zone: Zone,
+  suggestions: AutoObserveSuggestion[],
+): SuggestionRow[] =>
+  firstOfEachId(suggestions).map((s) => {
+    const parts = partsFor(t, zone, s);
+    return {
+      id: s.id,
+      headline: parts.headline,
+      where: whereOf(t, s),
+      kind: kindOf(t, s),
+      severity: severityTag(t, s),
+      detail: parts.body,
+    };
+  });
