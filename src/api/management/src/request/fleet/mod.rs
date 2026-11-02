@@ -47,6 +47,9 @@ const FLEET_CONFIGS: &str = "fleet_configs";
 const FLEET_MANAGEMENT: &str = "fleet_management";
 #[cfg(feature = "enterprise")]
 const FLEETS: &str = "fleets";
+/// Per-fleet checks in flight at once when withholding token values.
+#[cfg(feature = "enterprise")]
+const FLEET_CHECK_CONCURRENCY: usize = 16;
 
 #[utoipa::path(
     get,
@@ -1845,12 +1848,7 @@ async fn permitted_fleets(
     }
 }
 
-/// Per-fleet checks in flight at once when withholding token values.
-#[cfg(feature = "enterprise")]
-const FLEET_CHECK_CONCURRENCY: usize = 16;
-
-/// An enrollment token ingests into the org, so only a caller who may change its fleet sees it:
-/// one org-wide check for standard writers and `_all_` grants, then one per distinct fleet.
+/// An enrollment token ingests into the org, so only a caller who may change its fleet sees it.
 #[cfg(feature = "enterprise")]
 async fn withhold_token_values(
     org_id: &str,
@@ -1886,8 +1884,7 @@ async fn withhold_token_values(
     }
 }
 
-/// Saving a draft (PUT) and publishing (POST) both write the YAML back, so either caller reads
-/// it whole: a masked copy published as is would replace the stored credentials.
+/// Draft save (PUT) and publish (POST) write the YAML back, so masking it would erase credentials.
 #[cfg(feature = "enterprise")]
 async fn can_edit_configs(org_id: &str, user_id: &str) -> bool {
     allowed_on(FLEET_CONFIGS, org_id, user_id, "PUT").await

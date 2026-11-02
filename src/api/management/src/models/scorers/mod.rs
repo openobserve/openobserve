@@ -195,8 +195,7 @@ impl ScorerResponseBody {
             .any(|key| self.params.get(key).is_some_and(|v| !v.is_null()))
     }
 
-    /// A remote scorer's endpoint, auth and header values call the customer's service; the
-    /// endpoint keeps its origin and the auth and header names stay.
+    /// The endpoint keeps its origin and the auth and header names stay; their values are blanked.
     pub fn redact_credentials(&mut self) {
         if let Some(endpoint) = self.params.get_mut("endpoint")
             && let Some(raw) = endpoint.as_str()

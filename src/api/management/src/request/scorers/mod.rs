@@ -42,6 +42,9 @@ use crate::{
 /// Most scorers one request may name; each costs a permission check before anything runs.
 pub(crate) const MAX_SCORERS_PER_REQUEST: usize = 50;
 
+/// Per-scorer PUT checks in flight at once when the org-wide one fails.
+const PERMISSION_CONCURRENCY: usize = 16;
+
 fn scorer_error_response(value: ScorerError) -> Response {
     match value {
         ScorerError::InfraError(err) => {
@@ -63,11 +66,7 @@ fn scorer_error_response(value: ScorerError) -> Response {
     }
 }
 
-/// Per-scorer PUT checks in flight at once when the org-wide one fails.
-const PERMISSION_CONCURRENCY: usize = 16;
-
-/// Remote scorer credentials stay with those who may change the scorer: one org-wide check for
-/// standard writers and `_all_` grants, then one check per scorer that has something to redact.
+/// Remote scorer credentials stay with those who may change the scorer.
 async fn redact_unwritable(org_id: &str, user_id: &str, scorers: &mut [ScorerResponseBody]) {
     use futures::StreamExt;
 

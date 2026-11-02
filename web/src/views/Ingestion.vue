@@ -398,8 +398,7 @@ export default defineComponent({
         }
       });
 
-    // A 403 hides the token actions; any other read failure falls back to the Generate action.
-    // staleTime 0: a cached token must not outlive a role that can no longer read it.
+    // A 403 hides the token actions; staleTime 0 keeps a cached token from outliving that 403.
     const getRUMToken = () => {
       const org = store.state.selectedOrganization.identifier;
       return queryClient

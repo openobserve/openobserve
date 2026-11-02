@@ -25,6 +25,33 @@ use openobserve_core::alerts::{destination_usage, notifications::jira};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+/// Non-secret metadata keys; PagerDuty's `routing_key` is absent because it is the integration key.
+const PLAIN_METADATA_KEYS: &[&str] = &[
+    "prebuilt_type",
+    "render_format",
+    "setup_method",
+    "slack_team_id",
+    "slack_team_name",
+    "slack_channel_id",
+    "slack_app_name",
+    "credential_channel",
+    "credential_username",
+    "credential_euRegion",
+    "credential_priority",
+    "credential_assignmentGroup",
+    "credential_resolutionCode",
+    "severity",
+    "source",
+    "sourcetype",
+    "hostname",
+    "ddsource",
+    "ddtags",
+    "service",
+    "_index",
+    "converted_from_custom",
+    "conversion_date",
+];
+
 impl From<meta_dest::Destination> for Destination {
     fn from(value: meta_dest::Destination) -> Self {
         let mut dest = match value.module {
@@ -272,9 +299,7 @@ pub struct Destination {
     /// Specific destination type identifier (e.g., "openobserve", "splunk", "elasticsearch").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination_type_name: Option<String>,
-    /// Optional key-value metadata for the destination. Without PUT, only known non-secret
-    /// settings such as `prebuilt_type` or `severity` read back whole; `routing_key` and any other
-    /// value read back blank, or a URL as its origin.
+    /// Optional key-value metadata; without PUT, values outside the known plain keys read blank.
     #[serde(default)]
     pub metadata: HashMap<String, String>,
     /// The `slack_app` fields, flat on the body; absent for every other type.
@@ -507,42 +532,11 @@ impl From<destination_usage::DestinationUse> for DestinationUseResponse {
     }
 }
 
-/// Metadata keys whose values are not secrets: those the web form and the Slack Connect job
-/// write, and `render_format`, which the notifier reads. PagerDuty's `routing_key` is absent: it
-/// is the integration key.
-const PLAIN_METADATA_KEYS: &[&str] = &[
-    "prebuilt_type",
-    "render_format",
-    "setup_method",
-    "slack_team_id",
-    "slack_team_name",
-    "slack_channel_id",
-    "slack_app_name",
-    "credential_channel",
-    "credential_username",
-    "credential_euRegion",
-    "credential_priority",
-    "credential_assignmentGroup",
-    "credential_resolutionCode",
-    "severity",
-    "source",
-    "sourcetype",
-    "hostname",
-    "ddsource",
-    "ddtags",
-    "service",
-    "_index",
-    "converted_from_custom",
-    "conversion_date",
-];
-
 fn is_plain_metadata(key: &str) -> bool {
     PLAIN_METADATA_KEYS.contains(&key)
 }
 
-/// Any other key may hold a credential, such as `routing_key` or the `credential_<field>` copies
-/// older prebuilt destinations kept (`credential_webhookUrl`): a URL keeps its origin, the rest
-/// is blanked.
+/// Other keys may hold credentials, e.g. `routing_key` or older `credential_<field>` copies.
 fn redact_metadata(metadata: &mut HashMap<String, String>) {
     for (key, value) in metadata.iter_mut() {
         if !is_plain_metadata(key) {

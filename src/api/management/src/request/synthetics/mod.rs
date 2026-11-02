@@ -201,8 +201,7 @@ fn env_forbidden(name: &str) -> Response {
     ))
 }
 
-/// The install command embeds an `o2syn_` probe token, gated as `agent-setup` is: PUT on the
-/// default synthetics folder, which the route middleware checks when no `folder` is given.
+/// The install command embeds an `o2syn_` token, gated like `agent-setup`: default-folder PUT.
 async fn can_deploy_agents(org_id: &str, user_id: &str) -> bool {
     #[cfg(feature = "enterprise")]
     {

@@ -41,6 +41,9 @@ use crate::{
     request::{BulkDeleteRequest, BulkDeleteResponse},
 };
 
+/// Per-destination PUT checks in flight at once when the org-wide one fails.
+const PERMISSION_CONCURRENCY: usize = 16;
+
 #[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TestDestinationRequest {
@@ -905,9 +908,6 @@ pub async fn test_send(
     }
 }
 
-/// Per-destination PUT checks in flight at once when the org-wide one fails.
-const PERMISSION_CONCURRENCY: usize = 16;
-
 /// The URL and headers can post as the org, so only a destination writer reads them whole.
 async fn can_write_destination(org_id: &str, user_id: &str, name: &str) -> bool {
     #[cfg(feature = "enterprise")]
@@ -932,8 +932,7 @@ async fn can_write_destination(org_id: &str, user_id: &str, name: &str) -> bool 
     }
 }
 
-/// Blanks the secrets of every destination the caller may not PUT: one org-wide check, then at
-/// most `PERMISSION_CONCURRENCY` checks at a time for destinations that hold something to redact.
+/// Blanks the secrets of each destination the caller may not PUT, with one org-wide check first.
 async fn redact_unwritable(org_id: &str, user_id: &str, items: &mut [Destination]) {
     use futures::StreamExt;
 

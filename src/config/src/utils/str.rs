@@ -20,6 +20,9 @@ use regex::Regex;
 pub static EMPTY_STRING: String = String::new();
 pub static EMPTY_STR: &str = "";
 
+/// Webhook hosts whose subdomain is the key, so even the origin carries it.
+const SUBDOMAIN_KEYED_HOSTS: &[&str] = &[".m.pipedream.net"];
+
 /// Canonical email-validation regex (RFC 5321/5322 dot-atom form).
 ///
 /// Local part = one or more non-empty atoms separated by single dots (accepts single-char dotted
@@ -129,11 +132,7 @@ pub fn redact_dsn(s: &str) -> String {
     }
 }
 
-/// Webhook hosts whose subdomain is the key, so even the origin carries it.
-const SUBDOMAIN_KEYED_HOSTS: &[&str] = &[".m.pipedream.net"];
-
-/// A URL cut to its origin, as a webhook's userinfo, path or query can carry its secret;
-/// blank when the host itself is the key.
+/// A URL cut to its origin, since userinfo, path or query can carry a webhook's secret.
 pub fn url_origin(raw: &str) -> String {
     let Ok(mut url) = url::Url::parse(raw) else {
         return String::new();

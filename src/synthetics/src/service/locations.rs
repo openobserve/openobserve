@@ -386,8 +386,7 @@ pub(crate) async fn location_for_write(
     }
 }
 
-/// Response for a location create: private rows carry the org's `o2syn_` token and agent install
-/// command, which the handler withholds from callers without PUT on the default folder.
+/// Private rows carry the org's `o2syn_` token, withheld without PUT on the default folder.
 #[derive(Debug, Serialize)]
 pub struct CreateLocationResponse {
     pub location: synthetics_locations::SyntheticsLocationRecord,
