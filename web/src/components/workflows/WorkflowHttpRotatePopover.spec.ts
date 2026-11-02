@@ -141,6 +141,14 @@ describe("WorkflowHttpRotatePopover", () => {
     );
   });
 
+  it("a failure opening upward goes first, so the title and options above it do not move", async () => {
+    const w = mountPopover({ error: "nope" });
+    await byTest(w, "workflow-http-rotate").trigger("click");
+    expect(byTest(w, "workflow-http-rotate-error").classes()).toContain(
+      "[[data-side=top]_&]:order-first",
+    );
+  });
+
   it("a failure shows inside the popover; cancel emits cancel", async () => {
     const w = mountPopover({ error: "nope" });
     await byTest(w, "workflow-http-rotate").trigger("click");

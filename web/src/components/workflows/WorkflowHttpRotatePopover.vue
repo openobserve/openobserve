@@ -69,10 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :content="consequence"
         />
       </template>
+      <!-- Opened upward, the popover grows from its top edge, so the error goes first to keep the options in place -->
       <OBanner
         v-if="error"
         variant="error-soft"
         dense
+        class="[[data-side=top]_&]:order-first"
         data-test="workflow-http-rotate-error"
         :content="t('workflow.http.rotateFailed', { reason: raw(error) })"
       />
