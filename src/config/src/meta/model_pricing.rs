@@ -90,6 +90,7 @@ impl From<&str> for PricingSource {
 /// match wins.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
+#[schema(as = PricingMatchKind)]
 pub enum MatchKind {
     /// The pattern matched only part of the model name: the name continues before or after
     /// the match (e.g. `gpt-5\.4` matching `gpt-5.4-mini`). The span is still priced, but the
@@ -169,6 +170,8 @@ pub struct ModelPricingDefinition {
     /// Definitions shadowed by this one (same match_pattern, lower source/sort priority).
     /// Only populated in list responses — not stored in the database.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    // Self-referential: a typed field would recurse forever in utoipa's schema walk.
+    #[schema(value_type = Vec<Object>)]
     pub children: Vec<ModelPricingDefinition>,
     #[serde(skip)]
     #[schema(ignore)]

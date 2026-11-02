@@ -30,11 +30,12 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 /// Allowed values for `source_type` on create.
 const ALLOWED_SOURCE_TYPES: &[&str] = &["auto", "grafana", "alertmanager", "generic"];
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 pub struct CreateIntegrationPayload {
     pub name: String,
     pub source_type: Option<String>,
+    #[schema(value_type = Option<Object>)]
     pub config: Option<serde_json::Value>,
     /// Where notifications go when this source's alerts create or join an
     /// incident. Omitted or empty means "use the org default" — see
@@ -43,7 +44,7 @@ pub struct CreateIntegrationPayload {
     pub destinations: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 pub struct SetEnabledPayload {
     pub enabled: bool,
@@ -51,7 +52,7 @@ pub struct SetEnabledPayload {
 
 /// PATCH payload for updating an integration's name and/or destinations.
 /// Both fields are optional — only the fields present are updated.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 pub struct UpdateIntegrationPayload {
     pub name: Option<String>,
@@ -180,6 +181,25 @@ fn gate_enabled() -> Option<Response> {
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/incidents/integrations",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "ListIncidentIntegrations",
+    summary = "List incident integrations",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn list_integrations(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
@@ -207,6 +227,26 @@ pub async fn list_integrations(
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/incidents/integrations",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "CreateIncidentIntegration",
+    summary = "Create an incident integration",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = CreateIntegrationPayload, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn create_integration(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
@@ -241,6 +281,27 @@ pub async fn create_integration(
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/incidents/integrations/{integration_id}/enable",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "SetIncidentIntegrationEnabled",
+    summary = "Enable or disable an incident integration",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("integration_id" = String, Path, description = "Integration id"),
+    ),
+    request_body(content = SetEnabledPayload, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn set_integration_enabled(
     Path((org_id, integration_id)): Path<(String, String)>,
     Json(payload): Json<SetEnabledPayload>,
@@ -262,6 +323,27 @@ pub async fn set_integration_enabled(
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/incidents/integrations/{integration_id}",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "UpdateIncidentIntegration",
+    summary = "Update an incident integration",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("integration_id" = String, Path, description = "Integration id"),
+    ),
+    request_body(content = UpdateIntegrationPayload, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn update_integration(
     Path((org_id, integration_id)): Path<(String, String)>,
     Json(payload): Json<UpdateIntegrationPayload>,
@@ -290,6 +372,26 @@ pub async fn update_integration(
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/incidents/integrations/{integration_id}/rotate",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "RotateIncidentIntegrationToken",
+    summary = "Rotate the token of an incident integration",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("integration_id" = String, Path, description = "Integration id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn rotate_integration_token(
     Path((org_id, integration_id)): Path<(String, String)>,
 ) -> Response {
@@ -304,6 +406,26 @@ pub async fn rotate_integration_token(
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    delete,
+    path = "/v2/{org_id}/incidents/integrations/{integration_id}",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "DeleteIncidentIntegration",
+    summary = "Delete an incident integration",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("integration_id" = String, Path, description = "Integration id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_integration(
     Path((org_id, integration_id)): Path<(String, String)>,
 ) -> Response {
@@ -332,6 +454,26 @@ pub async fn delete_integration(
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/incidents/integrations/{integration_id}/senders",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "ListIncidentIntegrationSenders",
+    summary = "List senders seen by an incident integration",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("integration_id" = String, Path, description = "Integration id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn list_integration_senders(
     Path((org_id, integration_id)): Path<(String, String)>,
 ) -> Response {
@@ -359,11 +501,50 @@ pub async fn list_integration_senders(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/incidents/integrations",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "ListIncidentIntegrations",
+    summary = "List incident integrations",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn list_integrations(_path: Path<String>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/incidents/integrations",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "CreateIncidentIntegration",
+    summary = "Create an incident integration",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = CreateIntegrationPayload, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn create_integration(
     _path: Path<String>,
     _body: Json<CreateIntegrationPayload>,
@@ -372,6 +553,27 @@ pub async fn create_integration(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/incidents/integrations/{integration_id}/enable",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "SetIncidentIntegrationEnabled",
+    summary = "Enable or disable an incident integration",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("integration_id" = String, Path, description = "Integration id"),
+    ),
+    request_body(content = SetEnabledPayload, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn set_integration_enabled(
     _path: Path<(String, String)>,
     _body: Json<SetEnabledPayload>,
@@ -380,11 +582,52 @@ pub async fn set_integration_enabled(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/incidents/integrations/{integration_id}/rotate",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "RotateIncidentIntegrationToken",
+    summary = "Rotate the token of an incident integration",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("integration_id" = String, Path, description = "Integration id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn rotate_integration_token(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/incidents/integrations/{integration_id}",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "UpdateIncidentIntegration",
+    summary = "Update an incident integration",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("integration_id" = String, Path, description = "Integration id"),
+    ),
+    request_body(content = UpdateIntegrationPayload, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn update_integration(
     _path: Path<(String, String)>,
     _body: Json<UpdateIntegrationPayload>,
@@ -393,11 +636,51 @@ pub async fn update_integration(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/incidents/integrations/{integration_id}/senders",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "ListIncidentIntegrationSenders",
+    summary = "List senders seen by an incident integration",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("integration_id" = String, Path, description = "Integration id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn list_integration_senders(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    delete,
+    path = "/v2/{org_id}/incidents/integrations/{integration_id}",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "DeleteIncidentIntegration",
+    summary = "Delete an incident integration",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("integration_id" = String, Path, description = "Integration id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_integration(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }

@@ -561,8 +561,8 @@ pub async fn delete(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("email_id" = String, Path, description = "User name"),
       ),
+    request_body(content = BulkDeleteRequest, description = "Emails of the users to remove", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
@@ -652,7 +652,8 @@ context_path = "/auth",
                    Supports both JSON request body authentication and Authorization header-based authentication. \
                    Successful authentication establishes a session that allows access to protected resources and APIs \
                    throughout the platform.",
-    request_body(content = inline(SignInUser), description = "User login", content_type = "application/json"),
+    request_body(content = ref("#/components/schemas/SignInUser"), description = "User login; may be omitted when the Authorization header carries the credentials", content_type = "application/json"),
+    security(),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(SignInResponse)),
     ),
@@ -830,6 +831,23 @@ const fn default_exp_in() -> u32 {
     600
 }
 
+#[utoipa::path(
+    get,
+    path = "/auth/presigned-url",
+    tag = "Auth",
+    operation_id = "GetPresignedLoginUrl",
+    summary = "Generate a presigned login URL",
+    security(("BasicAuth" = [])),
+    params(
+        ("exp_in" = Option<u32>, Query, description = "URL lifetime in seconds, 600 by default"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn get_presigned_url(
     Query(_query): Query<HashMap<String, String>>,
     headers: HeaderMap,
@@ -1127,10 +1145,10 @@ pub async fn get_auth(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<RolesResponse>)),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "get"}))
     )
 )]
 pub async fn list_roles(Path(_org_id): Path<String>) -> impl IntoResponse {
@@ -1222,11 +1240,12 @@ async fn audit_login_failure(mut audit_message: AuditMessage, http_response_code
     security(
         ("Authorization"= [])
     ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-      ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn list_invitations(Headers(user_email): Headers<UserEmail>) -> Response {
@@ -1239,11 +1258,12 @@ pub async fn list_invitations(Headers(user_email): Headers<UserEmail>) -> Respon
 
 #[cfg(feature = "cloud")]
 #[utoipa::path(
-    post,
-    path = "/auth/invites/{token}",
+    delete,
+    path = "/invites/{token}",
     context_path = "/api",
     tag = "Users",
-    operation_id = "UserInvitations",
+    operation_id = "DeclineUserInvitation",
+    summary = "Decline an invitation",
     security(
         ("Authorization"= [])
     ),
@@ -1251,7 +1271,11 @@ pub async fn list_invitations(Headers(user_email): Headers<UserEmail>) -> Respon
         ("token" = String, Path, description = "invitation token"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(UserList)),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn decline_invitation(
@@ -1316,8 +1340,29 @@ pub async fn decline_invitation(
 }
 
 #[cfg(not(feature = "cloud"))]
+#[utoipa::path(
+    delete,
+    path = "/invites/{token}",
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "DeclineUserInvitation",
+    summary = "Decline an invitation",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("token" = String, Path, description = "invitation token"),
+      ),
+    responses(
+        (status = 403, description = "Invitations are only supported in the cloud edition", content_type = "application/json", body = String, example = json!("Not Supported")),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn decline_invitation(
-    Headers(_): Headers<UserEmail>,
+    Headers(_user_email): Headers<UserEmail>,
     Path(_token): Path<String>,
 ) -> Response {
     Response::builder()
@@ -1328,7 +1373,29 @@ pub async fn decline_invitation(
 }
 
 #[cfg(not(feature = "cloud"))]
-pub async fn list_invitations(Headers(_): Headers<UserEmail>) -> Response {
+#[utoipa::path(
+    get,
+    path = "/invites",
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "UserInvitations",
+    summary = "List user invitations",
+    description = "Retrieves a list of pending organization invitations for the authenticated user across different \
+                   organizations. Shows invitation details including organization names, invited roles, expiration \
+                   dates, and invitation status. Users can review and accept invitations to join new organizations \
+                   with appropriate access permissions.",
+    security(
+        ("Authorization"= [])
+    ),
+    responses(
+        (status = 403, description = "Invitations are only supported in the cloud edition", content_type = "application/json", body = String, example = json!("Not Supported")),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn list_invitations(Headers(_user_email): Headers<UserEmail>) -> Response {
     Response::builder()
         .status(StatusCode::FORBIDDEN)
         .header(header::CONTENT_TYPE, "application/json")

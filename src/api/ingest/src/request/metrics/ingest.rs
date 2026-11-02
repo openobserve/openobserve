@@ -112,6 +112,9 @@ pub async fn json(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PostMetrics",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Ingest metrics via OTLP",
     description = "Ingests metrics data using OpenTelemetry Protocol (OTLP) format. Supports both Protocol Buffers and JSON \
                    content types for OTLP metrics ingestion. This is the standard endpoint for OpenTelemetry SDK and \
@@ -120,6 +123,7 @@ pub async fn json(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
     request_body(description = "ExportMetricsServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
+    security(("Authorization" = [])),
     responses(
         (status = 200, description = "ExportMetricsServiceResponse", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 206, description = "ExportMetricsServiceResponse with a partial success (JSON requests only)", content((Object = "application/json"))),
