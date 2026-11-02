@@ -5446,7 +5446,7 @@
     "functionAlreadyAssociated": "함수가 이미 연결되어 있습니다",
     "atLeastOneCondition": "조건을 하나 이상 추가하세요",
     "fillAllConditionFields": "모든 조건 필드를 입력하세요(열, 연산자, 값은 필수입니다)",
-    "selectExternalDestination": "목록에서 외부 대상을 선택하세요.",
+    "selectExternalDestination": "목록에서 외부 대상을 선택하세요",
     "backfillNumericRange": "{min}에서 {max} 사이여야 합니다",
     "selectValidTimeRange": "유효한 시간 범위를 선택하세요",
     "startBeforeEndTime": "시작 시간은 종료 시간 이전이어야 합니다.",

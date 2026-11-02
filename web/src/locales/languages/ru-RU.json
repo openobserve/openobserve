@@ -5446,7 +5446,7 @@
     "functionAlreadyAssociated": "Функция уже связана",
     "atLeastOneCondition": "Добавьте хотя бы одно условие",
     "fillAllConditionFields": "Заполните все поля условия (столбец, оператор и значение обязательны)",
-    "selectExternalDestination": "Выберите внешнего получателя из списка",
+    "selectExternalDestination": "Пожалуйста, выберите внешнего получателя из списка",
     "backfillNumericRange": "Должно быть от {min} до {max}",
     "selectValidTimeRange": "Выберите допустимый временной диапазон",
     "startBeforeEndTime": "Время начала должно быть раньше времени окончания",

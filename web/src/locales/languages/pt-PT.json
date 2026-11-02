@@ -5446,7 +5446,7 @@
     "functionAlreadyAssociated": "A função já está associada",
     "atLeastOneCondition": "Adicione pelo menos uma condição",
     "fillAllConditionFields": "Preencha todos os campos da condição (coluna, operador e valor são obrigatórios)",
-    "selectExternalDestination": "Selecione o destino externo da lista",
+    "selectExternalDestination": "Selecione um destino externo da lista",
     "backfillNumericRange": "Deve estar entre {min} e {max}",
     "selectValidTimeRange": "Selecione um intervalo de tempo válido",
     "startBeforeEndTime": "A hora de início deve ser antes da hora de fim",
