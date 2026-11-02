@@ -519,9 +519,9 @@ def test_ing44_negative_value_kept(client: OpenObserveClient, prof_stream: str):
 
 def test_ing45_too_many_columns_rejected(client: OpenObserveClient, prof_stream: str):
     b = ProfilesBuilder()
-    # The ENT workflow raises ZO_COLS_PER_RECORD_LIMIT to 80000; the server default is 1000.
-    limit = int(os.environ.get("ZO_COLS_PER_RECORD_LIMIT") or 1000)
-    attrs = {f"extra.attr_{i:05d}": f"v{i}" for i in range(limit + 10)}
+    # The server's limit; CI may raise it from the default of 1000.
+    limit = int(os.environ.get("ZO_COLS_PER_RECORD_LIMIT", "1000"))
+    attrs = {f"extra.attr_{i:06d}": f"v{i}" for i in range(limit + 10)}
     resp = ingest_json(client, prof_stream, to_json(_one_profile(b, [b.sample(["wide_leaf"], values=[1])], attrs)))
     assert resp.status_code == 400, resp.text[:500]
     assert resp.json()["code"] == 3
