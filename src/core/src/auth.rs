@@ -224,6 +224,37 @@ pub struct UserEmail {
     pub user_id: String,
 }
 
+/// A per-object GET check, taken as a trait so tests can stand in for OpenFGA.
+#[cfg(feature = "enterprise")]
+pub trait ReadCheck {
+    fn can_read(&self, resource: &str, object_id: &str) -> impl Future<Output = bool> + Send;
+}
+
+/// One user's reads in one org, checked as the `GET /{org}/{resource}/{id}` routes check them.
+#[cfg(feature = "enterprise")]
+pub struct UserReads<'a> {
+    pub org_id: &'a str,
+    pub user_id: &'a str,
+}
+
+#[cfg(feature = "enterprise")]
+impl ReadCheck for UserReads<'_> {
+    async fn can_read(&self, resource: &str, object_id: &str) -> bool {
+        check_permissions(
+            object_id,
+            self.org_id,
+            self.user_id,
+            resource,
+            "GET",
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AuthExtractor {
     pub auth: String,
@@ -769,6 +800,22 @@ pub async fn check_permissions(
         .await;
     }
     true
+}
+
+/// The first object `reads` refuses, asking once per distinct trimmed id.
+#[cfg(feature = "enterprise")]
+pub async fn first_unreadable<'a>(
+    objects: &[(&'static str, &'a str)],
+    reads: &impl ReadCheck,
+) -> Option<(&'static str, &'a str)> {
+    let mut asked = std::collections::HashSet::new();
+    for &(resource, id) in objects {
+        let id = id.trim();
+        if asked.insert((resource, id)) && !reads.can_read(resource, id).await {
+            return Some((resource, id));
+        }
+    }
+    None
 }
 
 // OSS has no folder boundary to cross, so this allows where the `check_permissions`
