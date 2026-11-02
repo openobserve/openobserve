@@ -235,6 +235,49 @@ pub async fn delete<C: ConnectionTrait>(conn: &C, org_id: &str, anomaly_id: &str
     Ok(())
 }
 
+/// Open the alert episode at `candidate_us` unless one is open; returns the episode's start.
+pub async fn open_alert_episode<C: ConnectionTrait>(
+    conn: &C,
+    anomaly_id: &str,
+    candidate_us: i64,
+) -> Result<i64> {
+    anomaly_detection_config::Entity::update_many()
+        .col_expr(
+            anomaly_detection_config::Column::AlertEpisodeStartedAt,
+            sea_orm::sea_query::Expr::value(candidate_us),
+        )
+        .filter(anomaly_detection_config::Column::AnomalyId.eq(anomaly_id))
+        .filter(anomaly_detection_config::Column::AlertEpisodeStartedAt.is_null())
+        .exec(conn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    let row = anomaly_detection_config::Entity::find_by_id(anomaly_id)
+        .one(conn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    Ok(row
+        .and_then(|r| r.alert_episode_started_at)
+        .unwrap_or(candidate_us))
+}
+
+/// Close the alert episode and the owed recovery in one statement, inside the fan out transaction.
+pub async fn clear_alert_episode<C: ConnectionTrait>(conn: &C, anomaly_id: &str) -> Result<()> {
+    anomaly_detection_config::Entity::update_many()
+        .col_expr(
+            anomaly_detection_config::Column::AlertEpisodeStartedAt,
+            sea_orm::sea_query::Expr::value(Option::<i64>::None),
+        )
+        .col_expr(
+            anomaly_detection_config::Column::LastRecoveryNotifiedAt,
+            sea_orm::sea_query::Expr::value(Option::<i64>::None),
+        )
+        .filter(anomaly_detection_config::Column::AnomalyId.eq(anomaly_id))
+        .exec(conn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    Ok(())
+}
+
 pub async fn delete_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<()> {
     anomaly_detection_config::Entity::delete_many()
         .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
@@ -307,6 +350,7 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     // destinations, so a peer's fire time must not suppress a local alert.
     // last_recovery_notified_at is NOT patched, for the same reason one step later: a peer's
     // pending mark would recover an alert this region's destinations never received.
+    // alert_episode_started_at is NOT patched: it keys this region's own delivery ledger.
     // detection_lease_us is NOT patched: it is this region's in-flight detection run.
 }
 
@@ -355,6 +399,7 @@ fn into_active_model(mut m: Model) -> anomaly_detection_config::ActiveModel {
     m.last_failed_at = None;
     m.last_alert_fired_at = None;
     m.last_recovery_notified_at = None;
+    m.alert_episode_started_at = None;
     m.detection_lease_us = None;
     // For inserts the PK must be Set (it is not auto-increment).
     // `into_active_model()` sets every field including PK as Set, which is
@@ -427,6 +472,7 @@ mod tests {
             last_failed_at: None,
             last_alert_fired_at: None,
             last_recovery_notified_at: None,
+            alert_episode_started_at: None,
             detection_lease_us: None,
             last_updated: 0,
             created_at: 1_000_000,
@@ -656,6 +702,7 @@ mod tests {
             last_failed_at,
             last_alert_fired_at,
             last_recovery_notified_at,
+            alert_episode_started_at,
             detection_lease_us,
             last_updated,
             created_at,
@@ -720,6 +767,8 @@ mod tests {
             // Pending state for an alert this region delivered; a peer's mark would recover
             // an alert local destinations never received, or cancel one they did.
             ("last_recovery_notified_at", Scope::RegionLocal),
+            // Keys this region's delivery ledger, which never replicates.
+            ("alert_episode_started_at", Scope::RegionLocal),
             // A peer's in-flight run must neither block nor release this region's detection.
             ("detection_lease_us", Scope::RegionLocal),
             ("last_updated", Scope::Replicated),
@@ -778,6 +827,7 @@ mod tests {
             last_failed_at: Some(1_700_000_000_000_001),
             last_alert_fired_at: Some(1_700_000_000_000_002),
             last_recovery_notified_at: Some(1_700_000_000_000_003),
+            alert_episode_started_at: Some(1_700_000_000_000_005),
             detection_lease_us: Some(1_700_000_000_000_004),
             last_updated: 21,
             created_at: 9_999_999,
@@ -806,6 +856,7 @@ mod tests {
         local.last_failed_at = Some(1_700_000_000_000_900);
         local.last_alert_fired_at = Some(1_700_000_000_000_800);
         local.last_recovery_notified_at = Some(1_700_000_000_000_700);
+        local.alert_episode_started_at = Some(1_700_000_000_000_600);
         let peer = peer_model();
 
         let mut active = local.clone().into_active_model();
@@ -843,6 +894,7 @@ mod tests {
                                 | "last_failed_at"
                                 | "last_alert_fired_at"
                                 | "last_recovery_notified_at"
+                                | "alert_episode_started_at"
                                 | "detection_lease_us"
                         ),
                         "{field} was relabelled region-local; that is a replication change"

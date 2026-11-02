@@ -1307,6 +1307,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
+        o2_enterprise::enterprise::anomaly_detection::query_executor::register_recovery_sender(
+            |recovery| {
+                Box::pin(async move {
+                    openobserve_core::anomaly_detection::resolve_anomaly_episode(recovery).await
+                })
+            },
+        );
+
         if get_o2_config().downtimes.enabled {
             o2_enterprise::enterprise::anomaly_detection::query_executor::register_is_muted(
                 openobserve_core::anomaly_detection::downtime_is_muted,

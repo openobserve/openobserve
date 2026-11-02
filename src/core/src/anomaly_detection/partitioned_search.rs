@@ -1939,6 +1939,7 @@ mod tests {
             last_failed_at: None,
             last_alert_fired_at: None,
             last_recovery_notified_at: None,
+            alert_episode_started_at: None,
             detection_lease_us: None,
             last_updated: 0,
             created_at: 0,

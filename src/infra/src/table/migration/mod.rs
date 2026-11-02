@@ -249,6 +249,7 @@ mod m20261030_000001_create_org_domain_ownership_table;
 mod m20261030_000002_create_org_domain_ownership_req_table;
 mod m20261101_000001_create_oncall_slack;
 mod m20261110_000001_create_notification_deliveries;
+mod m20261110_000002_add_anomaly_alert_episode;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -779,6 +780,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261030_000002_create_org_domain_ownership_req_table::Migration),
             Box::new(m20261101_000001_create_oncall_slack::Migration),
             Box::new(m20261110_000001_create_notification_deliveries::Migration),
+            Box::new(m20261110_000002_add_anomaly_alert_episode::Migration),
         ]
     }
 }
@@ -880,6 +882,7 @@ mod tests {
         ),
         (132, "m20261101_000001_create_oncall_slack"),
         (133, "m20261110_000001_create_notification_deliveries"),
+        (134, "m20261110_000002_add_anomaly_alert_episode"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

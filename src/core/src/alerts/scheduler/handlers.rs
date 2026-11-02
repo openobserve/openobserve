@@ -2026,9 +2026,7 @@ async fn handle_anomaly_detection_triggers(
                     (
                         anomaly_run_status(&run),
                         run.notify_error.clone(),
-                        Some(
-                            serde_json::json!({ "anomalies_found": run.anomaly_count }).to_string(),
-                        ),
+                        Some(anomaly_success_response(&run)),
                         run.gate_passed,
                     )
                 }
@@ -2108,6 +2106,20 @@ async fn handle_anomaly_detection_triggers(
     db::scheduler::update_trigger(trigger, true, "").await?;
 
     Ok(())
+}
+
+/// The run's history payload, with the ledger keys its delivery panel filters by.
+#[cfg(feature = "enterprise")]
+pub(crate) fn anomaly_success_response(
+    run: &o2_enterprise::enterprise::anomaly_detection::scheduler::DetectionRunOutcome,
+) -> String {
+    serde_json::json!({
+        "anomalies_found": run.anomaly_count,
+        "notification_episode_id": run.notification_episode_id,
+        "notification_event": run.notification_event,
+        "notification_note": run.notification_note,
+    })
+    .to_string()
 }
 
 /// The model executed: anomalies found (delivered or not), none found, or muted by a downtime.
@@ -9349,6 +9361,7 @@ mod tests {
             claim_lost,
             ineligible,
             suppressed_by: None,
+            ..Default::default()
         };
         assert_eq!(
             anomaly_run_status(&run(true, true, true, false)),
