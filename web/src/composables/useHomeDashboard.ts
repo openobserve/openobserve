@@ -149,7 +149,9 @@ export function useHomeDashboard(t: TranslateFn) {
       homeDashboard.value = updated;
       if (org) {
         settings
-          .setOrgSetting(org, SETTING_KEY, updated, SETTING_CATEGORY)
+          .setOrgSetting(org, SETTING_KEY, updated, SETTING_CATEGORY, undefined, {
+            silentForbidden: true,
+          })
           .then(() => queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), updated))
           .catch(() => {
             /* label persist is best-effort; ref already shows the fresh label */

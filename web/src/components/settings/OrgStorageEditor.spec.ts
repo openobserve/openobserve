@@ -345,4 +345,23 @@ describe("OrgStorageEditor", () => {
       });
     });
   });
+  it("closes its loading toast when the save is refused with a 403", async () => {
+    const dismissLoading = vi.fn();
+    mockToast.mockReturnValueOnce(dismissLoading);
+    mockCreate.mockRejectedValueOnce({ response: { status: 403 } });
+    const wrapper = createWrapper("add");
+    await selectProvider(wrapper, "AwsCredentials");
+    const form = getForm(wrapper);
+    form.setFieldValue("bucket_name", "my-bucket");
+    form.setFieldValue("region", "us-east-1");
+    form.setFieldValue("access_key", "AKIA123");
+    form.setFieldValue("secret_key", "secret123");
+    await nextTick();
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(dismissLoading).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledTimes(1);
+  });
 });

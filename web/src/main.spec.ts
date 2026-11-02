@@ -6,6 +6,8 @@ const isStaleChunkError = vi.hoisted(() => vi.fn());
 const toast = vi.hoisted(() => vi.fn());
 const logsInit = vi.hoisted(() => vi.fn());
 const setInitialVersion = vi.hoisted(() => vi.fn());
+const bindAccess = vi.hoisted(() => vi.fn());
+const appMount = vi.hoisted(() => vi.fn());
 
 vi.mock("@/services/config.queries", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/config.queries")>()),
@@ -13,7 +15,7 @@ vi.mock("@/services/config.queries", async (importOriginal) => ({
 }));
 vi.mock("vue", async (importOriginal) => {
   const actual = await importOriginal<typeof import("vue")>();
-  const app = { use: () => app, mount: vi.fn() };
+  const app = { use: () => app, mount: appMount };
   return { ...actual, createApp: () => app };
 });
 vi.mock("@tanstack/vue-query", () => ({ VueQueryPlugin: {} }));
@@ -63,6 +65,10 @@ vi.mock("./composables/query/queryClient", () => ({
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
 vi.mock("@/utils/themeManager", () => ({ bootstrapTheme: vi.fn() }));
+vi.mock("@/composables/useAccessStore", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/useAccessStore")>()),
+  bindAccess,
+}));
 
 // main.ts boots the whole app on import, which can outlast the default hook timeout on a busy runner.
 beforeAll(async () => {
@@ -71,6 +77,20 @@ beforeAll(async () => {
     timeout: 20000,
   });
 }, 60000);
+
+describe("main.ts access store", () => {
+  it("binds the access store to the app's router and store before the app mounts", async () => {
+    const store = (await import("./stores")).default;
+    expect(bindAccess).toHaveBeenCalledTimes(1);
+    const [router, boundStore] = bindAccess.mock.calls[0];
+    expect(router.onError).toBe(routerOnError);
+    expect(boundStore).toBe(store);
+    await vi.waitFor(() => expect(appMount).toHaveBeenCalled());
+    expect(bindAccess.mock.invocationCallOrder[0]).toBeLessThan(
+      appMount.mock.invocationCallOrder[0],
+    );
+  });
+});
 
 describe("main.ts RUM", () => {
   it("does not start the RUM or logs SDK from the unauthenticated bootstrap config", () => {
