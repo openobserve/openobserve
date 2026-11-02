@@ -54,7 +54,7 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use proto::cluster_rpc::SearchQuery;
-use result_utils::get_ts_value;
+use result_utils::{get_ts_value, is_timestamp_field};
 use tracing::Instrument;
 use transform::{get_all_transform_keys, init_vrl_runtime};
 use usage_reporting::{http_report_metrics, report_request_usage_stats};
@@ -71,7 +71,7 @@ pub mod multi;
 pub mod result_utils;
 
 // Define cache version
-const CACHE_VERSION: &str = "v3";
+const CACHE_VERSION: &str = "v4";
 
 /// The hits a search was about to return when redaction could not run on them.
 #[cfg(any(feature = "vectorscan", test))]
@@ -932,9 +932,7 @@ fn sort_response(
 
     let compare = |a: &serde_json::Value, b: &serde_json::Value| {
         for (field, order) in order_by {
-            // ORDER BY _timestamp sorts by the result time column when the
-            // query aliases it, e.g. `SELECT _timestamp AS ts ... ORDER BY _timestamp`
-            let cmp = if ts_column == field || field == TIMESTAMP_COL_NAME {
+            let cmp = if is_timestamp_field(field, ts_column) {
                 let a_ts = get_ts_value(ts_column, a);
                 let b_ts = get_ts_value(ts_column, b);
                 a_ts.partial_cmp(&b_ts).unwrap_or(std::cmp::Ordering::Equal)
@@ -1869,8 +1867,7 @@ mod tests {
         resp.hits.iter().map(|h| get_ts_value("ts", h)).collect()
     }
 
-    // #16175: `SELECT _timestamp AS ts ... ORDER BY _timestamp DESC` keeps the raw
-    // name in order_by while the hits only carry the alias
+    // #16175: order_by keeps `_timestamp` while the hits carry only the alias `ts`
     #[test]
     fn test_sort_response_orders_by_aliased_timestamp() {
         let mut resp = response_with_alias_ts(&[10, 30, 20]);

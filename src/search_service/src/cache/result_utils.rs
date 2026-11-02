@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::{json, time::parse_str_to_timestamp_micros_as_option};
+use config::{
+    TIMESTAMP_COL_NAME,
+    utils::{json, time::parse_str_to_timestamp_micros_as_option},
+};
 
 pub fn get_ts_value(ts_column: &str, record: &json::Value) -> i64 {
     match record.get(ts_column) {
@@ -29,14 +32,17 @@ pub fn get_ts_value(ts_column: &str, record: &json::Value) -> i64 {
 }
 
 /// Checks if a field name matches the timestamp column, accounting for quoted names.
+/// The raw `_timestamp` also matches, because ORDER BY keeps it when the query aliases it.
 ///
 /// # Examples
 /// - `is_timestamp_field("_timestamp", "_timestamp")` returns `true`
 /// - `is_timestamp_field("\"_timestamp\"", "_timestamp")` returns `true`
+/// - `is_timestamp_field("_timestamp", "ts")` returns `true`
 /// - `is_timestamp_field("count", "_timestamp")` returns `false`
 #[inline]
 pub fn is_timestamp_field(field: &str, ts_column: &str) -> bool {
-    field == ts_column || field.trim_matches('"') == ts_column
+    let field = field.trim_matches('"');
+    field == ts_column || field == TIMESTAMP_COL_NAME
 }
 
 /// Checks if ORDER BY clause contains any non-timestamp columns.
@@ -139,6 +145,8 @@ mod tests {
     fn test_is_timestamp_field_exact_match() {
         assert!(is_timestamp_field("_timestamp", "_timestamp"));
         assert!(!is_timestamp_field("other", "_timestamp"));
+        assert!(is_timestamp_field("_timestamp", "ts"));
+        assert!(!is_timestamp_field("other", "ts"));
     }
 
     #[test]
