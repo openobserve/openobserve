@@ -197,6 +197,10 @@ class FleetSeed {
     return { id: body.id };
   }
 
+  async setFleetSettings(fleetId, settings) {
+    return await this.ok('PUT', `/fleet/fleets/${fleetId}/settings`, settings, `set settings of fleet ${fleetId}`);
+  }
+
   async waitForRolloutStatus(rolloutId, status) {
     await expect
       .poll(async () => (await this.call('GET', `/fleet/rollouts/${rolloutId}`)).body?.status, {

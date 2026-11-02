@@ -167,6 +167,12 @@ class FleetConfigPage {
     await dialog.locator(this.dialogPrimaryBtn).click();
   }
 
+  async expectPublishEnabled(enabled) {
+    const publish = this.page.locator(this.publishBtn);
+    if (enabled) await expect(publish).toBeEnabled({ timeout: PAGE_TIMEOUT_MS });
+    else await expect(publish).toBeDisabled({ timeout: PAGE_TIMEOUT_MS });
+  }
+
   async expectModeChip(text) {
     await expect(this.page.locator(this.modeChip)).toHaveText(text, { timeout: PAGE_TIMEOUT_MS });
   }

@@ -148,4 +148,20 @@ test.describe('Fleet management Add collector', { tag: ['@fleet', '@enterprise',
     const lines = FleetInstallPage.expectedInstallLines('linux', target);
     await pm.fleetInstallPage.expectCommandLines(lines);
   });
+
+  test('R-3311-9 · the token form leaves Max uses empty, so a token created with defaults has no enrollment limit', {
+    tag: ['@fleetInstall', '@regression', '@P2'],
+  }, async () => {
+    test.fail(true, 'o2-enterprise#3311 item 9: tokenDefaults() pre-fills Max uses with 100 although empty means unlimited');
+    const fleet = await pm.fleetSeed.createFleet('unlimited');
+    await pm.fleetManagerPage.gotoFleet({ tab: 'fleets', fleet: fleet.id });
+    await pm.fleetFleetsPage.openAddCollector();
+    await pm.fleetInstallPage.expectNoTokenState();
+    // Spec §5: maximum enrollments is optional; the field's help text says empty is unlimited.
+    await pm.fleetInstallPage.expectInlineMaxUses('');
+
+    const created = await pm.fleetInstallPage.createInlineTokenAndAwaitCollectorsPoll(pm.fleetSeed.fleetName('unlimited'));
+    expect(created.max_uses).not.toBe(100);
+    expect(created.max_uses).toBeNull();
+  });
 });
