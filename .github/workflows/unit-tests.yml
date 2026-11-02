@@ -73,8 +73,6 @@ jobs:
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -130,7 +128,9 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
+          # config::VERSION needs tags from git describe, which a shallow clone lacks; old blobs are not needed
           fetch-depth: 0
+          filter: blob:none
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -194,7 +194,9 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
+          # config::VERSION needs tags from git describe, which a shallow clone lacks; old blobs are not needed
           fetch-depth: 0
+          filter: blob:none
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -267,6 +269,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          filter: blob:none
 
       - uses: ./.github/actions/github-auth
       - name: Setup Node.js
@@ -307,6 +310,27 @@ jobs:
       - name: Install dependencies
         working-directory: web
         run: npm ci
+
+      # Cheapest first, so a failure skips the slower steps.
+      - name: Check token-file purity (token files contain tokens only)
+        working-directory: web
+        run: npm run lint:token-purity
+
+      - name: Check for undefined CSS custom properties
+        working-directory: web
+        run: npm run lint:tokens
+
+      - name: Lint styles (stylelint — bans legacy --o2-* tokens)
+        working-directory: web
+        run: npm run lint:styles
+
+      - name: Check design-consistency ratchet (strict — hardcoded/arbitrary/raw-token, no slack)
+        working-directory: web
+        run: npm run lint:design:strict
+
+      - name: Lint frontend code
+        working-directory: web
+        run: npm run lint:ci
 
       - name: Prettier format check (any unformatted file fails)
         working-directory: web
