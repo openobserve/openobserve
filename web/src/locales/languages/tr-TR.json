@@ -2053,8 +2053,11 @@
       "error": "Hata",
       "action": "Eylem",
       "view": "Görünüm",
-      "frustration": "Hayal kırıklığı"
+      "frustration": "Hayal kırıklığı",
+      "failedRequest": "Başarısız istekler",
+      "noResponse": "Yanıt yok"
     },
+    "replayCanvasNotRecorded": "Canvas içeriği kaydedilmedi",
     "actionOnTarget": "\"{target}\" üzerinde {action}",
     "errorWhileFetchingErrorEvents": "Hata olayları alınırken hata oluştu",
     "errorWhileFetchingSessionReplay": "Oturum tekrarı verileri alınırken hata oluştu",
@@ -11763,6 +11766,7 @@
       "recoveryResolvesIncident": "vakayı çözer",
       "recoveryClosesAlert": "uyarıyı kapatır",
       "recoveryChatMessage": "yeni \"Çözüldü\" mesajı",
+      "recoveryJiraComment": "açık bilete yorum ekler",
       "keepFiringFor": "Tetiklenmiş kalma süresi",
       "keepFiringForTooltip": "Koşul ortadan kalktıktan sonra düzelmiş sayılmadan önce bu kadar bekleyin. 0 hemen düzelmiş sayar.",
       "suppressRepeats": "Tekrarları bastır",
@@ -12071,7 +12075,37 @@
       "priorityP2": "P2 (Yüksek)",
       "priorityP3": "P3 (Orta)",
       "priorityP4": "P4 (Düşük)",
-      "priorityP5": "P5 (Bilgilendirme)"
+      "priorityP5": "P5 (Bilgilendirme)",
+      "jiraDescription": "Jira'da bilet oluşturun",
+      "jiraConnectSection": "Jira'ya Bağlan",
+      "jiraType": "Jira Türü",
+      "jiraCloud": "Jira Cloud",
+      "jiraDataCenter": "Jira Data Center",
+      "jiraUrl": "Jira URL'si",
+      "jiraUrlHelp": "Jira site adresiniz, örneğin {example}",
+      "jiraUrlFormat": "https:// veya http:// ile başlayan bir URL girin",
+      "jiraEmail": "E-posta",
+      "jiraApiToken": "API Token",
+      "jiraPersonalAccessToken": "Kişisel Erişim Token",
+      "jiraTokenRequired": "Token gerekli",
+      "jiraTokenTip": "Yalnızca bu projeyi görebilen bir bot hesabı kullanın.",
+      "jiraConnect": "Bağlan",
+      "jiraConnectedSummary": "{host} adresine {name} olarak bağlandı",
+      "jiraChange": "Değiştir",
+      "jiraConnectMissing": "Yukarıdaki alanları doldurun, ardından bağlanın.",
+      "jiraTicketsSection": "Biletlerin Gideceği Yer",
+      "jiraProject": "Proje",
+      "jiraIssueType": "Sorun Türü",
+      "jiraPriority": "Öncelik",
+      "jiraDefaultPriority": "Jira Varsayılanı",
+      "jiraRequiredFields": "Zorunlu Jira Alanları",
+      "jiraRequiredFieldHelp": "Bu sorun türü için Jira tarafından zorunlu tutulur",
+      "jiraUnsupportedField": "Jira, {issueType} için '{field}' alanını zorunlu tutuyor. OpenObserve bu alan türünü dolduramaz. Başka bir sorun türü seçin veya Jira yöneticinizden bu alanı isteğe bağlı yapmasını isteyin.",
+      "jiraCreateScreenNotLoaded": "Bu sorun türü için oluşturma ekranı yüklenmedi. Yüklenmesini bekleyin veya sorun türünü yeniden seçin.",
+      "jiraLabelsMissing": "{project} içindeki {issueType} için oluşturma ekranında Labels alanı yok. OpenObserve'un biletlerini bulması için bu alana ihtiyacı var. Jira yöneticinizden bu alanı eklemesini isteyin.",
+      "jiraBehavior": "Kurtarma bir yorum ekler ve bileti kapatmaz.",
+      "jiraTestCreated": "{key} oluşturuldu. Jira'da silebilirsiniz.",
+      "jiraOpenIssue": "Jira'da Aç"
     },
     "lastRun": "Son çalıştırma: {time}",
     "retryTraining": "Modeli yeniden eğitin ve tespiti yeniden çalıştırın",
@@ -13512,7 +13546,14 @@
       "pagerdutyDescription": "PagerDuty'de vakalar oluştur",
       "opsgenieDescription": "Opsgenie'de uyarılar oluştur",
       "servicenowDescription": "ServiceNow'da vakalar oluştur",
-      "slackAppDescription": "Zamanlanmış uyarıları yerinde günceller. Slack üzerinden onaylayın, sessize alın ve inceleyin. Bağlı bir çalışma alanı gerekir."
+      "slackAppRecommendedDescription": "Uyarı yanıtı için önerilir. Planlanmış uyarıları yerinde günceller. Slack'ten onaylayın, sessize alın ve inceleyin. Bağlı bir çalışma alanı gerektirir.",
+      "slackAppShort": "Uyarılara göre işlem yap",
+      "chatPostsShort": "Sohbet gönderileri",
+      "emailShort": "HTML e-posta",
+      "pageOnCallShort": "Nöbetçiye çağrı gönder",
+      "servicenowShort": "BT vakaları",
+      "jiraShort": "Bilet oluştur",
+      "customShort": "URL veya e-posta"
     },
     "import": {
       "title": "Hedefi İçe Aktar",
@@ -13758,6 +13799,15 @@
       "allTitle": "Bu aralıkta verisi olmayanlar dahil her metrik",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "Gösterge panoları",
+      "sortDashboardsTitle": "Gösterge panolarında en çok kullanılanlar önce",
+      "sortAlerts": "Uyarılar",
+      "sortAlertsTitle": "Uyarılarda en çok kullanılanlar önce",
+      "usageInDashboards": "Gösterge panolarında",
+      "usageHasAlerts": "Uyarıları var",
+      "usageInSlos": "SLO'larda",
+      "usageLoading": "Metriklerin kullanıldığı yerler yükleniyor",
+      "usageFailed": "Kullanım bilgisi kullanılamıyor, yeniden deneyin",
       "viewGrid": "Izgara",
       "viewRows": "Satırlar",
       "modeExplore": "Keşfet",
@@ -13891,16 +13941,7 @@
         "deleteMessage": "Bu kuruluştaki herkes için {name} görünümü silinsin mi?",
         "modified": "{name} (değiştirildi)",
         "clear": "Görünümü temizle"
-      },
-      "sortDashboards": "Gösterge panoları",
-      "sortDashboardsTitle": "Gösterge panolarında en çok kullanılanlar önce",
-      "sortAlerts": "Uyarılar",
-      "sortAlertsTitle": "Uyarılarda en çok kullanılanlar önce",
-      "usageInDashboards": "Gösterge panolarında",
-      "usageHasAlerts": "Uyarıları var",
-      "usageInSlos": "SLO'larda",
-      "usageLoading": "Metriklerin kullanıldığı yerler yükleniyor",
-      "usageFailed": "Kullanım bilgisi kullanılamıyor, yeniden deneyin"
+      }
     },
     "metricCard": {
       "lastRefreshed": "Son Yenileme:",
@@ -13927,6 +13968,17 @@
       "notEqualTo": "Eşit değil",
       "regexPattern": "Regex deseni (örn. prod.*)",
       "regexNotMatching": "Regex eşleşmiyor (örn. test.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR grubu",
+      "addGroupTooltip": "Bir filtre grubu ekleyin; bir seri, gruplardan herhangi biriyle eşleştiğinde eşleşir.",
+      "addToGroup": "Bu gruba filtre ekle",
+      "anyOf": "herhangi biri",
+      "andAnyOf": "ve herhangi biri",
+      "or": "veya",
+      "not": "değil",
+      "notTooltip": "Bu grubun tamamının eşleşmediği serilerle eşleş",
+      "tooManyBranches": "Bu filtreler {count} ayrı seçiciye genişler; en fazla {max} tanesi çalıştırılabilir. Değerleri tek bir regex filtresinde birleştirin veya bir grubu kaldırın."
     },
     "builderSwitch": {
       "unsupported": "Oluşturucu {construct} yapısını gösteremiyor",
@@ -13967,11 +14019,11 @@
         "byLabelsLabel": "Etiketlere Göre",
         "quantileLabel": "Kantil",
         "kLabel": "K",
-        "nearestMultipleLabel": "En yakın kat",
         "withoutLabel": "Hariç (bu etiketleri kaldır)",
         "withoutDesc": "Seçilen etiketleri toplulaştırarak kaldırın ve diğer tüm etiketleri koruyun",
         "offsetLabel": "Ofset",
-        "offsetDesc": "Metriğin ne kadar geriye dönük okunacağı, örn. 1h veya 1d"
+        "offsetDesc": "Metriğin ne kadar geriye dönük okunacağı, örn. 1h veya 1d",
+        "nearestMultipleLabel": "En yakın kat"
       },
       "rangeOnlyFirst": "Bir aralık fonksiyonu yalnızca ilk adım olabilir",
       "rangeOnlyFirstNote": "Bir aralık fonksiyonu ham örnekleri okur, bu nedenle yalnızca ilk adım olabilir. Bir tane eklemek için diğer adımları kaldırın.",
@@ -14041,17 +14093,6 @@
       "empty": "Henüz sorgu yok",
       "noMatch": "Arama veya yıldızlı filtresiyle eşleşen sorgu yok",
       "loadMore": "Daha fazla yükle"
-    },
-    "labelGroups": {
-      "addGroup": "+ OR grubu",
-      "addGroupTooltip": "Bir filtre grubu ekleyin; bir seri, gruplardan herhangi biriyle eşleştiğinde eşleşir.",
-      "addToGroup": "Bu gruba filtre ekle",
-      "anyOf": "herhangi biri",
-      "andAnyOf": "ve herhangi biri",
-      "or": "veya",
-      "not": "değil",
-      "notTooltip": "Bu grubun tamamının eşleşmediği serilerle eşleş",
-      "tooManyBranches": "Bu filtreler {count} ayrı seçiciye genişler; en fazla {max} tanesi çalıştırılabilir. Değerleri tek bir regex filtresinde birleştirin veya bir grubu kaldırın."
     }
   },
   "settings": {
@@ -21710,7 +21751,8 @@
         "longtask": "Uzun Görev",
         "view": "Görüntüle",
         "action": "İşlem",
-        "resource": "Kaynak"
+        "resource": "Kaynak",
+        "failedrequest": "Başarısız istek"
       },
       "subscriptionPlan": {
         "payasyougo": "Kullandıkça Öde",
@@ -22724,6 +22766,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "Metriği belirtilen süre önceki haliyle okur",
       "rateDoc": "Belirtilen zaman aralığında saniye başına ortalama artış hızını hesaplar",
       "irateDoc": "Son iki veri noktasına dayanarak saniye başına anlık artış hızını hesaplar",
       "increaseDoc": "Belirtilen zaman aralığındaki toplam artışı hesaplar",
@@ -22794,8 +22837,7 @@
       "moduloName": "Mod",
       "multiplyByName": "Çarpma",
       "divideByName": "Bölme",
-      "exponentName": "Üs",
-      "offsetDoc": "Metriği belirtilen süre önceki haliyle okur"
+      "exponentName": "Üs"
     }
   },
   "passwordPolicy": {
@@ -28177,7 +28219,6 @@
       "appTile": "{product} uygulaması",
       "webhookTile": "{product} webhook",
       "twoWay": "Çift yönlü",
-      "recommendedForAlertResponse": "Uyarı yanıtı için önerilir",
       "choiceHint": "Çağrılar ve süper kümeler webhook kullanır. Bir Slack uygulaması hedefinden yapılan manuel ve gerçek zamanlı gönderimler ayrı iletilerdir.",
       "unavailableReason": "Tek bir küme üzerinde Enterprise Slack uygulaması gerektirir",
       "unavailableFlag": "Bu sunucuda kapalı; operatörünüzden {variable} ayarlamasını isteyin",
@@ -28185,6 +28226,7 @@
       "unavailableCloud": "Bulut bölgeniz için henüz etkinleştirilmedi",
       "unavailableNoAccess": "Slack uygulamasını etkinleştirmesi için bir kuruluş yöneticisine başvurun",
       "postOnly": "Yalnızca gönder",
+      "off": "Kapalı",
       "switchToApp": "{product} uygulamasına geç",
       "switchThis": "Bu hedefi değiştir",
       "switchBack": "Geri dön",

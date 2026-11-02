@@ -2053,8 +2053,11 @@
       "error": "오류",
       "action": "작업",
       "view": "보기",
-      "frustration": "불만"
+      "frustration": "불만",
+      "failedRequest": "실패한 요청",
+      "noResponse": "응답 없음"
     },
+    "replayCanvasNotRecorded": "캔버스 콘텐츠가 기록되지 않았습니다",
     "actionOnTarget": "{action}: \"{target}\"",
     "errorWhileFetchingErrorEvents": "오류 이벤트를 가져오는 중 오류 발생",
     "errorWhileFetchingSessionReplay": "세션 리플레이 데이터를 가져오는 중 오류 발생",
@@ -11763,6 +11766,7 @@
       "recoveryResolvesIncident": "인시던트를 해결합니다",
       "recoveryClosesAlert": "알림을 종료합니다",
       "recoveryChatMessage": "새 \"해결됨\" 메시지",
+      "recoveryJiraComment": "열린 티켓에 댓글 작성",
       "keepFiringFor": "발생 유지 시간",
       "keepFiringForTooltip": "조건이 해제된 후 이 시간만큼 기다린 뒤 복구합니다. 0이면 즉시 복구합니다.",
       "suppressRepeats": "반복 억제",
@@ -12071,7 +12075,37 @@
       "priorityP2": "P2 (높음)",
       "priorityP3": "P3 (보통)",
       "priorityP4": "P4 (낮음)",
-      "priorityP5": "P5 (정보)"
+      "priorityP5": "P5 (정보)",
+      "jiraDescription": "Jira에서 티켓 생성",
+      "jiraConnectSection": "Jira 연결",
+      "jiraType": "Jira 유형",
+      "jiraCloud": "Jira Cloud",
+      "jiraDataCenter": "Jira Data Center",
+      "jiraUrl": "Jira URL",
+      "jiraUrlHelp": "Jira 사이트 주소입니다. 예: {example}",
+      "jiraUrlFormat": "https:// 또는 http://로 시작하는 URL을 입력하세요",
+      "jiraEmail": "이메일",
+      "jiraApiToken": "API 토큰",
+      "jiraPersonalAccessToken": "개인 액세스 토큰",
+      "jiraTokenRequired": "토큰은 필수입니다",
+      "jiraTokenTip": "이 프로젝트만 볼 수 있는 봇 계정을 사용하세요.",
+      "jiraConnect": "연결",
+      "jiraConnectedSummary": "{host}에 {name}(으)로 연결됨",
+      "jiraChange": "변경",
+      "jiraConnectMissing": "위 필드를 입력한 후 연결하세요.",
+      "jiraTicketsSection": "티켓 생성 위치",
+      "jiraProject": "프로젝트",
+      "jiraIssueType": "이슈 유형",
+      "jiraPriority": "우선순위",
+      "jiraDefaultPriority": "Jira 기본값",
+      "jiraRequiredFields": "필수 Jira 필드",
+      "jiraRequiredFieldHelp": "이 이슈 유형에 대해 Jira에서 요구하는 필수 필드",
+      "jiraUnsupportedField": "Jira는 {issueType}에 '{field}' 필드를 필수로 요구합니다. OpenObserve는 이 필드 유형을 채울 수 없습니다. 다른 이슈 유형을 선택하거나 Jira 관리자에게 선택 사항으로 만들어 달라고 요청하세요.",
+      "jiraCreateScreenNotLoaded": "이 이슈 유형의 생성 화면이 로드되지 않았습니다. 로드될 때까지 기다리거나 이슈 유형을 다시 선택하세요.",
+      "jiraLabelsMissing": "{project}의 {issueType} 생성 화면에 Labels 필드가 없습니다. OpenObserve가 티켓을 찾으려면 이 필드가 필요합니다. Jira 관리자에게 추가해 달라고 요청하세요.",
+      "jiraBehavior": "복구 시 댓글을 추가하며 티켓을 닫지 않습니다.",
+      "jiraTestCreated": "{key} 생성됨. Jira에서 삭제할 수 있습니다.",
+      "jiraOpenIssue": "Jira에서 열기"
     },
     "lastRun": "마지막 실행: {time}",
     "retryTraining": "모델을 재학습하고 탐지를 다시 실행하세요.",
@@ -13512,7 +13546,14 @@
       "pagerdutyDescription": "PagerDuty에 인시던트 생성",
       "opsgenieDescription": "Opsgenie에 알림 생성",
       "servicenowDescription": "ServiceNow에 인시던트 생성",
-      "slackAppDescription": "예약된 알림을 제자리에서 업데이트합니다. Slack에서 확인, 음소거, 조사할 수 있습니다. 연결된 워크스페이스가 필요합니다."
+      "slackAppRecommendedDescription": "알림 대응에 권장됩니다. 예약된 알림을 그 자리에서 업데이트합니다. Slack에서 확인, 음소거 및 조사할 수 있습니다. 연결된 워크스페이스가 필요합니다.",
+      "slackAppShort": "알림 대응",
+      "chatPostsShort": "채팅 게시물",
+      "emailShort": "HTML 이메일",
+      "pageOnCallShort": "온콜 호출",
+      "servicenowShort": "IT 인시던트",
+      "jiraShort": "이슈 티켓",
+      "customShort": "URL 또는 이메일"
     },
     "import": {
       "title": "대상 가져오기",
@@ -13758,6 +13799,15 @@
       "allTitle": "이 범위에 데이터가 없는 메트릭을 포함한 모든 메트릭",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "대시보드",
+      "sortDashboardsTitle": "대시보드에서 가장 많이 사용된 순",
+      "sortAlerts": "알림",
+      "sortAlertsTitle": "알림에서 가장 많이 사용된 순",
+      "usageInDashboards": "대시보드에서 사용",
+      "usageHasAlerts": "알림 있음",
+      "usageInSlos": "SLO에서 사용",
+      "usageLoading": "메트릭 사용 위치를 불러오는 중",
+      "usageFailed": "사용 정보를 사용할 수 없음, 다시 시도",
       "viewGrid": "그리드",
       "viewRows": "행",
       "modeExplore": "탐색",
@@ -13891,16 +13941,7 @@
         "deleteMessage": "이 조직의 모든 사용자에 대해 {name} 보기를 삭제하시겠습니까?",
         "modified": "{name} (수정됨)",
         "clear": "뷰 초기화"
-      },
-      "sortDashboards": "대시보드",
-      "sortDashboardsTitle": "대시보드에서 가장 많이 사용된 순",
-      "sortAlerts": "알림",
-      "sortAlertsTitle": "알림에서 가장 많이 사용된 순",
-      "usageInDashboards": "대시보드에서 사용",
-      "usageHasAlerts": "알림 있음",
-      "usageInSlos": "SLO에서 사용",
-      "usageLoading": "메트릭 사용 위치를 불러오는 중",
-      "usageFailed": "사용 정보를 사용할 수 없음, 다시 시도"
+      }
     },
     "metricCard": {
       "lastRefreshed": "마지막 새로고침:",
@@ -13927,6 +13968,17 @@
       "notEqualTo": "같지 않음",
       "regexPattern": "정규식 패턴 (예: prod.*)",
       "regexNotMatching": "정규식 불일치 (예: test.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR 그룹",
+      "addGroupTooltip": "필터 그룹을 추가합니다. 시리즈는 그룹 중 하나라도 일치하면 일치합니다",
+      "addToGroup": "이 그룹에 필터 추가",
+      "anyOf": "다음 중 하나",
+      "andAnyOf": "그리고 다음 중 하나",
+      "or": "또는",
+      "not": "아님",
+      "notTooltip": "이 그룹 전체와 일치하지 않는 시리즈를 일치시킵니다",
+      "tooManyBranches": "이 필터는 {count}개의 개별 선택자로 확장됩니다. 최대 {max}개만 실행할 수 있습니다. 값을 하나의 정규식 필터로 병합하거나 그룹을 제거하세요."
     },
     "builderSwitch": {
       "unsupported": "빌더에서 {construct}을(를) 표시할 수 없습니다",
@@ -13967,11 +14019,11 @@
         "byLabelsLabel": "레이블별",
         "quantileLabel": "분위수",
         "kLabel": "K",
-        "nearestMultipleLabel": "가장 가까운 배수",
         "withoutLabel": "제외 (이 레이블 제거)",
         "withoutDesc": "선택한 레이블을 집계에서 제외하고 나머지 레이블은 모두 유지합니다",
         "offsetLabel": "오프셋",
-        "offsetDesc": "메트릭을 얼마나 이전 시점까지 읽을지, 예: 1h 또는 1d"
+        "offsetDesc": "메트릭을 얼마나 이전 시점까지 읽을지, 예: 1h 또는 1d",
+        "nearestMultipleLabel": "가장 가까운 배수"
       },
       "rangeOnlyFirst": "범위 함수는 첫 번째 단계에만 올 수 있습니다",
       "rangeOnlyFirstNote": "범위 함수는 원시 샘플을 읽으므로 첫 번째 단계에만 올 수 있습니다. 추가하려면 다른 단계를 제거하세요.",
@@ -14041,17 +14093,6 @@
       "empty": "아직 쿼리가 없습니다",
       "noMatch": "검색 또는 즐겨찾기 필터와 일치하는 쿼리가 없습니다",
       "loadMore": "더 보기"
-    },
-    "labelGroups": {
-      "addGroup": "+ OR 그룹",
-      "addGroupTooltip": "필터 그룹을 추가합니다. 시리즈는 그룹 중 하나라도 일치하면 일치합니다",
-      "addToGroup": "이 그룹에 필터 추가",
-      "anyOf": "다음 중 하나",
-      "andAnyOf": "그리고 다음 중 하나",
-      "or": "또는",
-      "not": "아님",
-      "notTooltip": "이 그룹 전체와 일치하지 않는 시리즈를 일치시킵니다",
-      "tooManyBranches": "이 필터는 {count}개의 개별 선택자로 확장됩니다. 최대 {max}개만 실행할 수 있습니다. 값을 하나의 정규식 필터로 병합하거나 그룹을 제거하세요."
     }
   },
   "settings": {
@@ -21710,7 +21751,8 @@
         "longtask": "긴 작업",
         "view": "보기",
         "action": "작업",
-        "resource": "리소스"
+        "resource": "리소스",
+        "failedrequest": "실패한 요청"
       },
       "subscriptionPlan": {
         "payasyougo": "종량제",
@@ -22724,6 +22766,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "지정된 기간 전 시점의 메트릭을 읽습니다",
       "rateDoc": "지정된 시간 범위에 대한 초당 평균 증가율을 계산합니다",
       "irateDoc": "마지막 두 데이터 포인트를 기반으로 초당 순간 증가율을 계산합니다",
       "increaseDoc": "지정된 시간 범위에 대한 총 증가량을 계산합니다",
@@ -22794,8 +22837,7 @@
       "moduloName": "모듈로",
       "multiplyByName": "곱하기",
       "divideByName": "나누기",
-      "exponentName": "지수",
-      "offsetDoc": "지정된 기간 전 시점의 메트릭을 읽습니다"
+      "exponentName": "지수"
     }
   },
   "passwordPolicy": {
@@ -28177,7 +28219,6 @@
       "appTile": "{product} 앱",
       "webhookTile": "{product} 웹훅",
       "twoWay": "양방향",
-      "recommendedForAlertResponse": "알림 대응에 권장",
       "choiceHint": "호출 및 슈퍼 클러스터는 웹훅을 사용합니다. Slack 앱 대상에서의 수동 및 실시간 전송은 별도 게시물입니다.",
       "unavailableReason": "단일 클러스터에서 Enterprise Slack 앱이 필요합니다",
       "unavailableFlag": "이 서버에서는 꺼져 있습니다. 운영자에게 {variable} 설정을 요청하세요.",
@@ -28185,6 +28226,7 @@
       "unavailableCloud": "아직 해당 Cloud 리전에서 활성화되지 않았습니다.",
       "unavailableNoAccess": "조직 관리자에게 Slack 앱 활성화를 요청하세요.",
       "postOnly": "게시 전용",
+      "off": "꺼짐",
       "switchToApp": "{product} 앱으로 전환",
       "switchThis": "이 대상 전환",
       "switchBack": "되돌리기",

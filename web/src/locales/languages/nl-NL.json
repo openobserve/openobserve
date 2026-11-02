@@ -2053,8 +2053,11 @@
       "error": "Fout",
       "action": "Actie",
       "view": "Weergave",
-      "frustration": "Frustratie"
+      "frustration": "Frustratie",
+      "failedRequest": "Mislukte verzoeken",
+      "noResponse": "Geen antwoord"
     },
+    "replayCanvasNotRecorded": "Canvas-inhoud niet opgenomen",
     "actionOnTarget": "{action} op \"{target}\"",
     "errorWhileFetchingErrorEvents": "Fout bij het ophalen van foutgebeurtenissen",
     "errorWhileFetchingSessionReplay": "Fout bij het ophalen van sessie-replaygegevens",
@@ -11763,6 +11766,7 @@
       "recoveryResolvesIncident": "lost het incident op",
       "recoveryClosesAlert": "sluit het alarm",
       "recoveryChatMessage": "nieuw \"Opgelost\"-bericht",
+      "recoveryJiraComment": "Reageer op het open ticket",
       "keepFiringFor": "Blijf afgaan gedurende",
       "keepFiringForTooltip": "Wacht zo lang nadat de voorwaarde is verdwenen voordat wordt hersteld. 0 herstelt onmiddellijk.",
       "suppressRepeats": "Herhalingen onderdrukken",
@@ -12071,7 +12075,37 @@
       "priorityP2": "P2 (Hoog)",
       "priorityP3": "P3 (Matig)",
       "priorityP4": "P4 (Laag)",
-      "priorityP5": "P5 (Informatief)"
+      "priorityP5": "P5 (Informatief)",
+      "jiraDescription": "Tickets aanmaken in Jira",
+      "jiraConnectSection": "Verbinden met Jira",
+      "jiraType": "Jira-type",
+      "jiraCloud": "Jira Cloud",
+      "jiraDataCenter": "Jira Data Center",
+      "jiraUrl": "Jira-URL",
+      "jiraUrlHelp": "Het adres van je Jira-site, bijvoorbeeld {example}",
+      "jiraUrlFormat": "Voer een URL in die begint met https:// of http://",
+      "jiraEmail": "E-mail",
+      "jiraApiToken": "API-token",
+      "jiraPersonalAccessToken": "Persoonlijk toegangstoken",
+      "jiraTokenRequired": "Token is verplicht",
+      "jiraTokenTip": "Gebruik een botaccount dat alleen dit project kan zien.",
+      "jiraConnect": "Verbinden",
+      "jiraConnectedSummary": "Verbonden met {host} als {name}",
+      "jiraChange": "Wijzigen",
+      "jiraConnectMissing": "Vul de bovenstaande velden in en verbind daarna.",
+      "jiraTicketsSection": "Waar tickets naartoe gaan",
+      "jiraProject": "Project",
+      "jiraIssueType": "Issue-type",
+      "jiraPriority": "Prioriteit",
+      "jiraDefaultPriority": "Jira-standaard",
+      "jiraRequiredFields": "Vereiste Jira-velden",
+      "jiraRequiredFieldHelp": "Vereist door Jira voor dit issue-type",
+      "jiraUnsupportedField": "Jira vereist '{field}' voor {issueType}. OpenObserve kan dit veldtype niet invullen. Kies een ander issue-type of vraag je Jira-beheerder om het optioneel te maken.",
+      "jiraCreateScreenNotLoaded": "Het aanmaakscherm voor dit issue-type is niet geladen. Wacht totdat het is geladen of kies het issue-type opnieuw.",
+      "jiraLabelsMissing": "Het veld Labels staat niet op het aanmaakscherm voor {issueType} in {project}. OpenObserve heeft dit nodig om de eigen tickets te vinden. Vraag je Jira-beheerder om het toe te voegen.",
+      "jiraBehavior": "Bij herstel wordt een opmerking toegevoegd en wordt het ticket niet gesloten.",
+      "jiraTestCreated": "{key} aangemaakt. Je kunt het in Jira verwijderen.",
+      "jiraOpenIssue": "Openen in Jira"
     },
     "lastRun": "Laatste uitvoering: {time}",
     "retryTraining": "Model opnieuw trainen en detectie opnieuw uitvoeren",
@@ -13512,7 +13546,14 @@
       "pagerdutyDescription": "Maak incidenten aan in PagerDuty",
       "opsgenieDescription": "Maak alarmen aan in Opsgenie",
       "servicenowDescription": "Maak incidenten aan in ServiceNow",
-      "slackAppDescription": "Werkt geplande alarmen ter plaatse bij. Bevestig, demp en onderzoek vanuit Slack. Vereist een gekoppelde workspace."
+      "slackAppRecommendedDescription": "Aanbevolen voor alarmafhandeling. Werkt geplande alarmen ter plekke bij. Bevestig, demp en onderzoek vanuit Slack. Vereist een gekoppelde werkruimte.",
+      "slackAppShort": "Alarmen afhandelen",
+      "chatPostsShort": "Chatberichten",
+      "emailShort": "HTML-e-mail",
+      "pageOnCallShort": "Piket oproepen",
+      "servicenowShort": "IT-incidenten",
+      "jiraShort": "Tickets",
+      "customShort": "URL of e-mail"
     },
     "import": {
       "title": "Bestemming importeren",
@@ -13758,6 +13799,15 @@
       "allTitle": "Elke metriek, inclusief die zonder gegevens in dit bereik",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "Dashboards",
+      "sortDashboardsTitle": "Meest gebruikt in dashboards bovenaan",
+      "sortAlerts": "Alarmen",
+      "sortAlertsTitle": "Meest gebruikt in alarmen bovenaan",
+      "usageInDashboards": "In dashboards",
+      "usageHasAlerts": "Heeft alarmen",
+      "usageInSlos": "In SLO's",
+      "usageLoading": "Laden waar metrieken worden gebruikt",
+      "usageFailed": "Gebruik niet beschikbaar, opnieuw proberen",
       "viewGrid": "Raster",
       "viewRows": "Rijen",
       "modeExplore": "Verkennen",
@@ -13891,16 +13941,7 @@
         "deleteMessage": "De weergave {name} voor iedereen in deze organisatie verwijderen?",
         "modified": "{name} (gewijzigd)",
         "clear": "Weergave wissen"
-      },
-      "sortDashboards": "Dashboards",
-      "sortDashboardsTitle": "Meest gebruikt in dashboards bovenaan",
-      "sortAlerts": "Alarmen",
-      "sortAlertsTitle": "Meest gebruikt in alarmen bovenaan",
-      "usageInDashboards": "In dashboards",
-      "usageHasAlerts": "Heeft alarmen",
-      "usageInSlos": "In SLO's",
-      "usageLoading": "Laden waar metrieken worden gebruikt",
-      "usageFailed": "Gebruik niet beschikbaar, opnieuw proberen"
+      }
     },
     "metricCard": {
       "lastRefreshed": "Laatst vernieuwd:",
@@ -13927,6 +13968,17 @@
       "notEqualTo": "Niet gelijk aan",
       "regexPattern": "Regex patroon (bijv. prod.*)",
       "regexNotMatching": "Regex niet overeenkomend (bijv. test.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR-groep",
+      "addGroupTooltip": "Voeg een groep filters toe; een reeks komt overeen als deze aan een van de groepen voldoet",
+      "addToGroup": "Voeg een filter toe aan deze groep",
+      "anyOf": "een van",
+      "andAnyOf": "en een van",
+      "or": "of",
+      "not": "niet",
+      "notTooltip": "Kom overeen met de reeks die niet aan deze hele groep voldoet",
+      "tooManyBranches": "Deze filters worden uitgebreid naar {count} afzonderlijke selectors; maximaal {max} kunnen worden uitgevoerd. Voeg waarden samen in één regex-filter of verwijder een groep."
     },
     "builderSwitch": {
       "unsupported": "De builder kan {construct} niet weergeven",
@@ -13967,11 +14019,11 @@
         "byLabelsLabel": "Op labels",
         "quantileLabel": "Kwantiel",
         "kLabel": "K",
-        "nearestMultipleLabel": "Dichtstbijzijnde veelvoud",
         "withoutLabel": "Zonder (deze labels weglaten)",
         "withoutDesc": "Aggregeer de geselecteerde labels weg en behoud alle overige labels",
         "offsetLabel": "Offset",
-        "offsetDesc": "Hoe ver terug de metriek moet worden gelezen, bijv. 1h of 1d"
+        "offsetDesc": "Hoe ver terug de metriek moet worden gelezen, bijv. 1h of 1d",
+        "nearestMultipleLabel": "Dichtstbijzijnde veelvoud"
       },
       "rangeOnlyFirst": "Een range-functie kan alleen de eerste stap zijn",
       "rangeOnlyFirstNote": "Een range-functie leest de ruwe samples, dus kan alleen de eerste stap zijn. Verwijder de andere stappen om er een toe te voegen.",
@@ -14041,17 +14093,6 @@
       "empty": "Nog geen queries",
       "noMatch": "Geen queries komen overeen met de zoekopdracht of het filter voor sterren",
       "loadMore": "Meer laden"
-    },
-    "labelGroups": {
-      "addGroup": "+ OR-groep",
-      "addGroupTooltip": "Voeg een groep filters toe; een reeks komt overeen als deze aan een van de groepen voldoet",
-      "addToGroup": "Voeg een filter toe aan deze groep",
-      "anyOf": "een van",
-      "andAnyOf": "en een van",
-      "or": "of",
-      "not": "niet",
-      "notTooltip": "Kom overeen met de reeks die niet aan deze hele groep voldoet",
-      "tooManyBranches": "Deze filters worden uitgebreid naar {count} afzonderlijke selectors; maximaal {max} kunnen worden uitgevoerd. Voeg waarden samen in één regex-filter of verwijder een groep."
     }
   },
   "settings": {
@@ -21710,7 +21751,8 @@
         "longtask": "Lange taak",
         "view": "Bekijken",
         "action": "Actie",
-        "resource": "Resource"
+        "resource": "Resource",
+        "failedrequest": "Mislukt verzoek"
       },
       "subscriptionPlan": {
         "payasyougo": "Betaal per gebruik",
@@ -22724,6 +22766,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "Leest de metriek zoals die de opgegeven duur geleden was",
       "rateDoc": "Berekent de gemiddelde toename per seconde over het opgegeven tijdsbereik",
       "irateDoc": "Berekent de directe toename per seconde op basis van de laatste twee gegevenspunten",
       "increaseDoc": "Berekent de totale toename over het opgegeven tijdsbereik",
@@ -22794,8 +22837,7 @@
       "moduloName": "Modulo",
       "multiplyByName": "Vermenigvuldigen met",
       "divideByName": "Delen door",
-      "exponentName": "Exponent",
-      "offsetDoc": "Leest de metriek zoals die de opgegeven duur geleden was"
+      "exponentName": "Exponent"
     }
   },
   "passwordPolicy": {
@@ -28177,7 +28219,6 @@
       "appTile": "{product}-app",
       "webhookTile": "{product}-webhook",
       "twoWay": "Tweerichtings",
-      "recommendedForAlertResponse": "Aanbevolen voor alarmrespons",
       "choiceHint": "Oproepen en superclusters gebruiken de webhook. Handmatige en realtime verzendingen vanuit een Slack-app-bestemming zijn aparte berichten.",
       "unavailableReason": "Vereist de Enterprise Slack-app op één cluster",
       "unavailableFlag": "Uitgeschakeld op deze server; vraag je beheerder om {variable} in te stellen",
@@ -28185,6 +28226,7 @@
       "unavailableCloud": "Nog niet ingeschakeld voor je Cloud-regio",
       "unavailableNoAccess": "Vraag een organisatiebeheerder om de Slack-app in te schakelen",
       "postOnly": "Alleen berichten plaatsen",
+      "off": "Uit",
       "switchToApp": "Overschakelen naar {product}-app",
       "switchThis": "Deze bestemming overschakelen",
       "switchBack": "Terugschakelen",
