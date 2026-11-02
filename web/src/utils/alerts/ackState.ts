@@ -15,7 +15,14 @@
 
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { ActiveDowntime, AlertGroupRef } from "@/services/downtimes";
-import type { AlertGroup } from "@/ts/interfaces/alert";
+import type {
+  AckAlertResponse,
+  AlertActionPerson,
+  AlertActionRefusal,
+  AlertGroup,
+} from "@/ts/interfaces/alert";
+import type { ToastOptions } from "@/lib/feedback/Toast/OToast.types";
+import { alertActionErrorOf } from "@/services/alerts";
 import { normalizeKey } from "@/lib/core/Badge/badgeGroups";
 import { isFiringOutcome } from "./runOutcome";
 
@@ -104,4 +111,136 @@ export function groupRefLabels(ref: AlertGroupRef): string | null {
     return entries.length ? entries.map(([k, v]) => `${k}=${String(v)}`).join(", ") : null;
   }
   return null;
+}
+
+/** The verb a refusal answers, which names its title. */
+export type AckVerb = "ack" | "unack" | "takeOver" | "mute";
+
+const REFUSAL_TITLES = {
+  ack: "alerts.ack.refused.ack",
+  unack: "alerts.ack.refused.unack",
+  takeOver: "alerts.ack.refused.takeOver",
+  mute: "alerts.ack.refused.mute",
+} as const;
+
+const personName = (p: AlertActionPerson) => p.name || p.email;
+
+/** The refusal toast: the verb refused, then who is on call and who else can act. */
+export function refusalToast(
+  refusal: AlertActionRefusal,
+  verb: AckVerb,
+  t: TranslateFn,
+): ToastOptions {
+  const reason = t(REFUSAL_TITLES[verb]);
+  const onCall = raw(refusal.on_call.map(personName).join(", "));
+  const canAct = raw(refusal.can_act.map(personName).join(", "));
+  const people: I18nText | null =
+    onCall && canAct
+      ? t("alerts.ack.refused.people", { onCall, canAct })
+      : onCall
+        ? t("alerts.ack.refused.onCall", { people: onCall })
+        : canAct
+          ? t("alerts.ack.refused.canAct", { people: canAct })
+          : null;
+  return people
+    ? { variant: "error", title: reason, message: people }
+    : { variant: "error", message: reason };
+}
+
+/** The distinct team names of some pages, or "" when there are none. */
+export const teamsOf = (pages?: { team: string }[]): I18nText =>
+  raw([...new Set((pages ?? []).map((p) => p.team).filter(Boolean))].join(", "));
+
+/** A page's acknowledge words; a teamless page names no team, an incident page says incident. */
+export function pageAckWords(
+  team: string | null | undefined,
+  subjectType: string,
+  t: TranslateFn,
+): { ackHint: I18nText; unackHint: I18nText; acked: I18nText; unacked: I18nText } {
+  const incident = subjectType === "incident";
+  if (!team) {
+    return {
+      ackHint: incident
+        ? t("oncall.acknowledgeHintNoTeamIncident")
+        : t("oncall.acknowledgeHintNoTeam"),
+      unackHint: t("oncall.unacknowledgeHintNoTeam"),
+      acked: t("oncall.acknowledgedNoTeam"),
+      unacked: t("oncall.unacknowledgedNoTeam"),
+    };
+  }
+  const named = { team: raw(team) };
+  return {
+    ackHint: incident
+      ? t("oncall.acknowledgeHintIncident", named)
+      : t("oncall.acknowledgeHint", named),
+    unackHint: t("oncall.unacknowledgeHint", named),
+    acked: t("oncall.acknowledged", named),
+    unacked: t("oncall.unacknowledged", named),
+  };
+}
+
+/** The toast for an acknowledge that changed nothing: who already holds it, if anyone. */
+export function unchangedAckToast(
+  holder: string | null | undefined,
+  me: string | undefined,
+  t: TranslateFn,
+): ToastOptions {
+  const message = !holder
+    ? t("toastMessages.alerts.ack.alreadyAckedNoOne")
+    : holder === me
+      ? t("toastMessages.alerts.ack.alreadyYours")
+      : t("toastMessages.alerts.ack.alreadyAcked", { who: raw(holder) });
+  return { variant: "info", message };
+}
+
+/** The toast for an unacknowledge that changed nothing. */
+export const notAckedToast = (title: string, t: TranslateFn): ToastOptions => ({
+  variant: "info",
+  message: t("toastMessages.alerts.ack.incidentNotAcked", { title: raw(title) }),
+});
+
+/** The toast after an incident acknowledge: who was faster, or the incident and the teams it stopped. */
+export function incidentAckToast(
+  ack: AckAlertResponse,
+  title: string,
+  me: string | undefined,
+  t: TranslateFn,
+): ToastOptions {
+  if (!ack.changed) return unchangedAckToast(ack.acks[0]?.acked_by, me, t);
+  const teams = teamsOf(ack.oncall?.stopped);
+  return {
+    variant: "success",
+    message: teams
+      ? t("toastMessages.alerts.ack.incidentAckedPaging", { title: raw(title), teams })
+      : t("toastMessages.alerts.ack.incidentAcked", { title: raw(title) }),
+  };
+}
+
+/** The toast after an incident status change; the one ack's routes answer with what they did. */
+export function incidentStatusToast(
+  status: "open" | "acknowledged" | "resolved",
+  ack: AckAlertResponse | { changed: boolean } | undefined,
+  title: string,
+  me: string | undefined,
+  t: TranslateFn,
+): ToastOptions | null {
+  if (!ack) return null;
+  if (status === "acknowledged" && "acks" in ack) return incidentAckToast(ack, title, me, t);
+  return ack.changed
+    ? {
+        variant: "success",
+        message: t("toastMessages.alerts.ack.incidentUnacked", { title: raw(title) }),
+      }
+    : notAckedToast(title, t);
+}
+
+/** A refused incident acknowledge or unacknowledge says who can act; anything else is `null`. */
+export function incidentRefusalToast(
+  error: unknown,
+  status: "open" | "acknowledged" | "resolved",
+  t: TranslateFn,
+): ToastOptions | null {
+  const refused = alertActionErrorOf(error);
+  if (refused?.code !== "ack_refused") return null;
+  return refusalToast(refused, status === "acknowledged" ? "ack" : "unack", t);
 }
