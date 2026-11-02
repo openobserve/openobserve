@@ -58,6 +58,14 @@ describe("useAlertSettingTiers", () => {
     expect(api().isVisible("priority")).toBe(true);
   });
 
+  it("collapses a section that was expanded", () => {
+    const tiers = useAlertSettingTiers({ available: () => true, isSet: () => false });
+    tiers.expand("condition");
+    expect(tiers.view("condition").expanded).toBe(true);
+    tiers.collapse("condition");
+    expect(tiers.view("condition").expanded).toBe(false);
+  });
+
   it("still hides an unset setting that was never shown", async () => {
     const set = reactive<Partial<Record<AlertSettingId, boolean>>>({ holdFor: true });
     const api = host(set);
