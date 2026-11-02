@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     clearable
     :data-test="dataTest"
     @keydown.enter.prevent="commit"
-    @blur="commit"
-    @clear="emit('update:modelValue', undefined)"
+    @blur="onBlur"
+    @clear="apply(undefined)"
   >
     <template #icon-right>
       <OPopover
@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #trigger>
           <OButton
+            ref="triggerRef"
             variant="ghost"
             size="icon-xs-sq"
             icon-left="calendar-month"
@@ -107,6 +108,7 @@ const selectedDay = computed(() => props.modelValue?.replace(/-/g, "/"));
 const shown = (day?: string) => (day ? DateTime.fromISO(day).toFormat("dd/MM/yyyy") : "");
 const text = ref(shown(props.modelValue));
 const invalid = ref(false);
+const triggerRef = ref<InstanceType<typeof OButton> | null>(null);
 watch(
   () => props.modelValue,
   (day) => {
@@ -114,6 +116,13 @@ watch(
     invalid.value = false;
   },
 );
+
+// The field shows the applied day even when the day itself did not change, e.g. one retyped in another shape.
+const apply = (day: string | undefined) => {
+  text.value = shown(day);
+  invalid.value = false;
+  if (day !== props.modelValue) emit("update:modelValue", day);
+};
 
 // Typed days read day-first, the order the field shows; a day outside the calendar's range is refused.
 const parseTyped = (value: string): string | null => {
@@ -129,14 +138,18 @@ const parseTyped = (value: string): string | null => {
 
 const commit = () => {
   const value = String(text.value ?? "").trim();
-  if (!value) {
-    invalid.value = false;
-    if (props.modelValue) emit("update:modelValue", undefined);
-    return;
-  }
+  if (!value) return apply(undefined);
   const day = parseTyped(value);
-  invalid.value = !day;
-  if (day && day !== props.modelValue) emit("update:modelValue", day);
+  if (day) apply(day);
+  else invalid.value = true;
+};
+
+// Moving to the field's own calendar button is not leaving the field; a half-typed day stays unjudged.
+const onBlur = (event: FocusEvent) => {
+  const trigger = triggerRef.value?.$el as HTMLElement | undefined;
+  if (trigger && event.relatedTarget instanceof Node && trigger.contains(event.relatedTarget))
+    return;
+  commit();
 };
 
 // Arrow keys and Enter work only from a day cell, so open on the chosen day, else today.
@@ -149,10 +162,9 @@ const focusDay = (event: Event) => {
   day.focus();
 };
 
-// A first click on the range calendar is one complete day for this filter.
+// The calendar clears a one-day range clicked again and reports null; here that is re-picking the applied day.
 const pick = (day: string | null) => {
-  if (!day) return;
-  emit("update:modelValue", day.replace(/\//g, "-"));
+  apply(day ? day.replace(/\//g, "-") : props.modelValue);
   open.value = false;
 };
 </script>

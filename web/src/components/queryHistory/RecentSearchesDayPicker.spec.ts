@@ -74,6 +74,49 @@ describe("RecentSearchesDayPicker", () => {
     expect(field.attributes("aria-invalid")).toBe("true");
   });
 
+  it("drops the error mark when an invalid entry is cleared with no day applied", async () => {
+    const wrapper = mountPicker();
+    const field = wrapper.find('[data-test="ran-on-field"]');
+    await field.setValue("abc");
+    await field.trigger("blur");
+    expect(field.attributes("aria-invalid")).toBe("true");
+    await wrapper.find('[data-test="ran-on-clear"]').trigger("click");
+    expect(field.attributes("aria-invalid")).toBeUndefined();
+  });
+
+  it("shows the applied day again when the calendar picks it over invalid text", async () => {
+    const today = DateTime.local();
+    const wrapper = mountPicker(today.toISODate()!);
+    const field = wrapper.find<HTMLInputElement>('[data-test="ran-on-field"]');
+    await field.setValue("99/99");
+    await field.trigger("keydown", { key: "Enter" });
+    await openCalendar(wrapper);
+    cell(today.toISODate()!)!.click();
+    await flushPromises();
+    expect(field.element.value).toBe(today.toFormat("dd/MM/yyyy"));
+    expect(field.attributes("aria-invalid")).toBeUndefined();
+  });
+
+  it("rewrites the applied day retyped in another shape", async () => {
+    const wrapper = mountPicker("2026-02-01");
+    const field = wrapper.find<HTMLInputElement>('[data-test="ran-on-field"]');
+    await field.setValue("1-2-2026");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(field.element.value).toBe("01/02/2026");
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+  });
+
+  it("does not judge a half-typed day when focus moves to its calendar button", async () => {
+    const wrapper = mountPicker();
+    const field = wrapper.find('[data-test="ran-on-field"]');
+    await field.setValue("3/1");
+    const trigger = wrapper.find('[data-test="ran-on-trigger"]').element;
+    await field.trigger("blur", { relatedTarget: trigger });
+    expect(field.attributes("aria-invalid")).toBeUndefined();
+    await field.trigger("blur", { relatedTarget: document.body });
+    expect(field.attributes("aria-invalid")).toBe("true");
+  });
+
   it("clears the day when the typed text is emptied", async () => {
     const wrapper = mountPicker("2026-10-27");
     const field = wrapper.find('[data-test="ran-on-field"]');

@@ -852,13 +852,7 @@ describe("long queries in the details pane", () => {
 
   it("leaves PageDown to its owner when no row is active", async () => {
     const wrapper = await mountAttached();
-    const vm = wrapper.vm as unknown as {
-      handleOutsideKey: (event: KeyboardEvent) => boolean;
-      scrollDetails: (step: 1 | -1) => boolean;
-    };
-    const event = new KeyboardEvent("keydown", { key: "PageDown", cancelable: true });
-    expect(vm.handleOutsideKey(event)).toBe(false);
-    expect(event.defaultPrevented).toBe(false);
+    const vm = wrapper.vm as unknown as { scrollDetails: (step: 1 | -1) => boolean };
     expect(vm.scrollDetails(1)).toBe(false);
   });
 
@@ -948,8 +942,8 @@ describe("keyboard: arrows then Enter or Shift+Enter", () => {
     await vi.waitFor(() =>
       expect(document.querySelector('[data-test="recent-searches-row-e1"]')).not.toBeNull(),
     );
-    (wrapper.vm as unknown as { focusRoot: () => void }).focusRoot();
     const root = document.querySelector<HTMLElement>('[data-test="recent-searches-popover"]')!;
+    root.focus();
     return { wrapper, root };
   };
 

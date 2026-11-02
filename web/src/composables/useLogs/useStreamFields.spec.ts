@@ -160,6 +160,44 @@ describe("useStreamFields Composable", () => {
       }
     });
 
+    it("keeps the cached list when the refetch fails", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamType = "logs";
+      searchObj.data.stream.selectedStream = ["flaky"];
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValueOnce([{ name: "old", stream_type: "logs" }] as any)
+        .mockRejectedValueOnce(new Error("network"));
+
+      try {
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        expect(searchObj.data.streamResults.list.map((s: any) => s.name)).toEqual(["old"]);
+        expect(searchObj.data.filterErrMsg).toContain("flaky");
+      } finally {
+        fetchQuery.mockRestore();
+      }
+    });
+
+    it("refetches once for a stream a fresh list already lacked", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamType = "logs";
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValue([{ name: "old", stream_type: "logs" }] as any);
+
+      try {
+        searchObj.data.stream.selectedStream = ["deleted"];
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        searchObj.data.stream.selectedStream = ["deleted"];
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        expect(fetchQuery).toHaveBeenCalledTimes(3);
+      } finally {
+        fetchQuery.mockRestore();
+      }
+    });
+
     it("does not refetch when the streams are not from the URL", async () => {
       queryClient.clear();
       const { searchObj } = searchState();
