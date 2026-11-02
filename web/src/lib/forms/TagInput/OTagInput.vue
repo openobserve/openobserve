@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="tag-input-container" class="h-full w-full">
+  <div data-test="tag-input-container" class="h-full w-full" v-bind="wrapperAttrs">
     <div
       data-test="tag-input-wrapper"
       class="group border-card-glass-border rounded-default bg-card-glass-bg focus-within:border-theme-accent relative flex h-full min-h-14 w-full max-w-full cursor-text flex-col overflow-hidden border px-1.25 py-0 transition-colors duration-300"
@@ -56,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTag>
         <input
+          v-bind="controlAttrs"
           data-test="tag-input-field"
           ref="inputRef"
           v-model="inputValue"
@@ -79,12 +80,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from "vue";
+import { ref, computed, useAttrs } from "vue";
+import { splitControlAttrs } from "@/lib/forms/controlAttrs";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 const { t } = useI18nTyped();
+
+defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+const split = computed(() => splitControlAttrs($attrs));
+const wrapperAttrs = computed(() => split.value.wrapperAttrs);
+const controlAttrs = computed(() => split.value.controlAttrs);
 
 interface Props {
   modelValue: string[];

@@ -4,6 +4,7 @@
 import type { TextareaProps, TextareaEmits, TextareaSlots } from "./OTextarea.types";
 import { computed, nextTick, onMounted, ref, useAttrs, useId, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 
 // Forward the consumer's `data-test` from <OTextarea data-test="…"> onto the
 // root wrapper so E2E selectors can scope to the specific field instance.
@@ -14,11 +15,9 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const wrapperAttrs = computed(() => {
-  const rest = { ...$attrs };
-  delete rest.tabindex;
-  return rest;
-});
+const split = computed(() => splitControlAttrs($attrs));
+const wrapperAttrs = computed(() => split.value.wrapperAttrs);
+const controlAttrs = computed(() => split.value.controlAttrs);
 
 const props = withDefaults(defineProps<TextareaProps>(), {
   rows: 3,
@@ -37,6 +36,14 @@ defineSlots<TextareaSlots>();
 const _fallbackId = useId();
 const textareaId = computed(() => props.id ?? _fallbackId);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+
+onMounted(() =>
+  warnIfUnlabelled(
+    "OTextarea",
+    Boolean(props.label || props.placeholder || $attrs["aria-label"] || $attrs["aria-labelledby"]),
+    textareaId.value,
+  ),
+);
 
 // ── Error state ────────────────────────────────────────────────────────────
 // Error is only shown when `props.error` is true. A static `errorMessage`
@@ -150,6 +157,7 @@ const wrapperClasses = computed(() => [
     <!-- Textarea wrapper -->
     <div :class="[wrapperClasses, fill && 'min-h-0 flex-1']">
       <textarea
+        v-bind="controlAttrs"
         :id="textareaId"
         ref="textareaRef"
         :value="modelValue ?? ''"

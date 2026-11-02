@@ -14,8 +14,9 @@ import {
   ComboboxRoot,
   ComboboxViewport,
 } from "reka-ui";
-import { computed, nextTick, ref, useAttrs, useId, useSlots, watch } from "vue";
+import { computed, nextTick, onMounted, ref, useAttrs, useId, useSlots, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import { useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
@@ -26,10 +27,9 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const wrapperAttrs = computed(() => {
-  const { tabindex: _tabindex, ...rest } = $attrs;
-  return rest;
-});
+const split = computed(() => splitControlAttrs($attrs));
+const wrapperAttrs = computed(() => split.value.wrapperAttrs);
+const controlAttrs = computed(() => split.value.controlAttrs);
 
 const props = withDefaults(defineProps<ComboboxProps>(), {
   items: () => [],
@@ -172,6 +172,15 @@ const effectiveError = computed(() => props.errorMessage || (props.error ? " " :
 const hasError = computed(() => !!effectiveError.value);
 
 const hasLabel = computed(() => Boolean(slots.label) || props.label !== undefined);
+onMounted(() =>
+  warnIfUnlabelled(
+    "OCombobox",
+    Boolean(
+      hasLabel.value || props.placeholder || $attrs["aria-label"] || $attrs["aria-labelledby"],
+    ),
+    inputId.value,
+  ),
+);
 const hasInsideLabel = computed(
   () => props.labelPosition === "inside" && (Boolean(slots.label) || Boolean(props.label)),
 );
@@ -225,6 +234,7 @@ const hasInsideLabel = computed(
           ><span v-if="required" aria-hidden="true">&nbsp;*</span>
         </span>
         <ComboboxInput
+          v-bind="controlAttrs"
           :id="inputId"
           :name="name"
           :placeholder="placeholder"
