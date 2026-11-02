@@ -379,6 +379,17 @@ impl ManualTrigger {
             }
         }
     }
+
+    /// What the send could not deliver, such as a failed destination or a page the license
+    /// withheld.
+    pub fn warning(&self) -> Option<&str> {
+        match self {
+            Self::Sent { error_message, .. } if !error_message.trim().is_empty() => {
+                Some(error_message)
+            }
+            _ => None,
+        }
+    }
 }
 
 pub async fn save(
@@ -8719,6 +8730,16 @@ mod tests {
             error_message: String::new(),
         };
         assert_eq!(sent.response_message(), "Alert triggered");
+        assert_eq!(sent.warning(), None);
+        assert_eq!(suppressed.warning(), None);
+        let partial = ManualTrigger::Sent {
+            success_message: String::new(),
+            error_message: "not paged: On-Call is not included in your license".to_string(),
+        };
+        assert_eq!(
+            partial.warning(),
+            Some("not paged: On-Call is not included in your license")
+        );
     }
 
     #[test]
