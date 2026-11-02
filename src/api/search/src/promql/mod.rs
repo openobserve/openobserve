@@ -60,6 +60,7 @@ use crate::{
     request_body(content = String, description = "prometheus WriteRequest", content_type = "application/x-protobuf"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
+        (status = 400, description = "Not a protobuf body or the payload cannot be ingested", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -132,6 +133,9 @@ pub async fn remote_write(
                ]
             }
         })),
+        (status = 400, description = "Invalid query or time", content_type = "application/json", body = ()),
+        (status = 403, description = "No permission on the metric stream", content_type = "application/json", body = ()),
+        (status = 429, description = "Rate limit exceeded", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -304,6 +308,9 @@ async fn query(
                ]
             }
         })),
+        (status = 400, description = "Invalid query, time range, step or search type", content_type = "application/json", body = ()),
+        (status = 403, description = "No permission on the metric stream", content_type = "application/json", body = ()),
+        (status = 429, description = "Rate limit exceeded", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -398,6 +405,9 @@ pub async fn query_range_post(
                 }
             ]
         })),
+        (status = 400, description = "Invalid query, time range, step or search type", content_type = "application/json", body = ()),
+        (status = 403, description = "No permission on the metric stream", content_type = "application/json", body = ()),
+        (status = 429, description = "Rate limit exceeded", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -616,6 +626,7 @@ async fn query_range(
               ]
             }
         })),
+        (status = 403, description = "No permission to read metrics", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -740,6 +751,9 @@ pub async fn metadata(
                }
             ]
         })),
+        (status = 400, description = "Invalid match[] or time range", content_type = "application/json", body = ()),
+        (status = 403, description = "No permission on the metric stream", content_type = "application/json", body = ()),
+        (status = 429, description = "Rate limit exceeded", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -873,6 +887,8 @@ async fn series(
                 "version"
             ]
         })),
+        (status = 400, description = "Invalid match[] or time range", content_type = "application/json", body = ()),
+        (status = 403, description = "No permission to read metrics", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1014,6 +1030,7 @@ async fn labels(
             ]
         })),
         (status = 400, description = "Invalid parameters or match[] does not identify a metric", content_type = "application/json", body = ()),
+        (status = 403, description = "No permission to read metrics", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1223,6 +1240,7 @@ fn validate_metadata_params(
             "status" : "success",
             "data" : "foo / bar"
         })),
+        (status = 400, description = "The query does not parse", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
