@@ -172,29 +172,33 @@ test.describe('Fleet management configurations and deploy', { tag: ['@fleet', '@
     expect((await pm.fleetSeed.rolloutsForConfig(config)).map((r) => r.id)).toEqual([seeded.id]);
   });
 
-  test('R-3311-8 · Fix forward opens the editor on the halted version with Publish off until the YAML changes', {
+  test('R-3311-8 · the editor on a deployed version, where Fix forward lands, keeps the primary Publish off until the YAML changes', {
     tag: ['@fleetConfig', '@regression', '@P2'],
   }, async () => {
-    test.fail(true, 'o2-enterprise#3311 item 8: Publish is enabled with no change, so the failed config can be republished');
+    // A halted rollout needs a collector that rejects the version, which this suite has none of; Fix forward only opens this editor.
+    const fleet = await pm.fleetSeed.createFleet('fixfwd');
     const config = await pm.fleetSeed.createConfig('fixfwd', FLEET_YAML.publishable);
-    await pm.fleetSeed.publishConfig(config, FLEET_YAML.publishable);
-    // Fix forward routes to this editor for the rollout's configuration (FleetFleets.vue fixForward).
+    const v1 = await pm.fleetSeed.publishConfig(config, FLEET_YAML.publishable);
+    const seeded = await pm.fleetSeed.setDesired(fleet.id, config, v1);
+    await pm.fleetSeed.waitForRolloutStatus(seeded.id, 'completed');
     await pm.fleetConfigPage.goto(config);
+    await pm.fleetConfigPage.expectModeChip(`Viewing v${v1} · running`);
     await pm.fleetConfigPage.switchToYaml();
     await pm.fleetConfigPage.expectYaml(FLEET_YAML.publishable);
+    // Declared after the setup so a broken precondition fails loudly instead of counting as the expected failure.
+    test.fail(true, 'o2-enterprise#3311 item 8: Publish is enabled with no change, so the failed config can be republished');
     await pm.fleetConfigPage.expectPublishEnabled(false);
 
     await pm.fleetConfigPage.setYaml(FLEET_YAML.publishable.replace('https://example.com', 'https://example.org'));
     await pm.fleetConfigPage.expectPublishEnabled(true);
     await pm.fleetConfigPage.setYaml(FLEET_YAML.publishable);
     await pm.fleetConfigPage.expectPublishEnabled(false);
-    expect((await pm.fleetSeed.getConfig(config)).latest_version).toBe(1);
+    expect((await pm.fleetSeed.getConfig(config)).latest_version).toBe(v1);
   });
 
   test('R-3311-12 · the deploy dialog shows a 90 s phase timeout as "1 min 30 s", not rounded up to "2 min"', {
     tag: ['@fleetDeploy', '@regression', '@P3'],
   }, async () => {
-    test.fail(true, 'o2-enterprise#3311 item 12: the phase timeout note rounds 90 s to "2 min"');
     const fleet = await pm.fleetSeed.createFleet('timeout');
     await pm.fleetSeed.setFleetSettings(fleet.id, { phase_timeout_secs: 90 });
     const config = await pm.fleetSeed.createConfig('timeout', FLEET_YAML.publishable);
@@ -205,6 +209,7 @@ test.describe('Fleet management configurations and deploy', { tag: ['@fleet', '@
     await pm.fleetFleetsPage.openDeploy();
     await pm.fleetRolloutPage.expectReady();
 
+    test.fail(true, 'o2-enterprise#3311 item 12: the phase timeout note rounds 90 s to "2 min"');
     expect(await pm.fleetRolloutPage.timeoutNoteText()).not.toContain('2 min');
     await pm.fleetRolloutPage.expectTimeoutNoteContains('1 min 30 s');
   });
