@@ -1661,7 +1661,8 @@ fn service_route_table() -> Router {
             .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history))
 
             .route("/v2/{org_id}/alerts/history/summary", get(alerts::history_summary::get_alert_history_summary));
-        router = autoobserve_routes(alert_calibration_routes(router));
+        router = alert_calibration_routes(router);
+        router = autoobserve_routes(router);
     }
 
     router = router
