@@ -488,12 +488,16 @@ pub async fn update_role(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 400, description = "Invalid role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 pub async fn get_role_permissions(
     Path((org_id, role_id, resource)): Path<(String, String, String)>,
 ) -> Response {
+    if !is_storable_name("role", &org_id, &role_id) {
+        return MetaHttpResponse::bad_request("Invalid role name");
+    }
     lookup_response(
         o2_openfga::authorizer::roles::get_role_permissions(&org_id, &role_id, &resource).await,
         "Failed to get role permissions",
@@ -519,10 +523,14 @@ pub async fn get_role_permissions(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 400, description = "Invalid role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 pub async fn get_all_role_permissions(Path((org_id, role_id)): Path<(String, String)>) -> Response {
+    if !is_storable_name("role", &org_id, &role_id) {
+        return MetaHttpResponse::bad_request("Invalid role name");
+    }
     lookup_response(
         o2_openfga::authorizer::roles::get_all_role_permissions(&org_id, &role_id).await,
         "Failed to get role permissions",
@@ -599,10 +607,14 @@ pub async fn get_role_permissions(Path(_path): Path<(String, String, String)>) -
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 400, description = "Invalid role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 pub async fn get_users_with_role(Path((org_id, role_id)): Path<(String, String)>) -> Response {
+    if !is_storable_name("role", &org_id, &role_id) {
+        return MetaHttpResponse::bad_request("Invalid role name");
+    }
     lookup_response(
         o2_openfga::authorizer::roles::get_users_with_role(&org_id, &role_id).await,
         "Failed to get users with role",
@@ -653,10 +665,14 @@ pub async fn get_users_with_role(Path(_path): Path<(String, String)>) -> Respons
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 400, description = "Invalid user id", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 pub async fn get_roles_for_user(Path((org_id, user_email)): Path<(String, String)>) -> Response {
+    if !o2_openfga::authorizer::is_valid_user_id(&user_email) {
+        return MetaHttpResponse::bad_request("Invalid user id");
+    }
     lookup_response(
         o2_openfga::authorizer::roles::get_roles_for_org_user(&org_id, &user_email).await,
         "Failed to get roles for user",
@@ -1712,6 +1728,14 @@ mod tests {
                 delete_role(path(name)).await,
                 delete_group(path(name)).await,
                 get_group_details(path(name)).await,
+                get_users_with_role(path(name)).await,
+                get_all_role_permissions(path(name)).await,
+                get_role_permissions(Path((
+                    "test_org".to_string(),
+                    name.to_string(),
+                    "stream".to_string(),
+                )))
+                .await,
                 delete_role_bulk(
                     Path("test_org".to_string()),
                     mock_user_email(),
@@ -1734,12 +1758,16 @@ mod tests {
             }
         }
         for user in ["*", "a#b", ""] {
-            let resp = get_groups_for_user(path(user)).await;
-            assert_eq!(
-                extract_status_code(&resp),
-                StatusCode::BAD_REQUEST,
-                "{user:?}"
-            );
+            for resp in [
+                get_groups_for_user(path(user)).await,
+                get_roles_for_user(path(user)).await,
+            ] {
+                assert_eq!(
+                    extract_status_code(&resp),
+                    StatusCode::BAD_REQUEST,
+                    "{user:?}"
+                );
+            }
         }
     }
 
@@ -1748,11 +1776,18 @@ mod tests {
     async fn update_role_rejects_invalid_input_with_400() {
         init_ofga_test();
         let members = |user: &str| Some(HashSet::from([user.to_string()]));
+        // Fits the 256-char `role:` object but not the `#has` role-user form.
+        let too_long_for_role_user = "r".repeat(240);
+        assert!(
+            o2_openfga::authorizer::org_scoped_object("role", "test_org", &too_long_for_role_user)
+                .is_some()
+        );
         for (name, add_users, remove_users) in [
             ("test_role", members("*"), None),
             ("test_role", None, members("a#b")),
             ("a#b", None, None),
             ("", members("user1"), None),
+            (too_long_for_role_user.as_str(), None, None),
         ] {
             let role_request = o2_dex::meta::auth::RoleRequest {
                 add: vec![],
