@@ -35,7 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @updated:dataZoom="onDataZoom"
           />
         </div>
-        <div class="h-40 min-w-0 px-1 py-0.5 md:h-auto md:flex-1">
+        <!-- Tied to the Rate/Errors panels: metrics.json h (9 rows after migration) × 17px cellHeight, 4px GridStack margin -->
+        <div class="h-40 min-w-0 px-1 py-0.5 md:h-[9.5625rem] md:flex-1 md:py-1">
           <TracesLatencyHeatmap
             :request="heatmapRequest"
             :selection="heatmapSelection"

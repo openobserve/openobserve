@@ -71,7 +71,7 @@ pub mod multi;
 pub mod result_utils;
 
 // Define cache version
-const CACHE_VERSION: &str = "v3";
+const CACHE_VERSION: &str = "v4";
 
 /// The hits a search was about to return when redaction could not run on them.
 #[cfg(any(feature = "vectorscan", test))]
@@ -592,7 +592,7 @@ pub async fn prepare_cache_response(
 
     // Parse SQL first to get metadata needed for normalization
     let query: SearchQuery = req.query.clone().into();
-    let sql = match crate::Sql::new(&query, org_id, stream_type, req.search_type).await {
+    let mut sql = match crate::Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {e}");
@@ -664,6 +664,9 @@ pub async fn prepare_cache_response(
             ts_column = TIMESTAMP_COL_NAME.to_string();
         }
     }
+
+    // #16175: sort, trim and cache checks compare ORDER BY with the column the hits carry
+    sql.order_by = result_utils::normalize_ts_order_by(&sql.order_by, &ts_column, &sql.aliases);
 
     // Refine is_descending for histogram queries with non-timestamp ORDER BY
     is_descending = cacher::refine_is_descending_for_histogram(&sql, &ts_column, is_descending);
@@ -1849,5 +1852,58 @@ mod tests {
         let order_by = vec![("name".to_string(), OrderBy::Desc)];
         sort_response(false, &mut resp, "_timestamp", &order_by);
         assert_eq!(ts_of(&resp), vec![30, 20, 10]);
+    }
+
+    fn response_with_alias_ts(ts: &[i64]) -> search::Response {
+        let hits = ts
+            .iter()
+            .map(|t| json::json!({"ts": t, "status": "passed"}))
+            .collect::<Vec<_>>();
+        search::Response {
+            total: hits.len(),
+            hits,
+            ..Default::default()
+        }
+    }
+
+    fn alias_ts_of(resp: &search::Response) -> Vec<i64> {
+        resp.hits.iter().map(|h| get_ts_value("ts", h)).collect()
+    }
+
+    // #16175: order_by keeps `_timestamp` while the hits carry only the alias `ts`
+    fn alias_order_by() -> Vec<(String, OrderBy)> {
+        result_utils::normalize_ts_order_by(
+            &[(TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc)],
+            "ts",
+            &[(TIMESTAMP_COL_NAME.to_string(), "ts".to_string())],
+        )
+    }
+
+    #[test]
+    fn test_sort_response_orders_by_aliased_timestamp() {
+        let mut resp = response_with_alias_ts(&[10, 30, 20]);
+        let order_by = alias_order_by();
+        assert_eq!(order_by, vec![("ts".to_string(), OrderBy::Desc)]);
+        sort_response(true, &mut resp, "ts", &order_by);
+        assert_eq!(alias_ts_of(&resp), vec![30, 20, 10]);
+    }
+
+    #[test]
+    fn test_merge_response_orders_aliased_timestamp_newest_first() {
+        let order_by = alias_order_by();
+        let merged = merge_response(
+            "t",
+            vec![response_with_alias_ts(&[20, 10])],
+            vec![response_with_alias_ts(&[40, 30])],
+            "ts",
+            10,
+            true,
+            0,
+            order_by,
+        );
+        assert_eq!(alias_ts_of(&merged), vec![40, 30, 20, 10]);
+        // write_results() takes the time range from the first and last hit
+        let (start, end) = result_utils::extract_timestamp_range(&merged.hits, "ts", true);
+        assert_eq!((start, end), (10, 40));
     }
 }
