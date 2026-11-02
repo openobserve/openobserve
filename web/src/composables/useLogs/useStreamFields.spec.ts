@@ -179,6 +179,32 @@ describe("useStreamFields Composable", () => {
       }
     });
 
+    it("retries the refetch on the next load after one failed", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamType = "logs";
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValueOnce([{ name: "old", stream_type: "logs" }] as any)
+        .mockRejectedValueOnce(new Error("network"))
+        .mockResolvedValueOnce([{ name: "old", stream_type: "logs" }] as any)
+        .mockResolvedValueOnce([
+          { name: "old", stream_type: "logs" },
+          { name: "late", stream_type: "logs" },
+        ] as any);
+
+      try {
+        searchObj.data.stream.selectedStream = ["late"];
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        searchObj.data.stream.selectedStream = ["late"];
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        expect(fetchQuery).toHaveBeenCalledTimes(4);
+        expect(searchObj.data.stream.selectedStream).toEqual(["late"]);
+      } finally {
+        fetchQuery.mockRestore();
+      }
+    });
+
     it("refetches once for a stream a fresh list already lacked", async () => {
       queryClient.clear();
       const { searchObj } = searchState();

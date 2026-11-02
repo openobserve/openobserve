@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <span ref="fieldRef" class="contents" @focusout="onFocusOut">
+  <span ref="fieldRef" class="contents" @focusout="judgeLater">
     <OInput
       v-model="text"
       size="sm"
@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon-xs-sq"
+              @pointerdown="notePress"
               icon-left="calendar-month"
               class="text-input-hint"
               :aria-label="t('components.date.openCalendar')"
@@ -102,7 +103,7 @@ const today = ref(todayText());
 // Read on every open, so a drawer left open past midnight still offers the new day.
 watch(open, (isOpen) => {
   if (isOpen) today.value = todayText();
-  else if (!fieldRef.value?.contains(document.activeElement)) commit();
+  else judgeLater();
 });
 // The calendar speaks the app's YYYY/MM/DD; the filter keeps YYYY-MM-DD.
 const selectedDay = computed(() => props.modelValue?.replace(/-/g, "/"));
@@ -110,9 +111,13 @@ const shown = (day?: string) => (day ? DateTime.fromISO(day).toFormat("dd/MM/yyy
 const text = ref(shown(props.modelValue));
 const invalid = ref(false);
 const fieldRef = ref<HTMLElement | null>(null);
+// The day last sent; the parent's v-model lags a tick, so comparing to it would send a pick twice.
+const appliedDay = ref(props.modelValue);
+let pressingTrigger = false;
 watch(
   () => props.modelValue,
   (day) => {
+    appliedDay.value = day;
     text.value = shown(day);
     invalid.value = false;
   },
@@ -122,7 +127,9 @@ watch(
 const apply = (day: string | undefined) => {
   text.value = shown(day);
   invalid.value = false;
-  if (day !== props.modelValue) emit("update:modelValue", day);
+  if (day === appliedDay.value) return;
+  appliedDay.value = day;
+  emit("update:modelValue", day);
 };
 
 // Typed days read day-first, the order the field shows; a day outside the calendar's range is refused.
@@ -145,12 +152,22 @@ const commit = () => {
   else invalid.value = true;
 };
 
-// The text, its calendar button and the open calendar are one field, so a half-typed day waits while focus stays in it.
-const onFocusOut = (event: FocusEvent) => {
-  const next = event.relatedTarget;
-  if (open.value || (next instanceof Node && fieldRef.value?.contains(next))) return;
-  commit();
+// Judged once focus settles outside the text, its calendar button and the open calendar; Safari does not focus a pressed button.
+const judgeLater = () =>
+  setTimeout(() => {
+    const pressed = pressingTrigger;
+    pressingTrigger = false;
+    if (pressed || open.value || fieldRef.value?.contains(document.activeElement)) return;
+    commit();
+  });
+
+const notePress = () => {
+  pressingTrigger = true;
 };
+
+const reset = () => apply(undefined);
+
+defineExpose({ reset });
 
 // Arrow keys and Enter work only from a day cell, so open on the chosen day, else today.
 const focusDay = (event: Event) => {

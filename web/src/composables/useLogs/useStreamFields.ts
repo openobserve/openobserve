@@ -1048,15 +1048,19 @@ export const useStreamFields = () => {
       persisted: [],
       allowLatest: false,
     });
-    const unseen = missing.filter((name) => !refetchedMissing.has(`${org}/${streamType}/${name}`));
+    const key = (name: string) => `${org}/${streamType}/${name}`;
+    const unseen = missing.filter((name) => !refetchedMissing.has(key(name)));
     if (!unseen.length) return cached;
-    unseen.forEach((name) => refetchedMissing.add(`${org}/${streamType}/${name}`));
     try {
       await queryClient.invalidateQueries({
         queryKey: streamKeys.nameList(org, streamType),
         exact: true,
       });
-      return await getStreams(streamType, false);
+      const fresh: any = await getStreams(streamType, false);
+      // Marked only once a fresh list confirms the miss, so a failed or concurrent load still retries.
+      const listed = new Set((fresh?.list ?? []).map((entry: { name: string }) => entry.name));
+      unseen.filter((name) => !listed.has(name)).forEach((name) => refetchedMissing.add(key(name)));
+      return fresh;
     } catch (e: unknown) {
       if (e instanceof CancelledError) throw e;
       return cached;

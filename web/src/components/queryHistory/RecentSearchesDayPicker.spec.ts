@@ -37,6 +37,8 @@ const mountPicker = (modelValue?: string, zone?: string) =>
 const cell = (iso: string) =>
   document.querySelector<HTMLElement>(`[data-test="daterangecalendar-cell-${iso}"]`);
 
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0)).then(flushPromises);
+
 const openCalendar = async (wrapper: ReturnType<typeof mountPicker>) => {
   await wrapper.find('[data-test="ran-on-trigger"]').trigger("click");
   await flushPromises();
@@ -60,6 +62,7 @@ describe("RecentSearchesDayPicker", () => {
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["2026-10-05"]);
     await field.setValue("6/10/2026");
     await field.trigger("focusout");
+    await settle();
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["2026-10-06"]);
   });
 
@@ -79,6 +82,7 @@ describe("RecentSearchesDayPicker", () => {
     const field = wrapper.find('[data-test="ran-on-field"]');
     await field.setValue("abc");
     await field.trigger("focusout");
+    await settle();
     expect(field.attributes("aria-invalid")).toBe("true");
     await wrapper.find('[data-test="ran-on-clear"]').trigger("click");
     expect(field.attributes("aria-invalid")).toBeUndefined();
@@ -110,8 +114,33 @@ describe("RecentSearchesDayPicker", () => {
     const wrapper = mountPicker();
     const field = wrapper.find('[data-test="ran-on-field"]');
     await field.setValue("3/1");
-    const trigger = wrapper.find('[data-test="ran-on-trigger"]');
+    const trigger = wrapper.find<HTMLElement>('[data-test="ran-on-trigger"]');
+    trigger.element.focus();
     await field.trigger("focusout", { relatedTarget: trigger.element });
+    await settle();
+    expect(field.attributes("aria-invalid")).toBeUndefined();
+  });
+
+  it("does not judge a half-typed day when a press on the calendar button leaves focus nowhere", async () => {
+    const wrapper = mountPicker();
+    const field = wrapper.find('[data-test="ran-on-field"]');
+    await field.setValue("3/1");
+    await wrapper.find('[data-test="ran-on-trigger"]').trigger("pointerdown");
+    await field.trigger("focusout");
+    await settle();
+    expect(field.attributes("aria-invalid")).toBeUndefined();
+  });
+
+  it("does not judge a half-typed day when Escape closes the calendar back onto its button", async () => {
+    const wrapper = mountPicker();
+    const field = wrapper.find('[data-test="ran-on-field"]');
+    await field.setValue("29/10");
+    await openCalendar(wrapper);
+    document.activeElement!.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    await settle();
+    expect(document.querySelector('[data-test="ran-on-calendar"]')).toBeNull();
     expect(field.attributes("aria-invalid")).toBeUndefined();
   });
 
@@ -119,10 +148,33 @@ describe("RecentSearchesDayPicker", () => {
     const wrapper = mountPicker();
     const field = wrapper.find('[data-test="ran-on-field"]');
     await field.setValue("abc");
-    const trigger = wrapper.find('[data-test="ran-on-trigger"]');
-    await field.trigger("focusout", { relatedTarget: trigger.element });
+    const trigger = wrapper.find<HTMLElement>('[data-test="ran-on-trigger"]');
+    trigger.element.focus();
+    await settle();
+    trigger.element.blur();
     await trigger.trigger("focusout", { relatedTarget: document.body });
+    await settle();
     expect(field.attributes("aria-invalid")).toBe("true");
+  });
+
+  it("sends a calendar pick once", async () => {
+    const wrapper = mountPicker();
+    await openCalendar(wrapper);
+    cell(DateTime.local().toISODate()!)!.click();
+    await settle();
+    expect(wrapper.emitted("update:modelValue")).toHaveLength(1);
+  });
+
+  it("drops invalid text on reset", async () => {
+    const wrapper = mountPicker();
+    const field = wrapper.find<HTMLInputElement>('[data-test="ran-on-field"]');
+    await field.setValue("99/99/2026");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(field.attributes("aria-invalid")).toBe("true");
+    (wrapper.vm as unknown as { reset: () => void }).reset();
+    await flushPromises();
+    expect(field.element.value).toBe("");
+    expect(field.attributes("aria-invalid")).toBeUndefined();
   });
 
   it("clears the day when the typed text is emptied", async () => {
@@ -130,6 +182,7 @@ describe("RecentSearchesDayPicker", () => {
     const field = wrapper.find('[data-test="ran-on-field"]');
     await field.setValue("");
     await field.trigger("focusout");
+    await settle();
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([undefined]);
   });
 
