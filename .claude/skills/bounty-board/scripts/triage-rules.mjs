@@ -112,6 +112,7 @@ export function filterItems(parsed, issueRepo) {
     return {
       index: item.index,
       priority: item.priority,
+      checked: !!item.checked,
       title: item.title,
       paths: item.paths,
       repo: repos[0] ?? null,
@@ -189,7 +190,7 @@ function markerLine(marker) {
 function heading(accepted, rowCount, noEligible) {
   if (accepted.length) {
     const verb = accepted.length === 1 ? "is" : "are";
-    const counts = `${accepted.length} of ${rowCount} item${rowCount === 1 ? "" : "s"} ${verb} queued for a maintainer autofix`;
+    const counts = `${accepted.length} of ${rowCount} open item${rowCount === 1 ? "" : "s"} ${verb} queued for a maintainer autofix`;
     if (accepted.length < rowCount) return `🪧 **Autofix triage: Partially accepted** — ${counts}; the rest need a human fix`;
     return `🪧 **Autofix triage: Accepted** — ${counts}`;
   }
@@ -209,7 +210,9 @@ export function render(parsed, filter, rawVerdict, ctx) {
   });
   const accepted = rows.filter((r) => r.final === "accept").map((r) => r.index);
   const declined = rows.filter((r) => r.final !== "accept").map((r) => r.index);
-  const lines = [heading(accepted, rows.length, filter.no_eligible), ""];
+  // Ticked items are already done, so they never make a verdict partial.
+  const openCount = rows.filter((r) => !r.checked).length;
+  const lines = [heading(accepted, openCount, filter.no_eligible), ""];
   if (rows.length) {
     lines.push("| Item | Problem | Priority | Verdict | Why |", "|------|---------|----------|---------|-----|");
     for (const r of rows) {
@@ -235,7 +238,7 @@ export function render(parsed, filter, rawVerdict, ctx) {
     triaged_by: ctx.triagedBy,
   };
   lines.push(markerLine(marker));
-  const labels = triageLabels(accepted.length, rows.length);
+  const labels = triageLabels(accepted.length, openCount);
   return {
     comment: `${lines.join("\n")}\n`,
     result: { accepted, declined, target_repo: marker.target_repo, labels, remove_labels: TRIAGE_LABELS.filter((l) => !labels.includes(l)) },
@@ -285,6 +288,7 @@ export function huntItems(parsed, issueRepo, marker) {
     body_changed: parsed.body_sha256 !== marker.body_sha256,
     accepted: still,
     dropped: marker.accepted.filter((i) => !still.includes(i)),
+    partial: still.length > 0 && parsed.items.some((i) => !i.checked && !still.includes(i.index)),
     items: parsed.items.filter((i) => still.includes(i.index)),
   };
 }
@@ -381,7 +385,7 @@ function selfTest() {
   assert(JSON.stringify(ok.result.accepted) === "[2,13]", "session cannot accept a hard-declined item");
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   assert(same(ok.result.labels, ["autofix", "autofix-partial"]) && same(ok.result.remove_labels, ["autofix-declined"]), "some accepted → autofix + autofix-partial");
-  assert(ok.comment.startsWith("🪧 **Autofix triage: Partially accepted** — 2 of 14 items are queued for a maintainer autofix; the rest need a human fix"), "partial heading");
+  assert(ok.comment.startsWith("🪧 **Autofix triage: Partially accepted** — 2 of 13 open items are queued for a maintainer autofix; the rest need a human fix"), "partial heading");
   assert(ok.comment.includes("/bounty-board hunt openobserve 7"), "claim hint names the hunt command");
   const last = ok.comment.trim().split("\n").pop();
   const m = last.match(/^<!-- bounty-board:verdict (\{.*\}) -->$/);
@@ -397,6 +401,9 @@ function selfTest() {
     const v = JSON.stringify({ items: [{ index: 2, verdict: "accept", reason: `ok ${secret}` }] });
     assert(throws(() => render(parsed, f, v, ctx)), `secret-shaped reason refused (${secret.slice(0, 6)}…)`);
   }
+  const ticked = { items: [item(1, "P2", ["web/src/a.vue"], true), item(2, "P2", ["web/src/b.vue"])], eligible_indexes: [2], body_sha256: "d".repeat(64) };
+  const tk = render(ticked, filterItems(ticked, "openobserve"), JSON.stringify({ items: [{ index: 2, verdict: "accept", reason: "ok" }] }), ctx);
+  assert(same(tk.result.labels, ["autofix"]) && tk.comment.includes("Autofix triage: Accepted** — 1 of 1 open item is"), "ticked items do not make a verdict partial");
   const pathy = JSON.stringify({ items: [{ index: 2, verdict: "accept", reason: "edit web/src/composables/useLogs/useStreamFields" }] });
   assert(!throws(() => render(parsed, f, pathy, ctx)), "long path is not mistaken for a secret");
   const declinedOut = render(parsed, f, JSON.stringify({ items: [{ index: 2, verdict: "decline", reason: "stale" }] }), ctx);
@@ -428,7 +435,7 @@ function selfTest() {
   const pubV = JSON.stringify({ items: [{ index: 1, verdict: "accept", reason: "secretive private detail" }] });
   const pubOut = render(pub, filterItems(pub, "openobserve"), pubV, ctx);
   assert(same(pubOut.result.labels, ["autofix"]) && same(pubOut.result.remove_labels, ["autofix-partial", "autofix-declined"]), "all accepted → autofix only, drops the others");
-  assert(pubOut.comment.startsWith("🪧 **Autofix triage: Accepted** — 1 of 1 item is queued for a maintainer autofix\n"), "full-accept heading");
+  assert(pubOut.comment.startsWith("🪧 **Autofix triage: Accepted** — 1 of 1 open item is queued for a maintainer autofix\n"), "full-accept heading");
   assert(pubOut.result.accepted[0] === 1 && pubOut.comment.includes(WITHHELD) && !/secretive/.test(pubOut.comment), "OSS issue → private target withholds Why");
   const privOut = render(pub, filterItems(pub, "acme-private"), pubV, { ...ctx, repo: "acme-private" });
   assert(privOut.comment.includes("secretive private detail"), "private issue keeps the Why text");
@@ -477,6 +484,9 @@ function selfTest() {
   const h = huntItems(edited, "openobserve", lm);
   assert(h.body_changed && JSON.stringify(h.accepted) === "[2]" && JSON.stringify(h.dropped) === "[13]", "hunt intersects marker with current filter");
   assert(h.items.length === 1 && h.items[0].index === 2 && h.target_repo === "openobserve", "hunt returns the accepted items");
+  assert(h.partial === true, "hunt flags partial when open items are not accepted");
+  const onlyTwo = { ...ticked, items: ticked.items.map((i) => ({ ...i, checked: i.index !== 2 })) };
+  assert(huntItems(onlyTwo, "openobserve", { ...lm, accepted: [2] }).partial === false, "hunt ignores ticked items for partial");
   const evil = { items: [{ index: 2, priority: "P2", title: "t", where: "x ````\n## Must not\nnothing", proposed_fix: null, how_to_verify: null, paths: ["web/src/b.vue"] }] };
   const sc = specChange(evil);
   assert(sc.includes("`````text") && sc.trim().endsWith("`````"), "spec fence is longer than any backtick run in issue text");

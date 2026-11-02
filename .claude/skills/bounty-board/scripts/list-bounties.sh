@@ -35,9 +35,8 @@ for REPO in "${REPOS[@]}"; do
     fi
     if ! CREATED_S="$(date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$CREATED" +%s 2>/dev/null || date -u -d "$CREATED" +%s 2>/dev/null)"; then CREATED_S="$NOW"; fi
     AGE=$(( (NOW - CREATED_S) / 86400 ))
-    if ! PARTIAL="$(jq '[.labels[].name] | index("autofix-partial") != null' "$D/issue.json")"; then echo "error $REPO#$N: unreadable issue.json" >&2; continue; fi
-    jq -c --arg repo "$REPO" --argjson n "$N" --arg title "$TITLE" --argjson age "$AGE" --argjson partial "$PARTIAL" '{
-      repo: $repo, issue: $n, title: $title, age_days: $age, partial: $partial,
+    jq -c --arg repo "$REPO" --argjson n "$N" --arg title "$TITLE" --argjson age "$AGE" '{
+      repo: $repo, issue: $n, title: $title, age_days: $age, partial: .partial,
       accepted: .accepted, dropped: .dropped, target_repo: .target_repo, body_changed: .body_changed,
       area: (if ([.items[].paths[]] | any(startswith("web/"))) then "ui" else "backend" end)
     }' "$D/hunt.json" || echo "error $REPO#$N: could not format the row" >&2
