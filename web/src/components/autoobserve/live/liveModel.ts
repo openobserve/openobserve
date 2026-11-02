@@ -27,6 +27,7 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import { useI18nTyped } from "@/types/i18n";
+import { useNow } from "@/composables/useNow";
 import {
   autoobserveCoverageQuery,
   autoobserveSuggestionsPageQuery,
@@ -168,6 +169,7 @@ export const useLiveAutoObserve = () => {
   const live = useLiveMode();
   const { t } = useI18nTyped();
   const zone = useLiveZone();
+  const now = useNow();
   const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
   const enabled = computed(() => live.value && !!org.value);
   const coverage = useQuery(() =>
@@ -187,8 +189,16 @@ export const useLiveAutoObserve = () => {
     () => stateOf(suggestions, retry),
     () => org.value,
   );
+  // Ages are whole minutes, so the rows rebuild once a minute, not on every clock tick.
+  const minute = computed(() => Math.floor(now.value / 60_000));
   const source = computed<CoverageSource>(() =>
-    toCoverageSource(t, coverage.data.value, coverageState.value, zone.value.locale),
+    toCoverageSource(
+      t,
+      coverage.data.value,
+      coverageState.value,
+      zone.value.locale,
+      minute.value * 60_000,
+    ),
   );
   const rail = computed<RailSource>(() => ({
     ...railState.value,

@@ -299,8 +299,8 @@ const uniqueNames = (rows: AutoObserveCoverageRow[]) => {
   });
 };
 
-const minutesSince = (passAt: number | null) =>
-  passAt ? Math.max(0, Math.floor((Date.now() - passAt / 1000) / 60_000)) : null;
+const minutesSince = (passAt: number | null, now: number) =>
+  passAt ? Math.max(0, Math.floor((now - passAt / 1000) / 60_000)) : null;
 
 const toRow = (
   t: TranslateFn,
@@ -365,12 +365,13 @@ export const toCoverageSource = (
   data: AutoObserveCoverage | undefined,
   state: SourceState,
   locale: string,
+  now = Date.now(),
 ): CoverageSource => {
   const base = { busy: false, failure: null, detail: raw(""), stale: null, ...state };
   if (!data)
     return { ...base, rows: [], totals: EMPTY_TOTALS, planned: new Set(), passMinutes: null };
   const names = uniqueNames(data.rows);
-  const minutes = minutesSince(data.pass_at);
+  const minutes = minutesSince(data.pass_at, now);
   const rows = data.rows.map((row, i) => toRow(t, row, names[i], minutes, locale));
   const planned = new Set(data.rows.flatMap((row, i) => (cannotWatch(row) ? [names[i]] : [])));
   return { ...base, rows, totals: totalsOf(data, rows), planned, passMinutes: minutes };
