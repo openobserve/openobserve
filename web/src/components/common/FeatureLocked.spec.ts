@@ -24,8 +24,6 @@ vi.mock("vuex", () => ({
   useStore: () => ({ state: { zoConfig: { feature_names: { ai_assistant: "AI Assistant" } } } }),
 }));
 
-const openMock = vi.fn();
-
 describe("FeatureLocked", () => {
   it("renders the shared license-denied state for the routed feature", () => {
     const w = mount(FeatureLocked, {
@@ -37,18 +35,14 @@ describe("FeatureLocked", () => {
     expect(w.findComponent(LicenseDeniedState).props("features")).toEqual(["ai_assistant"]);
   });
 
-  it("offers a contact-sales action below the denied state", async () => {
-    vi.stubGlobal("open", openMock);
+  it("tells the user to ask an administrator and offers no contact-sales action", () => {
     const w = mount(FeatureLocked, {
       global: {
         plugins: [i18n],
         stubs: { OPageLayout: { template: "<div><slot /></div>" } },
       },
     });
-    const cta = w.find('[data-test="feature-locked-contact-sales"]');
-    expect(cta.text()).toBe("Contact sales");
-    await cta.trigger("click");
-    expect(openMock).toHaveBeenCalledWith(expect.any(String), "_blank", "noopener");
-    vi.unstubAllGlobals();
+    expect(w.text()).toContain("Ask your administrator to update the license");
+    expect(w.find('[data-test="feature-locked-contact-sales"]').exists()).toBe(false);
   });
 });

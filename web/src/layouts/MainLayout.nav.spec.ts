@@ -23,7 +23,8 @@ import router from "@/test/unit/helpers/router";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import { groupNavLinks, NAV_GROUPS } from "@/lib/core/Navbar/navGroups";
 import type { NavItem, RailEntry } from "@/lib/core/Navbar/ONavbar.types";
-import { addLicenseDeniedError } from "@/composables/useLicenseDenials";
+import { toastRecords, dismissAll } from "@/lib/feedback/Toast/useToast";
+import { addLicenseDeniedError, clearLicenseDenials } from "@/composables/useLicenseDenials";
 
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
@@ -36,6 +37,7 @@ vi.mock("@openobserve/browser-rum", () => ({
 import MainLayout from "./MainLayout.vue";
 
 const StubDiv = defineComponent({ setup: () => () => h("div") });
+const RoutedPage = defineComponent({ setup: () => () => h("div", { "data-test": "routed-page" }) });
 const NavbarStub = defineComponent({
   name: "ONavbar",
   props: { linksList: { type: Array, default: () => [] }, loading: Boolean },
@@ -45,7 +47,7 @@ const NavbarStub = defineComponent({
 describe("MainLayout — Product Analytics menu entry", () => {
   let wrapper: VueWrapper | undefined;
 
-  const railItems = async (): Promise<NavItem[]> => {
+  const railItems = async (realRouterView = false): Promise<NavItem[]> => {
     wrapper = mount(MainLayout, {
       global: {
         plugins: [store, i18n, router],
@@ -63,7 +65,7 @@ describe("MainLayout — Product Analytics menu entry", () => {
           SlackIcon: StubDiv,
           ManagementIcon: StubDiv,
           ODialog: StubDiv,
-          "router-view": StubDiv,
+          ...(realRouterView ? {} : { "router-view": StubDiv }),
         },
       },
     });
@@ -162,6 +164,8 @@ describe("MainLayout — Product Analytics menu entry", () => {
     afterEach(() => {
       config.isEnterprise = edition;
       delete store.state.zoConfig.features;
+      dismissAll();
+      clearLicenseDenials();
     });
 
     it("keeps a locked feature on the rail with a lock, pointing at its own page", async () => {
@@ -184,11 +188,13 @@ describe("MainLayout — Product Analytics menu entry", () => {
       await router.push("/locked-probe");
       store.state.zoConfig.features = { workflows: "locked" };
       await railItems();
+      (wrapper!.vm as any).isLoading = true;
+      await flushPromises();
       expect((wrapper!.vm as any).lockedFeature).toBe("workflows");
       addLicenseDeniedError(["alerts"]);
       await flushPromises();
-      expect(wrapper!.find('[data-test="feature-lock-banner-denied"]').exists()).toBe(false);
-      expect(wrapper!.find('[data-test="feature-lock-banner-dismiss"]').exists()).toBe(false);
+      // A locked page shows its own message, so a background denial raises no toast.
+      expect(toastRecords).toHaveLength(0);
       store.state.zoConfig.features = { workflows: "enabled" };
       await flushPromises();
       expect((wrapper!.vm as any).lockedFeature).toBeNull();
@@ -204,18 +210,19 @@ describe("MainLayout — Product Analytics menu entry", () => {
       (wrapper!.vm as any).isLoading = true;
       addLicenseDeniedError(["oncall"]);
       await flushPromises();
-      const denied = () => wrapper!.find('[data-test="feature-lock-banner-denied"]');
-      expect(denied().text()).toContain("oncall");
+      expect(toastRecords.map((r) => r.variant)).toEqual(["warning"]);
       await router.push({ path: "/denial-a", query: { period: "15m" } });
       await flushPromises();
-      expect(denied().exists()).toBe(true);
+      addLicenseDeniedError(["oncall"]);
+      expect(toastRecords).toHaveLength(1);
       const startedOnA = Date.now() - 1;
       await router.push("/denial-b");
       await flushPromises();
-      expect(denied().exists()).toBe(false);
       addLicenseDeniedError(["oncall"], startedOnA);
-      await flushPromises();
-      expect(denied().exists()).toBe(false);
+      expect(toastRecords).toHaveLength(1);
+      dismissAll();
+      addLicenseDeniedError(["oncall"]);
+      expect(toastRecords).toHaveLength(1);
       await router.push("/");
       router.removeRoute("denialA");
       router.removeRoute("denialB");

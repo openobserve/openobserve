@@ -22,6 +22,11 @@ vi.mock("../stores", () => ({
 vi.mock("../aws-exports", () => ({ default: { isCloud: "false", isEnterprise: "true" } }));
 vi.mock("@/utils/zincutils", () => ({ useLocalCurrentUser: vi.fn(), useLocalUserInfo: vi.fn() }));
 vi.mock("axios");
+// Spy on toast but keep the real store, so error-toast dedupe is still exercised.
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>();
+  return { ...actual, toast: vi.fn(actual.toast) };
+});
 
 import axios from "axios";
 import { mount, type VueWrapper } from "@vue/test-utils";
@@ -31,7 +36,7 @@ import { installFetchLicenseReceiver } from "./licenseDenialReceiver";
 import { raw } from "@/types/i18n";
 import { provideFeatureLock } from "@/composables/useFeatureLock";
 import { dismissAll, toast, toastRecords } from "@/lib/feedback/Toast/useToast";
-import { clearLicenseDenials, useLicenseDenials } from "@/composables/useLicenseDenials";
+import { clearLicenseDenials } from "@/composables/useLicenseDenials";
 
 // Sends the request config through the instance's request interceptor, then fails it with `error`.
 const sendAndFail = (error: any, beforeResponse: () => void = () => {}) => {
@@ -71,6 +76,10 @@ const navigate = () => {
   clearLicenseDenials();
 };
 
+const denialToasts = () => vi.mocked(toast).mock.calls.filter(([o]) => o.variant === "warning");
+// Record-store view of the error toasts only; the denial warning also lands there.
+const errorRecords = () => toastRecords.filter((r) => r.variant === "error");
+
 const feature = ref<string | null>("workflows");
 let wrapper: VueWrapper | undefined;
 
@@ -79,11 +88,13 @@ let now = 0;
 beforeEach(() => vi.useFakeTimers({ toFake: ["Date"], now: (now += 5000) }));
 
 afterEach(() => {
+  // Clear while the fake clock runs, or pageChangedAt lands in real time and rejects every later request.
+  clearLicenseDenials();
   vi.useRealTimers();
   wrapper?.unmount();
   wrapper = undefined;
   dismissAll();
-  useLicenseDenials().dismiss();
+  vi.mocked(toast).mockClear();
 });
 
 describe("http on a license-locked page", () => {
@@ -99,56 +110,68 @@ describe("http on a license-locked page", () => {
     );
   });
 
-  it("keeps a denial of the locked feature off the top bar and out of toasts", async () => {
+  it("keeps a denial of the locked feature without a denial toast and out of error toasts", async () => {
     await failAndToast(denial("workflows", "Workflows is not in your license"));
-    expect(toastRecords).toHaveLength(0);
-    expect(useLicenseDenials().features.value).toBeNull();
+    expect(errorRecords()).toHaveLength(0);
+    expect(denialToasts()).toHaveLength(0);
   });
 
   it("still toasts a non-license error when no denial preceded it", async () => {
     await sendAndFail(serverError("Header lookup failed")).catch(() =>
       toast({ variant: "error", message: raw("A new version is available, refresh") }),
     );
-    expect(toastRecords.map((r) => r.message)).toEqual(["A new version is available, refresh"]);
+    expect(errorRecords().map((r) => r.message)).toEqual(["A new version is available, refresh"]);
   });
 
-  it("keeps a denial of another feature off the top bar and out of toasts", async () => {
+  it("keeps a denial of another feature without a denial toast and out of error toasts", async () => {
     await failAndToast(denial("ai_assistant", "AI assistant is not in your license"));
-    expect(useLicenseDenials().features.value).toBeNull();
-    expect(toastRecords).toHaveLength(0);
+    expect(denialToasts()).toHaveLength(0);
+    expect(errorRecords()).toHaveLength(0);
   });
 
-  it("keeps a denial naming the locked feature and another off the top bar", async () => {
+  it("keeps a denial naming the locked feature and another without a denial toast", async () => {
     await failAndToast(denial("workflows, oncall", "Not in your license"));
-    expect(useLicenseDenials().features.value).toBeNull();
+    expect(denialToasts()).toHaveLength(0);
   });
 });
 
 describe("http with no page locked", () => {
-  it("puts the denial on the top bar and drops the catch site's generic toast", async () => {
+  it("shows one denial warning and drops the catch site's generic toast", async () => {
     await failAndToast(denial("workflows", "Workflows needs a license"));
-    expect(useLicenseDenials().features.value).toEqual(["workflows"]);
-    expect(toastRecords).toHaveLength(0);
+    expect(denialToasts()).toHaveLength(1);
+    expect(denialToasts()[0][0].variant).toBe("warning");
+    expect(errorRecords()).toHaveLength(0);
+  });
+
+  it("warns once per feature set until the page changes, and again for a different set", async () => {
+    await failAndToast(denial("workflows", "Workflows needs a license"));
+    await failAndToast(denial("workflows", "Workflows needs a license"));
+    expect(denialToasts()).toHaveLength(1);
+    await failAndToast(denial("oncall", "Oncall needs a license"));
+    expect(denialToasts()).toHaveLength(2);
+    navigate();
+    await failAndToast(denial("workflows", "Workflows needs a license"));
+    expect(denialToasts()).toHaveLength(3);
   });
 
   it("toasts again once the denial's window has passed", async () => {
     await failAndToast(denial("workflows", "Workflows needs a license"));
     vi.setSystemTime(Date.now() + 2000);
     genericToast();
-    expect(toastRecords).toHaveLength(1);
+    expect(errorRecords()).toHaveLength(1);
   });
 
   it("still toasts a non-license error", async () => {
     await sendAndFail(serverError("Header lookup failed")).catch((err: any) =>
       toast({ variant: "error", message: raw(err.response.data.message) }),
     );
-    expect(toastRecords.map((r) => r.message)).toEqual(["Header lookup failed"]);
+    expect(errorRecords().map((r) => r.message)).toEqual(["Header lookup failed"]);
   });
 
-  it("keeps a denial of a request the previous page started off the bar, and out of toasts", async () => {
+  it("keeps a denial of a request the previous page started without a denial toast, and out of error toasts", async () => {
     await failAndToast(denial("workflows", "Workflows needs a license"), navigate);
-    expect(useLicenseDenials().features.value).toBeNull();
-    expect(toastRecords).toHaveLength(0);
+    expect(denialToasts()).toHaveLength(0);
+    expect(errorRecords()).toHaveLength(0);
   });
 });
 
@@ -174,39 +197,39 @@ describe("fetch license receiver", () => {
     window.fetch = nativeFetch;
   });
 
-  it("sends a 403 + 40001 from the API to the top bar and returns the response untouched", async () => {
+  it("sends a 403 + 40001 from the API to a warning toast and returns the response untouched", async () => {
     const response = respond("http://localhost:5080/api/org/oncall", 403, licenseBody);
     const got = await fetch("http://localhost:5080/api/org/oncall");
     expect(got).toBe(response);
-    expect(useLicenseDenials().features.value).toEqual(["oncall"]);
+    expect(denialToasts()).toHaveLength(1);
     genericToast();
-    expect(toastRecords).toHaveLength(0);
+    expect(errorRecords()).toHaveLength(0);
   });
 
-  it("keeps a denial of a request the previous page started off the bar, and out of toasts", async () => {
+  it("keeps a denial of a request the previous page started without a denial toast, and out of error toasts", async () => {
     respond("http://localhost:5080/api/org/oncall", 403, licenseBody, navigate);
     await fetch("http://localhost:5080/api/org/oncall");
-    expect(useLicenseDenials().features.value).toBeNull();
+    expect(denialToasts()).toHaveLength(0);
     genericToast();
-    expect(toastRecords).toHaveLength(0);
+    expect(errorRecords()).toHaveLength(0);
   });
 
   it("ignores a 403 that is not a license denial", async () => {
     respond("http://localhost:5080/api/org/x", 403, JSON.stringify({ code: 403 }));
     await fetch("http://localhost:5080/api/org/x");
-    expect(useLicenseDenials().features.value).toBeNull();
+    expect(denialToasts()).toHaveLength(0);
   });
 
   it("ignores a license-shaped 403 from another origin", async () => {
     respond("https://elsewhere.example/api/org/oncall", 403, licenseBody);
     await fetch("https://elsewhere.example/api/org/oncall");
-    expect(useLicenseDenials().features.value).toBeNull();
+    expect(denialToasts()).toHaveLength(0);
   });
 
   it("returns a 403 whose body is not JSON without throwing", async () => {
     const response = respond("http://localhost:5080/api/org/x", 403, "<html>forbidden</html>");
     await expect(fetch("http://localhost:5080/api/org/x")).resolves.toBe(response);
     expect(await response.text()).toBe("<html>forbidden</html>");
-    expect(useLicenseDenials().features.value).toBeNull();
+    expect(denialToasts()).toHaveLength(0);
   });
 });
