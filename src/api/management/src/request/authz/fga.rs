@@ -132,6 +132,7 @@ pub async fn create_role(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -140,9 +141,12 @@ pub async fn create_role(
     )
 )]
 pub async fn delete_role(Path((org_id, role_name)): Path<(String, String)>) -> Response {
+    if !is_storable_name("role", &org_id, &role_name) {
+        return MetaHttpResponse::bad_request("Invalid role name");
+    }
     match o2_openfga::authorizer::roles::delete_role(&org_id, &role_name).await {
         Ok(_) => MetaHttpResponse::ok(serde_json::json!({"successful": "true"})),
-        Err(err) => MetaHttpResponse::internal_error(err),
+        Err(e) => failure_response(&e, "Failed to delete role"),
     }
 }
 
@@ -165,6 +169,7 @@ pub async fn delete_role(Path((org_id, role_name)): Path<(String, String)>) -> R
     request_body(content = BulkDeleteRequest, description = "names of role to be deleted", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+        (status = 400, description = "Invalid role name", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
@@ -176,6 +181,13 @@ pub async fn delete_role_bulk(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<BulkDeleteRequest>,
 ) -> Response {
+    if req
+        .ids
+        .iter()
+        .any(|name| !is_storable_name("role", &org_id, name))
+    {
+        return MetaHttpResponse::bad_request("Invalid role name");
+    }
     let user_id = user_email.user_id;
 
     for name in &req.ids {
@@ -196,27 +208,15 @@ pub async fn delete_role_bulk(
         }
     }
 
-    let mut successful = Vec::with_capacity(req.ids.len());
-    let mut unsuccessful = Vec::with_capacity(req.ids.len());
-    let mut err = None;
-
-    for name in req.ids {
-        match o2_openfga::authorizer::roles::delete_role(&org_id, &name).await {
-            Ok(_) => {
-                successful.push(name);
-            }
-            Err(e) => {
-                log::error!("error in deleting role {org_id}/{name} : {e}");
-                unsuccessful.push(name);
-                err = Some(e.to_string());
-            }
-        }
-    }
-    MetaHttpResponse::json(BulkDeleteResponse {
-        successful,
-        unsuccessful,
-        err,
-    })
+    let org = org_id.as_str();
+    MetaHttpResponse::json(
+        bulk_delete(
+            req.ids,
+            |name| async move { o2_openfga::authorizer::roles::delete_role(org, &name).await },
+            "Failed to delete role",
+        )
+        .await,
+    )
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -343,10 +343,10 @@ pub async fn get_roles(
         }
     }
 
-    match o2_openfga::authorizer::roles::get_all_roles(&org_id, permitted).await {
-        Ok(res) => Json(res).into_response(),
-        Err(err) => MetaHttpResponse::internal_error(err),
-    }
+    lookup_response(
+        o2_openfga::authorizer::roles::get_all_roles(&org_id, permitted).await,
+        "Failed to list roles",
+    )
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -396,6 +396,7 @@ pub async fn get_roles(Path(_org_id): Path<String>) -> Response {
     request_body(content = inline(RoleRequest), description = "RoleRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid role name or user id", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -407,6 +408,23 @@ pub async fn update_role(
     Path((org_id, role_id)): Path<(String, String)>,
     Json(update_role): Json<RoleRequest>,
 ) -> Response {
+    use o2_openfga::authorizer::{is_valid_tuple_user, org_scoped_object, roles::format_role_user};
+
+    // The role also becomes the `role:{org}/{name}#has` user, which has its own length limit.
+    if org_scoped_object("role", &org_id, &role_id).is_none()
+        || !is_valid_tuple_user(&format_role_user(&org_id, &role_id))
+    {
+        return MetaHttpResponse::bad_request("Invalid role name");
+    }
+    if !update_role
+        .add_users
+        .iter()
+        .chain(update_role.remove_users.iter())
+        .flatten()
+        .all(|user| o2_openfga::authorizer::is_valid_user_id(user))
+    {
+        return MetaHttpResponse::bad_request("Invalid user id in role users");
+    }
     match o2_openfga::authorizer::roles::update_role(
         &org_id,
         &role_id,
@@ -418,7 +436,7 @@ pub async fn update_role(
     .await
     {
         Ok(_) => MetaHttpResponse::ok("Role updated successfully"),
-        Err(err) => MetaHttpResponse::internal_error(err),
+        Err(e) => failure_response(&e, "Failed to update role"),
     }
 }
 
@@ -476,10 +494,10 @@ pub async fn update_role(
 pub async fn get_role_permissions(
     Path((org_id, role_id, resource)): Path<(String, String, String)>,
 ) -> Response {
-    match o2_openfga::authorizer::roles::get_role_permissions(&org_id, &role_id, &resource).await {
-        Ok(res) => Json(res).into_response(),
-        Err(err) => MetaHttpResponse::internal_error(err),
-    }
+    lookup_response(
+        o2_openfga::authorizer::roles::get_role_permissions(&org_id, &role_id, &resource).await,
+        "Failed to get role permissions",
+    )
 }
 
 #[cfg(feature = "enterprise")]
@@ -505,10 +523,10 @@ pub async fn get_role_permissions(
     )
 )]
 pub async fn get_all_role_permissions(Path((org_id, role_id)): Path<(String, String)>) -> Response {
-    match o2_openfga::authorizer::roles::get_all_role_permissions(&org_id, &role_id).await {
-        Ok(res) => Json(res).into_response(),
-        Err(err) => MetaHttpResponse::internal_error(err),
-    }
+    lookup_response(
+        o2_openfga::authorizer::roles::get_all_role_permissions(&org_id, &role_id).await,
+        "Failed to get role permissions",
+    )
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -585,7 +603,7 @@ pub async fn get_role_permissions(Path(_path): Path<(String, String, String)>) -
     )
 )]
 pub async fn get_users_with_role(Path((org_id, role_id)): Path<(String, String)>) -> Response {
-    role_lookup_response(
+    lookup_response(
         o2_openfga::authorizer::roles::get_users_with_role(&org_id, &role_id).await,
         "Failed to get users with role",
     )
@@ -639,7 +657,7 @@ pub async fn get_users_with_role(Path(_path): Path<(String, String)>) -> Respons
     )
 )]
 pub async fn get_roles_for_user(Path((org_id, user_email)): Path<(String, String)>) -> Response {
-    role_lookup_response(
+    lookup_response(
         o2_openfga::authorizer::roles::get_roles_for_org_user(&org_id, &user_email).await,
         "Failed to get roles for user",
     )
@@ -692,10 +710,10 @@ pub async fn get_roles_for_user(Path(_path): Path<(String, String)>) -> Response
     )
 )]
 pub async fn get_roles_for_all_users(Path(org_id): Path<String>) -> Response {
-    match o2_openfga::authorizer::roles::get_roles_for_all_org_users(&org_id).await {
-        Ok(res) => Json(res).into_response(),
-        Err(err) => MetaHttpResponse::internal_error(err),
-    }
+    lookup_response(
+        o2_openfga::authorizer::roles::get_roles_for_all_org_users(&org_id).await,
+        "Failed to get roles for users",
+    )
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -741,14 +759,18 @@ pub async fn get_roles_for_all_users(Path(_path): Path<String>) -> Response {
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
+        (status = 400, description = "Invalid user id", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 pub async fn get_groups_for_user(Path((org_id, user_email)): Path<(String, String)>) -> Response {
-    match o2_openfga::authorizer::groups::get_groups_for_org_user(&org_id, &user_email).await {
-        Ok(res) => Json(res).into_response(),
-        Err(err) => MetaHttpResponse::internal_error(err),
+    if !o2_openfga::authorizer::is_valid_user_id(&user_email) {
+        return MetaHttpResponse::bad_request("Invalid user id");
     }
+    lookup_response(
+        o2_openfga::authorizer::groups::get_groups_for_org_user(&org_id, &user_email).await,
+        "Failed to get groups for user",
+    )
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -1001,10 +1023,10 @@ pub async fn get_groups(
         permitted = Some(local_permitted);
     }
 
-    match o2_openfga::authorizer::groups::get_all_groups(&org_id, permitted).await {
-        Ok(res) => Json(res).into_response(),
-        Err(err) => MetaHttpResponse::internal_error(err),
-    }
+    lookup_response(
+        o2_openfga::authorizer::groups::get_all_groups(&org_id, permitted).await,
+        "Failed to list groups",
+    )
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -1050,14 +1072,18 @@ pub async fn get_groups(Path(_path): Path<String>) -> Response {
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(UserGroup)),
+        (status = 400, description = "Invalid group name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 pub async fn get_group_details(Path((org_id, group_name)): Path<(String, String)>) -> Response {
-    match o2_openfga::authorizer::groups::get_group_details(&org_id, &group_name).await {
-        Ok(res) => Json(res).into_response(),
-        Err(err) => MetaHttpResponse::internal_error(err),
+    if !is_storable_name("group", &org_id, &group_name) {
+        return MetaHttpResponse::bad_request("Invalid group name");
     }
+    lookup_response(
+        o2_openfga::authorizer::groups::get_group_details(&org_id, &group_name).await,
+        "Failed to get group",
+    )
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -1174,13 +1200,17 @@ pub async fn get_resources(Path(_org_id): Path<String>) -> Response {
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid group name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 pub async fn delete_group(Path((org_id, group_name)): Path<(String, String)>) -> Response {
+    if !is_storable_name("group", &org_id, &group_name) {
+        return MetaHttpResponse::bad_request("Invalid group name");
+    }
     match o2_openfga::authorizer::groups::delete_group(&org_id, &group_name).await {
         Ok(_) => MetaHttpResponse::ok(serde_json::json!({"successful": "true"})),
-        Err(err) => MetaHttpResponse::internal_error(err),
+        Err(e) => failure_response(&e, "Failed to delete group"),
     }
 }
 
@@ -1203,6 +1233,7 @@ pub async fn delete_group(Path((org_id, group_name)): Path<(String, String)>) ->
     request_body(content = BulkDeleteRequest, description = "user group names", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+        (status = 400, description = "Invalid group name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1214,6 +1245,13 @@ pub async fn delete_group_bulk(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<BulkDeleteRequest>,
 ) -> Response {
+    if req
+        .ids
+        .iter()
+        .any(|name| !is_storable_name("group", &org_id, name))
+    {
+        return MetaHttpResponse::bad_request("Invalid group name");
+    }
     let user_id = user_email.user_id;
 
     for name in &req.ids {
@@ -1234,28 +1272,15 @@ pub async fn delete_group_bulk(
         }
     }
 
-    let mut successful = Vec::with_capacity(req.ids.len());
-    let mut unsuccessful = Vec::with_capacity(req.ids.len());
-    let mut err = None;
-
-    for name in req.ids {
-        match o2_openfga::authorizer::groups::delete_group(&org_id, &name).await {
-            Ok(_) => {
-                successful.push(name);
-            }
-            Err(e) => {
-                log::error!("error in deleting group {org_id}/{name} : {e}");
-                unsuccessful.push(name);
-                err = Some(e.to_string());
-            }
-        }
-    }
-
-    MetaHttpResponse::json(BulkDeleteResponse {
-        successful,
-        unsuccessful,
-        err,
-    })
+    let org = org_id.as_str();
+    MetaHttpResponse::json(
+        bulk_delete(
+            req.ids,
+            |name| async move { o2_openfga::authorizer::groups::delete_group(org, &name).await },
+            "Failed to delete group",
+        )
+        .await,
+    )
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -1332,15 +1357,54 @@ fn hide_slack_unless_enabled<'a, 'b>(
         .collect()
 }
 
-/// The lookup's list, or a fixed 500 that keeps the OpenFGA error in the server log.
+/// The lookup's result, or a fixed 500 that keeps the OpenFGA error in the server log.
 #[cfg(feature = "enterprise")]
-fn role_lookup_response(result: Result<Vec<String>, anyhow::Error>, failure: &str) -> Response {
+fn lookup_response<T: serde::Serialize>(
+    result: Result<T, anyhow::Error>,
+    failure: &str,
+) -> Response {
     match result {
-        Ok(list) => Json(list).into_response(),
-        Err(e) => {
-            log::error!("{failure}: {e}");
-            MetaHttpResponse::internal_error(failure)
+        Ok(found) => Json(found).into_response(),
+        Err(e) => failure_response(&e, failure),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn failure_response(e: &anyhow::Error, failure: &str) -> Response {
+    // The authorizer's error carries raw OpenFGA text, which stays in the server log.
+    log::error!("{failure}: {e}");
+    MetaHttpResponse::internal_error(failure)
+}
+
+#[cfg(feature = "enterprise")]
+fn is_storable_name(object_type: &str, org_id: &str, name: &str) -> bool {
+    // Shape only: an empty name was storable before, so such a role or group must stay deletable.
+    o2_openfga::authorizer::is_valid_tuple_object(&format!("{object_type}:{org_id}/{name}"))
+}
+
+#[cfg(feature = "enterprise")]
+async fn bulk_delete<F, Fut>(ids: Vec<String>, delete: F, failure: &str) -> BulkDeleteResponse
+where
+    F: Fn(String) -> Fut,
+    Fut: std::future::Future<Output = Result<(), anyhow::Error>>,
+{
+    let mut successful = Vec::with_capacity(ids.len());
+    let mut unsuccessful = Vec::with_capacity(ids.len());
+    let mut err = None;
+    for name in ids {
+        match delete(name.clone()).await {
+            Ok(_) => successful.push(name),
+            Err(e) => {
+                log::error!("{failure} {name}: {e}");
+                unsuccessful.push(name);
+                err = Some(failure.to_string());
+            }
         }
+    }
+    BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
     }
 }
 
@@ -1445,6 +1509,10 @@ mod tests {
                 extract_status_code(&resp),
                 StatusCode::INTERNAL_SERVER_ERROR
             );
+            assert_eq!(
+                response_json(resp).await["message"],
+                "Failed to delete role"
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1464,6 +1532,7 @@ mod tests {
                 extract_status_code(&resp),
                 StatusCode::INTERNAL_SERVER_ERROR
             );
+            assert_eq!(response_json(resp).await["message"], "Failed to list roles");
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1499,6 +1568,10 @@ mod tests {
             assert_eq!(
                 extract_status_code(&resp),
                 StatusCode::INTERNAL_SERVER_ERROR
+            );
+            assert_eq!(
+                response_json(resp).await["message"],
+                "Failed to update role"
             );
         }
 
@@ -1559,7 +1632,7 @@ mod tests {
             init_ofga_test();
             let resp =
                 get_users_with_role(Path(("test_org".to_string(), "test_role".to_string()))).await;
-            // The failing-read 500 is covered by `role_lookup_response_hides_the_openfga_error`.
+            // The failing-read 500 is covered by `lookup_response_hides_the_openfga_error`.
             assert!(
                 !o2_openfga::config::get_config().enabled,
                 "unit tests run without OpenFGA"
@@ -1586,7 +1659,7 @@ mod tests {
                 "test@example.com".to_string(),
             )))
             .await;
-            // The failing-read 500 is covered by `role_lookup_response_hides_the_openfga_error`.
+            // The failing-read 500 is covered by `lookup_response_hides_the_openfga_error`.
             assert!(
                 !o2_openfga::config::get_config().enabled,
                 "unit tests run without OpenFGA"
@@ -1608,9 +1681,9 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
-    async fn role_lookup_response_hides_the_openfga_error() {
-        let failed = role_lookup_response(
-            Err(anyhow::anyhow!("raw OpenFGA text")),
+    async fn lookup_response_hides_the_openfga_error() {
+        let failed = lookup_response(
+            Err::<Vec<String>, _>(anyhow::anyhow!("raw OpenFGA text")),
             "Failed to get roles for user",
         );
         assert_eq!(
@@ -1621,9 +1694,103 @@ mod tests {
             response_json(failed).await["message"],
             "Failed to get roles for user"
         );
-        let found = role_lookup_response(Ok(vec!["editor".to_string()]), "unused");
+        let found = lookup_response(Ok(vec!["editor".to_string()]), "unused");
         assert_eq!(extract_status_code(&found), StatusCode::OK);
         assert_eq!(response_json(found).await, serde_json::json!(["editor"]));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn roles_and_groups_reject_unstorable_input_with_400() {
+        init_ofga_test();
+        let path = |name: &str| Path(("test_org".to_string(), name.to_string()));
+        let bulk = |name: &str| BulkDeleteRequest {
+            ids: vec!["fine".to_string(), name.to_string()],
+        };
+        for name in ["a#b", "a b", "a:b"] {
+            let responses = [
+                delete_role(path(name)).await,
+                delete_group(path(name)).await,
+                get_group_details(path(name)).await,
+                delete_role_bulk(
+                    Path("test_org".to_string()),
+                    mock_user_email(),
+                    Json(bulk(name)),
+                )
+                .await,
+                delete_group_bulk(
+                    Path("test_org".to_string()),
+                    mock_user_email(),
+                    Json(bulk(name)),
+                )
+                .await,
+            ];
+            for resp in responses {
+                assert_eq!(
+                    extract_status_code(&resp),
+                    StatusCode::BAD_REQUEST,
+                    "{name:?}"
+                );
+            }
+        }
+        for user in ["*", "a#b", ""] {
+            let resp = get_groups_for_user(path(user)).await;
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::BAD_REQUEST,
+                "{user:?}"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn update_role_rejects_invalid_input_with_400() {
+        init_ofga_test();
+        let members = |user: &str| Some(HashSet::from([user.to_string()]));
+        for (name, add_users, remove_users) in [
+            ("test_role", members("*"), None),
+            ("test_role", None, members("a#b")),
+            ("a#b", None, None),
+            ("", members("user1"), None),
+        ] {
+            let role_request = o2_dex::meta::auth::RoleRequest {
+                add: vec![],
+                remove: vec![],
+                add_users,
+                remove_users,
+            };
+            let resp = update_role(
+                Path(("test_org".to_string(), name.to_string())),
+                Json(role_request),
+            )
+            .await;
+            assert_eq!(
+                extract_status_code(&resp),
+                StatusCode::BAD_REQUEST,
+                "{name:?}"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn bulk_delete_hides_the_openfga_error() {
+        let resp = bulk_delete(
+            vec!["kept".to_string(), "broken".to_string()],
+            |name| async move {
+                if name == "broken" {
+                    Err(anyhow::anyhow!("raw OpenFGA text"))
+                } else {
+                    Ok(())
+                }
+            },
+            "Failed to delete role",
+        )
+        .await;
+        assert_eq!(resp.successful, vec!["kept".to_string()]);
+        assert_eq!(resp.unsuccessful, vec!["broken".to_string()]);
+        assert_eq!(resp.err.as_deref(), Some("Failed to delete role"));
     }
 
     #[tokio::test]
@@ -1635,6 +1802,10 @@ mod tests {
             assert_eq!(
                 extract_status_code(&resp),
                 StatusCode::INTERNAL_SERVER_ERROR
+            );
+            assert_eq!(
+                response_json(resp).await["message"],
+                "Failed to get roles for users"
             );
         }
 
@@ -1658,6 +1829,10 @@ mod tests {
             assert_eq!(
                 extract_status_code(&resp),
                 StatusCode::INTERNAL_SERVER_ERROR
+            );
+            assert_eq!(
+                response_json(resp).await["message"],
+                "Failed to get groups for user"
             );
         }
 
@@ -1823,6 +1998,10 @@ mod tests {
                 extract_status_code(&resp),
                 StatusCode::INTERNAL_SERVER_ERROR
             );
+            assert_eq!(
+                response_json(resp).await["message"],
+                "Failed to list groups"
+            );
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1843,6 +2022,7 @@ mod tests {
                 extract_status_code(&resp),
                 StatusCode::INTERNAL_SERVER_ERROR
             );
+            assert_eq!(response_json(resp).await["message"], "Failed to get group");
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1862,6 +2042,10 @@ mod tests {
             assert_eq!(
                 extract_status_code(&resp),
                 StatusCode::INTERNAL_SERVER_ERROR
+            );
+            assert_eq!(
+                response_json(resp).await["message"],
+                "Failed to delete group"
             );
         }
 
