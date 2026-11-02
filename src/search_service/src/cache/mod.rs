@@ -932,7 +932,9 @@ fn sort_response(
 
     let compare = |a: &serde_json::Value, b: &serde_json::Value| {
         for (field, order) in order_by {
-            let cmp = if ts_column == field {
+            // ORDER BY _timestamp sorts by the result time column when the
+            // query aliases it, e.g. `SELECT _timestamp AS ts ... ORDER BY _timestamp`
+            let cmp = if ts_column == field || field == TIMESTAMP_COL_NAME {
                 let a_ts = get_ts_value(ts_column, a);
                 let b_ts = get_ts_value(ts_column, b);
                 a_ts.partial_cmp(&b_ts).unwrap_or(std::cmp::Ordering::Equal)
@@ -1849,5 +1851,50 @@ mod tests {
         let order_by = vec![("name".to_string(), OrderBy::Desc)];
         sort_response(false, &mut resp, "_timestamp", &order_by);
         assert_eq!(ts_of(&resp), vec![30, 20, 10]);
+    }
+
+    fn response_with_alias_ts(ts: &[i64]) -> search::Response {
+        let hits = ts
+            .iter()
+            .map(|t| json::json!({"ts": t, "status": "passed"}))
+            .collect::<Vec<_>>();
+        search::Response {
+            total: hits.len(),
+            hits,
+            ..Default::default()
+        }
+    }
+
+    fn alias_ts_of(resp: &search::Response) -> Vec<i64> {
+        resp.hits.iter().map(|h| get_ts_value("ts", h)).collect()
+    }
+
+    // #16175: `SELECT _timestamp AS ts ... ORDER BY _timestamp DESC` keeps the raw
+    // name in order_by while the hits only carry the alias
+    #[test]
+    fn test_sort_response_orders_by_aliased_timestamp() {
+        let mut resp = response_with_alias_ts(&[10, 30, 20]);
+        let order_by = vec![(TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc)];
+        sort_response(true, &mut resp, "ts", &order_by);
+        assert_eq!(alias_ts_of(&resp), vec![30, 20, 10]);
+    }
+
+    #[test]
+    fn test_merge_response_orders_aliased_timestamp_newest_first() {
+        let order_by = vec![(TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc)];
+        let merged = merge_response(
+            "t",
+            vec![response_with_alias_ts(&[20, 10])],
+            vec![response_with_alias_ts(&[40, 30])],
+            "ts",
+            10,
+            true,
+            0,
+            order_by,
+        );
+        assert_eq!(alias_ts_of(&merged), vec![40, 30, 20, 10]);
+        // write_results() takes the time range from the first and last hit
+        let (start, end) = result_utils::extract_timestamp_range(&merged.hits, "ts", true);
+        assert_eq!((start, end), (10, 40));
     }
 }
