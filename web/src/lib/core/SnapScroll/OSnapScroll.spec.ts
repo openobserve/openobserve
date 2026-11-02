@@ -117,6 +117,14 @@ describe("OSnapScroll", () => {
     expect(flowing.some((c) => c.includes("min-h-[100cqh]"))).toBe(false);
     expect(flowing).not.toContain("[container-type:size]");
   });
+
+  it("keeps snapping but lets sections take their own height, all but the last, with contentHeight", () => {
+    wrapper = mount(OSnapScroll, { props: { contentHeight: true }, slots: { default: "x" } });
+    const classes = wrapper.find('[data-test="o-snap-scroll"]').classes();
+    expect(classes).toContain("snap-mandatory");
+    expect(classes).not.toContain("[&_[data-snap-section]]:min-h-[100cqh]");
+    expect(classes).toContain("[&_[data-snap-section]:last-child]:min-h-[100cqh]");
+  });
 });
 
 describe("OSnapScroll.revealElement", () => {
