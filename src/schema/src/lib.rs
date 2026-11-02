@@ -451,8 +451,7 @@ fn saved_defined_schema_fields(
         .into_iter()
         .collect::<Vec<_>>();
     fields.sort_unstable();
-    // profiles ingest keeps only the saved list, and a query column can first arrive after this
-    // save
+    // ingest keeps only the saved list, and a profiles query column may arrive later
     fields.retain(|field| {
         schema.field_with_name(field).is_ok()
             || (matches!(stream_type, StreamType::Profiles)
