@@ -186,6 +186,7 @@ export default class LogsVisualise {
 
         return isEnabled && hasRunQueryText && !hasLoadingClass;
       },
+      undefined,
       { timeout }
     );
 
