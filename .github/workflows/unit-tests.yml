@@ -108,7 +108,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_backend_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-16
+      labels: ubicloud-standard-8
     permissions:
       contents: read
     env:
@@ -172,19 +172,6 @@ jobs:
             sleep 2
           done
 
-      # One test process per core can open three pools with idle minimums, too close to the default 100 connections.
-      - name: Raise PostgreSQL connection limit
-        run: |
-          PGPASSWORD=password psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET max_connections = 500"
-          docker restart "${{ job.services.postgres.id }}"
-          for i in {1..30}; do
-            if PGPASSWORD=password psql -h localhost -U postgres -d postgres -c "SELECT 1" > /dev/null 2>&1; then
-              break
-            fi
-            sleep 2
-          done
-          PGPASSWORD=password psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -tAc "SHOW max_connections"
-
       - name: Run PostgreSQL unit tests
         run: ./coverage.sh run-cov
         env:
@@ -200,7 +187,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_backend_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-16
+      labels: ubicloud-standard-8
     permissions:
       contents: read
     env:
