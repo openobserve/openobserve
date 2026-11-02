@@ -23,7 +23,6 @@ import OverviewDataHealthCard from "./OverviewDataHealthCard.vue";
 import OverviewLimitCard from "./OverviewLimitCard.vue";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
 import OverviewSignalCards from "./OverviewSignalCards.vue";
-import OverviewStorageCard from "./OverviewStorageCard.vue";
 import OverviewStreamsCard from "./OverviewStreamsCard.vue";
 import { buildOverview } from "./overviewFixtures";
 import type {
@@ -60,6 +59,42 @@ const stateSections: Array<[string, OverviewSection<never>, string]> = [
 ];
 
 describe("OverviewSectionCard", () => {
+  it("draws every card on the outlined surface with one header height", () => {
+    const w = mount(OverviewSectionCard, {
+      props: { section: "x", title: raw("X"), view: "ok", linkLabel: raw("Open") },
+      global,
+    });
+    expect(w.get('[data-test="overview-x-card"]').classes()).toEqual(
+      expect.arrayContaining(["rounded-surface", "border"]),
+    );
+    expect(w.get("h2").classes()).toEqual(
+      expect.arrayContaining(["text-sm", "font-medium", "text-text-heading"]),
+    );
+    expect(w.get("h2").element.parentElement?.classList.contains("min-h-8")).toBe(true);
+  });
+
+  it("centres the empty message and keeps the header action", () => {
+    const w = mount(OverviewSectionCard, {
+      props: { section: "x", title: raw("X"), view: "empty", linkLabel: raw("Add") },
+      slots: { empty: '<p data-test="empty-slot">none</p>' },
+      global,
+    });
+    const slot = w.get('[data-test="empty-slot"]').element.parentElement!;
+    expect(slot.classList.contains("justify-center")).toBe(true);
+    expect(slot.classList.contains("flex-1")).toBe(true);
+    expect(w.get('[data-test="overview-x-view-all"]').text()).toBe("Add");
+  });
+
+  it("hides the header action while loading or failed", () => {
+    for (const view of ["loading", "error"] as const) {
+      const w = mount(OverviewSectionCard, {
+        props: { section: "x", title: raw("X"), view, linkLabel: raw("Add") },
+        global,
+      });
+      expect(w.find('[data-test="overview-x-view-all"]').exists()).toBe(false);
+    }
+  });
+
   it("falls back to a generic locked message when none is passed", async () => {
     const w = mount(OverviewSectionCard, {
       props: { section: "x", title: raw("X"), view: "locked" },
@@ -191,12 +226,26 @@ describe("OverviewAlertsCard", () => {
     expect(w.find('[data-test="overview-alerts-show-more"]').exists()).toBe(false);
   });
 
-  it("shows an empty state with an action when there are no alert rules", async () => {
+  it("titles the card alerts and incidents only where incidents exist", () => {
+    const title = (props: Record<string, unknown>) => mountAlerts(props).get("h2").text();
+    expect(title({ incidentsState: "ok", incidentsTotal: 0 })).toBe("Alerts and incidents");
+    expect(title({ incidentsState: "error" })).toBe("Alerts and incidents");
+    expect(title({ incidentsState: "locked" })).toBe("Alerts");
+    expect(title({ incidentsState: "unavailable" })).toBe("Alerts");
+    expect(title({})).toBe("Alerts");
+  });
+
+  it("shows a one-line empty state and puts Create an alert in the header", async () => {
     const w = mountAlerts({ section: alertsWith({ total: 0, enabled: 0, failed_evaluation: 0 }) });
-    expect(w.get('[data-test="overview-alerts-empty"]').text()).toContain("No alert rules yet");
+    const empty = w.get('[data-test="overview-alerts-empty"]');
+    expect(empty.text()).toContain("No alert rules yet");
+    expect(empty.find(".o2-empty-state__inline-icon").exists()).toBe(false);
+    expect(empty.find("svg").exists()).toBe(false);
     expect(w.find('[data-test="overview-alerts-tiles"]').exists()).toBe(false);
-    const action = w.get('[data-test="overview-alerts-open-btn"]');
+    const action = w.get('[data-test="overview-alerts-view-all"]');
     expect(action.text()).toBe("Create an alert");
+    expect(action.attributes("aria-label")).toBeUndefined();
+    expect(empty.find("button").exists()).toBe(false);
     await action.trigger("click");
     expect(w.emitted("create")).toHaveLength(1);
     expect(w.emitted("open")).toBeUndefined();
@@ -297,7 +346,6 @@ describe("forbidden request", () => {
     ["data-health", OverviewDataHealthCard],
     ["streams", OverviewStreamsCard],
     ["limit", OverviewLimitCard],
-    ["storage", OverviewStorageCard],
   ])("shows %s as no access without Retry", (name, comp) => {
     const w = mount(comp as never, {
       props: { pending: false, failed: false, forbidden: true },
@@ -356,15 +404,18 @@ describe("OverviewDataHealthCard", () => {
     });
     const w = mountHealth(overview);
     for (const key of ["failing", "delivery", "pipelines"]) {
-      expect(row(w, key).text()).toContain("Not set up");
+      const status = w.get(`[data-test="overview-data-health-status-${key}"]`);
+      expect(status.text()).toBe("Not set up");
+      expect(status.classes()).toContain("text-text-muted");
       expect(row(w, key).text()).not.toContain("Healthy");
-      expect(w.get(`[data-test="overview-data-health-value-${key}"]`).text()).toBe("—");
+      expect(row(w, key).text()).not.toContain("—");
+      expect(w.find(`[data-test="overview-data-health-value-${key}"]`).exists()).toBe(false);
     }
   });
 
   it("shows quiet streams and schema changes as not set up when there are no streams", () => {
     const w = mountHealth(buildOverview({ streams: streamsWith({ total_streams: 0 }) }));
-    for (const key of ["quiet", "schema"]) {
+    for (const key of ["quiet", "schema", "compaction"]) {
       expect(row(w, key).text()).toContain("Not set up");
       expect(row(w, key).text()).not.toContain("Healthy");
     }
@@ -389,7 +440,7 @@ describe("OverviewDataHealthCard", () => {
     expect(row(w, "pipelines").text()).toContain("No access");
     expect(row(w, "failing").text()).toContain("Locked");
     expect(row(w, "delivery").text()).toContain("Locked");
-    for (const key of ["quiet", "schema", "pipelines", "failing", "delivery"]) {
+    for (const key of ["quiet", "schema", "compaction", "pipelines", "failing", "delivery"]) {
       expect(w.get(`[data-test="overview-data-health-value-${key}"]`).text()).toBe("—");
     }
     expect(w.text()).not.toContain("secret internal");
@@ -397,7 +448,7 @@ describe("OverviewDataHealthCard", () => {
 
   it("links each row to its list page", async () => {
     const w = mountHealth();
-    for (const key of ["quiet", "failing", "pipelines", "delivery", "schema"]) {
+    for (const key of ["quiet", "failing", "pipelines", "delivery", "schema", "compaction"]) {
       await row(w, key).trigger("click");
     }
     expect(w.emitted("open")).toEqual([
@@ -406,7 +457,73 @@ describe("OverviewDataHealthCard", () => {
       ["pipelines"],
       ["alerts"],
       ["streams"],
+      ["streams"],
     ]);
+  });
+
+  const order = (w: ReturnType<typeof mountHealth>) =>
+    w
+      .findAll('[data-test^="overview-data-health-row-"]')
+      .map((r) => r.attributes("data-test")?.replace("overview-data-health-row-", ""));
+
+  it("sorts rows by severity: needs action, warning, info, healthy, then not set up", () => {
+    expect(order(mountHealth())).toEqual([
+      "failing",
+      "pipelines",
+      "quiet",
+      "schema",
+      "compaction",
+      "delivery",
+    ]);
+    const overview = buildOverview({
+      alerts: alertsWith({ total: 0, enabled: 0, disabled: 0, failed_evaluation: 0, by_state: {} }),
+      pipelines: okSection({ total: 3, enabled: 3, disabled: 0, errored: 0 }),
+    });
+    expect(order(mountHealth(overview))).toEqual([
+      "quiet",
+      "schema",
+      "compaction",
+      "pipelines",
+      "failing",
+      "delivery",
+    ]);
+  });
+
+  it("keeps the written order within one tier", () => {
+    const overview = buildOverview({
+      alerts: alertsWith({ by_state: { notify_failed: 1 } }),
+      streams: streamsWith({ quiet_count: 0 }),
+    });
+    expect(order(mountHealth(overview)).slice(0, 3)).toEqual(["failing", "pipelines", "delivery"]);
+  });
+
+  it("places a row that could not load above the healthy ones", () => {
+    const overview = buildOverview({
+      alerts: alertsWith({ failed_evaluation: 0, by_state: {} }),
+      pipelines: { status: "error", error: "boom" },
+      streams: streamsWith({ quiet_count: 0, schema_changes_24h: 0, compaction_pending: 0 }),
+    });
+    expect(order(mountHealth(overview))).toEqual([
+      "schema",
+      "compaction",
+      "pipelines",
+      "quiet",
+      "failing",
+      "delivery",
+    ]);
+  });
+
+  it("shows pending compaction jobs as an info row", () => {
+    const w = mountHealth();
+    expect(row(w, "compaction").text()).toContain("Compaction jobs pending");
+    expect(row(w, "compaction").text()).toContain("Across stream types you can see");
+    expect(row(w, "compaction").text()).toContain("Info");
+    expect(w.get('[data-test="overview-data-health-value-compaction"]').text()).toBe("12");
+  });
+
+  it("shows a dash for compaction when the count is unknown", () => {
+    const w = mountHealth(buildOverview({ streams: streamsWith({ compaction_pending: null }) }));
+    expect(w.get('[data-test="overview-data-health-value-compaction"]').text()).toBe("—");
   });
 
   it("shows a skeleton while loading, an error with retry, and no access", async () => {
@@ -420,11 +537,14 @@ describe("OverviewDataHealthCard", () => {
 });
 
 describe("OverviewStreamsCard", () => {
-  it("lists per-type counts and sizes", () => {
+  it("is titled by data size, links to all streams and lists no per-type summary", () => {
     const w = mount(OverviewStreamsCard, { props: { ...base, section: o.streams }, global });
-    expect(w.get('[data-test="overview-streams-type-logs"]').text()).toContain("4 streams");
-    expect(w.get('[data-test="overview-streams-type-logs"]').text()).toContain("1.50 GB");
-    expect(w.get('[data-test="overview-streams-type-metrics"]').text()).toContain("512.00 MB");
+    expect(w.get("h2").text()).toBe("Top streams by data size");
+    expect(w.get('[data-test="overview-streams-view-all"]').text()).toBe("All streams");
+    expect(w.find('[data-test="overview-streams-types"]').exists()).toBe(false);
+    expect(w.find('[data-test^="overview-streams-type-"]').exists()).toBe(false);
+    expect(w.find('[data-test="overview-streams-compaction"]').exists()).toBe(false);
+    expect(w.text()).not.toContain("compaction");
   });
 
   it("tags each top stream with its type so same-named streams differ", () => {
@@ -515,32 +635,15 @@ describe("OverviewStreamsCard", () => {
     expect(w.emitted("open")).toHaveLength(1);
   });
 
-  it.each([
-    [12, "12 compaction jobs pending"],
-    [1, "1 compaction job pending"],
-    [0, "No compaction jobs pending"],
-  ])("shows %s pending compaction as a footer line", (count, text) => {
-    const w = mount(OverviewStreamsCard, {
-      props: { ...base, section: streamsWith({ compaction_pending: count }) },
-      global,
-    });
-    expect(w.get('[data-test="overview-streams-compaction"]').text()).toBe(text);
-  });
-
-  it("hides the compaction line when the count is unknown", () => {
-    const w = mount(OverviewStreamsCard, {
-      props: { ...base, section: streamsWith({ compaction_pending: null }) },
-      global,
-    });
-    expect(w.find('[data-test="overview-streams-compaction"]').exists()).toBe(false);
-  });
-
-  it("shows the start-ingesting empty state for zero streams", async () => {
+  it("shows a one-line empty state and puts Start ingesting in the header for zero streams", async () => {
     const section = streamsWith({ total_streams: 0, total_storage_size_mb: 0, by_type: [] });
     const w = mount(OverviewStreamsCard, { props: { ...base, section }, global });
-    expect(w.find('[data-test="overview-streams-empty"]').exists()).toBe(true);
-    await w.get('[data-test="overview-streams-start-ingesting-btn"]').trigger("click");
+    expect(w.get('[data-test="overview-streams-empty"]').text()).toContain("No streams yet");
+    const action = w.get('[data-test="overview-streams-view-all"]');
+    expect(action.text()).toBe("Start ingesting");
+    await action.trigger("click");
     expect(w.emitted("startIngesting")).toHaveLength(1);
+    expect(w.emitted("open")).toBeUndefined();
   });
 
   it.each(stateSections)("renders %s without the API text", (_n, section, suffix) => {
@@ -561,6 +664,15 @@ describe("OverviewStreamsCard", () => {
 describe("OverviewSignalCards", () => {
   const mountSignals = (props: Record<string, unknown> = {}) =>
     mount(OverviewSignalCards, { props: { ...base, section: o.streams, ...props }, global });
+
+  it("puts each muted caption above its semibold value", () => {
+    const w = mountSignals();
+    const stat = w.get('[data-test="overview-signal-logs-streams"]');
+    expect(stat.classes()).toEqual(expect.arrayContaining(["font-semibold", "tabular-nums"]));
+    const caption = stat.element.previousElementSibling!;
+    expect(caption.textContent).toBe("Streams");
+    expect(caption.classList.contains("text-text-label")).toBe(true);
+  });
 
   it("shows count, events and stored size for each signal that has streams", () => {
     const w = mountSignals();
@@ -626,12 +738,19 @@ describe("OverviewSignalCards", () => {
   });
 });
 
-describe("OverviewStorageCard", () => {
+describe("OverviewLimitCard data size", () => {
   const mountStorage = (props: Record<string, unknown> = {}) =>
-    mount(OverviewStorageCard, { props: { ...base, section: o.streams, ...props }, global });
+    mount(OverviewLimitCard, {
+      props: { ...base, limits: o.limits, streams: o.streams, ...props },
+      global,
+    });
 
-  it("shows the total and the per-signal split with text labels", () => {
+  it("shows the limit, a divider, then the total and the per-signal split with text labels", () => {
     const w = mountStorage();
+    expect(w.get("h2").text()).toBe("Ingest limit and data size");
+    const html = w.html();
+    expect(html.indexOf("overview-limit-body")).toBeLessThan(html.indexOf('role="separator"'));
+    expect(html.indexOf('role="separator"')).toBeLessThan(html.indexOf("overview-storage-body"));
     expect(w.get('[data-test="overview-storage-total"]').text()).toBe("2.00 GB");
     expect(w.get('[data-test="overview-storage-legend-logs"]').text()).toBe("Logs75%");
     expect(w.get('[data-test="overview-storage-legend-metrics"]').text()).toBe("Metrics25%");
@@ -650,39 +769,62 @@ describe("OverviewStorageCard", () => {
         top: [],
       },
     ];
-    const w = mountStorage({ section: streamsWith({ by_type: byType }) });
+    const w = mountStorage({ streams: streamsWith({ by_type: byType }) });
     expect(w.get('[data-test="overview-storage-legend-logs"]').text()).toBe("Logs75%");
   });
 
   it("shows the empty state, not zero percentages, with nothing stored", () => {
-    const w = mountStorage({ section: streamsWith({ total_storage_size_mb: 0, by_type: [] }) });
+    const w = mountStorage({ streams: streamsWith({ total_storage_size_mb: 0, by_type: [] }) });
     expect(w.get('[data-test="overview-storage-empty"]').text()).toContain("No data yet");
     expect(w.find('[data-test="overview-storage-bar"]').exists()).toBe(false);
+    expect(w.find('[data-test="overview-limit-body"]').exists()).toBe(true);
   });
 
-  it("shows loading, error with retry, and state sections", async () => {
-    expect(
-      mount(OverviewStorageCard, { props: { pending: true, failed: false }, global })
-        .find('[data-test="overview-storage-loading"]')
-        .exists(),
-    ).toBe(true);
-    const failed = mount(OverviewStorageCard, { props: { pending: false, failed: true }, global });
-    await failed.get('[data-test="overview-storage-retry-btn"]').trigger("click");
+  it("keeps each part's state to itself when only one section failed", async () => {
+    const w = mountStorage({ streams: { status: "error", error: "secret internal failure" } });
+    expect(w.find('[data-test="overview-limit-body"]').exists()).toBe(true);
+    await w.get('[data-test="overview-storage-retry-btn"]').trigger("click");
+    expect(w.emitted("retry")).toHaveLength(1);
+    const forbidden = mountStorage({ streams: { status: "forbidden" } });
+    expect(forbidden.find('[data-test="overview-storage-forbidden"]').exists()).toBe(true);
+    expect(w.text()).not.toContain("secret internal");
+  });
+
+  it("shows one loading and one error state for the whole card", async () => {
+    const loading = mount(OverviewLimitCard, { props: { pending: true, failed: false }, global });
+    expect(loading.findAll('[data-test$="-loading"]')).toHaveLength(1);
+    const failed = mount(OverviewLimitCard, { props: { pending: false, failed: true }, global });
+    expect(failed.findAll('[data-test$="-retry-btn"]')).toHaveLength(1);
+    await failed.get('[data-test="overview-limit-retry-btn"]').trigger("click");
     expect(failed.emitted("retry")).toHaveLength(1);
-    for (const [, section, suffix] of stateSections.filter(([n]) => n !== "locked")) {
-      const w = mountStorage({ section });
-      expect(w.find(`[data-test="overview-storage-${suffix}"]`).exists()).toBe(true);
+  });
+
+  it("shows the data size alone, titled data size, on cloud", () => {
+    const original = config.isCloud;
+    config.isCloud = "true";
+    try {
+      const w = mountStorage();
+      expect(w.find('[data-test="overview-storage-card"]').exists()).toBe(true);
+      expect(w.find('[data-test="overview-limit-card"]').exists()).toBe(false);
+      expect(w.get("h2").text()).toBe("Data size");
+      expect(w.find('[data-test="overview-limit-body"]').exists()).toBe(false);
+      expect(w.find('[role="separator"]').exists()).toBe(false);
+      expect(w.get('[data-test="overview-storage-total"]').text()).toBe("2.00 GB");
+    } finally {
+      config.isCloud = original;
     }
   });
 });
 
 describe("OverviewLimitCard", () => {
-  const mountLimit = (section: OverviewSection<OverviewLimitsData>) =>
-    mount(OverviewLimitCard, { props: { ...base, section }, global });
+  const mountLimit = (limits: OverviewSection<OverviewLimitsData>) =>
+    mount(OverviewLimitCard, { props: { ...base, limits, streams: o.streams }, global });
 
   it("shows used of limit, the reset countdown, days over of allowed and license", () => {
     const w = mountLimit(o.limits);
-    expect(w.get('[data-test="overview-limit-usage"]').text()).toBe("85.50 GB of 100.00 GB");
+    const usage = w.get('[data-test="overview-limit-usage"]');
+    expect(usage.get(".font-semibold").text()).toBe("85.50 GB");
+    expect(usage.get(".text-text-secondary").text()).toBe("of 100.00 GB");
     expect(w.get('[data-test="overview-limit-resets"]').text()).toBe(
       "Resets at 00:00 UTC, in 1h 46m",
     );
@@ -691,6 +833,22 @@ describe("OverviewLimitCard", () => {
     expect(w.get('[data-test="overview-limit-bar"]').exists()).toBe(true);
     expect(w.get('[data-test="overview-limit-scope"]').text()).toBe(
       "Across the whole deployment, not just this organization.",
+    );
+  });
+
+  it("draws field names as muted labels and values as semibold numbers", () => {
+    const w = mountLimit(o.limits);
+    const labels = w.findAll(".text-text-label").map((el) => el.text());
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        "Ingested today (UTC)",
+        "Days over the limit this month",
+        "License",
+        "Data size",
+      ]),
+    );
+    expect(w.get('[data-test="overview-storage-total"]').classes()).toEqual(
+      expect.arrayContaining(["text-text-heading", "font-semibold", "tabular-nums"]),
     );
   });
 
@@ -756,10 +914,7 @@ describe("OverviewLimitCard", () => {
   });
 
   it("shows the locked affordance with our own copy and emits unlock", async () => {
-    const w = mount(OverviewLimitCard, {
-      props: { ...base, section: { status: "locked", reason: "secret internal reason" } },
-      global,
-    });
+    const w = mountLimit({ status: "locked", reason: "secret internal reason" });
     const locked = w.get('[data-test="overview-limit-locked"]');
     expect(locked.element.tagName).toBe("BUTTON");
     expect(locked.text()).toBe(
@@ -770,28 +925,10 @@ describe("OverviewLimitCard", () => {
     expect(w.emitted("unlock")).toHaveLength(1);
   });
 
-  it("says the limit is not available on cloud and never emits unlock", async () => {
-    const original = config.isCloud;
-    config.isCloud = "true";
-    try {
-      const w = mount(OverviewLimitCard, {
-        props: { ...base, section: { status: "locked", reason: "not available in this edition" } },
-        global,
-      });
-      const locked = w.get('[data-test="overview-limit-locked"]');
-      expect(locked.element.tagName).not.toBe("BUTTON");
-      expect(locked.text()).toBe("Not available on this edition");
-      await locked.trigger("click");
-      expect(w.emitted("unlock")).toBeUndefined();
-    } finally {
-      config.isCloud = original;
-    }
-  });
-
   it.each(stateSections.filter(([n]) => n !== "locked"))(
     "renders %s without the API text",
     (_n, section, suffix) => {
-      const w = mount(OverviewLimitCard, { props: { ...base, section: section as never }, global });
+      const w = mountLimit(section as never);
       expect(w.find(`[data-test="overview-limit-${suffix}"]`).exists()).toBe(true);
       expect(w.text()).not.toContain("secret internal");
     },

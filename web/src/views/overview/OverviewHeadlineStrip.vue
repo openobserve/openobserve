@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OStatStrip
     :items="items"
     :loading="pending"
-    compact
-    stack-sub
+    layout="stacked"
     selectable
     data-test="overview-headline-strip"
     @select="(key) => emit('select', key as OverviewTarget)"
@@ -39,8 +38,15 @@ import {
 } from "./overviewFormat";
 import { useOverviewTime } from "./useOverviewTime";
 
-export type OverviewTarget = "firing" | "failing" | "incidents" | "pipelines" | "quiet" | "streams";
+export type OverviewTarget = "firing" | "failing" | "incidents" | "pipelines" | "quiet";
 export type IncidentsTile = "ok" | "loading" | "error" | "locked" | "unavailable" | "forbidden";
+
+interface Tile {
+  value: string | number;
+  note?: I18nText;
+  ok: boolean;
+  loading: boolean;
+}
 
 const props = defineProps<{
   overview: OrgOverview | null;
@@ -68,7 +74,7 @@ const unavailableNote = (view: ReturnType<typeof sectionView>): I18nText | undef
 const sectionTile = <T,>(
   section: OverviewSection<T> | undefined,
   pick: (data: T) => number,
-): { value: string | number; note?: I18nText; ok: boolean; loading: boolean } => {
+): Tile => {
   const view = sectionView(section, {
     pending: props.pending,
     failed: props.failed,
@@ -79,37 +85,52 @@ const sectionTile = <T,>(
   return { value: pick(section.data), ok: true, loading: false };
 };
 
-const pipelinesSub = (tile: { ok: boolean; note?: I18nText }): I18nText | undefined => {
-  if (!tile.ok) return tile.note;
-  const enabled = props.overview?.pipelines.data?.enabled ?? 0;
-  return enabled > 0 ? t("overview.cards.pipelinesOf", { enabled }) : undefined;
-};
-
-// a zero with no rules behind it would read as reassurance, so say nothing is monitored
-const notSetUp = () => t("overview.dataHealth.status.notSetUp");
-
-// one short piece only: the tile has room for "2 critical" or "oldest 1h 0m", not both
-const firingSub = (tile: { ok: boolean; note?: I18nText }): I18nText | undefined => {
-  if (!tile.ok) return tile.note;
+// a zero with no rules behind it would read as reassurance, so the value is a dash and the note says why
+const noRulesNote = (): I18nText | undefined => {
   const alerts = props.overview?.alerts.data;
-  if (alerts?.enabled === 0) return notSetUp();
-  const critical = levelCount(alerts, "critical");
-  if (critical > 0) return t("overview.cards.firingCritical", { count: critical });
-  const oldest = oldestKnownFiring(alerts);
-  if (!oldest) return undefined;
-  const age = formatElapsed(Date.now() - microsToMs(oldest.since));
-  return t("overview.cards.firingOldest", { age });
+  if (!alerts || alerts.enabled > 0) return undefined;
+  return alerts.total > 0 ? t("overview.cards.noEnabledRules") : t("overview.cards.noAlertRules");
 };
 
-const items = computed<StatItem[]>(() => {
-  const o = props.overview;
-  const firing = sectionTile(o?.alerts, (d) => firingCount(d));
-  const failing = sectionTile(o?.alerts, (d) => d.failed_evaluation);
-  const noRules = firing.ok && o?.alerts.data?.enabled === 0;
-  const pipelines = sectionTile(o?.pipelines, (d) => d.errored);
-  const streams = sectionTile(o?.streams, (d) => d.total_streams);
-  const quiet = sectionTile(o?.streams, (d) => d.quiet_count);
-  const incidentNote: Record<IncidentsTile, I18nText | undefined> = {
+const firingNote = (count: number): I18nText | undefined => {
+  const alerts = props.overview?.alerts.data;
+  if (count === 0) return t("overview.cards.firingNone");
+  const critical = levelCount(alerts, "critical");
+  const oldest = oldestKnownFiring(alerts);
+  const age = oldest ? formatElapsed(Date.now() - microsToMs(oldest.since)) : "";
+  if (critical > 0 && age)
+    return t("overview.cards.firingCriticalOldest", { count: critical, age });
+  if (critical > 0) return t("overview.cards.firingCritical", { count: critical });
+  return age ? t("overview.cards.firingOldest", { age }) : undefined;
+};
+
+// one tile per alert question; both read "no rules" the same way
+const alertTile = (tile: Tile, note: (count: number) => I18nText | undefined): Tile => {
+  if (!tile.ok) return tile;
+  const noRules = noRulesNote();
+  if (noRules) return { ...tile, value: DASH, note: noRules };
+  return { ...tile, note: note(Number(tile.value)) };
+};
+
+const pipelinesTile = (): Tile => {
+  const tile = sectionTile(props.overview?.pipelines, (d) => d.errored);
+  const data = props.overview?.pipelines.data;
+  if (!tile.ok || !data) return tile;
+  if (data.total === 0) return { ...tile, value: DASH, note: t("overview.cards.noPipelines") };
+  return { ...tile, note: t("overview.cards.pipelinesOf", { enabled: data.enabled }) };
+};
+
+const quietTile = (): Tile => {
+  const tile = sectionTile(props.overview?.streams, (d) => d.quiet_count);
+  const data = props.overview?.streams.data;
+  if (!tile.ok || !data) return tile;
+  if (data.total_streams === 0)
+    return { ...tile, value: DASH, note: t("overview.cards.noStreams") };
+  return { ...tile, note: t("overview.cards.quietNote") };
+};
+
+const incidentsTile = (): Tile => {
+  const unavailable: Record<IncidentsTile, I18nText | undefined> = {
     ok: undefined,
     loading: undefined,
     unavailable: t("overview.state.tileUnavailable"),
@@ -117,76 +138,65 @@ const items = computed<StatItem[]>(() => {
     locked: t("overview.state.tileLocked"),
     forbidden: t("overview.state.tileForbidden"),
   };
-  const incidentsOk = props.incidentsState === "ok";
+  const ok = props.incidentsState === "ok";
+  if (!ok) {
+    const loading = props.incidentsState === "loading";
+    return { value: DASH, note: unavailable[props.incidentsState], ok, loading };
+  }
+  const total = props.incidentsTotal;
+  return {
+    value: total,
+    note: total > 0 ? undefined : t("overview.cards.incidentsNone"),
+    ok,
+    loading: false,
+  };
+};
+
+// a count above zero carries the tone; a dash or a zero stays quiet
+const toneOf = (tile: Tile, tone: StatItem["tone"]): StatItem["tone"] =>
+  tile.ok && Number(tile.value) > 0 ? tone : "neutral";
+
+const items = computed<StatItem[]>(() => {
+  const o = props.overview;
+  const firing = alertTile(
+    sectionTile(o?.alerts, (d) => firingCount(d)),
+    firingNote,
+  );
+  const failing = alertTile(
+    sectionTile(o?.alerts, (d) => d.failed_evaluation),
+    (count) => (count > 0 ? t("overview.cards.failingNote") : t("overview.cards.failingNone")),
+  );
+  const incidents = incidentsTile();
+  const pipelines = pipelinesTile();
+  const quiet = quietTile();
+  const tile = (
+    key: OverviewTarget,
+    label: I18nText,
+    data: Tile,
+    tone: StatItem["tone"],
+    selectable: boolean,
+  ): StatItem => ({
+    key,
+    label,
+    value: data.value,
+    sub: data.note,
+    loading: data.loading,
+    tone: toneOf(data, tone),
+    selectable,
+    dataTest: `overview-headline-${key}`,
+  });
   return [
-    {
-      key: "firing",
-      loading: firing.loading,
-      label: t("overview.cards.firingAlerts"),
-      value: noRules ? DASH : firing.value,
-      sub: firingSub(firing),
-      icon: "notifications",
-      tone: firing.ok && Number(firing.value) > 0 ? "error" : "neutral",
-      selectable: firing.ok,
-      dataTest: "overview-headline-firing",
-    },
-    {
-      key: "failing",
-      loading: firing.loading,
-      label: t("overview.cards.failingRules"),
-      value: noRules ? DASH : failing.value,
-      sub: noRules ? notSetUp() : failing.note,
-      icon: "error",
-      tone: failing.ok && Number(failing.value) > 0 ? "error" : "neutral",
-      selectable: failing.ok,
-      dataTest: "overview-headline-failing",
-    },
-    {
-      key: "incidents",
-      label: t("overview.cards.openIncidents"),
-      value: incidentsOk ? props.incidentsTotal : DASH,
-      sub: incidentNote[props.incidentsState],
-      loading: props.incidentsState === "loading",
-      icon: "warning",
-      tone: incidentsOk && props.incidentsTotal > 0 ? "warning" : "neutral",
-      selectable: props.incidentsState !== "unavailable" && props.incidentsState !== "forbidden",
-      dataTest: "overview-headline-incidents",
-    },
-    {
-      key: "pipelines",
-      loading: pipelines.loading,
-      label: t("overview.cards.pipelineErrors"),
-      value: pipelines.value,
-      sub: pipelinesSub(pipelines),
-      icon: "database",
-      tone: pipelines.ok && Number(pipelines.value) > 0 ? "error" : "neutral",
-      selectable: pipelines.ok,
-      dataTest: "overview-headline-pipelines",
-    },
-    {
-      key: "quiet",
-      loading: quiet.loading,
-      label: t("overview.cards.quietStreams"),
-      value: quiet.value,
-      sub: quiet.ok ? undefined : quiet.note,
-      icon: "schedule",
-      tone: quiet.ok && Number(quiet.value) > 0 ? "warning" : "neutral",
-      selectable: quiet.ok,
-      dataTest: "overview-headline-quiet",
-    },
-    {
-      key: "streams",
-      loading: streams.loading,
-      label: t("overview.cards.streams"),
-      value: streams.value,
-      sub: streams.ok ? undefined : streams.note,
-      icon: "storage",
-      // no real maximum exists, so a huge one keeps the tile bar from drawing full
-      max: Number.MAX_SAFE_INTEGER,
-      tone: "neutral",
-      selectable: streams.ok,
-      dataTest: "overview-headline-streams",
-    },
+    tile("firing", t("overview.cards.firingAlerts"), firing, "error", firing.ok),
+    tile("failing", t("overview.cards.failingRules"), failing, "error", failing.ok),
+    tile(
+      "incidents",
+      t("overview.cards.openIncidents"),
+      incidents,
+      "error",
+      props.incidentsState !== "unavailable" && props.incidentsState !== "forbidden",
+    ),
+    tile("pipelines", t("overview.cards.pipelineErrors"), pipelines, "error", pipelines.ok),
+    tile("quiet", t("overview.cards.quietStreams"), quiet, "warning", quiet.ok),
   ];
 });
 </script>

@@ -13,12 +13,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <OCard :data-test="`overview-${section}-card`">
+  <OCard variant="outlined" :data-test="`overview-${section}-card`">
     <OCardSection role="header" dense>
-      <div class="flex w-full items-center justify-between gap-2">
+      <div class="flex min-h-8 w-full items-center justify-between gap-2">
         <h2 class="text-text-heading text-sm font-medium">{{ title }}</h2>
         <OButton
-          v-if="linkLabel && view === 'ok'"
+          v-if="linkLabel && (view === 'ok' || view === 'empty')"
           variant="ghost-primary"
           size="sm"
           :aria-label="linkAriaLabel"
@@ -29,58 +29,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </OCardSection>
-    <OCardSection role="body" dense>
-      <div
-        v-if="view === 'loading'"
-        class="flex flex-col gap-2"
-        :data-test="`overview-${section}-loading`"
-      >
-        <OSkeleton v-for="i in 3" :key="i" class="h-4 w-full" />
+    <OCardSection role="body" dense class="flex flex-col">
+      <!-- a card stretched beside a taller one centres its one-line empty message instead of leaving a gap under it -->
+      <div v-if="view === 'empty'" class="flex flex-1 flex-col justify-center">
+        <slot name="empty" />
       </div>
-      <OEmptyState
-        v-else-if="view === 'error'"
-        size="inline"
-        preset="load-error"
-        :data-test="`overview-${section}-error`"
-      >
-        <template #actions>
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="refresh"
-            :data-test="`overview-${section}-retry-btn`"
-            @click="emit('retry')"
-          >
-            {{ t("emptyState.loadError.action") }}
-          </OButton>
-        </template>
-      </OEmptyState>
-      <OEmptyState
-        v-else-if="view === 'forbidden'"
-        size="inline"
-        preset="no-access"
-        :description="t('overview.state.sectionForbidden')"
-        :data-test="`overview-${section}-forbidden`"
+      <slot v-else-if="view === 'ok'" />
+      <OverviewSectionState
+        v-else
+        :section="section"
+        :view="view"
+        :locked-message="lockedMessage"
+        :can-unlock="canUnlock"
+        @retry="emit('retry')"
+        @unlock="emit('unlock')"
       />
-      <OEmptyState
-        v-else-if="view === 'locked' && !canUnlock"
-        size="inline"
-        icon="lock"
-        :title="lockedMessage ?? t('overview.state.sectionLocked')"
-        :data-test="`overview-${section}-locked`"
-      />
-      <OButton
-        v-else-if="view === 'locked'"
-        variant="locked-body"
-        block
-        icon-left="lock"
-        :data-test="`overview-${section}-locked`"
-        @click="emit('unlock')"
-      >
-        {{ lockedMessage ?? t("overview.state.sectionLocked") }}
-      </OButton>
-      <slot v-else-if="view === 'empty'" name="empty" />
-      <slot v-else />
     </OCardSection>
   </OCard>
 </template>
@@ -89,9 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import type { I18nText } from "@/types/i18n";
+import OverviewSectionState from "./OverviewSectionState.vue";
 import type { OverviewView } from "./overviewFormat";
 
 withDefaults(
@@ -109,6 +71,4 @@ withDefaults(
 );
 
 const emit = defineEmits<{ retry: []; viewAll: []; unlock: [] }>();
-
-const { t } = useI18nTyped();
 </script>

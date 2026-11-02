@@ -18,7 +18,7 @@
 import { computed, ref, watch } from "vue";
 
 import OStatCard from "./OStatCard.vue";
-import type { StatItem } from "./OStatStrip.types";
+import type { StatItem, StatLayout } from "./OStatStrip.types";
 
 const props = withDefaults(
   defineProps<{
@@ -41,8 +41,8 @@ const props = withDefaults(
      * Leave off for the standard strip — long labels need the wider basis.
      */
     compact?: boolean;
-    /** Show each tile's qualifier on its own line, for strips whose tiles are too narrow to fit label and qualifier together. */
-    stackSub?: boolean;
+    /** `stacked` tiles show the label above a large value and wrap five, three or two to a row by width. */
+    layout?: StatLayout;
   }>(),
   {
     items: () => [],
@@ -51,7 +51,7 @@ const props = withDefaults(
     selectedKey: null,
     defaultKey: null,
     compact: false,
-    stackSub: false,
+    layout: "inline",
   },
 );
 
@@ -74,6 +74,12 @@ const activeKey = computed(() => {
   return named ? props.selectedKey : props.defaultKey;
 });
 
+// fractions of the strip, so a five-tile headline reads 5, 3 + 2, then 2 + 2 + 1 as the width drops
+const tileBasis = computed(() => {
+  if (props.layout === "stacked") return "min-w-0 basis-1/6 max-xl:basis-1/4 max-md:basis-1/3";
+  return ["max-lg:shrink-0 max-lg:basis-auto", props.compact ? "basis-36" : "basis-52"];
+});
+
 const onCardClick = (item: StatItem) => {
   if (props.selectable && item.selectable !== false) emit("select", item.key);
 };
@@ -87,12 +93,12 @@ const onCardClick = (item: StatItem) => {
     <OStatCard
       v-for="item in items"
       :key="item.key"
-      class="grow max-lg:shrink-0 max-lg:basis-auto"
-      :class="compact ? 'basis-36' : 'basis-52'"
+      class="grow"
+      :class="tileBasis"
       :label="item.label"
       :value="item.value"
       :sub="item.sub"
-      :stack-sub="stackSub"
+      :layout="layout"
       :sub-icon="item.subIcon"
       :sub-tooltip="item.subTooltip"
       :icon="item.icon"

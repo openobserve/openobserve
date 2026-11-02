@@ -226,7 +226,7 @@ mod tests {
         assert!(!is_querier_route("/overview"));
         assert!(is_querier_route("/api/org1/overview?top=5"));
         assert!(is_querier_route("/api/org1/overview/"));
-        assert!(!is_querier_route("/api/default/overview_x/profiles/meta"));
+        assert!(!is_querier_route("/api/default/overview_x/_json"));
         assert!(!is_querier_route("/api/default/overview_events/_search"));
         assert!(!is_querier_route("/api/default/overview/extra"));
 

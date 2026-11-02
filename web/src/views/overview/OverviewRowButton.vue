@@ -14,7 +14,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OButton variant="row" block>
-    <slot />
+    <!-- the inset gives the hover background room around the text; lists pull it back with -mx-2 so text stays on the card's edge -->
+    <span class="flex w-full min-w-0 items-center justify-between gap-3 px-2">
+      <slot />
+    </span>
   </OButton>
 </template>
 

@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  checkState,
   elapsedParts,
   firingTotal,
   hasKnownSince,
@@ -22,6 +23,8 @@ import {
   mergeTopStreams,
   oldestKnownFiring,
   isUnderOnePercent,
+  overviewChecks,
+  overviewStatus,
   percentOf,
   percentToFraction,
   percentVariant,
@@ -30,8 +33,9 @@ import {
   signalVariant,
   sizeShare,
 } from "./overviewFormat";
-import { buildOverview } from "./overviewFixtures";
+import { buildHealthyOverview, buildOverview } from "./overviewFixtures";
 import type { OverviewStreamTypeSummary } from "@/ts/interfaces/overview";
+import type { AttentionCheck } from "./overviewFormat";
 
 const summary = (stream_type: string, top: Array<[string, number]>): OverviewStreamTypeSummary => ({
   stream_type,
@@ -202,5 +206,159 @@ describe("firing totals", () => {
     expect(oldestKnownFiring({ ...alerts, firing: rows })?.name).toBe(second.name);
     expect(oldestKnownFiring({ ...alerts, firing: [{ ...first, since: 0 }] })).toBeUndefined();
     expect(oldestKnownFiring(undefined)).toBeUndefined();
+  });
+});
+
+describe("overviewStatus", () => {
+  const idle = { pending: false, failed: false };
+  const clearOverview = () => {
+    const base = buildHealthyOverview();
+    return buildOverview({
+      ...base,
+      streams: { status: "ok", data: { ...base.streams.data!, quiet_count: 0 } },
+    });
+  };
+  const healthy = () => overviewChecks({ overview: clearOverview(), ...idle });
+  const check = (over: Partial<AttentionCheck>): AttentionCheck => ({
+    key: "quiet",
+    state: "ok",
+    count: 0,
+    monitors: true,
+    ...over,
+  });
+
+  it("lists the non-zero problems in the strip's order with the danger look", () => {
+    const status = overviewStatus(
+      overviewChecks({ overview: buildOverview(), ...idle, incidents: { state: "ok", count: 2 } }),
+    );
+    expect(status.kind).toBe("danger");
+    expect(status.items).toEqual([
+      { key: "firing", count: 3 },
+      { key: "failing", count: 4 },
+      { key: "incidents", count: 2 },
+      { key: "pipelines", count: 2 },
+      { key: "quiet", count: 3 },
+    ]);
+    expect(status).not.toHaveProperty("total");
+  });
+
+  it.each(["firing", "failing", "incidents", "pipelines"] as const)(
+    "uses the danger look when only %s is above zero",
+    (key) => {
+      expect(overviewStatus([check({ key, count: 1 })]).kind).toBe("danger");
+    },
+  );
+
+  it("uses the warning look, not danger, when only quiet streams are above zero", () => {
+    const status = overviewStatus([
+      check({ key: "quiet", count: 82 }),
+      check({ key: "firing", count: 0 }),
+    ]);
+    expect(status).toEqual({ kind: "warning", items: [{ key: "quiet", count: 82 }] });
+  });
+
+  it("reports a known problem even while other checks load or failed", () => {
+    const status = overviewStatus([
+      check({ key: "firing", count: 1 }),
+      check({ key: "incidents", state: "loading" }),
+      check({ key: "pipelines", state: "unavailable" }),
+    ]);
+    expect(status.kind).toBe("danger");
+  });
+
+  it("says checking while a source is still loading and none has a problem", () => {
+    expect(overviewStatus([...healthy(), check({ key: "incidents", state: "loading" })]).kind).toBe(
+      "checking",
+    );
+    expect(
+      overviewStatus(overviewChecks({ overview: null, pending: true, failed: false })).kind,
+    ).toBe("checking");
+  });
+
+  it("never says all clear when a source could not load", () => {
+    expect(
+      overviewStatus(overviewChecks({ overview: null, pending: false, failed: true })).kind,
+    ).toBe("partial");
+    expect(
+      overviewStatus(
+        overviewChecks({ overview: null, pending: false, failed: false, forbidden: true }),
+      ).kind,
+    ).toBe("partial");
+    const locked = buildOverview({ ...clearOverview(), pipelines: { status: "locked" } });
+    expect(overviewStatus(overviewChecks({ overview: locked, ...idle })).kind).toBe("partial");
+    expect(
+      overviewStatus([...healthy(), check({ key: "incidents", state: "unavailable" })]).kind,
+    ).toBe("partial");
+  });
+
+  it("calls a loaded page that monitors something and has no problem clear", () => {
+    expect(overviewStatus(healthy())).toEqual({ kind: "clear", items: [] });
+  });
+
+  it("says nothing is monitored, not clear, when every source is ok but nothing is set up", () => {
+    const base = clearOverview();
+    const overview = buildOverview({
+      ...base,
+      alerts: {
+        status: "ok",
+        data: { ...base.alerts.data!, total: 0, enabled: 0, disabled: 0, by_state: {} },
+      },
+      pipelines: { status: "ok", data: { total: 0, enabled: 0, disabled: 0, errored: 0 } },
+      streams: {
+        status: "ok",
+        data: { ...base.streams.data!, total_streams: 0, quiet_count: 0, by_type: [] },
+      },
+    });
+    const checks = overviewChecks({ overview, ...idle });
+    expect(checks.every((c) => !c.monitors)).toBe(true);
+    expect(overviewStatus(checks)).toEqual({ kind: "unmonitored", items: [] });
+    expect(
+      overviewStatus(overviewChecks({ overview, ...idle, incidents: { state: "ok", count: 0 } }))
+        .kind,
+    ).toBe("clear");
+  });
+
+  it("counts any one configured source as monitoring", () => {
+    const base = clearOverview();
+    const noRules = buildOverview({
+      ...base,
+      alerts: {
+        status: "ok",
+        data: { ...base.alerts.data!, total: 0, enabled: 0, disabled: 0, by_state: {} },
+      },
+      pipelines: { status: "ok", data: { total: 0, enabled: 0, disabled: 0, errored: 0 } },
+    });
+    expect(overviewStatus(overviewChecks({ overview: noRules, ...idle })).kind).toBe("clear");
+    const disabledRules = buildOverview({
+      ...noRules,
+      alerts: { status: "ok", data: { ...base.alerts.data!, total: 2, enabled: 0, disabled: 2 } },
+    });
+    const checks = overviewChecks({ overview: disabledRules, ...idle });
+    expect(checks.find((c) => c.key === "firing")?.monitors).toBe(true);
+  });
+
+  it("counts a notify-failed rule as firing", () => {
+    const base = clearOverview();
+    const overview = buildOverview({
+      ...base,
+      alerts: { status: "ok", data: { ...base.alerts.data!, by_state: { notify_failed: 2 } } },
+    });
+    expect(overviewStatus(overviewChecks({ overview, ...idle })).items).toEqual([
+      { key: "firing", count: 2 },
+    ]);
+  });
+
+  it("leaves out incidents the deployment does not have, and never reads anomalies", () => {
+    const keys = healthy().map((c) => c.key);
+    expect(keys).toEqual(["firing", "failing", "pipelines", "quiet"]);
+  });
+
+  it("maps each section view to a check state", () => {
+    expect(checkState("ok")).toBe("ok");
+    expect(checkState("empty")).toBe("ok");
+    expect(checkState("loading")).toBe("loading");
+    for (const view of ["error", "forbidden", "locked"] as const) {
+      expect(checkState(view)).toBe("unavailable");
+    }
   });
 });

@@ -15,31 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OverviewSectionCard
     section="alerts"
-    :title="t('overview.sections.alerts')"
-    :link-label="t('overview.viewAll')"
-    :link-aria-label="t('overview.alerts.viewAllAria')"
+    :title="
+      hasIncidents ? t('overview.sections.alertsAndIncidents') : t('overview.sections.alerts')
+    "
+    :link-label="view === 'empty' ? t('overview.alerts.emptyAction') : t('overview.viewAll')"
+    :link-aria-label="view === 'empty' ? undefined : t('overview.alerts.viewAllAria')"
     :view="view"
     @retry="emit('retry')"
-    @view-all="emit('open')"
+    @view-all="view === 'empty' ? emit('create') : emit('open')"
   >
     <template #empty>
       <OEmptyState
-        size="inline"
-        icon="notifications"
+        size="slim"
         :title="t('overview.alerts.emptyTitle')"
+        :description="t('overview.alerts.emptyDesc')"
         data-test="overview-alerts-empty"
-      >
-        <template #actions>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="overview-alerts-open-btn"
-            @click="emit('create')"
-          >
-            {{ t("overview.alerts.emptyAction") }}
-          </OButton>
-        </template>
-      </OEmptyState>
+      />
     </template>
     <div class="flex flex-col gap-4">
       <ul class="grid grid-cols-4 gap-3 max-md:grid-cols-2" data-test="overview-alerts-tiles">
@@ -49,13 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex flex-col gap-0.5"
           :data-test="`overview-alerts-tile-${tile.key}`"
         >
-          <span :class="['text-2xl font-semibold tabular-nums', tile.valueClass]">{{
+          <span class="text-text-label text-xs">{{ tile.label }}</span>
+          <span :class="['text-base font-semibold tabular-nums', tile.valueClass]">{{
             tile.value
           }}</span>
-          <span class="text-text-secondary text-xs">{{ tile.label }}</span>
         </li>
       </ul>
-      <div data-test="overview-alerts-firing">
+      <div class="-mx-2" data-test="overview-alerts-firing">
         <div class="mb-1 flex items-center justify-between gap-3 px-2">
           <span class="text-text-label text-xs font-medium">{{
             t("overview.alerts.firingNow")
@@ -151,6 +142,14 @@ const emit = defineEmits<{ retry: []; open: []; create: [] }>();
 
 const { t } = useI18nTyped();
 const { formatElapsed } = useOverviewTime();
+
+// OSS and a deployment with incidents off have no incidents to summarise, so the title says alerts only
+const hasIncidents = computed(
+  () =>
+    props.incidentsState !== undefined &&
+    props.incidentsState !== "locked" &&
+    props.incidentsState !== "unavailable",
+);
 
 const view = computed(() => {
   const base = sectionView(props.section, props);

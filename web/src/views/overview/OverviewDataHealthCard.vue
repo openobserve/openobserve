@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @retry="emit('retry')"
     @view-all="emit('open', 'pipelines')"
   >
-    <ul class="flex flex-col" data-test="overview-data-health-rows">
+    <ul class="-mx-2 flex flex-col" data-test="overview-data-health-rows">
       <li v-for="row in rows" :key="row.key">
         <OverviewRowButton
           :data-test="`overview-data-health-row-${row.key}`"
@@ -35,7 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-body text-sm">{{ row.label }}</span>
               <span class="text-text-secondary text-xs">{{ row.note }}</span>
             </span>
-            <span class="flex shrink-0 items-center gap-3">
+            <span
+              v-if="row.notSetUp"
+              class="text-text-muted shrink-0 text-xs"
+              :data-test="`overview-data-health-status-${row.key}`"
+              >{{ row.word }}</span
+            >
+            <span v-else class="flex shrink-0 items-center gap-3">
               <OTag
                 type="countChip"
                 :value="row.tone"
@@ -43,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ row.word }}</OTag
               >
               <span
-                class="text-text-heading min-w-8 text-end text-sm font-medium tabular-nums"
+                class="text-text-heading min-w-8 text-end text-sm font-semibold tabular-nums"
                 :data-test="`overview-data-health-value-${row.key}`"
                 >{{ row.value }}</span
               >
@@ -75,7 +81,12 @@ interface HealthRow {
   word: I18nText;
   value: I18nText;
   ok: boolean;
+  notSetUp: boolean;
 }
+
+// a row that needs action sorts above healthy ones; a row that could not load is unknown, so it sits above healthy too
+const TIER: Record<HealthTone, number> = { error: 0, warning: 1, info: 2, neutral: 3, success: 4 };
+const NOT_SET_UP_TIER = 5;
 
 const props = defineProps<{
   overview: OrgOverview | null;
@@ -120,7 +131,7 @@ const healthRow = <T,>(
   base: Pick<HealthRow, "key" | "label" | "note" | "destination">,
   section: OverviewSection<T> | undefined,
   pick: (data: T) => {
-    count: number;
+    count: number | null;
     tone: (count: number) => HealthTone;
     note?: I18nText;
     notSetUp?: boolean;
@@ -132,7 +143,14 @@ const healthRow = <T,>(
     forbidden: props.forbidden,
   });
   if (state !== "ok" || !section?.data) {
-    return { ...base, tone: "neutral", word: stateWord(state), value: raw("—"), ok: false };
+    return {
+      ...base,
+      tone: "neutral",
+      word: stateWord(state),
+      value: raw("—"),
+      ok: false,
+      notSetUp: false,
+    };
   }
   const { count, tone, note, notSetUp } = pick(section.data);
   if (notSetUp) {
@@ -143,20 +161,22 @@ const healthRow = <T,>(
       word: t("overview.dataHealth.status.notSetUp"),
       value: raw("—"),
       ok: true,
+      notSetUp: true,
     };
   }
-  const level = tone(count);
+  const level = tone(count ?? 0);
   return {
     ...base,
     note: note ?? base.note,
     tone: level,
     word: statusWord(level),
-    value: raw(count),
+    value: count === null ? raw("—") : raw(count),
     ok: true,
+    notSetUp: false,
   };
 };
 
-const rows = computed<HealthRow[]>(() => {
+const healthRows = (): HealthRow[] => {
   const o = props.overview;
   const byCount = (bad: HealthTone) => (count: number) => (count > 0 ? bad : "success");
   return [
@@ -230,6 +250,25 @@ const rows = computed<HealthRow[]>(() => {
         notSetUp: d.total_streams === 0,
       }),
     ),
+    healthRow(
+      {
+        key: "compaction",
+        label: t("overview.dataHealth.compaction"),
+        note: t("overview.dataHealth.compactionNote"),
+        destination: "streams",
+      },
+      o?.streams,
+      (d) => ({
+        count: d.compaction_pending,
+        tone: () => "info",
+        notSetUp: d.total_streams === 0,
+      }),
+    ),
   ];
-});
+};
+
+const tierOf = (row: HealthRow) => (row.notSetUp ? NOT_SET_UP_TIER : TIER[row.tone]);
+
+// Array.prototype.sort is stable, so rows in one tier keep the order written above
+const rows = computed<HealthRow[]>(() => healthRows().sort((a, b) => tierOf(a) - tierOf(b)));
 </script>

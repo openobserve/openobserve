@@ -1,3 +1,5 @@
+import type { I18nText } from "@/types/i18n";
+
 export interface RefreshButtonProps {
   /** Unix millisecond timestamp of the last completed query */
   lastRunAt?: number | null;
@@ -13,6 +15,8 @@ export interface RefreshButtonProps {
   dataTest?: string;
   /** Registry id, so the tooltip shows the page's refresh shortcut. */
   shortcutId?: string;
+  /** Replaces the last-refreshed time in the tooltip, for data that carries its own as-of time. */
+  tooltip?: I18nText;
   /** `inset` sizes the split-layout button to fill a 1.5rem bordered pill, so the pill need not clip it. */
   size?: "toolbar" | "inset";
 }

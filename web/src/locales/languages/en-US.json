@@ -9883,10 +9883,10 @@
     "alertsSuffix": "alerts",
     "viewingLabel": "— viewing",
     "timesSymbol": "×",
-    "activeAnomalies": "Active Anomalies",
-    "activeIncidents": "Active Incidents",
+    "activeAnomalies": "Active anomalies",
+    "activeIncidents": "Active incidents",
     "services": "Services",
-    "recentEvents": "Recent Events",
+    "recentEvents": "Recent events",
     "investigate": "Investigate →",
     "viewAll": "View all",
     "showingOf": "Showing {shown} of {total}",
@@ -9895,7 +9895,7 @@
     "colReqs": "Reqs",
     "scrollLeft": "Scroll services left",
     "scrollRight": "Scroll services right",
-    "untitledIncident": "Untitled Incident",
+    "untitledIncident": "Untitled incident",
     "notMonitoredTitle": "Nothing is watched yet",
     "notMonitoredDesc": "Your data is arriving, but no alert or anomaly check runs on it. Add one and Overview lists anything that needs attention.",
     "notMonitoredAlert": "Create an alert",
@@ -9913,13 +9913,22 @@
     "cards": {
       "firingAlerts": "Firing alerts",
       "firingCritical": "{count} critical",
-      "firingOldest": "oldest {age}",
+      "firingOldest": "Oldest {age}",
       "failingRules": "Failing rules",
       "openIncidents": "Open incidents",
       "pipelineErrors": "Pipeline errors",
       "pipelinesOf": "of {enabled} enabled",
       "quietStreams": "Quiet streams",
-      "streams": "Streams"
+      "firingCriticalOldest": "{count} critical · oldest {age}",
+      "firingNone": "None firing",
+      "noAlertRules": "No alert rules",
+      "noEnabledRules": "No enabled rules",
+      "failingNone": "None failing",
+      "failingNote": "Last evaluation errored",
+      "incidentsNone": "None open",
+      "noPipelines": "No pipelines",
+      "noStreams": "No streams",
+      "quietNote": "Stopped writing in the last 7 days"
     },
     "state": {
       "tileForbidden": "No access",
@@ -9945,10 +9954,10 @@
     "sections": {
       "alerts": "Alerts",
       "dataHealth": "Data health",
-      "streams": "Streams",
-      "topStreams": "Largest streams by data size",
-      "ingestLimit": "Ingest limit",
-      "storage": "Data size"
+      "topStreams": "Top streams by data size",
+      "storage": "Data size",
+      "alertsAndIncidents": "Alerts and incidents",
+      "limitAndStorage": "Ingest limit and data size"
     },
     "alerts": {
       "criticalLevel": "Firing at critical",
@@ -9960,6 +9969,7 @@
       "showMore": "Show {count} more firing alert | Show {count} more firing alerts",
       "allClear": "No alerts are firing right now.",
       "emptyTitle": "No alert rules yet",
+      "emptyDesc": "Rules you create show here, with what is firing by level and what is failing to run.",
       "emptyAction": "Create an alert",
       "viewAllAria": "View all alerts"
     },
@@ -9982,18 +9992,17 @@
         "healthy": "Healthy",
         "notSetUp": "Not set up",
         "info": "Info"
-      }
+      },
+      "compaction": "Compaction jobs pending",
+      "compactionNote": "Across stream types you can see"
     },
     "streams": {
-      "viewStreams": "View streams",
       "emptyTitle": "No streams yet",
       "emptyDesc": "Streams appear here once data starts arriving.",
       "startIngesting": "Start ingesting",
-      "typeSummary": "{count} stream | {count} streams",
       "shareOfTotal": "{percent}% of total",
       "shareUnderOne": "<{percent}% of total",
-      "compactionPending": "{count} compaction job pending | {count} compaction jobs pending",
-      "compactionNone": "No compaction jobs pending"
+      "allStreams": "All streams"
     },
     "signals": {
       "open": "Open",
@@ -10019,7 +10028,7 @@
     },
     "limit": {
       "used": "Ingested today (UTC)",
-      "ofLimit": "{used} of {limit}",
+      "ofLimit": "of {limit}",
       "noLimit": "No daily limit",
       "resets": "Resets at 00:00 UTC, in {countdown}",
       "scope": "Across the whole deployment, not just this organization.",
@@ -10032,7 +10041,6 @@
       "nearLimit": "Near limit",
       "blockNote": "Search is blocked once the days over the limit pass the number your license allows.",
       "overLimit": "Over limit",
-      "unavailableMessage": "Not available on this edition",
       "lockedMessage": "Track ingestion against your license limit with an enterprise license."
     },
     "empty": {
@@ -10046,7 +10054,24 @@
       "message": "Showing data from {time}. Refresh failed.",
       "retry": "Retry"
     },
-    "freshness": "Cards show the current state, not the selected time range. Updated {time}."
+    "dataAsOf": "Data as of {time}",
+    "status": {
+      "attention": "Needs attention",
+      "checking": "Checking…",
+      "partial": "Some checks could not load",
+      "clear": "Nothing needs attention",
+      "items": {
+        "firing": "{count} alert firing | {count} alerts firing",
+        "failing": "{count} rule failing | {count} rules failing",
+        "incidents": "{count} open incident | {count} open incidents",
+        "pipelines": "{count} pipeline with errors | {count} pipelines with errors",
+        "quiet": "{count} quiet stream | {count} quiet streams"
+      },
+      "unmonitored": "Nothing is being monitored yet"
+    },
+    "timeRange": {
+      "heading": "In the selected time range"
+    }
   },
   "chatHistory": {
     "title": "Chats",

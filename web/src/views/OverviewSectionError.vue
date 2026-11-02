@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <section class="mb-5" :data-test="`overview-${testSection}-load-error`">
-    <div class="mb-2 flex items-center ps-1">
-      <div class="text-text-heading text-sm font-medium tracking-[0.01em]">{{ title }}</div>
+  <section class="mb-4" :data-test="`overview-${testSection}-load-error`">
+    <div class="mb-2 flex min-h-8 items-center ps-1">
+      <div class="text-text-heading text-sm font-medium">{{ title }}</div>
     </div>
     <div
-      class="border-border-default rounded-default bg-surface-base overflow-hidden border border-[0.0625em]"
+      class="border-border-default rounded-surface bg-surface-base overflow-hidden border border-[0.0625em]"
     >
       <OEmptyState size="inline" preset="load-error">
         <template #actions>

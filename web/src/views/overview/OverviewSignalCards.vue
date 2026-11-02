@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="cards.length > 0 || view === 'loading'"
-    class="grid grid-cols-3 gap-3 max-lg:grid-cols-1"
+    class="grid grid-cols-3 gap-4 max-lg:grid-cols-1"
     data-test="overview-signal-cards"
   >
     <template v-if="view === 'loading'">
@@ -38,15 +38,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         view="ok"
         @view-all="emit('open', card.signal)"
       >
-        <div class="grid grid-cols-3 gap-2" :data-test="`overview-signal-${card.signal}-stats`">
+        <div class="grid grid-cols-3 gap-3" :data-test="`overview-signal-${card.signal}-stats`">
           <div v-for="stat in card.stats" :key="stat.key" class="flex min-w-0 flex-col gap-0.5">
+            <span class="text-text-label text-xs">{{ stat.label }}</span>
             <span
-              class="text-text-heading text-lg font-semibold tabular-nums"
+              class="text-text-heading text-base font-semibold tabular-nums"
               :data-test="`overview-signal-${card.signal}-${stat.key}`"
             >
               {{ stat.value }}
             </span>
-            <span class="text-text-secondary text-xs">{{ stat.label }}</span>
           </div>
         </div>
       </OverviewSectionCard>

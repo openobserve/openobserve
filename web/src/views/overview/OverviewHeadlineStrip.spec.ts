@@ -37,6 +37,23 @@ const mountStrip = (props: Partial<Props> = {}) =>
 const tile = (w: ReturnType<typeof mountStrip>, key: string) =>
   w.get(`[data-test="overview-headline-${key}"]`);
 
+const valueOf = (w: ReturnType<typeof mountStrip>, key: string) =>
+  tile(w, key).get('[data-test="o-stat-card-value"]');
+
+const noteOf = (w: ReturnType<typeof mountStrip>, key: string) =>
+  tile(w, key).find('[data-test="o-stat-card-sub-stacked"]');
+
+const withAlerts = (over: Record<string, unknown>) => {
+  const base = buildOverview();
+  return {
+    ...base,
+    alerts: { status: "ok", data: { ...base.alerts.data!, ...over } },
+  } as typeof base;
+};
+
+const ALL = ["firing", "failing", "incidents", "pipelines", "quiet"];
+const OVERVIEW_TILES = ["firing", "failing", "pipelines", "quiet"];
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(Math.floor(buildOverview().generated_at / 1000));
@@ -47,151 +64,156 @@ afterEach(() => {
 });
 
 describe("OverviewHeadlineStrip", () => {
+  it("shows exactly the five problem tiles, in order, with no streams total", () => {
+    const w = mountStrip();
+    const keys = w
+      .findAll('[data-test^="overview-headline-"]:not([data-test="overview-headline-strip"])')
+      .map((el) => el.attributes("data-test")?.replace("overview-headline-", ""));
+    expect(keys).toEqual(ALL);
+    expect(w.find('[data-test="overview-headline-streams"]').exists()).toBe(false);
+  });
+
+  it("puts each label above a large value", () => {
+    const w = mountStrip();
+    for (const key of ALL) {
+      const text = tile(w, key).text();
+      const value = valueOf(w, key);
+      expect(value.classes()).toContain("text-3xl");
+      expect(text.indexOf(value.text())).toBeGreaterThan(0);
+    }
+  });
+
   it("shows the real value of every tile", () => {
     const w = mountStrip();
-    expect(tile(w, "firing").text()).toContain("3");
-    expect(tile(w, "failing").text()).toContain("4");
-    expect(tile(w, "incidents").text()).toContain("6");
-    expect(tile(w, "pipelines").text()).toContain("2");
-    expect(tile(w, "pipelines").text()).toContain("of 8 enabled");
-    expect(tile(w, "streams").text()).toContain("7");
-    expect(tile(w, "streams").text()).not.toContain("GB");
+    expect(valueOf(w, "firing").text()).toBe("3");
+    expect(valueOf(w, "failing").text()).toBe("4");
+    expect(valueOf(w, "incidents").text()).toBe("6");
+    expect(valueOf(w, "pipelines").text()).toBe("2");
+    expect(valueOf(w, "quiet").text()).toBe("3");
   });
 
-  it("shows the streams gone quiet tile with its real count", () => {
+  it("tones a non-zero problem count as danger and quiet streams as warning", () => {
     const w = mountStrip();
-    expect(tile(w, "quiet").text()).toContain("Quiet streams");
-    expect(tile(w, "quiet").text()).toContain("3");
+    for (const key of ["firing", "failing", "incidents", "pipelines"]) {
+      expect(valueOf(w, key).classes()).toContain("text-icon-chip-error-text");
+    }
+    expect(valueOf(w, "quiet").classes()).toContain("text-icon-chip-warning-text");
   });
 
-  it("shows zero quiet streams as a real zero once loaded", () => {
+  it("keeps a zero quiet", () => {
     const base = buildOverview();
     const overview = {
       ...base,
       streams: { status: "ok", data: { ...base.streams.data!, quiet_count: 0 } },
+      pipelines: { status: "ok", data: { total: 3, enabled: 3, disabled: 0, errored: 0 } },
     } as typeof base;
-    expect(tile(mountStrip({ overview }), "quiet").text()).toContain("0");
+    const w = mountStrip({ overview, incidentsTotal: 0 });
+    for (const key of ["quiet", "pipelines", "incidents"]) {
+      expect(valueOf(w, key).text()).toBe("0");
+      expect(valueOf(w, key).classes()).toContain("text-text-muted");
+    }
   });
 
-  it("says not set up under the alert tiles when there are no alert rules", () => {
-    const base = buildOverview();
-    const overview = {
-      ...base,
-      alerts: {
-        status: "ok",
-        data: {
-          ...base.alerts.data!,
-          total: 0,
-          enabled: 0,
-          failed_evaluation: 0,
-          firing: [],
-          by_state: {},
-        },
-      },
-    } as typeof base;
-    const w = mountStrip({ overview });
-    expect(tile(w, "firing").text()).toContain("Not set up");
-    expect(tile(w, "failing").text()).toContain("Not set up");
-    expect(tile(w, "firing").text()).toContain("—");
-    expect(tile(w, "failing").text()).toContain("—");
-    expect(tile(w, "pipelines").text()).not.toContain("Not set up");
+  it("notes the critical count and the oldest firing age together", () => {
+    expect(noteOf(mountStrip(), "firing").text()).toBe("2 critical · oldest 1h 0m");
   });
 
-  it("does not say not set up when alert rules exist", () => {
-    expect(tile(mountStrip(), "failing").text()).not.toContain("Not set up");
+  it("notes only the oldest age when nothing is critical", () => {
+    const overview = withAlerts({
+      firing_by_level: { ok: 0, warning: 3, critical: 0, no_data: 0, unclassified: 0 },
+    });
+    expect(noteOf(mountStrip({ overview }), "firing").text()).toBe("Oldest 1h 0m");
   });
 
-  it("adds the critical count under the firing tile", () => {
-    const text = tile(mountStrip(), "firing").text();
-    expect(text).toContain("2 critical");
-    expect(text).not.toContain("oldest");
-  });
-
-  it("shows the oldest firing age when nothing is critical", () => {
-    const base = buildOverview();
-    const overview = {
-      ...base,
-      alerts: {
-        status: "ok",
-        data: {
-          ...base.alerts.data!,
-          firing_by_level: { ok: 0, warning: 3, critical: 0, no_data: 0, unclassified: 0 },
-        },
-      },
-    } as typeof base;
-    expect(tile(mountStrip({ overview }), "firing").text()).toContain("oldest 1h 0m");
+  it("notes only the critical count when no firing age is known", () => {
+    const [first] = buildOverview().alerts.data!.firing;
+    const overview = withAlerts({ firing: [{ ...first, since: 0 }] });
+    expect(noteOf(mountStrip({ overview }), "firing").text()).toBe("2 critical");
   });
 
   it("skips a firing row with an unknown since when picking the oldest age", () => {
-    const base = buildOverview();
-    const [first, second] = base.alerts.data!.firing;
-    const withFiring = (firing: NonNullable<typeof base.alerts.data>["firing"]) =>
-      ({
-        ...base,
-        alerts: {
-          status: "ok",
-          data: {
-            ...base.alerts.data!,
-            firing,
-            firing_by_level: { ok: 0, warning: 3, critical: 0, no_data: 0, unclassified: 0 },
-          },
-        },
-      }) as typeof base;
-    const skipped = tile(
-      mountStrip({ overview: withFiring([{ ...first, since: 0 }, second]) }),
-      "firing",
-    ).text();
-    expect(skipped).toContain("oldest 16m");
-    const unknown = tile(mountStrip({ overview: withFiring([{ ...first, since: 0 }]) }), "firing");
-    expect(unknown.text()).not.toContain("oldest");
-    expect(unknown.text()).not.toContain("d ");
+    const [first, second] = buildOverview().alerts.data!.firing;
+    const overview = withAlerts({
+      firing: [{ ...first, since: 0 }, second],
+      firing_by_level: { ok: 0, warning: 3, critical: 0, no_data: 0, unclassified: 0 },
+    });
+    expect(noteOf(mountStrip({ overview }), "firing").text()).toBe("Oldest 16m");
   });
 
-  it("leaves the firing sub-line out when nothing is critical or listed", () => {
-    const base = buildOverview();
-    const overview = {
-      ...base,
-      alerts: {
-        status: "ok",
-        data: {
-          ...base.alerts.data!,
-          firing: [],
-          firing_by_level: { ok: 0, warning: 1, critical: 0, no_data: 0, unclassified: 0 },
-        },
-      },
-    } as typeof base;
-    const text = tile(mountStrip({ overview }), "firing").text();
-    expect(text).not.toContain("critical");
-    expect(text).not.toContain("oldest");
+  it("says none firing and none failing at zero", () => {
+    const overview = withAlerts({
+      by_state: {},
+      failed_evaluation: 0,
+      firing: [],
+      firing_by_level: { ok: 0, warning: 0, critical: 0, no_data: 0, unclassified: 0 },
+    });
+    const w = mountStrip({ overview, incidentsTotal: 0 });
+    expect(noteOf(w, "firing").text()).toBe("None firing");
+    expect(noteOf(w, "failing").text()).toBe("None failing");
+    expect(noteOf(w, "incidents").text()).toBe("None open");
   });
 
-  it("hides the pipelines sub-line when there are no pipelines", () => {
+  it("notes why rules are failing when some are", () => {
+    expect(noteOf(mountStrip(), "failing").text()).toBe("Last evaluation errored");
+  });
+
+  it("shows a dash and no alert rules on the alert tiles when there are none", () => {
+    const overview = withAlerts({
+      total: 0,
+      enabled: 0,
+      failed_evaluation: 0,
+      firing: [],
+      by_state: {},
+    });
+    const w = mountStrip({ overview });
+    for (const key of ["firing", "failing"]) {
+      expect(valueOf(w, key).text()).toBe("—");
+      expect(noteOf(w, key).text()).toBe("No alert rules");
+    }
+    expect(tile(w, "pipelines").text()).not.toContain("No alert rules");
+  });
+
+  it("says no enabled rules when every alert rule is disabled", () => {
+    const overview = withAlerts({ total: 3, enabled: 0, disabled: 3 });
+    const w = mountStrip({ overview });
+    expect(valueOf(w, "firing").text()).toBe("—");
+    expect(noteOf(w, "firing").text()).toBe("No enabled rules");
+    expect(noteOf(w, "failing").text()).toBe("No enabled rules");
+  });
+
+  it("notes the enabled pipelines, or a dash and no pipelines when there are none", () => {
+    expect(noteOf(mountStrip(), "pipelines").text()).toBe("of 8 enabled");
     const base = buildOverview();
     const overview = {
       ...base,
       pipelines: { status: "ok", data: { total: 0, enabled: 0, disabled: 0, errored: 0 } },
     } as typeof base;
     const w = mountStrip({ overview });
-    expect(tile(w, "pipelines").text()).not.toContain("of 0");
-    expect(tile(w, "pipelines").text()).not.toContain("of ");
+    expect(valueOf(w, "pipelines").text()).toBe("—");
+    expect(noteOf(w, "pipelines").text()).toBe("No pipelines");
   });
 
-  it("counts a notify-failed rule as firing", () => {
+  it("notes the quiet definition, or no streams when there are none", () => {
+    expect(noteOf(mountStrip(), "quiet").text()).toBe("Stopped writing in the last 7 days");
     const base = buildOverview();
     const overview = {
       ...base,
-      alerts: {
-        status: "ok",
-        data: { ...base.alerts.data!, by_state: { firing: 2, notify_failed: 3 } },
-      },
+      streams: { status: "ok", data: { ...base.streams.data!, total_streams: 0, quiet_count: 0 } },
     } as typeof base;
-    expect(tile(mountStrip({ overview }), "firing").text()).toContain("5");
+    const w = mountStrip({ overview });
+    expect(valueOf(w, "quiet").text()).toBe("—");
+    expect(noteOf(w, "quiet").text()).toBe("No streams");
+  });
+
+  it("counts a notify-failed rule as firing", () => {
+    const overview = withAlerts({ by_state: { firing: 2, notify_failed: 3 } });
+    expect(valueOf(mountStrip({ overview }), "firing").text()).toBe("5");
   });
 
   it("shows no access on every overview tile for a forbidden request", () => {
     const w = mountStrip({ overview: null, forbidden: true });
-    for (const key of ["firing", "failing", "pipelines", "quiet", "streams"]) {
-      expect(tile(w, key).text()).toContain("No access");
+    for (const key of OVERVIEW_TILES) {
+      expect(noteOf(w, key).text()).toBe("No access");
     }
   });
 
@@ -203,10 +225,12 @@ describe("OverviewHeadlineStrip", () => {
     );
   });
 
-  it("shows a skeleton, never a zero, while the first load is pending", () => {
+  it("shows a skeleton, never a zero, and no unavailable note while the first load is pending", () => {
     const w = mountStrip({ overview: null, pending: true });
-    expect(w.findAll('[data-test="o-stat-card-value-skeleton"]').length).toBe(6);
+    expect(w.findAll('[data-test="o-stat-card-value-skeleton"]').length).toBe(5);
     expect(tile(w, "firing").text()).not.toContain("0");
+    expect(tile(w, "quiet").text()).not.toContain("Could not load");
+    expect(tile(w, "quiet").text()).not.toContain("—");
   });
 
   it("shows a dash and our own copy for an errored section, never the API string", () => {
@@ -215,38 +239,39 @@ describe("OverviewHeadlineStrip", () => {
       pipelines: { status: "forbidden", reason: "nope" },
     });
     const w = mountStrip({ overview });
-    expect(tile(w, "firing").text()).toContain("—");
-    expect(tile(w, "firing").text()).toContain("Could not load");
-    expect(tile(w, "pipelines").text()).toContain("No access");
-    expect(tile(w, "quiet").text()).toContain("3");
+    expect(valueOf(w, "firing").text()).toBe("—");
+    expect(noteOf(w, "firing").text()).toBe("Could not load");
+    expect(noteOf(w, "pipelines").text()).toBe("No access");
+    expect(valueOf(w, "quiet").text()).toBe("3");
     expect(w.text()).not.toContain("db exploded");
     expect(w.text()).not.toContain("nope");
   });
 
   it("shows every overview tile as unavailable when the whole request failed", () => {
     const w = mountStrip({ overview: null, failed: true });
-    for (const key of ["firing", "failing", "pipelines", "quiet", "streams"]) {
-      expect(tile(w, key).text()).toContain("—");
-      expect(tile(w, key).text()).toContain("Could not load");
+    for (const key of OVERVIEW_TILES) {
+      expect(valueOf(w, key).text()).toBe("—");
+      expect(noteOf(w, key).text()).toBe("Could not load");
     }
-  });
-
-  it("shows a dash on the quiet tile when streams are unavailable", () => {
-    const overview = buildOverview({ streams: { status: "error", error: "boom" } });
-    const text = tile(mountStrip({ overview }), "quiet").text();
-    expect(text).toContain("—");
-    expect(text).toContain("Could not load");
   });
 
   it("shows the incidents tile as locked", () => {
     const w = mountStrip({ incidentsState: "locked" });
-    expect(tile(w, "incidents").text()).toContain("—");
-    expect(tile(w, "incidents").text()).toContain("Locked");
+    expect(valueOf(w, "incidents").text()).toBe("—");
+    expect(noteOf(w, "incidents").text()).toBe("Locked");
   });
 
   it("shows no access and is not clickable when incidents are forbidden", async () => {
     const w = mountStrip({ incidentsState: "forbidden" });
-    expect(tile(w, "incidents").text()).toContain("No access");
+    expect(noteOf(w, "incidents").text()).toBe("No access");
+    await tile(w, "incidents").trigger("click");
+    expect(w.emitted("select")).toBeUndefined();
+  });
+
+  it("shows a note and is not clickable when incidents are unavailable", async () => {
+    const w = mountStrip({ incidentsState: "unavailable" });
+    expect(noteOf(w, "incidents").text()).toBe("Not available");
+    expect(tile(w, "incidents").element.tagName).not.toBe("BUTTON");
     await tile(w, "incidents").trigger("click");
     expect(w.emitted("select")).toBeUndefined();
   });
@@ -256,48 +281,16 @@ describe("OverviewHeadlineStrip", () => {
     const w = mountStrip({ overview });
     await tile(w, "pipelines").trigger("click");
     expect(w.emitted("select")).toBeUndefined();
-    await tile(w, "streams").trigger("click");
-    expect(w.emitted("select")).toEqual([["streams"]]);
-  });
-
-  it("reads not set up when every alert rule is disabled", () => {
-    const full = buildOverview();
-    const overview = buildOverview({
-      alerts: { status: "ok", data: { ...full.alerts.data!, total: 3, enabled: 0, disabled: 3 } },
-    });
-    const w = mountStrip({ overview });
-    expect(tile(w, "firing").text()).toContain("Not set up");
-    expect(tile(w, "failing").text()).toContain("Not set up");
-  });
-
-  it("shows a note and is not clickable when incidents are unavailable", async () => {
-    const w = mountStrip({ incidentsState: "unavailable" });
-    expect(tile(w, "incidents").text()).toContain("Not available");
-    expect(tile(w, "incidents").element.tagName).not.toBe("BUTTON");
-    await tile(w, "incidents").trigger("click");
-    expect(w.emitted("select")).toBeUndefined();
+    await tile(w, "quiet").trigger("click");
+    expect(w.emitted("select")).toEqual([["quiet"]]);
   });
 
   it("emits the tile key as a button click", async () => {
     const w = mountStrip();
-    expect(tile(w, "streams").element.tagName).toBe("BUTTON");
-    await tile(w, "streams").trigger("click");
+    expect(tile(w, "firing").element.tagName).toBe("BUTTON");
+    await tile(w, "firing").trigger("click");
     await tile(w, "failing").trigger("click");
-    await tile(w, "quiet").trigger("click");
-    expect(w.emitted("select")).toEqual([["streams"], ["failing"], ["quiet"]]);
-  });
-
-  it("shows skeletons and no unavailable note while the overview is pending", () => {
-    const w = mountStrip({ overview: null, pending: true, failed: false });
-    expect(tile(w, "firing").text()).not.toContain("Could not load");
-    expect(tile(w, "streams").text()).not.toContain("Could not load");
-    expect(tile(w, "streams").text()).not.toContain("—");
-    expect(tile(w, "streams").find('[data-test="o-stat-card-value-skeleton"]').exists()).toBe(true);
-  });
-
-  it("shows a dash with the unavailable note when the overview failed and is not pending", () => {
-    const w = mountStrip({ overview: null, pending: false, failed: true });
-    expect(tile(w, "streams").text()).toContain("—");
-    expect(tile(w, "streams").text()).toContain("Could not load");
+    await tile(w, "incidents").trigger("click");
+    expect(w.emitted("select")).toEqual([["firing"], ["failing"], ["incidents"]]);
   });
 });

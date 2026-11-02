@@ -24,7 +24,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type { StatTone, StatTrend } from "./OStatStrip.types";
+import type { StatLayout, StatTone, StatTrend } from "./OStatStrip.types";
 import useBreakpoint from "@/composables/useBreakpoint";
 
 const { lgUp } = useBreakpoint();
@@ -52,13 +52,13 @@ const props = withDefaults(
     clickable?: boolean;
     /** Active-filter state — accent border. */
     selected?: boolean;
-    /** Put the qualifier on its own line under the value row, so a long one never squeezes the label. */
-    stackSub?: boolean;
+    /** `stacked` puts the label above a large value and the qualifier on its own line below, for a page's headline numbers. */
+    layout?: StatLayout;
     /** Placeholder for the value until it first arrives; a 0 shown meanwhile reads as a real count. */
     loading?: boolean;
     dataTest?: string;
   }>(),
-  { tone: "neutral", clickable: false, selected: false, loading: false },
+  { tone: "neutral", clickable: false, selected: false, loading: false, layout: "inline" },
 );
 
 const slots = useSlots();
@@ -120,6 +120,7 @@ const TONES: Record<StatTone, { chip: string; value: string; bar: string }> = {
 };
 
 const tc = computed(() => TONES[props.tone ?? "neutral"] ?? TONES.neutral);
+const stacked = computed(() => props.layout === "stacked");
 // Empty ("" / null / "—") shows a dash; a real 0 shows "0". Both render MUTED
 // (nothing to draw attention to) — only a positive value gets the tone colour.
 const displayValue = computed(() => {
@@ -156,16 +157,49 @@ const trendClass = computed(() =>
     :is="clickable ? 'button' : 'div'"
     :type="clickable ? 'button' : undefined"
     :aria-pressed="clickable ? String(selected) : undefined"
-    class="rounded-default bg-surface-base flex min-w-0 flex-col justify-center gap-1 overflow-hidden border px-2.5 py-1 text-left transition-colors max-lg:px-1.5"
+    class="rounded-default bg-surface-base flex min-w-0 flex-col overflow-hidden border text-left transition-colors"
     :class="[
+      stacked
+        ? 'justify-start gap-0.5 px-3 py-2.5'
+        : 'justify-center gap-1 px-2.5 py-1 max-lg:px-1.5',
       selected ? 'border-accent' : 'border-border-default',
       clickable ? 'cursor-pointer' : '',
       clickable && !selected ? 'hover:border-accent' : '',
+      clickable && stacked
+        ? 'focus-visible:ring-button-ghost-focus-ring focus-visible:ring-3 focus-visible:outline-none'
+        : '',
     ]"
-    :title="label && !lgUp ? String(label) : undefined"
+    :title="label && !lgUp && !stacked ? String(label) : undefined"
     :data-test="dataTest"
   >
-    <div class="flex min-w-0 items-center justify-between gap-2">
+    <template v-if="stacked">
+      <OTruncatedText v-if="label" class="text-text-label text-xs font-medium">{{
+        label
+      }}</OTruncatedText>
+      <span
+        class="text-3xl leading-tight font-semibold whitespace-nowrap tabular-nums max-lg:text-2xl"
+        :class="isMuted ? 'text-text-muted' : tc.value"
+        data-test="o-stat-card-value"
+      >
+        <OSkeleton
+          v-if="loading"
+          type="text"
+          class="my-1 block h-7 w-12 max-lg:h-6"
+          data-test="o-stat-card-value-skeleton"
+        />
+        <slot v-else name="value">{{ displayValue }}</slot>
+      </span>
+      <!-- the line is reserved even when empty so values in one row stay level -->
+      <div class="min-h-4">
+        <OTruncatedText
+          v-if="sub"
+          class="text-text-secondary text-xs"
+          data-test="o-stat-card-sub-stacked"
+          >{{ sub }}</OTruncatedText
+        >
+      </div>
+    </template>
+    <div v-else class="flex min-w-0 items-center justify-between gap-2">
       <div class="flex min-w-0 items-baseline gap-1.5">
         <!-- The VALUE never shrinks: it is the payload, and a clipped "499.51…" is
              a useless number. When the tile is too narrow (5 tiles on a laptop),
@@ -203,11 +237,9 @@ const trendClass = computed(() =>
         >
           <OTooltip :content="subTooltip || sub" />
         </OIcon>
-        <OTruncatedText
-          v-else-if="sub && !stackSub"
-          class="text-text-label text-2xs max-lg:hidden"
-          >{{ sub }}</OTruncatedText
-        >
+        <OTruncatedText v-else-if="sub" class="text-text-label text-2xs max-lg:hidden">{{
+          sub
+        }}</OTruncatedText>
       </div>
       <span
         v-if="icon || slots.icon"
@@ -221,15 +253,9 @@ const trendClass = computed(() =>
         </slot>
       </span>
     </div>
-    <OTruncatedText
-      v-if="sub && !subIcon && stackSub"
-      class="text-text-label text-2xs max-lg:hidden"
-      data-test="o-stat-card-sub-stacked"
-      >{{ sub }}</OTruncatedText
-    >
     <!-- Track is always rendered so the card height never shifts as data loads;
          only the fill width changes. -->
-    <div class="bg-surface-subtle h-1 overflow-hidden rounded-full">
+    <div v-if="!stacked || max != null" class="bg-surface-subtle h-1 overflow-hidden rounded-full">
       <div
         class="h-full rounded-full transition-all duration-300"
         :class="tc.bar"
