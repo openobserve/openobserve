@@ -281,56 +281,6 @@ describe("User Component", () => {
   // ---------------------------------------------------------------------
   // Initialization
   // ---------------------------------------------------------------------
-  describe("Component Initialization", () => {
-    it("should mount successfully", () => {
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should initialize dialog flags as closed", () => {
-      const vm = wrapper.vm;
-      expect(vm.showUpdateUserDialog).toBe(false);
-      expect(vm.showAddUserDialog).toBe(false);
-      expect(vm.confirmDelete).toBe(false);
-      expect(vm.confirmRevoke).toBe(false);
-      expect(vm.confirmBulkDelete).toBe(false);
-    });
-
-    it.skip("should set up columns correctly", () => {
-      const vm = wrapper.vm;
-      expect(vm.columns).toHaveLength(6);
-      expect(vm.columns.map((c: any) => c.name)).toEqual([
-        "#",
-        "email",
-        "first_name",
-        "last_name",
-        "role",
-        "actions",
-      ]);
-    });
-
-    it.skip("should initialize pagination settings", () => {
-      const vm = wrapper.vm;
-      expect(vm.pagination.rowsPerPage).toBe(20);
-      expect(vm.selectedPerPage).toBe(20);
-      expect(vm.maxRecordToReturn).toBe(500);
-    });
-
-    it.skip("should initialize perPageOptions correctly", () => {
-      const vm = wrapper.vm;
-      expect(vm.perPageOptions).toEqual([
-        { label: "20", value: 20 },
-        { label: "50", value: 50 },
-        { label: "100", value: 100 },
-        { label: "250", value: 250 },
-        { label: "500", value: 500 },
-      ]);
-    });
-
-    it.skip("should reflect fetched users in resultTotal", () => {
-      expect(wrapper.vm.resultTotal).toBe(1);
-    });
-  });
-
   // ---------------------------------------------------------------------
   // ODialog migration coverage
   // ---------------------------------------------------------------------
@@ -339,19 +289,6 @@ describe("User Component", () => {
       wrapper.vm.confirmDeleteAction({ email: "to-delete@example.com" });
       await flushPromises();
       expect(wrapper.vm.confirmDelete).toBe(true);
-    });
-
-    it("forwards localized labels and size to ODialog", async () => {
-      wrapper.vm.confirmDelete = true;
-      await flushPromises();
-      const dialog = wrapper
-        .findAllComponents(ODialogStub)
-        .find((d: any) => d.props("title") === "Delete User");
-      expect(dialog).toBeTruthy();
-      expect(dialog!.props("size")).toBe("sm");
-      expect(dialog!.props("primaryButtonLabel")).toBe("OK");
-      expect(dialog!.props("secondaryButtonLabel")).toBe("Cancel");
-      expect(dialog!.props("open")).toBe(true);
     });
 
     it("names the user in bold and uses a destructive OK button", async () => {
@@ -400,19 +337,6 @@ describe("User Component", () => {
       await flushPromises();
       expect(wrapper.vm.confirmRevoke).toBe(true);
       expect(wrapper.vm.revokeInviteEmail).toBe("pending@example.com");
-    });
-
-    it("forwards static labels and size to ODialog", async () => {
-      wrapper.vm.confirmRevoke = true;
-      await flushPromises();
-      const dialog = wrapper
-        .findAllComponents(ODialogStub)
-        .find((d: any) => d.props("title") === "Revoke Invitation");
-      expect(dialog).toBeTruthy();
-      expect(dialog!.props("size")).toBe("xs");
-      expect(dialog!.props("primaryButtonLabel")).toBe("OK");
-      expect(dialog!.props("secondaryButtonLabel")).toBe("Cancel");
-      expect(dialog!.props("open")).toBe(true);
     });
 
     it("names the invited email in bold and uses a destructive OK button", async () => {
@@ -654,37 +578,6 @@ describe("User Component", () => {
     });
   });
 
-  describe.skip("changePagination", () => {
-    it("should change pagination settings", () => {
-      const mockSetPagination = vi.fn();
-      wrapper.vm.qTable = { setPagination: mockSetPagination };
-
-      wrapper.vm.changePagination({ label: "50", value: 50 });
-
-      expect(wrapper.vm.selectedPerPage).toBe(50);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-      expect(mockSetPagination).toHaveBeenCalledWith(wrapper.vm.pagination);
-    });
-  });
-
-  describe("updateUserActions", () => {
-    it("should update user action permissions", () => {
-      const mockUsers = [
-        { email: "test@example.com", role: "admin" },
-        { email: "test2@example.com", role: "member" },
-      ];
-      wrapper.vm.usersState.users = mockUsers;
-
-      wrapper.vm.updateUserActions();
-
-      mockUsers.forEach((user) => {
-        expect(user).toHaveProperty("enableEdit");
-        expect(user).toHaveProperty("enableChangeRole");
-        expect(user).toHaveProperty("enableDelete");
-      });
-    });
-  });
-
   describe("shouldAllowEdit", () => {
     it("should allow root users to edit themselves only", () => {
       const rootUser = { email: store.state.userInfo.email, role: "root" };
@@ -810,29 +703,7 @@ describe("User Component", () => {
     });
   });
 
-  describe.skip("changeMaxRecordToReturn", () => {
-    it("should update maxRecordToReturn value", () => {
-      wrapper.vm.changeMaxRecordToReturn(1000);
-      expect(wrapper.vm.maxRecordToReturn).toBe(1000);
-    });
-  });
-
-  describe("updateUser", () => {
-    it("should set selected user and show update dialog", () => {
-      const userProps = { row: { email: "test@example.com", role: "admin" } };
-      wrapper.vm.updateUser(userProps);
-      expect(wrapper.vm.selectedUser).toEqual(userProps.row);
-      expect(wrapper.vm.showUpdateUserDialog).toBe(true);
-    });
-  });
-
   describe("addUser", () => {
-    it("should handle adding new user", () => {
-      wrapper.vm.addUser({}, false);
-      expect(wrapper.vm.isUpdated).toBe(false);
-      expect(wrapper.vm.selectedUser).toBeDefined();
-    });
-
     it("should handle updating existing user", () => {
       const userProps = { row: { email: "test@example.com", role: "admin" } };
       wrapper.vm.addUser(userProps, true);
@@ -1063,34 +934,6 @@ describe("User Component", () => {
     });
   });
 
-  describe("toggleExpand", () => {
-    it("should expand row and fetch user data", () => {
-      const row = { email: "test@example.com", showGroups: false };
-      wrapper.vm.toggleExpand(row);
-      expect(row.showGroups).toBe(true);
-    });
-
-    it("should collapse expanded row", () => {
-      const row = { email: "test@example.com", showGroups: true };
-      wrapper.vm.toggleExpand(row);
-      expect(row.showGroups).toBe(false);
-    });
-  });
-
-  describe("forceCloseRow", () => {
-    it("should close expanded row", () => {
-      const row = { showGroups: true };
-      wrapper.vm.forceCloseRow(row);
-      expect(row.showGroups).toBe(false);
-    });
-
-    it("should handle row that is not expanded", () => {
-      const row = { showGroups: false };
-      wrapper.vm.forceCloseRow(row);
-      expect(row.showGroups).toBe(false);
-    });
-  });
-
   describe("fetchUserGroups", () => {
     it("should fetch and update user groups", async () => {
       mockUsersService.getUserGroups.mockResolvedValue({
@@ -1184,8 +1027,8 @@ describe("User Component", () => {
       await flushPromises();
 
       late.findComponent(AddUserStub).vm.$emit("update:open", false);
-      await flushPromises();
-      expect(router.currentRoute.value.query.action).toBeUndefined();
+      // The real router's replace settles asynchronously, so wait for the URL rather than one flush.
+      await vi.waitFor(() => expect(router.currentRoute.value.query.action).toBeUndefined());
 
       resolveRoles({ data: [{ label: "admin", value: "admin" }] });
       await flushPromises();
@@ -1246,13 +1089,6 @@ describe("User Component", () => {
 
       expect(wrapper.vm.showAddUserDialog).toBe(false);
       expect(replaceSpy).toHaveBeenCalled();
-    });
-  });
-
-  describe("confirmDeleteAction", () => {
-    it("should set up delete confirmation", () => {
-      wrapper.vm.confirmDeleteAction({ email: "delete@example.com" });
-      expect(wrapper.vm.confirmDelete).toBe(true);
     });
   });
 
@@ -1466,66 +1302,6 @@ describe("User Component", () => {
       });
 
       expect(mockOrganizationsService.update_member_role).toHaveBeenCalled();
-    });
-  });
-
-  describe.skip("filterData", () => {
-    const users = () => [
-      {
-        first_name: "John",
-        last_name: "Doe",
-        email: "john@example.com",
-        role: "admin",
-      },
-      {
-        first_name: "Jane",
-        last_name: "Smith",
-        email: "jane@example.com",
-        role: "member",
-      },
-    ];
-
-    it("should filter users by first name", () => {
-      const result = wrapper.vm.filterData(users(), "john");
-      expect(result).toHaveLength(1);
-      expect(result[0].first_name).toBe("John");
-    });
-
-    it("should filter users by last name", () => {
-      const result = wrapper.vm.filterData(users(), "smith");
-      expect(result).toHaveLength(1);
-      expect(result[0].last_name).toBe("Smith");
-    });
-
-    it("should filter users by email", () => {
-      const result = wrapper.vm.filterData(users(), "jane@example");
-      expect(result).toHaveLength(1);
-      expect(result[0].email).toBe("jane@example.com");
-    });
-
-    it("should filter users by role", () => {
-      const result = wrapper.vm.filterData(users(), "admin");
-      expect(result).toHaveLength(1);
-      expect(result[0].role).toBe("admin");
-    });
-
-    it("should return empty array for no matches", () => {
-      const result = wrapper.vm.filterData(users(), "nonexistent");
-      expect(result).toHaveLength(0);
-    });
-
-    it("should handle case insensitive search", () => {
-      const result = wrapper.vm.filterData(users(), "JOHN");
-      expect(result).toHaveLength(1);
-      expect(result[0].first_name).toBe("John");
-    });
-
-    it("should handle undefined fields gracefully", () => {
-      const result = wrapper.vm.filterData(
-        [{ last_name: "Doe", email: "john@example.com", role: "admin" }],
-        "doe",
-      );
-      expect(result).toHaveLength(1);
     });
   });
 

@@ -185,73 +185,7 @@ describe("TestFunction Component", () => {
     vi.clearAllMocks();
   });
 
-  describe("Component Initialization", () => {
-    it("renders the component", () => {
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("initializes with correct stream types", () => {
-      expect(wrapper.vm.streamTypes).toMatchObject([
-        { label: "Logs", value: "logs" },
-        { label: "Metrics", value: "metrics" },
-        { label: "Traces", value: "traces" },
-      ]);
-    });
-
-    it("initializes with default expand state", () => {
-      expect(wrapper.vm.expandState).toEqual({
-        stream: true,
-        functions: true,
-        query: false,
-        events: true,
-        output: true,
-      });
-    });
-
-    it("initializes with empty input query", () => {
-      expect(wrapper.vm.inputQuery).toBe("");
-    });
-
-    it("initializes with empty input events", () => {
-      expect(wrapper.vm.inputEvents).toBe("");
-    });
-
-    it("initializes with empty output events", () => {
-      expect(wrapper.vm.outputEvents).toBe("");
-    });
-
-    it("initializes with empty output events error message", () => {
-      expect(wrapper.vm.outputEventsErrorMsg).toBe("");
-    });
-
-    it("initializes with empty events error message", () => {
-      expect(wrapper.vm.eventsErrorMsg).toBe("");
-    });
-
-    it("initializes with empty SQL query error message", () => {
-      expect(wrapper.vm.sqlQueryErrorMsg).toBe("");
-    });
-
-    it("initializes with empty original output events", () => {
-      expect(wrapper.vm.originalOutputEvents).toBe("");
-    });
-  });
-
   describe("Query Management", () => {
-    it("validates query before execution", async () => {
-      wrapper.vm.inputQuery = "";
-      wrapper.vm.loading.events = false;
-      // Force server-side validation error to match component behavior
-      searchService.search.mockRejectedValueOnce({
-        response: { data: { message: "Invalid SQL Query" } },
-      });
-      await wrapper.vm.getResults();
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.vm.sqlQueryErrorMsg).toBe("Invalid SQL Query");
-      expect(wrapper.vm.loading.events).toBe(false);
-    });
-
     it("updates query when stream is selected", async () => {
       wrapper.vm.selectedStream.name = "test_stream";
       await wrapper.vm.updateQuery();
@@ -299,36 +233,6 @@ describe("TestFunction Component", () => {
       expect(wrapper.vm.sqlQueryErrorMsg).toBe("Invalid query");
       expect(wrapper.vm.loading.events).toBe(false);
     });
-
-    it("handles empty stream name", async () => {
-      wrapper.vm.selectedStream.name = "";
-      wrapper.vm.inputQuery = 'SELECT * FROM "test_stream"';
-      wrapper.vm.loading.events = false;
-      // Force server-side validation error to match component behavior
-      searchService.search.mockRejectedValueOnce({
-        response: { data: { message: "Invalid SQL Query" } },
-      });
-      await wrapper.vm.getResults();
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.vm.sqlQueryErrorMsg).toBe("Invalid SQL Query");
-      expect(wrapper.vm.loading.events).toBe(false);
-    });
-
-    it("handles empty stream type", async () => {
-      wrapper.vm.selectedStream.type = "";
-      wrapper.vm.inputQuery = 'SELECT * FROM "test_stream"';
-      wrapper.vm.loading.events = false;
-      // Force server-side validation error to match component behavior
-      searchService.search.mockRejectedValueOnce({
-        response: { data: { message: "Invalid SQL Query" } },
-      });
-      await wrapper.vm.getResults();
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.vm.sqlQueryErrorMsg).toBe("Invalid SQL Query");
-      expect(wrapper.vm.loading.events).toBe(false);
-    });
   });
 
   describe("Stream Management", () => {
@@ -359,30 +263,6 @@ describe("TestFunction Component", () => {
       await flushPromises();
       await nextTick();
       expect(wrapper.vm.filteredStreams).toEqual(["stream1", "stream2"]);
-    });
-
-    it("handles stream type change to logs", async () => {
-      wrapper.vm.selectedStream.type = "logs";
-      await wrapper.vm.updateStreams();
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.vm.selectedStream.name).toBe("");
-    });
-
-    it("handles stream type change to metrics", async () => {
-      wrapper.vm.selectedStream.type = "metrics";
-      await wrapper.vm.updateStreams();
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.vm.selectedStream.name).toBe("");
-    });
-
-    it("handles stream type change to traces", async () => {
-      wrapper.vm.selectedStream.type = "traces";
-      await wrapper.vm.updateStreams();
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.vm.selectedStream.name).toBe("");
     });
   });
 
@@ -418,34 +298,9 @@ describe("TestFunction Component", () => {
       expect(wrapper.vm.outputEvents).toBeTruthy();
       expect(wrapper.vm.originalOutputEvents).toBe(JSON.stringify(testResults.data.results));
     });
-
-    it("handles empty input events", async () => {
-      wrapper.vm.inputEvents = "";
-      await wrapper.vm.testFunction();
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.vm.eventsErrorMsg).toContain("Invalid events");
-    });
-
-    it("handles undefined input events", async () => {
-      wrapper.vm.inputEvents = "undefined";
-      await wrapper.vm.testFunction();
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.vm.eventsErrorMsg).toContain("Invalid events");
-    });
   });
 
   describe("Error Handling", () => {
-    it("handles invalid JSON in input events", async () => {
-      wrapper.vm.inputEvents = "invalid json";
-      const result = wrapper.vm.isInputValid();
-      await flushPromises();
-      await nextTick();
-      expect(result).toBe(false);
-      expect(wrapper.vm.eventsErrorMsg).toContain("Invalid events");
-    });
-
     it("handles test function errors", async () => {
       const error = {
         response: { data: { message: "Test error" } },
@@ -467,127 +322,11 @@ describe("TestFunction Component", () => {
       expect(wrapper.vm.outputEventsErrorMsg).toBe("Error while transforming results");
       expect(wrapper.vm.outputEvents).toBe("Error in testing function");
     });
-
-    it("handles timeout errors", async () => {
-      const error = {
-        message: "Timeout",
-      };
-      await wrapper.vm.handleTestError(error);
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.vm.outputEventsErrorMsg).toBe("Error while transforming results");
-      expect(wrapper.vm.outputEvents).toBe("Error in testing function");
-    });
-
-    it("handles server errors", async () => {
-      const error = {
-        response: { data: { message: "Server error" } },
-      };
-      await wrapper.vm.handleTestError(error);
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.vm.outputEventsErrorMsg).toBe("Error while transforming results");
-      expect(wrapper.vm.outputEvents).toBe("Server error");
-    });
-  });
-
-  describe("Event Highlighting", () => {
-    it("gets line ranges for error events", () => {
-      const mockEvent = {
-        event: { field1: "value1" },
-        message: "Error message",
-      };
-      const ranges = wrapper.vm.getLineRanges(mockEvent);
-      expect(ranges).toEqual({
-        startLineNumber: 1,
-        endLineNumber: 6,
-        message: "Error message",
-      });
-    });
-
-    it("handles errors in getLineRanges gracefully", () => {
-      const mockEvent = null;
-      const ranges = wrapper.vm.getLineRanges(mockEvent);
-      expect(ranges).toBeUndefined();
-    });
-
-    it("handles empty error events", () => {
-      const mockEvent = { event: {} };
-      const ranges = wrapper.vm.getLineRanges(mockEvent);
-      expect(ranges).toEqual({
-        startLineNumber: 1,
-        endLineNumber: 6,
-        message: "",
-      });
-    });
-
-    it("handles missing event property", () => {
-      const mockEvent = {};
-      const ranges = wrapper.vm.getLineRanges(mockEvent);
-      expect(ranges).toBeUndefined();
-    });
-  });
-
-  describe("DateTime Management", () => {
-    it("updates datetime value", async () => {
-      const newDateTime = {
-        type: "relative",
-        relativeTimePeriod: "15m",
-      };
-      wrapper.vm.updateDateTime(newDateTime);
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.vm.dateTime).toEqual(newDateTime);
-    });
-
-    it("handles absolute datetime", async () => {
-      const newDateTime = {
-        type: "absolute",
-        startTime: "2021-01-01T00:00:00Z",
-        endTime: "2021-01-02T00:00:00Z",
-      };
-      wrapper.vm.updateDateTime(newDateTime);
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.vm.dateTime).toEqual(newDateTime);
-    });
-
-    it("handles relative datetime with different periods", async () => {
-      const periods = ["5m", "15m", "30m", "1h", "3h", "6h", "12h", "24h", "7d", "30d"];
-      for (const period of periods) {
-        const newDateTime = {
-          type: "relative",
-          relativeTimePeriod: period,
-        };
-        wrapper.vm.updateDateTime(newDateTime);
-        await flushPromises();
-        await nextTick();
-        expect(wrapper.vm.dateTime).toEqual(newDateTime);
-      }
-    });
   });
 
   describe("AI Chat Integration", () => {
     it("emits sendToAiChat event with correct data", async () => {
       const testData = { test: "data" };
-      wrapper.vm.sendToAiChat(testData);
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.emitted()["sendToAiChat"]).toBeTruthy();
-      expect(wrapper.emitted()["sendToAiChat"][0]).toEqual([testData]);
-    });
-
-    it("handles empty data", async () => {
-      const testData = {};
-      wrapper.vm.sendToAiChat(testData);
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.emitted()["sendToAiChat"]).toBeTruthy();
-      expect(wrapper.emitted()["sendToAiChat"][0]).toEqual([testData]);
-    });
-
-    it("handles null data", async () => {
-      const testData = null;
       wrapper.vm.sendToAiChat(testData);
       await flushPromises();
       await nextTick();

@@ -2053,8 +2053,11 @@
       "error": "خطأ",
       "action": "الحدث",
       "view": "منظر",
-      "frustration": "الإحباط"
+      "frustration": "الإحباط",
+      "failedRequest": "الطلبات الفاشلة",
+      "noResponse": "لا استجابة"
     },
+    "replayCanvasNotRecorded": "لم يتم تسجيل محتوى Canvas",
     "actionOnTarget": "{action} في \"{target}\"",
     "errorWhileFetchingErrorEvents": "حدث خطأ أثناء جلب الأخطاء",
     "errorWhileFetchingSessionReplay": "خطأ أثناء جلب بيانات إعادة تشغيل الجلسة",
@@ -11763,6 +11766,7 @@
       "recoveryResolvesIncident": "يحل الحادث",
       "recoveryClosesAlert": "يغلق التنبيه",
       "recoveryChatMessage": "رسالة \"تم الحل\" جديدة",
+      "recoveryJiraComment": "إضافة تعليق على التذكرة المفتوحة",
       "keepFiringFor": "الاستمرار في الإطلاق لمدة",
       "keepFiringForTooltip": "انتظر هذه المدة بعد زوال الشرط قبل التعافي. القيمة 0 تعني التعافي فورًا.",
       "suppressRepeats": "كتم التكرارات",
@@ -12071,7 +12075,37 @@
       "priorityP2": "P2 (عالي)",
       "priorityP3": "P3 (متوسط)",
       "priorityP4": "P4 (منخفض)",
-      "priorityP5": "P5 (معلوماتي)"
+      "priorityP5": "P5 (معلوماتي)",
+      "jiraDescription": "إنشاء تذاكر في Jira",
+      "jiraConnectSection": "الاتصال بـ Jira",
+      "jiraType": "نوع Jira",
+      "jiraCloud": "Jira Cloud",
+      "jiraDataCenter": "Jira Data Center",
+      "jiraUrl": "رابط Jira",
+      "jiraUrlHelp": "عنوان موقع Jira الخاص بك، على سبيل المثال {example}",
+      "jiraUrlFormat": "أدخل رابطًا يبدأ بـ https:// أو http://",
+      "jiraEmail": "البريد الإلكتروني",
+      "jiraApiToken": "رمز API",
+      "jiraPersonalAccessToken": "رمز الوصول الشخصي",
+      "jiraTokenRequired": "الرمز مطلوب",
+      "jiraTokenTip": "استخدم حساب روبوت لا يمكنه رؤية سوى هذا المشروع.",
+      "jiraConnect": "اتصال",
+      "jiraConnectedSummary": "متصل بـ {host} باسم {name}",
+      "jiraChange": "تغيير",
+      "jiraConnectMissing": "املأ الحقول أعلاه، ثم اتصل.",
+      "jiraTicketsSection": "إلى أين تذهب التذاكر",
+      "jiraProject": "المشروع",
+      "jiraIssueType": "نوع المشكلة",
+      "jiraPriority": "الأولوية",
+      "jiraDefaultPriority": "افتراضي Jira",
+      "jiraRequiredFields": "حقول Jira المطلوبة",
+      "jiraRequiredFieldHelp": "مطلوب من Jira لنوع المشكلة هذا",
+      "jiraUnsupportedField": "يتطلب Jira الحقل '{field}' لنوع المشكلة {issueType}. لا يمكن لـ OpenObserve ملء هذا النوع من الحقول. اختر نوع مشكلة آخر، أو اطلب من مسؤول Jira جعله اختياريًا.",
+      "jiraCreateScreenNotLoaded": "لم يتم تحميل شاشة الإنشاء لنوع المشكلة هذا. انتظر حتى يتم تحميلها، أو اختر نوع المشكلة مرة أخرى.",
+      "jiraLabelsMissing": "حقل Labels غير موجود في شاشة الإنشاء لنوع المشكلة {issueType} في المشروع {project}. يحتاجه OpenObserve للعثور على تذاكره. اطلب من مسؤول Jira إضافته.",
+      "jiraBehavior": "يضيف التعافي تعليقًا ولا يغلق التذكرة.",
+      "jiraTestCreated": "تم إنشاء {key}. يمكنك حذفه في Jira.",
+      "jiraOpenIssue": "فتح في Jira"
     },
     "lastRun": "آخر تشغيل: {time}",
     "retryTraining": "إعادة تدريب النموذج وإعادة تشغيل الكشف",
@@ -13512,7 +13546,14 @@
       "pagerdutyDescription": "إنشاء حوادث في PagerDuty",
       "opsgenieDescription": "إنشاء تنبيهات في Opsgenie",
       "servicenowDescription": "إنشاء حوادث في ServiceNow",
-      "slackAppDescription": "يحدّث التنبيهات المجدولة في مكانها. أقرّ واكتم وحقّق من Slack. يتطلب مساحة عمل متصلة."
+      "slackAppRecommendedDescription": "موصى به للاستجابة للتنبيهات. يحدّث التنبيهات المجدولة في مكانها. يمكنك تأكيد الاستلام وكتم الصوت والتحقيق من Slack. يتطلب مساحة عمل متصلة.",
+      "slackAppShort": "التعامل مع التنبيهات",
+      "chatPostsShort": "منشورات الدردشة",
+      "emailShort": "بريد HTML",
+      "pageOnCallShort": "استدعاء المناوبة",
+      "servicenowShort": "حوادث تقنية المعلومات",
+      "jiraShort": "تذاكر المشكلات",
+      "customShort": "رابط أو بريد إلكتروني"
     },
     "import": {
       "title": "استيراد الوجهة",
@@ -13758,6 +13799,15 @@
       "allTitle": "كل المقاييس، بما في ذلك تلك التي لا تحتوي على بيانات ضمن هذا النطاق",
       "sortAsc": "من أ إلى ي",
       "sortDesc": "Z–A",
+      "sortDashboards": "لوحات المعلومات",
+      "sortDashboardsTitle": "الأكثر استخدامًا في لوحات المعلومات أولًا",
+      "sortAlerts": "التنبيهات",
+      "sortAlertsTitle": "الأكثر استخدامًا في التنبيهات أولًا",
+      "usageInDashboards": "في لوحات المعلومات",
+      "usageHasAlerts": "لديه تنبيهات",
+      "usageInSlos": "في SLOs",
+      "usageLoading": "جارٍ تحميل أماكن استخدام المقاييس",
+      "usageFailed": "الاستخدام غير متاح، أعد المحاولة",
       "viewGrid": "الشبكة",
       "viewRows": "الصفوف",
       "modeExplore": "استكشاف",
@@ -13891,16 +13941,7 @@
         "deleteMessage": "هل تريد حذف العرض {name} للجميع في هذه المؤسسة؟",
         "modified": "{name} (معدَّل)",
         "clear": "مسح العرض"
-      },
-      "sortDashboards": "لوحات المعلومات",
-      "sortDashboardsTitle": "الأكثر استخدامًا في لوحات المعلومات أولًا",
-      "sortAlerts": "التنبيهات",
-      "sortAlertsTitle": "الأكثر استخدامًا في التنبيهات أولًا",
-      "usageInDashboards": "في لوحات المعلومات",
-      "usageHasAlerts": "لديه تنبيهات",
-      "usageInSlos": "في SLOs",
-      "usageLoading": "جارٍ تحميل أماكن استخدام المقاييس",
-      "usageFailed": "الاستخدام غير متاح، أعد المحاولة"
+      }
     },
     "metricCard": {
       "lastRefreshed": "آخر تحديث:",
@@ -13927,6 +13968,17 @@
       "notEqualTo": "ليس مساويا ل",
       "regexPattern": "نمط Regex (مثل prod.*)",
       "regexNotMatching": "عدم تطابق Regex (مثلا، اختبار.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ مجموعة OR",
+      "addGroupTooltip": "أضف مجموعة من الفلاتر؛ تطابق السلسلة عندما تطابق أي مجموعة",
+      "addToGroup": "أضف فلترًا إلى هذه المجموعة",
+      "anyOf": "أي من",
+      "andAnyOf": "وأي من",
+      "or": "أو",
+      "not": "ليس",
+      "notTooltip": "طابِق السلسلة التي لا تطابقها هذه المجموعة بأكملها",
+      "tooManyBranches": "تتوسع هذه الفلاتر إلى {count} محدِّدات منفصلة؛ يمكن تشغيل {max} كحد أقصى. ادمج القيم في فلتر تعبير نمطي واحد أو أزل مجموعة."
     },
     "builderSwitch": {
       "unsupported": "لا يمكن للمنشئ عرض {construct}",
@@ -13967,11 +14019,11 @@
         "byLabelsLabel": "حسب العلامات التجارية",
         "quantileLabel": "كوانتيل",
         "kLabel": "K",
-        "nearestMultipleLabel": "أقرب مضاعف",
         "withoutLabel": "بدون (إسقاط هذه التسميات)",
         "withoutDesc": "جمّع مع إسقاط التسميات المحددة واحتفظ بكل تسمية أخرى",
         "offsetLabel": "الإزاحة",
-        "offsetDesc": "مدة الرجوع إلى الخلف لقراءة المقياس، مثل 1h أو 1d"
+        "offsetDesc": "مدة الرجوع إلى الخلف لقراءة المقياس، مثل 1h أو 1d",
+        "nearestMultipleLabel": "أقرب مضاعف"
       },
       "rangeOnlyFirst": "يمكن أن تكون دالة النطاق الخطوة الأولى فقط",
       "rangeOnlyFirstNote": "تقرأ دالة النطاق العينات الخام، لذا يمكن أن تكون الخطوة الأولى فقط. أزل الخطوات الأخرى لإضافة واحدة.",
@@ -14041,17 +14093,6 @@
       "empty": "لا توجد استعلامات بعد",
       "noMatch": "لا توجد استعلامات مطابقة للبحث أو عامل تصفية النجمة",
       "loadMore": "تحميل المزيد"
-    },
-    "labelGroups": {
-      "addGroup": "+ مجموعة OR",
-      "addGroupTooltip": "أضف مجموعة من الفلاتر؛ تطابق السلسلة عندما تطابق أي مجموعة",
-      "addToGroup": "أضف فلترًا إلى هذه المجموعة",
-      "anyOf": "أي من",
-      "andAnyOf": "وأي من",
-      "or": "أو",
-      "not": "ليس",
-      "notTooltip": "طابِق السلسلة التي لا تطابقها هذه المجموعة بأكملها",
-      "tooManyBranches": "تتوسع هذه الفلاتر إلى {count} محدِّدات منفصلة؛ يمكن تشغيل {max} كحد أقصى. ادمج القيم في فلتر تعبير نمطي واحد أو أزل مجموعة."
     }
   },
   "settings": {
@@ -21710,7 +21751,8 @@
         "longtask": "مهمة طويلة",
         "view": "منظر",
         "action": "الحدث",
-        "resource": "المصدر"
+        "resource": "المصدر",
+        "failedrequest": "طلب فاشل"
       },
       "subscriptionPlan": {
         "payasyougo": "ادفع حسب الاستخدام",
@@ -22724,6 +22766,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "يقرأ المقياس كما كان قبل المدة المحددة",
       "rateDoc": "يحسب متوسط معدل الزيادة في الثانية خلال النطاق الزمني المحدد",
       "irateDoc": "يحسب معدل الزيادة الفورية في الثانية بناء على آخر نقطتي بيانات",
       "increaseDoc": "يحسب الزيادة الكلية خلال النطاق الزمني المحدد",
@@ -22794,8 +22837,7 @@
       "moduloName": "مودولو",
       "multiplyByName": "الضرب في",
       "divideByName": "القسم على",
-      "exponentName": "الموس",
-      "offsetDoc": "يقرأ المقياس كما كان قبل المدة المحددة"
+      "exponentName": "الموس"
     }
   },
   "passwordPolicy": {
@@ -28177,7 +28219,6 @@
       "appTile": "تطبيق {product}",
       "webhookTile": "ويب هوك {product}",
       "twoWay": "ثنائي الاتجاه",
-      "recommendedForAlertResponse": "موصى به للاستجابة للتنبيهات",
       "choiceHint": "تستخدم نداءات المناوبة والعناقيد الفائقة الويب هوك. الإرسال اليدوي والفوري من وجهة تطبيق Slack منشورات منفصلة.",
       "unavailableReason": "يتطلب تطبيق Slack للمؤسسات على عنقود واحد",
       "unavailableFlag": "معطّل على هذا الخادم؛ اطلب من مشغّلك تعيين {variable}",
@@ -28185,6 +28226,7 @@
       "unavailableCloud": "لم يُفعّل بعد في منطقة السحابة الخاصة بك",
       "unavailableNoAccess": "اطلب من مسؤول المؤسسة تفعيل تطبيق Slack",
       "postOnly": "نشر فقط",
+      "off": "إيقاف",
       "switchToApp": "التبديل إلى تطبيق {product}",
       "switchThis": "تبديل هذه الوجهة",
       "switchBack": "التبديل مرة أخرى",

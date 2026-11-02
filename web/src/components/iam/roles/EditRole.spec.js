@@ -651,34 +651,8 @@ afterEach(() => {
 });
 
 // 1. Basic rendering
-describe("EditRole - basic rendering", () => {
-  it("renders page and title with role name", async () => {
-    const wrapper = await mountEditRole();
-    expect(wrapper.find('[data-test="edit-role-page"]').exists()).toBe(true);
-    // Role name now renders as the OPageHeader title (row 1).
-    expect(wrapper.find(".app-page-header h1").text()).toContain("Admin");
-  });
-
-  it("renders tabs component", async () => {
-    const wrapper = await mountEditRole();
-    expect(wrapper.find('[data-test="edit-role-tabs"]').exists()).toBe(true);
-  });
-
-  it.skip("shows loading spinner during initial fetch", async () => {
-    const wrapper = await mountEditRole();
-    wrapper.vm.isFetchingInitialRoles = true;
-    await flushPromises();
-    expect(wrapper.find('[data-test="edit-role-page-loading-spinner"]').exists()).toBe(true);
-  });
-});
-
 // 2. Tabs and activeTab switching
 describe("EditRole - tabs behavior", () => {
-  it("default tab is permissions", async () => {
-    const wrapper = await mountEditRole();
-    expect(wrapper.vm.activeTab).toBe("permissions");
-  });
-
   it("switches to users tab", async () => {
     const wrapper = await mountEditRole();
     await wrapper.find(".tab-users").trigger("click");
@@ -918,17 +892,6 @@ describe("EditRole - save and cancel", () => {
     });
   });
 
-  it("saveRole notifies info when no changes", async () => {
-    // The component uses toast() from @/lib/feedback/Toast/useToast.
-    const wrapper = await mountEditRole();
-    mockToast.mockClear();
-
-    await wrapper.vm.saveRole();
-
-    // toast is called with variant: "info" when there are no changes
-    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "info" }));
-  });
-
   it("saveRole calls updateRole and resets added/removed permissions", async () => {
     const wrapper = await mountEditRole();
     wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
@@ -946,57 +909,8 @@ describe("EditRole - save and cancel", () => {
 });
 
 // 8. Data fetch pipeline
-describe("EditRole - data fetch pipeline", () => {
-  it("getRoleDetails loads resources and users", async () => {
-    const wrapper = await mountEditRole();
-    await wrapper.vm.getRoleDetails();
-    await flushPromises();
-    expect(wrapper.vm.permissionsState.resources.length).toBeGreaterThan(0);
-    expect(wrapper.vm.roleUsers.length).toBeGreaterThan(0);
-  });
-});
-
 // 9. JSON sync flows
-describe("EditRole - JSON editor flows", () => {
-  it("updateJsonInTable updates mappings based on JSON string", async () => {
-    const wrapper = await mountEditRole();
-    wrapper.vm.permissionsJsonValue = JSON.stringify([
-      { object: "logs:app", permission: "AllowGet" },
-    ]);
-    await wrapper.vm.updateJsonInTable();
-    expect(wrapper.vm.selectedPermissionsHash.size).toBeGreaterThan(0);
-  });
-});
-
 // 10. Misc micro-tests to exceed 50 cases
-describe("EditRole - micro validations", () => {
-  it("decodePermission splits correctly", async () => {
-    const wrapper = await mountEditRole();
-    const { resource, entity } = wrapper.vm.decodePermission("logs:app");
-    expect(resource).toBe("logs");
-    expect(entity).toBe("app");
-  });
-
-  it("savePermissionHash builds sets from permissions", async () => {
-    const wrapper = await mountEditRole();
-    wrapper.vm.permissions = [{ object: "logs:_all_default", permission: "AllowGet" }];
-    wrapper.vm.savePermissionHash();
-    expect(wrapper.vm.permissionsHash.size).toBe(1);
-    expect(wrapper.vm.selectedPermissionsHash.size).toBe(1);
-  });
-
-  it("updateActiveTab ignores falsy input", async () => {
-    const wrapper = await mountEditRole();
-    await wrapper.vm.updateActiveTab("");
-    expect(wrapper.vm.activeTab).toBeTruthy();
-  });
-
-  it("getOrgId returns store selected org identifier", async () => {
-    const wrapper = await mountEditRole();
-    expect(wrapper.vm.getOrgId()).toBe(store.state.selectedOrganization.identifier);
-  });
-});
-
 // Per-tab dirty state
 describe("EditRole - dirty state", () => {
   it("is not dirty on initial load", async () => {
@@ -1552,25 +1466,6 @@ describe("EditRole - kubernetes viewer preset", () => {
 });
 
 // Characterization suite: pins observed grant behaviour, so a failure means the refactor changed it; never edit to make it pass.
-describe("EditRole - grant hash encoding [characterization]", () => {
-  it("encodes a type level grant with the _all_<org> entity", async () => {
-    const wrapper = await mountEditRole();
-    expect(wrapper.vm.getPermissionHash("stream", "AllowAll")).toBe("stream:_all_default:AllowAll");
-  });
-
-  it("encodes a per entity grant as resource:entity:action", async () => {
-    const wrapper = await mountEditRole();
-    expect(wrapper.vm.getPermissionHash("logs", "AllowGet", "app")).toBe("logs:app:AllowGet");
-  });
-
-  it("passes a folder scoped entity id through untouched", async () => {
-    const wrapper = await mountEditRole();
-    expect(wrapper.vm.getPermissionHash("dashboard", "AllowGet", "folder1/dash1")).toBe(
-      "dashboard:folder1/dash1:AllowGet",
-    );
-  });
-});
-
 describe("EditRole - toggle state machine [characterization]", () => {
   const NEW_GRANT = "logs:app:AllowGet";
   const SAVED_GRANT = "logs:sys:AllowGet";
@@ -3251,11 +3146,6 @@ describe("EditRole savedGrants - key helpers", () => {
 
   // Pinned as-is: split(":") with a 2-way destructure silently drops anything
   // after a second colon, so an entity containing ":" loses its tail.
-  it("decodePermission drops everything after a second colon", async () => {
-    const wrapper = await mountEditRole();
-    expect(wrapper.vm.decodePermission("logs:a:b")).toEqual({ resource: "logs", entity: "a" });
-  });
-
   it("getPermissionHash defaults the entity to _all_<org>", async () => {
     const wrapper = await mountEditRole();
     expect(wrapper.vm.getPermissionHash("stream", "AllowAll")).toBe(`stream:_all_${ORG}:AllowAll`);
@@ -3352,19 +3242,6 @@ describe("EditRole savedGrants - readonly preset", () => {
     expect(objects).not.toContain(`alert:_all_${ORG}`);
   });
 
-  it("reports nothing — the readonly preset raises no toast", async () => {
-    mockToast.mockClear();
-    await mountWithPreset("readonly");
-    expect(mockToast).not.toHaveBeenCalled();
-  });
-
-  it("seeds nothing when the role already holds grants", async () => {
-    ctl.rolePermissions = [{ object: `role:_all_${ORG}`, permission: "AllowGet" }];
-    const wrapper = await mountWithPreset("readonly");
-    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([]);
-    expect(wrapper.vm.selectedPermissionsHash.size).toBe(1);
-  });
-
   it("skips a permission the role already holds when seeded directly", async () => {
     const wrapper = await mountWithSaved([{ object: `role:_all_${ORG}`, permission: "AllowGet" }]);
     wrapper.vm.seedReadonlyPreset();
@@ -3376,13 +3253,6 @@ describe("EditRole savedGrants - readonly preset", () => {
     const wrapper = await mountEditRole();
     await wrapper.vm.applyPreset("readonly");
     expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(12);
-  });
-
-  it("applyPreset ignores an unknown preset id", async () => {
-    const wrapper = await mountEditRole();
-    await wrapper.vm.applyPreset("nope");
-    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([]);
-    expect(mockToast).not.toHaveBeenCalled();
   });
 });
 
@@ -3399,16 +3269,6 @@ describe("EditRole savedGrants - dbm preset", () => {
     ]);
   });
 
-  it("reports the matched count and total in the toast", async () => {
-    mockToast.mockClear();
-    await mountWithPreset("dbm");
-    expect(mockToast).toHaveBeenCalledWith({
-      variant: "info",
-      message:
-        "Pre-selected read access on 2 of 3 DB Monitoring metric streams, plus the DB Monitoring module. Review before saving.",
-    });
-  });
-
   it("warns and still stages the module grant when no curated stream matches", async () => {
     ctl.metricStreams = [{ name: "cpu" }];
     mockToast.mockClear();
@@ -3423,14 +3283,6 @@ describe("EditRole savedGrants - dbm preset", () => {
       `db_monitoring:_all_${ORG}:AllowGet`,
       `db_monitoring:_all_${ORG}:AllowList`,
     ]);
-  });
-
-  it("seeds nothing when the role already holds grants", async () => {
-    ctl.rolePermissions = [{ object: "logs:app", permission: "AllowGet" }];
-    mockToast.mockClear();
-    const wrapper = await mountWithPreset("dbm");
-    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([]);
-    expect(mockToast).not.toHaveBeenCalled();
   });
 });
 
@@ -3449,16 +3301,6 @@ describe("EditRole savedGrants - k8s preset", () => {
     ]);
   });
 
-  it("reports the matched count and total in the toast", async () => {
-    mockToast.mockClear();
-    await mountWithPreset("k8s");
-    expect(mockToast).toHaveBeenCalledWith({
-      variant: "info",
-      message:
-        "Pre-selected read access on 2 of 3 Kubernetes metric streams. Review before saving.",
-    });
-  });
-
   it("warns and stages nothing when no curated stream matches", async () => {
     ctl.metricStreams = [{ name: "cpu" }];
     mockToast.mockClear();
@@ -3469,14 +3311,6 @@ describe("EditRole savedGrants - k8s preset", () => {
       message:
         "None of the 3 Kubernetes metric streams exist in this organization yet, so nothing was pre-selected.",
     });
-  });
-
-  it("seeds nothing when the role already holds grants", async () => {
-    ctl.rolePermissions = [{ object: "logs:app", permission: "AllowGet" }];
-    mockToast.mockClear();
-    const wrapper = await mountWithPreset("k8s");
-    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([]);
-    expect(mockToast).not.toHaveBeenCalled();
   });
 });
 

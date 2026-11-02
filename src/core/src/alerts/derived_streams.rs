@@ -83,7 +83,8 @@ pub async fn save(
                     {
                         let max_query_range = settings.max_query_range;
                         if max_query_range > 0
-                            && derived_stream.trigger_condition.period > max_query_range * 60
+                            && derived_stream.trigger_condition.period
+                                > max_query_range.saturating_mul(60)
                         {
                             return Err(anyhow::anyhow!(
                                 "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""

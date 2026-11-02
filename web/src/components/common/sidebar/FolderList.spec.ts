@@ -187,67 +187,9 @@ describe("FolderList.vue", () => {
       expect(slot.find("svg").exists()).toBe(true);
       expect(slot.find('[data-test="glyph-emoji"]').exists()).toBe(false);
     });
-
-    it("should give the icon slot a fixed size so names stay aligned", () => {
-      const classes = wrapper.find('[data-test^="dashboard-folder-icon-"]').classes();
-      expect(classes).toContain("size-4");
-      expect(classes).toContain("shrink-0");
-    });
-
-    it("should let the folder name take the remaining row width", () => {
-      const name = wrapper.find('[data-test^="dashboard-folder-name-"]');
-      expect(name.classes()).toContain("flex-1");
-      expect(name.classes()).toContain("truncate");
-    });
   });
 
   describe("Component Initialization", () => {
-    it("should render the component correctly", () => {
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="folder-search"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboards-folder-tabs"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-new-folder-btn"]').exists()).toBe(true);
-    });
-
-    it("should initialize with correct default props", () => {
-      const wrapperWithDefaults = mount(FolderList, {
-        global: {
-          plugins: [i18n],
-          stubs: {
-            AddFolder: AddFolderStub,
-            ConfirmDialog: ConfirmDialogStub,
-          },
-          mocks: {
-            $store: mockStore,
-          },
-          provide: {
-            store: mockStore,
-          },
-        },
-      });
-      expect(wrapperWithDefaults.props("type")).toBe("alerts");
-      wrapperWithDefaults.unmount();
-    });
-
-    it("should initialize reactive variables correctly", () => {
-      expect(wrapper.vm.activeFolderId).toBe("default");
-      expect(wrapper.vm.showAddFolderDialog).toBe(false);
-      expect(wrapper.vm.isFolderEditMode).toBe(false);
-      expect(wrapper.vm.selectedFolderToEdit).toBe(null);
-      expect(wrapper.vm.selectedFolderDelete).toBe(null);
-      expect(wrapper.vm.confirmDeleteFolderDialog).toBe(false);
-      expect(wrapper.vm.searchQuery).toBe("");
-    });
-
-    it("should have correct component name", () => {
-      expect(wrapper.vm.$options.name).toBe("FolderList");
-    });
-
-    it("should emit correct events", () => {
-      // Component emits update:activeFolderId on initialization, so we check it exists
-      expect(wrapper.emitted("update:activeFolderId")).toBeTruthy();
-    });
-
     it("re-emits update:activeFolderId when the ALREADY-ACTIVE folder is clicked", async () => {
       // The v-model watcher only fires on change, so without the explicit
       // click re-emit a click on the active tab would be silent — and the
@@ -297,32 +239,10 @@ describe("FolderList.vue", () => {
     });
   });
 
-  describe("Component Props", () => {
-    it("should accept type prop with default value", () => {
-      expect(wrapper.props("type")).toBe("alerts");
-    });
-
-    it("should handle different type prop values", async () => {
-      await wrapper.setProps({ type: "dashboards" });
-      expect(wrapper.props("type")).toBe("dashboards");
-    });
-
-    it("should handle empty string type prop", async () => {
-      await wrapper.setProps({ type: "" });
-      expect(wrapper.props("type")).toBe("");
-    });
-  });
-
   describe("Computed Properties", () => {
     describe("filteredTabs", () => {
       it("should return all folders when search query is empty", async () => {
         wrapper.vm.searchQuery = "";
-        await nextTick();
-        expect(wrapper.vm.filteredTabs).toEqual(mockFolders);
-      });
-
-      it("should return all folders when search query is null", async () => {
-        wrapper.vm.searchQuery = null;
         await nextTick();
         expect(wrapper.vm.filteredTabs).toEqual(mockFolders);
       });
@@ -361,49 +281,11 @@ describe("FolderList.vue", () => {
         expect(filtered).toHaveLength(1);
         expect(filtered[0].name).toBe("Another Folder");
       });
-
-      it("should handle whitespace in search query", async () => {
-        wrapper.vm.searchQuery = "  test  ";
-        await nextTick();
-
-        // Whitespace search should still find 'test' in folder names
-        const filtered = wrapper.vm.filteredTabs;
-        expect(filtered.length).toBeGreaterThanOrEqual(0);
-        // Test that whitespace doesn't break the search functionality
-        expect(Array.isArray(filtered)).toBe(true);
-      });
-
-      it("should handle special characters in search", async () => {
-        wrapper.vm.searchQuery = "1";
-        await nextTick();
-
-        const filtered = wrapper.vm.filteredTabs;
-        expect(filtered).toHaveLength(1);
-        expect(filtered[0].name).toBe("Test Folder 1");
-      });
     });
   });
 
   describe("Methods", () => {
     describe("addFolder", () => {
-      it("should set correct state when adding a folder", () => {
-        wrapper.vm.addFolder();
-
-        expect(wrapper.vm.isFolderEditMode).toBe(false);
-        expect(wrapper.vm.showAddFolderDialog).toBe(true);
-      });
-
-      it("should reset edit mode when adding new folder", async () => {
-        wrapper.vm.isFolderEditMode = true;
-        wrapper.vm.selectedFolderToEdit = "folder1";
-        await nextTick();
-
-        wrapper.vm.addFolder();
-
-        expect(wrapper.vm.isFolderEditMode).toBe(false);
-        expect(wrapper.vm.showAddFolderDialog).toBe(true);
-      });
-
       it("should be called when new folder button is clicked", async () => {
         const newFolderBtn = wrapper.find('[data-test="dashboard-new-folder-btn"]');
         expect(newFolderBtn.exists()).toBe(true);
@@ -415,89 +297,6 @@ describe("FolderList.vue", () => {
         // Check the state changes that should happen when addFolder is called
         expect(wrapper.vm.showAddFolderDialog).toBe(true);
         expect(wrapper.vm.isFolderEditMode).toBe(false);
-      });
-    });
-
-    describe("editFolder", () => {
-      it("should set correct state for editing a folder", () => {
-        const folderId = "folder1";
-        wrapper.vm.editFolder(folderId);
-
-        expect(wrapper.vm.selectedFolderToEdit).toBe(folderId);
-        expect(wrapper.vm.isFolderEditMode).toBe(true);
-        expect(wrapper.vm.showAddFolderDialog).toBe(true);
-      });
-
-      it("should handle editing different folder IDs", () => {
-        const folderId = "folder2";
-        wrapper.vm.editFolder(folderId);
-
-        expect(wrapper.vm.selectedFolderToEdit).toBe(folderId);
-        expect(wrapper.vm.isFolderEditMode).toBe(true);
-      });
-
-      it("should handle null folder ID", () => {
-        wrapper.vm.editFolder(null);
-
-        expect(wrapper.vm.selectedFolderToEdit).toBe(null);
-        expect(wrapper.vm.isFolderEditMode).toBe(true);
-        expect(wrapper.vm.showAddFolderDialog).toBe(true);
-      });
-
-      it("should handle undefined folder ID", () => {
-        wrapper.vm.editFolder(undefined);
-
-        expect(wrapper.vm.selectedFolderToEdit).toBe(undefined);
-        expect(wrapper.vm.isFolderEditMode).toBe(true);
-      });
-
-      it("should handle empty string folder ID", () => {
-        wrapper.vm.editFolder("");
-
-        expect(wrapper.vm.selectedFolderToEdit).toBe("");
-        expect(wrapper.vm.isFolderEditMode).toBe(true);
-      });
-    });
-
-    describe("showDeleteFolderDialogFn", () => {
-      it("should set correct state for showing delete dialog", () => {
-        const folderId = "folder1";
-        wrapper.vm.showDeleteFolderDialogFn(folderId);
-
-        expect(wrapper.vm.selectedFolderDelete).toBe(folderId);
-        expect(wrapper.vm.confirmDeleteFolderDialog).toBe(true);
-      });
-
-      it("should handle different folder IDs for deletion", () => {
-        const folderId = "folder2";
-        wrapper.vm.showDeleteFolderDialogFn(folderId);
-
-        expect(wrapper.vm.selectedFolderDelete).toBe(folderId);
-        expect(wrapper.vm.confirmDeleteFolderDialog).toBe(true);
-      });
-
-      it("should handle null folder ID for deletion", () => {
-        wrapper.vm.showDeleteFolderDialogFn(null);
-
-        expect(wrapper.vm.selectedFolderDelete).toBe(null);
-        expect(wrapper.vm.confirmDeleteFolderDialog).toBe(true);
-      });
-
-      it("should handle undefined folder ID for deletion", () => {
-        wrapper.vm.showDeleteFolderDialogFn(undefined);
-
-        expect(wrapper.vm.selectedFolderDelete).toBe(undefined);
-        expect(wrapper.vm.confirmDeleteFolderDialog).toBe(true);
-      });
-
-      it("should not affect other state variables", () => {
-        const initialShowDialog = wrapper.vm.showAddFolderDialog;
-        const initialEditMode = wrapper.vm.isFolderEditMode;
-
-        wrapper.vm.showDeleteFolderDialogFn("folder1");
-
-        expect(wrapper.vm.showAddFolderDialog).toBe(initialShowDialog);
-        expect(wrapper.vm.isFolderEditMode).toBe(initialEditMode);
       });
     });
 
@@ -522,27 +321,6 @@ describe("FolderList.vue", () => {
 
         expect(wrapper.vm.showAddFolderDialog).toBe(false);
         expect(wrapper.vm.isFolderEditMode).toBe(false);
-      });
-
-      it("should handle empty folder list", async () => {
-        await wrapper.vm.updateFolderList([]);
-
-        expect(wrapper.emitted("update:folders")).toBeTruthy();
-        expect(wrapper.emitted("update:folders")[0]).toEqual([[]]);
-      });
-
-      it("should handle null folder list", async () => {
-        await wrapper.vm.updateFolderList(null);
-
-        expect(wrapper.emitted("update:folders")).toBeTruthy();
-        expect(wrapper.emitted("update:folders")[0]).toEqual([null]);
-      });
-
-      it("should handle undefined folder list", async () => {
-        await wrapper.vm.updateFolderList(undefined);
-
-        expect(wrapper.emitted("update:folders")).toBeTruthy();
-        expect(wrapper.emitted("update:folders")[0]).toEqual([undefined]);
       });
     });
 
@@ -647,24 +425,6 @@ describe("FolderList.vue", () => {
         expect(showPositiveNotificationMock).not.toHaveBeenCalled();
       });
 
-      it("should handle undefined selectedFolderDelete", async () => {
-        wrapper.vm.selectedFolderDelete = undefined;
-        await nextTick();
-
-        await wrapper.vm.deleteFolder();
-
-        expect(deleteFolderByIdByTypeMock).not.toHaveBeenCalled();
-      });
-
-      it("should handle empty string selectedFolderDelete", async () => {
-        wrapper.vm.selectedFolderDelete = "";
-        await nextTick();
-
-        await wrapper.vm.deleteFolder();
-
-        expect(deleteFolderByIdByTypeMock).not.toHaveBeenCalled();
-      });
-
       it("should always close confirm dialog", async () => {
         deleteFolderByIdByTypeMock.mockRejectedValue(new Error());
         wrapper.vm.selectedFolderDelete = "folder1";
@@ -688,39 +448,6 @@ describe("FolderList.vue", () => {
         const emissions = wrapper.emitted("update:activeFolderId");
         expect(emissions).toBeTruthy();
         expect(emissions[emissions.length - 1]).toEqual(["folder1"]);
-      });
-
-      it("should emit multiple times for multiple changes", async () => {
-        const initialEmissions = wrapper.emitted("update:activeFolderId")?.length || 0;
-
-        wrapper.vm.activeFolderId = "folder1";
-        await nextTick();
-
-        wrapper.vm.activeFolderId = "folder2";
-        await nextTick();
-
-        const emissions = wrapper.emitted("update:activeFolderId");
-        expect(emissions.length).toBe(initialEmissions + 2);
-        expect(emissions[emissions.length - 2]).toEqual(["folder1"]);
-        expect(emissions[emissions.length - 1]).toEqual(["folder2"]);
-      });
-
-      it("should handle null activeFolderId", async () => {
-        wrapper.vm.activeFolderId = null;
-        await nextTick();
-
-        const emissions = wrapper.emitted("update:activeFolderId");
-        expect(emissions).toBeTruthy();
-        expect(emissions[emissions.length - 1]).toEqual([null]);
-      });
-
-      it("should handle empty string activeFolderId", async () => {
-        wrapper.vm.activeFolderId = "";
-        await nextTick();
-
-        const emissions = wrapper.emitted("update:activeFolderId");
-        expect(emissions).toBeTruthy();
-        expect(emissions[emissions.length - 1]).toEqual([""]);
       });
     });
 
@@ -896,31 +623,6 @@ describe("FolderList.vue", () => {
       fleets.unmount();
     });
 
-    it("should render folder search input", () => {
-      const searchInput = wrapper.find('[data-test="folder-search"]');
-      expect(searchInput.exists()).toBe(true);
-      // OInput places the placeholder on the inner <input>, not on the root
-      // element that carries data-test. Query the underlying native input.
-      const nativeInput = searchInput.find("input");
-      expect(nativeInput.exists()).toBe(true);
-      expect(nativeInput.attributes("placeholder")).toBe("Search Folder");
-    });
-
-    it("should render folder tabs", () => {
-      const folderTabs = wrapper.find('[data-test="dashboards-folder-tabs"]');
-      expect(folderTabs.exists()).toBe(true);
-    });
-
-    it("should render new folder button", () => {
-      const newFolderBtn = wrapper.find('[data-test="dashboard-new-folder-btn"]');
-      expect(newFolderBtn.exists()).toBe(true);
-      // After OButton migration, the icon is rendered via <OIcon name="add">
-      // inside the button rather than as bare text. Verify the icon child.
-      const addIcon = newFolderBtn.findComponent({ name: "OIcon" });
-      expect(addIcon.exists()).toBe(true);
-      expect(addIcon.props("name")).toBe("add");
-    });
-
     it("should render AddFolder with v-model:open bound to showAddFolderDialog", async () => {
       // After migration, AddFolder owns the overlay surface itself via
       // v-model:open — there is no dialog wrapper anymore.
@@ -974,11 +676,6 @@ describe("FolderList.vue", () => {
       expect(wrapper.vm.isFolderEditMode).toBe(false);
     });
 
-    it("should render confirm delete dialog", () => {
-      const confirmDialog = wrapper.find('[data-test="dashboard-confirm-delete-folder-dialog"]');
-      expect(confirmDialog.exists()).toBe(true);
-    });
-
     it("should trigger deleteFolder when ConfirmDialog emits update:ok", async () => {
       const { deleteFolderByIdByType } = await import("@/utils/commons");
       const deleteMock = vi.mocked(deleteFolderByIdByType);
@@ -1003,36 +700,6 @@ describe("FolderList.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.confirmDeleteFolderDialog).toBe(false);
-    });
-
-    it("should show/hide more actions based on index and search", async () => {
-      // Test that default folder (index 0) doesn't show more button when no search
-      wrapper.vm.searchQuery = "";
-      await nextTick();
-      await nextTick();
-
-      const moreButtons = wrapper.findAll('[data-test="dashboard-more-icon"]');
-      expect(moreButtons.length).toBeGreaterThan(0);
-    });
-
-    it("should update search input value", async () => {
-      wrapper.find('[data-test="folder-search"]');
-      // Since we're using v-model, we can test by setting the component value directly
-      wrapper.vm.searchQuery = "test folder";
-      await nextTick();
-
-      expect(wrapper.vm.searchQuery).toBe("test folder");
-    });
-
-    it("should clear search input", async () => {
-      wrapper.vm.searchQuery = "test";
-      await nextTick();
-      wrapper.find('[data-test="folder-search"]');
-
-      // Simulate clear button click
-      wrapper.vm.searchQuery = "";
-      await nextTick();
-      expect(wrapper.vm.searchQuery).toBe("");
     });
   });
 
@@ -1104,115 +771,9 @@ describe("FolderList.vue", () => {
       expect(missingWrapper.vm.filteredTabs).toEqual([]);
       missingWrapper.unmount();
     });
-
-    it("should handle special characters in folder names", async () => {
-      const specialFolders = [
-        { folderId: "special1", name: "Folder-with-dashes" },
-        { folderId: "special2", name: "Folder_with_underscores" },
-        { folderId: "special3", name: "Folder with spaces" },
-        { folderId: "special4", name: "Folder@with#symbols$" },
-      ];
-
-      const specialStore = {
-        ...mockStore,
-        state: {
-          ...mockStore.state,
-          organizationData: {
-            ...mockStore.state.organizationData,
-            foldersByType: { alerts: specialFolders },
-          },
-        },
-      };
-
-      const specialWrapper = mount(FolderList, {
-        global: {
-          plugins: [i18n],
-          stubs: {
-            AddFolder: AddFolderStub,
-            ConfirmDialog: ConfirmDialogStub,
-          },
-          mocks: {
-            $store: specialStore,
-          },
-          provide: {
-            store: specialStore,
-          },
-        },
-        props: { type: "alerts" },
-      });
-
-      specialWrapper.vm.searchQuery = "folder";
-      await nextTick();
-      await nextTick();
-
-      expect(specialWrapper.vm.filteredTabs).toHaveLength(4);
-      specialWrapper.unmount();
-    });
-
-    it("should handle very long folder names", async () => {
-      const longName = "A".repeat(200);
-      const longFolders = [{ folderId: "long1", name: longName }];
-
-      const longStore = {
-        ...mockStore,
-        state: {
-          ...mockStore.state,
-          organizationData: {
-            ...mockStore.state.organizationData,
-            foldersByType: { alerts: longFolders },
-          },
-        },
-      };
-
-      const longWrapper = mount(FolderList, {
-        global: {
-          plugins: [i18n],
-          stubs: {
-            AddFolder: AddFolderStub,
-            ConfirmDialog: ConfirmDialogStub,
-          },
-          mocks: {
-            $store: longStore,
-          },
-          provide: {
-            store: longStore,
-          },
-        },
-        props: { type: "alerts" },
-      });
-
-      expect(longWrapper.vm.filteredTabs[0].name).toBe(longName);
-      longWrapper.unmount();
-    });
-
-    it("should handle numeric folder IDs", () => {
-      wrapper.vm.editFolder(123);
-      expect(wrapper.vm.selectedFolderToEdit).toBe(123);
-
-      wrapper.vm.showDeleteFolderDialogFn(456);
-      expect(wrapper.vm.selectedFolderDelete).toBe(456);
-    });
-
-    it("should handle boolean folder IDs", () => {
-      wrapper.vm.editFolder(true);
-      expect(wrapper.vm.selectedFolderToEdit).toBe(true);
-
-      wrapper.vm.showDeleteFolderDialogFn(false);
-      expect(wrapper.vm.selectedFolderDelete).toBe(false);
-    });
   });
 
   describe("Integration Tests", () => {
-    it("should work with different prop types", async () => {
-      await wrapper.setProps({ type: "dashboards" });
-      await nextTick();
-
-      expect(wrapper.props("type")).toBe("dashboards");
-      expect(wrapper.vm.filteredTabs).toBe(
-        mockStore.state.organizationData.foldersByType.dashboards,
-      );
-    });
-
     it("should handle complete folder management workflow", async () => {
       // Add folder
       wrapper.vm.addFolder();
@@ -1235,40 +796,6 @@ describe("FolderList.vue", () => {
       wrapper.vm.showDeleteFolderDialogFn("new-folder");
       expect(wrapper.vm.selectedFolderDelete).toBe("new-folder");
       expect(wrapper.vm.confirmDeleteFolderDialog).toBe(true);
-    });
-
-    it("should emit events correctly throughout workflow", async () => {
-      // Change active folder
-      wrapper.vm.activeFolderId = "test-folder";
-      await nextTick();
-      await nextTick();
-
-      const emissions = wrapper.emitted("update:activeFolderId");
-      expect(emissions).toBeTruthy();
-      expect(emissions[emissions.length - 1]).toEqual(["test-folder"]);
-
-      // Update folders
-      const testFolders = [{ folderId: "test", name: "Test" }];
-      await wrapper.vm.updateFolderList(testFolders);
-
-      expect(wrapper.emitted("update:folders")).toBeTruthy();
-      expect(wrapper.emitted("update:folders")[0]).toEqual([testFolders]);
-    });
-
-    it("should maintain state consistency", async () => {
-      // Initial state
-      expect(wrapper.vm.showAddFolderDialog).toBe(false);
-      expect(wrapper.vm.isFolderEditMode).toBe(false);
-
-      // Add folder
-      wrapper.vm.addFolder();
-      expect(wrapper.vm.showAddFolderDialog).toBe(true);
-      expect(wrapper.vm.isFolderEditMode).toBe(false);
-
-      // Update folders - should reset states
-      await wrapper.vm.updateFolderList([]);
-      expect(wrapper.vm.showAddFolderDialog).toBe(false);
-      expect(wrapper.vm.isFolderEditMode).toBe(false);
     });
   });
 

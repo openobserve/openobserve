@@ -26,3 +26,47 @@ pub fn get_default_max_query_range(stream_max_query_range: i64) -> i64 {
         default_max_query_range
     }
 }
+
+/// Start time limited to `max_hours` before `end`, or `None` when no clamp applies.
+pub fn clamp_start_time(start: i64, end: i64, max_hours: i64) -> Option<i64> {
+    if max_hours <= 0 {
+        return None;
+    }
+    // Stream settings accept any i64 hours; a plain multiply wraps and pushes start past end.
+    let max_micros = max_hours.saturating_mul(3600 * 1_000_000);
+    (end.saturating_sub(start) > max_micros).then(|| end - max_micros)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const HOUR: i64 = 3600 * 1_000_000;
+
+    #[test]
+    fn clamp_start_time_limits_the_range() {
+        assert_eq!(clamp_start_time(0, 10 * HOUR, 2), Some(8 * HOUR));
+        assert_eq!(clamp_start_time(9 * HOUR, 10 * HOUR, 2), None);
+        assert_eq!(clamp_start_time(8 * HOUR, 10 * HOUR, 2), None);
+        assert_eq!(clamp_start_time(0, 10 * HOUR, 0), None);
+        assert_eq!(clamp_start_time(0, 10 * HOUR, -5), None);
+    }
+
+    #[test]
+    fn clamp_start_time_survives_a_huge_max_query_range() {
+        let (start, end) = (1_792_919_976_430_732, 1_793_524_776_430_732);
+        assert_eq!(clamp_start_time(start, end, 4_746_838_768), None);
+        assert_eq!(clamp_start_time(start, end, i64::MAX), None);
+        assert_eq!(clamp_start_time(i64::MIN, end, i64::MAX / HOUR + 1), None);
+    }
+
+    #[test]
+    fn clamp_start_time_survives_extreme_start_times() {
+        let end = 1_793_524_776_430_732;
+        assert_eq!(clamp_start_time(i64::MIN, end, 2), Some(end - 2 * HOUR));
+        assert_eq!(
+            clamp_start_time(i64::MIN, i64::MAX, 2),
+            Some(i64::MAX - 2 * HOUR)
+        );
+    }
+}

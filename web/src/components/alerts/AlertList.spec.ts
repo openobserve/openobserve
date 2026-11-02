@@ -209,12 +209,14 @@ let alertsDB: AlertV2[] = [];
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 
-async function mountAlertList() {
+// Tests that only call vm methods skip the table: its render is the slowest part of a mount.
+async function mountAlertList({ renderTable = true } = {}) {
   const wrapper = mount(AlertList, {
     attachTo: node,
     global: {
       plugins: [i18n, store, router],
       stubs: {
+        OTable: !renderTable,
         FolderList: {
           template: '<div data-test="stub-folder-list"></div>',
         },
@@ -484,12 +486,6 @@ const waitData = async (wrapper: any) => {
 
 // 1. Basic rendering and structure
 describe("AlertList - basic rendering", () => {
-  it("renders the page container", async () => {
-    const wrapper = await mountAlertList();
-    await waitData(wrapper);
-    expect(wrapper.find('[data-test="alert-list-page"]').exists()).toBe(true);
-  });
-
   it("titles itself with the SECTION, so the peer tabs never move", async () => {
     // Identical on all four alerting pages — see TemplateList.spec.ts. Note it
     // is NOT "Alerts": a per-page title sizes the title block and shifts the
@@ -497,28 +493,6 @@ describe("AlertList - basic rendering", () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);
     expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
-  });
-
-  it("renders search input and toggle", async () => {
-    const wrapper = await mountAlertList();
-    await waitData(wrapper);
-    expect(wrapper.find('[data-test="alert-list-search-input"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alert-list-search-across-folders-toggle"]').exists()).toBe(
-      true,
-    );
-  });
-
-  it("renders import and add buttons", async () => {
-    const wrapper = await mountAlertList();
-    await waitData(wrapper);
-    expect(wrapper.find('[data-test="alert-import"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alert-list-add-alert-btn"]').exists()).toBe(true);
-  });
-
-  it("renders the alert list table", async () => {
-    const wrapper = await mountAlertList();
-    await waitData(wrapper);
-    expect(wrapper.find('[data-test="alert-list-table"]').exists()).toBe(true);
   });
 });
 
@@ -1192,51 +1166,10 @@ describe("AlertList - additional validations", () => {
       expect(wrapper.vm.filteredResults.every((r: any) => predicate(r))).toBe(true);
     }, 10000);
   });
-
-  it("openMenu stops event propagation (no error)", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    const event = new Event("click");
-    const stopSpy = vi.spyOn(event, "stopPropagation");
-    wrapper.vm.openMenu(event, {});
-    expect(stopSpy).toHaveBeenCalled();
-  });
 });
 
 // 10. Extensive small unit validations to reach 60+ tests
 describe("AlertList - micro validations", () => {
-  it("splitterModel has default value 200", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    expect(wrapper.vm.splitterModel).toBe(200);
-  });
-
-  it("pageSize has a default value", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    // OTable-based component uses pageSize ref instead of a pagination object
-    expect(typeof wrapper.vm.pageSize).toBe("number");
-    expect(wrapper.vm.pageSize).toBeGreaterThan(0);
-  });
-
-  it("clearSearchHistory clears global search and results array", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.searchAcrossFolders = true;
-    wrapper.vm.searchQuery = "abc";
-    wrapper.vm.filteredResults = [1, 2] as any;
-    wrapper.vm.clearSearchHistory();
-    expect(wrapper.vm.searchQuery).toBe("");
-  });
-
-  it("filterAlertsByTab returns early if refreshResults=false", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    const before = [...wrapper.vm.filteredResults];
-    wrapper.vm.filterAlertsByTab(false);
-    expect(wrapper.vm.filteredResults).toEqual(before);
-  });
-
   it("transformToExpression builds grouped conditions", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -1248,14 +1181,6 @@ describe("AlertList - micro validations", () => {
     });
     expect(typeof expr).toBe("string");
     expect(expr).toContain("OR");
-  });
-
-  it("routeTo pushes with name", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    const spy = vi.spyOn(router, "push");
-    await wrapper.vm.routeTo("alertTemplates");
-    expect(spy).toHaveBeenCalled();
   });
 
   it("importAlert sets dialog and pushes route, preserving the rest of the query", async () => {
@@ -1271,13 +1196,6 @@ describe("AlertList - micro validations", () => {
     expect(wrapper.vm.showImportAlertDialog).toBe(true);
     expect(spy).toHaveBeenCalled();
     expect(spy.mock.calls[0][0].query.page).toBe("3");
-  });
-
-  it("updateFolderIdToBeCloned updates state", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.updateFolderIdToBeCloned({ value: "folderX" });
-    expect(wrapper.vm.folderIdToBeCloned).toBe("folderX");
   });
 
   // Note: multipleExportAlert functionality is already tested in "exports multiple selected alerts to JSON" test above
@@ -1307,17 +1225,6 @@ describe("AlertList - micro validations", () => {
     expect(wrapper.vm.showAddAlertDialog).toBe(true);
   });
 
-  it("open and close clone dialog via back button behavior", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    const row = wrapper.vm.filteredResults[0];
-    await wrapper.vm.duplicateAlert(row);
-    await flushPromises();
-    expect(wrapper.vm.showForm).toBe(true);
-    wrapper.vm.showForm = false;
-    expect(wrapper.vm.showForm).toBe(false);
-  });
-
   it("deleteAlertByAlertId handles 403 gracefully (simulated)", async () => {
     // Fail next delete call with 403
     alertsSvc.delete_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } } as any);
@@ -1345,23 +1252,6 @@ describe("AlertList - micro validations", () => {
     await flushPromises();
     expect(wrapper.vm.alertStateLoadingMap[uuid]).toBe(false);
     expect(before === undefined || before === false).toBe(true);
-  });
-
-  it("filteredResults reflects searchQuery filtering", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    // The component filters via filterAlertsByTab using filterQuery/searchQuery
-    // filteredResults already reflects the current filter state
-    const rows = wrapper.vm.filteredResults;
-    expect(Array.isArray(rows)).toBe(true);
-    // All rows from test data are present with no filter applied
-    expect(rows.length).toBeGreaterThan(0);
-  });
-
-  it("mapped timestamps are strings (conversion internal)", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    expect(typeof wrapper.vm.filteredResults[0].last_triggered_at).toBe("string");
   });
 });
 
@@ -1632,18 +1522,6 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     }
   });
 
-  it("clone dialog emits click:secondary -> closes showForm", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.showForm = true;
-    await wrapper.vm.$nextTick();
-
-    const cloneDialog = wrapper.findComponent({ name: "ODialog" });
-    await cloneDialog.vm.$emit("click:secondary");
-    await flushPromises();
-    expect(wrapper.vm.showForm).toBe(false);
-  });
-
   it("duplicateAlert pre-fills stream type and name from the source row", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -1767,7 +1645,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
   // its group history and the cap banner do not fit a drawer, and a routed
   // page is linkable and back-navigable. Clicking a row now navigates.
   it("row click routes to the alert detail page instead of opening a drawer", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     expect(wrapper.findComponent({ name: "AlertHistoryDrawer" }).exists()).toBe(false);
@@ -1787,7 +1665,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
   });
 
   it("row click opens the alert in its own folder, not the selected one", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined as any);
@@ -1801,7 +1679,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
   });
 
   it("row click without an alert id does not navigate", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined as any);

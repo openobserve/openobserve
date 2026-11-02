@@ -272,6 +272,7 @@ pub async fn save_in(
     if let Some(target) = super::slack_destination::slack_app_target(&destination) {
         super::slack_destination::check_save(env, &destination, target, previous.as_ref()).await?;
     }
+    super::notifications::jira::keep_saved_token(&mut destination, previous.as_ref())?;
 
     // For prebuilt destinations, ensure template exists before saving destination
     // This implements template reuse: multiple destinations can share the same prebuilt template

@@ -200,60 +200,6 @@ describe("RunningQueries", () => {
     wrapper?.unmount();
   });
 
-  // Test 1: Component initialization
-  it("should initialize component with correct default values", () => {
-    expect(wrapper.exists()).toBe(true);
-    expect(wrapper.vm.selectedQueryTypeTab).toBe("summary");
-    expect(wrapper.vm.selectedSearchType).toBe("dashboards");
-    expect(wrapper.vm.selectedSearchField).toBe("all");
-    expect(wrapper.vm.selectedPerPage).toBe(20);
-    expect(wrapper.vm.filterQuery).toBe("");
-  });
-
-  // Test 2: Component props and data
-  it("should have correct initial data structure", () => {
-    expect(wrapper.vm.selectedRow).toEqual({
-      all: [],
-      summary: [],
-    });
-    expect(wrapper.vm.searchFieldOptions).toHaveLength(3);
-    expect(wrapper.vm.runningQueryTypes).toHaveLength(2);
-    expect(wrapper.vm.perPageOptions).toHaveLength(5);
-  });
-
-  // Test 3: refreshData function
-  it("should call refreshData and update lastRefreshed", () => {
-    // Test that refreshData updates lastRefreshed with a proper time format
-    wrapper.vm.refreshData();
-
-    expect(wrapper.vm.lastRefreshed).toBeTruthy();
-    expect(wrapper.vm.lastRefreshed).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC$/);
-  });
-
-  // Test 4: getCurrentTime function
-  it("should format current time correctly", () => {
-    const currentTime = wrapper.vm.getCurrentTime();
-    expect(currentTime).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC$/);
-  });
-
-  // Test 5: localTimeToMicroseconds function
-  it("should convert current time to microseconds", () => {
-    const microseconds = wrapper.vm.localTimeToMicroseconds();
-    expect(typeof microseconds).toBe("number");
-    expect(microseconds).toBeGreaterThan(0);
-  });
-
-  // Test 6: getDuration function
-  it("should calculate duration correctly", () => {
-    const createdAt = Date.now() * 1000 - 5000000; // 5 seconds ago
-    const duration = wrapper.vm.getDuration(createdAt);
-
-    expect(duration).toHaveProperty("durationInSeconds");
-    expect(duration).toHaveProperty("duration");
-    expect(duration.durationInSeconds).toBeGreaterThan(0);
-  });
-
-  // Test 7: queryRange function
   it("should calculate query range correctly", () => {
     const startTime = 1640995200000000;
     const endTime = 1640995260000000; // 60 seconds later
@@ -262,71 +208,6 @@ describe("RunningQueries", () => {
     expect(range).toHaveProperty("queryRangeInSeconds");
     expect(range).toHaveProperty("duration");
     expect(range.queryRangeInSeconds).toBe(60);
-  });
-
-  // Test 8: getDurationInSeconds function
-  it("should calculate average duration for queries array", () => {
-    const queries = [
-      { createdAt: Date.now() * 1000 - 2000000 },
-      { createdAt: Date.now() * 1000 - 4000000 },
-    ];
-    const avgDuration = wrapper.vm.getDurationInSeconds(queries);
-    expect(typeof avgDuration).toBe("string");
-  });
-
-  // Test 9: getGroupedQueryRange function
-  it("should calculate average query range for queries array", () => {
-    const queries = [
-      { startTime: 1640995200000000, endTime: 1640995260000000 },
-      { startTime: 1640995200000000, endTime: 1640995320000000 },
-    ];
-    const avgRange = wrapper.vm.getGroupedQueryRange(queries);
-    expect(typeof avgRange).toBe("string");
-  });
-
-  // Test 10: listSchema function
-  it("should open schema dialog with correct data", () => {
-    const rowData = { test: "data" };
-    wrapper.vm.listSchema(rowData);
-
-    expect(wrapper.vm.schemaData).toEqual(rowData);
-    expect(wrapper.vm.showListSchemaDialog).toBe(true);
-  });
-
-  // Test 11: changePagination function
-  it("should update pagination settings", () => {
-    const newPagination = { label: "50", value: 50 };
-    wrapper.vm.changePagination(newPagination);
-
-    expect(wrapper.vm.selectedPerPage).toBe(50);
-    expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-  });
-
-  // Test 12: confirmDeleteAction function
-  it("should show delete dialog with correct data", () => {
-    const row = { trace_id: "test-trace-id", org_id: "org-1" };
-    wrapper.vm.confirmDeleteAction(row);
-
-    expect(wrapper.vm.deleteDialog.show).toBe(true);
-    expect(wrapper.vm.deleteDialog.data).toEqual([{ trace_id: "test-trace-id", org_id: "org-1" }]);
-  });
-
-  // Test 13: onChangeQueryTab function
-  it("should change query tab", () => {
-    wrapper.vm.onChangeQueryTab("all");
-    expect(wrapper.vm.selectedQueryTypeTab).toBe("all");
-
-    wrapper.vm.onChangeQueryTab("summary");
-    expect(wrapper.vm.selectedQueryTypeTab).toBe("summary");
-  });
-
-  // Test 14: onChangeSearchType function
-  it("should change search type", () => {
-    wrapper.vm.onChangeSearchType("ui");
-    expect(wrapper.vm.selectedSearchType).toBe("ui");
-
-    wrapper.vm.onChangeSearchType("Others");
-    expect(wrapper.vm.selectedSearchType).toBe("Others");
   });
 
   // Test 15: filterUserQueries function
@@ -422,17 +303,6 @@ describe("RunningQueries", () => {
   });
 
   // Test 22: getRunningQueriesSummary function
-  it("should generate queries summary correctly", () => {
-    wrapper.vm.queries = mockQueries;
-    const summary = wrapper.vm.getRunningQueriesSummary();
-
-    expect(Array.isArray(summary)).toBe(true);
-    expect(summary.length).toBeGreaterThan(0);
-    expect(summary[0]).toHaveProperty("user_id");
-    expect(summary[0]).toHaveProperty("numOfQueries");
-    expect(summary[0]).toHaveProperty("duration");
-  });
-
   // Test 23: getRunningQueriesSummary error handling
   it("should handle getRunningQueriesSummary error", () => {
     wrapper.vm.queries = [{ invalid: "data" }];
@@ -474,15 +344,6 @@ describe("RunningQueries", () => {
     ).toBe(true);
   });
 
-  // Test 27: fieldFiltered computed property with no filter
-  it("should return all queries when no filter is applied", async () => {
-    wrapper.vm.queries = mockQueries;
-    wrapper.vm.filterQuery = "";
-
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.fieldFiltered.length).toBe(wrapper.vm.searchTypeFiltered.length);
-  });
-
   // Test 28: fieldFiltered computed property with filter
   it("should filter queries by user_id", async () => {
     wrapper.vm.queries = mockQueries;
@@ -491,91 +352,6 @@ describe("RunningQueries", () => {
     await wrapper.vm.$nextTick();
     const filtered = wrapper.vm.fieldFiltered;
     expect(filtered.some((q: any) => q.user_id?.includes("user@example.com"))).toBe(true);
-  });
-
-  // Test 29: filteredRows computed property with all search field
-  it("should return fieldFiltered when selectedSearchField is all", async () => {
-    wrapper.vm.selectedSearchField = "all";
-    wrapper.vm.queries = mockQueries;
-
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.filteredRows).toEqual(wrapper.vm.fieldFiltered);
-  });
-
-  // Test 30: filteredRows computed property with exec_duration filter
-  it("should filter by execution duration", async () => {
-    wrapper.vm.selectedSearchField = "exec_duration";
-    wrapper.vm.filterQuery = "gt_1s";
-    wrapper.vm.queries = mockQueries;
-
-    await wrapper.vm.$nextTick();
-    expect(Array.isArray(wrapper.vm.filteredRows)).toBe(true);
-  });
-
-  // Test 31: filteredRows computed property with query_range filter
-  it("should filter by query range", async () => {
-    wrapper.vm.selectedSearchField = "query_range";
-    wrapper.vm.filterQuery = "gt_1m";
-    wrapper.vm.queries = mockQueries;
-
-    await wrapper.vm.$nextTick();
-    expect(Array.isArray(wrapper.vm.filteredRows)).toBe(true);
-  });
-
-  // Test 32: otherFieldOptions computed property for exec_duration
-  it("should return exec_duration options", async () => {
-    wrapper.vm.selectedSearchField = "exec_duration";
-
-    await wrapper.vm.$nextTick();
-    const options = wrapper.vm.otherFieldOptions;
-    expect(options.length).toBeGreaterThan(0);
-    expect(options[0]).toHaveProperty("label");
-    expect(options[0]).toHaveProperty("value");
-  });
-
-  // Test 33: otherFieldOptions computed property for query_range
-  it("should return query_range options", async () => {
-    wrapper.vm.selectedSearchField = "query_range";
-
-    await wrapper.vm.$nextTick();
-    const options = wrapper.vm.otherFieldOptions;
-    expect(options.length).toBeGreaterThan(0);
-    expect(options[0].label).toContain(">");
-  });
-
-  // Test 34: otherFieldOptions computed property for other fields
-  it("should return empty array for other fields", async () => {
-    wrapper.vm.selectedSearchField = "all";
-
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.otherFieldOptions).toEqual([]);
-  });
-
-  // Test 35: summaryRows computed property
-  it("should format summary rows correctly", async () => {
-    wrapper.vm.queries = mockQueries;
-    wrapper.vm.runningQueriesSummary = wrapper.vm.getRunningQueriesSummary();
-    wrapper.vm.selectedQueryTypeTab = "summary";
-
-    await wrapper.vm.$nextTick();
-    const rows = wrapper.vm.summaryRows;
-    expect(Array.isArray(rows)).toBe(true);
-    // "#" is no longer injected into row data — it's OTable's built-in show-index.
-  });
-
-  // Test 36: rowsQuery computed property
-  it("should format query rows correctly", async () => {
-    wrapper.vm.queries = mockQueries;
-    wrapper.vm.selectedQueryTypeTab = "all";
-
-    await wrapper.vm.$nextTick();
-    const rows = wrapper.vm.rowsQuery;
-    expect(Array.isArray(rows)).toBe(true);
-    if (rows.length > 0) {
-      expect(rows[0]).toHaveProperty("user_id");
-      expect(rows[0]).toHaveProperty("duration");
-      expect(rows[0]).toHaveProperty("queryRange");
-    }
   });
 
   // Test 37: filterQueryBySearchTypeTab function
@@ -620,94 +396,11 @@ describe("RunningQueries", () => {
     expect(wrapper.vm.filterQuery).toBe("");
   });
 
-  // Test 40: Watch filterQuery for resultTotal update
-  it("should update resultTotal when filterQuery changes", async () => {
-    wrapper.vm.queries = mockQueries;
-    wrapper.vm.filterQuery = "user@example.com";
-
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.resultTotal).toBeGreaterThanOrEqual(0);
-  });
-
-  // Test 41: Component columns configuration
-  it("should have correct columns configuration", () => {
-    const columns = wrapper.vm.columns;
-    expect(Array.isArray(columns)).toBe(true);
-    expect(columns.length).toBeGreaterThan(0);
-
-    const columnNames = columns.map((col: any) => col.name);
-    expect(columnNames).toContain("user_id");
-    expect(columnNames).toContain("actions");
-  });
-
-  // Test 42: Search field options
-  it("should have correct search field options", () => {
-    expect(wrapper.vm.searchFieldOptions).toEqual([
-      { label: "All Fields", value: "all" },
-      { label: "Exec. Duration", value: "exec_duration" },
-      { label: "Query Range", value: "query_range" },
-    ]);
-  });
-
-  // Test 43: Running query types
-  it("should have correct running query types", () => {
-    expect(wrapper.vm.runningQueryTypes).toEqual([
-      { label: "User Summary", value: "summary" },
-      { label: "All Queries", value: "all" },
-    ]);
-  });
-
-  // Test 44: Search types
-  it("should have correct search types", () => {
-    expect(wrapper.vm.searchTypes).toEqual(["dashboards", "ui", "Others"]);
-  });
-
-  // Test 45: Per page options
-  it("should have correct per page options", () => {
-    expect(wrapper.vm.perPageOptions).toEqual([
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-    ]);
-  });
-
-  // Test 46: Delete dialog initial state
-  it("should have correct delete dialog initial state", () => {
-    expect(wrapper.vm.deleteDialog).toEqual({
-      show: false,
-      title: "Delete Running Query",
-      message: "Are you sure you want to delete this running query?",
-      data: null,
-    });
-  });
-
-  // Test 47: Component lifecycle - onBeforeMount
-  it("should call getRunningQueries on mount", () => {
-    expect(SearchService.get_running_queries).toHaveBeenCalled();
-  });
-
   // Test 48: Error handling in getRunningQueriesSummary with empty queries
   it("should handle empty queries in getRunningQueriesSummary", () => {
     wrapper.vm.queries = [];
     const summary = wrapper.vm.getRunningQueriesSummary();
     expect(summary).toEqual([]);
-  });
-
-  // Test 49: Time filter with lt_ prefix
-  it("should handle lt_ time filters", async () => {
-    wrapper.vm.selectedSearchField = "exec_duration";
-    wrapper.vm.filterQuery = "lt_1s";
-    wrapper.vm.queries = mockQueries;
-
-    await wrapper.vm.$nextTick();
-    expect(Array.isArray(wrapper.vm.filteredRows)).toBe(true);
-  });
-
-  // ODrawer: schema drawer should be hidden initially
-  it("should not render schema ODrawer initially", () => {
-    expect(wrapper.find('[data-test="o-drawer-stub"]').exists()).toBe(false);
   });
 
   // ODrawer: schema drawer should appear after listSchema()

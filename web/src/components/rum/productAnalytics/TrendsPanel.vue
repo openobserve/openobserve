@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="icon-toolbar"
           icon-left="dashboard-customize"
-          :disabled="eventsGate !== 'ready'"
+          :disabled="chartHeld || eventsGate !== 'ready'"
           :aria-label="t('rum.analytics.dashboard.add')"
           data-test="rum-analytics-trends-add-dashboard-btn"
           @click="dashboardOpen = true"
@@ -104,11 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-if="!eventsHeld || chartSeries.length" class="h-64 w-full px-2 pb-2">
       <!-- v-if (not v-show): an unresolved event series must not mount the renderer at all. -->
-      <OSkeleton
-        v-if="eventsGate === 'loading'"
-        class="h-full w-full"
-        data-test="rum-analytics-trends-loading"
-      />
+      <OSkeleton v-if="chartHeld" class="h-full w-full" data-test="rum-analytics-trends-loading" />
       <template v-else>
         <OSkeleton
           v-if="chartLoading"
@@ -224,6 +220,9 @@ const eventsGate = computed<NamedEventsStatus>(() =>
 const eventsHeld = computed(
   () => eventsGate.value === "failed" || eventsGate.value === "forbidden",
 );
+
+// The shell mounts the Overview before its app probe answers, and a query without an app is invalid.
+const chartHeld = computed(() => !props.scope.app || eventsGate.value === "loading");
 
 const chartSeries = computed<StepRef[]>(() =>
   eventsHeld.value ? props.series.filter((s) => s.kind !== "e") : props.series,

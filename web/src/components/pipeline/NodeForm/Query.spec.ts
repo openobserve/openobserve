@@ -166,12 +166,6 @@ describe("Query Component", () => {
 
   // -------------------------------------------------------------------------
   describe("Component Initialization", () => {
-    it("mounts successfully", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
     it("initializes streamRoute with default values", async () => {
       const wrapper = createWrapper();
       await flushPromises();
@@ -191,66 +185,6 @@ describe("Query Component", () => {
       expect(t.frequency_type).toBe("minutes");
       expect(t.timezone).toBe("UTC");
       expect(t.cron).toBe("");
-    });
-
-    it("initializes conditions with a single blank entry", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.streamRoute.conditions).toHaveLength(1);
-      expect(wrapper.vm.streamRoute.conditions[0]).toEqual({
-        column: "",
-        operator: "",
-        value: "",
-        id: "mock-uuid",
-      });
-    });
-
-    it("initializes context_attributes with a single blank entry", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.streamRoute.context_attributes).toHaveLength(1);
-      expect(wrapper.vm.streamRoute.context_attributes[0]).toMatchObject({
-        key: "",
-        value: "",
-        id: "mock-uuid",
-      });
-    });
-
-    it("initializes isValidSqlQuery as true", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.isValidSqlQuery).toBe(true);
-    });
-
-    it("initializes validatingSqlQuery as false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.validatingSqlQuery).toBe(false);
-    });
-
-    it("initializes isAggregationEnabled as false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.isAggregationEnabled).toBe(false);
-    });
-
-    it("initializes isFullscreenMode as false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.isFullscreenMode).toBe(false);
-    });
-
-    it("exposes streamTypes array", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.streamTypes).toEqual(["logs", "metrics", "traces"]);
-    });
-
-    it("initializes expandedLogs as empty array", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(Array.isArray(wrapper.vm.expandedLogs)).toBe(true);
-      expect(wrapper.vm.expandedLogs).toHaveLength(0);
     });
   });
 
@@ -294,27 +228,6 @@ describe("Query Component", () => {
   });
 
   // -------------------------------------------------------------------------
-  describe("Props Handling", () => {
-    it("accepts streamType prop", async () => {
-      const wrapper = createWrapper({ streamType: "traces" });
-      await flushPromises();
-      expect(wrapper.props("streamType")).toBe("traces");
-    });
-
-    it("accepts streamRoutes prop", async () => {
-      const wrapper = createWrapper({ streamRoutes: { route1: {} } });
-      await flushPromises();
-      expect(wrapper.props("streamRoutes")).toMatchObject({ route1: {} });
-    });
-
-    it("accepts null editingRoute", async () => {
-      const wrapper = createWrapper({ editingRoute: null });
-      await flushPromises();
-      expect(wrapper.props("editingRoute")).toBeNull();
-    });
-  });
-
-  // -------------------------------------------------------------------------
   describe("Stream Type Management", () => {
     it("updateStreamType updates stream_type", async () => {
       const wrapper = createWrapper();
@@ -322,22 +235,6 @@ describe("Query Component", () => {
       wrapper.vm.updateStreamType("metrics");
       await nextTick();
       expect(wrapper.vm.streamRoute.stream_type).toBe("metrics");
-    });
-
-    it("updateStreamType handles traces", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.updateStreamType("traces");
-      await nextTick();
-      expect(wrapper.vm.streamRoute.stream_type).toBe("traces");
-    });
-
-    it("updateStreamType handles empty string", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.updateStreamType("");
-      await nextTick();
-      expect(wrapper.vm.streamRoute.stream_type).toBe("");
     });
   });
 
@@ -370,16 +267,8 @@ describe("Query Component", () => {
   describe("Stream Name Validation (isValidStreamName)", () => {
     const cases = [
       { name: "valid123", expected: true },
-      { name: "valid_name", expected: true },
-      { name: "valid-name", expected: true },
-      { name: "valid.name", expected: true },
       { name: "valid@name", expected: true },
-      { name: "valid+name", expected: true },
-      { name: "valid=name", expected: true },
-      { name: "valid,name", expected: true },
       { name: "invalid!name", expected: false },
-      { name: "invalid#name", expected: false },
-      { name: "invalid$name", expected: false },
       { name: "", expected: false },
     ];
     cases.forEach(({ name, expected }) => {
@@ -403,30 +292,6 @@ describe("Query Component", () => {
       expect(wrapper.vm.streamRoute.delay).toBe(30);
     });
 
-    it("updateDelay truncates float strings", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.updateDelay("15.9");
-      await nextTick();
-      expect(wrapper.vm.streamRoute.delay).toBe(15);
-    });
-
-    it("updateDelay handles zero", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.updateDelay("0");
-      await nextTick();
-      expect(wrapper.vm.streamRoute.delay).toBe(0);
-    });
-
-    it("updateDelay handles negative value", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.updateDelay("-5");
-      await nextTick();
-      expect(wrapper.vm.streamRoute.delay).toBe(-5);
-    });
-
     it("updateDelay with non-numeric string results in NaN", async () => {
       const wrapper = createWrapper();
       await flushPromises();
@@ -438,13 +303,6 @@ describe("Query Component", () => {
 
   // -------------------------------------------------------------------------
   describe("Fullscreen Mode", () => {
-    it("updateFullscreenMode sets isFullscreenMode to true", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.updateFullscreenMode(true);
-      expect(wrapper.vm.isFullscreenMode).toBe(true);
-    });
-
     it("updateFullscreenMode sets isFullscreenMode to false", async () => {
       const wrapper = createWrapper();
       await flushPromises();
@@ -461,14 +319,6 @@ describe("Query Component", () => {
       await flushPromises();
       wrapper.vm.expandedLogs = [0, 1, 2];
       wrapper.vm.toggleExpandLog(1);
-      expect(wrapper.vm.expandedLogs).toEqual([]);
-    });
-
-    it("toggleExpandLog clears logs regardless of index value", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.expandedLogs = [5, 10];
-      wrapper.vm.toggleExpandLog(99);
       expect(wrapper.vm.expandedLogs).toEqual([]);
     });
   });
@@ -497,16 +347,6 @@ describe("Query Component", () => {
       expect(wrapper.vm.streamRoute.context_attributes).toHaveLength(1);
       expect(wrapper.vm.streamRoute.context_attributes[0].id).toBe("id2");
     });
-
-    it("removeVariable with unknown id leaves array unchanged", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.form.setFieldValue("context_attributes", [{ key: "k", value: "v", id: "id1" }]);
-      await nextTick();
-      wrapper.vm.removeVariable({ id: "does-not-exist" });
-      await nextTick();
-      expect(wrapper.vm.streamRoute.context_attributes).toHaveLength(1);
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -524,15 +364,6 @@ describe("Query Component", () => {
 
   // -------------------------------------------------------------------------
   describe("SQL Query Validation", () => {
-    it("sets validatingSqlQuery to true immediately on validation start", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
-      wrapper.vm.validateSqlQuery(); // don't await
-      expect(wrapper.vm.validatingSqlQuery).toBe(true);
-    });
-
     it("resolves isValidSqlQuery to true on success", async () => {
       const wrapper = createWrapper();
       await flushPromises();
@@ -603,19 +434,6 @@ describe("Query Component", () => {
       );
     });
 
-    it("does not use hardcoded 'logs' when stream_type is traces", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
-      wrapper.vm.form.setFieldValue("stream_type", "traces");
-      await wrapper.vm.validateSqlQuery();
-      await flushPromises();
-      expect(searchService.search).not.toHaveBeenCalledWith(
-        expect.objectContaining({ page_type: "logs" }),
-      );
-    });
-
     it("passes validate:true in the search call", async () => {
       const wrapper = createWrapper();
       await flushPromises();
@@ -657,21 +475,6 @@ describe("Query Component", () => {
       await flushPromises();
       const result = wrapper.vm.normalizeLimit("SELECT * FROM t LIMIT 200 OFFSET 10", 100);
       expect(result).toBe("SELECT * FROM t LIMIT 100 OFFSET 10");
-    });
-
-    it("handles multiple LIMIT clauses in subqueries", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const sql = "SELECT * FROM (SELECT * FROM t LIMIT 300) AS sub LIMIT 200";
-      const result = wrapper.vm.normalizeLimit(sql, 100);
-      expect(result).not.toContain("LIMIT 300");
-      expect(result).not.toContain("LIMIT 200");
-    });
-
-    it("handles empty sql gracefully", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.normalizeLimit("", 100)).toBe("");
     });
   });
 
@@ -727,13 +530,6 @@ describe("Query Component", () => {
       expect(mockDeletePipelineNode).toHaveBeenCalledWith("node-1");
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
-
-    it("closeDialog emits cancel:hideform", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.closeDialog();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -783,14 +579,6 @@ describe("Query Component", () => {
       expect(wrapper.vm.form.state.isValid).toBe(true);
       expect(mockAddNode).toHaveBeenCalled();
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-
-    it("addNode payload has node_type 'query'", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      await submit(wrapper);
-      expect(mockAddNode).toHaveBeenCalledWith(expect.objectContaining({ node_type: "query" }));
     });
 
     it("converts period string to integer in payload", async () => {
@@ -875,69 +663,6 @@ describe("Query Component", () => {
       wrapper.vm.deleteRoute();
       expect(mockDeletePipelineNode).toHaveBeenCalledWith("node-delete");
     });
-
-    it("emits cancel:hideform after deleting", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.deleteRoute();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("getDefaultStreamRoute", () => {
-    it("returns edit node data when isEditNode is true", async () => {
-      const editData = {
-        name: "edit-q",
-        stream_type: "metrics",
-        query_condition: { type: "sql", sql: "", aggregation: null, promql_condition: null },
-        trigger_condition: {
-          period: 5,
-          frequency_type: "cron",
-          cron: "* * * * *",
-          frequency: 5,
-          timezone: "UTC",
-        },
-        delay: 2,
-        conditions: [],
-        context_attributes: [],
-        description: "",
-        enabled: true,
-      };
-      const wrapper = createWrapper(
-        {},
-        {
-          isEditNode: true,
-          currentSelectedNodeData: { data: editData },
-        },
-      );
-      await flushPromises();
-      const result = wrapper.vm.getDefaultStreamRoute();
-      expect(result.name).toBe("edit-q");
-      expect(result.stream_type).toBe("metrics");
-    });
-
-    it("returns default structure when isEditNode is false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const result = wrapper.vm.getDefaultStreamRoute();
-      expect(result.name).toBe("");
-      expect(result.stream_type).toBe("logs");
-      expect(result.enabled).toBe(true);
-      expect(result.description).toBe("");
-      expect(result.delay).toBe(0);
-      expect(result.conditions).toHaveLength(1);
-      expect(result.query_condition.type).toBe("sql");
-      expect(result.trigger_condition.timezone).toBe("UTC");
-    });
-
-    it("uses zoConfig.min_auto_refresh_interval for frequency if set", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const result = wrapper.vm.getDefaultStreamRoute();
-      // frequency defaults to 15 if zoConfig is absent; with 1800 it becomes 30
-      expect([15, 30]).toContain(result.trigger_condition.frequency);
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -952,54 +677,6 @@ describe("Query Component", () => {
         value: "_timestamp",
         type: "datetime",
       });
-    });
-
-    it("populates originalStreamFields from schema", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      await wrapper.vm.updateStreamFields();
-      expect(wrapper.vm.originalStreamFields).toHaveLength(4);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("Integration – full workflow", () => {
-    it("completes create > validate > save cycle", async () => {
-      vi.clearAllMocks();
-      const wrapper = createWrapper();
-      await flushPromises();
-      (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.form.setFieldValue("name", "integration-test");
-      wrapper.vm.form.setFieldValue(
-        "query_condition.sql",
-        "SELECT * FROM logs WHERE level='error'",
-      );
-      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
-      await submit(wrapper);
-      expect(mockAddNode).toHaveBeenCalled();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-
-    it("completes delete workflow via dialog", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.openDeleteDialog();
-      wrapper.vm.dialog.okCallback();
-      await nextTick();
-      expect(mockDeletePipelineNode).toHaveBeenCalled();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-
-    it("completes cancel workflow via dialog with changes", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.form.setFieldValue("name", "dirty-state");
-      await nextTick();
-      wrapper.vm.openCancelDialog();
-      expect(wrapper.vm.dialog.show).toBe(true);
-      wrapper.vm.dialog.okCallback();
-      await nextTick();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
   });
 });

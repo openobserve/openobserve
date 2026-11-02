@@ -172,6 +172,8 @@ pub async fn assume_service_account(
             let basic_auth = format!("{}:{}", email, token);
             let basic_auth_encoded = config::utils::base64::encode(&basic_auth);
             let auth_token = format!("Basic {}", basic_auth_encoded);
+            // Enterprise hands over the expiry in seconds; the sessions table stores microseconds.
+            let expires_at = expires_at.saturating_mul(1_000_000);
             Box::pin(async move {
                 db::session::set_with_expiry(&session_id, &auth_token, expires_at).await
             })
