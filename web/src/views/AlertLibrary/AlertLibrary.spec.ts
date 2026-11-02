@@ -731,6 +731,26 @@ describe("AlertLibrary", () => {
       expect(wrapper.findComponent({ name: "LibraryDrawer" }).props("open")).toBe(false);
     });
 
+    it("ignores a second card's Add while the first card's alert is still loading", async () => {
+      let resolveFirst: (file: unknown) => void = () => {};
+      loadAlertFile.mockImplementationOnce(
+        () => new Promise((resolve) => (resolveFirst = resolve)),
+      );
+      const wrapper = await mountView();
+      await wrapper.find(CARD_ADD).trigger("click");
+      await wrapper
+        .find('[data-test="alert-library-card-add-k8s/node-disk-pressure"]')
+        .trigger("click");
+      resolveFirst({ name: "pod-oom-killed", trigger_condition: { threshold: 1, period: 5 } });
+      await flushPromises();
+
+      expect(loadAlertFile).toHaveBeenCalledTimes(1);
+      const dialog = wrapper.findComponent({ name: "LibraryInstallDialog" });
+      expect(dialog.props("open")).toBe(true);
+      const seed = dialog.props("seed") as { entry: AlertLibraryEntry; file: any };
+      expect(seed.entry.id).toBe("k8s/pod-oom-killed");
+    });
+
     it("says so and opens nothing when the card's alert cannot be loaded", async () => {
       loadAlertFile.mockRejectedValueOnce(new Error("gone"));
       const wrapper = await mountView();

@@ -290,6 +290,17 @@ test.describe('Alert Library', () => {
     await lib.openViaUrl();
     await lib.customizeFromCard(ready.id);
     await expect(page).toHaveURL(/prefill=library/, { timeout: 15000 });
+    await lib.expectEditorAlertName(ready.name);
+  });
+
+  test('Customize on a card whose stream was never ingested still prefills the editor', async ({ page }) => {
+    const missing = entries[1];
+
+    await lib.openViaUrl();
+    await lib.filterAll();
+    await lib.customizeFromCard(missing.id);
+    await expect(page).toHaveURL(/prefill=library/, { timeout: 15000 });
+    await lib.expectEditorAlertName(missing.name);
   });
 
   test('the rail filters the gallery by severity and by category', async () => {

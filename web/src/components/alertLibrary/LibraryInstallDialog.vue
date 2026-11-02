@@ -289,7 +289,7 @@ import {
   InstallPayloadError,
   type InstallOverrides,
 } from "./libraryInstall";
-import { coerceTunable, readTunables, DEFAULT_TUNABLES } from "./libraryTunables";
+import { coerceTunable, fileForInstall, readTunables, DEFAULT_TUNABLES } from "./libraryTunables";
 
 const props = defineProps<{
   open: boolean;
@@ -529,7 +529,9 @@ const installOne = async (
   overrides: InstallOverrides | undefined,
 ): Promise<boolean> => {
   const file =
-    props.seed && props.seed.entry.id === entry.id ? props.seed.file : await loadAlertFile(entry);
+    props.seed && props.seed.entry.id === entry.id
+      ? props.seed.file
+      : fileForInstall(entry, await loadAlertFile(entry));
 
   // The file is checked too: on OSS an anomaly body is stored as a broken scheduled alert.
   const isAnomaly = alertTypeOf(entry) === "anomaly" || file.alert_type === "anomaly_detection";

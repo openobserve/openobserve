@@ -19,6 +19,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import { useI18nTyped } from "@/types/i18n";
 import { buildPrefillFromLibrary } from "@/utils/alerts/prefill/fromLibrary";
+import { fileForInstall } from "./libraryTunables";
 
 /** "Customize in editor" for a scheduled library alert, shared by the drawer and the card. */
 export const useLibraryCustomize = () => {
@@ -34,7 +35,10 @@ export const useLibraryCustomize = () => {
     const source = file ?? (await loadAlertFile(entry).catch(() => null));
     // The prefill speaks the scheduled shape only; an anomaly body would open a broken form.
     const prefillable = source !== null && source.alert_type !== "anomaly_detection";
-    if (prefillable && openAlertCreation(buildPrefillFromLibrary({ entry, file: source }))) {
+    if (
+      prefillable &&
+      openAlertCreation(buildPrefillFromLibrary({ entry, file: fileForInstall(entry, source) }))
+    ) {
       return true;
     }
     toast({ variant: "error", message: t("alert_library.drawer.customizeFailed") });

@@ -419,6 +419,23 @@ describe("LibraryInstallDialog", () => {
       expect(mocks.createAlert).toHaveBeenCalledTimes(3);
     });
 
+    it("floors a fetched batch file's zero threshold and period, as the card and drawer do", async () => {
+      mocks.loadAlertFile.mockImplementation((e: AlertLibraryEntry) =>
+        Promise.resolve({
+          ...libraryFile(e.name),
+          trigger_condition: { period: 0, operator: ">=", threshold: 0, frequency: 5, silence: 30 },
+        }),
+      );
+      const wrapper = await mountBatch();
+      await advanceToInstall(wrapper);
+      await click(wrapper, "alert-library-install-run");
+
+      for (const name of ["pod-oom-killed", "node-disk-pressure", "cert-expiring"]) {
+        expect(payloadFor(name).trigger_condition.threshold).toBe(1);
+        expect(payloadFor(name).trigger_condition.period).toBe(1);
+      }
+    });
+
     it("applies the bulk-tuned pair to every alert in the batch", async () => {
       const wrapper = await mountBatch();
       await click(wrapper, "alert-library-install-next");

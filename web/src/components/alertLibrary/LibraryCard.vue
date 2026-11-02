@@ -102,7 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!ready"
         variant="warning-quiet"
         class="shrink-0"
-        :title="t('alert_library.notIngestedHint', { stream: entry.stream })"
+        :title="
+          entry.stream ? t('alert_library.notIngestedHint', { stream: entry.stream }) : undefined
+        "
         data-test="alert-library-card-needs-data"
       >
         <template #icon>

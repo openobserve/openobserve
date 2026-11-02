@@ -58,6 +58,8 @@ export class AlertLibraryPage {
       retry: '[data-test="alert-library-install-retry"]',
       done: '[data-test="alert-library-install-done"]',
       cancel: '[data-test="alert-library-install-cancel"]',
+      // alert editor (the Customize hand-off target)
+      editorAlertName: '[data-test="add-alert-name-input-value"]',
     };
   }
 
@@ -267,6 +269,10 @@ export class AlertLibraryPage {
   async closeDrawer() {
     await this.page.keyboard.press('Escape');
     await expect(this.page.locator(this.l.drawer)).toBeHidden();
+  }
+
+  async expectEditorAlertName(name) {
+    await expect(this.page.locator(this.l.editorAlertName).first()).toHaveText(name, { timeout: 15000 });
   }
 
   async expectReadyFacetActive() {

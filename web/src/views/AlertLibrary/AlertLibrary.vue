@@ -939,12 +939,18 @@ const onInstall = (payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }
 };
 
 /** The card's Add: the same single-alert hand-off the drawer makes, minus the drawer. */
+// A second Add while a file loads would swap the seed under the dialog the first one opened.
+let addInFlight = false;
 const addEntry = async (entry: AlertLibraryEntry) => {
+  if (addInFlight) return;
+  addInFlight = true;
   try {
     const file = await loadAlertFile(entry);
     onInstall({ entry, file: fileForInstall(entry, file) });
   } catch {
     toast({ variant: "error", message: t("alert_library.drawer.loadFailed") });
+  } finally {
+    addInFlight = false;
   }
 };
 

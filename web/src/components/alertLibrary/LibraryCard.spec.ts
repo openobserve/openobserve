@@ -162,7 +162,9 @@ describe("LibraryCard", () => {
 
   it("still flags a not-ingested entry that has no stream", () => {
     const wrapper = mountCard({ entry: { ...entry, stream: "" }, ready: false });
-    expect(wrapper.find('[data-test="alert-library-card-needs-data"]').exists()).toBe(true);
+    const tag = wrapper.find('[data-test="alert-library-card-needs-data"]');
+    expect(tag.exists()).toBe(true);
+    expect(tag.attributes("title")).toBeUndefined();
   });
 
   it("does not dim the card, so its description stays readable", () => {
