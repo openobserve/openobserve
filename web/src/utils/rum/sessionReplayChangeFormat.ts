@@ -205,6 +205,36 @@ export function createRecordConverter(): RecordConverter {
     }
   }
 
+  // The classic Input data for one InputSelection target, or null when it has no classic equivalent.
+  function inputSelectionData(
+    nodeId: number,
+    selected: boolean,
+  ): { id: number; text: string; isChecked: boolean } | null {
+    const tracked = nodes.get(nodeId);
+    const node = tracked?.node;
+    const attrs = node?.attributes;
+    if (attrs?.type === "checkbox" || attrs?.type === "radio") {
+      return { id: nodeId, text: attrs.value ?? "", isChecked: selected };
+    }
+    // The SDK records a <select> change as the newly selected <option> (possibly inside an <optgroup>).
+    if (node?.tagName !== "option" || !selected) return null;
+    let parentId = tracked!.parentId;
+    let parent = nodes.get(parentId)?.node;
+    if (parent?.tagName === "optgroup") {
+      parentId = nodes.get(parentId)!.parentId;
+      parent = nodes.get(parentId)?.node;
+    }
+    if (parent?.tagName !== "select") return null;
+    // Like the DOM: an <option> without a value attribute takes its text as its value.
+    const text =
+      attrs?.value ??
+      (node.childNodes ?? [])
+        .map((child: any) => child.textContent ?? "")
+        .join("")
+        .trim();
+    return { id: parentId, text, isChecked: false };
+  }
+
   function rulesToCssText(rules: string | string[]): string {
     return Array.isArray(rules) ? rules.join("") : rules;
   }
@@ -729,30 +759,28 @@ export function createRecordConverter(): RecordConverter {
           }
           break;
 
-        case ChangeType.InputSelection: {
-          // Only checkboxes and radios have a classic equivalent (isChecked). <option> and indeterminate have none.
-          const state = group[1];
-          if (state !== InputSelectionState.Selected && state !== InputSelectionState.Deselected)
-            break;
-          for (let i = 2; i < group.length; i++) {
-            const nodeId = group[i];
-            const attrs = nodes.get(nodeId)?.node?.attributes;
-            if (attrs?.type !== "checkbox" && attrs?.type !== "radio") continue;
-            const input = {
-              type: RecordType.IncrementalSnapshot,
-              timestamp,
-              data: {
-                source: IncrementalSource.Input,
-                id: nodeId,
-                text: attrs.value ?? "",
-                isChecked: state === InputSelectionState.Selected,
-              },
-            };
-            trackClassic(input);
-            extraRecords.push(input);
+        case ChangeType.InputSelection:
+          // Each change is [state, ...nodeIds]. Checkboxes and radios map to isChecked; a selected
+          // <option> maps to a value change on its <select>. Indeterminate has no classic equivalent.
+          for (let i = 1; i < group.length; i++) {
+            const selection = group[i];
+            if (!Array.isArray(selection)) continue;
+            const state = selection[0];
+            if (state !== InputSelectionState.Selected && state !== InputSelectionState.Deselected)
+              continue;
+            for (let j = 1; j < selection.length; j++) {
+              const data = inputSelectionData(selection[j], state === InputSelectionState.Selected);
+              if (!data) continue;
+              const input = {
+                type: RecordType.IncrementalSnapshot,
+                timestamp,
+                data: { source: IncrementalSource.Input, ...data },
+              };
+              trackClassic(input);
+              extraRecords.push(input);
+            }
           }
           break;
-        }
 
         case ChangeType.VisualViewport:
           for (let i = 1; i < group.length; i++) {

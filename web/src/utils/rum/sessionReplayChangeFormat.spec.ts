@@ -764,24 +764,71 @@ describe("sessionReplayChangeFormat", () => {
             [null, "#document"],
             [1, "INPUT", ["type", "checkbox"]],
             [0, "INPUT", ["type", "radio"]],
-            [0, "OPTION"],
+            [0, "INPUT", ["type", "radio"]],
             [0, "INPUT", ["type", "text"]],
           ],
         ]),
       );
+      // The SDK shape: [13, ...[state, ...nodeIds]]. A radio pick is one Selected change for the
+      // clicked radio and one Deselected change for the rest of its group.
       const out = converter.convert(
-        change(1100, [
-          [INPUT_SELECTION, 0, 1, 3], // selected: checkbox, option
-          [INPUT_SELECTION, 1, 2], // deselected: radio
-          [INPUT_SELECTION, 2, 1], // indeterminate: no classic equivalent
-          [INPUT_SELECTION, 0, 4], // text input is not checkable
-        ]),
+        change(1100, [[INPUT_SELECTION, [0, 1], [0, 2], [1, 3], [2, 1], [0, 4]]]),
       );
       expect(out.map((r: any) => r.data)).toEqual([
         { source: 5, id: 1, text: "", isChecked: true },
-        { source: 5, id: 2, text: "", isChecked: false },
+        { source: 5, id: 2, text: "", isChecked: true },
+        { source: 5, id: 3, text: "", isChecked: false },
       ]);
-      expect(nodeWithId(converter.snapshot()!.node, 1).attributes.checked).toBe(true);
+      const snap = converter.snapshot()!.node;
+      expect(nodeWithId(snap, 1).attributes.checked).toBe(true);
+      expect(nodeWithId(snap, 2).attributes.checked).toBe(true);
+      expect(nodeWithId(snap, 3).attributes.checked).toBeUndefined();
+    });
+
+    it("maps a selected <option> to a value change on its <select>, through an <optgroup>", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([
+          [
+            ADD_NODE,
+            [null, "#document"],
+            [1, "SELECT"],
+            [1, "OPTION", ["value", "a"]],
+            [0, "OPTGROUP"],
+            [1, "OPTION"],
+            [1, "#text", " Bee "],
+          ],
+        ]),
+      );
+      const out = converter.convert(change(1100, [[INPUT_SELECTION, [0, 2]]]));
+      expect(out.map((r: any) => r.data)).toEqual([
+        { source: 5, id: 1, text: "a", isChecked: false },
+      ]);
+      // An <option> without a value attribute takes its text; a Deselected <option> is ignored.
+      const out2 = converter.convert(change(1200, [[INPUT_SELECTION, [1, 2], [0, 4]]]));
+      expect(out2.map((r: any) => r.data)).toEqual([
+        { source: 5, id: 1, text: "Bee", isChecked: false },
+      ]);
+      expect(nodeWithId(converter.snapshot()!.node, 1).attributes.value).toBe("Bee");
+    });
+
+    it("decodes references after ClearStrings across encoder runs in one record", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([[ADD_NODE, [null, "#document"], [1, "DIV"], [1, "#text", "start"]]]),
+      );
+      // Encoder output when the string table fills up mid-record: run 1, ClearStrings, run 2.
+      const out = converter.convert(
+        change(1100, [
+          [ADD_ROLE_ANNOTATED_STRINGS, [4, "first"]],
+          [TEXT, [2, 0]],
+          [CLEAR_STRINGS],
+          [ADD_ROLE_ANNOTATED_STRINGS, [4, "second"]],
+          [TEXT, [2, 0]],
+        ]),
+      );
+      expect(out.length).toBeGreaterThan(0);
+      expect(nodeWithId(converter.snapshot()!.node, 2).textContent).toBe("second");
     });
 
     it("skips ImageContent and unknown change types without dropping the rest of the record", () => {
