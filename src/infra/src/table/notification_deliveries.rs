@@ -833,6 +833,26 @@ pub async fn delete_expired(
     Ok(deliveries)
 }
 
+/// Drop an org's delivery rows and episode routing state, for org teardown.
+pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
+    let db = crate::db::get_orm_client_rw().await;
+    let txn = db.begin().await?;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .exec(&txn)
+        .await?;
+    episodes::Entity::delete_many()
+        .filter(episodes::Column::Org.eq(org))
+        .exec(&txn)
+        .await?;
+    dest_records::Entity::delete_many()
+        .filter(dest_records::Column::Org.eq(org))
+        .exec(&txn)
+        .await?;
+    txn.commit().await?;
+    Ok(())
+}
+
 /// Open episodes, for the daily orphan check of their owning objects.
 pub async fn open_episodes(
     db: &DatabaseConnection,

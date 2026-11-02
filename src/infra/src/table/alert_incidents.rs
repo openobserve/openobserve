@@ -373,6 +373,38 @@ pub async fn update_status_with<C: ConnectionTrait>(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// Resolve an incident that is not resolved yet; `None` when another resolve already did.
+pub async fn resolve_if_open_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let changed = alert_incidents::Entity::update_many()
+        .col_expr(alert_incidents::Column::Status, Expr::value("resolved"))
+        .col_expr(alert_incidents::Column::ResolvedAt, Expr::value(Some(now)))
+        .col_expr(alert_incidents::Column::UpdatedAt, Expr::value(now))
+        // A resolved incident is muted by nothing, even if recording its events fails later.
+        .col_expr(
+            alert_incidents::Column::MutedByDowntimeId,
+            Expr::value(Option::<String>::None),
+        )
+        .filter(alert_incidents::Column::Id.eq(id))
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .exec(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .rows_affected;
+    if changed == 0 {
+        return Ok(None);
+    }
+    alert_incidents::Entity::find_by_id(id)
+        .one(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 /// Acknowledges an incident. Returns `None` if it is gone, and the current
 /// record if the WHERE guard did not match — somebody else already acknowledged
 /// it, or it is already resolved.

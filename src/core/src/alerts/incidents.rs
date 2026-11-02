@@ -41,6 +41,8 @@ const UNKNOWN_SERVICE: &str = "unknown";
 const INCIDENT_EDGE_RANGE_SECS: i64 = 3600;
 /// How many of an alert's latest firings a Firing run after a window looks through for open pages.
 const MUTED_RESOLVES_SCANNED: u64 = 10;
+/// The actor a resolve records when no person did it.
+const SYSTEM_ACTOR: &str = "system";
 
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
@@ -3316,6 +3318,15 @@ pub async fn update_status_as(
     if is_the_one_ack(org_id, incident_id, status).await? {
         return through_the_one_ack(org_id, incident_id, status, user_id).await;
     }
+    if status == "resolved" {
+        let updated = match resolve_incident_as(org_id, incident_id, Some(user_id), quiet).await? {
+            Some(updated) => updated,
+            None => infra::table::alert_incidents::get(org_id, incident_id)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Incident not found"))?,
+        };
+        return model_to_incident(updated).await;
+    }
     // Read before the resolve clears it, so resolving a muted incident still notifies nobody.
     let muted_before = reads_mute_before(
         status,
@@ -3330,32 +3341,15 @@ pub async fn update_status_as(
         && infra::table::alert_incidents::get(org_id, incident_id)
             .await?
             .is_some_and(|m| m.status == "resolved");
-    let updated = if status == "resolved" {
-        resolve_status(org_id, incident_id, quiet || muted_before).await?
-    } else {
-        infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
-    };
+    let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
 
     let muted = status_change_is_muted(
         quiet || muted_before,
         updated.muted_by_downtime_id.as_deref(),
     );
-    // Every resolution path lands here, so closing the record once covers all of them.
-    #[cfg(feature = "enterprise")]
-    if status == "resolved"
-        && !muted
-        && o2_enterprise::enterprise::oncall::is_enabled()
-        && let Err(e) =
-            o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, incident_id)
-                .await
-    {
-        log::error!("[incidents] on-call recovery failed for {org_id}/{incident_id}: {e}");
-    }
-
     // Emit status change event
     use config::meta::alerts::incidents::IncidentEvent;
     let event = match status {
-        "resolved" => Some(IncidentEvent::resolved(Some(user_id.to_string()))),
         "open" => Some(IncidentEvent::reopened(user_id, "Manually reopened")),
         _ => None,
     };
@@ -3363,17 +3357,6 @@ pub async fn update_status_as(
         && let Err(e) = append_event_unless_muted(org_id, incident_id, evt, muted).await
     {
         log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");
-    }
-
-    // A resolve cancels a run that waits for an answer; a working run finishes.
-    #[cfg(feature = "enterprise")]
-    if status == "resolved"
-        && let Err(e) =
-            super::rca_steering::cancel_waiting_on_resolve(org_id, incident_id, user_id).await
-    {
-        log::error!(
-            "[INCIDENTS::RCA] Could not stop the paused run of {org_id}/{incident_id}: {e}"
-        );
     }
 
     // A reopen starts a new episode, so its destinations hear it open again.
@@ -3403,7 +3386,7 @@ pub(crate) async fn resolve_status(
     org_id: &str,
     incident_id: &str,
     muted: bool,
-) -> Result<infra::table::entity::alert_incidents::Model, anyhow::Error> {
+) -> Result<Option<infra::table::entity::alert_incidents::Model>, anyhow::Error> {
     use config::meta::alerts::notification_kind::NotificationKind;
     use infra::table::notification_deliveries::{CLOSED_BY_PRODUCER, CLOSED_BY_RESOLVE};
 
@@ -3412,6 +3395,9 @@ pub(crate) async fn resolve_status(
     let Some(before) = infra::table::alert_incidents::get(org_id, incident_id).await? else {
         anyhow::bail!("Incident not found");
     };
+    if before.status == "resolved" {
+        return Ok(None);
+    }
     let episode_id = format!("{incident_id}:{}", before.episode_opened_at);
     let rows = if muted {
         IncidentResolveRows::default()
@@ -3423,11 +3409,11 @@ pub(crate) async fn resolve_status(
     let (org, id) = (org_id.to_string(), incident_id.to_string());
     let state_change: delivery::StateChange = Box::new(move |txn| {
         Box::pin(async move {
-            let model =
-                infra::table::alert_incidents::update_status_with(txn, &org, &id, "resolved")
-                    .await?;
-            *slot.lock().await = Some(model);
-            Ok(())
+            // The guard is the fence between nodes and paths: only one resolve writes.
+            let model = infra::table::alert_incidents::resolve_if_open_with(txn, &org, &id).await?;
+            let changed = model.is_some();
+            *slot.lock().await = model;
+            Ok(changed)
         })
     });
     let results = delivery::resolve_episode(
@@ -3446,6 +3432,9 @@ pub(crate) async fn resolve_status(
         state_change,
     )
     .await?;
+    let Some(results) = results else {
+        return Ok(None);
+    };
     for failed in results.iter().filter_map(|r| r.as_ref().err()) {
         log::warn!("[incidents] resolved notification for {org_id}/{incident_id}: {failed}");
     }
@@ -3457,11 +3446,7 @@ pub(crate) async fn resolve_status(
         &rows.ctx,
     )
     .await;
-    written
-        .lock()
-        .await
-        .take()
-        .ok_or_else(|| anyhow::anyhow!("Incident not found"))
+    Ok(written.lock().await.take())
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -3469,8 +3454,62 @@ pub(crate) async fn resolve_status(
     org_id: &str,
     incident_id: &str,
     _muted: bool,
-) -> Result<infra::table::entity::alert_incidents::Model, anyhow::Error> {
-    Ok(infra::table::alert_incidents::update_status(org_id, incident_id, "resolved").await?)
+) -> Result<Option<infra::table::entity::alert_incidents::Model>, anyhow::Error> {
+    let conn = infra::db::get_orm_client_rw().await;
+    Ok(infra::table::alert_incidents::resolve_if_open_with(conn, org_id, incident_id).await?)
+}
+
+/// Every resolve path; all side effects are skipped when another resolve already won.
+pub(crate) async fn resolve_incident_as(
+    org_id: &str,
+    incident_id: &str,
+    actor: Option<&str>,
+    quiet: bool,
+) -> Result<Option<infra::table::entity::alert_incidents::Model>, anyhow::Error> {
+    let muted_before = reads_mute_before(
+        "resolved",
+        o2_enterprise::enterprise::common::config::get_config()
+            .downtimes
+            .enabled,
+    ) && infra::table::alert_incidents::get(org_id, incident_id)
+        .await?
+        .is_some_and(|m| m.muted_by_downtime_id.is_some());
+    let Some(updated) = resolve_status(org_id, incident_id, quiet || muted_before).await? else {
+        return Ok(None);
+    };
+    let muted = status_change_is_muted(
+        quiet || muted_before,
+        updated.muted_by_downtime_id.as_deref(),
+    );
+    // Every resolution path lands here, so closing the record once covers all of them.
+    #[cfg(feature = "enterprise")]
+    if !muted
+        && o2_enterprise::enterprise::oncall::is_enabled()
+        && let Err(e) =
+            o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, incident_id)
+                .await
+    {
+        log::error!("[incidents] on-call recovery failed for {org_id}/{incident_id}: {e}");
+    }
+    let event = config::meta::alerts::incidents::IncidentEvent::resolved(actor.map(str::to_string));
+    if let Err(e) = append_event_unless_muted(org_id, incident_id, event, muted).await {
+        log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");
+    }
+    // A resolve cancels a run that waits for an answer; a working run finishes.
+    #[cfg(feature = "enterprise")]
+    if let Err(e) = super::rca_steering::cancel_waiting_on_resolve(
+        org_id,
+        incident_id,
+        actor.unwrap_or(SYSTEM_ACTOR),
+    )
+    .await
+    {
+        log::error!(
+            "[INCIDENTS::RCA] Could not stop the paused run of {org_id}/{incident_id}: {e}"
+        );
+    }
+    publish_status(org_id, incident_id, "resolved").await;
+    Ok(Some(updated))
 }
 
 /// The resolve rows: today's alert destination merge, then destinations only the episode recorded.
@@ -3690,8 +3729,16 @@ async fn publish_status(org_id: &str, incident_id: &str, status: &str) {
 /// Resolve every stale incident through the single choke point; returns how many resolved.
 pub async fn auto_resolve_stale(threshold_micros: i64) -> Result<usize, anyhow::Error> {
     const PAGE: u64 = 500;
-    let stale = infra::table::alert_incidents::list_stale(threshold_micros, PAGE).await?;
-    Ok(resolve_stale(&stale).await)
+    let mut total = 0;
+    loop {
+        let stale = infra::table::alert_incidents::list_stale(threshold_micros, PAGE).await?;
+        let resolved = resolve_stale(&stale).await;
+        total += resolved;
+        // A page that resolved nothing would come back unchanged, so the loop stops there.
+        if stale.len() < PAGE as usize || resolved == 0 {
+            return Ok(total);
+        }
+    }
 }
 
 /// Resolve each listed incident on its own, so one failure never stops the rest.
@@ -3705,7 +3752,8 @@ pub(crate) async fn resolve_stale(stale: &[infra::table::alert_incidents::AutoRe
         )
         .await
         {
-            Ok(()) => resolved += 1,
+            Ok(true) => resolved += 1,
+            Ok(false) => {}
             Err(e) => log::warn!(
                 "[incidents] auto-resolve of {}/{} failed: {e}",
                 incident.org_id,
@@ -3716,34 +3764,30 @@ pub(crate) async fn resolve_stale(stale: &[infra::table::alert_incidents::AutoRe
     resolved
 }
 
-/// The resolve and its fan out commit together, then the timeline event; muted notifies nobody.
+/// One stale incident through `resolve_incident_as`; a muted one also notes the downtime.
 pub async fn record_auto_resolved(
     org_id: &str,
     incident_id: &str,
     muted_by_downtime_id: Option<&str>,
-) -> Result<(), anyhow::Error> {
-    resolve_status(org_id, incident_id, muted_by_downtime_id.is_some()).await?;
-    let event = match muted_by_downtime_id {
-        None => {
-            crate::incidents::append_event(org_id, incident_id, IncidentEvent::resolved(None)).await
-        }
-        Some(downtime_id) => {
-            let conn = infra::db::get_orm_client_rw().await;
-            record_muted_auto_resolve(conn, org_id, incident_id, downtime_id).await
-        }
-    };
-    if let Err(e) = event {
-        log::warn!("[incidents] resolved event of {org_id}/{incident_id} not recorded: {e}");
+) -> Result<bool, anyhow::Error> {
+    if resolve_incident_as(org_id, incident_id, None, false)
+        .await?
+        .is_none()
+    {
+        return Ok(false);
     }
-    Ok(())
+    if let Some(downtime_id) = muted_by_downtime_id {
+        let conn = infra::db::get_orm_client_rw().await;
+        if let Err(e) = record_muted_auto_resolve(conn, org_id, incident_id, downtime_id).await {
+            log::warn!("[incidents] muted resolve of {org_id}/{incident_id} not recorded: {e}");
+        }
+    }
+    Ok(true)
 }
 
-/// The on-call page close: the same resolve and fan out, without the on-call recovery it came from.
+/// The on-call page close: the same resolve and side effects as every other path.
 pub async fn resolve_from_oncall(org_id: &str, incident_id: &str) -> Result<(), anyhow::Error> {
-    let muted = infra::table::alert_incidents::get(org_id, incident_id)
-        .await?
-        .is_some_and(|m| m.muted_by_downtime_id.is_some());
-    resolve_status(org_id, incident_id, muted).await?;
+    resolve_incident_as(org_id, incident_id, Some(SYSTEM_ACTOR), false).await?;
     Ok(())
 }
 

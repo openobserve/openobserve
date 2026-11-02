@@ -872,6 +872,17 @@ async fn delete_org_storage_providers(org_id: &str) -> Result<(), anyhow::Error>
         .map_err(|e| anyhow::anyhow!("drain_deleted_files_final/org_storage_providers: {e}"))
 }
 
+/// Incident timelines and the notification ledger rows of every kind.
+async fn delete_org_incident_history(org_id: &str) -> Result<(), anyhow::Error> {
+    use infra::table::{incident_events, notification_deliveries};
+    incident_events::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/incident_events: {e}"))?;
+    notification_deliveries::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/notification_deliveries: {e}"))
+}
+
 /// Delete every downtime through the db layer, so caches, regions and OpenFGA tuples drop it.
 async fn delete_org_downtimes(org_id: &str) -> Result<(), anyhow::Error> {
     crate::db::downtimes::delete_by_org(org_id).await
@@ -1096,12 +1107,12 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     use infra::table::{
         ai_chat_sessions, ai_chat_shares, ai_chat_turns, alert_acks, alert_calibration,
         alert_incidents, anomaly_detection, compactor_manual_jobs, distinct_values,
-        external_alerts, gen_ai_agents, incident_events, incident_integrations, llm_eval,
-        llm_prompts, llm_secrets, oncall_teams, online_eval_jobs, org_ai_toolsets, org_telephony,
-        providers, query_history, ratelimit, rca_runs, rca_steering, re_pattern,
-        re_pattern_stream_map, rum_pa, score_configs, scorers, search_queue, slack_alert_messages,
-        slo, slo_backfill_jobs, slo_budget, slos, status_pages, synthetics_agents,
-        synthetics_checks, synthetics_environments, synthetics_locations, synthetics_probe_tokens,
+        external_alerts, gen_ai_agents, incident_integrations, llm_eval, llm_prompts, llm_secrets,
+        oncall_teams, online_eval_jobs, org_ai_toolsets, org_telephony, providers, query_history,
+        ratelimit, rca_runs, rca_steering, re_pattern, re_pattern_stream_map, rum_pa,
+        score_configs, scorers, search_queue, slack_alert_messages, slo, slo_backfill_jobs,
+        slo_budget, slos, status_pages, synthetics_agents, synthetics_checks,
+        synthetics_environments, synthetics_locations, synthetics_probe_tokens,
         synthetics_variables, timed_annotations, workflows,
     };
 
@@ -1111,9 +1122,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     alert_incidents::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_incidents: {e}"))?;
-    incident_events::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/incident_events: {e}"))?;
+    delete_org_incident_history(org_id).await?;
     rca_steering::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/rca_steering: {e}"))?;

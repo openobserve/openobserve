@@ -3515,7 +3515,7 @@ pub async fn send_anomaly_alert(
     anomaly_send_result(sent.map(|_| ()))
 }
 
-/// Delivered and handled are done; a pending ledger row is neither done nor failed.
+/// Delivered and handled are done; a pending ledger row is handed off and reported as pending.
 #[cfg(feature = "enterprise")]
 fn anomaly_send_result(
     sent: Result<(), crate::alerts::notifications::notify::NotifyError>,
@@ -3585,9 +3585,8 @@ pub async fn resolve_anomaly_episode(
     let anomaly_id = actx.anomaly_id.clone();
     let state_change: delivery::StateChange = Box::new(move |txn| {
         Box::pin(async move {
-            anomaly_config_table::clear_alert_episode(txn, &anomaly_id)
-                .await
-                .map_err(anyhow::Error::from)
+            anomaly_config_table::clear_alert_episode(txn, &anomaly_id).await?;
+            Ok(true)
         })
     });
     let closed_by = if recovery.send_resolves {
@@ -3607,6 +3606,7 @@ pub async fn resolve_anomaly_episode(
         state_change,
     )
     .await?;
+    let results = results.unwrap_or_default();
     delivery::send_outside_after_close(&org_id, &outside, &explicit, None, &ctx).await;
     let delivered = results
         .iter()
@@ -6851,7 +6851,7 @@ mod tests {
         }
 
         #[test]
-        fn a_pending_ledger_row_is_neither_delivered_nor_failed() {
+        fn a_pending_ledger_row_is_reported_as_pending() {
             for reason in [SkipReason::InFlight, SkipReason::RetryScheduled] {
                 let err = anomaly_send_result(Err(NotifyError::Skipped(reason))).unwrap_err();
                 assert!(

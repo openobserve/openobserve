@@ -46,8 +46,9 @@ use super::{
 pub const SENT_OUTSIDE_LEDGER: &str = "sent outside the ledger, not replayable";
 
 /// The producer state change that commits in the same transaction as a resolve fan out.
+/// `Ok(false)` means the producer's state was already there: nothing is written, nothing sent.
 pub type StateChange =
-    Box<dyn for<'a> FnOnce(&'a DatabaseTransaction) -> BoxFuture<'a, anyhow::Result<()>> + Send>;
+    Box<dyn for<'a> FnOnce(&'a DatabaseTransaction) -> BoxFuture<'a, anyhow::Result<bool>> + Send>;
 
 /// The identity of one send on the ledger, before the rendered record is known.
 pub fn new_delivery(
@@ -314,7 +315,7 @@ pub async fn resolve_episode(
     closed_by: &str,
     write_resolves: bool,
     state_change: StateChange,
-) -> Result<Vec<Result<DeliveryRow, NotifyError>>, anyhow::Error> {
+) -> Result<Option<Vec<Result<DeliveryRow, NotifyError>>>, anyhow::Error> {
     let key = EpisodeKey {
         org: org_id.to_string(),
         kind: kind.as_str().to_string(),
@@ -322,7 +323,10 @@ pub async fn resolve_episode(
     };
     let db = get_orm_client_rw().await;
     let txn = db.begin().await?;
-    state_change(&txn).await?;
+    if !state_change(&txn).await? {
+        txn.rollback().await?;
+        return Ok(None);
+    }
     ledger::resolve_episode_in(
         &txn,
         &key,
@@ -345,7 +349,7 @@ pub async fn resolve_episode(
     for row in ledger::queued_resolves(db, &key).await? {
         results.push(replay(&row.id).await);
     }
-    Ok(results)
+    Ok(Some(results))
 }
 
 /// A recorded platform destination needs no render: its resolve is protocol.

@@ -47,6 +47,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
             return Ok(());
         }
 
+        // One scheduler sweeps; the guarded resolve fences any overlap that remains.
+        if !config::cluster::LOCAL_NODE.is_scheduler() {
+            log::debug!("[INCIDENTS::JOB] not a scheduler node, skipping auto-resolve");
+            return Ok(());
+        }
+
         if config.incidents.auto_resolve_after_minutes <= 0 {
             log::info!(
                 "[INCIDENTS::JOB] Auto-resolve is disabled (auto_resolve_after_minutes=0), only manual resolution allowed"

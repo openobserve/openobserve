@@ -490,17 +490,20 @@ async fn assert_resolved_once(incident: &str, episode: &str, dest: &str, seen: &
     // Whatever the producer could not finish is the sweeper's, exactly as in production.
     let mut rows = ledger::list(db, &filter).await.unwrap().1;
     for _ in 0..10 {
-        if rows.iter().all(|r| r.status == ledger::STATUS_SENT) {
+        if rows
+            .iter()
+            .filter(|r| r.destination == dest)
+            .all(|r| r.status == ledger::STATUS_SENT)
+        {
             break;
         }
         let _ = retry_tick().await;
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         rows = ledger::list(db, &filter).await.unwrap().1;
     }
-    let total = rows.len();
-    assert_eq!(total, 1, "one resolve row per destination");
-    assert_eq!(rows[0].destination, dest);
-    assert_eq!(rows[0].status, ledger::STATUS_SENT);
+    let mine: Vec<_> = rows.iter().filter(|r| r.destination == dest).collect();
+    assert_eq!(mine.len(), 1, "one resolve row per destination");
+    assert_eq!(mine[0].status, ledger::STATUS_SENT);
     let resolves: Vec<serde_json::Value> = calls(seen, "/ok")
         .iter()
         .filter_map(|(_, b)| serde_json::from_slice::<serde_json::Value>(b).ok())
@@ -514,6 +517,31 @@ async fn assert_resolved_once(incident: &str, episode: &str, dest: &str, seen: &
         .unwrap()
         .status;
     assert_eq!(status, "resolved");
+}
+
+/// The incident's resolved timeline events.
+#[cfg(feature = "enterprise")]
+async fn resolved_events(incident: &str) -> usize {
+    infra::table::incident_events::get("acme", incident)
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|e| {
+            matches!(
+                e.event_type,
+                config::meta::alerts::incidents::IncidentEventType::Resolved { .. }
+            )
+        })
+        .count()
+}
+
+#[cfg(feature = "enterprise")]
+async fn resolved_at(incident: &str) -> Option<i64> {
+    infra::table::alert_incidents::get("acme", incident)
+        .await
+        .unwrap()
+        .unwrap()
+        .resolved_at
 }
 
 #[cfg(feature = "enterprise")]
@@ -531,23 +559,29 @@ fn the_timeout_sweep_resolves_through_the_fan_out() {
             let (base, seen) = mock().await;
             let hour = 3600 * 1_000_000;
             let (incident, episode) = paged_incident("pd-sweep", &base, 2 * hour).await;
-            // The sweep's own list, narrowed to this test's incident: the store is shared.
-            let sweep = || async {
-                infra::table::alert_incidents::list_stale(hour, 10_000)
+            // The child's store holds only this test's incidents, so the whole sweep runs.
+            assert_eq!(
+                crate::alerts::incidents::auto_resolve_stale(hour)
                     .await
-                    .unwrap()
-                    .into_iter()
-                    .filter(|s| s.incident_id == incident)
-                    .collect::<Vec<_>>()
-            };
-            let stale = sweep().await;
-            assert_eq!(stale.len(), 1);
-            assert_eq!(crate::alerts::incidents::resolve_stale(&stale).await, 1);
+                    .unwrap(),
+                1
+            );
             assert_resolved_once(&incident, &episode, "pd-sweep", &seen).await;
-            assert!(
-                sweep().await.is_empty(),
+            let first = resolved_at(&incident).await;
+            assert!(first.is_some());
+            assert_eq!(
+                crate::alerts::incidents::auto_resolve_stale(hour)
+                    .await
+                    .unwrap(),
+                0,
                 "a resolved incident is not stale again"
             );
+            assert_eq!(
+                resolved_at(&incident).await,
+                first,
+                "resolved_at is written once"
+            );
+            assert_eq!(resolved_events(&incident).await, 1);
         },
     );
 }
@@ -566,11 +600,106 @@ fn an_on_call_page_close_resolves_through_the_fan_out() {
             incident_tables().await;
             let (base, seen) = mock().await;
             let (incident, episode) = paged_incident("pd-oncall", &base, 0).await;
-            // What the registered resolver runs when a promoted page closes.
-            crate::alerts::incidents::resolve_from_oncall("acme", &incident)
+            // The same registration as the jobs init, then the entry the page close calls.
+            o2_enterprise::enterprise::oncall::escalation::register_incident_resolver(
+                |org_id, incident_id| {
+                    Box::pin(async move {
+                        crate::alerts::incidents::resolve_from_oncall(&org_id, &incident_id).await
+                    })
+                },
+            );
+            o2_enterprise::enterprise::oncall::escalation::resolve_incident("acme", &incident)
                 .await
                 .unwrap();
             assert_resolved_once(&incident, &episode, "pd-oncall", &seen).await;
+            assert_eq!(resolved_events(&incident).await, 1);
+        },
+    );
+}
+
+#[cfg(feature = "enterprise")]
+#[test]
+fn three_resolves_in_one_second_write_one_resolve() {
+    run(
+        concat!(
+            module_path!(),
+            "::three_resolves_in_one_second_write_one_resolve"
+        ),
+        &[],
+        || async {
+            store().await;
+            incident_tables().await;
+            let (base, seen) = mock().await;
+            let jira = DestinationType::Http(Endpoint {
+                url: format!("{base}/jira"),
+                destination_type: Some("jira".into()),
+                metadata: [
+                    ("jira_deployment", "cloud"),
+                    ("jira_project_key", "OPS"),
+                    ("jira_issue_type_id", "10004"),
+                ]
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+                ..Default::default()
+            });
+            register("jira-race", jira);
+            let (incident, episode) = paged_incident("pd-race", &base, 0).await;
+            let alert_id = svix_ksuid::Ksuid::new(None, None);
+            let mut alert = config::meta::alerts::alert::Alert::default();
+            alert.id = Some(alert_id);
+            alert.org_id = "acme".into();
+            alert.name = "High error rate".into();
+            alert.destinations = vec!["pd-race".into(), "jira-race".into()];
+            crate::common::infra::config::ALERTS.write().await.insert(
+                db::alerts::alert::cache_alert_key("acme", &alert_id.to_string()),
+                (Default::default(), alert),
+            );
+            infra::table::alert_incidents::add_alert_to_incident(
+                &incident,
+                &alert_id.to_string(),
+                "High error rate",
+                "scheduled",
+                now_micros(),
+                "test",
+            )
+            .await
+            .unwrap();
+            let jira_calls = || {
+                seen.lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|(p, ..)| p.starts_with("/jira"))
+                    .count()
+            };
+            let jira_before = jira_calls();
+            // Manual, timeout and alert recovery in the same second.
+            let (manual, sweep, recovery) = tokio::join!(
+                crate::alerts::incidents::resolve_incident_as("acme", &incident, Some("u1"), false),
+                crate::alerts::incidents::record_auto_resolved("acme", &incident, None),
+                crate::alerts::incidents::resolve_incident_as("acme", &incident, Some("u2"), false),
+            );
+            let winners = [
+                manual.unwrap().is_some(),
+                sweep.unwrap(),
+                recovery.unwrap().is_some(),
+            ]
+            .into_iter()
+            .filter(|won| *won)
+            .count();
+            assert_eq!(winners, 1, "one resolve wins; the others write nothing");
+            assert_resolved_once(&incident, &episode, "pd-race", &seen).await;
+            assert_eq!(resolved_events(&incident).await, 1);
+            let after = jira_calls() - jira_before;
+            assert!(after > 0, "the Jira resolve goes out");
+            // Every Jira send searches once first, so one search means one outside send.
+            let searches = seen
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(p, ..)| p.ends_with("/search/jql"))
+                .count();
+            assert_eq!(searches, 1, "one outside send");
         },
     );
 }
