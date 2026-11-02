@@ -162,13 +162,13 @@ describe("preview SQL for the new operators", () => {
     [c("path", "Ends With", ".js"), "path LIKE '%.js'"],
     [c("msg", "re_match", "time(out)?"), "re_match(msg, 'time(out)?')"],
     [c("msg", "re_not_match", "x'y"), "re_not_match(msg, 'x''y')"],
-    [c("msg", "regex", "err", { ignore_case: true }), "re_match(msg, '(?i)err')"],
+    [c("msg", "regex", "err", { ignore_case: true }), "re_match(msg, 'err')"],
     [c("msg", "regex", "(?i)err", { case_insensitive: true }), "re_match(msg, '(?i)(?i)err')"],
     [c("msg", "Contains", "Err", { case_insensitive: true }), "str_match_ignore_case(msg, 'Err')"],
     [c("msg", "NotContains", "Err", { case_insensitive: true }), "lower(msg) NOT LIKE '%err%'"],
     [c("msg", "=", "Err", { case_insensitive: true }), "lower(msg) = 'err'"],
     [c("env", "in", ["A", "B"], { case_insensitive: true }), "lower(env) IN ('a', 'b')"],
-    [c("env", "in", ["A", "B"], { ignore_case: true }), "lower(env) IN ('a', 'b')"],
+    [c("env", "in", ["A", "B"], { ignore_case: true }), "env IN ('A', 'B')"],
     [c("msg", "is_empty", ""), "(msg IS NULL OR msg = '')"],
     [c("path", "starts_with", "50%_a\\"), "path LIKE '50\\%\\_a\\\\%'"],
     [c("path", "ends_with", "_x"), "path LIKE '%\\_x'"],
@@ -193,6 +193,25 @@ describe("preview SQL for the new operators", () => {
     for (const operator of ["Contains", "NotContains", "=", ">"]) {
       expect(sql(c("msg", operator, "Err", { ignore_case: true }))).toBe(
         sql(c("msg", operator, "Err")),
+      );
+    }
+  });
+
+  it("ignores the legacy ignore_case on the new operators and folds only on case_insensitive", () => {
+    const cases: [string, unknown][] = [
+      ["in", ["Error"]],
+      ["not_in", ["Error"]],
+      ["starts_with", "Err"],
+      ["ends_with", "Err"],
+      ["re_match", "^Err"],
+      ["re_not_match", "^Err"],
+    ];
+    for (const [operator, value] of cases) {
+      const plain = sql(c("msg", operator, value));
+      expect(sql(c("msg", operator, value, { ignore_case: true }))).toBe(plain);
+      expect(plain).not.toMatch(/lower\(|\(\?i\)/);
+      expect(sql(c("msg", operator, value, { case_insensitive: true }))).toMatch(
+        /lower\(msg\)|\(\?i\)/,
       );
     }
   });

@@ -1128,7 +1128,7 @@ impl ConditionExt for Condition {
             &self.operator,
             val,
             &self.value,
-            self.extended_case_insensitive(),
+            self.is_case_insensitive(),
         ) {
             return result;
         }
@@ -1972,7 +1972,7 @@ fn build_extended_expr(
     field_type: &DataType,
     is_string_type: bool,
 ) -> Result<String, anyhow::Error> {
-    let fold = cond.extended_case_insensitive() && is_string_type;
+    let fold = cond.is_case_insensitive() && is_string_type;
     let column = if fold {
         format!("lower({field_alias})")
     } else {
@@ -2011,7 +2011,7 @@ fn build_extended_expr(
         }
         Operator::ReMatch | Operator::ReNotMatch if is_string_type => {
             let pattern = cond.value.as_str().unwrap_or_default();
-            let pattern = if cond.extended_case_insensitive() {
+            let pattern = if cond.is_case_insensitive() {
                 format!("(?i){pattern}")
             } else {
                 pattern.to_string()
@@ -3709,20 +3709,81 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_build_expr_extended_operators_honour_legacy_ignore_case() {
+    fn extended_operator_cases() -> Vec<(Operator, Value)> {
         use config::utils::json::json;
 
-        let cond = make_legacy_ic_cond("c", Operator::In, json!(["A"]));
+        vec![
+            (Operator::In, json!(["Error", "Warn"])),
+            (Operator::NotIn, json!(["Error"])),
+            (Operator::StartsWith, json!("Err")),
+            (Operator::EndsWith, json!("ROR")),
+            (Operator::ReMatch, json!("^err")),
+            (Operator::ReNotMatch, json!("^err")),
+        ]
+    }
+
+    #[test]
+    fn test_build_expr_extended_operators_ignore_legacy_ignore_case() {
+        for (op, value) in extended_operator_cases() {
+            let legacy = make_legacy_ic_cond("c", op, value.clone());
+            let plain = make_cond("c", op, value.clone());
+            let sql = build_expr(&legacy, "", &DataType::Utf8).unwrap();
+            assert_eq!(
+                sql,
+                build_expr(&plain, "", &DataType::Utf8).unwrap(),
+                "{op:?}"
+            );
+            assert!(
+                !sql.contains("lower(") && !sql.contains("(?i)"),
+                "{op:?}: {sql}"
+            );
+            let folded = build_expr(&make_ci_cond("c", op, value), "", &DataType::Utf8).unwrap();
+            assert!(
+                folded.contains("lower(\"c\")") || folded.contains("(?i)"),
+                "{op:?}: {folded}"
+            );
+        }
+        let cond = make_legacy_ic_cond("c", Operator::In, Value::from(vec!["A"]));
         assert_eq!(
             build_expr(&cond, "", &DataType::Utf8).unwrap(),
-            r#"lower("c") IN ('a')"#
+            r#""c" IN ('A')"#
         );
-        let cond = make_legacy_ic_cond("c", Operator::ReMatch, json!("^a"));
-        assert_eq!(
-            build_expr(&cond, "", &DataType::Utf8).unwrap(),
-            r#"re_match("c", '(?i)^a')"#
-        );
+    }
+
+    #[tokio::test]
+    async fn test_extended_operators_ignore_legacy_ignore_case_in_memory() {
+        use config::utils::json::json;
+
+        let row = json!({"level": "ERROR"});
+        let row = row.as_object().unwrap();
+        let lower_matches = [
+            (Operator::In, json!(["error", "warn"]), false),
+            (Operator::NotIn, json!(["error"]), true),
+            (Operator::StartsWith, json!("err"), false),
+            (Operator::EndsWith, json!("ror"), false),
+            (Operator::ReMatch, json!("^err"), false),
+            (Operator::ReNotMatch, json!("^err"), true),
+        ];
+        for (op, value, sensitive) in lower_matches {
+            let legacy = make_legacy_ic_cond("level", op, value.clone());
+            assert_eq!(legacy.evaluate(row).await, sensitive, "V1 legacy {op:?}");
+            assert_eq!(
+                make_ci_cond("level", op, value.clone()).evaluate(row).await,
+                !sensitive,
+                "V1 case_insensitive {op:?}"
+            );
+            for (flag, expected) in [("ignore_case", sensitive), ("case_insensitive", !sensitive)] {
+                let mut leaf = json!({"filterType": "condition", "column": "level",
+                    "operator": op, "value": value, "logicalOperator": "AND"});
+                leaf[flag] = json!(true);
+                let v2: AlertConditionParams = serde_json::from_value(json!({
+                    "version": 2,
+                    "conditions": {"filterType": "group", "logicalOperator": "AND", "conditions": [leaf]}
+                }))
+                .unwrap();
+                assert_eq!(v2.evaluate(row).await, expected, "V2 {flag} {op:?}");
+            }
+        }
     }
 
     #[test]
@@ -4099,7 +4160,7 @@ mod tests {
         let cond = make_legacy_ic_cond("level", Operator::EqualTo, json!("error"));
         assert!(!cond.evaluate(row).await);
         let cond = make_legacy_ic_cond("level", Operator::StartsWith, json!("err"));
-        assert!(cond.evaluate(row).await);
+        assert!(!cond.evaluate(row).await);
         let cond = make_ci_cond("level", Operator::EqualTo, json!("error"));
         assert!(cond.evaluate(row).await);
         let cond = make_ci_cond("level", Operator::Contains, json!("RR"));

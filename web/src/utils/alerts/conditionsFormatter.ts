@@ -204,8 +204,8 @@ function formatLeaf(
   const columnType = streamFieldsMap?.[item.column]?.type;
   const extended = extendedOperator(item.operator);
   if (extended) {
-    // Like the backend, the operators added with case_insensitive also honour the legacy flag.
-    const folds = item.case_insensitive === true || item.ignore_case === true;
+    // Like the backend, the operators added with case_insensitive ignore the legacy ignore_case flag.
+    const folds = item.case_insensitive === true;
     if (sqlMode) return extendedSql(column, extended, item.value, folds, columnType);
     const shown =
       extended === "in" || extended === "not_in" ? displayList(item.value) : sqlLiteral(item.value);

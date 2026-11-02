@@ -793,14 +793,14 @@ impl ConditionList {
                     &c.column,
                     &c.operator,
                     &c.value,
-                    c.extended_case_insensitive(),
+                    c.is_case_insensitive(),
                 )
             }),
             ConditionList::EndCondition(c) => condition_ops::validate_condition_value(
                 &c.column,
                 &c.operator,
                 &c.value,
-                c.extended_case_insensitive(),
+                c.is_case_insensitive(),
             ),
         }
     }
@@ -1084,7 +1084,7 @@ pub struct Condition {
     pub operator: Operator,
     #[schema(value_type = Object)]
     pub value: Value,
-    /// Legacy flag: honoured only by the V2 in-memory evaluators and the extended operators.
+    /// Legacy flag: honoured only by the V2 in-memory evaluators, never by the extended operators.
     #[serde(default)]
     pub ignore_case: bool,
     /// Case-insensitive matching for every string operator on every evaluation path.
@@ -1093,14 +1093,9 @@ pub struct Condition {
 }
 
 impl Condition {
-    /// Case folding for the original operators; the legacy `ignore_case` does not apply here.
+    /// Case folding on every operator; the legacy `ignore_case` never applies here.
     pub fn is_case_insensitive(&self) -> bool {
         self.case_insensitive.unwrap_or(false)
-    }
-
-    /// Case folding for the extended operators, which have no legacy `ignore_case` entries.
-    pub fn extended_case_insensitive(&self) -> bool {
-        self.ignore_case || self.is_case_insensitive()
     }
 }
 
@@ -1244,7 +1239,7 @@ pub struct ConditionItemCondition {
     pub operator: Operator,
     #[schema(value_type = Object)]
     pub value: Value,
-    /// Legacy flag: honoured only by the V2 in-memory evaluators and the extended operators.
+    /// Legacy flag: honoured only by the V2 in-memory evaluators, never by the extended operators.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ignore_case: Option<bool>,
     /// Case-insensitive matching for every string operator on every evaluation path.
@@ -1255,14 +1250,13 @@ pub struct ConditionItemCondition {
 }
 
 impl ConditionItemCondition {
-    /// Case folding the V2 in-memory evaluators apply, which have always honoured `ignore_case`.
+    /// V2 in-memory case folding; legacy `ignore_case` counts only on the original operators.
     pub fn in_memory_case_insensitive(&self) -> bool {
-        self.ignore_case.unwrap_or(false) || self.case_insensitive.unwrap_or(false)
-    }
-
-    /// Case folding for the extended operators, which have no legacy `ignore_case` entries.
-    pub fn extended_case_insensitive(&self) -> bool {
-        self.in_memory_case_insensitive()
+        let explicit = self.case_insensitive.unwrap_or(false);
+        if self.operator.is_extended() {
+            return explicit;
+        }
+        self.ignore_case.unwrap_or(false) || explicit
     }
 }
 
@@ -1445,7 +1439,7 @@ fn validate_items_operator_values(items: &[ConditionItem]) -> Result<(), String>
             &c.column,
             &c.operator,
             &c.value,
-            c.extended_case_insensitive(),
+            c.in_memory_case_insensitive(),
         ),
         ConditionItem::Group { conditions, .. } => validate_items_operator_values(conditions),
     })
@@ -3824,6 +3818,42 @@ mod test {
         ]))
         .unwrap();
         assert!(legacy.validate_operator_values().is_ok());
+    }
+
+    #[test]
+    fn test_legacy_ignore_case_folds_only_original_operators() {
+        let leaf = |op: &str, flag: &str| -> ConditionItemCondition {
+            let mut v = serde_json::json!({
+                "column": "c", "operator": op, "value": "a", "logicalOperator": "AND"
+            });
+            v[flag] = serde_json::json!(true);
+            serde_json::from_value(v).unwrap()
+        };
+        for op in ["=", "!=", "contains", "not_contains"] {
+            assert!(leaf(op, "ignore_case").in_memory_case_insensitive(), "{op}");
+        }
+        for op in [
+            "in",
+            "not_in",
+            "starts_with",
+            "ends_with",
+            "re_match",
+            "re_not_match",
+        ] {
+            assert!(
+                !leaf(op, "ignore_case").in_memory_case_insensitive(),
+                "{op}"
+            );
+            assert!(
+                leaf(op, "case_insensitive").in_memory_case_insensitive(),
+                "{op}"
+            );
+        }
+        let v1: Condition = serde_json::from_value(serde_json::json!({
+            "column": "c", "operator": "in", "value": ["a"], "ignore_case": true
+        }))
+        .unwrap();
+        assert!(!v1.is_case_insensitive());
     }
 
     #[test]

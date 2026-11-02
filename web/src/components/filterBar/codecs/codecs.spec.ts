@@ -45,6 +45,7 @@ import {
   type FilterCodec,
 } from "./index";
 import { pruneIncomplete } from "../filterValidation";
+import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 
 const context: CodecContext = {
   fields: [
@@ -266,6 +267,59 @@ describe("engine codec (alerts, pipelines, workflows, evals, annotations)", () =
     const out = codec.serialize(edit(tree, 0, { operator: "eq" }), context) as any;
     expect(out.conditions[0]).toMatchObject({ operator: "=", ignore_case: true });
     expect(out.conditions[0]).not.toHaveProperty("case_insensitive");
+  });
+
+  describe("legacy ignore_case moving onto a new operator", () => {
+    const legacySaved = () => ({
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [
+        {
+          filterType: "condition",
+          column: "level",
+          operator: "=",
+          value: "error",
+          ignore_case: true,
+          logicalOperator: "AND",
+          id: "c1",
+        },
+      ],
+    });
+    const previewSql = (group: unknown) =>
+      buildConditionsString(group, {
+        sqlMode: true,
+        formatValues: true,
+        streamFieldsMap: { level: { label: "level", value: "level", type: "Utf8" } } as any,
+      });
+
+    it("saves level = error changed to IN without ignore_case and previews case-sensitive SQL", () => {
+      expectRoundTrip(codec, legacySaved() as never);
+      const tree = codec.parse(legacySaved() as never, context);
+      const out = codec.serialize(
+        edit(tree, 0, { operator: "in", values: ["error"] }),
+        context,
+      ) as any;
+      expect(out.conditions[0]).toMatchObject({ operator: "in", value: ["error"] });
+      expect(out.conditions[0]).not.toHaveProperty("ignore_case");
+      expect(out.conditions[0]).not.toHaveProperty("case_insensitive");
+      expect(previewSql(out)).toBe("level IN ('error')");
+    });
+
+    it.each(["in", "not_in", "starts_with", "ends_with", "regex", "not_regex"] as const)(
+      "drops it on %s",
+      (operator) => {
+        const tree = codec.parse(legacySaved() as never, context);
+        const out = codec.serialize(edit(tree, 0, { operator }), context) as any;
+        expect(out.conditions[0]).not.toHaveProperty("ignore_case");
+        expect(previewSql(out)).not.toMatch(/lower\(|\(\?i\)/);
+      },
+    );
+
+    it("keeps it on an edited condition that stays on an original operator", () => {
+      const tree = codec.parse(legacySaved() as never, context);
+      const out = codec.serialize(edit(tree, 0, { values: ["warn"] }), context) as any;
+      expect(out.conditions[0]).toMatchObject({ operator: "=", value: "warn", ignore_case: true });
+    });
   });
 
   it("saves a toggled connector on a locked part and writes a null item back as null", () => {

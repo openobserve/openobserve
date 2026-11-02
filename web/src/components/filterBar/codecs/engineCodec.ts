@@ -91,6 +91,14 @@ export interface EngineCodecOptions {
 type SavedEngine = EngineGroup | Record<string, unknown> | unknown[] | null;
 
 const LIST_OPERATORS = new Set<FilterOperatorId>(["in", "not_in"]);
+const EXTENDED_OPERATORS = new Set<FilterOperatorId>([
+  "in",
+  "not_in",
+  "starts_with",
+  "ends_with",
+  "regex",
+  "not_regex",
+]);
 
 const isV2Group = (value: unknown): value is EngineGroup =>
   isPlainObject(value) && value.filterType === "group" && Array.isArray(value.conditions);
@@ -232,6 +240,8 @@ function serializeLeaf(
   // Only moving off contains_ci clears it; a flag saved on any other operator is not drawn but still applies.
   else if (parsedOperator(node) === "contains_ci" || !base?.case_insensitive)
     delete out.case_insensitive;
+  // The backend ignores legacy ignore_case on these operators, so carrying it over would only mislead.
+  if (EXTENDED_OPERATORS.has(node.operator)) delete out.ignore_case;
   return out;
 }
 
