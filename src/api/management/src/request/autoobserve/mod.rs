@@ -15,55 +15,48 @@
 
 //! AutoObserve engine routes: coverage, suggestions, and the marks the alert gate reads.
 
-#[cfg(any(feature = "enterprise", test))]
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::{
+    collections::{BTreeSet, HashMap, HashSet},
+    future::Future,
+    str::FromStr,
+};
 
 use axum::{
     body::{Body, Bytes},
     extract::{Path, Query, RawQuery, rejection::QueryRejection},
     response::Response,
 };
-#[cfg(any(feature = "enterprise", test))]
-use config::meta::alerts::alert::ListAlertsParams;
-use serde::Deserialize;
-use utoipa::{IntoParams, ToSchema};
-#[cfg(feature = "enterprise")]
-use {
-    config::{meta::autoobserve::marks::ENTITY_TYPE_ALERT, utils::time::now_micros},
-    futures::{StreamExt, stream},
-    infra::db::get_orm_client_ro,
-    o2_enterprise::enterprise::autoobserve::{
-        api::{
-            self, ApiError, CoverageView, DEFAULT_LIMIT, Deps, MarkFilter, MarkPut, MarkTarget,
-            Page, SuggestionFilter,
-        },
-        contract::EntityRef,
-        marks::MarkSource,
-        names::{dims, kinds},
-    },
-    o2_openfga::{authorizer::authz::list_objects, meta::mapping::OFGA_MODELS},
-    openobserve_api_common::extractors::Headers,
-    openobserve_core::{
-        alerts::alert, auth::check_permissions, background_access::rbac_enforced, users,
-    },
-    serde::Serialize,
-    std::{future::Future, str::FromStr},
-    svix_ksuid::Ksuid,
+use config::{
+    meta::{alerts::alert::ListAlertsParams, autoobserve::marks::ENTITY_TYPE_ALERT},
+    utils::time::now_micros,
 };
+use futures::{StreamExt, stream};
+use infra::db::get_orm_client_ro;
+use o2_enterprise::enterprise::autoobserve::{
+    api::{
+        self, ApiError, CoverageView, DEFAULT_LIMIT, Deps, MarkFilter, MarkPut, MarkTarget, Page,
+        SuggestionFilter,
+    },
+    contract::EntityRef,
+    marks::MarkSource,
+    names::{dims, kinds},
+};
+use o2_openfga::{authorizer::authz::list_objects, meta::mapping::OFGA_MODELS};
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::{
+    alerts::alert, auth::check_permissions, background_access::rbac_enforced, users,
+};
+use serde::{Deserialize, Serialize};
+use svix_ksuid::Ksuid;
+use utoipa::{IntoParams, ToSchema};
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-#[cfg(feature = "enterprise")]
-use crate::service::auth::UserEmail;
+use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::auth::UserEmail};
 
 /// Only whether a DELETE carries a body matters, so reading stops here.
-#[cfg(any(feature = "enterprise", test))]
 const MAX_DELETE_BODY: usize = 64 * 1024;
-#[cfg(feature = "enterprise")]
 const DISABLED_MESSAGE: &str = "AutoObserve is disabled (O2_AUTOOBSERVE_ENABLED=false)";
 /// Past this many alerts, one list filtered to their ids is cheaper than reading each.
-#[cfg(feature = "enterprise")]
 const ALERT_READS_ONE_BY_ONE: usize = 64;
-#[cfg(feature = "enterprise")]
 const ALERT_READ_CONCURRENCY: usize = 16;
 
 #[derive(Debug, Default, Deserialize, IntoParams)]
@@ -130,7 +123,6 @@ pub struct MarkBody {
     pub reason: Option<String>,
 }
 
-#[cfg(any(feature = "enterprise", test))]
 impl MarkBody {
     /// Unknown fields are refused, so a misspelt `group_key` cannot mark the ungrouped series.
     fn parse(body: &[u8]) -> Result<Self, String> {
@@ -145,14 +137,12 @@ impl MarkBody {
     }
 }
 
-#[cfg(any(feature = "enterprise", test))]
 #[derive(Clone, Copy, Debug)]
 struct Subject<'a> {
     resource: &'static str,
     alert_id: Option<&'a str>,
 }
 
-#[cfg(feature = "enterprise")]
 impl<'a> Subject<'a> {
     fn of(subject: &'a EntityRef) -> Self {
         let resource = if subject.kind == kinds::SYNTHETIC {
@@ -168,7 +158,6 @@ impl<'a> Subject<'a> {
 }
 
 /// A role's alert grants short of org-wide, as list-objects ids: folders, and single alerts.
-#[cfg(any(feature = "enterprise", test))]
 #[derive(Debug, Default)]
 struct AlertGrants {
     every_folder: bool,
@@ -176,7 +165,6 @@ struct AlertGrants {
     alerts: HashSet<String>,
 }
 
-#[cfg(any(feature = "enterprise", test))]
 impl AlertGrants {
     fn from_objects(org_id: &str, folders: Vec<String>, alerts: Vec<String>) -> Self {
         let ids = |objects: Vec<String>| -> HashSet<String> {
@@ -209,7 +197,6 @@ impl AlertGrants {
 }
 
 /// The permission and alert reads a subject filter makes; tests count them.
-#[cfg(any(feature = "enterprise", test))]
 trait AlertAuthority {
     async fn org_wide(&self, resource: &'static str) -> bool;
     async fn grants(&self) -> AlertGrants;
@@ -217,13 +204,11 @@ trait AlertAuthority {
     async fn folders_of(&self, alert_ids: Vec<String>) -> HashMap<String, String>;
 }
 
-#[cfg(feature = "enterprise")]
 struct LiveAuthority<'a> {
     org_id: &'a str,
     user_id: &'a str,
 }
 
-#[cfg(feature = "enterprise")]
 impl LiveAuthority<'_> {
     /// A failed listing grants nothing, as a failed per-alert check denies.
     async fn listed(&self, permission: &str, resource: &str, role: &str) -> Vec<String> {
@@ -237,7 +222,6 @@ impl LiveAuthority<'_> {
     }
 }
 
-#[cfg(feature = "enterprise")]
 impl AlertAuthority for LiveAuthority<'_> {
     async fn org_wide(&self, resource: &'static str) -> bool {
         org_wide_allows(self.org_id, self.user_id, resource, "GET").await
@@ -287,7 +271,7 @@ impl AlertAuthority for LiveAuthority<'_> {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
-        (status = 404, description = "AutoObserve is disabled for this deployment, or not supported in this build", content_type = "application/json", body = Object),
+        (status = 404, description = "AutoObserve is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
         (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
     ),
@@ -297,17 +281,10 @@ impl AlertAuthority for LiveAuthority<'_> {
     )
 )]
 pub async fn entity_types(Path(_org_id): Path<String>) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        if let Some(disabled) = deployment_disabled() {
-            return disabled;
-        }
-        respond(Deps::live().and_then(|deps| api::entity_types(&deps)))
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        MetaHttpResponse::not_found("Not Supported")
-    }
+    respond(Deps::live().and_then(|deps| api::entity_types(&deps)))
 }
 
 #[utoipa::path(
@@ -324,7 +301,7 @@ pub async fn entity_types(Path(_org_id): Path<String>) -> Response {
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Unknown view", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
-        (status = 404, description = "AutoObserve is disabled for this deployment, or not supported in this build", content_type = "application/json", body = Object),
+        (status = 404, description = "AutoObserve is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
         (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
     ),
@@ -337,30 +314,22 @@ pub async fn coverage(
     Path(org_id): Path<String>,
     query: Result<Query<CoverageQuery>, QueryRejection>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        if let Some(disabled) = deployment_disabled() {
-            return disabled;
-        }
-        let query = match parse_query(query) {
-            Ok(query) => query,
-            Err(refused) => return refused,
-        };
-        let view = match CoverageView::parse(query.view.as_deref()) {
-            Ok(view) => view,
-            Err(e) => return failed(&e),
-        };
-        serve(|deps| async move {
-            let service = query.service.as_deref().filter(|s| !s.is_empty());
-            api::coverage(&deps, &org_id, view, service, now_micros()).await
-        })
-        .await
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, query);
-        MetaHttpResponse::not_found("Not Supported")
-    }
+    let query = match parse_query(query) {
+        Ok(query) => query,
+        Err(refused) => return refused,
+    };
+    let view = match CoverageView::parse(query.view.as_deref()) {
+        Ok(view) => view,
+        Err(e) => return failed(&e),
+    };
+    serve(|deps| async move {
+        let service = query.service.as_deref().filter(|s| !s.is_empty());
+        api::coverage(&deps, &org_id, view, service, now_micros()).await
+    })
+    .await
 }
 
 #[utoipa::path(
@@ -377,7 +346,7 @@ pub async fn coverage(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "A missing bound, from after to, or a span over 90 days", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
-        (status = 404, description = "AutoObserve is disabled for this deployment, or not supported in this build", content_type = "application/json", body = Object),
+        (status = 404, description = "AutoObserve is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
         (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
     ),
@@ -390,25 +359,15 @@ pub async fn coverage_history(
     Path(org_id): Path<String>,
     query: Result<Query<HistoryQuery>, QueryRejection>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        if let Some(disabled) = deployment_disabled() {
-            return disabled;
-        }
-        let query = match parse_query(query) {
-            Ok(query) => query,
-            Err(refused) => return refused,
-        };
-        serve(
-            |deps| async move { api::coverage_history(&deps, &org_id, query.from, query.to).await },
-        )
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
+    }
+    let query = match parse_query(query) {
+        Ok(query) => query,
+        Err(refused) => return refused,
+    };
+    serve(|deps| async move { api::coverage_history(&deps, &org_id, query.from, query.to).await })
         .await
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, query);
-        MetaHttpResponse::not_found("Not Supported")
-    }
 }
 
 #[utoipa::path(
@@ -425,7 +384,7 @@ pub async fn coverage_history(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "An unknown entity type or status, a malformed kind, or a limit outside 1 to 500", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
-        (status = 404, description = "AutoObserve is disabled for this deployment, or not supported in this build", content_type = "application/json", body = Object),
+        (status = 404, description = "AutoObserve is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
         (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
     ),
@@ -436,37 +395,29 @@ pub async fn coverage_history(
 )]
 pub async fn suggestions(
     Path(org_id): Path<String>,
-    #[cfg(feature = "enterprise")] Headers(user): Headers<UserEmail>,
+    Headers(user): Headers<UserEmail>,
     query: Result<Query<SuggestionsQuery>, QueryRejection>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        if let Some(disabled) = deployment_disabled() {
-            return disabled;
-        }
-        let query = match parse_query(query) {
-            Ok(query) => query,
-            Err(refused) => return refused,
-        };
-        let page = page(query.limit, query.offset);
-        let filter = SuggestionFilter {
-            entity_type: query.entity_type,
-            kind: query.kind,
-            status: query.status,
-            subject: query.subject,
-            sort: query.sort,
-        };
-        serve(|deps| async move {
-            let readable = |subjects| readable_subjects(&org_id, &user.user_id, subjects);
-            api::suggestions(&deps, &org_id, &filter, page, now_micros(), readable).await
-        })
-        .await
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, query);
-        MetaHttpResponse::not_found("Not Supported")
-    }
+    let query = match parse_query(query) {
+        Ok(query) => query,
+        Err(refused) => return refused,
+    };
+    let page = page(query.limit, query.offset);
+    let filter = SuggestionFilter {
+        entity_type: query.entity_type,
+        kind: query.kind,
+        status: query.status,
+        subject: query.subject,
+        sort: query.sort,
+    };
+    serve(|deps| async move {
+        let readable = |subjects| readable_subjects(&org_id, &user.user_id, subjects);
+        api::suggestions(&deps, &org_id, &filter, page, now_micros(), readable).await
+    })
+    .await
 }
 
 #[utoipa::path(
@@ -483,7 +434,7 @@ pub async fn suggestions(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "An unknown mark or entity type, a malformed entity id, or a limit outside 1 to 500", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
-        (status = 404, description = "AutoObserve is disabled for this deployment, or not supported in this build", content_type = "application/json", body = Object),
+        (status = 404, description = "AutoObserve is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
         (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
     ),
@@ -494,35 +445,27 @@ pub async fn suggestions(
 )]
 pub async fn list_marks(
     Path(org_id): Path<String>,
-    #[cfg(feature = "enterprise")] Headers(user): Headers<UserEmail>,
+    Headers(user): Headers<UserEmail>,
     query: Result<Query<MarksQuery>, QueryRejection>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        if let Some(disabled) = deployment_disabled() {
-            return disabled;
-        }
-        let query = match parse_query(query) {
-            Ok(query) => query,
-            Err(refused) => return refused,
-        };
-        let page = page(query.limit, query.offset);
-        let filter = MarkFilter {
-            mark: query.mark,
-            entity_type: query.entity_type,
-            entity_id: query.entity_id,
-        };
-        serve(|deps| async move {
-            let readable = |subjects| readable_subjects(&org_id, &user.user_id, subjects);
-            api::list_marks(&deps, &org_id, &filter, page, readable).await
-        })
-        .await
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, query);
-        MetaHttpResponse::not_found("Not Supported")
-    }
+    let query = match parse_query(query) {
+        Ok(query) => query,
+        Err(refused) => return refused,
+    };
+    let page = page(query.limit, query.offset);
+    let filter = MarkFilter {
+        mark: query.mark,
+        entity_type: query.entity_type,
+        entity_id: query.entity_id,
+    };
+    serve(|deps| async move {
+        let readable = |subjects| readable_subjects(&org_id, &user.user_id, subjects);
+        api::list_marks(&deps, &org_id, &filter, page, readable).await
+    })
+    .await
 }
 
 #[utoipa::path(
@@ -545,7 +488,7 @@ pub async fn list_marks(
         (status = 200, description = "`change` is created, updated or unchanged", content_type = "application/json", body = Object),
         (status = 400, description = "An unknown mark or entity type, a malformed id, an over-long field, or an invalid body", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
-        (status = 404, description = "AutoObserve is disabled for this deployment, or not supported in this build", content_type = "application/json", body = Object),
+        (status = 404, description = "AutoObserve is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "The write failed, or the mark changed but its history row was not written", content_type = "application/json", body = Object),
         (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
     ),
@@ -556,46 +499,38 @@ pub async fn list_marks(
 )]
 pub async fn put_mark(
     Path((org_id, mark, entity_type, entity_id)): Path<(String, String, String, String)>,
-    #[cfg(feature = "enterprise")] Headers(user): Headers<UserEmail>,
+    Headers(user): Headers<UserEmail>,
     RawQuery(query): RawQuery,
     body: Bytes,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        if let Some(disabled) = deployment_disabled() {
-            return disabled;
-        }
-        if let Err(refused) = refuse_query(query.as_deref()) {
-            return refused;
-        }
-        let body = match MarkBody::parse(&body) {
-            Ok(body) => body,
-            Err(e) => return MetaHttpResponse::bad_request(e),
-        };
-        if !may_change_mark(&org_id, &user.user_id, &entity_type, &entity_id).await {
-            return MetaHttpResponse::forbidden("Unauthorized Access");
-        }
-        let put = MarkPut {
-            target: MarkTarget {
-                mark,
-                entity_type,
-                entity_id,
-                group_key: body.group_key().to_string(),
-            },
-            reason: body.reason,
-            source: MarkSource::Manual,
-            suggestion_id: None,
-        };
-        serve(|deps| async move {
-            api::put_mark(&deps, &org_id, &put, &user.user_id, now_micros()).await
-        })
-        .await
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, mark, entity_type, entity_id, query, body);
-        MetaHttpResponse::not_found("Not Supported")
+    if let Err(refused) = refuse_query(query.as_deref()) {
+        return refused;
     }
+    let body = match MarkBody::parse(&body) {
+        Ok(body) => body,
+        Err(e) => return MetaHttpResponse::bad_request(e),
+    };
+    if !may_change_mark(&org_id, &user.user_id, &entity_type, &entity_id).await {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+    let put = MarkPut {
+        target: MarkTarget {
+            mark,
+            entity_type,
+            entity_id,
+            group_key: body.group_key().to_string(),
+        },
+        reason: body.reason,
+        source: MarkSource::Manual,
+        suggestion_id: None,
+    };
+    serve(|deps| async move {
+        api::put_mark(&deps, &org_id, &put, &user.user_id, now_micros()).await
+    })
+    .await
 }
 
 #[utoipa::path(
@@ -618,7 +553,7 @@ pub async fn put_mark(
         (status = 200, description = "`change` is deleted or absent", content_type = "application/json", body = Object),
         (status = 400, description = "An unknown mark or entity type, a malformed id or query, or a request body", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
-        (status = 404, description = "AutoObserve is disabled for this deployment, or not supported in this build", content_type = "application/json", body = Object),
+        (status = 404, description = "AutoObserve is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "The delete failed, or the mark was removed but its history row was not written", content_type = "application/json", body = Object),
         (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
     ),
@@ -629,44 +564,35 @@ pub async fn put_mark(
 )]
 pub async fn delete_mark(
     Path((org_id, mark, entity_type, entity_id)): Path<(String, String, String, String)>,
-    #[cfg(feature = "enterprise")] Headers(user): Headers<UserEmail>,
+    Headers(user): Headers<UserEmail>,
     query: Result<Query<DeleteMarkQuery>, QueryRejection>,
     body: Body,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        if let Some(disabled) = deployment_disabled() {
-            return disabled;
-        }
-        let query = match parse_query(query) {
-            Ok(query) => query,
-            Err(refused) => return refused,
-        };
-        if let Err(refused) = refuse_body(body).await {
-            return refused;
-        }
-        if !may_change_mark(&org_id, &user.user_id, &entity_type, &entity_id).await {
-            return MetaHttpResponse::forbidden("Unauthorized Access");
-        }
-        let target = MarkTarget {
-            mark,
-            entity_type,
-            entity_id,
-            group_key: query.group_key.unwrap_or_default(),
-        };
-        serve(|deps| async move {
-            api::delete_mark(&deps, &org_id, &target, &user.user_id, now_micros()).await
-        })
-        .await
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, mark, entity_type, entity_id, query, body);
-        MetaHttpResponse::not_found("Not Supported")
+    let query = match parse_query(query) {
+        Ok(query) => query,
+        Err(refused) => return refused,
+    };
+    if let Err(refused) = refuse_body(body).await {
+        return refused;
     }
+    if !may_change_mark(&org_id, &user.user_id, &entity_type, &entity_id).await {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+    let target = MarkTarget {
+        mark,
+        entity_type,
+        entity_id,
+        group_key: query.group_key.unwrap_or_default(),
+    };
+    serve(|deps| async move {
+        api::delete_mark(&deps, &org_id, &target, &user.user_id, now_micros()).await
+    })
+    .await
 }
 
-#[cfg(feature = "enterprise")]
 fn page(limit: Option<usize>, offset: Option<usize>) -> Page {
     Page {
         limit: limit.unwrap_or(DEFAULT_LIMIT),
@@ -675,12 +601,10 @@ fn page(limit: Option<usize>, offset: Option<usize>) -> Page {
 }
 
 /// Every route is a 404 while the deployment switch is off, as alert calibration's are.
-#[cfg(feature = "enterprise")]
 fn deployment_disabled() -> Option<Response> {
     (!engine_enabled()).then(|| MetaHttpResponse::not_found(DISABLED_MESSAGE))
 }
 
-#[cfg(feature = "enterprise")]
 fn engine_enabled() -> bool {
     #[cfg(test)]
     if let Some(on) = tests::ENGINE_ON.with(std::cell::Cell::get) {
@@ -690,7 +614,6 @@ fn engine_enabled() -> bool {
 }
 
 /// Deps fail with `Unavailable` where the engine never initialised, such as on a router node.
-#[cfg(feature = "enterprise")]
 async fn serve<T, F, Fut>(call: F) -> Response
 where
     T: Serialize,
@@ -703,7 +626,6 @@ where
     }
 }
 
-#[cfg(feature = "enterprise")]
 fn respond<T: Serialize>(result: Result<T, ApiError>) -> Response {
     match result {
         Ok(body) => MetaHttpResponse::json(body),
@@ -711,12 +633,10 @@ fn respond<T: Serialize>(result: Result<T, ApiError>) -> Response {
     }
 }
 
-#[cfg(feature = "enterprise")]
 fn failed(e: &ApiError) -> Response {
     error_response(e.status(), e)
 }
 
-#[cfg(any(feature = "enterprise", test))]
 fn error_response(status: u16, message: impl ToString) -> Response {
     match status {
         400 => MetaHttpResponse::bad_request(message),
@@ -726,7 +646,6 @@ fn error_response(status: u16, message: impl ToString) -> Response {
 }
 
 /// Axum's own query rejection is plain text; these routes document a JSON 400.
-#[cfg(any(feature = "enterprise", test))]
 fn parse_query<T>(query: Result<Query<T>, QueryRejection>) -> Result<T, Response> {
     query
         .map(|Query(q)| q)
@@ -734,7 +653,6 @@ fn parse_query<T>(query: Result<Query<T>, QueryRejection>) -> Result<T, Response
 }
 
 /// A body naming `group_key` would otherwise be ignored and unmark the ungrouped series.
-#[cfg(any(feature = "enterprise", test))]
 async fn refuse_body(body: Body) -> Result<(), Response> {
     let empty = axum::body::to_bytes(body, MAX_DELETE_BODY)
         .await
@@ -748,7 +666,6 @@ async fn refuse_body(body: Body) -> Result<(), Response> {
 }
 
 /// A query naming `group_key` would otherwise be ignored and mark the ungrouped series.
-#[cfg(any(feature = "enterprise", test))]
 fn refuse_query(query: Option<&str>) -> Result<(), Response> {
     if query.is_none_or(str::is_empty) {
         return Ok(());
@@ -759,7 +676,6 @@ fn refuse_query(query: Option<&str>) -> Result<(), Response> {
 }
 
 /// An alert subject a role cannot read org-wide is still readable through its folder or own grant.
-#[cfg(feature = "enterprise")]
 async fn readable_subjects(org_id: &str, user_id: &str, subjects: Vec<EntityRef>) -> Vec<bool> {
     if !rbac_enforced().await {
         return vec![true; subjects.len()];
@@ -769,7 +685,6 @@ async fn readable_subjects(org_id: &str, user_id: &str, subjects: Vec<EntityRef>
 }
 
 /// One org-wide check per resource, then one grant listing and one folder read for the alerts left.
-#[cfg(any(feature = "enterprise", test))]
 async fn readable_mask<A: AlertAuthority>(auth: &A, subjects: &[Subject<'_>]) -> Vec<bool> {
     let mut org_wide: HashMap<&'static str, bool> = HashMap::new();
     for subject in subjects {
@@ -808,7 +723,6 @@ async fn readable_mask<A: AlertAuthority>(auth: &A, subjects: &[Subject<'_>]) ->
         .collect()
 }
 
-#[cfg(feature = "enterprise")]
 async fn org_alert_folders(org_id: &str, alert_ids: &[String]) -> HashMap<String, String> {
     match alert::list_with_folders_db(folder_params(org_id, alert_ids)).await {
         Ok(listed) => listed
@@ -823,13 +737,11 @@ async fn org_alert_folders(org_id: &str, alert_ids: &[String]) -> HashMap<String
 }
 
 /// Filtered to the ids in SQL, so the read follows the page, never the org's alert count.
-#[cfg(any(feature = "enterprise", test))]
 fn folder_params(org_id: &str, alert_ids: &[String]) -> ListAlertsParams {
     ListAlertsParams::new(org_id).with_tag_alert_ids(alert_ids.to_vec())
 }
 
 /// A mark whose alert is gone has no per-alert grant left, so it needs alerts PUT org-wide.
-#[cfg(feature = "enterprise")]
 async fn may_change_mark(org_id: &str, user_id: &str, entity_type: &str, entity_id: &str) -> bool {
     #[cfg(test)]
     if let Some(allowed) = tests::MAY_CHANGE.with(std::cell::Cell::get) {
@@ -847,7 +759,6 @@ async fn may_change_mark(org_id: &str, user_id: &str, entity_type: &str, entity_
 }
 
 /// The per-alert check the alert handlers make; `None` when no alert has this id.
-#[cfg(feature = "enterprise")]
 async fn alert_allows(org_id: &str, user_id: &str, alert_id: &str, method: &str) -> Option<bool> {
     let ksuid = Ksuid::from_str(alert_id).ok()?;
     let (folder, _) = alert::get_by_id(get_orm_client_ro().await, org_id, ksuid)
@@ -869,7 +780,6 @@ async fn alert_allows(org_id: &str, user_id: &str, alert_id: &str, method: &str)
     )
 }
 
-#[cfg(feature = "enterprise")]
 async fn org_wide_allows(org_id: &str, user_id: &str, resource: &str, method: &str) -> bool {
     check_permissions(
         org_id, org_id, user_id, resource, method, None, true, false, false,
@@ -891,7 +801,6 @@ mod tests {
 
     use super::*;
 
-    #[cfg(feature = "enterprise")]
     thread_local! {
         /// The deployment switch as this test's thread sees it; None reads the config.
         pub(super) static ENGINE_ON: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
@@ -927,7 +836,6 @@ mod tests {
         app().oneshot(request).await.unwrap()
     }
 
-    #[cfg(feature = "enterprise")]
     async fn status(method: &str, uri: &str, body: &str) -> StatusCode {
         send(method, uri, body).await.status()
     }
@@ -1060,7 +968,6 @@ mod tests {
     }
 
     /// Refused before the permission check, so the caller learns its request was wrong.
-    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_mark_route_refuses_a_group_key_it_would_ignore() {
         ENGINE_ON.with(|on| on.set(Some(true)));
@@ -1238,30 +1145,7 @@ mod tests {
         assert!(!other_org.allows("a9", "any"));
     }
 
-    #[cfg(not(feature = "enterprise"))]
-    #[tokio::test]
-    async fn every_route_is_a_404_without_enterprise() {
-        let mark = "/v2/o/autoobserve/marks/protected/alert/a1";
-        for (method, uri) in [
-            ("GET", "/v2/o/autoobserve/coverage?view=strict"),
-            ("GET", "/v2/o/autoobserve/coverage/history?from=0&to=1"),
-            ("GET", "/v2/o/autoobserve/suggestions?limit=5"),
-            ("GET", "/v2/o/autoobserve/marks"),
-            ("PUT", mark),
-            ("DELETE", mark),
-        ] {
-            let response = send(method, uri, "").await;
-            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{method} {uri}");
-            assert!(is_json(&response), "{method} {uri}");
-        }
-        assert_eq!(
-            entity_types(Path("o".into())).await.status(),
-            StatusCode::NOT_FOUND
-        );
-    }
-
     /// Calibration v1's convention: a switched-off deployment answers 404 before any other check.
-    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn every_route_is_a_404_while_the_deployment_switch_is_off() {
         ENGINE_ON.with(|on| on.set(Some(false)));
@@ -1294,7 +1178,6 @@ mod tests {
     }
 
     /// A real permission denial stays a 403 while the engine is on.
-    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_denied_mark_change_is_a_403_not_a_404() {
         ENGINE_ON.with(|on| on.set(Some(true)));
@@ -1307,7 +1190,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn without_the_engine_a_valid_request_is_a_503_and_a_bad_one_a_400() {
         ENGINE_ON.with(|on| on.set(Some(true)));
@@ -1345,7 +1227,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "enterprise")]
     #[test]
     fn engine_errors_and_default_paging_map_as_documented() {
         for (e, want) in [
