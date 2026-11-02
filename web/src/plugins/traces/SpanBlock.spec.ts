@@ -1054,6 +1054,13 @@ describe("SpanBlock", () => {
       expect(markers()).toHaveLength(0);
     });
 
+    it("pins an event past the span's end to the bar's end", async () => {
+      await setEvents([{ name: "late", _timestamp: eventNsAt(0.98) }]);
+
+      expect(markers()).toHaveLength(1);
+      expect(markers()[0].attributes("style")).toContain("left: 91.72%");
+    });
+
     it("skips events falling outside the trace window", async () => {
       await setEvents([
         { name: "before", _timestamp: eventNsAt(-0.5) },
