@@ -657,6 +657,25 @@ describe("Schema Component Tests", () => {
       await flushPromises();
       expect(tracesWrapper.vm.showStoreOriginalDataToggle).toBe(false);
       tracesWrapper.unmount();
+
+      const profilesWrapper = mount(LogStream, {
+        props: {
+          modelValue: {
+            name: "test-stream",
+            stream_type: "profiles",
+            settings: { defined_schema_fields: [] },
+          },
+        },
+        global: {
+          provide: { store: store },
+          plugins: [i18n],
+          stubs: { ODrawer: ODrawerStub },
+        },
+      });
+
+      await flushPromises();
+      expect(profilesWrapper.vm.showStoreOriginalDataToggle).toBe(false);
+      profilesWrapper.unmount();
     });
 
     // Test 41-50: Additional edge cases and error scenarios

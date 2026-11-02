@@ -119,7 +119,12 @@ impl FirstDataIo for LiveIo {
         stream_name: &str,
     ) -> Vec<Option<i64>> {
         let mut created = Vec::new();
-        for kind in [StreamType::Logs, StreamType::Metrics, StreamType::Traces] {
+        for kind in [
+            StreamType::Logs,
+            StreamType::Metrics,
+            StreamType::Traces,
+            StreamType::Profiles,
+        ] {
             for name in db::schema::list_streams_from_cache(org_id, kind).await {
                 if !is_user_data_stream(kind, &name) || (kind == stream_type && name == stream_name)
                 {
@@ -168,7 +173,7 @@ impl FirstDataIo for LiveIo {
         if !cfg.smtp.smtp_reply_to.is_empty() {
             email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
         }
-        let logs_url = logs_link(
+        let stream_url = stream_link(
             &format!("{}{}", cfg.common.web_url, cfg.common.base_uri),
             org_id,
             stream_type,
@@ -177,7 +182,8 @@ impl FirstDataIo for LiveIo {
         let email = email.singlepart(SinglePart::html(email_body(
             &org_name,
             stream_name,
-            &logs_url,
+            stream_type,
+            &stream_url,
         )))?;
         let client = SMTP_CLIENT
             .as_ref()
@@ -299,26 +305,42 @@ fn email_subject(org_name: &str) -> String {
 }
 
 #[cfg(feature = "cloud")]
-fn email_body(org_name: &str, stream_name: &str, logs_url: &str) -> String {
+fn email_body(
+    org_name: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    stream_url: &str,
+) -> String {
     format!(
-        "<p>The first data for {org} arrived in the stream <b>{stream}</b>. <a href=\"{url}\">Open it in Logs</a>.</p>",
+        "<p>The first data for {org} arrived in the stream <b>{stream}</b>. <a href=\"{url}\">Open it in {page}</a>.</p>",
         org = escape_html(org_name),
         stream = escape_html(stream_name),
-        url = escape_html(logs_url),
+        url = escape_html(stream_url),
+        page = stream_page(stream_type).1,
     )
 }
 
 #[cfg(feature = "cloud")]
-fn logs_link(web_root: &str, org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
+fn stream_link(web_root: &str, org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     let encode =
         |value: &str| url::form_urlencoded::byte_serialize(value.as_bytes()).collect::<String>();
     format!(
-        "{}/web/logs?org_identifier={}&stream_type={}&stream={}",
+        "{}/web/{}?org_identifier={}&stream_type={}&stream={}",
         web_root.trim_end_matches('/'),
+        stream_page(stream_type).0,
         encode(org_id),
         stream_type,
         encode(stream_name),
     )
+}
+
+/// The web route that opens a stream of this type, and that page's name.
+#[cfg(feature = "cloud")]
+fn stream_page(stream_type: StreamType) -> (&'static str, &'static str) {
+    match stream_type {
+        StreamType::Profiles => ("profiles", "Profiles"),
+        _ => ("logs", "Logs"),
+    }
 }
 
 #[cfg(feature = "cloud")]
@@ -580,15 +602,32 @@ mod tests {
 
     #[test]
     fn test_email_escapes_names_and_links_to_logs() {
-        let link = logs_link("https://cloud.test/", "acme", StreamType::Logs, "a b&c");
+        let link = stream_link("https://cloud.test/", "acme", StreamType::Logs, "a b&c");
         assert_eq!(
             link,
             "https://cloud.test/web/logs?org_identifier=acme&stream_type=logs&stream=a+b%26c"
         );
-        let body = email_body("<Acme>", "s\"1", &link);
+        let body = email_body("<Acme>", "s\"1", StreamType::Logs, &link);
         assert!(body.contains("&lt;Acme&gt;"));
         assert!(body.contains("s&quot;1"));
         assert!(body.contains("stream=a+b%26c"));
+        assert!(body.contains("Open it in Logs"));
         assert_eq!(email_subject("Acme"), "Your data is flowing in Acme");
+    }
+
+    #[test]
+    fn test_email_links_profiles_to_the_profiles_page() {
+        let link = stream_link(
+            "https://cloud.test",
+            "acme",
+            StreamType::Profiles,
+            "default",
+        );
+        assert_eq!(
+            link,
+            "https://cloud.test/web/profiles?org_identifier=acme&stream_type=profiles&stream=default"
+        );
+        let body = email_body("Acme", "default", StreamType::Profiles, &link);
+        assert!(body.contains("Open it in Profiles"));
     }
 }
