@@ -203,11 +203,11 @@ async fn resolve_servicenow(
         .iter()
         .filter_map(|row| row["sys_id"].as_str().map(str::to_string))
         .collect();
+    // A resolve that finds nothing open is done: an earlier attempt or a person closed it.
     if sys_ids.is_empty() {
-        return Ok(ResolveAnswer::Rejected {
-            status: 404,
-            body: format!("no open incident carries correlation_id {episode_id}"),
-        });
+        return Ok(ResolveAnswer::NothingToClose(format!(
+            "{NOTHING_TO_CLOSE}: no open incident carries correlation_id {episode_id}"
+        )));
     }
 
     let close_code = endpoint

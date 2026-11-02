@@ -60,6 +60,7 @@ mod llm_review_reconciliation;
 mod llm_secret_cleanup;
 pub mod metrics;
 mod mmdb_downloader;
+mod notification_retry;
 #[cfg(feature = "enterprise")]
 mod oncall_maintenance;
 #[cfg(feature = "enterprise")]
@@ -1543,6 +1544,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // RCA runs that stopped writing end as stale.
     #[cfg(feature = "enterprise")]
     rca_run_sweeper::run();
+    notification_retry::run();
     // Early Experiment deletion marks the head and leaves the removal to this
     // sweep, which retries until the Experiment's own storage is gone.
     #[cfg(feature = "enterprise")]

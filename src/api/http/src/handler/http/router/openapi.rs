@@ -330,6 +330,7 @@ use crate::{
         openobserve_api_management::request::slos::move_slos,
         openobserve_api_management::request::slos::list_slo_eligible_alerts,
         openobserve_api_management::request::slos::preview_alert_sli,
+        openobserve_api_management::request::notifications::list_deliveries,
         openobserve_api_management::request::downtimes::list_downtimes,
         openobserve_api_management::request::downtimes::create_downtime,
         openobserve_api_management::request::downtimes::preview_downtime,

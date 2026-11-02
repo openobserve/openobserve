@@ -130,7 +130,7 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 130: add suppress_repeats to alerts.
 // 131: org domain mapping migrations
 // 132: create oncall_chat_messages; add oncall_teams slack columns.
-pub const DB_SCHEMA_VERSION: u64 = 132;
+pub const DB_SCHEMA_VERSION: u64 = 133;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2956,6 +2956,18 @@ pub struct Limit {
         help = "Per-user cap on alert-destination test-sends per minute. A test-send posts a real [TEST]-marked message to a real destination, so this bounds accidental or scripted spam of someone's channel/inbox. The cap is enforced PER PROCESS (in-memory, not cluster-shared) — a multi-node deployment's effective cap is N times this value, where N is the node count. 0 = unlimited."
     )]
     pub alert_test_send_per_minute: u32,
+    #[env_config(
+        name = "ZO_NOTIFICATION_DELIVERY_RETENTION_DAYS",
+        default = 30,
+        help = "Days a notification delivery row is kept after its episode closed."
+    )]
+    pub notification_delivery_retention_days: i64,
+    #[env_config(
+        name = "ZO_NOTIFICATION_DELIVERY_MAX_AGE_DAYS",
+        default = 365,
+        help = "Days after which a notification delivery row is deleted whatever its episode."
+    )]
+    pub notification_delivery_max_age_days: i64,
     #[env_config(
         name = "ZO_ALERT_CHART_ENABLED",
         default = true,

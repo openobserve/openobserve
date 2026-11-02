@@ -23,6 +23,7 @@ pub mod chart;
 pub mod context;
 pub mod custom;
 pub mod default_template;
+pub mod delivery;
 pub mod examples;
 pub mod format;
 pub mod jira;

@@ -1367,6 +1367,19 @@ pub static ALERT_CHART_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static NOTIFICATIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "notifications_total",
+            "Notification deliveries finished through the shared send path",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["kind", "channel", "status"],
+    )
+    .expect("Metric created")
+});
+
 pub static ALERT_RUNS_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -3435,6 +3448,9 @@ pub(crate) fn register(registry: &Registry) {
         .expect("Metric registered");
 
     registry
+        .register(Box::new(NOTIFICATIONS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(ALERT_RUNS_SUPPRESSED_TOTAL.clone()))
         .expect("Metric registered");
 
@@ -3901,6 +3917,7 @@ mod tests {
     fn test_statics_alert_chart_and_suppression() {
         let _ = ALERT_CHART_EVENTS_TOTAL.clone();
         let _ = ALERT_RUNS_SUPPRESSED_TOTAL.clone();
+        let _ = NOTIFICATIONS_TOTAL.clone();
     }
 
     #[test]

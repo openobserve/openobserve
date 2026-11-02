@@ -248,6 +248,7 @@ mod m20261030_000001_add_suppress_repeats_to_alerts;
 mod m20261030_000001_create_org_domain_ownership_table;
 mod m20261030_000002_create_org_domain_ownership_req_table;
 mod m20261101_000001_create_oncall_slack;
+mod m20261110_000001_create_notification_deliveries;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -400,6 +401,16 @@ pub(crate) async fn create_slo_tables_for_test(
         .await?;
     m20261009_000004_add_kind_to_slo_backfill_jobs::Migration
         .up(&manager)
+        .await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_notification_deliveries_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    m20261110_000001_create_notification_deliveries::Migration
+        .up(&SchemaManager::new(db))
         .await
 }
 
@@ -767,6 +778,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261030_000001_create_org_domain_ownership_table::Migration),
             Box::new(m20261030_000002_create_org_domain_ownership_req_table::Migration),
             Box::new(m20261101_000001_create_oncall_slack::Migration),
+            Box::new(m20261110_000001_create_notification_deliveries::Migration),
         ]
     }
 }
@@ -867,6 +879,7 @@ mod tests {
             "m20261030_000002_create_org_domain_ownership_req_table",
         ),
         (132, "m20261101_000001_create_oncall_slack"),
+        (133, "m20261110_000001_create_notification_deliveries"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

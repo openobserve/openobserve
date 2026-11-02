@@ -221,7 +221,7 @@ pub async fn resolve(
     })
 }
 
-/// Render and send one notification to one resolved destination.
+/// Render and send one notification to one resolved destination through the delivery ledger.
 pub async fn send(
     org_id: &str,
     resolved: &Resolved,
@@ -229,13 +229,7 @@ pub async fn send(
     ctx: &mut NotificationContext,
 ) -> Result<DeliveryRow, NotifyError> {
     apply_destination_metadata(&resolved.destination_type, ctx);
-    let prepared = prepare(resolved, subject, ctx)?;
-    transport(org_id, &resolved.destination_type, &prepared.record).await?;
-    Ok(DeliveryRow {
-        status: "sent".into(),
-        attempt: 1,
-        ..Default::default()
-    })
+    super::delivery::send_on_ledger(org_id, resolved, subject, ctx).await
 }
 
 /// The Slack app outbox and Jira issues have no replayable body, so both bypass the ledger.
