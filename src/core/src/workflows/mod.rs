@@ -74,6 +74,7 @@ pub struct TestWorkflowOptions {
 pub(crate) enum WorkflowExecutionStatus {
     Success,
     Errored,
+    Disabled,
 }
 
 pub struct TriggeredRun {
@@ -956,7 +957,7 @@ async fn execute_workflow(
         .ok_or_else(|| anyhow::anyhow!("workflow with given id not found"))?;
 
     if !workflow.enabled {
-        return Ok(WorkflowExecutionStatus::Success);
+        return Ok(WorkflowExecutionStatus::Disabled);
     }
 
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;

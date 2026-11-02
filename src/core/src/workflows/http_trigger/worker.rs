@@ -640,6 +640,10 @@ fn run_outcome(outcome: Option<Result<WorkflowExecutionStatus, anyhow::Error>>) 
             ERR_NODE_ERRORED,
             "some node errored during execution".to_string(),
         ),
+        Some(Ok(WorkflowExecutionStatus::Disabled)) => RunEnd::failed(
+            ERR_WORKFLOW_DISABLED,
+            "the workflow was disabled before the run started".to_string(),
+        ),
         Some(Err(e)) => RunEnd::failed(ERR_RUN_FAILED, e.to_string()),
     }
 }
@@ -1312,6 +1316,11 @@ mod tests {
     fn run_results_map_to_ledger_statuses() {
         let clean = run_outcome(Some(Ok(WorkflowExecutionStatus::Success)));
         assert_eq!((clean.status, clean.code), (HookRunStatus::Succeeded, None));
+        let disabled = run_outcome(Some(Ok(WorkflowExecutionStatus::Disabled)));
+        assert_eq!(
+            (disabled.status, disabled.code),
+            (HookRunStatus::Failed, Some(ERR_WORKFLOW_DISABLED))
+        );
         let errored = run_outcome(Some(Ok(WorkflowExecutionStatus::Errored)));
         assert_eq!(
             (errored.status, errored.code),
