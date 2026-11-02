@@ -1571,7 +1571,7 @@ export class PipelinesPage {
             const text = table.textContent || '';
             const hasFooter = /Showing \d+ - \d+/.test(text) || text.includes('No data available');
             return hasRow || hasEmpty || hasFooter;
-        }, { timeout }).catch(() => {});
+        }, undefined, { timeout }).catch(() => {});
     }
 
     /**
@@ -3126,7 +3126,7 @@ export class PipelinesPage {
         await this.page.waitForFunction(() => {
             const editor = document.querySelector('.monaco-editor');
             return editor !== null;
-        }, { timeout: 3000 });
+        }, undefined, { timeout: 3000 });
         // Additional small wait for query update to complete
         await this.page.waitForTimeout(500);
         testLogger.info('Watcher processing complete');

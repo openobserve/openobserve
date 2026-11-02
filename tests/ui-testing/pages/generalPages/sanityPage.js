@@ -492,13 +492,13 @@ export class SanityPage {
                 && window.monaco
                 && window.monaco.editor
                 && window.monaco.editor.getEditors().length > 0;
-        }, { timeout: 15000 });
+        }, undefined, { timeout: 15000 });
         await this.page.waitForFunction(() => {
             const vrlContainer = document.querySelector('[data-test="logs-vrl-function-editor"]');
             if (!vrlContainer) return false;
             const editors = window.monaco.editor.getEditors();
             return editors.some(ed => vrlContainer.contains(ed.getDomNode()));
-        }, { timeout: 15000 });
+        }, undefined, { timeout: 15000 });
         // Drive the VRL editor via real keyboard input — this dispatches the same
         // DOM input events the user generates, which Monaco's input handler routes
         // through onDidChangeModelContent → debounced emit("update:query") in the
@@ -510,7 +510,7 @@ export class SanityPage {
             const editors = window.monaco.editor.getEditors();
             const targetEditor = editors.find(ed => vrlContainer && vrlContainer.contains(ed.getDomNode()));
             return targetEditor && targetEditor.hasTextFocus && targetEditor.hasTextFocus();
-        }, { timeout: 5000 }).catch(() => {});
+        }, undefined, { timeout: 5000 }).catch(() => {});
         await this.page.keyboard.type('.sanity=1');
         // Wait for the editor model to actually contain the typed text.
         await this.page.waitForFunction(() => {
@@ -518,7 +518,7 @@ export class SanityPage {
             const vrlContainer = document.querySelector('[data-test="logs-vrl-function-editor"]');
             const targetEditor = editors.find(ed => vrlContainer && vrlContainer.contains(ed.getDomNode())) || editors[0];
             return targetEditor && targetEditor.getValue().includes('.sanity=1');
-        }, { timeout: 5000 });
+        }, undefined, { timeout: 5000 });
         // The CodeQueryEditor debounces `update:query` by 500ms. The keyboard.type call
         // queues per-char events; the debounced emit fires 500ms after the LAST char.
         // To make this deterministic, poll the time-since-last-mutation against the
@@ -537,7 +537,7 @@ export class SanityPage {
                 return false;
             }
             return Date.now() - w.__vrlLastChangedAt > 600;
-        }, { timeout: 5000 });
+        }, undefined, { timeout: 5000 });
 
         // Use the specific data-test selector for the save button to avoid
         // ambiguity with other "Save" labelled buttons on the page.

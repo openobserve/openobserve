@@ -28,6 +28,12 @@ export default class DashboardCreate {
     this.defaultFolderTab = this.page.locator(
       'button[data-test="dashboard-folder-tab-default"]'
     );
+    // Excludes Favorites: that pseudo-folder renders before the folder list has loaded.
+    this.anyFolderTab = this.page
+      .locator(
+        'button[data-test^="dashboard-folder-tab-"]:not([data-test="dashboard-folder-tab-__favorites__"])'
+      )
+      .first();
     this.defaultDashboardTab = this.page.locator(
       '[data-test="dashboard-tab-default"]'
     );
@@ -228,7 +234,7 @@ export default class DashboardCreate {
     // goes out, the dialog is gone so the retry loop below sees "submitted",
     // and the navigation wait at the end expires with the list still on screen.
     // The folder tab is the DOM signal that folder resolution has finished.
-    await this.defaultFolderTab
+    await this.anyFolderTab
       .waitFor({ state: "visible", timeout: 30000 })
       .catch(() => {
         // Not every list renders a folder strip; the retry loop stays the gate.

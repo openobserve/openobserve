@@ -557,6 +557,7 @@ export default class DashboardVariables {
         const options = document.querySelectorAll('[data-test="dashboard-variable-field-select-option"]');
         return options.length > 0;
       },
+      undefined,
       { timeout: 10000, polling: 100 }
     );
 

@@ -3539,7 +3539,7 @@ export class AlertsPage {
             if (!monaco?.editor?.getEditors) return false;
             const editors = monaco.editor.getEditors();
             return editors && editors.length > 0;
-        }, { timeout: 15000 });
+        }, undefined, { timeout: 15000 });
 
         await this.page.evaluate((sql) => {
             const monaco = window.monaco;

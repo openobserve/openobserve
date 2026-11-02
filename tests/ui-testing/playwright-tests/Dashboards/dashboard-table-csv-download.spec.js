@@ -158,6 +158,7 @@ test.describe("Dashboard Table Chart — CSV Download", () => {
           )
         );
       },
+      undefined,
       { timeout: 20000 }
     );
 
