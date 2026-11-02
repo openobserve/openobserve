@@ -81,6 +81,37 @@ Applies to every NEW table and column (sqlite, MySQL and PostgreSQL alike):
 - Existing columns that break these rules are legacy; do not add new ones next
   to them, and do not migrate them as part of an unrelated change.
 
+## Feature-owned internal streams
+
+- Any new feature that uses OpenObserve itself to ingest and query its own
+  operational or result data must name its feature-owned streams with the
+  `_o2_` prefix. Existing examples: `_o2_dbm_server` (`DBM_SERVER_STREAM` in
+  `src/config/src/meta/db_monitoring.rs`), `_o2_ai_chat_events`
+  (`AI_CHAT_EVENTS_STREAM` in `src/config/src/meta/self_reporting/ai_chat.rs`)
+  and `_o2_alert_calibration_digests` (`DIGEST_STREAM` in
+  `src/core/src/alerts/alert_calibration/sink.rs`). Apply this to every stream
+  the feature creates, including execution-level and step-level results.
+- Reuse shared stream-name constants within each code layer. Keep writers,
+  readers, runner configuration, ingestion grants and internal-stream
+  classification consistent. Verify that the actual ingestion path accepts
+  authorized writes to the reserved prefix.
+- Writers into feature-owned streams must authenticate with an org-based
+  ingestion token from the `org_ingestion_tokens` table. Do not use a user
+  passcode, a RUM token, a service-account login or a root credential. Create or
+  look up the token per org when the feature is enabled, and scope it to that
+  org. Rotate and revoke it together with the other ingestion tokens of the org.
+- Before renaming an existing stream, assess existing customers, saved queries,
+  dashboards, alerts, historical analytics, in-flight jobs and older runners.
+  State the history and rollout impact explicitly and choose a compatibility
+  plan. When continuous history is required, read legacy and new streams during
+  the transition and retain legacy write permissions until old writers drain.
+  Preserve existing data under its retention policy unless deletion or migration
+  is explicitly requested.
+- This convention applies to feature-owned internal data, not customer-chosen
+  stream names or externally standardized names such as
+  `traces_service_graph_*`. Do not rename shared streams as an incidental change.
+  Internal-stream naming/classification is not an access-control or billing rule.
+
 ## PR conventions
 
 - CI runs on a PR only while it carries the `ready-for-ci` label and is not a draft

@@ -1577,6 +1577,19 @@ pub async fn set_policy(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        let nodes = infra::cluster::get_cached_online_nodes()
+            .await
+            .unwrap_or_default();
+        if let Err(e) =
+            openobserve_core::alerts::slack_destination::slack_step_guard(&body.rungs, &nodes)
+        {
+            return match e {
+                db::alerts::destinations::DestinationError::SlackApp(r) => {
+                    MetaHttpResponse::error(r.status, r.message).into_response()
+                }
+                other => internal_error("set_policy node versions", &other),
+            };
+        }
         match o2_enterprise::enterprise::oncall::service::set_policy(
             &org_id,
             &team_id,
@@ -1602,6 +1615,12 @@ pub async fn set_policy(
 pub struct SetTeamChannelRequest {
     #[serde(default)]
     pub destinations: Option<Vec<String>>,
+    /// RO-1: the team's webhook that posts to its Slack room; omitted keeps it, `""` unticks it.
+    #[serde(default)]
+    pub slack_same_room_destination: Option<String>,
+    /// Empties the team's Slack channel and its same-room destination.
+    #[serde(default)]
+    pub clear_slack: bool,
 }
 
 /// A team's channel and where the answer came from.
@@ -1611,6 +1630,49 @@ pub struct TeamChannelResponse {
     pub destinations: Vec<String>,
     /// `team` or `policy`, or "pages still go to the old room" is unanswerable from the API.
     pub source: &'static str,
+    #[serde(flatten)]
+    pub slack: config::meta::oncall::TeamSlackView,
+}
+
+/// The team's channel read, its Slack part included (RO-2).
+#[cfg(feature = "enterprise")]
+async fn team_channel_response(team: config::meta::oncall::Team) -> Response {
+    let policy = match o2_enterprise::enterprise::oncall::service::get_policy(
+        &team.org_id,
+        &team.id,
+    )
+    .await
+    {
+        Ok(p) => p.destinations,
+        Err(e) => return to_response(e),
+    };
+    // An empty list while pages go to the policy's room would be a lie of omission.
+    let destinations =
+        config::meta::oncall::policy::team_channel(team.channel_destinations.as_deref(), &policy)
+            .to_vec();
+    let source = if team.channel_destinations.is_some() {
+        "team"
+    } else {
+        "policy"
+    };
+    let off_text = openobserve_core::alerts::slack_publish::unavailable_reason(&team.org_id)
+        .unwrap_or_default();
+    let slack = match o2_enterprise::enterprise::oncall::chat::room::team_slack_view(
+        &team,
+        &destinations,
+        &off_text,
+    )
+    .await
+    {
+        Ok(view) => view,
+        Err(e) => return internal_error("team channel Slack view", &e),
+    };
+    MetaHttpResponse::json(TeamChannelResponse {
+        team_id: team.id,
+        destinations,
+        source,
+        slack,
+    })
 }
 
 #[utoipa::path(
@@ -1636,23 +1698,11 @@ pub async fn get_team_channel(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        let team = match infra::table::oncall_teams::get_channel(&org_id, &team_id).await {
-            Ok(t) => t,
-            Err(e) => return internal_error("get_team_channel", &e),
-        };
-        // An empty list while pages go to the policy's room would be a lie of omission.
-        let policy =
-            match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id).await {
-                Ok(p) => p.destinations,
-                Err(e) => return to_response(e),
-            };
-        let source = if team.is_some() { "team" } else { "policy" };
-        MetaHttpResponse::json(TeamChannelResponse {
-            team_id,
-            destinations: config::meta::oncall::policy::team_channel(team.as_deref(), &policy)
-                .to_vec(),
-            source,
-        })
+        match infra::table::oncall_teams::get(&org_id, &team_id).await {
+            Ok(Some(team)) => team_channel_response(team).await,
+            Ok(None) => MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
+            Err(e) => internal_error("get_team_channel", &e),
+        }
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1674,7 +1724,11 @@ pub async fn get_team_channel(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     request_body(content = SetTeamChannelRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = TeamChannelResponse)),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = TeamChannelResponse),
+        (status = 400, description = "Not one of the team's webhook destinations", content_type = "application/json", body = Object),
+        (status = 404, description = "Team not found", content_type = "application/json", body = Object),
+    ),
 )]
 pub async fn set_team_channel(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1700,37 +1754,99 @@ pub async fn set_team_channel(
         {
             return to_response(e);
         }
-        match infra::table::oncall_teams::set_channel(&org_id, &team_id, requested.clone()).await {
-            Ok(false) => MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
-            Err(e) => internal_error("set_team_channel", &e),
-            Ok(true) => {
-                let policy =
-                    match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id)
-                        .await
-                    {
-                        Ok(p) => p.destinations,
-                        Err(e) => return to_response(e),
-                    };
-                let source = if requested.is_some() {
-                    "team"
-                } else {
-                    "policy"
-                };
-                MetaHttpResponse::json(TeamChannelResponse {
-                    team_id,
-                    destinations: config::meta::oncall::policy::team_channel(
-                        requested.as_deref(),
-                        &policy,
-                    )
-                    .to_vec(),
-                    source,
-                })
-            }
+        let saved = o2_enterprise::enterprise::oncall::chat::room::save_channel(
+            &org_id,
+            &team_id,
+            requested,
+            body.slack_same_room_destination,
+            body.clear_slack,
+        )
+        .await;
+        match saved {
+            Ok(team) => team_channel_response(team).await,
+            Err(e) => to_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, team_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// RO-6: what a test post to the team's Slack channel found.
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct TeamSlackTestResponse {
+    pub ok: bool,
+    /// `ok`, `channel_problem`, `not_connected` or `no_channel`.
+    pub class: String,
+    pub advice: String,
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/teams/{team_id}/slack/test",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "TestOnCallTeamSlackChannel",
+    summary = "Post a test message to a team's Slack channel",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = TeamSlackTestResponse),
+        (status = 404, description = "Team not found", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn test_team_slack_channel(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::{oncall::chat::room, slack};
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let team = match infra::table::oncall_teams::get(&org_id, &team_id).await {
+            Ok(Some(team)) => team,
+            Ok(None) => return MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
+            Err(e) => return internal_error("test_team_slack_channel", &e),
+        };
+        let repo = slack::repo::LiveRepo;
+        let (plan, installation) = match room::team_room(&repo, &org_id, Some(&team), &[]).await {
+            Ok(read) => read,
+            Err(e) => return internal_error("test_team_slack_channel", &e.message),
+        };
+        let api = match slack::client::live() {
+            Ok(api) => api,
+            Err(e) => return internal_error("test_team_slack_channel", &e.message),
+        };
+        let off_text = openobserve_core::alerts::slack_publish::unavailable_reason(&org_id)
+            .unwrap_or_default();
+        let test = room::test_room(
+            api.as_ref(),
+            installation,
+            plan.native.as_ref(),
+            &team,
+            &off_text,
+        )
+        .await;
+        let class = serde_json::to_value(test.class)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_string))
+            .unwrap_or_default();
+        MetaHttpResponse::json(TeamSlackTestResponse {
+            ok: test.ok,
+            class,
+            advice: test.advice,
+        })
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -6389,5 +6505,76 @@ mod tests {
     #[tokio::test]
     async fn test_delete_telephony_is_not_supported_without_enterprise() {
         assert_not_supported(delete_telephony(Path("default".to_string())).await).await;
+    }
+
+    /// DM-8: a policy ticking Slack is refused with 409 while a node runs another version,
+    /// before anything is saved.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_slack_policy_is_refused_while_a_node_is_on_another_version() {
+        use config::meta::{
+            alerts::priority::AlertPriority,
+            cluster::{Node, NodeStatus},
+            oncall::Channel,
+        };
+        let root = "root-dm8@example.com";
+        common::infra::config::ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                org_id: config::DEFAULT_ORG.to_string(),
+                email: root.to_string(),
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+        infra::cluster::add_node_to_cache(Node {
+            uuid: "dm8-old".into(),
+            name: "dm8-old".into(),
+            version: "v0.80.0-fake".into(),
+            status: NodeStatus::Online,
+            ..Default::default()
+        })
+        .await;
+        let body = SetPolicyRequest {
+            rungs: vec![PriorityRung {
+                priority: AlertPriority::P2,
+                steps: vec![],
+                channels: vec![Channel::Email, Channel::Slack],
+            }],
+            destinations: None,
+            l0: None,
+        };
+        let response = set_policy(
+            Path(("acme".to_string(), "t_dm8".to_string())),
+            Headers(UserEmail {
+                user_id: root.to_string(),
+            }),
+            ValidatedJson(body),
+        )
+        .await;
+        // The guard returns before the save; a save here would answer 200 or 500.
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(
+            String::from_utf8_lossy(&body).contains("Upgrade every node first"),
+            "{body:?}"
+        );
+    }
+
+    /// RB-3: an OSS build answers the Slack channel test with 403 "Not Supported".
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_rb3_the_slack_test_is_not_supported_without_enterprise() {
+        let response = test_team_slack_channel(Path(("acme".to_string(), "t1".to_string()))).await;
+        assert_eq!(response.status(), axum::http::StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(String::from_utf8_lossy(&body).contains("Not Supported"));
     }
 }
