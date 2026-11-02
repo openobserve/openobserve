@@ -21,8 +21,9 @@ use config::meta::{
     pipeline::{Pipeline, components::PipelineSource},
     stream::StreamParams,
 };
+use sqlx::FromRow;
 
-use crate::errors::Result;
+use crate::errors::{DbError, Result};
 
 pub mod postgres;
 pub mod sqlite;
@@ -137,4 +138,45 @@ pub async fn delete(pipeline_id: &str) -> Result<Pipeline> {
 pub async fn drop_table() -> Result<()> {
     CLIENT.drop_table().await?;
     Ok(())
+}
+
+/// Decodes each row, logging and skipping the ones this version cannot read so they never hide
+/// the rest.
+pub(crate) fn decode_rows<R>(rows: Vec<R>) -> Vec<Pipeline>
+where
+    R: sqlx::Row,
+    for<'r> Pipeline: sqlx::FromRow<'r, R>,
+    for<'r> &'r str: sqlx::ColumnIndex<R>,
+    for<'r> String: sqlx::Decode<'r, R::Database> + sqlx::Type<R::Database>,
+{
+    crate::table::convert_skipping_unreadable("pipelines", rows, pipeline_row_key, |row| {
+        Pipeline::from_row(&row)
+    })
+}
+
+/// Decodes the row `get_by_id` found; one this version cannot read is an error, not a missing key.
+pub(crate) fn decode_row<R>(pipeline_id: &str, row: Option<R>) -> Result<Pipeline>
+where
+    R: sqlx::Row,
+    for<'r> Pipeline: sqlx::FromRow<'r, R>,
+    for<'r> &'r str: sqlx::ColumnIndex<R>,
+    for<'r> String: sqlx::Decode<'r, R::Database> + sqlx::Type<R::Database>,
+{
+    let Some(row) = row else {
+        return Err(DbError::KeyNotExists(pipeline_id.to_string()).into());
+    };
+    Pipeline::from_row(&row).map_err(|e| {
+        log::error!("[pipelines] unreadable row {}: {e}", pipeline_row_key(&row));
+        e.into()
+    })
+}
+
+fn pipeline_row_key<R>(row: &R) -> String
+where
+    R: sqlx::Row,
+    for<'r> &'r str: sqlx::ColumnIndex<R>,
+    for<'r> String: sqlx::Decode<'r, R::Database> + sqlx::Type<R::Database>,
+{
+    let column = |name: &str| row.try_get::<String, _>(name).unwrap_or_default();
+    format!("org={} id={}", column("org"), column("id"))
 }

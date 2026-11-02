@@ -618,7 +618,7 @@ where
             "scheduled" => {
                 let derived_stream_raw: String = row.try_get("derived_stream")?;
                 let derived_stream: DerivedStream = json::from_str(&derived_stream_raw)
-                    .expect("Deserializing DerivedStream from ROW error");
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
                 PipelineSource::Scheduled(derived_stream)
             }
             _ => return Err(sqlx::Error::ColumnNotFound("Invalid source type".into())),
@@ -628,8 +628,8 @@ where
             let nodes_raw: String = row.try_get("nodes")?;
             let edges_raw: String = row.try_get("edges")?;
             (
-                json::from_str(&nodes_raw).expect("Deserializing Nodes from ROW error"),
-                json::from_str(&edges_raw).expect("Deserializing Edges from ROW error"),
+                json::from_str(&nodes_raw).map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+                json::from_str(&edges_raw).map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
             )
         };
 
