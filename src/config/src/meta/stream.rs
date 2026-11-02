@@ -149,7 +149,11 @@ impl StreamType {
     pub fn support_index(&self) -> bool {
         matches!(
             *self,
-            StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Metadata
+            StreamType::Logs
+                | StreamType::Metrics
+                | StreamType::Traces
+                | StreamType::Profiles
+                | StreamType::Metadata
         )
     }
 
@@ -1716,7 +1720,7 @@ mod tests {
         assert!(StreamType::Logs.support_index());
         assert!(StreamType::Metrics.support_index());
         assert!(StreamType::Traces.support_index());
-        assert!(!StreamType::Profiles.support_index());
+        assert!(StreamType::Profiles.support_index());
         assert!(StreamType::Metadata.support_index());
         assert!(!StreamType::EnrichmentTables.support_index());
         assert!(!StreamType::Filelist.support_index());
