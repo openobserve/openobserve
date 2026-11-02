@@ -380,8 +380,24 @@ pub async fn finish(
     now: i64,
 ) -> Result<bool, errors::Error> {
     let txn = db.begin().await?;
-    let Some(row) = Entity::find_by_id(id).one(&txn).await? else {
+    if finish_in(&txn, id, token, result, now).await? {
+        txn.commit().await?;
+        Ok(true)
+    } else {
         txn.rollback().await?;
+        Ok(false)
+    }
+}
+
+/// The finish statements inside a caller's transaction; false means nothing may be committed.
+async fn finish_in(
+    txn: &DatabaseTransaction,
+    id: &str,
+    token: &str,
+    result: &Finish,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    let Some(row) = Entity::find_by_id(id).one(txn).await? else {
         return Ok(false);
     };
     let status = match (result.sent, &result.skip_reason) {
@@ -403,11 +419,10 @@ pub async fn finish(
         .filter(Column::Id.eq(id))
         .filter(Column::ClaimToken.eq(token))
         .filter(Column::Status.eq(STATUS_PENDING))
-        .exec(&txn)
+        .exec(txn)
         .await?
         .rows_affected;
     if updated == 0 {
-        txn.rollback().await?;
         return Ok(false);
     }
     if row.opens_episode {
@@ -416,9 +431,8 @@ pub async fn finish(
             (false, false) => Some(OUTCOME_UNKNOWN),
             (false, true) => None,
         };
-        settle_trigger(&txn, &row, outcome, !result.sent, now).await?;
+        settle_trigger(txn, &row, outcome, !result.sent, now).await?;
     }
-    txn.commit().await?;
     Ok(true)
 }
 
@@ -494,6 +508,51 @@ pub async fn insert_terminal(
         closed: new.closed_at_insert,
     };
     insert_row(db, new, now, start).await
+}
+
+/// A finished row for a send outside the ledger; a later outcome updates it unless it is sent.
+pub async fn upsert_terminal(
+    db: &DatabaseConnection,
+    new: &NewDelivery,
+    result: &Finish,
+    now: i64,
+) -> Result<(), errors::Error> {
+    let status = if result.sent {
+        STATUS_SENT
+    } else if result.skip_reason.is_some() {
+        STATUS_SKIPPED
+    } else {
+        STATUS_FAILED
+    };
+    let start = RowStart::Terminal {
+        status,
+        skip: result.skip_reason.as_deref(),
+        error: result.error.as_deref(),
+        closed: new.closed_at_insert,
+    };
+    Entity::insert(row_model(new, now, start))
+        .on_conflict(
+            OnConflict::columns(KEY_COLUMNS)
+                .update_columns([
+                    Column::Status,
+                    Column::Error,
+                    Column::SkipReason,
+                    Column::FinishedAt,
+                ])
+                .action_and_where(Expr::col((Entity, Column::Status)).ne(STATUS_SENT))
+                .to_owned(),
+        )
+        .exec_without_returning(db)
+        .await?;
+    Ok(())
+}
+
+/// The row of `new`'s identity, if one exists.
+pub async fn find_row<C: ConnectionTrait>(
+    conn: &C,
+    new: &NewDelivery,
+) -> Result<Option<Model>, errors::Error> {
+    find_key(conn, new).await
 }
 
 /// Close the episode and queue a resolve per destination inside the producer's own transaction.
@@ -1095,6 +1154,15 @@ impl<'a> RowInit<'a> {
     }
 }
 
+/// The identity of a row: one per episode, event and destination.
+const KEY_COLUMNS: [Column; 5] = [
+    Column::Org,
+    Column::Kind,
+    Column::EpisodeId,
+    Column::Event,
+    Column::Destination,
+];
+
 /// INSERT … ON CONFLICT DO NOTHING; true when this call created the row.
 async fn insert_row<C: ConnectionTrait>(
     conn: &C,
@@ -1102,8 +1170,17 @@ async fn insert_row<C: ConnectionTrait>(
     now: i64,
     start: RowStart<'_>,
 ) -> Result<bool, errors::Error> {
+    let inserted = Entity::insert(row_model(new, now, start))
+        .on_conflict(OnConflict::columns(KEY_COLUMNS).do_nothing().to_owned())
+        .exec_without_returning(conn)
+        .await?;
+    Ok(inserted > 0)
+}
+
+/// The full row a send starts as.
+fn row_model(new: &NewDelivery, now: i64, start: RowStart<'_>) -> ActiveModel {
     let init = RowInit::of(start, now);
-    let model = ActiveModel {
+    ActiveModel {
         id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
         org: Set(new.org.clone()),
         kind: Set(new.kind.clone()),
@@ -1131,22 +1208,7 @@ async fn insert_row<C: ConnectionTrait>(
         next_retry_at: Set(init.next_retry_at),
         created_at: Set(now),
         episode_closed_at: Set(init.closed_at),
-    };
-    let inserted = Entity::insert(model)
-        .on_conflict(
-            OnConflict::columns([
-                Column::Org,
-                Column::Kind,
-                Column::EpisodeId,
-                Column::Event,
-                Column::Destination,
-            ])
-            .do_nothing()
-            .to_owned(),
-        )
-        .exec_without_returning(conn)
-        .await?;
-    Ok(inserted > 0)
+    }
 }
 
 async fn find_key<C: ConnectionTrait>(

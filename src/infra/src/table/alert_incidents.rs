@@ -36,7 +36,7 @@ use crate::{
     errors::{self, DbError, Error},
 };
 
-/// One incident [auto_resolve_stale] resolved, with the downtime that muted it until then.
+/// One stale incident [list_stale] found, with the downtime that mutes it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AutoResolved {
     pub org_id: String,
@@ -1172,65 +1172,42 @@ pub async fn upgrade_incident_group_values(
     Ok(())
 }
 
-/// Resolves the incidents with no alert within the threshold; their count and the incidents.
-pub async fn auto_resolve_stale(
+/// The open or acknowledged incidents with no alert within the threshold, oldest first.
+pub async fn list_stale(
     stale_threshold_micros: i64,
-) -> Result<(u64, Vec<AutoResolved>), errors::Error> {
+    limit: u64,
+) -> Result<Vec<AutoResolved>, errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
-    auto_resolve_stale_with(get_orm_client_rw().await, now - stale_threshold_micros, now).await
+    list_stale_with(
+        get_orm_client_ro().await,
+        now - stale_threshold_micros,
+        limit,
+    )
+    .await
 }
 
-/// [auto_resolve_stale] on a given connection, for incidents with no alert since `cutoff`.
-pub async fn auto_resolve_stale_with<C: ConnectionTrait>(
+/// [list_stale] on a given connection, for incidents with no alert since `cutoff`.
+pub async fn list_stale_with<C: ConnectionTrait>(
     client: &C,
     cutoff: i64,
-    now: i64,
-) -> Result<(u64, Vec<AutoResolved>), errors::Error> {
-    const PAGE_SIZE: u64 = 500;
-
-    let mut resolved_ids = Vec::new();
-    loop {
-        // Find open/acknowledged incidents with last_alert_at older than threshold
-        let stale_incidents = alert_incidents::Entity::find()
-            .filter(alert_incidents::Column::Status.ne("resolved"))
-            .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
-            .limit(PAGE_SIZE)
-            .all(client)
-            .await
-            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-        if stale_incidents.is_empty() {
-            break;
-        }
-        let page_full = stale_incidents.len() as u64 == PAGE_SIZE;
-
-        let page_ids: Vec<String> = stale_incidents.iter().map(|i| i.id.clone()).collect();
-        alert_incidents::Entity::update_many()
-            .col_expr(alert_incidents::Column::Status, Expr::value("resolved"))
-            .col_expr(alert_incidents::Column::ResolvedAt, Expr::value(Some(now)))
-            .col_expr(alert_incidents::Column::UpdatedAt, Expr::value(now))
-            // A resolved incident is muted by nothing, even if recording its events fails later.
-            .col_expr(
-                alert_incidents::Column::MutedByDowntimeId,
-                Expr::value(Option::<String>::None),
-            )
-            .filter(alert_incidents::Column::Id.is_in(page_ids))
-            .filter(alert_incidents::Column::Status.ne("resolved"))
-            .exec(client)
-            .await
-            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-        resolved_ids.extend(stale_incidents.into_iter().map(|incident| AutoResolved {
+    limit: u64,
+) -> Result<Vec<AutoResolved>, errors::Error> {
+    let stale = alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
+        .order_by_asc(alert_incidents::Column::LastAlertAt)
+        .limit(limit)
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(stale
+        .into_iter()
+        .map(|incident| AutoResolved {
             org_id: incident.org_id,
             incident_id: incident.id,
             muted_by_downtime_id: incident.muted_by_downtime_id,
-        }));
-        if !page_full {
-            break;
-        }
-    }
-
-    let count = resolved_ids.len() as u64;
-    Ok((count, resolved_ids))
+        })
+        .collect())
 }
 
 /// Deletes all alert incidents belonging to the given org.
@@ -1850,15 +1827,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_bulk_auto_resolve_clears_the_mute_and_reports_it() {
+    async fn the_stale_list_reports_the_mute_and_writes_nothing() {
         let db = incidents_db().await;
         let incident = muted_incident(&db, "dt-1").await;
-        let now = incident.last_alert_at + 1_000;
+        let cutoff = incident.last_alert_at + 1_000;
 
-        let (count, resolved) = auto_resolve_stale_with(&db, now, now).await.unwrap();
-        assert_eq!(count, 1);
+        let stale = list_stale_with(&db, cutoff, 500).await.unwrap();
         assert_eq!(
-            resolved,
+            stale,
             [AutoResolved {
                 org_id: "acme".to_string(),
                 incident_id: incident.id.clone(),
@@ -1870,7 +1846,12 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(row.status, "resolved");
-        assert_eq!(row.muted_by_downtime_id, None);
+        assert_eq!(row.status, "open", "the resolve is the fan out's to write");
+        assert!(
+            list_stale_with(&db, incident.last_alert_at, 500)
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 }

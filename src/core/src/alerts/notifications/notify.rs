@@ -242,6 +242,10 @@ async fn send_outside_ledger(
     subject: Option<&str>,
     ctx: &mut NotificationContext,
 ) -> Result<DeliveryRow, NotifyError> {
+    let new = super::delivery::new_delivery(org_id, resolved, ctx, subject);
+    if super::delivery::already_sent_outside(&new).await {
+        return Err(NotifyError::Skipped(SkipReason::AlreadyDelivered));
+    }
     let sent = match &resolved.destination_type {
         DestinationType::SlackApp(target) => {
             crate::alerts::slack_publish::send_templated_post(
@@ -257,7 +261,6 @@ async fn send_outside_ledger(
         _ => Err(anyhow::anyhow!("not an outside-ledger destination")),
     }
     .map_err(|e| NotifyError::Transport(e.to_string()));
-    let new = super::delivery::new_delivery(org_id, resolved, ctx, subject);
     super::delivery::record_outside(&new, &sent).await;
     sent.map(|_| DeliveryRow {
         status: "sent".into(),

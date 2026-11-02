@@ -619,6 +619,10 @@ pub(crate) mod tests {
                         .await
                         .unwrap();
                 }
+                // A resolve closes its notification episode in the same transaction.
+                infra::table::notification_deliveries::create_tables_for_test(conn)
+                    .await
+                    .unwrap();
                 // The ladder's triage hold lives on `scheduled_jobs`.
                 infra::scheduler::init().await.unwrap();
                 // The one way to make a completed write error: only this report is refused.

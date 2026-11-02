@@ -760,6 +760,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
             o2_enterprise::enterprise::oncall::token::mark_spent(tag, expires_at);
         }));
     }
+    // A page close resolves its incident through the same fan out as every other resolve.
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::oncall::escalation::register_incident_resolver(
+        |org_id, incident_id| {
+            Box::pin(async move {
+                openobserve_core::alerts::incidents::resolve_from_oncall(&org_id, &incident_id)
+                    .await
+            })
+        },
+    );
     // Every node: the validator, which reads the token cache, runs wherever HTTP is served.
     #[cfg(feature = "enterprise")]
     if openobserve_core::fleet::enabled() {

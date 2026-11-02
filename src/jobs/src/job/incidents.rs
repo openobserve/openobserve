@@ -89,31 +89,13 @@ async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
     // Convert minutes to microseconds
     let threshold_micros = (threshold_minutes as i64) * 60 * 1_000_000;
 
-    let (resolved_count, resolved_ids) =
-        infra::table::alert_incidents::auto_resolve_stale(threshold_micros).await?;
-
+    let resolved_count =
+        openobserve_core::alerts::incidents::auto_resolve_stale(threshold_micros).await?;
     if resolved_count > 0 {
         log::info!(
-            "[INCIDENTS::JOB] Auto-resolved {} stale incidents (threshold: {} minutes)",
-            resolved_count,
-            threshold_minutes
+            "[INCIDENTS::JOB] Auto-resolved {resolved_count} stale incidents (threshold: \
+             {threshold_minutes} minutes)"
         );
-
-        // Emit Resolved events for each auto-resolved incident
-        for resolved in &resolved_ids {
-            if let Err(e) = openobserve_core::alerts::incidents::record_auto_resolved(
-                &resolved.org_id,
-                &resolved.incident_id,
-                resolved.muted_by_downtime_id.as_deref(),
-            )
-            .await
-            {
-                log::warn!(
-                    "[INCIDENTS::JOB] Failed to record auto-resolve event for {}: {e}",
-                    resolved.incident_id
-                );
-            }
-        }
     } else {
         log::debug!("[INCIDENTS::JOB] No stale incidents to auto-resolve");
     }

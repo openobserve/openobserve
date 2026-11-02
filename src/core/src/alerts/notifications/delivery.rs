@@ -595,10 +595,19 @@ pub async fn record_outside(new: &NewDelivery, result: &Result<String, NotifyErr
         None => SENT_OUTSIDE_LEDGER.to_string(),
     });
     if let Err(e) =
-        ledger::insert_terminal(get_orm_client_rw().await, &new, &finish, now_micros()).await
+        ledger::upsert_terminal(get_orm_client_rw().await, &new, &finish, now_micros()).await
     {
         log::error!("[NOTIFY] could not record the {} row: {e}", new.event);
     }
+}
+
+/// A send outside the ledger that already went out is not sent again by a producer retry.
+pub async fn already_sent_outside(new: &NewDelivery) -> bool {
+    ledger::find_row(get_orm_client_rw().await, new)
+        .await
+        .ok()
+        .flatten()
+        .is_some_and(|row| row.status == ledger::STATUS_SENT)
 }
 
 /// A send that never reaches a transport still leaves its row: a platform skip or a render failure.

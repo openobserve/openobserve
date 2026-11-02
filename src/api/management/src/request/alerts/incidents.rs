@@ -3240,6 +3240,10 @@ mod tests {
                         .await
                         .unwrap();
                 }
+                // A resolve closes its notification episode in the same transaction.
+                infra::table::notification_deliveries::create_tables_for_test(conn)
+                    .await
+                    .unwrap();
                 // A start's triage hold lives on `scheduled_jobs`.
                 infra::scheduler::init().await.unwrap();
                 common::infra::config::ORG_USERS.insert(

@@ -727,7 +727,7 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
 
 /// Send "reopened" under the new episode key to the incident's merged alert destinations.
 #[cfg(feature = "enterprise")]
-async fn send_incident_reopened_notification(org_id: &str, incident_id: &str) {
+pub(crate) async fn send_incident_reopened_notification(org_id: &str, incident_id: &str) {
     let Some(first_alert) = first_incident_alert(org_id, incident_id).await else {
         log::debug!("[incidents] no alert to notify for the reopen of {incident_id}");
         return;
@@ -3687,24 +3687,63 @@ async fn publish_status(org_id: &str, incident_id: &str, status: &str) {
     }
 }
 
-/// Records the resolved event of the auto-resolve job; a muted incident notifies nobody (D3).
+/// Resolve every stale incident through the single choke point; returns how many resolved.
+pub async fn auto_resolve_stale(threshold_micros: i64) -> Result<usize, anyhow::Error> {
+    const PAGE: u64 = 500;
+    let stale = infra::table::alert_incidents::list_stale(threshold_micros, PAGE).await?;
+    Ok(resolve_stale(&stale).await)
+}
+
+/// Resolve each listed incident on its own, so one failure never stops the rest.
+pub(crate) async fn resolve_stale(stale: &[infra::table::alert_incidents::AutoResolved]) -> usize {
+    let mut resolved = 0;
+    for incident in stale {
+        match record_auto_resolved(
+            &incident.org_id,
+            &incident.incident_id,
+            incident.muted_by_downtime_id.as_deref(),
+        )
+        .await
+        {
+            Ok(()) => resolved += 1,
+            Err(e) => log::warn!(
+                "[incidents] auto-resolve of {}/{} failed: {e}",
+                incident.org_id,
+                incident.incident_id
+            ),
+        }
+    }
+    resolved
+}
+
+/// The resolve and its fan out commit together, then the timeline event; muted notifies nobody.
 pub async fn record_auto_resolved(
     org_id: &str,
     incident_id: &str,
     muted_by_downtime_id: Option<&str>,
 ) -> Result<(), anyhow::Error> {
-    match muted_by_downtime_id {
+    resolve_status(org_id, incident_id, muted_by_downtime_id.is_some()).await?;
+    let event = match muted_by_downtime_id {
         None => {
-            crate::incidents::append_event(org_id, incident_id, IncidentEvent::resolved(None))
-                .await?
+            crate::incidents::append_event(org_id, incident_id, IncidentEvent::resolved(None)).await
         }
         Some(downtime_id) => {
             let conn = infra::db::get_orm_client_rw().await;
-            record_muted_auto_resolve(conn, org_id, incident_id, downtime_id).await?
+            record_muted_auto_resolve(conn, org_id, incident_id, downtime_id).await
         }
+    };
+    if let Err(e) = event {
+        log::warn!("[incidents] resolved event of {org_id}/{incident_id} not recorded: {e}");
     }
-    // The bulk sweep wrote the status; this closes the episode with it, as every resolve does.
-    resolve_status(org_id, incident_id, muted_by_downtime_id.is_some()).await?;
+    Ok(())
+}
+
+/// The on-call page close: the same resolve and fan out, without the on-call recovery it came from.
+pub async fn resolve_from_oncall(org_id: &str, incident_id: &str) -> Result<(), anyhow::Error> {
+    let muted = infra::table::alert_incidents::get(org_id, incident_id)
+        .await?
+        .is_some_and(|m| m.muted_by_downtime_id.is_some());
+    resolve_status(org_id, incident_id, muted).await?;
     Ok(())
 }
 

@@ -741,6 +741,65 @@ async fn a_trigger_that_never_finished_reads_as_unknown_at_the_resolve() {
     owned(reclaim(&db, &r.id, "r1", later + 2).await.unwrap());
 }
 
+#[tokio::test]
+async fn a_crash_between_the_finish_update_and_its_commit_leaves_no_sent_row() {
+    let db = db().await;
+    let row = owned(claim(&db, &trigger("pd", true), "t1", T0).await.unwrap());
+    let txn = db.begin().await.unwrap();
+    assert!(
+        finish_in(&txn, &row.id, "t1", &sent(), T0 + 1)
+            .await
+            .unwrap()
+    );
+    // The node dies after the UPDATE statement and before COMMIT.
+    txn.rollback().await.unwrap();
+    let after = get(&db, &row.id).await.unwrap().unwrap();
+    assert_eq!(after.status, STATUS_PENDING);
+    assert_eq!(
+        record_of(&db, "pd").await.as_deref(),
+        Some(OUTCOME_ATTEMPTED)
+    );
+    let later = T0 + LEASE_US + 1;
+    resolve(&db, &[fanout("pd", true)], later).await;
+    let r = resolve_row(&db, "pd").await;
+    owned(reclaim(&db, &r.id, "r1", later + 1).await.unwrap());
+    assert_eq!(record_of(&db, "pd").await.as_deref(), Some(OUTCOME_UNKNOWN));
+    assert!(
+        Entity::find()
+            .filter(Column::Status.eq(STATUS_SENT))
+            .filter(Column::OpensEpisode.eq(true))
+            .one(&db)
+            .await
+            .unwrap()
+            .is_none(),
+        "no trigger reads as sent without its destination record"
+    );
+}
+
+#[tokio::test]
+async fn an_outside_ledger_row_takes_a_later_outcome_until_it_is_sent() {
+    let db = db().await;
+    let new = informational("started");
+    upsert_terminal(&db, &new, &rejected(500), T0)
+        .await
+        .unwrap();
+    upsert_terminal(&db, &new, &sent(), T0 + 1).await.unwrap();
+    let row = find_row(&db, &new).await.unwrap().unwrap();
+    assert_eq!(row.status, STATUS_SENT);
+    assert_eq!(row.finished_at, Some(T0 + 1));
+    upsert_terminal(&db, &new, &rejected(500), T0 + 2)
+        .await
+        .unwrap();
+    let row = find_row(&db, &new).await.unwrap().unwrap();
+    assert_eq!(row.status, STATUS_SENT, "a sent row is never lowered");
+    assert!(
+        retry_candidates(&db, T0 + DAY, 100)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}
+
 #[test]
 fn backoff_spans_about_eighty_minutes() {
     let total: i64 = (1..=4).map(backoff_us).sum();

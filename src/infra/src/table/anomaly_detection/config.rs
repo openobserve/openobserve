@@ -1185,4 +1185,35 @@ mod tests {
             "a replicated 'Never' must not be rewritten into a cadence"
         );
     }
+
+    #[tokio::test]
+    async fn a_new_alert_episode_after_a_recovery_gets_a_new_key() {
+        use sea_orm::{ConnectionTrait, Database, EntityTrait, Schema};
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(anomaly_detection_config::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        let mut row = make_model("anom-1", "acme");
+        row.last_recovery_notified_at = Some(90);
+        anomaly_detection_config::Entity::insert(row.into_active_model())
+            .exec(&db)
+            .await
+            .unwrap();
+
+        assert_eq!(open_alert_episode(&db, "anom-1", 100).await.unwrap(), 100);
+        assert_eq!(
+            open_alert_episode(&db, "anom-1", 200).await.unwrap(),
+            100,
+            "a firing inside the open episode reuses its key"
+        );
+        clear_alert_episode(&db, "anom-1").await.unwrap();
+        let cleared = get_by_id(&db, "acme", "anom-1").await.unwrap().unwrap();
+        assert_eq!(cleared.alert_episode_started_at, None);
+        assert_eq!(cleared.last_recovery_notified_at, None);
+        assert_eq!(
+            open_alert_episode(&db, "anom-1", 300).await.unwrap(),
+            300,
+            "the next anomaly opens a new key"
+        );
+    }
 }
