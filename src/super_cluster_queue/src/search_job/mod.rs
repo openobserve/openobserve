@@ -176,22 +176,23 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     log::error!("error while deleting workflow from db {id} : {e}");
                 }
             }
-            if let Some(trigger_id) = infra::table::workflow_http_triggers::tombstone_for_workflow(
+            let tombstoned = infra::table::workflow_http_triggers::tombstone_for_workflow(
                 infra::db::get_orm_client_rw().await,
                 &id,
                 config::utils::time::now_micros(),
             )
-            .await?
-                && let Err(e) = db::workflow_http_triggers::notify_local(&trigger_id).await
-            {
-                log::error!("error while evicting workflow http trigger {trigger_id} : {e}");
-            }
-            log::info!("successfully handled workflow delete for {id}");
+            .await;
             // trigger watch event by putting value to cluster coordinator
             let cluster_coordinator = get_coordinator().await;
             cluster_coordinator
                 .delete(&format!("{WORKFLOWS_PREFIX}{id}",), false, true, None)
                 .await?;
+            if let Some(trigger_id) = tombstoned?
+                && let Err(e) = db::workflow_http_triggers::notify_local(&trigger_id).await
+            {
+                log::error!("error while evicting workflow http trigger {trigger_id} : {e}");
+            }
+            log::info!("successfully handled workflow delete for {id}");
         }
         MessageType::WorkflowDraftPut => {
             let draft: Workflow = json::from_slice(&msg.value.unwrap())?;

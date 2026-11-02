@@ -38,6 +38,12 @@ pub async fn clean() {
         interval.tick().await;
         let limit_time = chrono::Utc::now().timestamp_micros() - duration_limit;
 
+        // First, so a failed error or run cleanup below never skips the ledger's.
+        let now = chrono::Utc::now().timestamp_micros();
+        if let Err(e) = clean_hook_ledger(get_orm_client_rw().await, now, limit_time).await {
+            log::error!("error cleaning the workflow http trigger ledger : {e}");
+        }
+
         let errors = match db::workflows::delete_errors_older_than(limit_time).await {
             Ok(v) => v,
             Err(e) => {
@@ -59,11 +65,6 @@ pub async fn clean() {
             }
         };
         log::info!("cleaned {runs} old entries for workflow run data");
-
-        let now = chrono::Utc::now().timestamp_micros();
-        if let Err(e) = clean_hook_ledger(get_orm_client_rw().await, now, limit_time).await {
-            log::error!("error cleaning the workflow http trigger ledger : {e}");
-        }
     }
 }
 
