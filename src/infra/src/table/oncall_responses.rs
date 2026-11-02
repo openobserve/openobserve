@@ -697,7 +697,7 @@ pub async fn reassign_team(
     to_team_id: &str,
     now: i64,
 ) -> Result<Option<Response>, errors::Error> {
-    hand_over(org_id, id, Some(to_team_id), now).await
+    hand_over(org_id, id, Some(to_team_id), None, now).await
 }
 
 /// Hands a record to somebody on the same team, starting its ladder again. Same
@@ -709,7 +709,17 @@ pub async fn restart_ladder(
     id: &str,
     now: i64,
 ) -> Result<Option<Response>, errors::Error> {
-    hand_over(org_id, id, None, now).await
+    hand_over(org_id, id, None, None, now).await
+}
+
+/// [`restart_ladder`] only while `acked_by` still holds the page; `None` when it was not restarted.
+pub async fn restart_ladder_if_acked_by(
+    org_id: &str,
+    id: &str,
+    acked_by: &str,
+    now: i64,
+) -> Result<Option<Response>, errors::Error> {
+    hand_over(org_id, id, None, Some(acked_by), now).await
 }
 
 /// Re-runs an exhausted, unowned page only if its row is still as `seen`, else `None`. [strong]
@@ -878,9 +888,28 @@ async fn hand_over(
     org_id: &str,
     id: &str,
     to_team_id: Option<&str>,
+    acked_by: Option<&str>,
     now: i64,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = get_orm_client_rw().await;
+    hand_over_in(
+        get_orm_client_rw().await,
+        org_id,
+        id,
+        to_team_id,
+        acked_by,
+        now,
+    )
+    .await
+}
+
+async fn hand_over_in(
+    client: &impl ConnectionTrait,
+    org_id: &str,
+    id: &str,
+    to_team_id: Option<&str>,
+    acked_by: Option<&str>,
+    now: i64,
+) -> Result<Option<Response>, errors::Error> {
     let Some(existing) = oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .one(client)
@@ -894,7 +923,7 @@ async fn hand_over(
     // A handoff's effect on a record is decided in `Response::handed_over`; this writes it down.
     let next = current.handed_over(to_team_id, now);
     // Conditional: a `resolve` landing between the read and this write would tear the row.
-    oncall_responses::Entity::update_many()
+    let mut query = oncall_responses::Entity::update_many()
         .col_expr(
             oncall_responses::Column::TeamId,
             Expr::value(next.team_id.clone()),
@@ -932,11 +961,22 @@ async fn hand_over(
         .filter(oncall_responses::Column::Id.eq(id))
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::ClosedAt.is_null())
-        .filter(oncall_responses::Column::State.ne(ResponseState::Resolved.to_i32()))
-        .exec(client)
-        .await?;
+        .filter(oncall_responses::Column::State.ne(ResponseState::Resolved.to_i32()));
+    if let Some(holder) = acked_by {
+        query = query
+            .filter(oncall_responses::Column::State.eq(ResponseState::Acknowledged.to_i32()))
+            .filter(oncall_responses::Column::AckedBy.eq(holder));
+    }
+    let result = query.exec(client).await?;
+    if acked_by.is_some() && result.rows_affected == 0 {
+        return Ok(None);
+    }
     // Read back, not from the snapshot: after a lost race the answer is the closed record.
-    get(org_id, id).await
+    Ok(oncall_responses::Entity::find_by_id(id)
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+        .and_then(to_response))
 }
 
 /// Records opened because `origin_id` fired — the impacted teams.
@@ -974,6 +1014,30 @@ pub async fn latest_open_for_source(
         .one(client)
         .await?
         .and_then(to_response))
+}
+
+/// Every still-open record of a source, newest first: older firings' pages stay open until closed.
+pub async fn open_records_for_source(
+    org_id: &str,
+    subject_type: SubjectType,
+    source_id: &str,
+) -> Result<Vec<Response>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    Ok(oncall_responses::Entity::find()
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::SubjectType.eq(subject_type.to_i32()))
+        .filter(oncall_responses::Column::SubjectId.starts_with(format!("{source_id}#")))
+        .filter(oncall_responses::Column::State.is_in([
+            ResponseState::Triggered.to_i32(),
+            ResponseState::Triaged.to_i32(),
+            ResponseState::Acknowledged.to_i32(),
+        ]))
+        .order_by_desc(oncall_responses::Column::OpenedAt)
+        .all(client)
+        .await?
+        .into_iter()
+        .filter_map(to_response)
+        .collect())
 }
 
 /// The still-open records a fan-out opened for one source.
@@ -1916,6 +1980,57 @@ mod tests {
                 assert!(result.acked_at.unwrap() > 900);
             } else {
                 assert_eq!(result.acked_at, Some(900));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_guarded_restart_skips_a_page_someone_else_acknowledged_in_between() {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        db.execute(
+            backend.build(&Schema::new(backend).create_table_from_entity(oncall_responses::Entity)),
+        )
+        .await
+        .unwrap();
+        for (id, holder) in [
+            ("held", "alice@example.com"),
+            ("raced", "carol@example.com"),
+        ] {
+            let mut row = model();
+            row.id = id.into();
+            row.state = ResponseState::Acknowledged.to_i32();
+            row.acked_by = Some(holder.into());
+            row.acked_at = Some(900);
+            oncall_responses::ActiveModel::from(row)
+                .insert(&db)
+                .await
+                .unwrap();
+            let restarted =
+                hand_over_in(&db, "default", id, None, Some("alice@example.com"), 2_000)
+                    .await
+                    .unwrap();
+            let stored = oncall_responses::Entity::find_by_id(id)
+                .one(&db)
+                .await
+                .unwrap()
+                .and_then(to_response)
+                .unwrap();
+            if id == "held" {
+                let restarted = restarted.expect("the holder's page restarts");
+                assert_eq!(
+                    (restarted.state, restarted.acked_by),
+                    (ResponseState::Triggered, None)
+                );
+                assert_eq!(stored.ladder_run, Some(FIRST_LADDER_RUN + 1));
+            } else {
+                assert!(restarted.is_none(), "an ack landing in between is kept");
+                assert_eq!(
+                    (stored.state, stored.acked_by.as_deref()),
+                    (ResponseState::Acknowledged, Some(holder))
+                );
             }
         }
     }
