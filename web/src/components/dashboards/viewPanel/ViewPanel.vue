@@ -764,20 +764,7 @@ export default defineComponent({
           props.initialVariableValues.values &&
           props.initialVariableValues.values.length > 0
         ) {
-          // Update variablesManager with passed values
-          props.initialVariableValues.values.forEach((passedVar: any) => {
-            // Find and update the variable in the manager (global scope)
-            const globalVar = variablesManager.variablesData.global.find(
-              (v: any) => v.name === passedVar.name,
-            );
-            if (globalVar) {
-              globalVar.value = passedVar.value;
-              globalVar.isVariablePartialLoaded = true;
-              globalVar.isLoading = false;
-              // Set pending to false to prevent API call
-              globalVar.isVariableLoadingPending = false;
-            }
-          });
+          variablesManager.adoptLoadedValues(props.initialVariableValues.values);
 
           // Also populate currentVariablesDataRef with passed values
           Object.assign(currentVariablesDataRef, props.initialVariableValues);

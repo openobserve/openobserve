@@ -68,7 +68,15 @@ const stubs = {
   OTooltip: true,
   CommonFlameGraph: {
     name: "FlameStub",
-    props: ["root", "diffBaselineTotal", "diffComparisonTotal", "diffLabels", "summaryLabel"],
+    props: {
+      root: null,
+      diffBaselineTotal: null,
+      diffComparisonTotal: null,
+      diffLabels: null,
+      summaryLabel: null,
+      hideProfileActions: Boolean,
+    },
+    emits: ["search"],
     template: "<div />",
   },
   OTable: {
@@ -181,6 +189,16 @@ describe("ProfilesCompare", () => {
     await flushPromises();
 
     expect(wrapper.findComponent({ name: "FlameStub" }).props("diffBaselineTotal")).toBe(100);
+  });
+
+  it("hides the sandwich and details actions and passes Highlight up as a search", async () => {
+    const { wrapper } = mountCompare();
+    await flushPromises();
+    const flame = wrapper.findComponent({ name: "FlameStub" });
+
+    expect(flame.props("hideProfileActions")).toBe(true);
+    flame.vm.$emit("search", "main.handler");
+    expect(wrapper.findComponent(ProfilesCompare).emitted("search")).toEqual([["main.handler"]]);
   });
 
   it("names each side by its value, not as baseline and comparison", async () => {

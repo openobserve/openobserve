@@ -567,6 +567,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :search-query="searchQuery"
                 :unit-label="tableUnitLabel"
                 :value-formatter="formatTableValue"
+                @search="searchForFunction"
               />
               <OTable
                 v-else-if="activeView === 'tree'"
