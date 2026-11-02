@@ -17,7 +17,8 @@
 
 use config::{ider, meta::oncall::Unavailability, utils::time::now_micros};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set,
 };
 
 use super::entity::oncall_unavailability;
@@ -32,9 +33,8 @@ const RESOLUTION_LOOKBACK_MICROS: i64 = 7 * 24 * 60 * 60 * 1_000_000;
 
 /// Ceiling on the rows any one read returns.
 ///
-/// An org where a thousand absences are live at once has scripted a loop. The
-/// loss is safe in one direction only, which is why the resolution read is
-/// ordered so the windows most likely to be in force survive the truncation.
+/// The resolution read is ordered so a truncation drops far-future windows, not
+/// ones in force now.
 const MAX_ROWS: u64 = 1_000;
 
 fn to_window(m: oncall_unavailability::Model) -> Unavailability {
@@ -152,25 +152,13 @@ pub async fn list_in_window(
 /// append-mostly and a read on the paging path must not grow with the org's
 /// history.
 ///
-/// Ordered by `end_at` descending, so a truncated read keeps the windows
-/// reaching furthest forward — the ones most likely still in force. Truncation
-/// can then cost a skip that should have happened, never one that should not.
+/// Ordered by `start_at` ascending, so a truncated read drops the windows that
+/// start furthest in the future and keeps the ones in force now.
 pub async fn list_for_resolution(
     org_id: &str,
     at: i64,
 ) -> Result<Vec<Unavailability>, errors::Error> {
-    let client = get_orm_client_rw().await;
-    Ok(oncall_unavailability::Entity::find()
-        .filter(oncall_unavailability::Column::OrgId.eq(org_id))
-        .filter(oncall_unavailability::Column::EndAt.gt(at - RESOLUTION_LOOKBACK_MICROS))
-        .order_by_desc(oncall_unavailability::Column::EndAt)
-        .order_by_asc(oncall_unavailability::Column::Id)
-        .limit(MAX_ROWS)
-        .all(client)
-        .await?
-        .into_iter()
-        .map(to_window)
-        .collect())
+    list_for_resolution_in(get_orm_client_rw().await, org_id, at).await
 }
 
 pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
@@ -201,9 +189,28 @@ pub async fn delete_by_user(org_id: &str, user_email: &str) -> Result<u64, error
     Ok(dropped)
 }
 
+async fn list_for_resolution_in<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    at: i64,
+) -> Result<Vec<Unavailability>, errors::Error> {
+    Ok(oncall_unavailability::Entity::find()
+        .filter(oncall_unavailability::Column::OrgId.eq(org_id))
+        .filter(oncall_unavailability::Column::EndAt.gt(at - RESOLUTION_LOOKBACK_MICROS))
+        .order_by_asc(oncall_unavailability::Column::StartAt)
+        .order_by_asc(oncall_unavailability::Column::Id)
+        .limit(MAX_ROWS)
+        .all(db)
+        .await?
+        .into_iter()
+        .map(to_window)
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::oncall::is_unavailable;
+    use sea_orm::{ConnectOptions, Database, Schema};
 
     use super::*;
 
@@ -266,5 +273,35 @@ mod tests {
             assert!(is_unavailable(order, "bob@o2.ai", 500));
             assert!(!is_unavailable(order, "cara@o2.ai", 500));
         }
+    }
+
+    /// Past the cap, far-future leave is what gets dropped, never an absence in force now.
+    #[tokio::test]
+    async fn test_truncation_keeps_the_absence_in_force_now() {
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(oncall_unavailability::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        let now = 1_000_000;
+        let mut rows = vec![model("un_now", "ana@o2.ai", now - 10, now + 10)];
+        rows.extend((0..MAX_ROWS as i64).map(|i| {
+            model(
+                &format!("un_{i}"),
+                "bob@o2.ai",
+                now + 100 + i,
+                now + 200 + i,
+            )
+        }));
+        for row in rows {
+            oncall_unavailability::ActiveModel::from(row)
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+        let kept = list_for_resolution_in(&db, "default", now).await.unwrap();
+        assert_eq!(kept.len(), MAX_ROWS as usize);
+        assert!(is_unavailable(&kept, "ana@o2.ai", now));
     }
 }
