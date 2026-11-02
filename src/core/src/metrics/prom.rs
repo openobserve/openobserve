@@ -67,6 +67,29 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
 };
 
+const SAMPLES_WRITTEN_HEADER: &str = "X-Prometheus-Remote-Write-Samples-Written";
+const HISTOGRAMS_WRITTEN_HEADER: &str = "X-Prometheus-Remote-Write-Histograms-Written";
+const EXEMPLARS_WRITTEN_HEADER: &str = "X-Prometheus-Remote-Write-Exemplars-Written";
+
+/// What a remote-write request stored, in the units Prometheus counts what it sent.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WrittenCounts {
+    pub samples: usize,
+    pub histograms: usize,
+    pub exemplars: usize,
+}
+
+impl WrittenCounts {
+    /// Prometheus (>= 2.54) counts the shortfall against these as failed, even on a 2xx.
+    pub fn response_headers(self) -> [(&'static str, String); 3] {
+        [
+            (SAMPLES_WRITTEN_HEADER, self.samples.to_string()),
+            (HISTOGRAMS_WRITTEN_HEADER, self.histograms.to_string()),
+            (EXEMPLARS_WRITTEN_HEADER, self.exemplars.to_string()),
+        ]
+    }
+}
+
 /// A record waiting for the write path, with the series hash when this handler computed it.
 type PendingRecord = (json::Map<String, json::Value>, i64, Option<u64>);
 
@@ -103,7 +126,7 @@ pub async fn remote_write(
     org_id: &str,
     body: Bytes,
     user: IngestUser,
-) -> std::result::Result<(), anyhow::Error> {
+) -> std::result::Result<WrittenCounts, anyhow::Error> {
     // check system resource
     check_ingestion_allowed(org_id, StreamType::Metrics, None).await?;
 
@@ -182,7 +205,7 @@ pub async fn remote_write(
     // maybe empty, we can return immediately
     if request.timeseries.is_empty() {
         ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
-        return Ok(());
+        return Ok(WrittenCounts::default());
     }
 
     // parse timeseries
@@ -199,7 +222,11 @@ pub async fn remote_write(
     let mut unique_metrics = HashSet::new();
     // a request carries far more series than distinct metric names, so each is formatted once
     let mut formatted_names: HashMap<String, String> = HashMap::new();
+    let mut total = WrittenCounts::default();
     for event in &request.timeseries {
+        total.samples += event.samples.len();
+        total.histograms += event.histograms.len();
+        total.exemplars += event.exemplars.len();
         if let Some((_, raw_name)) = event.labels.iter().find(|(name, _)| *name == NAME_LABEL) {
             let metric_name = match formatted_names.get(*raw_name) {
                 Some(name) => name.clone(),
@@ -224,6 +251,8 @@ pub async fn remote_write(
     }
 
     unique_metrics.retain(|name| stream_key_checks.violation(org_id, name).is_none());
+    // every deduction below is of items counted once in `total`, so none can underflow
+    let mut written = total;
 
     let mut preload_pipeline_time = 0u128;
     let mut preload_uds_time = 0u128;
@@ -387,6 +416,9 @@ pub async fn remote_write(
         }
 
         if stream_key_checks.violation(org_id, &metric_name).is_some() {
+            written.samples -= event.samples.len();
+            written.histograms -= event.histograms.len();
+            written.exemplars -= event.exemplars.len();
             continue;
         }
 
@@ -418,7 +450,8 @@ pub async fn remote_write(
                 .any(|s| sample_cell(s.value, schema).is_some());
             if has_writable && !gate.admit().await {
                 ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
-                return Ok(());
+                // deduplicated data counts as written, or every non-leader request reads as failed
+                return Ok(total);
             }
             for sample in &event.samples {
                 if let Some(value) = sample_cell(sample.value, schema) {
@@ -457,7 +490,7 @@ pub async fn remote_write(
             if !gate.admit().await {
                 // do not accept any entries for this request
                 ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
-                return Ok(());
+                return Ok(total);
             }
 
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
@@ -479,6 +512,13 @@ pub async fn remote_write(
         }
 
         if !event.histograms.is_empty() {
+            // `_sum` may still be stored, but a histogram missing its buckets is not written
+            if CLASSIC_HISTOGRAM_SUFFIXES.iter().any(|suffix| {
+                let stream = format!("{metric_name}{suffix}");
+                stream_key_checks.violation(org_id, &stream).is_some()
+            }) {
+                written.histograms -= event.histograms.len();
+            }
             match buffer_native_histograms(
                 &event.histograms,
                 &labels,
@@ -492,7 +532,7 @@ pub async fn remote_write(
                 Some(counted) => sample_count += counted,
                 None => {
                     ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
-                    return Ok(());
+                    return Ok(total);
                 }
             }
         }
@@ -504,10 +544,17 @@ pub async fn remote_write(
         exemplar_count += event.exemplars.len();
         let exemplars_stream =
             exemplars_stream_for_series(&metric_name, labels.contains_key(BUCKET_LABEL));
+        if stream_key_checks
+            .violation(org_id, &exemplars_stream)
+            .is_some()
+        {
+            written.exemplars -= event.exemplars.len();
+            continue;
+        }
         let rows = exemplar_records(std::mem::take(&mut labels), &event.exemplars);
         if !rows.is_empty() && !gate.admit().await {
             ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
-            return Ok(());
+            return Ok(total);
         }
         for (record, timestamp) in rows {
             buffer_metric_record(
@@ -661,7 +708,7 @@ pub async fn remote_write(
         log::info!("[remote_write] org: {org_id}, total time: {total_ms} ms");
     }
 
-    Ok(())
+    Ok(written)
 }
 
 pub async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<ResponseMetadata> {
@@ -2454,12 +2501,26 @@ mod tests {
             }],
             ..series(&histogram_name)
         };
-        let request = prometheus_rpc::WriteRequest {
-            timeseries: vec![
-                series("test_prom_key_len_ok"),
-                series(&long_name),
-                histogram,
+        let with_stale_marker = prometheus_rpc::TimeSeries {
+            samples: vec![
+                prometheus_rpc::Sample {
+                    value: 1.0,
+                    timestamp: now,
+                },
+                prometheus_rpc::Sample {
+                    value: f64::from_bits(STALE_NAN_BITS),
+                    timestamp: now + 1,
+                },
             ],
+            ..series("test_prom_key_len_ok")
+        };
+        let long = prometheus_rpc::TimeSeries {
+            exemplars: histogram.exemplars.clone(),
+            histograms: histogram.histograms.clone(),
+            ..series(&long_name)
+        };
+        let request = prometheus_rpc::WriteRequest {
+            timeseries: vec![with_stale_marker, long, histogram],
             metadata: vec![prometheus_rpc::MetricMetadata {
                 r#type: prometheus_rpc::metric_metadata::MetricType::Gauge as i32,
                 metric_family_name: long_name.clone(),
@@ -2469,7 +2530,7 @@ mod tests {
         let body = snap::raw::Encoder::new()
             .compress_vec(&request.encode_to_vec())
             .unwrap();
-        remote_write(
+        let written = remote_write(
             org_id,
             Bytes::from(body),
             IngestUser::User("root@example.com".to_string()),
@@ -2480,6 +2541,21 @@ mod tests {
         let bounded =
             infra::file_list::stream_key_violation(org_id, StreamType::Metrics, &long_name)
                 .is_some();
+        // a skipped stale marker counts as written; a histogram missing its buckets does not
+        let expected_written = if bounded {
+            WrittenCounts {
+                samples: 2,
+                histograms: 0,
+                exemplars: 0,
+            }
+        } else {
+            WrittenCounts {
+                samples: 3,
+                histograms: 2,
+                exemplars: 2,
+            }
+        };
+        assert_eq!(written, expected_written);
         let expected = [
             ("test_prom_key_len_ok".to_string(), true),
             (format!("{histogram_name}_sum"), true),
@@ -2492,6 +2568,29 @@ mod tests {
             let exists = infra::schema::exists(org_id, StreamType::Metrics, &name).await;
             assert_eq!(exists, created, "{name}");
         }
+    }
+
+    #[test]
+    fn written_counts_become_the_prw_written_headers() {
+        let written = WrittenCounts {
+            samples: 3,
+            histograms: 1,
+            exemplars: 0,
+        };
+        assert_eq!(
+            written.response_headers(),
+            [
+                ("X-Prometheus-Remote-Write-Samples-Written", "3".to_string()),
+                (
+                    "X-Prometheus-Remote-Write-Histograms-Written",
+                    "1".to_string()
+                ),
+                (
+                    "X-Prometheus-Remote-Write-Exemplars-Written",
+                    "0".to_string()
+                ),
+            ]
+        );
     }
 
     #[tokio::test]

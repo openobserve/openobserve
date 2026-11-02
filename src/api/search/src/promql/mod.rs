@@ -79,7 +79,7 @@ pub async fn remote_write(
         .unwrap_or("");
     if content_type == "application/x-protobuf" {
         match metrics::prom::remote_write(&org_id, body, user).await {
-            Ok(_) => StatusCode::OK.into_response(),
+            Ok(written) => (StatusCode::OK, written.response_headers()).into_response(),
             Err(e) => MetaHttpResponse::bad_request(e),
         }
     } else {
