@@ -177,3 +177,26 @@ describe("LiveSuggestions rail (OSS-11, OSS-9)", () => {
     expect(announce(wrapper).text()).toBe("Suggestions loaded");
   });
 });
+
+describe("LiveSuggestions rail when decisions empty the first page", () => {
+  it("keeps See all from the server total, and never says there are no suggestions", () => {
+    const wrapper = mountRail(rail(0, 12));
+    expect(cards(wrapper)).toHaveLength(0);
+    const seeAll = wrapper.find('[data-test="autoobserve2-suggestions-see-all"]');
+    expect(seeAll.exists()).toBe(true);
+    expect(seeAll.text()).toBe("See all 12");
+    expect(wrapper.find('[data-test="autoobserve2-suggestions-more"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="autoobserve2-suggestions-empty"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="autoobserve2-suggestions-page-empty"]').text()).toContain(
+      "The top suggestions were already handled",
+    );
+    expect(countChip(wrapper)).toBe("12");
+  });
+
+  it("keeps See all when the page holds fewer cards than the total", () => {
+    const wrapper = mountRail(rail(2, 12));
+    expect(cards(wrapper)).toHaveLength(2);
+    expect(wrapper.find('[data-test="autoobserve2-suggestions-more"]').text()).toBe("and 10 more");
+    expect(wrapper.find('[data-test="autoobserve2-suggestions-see-all"]').exists()).toBe(true);
+  });
+});

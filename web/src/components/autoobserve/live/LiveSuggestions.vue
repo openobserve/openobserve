@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <SectionCard
     :title="t('autoobserve2.suggestions.title')"
-    :count="listed ? rail.total : undefined"
+    :count="listed || hidden ? rail.total : undefined"
     :aria-busy="rail.status === 'loading'"
     data-test="autoobserve2-suggestions"
   >
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       loadText
     }}</span>
     <p
-      v-if="rail.status === 'loading' || skeleton || listed"
+      v-if="rail.status === 'loading' || skeleton || listed || hidden"
       class="text-text-secondary -mt-2 px-5 pb-3 text-sm leading-relaxed text-pretty sm:px-6"
       data-test="autoobserve2-suggestions-subtitle"
     >
@@ -78,6 +78,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @retry="rail.retry()"
       />
       <OEmptyState
+        v-if="hidden"
+        size="inline"
+        icon="task-alt"
+        :title="t('autoobserveLive.notice.suggestions.pageEmptyTitle')"
+        :description="t('autoobserveLive.notice.suggestions.pageEmptyDesc')"
+        data-test="autoobserve2-suggestions-page-empty"
+      />
+      <OEmptyState
+        v-else
         size="inline"
         icon="task-alt"
         :title="t('autoobserveLive.notice.suggestions.emptyTitle')"
@@ -101,11 +110,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </li>
       </ul>
     </template>
-    <template v-if="more" #footer>
+    <template v-if="beyond" #footer>
       <div class="flex items-center gap-2">
-        <span class="text-text-secondary text-xs" data-test="autoobserve2-suggestions-more">{{
-          more
-        }}</span>
+        <span
+          v-if="more"
+          class="text-text-secondary text-xs"
+          data-test="autoobserve2-suggestions-more"
+          >{{ more }}</span
+        >
         <OButton
           variant="ghost-primary"
           size="xs"
@@ -157,9 +169,11 @@ const emit = defineEmits<{ "see-all": [] }>();
 const { t, locale } = useI18nTyped();
 
 const shown = computed(() => props.rail.requests.slice(0, RAIL_CAP));
-const listed = computed(
-  () => !props.skeleton && props.rail.status === "ready" && shown.value.length > 0,
-);
+const settled = computed(() => !props.skeleton && props.rail.status === "ready");
+const listed = computed(() => settled.value && shown.value.length > 0);
+// The server total, not this page's length, decides whether more exist: decided suggestions can empty a page.
+const beyond = computed(() => settled.value && props.rail.total > shown.value.length);
+const hidden = computed(() => beyond.value && !listed.value);
 const notice = computed(() =>
   props.rail.status === "error" && props.rail.failure
     ? liveNotice(t, "suggestions", props.rail.failure)
