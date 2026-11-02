@@ -16,6 +16,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import i18n from "@/locales";
 import {
+  ERROR_RATIO_MIN_SPANS,
+  ERROR_RATIO_MIN_TRACES,
   buildPrefillFromTraces,
   buildTracesSeedQuery,
   tracesAlertPeriod,
@@ -78,6 +80,19 @@ describe("buildTracesSeedQuery", () => {
     expect(buildTracesSeedQuery(base({ metric: "duration" })).valueColumn).toBe("p95_duration");
   });
 
+  it("reads the error percentage and the span count for error_ratio in the Spans view", () => {
+    expect(buildTracesSeedQuery(base({ metric: "error_ratio" }))).toEqual({
+      sql: `SELECT CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) * 100 / count(*) AS error_rate, count(*) AS spans FROM "default" WHERE service_name = 'api'`,
+      valueColumn: "error_rate",
+    });
+  });
+
+  it("reads the error-trace percentage over distinct traces in the Traces view", () => {
+    expect(buildTracesSeedQuery(base({ metric: "error_ratio", view: "traces" })).sql).toBe(
+      `SELECT CAST(approx_distinct(CASE WHEN span_status = 'ERROR' THEN trace_id END) AS DOUBLE) * 100 / approx_distinct(trace_id) AS error_rate, approx_distinct(trace_id) AS traces FROM "default" WHERE service_name = 'api'`,
+    );
+  });
+
   it("drops WHERE for an empty filter, keeping only the error predicate", () => {
     expect(buildTracesSeedQuery(base({ filter: "  " })).sql).toBe(
       `SELECT count(*) AS matches FROM "default"`,
@@ -129,6 +144,57 @@ describe("buildPrefillFromTraces", () => {
     expect(p.sql).toBe(
       `SELECT approx_percentile_cont(duration, 0.95) AS p95_duration, count(*) AS spans FROM "default" WHERE service_name = 'api' HAVING approx_percentile_cont(duration, 0.95) > 265464 AND count(*) >= 20`,
     );
+  });
+
+  it("thresholds error_ratio in percent with a span-traffic guard", () => {
+    expect(ERROR_RATIO_MIN_SPANS).toBe(100);
+    const p = buildPrefillFromTraces(base({ metric: "error_ratio" }), 2);
+    expect(p.sql).toBe(
+      `SELECT CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) * 100 / count(*) AS error_rate, count(*) AS spans FROM "default" WHERE service_name = 'api' HAVING CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) * 100 / count(*) > 3 AND count(*) >= 100`,
+    );
+    expect(p.meta).toMatchObject({
+      metric: "error_ratio",
+      valueColumn: "error_rate",
+      threshold: 3,
+    });
+    expect(p.name).toBe("traces_default_error_rate");
+  });
+
+  it("thresholds error_ratio on distinct traces with a trace-traffic guard", () => {
+    expect(ERROR_RATIO_MIN_TRACES).toBe(20);
+    const sql = buildPrefillFromTraces(base({ metric: "error_ratio", view: "traces" }), 4).sql;
+    expect(sql).toMatch(
+      / HAVING CAST\(approx_distinct\(CASE WHEN span_status = 'ERROR' THEN trace_id END\) AS DOUBLE\) \* 100 \/ approx_distinct\(trace_id\) > 6 AND approx_distinct\(trace_id\) >= 20$/,
+    );
+  });
+
+  it("caps the error_ratio threshold below 100 percent so the alert can still fire", () => {
+    const p = buildPrefillFromTraces(base({ metric: "error_ratio" }), 80);
+    expect(p.meta?.threshold).toBe(99);
+    expect(p.sql).toContain("> 99 AND count(*) >= 100");
+  });
+
+  it("seeds error_ratio 0 as threshold 0, still behind the traffic guard", () => {
+    const p = buildPrefillFromTraces(base({ metric: "error_ratio" }), 0);
+    expect(p.sql).toMatch(/ > 0 AND count\(\*\) >= 100$/);
+    expect(p.warnings.map((w) => w.key)).toContain("tracesNoMatches");
+  });
+
+  it("states the error_ratio seed in percent and notes the traffic guard", () => {
+    const p = buildPrefillFromTraces(base({ metric: "error_ratio" }), 2);
+    expect(p.warnings).toContainEqual({
+      key: "tracesSeedErrorRatio",
+      level: "info",
+      params: { minutes: 15, threshold: "3.0", current: "2.0" },
+    });
+    expect(p.warnings).toContainEqual({
+      key: "tracesErrorRatioMinSpans",
+      level: "info",
+      params: { minimum: 100 },
+    });
+    expect(
+      buildPrefillFromTraces(base({ metric: "error_ratio", view: "traces" }), 2).warnings,
+    ).toContainEqual({ key: "tracesErrorRatioMinTraces", level: "info", params: { minimum: 20 } });
   });
 
   it("uses the same SQL in both views for duration", () => {
@@ -225,7 +291,7 @@ describe("buildPrefillFromTraces", () => {
   });
 
   it("never selects *", () => {
-    for (const metric of ["matches", "rate", "errors", "duration"] as const) {
+    for (const metric of ["matches", "rate", "errors", "duration", "error_ratio"] as const) {
       expect(buildPrefillFromTraces(base({ metric }), 3).sql).not.toMatch(/select\s+\*/i);
     }
   });
@@ -327,6 +393,8 @@ describe("traces alert source and text", () => {
       [base({ metric: "rate", view: "traces" }), 1],
       [base({ metric: "errors" }), 1],
       [base({ metric: "errors", view: "traces" }), 1],
+      [base({ metric: "error_ratio" }), 1],
+      [base({ metric: "error_ratio", view: "traces" }), 1],
       [base({ metric: "duration", datetime: { type: "relative", relativeTimePeriod: "2h" } }), 1],
     ];
     for (const [input, seed] of inputs) {

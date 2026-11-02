@@ -104,7 +104,7 @@ describe("useTracesAlertAction", () => {
     await action.createAlert("errors");
     await flushPromises();
 
-    expect(search).toHaveBeenCalledTimes(1);
+    expect(search).toHaveBeenCalledTimes(2);
     const [arg] = search.mock.calls[0];
     expect(arg.page_type).toBe("traces");
     expect(arg.query.query.sql).toBe(
@@ -185,6 +185,31 @@ describe("useTracesAlertAction", () => {
     await action.createAlert("errors");
     expect(search).not.toHaveBeenCalled();
     expect(alertCreationDialog.value).toBeNull();
+  });
+
+  it("offers Error count (default) and Error rate as query choices for Errors, and rebuilds on a pick", async () => {
+    markRun();
+    search.mockImplementation((async (arg: any) => {
+      const sql: string = arg.query.query.sql;
+      const row = sql.includes("AS error_rate")
+        ? { error_rate: 4.2, traces: 500 }
+        : { errors: 720 };
+      return { data: { hits: [row] } };
+    }) as any);
+    mountHost();
+    await action.createAlert("errors");
+
+    expect(search).toHaveBeenCalledTimes(2);
+    const prefill = alertCreationDialog.value!.prefill;
+    expect(prefill.queryChoices?.map((c) => c.tabName)).toEqual(["Error count", "Error rate"]);
+    expect(prefill.queryIndex).toBe(0);
+    expect(prefill.sql).toContain("HAVING approx_distinct(trace_id) > 1080");
+
+    rebuildAlertPrefill({ queryIndex: 1 });
+    const rebuilt = alertCreationDialog.value!.prefill;
+    expect(rebuilt.queryIndex).toBe(1);
+    expect(rebuilt.sql).toContain("AS error_rate");
+    expect(rebuilt.sql).toMatch(/HAVING CAST\(.+\) \* 100 \/ approx_distinct\(trace_id\) > 7 /);
   });
 
   it("offers p50/p95/p99 as query choices for Duration, p95 first, and rebuilds on a pick", async () => {

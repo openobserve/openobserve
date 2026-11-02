@@ -12808,7 +12808,9 @@
         "traces": {
           "label": "Create alert",
           "toast": "Query imported from your traces search",
-          "noStream": "Pick a stream first"
+          "noStream": "Pick a stream first",
+          "errorCount": "Error count",
+          "errorRate": "Error rate"
         }
       },
       "warnings": {
@@ -12848,6 +12850,9 @@
         "tracesSeedTraces": "Fires when traces in {minutes} min exceed {threshold} (now {current}).",
         "tracesSeedErrorSpans": "Fires when error spans in {minutes} min exceed {threshold} (now {current}).",
         "tracesSeedErrorTraces": "Fires when traces with errors in {minutes} min exceed {threshold} (now {current}).",
+        "tracesSeedErrorRatio": "Fires when the error rate in {minutes} min exceeds {threshold}% (now {current}%).",
+        "tracesErrorRatioMinSpans": "Checks only windows with at least {minimum} spans, so a few failures in a quiet period do not fire.",
+        "tracesErrorRatioMinTraces": "Checks only windows with at least {minimum} traces, so a few failures in a quiet period do not fire.",
         "tracesSeedDuration": "Fires when {percentile} duration over {minutes} min is above {threshold} ms (now {current} ms).",
         "tracesSeedUnavailable": "The current value could not be read, so the threshold starts at 0. Set it before saving.",
         "tracesNoMatches": "No matching spans yet, so the alert fires as soon as one appears.",

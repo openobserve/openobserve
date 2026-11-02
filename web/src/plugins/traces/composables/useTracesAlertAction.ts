@@ -34,6 +34,7 @@ import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils
 
 const DURATION_PERCENTILES: TracesAlertPercentile[] = [0.5, 0.95, 0.99];
 const DEFAULT_DURATION_INDEX = 1;
+const ERROR_METRICS: TracesAlertMetric[] = ["errors", "error_ratio"];
 
 /** Create alert from the Traces page: seeds the threshold from the current value, then opens the confirm dialog. */
 export const useTracesAlertAction = () => {
@@ -97,9 +98,12 @@ export const useTracesAlertAction = () => {
     const startUs = endUs - minutes * 60 * 1_000_000;
 
     const isDuration = metric === "duration";
+    const isErrors = metric === "errors";
     const variants: TracesPrefillInput[] = isDuration
       ? DURATION_PERCENTILES.map((percentile) => ({ ...input, percentile }))
-      : [input];
+      : isErrors
+        ? ERROR_METRICS.map((errorMetric) => ({ ...input, metric: errorMetric }))
+        : [input];
     creating = true;
     let seeds: (number | null)[];
     try {
@@ -109,7 +113,11 @@ export const useTracesAlertAction = () => {
     }
 
     const choiceLabel = (variant: TracesPrefillInput) =>
-      raw(`p${Math.round((variant.percentile ?? 0.95) * 100)}`);
+      isDuration
+        ? raw(`p${Math.round((variant.percentile ?? 0.95) * 100)}`)
+        : variant.metric === "error_ratio"
+          ? t("alerts.prefill.sources.traces.errorRate")
+          : t("alerts.prefill.sources.traces.errorCount");
 
     const build = (options: AlertBuildOptions = {}): AlertPrefill => {
       const defaultIndex = isDuration ? DEFAULT_DURATION_INDEX : 0;

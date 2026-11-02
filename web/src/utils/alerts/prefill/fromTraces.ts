@@ -25,7 +25,7 @@ import {
   type PrefillTimeRange,
 } from "../alertPrefill";
 
-export type TracesAlertMetric = "matches" | "rate" | "errors" | "duration";
+export type TracesAlertMetric = "matches" | "rate" | "errors" | "duration" | "error_ratio";
 export type TracesAlertPercentile = 0.5 | 0.95 | 0.99;
 
 export interface TracesPrefillInput {
@@ -52,6 +52,11 @@ export const TRACES_ALERT_MAX_PERIOD_MINUTES = 60;
 const FREQUENCY_MINUTES = 5;
 const SILENCE_MINUTES = 10;
 const MIN_DURATION_SPANS = 20;
+/** A quiet window where 1 of 2 spans failed must not fire an error-rate alert. */
+export const ERROR_RATIO_MIN_SPANS = 100;
+export const ERROR_RATIO_MIN_TRACES = 20;
+// The alert fires on `>`, so a 100 % threshold could never be exceeded.
+const ERROR_RATIO_MAX_THRESHOLD = 99;
 const SEED_HEADROOM = 1.5;
 
 interface MetricShape {
@@ -80,6 +85,20 @@ const metricShape = (input: TracesPrefillInput): MetricShape => {
         expr: counter,
         alias: "errors",
         where: filter ? `(${filter}) AND ${errorOnly}` : errorOnly,
+      };
+    }
+    case "error_ratio": {
+      const errors = distinctTraces
+        ? "approx_distinct(CASE WHEN span_status = 'ERROR' THEN trace_id END)"
+        : "SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END)";
+      const total = distinctTraces ? "traces" : "spans";
+      const minimum = distinctTraces ? ERROR_RATIO_MIN_TRACES : ERROR_RATIO_MIN_SPANS;
+      return {
+        where: filter,
+        expr: `CAST(${errors} AS DOUBLE) * 100 / ${counter}`,
+        alias: "error_rate",
+        extraSelect: `, ${counter} AS ${total}`,
+        extraHaving: ` AND ${counter} >= ${minimum}`,
       };
     }
     case "duration": {
@@ -132,6 +151,11 @@ const formatMs = (micros: number): string => {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: ms < 10 ? 2 : 0 }).format(ms);
 };
 
+const formatPercent = (value: number): string =>
+  new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(
+    value,
+  );
+
 const seedWarning = (
   input: TracesPrefillInput,
   minutes: number,
@@ -146,8 +170,15 @@ const seedWarning = (
       current: formatMs(seed),
     });
   }
+  if (input.metric === "error_ratio") {
+    return warn("tracesSeedErrorRatio", "info", {
+      minutes,
+      threshold: formatPercent(threshold),
+      current: formatPercent(seed),
+    });
+  }
   const traces = input.view === "traces";
-  const keyByMetric: Record<Exclude<TracesAlertMetric, "duration">, string> = {
+  const keyByMetric: Record<Exclude<TracesAlertMetric, "duration" | "error_ratio">, string> = {
     matches: "tracesSeedMatches",
     rate: traces ? "tracesSeedTraces" : "tracesSeedSpans",
     errors: traces ? "tracesSeedErrorTraces" : "tracesSeedErrorSpans",
@@ -170,7 +201,9 @@ export const buildPrefillFromTraces = (
 
   const known = typeof seed === "number" && Number.isFinite(seed) && seed >= 0;
   const current = known ? seed : 0;
-  const threshold = Math.ceil(current * SEED_HEADROOM);
+  const ratio = input.metric === "error_ratio";
+  const headroom = Math.ceil(current * SEED_HEADROOM);
+  const threshold = ratio ? Math.min(headroom, ERROR_RATIO_MAX_THRESHOLD) : headroom;
 
   const { minutes, warnings: periodWarnings } = tracesAlertPeriod(input.datetime);
   warnings.push(...periodWarnings);
@@ -178,6 +211,11 @@ export const buildPrefillFromTraces = (
   if (!known) warnings.push(warn("tracesSeedUnavailable", "warning"));
   else if (current === 0) warnings.push(warn("tracesNoMatches", "info"));
   warnings.push(seedWarning(input, minutes, current, threshold));
+  if (ratio && input.view === "traces") {
+    warnings.push(warn("tracesErrorRatioMinTraces", "info", { minimum: ERROR_RATIO_MIN_TRACES }));
+  } else if (ratio) {
+    warnings.push(warn("tracesErrorRatioMinSpans", "info", { minimum: ERROR_RATIO_MIN_SPANS }));
+  }
   warnings.push(warn("tracesStoredSpans", "info"));
 
   const shape = metricShape(input);
