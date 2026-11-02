@@ -69,6 +69,9 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
     expect(slack.listOncallUnlinked).toHaveBeenCalledWith("acme", "inst-1");
     const section = w.find('[data-test="slack-oncall-unlinked"]');
     expect(section.text()).toContain("On-call members not linked to Slack");
+    expect(section.text()).toContain(
+      "Link your OpenObserve account so page buttons (Acknowledge, Resolve) and alert buttons (Acknowledge, Mute, Investigate) act as you. Until then your presses wait for you to link.",
+    );
     expect(section.text()).toContain("kim@acme.io");
     expect(section.text()).toContain("Payments");
     expect(w.find('[data-test="slack-oncall-unlinked-reminder-kim@acme.io"]').text()).toContain(
