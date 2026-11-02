@@ -169,7 +169,8 @@ export function createRecordConverter(): RecordConverter {
   let nextStyleSheetId = 0;
   let rootId: number | null = null;
   let scrolls = new Map<number, { x: number; y: number }>();
-  let inputs = new Map<number, { text?: string; isChecked?: boolean }>();
+  // optionId: the <option> an InputSelection picked, so a rebuilt <select> marks that exact option.
+  let inputs = new Map<number, { text?: string; isChecked?: boolean; optionId?: number }>();
   let changeCount = 0;
 
   function reset() {
@@ -209,7 +210,7 @@ export function createRecordConverter(): RecordConverter {
   function inputSelectionData(
     nodeId: number,
     selected: boolean,
-  ): { id: number; text: string; isChecked: boolean } | null {
+  ): { id: number; text: string; isChecked: boolean; optionId?: number } | null {
     const tracked = nodes.get(nodeId);
     const node = tracked?.node;
     const attrs = node?.attributes;
@@ -225,24 +226,31 @@ export function createRecordConverter(): RecordConverter {
       parent = nodes.get(parentId)?.node;
     }
     if (parent?.tagName !== "select") return null;
-    return { id: parentId, text: optionValue(node), isChecked: false };
+    return { id: parentId, text: optionValue(node), isChecked: false, optionId: nodeId };
   }
 
-  // Like the DOM: an <option> without a value attribute takes its text with ASCII whitespace
-  // stripped and collapsed (a non-breaking space is kept).
+  // Like the DOM: an <option> without a value attribute takes the text of its Text descendants
+  // (outside <script>), with ASCII whitespace stripped and collapsed (a non-breaking space is kept).
   function optionValue(option: any): string {
     if (option.attributes?.value !== undefined) return option.attributes.value;
-    return (option.childNodes ?? [])
-      .map((child: any) => child.textContent ?? "")
+    const parts: string[] = [];
+    const collect = (n: any) => {
+      for (const child of n.childNodes ?? []) {
+        if (child.type === NodeType.Text) parts.push(child.textContent ?? "");
+        else if (child.tagName !== "script") collect(child);
+      }
+    };
+    collect(option);
+    return parts
       .join("")
       .replace(/[\t\n\f\r ]+/g, " ")
       .replace(/^ | $/g, "");
   }
 
   // rrweb rebuilds a <select>'s choice from its options' `selected` attributes, not from a value
-  // attribute, so mark the first option matching the value and clear the rest. No match (for
-  // example a masked value) leaves the options as recorded.
-  function selectOptionByValue(select: any, value: string) {
+  // attribute, so mark the first matching option and, unless the <select> is `multiple`, clear the
+  // rest. No match (for example a masked value) leaves the options as recorded.
+  function selectOption(select: any, isMatch: (option: any) => boolean) {
     const options: any[] = [];
     const collect = (n: any) => {
       for (const child of n.childNodes ?? []) {
@@ -251,11 +259,12 @@ export function createRecordConverter(): RecordConverter {
       }
     };
     collect(select);
-    const match = options.findIndex((option) => optionValue(option) === value);
+    const match = options.findIndex(isMatch);
     if (match === -1) return;
+    const multiple = select.attributes?.multiple !== undefined;
     options.forEach((option, i) => {
       if (i === match) option.attributes.selected = true;
-      else delete option.attributes.selected;
+      else if (!multiple) delete option.attributes.selected;
     });
   }
 
@@ -455,7 +464,13 @@ export function createRecordConverter(): RecordConverter {
         else delete n.attributes.checked;
       } else if (value.text !== undefined) {
         n.attributes.value = value.text;
-        if (n.tagName === "select") selectOptionByValue(n, value.text);
+        if (n.tagName === "select") {
+          selectOption(n, (option) =>
+            value.optionId !== undefined
+              ? option.id === value.optionId
+              : optionValue(option) === value.text,
+          );
+        }
       }
     });
     return initialOffset;
@@ -794,14 +809,19 @@ export function createRecordConverter(): RecordConverter {
             if (state !== InputSelectionState.Selected && state !== InputSelectionState.Deselected)
               continue;
             for (let j = 1; j < selection.length; j++) {
-              const data = inputSelectionData(selection[j], state === InputSelectionState.Selected);
-              if (!data) continue;
+              const result = inputSelectionData(
+                selection[j],
+                state === InputSelectionState.Selected,
+              );
+              if (!result) continue;
+              const { optionId, ...data } = result;
               const input = {
                 type: RecordType.IncrementalSnapshot,
                 timestamp,
                 data: { source: IncrementalSource.Input, ...data },
               };
               trackClassic(input);
+              if (optionId !== undefined) inputs.get(data.id)!.optionId = optionId;
               extraRecords.push(input);
             }
           }

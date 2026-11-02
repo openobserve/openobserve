@@ -843,6 +843,65 @@ describe("sessionReplayChangeFormat", () => {
       expect(nodeWithId(converter.snapshot()!.node, 2).attributes.selected).toBe("");
     });
 
+    it("rebuilds the exact <option> the SDK picked when options share a value", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([
+          [
+            ADD_NODE,
+            [null, "#document"],
+            [1, "SELECT"],
+            [1, "OPTION", ["value", "x"]],
+            [0, "OPTION", ["value", "x"], ["selected", ""]],
+          ],
+        ]),
+      );
+      converter.convert(change(1100, [[INPUT_SELECTION, [0, 2]]]));
+      converter.convert(change(1200, [[INPUT_SELECTION, [0, 3]]]));
+      const snap = converter.snapshot()!.node;
+      expect(nodeWithId(snap, 2).attributes.selected).toBeUndefined();
+      expect(nodeWithId(snap, 3).attributes.selected).toBe(true);
+    });
+
+    it("keeps the other selected options of a <select multiple>", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([
+          [
+            ADD_NODE,
+            [null, "#document"],
+            [1, "SELECT", ["multiple", ""]],
+            [1, "OPTION", ["value", "a"], ["selected", ""]],
+            [0, "OPTION", ["value", "b"]],
+          ],
+        ]),
+      );
+      converter.convert(change(1100, [[INPUT_SELECTION, [0, 3]]]));
+      const snap = converter.snapshot()!.node;
+      expect(nodeWithId(snap, 2).attributes.selected).toBe("");
+      expect(nodeWithId(snap, 3).attributes.selected).toBe(true);
+    });
+
+    it("takes an <option>'s text from all its Text descendants, outside <script>", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([
+          [
+            ADD_NODE,
+            [null, "#document"],
+            [1, "SELECT"],
+            [1, "OPTION"],
+            [1, "SPAN"],
+            [1, "#text", "B"],
+            [3, "SCRIPT"],
+            [1, "#text", "x"],
+          ],
+        ]),
+      );
+      const out = converter.convert(change(1100, [[INPUT_SELECTION, [0, 2]]]));
+      expect(out.map((r: any) => r.data.text)).toEqual(["B"]);
+    });
+
     it("decodes references after ClearStrings across encoder runs in one record", () => {
       const converter = createRecordConverter();
       converter.convert(
