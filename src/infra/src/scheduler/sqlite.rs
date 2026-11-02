@@ -729,6 +729,23 @@ WHERE status = $2 AND end_time <= $3;
         Ok(())
     }
 
+    async fn watch_timeout_module(&self, module: TriggerModule) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        sqlx::query(
+            r#"UPDATE scheduled_jobs
+SET status = $1, retries = retries + 1
+WHERE status = $2 AND end_time <= $3 AND module = $4;
+                "#,
+        )
+        .bind(TriggerStatus::Waiting)
+        .bind(TriggerStatus::Processing)
+        .bind(now_micros())
+        .bind(module)
+        .execute(&client)
+        .await?;
+        Ok(())
+    }
+
     async fn len(&self) -> usize {
         let pool = CLIENT_RO.clone();
         let ret = match sqlx::query(
@@ -963,6 +980,9 @@ mod tests {
         let _scheduler = SqliteScheduler::default();
     }
 
+    /// Every timeout watch in here touches all lapsed rows, so the tests that make some take turns.
+    static WATCH_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     fn claimed(rows: Vec<Trigger>, org: &str) -> Option<Trigger> {
         rows.into_iter().find(|t| t.org == org)
     }
@@ -975,6 +995,7 @@ mod tests {
         }
         std::fs::create_dir_all(&cfg.common.data_db_dir).unwrap();
         scheduler::init().await.unwrap();
+        let _serial = WATCH_LOCK.lock().await;
         let module = TriggerModule::AutoObserve;
         let org = format!("hidden_{}", now_micros());
         let get = || scheduler::get(&org, module.clone(), "engine");
@@ -1031,6 +1052,43 @@ mod tests {
         let shared = scheduler::pull(1000, 60, 60, None).await.unwrap();
         assert!(claimed(shared, &org).is_none());
         scheduler::delete(&org, module, "engine").await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_module_timeout_watch_frees_only_that_modules_lapsed_rows() {
+        let cfg = config::get_config();
+        if !(cfg.common.meta_store.is_empty() || cfg.common.meta_store == "sqlite") {
+            return;
+        }
+        std::fs::create_dir_all(&cfg.common.data_db_dir).unwrap();
+        scheduler::init().await.unwrap();
+        let _serial = WATCH_LOCK.lock().await;
+        let org = format!("watch_module_{}", now_micros());
+        let modules = [TriggerModule::AutoObserve, TriggerModule::Report];
+        for module in &modules {
+            scheduler::push(Trigger {
+                org: org.clone(),
+                module: module.clone(),
+                module_key: "k".to_string(),
+                status: TriggerStatus::Processing,
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        }
+        scheduler::watch_timeout_module(TriggerModule::AutoObserve)
+            .await
+            .unwrap();
+        let mut after = Vec::new();
+        for module in &modules {
+            let t = scheduler::get(&org, module.clone(), "k").await.unwrap();
+            after.push((t.status, t.retries));
+            scheduler::delete(&org, module.clone(), "k").await.unwrap();
+        }
+        assert_eq!(
+            after,
+            vec![(TriggerStatus::Waiting, 1), (TriggerStatus::Processing, 0)]
+        );
     }
 
     #[test]
