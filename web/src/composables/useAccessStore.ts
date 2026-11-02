@@ -901,7 +901,8 @@ export function recordForbidden({ url, method, routeKey: stamp }: AccessRequest)
 /** Lifts a page lock or a section entry once the same permission on that resource succeeds on the same route. */
 export function noteAccessSuccess({ url, method, routeKey: stamp }: Partial<AccessRequest>): void {
   // Two cached reads per response; parsing happens only while the route shows a denial.
-  if (!url || (!pageDenied.value && sectionEntries.value.length === 0)) return;
+  if (!url || (!pageDenied.value && sectionEntries.value.length === 0 && !actionNotice.value))
+    return;
   const route = currentRoute.value;
   if (!route || !stampedHere(stamp, routeKey(route))) return;
   const verb = (method ?? "get").toUpperCase();
@@ -932,6 +933,7 @@ export function noteAccessSuccess({ url, method, routeKey: stamp }: Partial<Acce
     return requests.length ? [{ ...e, requests }] : [];
   });
   if (changed) setEntries(key, write, kept);
+  dropRecoveredAction(key, info.key, permission, request);
 }
 
 /** Forgets every denial, for an org switch or a sign-out. */
@@ -1204,6 +1206,28 @@ function mergeDenials(
     const requests = [...new Set([...found.requests, ...d.requests])];
     return merged.map((m) => (m === found ? { ...m, requests } : m));
   }, open);
+}
+
+// A later attempt on the same control merges into the card, so a write that has since succeeded must leave it first.
+function dropRecoveredAction(
+  key: string,
+  resourceKey: string,
+  permission: AccessPermission,
+  request: string,
+): void {
+  const notice = actionNotice.value;
+  if (!notice || notice.routeKey !== key) return;
+  let changed = false;
+  const denials = notice.denials.flatMap((d) => {
+    if (entryId(d) !== resourceKey || d.permission !== permission || !d.requests.includes(request))
+      return [d];
+    changed = true;
+    const requests = d.requests.filter((r) => r !== request);
+    return requests.length ? [{ ...d, requests }] : [];
+  });
+  if (!changed) return;
+  if (denials.length) actionNotice.value = { ...notice, denials };
+  else dismissAction();
 }
 
 function dismissAction(): void {

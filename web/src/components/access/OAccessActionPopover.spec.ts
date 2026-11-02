@@ -127,6 +127,48 @@ describe("OAccessActionPopover", () => {
     expect(state.dismissAction).toHaveBeenCalledTimes(1);
   });
 
+  it("returns Shift+Tab from the first card button to the pressed control", async () => {
+    await openCard();
+    const copy = card()!.querySelector<HTMLElement>('[data-test="access-denied-copy"]')!;
+    copy.focus();
+    const event = new KeyboardEvent("keydown", {
+      key: "Tab",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    copy.dispatchEvent(event);
+    await settle();
+    expect(event.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(anchor);
+    expect(state.dismissAction).not.toHaveBeenCalled();
+  });
+
+  it("returns Shift+Tab from the first of several card buttons, and leaves the others to the browser", async () => {
+    await openCard(
+      ["dashboards", "alerts", "streams", "functions", "pipelines", "destinations"].map((key) =>
+        viewDenial(key, "delete", [`DELETE /api/default/${key}/x`]),
+      ),
+    );
+    const buttons = [...card()!.querySelectorAll<HTMLElement>("button")];
+    expect(buttons[0].dataset.test).toBe("access-denied-more");
+    expect(buttons.length).toBeGreaterThan(1);
+    buttons[1].focus();
+    const inner = new KeyboardEvent("keydown", {
+      key: "Tab",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    buttons[1].dispatchEvent(inner);
+    expect(inner.defaultPrevented).toBe(false);
+    buttons[0].focus();
+    press(buttons[0], "Tab", { shiftKey: true });
+    await settle();
+    expect(document.activeElement).toBe(anchor);
+    expect(state.dismissAction).not.toHaveBeenCalled();
+  });
+
   it("closes on Escape and gives focus back to the pressed control", async () => {
     await openCard();
     card()!.focus();

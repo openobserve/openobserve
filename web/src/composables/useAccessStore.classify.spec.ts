@@ -896,6 +896,48 @@ describe("access store lifecycle", () => {
     expect(access.sectionEntries.value).toEqual([]);
   });
 
+  it("drops a refused write from the card once its retry succeeds, before the next refusal joins it", async () => {
+    await boot("/settings");
+    document.body.innerHTML = "<button id='save'>Save</button>";
+    press("save");
+    forbidden("PUT", "/api/acme/roles/developer");
+    noteAccessSuccess({
+      method: "PUT",
+      url: "/api/acme/roles/developer",
+      routeKey: currentAccessRouteKey(),
+    });
+    press("save");
+    forbidden("PUT", "/api/acme/groups/admins");
+    expect(access.actionNotice.value?.denials.map((d) => d.resource.key)).toEqual(["groups"]);
+  });
+
+  it("keeps the card's other refusals when one of its writes later succeeds", async () => {
+    await boot("/settings");
+    document.body.innerHTML = "<button id='save'>Save</button>";
+    press("save");
+    forbidden("PUT", "/api/acme/roles/developer");
+    forbidden("PUT", "/api/acme/groups/admins");
+    noteAccessSuccess({
+      method: "PUT",
+      url: "/api/acme/roles/developer",
+      routeKey: currentAccessRouteKey(),
+    });
+    expect(access.actionNotice.value?.denials.map((d) => d.resource.key)).toEqual(["groups"]);
+  });
+
+  it("closes the card once every write it names has succeeded", async () => {
+    await boot("/settings");
+    document.body.innerHTML = "<button id='save'>Save</button>";
+    press("save");
+    forbidden("PUT", "/api/acme/roles/developer");
+    noteAccessSuccess({
+      method: "PUT",
+      url: "/api/acme/roles/developer",
+      routeKey: currentAccessRouteKey(),
+    });
+    expect(access.actionNotice.value).toBeNull();
+  });
+
   it("moves an open card's denial to the section notice when another control's card replaces it", async () => {
     await boot("/settings");
     document.body.innerHTML = "<button id='a'>Delete</button><button id='b'>Delete</button>";

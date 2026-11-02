@@ -104,7 +104,8 @@ function onCardKeydown(event: KeyboardEvent): void {
   const root = cardEl();
   if (event.key !== "Tab" || !root) return;
   const buttons = [...root.querySelectorAll<HTMLElement>("button:not([disabled])")];
-  const leavingStart = event.shiftKey && document.activeElement === root;
+  const leavingStart =
+    event.shiftKey && (document.activeElement === root || document.activeElement === buttons[0]);
   const leavingEnd = !event.shiftKey && document.activeElement === buttons[buttons.length - 1];
   if (!leavingStart && !leavingEnd) return;
   event.preventDefault();
