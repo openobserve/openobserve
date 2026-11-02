@@ -10,6 +10,7 @@ use config::{
     get_config,
     meta::stream::{FileKey, PartitionTimeLevel, StreamType},
     metrics::{FILE_LIST_CACHE_HIT_COUNT, FILE_LIST_ID_SELECT_COUNT},
+    utils::time::day_micros,
 };
 use hashbrown::HashSet;
 use infra::{errors::Result, file_list as infra_file_list};
@@ -54,6 +55,42 @@ pub async fn query(
     files.par_sort_unstable_by(|left, right| left.key.cmp(&right.key));
     files.dedup_by(|left, right| left.key == right.key);
     Ok(files)
+}
+
+/// Errors when deleting `time_range` would hit a file whose data reaches outside it (a merged day).
+pub async fn check_delete_range(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_range: (i64, i64),
+) -> Result<()> {
+    let (start, end) = time_range;
+    // an invalid range is the caller's to report
+    if start <= 0 || end < start {
+        return Ok(());
+    }
+    let trace_id = format!("check_delete_range-{org_id}-{stream_type}-{stream_name}");
+    // a day past the range: a merged day is found whatever the stream's query bound is
+    let files = query(
+        &trace_id,
+        org_id,
+        stream_type,
+        stream_name,
+        PartitionTimeLevel::Unset,
+        start,
+        end + day_micros(1),
+    )
+    .await?;
+    let exceeding = files
+        .iter()
+        .filter(|f| f.meta.overlaps(time_range) && !f.meta.within(time_range))
+        .count();
+    if exceeding == 0 {
+        return Ok(());
+    }
+    Err(infra::errors::Error::Message(format!(
+        "{exceeding} file(s) of {stream_type}/{stream_name} hold data outside the requested range: the data is stored by day, delete a day-aligned range"
+    )))
 }
 
 /// Query merge candidates from the live file list only.
@@ -244,4 +281,58 @@ pub async fn query_ids(
     files.par_sort_unstable_by(|left, right| left.id.cmp(&right.id));
     files.dedup_by(|left, right| left.id == right.id);
     Ok(files)
+}
+
+#[cfg(test)]
+mod tests {
+    use config::{
+        meta::stream::FileMeta,
+        utils::time::{hour_micros, parse_str_to_timestamp_micros},
+    };
+
+    use super::*;
+
+    fn merged_day_file(stream: &str, min_ts: i64, max_ts: i64) -> FileKey {
+        FileKey::new(
+            0,
+            "default".to_string(),
+            format!("files/precheck/logs/{stream}/2026/09/30/00/{min_ts}.parquet"),
+            FileMeta {
+                min_ts,
+                max_ts,
+                records: 1,
+                original_size: 1,
+                compressed_size: 1,
+                ..Default::default()
+            },
+            false,
+        )
+    }
+
+    /// A merged day refuses a delete of one of its hours and accepts the whole day.
+    #[tokio::test]
+    async fn test_check_delete_range_refuses_part_of_a_merged_day() {
+        infra_file_list::create_table().await.unwrap();
+        let stream = "precheck_delete";
+        let day = parse_str_to_timestamp_micros("2026-09-30T00:00:00Z").unwrap();
+        let merged_day = merged_day_file(stream, day + 1, day + hour_micros(24) - 2);
+        infra_file_list::batch_add(&[merged_day]).await.unwrap();
+
+        let hour10 = day + hour_micros(10);
+        let one_hour = (hour10, hour10 + hour_micros(1) - 1);
+        let err = check_delete_range("precheck", StreamType::Logs, stream, one_hour)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("stored by day"), "{err}");
+
+        let whole_day = (day, day + hour_micros(24) - 1);
+        check_delete_range("precheck", StreamType::Logs, stream, whole_day)
+            .await
+            .unwrap();
+        // an hour with no data at all is fine too
+        let next_day = (day + hour_micros(24), day + hour_micros(25) - 1);
+        check_delete_range("precheck", StreamType::Logs, stream, next_day)
+            .await
+            .unwrap();
+    }
 }
