@@ -536,6 +536,43 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
   },
 };
 
+/** Engine operators that servers older than the skip-unreadable-rows fix fail on; offered only when the server allows them. */
+export const EXTENDED_ENGINE_OPERATORS: readonly FilterOperatorId[] = [
+  "in",
+  "not_in",
+  "starts_with",
+  "ends_with",
+  "regex",
+  "not_regex",
+];
+
+const ENGINE_PROFILES: ReadonlySet<FilterProfileName> = new Set([
+  "alert",
+  "pipeline",
+  "workflow",
+  "eval",
+  "annotation",
+]);
+
+/** A profile as this server allows it: engine profiles lose the extended operators unless `extendedOperators`. */
+export const serverProfile = (
+  name: FilterProfileName,
+  extendedOperators: boolean,
+): FilterProfile => {
+  const profile = FILTER_PROFILES[name];
+  if (extendedOperators || !ENGINE_PROFILES.has(name)) return profile;
+  const allowed = (ids: FilterOperatorId[]) =>
+    ids.filter((id) => !EXTENDED_ENGINE_OPERATORS.includes(id));
+  return {
+    ...profile,
+    operators: {
+      string: allowed(profile.operators.string),
+      number: allowed(profile.operators.number),
+      boolean: allowed(profile.operators.boolean),
+    },
+  };
+};
+
 /** How many values an operator takes under this config. */
 export const arityFor = (
   config: Pick<FilterEditorConfig, "arity">,

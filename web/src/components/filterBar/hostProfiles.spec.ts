@@ -19,7 +19,12 @@ import { OPERATORS, type FilterCondition, type FilterGroup } from "@/utils/query
 import type { TranslateFn } from "@/types/i18n";
 import { encodeProfileRouteFilters, parseProfileFilters } from "@/services/profiles";
 import { DASHBOARD_SPELLINGS } from "./codecs";
-import { FILTER_PROFILES, type FilterProfileName } from "./filterProfiles";
+import {
+  EXTENDED_ENGINE_OPERATORS,
+  FILTER_PROFILES,
+  serverProfile,
+  type FilterProfileName,
+} from "./filterProfiles";
 import { filterIssues } from "./filterValidation";
 import { operatorName } from "./useFilterBarEditor";
 
@@ -288,4 +293,24 @@ describe("operator names", () => {
     }
     expect(operatorName("regex", "sql", tr)).toBe("re_match");
   });
+});
+
+describe("serverProfile", () => {
+  const ENGINE: FilterProfileName[] = ["alert", "pipeline", "workflow", "eval", "annotation"];
+  const offered = (name: FilterProfileName, extended: boolean) =>
+    Object.values(serverProfile(name, extended).operators).flat();
+
+  it.each(ENGINE)("drops the extended operators from %s unless the server allows them", (name) => {
+    expect(offered(name, false).filter((id) => EXTENDED_ENGINE_OPERATORS.includes(id))).toEqual([]);
+    expect(offered(name, false)).toContain("contains_ci");
+    expect(serverProfile(name, true)).toBe(FILTER_PROFILES[name]);
+    expect(serverProfile(name, false).codec).toBe(FILTER_PROFILES[name].codec);
+  });
+
+  it.each(["logs", "traces", "metrics", "dashboard-panel", "rum-funnel", "profiles"] as const)(
+    "leaves %s as it is",
+    (name) => {
+      expect(serverProfile(name, false)).toBe(FILTER_PROFILES[name]);
+    },
+  );
 });

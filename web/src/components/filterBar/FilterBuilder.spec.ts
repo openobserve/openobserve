@@ -16,6 +16,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
+import { createStore } from "vuex";
 import FilterBuilder from "./FilterBuilder.vue";
 import type { FilterProfileName } from "./filterProfiles";
 import type { FilterField } from "@/utils/query/filterBar";
@@ -55,6 +56,7 @@ function mountBuilder(
   profile: FilterProfileName,
   modelValue: unknown,
   props: Record<string, unknown> = {},
+  zoConfig: Record<string, unknown> = {},
 ) {
   const state = { value: modelValue as any, valid: [] as boolean[] };
   wrapper = mount(FilterBuilder, {
@@ -72,6 +74,7 @@ function mountBuilder(
       "onUpdate:valid": (valid: boolean) => state.valid.push(valid),
       ...props,
     },
+    global: { plugins: [createStore({ state: { zoConfig } })] },
   });
   return state;
 }
@@ -120,6 +123,57 @@ async function addEq(field: string, value: string) {
 }
 
 describe("FilterBuilder", () => {
+  describe("server switch for the extended engine operators", () => {
+    const EXTENDED = ["in", "not_in", "starts_with", "ends_with", "regex", "not_regex"];
+
+    async function operatorRows(
+      profile: FilterProfileName,
+      extended: boolean,
+      saved: unknown = null,
+    ) {
+      mountBuilder(profile, saved, {}, { extended_condition_operators: extended });
+      await find("input").trigger("click");
+      await flushPromises();
+      await type("level");
+      await press("Enter");
+      return rowKeys();
+    }
+
+    it.each(["alert", "pipeline", "workflow", "eval", "annotation"] as FilterProfileName[])(
+      "%s hides them while the server keeps them off, and keeps contains ignore case",
+      async (profile) => {
+        const rows = await operatorRows(profile, false);
+        expect(rows.filter((id) => EXTENDED.includes(id))).toEqual([]);
+        expect(rows).toContain("contains_ci");
+        expect(rows).toContain("eq");
+      },
+    );
+
+    it.each(["alert", "pipeline", "workflow", "eval", "annotation"] as FilterProfileName[])(
+      "%s offers them once the server allows them",
+      async (profile) => {
+        const rows = await operatorRows(profile, true);
+        expect(rows).toEqual(expect.arrayContaining([...EXTENDED, "contains_ci"]));
+      },
+    );
+
+    it.each(["logs", "dashboard-panel"] as FilterProfileName[])(
+      "%s is not affected by the switch",
+      async (profile) => {
+        expect(await operatorRows(profile, false)).toEqual(expect.arrayContaining(EXTENDED));
+      },
+    );
+
+    it("still shows a saved IN condition while the server keeps them off", async () => {
+      const saved = v2(leaf("level", ["error", "warn"], "AND", "in"));
+      const state = mountBuilder("alert", saved, {}, { extended_condition_operators: false });
+      await flushPromises();
+      expect(find("row-0").text()).toContain("IN");
+      expect(find("row-0").text()).toContain("error");
+      expect(state.valid.at(-1)).toBe(true);
+    });
+  });
+
   describe("vertical layout (alerts engine tree)", () => {
     const saved = v2(leaf("level", "error"), leaf("service", "api", "OR"), {
       filterType: "group",

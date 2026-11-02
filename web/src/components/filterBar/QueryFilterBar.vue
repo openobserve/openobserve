@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, provide, ref, toRef, watch, type ComponentPublicInstance } from "vue";
+import { useStore } from "vuex";
 import OChipInput from "@/lib/forms/ChipInput/OChipInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OFilterToken from "@/lib/core/Badge/OFilterToken.vue";
@@ -26,7 +27,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { countConditions, findNode, findParent, type FilterGroup } from "@/utils/query/filterBar";
 import FilterBarNodes from "./FilterBarNodes.vue";
 import FilterBarRows from "./FilterBarRows.vue";
-import { dialectConfig, FILTER_PROFILES, type FilterEditorConfig } from "./filterProfiles";
+import { dialectConfig, serverProfile, type FilterEditorConfig } from "./filterProfiles";
 import { operatorName, useFilterBarEditor } from "./useFilterBarEditor";
 import { containsNode, useFilterBarFolds } from "./useFilterBarFolds";
 import {
@@ -58,6 +59,7 @@ const props = withDefaults(defineProps<QueryFilterBarProps>(), {
 const emit = defineEmits<QueryFilterBarEmits>();
 
 const { t } = useI18nTyped();
+const store = useStore();
 const inputRef = ref<InstanceType<typeof OChipInput> | null>(null);
 const draftRef = ref<ComponentPublicInstance | null>(null);
 const editAnchor = ref<HTMLElement | null>(null);
@@ -65,7 +67,7 @@ const rowsRef = ref<HTMLElement | null>(null);
 
 const config = computed<FilterEditorConfig>(() => {
   const base = props.profile
-    ? FILTER_PROFILES[props.profile]
+    ? serverProfile(props.profile, store?.state?.zoConfig?.extended_condition_operators === true)
     : dialectConfig(props.dialect, props.freeText, props.allowCustomFields);
   return props.layout ? { ...base, layout: props.layout } : base;
 });
