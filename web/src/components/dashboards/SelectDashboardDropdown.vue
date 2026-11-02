@@ -83,6 +83,11 @@ export default defineComponent({
         return typeof value === "string" || value === null;
       },
     },
+    /** Picked instead of the newest dashboard when the folder still has it. */
+    preferredDashboardId: {
+      type: String,
+      default: undefined,
+    },
   },
   setup(props, { emit }) {
     const store: any = useStore();
@@ -121,7 +126,8 @@ export default defineComponent({
         if (data === undefined) return; // pending, or disabled by a null folder
         const list = dashboardList.value;
         if (!list.some((d: any) => d.value === selectedDashboard.value)) {
-          selectedDashboard.value = list[0]?.value ?? null;
+          const preferred = list.find((d: any) => d.value === props.preferredDashboardId);
+          selectedDashboard.value = (preferred ?? list[0])?.value ?? null;
         }
         emit("dashboard-list-updated");
       },

@@ -300,6 +300,23 @@ vi.mock("@/composables/useTraces", () => ({
   }),
 }));
 
+const alertAction = vi.hoisted(() => ({
+  createAlert: vi.fn(),
+  disabledReason: { value: null as string | null },
+  queryNotRun: { value: false },
+}));
+
+vi.mock("@/plugins/traces/composables/useTracesAlertAction", async () => {
+  const { computed } = await import("vue");
+  return {
+    useTracesAlertAction: () => ({
+      createAlert: alertAction.createAlert,
+      disabledReason: computed(() => alertAction.disabledReason.value),
+      queryNotRun: computed(() => alertAction.queryNotRun.value),
+    }),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Import the component AFTER all vi.mock declarations.
 // ---------------------------------------------------------------------------
@@ -421,6 +438,11 @@ const sharedStubs = {
     template: '<div v-bind="$attrs"><slot name="label-action" /><slot /></div>',
   },
   ODropdownSeparator: { template: "<hr />" },
+  AddToDashboard: {
+    name: "AddToDashboard",
+    template: '<div data-test="traces-add-to-dashboard-stub" />',
+    props: ["open", "panels", "notice", "dashboardPanelData"],
+  },
   ODropdownSub: {
     name: "ODropdownSub",
     template:
@@ -1456,8 +1478,7 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      // OButton: the download button uses title="Export Traces" (no .download-logs-btn class)
-      expect(wrapper.find('[title="traces.exportTraces"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-search-bar-export-btn"]').exists()).toBe(true);
     });
 
     it("should be disabled when queryResults.hits is empty", async () => {
@@ -1465,10 +1486,9 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      // OButton uses native HTML disabled attribute (not a CSS "disabled" class)
-      const btn = wrapper.find('[title="traces.exportTraces"]');
+      const btn = wrapper.find('[data-test="traces-search-bar-export-btn"]');
       expect(btn.exists()).toBe(true);
-      expect(btn.attributes("disabled")).toBeDefined();
+      expect(btn.attributes("disabled")).toBe("true");
     });
 
     it("should be enabled when queryResults.hits has entries", async () => {
@@ -1483,10 +1503,9 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      // OButton: when enabled, native disabled attribute should be absent
-      const btn = wrapper.find('[title="traces.exportTraces"]');
+      const btn = wrapper.find('[data-test="traces-search-bar-export-btn"]');
       expect(btn.exists()).toBe(true);
-      expect(btn.attributes("disabled")).toBeUndefined();
+      expect(btn.attributes("disabled")).toBe("false");
     });
 
     it("should export a traces-mode hit with a services object as aligned CSV", async () => {
@@ -1542,6 +1561,88 @@ describe("SearchBar", () => {
         message: "traces.exportTracesFailed",
         variant: "error",
       });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("more actions menu", () => {
+    const moreBtn = () => wrapper.find('[data-test="traces-search-bar-more-actions-btn"]');
+    const alertItem = () => wrapper.find('[data-test="traces-create-alert-btn"]');
+    const redItem = () => wrapper.find('[data-test="traces-add-red-to-dashboard-btn"]');
+
+    beforeEach(() => {
+      alertAction.createAlert.mockReset();
+      alertAction.disabledReason.value = null;
+      alertAction.queryNotRun.value = false;
+    });
+
+    it("renders the more actions trigger with Export, Create alert and Add RED charts inside", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(moreBtn().exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-search-bar-export-btn"]').exists()).toBe(true);
+      expect(alertItem().exists()).toBe(true);
+      expect(redItem().exists()).toBe(true);
+      expect(wrapper.find('[title="traces.exportTraces"]').exists()).toBe(false);
+    });
+
+    it("exports from the menu item", async () => {
+      downloadFileMock.mockReturnValue(true);
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await wrapper.find('[data-test="traces-search-bar-export-btn"]').trigger("click");
+      expect(downloadFileMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("hides the menu outside the spans and traces views", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(moreBtn().exists()).toBe(false);
+    });
+
+    it("creates a matches alert on select", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await alertItem().trigger("click");
+      expect(alertAction.createAlert).toHaveBeenCalledWith("matches");
+    });
+
+    it("disables Create alert with the reason when no stream is picked", async () => {
+      alertAction.disabledReason.value = "Pick a stream first";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(alertItem().attributes("disabled")).toBe("true");
+      expect(alertItem().attributes("description")).toBe("Pick a stream first");
+      await alertItem().trigger("click");
+      expect(alertAction.createAlert).not.toHaveBeenCalled();
+    });
+
+    it("notes when the query has not run yet", async () => {
+      alertAction.queryNotRun.value = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(alertItem().attributes("description")).toBe("search.queryActions.usesUnrunQuery");
+    });
+
+    it("opens Add to dashboard with Rate, Errors and Duration panels and the bucket notice", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await redItem().trigger("click");
+      await flushPromises();
+      const dialog = wrapper.findComponent({ name: "AddToDashboard" });
+      expect(dialog.exists()).toBe(true);
+      const panels = dialog.props("panels") as any[];
+      expect(panels.map((p) => p.title.split(" · ")[0])).toEqual(["Rate", "Errors", "Duration"]);
+      expect(panels.every((p) => p.queries[0].fields.stream_type === "traces")).toBe(true);
+      expect(dialog.props("notice")).toBe("traces.redActions.bucketNotice.seconds");
+    });
+
+    it("disables Add RED charts when no stream is picked", async () => {
+      searchObjInstance.data.stream.selectedStream = { label: "", value: "" };
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(redItem().attributes("disabled")).toBe("true");
     });
   });
 

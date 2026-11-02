@@ -9112,6 +9112,8 @@
       "addAnnotations": "Add Annotations",
       "dependentAdhocVariableWarning": "Some dynamic variables are not applied because the field is not present in the query's stream. Open Query Inspector to see all the details of the variables and queries executed to render this panel",
       "refreshCacheReload": "Refresh Cache & Reload",
+      "exploreCreateAlert": "Create alert",
+      "exploreAddToDashboard": "Add to dashboard",
       "redirectingToLogs": "Redirecting to logs page",
       "pleaseWait": "Please wait..."
     },
@@ -12802,6 +12804,11 @@
         "rumfunnel": {
           "label": "Alert me",
           "toast": "Imported from Product Analytics: \"{sourceLabel}\""
+        },
+        "traces": {
+          "label": "Create alert",
+          "toast": "Query imported from your traces search",
+          "noStream": "Pick a stream first"
         }
       },
       "warnings": {
@@ -12835,7 +12842,18 @@
         "heldFilterDropped": "Your search filter was not carried over because it needs a Run as choice on the logs page first. Add it to the alert query if you need it.",
         "thresholdColumnGuessed": "The threshold was applied to {column}; check it is the value you meant.",
         "thresholdNotCarried": "The {value} threshold from the chart wasn't applied because you picked a different query.",
-        "rumFunnelExclusions": "Uses this app's app filters as of now; re-create it after they change."
+        "rumFunnelExclusions": "Uses this app's app filters as of now; re-create it after they change.",
+        "tracesSeedMatches": "Fires when matching spans in {minutes} min exceed {threshold} (now {current}).",
+        "tracesSeedSpans": "Fires when spans in {minutes} min exceed {threshold} (now {current}).",
+        "tracesSeedTraces": "Fires when traces in {minutes} min exceed {threshold} (now {current}).",
+        "tracesSeedErrorSpans": "Fires when error spans in {minutes} min exceed {threshold} (now {current}).",
+        "tracesSeedErrorTraces": "Fires when traces with errors in {minutes} min exceed {threshold} (now {current}).",
+        "tracesSeedDuration": "Fires when {percentile} duration over {minutes} min is above {threshold} ms (now {current} ms).",
+        "tracesSeedUnavailable": "The current value could not be read, so the threshold starts at 0. Set it before saving.",
+        "tracesNoMatches": "No matching spans yet, so the alert fires as soon as one appears.",
+        "tracesStoredSpans": "Counts are of stored spans, so sampled traffic reads lower than it really is.",
+        "tracesPeriodCapped": "The alert window was capped at {minutes} minutes to keep each check fast.",
+        "tracesNotRun": "This search has not been run yet, so the alert uses the filter in the editor."
       }
     },
     "saveFailed": "Could not save the alert.",
@@ -14465,7 +14483,8 @@
       "panelAdded": "Panel added to dashboard",
       "errorAddingPanel": "Error while adding panel",
       "selectDashboard": "Please select a dashboard",
-      "selectTab": "Please select a tab"
+      "selectTab": "Please select a tab",
+      "panelsToAdd": "Panels to add"
     },
     "groups": {
       "compute": "Compute",
@@ -15513,6 +15532,23 @@
     "searchTypeOthers": "Others"
   },
   "traces": {
+    "redActions": {
+      "menuGroupDashboards": "Dashboards",
+      "addRedToDashboard": "Add RED charts to dashboard",
+      "durationActions": "Duration actions",
+      "bucketNotice": {
+        "seconds": "These charts keep the {count}-second bars you see now.",
+        "minutes": "These charts keep the {count}-minute bars you see now.",
+        "hours": "These charts keep the {count}-hour bars you see now.",
+        "days": "These charts keep the {count}-day bars you see now."
+      },
+      "bucketNoticeSingle": {
+        "seconds": "This chart keeps the {count}-second bars you see now.",
+        "minutes": "This chart keeps the {count}-minute bars you see now.",
+        "hours": "This chart keeps the {count}-hour bars you see now.",
+        "days": "This chart keeps the {count}-day bars you see now."
+      }
+    },
     "latencyHeatmap": {
       "title": "Duration",
       "tooltipSpans": "{count} span | {count} spans",

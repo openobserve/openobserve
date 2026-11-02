@@ -31,8 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :dashboardData="dashboardData || {}"
             :currentTimeObj="currentTimeObj"
             :allowAlertCreation="false"
+            :exploreActions="true"
             searchType="dashboards"
             @updated:dataZoom="onDataZoom"
+            @exploreCreateAlert="onExploreCreateAlert"
+            @exploreAddToDashboard="onExploreAddToDashboard"
           />
         </div>
         <!-- Tied to the Rate/Errors panels: metrics.json h (9 rows after migration) × 17px cellHeight, 4px GridStack margin -->
@@ -46,10 +49,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @drill-down="onHeatmapDrillDown"
             @clear="onHeatmapClear"
             @ask-ai="onHeatmapAskAi"
+            @create-alert="createAlert('duration')"
+            @add-to-dashboard="openAddToDashboard('duration')"
           />
         </div>
       </div>
     </transition>
+
+    <AddToDashboard
+      v-if="addToDashboardPanel"
+      v-model:open="addToDashboardOpen"
+      :dashboard-panel-data="{ data: addToDashboardPanel }"
+      :default-panel-title="addToDashboardPanel.title"
+      :notice="addToDashboardNotice"
+    />
 
     <Teleport v-if="showComparison" defer to="#traces-drill-down-page">
       <TracesComparison
@@ -88,14 +101,18 @@ import {
   type LatencyHeatmapSelection,
 } from "./latencyHeatmap";
 import useTraces from "@/composables/useTraces";
-import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
-import { parseSpanKindWhereClause } from "@/utils/traces/constants";
+import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
+import { buildTracesRedPanel, tracesBucketNotice, type TracesRedChart } from "./tracesRedPanels";
+import type { I18nText } from "@/types/i18n";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );
 
 const TracesComparison = defineAsyncComponent(() => import("./TracesComparison.vue"));
+
+const AddToDashboard = defineAsyncComponent(() => import("@/plugins/metrics/AddToDashboard.vue"));
 
 export interface AiChatHandoff {
   query: string;
@@ -138,23 +155,8 @@ const { t } = useI18nTyped();
 // composable — the same object buildSearch() reads — guarantees the latest value.
 const effectiveFilter = computed(() => searchObj.data.editorValue);
 
-// Query editor text may contain human-readable duration/span_kind literals
-// (e.g. duration <= '1.64s') for display; decode them back to raw SQL values
-// (microseconds, numeric OTEL keys) before use in any generated query.
-const decodeFilter = (text: string | undefined): string => {
-  const trimmed = text?.trim();
-  if (!trimmed) return "";
-  const parsed = parseDurationWhereClause(
-    trimmed,
-    tracesParser.value,
-    searchObj.data.stream.selectedStream.value,
-  );
-  return parseSpanKindWhereClause(
-    typeof parsed === "string" ? parsed : trimmed,
-    tracesParser.value,
-    searchObj.data.stream.selectedStream.value,
-  );
-};
+const decodeFilter = (text: string | undefined): string =>
+  resolveTracesFilter(text, tracesParser.value, searchObj.data.stream.selectedStream.value);
 const parseEffectiveFilter = (): string => decodeFilter(effectiveFilter.value);
 
 const effectiveTimeRange = computed<TimeRange>(() => ({
@@ -194,6 +196,8 @@ let chartsFilter = "";
 // The stream and mode the charts ran with, for the same reason.
 let chartsStream = "";
 let chartsMode: "spans" | "traces" = "traces";
+// The bucket the charts were drawn with, which an exported panel keeps.
+let chartsInterval: { sql: string; seconds: number } | null = null;
 // The range the open comparison measured, which its Filter/Exclude restores.
 let comparisonRange: TimeRange | null = null;
 // Store the original time range before selection for baseline comparison
@@ -254,6 +258,7 @@ const loadDashboard = async () => {
     chartsFilter = searchObj.data.editorValue ?? "";
     chartsStream = streamName;
     chartsMode = isSpansMode ? "spans" : "traces";
+    chartsInterval = interval;
     heatmapSelection.value = null;
     convertedDashboard.tabs[0].panels.forEach(
       (
@@ -350,6 +355,44 @@ const onDataZoom = async ({
   if (panelTitle !== "Rate" && panelTitle !== "Errors") return;
   // Line charts plot zoned wall-clock times, so a brush value is already what the picker expects.
   await applySelection(panelTitle, data?.id ?? panelTitle, { start, end }, null, null, null, null);
+};
+
+const { createAlert } = useTracesAlertAction();
+
+const CHART_BY_PANEL_TITLE: Record<string, TracesRedChart> = { Rate: "rate", Errors: "errors" };
+
+const onExploreCreateAlert = (panel: { title?: string }) => {
+  const chart = CHART_BY_PANEL_TITLE[panel?.title ?? ""];
+  if (chart === "rate" || chart === "errors") createAlert(chart);
+};
+
+const addToDashboardOpen = ref(false);
+const addToDashboardPanel = shallowRef<any>(null);
+const addToDashboardNotice = ref<I18nText | undefined>(undefined);
+
+const openAddToDashboard = (chart: TracesRedChart) => {
+  const interval =
+    chartsInterval ??
+    chartInterval(effectiveTimeRange.value.startTime, effectiveTimeRange.value.endTime);
+  addToDashboardPanel.value = buildTracesRedPanel(chart, {
+    streamName: chartsStream || searchObj.data.stream.selectedStream.value,
+    filter: decodeFilter(chartsFilter),
+    filterText: chartsFilter,
+    view: chartsMode,
+    interval,
+    rateUnit:
+      chartsMode === "spans"
+        ? t("traces.metrics.perSecond.spans")
+        : t("traces.metrics.perSecond.traces"),
+  });
+  const { unit, count } = tracesBucketNotice(interval.seconds);
+  addToDashboardNotice.value = t(`traces.redActions.bucketNoticeSingle.${unit}`, { count });
+  addToDashboardOpen.value = true;
+};
+
+const onExploreAddToDashboard = (panel: { title?: string }) => {
+  const chart = CHART_BY_PANEL_TITLE[panel?.title ?? ""];
+  if (chart) openAddToDashboard(chart);
 };
 
 const onHeatmapSelect = (selection: LatencyHeatmapSelection) => {

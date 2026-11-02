@@ -418,21 +418,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
             </div>
           </div>
-          <OButton
-            variant="outline"
-            size="icon-toolbar"
-            :disabled="!searchObj.data.queryResults?.hits?.length"
-            :title="t('traces.exportTraces')"
-            @click="downloadLogs"
-          >
-            <OIcon name="download" size="sm" />
-          </OButton>
           <ShareButton
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
             variant="outline"
             size="icon-toolbar"
             shortcut-id="tracesCopyUrl"
+          />
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                data-test="traces-search-bar-more-actions-btn"
+                class="hover:bg-interactive-hover-bg! size-[2.125rem]!"
+                variant="outline"
+                size="icon-toolbar"
+              >
+                <OIcon name="menu" size="sm" />
+                <OTooltip max-width="7rem" :content="t('search.moreActions')" />
+              </OButton>
+            </template>
+
+            <ODropdownGroup :label="t('search.menuGroupDownloads')">
+              <ODropdownItem
+                data-test="traces-search-bar-export-btn"
+                :disabled="!searchObj.data.queryResults?.hits?.length"
+                @select="downloadLogs"
+              >
+                <template #icon-left>
+                  <span
+                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  >
+                    <OIcon name="download" size="sm" />
+                  </span>
+                </template>
+                {{ t("traces.exportTraces") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+
+            <ODropdownSeparator />
+
+            <ODropdownGroup :label="t('search.menuGroupAlerts')">
+              <ODropdownItem
+                data-test="traces-create-alert-btn"
+                :disabled="!!createAlertDisabledReason"
+                focusable-unavailable
+                :description="createAlertDisabledReason || createAlertNote"
+                @select="onCreateAlert"
+              >
+                <template #icon-left>
+                  <span
+                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  >
+                    <OIcon :name="createAlertIcon" size="sm" />
+                  </span>
+                </template>
+                {{ t("alerts.prefill.sources.traces.label") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+
+            <ODropdownSeparator />
+
+            <ODropdownGroup :label="t('traces.redActions.menuGroupDashboards')">
+              <ODropdownItem
+                data-test="traces-add-red-to-dashboard-btn"
+                :disabled="!!redDashboardDisabledReason"
+                focusable-unavailable
+                :description="redDashboardDisabledReason"
+                @select="openRedDashboardDialog"
+              >
+                <template #icon-left>
+                  <span
+                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  >
+                    <OIcon name="dashboard" size="sm" />
+                  </span>
+                </template>
+                {{ t("traces.redActions.addRedToDashboard") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+          </ODropdown>
+          <AddToDashboard
+            v-if="redDashboardOpen"
+            v-model:open="redDashboardOpen"
+            :dashboard-panel-data="{ data: {} }"
+            :panels="redDashboardPanels"
+            :notice="redDashboardNotice"
           />
         </div>
 
@@ -604,8 +674,14 @@ import {
   onActivated,
   computed,
   toRef,
+  shallowRef,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
+import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
+import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { chartInterval } from "./metrics/latencyHeatmap";
+import { buildTracesRedPanels, tracesBucketNotice } from "./metrics/tracesRedPanels";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -621,6 +697,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -698,6 +775,8 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
+    ODropdownGroup,
+    AddToDashboard: defineAsyncComponent(() => import("@/plugins/metrics/AddToDashboard.vue")),
     ODialog,
     OInput,
     OSwitch,
@@ -1125,6 +1204,50 @@ export default defineComponent({
       }
     };
 
+    const {
+      createAlert,
+      disabledReason: createAlertDisabledReason,
+      queryNotRun,
+    } = useTracesAlertAction();
+    const createAlertIcon = getAlertSource("traces").icon;
+    const createAlertNote = computed(() =>
+      queryNotRun.value ? t("search.queryActions.usesUnrunQuery") : null,
+    );
+    const onCreateAlert = () => {
+      if (!createAlertDisabledReason.value) createAlert("matches");
+    };
+
+    const redDashboardOpen = ref(false);
+    const redDashboardPanels = shallowRef([]);
+    const redDashboardNotice = ref(undefined);
+    const redDashboardDisabledReason = computed(() =>
+      searchObj.data.stream.selectedStream?.value
+        ? null
+        : t("alerts.prefill.sources.traces.noStream"),
+    );
+    const openRedDashboardDialog = () => {
+      const stream = searchObj.data.stream.selectedStream?.value;
+      if (!stream) return;
+      const view = searchObj.meta.searchMode === "spans" ? "spans" : "traces";
+      // Same bucket the RED charts compute for this range.
+      const interval = chartInterval(
+        searchObj.data.datetime.startTime,
+        searchObj.data.datetime.endTime,
+      );
+      const editorText = searchObj.data.editorValue ?? "";
+      redDashboardPanels.value = buildTracesRedPanels({
+        streamName: stream,
+        filter: resolveTracesFilter(editorText, tracesParser.value, stream),
+        filterText: editorText,
+        view,
+        interval,
+        rateUnit: t(`traces.metrics.perSecond.${view}`),
+      });
+      const { unit, count } = tracesBucketNotice(interval.seconds);
+      redDashboardNotice.value = t(`traces.redActions.bucketNotice.${unit}`, { count });
+      redDashboardOpen.value = true;
+    };
+
     const updateTimezone = () => {
       emit("onChangeTimezone");
     };
@@ -1482,6 +1605,15 @@ export default defineComponent({
       updateQueryValue,
       updateDateTime,
       downloadLogs,
+      createAlertDisabledReason,
+      createAlertNote,
+      createAlertIcon,
+      onCreateAlert,
+      redDashboardOpen,
+      redDashboardPanels,
+      redDashboardNotice,
+      redDashboardDisabledReason,
+      openRedDashboardDialog,
       setEditorValue,
       autoCompleteKeywords,
       effectiveKeywords,
