@@ -266,7 +266,13 @@ test.describe('On-call page lifecycle', {
     const closed = await waitForResponseState(page, record.id, ['resolved'], {
       timeout: 6 * 60 * 1000, pollMs: 5000,
     });
-    const detail = await getResponseDetail(page, record.id);
+    // The record row is written before its `state` event is appended, so the timeline can lag the state.
+    let detail;
+    await expect.poll(async () => {
+      detail = await getResponseDetail(page, record.id);
+      return eventsOfKind(detail.events, 'state').some((e) => /^resolved/.test(String(e.body)));
+    }, { timeout: 30000, intervals: [1000], message: 'the resolved state event never reached the timeline' })
+      .toBe(true);
     testLogger.info('TS-15.03 record after recovery', {
       state: closed.state, closedAt: closed.closed_at, ackedBy: closed.acked_by, cause: closed.cause,
       events: detail.events.map((e) => [e.kind, e.actor, e.body]),
@@ -287,7 +293,8 @@ test.describe('On-call page lifecycle', {
     expect(closes[0].actor, 'the engine closed it').toBe('o2-engine');
     expect(closes[0].body, 'and the timeline says it recovered rather than that someone fixed it')
       .toMatch(/recovered automatically/);
-    const humanActors = detail.events.filter((e) => e.actor !== 'o2-engine');
+    // `o2-sre` is the AI agent, which writes verdicts on agent-enabled deployments; neither is a person.
+    const humanActors = detail.events.filter((e) => !['o2-engine', 'o2-sre'].includes(e.actor));
     expect(humanActors, 'nobody but the engine may have acted on a page nobody answered').toEqual([]);
 
     const ledger = await getDeliveries(page, record.id);

@@ -454,8 +454,8 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: users })],
     });
-    // A second rung 45s out, so "nothing was delivered after the delete" covers a rung that was really due.
-    await shortenPolicyForSpeed(page, team.id, 2, [0, 45]);
+    // Past the 60s first-delivery poll, so it is still pending at the delete but due inside the wait below.
+    await shortenPolicyForSpeed(page, team.id, 2, [0, 90]);
 
     const stream = `${name}_stream`;
     await seedOnCallStream(page, stream);
@@ -496,7 +496,7 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
       .toMatch(/owning team was deleted/);
     expect(progress.next_at ?? null, 'and schedules nothing further').toBeNull();
 
-    await page.waitForTimeout(60_000);
+    await page.waitForTimeout(100_000);
     const ledgerAfter = await getDeliveries(page, openRecord.id);
     expect(ledgerAfter.deliveries.filter((row) => row.at > deletedAtMicros),
       'the pending rung must not fire once its team is gone').toEqual([]);

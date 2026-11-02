@@ -677,14 +677,7 @@ export class OnCallTeamDetailPage {
 
 
 
-  /**
-   * The config-risk count riding the title.
-   *
-   * It is a COUNT, not a list — the risk texts live on
-   * `GET /teams/{id}/config-risks` and are derived on read, so a spec asserting
-   * that a risk cleared reads the endpoint and asserts the tag disappeared.
-   * Returns null when the tag is absent, which is what "no risks" looks like.
-   */
+  /** The attention banner's finding count (config risks, with folded findings discounted), or null when no banner shows. */
   async readConfigRiskCount() {
     const tag = this.page.locator(this.locators.configRisks);
     if ((await tag.count()) === 0) return null;

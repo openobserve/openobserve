@@ -483,11 +483,7 @@ async function assertMailSink() {
   if (problem) throw new Error(`cannot read mail: ${problem}`);
 }
 
-/**
- * Call first in a test that reads mail: skips locally when no sink is up, throws in CI where that is a broken runner.
- *
- * @param {import('@playwright/test').TestType<any, any>} test
- */
+/** Call first in a test that reads mail: skips locally when no sink is up, throws in CI where that is a broken runner. */
 async function requireMailSink(test) {
   const problem = await mailSinkProblem();
   if (!problem) return;

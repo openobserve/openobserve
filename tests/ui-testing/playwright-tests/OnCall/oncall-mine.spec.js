@@ -317,10 +317,11 @@ test.describe('On-call — my duty, my inbox, my history', {
     await waitForStreamSearchable(page, stream, seeded.records);
     await createOwnershipRule(page, { teamId: team.id, dimensions: { service } });
     const destination = await seedNotificationDestination(page, stream);
-    await firePageAndWait(page, {
+    const { pages } = await firePageAndWait(page, {
       alertOptions: { name: `${prefix}_alert`, stream, destinations: [destination], priority: 2 },
       expectTeamId: team.id,
     });
+    const pageId = pages[0].id;
 
     const first = await loginAs(browser, { email: mine });
     const second = await loginAs(browser, { email: theirs });
@@ -329,7 +330,7 @@ test.describe('On-call — my duty, my inbox, my history', {
         let found;
         await expect.poll(async () => {
           const box = await myDeliveries(session.page, { limit: 200, asSession: true });
-          found = (box?.deliveries ?? []).find((d) => String(d.title ?? '').includes(prefix));
+          found = (box?.deliveries ?? []).find((d) => d.response_id === pageId);
           return Boolean(found);
         }, {
           timeout: 120000,

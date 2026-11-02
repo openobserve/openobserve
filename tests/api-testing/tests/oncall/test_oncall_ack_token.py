@@ -84,10 +84,6 @@ from tests.oncall.oncall_helpers import (
 )
 
 
-class AckTokenLeak(AssertionError):
-    """A removed member's emailed link still acknowledged the page (o2-enterprise#2481)."""
-
-
 # JWT-shaped so the route gets something structurally plausible to reject, but
 # signed with nothing — this must never be mistaken for a real token.
 UNSIGNED_SIGNATURE = "not-a-real-signature"
@@ -135,7 +131,31 @@ def foreign_org():
 
 @pytest.fixture
 def minted_ack_token(oncall):
-    """A real token, the response it acks, and its subject.
+    """A real token, the response it acks, and its (admin) subject, alone on the team."""
+    return mint_ack_token(oncall, make_user(oncall._c, oncall.org, "admin")[0])
+
+
+@pytest.fixture
+def viewer_ack_token_with_a_teammate(oncall):
+    """A real token whose subject is a viewer, on a team that has a second member.
+
+    Neither exemption in `record_for_actor` applies: a viewer cannot work any
+    page on role alone, and a team that still has members is not open to the org.
+    """
+    try:
+        subject, _ = make_user(oncall._c, oncall.org, "viewer")
+    except AssertionError as e:
+        if "require open-fga" in str(e):
+            pytest.skip("non-admin roles need OpenFGA on")
+        raise
+    oncall.users.append(subject)
+    teammate, _ = make_user(oncall._c, oncall.org, "admin")
+    oncall.users.append(teammate)
+    return mint_ack_token(oncall, subject, teammates=[teammate])
+
+
+def mint_ack_token(oncall, email, teammates=()):
+    """Page `email` for real and return (token, response id, email).
 
     The token is minted server-side and leaves only inside the page email, so it
     is read back out of a mailbox. A TEST page will not do — those are sent with
@@ -149,11 +169,12 @@ def minted_ack_token(oncall):
             "inside a page email. Run Mailpit and point the server's SMTP at it."
         )
 
-    email, _ = make_user(oncall._c, oncall.org, "admin")
     marker = email.split("@")[0]
 
     team_id = oncall.team_id(uniq("oncall_ack_team"))
-    oncall.add_member(team_id, email)
+    for member in (email, *teammates):
+        added = oncall.add_member(team_id, member)
+        assert added.status_code == 200, f"adding {member} refused: {added.status_code} {added.text}"
     resp = oncall.set_schedule(team_id, [rotation("R1", "Primary", [shift_rule("L1", [email])])])
     assert resp.status_code == 200, f"schedule refused: {resp.status_code} {resp.text}"
 
@@ -492,12 +513,10 @@ def test_the_ack_route_does_not_enumerate_orgs(base_url, org_id, foreign_org):
 @pytest.mark.parametrize("token", MALFORMED_TOKENS)
 def test_a_get_never_redirects(base_url, org_id, token):
     """The "Acknowledged" page is the only thing an acknowledgement emits, and a
-    GET must never emit it, nor a redirect. A mail gateway prefetching the link would otherwise answer the
-    page on the responder's behalf.
+    GET must never emit it, nor a redirect. A mail gateway prefetching the link
+    would otherwise answer the page on the responder's behalf.
 
-    Partial by necessity: without a valid token this covers every shape a
-    prefetcher could be handed from a *broken* link, not the real one. The full
-    case is the skipped test below.
+    Covers only broken-link shapes; the valid-token case below runs whenever the mailbox is reachable.
     """
     assert_did_not_act(get_ack(base_url, org_id, token))
 
@@ -635,28 +654,15 @@ def test_a_used_link_opened_again_shows_the_state_not_the_button(create_session,
     assert_did_not_act(again)
 
 
-@pytest.mark.xfail(
-    reason=(
-        "PRODUCT DEFECT, not a test gap: the emailed link still acknowledges after "
-        "its subject is removed from the team. Measured on :5090 — remove the member "
-        "(200, membership empty), POST the link, 200 and the record reads acknowledged, "
-        "attributed to the removed person. The signed-in path refuses the same action "
-        "with NotOnThisTeam. o2-enterprise#2481."
-    ),
-    # Only the defect's own observation raises it, so a broken fixture or setup assert still fails.
-    raises=AckTokenLeak,
-    strict=True,
-)
-def test_a_token_whose_subject_left_the_team_is_refused(create_session, base_url, org_id,
-                                                        minted_ack_token):
-    """12.6, and invariant 3: claims resolve through `service::ack_claims`, so
-    the same membership check as the authenticated route applies here.
+def test_a_token_whose_subject_left_the_team_does_not_acknowledge(
+        create_session, base_url, org_id, viewer_ack_token_with_a_teammate):
+    """12.6: a viewer removed from a team that still has members cannot take its page from their old email.
 
-    The token is minted while the subject is on the team and presented after
-    they are removed — a leaver's old page email must stop working, or §1's
-    team scoping has a hole in it that needs no credentials at all.
+    `ack_claims` checks only org membership, so the link still opens; the team
+    check is `record_for_actor`, which exempts root/admin/editor and an emptied
+    team, hence the viewer subject and the teammate left behind.
     """
-    token, response_id, subject = minted_ack_token
+    token, response_id, subject = viewer_ack_token_with_a_teammate
 
     record = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}")
     assert record.status_code == 200, record.text
@@ -667,13 +673,26 @@ def test_a_token_whose_subject_left_the_team_is_refused(create_session, base_url
         params={"user_email": subject},
     )
     assert removed.status_code == 200, removed.text
+    roster = create_session.get(f"{base_url}api/{org_id}/oncall/teams/{team_id}/members")
+    assert roster.status_code == 200, roster.text
+    remaining = [m.get("user_email") for m in roster.json()]
+    # An emptied team is open to the whole org, which would make this case measure the wrong rule.
+    assert remaining, "the teammate must still be on the team"
+    assert subject not in remaining, f"the subject must be gone: {remaining}"
+
+    assert_did_not_act(get_ack(base_url, org_id, token))
 
     leaver_post = post_ack(base_url, org_id, token)
-    if ACKED_HEADING in leaver_post.text:
-        raise AckTokenLeak(f"a removed member's link still acknowledged: {leaver_post.text[:300]}")
-    assert_handler_refused(leaver_post)
-    assert_handler_refused(get_ack(base_url, org_id, token))
+    # The refused ack is swallowed by the handler, which then shows the record as it stands.
+    assert leaver_post.status_code == 200, f"{leaver_post.status_code}: {leaver_post.text[:300]}"
+    assert leaver_post.headers.get("Content-Type", "").startswith("text/html"), leaver_post.headers
+    assert "<h1>Not acknowledged yet.</h1>" in leaver_post.text, (
+        f"a removed member's link must leave the page open: {leaver_post.text[:300]}"
+    )
+    assert_did_not_act(leaver_post)
 
     after = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}")
     assert after.status_code == 200, after.text
-    assert after.json()["response"].get("state") != "acknowledged"
+    body = after.json()["response"]
+    assert body.get("state") != "acknowledged", body
+    assert (body.get("acked_by") or "").lower() != subject.lower(), body

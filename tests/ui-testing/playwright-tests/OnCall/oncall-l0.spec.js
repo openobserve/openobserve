@@ -260,6 +260,11 @@ test.describe('On-call L0 / AI SRE', {
       progress.fired[0].after_micros,
       'parallel means the page goes out at +0 while the agent runs alongside',
     ).toBe(0);
+    // Measured from `opened_at`, not `ladder_anchor`: a triage hold moves the anchor, so only the open time exposes it.
+    expect(
+      progress.fired[0].at - record.opened_at,
+      'the first rung must fire inside the triage budget — a held P1 would fire only after it',
+    ).toBeLessThan(TRIAGE_BUDGET_SECONDS * 1_000_000);
   });
 
   test('§9.1b a parallel agent attaches its verdict on an alert-backed P1 page', {
