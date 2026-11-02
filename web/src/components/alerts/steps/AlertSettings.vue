@@ -45,14 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="!sectionTargets?.settingsSchedule"
           >
             <!-- Silence Notification (Cooldown) -->
-            <div class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1">
-              <div
-                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
-              >
-                {{ t("alerts.plain.cooldown") }}
-                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-                <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
-              </div>
+            <OSettingRow
+              :label="t('alerts.plain.cooldown')"
+              :info="t('alerts.alertSettings.cooldownTooltip')"
+              fill
+            >
               <div class="me-2 flex w-fit flex-col gap-1">
                 <div class="flex items-center">
                   <div class="w-21.75">
@@ -82,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ silenceError }}
                 </div>
               </div>
-            </div>
+            </OSettingRow>
 
             <!-- Pending period. Composite only — no per-alert frequency to warn
                against (§2b), so no not-a-multiple hint here, unlike the
@@ -90,17 +87,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                scheduled version, intentionally no visual distinction — the
                backend stores and evaluates it for composite alerts too
                (handle_composite_alert_trigger). -->
-            <div
+            <OSettingRow
               v-if="isRealTime === 'composite'"
-              class="mb-4 flex items-start justify-start pb-3 max-md:flex-col max-md:gap-1"
+              :label="t('alerts.queryConfig.pendingPeriod')"
+              :info="t('alerts.queryConfig.pendingPeriodTooltip')"
+              fill
             >
-              <div
-                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
-              >
-                {{ t("alerts.queryConfig.pendingPeriod") }}
-                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-                <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
-              </div>
               <div class="me-2 flex w-fit flex-col gap-1">
                 <div class="flex items-center gap-2">
                   <div class="w-21.75">
@@ -136,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ pendingPeriodError }}
                 </div>
               </div>
-            </div>
+            </OSettingRow>
           </Teleport>
 
           <Teleport
@@ -148,7 +140,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                the events below. -->
             <AlertDestinationsField
               :wrap="!!sectionTargets"
-              class="mb-4 pb-4"
+              :setting-row="!!sectionTargets"
+              :class="sectionTargets ? '' : 'mb-4 pb-4'"
               :destinations="destinations"
               :workflows="workflows"
               :destination-options="formattedDestinations"
@@ -170,18 +163,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="!sectionTargets?.settingsSchedule"
           >
             <!-- Period -->
-            <div
+            <OSettingRow
               v-if="!isForecastMode"
               ref="periodFieldRef"
-              class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+              :label="t('alerts.plain.lookBack')"
+              :info="t('alerts.alertSettings.periodTooltip')"
+              fill
             >
-              <div
-                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
-              >
-                {{ t("alerts.plain.lookBack") }}
-                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-                <OTooltip :content="t('alerts.alertSettings.periodTooltip')" side="right" />
-              </div>
               <div class="me-2 flex w-fit flex-col gap-1">
                 <div class="flex items-center">
                   <div class="w-21.75">
@@ -213,20 +201,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ periodError }}
                 </div>
               </div>
-            </div>
+            </OSettingRow>
 
             <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-            <div
+            <OSettingRow
               ref="silenceFieldRef"
-              class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+              :label="t('alerts.plain.cooldown')"
+              :info="t('alerts.alertSettings.cooldownTooltip')"
+              fill
             >
-              <div
-                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
-              >
-                {{ t("alerts.plain.cooldown") }}
-                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-                <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
-              </div>
               <div class="me-2 flex w-fit flex-col gap-1">
                 <div class="flex items-center">
                   <div class="w-21.75">
@@ -257,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ silenceError }}
                 </div>
               </div>
-            </div>
+            </OSettingRow>
           </Teleport>
 
           <Teleport :to="sectionTargets?.settingsHold" :disabled="!sectionTargets?.settingsHold">
@@ -266,18 +249,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                tooltip as the composite version above, plus the
                not-a-multiple-of-Check-every warning (composite has no
                frequency to compare against, so it skips that row). -->
-            <div
+            <OSettingRow
               v-if="tierShows('holdFor')"
               ref="pendingPeriodFieldRef"
-              class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
+              :label="t('alerts.plain.forAtLeast')"
+              :info="t('alerts.queryConfig.pendingPeriodTooltip')"
+              fill
             >
-              <div
-                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
-              >
-                {{ t("alerts.plain.forAtLeast") }}
-                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-                <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
-              </div>
               <div class="me-2 flex w-fit flex-col gap-1">
                 <div class="flex items-center gap-2">
                   <div class="w-21.75">
@@ -321,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ pendingPeriodWarning }}
                 </div>
               </div>
-            </div>
+            </OSettingRow>
           </Teleport>
 
           <Teleport
@@ -334,8 +312,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                $el, so the ref moves onto the field unchanged. -->
             <AlertDestinationsField
               :wrap="!!sectionTargets"
+              :setting-row="!!sectionTargets"
               ref="destinationsFieldRef"
-              class="me-2 mb-4!"
+              :class="sectionTargets ? '' : 'me-2 mb-4!'"
               :destinations="destinations"
               :workflows="workflows"
               :destination-options="formattedDestinations"
@@ -355,39 +334,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="!sectionTargets?.settingsNotifyMore"
         >
           <!-- Creates Incident toggle — all alert types, enterprise/cloud with Incidents on -->
-          <div
+          <OSettingRow
             v-if="incidentsEnabled && tierShows('createsIncident')"
-            class="mb-4! flex items-start max-md:gap-3"
+            :label="t('alerts.plain.openIncident')"
+            :info="t('alerts.alertSettings.createsIncidentTooltip')"
+            fill
           >
-            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-              {{ t("alerts.plain.openIncident") }}
-              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />
-            </div>
             <OFormSwitch
               name="creates_incident"
               :aria-label="t('alerts.alertSettings.createsIncident')"
               data-test="alert-creates-incident-toggle"
             />
-          </div>
+          </OSettingRow>
 
           <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
           <template v-if="isRealTime === 'false'">
-            <div v-if="tierShows('recovery')" class="mb-4! flex items-start max-md:gap-3">
-              <div
-                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
-              >
-                {{ t("alerts.plain.notifyOnRecovery") }}
-                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-                <OTooltip
-                  :content="
-                    notifiesNobody
-                      ? t('alerts.alertSettings.notifyOnRecoveryNeedsDestination')
-                      : t('alerts.alertSettings.notifyOnRecoveryTooltip')
-                  "
-                  side="right"
-                />
-              </div>
+            <OSettingRow
+              v-if="tierShows('recovery')"
+              :label="t('alerts.plain.notifyOnRecovery')"
+              :info="
+                notifiesNobody
+                  ? t('alerts.alertSettings.notifyOnRecoveryNeedsDestination')
+                  : t('alerts.alertSettings.notifyOnRecoveryTooltip')
+              "
+              fill
+            >
               <div class="flex flex-col gap-1">
                 <!-- A recovery closes what a firing delivered; with no target nothing is
                    delivered, so it cannot be turned on. It can still be turned off. -->
@@ -422,12 +393,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </div>
-            </div>
+            </OSettingRow>
 
             <AlertDestinationsField
               :wrap="!!sectionTargets"
+              :setting-row="!!sectionTargets"
               v-if="formData?.notify_on_recovery && !notifiesNobody && tierShows('recovery')"
-              class="me-2 mb-4!"
+              :class="sectionTargets ? '' : 'me-2 mb-4!'"
               :destinations="recoveryDestinations"
               :workflows="[]"
               :destination-options="formattedDestinations"
@@ -439,17 +411,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <!-- The hold delays on-call and incident closure too, not only the message. -->
-            <div
+            <OSettingRow
               v-if="tierShows('keepFiring')"
-              class="mb-4! flex items-start max-md:flex-col max-md:gap-1"
+              :label="t('alerts.plain.keepFiringFor')"
+              :info="t('alerts.alertSettings.keepFiringForTooltip')"
+              fill
             >
-              <div
-                class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
-              >
-                {{ t("alerts.plain.keepFiringFor") }}
-                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-                <OTooltip :content="t('alerts.alertSettings.keepFiringForTooltip')" side="right" />
-              </div>
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
@@ -467,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("alerts.seconds") }}
                 </div>
               </div>
-            </div>
+            </OSettingRow>
           </template>
         </Teleport>
       </div>
@@ -484,8 +451,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
@@ -501,8 +467,7 @@ export default defineComponent({
     OFormInput,
     OFormSwitch,
     OSelect,
-    OTooltip,
-    OIcon,
+    OSettingRow,
     AlertDestinationsField,
   },
   props: {

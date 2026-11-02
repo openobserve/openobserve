@@ -27,8 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   navigation identical from anywhere.
 -->
 <template>
-  <div class="flex items-start max-md:flex-col max-md:gap-1">
-    <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
+  <component :is="settingRow ? OSettingRow : 'div'" v-bind="rootProps">
+    <div
+      v-if="!settingRow"
+      class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto"
+    >
       {{ labelText }}
       <template v-if="tooltipText">
         <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
@@ -76,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ statusText }}
       </p>
     </div>
-  </div>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -87,6 +90,7 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
 import { workflowsQuery } from "@/services/workflows.queries";
 import { queryClient } from "@/composables/query/queryClient";
@@ -117,8 +121,16 @@ const props = withDefaults(
     supportsWorkflows?: boolean;
     /** Let the controls wrap inside a column narrower than the row (opt-in). */
     wrap?: boolean;
+    /** Render as an OSettingRow, for forms built from setting rows (opt-in). */
+    settingRow?: boolean;
   }>(),
-  { supportsWorkflows: true, notifiesNobody: false, showStatus: false, wrap: false },
+  {
+    supportsWorkflows: true,
+    notifiesNobody: false,
+    showStatus: false,
+    wrap: false,
+    settingRow: false,
+  },
 );
 
 const emit = defineEmits<{
@@ -138,6 +150,11 @@ const labelText = computed<I18nText>(() =>
 // `undefined` means "the default tooltip"; an explicit "" means "none".
 const tooltipText = computed<I18nText>(() =>
   props.tooltip === undefined ? t("alerts.alertSettings.destinationsTooltip") : raw(props.tooltip),
+);
+const rootProps = computed(() =>
+  props.settingRow
+    ? { label: labelText.value, info: tooltipText.value || undefined, fill: true }
+    : { class: "flex items-start max-md:flex-col max-md:gap-1" },
 );
 
 // Edition entitlement and the backend /config runtime flag are separate
