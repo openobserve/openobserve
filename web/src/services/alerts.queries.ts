@@ -18,7 +18,8 @@ import { quantizeRange } from "@/composables/query/queryClient";
 import alerts from "./alerts";
 import search from "./search";
 import type { AlertHistoryQuery } from "./alerts";
-import { alertKeys } from "./alerts.querykeys";
+import { alertKeys, oneAckScopes } from "./alerts.querykeys";
+import { oncallKeys } from "./oncall.querykeys";
 import { anomalyKeys } from "./anomaly_detection.querykeys";
 import { downtimeKeys } from "./downtimes.querykeys";
 import { announcementKeys } from "./announcements.querykeys";
@@ -194,14 +195,14 @@ export const ackAlertMutation = (org: string) =>
     mutationFn: async (vars: { alertId: string; body: AckAlertRequest; folderId?: string }) =>
       (await alerts.ackAlert(org, vars.alertId, vars.body, vars.folderId)).data,
     // Callers render refusals and stale-firing answers themselves.
-    meta: { invalidates: [alertKeys.all(org)], silentError: true },
+    meta: { invalidates: oneAckScopes(org), silentError: true },
   });
 
 export const unackAlertMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (vars: { alertId: string; body: UnackAlertRequest; folderId?: string }) =>
       (await alerts.unackAlert(org, vars.alertId, vars.body, vars.folderId)).data,
-    meta: { invalidates: [alertKeys.all(org)], silentError: true },
+    meta: { invalidates: oneAckScopes(org), silentError: true },
   });
 
 /** A quick mute is a downtime, so the Downtimes list refreshes with the alert's chip. */
@@ -209,7 +210,16 @@ export const muteAlertMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (vars: { alertId: string; body: MuteAlertRequest; folderId?: string }) =>
       (await alerts.muteAlert(org, vars.alertId, vars.body, vars.folderId)).data,
-    meta: { invalidates: [alertKeys.all(org), downtimeKeys.all(org)], silentError: true },
+    // A mute also snoozes the alert's open pages.
+    meta: {
+      invalidates: [
+        alertKeys.all(org),
+        downtimeKeys.all(org),
+        oncallKeys.responsesAll(org),
+        oncallKeys.myAll(org),
+      ],
+      silentError: true,
+    },
   });
 
 export const extendAlertMuteMutation = (org: string) =>

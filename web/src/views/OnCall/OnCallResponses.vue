@@ -707,6 +707,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="acknowledgeRow(row)"
             >
               {{ t("oncall.acknowledge") }}
+              <OTooltip
+                :content="
+                  pageAckWords(
+                    row.latest.team_id
+                      ? (teamNameById[row.latest.team_id] ?? row.latest.team_id)
+                      : '',
+                    row.latest.subject.subject_type,
+                    t,
+                  ).ackHint
+                "
+              />
             </OButton>
             <OButton
               v-else-if="primaryAction(row) === 'resolve'"
@@ -925,6 +936,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { pageAckWords } from "@/utils/alerts/ackState";
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import {

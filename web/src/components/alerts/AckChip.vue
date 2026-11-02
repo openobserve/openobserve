@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <span class="inline-flex min-w-12 shrink-4" :data-test="dataTest">
     <OTag type="alertState" value="acknowledged" class="max-w-full min-w-0">
       <OTruncatedText as="span" class="min-w-0" :tooltip="false">
-        {{ t("alerts.ack.chip", { who: shortName, source: sourceLabel, time: ackedTime }) }}
+        {{ t("alerts.ack.chip", { who: raw(ack.acked_by), time: ackedTime }) }}
       </OTruncatedText>
     </OTag>
     <OTooltip
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { AckView } from "@/ts/interfaces/alert";
-import { ackShortName, ackSourceLabel } from "@/utils/alerts/ackState";
+import { ackSourceLabel } from "@/utils/alerts/ackState";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { formatInZone } from "@/utils/oncall";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -54,8 +54,6 @@ const props = withDefaults(
 
 const { t } = useI18nTyped();
 const viewerZone = useViewerTimezone();
-
-const shortName = computed(() => raw(ackShortName(props.ack.acked_by)));
 
 const ackedTime = computed(() =>
   raw(formatInZone(props.ack.acked_at, viewerZone.value, { timeStyle: "short" })),
