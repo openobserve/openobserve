@@ -26,6 +26,7 @@ pub mod announcements;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
 pub mod authz;
+#[cfg(feature = "enterprise")]
 pub mod autoobserve;
 #[cfg(feature = "cloud")]
 pub mod cloud;

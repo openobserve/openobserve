@@ -44,11 +44,10 @@ use openobserve_api_management::request::org_domains;
 #[cfg(feature = "cpu-profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, announcements, authz, autoobserve, dashboards, db_monitoring, downtimes, folders,
-    gen_ai_health, ingest_rejections, kv, metrics_usage, model_pricing, organization,
-    public_dashboards, query_history, rum_analytics, sample_data, security, service_accounts,
-    service_streams, short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics,
-    users,
+    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
+    ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
+    query_history, rum_analytics, sample_data, security, service_accounts, service_streams,
+    short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -79,9 +78,10 @@ use {
     },
     openobserve_api_common::auth::delegation::DelegatedCaller,
     openobserve_api_management::request::{
-        ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
-        discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys, license, oncall,
-        playground, prompts, providers, quality, remote_tasks, score_configs, scorers, workflows,
+        ai, alert_calibration, annotation_queues, annotations, anomaly_detection, autoobserve,
+        datasets, discovery, domain_management, eval_jobs, experiments, fleet, gen_ai, keys,
+        license, oncall, playground, prompts, providers, quality, remote_tasks, score_configs,
+        scorers, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1294,7 +1294,7 @@ fn alert_calibration_routes(router: Router) -> Router {
         .route("/v2/{org_id}/alert_calibration/digests/run", post(alert_calibration::digests::run_alert_calibration))
 }
 
-// Registered in every build: without enterprise each handler answers Not Supported.
+#[cfg(feature = "enterprise")]
 #[rustfmt::skip]
 fn autoobserve_routes(router: Router) -> Router {
     router
@@ -1308,12 +1308,11 @@ fn autoobserve_routes(router: Router) -> Router {
 
 #[rustfmt::skip]
 fn service_route_table() -> Router {
-    // Downtimes, Slack, search, service streams and AutoObserve live in their own tables to keep this function under the line limit.
+    // Downtimes, Slack, search and service streams live in their own tables to keep this function under the line limit.
     let mut router = Router::new()
         .merge(downtime_routes())
         .merge(slack_routes())
         .merge(search_routes());
-    router = autoobserve_routes(router);
     router = public_dashboard_admin_routes(router);
     router = router.merge(service_streams_routes());
     // Full UI configuration — authenticated counterpart of the unauthenticated
@@ -1662,7 +1661,7 @@ fn service_route_table() -> Router {
             .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history))
 
             .route("/v2/{org_id}/alerts/history/summary", get(alerts::history_summary::get_alert_history_summary));
-        router = alert_calibration_routes(router);
+        router = autoobserve_routes(alert_calibration_routes(router));
     }
 
     router = router

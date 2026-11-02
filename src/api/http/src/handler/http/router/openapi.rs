@@ -18,8 +18,8 @@ use config::{get_config, meta::stream::StreamType};
 use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
 use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
 use openobserve_api_management::request::{
-    autoobserve, gen_ai, keys, kv, rum_analytics, service_accounts, service_streams, short_url,
-    status, stream, synthetics,
+    gen_ai, keys, kv, rum_analytics, service_accounts, service_streams, short_url, status, stream,
+    synthetics,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::search::patterns;
@@ -219,13 +219,6 @@ use crate::{
         kv::set,
         kv::delete,
         kv::list,
-        autoobserve::entity_types,
-        autoobserve::coverage,
-        autoobserve::coverage_history,
-        autoobserve::suggestions,
-        autoobserve::list_marks,
-        autoobserve::put_mark,
-        autoobserve::delete_mark,
         clusters::list_clusters,
         short_url::shorten,
         short_url::retrieve,
@@ -1077,7 +1070,6 @@ use crate::{
         (name = "Fleet", description = "Fleet Manager: OpAMP collector inventory (enterprise)"),
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
         (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
-        (name = "AutoObserve", description = "Monitoring coverage, suggestions and entity marks from the AutoObserve engine (enterprise)"),
         (name = "Anomaly Detection", description = "Anomaly detection configs, model training and detection history (enterprise)"),
         (name = "Workflows", description = "Workflow authoring, drafts, runs and run history (enterprise)"),
         (name = "Security", description = "Security sources, OCSF packs, detections, cases and investigation (enterprise)"),
@@ -1440,6 +1432,16 @@ pub struct ApiDoc;
     openobserve_core::traces::agent_signals::api::compare_agent_versions,
     openobserve_core::traces::agent_signals::api::get_agent_signals,
     openobserve_core::traces::service_graph::api::get_edge_history,
+    openobserve_api_management::request::autoobserve::entity_types,
+    openobserve_api_management::request::autoobserve::coverage,
+    openobserve_api_management::request::autoobserve::coverage_history,
+    openobserve_api_management::request::autoobserve::suggestions,
+    openobserve_api_management::request::autoobserve::list_marks,
+    openobserve_api_management::request::autoobserve::put_mark,
+    openobserve_api_management::request::autoobserve::delete_mark,
+))]
+#[openapi(tags(
+    (name = "AutoObserve", description = "Monitoring coverage, suggestions and entity marks from the AutoObserve engine (enterprise)"),
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
@@ -1518,7 +1520,14 @@ pub struct SecurityAddon;
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         #[cfg(feature = "enterprise")]
-        overlay_doc(openapi, EnterpriseExperimentApiDoc::openapi());
+        {
+            let mut enterprise = EnterpriseExperimentApiDoc::openapi();
+            openapi
+                .tags
+                .get_or_insert_with(Vec::new)
+                .extend(enterprise.tags.take().unwrap_or_default());
+            overlay_doc(openapi, enterprise);
+        }
         #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
         overlay_doc(openapi, WorkflowHttpTriggerApiDoc::openapi());
         #[cfg(feature = "cloud")]
@@ -2221,9 +2230,27 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn a_build_without_enterprise_publishes_no_autoobserve_path_or_tag() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths: Vec<&String> = spec["paths"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .filter(|p| p.contains("autoobserve"))
+            .collect();
+        assert!(paths.is_empty(), "{paths:?}");
+        let tags = spec["tags"].to_string();
+        assert!(!tags.contains("AutoObserve"), "{tags}");
+    }
+
+    #[cfg(feature = "enterprise")]
     #[test]
     fn autoobserve_paths_are_rate_limited_mcp_tagged_and_delete_has_no_body() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let tags = spec["tags"].as_array().unwrap();
+        assert!(tags.iter().any(|t| t["name"] == "AutoObserve"), "{tags:?}");
         let paths = &spec["paths"];
         let mark = "/api/v2/{org_id}/autoobserve/marks/{mark}/{entity_type}/{entity_id}";
         let base = "/api/v2/{org_id}/autoobserve";
