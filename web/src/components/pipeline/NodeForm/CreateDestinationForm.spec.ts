@@ -21,6 +21,13 @@ import { createStore } from "vuex";
 import destinationService from "@/services/alert_destination";
 import i18n from "@/locales";
 import { nextTick } from "vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+
+// Passthrough spy: real toasts still render, and specs can read what was raised.
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>();
+  return { ...actual, toast: vi.fn((...args: unknown[]) => actual.toast(...(args as [never]))) };
+});
 
 // Mock the destination service
 vi.mock("@/services/alert_destination", async (importOriginal) => {
@@ -951,6 +958,37 @@ describe("CreateDestinationForm", () => {
       expect(wrapper.emitted("created")).toBeTruthy();
       expect(wrapper.emitted("created")![0]).toEqual(["My Dest"]);
     });
+
+    it.each(["create", "update"] as const)(
+      "closes its loading toast when a %s is refused with a 403",
+      async (op) => {
+        if (op === "update") {
+          wrapper.unmount();
+          wrapper = createWrapper({
+            destination: {
+              name: "My Dest",
+              url: "https://example.com",
+              method: "post",
+              type: "http",
+            },
+          });
+          await flushPromises();
+        }
+        const dismissLoading = vi.fn();
+        vi.mocked(toast).mockImplementationOnce(() => dismissLoading);
+        (destinationService[op] as any).mockRejectedValueOnce({ response: { status: 403 } });
+        setFormField(wrapper, "name", "My Dest");
+        setFormField(wrapper, "url", "https://example.com");
+        setFormField(wrapper, "method", "post");
+
+        await wrapper.vm.createDestination();
+        await flushPromises();
+
+        expect(destinationService[op]).toHaveBeenCalledTimes(1);
+        expect(dismissLoading).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).toEqual(["loading"]);
+      },
+    );
 
     it("does not call destinationService.create when name is empty", async () => {
       setFormField(wrapper, "name", "");

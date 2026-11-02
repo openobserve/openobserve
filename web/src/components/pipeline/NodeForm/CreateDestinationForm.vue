@@ -1164,10 +1164,10 @@ const createDestination = (value?: DestinationForm) => {
         emit("updated", name);
       })
       .catch((err: any) => {
+        dismiss();
         if (err.response?.status == 403) {
           return;
         }
-        dismiss();
         toast({
           variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
@@ -1182,10 +1182,10 @@ const createDestination = (value?: DestinationForm) => {
         emit("created", name);
       })
       .catch((err: any) => {
+        dismiss();
         if (err.response?.status == 403) {
           return;
         }
-        dismiss();
         toast({
           variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,

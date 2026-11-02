@@ -54,6 +54,19 @@ describe("settings service", () => {
     });
   });
 
+  describe("setOrgSetting", () => {
+    it("forwards silentForbidden for a background write", async () => {
+      await settings.setOrgSetting("org1", "home", { id: "a" }, "ui", undefined, {
+        silentForbidden: true,
+      });
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/org1/settings/v2",
+        { setting_key: "home", setting_value: { id: "a" }, setting_category: "ui" },
+        { silentForbidden: true },
+      );
+    });
+  });
+
   describe("createLogo", () => {
     it("should make POST request with multipart form data headers and default theme", async () => {
       const params = {

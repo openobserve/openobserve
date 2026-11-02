@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="email"
           :loading="loading"
           :forbidden="forbidden"
+          forbidden-resource="service_accounts"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"

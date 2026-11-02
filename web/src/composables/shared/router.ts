@@ -708,6 +708,7 @@ const useRoutes = () => {
       props: true,
       meta: {
         titleKey: "routeTitles.viewDashboard",
+        accessScopeQuery: ["dashboard"],
       },
       beforeEnter(to: any, from: any, next: any) {
         // A playlist link to the dashboard view is played by the TV player, except its own page fallback.
@@ -765,6 +766,7 @@ const useRoutes = () => {
       props: true,
       meta: {
         titleKey: "panel.addPanel",
+        accessScopeQuery: ["dashboard"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -836,6 +838,7 @@ const useRoutes = () => {
               path: "edit",
               name: "pipelineEditor",
               component: PipelineEditor,
+              meta: { accessScopeQuery: ["id"] },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },

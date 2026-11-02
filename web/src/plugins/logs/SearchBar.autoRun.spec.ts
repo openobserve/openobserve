@@ -430,7 +430,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(vm.searchSchedulerJob).toBe(true);
     });
 
-    it("submits the guard's frozen snapshot and says why a 403 failed", async () => {
+    it("submits the guard's frozen snapshot and leaves a 403 to the access card alone", async () => {
       (config as any).isEnterprise = "true";
       await setup();
       const vm = wrapper!.vm;
@@ -438,14 +438,10 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       vm.searchObj.meta.jobRecords = 100;
       scheduleSearch.mockRejectedValueOnce({ response: { status: 403, data: {} } });
       vm.openGuardSearchJob({ query: { sql: 'select * from "frozen"', size: 10 } });
+      toastMock.mockClear();
       await vm.addJobScheduler();
       expect(scheduleSearch.mock.calls[0][0].query.query.sql).toBe('select * from "frozen"');
-      expect(toastMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-          message: "You do not have permission to create search jobs",
-        }),
-      );
+      expect(toastMock).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("shows the server's message for any other job failure", async () => {

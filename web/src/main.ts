@@ -35,6 +35,7 @@ import { queryClient, setMutationNotifier } from "./composables/query/queryClien
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
+import { bindAccess } from "@/composables/useAccessStore";
 
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
@@ -50,6 +51,8 @@ app.use(i18n);
 
 // const router = createRouter(store);
 app.use(store).use(router);
+// Bound before mount: a 403 while the layout still shows its skeleton has no boundary to bind it yet.
+bindAccess(router, store);
 
 app.use(VueQueryPlugin, { queryClient });
 

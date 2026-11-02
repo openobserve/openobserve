@@ -56,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="rows"
           :loading="loading"
           :forbidden="forbidden"
+          forbidden-resource="roles"
           :action-loading="bulkDeleteLoading"
           v-model:global-filter="filterQuery"
           v-model:page-size="pageSize"
