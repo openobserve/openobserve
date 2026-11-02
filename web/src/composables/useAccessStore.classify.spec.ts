@@ -780,6 +780,26 @@ describe("access store classification", () => {
       `Your role is missing the ${permissionText} permission on ${resourceText}.`,
     );
   });
+
+  // Each row is resolved the way the server walks its route table: an area's rows ahead of the stream routes win, rows after them lose.
+  it.each([
+    ["GET", "/api/acme/functions/_values", "functions", "get"],
+    ["PUT", "/api/acme/functions/_values", "functions", "update"],
+    ["DELETE", "/api/acme/functions/_values", "functions", "delete"],
+    ["POST", "/api/acme/functions/_around", "streams", "get"],
+    ["GET", "/api/acme/eval_jobs/_around", "eval_jobs", "get"],
+    ["GET", "/api/acme/settings/_values", "settings", "get"],
+    ["POST", "/api/acme/settings/_around", "settings", "update"],
+    ["GET", "/api/acme/db_monitoring/_values", "streams", "get"],
+    ["GET", "/api/acme/db_monitoring/query/history", "db_monitoring", "get"],
+    ["GET", "/api/acme/db_monitoring/not_an_endpoint", undefined, "list"],
+    ["GET", "/api/acme/synthetics/_values", "streams", "get"],
+    ["PUT", "/api/acme/status_pages/_around", "status_pages", "update"],
+    ["GET", "/api/acme/slos/traces/latest", "streams", "get"],
+  ])("checks %s %s as %s %s, in the server's route order", (method, url, key, permission) => {
+    expect(extractResourceInfo(url, method)?.key).toBe(key);
+    expect(accessPermission(method, url)).toBe(permission);
+  });
 });
 
 describe("access store lifecycle", () => {
@@ -996,5 +1016,60 @@ describe("access store lifecycle", () => {
     expect(access.actionNotice.value).toBeNull();
     const stored = JSON.parse(sessionStorage.getItem("o2.access.memory.acme") ?? "{}");
     expect(Object.keys(stored.sections ?? {})).toEqual(["settings"]);
+  });
+
+  it.each(["series", "merge", "diff"])(
+    "keeps the profile %s query a stored read after a click and across a revisit",
+    async (operation) => {
+      await boot("/settings");
+      document.body.innerHTML = "<button id='run'>Query</button>";
+      press("run");
+      forbidden("POST", `/api/acme/cpu/profiles/${operation}`);
+      expect(access.actionNotice.value).toBeNull();
+      await router.push("/users");
+      await router.push("/settings");
+      expect(access.sectionEntries.value.map((e) => [e.resource.key, e.permission])).toEqual([
+        ["streams", "get"],
+      ]);
+    },
+  );
+
+  it("keeps a denied GET the server checks as Update across a reload", async () => {
+    await boot("/settings");
+    forbidden("GET", "/api/acme/synthetics/agent-tokens");
+    const stored = sessionStorage.getItem("o2.access.memory.acme");
+    resetAccess();
+    sessionStorage.setItem("o2.access.memory.acme", stored ?? "");
+    expect(access.sectionEntries.value.map((e) => [e.resource.key, e.permission])).toEqual([
+      ["synthetic_folder", "update"],
+    ]);
+  });
+
+  it("drops a refused write an older build stored, by its request rather than its permission", async () => {
+    const functions = { key: "functions", labelKey: "accessBoundary.resources.functions" };
+    sessionStorage.setItem(
+      "o2.access.memory.acme",
+      JSON.stringify({
+        pages: {},
+        sections: {
+          settings: [
+            {
+              resource: { ...functions, path: "/api/acme/functions/f" },
+              permission: "get",
+              requests: ["POST /api/acme/functions/f/test", "GET /api/acme/functions/f"],
+            },
+            {
+              resource: { ...functions, path: "/api/acme/functions/f" },
+              permission: "delete",
+              requests: ["DELETE /api/acme/functions/f"],
+            },
+          ],
+        },
+      }),
+    );
+    await boot("/settings");
+    expect(access.sectionEntries.value.map((e) => [e.permission, e.requests])).toEqual([
+      ["get", ["GET /api/acme/functions/f"]],
+    ]);
   });
 });

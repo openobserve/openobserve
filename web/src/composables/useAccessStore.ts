@@ -131,8 +131,6 @@ interface RouteOverride {
 interface LocatedResource {
   matched: string;
   after: string[];
-  /** The resource word is a stream name in front of a stream action. */
-  streamScoped: boolean;
 }
 
 interface ClassifiedRequest {
@@ -143,7 +141,7 @@ interface ClassifiedRequest {
   inPage: boolean;
   /** The bare collection, as a page's own list reads it; a sub-read such as `roles/<id>/users` is not. */
   collection: boolean;
-  /** Decided by the method, except a POST the server checks as List, which only reads: a POST it checks as Get still changes something. */
+  /** Decided by the method, except a stream read or a POST the server checks as List: a POST it checks as Get still changes something. */
   write: boolean;
   /** The server checks no role resource for the request. */
   bypass: boolean;
@@ -248,10 +246,70 @@ const RESOURCE_ALIASES: Record<string, string> = {
   "fleet/settings": "fleet_management",
 };
 
-// What follows a stream name on the server's stream routes; any other word after a name is an item of its own.
-const STREAM_OPERATION =
-  "(?:_values|_around|_around_multi)$|traces/(?:latest|latest_stream|session|user|time_range)(?:/|$)|traces/[^/]+/(?:details|dag)$|profiles/(?:meta|tag_values|series|merge|diff)$";
-const STREAM_OPERATION_RE = new RegExp(`^(?:${STREAM_OPERATION})`);
+// The server's `{org}/{stream}/<operation>` rows with the methods each takes; every one reads the stream.
+const STREAM_ROUTES: { operation: RegExp; methods: string[] }[] = [
+  { operation: /^profiles\/(?:meta|tag_values)$/, methods: ["GET"] },
+  { operation: /^profiles\/(?:series|merge)$/, methods: ["GET", "POST"] },
+  { operation: /^profiles\/diff$/, methods: ["POST"] },
+  {
+    operation: /^traces\/(?:latest|latest_stream|session|user|time_range|[^/]+\/(?:details|dag))$/,
+    methods: ["GET"],
+  },
+  { operation: /^(?:_values|_around_multi)$/, methods: ["GET"] },
+  { operation: /^_around$/, methods: ["GET", "POST"] },
+];
+
+// Server rows checked ahead of its stream routes that take a GET or POST where an operation could sit, by `<area>/{id}`, `<area>/{id}/{action}` or `<area>/{*}`.
+const ROWS_BEFORE_STREAM_ROUTES: Record<string, string[]> = {
+  ...Object.fromEntries(
+    [
+      "org_cleanup_tasks",
+      "dashboards",
+      "slos",
+      "anomaly_detection",
+      "folders",
+      "reports",
+      "functions",
+      "pipelines",
+      "roles",
+      "groups",
+      "service_accounts",
+      "cipher_keys",
+      "savedviews",
+      "search_jobs",
+      "re_patterns",
+      "annotation_queues",
+      "prompts",
+      "experiments",
+      "datasets",
+      "providers",
+      "score_configs",
+      "tasks",
+      "scorers",
+      "eval_jobs",
+    ].map((area) => [`${area}/{id}`, ["GET"]]),
+  ),
+  ...Object.fromEntries(
+    ["streams", "users", "kv", "enrichment_tables", "_index_template", "_data_stream"].map(
+      (area) => [`${area}/{id}`, ["GET", "POST"]],
+    ),
+  ),
+  "eval_jobs/{id}/{action}": ["POST"],
+  ...Object.fromEntries(
+    ["billings", "aws-marketplace", "settings", "sourcemaps", "ai", "mcp", "prometheus"].map(
+      (area) => [`${area}/{*}`, ["GET", "POST"]],
+    ),
+  ),
+  "ratelimit/{*}": ["GET"],
+  // These two sit between the server's trace and value routes, so they shadow only the one-word operations.
+  "clusters/{id}": ["GET"],
+  "short/{id}": ["GET"],
+  ...Object.fromEntries(["azure-marketplace", "_search"].map((a) => [`${a}/{*}`, ["POST"]])),
+};
+
+// Every Database Monitoring endpoint the server lists; any other path under it has no row.
+const DB_MONITORING_ENDPOINTS =
+  "databases|queries|query/(?:history|endpoints|insights|plans|server_metrics)|samples|deadlocks|blocking|activity|server_queries|server_samples|table_health|instances|instance_metrics|badges";
 
 const ITEM_PERMISSIONS: RouteOverride["permissions"] = {
   GET: "get",
@@ -445,7 +503,11 @@ const ROUTE_OVERRIDES: RouteOverride[] = [
     resource: null,
     permissions: { POST: "create" },
   },
-  { path: /^\/[^/]+\/db_monitoring\/.+$/, resource: "db_monitoring", permissions: { GET: "get" } },
+  {
+    path: new RegExp(`^/[^/]+/db_monitoring/(?:${DB_MONITORING_ENDPOINTS})$`),
+    resource: "db_monitoring",
+    permissions: { GET: "get" },
+  },
   {
     path: /^\/[^/]+\/oncall\/teams\/[^/]+\/(members|overrides)$/,
     resource: "oncall",
@@ -1239,7 +1301,7 @@ function writeMemory(org: string, memory: OrgAccessMemory): void {
   }
 }
 
-// A record written by an older build can hold unlabelled resources, refused writes or long request lists, none of which may come back.
+// A record written by an older build can hold unlabelled resources, refused writes or long request lists, none of which may come back; a write is told by its request, as a GET the server checks as Update is still a read.
 function namedSections(
   sections: Record<string, AccessSectionEntry[]>,
 ): Record<string, AccessSectionEntry[]> {
@@ -1248,8 +1310,8 @@ function namedSections(
       [
         key,
         entries
-          .filter((e) => !!e.resource.labelKey && isReadPermission(e.permission))
-          .map((e) => ({ ...e, requests: cappedRequests(e.requests) })),
+          .map((e) => ({ ...e, requests: cappedRequests(e.requests.filter(isReadRequest)) }))
+          .filter((e) => !!e.resource.labelKey && e.requests.length > 0),
       ] as const,
   );
   return Object.fromEntries(named.filter(([, entries]) => entries.length > 0));
@@ -1259,8 +1321,9 @@ function entryId(entry: AccessSectionEntry): string {
   return entry.resource.key;
 }
 
-function isReadPermission(permission: AccessPermission): boolean {
-  return permission === "list" || permission === "get";
+function isReadRequest(request: string): boolean {
+  const [method = "", path = ""] = request.split(" ");
+  return !classifyRequest(method, path).write;
 }
 
 function isUnnamed(resource: AccessResource): boolean {
@@ -1352,10 +1415,9 @@ function collectionRoutes(area: string, resource: string): RouteOverride[] {
   ];
 }
 
-// A stream that shares the area's name keeps its stream reads.
 function itemRoute(area: string, resource: string): RouteOverride {
   return {
-    path: new RegExp(`^/[^/]+/${area}/(?!(?:${STREAM_OPERATION})).+$`),
+    path: new RegExp(`^/[^/]+/${area}/.+$`),
     resource,
     permissions: ITEM_PERMISSIONS,
   };
@@ -1370,6 +1432,15 @@ function classifyRequest(method: string, rawUrl: string): ClassifiedRequest {
     // An unparseable URL reads as an unnamed collection.
   }
   const segments = apiSegments(pathname);
+  if (isStreamRoute(verb, segments))
+    return {
+      resource: resourceForKey("streams", pathname),
+      permission: "get",
+      inPage: false,
+      collection: false,
+      write: false,
+      bypass: false,
+    };
   const apiPath = "/" + segments.join("/");
   // Search-style POSTs only read, so they route like a GET.
   const searchPost = verb === "POST" && isSearchPost(segments);
@@ -1404,7 +1475,6 @@ function inferPermission(
   located: LocatedResource | null,
 ): AccessPermission {
   if (verb === "POST") {
-    if (located?.streamScoped) return "get";
     if (isSearchPost(segments)) return "list";
     return segments.some((s) => UPDATE_POST_ACTIONS.has(s)) ? "update" : "create";
   }
@@ -1414,10 +1484,9 @@ function inferPermission(
   return itemNamed || hasItemId(segments) ? "get" : "list";
 }
 
-// The segment after the optional version is the org (or a `_` system scope), never the resource; the first named word wins, so `users/<id>/roles` is Users and a stream called `alerts` stays a stream.
+// The segment after the optional version is the org (or a `_` system scope), never the resource; the first named word wins, so `users/<id>/roles` is Users.
 function locateResource(segments: string[]): LocatedResource | null {
   const rest = afterOrg(segments);
-  if (isStreamOperation(rest)) return { matched: "streams", after: rest, streamScoped: true };
   for (let start = 0; start < rest.length; start++) {
     if (isIdSegment(rest[start])) continue;
     for (let end = rest.length; end > start; end--) {
@@ -1425,17 +1494,21 @@ function locateResource(segments: string[]): LocatedResource | null {
         .slice(start, end)
         .filter((s) => !isIdSegment(s))
         .join("/");
-      if (isKnownResource(joined))
-        return { matched: resolveAlias(joined), after: rest.slice(end), streamScoped: false };
+      if (isKnownResource(joined)) return { matched: resolveAlias(joined), after: rest.slice(end) };
     }
   }
   return null;
 }
 
-// The server checks `streams/{name}` before any stream route, so `streams/_around` names a stream, not an operation.
-function isStreamOperation(rest: string[]): boolean {
-  if (rest.length < 2 || (rest[0] === "streams" && rest.length === 2)) return false;
-  return STREAM_OPERATION_RE.test(rest.slice(1).join("/"));
+// Walked in the server's order, so a function named `_values` stays a function while a stream named `synthetics` keeps its reads.
+function isStreamRoute(verb: string, segments: string[]): boolean {
+  const [org = "", area, ...operation] = segments;
+  if (!area || !operation.length || /^v\d+$/.test(org)) return false;
+  const path = operation.join("/");
+  if (!STREAM_ROUTES.some((r) => r.methods.includes(verb) && r.operation.test(path))) return false;
+  const shape = ["{id}", "{id}/{action}"][operation.length - 1];
+  const rows = [`${area}/{*}`, ...(shape ? [`${area}/${shape}`] : [])];
+  return !rows.some((row) => ROWS_BEFORE_STREAM_ROUTES[row]?.includes(verb));
 }
 
 // Matched only where the server puts operation words, so an item named `_search_archive` is still created.
