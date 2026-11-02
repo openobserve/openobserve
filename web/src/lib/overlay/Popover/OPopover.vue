@@ -9,7 +9,7 @@
   Shares ODropdown's overlay coordination so descendant overlays (OSelect /
   OCombobox / nested dropdowns) opening INSIDE the popover never dismiss it.
 
-  Props: open (v-model) | anchor | side | align | flipAlign | sideOffset | arrow | hideWhenDetached | modal | ariaLabel | contentClass | collisionPadding
+  Props: open (v-model) | anchor | side | align | flipAlign | sideOffset | arrow | hideWhenDetached | closeOnScroll | modal | ariaLabel | contentClass | collisionPadding
   Slots: trigger (unused when `anchor` is set) | default | arrow (paths in a 12x6 viewBox)
   Emits: update:open | open-auto-focus
 -->
@@ -75,6 +75,8 @@ const props = withDefaults(
     arrow?: boolean;
     /** Hide the content when the trigger scrolls out of view (Floating UI). */
     hideWhenDetached?: boolean;
+    /** Close when an ancestor of the trigger scrolls; false keeps it open, following the trigger and hidden while detached. */
+    closeOnScroll?: boolean;
     ariaLabel?: I18nText;
     /** Content stacking order. Default sits above the app header/drawer (2000/3000). */
     zIndex?: number;
@@ -89,6 +91,7 @@ const props = withDefaults(
     align: "start",
     sideOffset: 4,
     hideWhenDetached: true,
+    closeOnScroll: true,
     zIndex: 6000,
   },
 );
@@ -217,11 +220,11 @@ function handleFocusOutside(event: Event) {
 const sidebarScrollTick = inject<Ref<number> | null>("sidebarScrollTick", null);
 if (sidebarScrollTick) {
   watch(sidebarScrollTick, () => {
-    if (internalOpen.value) handleOpenChange(false);
+    if (internalOpen.value && props.closeOnScroll) handleOpenChange(false);
   });
 }
 function handleViewportScroll(event: Event) {
-  if (!internalOpen.value) return;
+  if (!internalOpen.value || !props.closeOnScroll) return;
   const target = event.target as (Element & Node) | Document | null;
   if (!target) return;
   // Ignore scrolls inside our own or a nested overlay's content.

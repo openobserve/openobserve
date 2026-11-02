@@ -826,6 +826,107 @@ describe("AlertList - row actions", () => {
     expect(alertsDB.length).toBeGreaterThan(6);
   });
 
+  it("names its own list to the table's no-access lock", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const table = wrapper
+      .findAllComponents({ name: "OTable" })
+      .find((c: any) => "forbidden" in c.props());
+    expect(table.props("forbiddenResource")).toBe("alert_folders");
+  });
+
+  it("closes the clone's loading toast when the clone is refused with a 403", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const row = wrapper.vm.filteredResults[0];
+    await wrapper.find(`[data-test="alert-list-${row.name}-clone-alert"]`).trigger("click");
+    await flushPromises();
+    wrapper.vm.toBeCloneAlertName = `${row.name} - Copy`;
+    wrapper.vm.toBeClonestreamType = "logs";
+    wrapper.vm.toBeClonestreamName = "default";
+    wrapper.vm.folderIdToBeCloned = "default";
+    (alertsSvc.create_by_alert_id as any).mockRejectedValueOnce({ response: { status: 403 } });
+    const dismissLoading = vi.fn();
+    vi.mocked(toast).mockClear();
+    vi.mocked(toast).mockImplementationOnce(() => dismissLoading);
+
+    await wrapper.vm.submitForm();
+    await flushPromises();
+
+    expect(dismissLoading).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).toEqual(["loading"]);
+  });
+
+  it.each([
+    ["an anomaly", { toBeClonedIsAnomaly: true, toBeClonedIsComposite: false }],
+    ["a composite", { toBeClonedIsAnomaly: false, toBeClonedIsComposite: true }],
+  ])(
+    "closes its loading toast when cloning %s alert is refused with a 403",
+    async (_kind, flags) => {
+      const wrapper: any = await mountAlertList();
+      await waitData(wrapper);
+      Object.assign(wrapper.vm, flags, {
+        toBeClonedID: "a1",
+        toBeCloneAlertName: "Copy",
+        toBeClonestreamType: "logs",
+        toBeClonestreamName: "default",
+        folderIdToBeCloned: "default",
+        showForm: true,
+      });
+      const clone = vi
+        .spyOn(alertsSvc, "clone_by_id")
+        .mockRejectedValueOnce({ response: { status: 403, data: { message: "denied" } } });
+      const dismissLoading = vi.fn();
+      vi.mocked(toast).mockClear();
+      vi.mocked(toast).mockImplementationOnce(() => dismissLoading);
+
+      await wrapper.vm.submitForm();
+      await flushPromises();
+      clone.mockRestore();
+
+      expect(dismissLoading).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).toEqual(["loading"]);
+      expect(wrapper.vm.showForm).toBe(false);
+      expect(wrapper.vm.isSubmitting).toBe(false);
+    },
+  );
+
+  it.each([
+    ["exporting an alert", "export_by_id", (vm: any, row: any) => vm.exportAlert(row)],
+    ["triggering an alert", "trigger_alert", (vm: any, row: any) => vm.triggerAlert(row)],
+    ["retraining an anomaly", "retrain_by_id", (vm: any, row: any) => vm.retrainAnomaly(row)],
+    [
+      "exporting selected alerts",
+      "export_by_id",
+      (vm: any, row: any) => {
+        vm.selectedAlertIds = [row.alert_id];
+        return vm.multipleExportAlert();
+      },
+    ],
+    [
+      "pausing or resuming selected alerts",
+      "bulkToggleState",
+      (vm: any, row: any) => {
+        vm.selectedAlertIds = [row.alert_id];
+        return vm.bulkToggleAlerts(row.enabled ? "pause" : "resume");
+      },
+    ],
+  ])("raises no error toast when %s is refused with a 403", async (_action, method, run) => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const row = wrapper.vm.filteredResults[0];
+    const refused = vi
+      .spyOn(alertsSvc, method)
+      .mockRejectedValue({ response: { status: 403, data: { message: "denied" } } });
+    vi.mocked(toast).mockClear();
+
+    await run(wrapper.vm, row);
+    await flushPromises();
+    refused.mockRestore();
+
+    expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).not.toContain("error");
+  });
+
   it("deletes an alert after confirming dialog", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -2438,6 +2539,18 @@ describe("AlertList - editor drafts", () => {
         message: "This alert no longer exists, so its unsaved draft was discarded.",
       }),
     );
+  });
+
+  it("raises no error toast when its edit link is refused with a 403", async () => {
+    const { vm } = await mountDraftList();
+    alertsSvc.get_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } });
+    vm.router.currentRoute.value.query = { action: "update", alert_id: "denied-1" };
+    vi.mocked(toast).mockClear();
+
+    await vm.handleActionQuery("update");
+    await flushPromises();
+
+    expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).not.toContain("error");
   });
 
   it("refreshes without closing the editor when the leave dialog saved", async () => {

@@ -14,7 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, shallowReactive, shallowRef, toRaw, type InjectionKey, type Ref } from "vue";
-import { useRouter, type RouteLocationNormalizedLoaded, type Router } from "vue-router";
+import {
+  START_LOCATION,
+  useRouter,
+  type LocationQuery,
+  type RouteLocationNormalizedLoaded,
+  type RouteMeta,
+  type RouteParamsGeneric,
+  type Router,
+} from "vue-router";
 import { useStore } from "vuex";
 import { getIntlLocale } from "@/locales";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
@@ -26,6 +34,8 @@ export interface AccessResource {
   labelKey: I18nKey;
   /** Request path without host or query. */
   path: string;
+  /** False where no role grant lifts the denial, so no message names a permission for it. */
+  grantable?: false;
 }
 
 /** IAM permission a denied request needed, named as the role editor names it. */
@@ -40,9 +50,12 @@ export interface AccessSectionEntry {
 
 export interface AccessActionNotice {
   el: Element;
+  /** The first denial's permission, method and resource; {@link denials} holds every denial of the action. */
   permission: AccessPermission;
   method: string;
   resource: AccessResource;
+  /** Every write the action had refused, merged by resource and permission. */
+  denials: AccessSectionEntry[];
   /** Route the request started on; the notice falls back to this route's section notice. */
   routeKey: string;
   /** Older qualifying activations, newest first, to re-anchor on if `el` leaves the page. */
@@ -85,9 +98,12 @@ export interface AccessDeniedGroup {
 /** The shared 403 wording: a "You can't ..." title and the denials grouped by permission. */
 export interface AccessDeniedMessage {
   title: I18nText;
+  /** Only denials a role grant lifts; the rest set {@link askAdmin}. */
   groups: AccessDeniedGroup[];
-  /** Distinct resources across every group, as the chip counts them. */
-  resourceCount: number;
+  /** Some denial names no permission, as the server checks no role resource for it. */
+  askAdmin: boolean;
+  /** Denials across every group, one per resource and permission; the title and the chip's badge count this. */
+  count: number;
 }
 
 /** A piece of a resource list; `more` marks the "N more" item that expands the list. */
@@ -101,12 +117,54 @@ interface DeniedRequest {
   request: string;
 }
 
+interface RouteOverride {
+  /** Matched on the path after `/api`. */
+  path: RegExp;
+  /** Null where the server checks no role resource, so the route reads unnamed even under a named area. */
+  resource: string | null;
+  /** Permission per HTTP method, as the server's route table maps it; a method not listed falls through. */
+  permissions: Partial<Record<string, AccessPermission>>;
+  /** False where no view's own lock covers the route, though only views name its resource. */
+  inPage?: false;
+}
+
+interface LocatedResource {
+  matched: string;
+  after: string[];
+  /** The resource word is a stream name in front of a stream action. */
+  streamScoped: boolean;
+}
+
+interface ClassifiedRequest {
+  /** Null when the resource has no friendly name. */
+  resource: AccessResource | null;
+  permission: AccessPermission;
+  /** A view's own lock names the resource, so its denied reads are not repeated as a chip. */
+  inPage: boolean;
+  /** The bare collection, as a page's own list reads it; a sub-read such as `roles/<id>/users` is not. */
+  collection: boolean;
+  /** Decided by the method, except a POST the server checks as List, which only reads: a POST it checks as Get still changes something. */
+  write: boolean;
+  /** The server checks no role resource for the request. */
+  bypass: boolean;
+}
+
 // One sessionStorage record per org, so a revisit or a reload renders the access state on its first frame.
 interface OrgAccessMemory {
   /** `<route>|<resource>` of each locked page, with the permission whose denial locked it. */
   pages: Record<string, AccessPermission>;
-  /** Section denials per route key. */
+  /** Denied reads per route key; refused writes live in {@link writeEntries} only. */
   sections: Record<string, AccessSectionEntry[]>;
+}
+
+// Every `accessBoundary.resources.X`; the compiler then proves each has its `resourcesInline.X`.
+type ResourceLabelName = LabelName<I18nKey>;
+type LabelName<K> = K extends `accessBoundary.resources.${infer N}` ? N : never;
+
+interface RouteWrites {
+  /** {@link accessStamp} of the route the writes were refused on. */
+  stamp: string;
+  entries: AccessSectionEntry[];
 }
 
 const FRIENDLY_NAME_KEYS: Record<string, I18nKey> = {
@@ -123,6 +181,7 @@ const FRIENDLY_NAME_KEYS: Record<string, I18nKey> = {
   templates: "accessBoundary.resources.templates",
   reports: "accessBoundary.resources.reports",
   passcode: "accessBoundary.resources.passcode",
+  status_pages: "accessBoundary.resources.statusPages",
   "llm/models": "accessBoundary.resources.llmModelPricing",
   groups: "accessBoundary.resources.groups",
   service_accounts: "accessBoundary.resources.serviceAccounts",
@@ -130,7 +189,41 @@ const FRIENDLY_NAME_KEYS: Record<string, I18nKey> = {
   re_patterns: "accessBoundary.resources.regexPatterns",
 };
 
-// Resources only a view's own lock names; the URL classifier leaves their 403s silent, so the lock is not repeated as a chip.
+// Resources no path word names on its own; only a route override or a nested-path alias reaches them.
+const ROUTE_NAME_KEYS: Record<string, I18nKey> = {
+  alert_folders: "accessBoundary.resources.alertFolders",
+  folders: "accessBoundary.resources.dashboardFolders",
+  incidents: "accessBoundary.resources.incidents",
+  fleet_management: "accessBoundary.resources.fleetManagement",
+  report_folders: "accessBoundary.resources.reportFolders",
+  downtime_folders: "accessBoundary.resources.downtimeFolders",
+  settings: "accessBoundary.resources.settings",
+  db_monitoring: "accessBoundary.resources.databaseMonitoring",
+  oncall: "accessBoundary.resources.onCall",
+  oncall_responses: "accessBoundary.resources.onCallResponses",
+  synthetic_folder: "accessBoundary.resources.syntheticFolders",
+  synthetic_environment: "accessBoundary.resources.syntheticEnvironments",
+  synthetics: "accessBoundary.resources.syntheticChecks",
+  billing_group: "accessBoundary.resources.billingGroup",
+  enrichment_tables: "accessBoundary.resources.enrichmentTables",
+  eval_jobs: "accessBoundary.resources.evalJobs",
+  providers: "accessBoundary.resources.llmProviders",
+  rumtoken: "accessBoundary.resources.rumTokens",
+  score_configs: "accessBoundary.resources.scoreConfigs",
+  scorers: "accessBoundary.resources.scorers",
+  service_streams: "accessBoundary.resources.serviceStreams",
+  remote_tasks: "accessBoundary.resources.remoteTasks",
+  workflows: "accessBoundary.resources.workflows",
+  workflow_folder: "accessBoundary.resources.workflowFolders",
+  prompt_folders: "accessBoundary.resources.promptFolders",
+  incident_integrations: "accessBoundary.resources.incidentIntegrations",
+  search_jobs: "accessBoundary.resources.searchJobs",
+  metrics: "accessBoundary.resources.metrics",
+  traces: "accessBoundary.resources.traces",
+  sourcemaps: "accessBoundary.resources.sourceMaps",
+};
+
+// Resources only a view's own lock names; the classifier leaves their denied reads silent, so the lock is not repeated as a chip.
 const IN_PAGE_NAME_KEYS: Record<string, I18nKey> = {
   ai: "accessBoundary.resources.ai",
   downtimes: "accessBoundary.resources.downtimes",
@@ -138,13 +231,446 @@ const IN_PAGE_NAME_KEYS: Record<string, I18nKey> = {
   public_dashboards: "accessBoundary.resources.publicDashboards",
 };
 
-// Paths that hit the same IAM resource as another key, so their denials merge into one row.
+// Paths that hit the same IAM resource as another key, so their denials merge into one row; a nested collection is its own resource.
 const RESOURCE_ALIASES: Record<string, string> = {
   query_functions: "functions",
   "ingestion-tokens": "passcode",
   "llm/models/built-in": "llm/models",
   "llm/models/refresh-built-in": "llm/models",
+  "alerts/templates": "templates",
+  "alerts/destinations": "destinations",
+  "alerts/incidents": "incidents",
+  "dashboards/public_links": "public_dashboards",
+  "fleet/configs": "fleet_configs",
+  "fleet/pipelines": "fleet_management",
+  "fleet/summary": "fleet_management",
+  "fleet/audit": "fleet_management",
+  "fleet/settings": "fleet_management",
 };
+
+// A path word followed by one of these is a stream name, a value of Streams, never a resource of its own.
+const STREAM_SCOPED_SEGMENTS = new Set([
+  "_values",
+  "_around",
+  "_around_multi",
+  "traces",
+  "profiles",
+]);
+
+const ITEM_PERMISSIONS: RouteOverride["permissions"] = {
+  GET: "get",
+  POST: "create",
+  PUT: "update",
+  PATCH: "update",
+  DELETE: "delete",
+};
+
+// Folder types whose folders the role editor names; other types keep the path heuristic.
+const FOLDER_RESOURCES: Record<string, string> = {
+  alerts: "alert_folders",
+  dashboards: "folders",
+  reports: "report_folders",
+  synthetics: "synthetic_folder",
+  downtimes: "downtime_folders",
+  workflows: "workflow_folder",
+  prompts: "prompt_folders",
+};
+
+// The server answers these folder types' list and name lookups itself, with no role check.
+const UNLISTED_FOLDER_TYPES = new Set(["downtimes"]);
+
+const KNOWN_FOLDER_TYPES = Object.keys(FOLDER_RESOURCES).join("|");
+
+// Routes the server checks against another resource or permission than the path suggests, as its route permission table lists them; first match wins.
+const ROUTE_OVERRIDES: RouteOverride[] = [
+  {
+    path: /^\/v2\/[^/]+\/alerts$/,
+    resource: "alert_folders",
+    permissions: { GET: "list", POST: "create" },
+  },
+  {
+    path: /^\/[^/]+\/dashboards$/,
+    resource: "folders",
+    permissions: { GET: "list", POST: "create" },
+  },
+  {
+    path: /^\/v2\/[^/]+\/alerts\/[^/]+\/clone$/,
+    resource: "alert_folders",
+    permissions: { POST: "create" },
+  },
+  {
+    path: /^\/v2\/[^/]+\/alerts\/[^/]+\/(ack|unack|mute(\/[^/]+\/(extend|cancel))?|export)$/,
+    resource: "alerts",
+    permissions: { POST: "get" },
+  },
+  {
+    path: /^\/[^/]+\/dashboards\/[^/]+\/public_links\/[^/]+\/(pause|refresh|resume)$/,
+    resource: "public_dashboards",
+    permissions: { POST: "update" },
+  },
+  {
+    path: /^\/[^/]+\/dashboards\/[^/]+\/(annotations|panels)(\/panels)?(\/[^/]+)?$/,
+    resource: "dashboards",
+    permissions: { POST: "update", DELETE: "update" },
+  },
+  { path: /^\/[^/]+\/pipelines\/backfill$/, resource: "pipelines", permissions: { GET: "list" } },
+  {
+    path: /^\/[^/]+\/pipelines\/[^/]+\/backfill$/,
+    resource: "pipelines",
+    permissions: { POST: "update" },
+  },
+  { path: /^\/[^/]+\/pipelines\/streams$/, resource: "pipelines", permissions: { GET: "list" } },
+  {
+    path: /^\/v2\/[^/]+\/alerts\/incidents(\/stats)?$/,
+    resource: "incidents",
+    permissions: { GET: "list" },
+  },
+  {
+    path: /^\/v2\/[^/]+\/alerts\/incidents\/[^/]+\/rca$/,
+    resource: "incidents",
+    permissions: { DELETE: "update" },
+  },
+  { path: /^\/[^/]+\/users\/roles$/, resource: "users", permissions: { GET: "list" } },
+  { path: /^\/[^/]+\/users\/roles\/all$/, resource: "users", permissions: { GET: "get" } },
+  { path: /^\/[^/]+\/roles\/[^/]+\/users$/, resource: "roles", permissions: { GET: "list" } },
+  {
+    path: /^\/[^/]+\/fleet\/(pipelines|summary|settings)$/,
+    resource: "fleet_management",
+    permissions: { GET: "get" },
+  },
+  { path: /^\/[^/]+\/fleet\/audit$/, resource: "fleet_management", permissions: { GET: "list" } },
+  {
+    path: /^\/[^/]+\/fleet\/configs\/validate$/,
+    resource: "fleet_configs",
+    permissions: { POST: "get" },
+  },
+  {
+    path: /^\/[^/]+\/llm\/models(\/refresh-built-in)?$/,
+    resource: "llm/models",
+    permissions: { POST: "update" },
+  },
+  { path: /^\/[^/]+\/re_patterns\/test$/, resource: "re_patterns", permissions: { POST: "get" } },
+  {
+    path: /^\/v2\/[^/]+\/reports$/,
+    resource: "report_folders",
+    permissions: { GET: "list", POST: "create" },
+  },
+  {
+    path: /^\/v2\/[^/]+\/downtimes(\/(preview|resources|values))?$/,
+    resource: "downtime_folders",
+    permissions: { POST: "create" },
+  },
+  {
+    path: /^\/v2\/[^/]+\/downtimes\/[^/]+\/(cancel|extend)$/,
+    resource: "downtimes",
+    permissions: { POST: "update" },
+  },
+  ...Object.entries(FOLDER_RESOURCES).flatMap(([type, resource]): RouteOverride[] => {
+    const unlisted = UNLISTED_FOLDER_TYPES.has(type);
+    const name: RouteOverride = {
+      path: new RegExp(`^/v2/[^/]+/folders/${type}/name/[^/]+$`),
+      resource,
+      permissions: { GET: "list" },
+    };
+    return [
+      ...(unlisted ? [] : [name]),
+      {
+        path: new RegExp(`^/v2/[^/]+/folders/${type}$`),
+        resource,
+        permissions: unlisted ? { POST: "create" } : { GET: "list", POST: "create" },
+      },
+      {
+        path: new RegExp(`^/v2/[^/]+/folders/${type}/[^/]+$`),
+        resource,
+        permissions: { GET: "get", PUT: "update", DELETE: "delete" },
+      },
+    ];
+  }),
+  // The server checks a raw PATCH here, which no role permission grants.
+  {
+    path: /^\/v2\/[^/]+\/folders\/alerts\/[^/]+\/[^/]+$/,
+    resource: null,
+    permissions: { PATCH: "update" },
+  },
+  {
+    path: /^\/v2\/[^/]+\/folders\/alerts\/[^/]+\/[^/]+$/,
+    resource: "alert_folders",
+    permissions: { PUT: "update", DELETE: "delete" },
+  },
+  {
+    path: /^\/v2\/[^/]+\/folders\/dashboards\/[^/]+\/[^/]+$/,
+    resource: "dashboards",
+    permissions: { PUT: "update", PATCH: "update", DELETE: "update" },
+  },
+  {
+    path: /^\/[^/]+\/settings\/v2\/user\/[^/]+$/,
+    resource: "settings",
+    permissions: { POST: "get" },
+  },
+  {
+    path: /^\/[^/]+\/settings\/v2\/user\/[^/]+\/[^/]+$/,
+    resource: "settings",
+    permissions: { DELETE: "get" },
+  },
+  {
+    path: /^\/[^/]+\/alerts\/deduplication\/semantic-groups(\/preview-diff)?$/,
+    resource: "settings",
+    permissions: { GET: "get", POST: "update", PUT: "update" },
+  },
+  {
+    path: /^\/[^/]+\/(settings(\/.*)?|telephony(\/status)?)$/,
+    resource: "settings",
+    permissions: { GET: "get", POST: "update", PUT: "update", DELETE: "update" },
+  },
+  {
+    path: /^\/[^/]+\/storage$/,
+    resource: "settings",
+    permissions: { GET: "get", POST: "create", PUT: "update" },
+  },
+  {
+    path: /^\/[^/]+\/sourcemaps\/stacktrace$/,
+    resource: "sourcemaps",
+    permissions: { POST: "list" },
+  },
+  { path: /^\/[^/]+\/annotations$/, resource: "score_configs", permissions: { POST: "list" } },
+  { path: /^\/[^/]+\/prompts\/match$/, resource: "prompt_folders", permissions: { POST: "list" } },
+  {
+    path: /^\/[^/]+\/prometheus\/api\/v1\/query_range$/,
+    resource: null,
+    permissions: { POST: "list" },
+  },
+  {
+    path: /^\/[^/]+\/oncall\/contacts\/[^/]+(\/verify(\/confirm)?)?$/,
+    resource: null,
+    permissions: ITEM_PERMISSIONS,
+  },
+  {
+    path: /^\/[^/]+\/org_cleanup_tasks\/[^/]+\/retry$/,
+    resource: null,
+    permissions: { POST: "create" },
+  },
+  { path: /^\/[^/]+\/db_monitoring\/.+$/, resource: "db_monitoring", permissions: { GET: "get" } },
+  {
+    path: /^\/[^/]+\/oncall\/teams\/[^/]+\/(members|overrides)$/,
+    resource: "oncall",
+    permissions: { GET: "list", POST: "create", DELETE: "delete" },
+  },
+  {
+    path: /^\/[^/]+\/oncall\/(teams\/[^/]+\/resolved-schedule|routing)\/preview$/,
+    resource: "oncall",
+    permissions: { POST: "get" },
+  },
+  {
+    path: /^\/[^/]+\/oncall\/(teams|ownership(\/stats)?|unrouted|coverage-gaps)$/,
+    resource: "oncall",
+    permissions: { GET: "list", POST: "create" },
+  },
+  {
+    path: /^\/[^/]+\/oncall\/(teams|schedule-presets|routing|ownership|unrouted)(\/.*)?$/,
+    resource: "oncall",
+    permissions: ITEM_PERMISSIONS,
+  },
+  {
+    path: /^\/[^/]+\/oncall\/(responses|my\/deliveries|my\/teams|unavailability|analytics\/causes)$/,
+    resource: "oncall_responses",
+    permissions: { GET: "list", POST: "create" },
+  },
+  {
+    path: /^\/[^/]+\/oncall\/(responses\/[^/]+\/(history|deliveries)|incidents\/[^/]+\/responses)$/,
+    resource: "oncall_responses",
+    permissions: { GET: "list" },
+  },
+  {
+    path: /^\/[^/]+\/oncall\/(responses|my|unavailability)\/.+$/,
+    resource: "oncall_responses",
+    permissions: ITEM_PERMISSIONS,
+  },
+  {
+    path: /^\/[^/]+\/synthetics\/(agent-setup|agent-tokens(\/.*)?)$/,
+    resource: "synthetic_folder",
+    permissions: { GET: "update", POST: "update", PATCH: "update" },
+  },
+  {
+    path: /^\/[^/]+\/synthetics(\/locations)?$/,
+    resource: "synthetic_folder",
+    permissions: { GET: "list", POST: "create", DELETE: "delete" },
+  },
+  {
+    path: /^\/[^/]+\/synthetics\/locations\/[^/]+$/,
+    resource: "synthetic_folder",
+    permissions: { GET: "get", PUT: "update", DELETE: "delete" },
+  },
+  {
+    path: /^\/[^/]+\/synthetics\/(variables|environments(\/global\/variables)?)$/,
+    resource: null,
+    permissions: { GET: "list" },
+  },
+  {
+    path: /^\/[^/]+\/synthetics\/variables$/,
+    resource: "synthetic_environment",
+    permissions: { POST: "update" },
+  },
+  {
+    path: /^\/[^/]+\/synthetics\/environments$/,
+    resource: "synthetic_environment",
+    permissions: { POST: "create" },
+  },
+  {
+    path: /^\/[^/]+\/synthetics\/environments\/[^/]+\/duplicate$/,
+    resource: "synthetic_environment",
+    permissions: { POST: "get" },
+  },
+  {
+    path: /^\/[^/]+\/synthetics\/environments\/[^/]+$/,
+    resource: "synthetic_environment",
+    permissions: { POST: "create", PUT: "update", DELETE: "delete" },
+  },
+  {
+    path: /^\/[^/]+\/synthetics\/(variables|environments)\/.+$/,
+    resource: "synthetic_environment",
+    permissions: { GET: "get", POST: "update", PUT: "update", DELETE: "update" },
+  },
+  {
+    path: /^\/[^/]+\/synthetics\/[^/]+\/(variables\/[^/]+\/promote|replay-secrets)$/,
+    resource: "synthetics",
+    permissions: { POST: "update" },
+  },
+  {
+    path: /^\/[^/]+\/synthetics\/[^/]+\/artifacts\/presign$/,
+    resource: "synthetics",
+    permissions: { POST: "get" },
+  },
+  // Any other folder type is a dashboard folder on the server.
+  {
+    path: new RegExp(`^/v2/[^/]+/folders/(?!(${KNOWN_FOLDER_TYPES})(/|$))[^/]+$`),
+    resource: "folders",
+    permissions: { GET: "list", POST: "create" },
+  },
+  {
+    path: new RegExp(`^/v2/[^/]+/folders/(?!(${KNOWN_FOLDER_TYPES})(/|$))[^/]+/[^/]+$`),
+    resource: "folders",
+    permissions: { GET: "get", PUT: "update", DELETE: "delete" },
+  },
+  {
+    path: /^\/[^/]+\/(anomaly_detection(\/history)?|slos|alerts\/slo-eligible)$/,
+    resource: "alert_folders",
+    permissions: { GET: "list", POST: "create" },
+  },
+  {
+    path: /^\/[^/]+\/(anomaly_detection|slos)\/(?!move$)[^/]+(\/.*)?$/,
+    resource: "alerts",
+    permissions: ITEM_PERMISSIONS,
+  },
+  {
+    path: /^\/[^/]+\/billing_group\/.+$/,
+    resource: "billing_group",
+    permissions: { GET: "get", POST: "create", DELETE: "delete" },
+  },
+  {
+    path: /^\/[^/]+\/billings\/.+$/,
+    resource: "organizations",
+    permissions: { GET: "get", POST: "create" },
+  },
+  {
+    path: /^\/[^/]+\/org_cleanup_tasks\/[^/]+$/,
+    resource: "organizations",
+    permissions: { GET: "list" },
+  },
+  {
+    path: /^\/[^/]+\/quota\/[^/]+\/paid_overage$/,
+    resource: "ai",
+    inPage: false,
+    permissions: { GET: "get", PUT: "update" },
+  },
+  {
+    path: /^\/[^/]+\/quota\/[^/]+\/usage_limit$/,
+    resource: "organizations",
+    permissions: { PUT: "update" },
+  },
+  { path: /^\/[^/]+\/invites$/, resource: "users", permissions: { GET: "list", POST: "create" } },
+  { path: /^\/[^/]+\/invites\/[^/]+$/, resource: "users", permissions: { DELETE: "delete" } },
+  {
+    path: /^\/[^/]+\/eval_jobs\/[^/]+\/[^/]+$/,
+    resource: "eval_jobs",
+    permissions: { POST: "update" },
+  },
+  ...collectionRoutes("eval_jobs", "eval_jobs"),
+  ...collectionRoutes("providers", "providers"),
+  {
+    path: /^\/[^/]+\/rumtoken$/,
+    resource: "rumtoken",
+    permissions: { GET: "list", POST: "create", PUT: "update" },
+  },
+  {
+    path: /^\/[^/]+\/score_configs\/([^/]+\/)?quality(\/timeline)?$/,
+    resource: "traces",
+    permissions: { GET: "get" },
+  },
+  {
+    path: /^\/[^/]+\/score_configs$/,
+    resource: "score_configs",
+    permissions: { GET: "list", POST: "create", PUT: "update" },
+  },
+  itemRoute("score_configs", "score_configs"),
+  ...collectionRoutes("scorers", "scorers"),
+  { path: /^\/[^/]+\/service_streams$/, resource: "service_streams", permissions: { GET: "list" } },
+  {
+    path: /^\/[^/]+\/service_streams\/_grouped$/,
+    resource: "settings",
+    permissions: { GET: "get" },
+  },
+  {
+    path: /^\/[^/]+\/tasks\/[^/]+\/(signing\/(rotate|test|activate|end_grace)|test_connection|test_run)$/,
+    resource: "remote_tasks",
+    permissions: { POST: "update" },
+  },
+  ...collectionRoutes("tasks", "remote_tasks"),
+  {
+    path: /^\/[^/]+\/workflows$/,
+    resource: "workflow_folder",
+    permissions: { GET: "list", POST: "create" },
+  },
+  {
+    path: /^\/[^/]+\/workflows\/(?!promote\/)[^/]+(\/.*)?$/,
+    resource: "workflows",
+    permissions: ITEM_PERMISSIONS,
+  },
+  {
+    path: /^\/v2\/[^/]+\/incidents\/integrations\/[^/]+\/(enable|rotate)$/,
+    resource: "incident_integrations",
+    permissions: { POST: "update", PATCH: "update" },
+  },
+  {
+    path: /^\/v2\/[^/]+\/incidents\/integrations$/,
+    resource: "incident_integrations",
+    permissions: { GET: "list", POST: "create" },
+  },
+  {
+    path: /^\/v2\/[^/]+\/incidents\/integrations\/.+$/,
+    resource: "incident_integrations",
+    permissions: ITEM_PERMISSIONS,
+  },
+  ...collectionRoutes("search_jobs", "search_jobs"),
+  {
+    path: /^\/[^/]+\/enrichment_tables(\/status)?$/,
+    resource: "enrichment_tables",
+    permissions: { GET: "list", POST: "create" },
+  },
+  itemRoute("enrichment_tables", "enrichment_tables"),
+  { path: /^\/[^/]+\/streams$/, resource: "streams", permissions: { POST: "update" } },
+  { path: /^\/[^/]+\/metrics\/[^/]+\/usage$/, resource: "metrics", permissions: { GET: "get" } },
+  {
+    path: /^\/[^/]+\/traces\/(service_graph\/(topology\/current|edge\/history)|agent_signals(\/compare)?)$/,
+    resource: "traces",
+    permissions: { GET: "get", POST: "get" },
+  },
+  // Agent job and registration calls are checked by agent token, not by a role resource.
+  {
+    path: /^\/[^/]+\/synthetics\/(?!jobs\/|agent\/)[^/]+(\/.*)?$/,
+    resource: "synthetics",
+    permissions: ITEM_PERMISSIONS,
+  },
+];
 
 // Trailing path words that name an operation or a view of a collection, never the resource itself.
 const NON_RESOURCE_SEGMENTS = new Set([
@@ -156,35 +682,10 @@ const NON_RESOURCE_SEGMENTS = new Set([
   "status",
   "count",
   "summary",
+  "stats",
 ]);
 
-// Casing inside a sentence is a per-locale choice (German keeps nouns capitalised), so it is translated, never lower-cased in code.
-const INLINE_LABEL_KEYS: Record<string, I18nKey> = {
-  "accessBoundary.resources.dashboards": "accessBoundary.resourcesInline.dashboards",
-  "accessBoundary.resources.alerts": "accessBoundary.resourcesInline.alerts",
-  "accessBoundary.resources.streams": "accessBoundary.resourcesInline.streams",
-  "accessBoundary.resources.functions": "accessBoundary.resourcesInline.functions",
-  "accessBoundary.resources.savedviews": "accessBoundary.resourcesInline.savedviews",
-  "accessBoundary.resources.users": "accessBoundary.resourcesInline.users",
-  "accessBoundary.resources.roles": "accessBoundary.resourcesInline.roles",
-  "accessBoundary.resources.organizations": "accessBoundary.resourcesInline.organizations",
-  "accessBoundary.resources.pipelines": "accessBoundary.resourcesInline.pipelines",
-  "accessBoundary.resources.destinations": "accessBoundary.resourcesInline.destinations",
-  "accessBoundary.resources.templates": "accessBoundary.resourcesInline.templates",
-  "accessBoundary.resources.reports": "accessBoundary.resourcesInline.reports",
-  "accessBoundary.resources.llmModelPricing": "accessBoundary.resourcesInline.llmModelPricing",
-  "accessBoundary.resources.passcode": "accessBoundary.resourcesInline.passcode",
-  "accessBoundary.resources.groups": "accessBoundary.resourcesInline.groups",
-  "accessBoundary.resources.serviceAccounts": "accessBoundary.resourcesInline.serviceAccounts",
-  "accessBoundary.resources.cipherKeys": "accessBoundary.resourcesInline.cipherKeys",
-  "accessBoundary.resources.regexPatterns": "accessBoundary.resourcesInline.regexPatterns",
-  "accessBoundary.resources.ai": "accessBoundary.resourcesInline.ai",
-  "accessBoundary.resources.downtimes": "accessBoundary.resourcesInline.downtimes",
-  "accessBoundary.resources.fleetConfigs": "accessBoundary.resourcesInline.fleetConfigs",
-  "accessBoundary.resources.publicDashboards": "accessBoundary.resourcesInline.publicDashboards",
-};
-
-// App-shell and prefetch reads the user never asked for, matched on the path after `/api`; their 403s say nothing about the page on screen.
+// App-shell and prefetch reads the user never asked for, matched on the path after `/api`; a refused write on them is still the user's own action.
 const BACKGROUND_PATHS: RegExp[] = [
   /^\/organizations$/,
   /^\/auth\/refresh_token$/,
@@ -194,6 +695,7 @@ const BACKGROUND_PATHS: RegExp[] = [
   /^\/[^/]+\/settings\/v2\//,
   /^\/[^/]+\/announcements(\/config)?$/,
   /^\/[^/]+\/alerts\/deduplication\/semantic-groups$/,
+  /^\/[^/]+\/summary$/,
 ];
 
 // The role editor's own column labels, so a message names the permission an admin will look for.
@@ -214,18 +716,8 @@ const DENIED_TITLE_KEYS: Record<AccessPermission, I18nKey> = {
   delete: "accessBoundary.denied.delete",
 };
 
-// POST endpoints that only read data; the server checks them as List, not Create.
-const READ_POST_ACTIONS = new Set([
-  "_search",
-  "_search_partition",
-  "_search_partition_multi",
-  "_search_multi",
-  "_search_history",
-  "_values",
-  "_around",
-  "_around_multi",
-  "_correlate",
-]);
+// Path-word prefixes of POSTs that only read data, so the `_stream` and `_multi` variants count too.
+const READ_POST_PREFIXES = ["_search", "_values", "_around", "_correlate"];
 
 // A POST that toggles an existing item is checked against Update on the server, not Create.
 const UPDATE_POST_ACTIONS = new Set(["enable", "disable"]);
@@ -235,8 +727,16 @@ const PERMISSION_ORDER: AccessPermission[] = ["list", "get", "create", "update",
 /** Resources a collapsed list names before it folds the rest into "N more". */
 export const ACCESS_LIST_LIMIT = 4;
 
+/** Request lines one denial keeps for "Copy details"; older ones drop off first. */
+export const ACCESS_REQUEST_LIMIT = 20;
+
+const RESOURCE_LABEL_PREFIX = "accessBoundary.resources.";
 const MEMORY_PREFIX = "o2.access.memory.";
+// Route key of a request sent before the router's first navigation; a real route key is never empty.
+const BEFORE_NAVIGATION = "";
 const UNNAMED_RESOURCE = "_unnamed";
+// AI paths span several server resources (chats, shares, toolsets), so a refused AI write stays unnamed rather than name the wrong one.
+const UNNAMED_IN_PAGE_WRITES = new Set(["ai"]);
 const ACTIVATION_WINDOW_MS = 5000;
 const ACTIVATION_HISTORY = 5;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -260,6 +760,8 @@ const memoryByOrg = shallowReactive(new Map<string, OrgAccessMemory>());
 // Request lines for "Copy details"; memory only, the next 403 refills them.
 const deniedRequests = new Map<string, DeniedRequest[]>();
 const actionNotice = shallowRef<AccessActionNotice | null>(null);
+// A refused write stays for the visit only: the exact request rarely succeeds later, so a stored one would never clear.
+const writeEntries = shallowRef<RouteWrites>({ stamp: "", entries: [] });
 // Each mounted boundary's index in the current route's matched records; -1 when it renders none of them.
 const boundaryDepths = shallowReactive(new Set<Ref<number>>());
 
@@ -276,9 +778,13 @@ const deniedPermission = computed<AccessPermission | null>(() =>
   currentEntry.value === null ? null : (readMemory(currentOrg()).pages[currentEntry.value] ?? null),
 );
 const pageDenied = computed(() => deniedPermission.value !== null);
-const sectionEntries = computed<AccessSectionEntry[]>(() =>
-  currentRoute.value ? (readMemory(currentOrg()).sections[routeKey(currentRoute.value)] ?? []) : [],
-);
+const sectionEntries = computed<AccessSectionEntry[]>(() => {
+  if (!currentRoute.value) return [];
+  const key = routeKey(currentRoute.value);
+  const reads = readMemory(currentOrg()).sections[key] ?? [];
+  const writes = routeWrites(key);
+  return writes.length ? [...reads, ...writes] : reads;
+});
 const pageDenial = computed<AccessDenial | null>(() => {
   const resource = currentResource.value ? resourceForKey(currentResource.value) : null;
   return resource && deniedPermission.value
@@ -291,71 +797,71 @@ const deepestBoundary = computed(() =>
 
 /** Route key a request is stamped with when it starts, so its response is judged against the page that asked. */
 export function currentAccessRouteKey(): string | undefined {
-  return currentRoute.value ? accessStamp(routeKey(currentRoute.value)) : undefined;
+  const route = currentRoute.value;
+  if (!route) return undefined;
+  return accessStamp(route === START_LOCATION ? BEFORE_NAVIGATION : routeKey(route));
 }
 
 /** Classifies one 403 and records it as page-denied, a section entry or an action notice. */
-export function recordForbidden({ url, method, routeKey: startedOn }: AccessRequest): void {
-  if (isBackground(url)) return;
+export function recordForbidden({ url, method, routeKey: stamp }: AccessRequest): void {
+  const verb = (method ?? "get").toUpperCase();
+  if (isBackground(verb, url)) return;
   const route = currentRoute.value;
   if (!route) return;
   const key = routeKey(route);
   // A response from a page the user has already left says nothing about the page now on screen.
-  if (startedOn !== undefined && startedOn !== accessStamp(key)) return;
-  const verb = (method ?? "get").toUpperCase();
-  const permission = accessPermission(verb, url);
-  const isRead = permission === "list" || permission === "get";
-  // An unnamed read is mostly a side fetch the user never asked for; an unnamed write is their own action and must not vanish.
-  const resource = extractResourceInfo(url) ?? (isRead ? null : unnamedResource(url));
-  if (!resource) {
-    if (import.meta.env.DEV) console.debug("[access] 403 on an unnamed resource:", verb, url);
-    return;
-  }
+  if (!stampedHere(stamp, key)) return;
+  const {
+    resource: named,
+    permission,
+    inPage,
+    collection,
+    write,
+    bypass,
+  } = classifyRequest(verb, url);
+  if (!write && inPage) return;
+  // An unnamed read is a side fetch whose resource no role editor row names, like a server bypass.
+  const resource = named ?? unnamedResource(url, write && !bypass);
   const denied: DeniedRequest = { permission, request: `${verb} ${resource.path}` };
-  if (!isRead) {
+  if (write) {
     const [el, ...fallbacks] = anchorCandidates();
     if (el) {
-      showAction({ el, permission, method: verb, resource, routeKey: key, fallbacks });
+      const denials = [{ resource, permission, requests: [denied.request] }];
+      showAction({ el, permission, method: verb, resource, denials, routeKey: key, fallbacks });
       return;
     }
   }
   const pageResource = routeResource(route);
-  if (pageResource && resource.key === pageResource && isPageList(permission, url)) {
+  if (pageResource && resource.key === pageResource && permission === "list" && collection) {
     markPageDenied(deniedEntry(route, pageResource), denied);
     return;
   }
-  addSectionEntry(key, resource, denied);
+  addSectionEntry(key, resource, denied, write);
 }
 
 /** Lifts a page lock or a section entry once the same permission on that resource succeeds on the same route. */
-export function noteAccessSuccess({
-  url,
-  method,
-  routeKey: startedOn,
-}: Partial<AccessRequest>): void {
+export function noteAccessSuccess({ url, method, routeKey: stamp }: Partial<AccessRequest>): void {
   // Two cached reads per response; parsing happens only while the route shows a denial.
   if (!url || (!pageDenied.value && sectionEntries.value.length === 0)) return;
   const route = currentRoute.value;
-  if (!route || (startedOn !== undefined && startedOn !== accessStamp(routeKey(route)))) return;
+  if (!route || !stampedHere(stamp, routeKey(route))) return;
   const verb = (method ?? "get").toUpperCase();
-  const permission = accessPermission(verb, url);
-  const info =
-    extractResourceInfo(url) ??
-    (permission === "list" || permission === "get" ? null : unnamedResource(url));
-  if (!info) return;
+  const { resource: named, permission, collection, write } = classifyRequest(verb, url);
+  const info = named ?? unnamedResource(url);
   const entry = currentEntry.value;
   const org = currentOrg();
   if (
     entry &&
     deniedPermission.value === permission &&
     info.key === currentResource.value &&
-    isPageList(permission, url)
+    permission === "list" &&
+    collection
   ) {
     writeMemory(org, { ...readMemory(org), pages: omitKey(readMemory(org).pages, entry) });
     deniedRequests.delete(entry);
   }
   const key = routeKey(route);
-  const entries = sectionEntries.value;
+  const entries = entriesFor(key, write);
   // Only the request that succeeded is cleared, so a readable dashboard does not erase another one's denial.
   const request = `${verb} ${info.path}`;
   let changed = false;
@@ -366,12 +872,13 @@ export function noteAccessSuccess({
     const requests = e.requests.filter((r) => r !== request);
     return requests.length ? [{ ...e, requests }] : [];
   });
-  if (changed) writeSections(org, key, kept);
+  if (changed) setEntries(key, write, kept);
 }
 
 /** Forgets every denial, for an org switch or a sign-out. */
 export function resetAccess(): void {
   dismissAction();
+  writeEntries.value = { stamp: "", entries: [] };
   activations = [];
   deniedRequests.clear();
   memoryByOrg.clear();
@@ -423,18 +930,24 @@ export function groupDenials(
 /** Title and permission groups for any set of denials; every 403 surface words itself through this. */
 export function accessDeniedMessage(denials: AccessDenial[], t: TranslateFn): AccessDeniedMessage {
   const grouped = groupDenials(denials);
-  const resourceCount = new Set(denials.map(entryId)).size;
-  const first = grouped[0]?.denials[0];
-  const title =
-    resourceCount === 1 && first
-      ? t(DENIED_TITLE_KEYS[first.permission], { resource: resourceInlineLabel(first.resource, t) })
-      : t("accessBoundary.denied.parts", resourceCount);
-  const groups = grouped.map((g) => ({
-    permission: g.permission,
-    label: permissionLabel(g.permission, t),
-    resources: g.denials.map((d) => resourceLabel(d.resource, t)),
-  }));
-  return { title, groups, resourceCount };
+  const groups = grouped.flatMap((g) => {
+    const granted = g.denials.filter((d) => d.resource.grantable !== false);
+    if (!granted.length) return [];
+    return [
+      {
+        permission: g.permission,
+        label: permissionLabel(g.permission, t),
+        resources: resourceLabels(
+          granted.map((d) => d.resource),
+          (r) => resourceLabel(r, t),
+          t,
+        ),
+      },
+    ];
+  });
+  const count = grouped.reduce((sum, g) => sum + g.denials.length, 0);
+  const askAdmin = denials.some((d) => d.resource.grantable === false);
+  return { title: deniedTitle(grouped, count, t), groups, askAdmin, count };
 }
 
 /** The full "missing permission" sentence for one group, naming every resource. */
@@ -468,9 +981,10 @@ export function accessDetails(denials: AccessDenial[]): string {
   return [
     ...identityLines(),
     ...groupDenials(denials).map(({ permission, denials: inGroup }) => {
-      const requests = inGroup.flatMap((d) => d.requests);
-      const keys = inGroup.map((d) => d.resource.key).join(", ");
-      return `denied ${permission}: ${keys}${requests.length ? ` (${requests.join(", ")})` : ""}`;
+      const requests = inGroup.flatMap((d) => d.requests).join(", ");
+      const keys = inGroup.filter((d) => !isUnnamed(d.resource)).map((d) => d.resource.key);
+      if (!keys.length) return `denied ${permission}: ${requests}`;
+      return `denied ${permission}: ${keys.join(", ")}${requests ? ` (${requests})` : ""}`;
     }),
   ].join("\n");
 }
@@ -499,38 +1013,14 @@ export function failedRequests(...errors: unknown[]): string[] {
   });
 }
 
-/** Maps a request URL to the resource key and label the access UI shows; null when the resource has no friendly name. */
-export function extractResourceInfo(rawUrl: string): AccessResource | null {
-  let parsed: URL;
-  try {
-    parsed = new URL(rawUrl, "http://localhost");
-  } catch {
-    return null;
-  }
-  const located = locateResource(apiSegments(parsed.pathname));
-  if (!located) return null;
-  const { matched } = located;
-  const key = Object.hasOwn(RESOURCE_ALIASES, matched) ? RESOURCE_ALIASES[matched] : matched;
-  return resourceForKey(key, parsed.pathname);
+/** Maps a request to the resource key and label the access UI shows; null when the resource has no friendly name. */
+export function extractResourceInfo(rawUrl: string, method = "GET"): AccessResource | null {
+  return classifyRequest(method, rawUrl).resource;
 }
 
-/** IAM permission a request needed: reads are List or Get (an id after the resource), writes follow the method. */
+/** IAM permission a request needed: the server's own mapping where the path misleads, else reads are List or Get and writes follow the method. */
 export function accessPermission(method: string, rawUrl: string): AccessPermission {
-  const verb = method.toUpperCase();
-  let segments: string[] = [];
-  try {
-    segments = apiSegments(new URL(rawUrl, "http://localhost").pathname);
-  } catch {
-    // An unparseable URL reads as a collection.
-  }
-  if (verb === "POST") {
-    if (segments.some((s) => READ_POST_ACTIONS.has(s))) return "list";
-    return segments.some((s) => UPDATE_POST_ACTIONS.has(s)) ? "update" : "create";
-  }
-  if (verb === "PUT" || verb === "PATCH") return "update";
-  if (verb === "DELETE") return "delete";
-  const itemNamed = locateResource(segments)?.after.some((s) => !NON_RESOURCE_SEGMENTS.has(s));
-  return itemNamed || hasItemId(segments) ? "get" : "list";
+  return classifyRequest(method, rawUrl).permission;
 }
 
 /** Translated IAM permission name, as the role editor shows it. */
@@ -545,7 +1035,9 @@ export function resourceLabel(resource: AccessResource, t: TranslateFn): I18nTex
 
 /** Label placed mid-sentence, as in "Your role can't delete {resource}." */
 export function resourceInlineLabel(resource: AccessResource, t: TranslateFn): I18nText {
-  return t(INLINE_LABEL_KEYS[resource.labelKey] ?? resource.labelKey);
+  const key = resource.labelKey;
+  if (!key.startsWith(RESOURCE_LABEL_PREFIX)) return t(key);
+  return t(inlineLabelKey(key.slice(RESOURCE_LABEL_PREFIX.length) as ResourceLabelName));
 }
 
 /** Binds the router and store once, and exposes the access state to the shell components. */
@@ -562,7 +1054,8 @@ export function useAccessBoundary() {
   };
 }
 
-function bindAccess(router: Router, store: AccessShellStore): void {
+/** Binds the router and store once; called at app start too, so a 403 before the first boundary mounts is still recorded. */
+export function bindAccess(router: Router, store: AccessShellStore): void {
   shellStore = store;
   if (routerRef.value === router) return;
   routerRef.value = router;
@@ -570,6 +1063,7 @@ function bindAccess(router: Router, store: AccessShellStore): void {
     const leaving = routeKey(from);
     if (leaving === routeKey(to)) return;
     dismissAction();
+    writeEntries.value = { stamp: "", entries: [] };
   });
   if (!listenersInstalled && typeof document !== "undefined") {
     listenersInstalled = true;
@@ -600,7 +1094,14 @@ function isAnchorable(el: Element): boolean {
   return el.isConnected && !el.closest(CLOSING_OVERLAY);
 }
 
+// Requests from one action share its control: they join the open card; a card for another control sends the open one to the section notice.
 function showAction(notice: AccessActionNotice): void {
+  const open = actionNotice.value;
+  if (open && open.el === notice.el && open.routeKey === notice.routeKey) {
+    actionNotice.value = { ...open, denials: mergeDenials(open.denials, notice.denials) };
+    return;
+  }
+  if (open) handOff(open);
   actionNotice.value = notice;
   if (anchorObserver || typeof MutationObserver === "undefined") return;
   anchorObserver = new MutationObserver(keepAnchored);
@@ -622,11 +1123,26 @@ function keepAnchored(): void {
     return;
   }
   dismissAction();
-  if (currentRoute.value && notice.routeKey === routeKey(currentRoute.value))
-    addSectionEntry(notice.routeKey, notice.resource, {
-      permission: notice.permission,
-      request: `${notice.method} ${notice.resource.path}`,
-    });
+  handOff(notice);
+}
+
+function handOff(notice: AccessActionNotice): void {
+  if (!currentRoute.value || notice.routeKey !== routeKey(currentRoute.value)) return;
+  for (const d of notice.denials)
+    for (const request of d.requests)
+      addSectionEntry(notice.routeKey, d.resource, { permission: d.permission, request }, true);
+}
+
+function mergeDenials(
+  open: AccessSectionEntry[],
+  added: AccessSectionEntry[],
+): AccessSectionEntry[] {
+  return added.reduce((merged, d) => {
+    const found = merged.find((m) => entryId(m) === entryId(d) && m.permission === d.permission);
+    if (!found) return [...merged, d];
+    const requests = cappedRequests([...new Set([...found.requests, ...d.requests])]);
+    return merged.map((m) => (m === found ? { ...m, requests } : m));
+  }, open);
 }
 
 function dismissAction(): void {
@@ -638,7 +1154,7 @@ function dismissAction(): void {
 function markPageDenied(entry: string, denied: DeniedRequest): void {
   const records = deniedRequests.get(entry) ?? [];
   if (!records.some((r) => r.request === denied.request))
-    deniedRequests.set(entry, [...records, denied]);
+    deniedRequests.set(entry, [...records, denied].slice(-ACCESS_REQUEST_LIMIT));
   const org = currentOrg();
   const memory = readMemory(org);
   if (!memory.pages[entry])
@@ -646,25 +1162,43 @@ function markPageDenied(entry: string, denied: DeniedRequest): void {
 }
 
 // One entry per (resource, permission): a denied List and a denied Delete on alerts are two things to grant.
-function addSectionEntry(key: string, resource: AccessResource, denied: DeniedRequest): void {
-  const org = currentOrg();
-  const entries = readMemory(org).sections[key] ?? [];
+function addSectionEntry(
+  key: string,
+  resource: AccessResource,
+  denied: DeniedRequest,
+  write: boolean,
+): void {
+  const entries = entriesFor(key, write);
   const found = entries.find(
     (e) => entryId(e) === resource.key && e.permission === denied.permission,
   );
-  if (!found) {
-    writeSections(org, key, [
-      ...entries,
-      { resource, permission: denied.permission, requests: [denied.request] },
-    ]);
-    return;
-  }
-  if (found.requests.includes(denied.request)) return;
-  writeSections(
-    org,
+  if (found?.requests.includes(denied.request)) return;
+  setEntries(
     key,
-    entries.map((e) => (e === found ? { ...e, requests: [...e.requests, denied.request] } : e)),
+    write,
+    found
+      ? entries.map((e) =>
+          e === found ? { ...e, requests: cappedRequests([...e.requests, denied.request]) } : e,
+        )
+      : [...entries, { resource, permission: denied.permission, requests: [denied.request] }],
   );
+}
+
+function entriesFor(key: string, write: boolean): AccessSectionEntry[] {
+  return write ? routeWrites(key) : (readMemory(currentOrg()).sections[key] ?? []);
+}
+
+function setEntries(key: string, write: boolean, entries: AccessSectionEntry[]): void {
+  if (write) writeEntries.value = { stamp: accessStamp(key), entries };
+  else writeSections(currentOrg(), key, entries);
+}
+
+function routeWrites(key: string): AccessSectionEntry[] {
+  return writeEntries.value.stamp === accessStamp(key) ? writeEntries.value.entries : [];
+}
+
+function cappedRequests(requests: string[]): string[] {
+  return requests.slice(-ACCESS_REQUEST_LIMIT);
 }
 
 function writeSections(org: string, key: string, entries: AccessSectionEntry[]): void {
@@ -703,18 +1237,68 @@ function writeMemory(org: string, memory: OrgAccessMemory): void {
   }
 }
 
-// A record written by an older build can hold resources with no friendly name, which must never render.
+// A record written by an older build can hold unlabelled resources, refused writes or long request lists, none of which may come back.
 function namedSections(
   sections: Record<string, AccessSectionEntry[]>,
 ): Record<string, AccessSectionEntry[]> {
   const named = Object.entries(sections).map(
-    ([key, entries]) => [key, entries.filter((e) => !!e.resource.labelKey)] as const,
+    ([key, entries]) =>
+      [
+        key,
+        entries
+          .filter((e) => !!e.resource.labelKey && isReadPermission(e.permission))
+          .map((e) => ({ ...e, requests: cappedRequests(e.requests) })),
+      ] as const,
   );
   return Object.fromEntries(named.filter(([, entries]) => entries.length > 0));
 }
 
 function entryId(entry: AccessSectionEntry): string {
   return entry.resource.key;
+}
+
+function isReadPermission(permission: AccessPermission): boolean {
+  return permission === "list" || permission === "get";
+}
+
+function isUnnamed(resource: AccessResource): boolean {
+  return resource.key.startsWith(UNNAMED_RESOURCE);
+}
+
+// Same verb everywhere: one resource is named, several reads are counted, several writes are listed; mixed verbs count the blocked actions. A count is the chip's count.
+function deniedTitle(
+  grouped: { permission: AccessPermission; denials: AccessDenial[] }[],
+  count: number,
+  t: TranslateFn,
+): I18nText {
+  const verbs = new Set(grouped.map((g) => DENIED_TITLE_KEYS[g.permission]));
+  if (verbs.size > 1) return t("accessBoundary.denied.actions", count);
+  const [verb] = verbs;
+  const resources = [
+    ...new Map(grouped.flatMap((g) => g.denials).map((d) => [entryId(d), d.resource])).values(),
+  ];
+  if (!verb || (verb === DENIED_TITLE_KEYS.list && resources.length > 1))
+    return t("accessBoundary.denied.parts", count);
+  const labels = resourceLabels(resources, (r) => resourceInlineLabel(r, t), t);
+  const resource = accessListParts(labels, false, t)
+    .map((p) => p.text)
+    .join("");
+  return t(verb, { resource });
+}
+
+// Unnamed resources share one label, so several of them read as one counted item after the named ones.
+function resourceLabels(
+  resources: AccessResource[],
+  label: (resource: AccessResource) => I18nText,
+  t: TranslateFn,
+): I18nText[] {
+  const unnamed = resources.filter(isUnnamed);
+  const named = resources.filter((r) => !isUnnamed(r)).map(label);
+  if (unnamed.length === 0) return named;
+  return [
+    ...named,
+    unnamed.length === 1 ? label(unnamed[0]) : t("accessBoundary.denied.resources", unnamed.length),
+  ];
 }
 
 function listFormat(): Intl.ListFormat {
@@ -739,53 +1323,151 @@ function identityLines(): string[] {
   ];
 }
 
-function resourceForKey(key: string, path = ""): AccessResource | null {
-  return Object.hasOwn(FRIENDLY_NAME_KEYS, key)
-    ? { key, labelKey: FRIENDLY_NAME_KEYS[key], path }
+// Casing inside a sentence is a per-locale choice (German keeps nouns capitalised), so it is translated, never lower-cased in code.
+function inlineLabelKey(name: ResourceLabelName): I18nKey {
+  return `accessBoundary.resourcesInline.${name}`;
+}
+
+// An override names its resource on purpose, so an in-page resource is named there even where the path heuristic leaves it unnamed.
+function resourceForKey(key: string, path = "", explicit = false): AccessResource | null {
+  if (Object.hasOwn(FRIENDLY_NAME_KEYS, key))
+    return { key, labelKey: FRIENDLY_NAME_KEYS[key], path };
+  if (Object.hasOwn(ROUTE_NAME_KEYS, key)) return { key, labelKey: ROUTE_NAME_KEYS[key], path };
+  return Object.hasOwn(IN_PAGE_NAME_KEYS, key) && (explicit || !UNNAMED_IN_PAGE_WRITES.has(key))
+    ? { key, labelKey: IN_PAGE_NAME_KEYS[key], path }
     : null;
 }
 
-// The segment after the optional version is the org (or a `_` system scope), never the resource; the last named word wins, so `functions/my_fn` is Functions.
-function locateResource(segments: string[]): { matched: string; after: string[] } | null {
+// A collection and its items checked as plain CRUD.
+function collectionRoutes(area: string, resource: string): RouteOverride[] {
+  return [
+    {
+      path: new RegExp(`^/[^/]+/${area}$`),
+      resource,
+      permissions: { GET: "list", POST: "create" },
+    },
+    itemRoute(area, resource),
+  ];
+}
+
+// A stream that shares the area's name keeps its stream reads.
+function itemRoute(area: string, resource: string): RouteOverride {
+  return {
+    path: new RegExp(`^/[^/]+/${area}/(?!(${[...STREAM_SCOPED_SEGMENTS].join("|")})(/|$)).+$`),
+    resource,
+    permissions: ITEM_PERMISSIONS,
+  };
+}
+
+function classifyRequest(method: string, rawUrl: string): ClassifiedRequest {
+  const verb = method.toUpperCase();
+  let pathname = "";
+  try {
+    pathname = new URL(rawUrl, "http://localhost").pathname;
+  } catch {
+    // An unparseable URL reads as an unnamed collection.
+  }
+  const segments = apiSegments(pathname);
+  const apiPath = "/" + segments.join("/");
+  // Search-style POSTs only read, so they route like a GET.
+  const searchPost = verb === "POST" && isSearchPost(segments);
+  const override = ROUTE_OVERRIDES.find((o) => !!o.permissions[verb] && o.path.test(apiPath));
+  if (override) {
+    const key = override.resource;
+    const permission = override.permissions[verb]!;
+    return {
+      resource: key === null ? null : resourceForKey(key, pathname, true),
+      permission,
+      inPage: override.inPage ?? (key !== null && Object.hasOwn(IN_PAGE_NAME_KEYS, key)),
+      collection: false,
+      write: verb !== "GET" && !searchPost && !(verb === "POST" && permission === "list"),
+      bypass: key === null,
+    };
+  }
+  const located = locateResource(segments);
+  const key = located?.matched ?? "";
+  return {
+    resource: located ? resourceForKey(key, pathname) : null,
+    permission: inferPermission(verb, segments, located),
+    inPage: Object.hasOwn(IN_PAGE_NAME_KEYS, key),
+    collection: located?.after.length === 0,
+    write: verb !== "GET" && !searchPost,
+    bypass: false,
+  };
+}
+
+function inferPermission(
+  verb: string,
+  segments: string[],
+  located: LocatedResource | null,
+): AccessPermission {
+  if (verb === "POST") {
+    if (located?.streamScoped) return "get";
+    if (isSearchPost(segments)) return "list";
+    return segments.some((s) => UPDATE_POST_ACTIONS.has(s)) ? "update" : "create";
+  }
+  if (verb === "PUT" || verb === "PATCH") return "update";
+  if (verb === "DELETE") return "delete";
+  const itemNamed = located?.after.some((s) => !NON_RESOURCE_SEGMENTS.has(s));
+  return itemNamed || hasItemId(segments) ? "get" : "list";
+}
+
+// The segment after the optional version is the org (or a `_` system scope), never the resource; the first named word wins, so `users/<id>/roles` is Users and a stream called `alerts` stays a stream.
+function locateResource(segments: string[]): LocatedResource | null {
   const rest = segments.slice((/^v\d+$/.test(segments[0] ?? "") ? 1 : 0) + 1);
-  for (let i = rest.length; i > 0; i--) {
-    const joined = rest
-      .slice(0, i)
-      .filter((s) => !isIdSegment(s))
-      .join("/");
-    const matched = isKnownResource(joined) ? joined : rest[i - 1];
-    if (isKnownResource(matched)) return { matched, after: rest.slice(i) };
+  if (rest.length > 1 && STREAM_SCOPED_SEGMENTS.has(rest[1]))
+    return { matched: "streams", after: rest, streamScoped: true };
+  for (let start = 0; start < rest.length; start++) {
+    if (isIdSegment(rest[start])) continue;
+    for (let end = rest.length; end > start; end--) {
+      const joined = rest
+        .slice(start, end)
+        .filter((s) => !isIdSegment(s))
+        .join("/");
+      if (isKnownResource(joined))
+        return { matched: resolveAlias(joined), after: rest.slice(end), streamScoped: false };
+    }
   }
   return null;
 }
 
-// The page's own list is the bare collection; a failing sub-read such as `users/roles/all` leaves the page readable.
-function isPageList(permission: AccessPermission, url: string): boolean {
-  if (permission !== "list") return false;
-  try {
-    return (
-      locateResource(apiSegments(new URL(url, "http://localhost").pathname))?.after.length === 0
-    );
-  } catch {
-    return false;
-  }
+function isSearchPost(segments: string[]): boolean {
+  return segments.some((s) => READ_POST_PREFIXES.some((p) => s.startsWith(p)));
 }
 
-function unnamedResource(url: string): AccessResource {
+// Keyed by the path area after the org, so two unnamed resources stay two rows.
+function unnamedResource(url: string, grantable = true): AccessResource {
   let path = "";
   try {
     path = new URL(url, "http://localhost").pathname;
   } catch {
     // The request line in Copy details then omits the path.
   }
-  return { key: UNNAMED_RESOURCE, labelKey: "accessBoundary.resourcesInline.unnamed", path };
+  const segments = apiSegments(path);
+  const rest = segments.slice((/^v\d+$/.test(segments[0] ?? "") ? 1 : 0) + 1);
+  const area = (rest[0] === "folders" ? rest.slice(0, 2) : rest.slice(0, 1)).join("/");
+  return {
+    key: `${UNNAMED_RESOURCE}/${area || segments[0] || ""}`,
+    labelKey: "accessBoundary.resourcesInline.unnamed",
+    path,
+    ...(grantable ? {} : { grantable: false as const }),
+  };
 }
 
 function isKnownResource(path: string): boolean {
-  return Object.hasOwn(FRIENDLY_NAME_KEYS, path) || Object.hasOwn(RESOURCE_ALIASES, path);
+  return (
+    Object.hasOwn(FRIENDLY_NAME_KEYS, path) ||
+    Object.hasOwn(IN_PAGE_NAME_KEYS, path) ||
+    Object.hasOwn(RESOURCE_ALIASES, path)
+  );
 }
 
-function isBackground(url: string): boolean {
+function resolveAlias(path: string): string {
+  return Object.hasOwn(RESOURCE_ALIASES, path) ? RESOURCE_ALIASES[path] : path;
+}
+
+function isBackground(verb: string, url: string): boolean {
+  if (verb !== "GET") return false;
   try {
     const path = "/" + apiSegments(new URL(url, "http://localhost").pathname).join("/");
     return BACKGROUND_PATHS.some((re) => re.test(path));
@@ -821,8 +1503,27 @@ function accessStamp(key: string): string {
   return `${currentOrg()}|${key}`;
 }
 
-function routeKey(route: { name?: unknown; path: string }): string {
-  return typeof route.name === "string" ? route.name : route.path;
+// A request sent before the first navigation belongs to whichever route the router lands on in the same org.
+function stampedHere(stamp: string | undefined, key: string): boolean {
+  return (
+    stamp === undefined || stamp === accessStamp(key) || stamp === accessStamp(BEFORE_NAVIGATION)
+  );
+}
+
+// Two items on one route (two dashboards) keep separate denials; other query changes (time range, tab) keep the key.
+function routeKey(route: {
+  name?: unknown;
+  path: string;
+  params?: RouteParamsGeneric;
+  query?: LocationQuery;
+  meta?: RouteMeta;
+}): string {
+  const base = typeof route.name === "string" ? route.name : route.path;
+  const scoped = (route.meta?.accessScopeQuery ?? []).map((k) => [k, route.query?.[k]] as const);
+  const scope = [...Object.entries(route.params ?? {}), ...scoped]
+    .filter(([, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `${k}=${String(v)}`);
+  return scope.length ? `${base}?${scope.join("&")}` : base;
 }
 
 function routeResource(route: RouteLocationNormalizedLoaded): string | undefined {

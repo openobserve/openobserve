@@ -482,6 +482,8 @@ export interface OTableProps<TData = any> {
    * user to create something they are not allowed to create.
    */
   forbidden?: boolean;
+  /** What the forbidden table lists, as the app's access state names it (an IAM resource key). */
+  forbiddenResource?: string;
   /** Text shown when data is empty and not loading */
   emptyMessage?: I18nText;
   dense?: boolean;

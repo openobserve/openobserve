@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="email"
           :loading="loading"
           :forbidden="forbidden"
+          forbidden-resource="users"
           :selected-ids="selectedUserIds"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"

@@ -4,6 +4,7 @@
 import {
   computed,
   getCurrentInstance,
+  inject,
   nextTick,
   onBeforeUnmount,
   onMounted,
@@ -63,6 +64,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTableEmpty from "./sub-components/OTableEmpty.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { TABLE_FORBIDDEN_STATE_KEY } from "./tableForbiddenState";
 import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
 import OTableOverflowTooltip from "./sub-components/OTableOverflowTooltip.vue";
@@ -1317,6 +1319,7 @@ useTableRowShortcuts(scrollContainerRef);
 // itself was not empty.
 // A denied fetch and a genuinely empty list are both zero rows; only the caller
 // knows which, so `forbidden` decides and takes precedence over the empty state.
+const forbiddenState = inject(TABLE_FORBIDDEN_STATE_KEY, null);
 const showForbidden = computed(
   () => !heldLoading.value && !!props.forbidden && displayRows.value.length === 0,
 );
@@ -1874,7 +1877,12 @@ defineExpose({
 
         <!-- ── Access Denied State ───────────────────────────── -->
         <OTableEmpty v-if="showForbidden" :floor="!props.fillHeight" data-test="o2-table-forbidden">
-          <OEmptyState size="hero" preset="no-access" />
+          <component
+            :is="forbiddenState"
+            v-if="forbiddenState"
+            :resource="props.forbiddenResource"
+          />
+          <OEmptyState v-else size="hero" preset="no-access" />
         </OTableEmpty>
 
         <!-- ── Empty State ───────────────────────────────────── -->

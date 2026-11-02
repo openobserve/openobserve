@@ -4830,15 +4830,12 @@ export default defineComponent({
         guardJobSnapshot.value = null;
         await getJobData(false, snapshot);
       } catch (e) {
-        const status = e?.response?.status;
+        if (e?.response?.status === 403) return;
         toast({
           variant: "error",
-          message:
-            status === 403
-              ? t("search.searchJobNoPermission")
-              : e?.response?.data?.message
-                ? raw(e.response.data.message)
-                : t("search.errorAddingJob"),
+          message: e?.response?.data?.message
+            ? raw(e.response.data.message)
+            : t("search.errorAddingJob"),
         });
       }
     };

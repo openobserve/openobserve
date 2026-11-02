@@ -65,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-lg:h-auto max-lg:self-stretch max-md:gap-2 md:max-lg:min-w-40 @max-4xl/page:h-auto @max-4xl/page:self-stretch"
         :class="[
+          statusComponent ? 'md:@max-4xl/page:min-w-40' : '',
           hasBack() ? 'max-md:min-w-40' : 'max-md:min-w-24',
           hasTabs() && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
         ]"
@@ -119,7 +120,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? ''
               : hasTabs() && !tabsBelow
                 ? 'shrink-0 max-md:shrink'
-                : 'md:max-lg:min-w-32'
+                : statusComponent
+                  ? ''
+                  : 'md:max-lg:min-w-32'
           "
         >
           <h1
@@ -159,6 +162,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            input on create pages). Renders between title text and tabs/actions. -->
         <slot name="title-trail" />
 
+        <!-- A status arrives after paint; while the row wraps it takes width from the title, so the row never wraps or grows for it. One element moved by order keeps an open card open. -->
+        <span v-if="statusComponent" :class="statusClass()">
+          <component :is="statusComponent" :compact="rowWraps" />
+        </span>
+
         <!-- Module tabs (Level-2 nav), inline to the right of the title.
            Two-row mode renders them as a full-width strip below instead. -->
         <div
@@ -171,10 +179,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- max-w-full + shrink let the group wrap within its row (shrink-0 alone runs it off-screen); phone date pickers go icon-only to share the title row. -->
       <div
-        v-if="statusComponent || hasActions() || hasActionsOverflow()"
+        v-if="hasActions() || hasActionsOverflow()"
         class="flex shrink-0 items-center gap-2 max-lg:ms-auto max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end @max-4xl/page:ms-auto @max-4xl/page:max-w-full @max-4xl/page:shrink @max-4xl/page:flex-wrap @max-4xl/page:justify-end max-md:[&_.date-time-label]:hidden"
       >
-        <component :is="statusComponent" v-if="statusComponent" />
         <slot v-if="hasActionsOverflow() && !isMobile && overflowFirst" name="actions-overflow" />
         <slot name="actions" />
 
@@ -280,11 +287,13 @@ const props = withDefaults(
 // The @page half repeats the max-lg half against the page container: a wide viewport whose content column is narrow collapses the same way.
 const ROW_CLASS =
   "flex h-15 items-center justify-between gap-4 max-lg:h-auto max-lg:min-h-15 max-lg:flex-wrap max-lg:gap-y-1 max-lg:py-1.5 @max-4xl/page:h-auto @max-4xl/page:min-h-15 @max-4xl/page:flex-wrap @max-4xl/page:gap-y-1 @max-4xl/page:py-1.5";
+// Tailwind's `4xl` container width, the `@max-4xl/page` threshold above.
+const PAGE_WRAP_REM = 56;
 
 const router = useRouter();
 const slots = useSlots();
 const { t } = useI18nTyped();
-const { isMobile } = useBreakpoint();
+const { isMobile, lgUp } = useBreakpoint();
 
 // The first header inside a sidebar layout carries its phone trigger, saving the layout a row.
 const layoutSidebar = inject(PAGE_LAYOUT_SIDEBAR_KEY, null);
@@ -305,6 +314,23 @@ const ownsSidebarTrigger = computed(
 
 const headerEl = ref<HTMLElement | null>(null);
 const statusComponent = usePageHeaderStatusHost(headerEl);
+
+// The status follows the row's own wrap condition (viewport or page container), so it never wraps onto a line of its own.
+const pageNarrow = ref(false);
+let pageObserver: ResizeObserver | null = null;
+onMounted(() => {
+  const page = headerEl.value?.closest<HTMLElement>('[class~="@container/page"]');
+  if (!page || typeof ResizeObserver === "undefined") return;
+  const measure = () => {
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    pageNarrow.value = page.clientWidth < PAGE_WRAP_REM * rem;
+  };
+  measure();
+  pageObserver = new ResizeObserver(measure);
+  pageObserver.observe(page);
+});
+onBeforeUnmount(() => pageObserver?.disconnect());
+const rowWraps = computed(() => !lgUp.value || pageNarrow.value);
 
 // A slot passed with an always-present <template> but a falsy inner v-if still
 // yields a comment placeholder node — so checking `$slots.x` is truthy even
@@ -331,6 +357,12 @@ const hasTabs = (): boolean => slotHasContent("tabs");
 const hasActions = (): boolean => slotHasContent("actions");
 const hasActionsOverflow = (): boolean => slotHasContent("actions-overflow");
 const hasBack = (): boolean => Boolean(props.back) || slotHasContent("back");
+// On one row the status sits last in the title block, at the actions' own gap from them.
+const statusClass = (): string[] => [
+  "flex shrink-0 items-center",
+  rowWraps.value ? "" : "order-last ms-auto",
+  !rowWraps.value && (hasActions() || hasActionsOverflow()) ? "-me-2" : "",
+];
 const backLabel = computed(() =>
   props.back?.label ? t("common.backTo", { label: props.back.label }) : t("common.back"),
 );

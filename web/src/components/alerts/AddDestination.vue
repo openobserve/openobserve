@@ -1478,10 +1478,10 @@ function saveCustomDestination(value: AddDestinationForm) {
         });
       })
       .catch((err: any) => {
+        dismiss();
         if (err.response?.status == 403) {
           return;
         }
-        dismiss();
         toast({
           variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
@@ -1503,10 +1503,10 @@ function saveCustomDestination(value: AddDestinationForm) {
         });
       })
       .catch((err: any) => {
+        dismiss();
         if (err.response?.status == 403) {
           return;
         }
-        dismiss();
         toast({
           variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,

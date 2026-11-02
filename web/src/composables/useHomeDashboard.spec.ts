@@ -169,11 +169,14 @@ describe("useHomeDashboard", () => {
     updateLabel("org1", "abc", "Renamed");
     expect(homeDashboard.value?.label).toBe("Renamed");
     // Persisted so the fresh label survives the next load().
+    // Background sync the user never asked for, so its 403 must not reach the access boundary.
     expect(settings.setOrgSetting).toHaveBeenCalledWith(
       "org1",
       "home_dashboard",
       { ...D, label: "Renamed" },
       "ui",
+      undefined,
+      { silentForbidden: true },
     );
   });
 
