@@ -55,7 +55,9 @@ use search_service;
 
 use super::{
     columnar, ingest,
-    native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, ExpansionLimits, expand_native_histogram},
+    native_histogram::{
+        CLASSIC_HISTOGRAM_SUFFIXES, ExpansionLimits, expand_native_histogram, expands_to_records,
+    },
     prom_decode,
 };
 use crate::{
@@ -235,7 +237,7 @@ pub async fn remote_write(
 
     // maybe empty, we can return immediately
     if request.timeseries.is_empty() {
-        ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
+        ingest::observe_request(WRITE_ENDPOINT, org_id, &start, http::StatusCode::OK);
         return Ok(RemoteWriteOutcome::default());
     }
 
@@ -482,7 +484,7 @@ pub async fn remote_write(
                 .iter()
                 .any(|s| sample_cell(s.value, schema).is_some());
             if has_writable && !gate.admit().await {
-                ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
+                ingest::observe_request(WRITE_ENDPOINT, org_id, &start, http::StatusCode::OK);
                 // deduplicated data counts as written, or every non-leader request reads as failed
                 return Ok(total.into());
             }
@@ -522,7 +524,7 @@ pub async fn remote_write(
 
             if !gate.admit().await {
                 // do not accept any entries for this request
-                ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
+                ingest::observe_request(WRITE_ENDPOINT, org_id, &start, http::StatusCode::OK);
                 return Ok(total.into());
             }
 
@@ -546,13 +548,20 @@ pub async fn remote_write(
 
         if !event.histograms.is_empty() {
             // `_sum` may still be stored, but a histogram missing its buckets is not written
-            if let Some(reason) = CLASSIC_HISTOGRAM_SUFFIXES.iter().find_map(|suffix| {
-                let stream = format!("{metric_name}{suffix}");
-                stream_key_checks
-                    .violation(org_id, &stream)
-                    .map(str::to_string)
-            }) {
-                written.histograms -= event.histograms.len();
+            let expandable = event
+                .histograms
+                .iter()
+                .filter(|hp| expands_to_records(hp))
+                .count();
+            if expandable > 0
+                && let Some(reason) = CLASSIC_HISTOGRAM_SUFFIXES.iter().find_map(|suffix| {
+                    let stream = format!("{metric_name}{suffix}");
+                    stream_key_checks
+                        .violation(org_id, &stream)
+                        .map(str::to_string)
+                })
+            {
+                written.histograms -= expandable;
                 rejection.get_or_insert(reason);
             }
             match buffer_native_histograms(
@@ -567,7 +576,7 @@ pub async fn remote_write(
             {
                 Some(counted) => sample_count += counted,
                 None => {
-                    ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
+                    ingest::observe_request(WRITE_ENDPOINT, org_id, &start, http::StatusCode::OK);
                     return Ok(total.into());
                 }
             }
@@ -587,7 +596,7 @@ pub async fn remote_write(
         }
         let rows = exemplar_records(std::mem::take(&mut labels), &event.exemplars);
         if !rows.is_empty() && !gate.admit().await {
-            ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
+            ingest::observe_request(WRITE_ENDPOINT, org_id, &start, http::StatusCode::OK);
             return Ok(total.into());
         }
         for (record, timestamp) in rows {
@@ -734,7 +743,12 @@ pub async fn remote_write(
         crate::onboarding::on_user_stream_created(org_id, StreamType::Metrics, &stream_name);
     }
 
-    ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
+    let outcome = RemoteWriteOutcome::new(total, written, rejection);
+    let status = match outcome.rejected {
+        Some(_) => http::StatusCode::BAD_REQUEST,
+        None => http::StatusCode::OK,
+    };
+    ingest::observe_request(WRITE_ENDPOINT, org_id, &start, status);
     ingest::spawn_triggers(stream_trigger_map);
 
     let total_ms = start.elapsed().as_millis();
@@ -742,7 +756,7 @@ pub async fn remote_write(
         log::info!("[remote_write] org: {org_id}, total time: {total_ms} ms");
     }
 
-    Ok(RemoteWriteOutcome::new(total, written, rejection))
+    Ok(outcome)
 }
 
 pub async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<ResponseMetadata> {
@@ -2553,8 +2567,17 @@ mod tests {
             histograms: histogram.histograms.clone(),
             ..series(&long_name)
         };
+        let stale_histogram = prometheus_rpc::TimeSeries {
+            samples: vec![],
+            histograms: vec![prometheus_rpc::Histogram {
+                sum: f64::from_bits(STALE_NAN_BITS),
+                timestamp: now + 1,
+                ..Default::default()
+            }],
+            ..series(&histogram_name)
+        };
         let request = prometheus_rpc::WriteRequest {
-            timeseries: vec![with_stale_marker, long, histogram],
+            timeseries: vec![with_stale_marker, long, histogram, stale_histogram],
             metadata: vec![prometheus_rpc::MetricMetadata {
                 r#type: prometheus_rpc::metric_metadata::MetricType::Gauge as i32,
                 metric_family_name: long_name.clone(),
@@ -2575,17 +2598,17 @@ mod tests {
         let bounded =
             infra::file_list::stream_key_violation(org_id, StreamType::Metrics, &long_name)
                 .is_some();
-        // a skipped stale marker counts as written; a histogram missing its buckets does not
+        // stale markers, float or histogram, count as written; a histogram missing buckets does not
         let expected_written = if bounded {
             WrittenCounts {
                 samples: 2,
-                histograms: 0,
+                histograms: 1,
                 exemplars: 0,
             }
         } else {
             WrittenCounts {
                 samples: 3,
-                histograms: 2,
+                histograms: 3,
                 exemplars: 2,
             }
         };
@@ -2600,6 +2623,11 @@ mod tests {
             ),
             None => assert!(!bounded),
         }
+        let labels = [WRITE_ENDPOINT, "400", org_id, "metrics", "", ""];
+        let rejected_requests = config::metrics::HTTP_INCOMING_REQUESTS
+            .with_label_values(&labels)
+            .get();
+        assert_eq!(rejected_requests > 0, bounded);
         let expected = [
             ("test_prom_key_len_ok".to_string(), true),
             (format!("{histogram_name}_sum"), true),
