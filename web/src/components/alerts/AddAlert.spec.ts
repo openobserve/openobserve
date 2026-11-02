@@ -1210,6 +1210,37 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find('[data-test="add-alert-tab-advanced"]').exists()).toBe(false);
     });
 
+    it("asks how it checks in the schedule section, not the watch section", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const tabs = '[data-test="add-alert-type-tabs"]';
+      expect(wrapper.find(`[data-test="add-alert-section-schedule"] ${tabs}`).exists()).toBe(true);
+      expect(wrapper.find(`[data-test="add-alert-section-watch"] ${tabs}`).exists()).toBe(false);
+    });
+
+    it("steps from the footer: Back from the second section, Next names the following one", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const back = '[data-test="add-alert-step-back-btn"]';
+      const next = '[data-test="add-alert-step-next-btn"]';
+      const position = '[data-test="add-alert-step-position"]';
+      wrapper.vm.activeSection = "watch";
+      await flushPromises();
+      expect(wrapper.find(back).exists()).toBe(false);
+      expect(wrapper.find(next).text()).toBe("Next: When is it a problem?");
+      expect(wrapper.find(position).text()).toBe("1 of 5");
+
+      wrapper.vm.activeSection = "notify";
+      await flushPromises();
+      expect(wrapper.find(back).exists()).toBe(true);
+      expect(wrapper.find(next).text()).toBe("Next: How often should we check?");
+      expect(wrapper.find(position).text()).toBe("3 of 5");
+
+      wrapper.vm.activeSection = "details";
+      await flushPromises();
+      expect(wrapper.find(next).exists()).toBe(false);
+    });
+
     it("names the alert types as ways of checking, keeping their ids", async () => {
       wrapper = mountAlert();
       await flushPromises();
@@ -1264,7 +1295,7 @@ describe("AddAlert (OForm owner)", () => {
       );
     });
 
-    it("keeps the message settings one click away and tucks priority and tags", async () => {
+    it("keeps the message settings one click away, shows tags and tucks priority", async () => {
       wrapper = mountAlert();
       await flushPromises();
       expect(wrapper.vm.tiers.isVisible("template")).toBe(false);
@@ -1273,8 +1304,9 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find('[data-test="add-alert-add-template"]').exists()).toBe(false);
       await wrapper.find('[data-test="add-alert-add-variables"]').trigger("click");
       expect(wrapper.vm.form.getFieldValue("context_attributes")).toHaveLength(1);
+      expect(wrapper.vm.tiers.isVisible("tags")).toBe(true);
       expect(wrapper.find('[data-test="add-alert-section-details-more"]').text()).toBe(
-        "2 more: priority, tags",
+        "1 more: priority",
       );
     });
 

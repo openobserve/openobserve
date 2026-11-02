@@ -317,7 +317,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
   {
     id: "cooldown",
     labelKey: "alerts.plain.cooldown",
-    aliases: ["cooldown", "silence", "silence notification", "throttle", "snooze"],
+    aliases: ["cooldown", "silence", "silence notification", "throttle", "snooze", "at most once"],
     section: "schedule",
     tier: "shown",
     groupKey: "alerts.find.groups.schedule",
@@ -373,7 +373,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     labelKey: "alerts.tags",
     aliases: ["tag", "labels", "label"],
     section: "details",
-    tier: "tucked",
+    tier: "shown",
     groupKey: MORE,
     targets: ["alert-tags-input"],
   },
