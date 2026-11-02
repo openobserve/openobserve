@@ -2065,10 +2065,8 @@ export class LogsPage {
         const option10 = this.page.locator(this.recordsPerPageOption(10)).first();
         await option10.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
         await option10.click({ force: true });
-        // Wait for the per-page change to take effect — cloud wildcard queries
-        // can take 5s+ to re-run after changing results-per-page
-        await this.page.waitForTimeout(5000);
-        // Retry the pagination assertion — slow cloud re-runs can miss the first check
+        // Retry the pagination assertion — cloud wildcard queries can take 5s+ to re-run after changing
+        // results-per-page, and slow re-runs can miss the first check
         const searchResult = this.page.locator(this.searchResultText);
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
@@ -2108,7 +2106,6 @@ export class LogsPage {
             // OPagination forwards the parent data-test as `${parent}-page-{n}` for each page button.
             const pageBtn = this.page.locator(this.resultPaginationPageBtn(resultsPerPage));
             await pageBtn.click({ force: true }).catch(() => {});
-            await this.page.waitForTimeout(3000);
 
             try {
                 await expect(searchResult).toContainText(expectedPattern, { timeout: 10000 });

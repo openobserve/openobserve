@@ -258,9 +258,7 @@ export default class DashboardPanelTime {
     await visibleCell(startDay).click();
     await visibleCell(endDay).click();
 
-    // Config panel picker has auto-apply enabled — no Apply button; menu closes automatically
-    // Wait for the date picker dropdown to close after auto-apply
-    await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    // Config panel picker has auto-apply enabled — no Apply button; the menu stays open after the pick
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
   }
 

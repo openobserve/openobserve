@@ -140,7 +140,6 @@ export class LoginPage {
     }
 
     await waitForLogin;
-    await this.page.waitForTimeout(2000);
     await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
       waitUntil: "domcontentloaded",
       timeout: 60000

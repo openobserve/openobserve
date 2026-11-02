@@ -228,7 +228,8 @@ export default class DashboardCreate {
     // goes out, the dialog is gone so the retry loop below sees "submitted",
     // and the navigation wait at the end expires with the list still on screen.
     // The folder tab is the DOM signal that folder resolution has finished.
-    await this.defaultFolderTab
+    // Any tab will do: a folder search filters the strip, so "default" isn't always in it.
+    await this.page.locator('button[data-test^="dashboard-folder-tab-"]').first()
       .waitFor({ state: "visible", timeout: 30000 })
       .catch(() => {
         // Not every list renders a folder strip; the retry loop stays the gate.

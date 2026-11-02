@@ -23,6 +23,8 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
   let currentPipelineName;
   // Worker-specific stream suffix to avoid conflicts in parallel execution
   let streamSuffix;
+  // The source streams only need to exist with a schema, so one ingest per worker is enough.
+  let streamsIngested = false;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -37,7 +39,6 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
 
     // Post-authentication stabilization wait
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Ingest data to worker-specific unique streams to avoid conflicts in parallel execution
     // Use only first 10 records to avoid timeout (full dataset has 3800+ records)
@@ -51,12 +52,15 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
       `e2e_conditions_operators${streamSuffix}`
     ];
 
-    for (const streamName of streamNames) {
-      await pageManager.logsPage.ingestData(streamName, logsdata.slice(0, 10));
-    }
+    if (!streamsIngested) {
+      for (const streamName of streamNames) {
+        await pageManager.logsPage.ingestData(streamName, logsdata.slice(0, 10));
+      }
 
-    // Brief wait for stream schemas to be established
-    await page.waitForTimeout(3000);
+      // Brief wait for stream schemas to be established
+      await page.waitForTimeout(3000);
+      streamsIngested = true;
+    }
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`

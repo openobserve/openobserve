@@ -555,7 +555,8 @@ class SchemaPage {
         // Wait until the timestamp field shows up in the stream-fields table, signalling
         // the new stream's schema has been loaded.
         await this.logSearchIndexFieldsTable
-            .locator('[data-test="log-search-expand-_timestamp-field"]')
+            .locator('[data-test^="log-search-expand-"]')
+            .first()
             .waitFor({ state: 'visible', timeout: 15000 })
             .catch(() => {});
     }

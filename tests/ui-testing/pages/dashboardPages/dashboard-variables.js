@@ -672,12 +672,9 @@ export default class DashboardVariables {
    * @param {number} timeout - Timeout in milliseconds (default: 5000)
    */
   async verifyVariableTimeRange(monitor, expectedDurationMs, successMessage, timeout = 10000) {
-    // Wait for the /values API response (longer timeout for parallel test execution)
+    // The monitor is armed before the action, so the call may already have happened (longer timeout for parallel test execution)
     try {
-      await this.page.waitForResponse(
-        response => (response.url().includes('/_values') || response.url().includes('/values')) && response.status() === 200,
-        { timeout }
-      );
+      await expect.poll(() => monitor.getResults().apiCallDetected, { timeout }).toBe(true);
     } catch (error) {
       console.log('⚠️ Warning: No variable API call detected within timeout');
       return;

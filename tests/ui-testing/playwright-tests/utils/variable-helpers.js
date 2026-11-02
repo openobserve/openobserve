@@ -466,7 +466,7 @@ export async function waitForAllPanelsToLoad(page, panelCount, timeout = 30000) 
   try {
     await page.waitForFunction(
       (count) => {
-        const loadedPanels = document.querySelectorAll('[data-test*="dashboard-panel-"][data-state="loaded"]');
+        const loadedPanels = document.querySelectorAll('[data-test="chart-renderer"], [data-test="dashboard-panel-table"]');
         return loadedPanels.length >= count;
       },
       panelCount,

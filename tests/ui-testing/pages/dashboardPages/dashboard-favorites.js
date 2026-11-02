@@ -146,11 +146,11 @@ export default class DashboardFavorites {
 
   // Narrow the paginated list to a single row. The list is 20-per-page with no
   // newest-first sort, so a freshly created dashboard can land on page 2+.
-  async searchDashboard(dashboardName) {
+  async searchDashboard(dashboardName, { timeout = 15000 } = {}) {
     await this.searchInput.waitFor({ state: "visible", timeout: 15000 });
     await this.searchInput.fill(dashboardName);
     await this.getNameCell(dashboardName)
-      .waitFor({ state: "visible", timeout: 15000 })
+      .waitFor({ state: "visible", timeout })
       .catch(() => {});
   }
 

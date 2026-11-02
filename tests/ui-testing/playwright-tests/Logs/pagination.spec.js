@@ -44,6 +44,7 @@ test.describe("Pagination for logs", () => {
 
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
+        await pageManager.logsPage.enableSqlModeIfNeeded();
         testLogger.debug('Stream name generated', { streamName });
         await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')`);
         // Strategic 1000ms wait for query preparation - this is functionally necessary
@@ -65,6 +66,7 @@ test.describe("Pagination for logs", () => {
 
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
+        await pageManager.logsPage.enableSqlModeIfNeeded();
         testLogger.debug('Stream name generated', { streamName });
         await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('zin*')`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
@@ -82,6 +84,7 @@ test.describe("Pagination for logs", () => {
 
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
+        await pageManager.logsPage.enableSqlModeIfNeeded();
         testLogger.debug('Stream name generated', { streamName });
         await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T1*')`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
@@ -99,6 +102,7 @@ test.describe("Pagination for logs", () => {
         
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
+        await pageManager.logsPage.enableSqlModeIfNeeded();
         testLogger.debug('Stream name generated', { streamName });
         await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit 10`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
@@ -114,6 +118,7 @@ test.describe("Pagination for logs", () => {
         // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
+        await pageManager.logsPage.enableSqlModeIfNeeded();
         testLogger.debug('Stream name generated', { streamName });
         await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
@@ -132,6 +137,7 @@ test.describe("Pagination for logs", () => {
         // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
+        await pageManager.logsPage.enableSqlModeIfNeeded();
         testLogger.debug('Stream name generated', { streamName });
         await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('zin*')`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
@@ -150,6 +156,7 @@ test.describe("Pagination for logs", () => {
         // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
+        await pageManager.logsPage.enableSqlModeIfNeeded();
         testLogger.debug('Stream name generated', { streamName });
         await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T1*')`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
@@ -168,6 +175,7 @@ test.describe("Pagination for logs", () => {
         // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
+        await pageManager.logsPage.enableSqlModeIfNeeded();
         testLogger.debug('Stream name generated', { streamName });
         await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:2*')`);
         // Strategic 500ms wait for operation completion - this is functionally necessary
@@ -186,6 +194,7 @@ test.describe("Pagination for logs", () => {
         // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
+        await pageManager.logsPage.enableSqlModeIfNeeded();
         testLogger.debug('Stream name generated', { streamName });
         await pageManager.logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit 10`);
         // Strategic 500ms wait for operation completion - this is functionally necessary

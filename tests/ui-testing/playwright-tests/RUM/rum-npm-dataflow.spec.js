@@ -162,11 +162,7 @@ test.describe('RUM NPM Data Flow', () => {
     beacons = attachBeaconCounter(app, ORG);
 
     await app.goto(server.url, { waitUntil: 'domcontentloaded' });
-    // Wait for the bundled SDK entry (served locally) to load, then for the
-    // SDK objects to be live — explicit signals instead of networkidle.
-    await app
-      .waitForResponse((r) => r.url().includes('/npm-bundle.js'), { timeout: 30000 })
-      .catch(() => testLogger.warn('npm bundle response not observed'));
+    // Wait for the SDK objects to be live — an explicit signal instead of networkidle.
     await waitForRumSdkReady(app);
 
     // Deterministic signal generation + flush (shared with the CDN path).
