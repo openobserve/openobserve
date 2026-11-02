@@ -117,7 +117,31 @@
           @click="acknowledgeRecord"
         >
           {{ t("oncall.acknowledge") }}
+          <OTooltip :content="ackWords.ackHint" />
         </OButton>
+        <template v-if="response.state === 'acknowledged'">
+          <OButton
+            v-if="response.acked_by !== me"
+            variant="outline"
+            size="sm-action"
+            :loading="acking"
+            data-test="oncall-response-take-over-btn"
+            @click="takeOverRecord"
+          >
+            {{ t("oncall.takeOver") }}
+            <OTooltip :content="t('oncall.takeOverHint')" />
+          </OButton>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            :loading="acking"
+            data-test="oncall-response-unack-btn"
+            @click="unacknowledgeRecord"
+          >
+            {{ t("oncall.unacknowledge") }}
+            <OTooltip :content="ackWords.unackHint" />
+          </OButton>
+        </template>
 
         <!-- A menu of durations, not a panel that pushes the page down. -->
         <ODropdown v-if="canSnooze && lgUp">
@@ -779,6 +803,7 @@ import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { notAckedToast, pageAckWords, unchangedAckToast } from "@/utils/alerts/ackState";
 import OnCallFiringHistory from "@/components/oncall/OnCallFiringHistory.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
 import OnCallReportCard from "@/components/oncall/OnCallReportCard.vue";
@@ -801,6 +826,8 @@ import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import {
   acknowledgeResponseMutation,
+  takeOverResponseMutation,
+  unacknowledgeResponseMutation,
   addResponseNoteMutation,
   confirmRecoveryMutation,
   escalateNowMutation,
@@ -1048,6 +1075,16 @@ const responseId = computed(() => String(route.params.responseId ?? ""));
 // The id rides in the variables: the origin link swaps it under a reused instance.
 const resolveWrite = useMutation(() => resolveResponseMutation(orgId.value));
 const ackWrite = useMutation(() => acknowledgeResponseMutation(orgId.value));
+const takeOverWrite = useMutation(() => takeOverResponseMutation(orgId.value));
+const unackWrite = useMutation(() => unacknowledgeResponseMutation(orgId.value));
+const me = computed(() => store.state.userInfo?.email);
+const ackWords = computed(() =>
+  pageAckWords(
+    response.value?.team_id ? teamName.value : "",
+    response.value?.subject.subject_type ?? "alert",
+    t,
+  ),
+);
 const snoozeWrite = useMutation(() => snoozeResponseMutation(orgId.value));
 const noteWrite = useMutation(() => addResponseNoteMutation(orgId.value));
 const handoffWrite = useMutation(() => handoffResponseMutation(orgId.value));
@@ -1393,17 +1430,71 @@ async function resolveRecord() {
   }
 }
 
+/// A press that changed nothing on a closed page says so; nobody acknowledged it then (ack, take over).
+function resolvedToast(page: OnCallResponse, unheld: boolean) {
+  const closed = !!page.closed_at || !isUnresolved(page.state);
+  return closed && (!unheld || !page.acked_by)
+    ? { variant: "info" as const, message: t("oncall.alreadyResolved") }
+    : null;
+}
+
 async function acknowledgeRecord() {
   acking.value = true;
   try {
-    await ackWrite.mutateAsync(responseId.value);
+    const res = await ackWrite.mutateAsync(responseId.value);
     analytics.track("oncall_page_acknowledged", { count: 1 });
-    toast({ variant: "success", message: t("oncall.acknowledged") });
+    toast(
+      res.data.ack?.changed === false
+        ? (resolvedToast(res.data, true) ?? unchangedAckToast(res.data.acked_by, me.value, t))
+        : { variant: "success", message: ackWords.value.acked },
+    );
     await fetchResponse();
   } catch (err: any) {
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.acknowledgeFailed"),
+    });
+  } finally {
+    acking.value = false;
+  }
+}
+
+async function takeOverRecord() {
+  const from = response.value?.acked_by ?? "";
+  acking.value = true;
+  try {
+    const res = await takeOverWrite.mutateAsync(responseId.value);
+    toast(
+      res.data.ack?.changed === false
+        ? (resolvedToast(res.data, true) ?? unchangedAckToast(res.data.acked_by, me.value, t))
+        : { variant: "success", message: t("oncall.tookOver", { who: raw(from) }) },
+    );
+    await fetchResponse();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.acknowledgeFailed"),
+    });
+  } finally {
+    acking.value = false;
+  }
+}
+
+async function unacknowledgeRecord() {
+  acking.value = true;
+  try {
+    const res = await unackWrite.mutateAsync(responseId.value);
+    toast(
+      res.data.ack?.changed === false
+        ? (resolvedToast(res.data, false) ??
+            notAckedToast(res.data.title || res.data.subject.source_id, t))
+        : { variant: "success", message: ackWords.value.unacked },
+    );
+    await fetchResponse();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.unacknowledgeFailed"),
     });
   } finally {
     acking.value = false;
