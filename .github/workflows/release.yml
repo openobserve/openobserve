@@ -223,6 +223,7 @@ jobs:
 
           curl -sSf http://127.0.0.1:5080/api-doc/openapi.json -o "${workdir}/openapi.json"
           grep -q '"openapi"' "${workdir}/openapi.json"
+          kill "${pid}" 2>/dev/null || true
           mv "${workdir}/openapi.json" openapi.json
 
       - name: Configure AWS credentials
