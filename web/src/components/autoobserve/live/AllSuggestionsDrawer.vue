@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!notice"
         :data="rows"
         :columns="columns"
-        :loading="skeleton || paging"
+        :loading="skeleton || paging || clampTotal !== null"
         :frame="false"
         row-key="id"
         :pagination="total > 0 ? 'server' : 'none'"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #empty>
           <div
-            v-if="state.status === 'loading'"
+            v-if="state.status === 'loading' || pastEnd"
             aria-hidden="true"
             data-test="autoobserve2-suggestions-drawer-pending"
           />
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -176,9 +176,18 @@ const notice = computed(() =>
 const rows = computed<SuggestionRow[]>(() =>
   toSuggestionRows(t, zone.value, query.data.value?.suggestions ?? []),
 );
-const total = computed(() => query.data.value?.total ?? 0);
+const clampTotal = ref<number | null>(null);
+const total = computed(() => clampTotal.value ?? query.data.value?.total ?? 0);
 const skeleton = useHeldSkeleton(() => props.open && state.value.status === "loading");
 const paging = computed(() => query.isPlaceholderData.value && query.isFetching.value);
+// The total can shrink while a later page is open, leaving its offset past the end.
+const pastEnd = computed(
+  () =>
+    !!query.data.value &&
+    !query.isPlaceholderData.value &&
+    page.value > 1 &&
+    (page.value - 1) * DRAWER_PAGE >= total.value,
+);
 const loadPhase = useLoadPhase(() => state.value.status, skeleton);
 const loadText = computed(() => liveLoadText(t, "suggestions", loadPhase.value));
 
@@ -193,6 +202,16 @@ watch(
 
 watch(org, () => {
   page.value = 1;
+});
+
+// The page it lands on may be cached from before the total shrank, so it is fetched again under the new total.
+watch(pastEnd, async (past) => {
+  if (!past) return;
+  clampTotal.value = total.value;
+  page.value = Math.max(1, Math.ceil(clampTotal.value / DRAWER_PAGE));
+  await nextTick();
+  if (!query.isPlaceholderData.value) await query.refetch();
+  clampTotal.value = null;
 });
 
 const columns = computed<OTableColumnDef<SuggestionRow>[]>(() => [
