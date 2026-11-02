@@ -329,7 +329,7 @@ jobs:
         working-directory: web
         run: npx vitest --merge-reports
       - name: debug
-        run: echo "web" && ls ./web && echo "reports" && ls ./web/.vitest-reports
+        run: echo "web" && ls -a ./web && echo "reports" && ls -a ./web/.vitest-reports
       - name: check coverage
         working-directory: web
         run: ./coverage.sh check
