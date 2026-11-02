@@ -80,7 +80,7 @@ fn scorer_error_response(value: ScorerError) -> Response {
     responses(
         (status = 200, body = inline(ListScorersResponseBody)),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "list"})),
     ),
 )]
@@ -142,7 +142,7 @@ pub async fn list_scorers(
         (status = 404, description = "Provider not found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "create"})),
     ),
 )]
@@ -184,7 +184,7 @@ pub async fn create_scorer(
         (status = 200, body = inline(ScorerResponseBody)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "get"})),
     ),
 )]
@@ -215,8 +215,8 @@ pub async fn get_scorer(Path((org_id, entity_id)): Path<(String, String)>) -> Re
     responses(
         (status = 200, body = inline(ListScorerVersionsResponseBody)),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "list_versions"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "list"})),
     ),
 )]
 pub async fn list_scorer_versions(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
@@ -249,7 +249,7 @@ pub async fn list_scorer_versions(Path((org_id, entity_id)): Path<(String, Strin
         (status = 403, description = "Provider not accessible", body = ()),
         (status = 404, description = "Scorer or provider not found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "update"})),
     ),
 )]
@@ -289,11 +289,11 @@ pub async fn update_scorer(
         ("entity_id" = String, Path, description = "Scorer stable entity id"),
     ),
     responses(
-        (status = 200, description = "Deactivated", body = String),
+        (status = 200, description = "Deactivated", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 404, description = "Not Found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "delete"})),
     ),
 )]
@@ -325,8 +325,8 @@ pub async fn delete_scorer(Path((org_id, entity_id)): Path<(String, String)>) ->
         (status = 403, description = "Provider not accessible", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "test"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "create"})),
     ),
 )]
 pub async fn test_scorer(
@@ -356,8 +356,8 @@ pub async fn test_scorer(
         (status = 200, body = inline(LlmJudgeOutputSchemaResponseBody)),
         (status = 400, description = "Bad Request", body = ()),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "preview_llm_judge_output_schema"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "create"})),
     ),
 )]
 pub async fn preview_llm_judge_output_schema(

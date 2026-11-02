@@ -33,6 +33,27 @@ pub struct BatchParams {
 }
 
 /// GET /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/status, with sources.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/status",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "GetPublicDashboardLinkStatus",
+    summary = "Get the status of a public dashboard link",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard id"),
+        ("link_id" = String, Path, description = "Link id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn link(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -58,6 +79,26 @@ pub async fn link(
 }
 
 /// GET /{org_id}/public_dashboards/status?ids=a,b — no sources; unreachable owners left out.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/public_dashboards/status",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "ListPublicDashboardLinkStatuses",
+    summary = "Get the status of public dashboard links",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("ids" = Option<String>, Query, description = "Comma-separated link ids"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn batch(
     Path(org_id): Path<String>,
     Headers(user): Headers<UserEmail>,

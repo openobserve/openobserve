@@ -861,6 +861,8 @@ pub struct PresetInput {
     pub default: Option<serde_json::Value>,
     /// For `group` and `group_list`: the fields each group carries.
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    // Self-referential: a typed field would recurse forever in utoipa's schema walk.
+    #[schema(value_type = Vec<Object>)]
     pub fields: Vec<PresetInput>,
 }
 

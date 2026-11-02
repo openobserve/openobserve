@@ -62,9 +62,10 @@ fn otlp_request_type_from_content_type(content_type: &str) -> Option<OtlpRequest
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
-    request_body(content = String, description = "ExportProfilesServiceRequest", content_type = "application/x-protobuf"),
+    request_body(description = "ExportProfilesServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
+    security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
+        (status = 200, description = "ExportProfilesServiceResponse, encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]

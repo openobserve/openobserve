@@ -120,6 +120,7 @@ pub async fn json(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
     request_body(description = "ExportMetricsServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
+    security(("Authorization" = [])),
     responses(
         (status = 200, description = "ExportMetricsServiceResponse", content(("application/x-protobuf"), (Object = "application/json"))),
         (status = 206, description = "ExportMetricsServiceResponse with a partial success (JSON requests only)", content((Object = "application/json"))),

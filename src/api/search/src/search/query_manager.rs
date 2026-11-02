@@ -30,12 +30,32 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 
 /// A query to cancel and the org it runs in.
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, utoipa::ToSchema)]
 struct QueryToCancel {
     trace_id: String,
     org_id: String,
 }
 
+#[utoipa::path(
+    put,
+    path = "/{org_id}/query_manager/cancel",
+    context_path = "/api",
+    tag = "Search",
+    operation_id = "CancelQueries",
+    summary = "Cancel running queries",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(Vec<QueryToCancel>), description = "Queries to cancel", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<search::CancelQueryResponse>)),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn cancel_query(
     Headers(user_email): Headers<UserEmail>,
     Path(org_id): Path<String>,
@@ -63,6 +83,25 @@ pub async fn cancel_query(
     Json(res).into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/query_manager/status",
+    context_path = "/api",
+    tag = "Search",
+    operation_id = "GetQueryManagerStatus",
+    summary = "List running queries",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn query_status(Path(org_id): Path<String>) -> Response {
     // only the _meta Query Management page lists running queries, and it lists every org's
     if org_id != META_ORG_ID {

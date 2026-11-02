@@ -96,8 +96,8 @@ pub struct TestDestinationResponse {
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test"})),
-        ("x-o2-mcp" = json!({"description": "Test alert destination connectivity", "category": "alerts"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false, "description": "Test alert destination connectivity", "category": "alerts"}))
     )
 )]
 pub async fn test_destination(
@@ -739,8 +739,8 @@ pub async fn delete_destination_bulk(
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List prebuilt alert destination templates", "category": "alerts"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false, "description": "List prebuilt alert destination templates", "category": "alerts"}))
     )
 )]
 pub async fn list_prebuilt_destinations(Path(org_id): Path<String>) -> Response {
@@ -806,7 +806,7 @@ pub struct TestSendResponse {
         (status = 429, description = "Rate limited", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test_send"})),
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]

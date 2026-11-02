@@ -23,10 +23,29 @@ use serde::Deserialize;
 
 use crate::service::auth::UserEmail;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct RequestDecision {
     reason: String,
 }
+#[utoipa::path(
+    get,
+    path = "/{org_id}/settings/domains",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetOrgLinkedDomain",
+    summary = "Get the domain linked to an organization",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn get_linked_domain(Path(org_id): Path<String>) -> Response {
     match org_domain_ownership::get_domains_for_org(&org_id).await {
         Ok(v) => MetaHttpResponse::json(v),
@@ -37,6 +56,26 @@ pub async fn get_linked_domain(Path(org_id): Path<String>) -> Response {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/domains",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "LinkOrgDomain",
+    summary = "Link a domain to an organization",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = CreateDomainRequest, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn link_domain(
     Path(org_id): Path<String>,
     Headers(user): Headers<UserEmail>,
@@ -116,6 +155,26 @@ pub async fn link_domain(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/domains/requests",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "RaiseOrgDomainRequest",
+    summary = "Request a domain link",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = CreateDomainRequest, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn raise_request(
     Path(org_id): Path<String>,
     Headers(user): Headers<UserEmail>,
@@ -173,6 +232,25 @@ pub async fn raise_request(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/settings/domains/requests",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "ListOrgDomainRequests",
+    summary = "List domain link requests",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn list_requests(Path(org_id): Path<String>) -> Response {
     let requests = if org_id == META_ORG_ID {
         org_domain_requests::list_all_req().await
@@ -189,6 +267,27 @@ pub async fn list_requests(Path(org_id): Path<String>) -> Response {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/domain/request/{id}/approve",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "ApproveOrgDomainRequest",
+    summary = "Approve a domain link request",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Resource id"),
+    ),
+    request_body(content = RequestDecision, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn approve_request(
     Path((org_id, id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -246,6 +345,27 @@ pub async fn approve_request(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/domain/request/{id}/reject",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "RejectOrgDomainRequest",
+    summary = "Reject a domain link request",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Resource id"),
+    ),
+    request_body(content = RequestDecision, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn reject_request(
     Path((org_id, id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -287,6 +407,26 @@ pub async fn reject_request(
     MetaHttpResponse::ok("request rejected successfully")
 }
 
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/settings/domains/{domain}",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "DeleteOrgLinkedDomain",
+    summary = "Remove a linked domain",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("domain" = String, Path, description = "Custom domain id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_linked_domain(
     Path((org_id, did)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -323,6 +463,26 @@ pub async fn delete_linked_domain(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/domains/verify/{domain}",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "VerifyOrgDomain",
+    summary = "Verify a linked domain",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("domain" = String, Path, description = "Custom domain id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn verify_domain(
     Path((org_id, did)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,

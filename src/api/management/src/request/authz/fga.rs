@@ -1155,6 +1155,10 @@ pub async fn get_group_details(Path(_path): Path<(String, String)>) -> Response 
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn get_resources(Path(org_id): Path<String>) -> Response {
@@ -1200,6 +1204,10 @@ pub async fn get_resources(Path(org_id): Path<String>) -> Response {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn get_resources(Path(_org_id): Path<String>) -> Response {

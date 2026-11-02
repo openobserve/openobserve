@@ -131,6 +131,10 @@ pub struct LinkSubscriptionResponse {
         (status = 409, description = "Conflict (already subscribed)", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Billings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn link_subscription(
     Path(org_id): Path<String>,
@@ -330,6 +334,10 @@ pub async fn link_subscription(
         (status = 404, description = "Not Found", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Billings", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn activation_status(
     Path(org_id): Path<String>,

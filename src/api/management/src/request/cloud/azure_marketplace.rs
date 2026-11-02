@@ -54,12 +54,16 @@ pub struct LinkSubscriptionResponse {
     ),
     request_body(content = LinkSubscriptionRequest),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = LinkSubscriptionResponse),
+        (status = 201, description = "Success", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 400, description = "Bad Request (token expired, invalid)", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden (not admin)", content_type = "application/json", body = ()),
         (status = 409, description = "Conflict (already subscribed)", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Billings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn link_subscription(
     Path(org_id): Path<String>,
