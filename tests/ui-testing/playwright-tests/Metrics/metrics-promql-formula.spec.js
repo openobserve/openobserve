@@ -137,7 +137,7 @@ test.describe('Metrics PromQL formulas', () => {
     const dash = saved[`v${saved.version}`] || saved;
     const savedPanel = dash.tabs.flatMap((tab) => tab.panels).find((p) => p.title === panelTitle);
     expect(savedPanel.queries.map((q) => q.config.hide ?? false)).toEqual([true, true, false]);
-    expect(savedPanel.queries.map((q) => q.config.ref ?? null)).toEqual(['A', 'B', null]);
+    expect(savedPanel.queries.map((q) => q.config.ref ?? null)).toEqual(['A', 'B', 'F1']);
     expect(savedPanel.queries[2].config.formula).toBe(FORMULA);
 
     // The inputs were typed in code mode, so each one's metric comes from its text, not the inherited stream pick.

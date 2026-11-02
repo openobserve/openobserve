@@ -42,6 +42,28 @@ describe("explorerUrlState", () => {
     }
   });
 
+  it("round-trips OR groups and their negation as a matcher prefix", () => {
+    const labelFilters = [
+      { label: "job", operator: "=", value: "api" },
+      { label: "code", operator: "=", value: "5:00", group: 1 },
+      { label: "env", operator: "!=", value: "prod", group: 2, negate: true },
+    ] as any[];
+    const query = explorerFiltersToQuery({ ...defaults(), labelFilters });
+    expect(query.labels).toEqual(["job=api", "1:code=5:00", "!2:env!=prod"]);
+    expect(queryToExplorerFilters(query).labelFilters).toEqual(labelFilters);
+    expect(queryToExplorerFilters({ labels: ["0:a=1", "!a=1"] }).labelFilters).toBeUndefined();
+  });
+
+  it("keeps only the base filters when the groups expand past the branch cap", () => {
+    const groups = Array.from({ length: 17 }, (_, i) => `${i + 1}:l${i}=v`);
+    const f = queryToExplorerFilters({ labels: ["job=api", ...groups] });
+    expect(f.labelFilters).toEqual([{ label: "job", operator: "=", value: "api" }]);
+    expect(f.labelGroupsOverCap).toBe(17);
+    expect(
+      queryToExplorerFilters({ labels: ["job=api", "1:a=1"] }).labelGroupsOverCap,
+    ).toBeUndefined();
+  });
+
   it("serializes defaults to an empty query", () => {
     expect(explorerFiltersToQuery(defaults())).toEqual({});
   });
@@ -136,6 +158,20 @@ describe("explorerUrlState", () => {
       labels: ["no operator", "1starts_with_digit=x", "pod=api"],
     });
     expect(out.labelFilters).toEqual([{ label: "pod", operator: "=", value: "api" }]);
+  });
+
+  it("round-trips a usage sort and usage filters, dropping unknown filter ids", () => {
+    const query = explorerFiltersToQuery({
+      ...defaults(),
+      sortBy: "dashboards",
+      usageFilters: new Set(["slos", "alerts"]),
+    });
+    expect(query).toEqual({ sort: "dashboards", usage: "alerts,slos" });
+    const f = queryToExplorerFilters({ ...query, usage: "alerts,slos,pipelines" });
+    expect(f.sortBy).toBe("dashboards");
+    expect([...(f.usageFilters ?? [])]).toEqual(["alerts", "slos"]);
+    expect(queryToExplorerFilters({ sort: "alerts" }).sortBy).toBe("alerts");
+    expect(queryToExplorerFilters({ usage: "bogus" }).usageFilters).toBeUndefined();
   });
 
   it("ignores non-literal boolean and enum values", () => {
