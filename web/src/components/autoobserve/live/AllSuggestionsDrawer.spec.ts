@@ -244,4 +244,60 @@ describe("AllSuggestionsDrawer (journey 3)", () => {
     expect(wrapper.find(COUNT).text()).toBe("24");
     expect(wrapper.findComponent(OTable).props("loading")).toBe(false);
   });
+
+  it("never shows the previous org's held total when the org switches mid-clamp", async () => {
+    api.mockResolvedValueOnce(page(["a1"], 30));
+    const wrapper = mountDrawer();
+    await flushPromises();
+    api.mockResolvedValueOnce(page([], 24));
+    let release: (value: unknown) => void = () => undefined;
+    api.mockReturnValueOnce(new Promise((resolve) => (release = resolve)) as never);
+    wrapper.findComponent(OTable).vm.$emit("pagination-change", { page: 2, pageSize: 25 });
+    await flushPromises();
+    expect(wrapper.find(COUNT).text()).toBe("24");
+    api.mockResolvedValueOnce(page(["b1"], 1));
+    setOrg("org-b");
+    await flushPromises();
+    expect(rows(wrapper).map((r) => r.id)).toEqual(["b1"]);
+    expect(wrapper.find(COUNT).text()).toBe("1");
+    expect(wrapper.findComponent(OTable).props("loading")).toBe(false);
+    release(page(["a1"], 24));
+    await flushPromises();
+    expect(rows(wrapper).map((r) => r.id)).toEqual(["b1"]);
+    expect(wrapper.find(COUNT).text()).toBe("1");
+    expect(wrapper.findComponent(OTable).props("loading")).toBe(false);
+  });
+
+  it("keeps the new org's own clamp when the old org's clamp refetch settles late", async () => {
+    const held = () => {
+      let release: (value: unknown) => void = () => undefined;
+      const promise = new Promise((resolve) => (release = resolve));
+      return { promise: promise as never, release: (v: unknown) => release(v) };
+    };
+    const toPage2 = () =>
+      wrapper.findComponent(OTable).vm.$emit("pagination-change", { page: 2, pageSize: 25 });
+    api.mockResolvedValueOnce(page(["a1"], 30));
+    const wrapper = mountDrawer();
+    await flushPromises();
+    const orgA = held();
+    api.mockResolvedValueOnce(page([], 24)).mockReturnValueOnce(orgA.promise);
+    toPage2();
+    await flushPromises();
+    api.mockResolvedValueOnce(page(["b1"], 30));
+    setOrg("org-b");
+    await flushPromises();
+    const orgB = held();
+    api.mockResolvedValueOnce(page([], 20)).mockReturnValueOnce(orgB.promise);
+    toPage2();
+    await flushPromises();
+    expect(wrapper.find(COUNT).text()).toBe("20");
+    orgA.release(page(["a1"], 24));
+    await flushPromises();
+    expect(wrapper.find(COUNT).text()).toBe("20");
+    expect(wrapper.findComponent(OTable).props("loading")).toBe(true);
+    orgB.release(page(["b1"], 20));
+    await flushPromises();
+    expect(wrapper.find(COUNT).text()).toBe("20");
+    expect(wrapper.findComponent(OTable).props("loading")).toBe(false);
+  });
 });
