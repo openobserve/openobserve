@@ -136,7 +136,7 @@ test("sanitized PR + sandboxed opencode: planted loaders are inert and reads out
     await selfCheck(client, REVIEW_AGENTS);
     const result = await client.prompt({ ...PROMPT, title: "sandbox" });
     assert.equal(result.text, "<no-issues/>");
-    assert.ok(result.info.cost > 0, "model cost must come from the opencode.jsonc cost block");
+    assert.ok(result.info.tokens?.output > 0, "token counts must reach telemetry so the server can price the call");
   });
 
   assert.equal(existsSync(pr.canary), false, "a planted plugin ran");

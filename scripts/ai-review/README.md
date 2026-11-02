@@ -277,6 +277,8 @@ Model spans use the OpenTelemetry GenAI content attributes:
 - `gen_ai.input.messages`
 - `gen_ai.output.messages`
 
-Token counts, cost, model, response ID, and finish reasons come from the Opencode assistant
-response. Do not put content-length metadata below `gen_ai.prompt.*`: OpenObserve recognizes that
+Token counts, model, response ID, and finish reasons come from the Opencode assistant response.
+The engine sends no `gen_ai.usage.cost`: OpenObserve computes the cost from the token counts and its
+model pricing table, so the configs carry no prices. Do not put content-length metadata below
+`gen_ai.prompt.*`: OpenObserve recognizes that
 prefix as legacy TraceLoop prompt content and would tokenize the metadata instead of the prompt.
