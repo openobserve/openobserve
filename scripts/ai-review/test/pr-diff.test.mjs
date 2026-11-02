@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -150,4 +150,52 @@ test("a fetched diff with no local proof stays usable but unpinned", () => {
   const run = cmd => { if (cmd === "git") throw new Error("no such commit"); return "api"; };
   assert.deepEqual(fetchPinnedDiff({ repo: "o/r", prNumber: 1, prDir: "/pr", mergeBase: "b", head: "h", env: {}, run }), { diff: "api", pinned: false });
   assert.deepEqual(fetchPinnedDiff({ repo: "o/r", prNumber: 1, prDir: "", mergeBase: "", head: "", env: {}, run }), { diff: "api", pinned: false });
+});
+
+function renameDiff(t, setup, rename) {
+  const dir = mkdtempSync(join(tmpdir(), "pr-diff-rename-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const git = (...args) => execFileSync("git", ["-C", dir, ...args], { encoding: "utf-8" });
+  git("init", "-q");
+  git("config", "user.email", "t@example.com");
+  git("config", "user.name", "t");
+  writeFileSync(join(dir, "notes.md"), "a\n");
+  setup(dir, git);
+  git("add", "--", "notes.md");
+  git("-c", "commit.gpgsign=false", "commit", "-qm", "base");
+  const base = git("rev-parse", "HEAD").trim();
+  rename(dir, git);
+  writeFileSync(join(dir, "notes.md"), "b\n");
+  git("add", "--", "notes.md");
+  git("-c", "commit.gpgsign=false", "commit", "-qm", "head");
+  return localDiff(dir, base, git("rev-parse", "HEAD").trim());
+}
+
+test("a renamed symlink or submodule whose header carries no mode cannot pass as a plain file", t => {
+  const symlink = renameDiff(t, (dir, git) => {
+    symlinkSync("/etc/passwd", join(dir, "link"));
+    git("add", "link");
+  }, (_, git) => git("mv", "link", "moved"));
+  const gitlink = renameDiff(
+    t,
+    (_, git) => git("update-index", "--add", "--cacheinfo", `160000,${"1".repeat(40)},vendor/x`),
+    (_, git) => {
+      git("update-index", "--force-remove", "vendor/x");
+      git("update-index", "--add", "--cacheinfo", `160000,${"1".repeat(40)},vendor/y`);
+    },
+  );
+  for (const diff of [symlink, gitlink]) {
+    assert.match(diff, /^similarity index 100%$/m);
+    assert.deepEqual(parseRawDiff(diff).problems, ["a renamed file's type could not be read"], diff);
+  }
+  const edited = renameDiff(t, (dir, git) => {
+    writeFileSync(join(dir, "a.md"), "1\n2\n3\n4\n5\n6\n");
+    git("add", "a.md");
+  }, (dir, git) => {
+    git("mv", "a.md", "b.md");
+    writeFileSync(join(dir, "b.md"), "1\n2\n3\n4\n5\n7\n");
+    git("add", "b.md");
+  });
+  assert.match(edited, /^index \S+ 100644$/m);
+  assert.deepEqual(parseRawDiff(edited).problems, []);
 });

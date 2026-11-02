@@ -1602,7 +1602,8 @@ async function main() {
       failedReviewers: unfinishedReviewers(ranResults),
       ranCount: ranResults.length,
       coordinatorFallback: Boolean(coordinatorResult?.fallback),
-      ...changedCodeEvidence(filtered.diff, PAIRED.dir),
+      // The unfiltered diff: a production asset the noise filter hides from reviewers is still an untested production change.
+      ...changedCodeEvidence(diff, PAIRED.dir),
     });
     TRACE.setSpanAttributes(rootSpan, {
       "gen_ai.response.ids": responseIds,

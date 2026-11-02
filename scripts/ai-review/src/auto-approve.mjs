@@ -87,6 +87,8 @@ function readMode(mode, problems) {
 }
 
 function readFileHeader(line, file, problems) {
+  if (/^(?:rename|copy) (?:from|to) /.test(line)) file.moved = true;
+  if (/^(?:old mode|new mode|new file mode|deleted file mode) |^index \S+ \d+/.test(line)) file.modeKnown = true;
   const path = /^(?:--- a\/|\+\+\+ b\/|rename from |rename to |copy from |copy to )(.*)$/.exec(line)?.[1];
   if (path !== undefined) {
     if (path.startsWith('"')) problems.add("a file path could not be read");
@@ -138,6 +140,8 @@ export function parseRawDiff(diff) {
   }
   if (oldLeft > 0 || newLeft > 0) problems.add("the diff is cut short");
   if (files.some(f => f.paths.size === 0)) problems.add("a file path could not be read");
+  // An unchanged rename prints no mode, so a symlink or submodule would otherwise pass as a plain file.
+  if (files.some(f => f.moved && !f.modeKnown)) problems.add("a renamed file's type could not be read");
   return { fileCount: files.length, changedLines, paths: files.flatMap(f => [...f.paths]), addedLines, problems: [...problems] };
 }
 

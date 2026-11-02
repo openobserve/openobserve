@@ -768,7 +768,7 @@ const silentReviewer = key => ({ ...finishedReviewer(key), parsed: false, rawTex
 const smallRawDiff = "diff --git a/docs/a.md b/docs/a.md\n--- a/docs/a.md\n+++ b/docs/a.md\n@@ -1 +1 @@\n-old\n+new\n";
 
 // Every default makes the run an approvable one, so a test changes the single fact it is about.
-async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], byPass = null, pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, coordinatorOutput = cleanCoordinatorOutput } = {}) {
+async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], byPass = null, pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, coordinatorOutput = cleanCoordinatorOutput, rawDiff = smallRawDiff, keptDiff = null } = {}) {
   const run = { posted: "", approvals: [], logs: [], coordinatorCalls: 0, coordinatorArgs: null, reviewerCalls: [], artifact: null, updates: 0, creates: 0, claims: 0, sanitized: 0 };
   const pr = { ...eligibleInput().pr, title: "fix a bug", body: "plain words", head: { sha: MAIN_HEAD }, changed_files: 1, additions: 1, deletions: 1, ...prNow };
   const noop = () => {};
@@ -784,9 +784,9 @@ async function runMain({ results = [finishedReviewer("security"), finishedReview
     REVIEW_MARKER: "<!-- ai-code-review -->", PAIRED: { repo: "", prNumber: "", dir: "", mergeBase: "", head: "", ...paired }, PR_DIR: "/pr", resolve: (...parts) => parts.join("/"),
     githubReviewApi: () => ({ readPr: () => pr, listReviews: () => [], dismissReview: noop, approve: payload => run.approvals.push(payload) }),
     noteSkippedPush: noop, apiKey: () => "configured", API_KEY_VAR_NAME: "TEST_KEY", MODEL_SLUG: "test/model",
-    fetchPinnedDiff: ({ repo }) => { if (diffFails) throw new Error("diff unavailable"); return { diff: smallRawDiff, pinned: pinned[repo] ?? true }; }, prefixDiffPaths: diff => diff,
+    fetchPinnedDiff: ({ repo }) => { if (diffFails) throw new Error("diff unavailable"); return { diff: rawDiff, pinned: pinned[repo] ?? true }; }, prefixDiffPaths: diff => diff,
     parseDiffFiles: () => [{ oldPath: "docs/a.md", newPath: "docs/a.md" }], execErrorText: err => err.message,
-    filterDiff: diff => (noiseOnly ? { diff: "", files: [], totalAdded: 0, totalRemoved: 0 } : { diff, files: [{ oldPath: "docs/a.md", newPath: "docs/a.md" }], totalAdded: 1, totalRemoved: 1 }),
+    filterDiff: diff => (noiseOnly ? { diff: "", files: [], totalAdded: 0, totalRemoved: 0 } : { diff: keptDiff ?? diff, files: [{ oldPath: "docs/a.md", newPath: "docs/a.md" }], totalAdded: 1, totalRemoved: 1 }),
     sha256: () => "hash", RISK_TIERS: { full: {} }, assessRiskTier: () => "full", selectAgents: () => results.map(r => r.agentKey),
     ghJson: () => { if (contextFails) throw new Error("no context"); return { title: "fix a bug", body: reviewedBody, files: [{}] }; },
     pairedPrContext: () => "", isPlaceholderComment: () => false, claimReviewPass: () => { run.claims += 1; return 1; }, buildImpactContext: () => "",
@@ -867,6 +867,13 @@ test("only a diff pinned to the head earns the sha stamp, and the review still c
   const retry = await runMain({ existing: { id: 1, body: run.posted }, pinned: { [repo]: false }, mode: "shadow" });
   assert.equal(retry.logs.some(line => line.includes("already_reviewed")), false);
   assert.equal(commentsModule.reviewPassCount(retry.posted), 2);
+});
+
+test("a production file the noise filter hides from reviewers still counts as an untested production change", async () => {
+  const svg = "diff --git a/web/src/assets/logo.svg b/web/src/assets/logo.svg\n--- a/web/src/assets/logo.svg\n+++ b/web/src/assets/logo.svg\n@@ -1 +1 @@\n-<svg/>\n+<svg></svg>\n";
+  const run = await runMain({ rawDiff: `${svg}${smallRawDiff}`, keptDiff: smallRawDiff, mode: "off" });
+  assert.match(run.posted, /Merge confidence: 🟡 Medium/);
+  assert.match((await runMain({ mode: "off" })).posted, /Merge confidence: 🟢 High/);
 });
 
 test("a paired review is stamped only when both sides are pinned", async () => {
@@ -1289,4 +1296,31 @@ test("a no-issues body saying the review could not be done is not a finished rev
   ];
   for (const body of unfinished) assert.equal(reviewerReported(wrap(body), []), false, body);
   for (const body of finished) assert.equal(reviewerReported(wrap(body), []), true, body);
+});
+
+test("a typographic apostrophe or odd spacing cannot hide that the review did not happen", () => {
+  const wrap = body => `<findings><no-issues>${body}</no-issues></findings>`;
+  const unfinished = [
+    "I couldn’t inspect the repository because file reads failed.",
+    "I couldn‘t read the diff.",
+    "I canʼt access the files.",
+    "I wasn′t able to review the changes.",
+    "I don＇t have access to the repository.",
+    "I could\nnot\tinspect the code.",
+  ];
+  for (const body of unfinished) assert.equal(reviewerReported(wrap(body), []), false, body);
+  assert.equal(reviewerReported("I couldn’t open the tool.\n<findings><no-issues/></findings>", []), false);
+  assert.equal(reviewerReported(wrap("I couldn’t find any problem."), []), true);
+});
+
+test("a tilde-fenced or blockquoted report example is not a finished review", () => {
+  const table = [
+    ["Expected response format:\n~~~xml\n<findings><no-issues/></findings>\n~~~\nI could not proceed.", false],
+    ["Example:\n~~~xml\n<findings><no-issues/></findings>\n~~~", false],
+    ["Expected response format:\n> <findings><no-issues/></findings>", false],
+    ["Expected response format:\n> <findings>\n> <no-issues>LGTM</no-issues>\n> </findings>", false],
+    ["~~~xml\n<findings><no-issues>LGTM</no-issues></findings>\n~~~", true],
+    ["Example:\n> quoted\n\n<findings><no-issues>LGTM</no-issues></findings>", true],
+  ];
+  for (const [text, parsed] of table) assert.equal(reviewerReported(text, parseFindings(text)), parsed, text);
 });

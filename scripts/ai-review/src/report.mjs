@@ -21,6 +21,10 @@ const REVIEW_INABILITY_RE = new RegExp([
   String.raw`\bno access\b|\b(?:do|does|did) ?n[o']t have access\b|\b(?:don't|doesn't|didn't) have access\b|\bwithout access\b`,
   String.raw`\btools? (?:call )?(?:failed|errored|was unavailable|is unavailable)\b`,
 ].join("|"), "i");
+// Typographic apostrophes and broken spacing would otherwise slip a contraction past the inability patterns.
+const APOSTROPHE_RE = /[\u2018\u2019\u02BC\u2032\uFF07]/g;
+const FENCE_RE = /(```|~~~)[\s\S]*?(?:\1|$)/g;
+const BLOCKQUOTE_LINE_RE = /^[ \t]*>.*$/gm;
 const SEVERITY_GLYPH = { p0: "🔴", p1: "🟠", p2: "🟡", p3: "🔵" };
 const SEVERITY_SECTION = {
   p0: "#### 🔴 P0 · Blockers",
@@ -39,6 +43,10 @@ const CATEGORY_GLYPH = {
   frontend: "🎨", ui: "🎨",
   qa: "🧪", test: "🧪",
 };
+
+function plainProse(text) {
+  return text.replace(APOSTROPHE_RE, "'").replace(/\s+/g, " ");
+}
 
 function failureReason(result) {
   if (result.timedOut || /timed out|TimeoutError/i.test(result.error || "")) return "timed out";
@@ -95,22 +103,23 @@ function outputCutOff(text) {
 
 // A fence holding nothing but the report is a formatting habit; anything else around the fence makes it a quoted example.
 function unwrapWholeFence(text) {
-  const m = text.match(/^\s*```[\w-]*[ \t]*\n([\s\S]*?)\n?[ \t]*```\s*$/);
-  return m && !m[1].includes("```") ? m[1] : text;
+  const m = text.match(/^\s*(```|~~~)[\w-]*[ \t]*\n([\s\S]*?)\n?[ \t]*\1\s*$/);
+  return m && !m[2].includes(m[1]) ? m[2] : text;
 }
 
 function quotesReportInFence(text) {
-  return [...text.matchAll(/```[\s\S]*?(?:```|$)/g)].some(([fence]) => /<\/?findings\b|<no-issues\b|<finding\b/.test(fence));
+  return [...text.matchAll(FENCE_RE)].some(([fence]) => /<\/?findings\b|<no-issues\b|<finding\b/.test(fence));
 }
 
 // Neither a renderer nor a reader sees a report inside code or a comment, so it cannot be the answer.
 function withoutQuotedText(text) {
-  return text.replace(/```[\s\S]*?(?:```|$)/g, "").replace(/(`+)[\s\S]*?\1|`/g, "");
+  return text.replace(FENCE_RE, "").replace(/(`+)[\s\S]*?\1|`/g, "");
 }
 
 // Finding blocks become placeholders first, so code a finding quotes cannot hide its closing tag.
 function hasReport(outside, findingCount) {
-  return [...withoutQuotedText(outside).matchAll(/<findings(?:\s[^<>]*)?>([\s\S]*?)<\/findings>/g)]
+  // A blockquoted report is a quoted example; its prose still counts toward the inability checks.
+  return [...withoutQuotedText(outside).replace(BLOCKQUOTE_LINE_RE, "").matchAll(/<findings(?:\s[^<>]*)?>([\s\S]*?)<\/findings>/g)]
     .some(([, body]) => (findingCount > 0 ? body.includes(FINDING_PLACEHOLDER) : NO_ISSUES_RE.test(body)));
 }
 
@@ -121,8 +130,8 @@ export function reviewerReported(text, findings) {
   const outside = output.replace(FINDING_BLOCK_RE, FINDING_PLACEHOLDER);
   if (quotesReportInFence(outside)) return false;
   const prose = withoutQuotedText(outside);
-  if (INABILITY_RE.test(prose.replace(new RegExp(NO_ISSUES_RE.source, "g"), ""))) return false;
-  if ([...prose.matchAll(new RegExp(NO_ISSUES_RE.source, "g"))].some(([block]) => REVIEW_INABILITY_RE.test(block))) return false;
+  if (INABILITY_RE.test(plainProse(prose.replace(new RegExp(NO_ISSUES_RE.source, "g"), "")))) return false;
+  if ([...prose.matchAll(new RegExp(NO_ISSUES_RE.source, "g"))].some(([block]) => REVIEW_INABILITY_RE.test(plainProse(block)))) return false;
   return hasReport(outside, findings.length);
 }
 

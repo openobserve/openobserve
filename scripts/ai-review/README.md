@@ -99,7 +99,8 @@ output is stripped. It is advisory evidence, not a guarantee: reviewers sample t
 
 Production means `src/`, `web/src/` and the enterprise `o2_*/src/` trees, outside test paths. Tests
 mean `tests/`, `test/`, `__tests__/`, `*.spec.*`, `*.test.*`, and Rust files that add `#[test]`,
-`#[tokio::test]` or `#[cfg(test)]`. A paired review counts both repos. When a cap is set and a push
+`#[tokio::test]` or `#[cfg(test)]`. Both are read from the unfiltered diff, so a production file
+the noise filter hides from reviewers still counts. A paired review counts both repos. When a cap is set and a push
 is skipped at it, the line turns to 🔴 Low and names the unreviewed commit, until a full review
 replaces it.
 While a run reviews a new commit, the line reads `**Merge confidence: 🟡 Reviewing**` and names that
@@ -123,7 +124,8 @@ All of these are required:
    commands". `shadow` records that reason too, plus `eligible_ignoring_config`, so the data stays
    useful while the workflow sets `ci-full`.
 2. The raw diff has at most 100 changed lines and 5 files, with no binary file, mode change, symlink,
-   submodule or file path that cannot be read. The diff is rebuilt locally from `MERGE_BASE_SHA` and
+   submodule, file path that cannot be read, or rename/copy whose header shows no file mode (an
+   unchanged rename does not say whether it moved a symlink or submodule). The diff is rebuilt locally from `MERGE_BASE_SHA` and
    `HEAD_SHA` in `./pr` before any reviewer starts, and the reviewers and every size condition use
    that pinned diff. If it cannot be built the review carries on with the API diff and the run is
    ineligible.
@@ -265,7 +267,8 @@ in o2-enterprise:
   not review. If that PR is out of draft and labelled `ready-for-ci`, it dispatches the
   o2-enterprise review; otherwise it waits for that PR to become ready, so a draft ENT PR never
   gets a paid run through its OSS twin. Either way it replaces this PR's review comment with a
-  pointer (`post-paired-pointer.sh`). This uses a reviewer-app token scoped to o2-enterprise
+  pointer (`post-paired-pointer.sh`, which replaces the same comment the runner would: the reviewer
+  app's newest comment carrying any review marker). This uses a reviewer-app token scoped to o2-enterprise
   (Pull requests read, Actions write); if it cannot be minted or the lookup fails, the OSS review
   runs as usual unless the reviewer app's newest review comment on the PR is its pointer (a pointer posted under the shared `github-actions[bot]` identity never counts). If the dispatch fails, the OSS review runs. To force an OSS review anyway, dispatch this workflow with `ignore_paired`.
 - **ENT side.** The o2-enterprise workflow checks out this engine pinned by commit SHA, finds the
