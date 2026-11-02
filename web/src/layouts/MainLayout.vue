@@ -160,8 +160,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               isDark ? 'border-border-default' : 'border-transparent',
             ]"
           >
-            <!-- Outside the lock boundary, so its own actions stay live. -->
-            <FeatureLockBanner v-if="isLoading" class="shrink-0" :feature="lockedFeature" />
             <div
               v-if="isLoading && fullConfigSettled"
               :key="store.state.selectedOrganization?.identifier"
@@ -340,7 +338,6 @@ import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import useStreams from "@/composables/useStreams";
 import { userDataStreams } from "@/utils/internalStreams";
 import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
-import FeatureLockBanner from "@/components/common/FeatureLockBanner.vue";
 import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";
 import { clearLicenseDenials } from "@/composables/useLicenseDenials";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
@@ -403,7 +400,6 @@ export default defineComponent({
     OSkeleton,
     FirstDataNotice,
     EditorDraftSignOutDialog,
-    FeatureLockBanner,
     FeatureLockBoundary,
     DashboardSaveConflictDialog: defineAsyncComponent(
       () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),

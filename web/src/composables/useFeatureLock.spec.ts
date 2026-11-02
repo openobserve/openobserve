@@ -30,10 +30,9 @@ import {
 } from "./useFeatureLock";
 import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
-import FeatureLockBanner from "@/components/common/FeatureLockBanner.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import { toast, toastRecords, dismissAll } from "@/lib/feedback/Toast/useToast";
-import { addLicenseDeniedError, useLicenseDenials } from "@/composables/useLicenseDenials";
+import { addLicenseDeniedError, clearLicenseDenials } from "@/composables/useLicenseDenials";
 
 let wrapper: VueWrapper | undefined;
 
@@ -61,7 +60,7 @@ afterEach(() => {
   wrapper?.unmount();
   wrapper = undefined;
   dismissAll();
-  useLicenseDenials().dismiss();
+  clearLicenseDenials();
 });
 
 describe("useFeatureLock", () => {
@@ -96,17 +95,21 @@ describe("useFeatureLock", () => {
     expect(isPageLocked()).toBe(false);
   });
 
-  it("ignores every denial while the page is locked, and records them once it is free", () => {
+  it("ignores every denial while the page is locked, and warns once it is free", () => {
     const feature = ref<string | null>("workflows");
     mountWithLock(feature);
     addLicenseDeniedError(["workflows"]);
     addLicenseDeniedError(["alerts"]);
     addLicenseDeniedError([]);
-    expect(useLicenseDenials().features.value).toBeNull();
+    expect(toastRecords).toHaveLength(0);
 
     feature.value = null;
     addLicenseDeniedError(["workflows"]);
-    expect(useLicenseDenials().features.value).toEqual(["workflows"]);
+    expect(toastRecords.map((r) => r.variant)).toEqual(["warning"]);
+
+    // One notice per distinct feature set per page.
+    addLicenseDeniedError(["workflows"]);
+    expect(toastRecords).toHaveLength(1);
   });
 
   it("drops error toasts just after a denial, then only those repeating its message", () => {
@@ -133,97 +136,6 @@ describe("useFeatureLock", () => {
     mountWithLock(ref("workflows"));
     toast({ variant: "error", message: "A new version is available, refresh" as never });
     expect(toastRecords.map((r) => r.message)).toEqual(["A new version is available, refresh"]);
-  });
-});
-
-describe("FeatureLockBanner", () => {
-  const mountBanner = async (withLicensePage: boolean, feature: string | null = "workflows") => {
-    const router = createRouter({
-      history: createMemoryHistory(),
-      routes: [
-        { path: "/", component: { template: "<div />" } },
-        ...(withLicensePage
-          ? [{ path: "/license", name: "license", component: { template: "<div />" } }]
-          : []),
-      ],
-    });
-    await router.push("/");
-    const store = createStore({
-      state: () => ({
-        selectedOrganization: { identifier: "acme" },
-        zoConfig: { feature_names: { workflows: "Workflows", ai_assistant: "AI Assistant" } },
-      }),
-    });
-    wrapper = mount(FeatureLockBanner, {
-      props: { feature },
-      global: { plugins: [i18n, router, store] },
-    });
-    return router;
-  };
-
-  it("names the missing feature by its display name, not its key", async () => {
-    await mountBanner(true);
-    expect(wrapper!.text()).toContain("This feature is locked. It needs the Workflows feature");
-    expect(wrapper!.get('[data-test="feature-lock-banner-feature"]').element.tagName).toBe(
-      "STRONG",
-    );
-    wrapper!.unmount();
-    await mountBanner(true, "ai_assistant");
-    expect(wrapper!.get('[data-test="feature-lock-banner-feature"]').text()).toBe("AI Assistant");
-  });
-
-  it("says a generic sentence for a key with no display name, naming nothing", async () => {
-    await mountBanner(true, "some_new_feature");
-    expect(wrapper!.get('[data-test="feature-lock-banner-generic"]').text()).toBe(
-      "This page needs a feature that is not in your license.",
-    );
-    expect(wrapper!.find('[data-test="feature-lock-banner-feature"]').exists()).toBe(false);
-    expect(wrapper!.text()).not.toContain("This feature feature");
-  });
-
-  it("offers only Contact sales, even where a license page exists", async () => {
-    await mountBanner(true);
-    expect(wrapper!.find('[data-test="feature-lock-banner-view-license"]').exists()).toBe(false);
-    const open = vi.spyOn(window, "open").mockImplementation(() => null);
-    await wrapper!.get('[data-test="feature-lock-banner-contact-sales"]').trigger("click");
-    expect(open).toHaveBeenCalledWith(expect.any(String), "_blank", "noopener");
-    open.mockRestore();
-  });
-
-  it("renders nothing with no page lock and no denial", async () => {
-    await mountBanner(true, null);
-    expect(wrapper!.find('[data-test="feature-lock-banner"]').exists()).toBe(false);
-  });
-
-  it("names on-the-fly denials by display name, dismissibly, when no page is locked", async () => {
-    await mountBanner(true, null);
-    addLicenseDeniedError(["ai_assistant", "new_key"]);
-    await nextTick();
-    expect(wrapper!.get('[data-test="feature-lock-banner-denied"]').text()).toBe(
-      "Your license does not include: AI Assistant, new_key. Ask your administrator to update the license.",
-    );
-    expect(wrapper!.find('[data-test="feature-lock-banner-contact-sales"]').exists()).toBe(true);
-    await wrapper!.get('[data-test="feature-lock-banner-dismiss"]').trigger("click");
-    expect(useLicenseDenials().features.value).toBeNull();
-    expect(wrapper!.find('[data-test="feature-lock-banner"]').exists()).toBe(false);
-  });
-
-  it("says a generic sentence for a denial that named no feature", async () => {
-    await mountBanner(true, null);
-    addLicenseDeniedError([]);
-    await nextTick();
-    expect(wrapper!.get('[data-test="feature-lock-banner-denied"]').text()).toBe(
-      "Your license does not include this feature. Ask your administrator to update the license.",
-    );
-  });
-
-  it("shows only the page sentence on a locked page, undismissable, whatever was denied", async () => {
-    await mountBanner(true);
-    addLicenseDeniedError(["workflows", "ai_assistant"]);
-    await nextTick();
-    expect(wrapper!.get('[data-test="feature-lock-banner-feature"]').text()).toBe("Workflows");
-    expect(wrapper!.find('[data-test="feature-lock-banner-denied"]').exists()).toBe(false);
-    expect(wrapper!.find('[data-test="feature-lock-banner-dismiss"]').exists()).toBe(false);
   });
 });
 

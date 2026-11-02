@@ -127,7 +127,7 @@ function capitalizeFirst(str: I18nText): I18nText {
 
 function toast(options: ToastOptions): DismissFn {
   const variant: ToastVariant = options.variant ?? "default";
-  // The license top bar already names the features a refused request needed.
+  // The license warning toast already names the features a refused request needed.
   if (variant === "error" && isLicenseDenialToast(options.message)) return () => {};
   const position: ToastPosition = options.position ?? defaultPositions[variant];
   const timeout = options.timeout !== undefined ? options.timeout : defaultTimeouts[variant];

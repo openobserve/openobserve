@@ -15,19 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout :title="label" :icon="meta?.icon ?? 'lock'" data-test="feature-locked-page">
-    <LicenseDeniedState :features="[key]">
-      <template #actions>
-        <OButton
-          variant="primary"
-          data-test="feature-locked-contact-sales"
-          @click="openContactSales"
-        >
-          {{ t("featureLock.contactSales") }}
-        </OButton>
-      </template>
-    </LicenseDeniedState>
-  </OPageLayout>
+  <FeatureLockExempt class="h-full">
+    <OPageLayout :title="label" :icon="meta?.icon ?? 'lock'" data-test="feature-locked-page">
+      <LicenseDeniedState :features="[key]" />
+    </OPageLayout>
+  </FeatureLockExempt>
 </template>
 
 <script setup lang="ts">
@@ -35,14 +27,13 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
-import { useFeatureLockActions, useFeatureNames } from "@/composables/useFeatureLock";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
+import { useFeatureNames } from "@/composables/useFeatureLock";
 import { LOCKED_FEATURES } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 const route = useRoute();
-const { openContactSales } = useFeatureLockActions();
 const { featureName } = useFeatureNames();
 
 const key = computed(() => String(route.params.feature ?? ""));

@@ -13,31 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { readonly, ref } from "vue";
+import store from "@/stores";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { gt, raw } from "@/types/i18n";
 import { isPageLocked } from "@/composables/useFeatureLock";
 
-// null while there is nothing to show; [] is a denial that named no feature.
-const licenseDenials = ref<string[] | null>(null);
+// One notice per denied feature set until the page changes, so a page firing many requests does not stack toasts.
+const shown = new Set<string>();
 let pageChangedAt = 0;
 
-/** Record a license denial (403 + 40001) for the layout's top bar, kept apart from the RBAC access notice. */
+/** Tell the user a request was refused by the license (403 + 40001) on a page the license leaves open. */
 export function addLicenseDeniedError(features: string[], requestStartedAt = Date.now()): void {
-  // A locked page disables every action, so its denials only come from its own background loads.
+  // A locked page shows its own message in place of the page, so only the background loads of other pages land here.
   if (requestStartedAt < pageChangedAt || isPageLocked()) return;
-  licenseDenials.value = [...new Set([...(licenseDenials.value ?? []), ...features])];
+  const key = [...features].sort().join(",");
+  if (shown.has(key)) return;
+  shown.add(key);
+  const names = features.map((k) => store.state.zoConfig?.feature_names?.[k] ?? k).join(", ");
+  toast({
+    variant: "warning",
+    title: gt("featureLock.toastTitle"),
+    message: features.length
+      ? gt("featureLock.toastMessage", { features: raw(names) })
+      : gt("featureLock.toastMessageGeneric"),
+  });
 }
 
-export function useLicenseDenials() {
-  return {
-    features: readonly(licenseDenials),
-    dismiss: () => {
-      licenseDenials.value = null;
-    },
-  };
-}
-
-/** Clears the top bar's license denials on navigation and ignores those of requests the old page started. */
+/** Forget the notices already shown and ignore those of requests the previous page started. */
 export function clearLicenseDenials(): void {
   pageChangedAt = Date.now();
-  licenseDenials.value = null;
+  shown.clear();
 }

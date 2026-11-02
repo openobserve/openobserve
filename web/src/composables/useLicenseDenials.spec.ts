@@ -13,37 +13,56 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { addLicenseDeniedError, clearLicenseDenials, useLicenseDenials } from "./useLicenseDenials";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { addLicenseDeniedError, clearLicenseDenials } from "./useLicenseDenials";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { isPageLocked } from "@/composables/useFeatureLock";
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+vi.mock("@/composables/useFeatureLock", () => ({ isPageLocked: vi.fn(() => false) }));
 
 describe("license denials", () => {
-  afterEach(() => useLicenseDenials().dismiss());
-
-  it("collects distinct features until dismissed", () => {
-    const { features, dismiss } = useLicenseDenials();
-    expect(features.value).toBeNull();
-
-    addLicenseDeniedError(["dashboards"]);
-    addLicenseDeniedError(["functions", "dashboards"]);
-    expect(features.value).toEqual(["dashboards", "functions"]);
-
-    dismiss();
-    expect(features.value).toBeNull();
-
-    addLicenseDeniedError([]);
-    expect(features.value).toEqual([]);
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.mocked(isPageLocked).mockReturnValue(false);
+  });
+  afterEach(() => {
+    // Clear on the fake clock so pageChangedAt does not jump to real time.
+    clearLicenseDenials();
+    vi.useRealTimers();
+    vi.mocked(toast).mockClear();
   });
 
-  it("forgets them on navigation and ignores requests the old page started", () => {
-    vi.useFakeTimers();
+  it("warns once per feature set, regardless of order, and again for a different set", () => {
+    addLicenseDeniedError(["dashboards", "functions"]);
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls[0][0]).toMatchObject({ variant: "warning" });
+
+    addLicenseDeniedError(["functions", "dashboards"]);
+    expect(toast).toHaveBeenCalledTimes(1);
+
+    addLicenseDeniedError(["dashboards"]);
+    expect(toast).toHaveBeenCalledTimes(2);
+  });
+
+  it("warns for an empty feature set too", () => {
+    addLicenseDeniedError([]);
+    expect(toast).toHaveBeenCalledTimes(1);
+  });
+
+  it("warns again after navigation and ignores requests the old page started", () => {
     addLicenseDeniedError(["workflows"]);
-    expect(useLicenseDenials().features.value).toEqual(["workflows"]);
+    vi.setSystemTime(Date.now() + 1);
     clearLicenseDenials();
-    expect(useLicenseDenials().features.value).toBeNull();
     addLicenseDeniedError(["oncall"], Date.now() - 1);
-    expect(useLicenseDenials().features.value).toBeNull();
-    addLicenseDeniedError(["oncall"]);
-    expect(useLicenseDenials().features.value).toEqual(["oncall"]);
-    vi.useRealTimers();
+    expect(toast).toHaveBeenCalledTimes(1);
+    addLicenseDeniedError(["workflows"]);
+    expect(toast).toHaveBeenCalledTimes(2);
+  });
+
+  it("stays silent on a locked page", () => {
+    vi.mocked(isPageLocked).mockReturnValue(true);
+    addLicenseDeniedError(["workflows"]);
+    expect(toast).not.toHaveBeenCalled();
   });
 });

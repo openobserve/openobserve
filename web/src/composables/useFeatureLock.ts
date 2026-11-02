@@ -26,7 +26,6 @@ import {
   type Ref,
 } from "vue";
 import { useStore } from "vuex";
-import { siteURL } from "@/constants/config";
 import { featureState } from "@/utils/featureGate";
 import type { I18nText } from "@/types/i18n";
 
@@ -91,14 +90,6 @@ export const markLicenseDenial = (error: unknown): void => {
 export const isLicenseDenialToast = (message: unknown): boolean =>
   Date.now() - lastDenialAt < DENIAL_TOAST_WINDOW_MS ||
   (typeof message === "string" && licenseDenialMessages.has(message));
-
-/** The upsell actions shared by the locked page and the locked-page banner. */
-export const useFeatureLockActions = () => {
-  const openContactSales = () => {
-    window.open(siteURL.contactSales, "_blank", "noopener");
-  };
-  return { openContactSales };
-};
 
 /** Display names from the build's feature definition (`feature_names` in the org config). */
 export const useFeatureNames = () => {
