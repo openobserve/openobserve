@@ -27,7 +27,9 @@ use infra::errors::Error;
 use proto::cluster_rpc;
 
 use crate::{
-    cache::cacher::get_ts_col_order_by, partition::aggregate::is_streaming_aggregate, sql::Sql,
+    cache::{cacher::get_ts_col_order_by, result_utils::is_ts_order_field},
+    partition::aggregate::is_streaming_aggregate,
+    sql::Sql,
 };
 
 /// SQL-derived context for a search partition request.
@@ -79,7 +81,11 @@ impl PartitionSqlContext {
             .order_by
             .first()
             .map(|(field, order_by)| {
-                if field == &ts_column.clone().unwrap_or_default() && order_by == &OrderBy::Asc {
+                if ts_column
+                    .as_deref()
+                    .is_some_and(|ts| is_ts_order_field(field, ts, &sql.aliases))
+                    && order_by == &OrderBy::Asc
+                {
                     OrderBy::Asc
                 } else {
                     OrderBy::Desc

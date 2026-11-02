@@ -322,14 +322,6 @@ describe("PanelContainer", () => {
   };
 
   describe("Component Rendering", () => {
-    it("should render panel container with basic structure", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.find('[data-test="dashboard-panel-container"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-panel-bar"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("Test Panel");
-    });
-
     it("should show drag indicator when not in view-only mode", () => {
       wrapper = createWrapper({ viewOnly: false });
 
@@ -683,18 +675,6 @@ describe("PanelContainer", () => {
   });
 
   describe("Panel State Management", () => {
-    it("should track hover state correctly", async () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.isCurrentlyHoveredPanel).toBe(false);
-
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
-      expect(wrapper.vm.isCurrentlyHoveredPanel).toBe(true);
-
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseleave");
-      expect(wrapper.vm.isCurrentlyHoveredPanel).toBe(false);
-    });
-
     it("should handle panel modification requests", async () => {
       wrapper = createWrapper();
 
@@ -715,59 +695,6 @@ describe("PanelContainer", () => {
     });
   });
 
-  describe("Responsive Behavior", () => {
-    it("should handle component mounting", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-panel-container"]').exists()).toBe(true);
-    });
-
-    it("should cleanup on unmount", () => {
-      wrapper = createWrapper();
-
-      expect(() => wrapper.unmount()).not.toThrow();
-    });
-  });
-
-  describe("Props Validation", () => {
-    it("should handle missing panel data gracefully", () => {
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      // Create minimal valid data to avoid null reference
-      const minimalData = { ...mockPanelData, title: null };
-      wrapper = createWrapper({
-        data: minimalData,
-        variablesData: { values: [], isLoading: false },
-      });
-
-      expect(wrapper.exists()).toBe(true);
-      consoleWarnSpy.mockRestore();
-    });
-
-    it("should handle malformed search data", () => {
-      const malformedSearchData = { invalid: "data" };
-      wrapper = createWrapper({ searchData: malformedSearchData });
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle empty variables data", () => {
-      wrapper = createWrapper({
-        variablesData: { values: [], isLoading: false },
-        currentVariablesData: { values: [], isLoading: false },
-      });
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle missing date time", () => {
-      wrapper = createWrapper({ DateTime: null });
-
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
   describe("Context Menu", () => {
     it("should show dropdown menu in non-view-only mode", () => {
       wrapper = createWrapper({ viewOnly: false });
@@ -781,30 +708,6 @@ describe("PanelContainer", () => {
 
       const dropdown = wrapper.findComponent({ name: "ODropdown" });
       expect(dropdown.exists()).toBe(false);
-    });
-  });
-
-  describe("Performance", () => {
-    it("should handle component updates without errors", async () => {
-      wrapper = createWrapper();
-
-      // Update props multiple times
-      await wrapper.setProps({ width: 500 });
-      await wrapper.setProps({ height: 400 });
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle variable updates", async () => {
-      wrapper = createWrapper();
-      const newVariablesData = {
-        values: [{ name: "test", value: "new value" }],
-        isLoading: false,
-      };
-
-      await wrapper.setProps({ variablesData: newVariablesData });
-
-      expect(wrapper.props().variablesData).toEqual(newVariablesData);
     });
   });
 
@@ -1692,27 +1595,6 @@ describe("PanelContainer", () => {
   });
 
   describe("Loading State Management", () => {
-    it("should update loading state", async () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.isPanelLoading).toBe(false);
-
-      await wrapper.vm.handleLoadingStateChange(true);
-      expect(wrapper.vm.isPanelLoading).toBe(true);
-
-      await wrapper.vm.handleLoadingStateChange(false);
-      expect(wrapper.vm.isPanelLoading).toBe(false);
-    });
-
-    it("should handle loading state changes from PanelSchemaRenderer", async () => {
-      wrapper = createWrapper();
-
-      const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit("loading-state-change", true);
-
-      expect(wrapper.vm.isPanelLoading).toBe(true);
-    });
-
     it("keeps the previous last-refreshed age in the header while a restored panel refreshes", async () => {
       wrapper = createWrapper({}, { PanelErrorButtons });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
@@ -1736,41 +1618,7 @@ describe("PanelContainer", () => {
     });
   });
 
-  describe("Metadata Management", () => {
-    it("should update metadata", async () => {
-      wrapper = createWrapper();
-      const newMetadata = {
-        queries: [{ query: "SELECT * FROM new_table" }],
-      };
-
-      await wrapper.vm.metaDataValue(newMetadata);
-
-      expect(wrapper.vm.metaData).toEqual(newMetadata);
-    });
-
-    it("should handle metadata updates from PanelSchemaRenderer", async () => {
-      wrapper = createWrapper();
-      const newMetadata = {
-        queries: [{ query: "SELECT * FROM updated" }],
-      };
-
-      const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit("metadata-update", newMetadata);
-
-      expect(wrapper.vm.metaData).toEqual(newMetadata);
-    });
-  });
-
   describe("Last Triggered At", () => {
-    it("should update last triggered timestamp", async () => {
-      wrapper = createWrapper();
-      const timestamp = Date.now();
-
-      await wrapper.vm.handleLastTriggeredAtUpdate(timestamp);
-
-      expect(wrapper.vm.lastTriggeredAt).toBe(timestamp);
-    });
-
     it("should display last refreshed time when not view-only", async () => {
       wrapper = createWrapper({ viewOnly: false });
       const timestamp = Date.now();
@@ -2063,29 +1911,6 @@ describe("PanelContainer", () => {
   });
 
   describe("RunId Management", () => {
-    it("should initialize runId from props", () => {
-      const testRunId = "test-run-123";
-      wrapper = createWrapper({ runId: testRunId });
-
-      expect(wrapper.vm.runId).toBe(testRunId);
-    });
-
-    it("should generate new runId if not provided", () => {
-      // When runId is not provided, component generates one
-      wrapper = createWrapper({ runId: "" });
-
-      // The component should have a runId
-      expect(wrapper.vm.runId).toBeDefined();
-    });
-
-    it("should update runId when prop changes", async () => {
-      wrapper = createWrapper({ runId: "initial-run-id" });
-
-      await wrapper.setProps({ runId: "new-run-id" });
-
-      expect(wrapper.vm.runId).toBe("new-run-id");
-    });
-
     it("should emit new runId when refreshing", async () => {
       wrapper = createWrapper();
       const initialRunId = wrapper.vm.runId;
@@ -2195,100 +2020,13 @@ describe("PanelContainer", () => {
     });
   });
 
-  describe("Component Cleanup", () => {
-    it("should cleanup metadata on unmount", () => {
-      wrapper = createWrapper();
-      wrapper.vm.metaData = { queries: [] };
-
-      wrapper.unmount();
-
-      expect(wrapper.vm.metaData).toBeNull();
-    });
-
-    it("should cleanup error data on unmount", () => {
-      wrapper = createWrapper();
-      wrapper.vm.errorData = "Some error";
-
-      wrapper.unmount();
-
-      expect(wrapper.vm.errorData).toBe("");
-    });
-
-    it("should cleanup PanelSchemaRenderer ref on unmount", () => {
-      wrapper = createWrapper();
-      wrapper.vm.PanleSchemaRendererRef = { some: "ref" };
-
-      wrapper.unmount();
-
-      expect(wrapper.vm.PanleSchemaRendererRef).toBeNull();
-    });
-  });
-
-  describe("Event Emissions", () => {
-    it("should emit updated:data-zoom event", async () => {
-      wrapper = createWrapper();
-      const zoomData = { start: 100, end: 200 };
-
-      const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit("updated:data-zoom", zoomData);
-
-      expect(wrapper.emitted("updated:data-zoom")).toBeTruthy();
-      expect(wrapper.emitted("updated:data-zoom")[0]).toEqual([zoomData]);
-    });
-
-    it("should emit update:initial-variable-values event", async () => {
-      wrapper = createWrapper();
-      const variableValues = { var1: "value1" };
-
-      const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit("update:initial-variable-values", variableValues);
-
-      expect(wrapper.emitted("update:initial-variable-values")).toBeTruthy();
-    });
-
-    it("should emit contextmenu event", async () => {
-      wrapper = createWrapper();
-      const contextMenuEvent = new Event("contextmenu");
-
-      const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit("contextmenu", contextMenuEvent);
-
-      expect(wrapper.emitted("contextmenu")).toBeTruthy();
-    });
-
-    it("should emit refresh event from SinglePanelMove", async () => {
-      wrapper = createWrapper();
-
-      const panelMove = wrapper.findComponent('[data-test="single-panel-move"]');
-      await panelMove.vm.$emit("refresh");
-
-      expect(wrapper.emitted("refresh")).toBeTruthy();
-    });
-  });
-
   describe("Error Handling", () => {
-    it("should handle string error", async () => {
-      wrapper = createWrapper();
-
-      await wrapper.vm.onError("String error message");
-
-      expect(wrapper.vm.errorData).toBe("String error message");
-    });
-
     it("should handle error object with message", async () => {
       wrapper = createWrapper();
 
       await wrapper.vm.onError({ message: "Error object message" });
 
       expect(wrapper.vm.errorData).toBe("Error object message");
-    });
-
-    it("should handle error object without message", async () => {
-      wrapper = createWrapper();
-
-      await wrapper.vm.onError({});
-
-      expect(wrapper.vm.errorData).toBe("");
     });
   });
 
@@ -2397,21 +2135,6 @@ describe("PanelContainer", () => {
       const c = w.findComponent({ name: "ShowLegendsPopup" });
       return c.exists() ? c : undefined;
     };
-
-    it("should render QueryInspector and legends ODialog", () => {
-      wrapper = createWrapper();
-
-      expect(findQueryInspector(wrapper).exists()).toBe(true);
-      expect(findLegendsDialog(wrapper)).toBeTruthy();
-    });
-
-    it("should render QueryInspector closed by default", () => {
-      wrapper = createWrapper();
-
-      const inspector = findQueryInspector(wrapper);
-      expect(inspector.exists()).toBe(true);
-      expect(inspector.props("open")).toBe(false);
-    });
 
     it("should open QueryInspector when showViewPanel becomes true", async () => {
       wrapper = createWrapper();

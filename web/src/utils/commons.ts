@@ -568,6 +568,8 @@ const updatedAtOf = (data: any): number | null =>
 
 // An inherited key such as `constructor` must never resolve to a shared prototype object.
 const ownDashboard = (store: any, dashboardId: any) => {
+  if (dashboardId === "__proto__" || dashboardId === "constructor" || dashboardId === "prototype")
+    return undefined;
   const all = store.state.organizationData.allDashboardData;
   return Object.prototype.hasOwnProperty.call(all, dashboardId) ? all[dashboardId] : undefined;
 };
@@ -749,7 +751,8 @@ const ensureVariablesStructure = (dashboard: any): void => {
 
 export const getDashboard = async (store: any, dashboardId: any, folderId: any) => {
   // The id comes from the URL, and a prototype key would hand back Object.prototype to be mutated.
-  if (["__proto__", "constructor", "prototype"].includes(String(dashboardId))) return {};
+  if (dashboardId === "__proto__" || dashboardId === "constructor" || dashboardId === "prototype")
+    return {};
 
   // check if dashboard data is present in store
   let dashboardJson = ownDashboard(store, dashboardId);
