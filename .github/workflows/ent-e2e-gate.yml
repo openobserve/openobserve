@@ -33,7 +33,7 @@ name: Playwright E2E Crosscheck
 on:
   pull_request:
     types: [synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
-  # Runs when ready-for-ci is added and when the PR is approved; other label changes and pushes run only while approved.
+  # Runs on label changes of a ready-for-ci PR and on approval; pushes run only while approved.
   pull_request_review:
     types: [submitted]
   # A required check must also report on merge-queue commits; the gate already passed on the PR head.
@@ -41,8 +41,8 @@ on:
 
 # PR-scoped: a new push/label supersedes the previous gate attempt for the same PR.
 concurrency:
-  # A non-approval review or an unrelated label may not dispatch, so it must not cancel a running gate.
-  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ ((github.event_name == 'pull_request_review' && github.event.review.state != 'approved') || ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'ready-for-ci' && github.event.label.name != 'skip-ent-e2e')) && format('-{0}', github.run_id) || '' }}
+  # A non-approval review does nothing, so it must not cancel a running gate.
+  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -68,8 +68,8 @@ jobs:
           ACTION: ${{ github.event_name == 'pull_request' && github.event.action || '' }}
           LABEL: ${{ github.event.label.name }}
         run: |
-          # Adding ready-for-ci or marking a labelled PR ready runs the gate once without an approval.
-          if { [ "$ACTION" = "labeled" ] && [ "$LABEL" = "ready-for-ci" ]; } || [ "$ACTION" = "ready_for_review" ]; then
+          # Any label change cancels the running gate, so it must start a replacement; without approval only label events and ready_for_review do.
+          if [ "$ACTION" = "labeled" ] || [ "$ACTION" = "unlabeled" ] || [ "$ACTION" = "ready_for_review" ]; then
             echo "Triggered by $ACTION; approval not required."
             echo "dispatch=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -330,7 +330,13 @@ jobs:
           # The engine's baseline step builds the same ENT ref against OSS main after a failed build.
           BASELINE_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="build_binary")|.steps[]|select(.name|startswith("Baseline"))|.conclusion' 2>/dev/null || echo "")
 
-          if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_LOST" != "0" ]; then
+          rm -rf /tmp/fs; SPEC_LIST=""
+          if [ "$TEST_CONCL" = "failure" ] && gh run download "$RUN_ID" --repo "$REPO" -n failed-specs -D /tmp/fs >/dev/null 2>&1 && [ -f /tmp/fs/failed-specs.txt ]; then
+            SPEC_LIST=$(sed '/^[[:space:]]*$/d; s/^/- `/; s/$/`/' /tmp/fs/failed-specs.txt)
+          fi
+
+          # Spec failures from other shards outrank a lost runner, so they are reported first.
+          if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_LOST" != "0" ] && [ -z "$SPEC_LIST" ]; then
           sticky "### ⚠️ Playwright E2E Crosscheck — runner lost, re-run needed
 
           $MARKER
@@ -338,10 +344,6 @@ jobs:
 
           $SISTER_NOTE · [ENT run]($RUN_URL)"
           elif [ "$TEST_CONCL" = "failure" ]; then
-            rm -rf /tmp/fs; SPEC_LIST=""
-            if gh run download "$RUN_ID" --repo "$REPO" -n failed-specs -D /tmp/fs >/dev/null 2>&1 && [ -f /tmp/fs/failed-specs.txt ]; then
-              SPEC_LIST=$(sed '/^[[:space:]]*$/d; s/^/- `/; s/$/`/' /tmp/fs/failed-specs.txt)
-            fi
             [ -n "$SPEC_LIST" ] || SPEC_LIST="_(couldn't read the failed-spec list — open the run for details)_"
           sticky "### 🚫 Playwright E2E Crosscheck — Needs Review
 
