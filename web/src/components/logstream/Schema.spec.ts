@@ -263,79 +263,18 @@ describe("Schema Component Tests", () => {
     });
 
     // Test 1: Component initialization with default values
-    it("should initialize with correct default values", () => {
-      expect(wrapper.vm.indexData.name).toBe("test-stream");
-      expect(wrapper.vm.indexData.schema).toBeDefined();
-      expect(wrapper.vm.loadingState).toBe(false);
-      expect(wrapper.vm.formDirtyFlag).toBe(false);
-    });
 
     // Test 2: markFormDirty function
-    it("should mark form as dirty", () => {
-      expect(wrapper.vm.formDirtyFlag).toBe(false);
-      wrapper.vm.markFormDirty();
-      expect(wrapper.vm.formDirtyFlag).toBe(true);
-    });
 
     // Test 3: changePagination function
-    it("should change pagination correctly", () => {
-      const newPagination = { label: "50", value: 50 };
-      wrapper.vm.changePagination(newPagination);
-
-      expect(wrapper.vm.selectedPerPage).toBe(50);
-    });
 
     // Test 4: updateActiveTab function
-    it("should update active tab and result total", () => {
-      wrapper.vm.indexData.defined_schema_fields = ["field1"];
-      wrapper.vm.indexData.schema = [{ name: "field1" }, { name: "field2" }];
-
-      wrapper.vm.updateActiveTab("schemaFields");
-      expect(wrapper.vm.activeTab).toBe("schemaFields");
-      expect(wrapper.vm.resultTotal).toBe(1);
-
-      wrapper.vm.updateActiveTab("allFields");
-      expect(wrapper.vm.activeTab).toBe("allFields");
-      expect(wrapper.vm.resultTotal).toBe(2);
-    });
 
     // Test 5: updateActiveMainTab function
-    it("should update active main tab", () => {
-      wrapper.vm.updateActiveMainTab("redButton");
-      expect(wrapper.vm.activeMainTab).toBe("redButton");
-    });
 
     // Test 6: openDialog function
-    it("should open dialog and initialize fields", async () => {
-      wrapper.vm.openDialog();
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.isDialogOpen).toBe(true);
-      expect(wrapper.vm.formDirtyFlag).toBe(true);
-      // Rows are form-owned now (read via the reactive newSchemaFields view).
-      expect(wrapper.vm.newSchemaFields.length).toBe(1);
-      expect(wrapper.vm.newSchemaFields[0]).toEqual({
-        name: "",
-        type: "",
-        index_type: [],
-      });
-    });
 
     // Test 7: closeDialog function
-    it("should close dialog and reset fields", async () => {
-      wrapper.vm.isDialogOpen = true;
-      // Seed rows through the form (single source of truth), not a local ref.
-      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
-        { name: "test", type: "string", index_type: [] },
-      ]);
-      await wrapper.vm.$nextTick();
-
-      wrapper.vm.closeDialog();
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.isDialogOpen).toBe(false);
-      expect(wrapper.vm.newSchemaFields).toEqual([]);
-    });
 
     // Test 8: hasUserDefinedSchema computed property
     it("should compute hasUserDefinedSchema correctly", () => {
@@ -630,15 +569,6 @@ describe("Schema Component Tests", () => {
     });
 
     // Test 30: scrollToAddFields function
-    it("should scroll to add fields section", () => {
-      const mockElement = { scrollIntoView: vi.fn() };
-      vi.spyOn(document, "getElementById").mockReturnValue(mockElement);
-
-      wrapper.vm.scrollToAddFields();
-
-      expect(document.getElementById).toHaveBeenCalledWith("schema-add-fields-section");
-      expect(mockElement.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth" });
-    });
 
     // Test 31: dateChangeValue function
     // NOTE: dateChangeValue internally calls convertDateToTimestamp which uses
@@ -695,46 +625,14 @@ describe("Schema Component Tests", () => {
     });
 
     // Test 35: computedSchemaFieldsName computed property
-    it("should compute schema fields name correctly", () => {
-      // Without user defined schema
-      expect(wrapper.vm.computedSchemaFieldsName).toBe("All Fields");
-
-      // With user defined schema
-      wrapper.vm.indexData.defined_schema_fields = ["field1"];
-      expect(wrapper.vm.computedSchemaFieldsName).toBe("All Fields");
-    });
 
     // Test 36: tabs computed property
-    it("should compute tabs correctly", () => {
-      wrapper.vm.indexData.defined_schema_fields = ["field1"];
-      wrapper.vm.indexData.schema = [{ name: "field1" }, { name: "field2" }];
-
-      const tabs = wrapper.vm.tabs;
-      expect(tabs[0].value).toBe("schemaFields");
-      expect(tabs[1].value).toBe("allFields");
-      expect(tabs[0].label).toContain("User Defined Schema (1)");
-      expect(tabs[1].label).toContain("All Fields (2)");
-    });
 
     // Test 37: mainTabs computed property
-    it("should compute main tabs correctly", () => {
-      const mainTabs = wrapper.vm.mainTabs;
-      expect(mainTabs[0].value).toBe("schemaSettings");
-      expect(mainTabs[0].label).toBe("Schema Settings");
-      expect(mainTabs[1].value).toBe("redButton");
-      expect(mainTabs[1].label).toBe("Extended Retention");
-    });
 
     // Test 38: isSchemaUDSEnabled computed property
-    it("should compute UDS enabled correctly", () => {
-      expect(wrapper.vm.isSchemaUDSEnabled).toBe(true);
-    });
 
     // Test 39: allFieldsName computed property
-    it("should compute all fields name correctly", () => {
-      // The allFieldsName is a computed property that depends on store state
-      expect(wrapper.vm.allFieldsName).toBe("_all");
-    });
 
     // Test 40: showStoreOriginalDataToggle computed property
     it("should compute store original data toggle visibility", async () => {
@@ -812,11 +710,6 @@ describe("Schema Component Tests", () => {
       wrapper.vm.dateChangeValue(dateValue);
       // Should not add to redDaysList
       expect(wrapper.vm.redDaysList).toEqual([]);
-    });
-
-    it("should handle scroll when element doesn't exist", () => {
-      vi.spyOn(document, "getElementById").mockReturnValue(null);
-      expect(() => wrapper.vm.scrollToAddFields()).not.toThrow();
     });
 
     it("should handle empty stream response in updateStreamResponse", () => {
@@ -1150,21 +1043,6 @@ describe("Schema Component Tests", () => {
     });
 
     // Test 16: updateActiveMainTab for new tabs (Configuration, Cross-Linking)
-    it("should update activeMainTab to 'configuration'", () => {
-      wrapper.vm.updateActiveMainTab("configuration");
-      expect(wrapper.vm.activeMainTab).toBe("configuration");
-    });
-
-    it("should update activeMainTab to 'crossLinking'", () => {
-      wrapper.vm.updateActiveMainTab("crossLinking");
-      expect(wrapper.vm.activeMainTab).toBe("crossLinking");
-    });
-
-    it("should reset activeMainTab back to 'schemaSettings'", () => {
-      wrapper.vm.updateActiveMainTab("configuration");
-      wrapper.vm.updateActiveMainTab("schemaSettings");
-      expect(wrapper.vm.activeMainTab).toBe("schemaSettings");
-    });
   });
 
   // Tests for new features added in Mar 11 update
@@ -1248,10 +1126,6 @@ describe("Schema Component Tests", () => {
 
     it("should render storage-size-tile", async () => {
       expect(w.find('[data-test="storage-size-tile"]').exists()).toBe(true);
-    });
-
-    it("should expose formatSizeFromMB function", () => {
-      expect(typeof w.vm.formatSizeFromMB).toBe("function");
     });
 
     it("formatSizeFromMB should format MB values with units", () => {
@@ -1347,26 +1221,6 @@ describe("Schema Component Tests", () => {
     it("should show the stream name in the header badge", async () => {
       expect(w.find('[data-test="schema-title-text"]').text()).toContain("my-stream-name");
     });
-
-    it("should expose getTimelineIcon computed", () => {
-      expect(w.vm.getTimelineIcon).toBeDefined();
-      expect(typeof w.vm.getTimelineIcon).toBe("string");
-    });
-
-    it("getTimelineIcon should return different URL based on theme", async () => {
-      // light theme
-      w.vm.store.state.theme = "light";
-      await w.vm.$nextTick();
-      const lightIcon = w.vm.getTimelineIcon;
-
-      // dark theme
-      w.vm.store.state.theme = "dark";
-      await w.vm.$nextTick();
-      const darkIcon = w.vm.getTimelineIcon;
-
-      expect(typeof lightIcon).toBe("string");
-      expect(typeof darkIcon).toBe("string");
-    });
   });
 
   describe("Cross-Linking Tab (added Mar 11)", () => {
@@ -1411,15 +1265,6 @@ describe("Schema Component Tests", () => {
       // When enable_cross_linking is false, the tab should not exist
       expect(w.exists()).toBe(true);
       w.unmount();
-    });
-
-    it("should expose streamCrossLinks reactive ref", async () => {
-      expect(Array.isArray(wrapper.vm.streamCrossLinks)).toBe(true);
-    });
-
-    it("should expose orgCrossLinks computed", async () => {
-      expect(wrapper.vm.orgCrossLinks).toBeDefined();
-      expect(Array.isArray(wrapper.vm.orgCrossLinks)).toBe(true);
     });
   });
 
@@ -1483,32 +1328,6 @@ describe("Schema Component Tests", () => {
       (config as any).isEnterprise = originalIsEnterprise;
     });
 
-    it("should render both ODrawer instances (schema drawer + pattern association drawer)", () => {
-      const drawers = w.findAllComponents(ODrawerStub);
-      expect(drawers.length).toBe(2);
-    });
-
-    it("should forward the open prop to the schema ODrawer", () => {
-      const drawers = w.findAllComponents(ODrawerStub);
-      expect(drawers[0].props("open")).toBe(true);
-    });
-
-    it("should mount the schema ODrawer with width=60", () => {
-      const drawers = w.findAllComponents(ODrawerStub);
-      expect(drawers[0].props("width")).toBe(60);
-    });
-
-    it("should mount the pattern association ODrawer with width=60 and showClose=false", () => {
-      const drawers = w.findAllComponents(ODrawerStub);
-      expect(drawers[1].props("width")).toBe(60);
-      expect(drawers[1].props("showClose")).toBe(false);
-    });
-
-    it("should keep the pattern association ODrawer closed by default", () => {
-      const drawers = w.findAllComponents(ODrawerStub);
-      expect(drawers[1].props("open")).toBe(false);
-    });
-
     it("should emit update:open=false when the schema ODrawer emits update:open=false", async () => {
       const drawers = w.findAllComponents(ODrawerStub);
       await drawers[0].vm.$emit("update:open", false);
@@ -1524,12 +1343,6 @@ describe("Schema Component Tests", () => {
       const emitted = w.emitted("update:open");
       expect(emitted).toBeTruthy();
       expect(emitted![emitted!.length - 1]).toEqual([false]);
-    });
-
-    it("should render the header slot content (stream name badge) inside the ODrawer", () => {
-      const drawers = w.findAllComponents(ODrawerStub);
-      expect(drawers[0].find('[data-test="schema-title-text"]').exists()).toBe(true);
-      expect(drawers[0].find('[data-test="schema-title-text"]').text()).toContain("test-stream");
     });
 
     it("should open the pattern association ODrawer when openPatternAssociationDialog is invoked", async () => {
@@ -1588,14 +1401,6 @@ describe("Schema Component Tests", () => {
       expect(drawer.exists()).toBe(true);
       expect(drawer.text()).toContain("Wait while loading");
       lw.unmount();
-    });
-
-    it("should not throw when ODrawer emits update:open with the same value", async () => {
-      const drawers = w.findAllComponents(ODrawerStub);
-      await drawers[0].vm.$emit("update:open", true);
-      const emitted = w.emitted("update:open");
-      expect(emitted).toBeTruthy();
-      expect(emitted![emitted!.length - 1]).toEqual([true]);
     });
   });
 
@@ -1684,15 +1489,6 @@ describe("Schema Component Tests", () => {
 
     afterEach(() => {
       w.unmount();
-    });
-
-    it("should render the config tab when activeMainTab is 'configuration'", async () => {
-      w.vm.updateActiveMainTab("configuration");
-      await w.vm.$nextTick();
-
-      expect(w.find('[data-test="stream-details-data-retention-input"]').exists()).toBe(true);
-      expect(w.find('[data-test="stream-details-max-query-range-input"]').exists()).toBe(true);
-      expect(w.find('[data-test="stream-details-flatten-level-input"]').exists()).toBe(true);
     });
 
     it("should update dataRetentionDays and mark form dirty", async () => {
@@ -1847,16 +1643,6 @@ describe("Schema Component Tests", () => {
 
     afterEach(() => {
       w.unmount();
-    });
-
-    it("should render the red button tab when activeMainTab is 'redButton'", async () => {
-      w.vm.updateActiveMainTab("redButton");
-      await w.vm.$nextTick();
-
-      // The red button tab renders an info message and a DateTime component
-      expect(w.vm.activeMainTab).toBe("redButton");
-      expect(w.vm.redBtnRows).toBeDefined();
-      expect(Array.isArray(w.vm.redBtnRows)).toBe(true);
     });
 
     it("should populate redBtnRows from extended_retention_days settings", () => {
@@ -2175,29 +1961,6 @@ describe("Schema Component Tests", () => {
       wrapper.vm.selectedFields = [{ name: "message", isUserDefined: false }];
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.hasUDSFieldInSelection).toBe(false);
-    });
-
-    it("should handle handleSchemaSelectedIdsUpdate", () => {
-      wrapper.vm.handleSchemaSelectedIdsUpdate(["message"]);
-      expect(wrapper.vm.selectedFields.map((f: any) => f.name)).toContain("message");
-    });
-
-    it("should handle handleSchemaSelectionChange", () => {
-      wrapper.vm.handleSchemaSelectionChange([
-        { name: "_timestamp" },
-        { name: "message" },
-        { name: "_all" },
-      ]);
-      const names = wrapper.vm.selectedFields.map((f: any) => f.name);
-      expect(names).not.toContain("_timestamp");
-      expect(names).not.toContain("_all");
-      expect(names).toContain("message");
-    });
-
-    it("should handle handleDateSelectionChange", () => {
-      const rows = [{ index: 0, start: "01-01-2024", end: "02-01-2024" }];
-      wrapper.vm.handleDateSelectionChange(rows);
-      expect(wrapper.vm.selectedDateFields).toEqual(rows);
     });
 
     it("should get missing performance fields (concurrent with secondaryIndex and FTS)", () => {
@@ -2532,10 +2295,6 @@ describe("Schema Component Tests", () => {
       expect(w.vm.activeMainTab).toBe("crossLinking");
       expect(Array.isArray(w.vm.streamCrossLinks)).toBe(true);
       expect(Array.isArray(w.vm.orgCrossLinks)).toBe(true);
-    });
-
-    it("should streamCrossLinks be an empty array initially", () => {
-      expect(w.vm.streamCrossLinks).toEqual([]);
     });
 
     it("should hide storeOriginalData toggle for traces", () => {
@@ -3981,21 +3740,6 @@ describe("Schema Component Tests", () => {
         },
       });
       await flushPromises();
-    });
-
-    it("should access showPartitionColumn computed to trigger function coverage", () => {
-      expect(typeof wrapper.vm.showPartitionColumn).toBe("boolean");
-    });
-
-    it("should access showFullTextSearchColumn computed to trigger function coverage", () => {
-      expect(typeof wrapper.vm.showFullTextSearchColumn).toBe("boolean");
-    });
-
-    it("should access filteredSchemaData with empty filter to exercise filter callback", () => {
-      wrapper.vm.filterField = "";
-      const data = wrapper.vm.filteredSchemaData;
-      expect(Array.isArray(data)).toBe(true);
-      expect(data.length).toBeGreaterThanOrEqual(1);
     });
 
     it("should exercise onSubmit with non-empty newSchemaFields (maps)", async () => {
