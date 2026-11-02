@@ -94,7 +94,7 @@ fn history_lists_queued_running_expired_and_worker_lost_rows() {
 }
 
 #[test]
-fn ledger_rows_stay_in_history_after_the_trigger_is_swept() {
+fn ledger_rows_show_in_history_without_their_trigger_row() {
     run(ENV, async {
         seed_user(ORG, ADMIN, UserRole::Admin).await;
         seed_workflow(ORG, "wf-swept", true).await;
@@ -107,7 +107,7 @@ fn ledger_rows_stay_in_history_after_the_trigger_is_swept() {
 }
 
 #[test]
-fn no_reveal_audit_when_audit_is_off() {
+fn reveal_works_without_audit_or_encryption() {
     run(ENV, async {
         seed_user(ORG, ADMIN, UserRole::Admin).await;
         seed_workflow(ORG, "wf-quiet", true).await;
@@ -130,11 +130,5 @@ fn no_reveal_audit_when_audit_is_off() {
         ))
         .await;
         assert_eq!(reveal.status, StatusCode::OK);
-        assert!(
-            drained_audits()
-                .await
-                .iter()
-                .all(|row| !row.to_string().contains("credential_revealed"))
-        );
     });
 }

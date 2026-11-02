@@ -541,6 +541,7 @@ fn the_test_route_runs_the_hook_shaped_input_with_destinations_suppressed() {
         assert!(body.contains("\"trigger_source\":\"http\""), "{body}");
         assert!(body.contains(created["id"].as_str().unwrap()), "{body}");
         assert!(body.contains("deploy"), "{body}");
+        assert!(body.contains("\"suppressed\":true"), "{body}");
     });
 }
 
