@@ -48,7 +48,7 @@ use crate::{
     request_body(content = inline(UserRoleRequest), description = "UserRoleRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 400, description = "Invalid role name", content_type = "application/json", body = ()),
+        (status = 400, description = "Invalid, standard or already existing role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -69,8 +69,7 @@ pub async fn create_role(
     if role_name.is_empty() || is_standard_role(&role_name) {
         return MetaHttpResponse::bad_request("Custom role name cannot be empty or standard role");
     }
-    // A name that fits the role object can still overflow the `#has` role user, leaving it
-    // unupdatable.
+    // A name the role object accepts can still overflow the `#has` role user.
     if o2_openfga::authorizer::org_scoped_object("role", &org_id, &role_name).is_none()
         || !o2_openfga::authorizer::is_valid_tuple_user(
             &o2_openfga::authorizer::roles::format_role_user(&org_id, &role_name),
@@ -862,8 +861,7 @@ pub async fn create_group(
 
     match o2_openfga::authorizer::groups::create_group(&org_id, &user_grp.name, users).await {
         Ok(_) => MetaHttpResponse::ok("Group created successfully"),
-        // The authorizer's error carries raw OpenFGA text, which stays in the server log.
-        Err(_) => MetaHttpResponse::internal_error("Failed to create group"),
+        Err(e) => failure_response(&e, "Failed to create group"),
     }
 }
 
@@ -958,8 +956,7 @@ pub async fn update_group(
     .await
     {
         Ok(_) => MetaHttpResponse::ok("Group updated successfully"),
-        // The authorizer's error carries raw OpenFGA text, which stays in the server log.
-        Err(_) => MetaHttpResponse::internal_error("Failed to update group"),
+        Err(e) => failure_response(&e, "Failed to update group"),
     }
 }
 
