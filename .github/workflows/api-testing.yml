@@ -73,13 +73,6 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Checkout git repo
         uses: actions/checkout@v5
 
@@ -111,16 +104,17 @@ jobs:
       - name: Package OpenObserve debug binary
         run: |
           strip target/debug/openobserve
-          tar -C target/debug -czf openobserve-api-debug.tar.gz openobserve
+          tar -C target/debug -I 'zstd -T0' -cf openobserve-api-debug.tar.zst openobserve
+          df -h /
 
       - name: Upload OpenObserve debug binary
         uses: actions/upload-artifact@v4
         with:
           name: openobserve-api-debug-${{ github.sha }}
-          path: openobserve-api-debug.tar.gz
+          path: openobserve-api-debug.tar.zst
           if-no-files-found: error
           retention-days: 3
-          # The payload is already gzip-compressed; avoid a second compression pass.
+          # The payload is already zstd-compressed; avoid a second compression pass.
           compression-level: 0
 
   api_integration_tests:
@@ -144,7 +138,7 @@ jobs:
       - name: Extract OpenObserve debug binary
         run: |
           mkdir -p target/debug
-          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          tar -I 'zstd -T0' -xf api-binary-artifact/openobserve-api-debug.tar.zst -C target/debug
           chmod +x target/debug/openobserve
 
       - name: Setup Python
@@ -160,7 +154,8 @@ jobs:
           RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
-          working-directory: "tests/api-testing/"
+          # No trailing slash: setup-rye discards a restored .venv whose recorded path differs from <workspace>/<dir>/.venv.
+          working-directory: "tests/api-testing"
           version: "0.27.0"
 
       - name: Pin cpython
@@ -256,7 +251,7 @@ jobs:
       - name: Extract OpenObserve debug binary
         run: |
           mkdir -p target/debug
-          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          tar -I 'zstd -T0' -xf api-binary-artifact/openobserve-api-debug.tar.zst -C target/debug
           chmod +x target/debug/openobserve
 
       - name: Setup Python
@@ -272,7 +267,8 @@ jobs:
           RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
-          working-directory: "tests/api-testing/"
+          # No trailing slash: setup-rye discards a restored .venv whose recorded path differs from <workspace>/<dir>/.venv.
+          working-directory: "tests/api-testing"
           version: "0.27.0"
 
       - name: Pin cpython
@@ -376,7 +372,7 @@ jobs:
       - name: Extract OpenObserve debug binary
         run: |
           mkdir -p target/debug
-          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          tar -I 'zstd -T0' -xf api-binary-artifact/openobserve-api-debug.tar.zst -C target/debug
           chmod +x target/debug/openobserve
 
       - uses: actions/setup-python@v7
@@ -390,7 +386,8 @@ jobs:
           RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
-          working-directory: "tests/api-testing/"
+          # No trailing slash: setup-rye discards a restored .venv whose recorded path differs from <workspace>/<dir>/.venv.
+          working-directory: "tests/api-testing"
           version: "0.27.0"
 
       - name: Pin cpython
@@ -462,7 +459,7 @@ jobs:
       - name: Extract OpenObserve debug binary
         run: |
           mkdir -p target/debug
-          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          tar -I 'zstd -T0' -xf api-binary-artifact/openobserve-api-debug.tar.zst -C target/debug
           chmod +x target/debug/openobserve
 
       - uses: actions/setup-python@v7
@@ -476,7 +473,8 @@ jobs:
           RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
-          working-directory: "tests/api-testing/"
+          # No trailing slash: setup-rye discards a restored .venv whose recorded path differs from <workspace>/<dir>/.venv.
+          working-directory: "tests/api-testing"
           version: "0.27.0"
 
       - name: Pin cpython
@@ -548,7 +546,7 @@ jobs:
       - name: Extract OpenObserve debug binary
         run: |
           mkdir -p target/debug
-          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          tar -I 'zstd -T0' -xf api-binary-artifact/openobserve-api-debug.tar.zst -C target/debug
           chmod +x target/debug/openobserve
 
       - name: Setup Python
@@ -564,7 +562,8 @@ jobs:
           RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
-          working-directory: "tests/api-testing/"
+          # No trailing slash: setup-rye discards a restored .venv whose recorded path differs from <workspace>/<dir>/.venv.
+          working-directory: "tests/api-testing"
           version: "0.27.0"
 
       - name: Pin cpython
