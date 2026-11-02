@@ -1146,7 +1146,7 @@ const put = (params: QueryParams, key: string, value?: string | number) => {
 };
 
 const dbMonitoringService = {
-  /** FR-1 overview — `db_totals` rows per (system, instance, namespace). */
+  /** FR-1 overview — `db_totals` rows per (system, instance). */
   getDatabases: (orgId: string, options: DatabasesParams = {}) => {
     const params: QueryParams = {};
     put(params, "start_time", options.startTime);

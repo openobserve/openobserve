@@ -594,7 +594,7 @@ const MAX_VISIBLE_SERVICES = 3;
 interface DatabaseRow extends Partial<DbTotalsRow> {
   db_system: string;
   db_instance: string;
-  /** OTable needs a stable identity; the grain is (system, instance, namespace). */
+  /** OTable needs a stable identity; one row per (system, instance); schemas are its children. */
   rowKey: string;
   share: number;
   errorRate: number | null;

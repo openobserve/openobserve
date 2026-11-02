@@ -63,7 +63,7 @@ use super::{models::*, service::*};
 
 /// GET /{org_id}/db_monitoring/databases — FR-1 overview.
 ///
-/// `db_totals` rows grouped per (system, instance, namespace) — exact window
+/// `db_totals` rows grouped per (system, instance) — exact window
 /// totals with true percentiles, never fingerprint-fused — plus the distinct
 /// calling services from `query_stats` rows. Rollup + live tail (D4). With a
 /// `service` filter the totals grain does not exist, so rows aggregate from
@@ -75,7 +75,7 @@ use super::{models::*, service::*};
     tag = "Traces",
     operation_id = "GetDbMonitoringDatabases",
     summary = "Database Monitoring: databases overview",
-    description = "Per-(system, instance, namespace) rollup totals with calling services, merged with a bounded live tail over the un-rolled-up spans.",
+    description = "Per-(system, instance) rollup totals with calling services, merged with a bounded live tail over the un-rolled-up spans.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),

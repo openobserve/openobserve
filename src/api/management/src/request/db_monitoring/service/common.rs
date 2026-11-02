@@ -683,30 +683,47 @@ pub(crate) fn group_query_rows(
 }
 
 /// Group namespace-grain `db_totals` rows (rollup + tail, already
-/// scope-filtered) per `(db_system, db_instance, db_namespace)` — the FR-1
-/// overview rows. Percentiles come from the totals rows themselves (never a
-/// fusion of per-fingerprint approximations), request-weighted across windows.
+/// scope-filtered) per `(db_system, db_instance)` — the FR-1 overview rows.
+/// Percentiles come from the totals rows themselves (never a fusion of
+/// per-fingerprint approximations), request-weighted across windows and
+/// namespaces.
+///
+/// One row per INSTANCE, not per namespace: the page's drill-down already
+/// splits each database into its schemas (and is keyed by instance), so a row
+/// per namespace listed the same database once per schema, every copy
+/// expanding into the same schema list. Namespace-grain rows partition an
+/// instance's traffic, so summing them is exact for the additive metrics.
 pub(crate) fn group_database_rows(rows: &[Value]) -> Vec<Value> {
-    type Key = (String, String, String);
-    let mut groups: BTreeMap<Key, Vec<&Value>> = BTreeMap::new();
-    for row in rows {
+    let namespace_grain = rows
+        .iter()
         // Namespace-grain discriminator: stmt_class is NULL (class-grain
         // totals rows carry stmt_class and NULL namespace, §5.2).
-        if row.get("stmt_class").is_some_and(|v| !v.is_null()) {
-            continue;
-        }
+        .filter(|row| !row.get("stmt_class").is_some_and(|v| !v.is_null()));
+    merge_by_instance(namespace_grain)
+}
+
+/// Fold rows per `(db_system, db_instance)`, stamping the identity back on and
+/// keeping `db_namespace` only when every constituent agrees on it — so a
+/// single-schema database still names its schema, and a multi-schema one
+/// leaves it empty (the scope its hand-off then carries is the whole instance).
+pub(crate) fn merge_by_instance<'a>(rows: impl IntoIterator<Item = &'a Value>) -> Vec<Value> {
+    let mut groups: BTreeMap<(String, String), Vec<&Value>> = BTreeMap::new();
+    for row in rows {
         groups
-            .entry((
-                get_str(row, "db_system"),
-                get_str(row, "db_instance"),
-                get_str(row, "db_namespace"),
-            ))
+            .entry((get_str(row, "db_system"), get_str(row, "db_instance")))
             .or_default()
             .push(row);
     }
     groups
         .into_iter()
-        .map(|((system, instance, namespace), rows)| {
+        .map(|((system, instance), rows)| {
+            let namespaces: BTreeSet<String> =
+                rows.iter().map(|r| get_str(r, "db_namespace")).collect();
+            let namespace = if namespaces.len() == 1 {
+                namespaces.into_iter().next().unwrap_or_default()
+            } else {
+                String::new()
+            };
             let mut merged = merge_rows(rows.iter().copied());
             merged["db_system"] = json!(system);
             merged["db_instance"] = json!(instance);
@@ -717,24 +734,18 @@ pub(crate) fn group_database_rows(rows: &[Value]) -> Vec<Value> {
         .collect()
 }
 
-/// Distinct calling services per `(system, instance, namespace)` from
-/// `query_stats`-shaped rows (rollup + tail rank rows).
-pub(crate) fn calling_services(
-    rows: &[Value],
-) -> HashMap<(String, String, String), BTreeSet<String>> {
-    let mut out: HashMap<(String, String, String), BTreeSet<String>> = HashMap::new();
+/// Distinct calling services per `(system, instance)` from
+/// `query_stats`-shaped rows (rollup + tail rank rows) — the overview's grain.
+pub(crate) fn calling_services(rows: &[Value]) -> HashMap<(String, String), BTreeSet<String>> {
+    let mut out: HashMap<(String, String), BTreeSet<String>> = HashMap::new();
     for row in rows {
         let service = get_str(row, "service_name");
         if service.is_empty() || get_str(row, "fingerprint") == "_other" {
             continue;
         }
-        out.entry((
-            get_str(row, "db_system"),
-            get_str(row, "db_instance"),
-            get_str(row, "db_namespace"),
-        ))
-        .or_default()
-        .insert(service);
+        out.entry((get_str(row, "db_system"), get_str(row, "db_instance")))
+            .or_default()
+            .insert(service);
     }
     out
 }
@@ -3326,6 +3337,38 @@ mod tests {
         assert_eq!(other[0]["trace_stream_name"], "otel_demo");
     }
 
+    // One database per instance: rows for several namespaces of one instance
+    // fold into a single row (the drill-down splits it by schema), instead of
+    // listing the instance once per schema.
+    #[test]
+    fn test_group_database_rows_one_row_per_instance() {
+        let rows = vec![
+            json!({"db_system": "postgresql", "db_instance": "o2dev", "db_namespace": "",
+                   "stmt_class": null, "calls": 10, "errors": 1, "total_time_ns": 100,
+                   "p95_ns": 100}),
+            json!({"db_system": "postgresql", "db_instance": "o2dev", "db_namespace": "o2dev",
+                   "stmt_class": null, "calls": 30, "errors": 0, "total_time_ns": 300,
+                   "p95_ns": 300}),
+            json!({"db_system": "postgresql", "db_instance": "o2dev", "db_namespace": "public",
+                   "stmt_class": null, "calls": 60, "errors": 2, "total_time_ns": 600,
+                   "p95_ns": 400}),
+            json!({"db_system": "redis", "db_instance": "cache", "db_namespace": "0",
+                   "stmt_class": null, "calls": 5, "total_time_ns": 5}),
+        ];
+        let out = group_database_rows(&rows);
+        assert_eq!(out.len(), 2);
+        let pg = out.iter().find(|r| r["db_instance"] == "o2dev").unwrap();
+        assert_eq!(pg["calls"], 100);
+        assert_eq!(pg["errors"], 3);
+        assert_eq!(pg["total_time_ns"], 1000);
+        assert_eq!(pg["p95_ns"], 340);
+        // Several schemas: no single namespace to name.
+        assert_eq!(pg["db_namespace"], "");
+        // One schema: still named.
+        let redis = out.iter().find(|r| r["db_instance"] == "cache").unwrap();
+        assert_eq!(redis["db_namespace"], "0");
+    }
+
     #[test]
     fn test_group_database_rows_keeps_trace_stream_name() {
         let rows = vec![
@@ -3369,7 +3412,7 @@ mod tests {
                    "db_namespace": "ns1", "service_name": "ghost"}),
         ];
         let map = calling_services(&rows);
-        let key = ("pg".to_string(), "db1".to_string(), "ns1".to_string());
+        let key = ("pg".to_string(), "db1".to_string());
         assert_eq!(
             map[&key],
             BTreeSet::from(["cart".to_string(), "checkout".to_string()])

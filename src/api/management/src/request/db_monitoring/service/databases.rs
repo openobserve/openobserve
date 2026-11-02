@@ -191,42 +191,18 @@ async fn read_databases_window(
     let mut hits = if top_n_subset {
         // Service-scoped: totals at this grain do not exist — aggregate the
         // service-filtered top-N constituent rows and say so (§5.2).
-        let mut groups: BTreeMap<(String, String, String), Vec<&Value>> = BTreeMap::new();
-        for row in qs_pool
-            .iter()
-            .filter(|r| get_str(r, "fingerprint") != "_other")
-        {
-            groups
-                .entry((
-                    get_str(row, "db_system"),
-                    get_str(row, "db_instance"),
-                    get_str(row, "db_namespace"),
-                ))
-                .or_default()
-                .push(row);
-        }
-        groups
-            .into_iter()
-            .map(|((system, instance, namespace), rows)| {
-                let mut merged = merge_rows(rows.iter().copied());
-                merged["db_system"] = json!(system);
-                merged["db_instance"] = json!(instance);
-                merged["db_namespace"] = json!(namespace);
-                stamp_trace_streams(&mut merged, rows.iter().copied());
-                merged
-            })
-            .collect()
+        merge_by_instance(
+            qs_pool
+                .iter()
+                .filter(|r| get_str(r, "fingerprint") != "_other"),
+        )
     } else {
         group_database_rows(&totals_pool)
     };
 
     let services = calling_services(&qs_pool);
     for row in &mut hits {
-        let key = (
-            get_str(row, "db_system"),
-            get_str(row, "db_instance"),
-            get_str(row, "db_namespace"),
-        );
+        let key = (get_str(row, "db_system"), get_str(row, "db_instance"));
         row["calling_services"] = json!(services.get(&key).cloned().unwrap_or_default());
     }
     // FR-1: calls-per-second over THIS window (the baseline call passes its own
