@@ -11,6 +11,7 @@ RUN cp protoc/bin/protoc /usr/local/bin/
 RUN cp -r protoc/include/google /usr/local/include/
 
 COPY --from=ent ./ /home/runner/work/o2-enterprise/o2-enterprise/o2-enterprise
+COPY --from=features ./ /home/runner/work/o2-enterprise/o2-enterprise/feature-definitions
 RUN test -n "${CROSS_SYSROOT:?CROSS_SYSROOT must be set by the base image}" && \
     { test -d "${CROSS_SYSROOT%/}/usr/include" || \
     { echo "Missing compiler include directory: ${CROSS_SYSROOT%/}/usr/include" >&2; exit 1; }; } && \
