@@ -137,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="hoverRevealClass"
           v-if="
             props.showLegendsButton &&
+            !isDataView &&
             !PanleSchemaRendererRef?.noData &&
             ![
               'table',
@@ -176,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           :class="hoverRevealClass"
           v-if="
+            !isDataView &&
             !viewOnly &&
             !simplifiedPanelView &&
             [
@@ -210,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <ExemplarToggle
-          v-if="exemplarsEligible && !viewOnly"
+          v-if="exemplarsEligible && !viewOnly && !isDataView"
           :class="exemplarToggleAtRest && !isLayoutEditing ? '' : hoverRevealClass"
           :on="exemplarsOn"
           :loading="PanleSchemaRendererRef?.exemplarsStatus === 'loading'"
@@ -388,6 +390,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </ODropdownItem>
           <ODropdownItem
+            v-if="showDataViewToggle && !isLayoutEditing"
+            data-test="dashboard-panel-data-view-toggle"
+            @select="previewView = isDataView ? 'chart' : 'data'"
+          >
+            <template #icon-left
+              ><OIcon :name="isDataView ? 'show-chart' : 'table-chart'" size="sm"
+            /></template>
+            {{ isDataView ? t("panel.showChart") : t("panel.showRawData") }}
+          </ODropdownItem>
+          <ODropdownItem
             v-if="!simplifiedPanelView && layoutMode !== 'view'"
             data-test="dashboard-edit-layout"
             @select="onPanelModifyClick('EditLayout')"
@@ -547,6 +559,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @series-data-update="onCuratedSeriesData"
         @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
       ></PanelSchemaRenderer>
+      <PanelDataView
+        v-if="showDataOverlay"
+        class="absolute inset-0 z-10"
+        :data="previewRawData"
+        :query-type="props.data.queryType"
+        :loading="isPanelLoading"
+        data-test-prefix="dashboard-panel"
+      />
 
       <!-- Until the first result or error lands, an empty body would read as "No Data" on a TV. -->
       <div
@@ -651,6 +671,8 @@ import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh"
 import { summarizePanelError } from "@/utils/dashboard/kiosk";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
+import PanelDataView from "./addPanel/PanelDataView.vue";
+import { usePanelDataView } from "@/composables/dashboard/usePanelDataView";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
@@ -759,6 +781,7 @@ export default defineComponent({
     OBadge,
     OSkeleton,
     PanelSchemaRenderer,
+    PanelDataView,
     PanelBar,
     QueryInspector,
     ConfirmDialog,
@@ -827,6 +850,17 @@ export default defineComponent({
     );
     // need PanleSchemaRendererRef for table download as a csv
     const PanleSchemaRendererRef: any = ref(null);
+    const {
+      previewView,
+      showDataViewToggle,
+      isDataView,
+      showDataOverlay,
+      rawData: previewRawData,
+    } = usePanelDataView({
+      panelType: () => props.data?.type,
+      renderer: PanleSchemaRendererRef,
+      enabled: () => !props.kiosk && !props.viewOnly && !props.simplifiedPanelView,
+    });
 
     const exemplarsEligible = computed(() => isExemplarEligible(props.data));
     const exemplarKey = computed(() =>
@@ -986,6 +1020,10 @@ export default defineComponent({
     // for full screen button
     const isCurrentlyHoveredPanel: any = ref(false);
     const isLayoutEditing = computed(() => props.layoutMode === "edit");
+    // Layout editing hides the panel bar controls, which would leave the Data view with no way back.
+    watch(isLayoutEditing, (editing) => {
+      if (editing) previewView.value = "chart";
+    });
 
     // Editor actions follow the "Edit panel" menu item; Refresh is a viewer action, so layout edit and viewOnly keep it.
     const canEditFromNotice = computed(
@@ -1512,6 +1550,11 @@ export default defineComponent({
       isCurrentlyHoveredPanel,
       isLayoutEditing,
       hoverRevealClass,
+      previewView,
+      showDataViewToggle,
+      isDataView,
+      showDataOverlay,
+      previewRawData,
       hasNoticeChips,
       showViewPanel,
       dependentAdHocVariable,

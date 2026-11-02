@@ -9399,6 +9399,13 @@
     "rowFields": "Row Fields",
     "valueFields": "Value Fields",
     "noData": "No Data",
+    "previewView": "มุมมองตัวอย่าง",
+    "previewChart": "แผนภูมิ",
+    "previewData": "ข้อมูล",
+    "showRawData": "แสดงข้อมูลดิบ",
+    "showChart": "แสดงแผนภูมิ",
+    "dataViewEmpty": "ไม่มีแถวที่ส่งกลับมา",
+    "dataViewCapped": "แสดง {shown} แถวแรกจากทั้งหมด {total} แถว",
     "logExplorer": {
       "title": "Logs Explorer",
       "openInLogs": "Open in Logs",
