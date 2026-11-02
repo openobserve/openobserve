@@ -228,3 +228,82 @@ describe("AddDestination schema Slack OAuth flow", () => {
     expect(schema.safeParse(values).success).toBe(false);
   });
 });
+
+describe("AddDestination schema Jira", () => {
+  const schema = makeAddDestinationSchema(t, true);
+  const connected = {
+    deployment: "cloud",
+    url: "https://acme.atlassian.net",
+    email: "alerts-bot@example.com",
+    token: "secret-token",
+    projectKey: "OPS",
+    issueTypeId: "10004",
+    connectedAs: "Alerts Bot",
+    createMeta: {
+      projectName: "Operations",
+      issueTypeName: "Bug",
+      hasLabels: true,
+      requiredFields: [],
+    },
+  };
+  const jiraValues = (credentials: Record<string, unknown> = {}) => ({
+    ...addDestinationDefaults(),
+    destination_type: "jira",
+    name: "jira-ops",
+    credentials: { ...connected, ...credentials },
+  });
+  const meta = (overrides: Record<string, unknown> = {}) => ({
+    projectName: "Operations",
+    issueTypeName: "Bug",
+    hasLabels: true,
+    requiredFields: [{ id: "customfield_3", name: "Team", kind: "option" }],
+    ...overrides,
+  });
+  const errorPaths = (values: Record<string, unknown>) => {
+    const result = schema.safeParse(values);
+    return result.success ? [] : result.error.issues.map((issue) => issue.path.join("."));
+  };
+
+  it("accepts a connected destination whose required fields are filled", () => {
+    expect(
+      errorPaths(jiraValues({ createMeta: meta(), fieldValues: { customfield_3: "10101" } })),
+    ).toEqual([]);
+  });
+
+  it("requires the email for Jira Cloud only", () => {
+    expect(errorPaths(jiraValues({ email: "" }))).toEqual(["credentials.email"]);
+    expect(errorPaths(jiraValues({ email: "", deployment: "data_center" }))).toEqual([]);
+  });
+
+  it("requires the token on create", () => {
+    expect(errorPaths(jiraValues({ token: "" }))).toEqual(["credentials.token"]);
+  });
+
+  it("does not require the token on edit until Change", () => {
+    const edit = { token: "", savedDestination: "jira-ops" };
+    expect(errorPaths(jiraValues(edit))).toEqual([]);
+    expect(errorPaths(jiraValues({ ...edit, changing: true }))).toEqual(["credentials.token"]);
+  });
+
+  it("blocks Save until the create screen has loaded", () => {
+    expect(errorPaths(jiraValues({ createMeta: undefined }))).toEqual(["credentials.issueTypeId"]);
+  });
+
+  it("blocks Save on an empty required field, a missing Labels field and an unsupported field", () => {
+    expect(errorPaths(jiraValues({ createMeta: meta(), fieldValues: {} }))).toEqual([
+      "credentials.fieldValues.customfield_3",
+    ]);
+    expect(
+      errorPaths(jiraValues({ createMeta: meta({ hasLabels: false, requiredFields: [] }) })),
+    ).toEqual(["credentials.issueTypeId"]);
+    expect(
+      errorPaths(
+        jiraValues({
+          createMeta: meta({
+            requiredFields: [{ id: "versions", name: "Affects Version", kind: "unsupported" }],
+          }),
+        }),
+      ),
+    ).toEqual(["credentials.issueTypeId"]);
+  });
+});

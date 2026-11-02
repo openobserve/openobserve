@@ -28,6 +28,11 @@ import { z } from "zod";
 import { isValidResourceName } from "@/utils/zincutils";
 import { makePrebuiltDestinationSchema } from "./PrebuiltDestinationForm.schema";
 import { DEFAULT_SLACK_APP_NAME, SLACK_APP_NAME_MAX_LENGTH } from "@/utils/slackManifest";
+import {
+  jiraKeepsSavedToken,
+  toJiraFieldValue,
+  type JiraCreateMeta,
+} from "@/utils/prebuilt-templates/jira";
 
 // One row in the dynamic api-headers array-field. Both fields are free-form
 // text (a blank starter row is valid — only non-empty rows persist on save).
@@ -148,8 +153,12 @@ export const makeAddDestinationSchema = (
         const credResult = makePrebuiltDestinationSchema(t, String(val.destination_type)).safeParse(
           (val.credentials ?? {}) as Record<string, unknown>,
         );
+        // A saved Jira token never comes back to the browser; it is required again only after Change.
+        const keepsSavedToken =
+          val.destination_type === "jira" && jiraKeepsSavedToken(val.credentials);
         if (!credResult.success) {
           for (const issue of credResult.error.issues) {
+            if (keepsSavedToken && issue.path[0] === "token") continue;
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               path: ["credentials", ...issue.path],
@@ -172,6 +181,55 @@ export const makeAddDestinationSchema = (
             path: ["credentials", "webhookUrl"],
             message: t("alert_destinations.slackOAuth.connectionRequired"),
           });
+        }
+      }
+
+      if (isPrebuilt && val.destination_type === "jira") {
+        const credentials = val.credentials;
+        if (credentials.deployment !== "data_center" && !trimmed(credentials.email)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["credentials", "email"],
+            message: t("alerts.validation.credentialFieldRequired", {
+              field: t("alerts.prebuiltDestinations.jiraEmail"),
+            }),
+          });
+        }
+        // Set by JiraDestinationFields from Jira's create screen; the blocking cases fail here on Save.
+        const meta = credentials.createMeta as JiraCreateMeta | undefined;
+        const values = (credentials.fieldValues ?? {}) as Record<string, unknown>;
+        const blockIssueType = (message: string) =>
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["credentials", "issueTypeId"],
+            message,
+          });
+        if (!meta && credentials.projectKey && credentials.issueTypeId) {
+          blockIssueType(t("alerts.prebuiltDestinations.jiraCreateScreenNotLoaded"));
+        }
+        if (meta && !meta.hasLabels) {
+          blockIssueType(
+            t("alerts.prebuiltDestinations.jiraLabelsMissing", {
+              issueType: meta.issueTypeName,
+              project: meta.projectName,
+            }),
+          );
+        }
+        for (const field of meta?.requiredFields ?? []) {
+          if (field.kind === "unsupported") {
+            blockIssueType(
+              t("alerts.prebuiltDestinations.jiraUnsupportedField", {
+                field: field.name,
+                issueType: meta?.issueTypeName,
+              }),
+            );
+          } else if (toJiraFieldValue(field.kind, values[field.id]) === undefined) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["credentials", "fieldValues", field.id],
+              message: t("alerts.validation.credentialFieldRequired", { field: field.name }),
+            });
+          }
         }
       }
 

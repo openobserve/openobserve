@@ -2053,8 +2053,11 @@
       "error": "错误",
       "action": "操作",
       "view": "视图",
-      "frustration": "挫败"
+      "frustration": "挫败",
+      "failedRequest": "失败请求",
+      "noResponse": "无响应"
     },
+    "replayCanvasNotRecorded": "未录制 Canvas 内容",
     "actionOnTarget": "在 \"{target}\" 上 {action}",
     "errorWhileFetchingErrorEvents": "获取错误事件时出错",
     "errorWhileFetchingSessionReplay": "获取会话重放数据时出错",
@@ -11763,6 +11766,7 @@
       "recoveryResolvesIncident": "解决该事件",
       "recoveryClosesAlert": "关闭该告警",
       "recoveryChatMessage": "新的“已恢复”消息",
+      "recoveryJiraComment": "在未关闭的工单上添加评论",
       "keepFiringFor": "持续触发时长",
       "keepFiringForTooltip": "条件清除后等待此时长再恢复。0 表示立即恢复。",
       "suppressRepeats": "抑制重复通知",
@@ -12071,7 +12075,37 @@
       "priorityP2": "P2 (高)",
       "priorityP3": "P3 (中)",
       "priorityP4": "P4 (低)",
-      "priorityP5": "P5 (信息)"
+      "priorityP5": "P5 (信息)",
+      "jiraDescription": "在 Jira 中创建工单",
+      "jiraConnectSection": "连接到 Jira",
+      "jiraType": "Jira 类型",
+      "jiraCloud": "Jira Cloud",
+      "jiraDataCenter": "Jira Data Center",
+      "jiraUrl": "Jira URL",
+      "jiraUrlHelp": "您的 Jira 站点地址，例如 {example}",
+      "jiraUrlFormat": "输入以 https:// 或 http:// 开头的 URL",
+      "jiraEmail": "电子邮件",
+      "jiraApiToken": "API 令牌",
+      "jiraPersonalAccessToken": "个人访问令牌",
+      "jiraTokenRequired": "令牌为必填项",
+      "jiraTokenTip": "使用只能查看此项目的机器人账户。",
+      "jiraConnect": "连接",
+      "jiraConnectedSummary": "已连接到 {host}，身份为 {name}",
+      "jiraChange": "更改",
+      "jiraConnectMissing": "填写上方字段，然后连接。",
+      "jiraTicketsSection": "工单去向",
+      "jiraProject": "项目",
+      "jiraIssueType": "问题类型",
+      "jiraPriority": "优先级",
+      "jiraDefaultPriority": "Jira 默认值",
+      "jiraRequiredFields": "Jira 必填字段",
+      "jiraRequiredFieldHelp": "Jira 针对此问题类型的必填项",
+      "jiraUnsupportedField": "Jira 要求 '{field}' 作为 {issueType} 的必填字段。OpenObserve 无法填写此字段类型。请选择其他问题类型，或让您的 Jira 管理员将其设为可选。",
+      "jiraCreateScreenNotLoaded": "此问题类型的创建界面尚未加载。请等待其加载，或重新选择问题类型。",
+      "jiraLabelsMissing": "{issueType} 在 {project} 中的创建界面没有“Labels”字段。OpenObserve 需要该字段来查找其工单。请让您的 Jira 管理员添加该字段。",
+      "jiraBehavior": "恢复时会添加评论，且不会关闭工单。",
+      "jiraTestCreated": "已创建 {key}。您可以在 Jira 中删除它。",
+      "jiraOpenIssue": "在 Jira 中打开"
     },
     "lastRun": "上次运行: {time}",
     "retryTraining": "重新训练模型并重新运行检测",
@@ -13512,7 +13546,14 @@
       "pagerdutyDescription": "在 PagerDuty 中创建事件",
       "opsgenieDescription": "在 Opsgenie 中创建告警",
       "servicenowDescription": "在 ServiceNow 中创建事件",
-      "slackAppDescription": "就地更新定时告警。可在 Slack 中确认、静默和调查。需要已连接的工作区。"
+      "slackAppRecommendedDescription": "推荐用于告警响应。就地更新已安排的告警。可在 Slack 中确认、静默和调查。需要已连接的工作区。",
+      "slackAppShort": "处理告警",
+      "chatPostsShort": "聊天消息",
+      "emailShort": "HTML 电子邮件",
+      "pageOnCallShort": "呼叫值班人员",
+      "servicenowShort": "IT 事件",
+      "jiraShort": "问题工单",
+      "customShort": "URL 或电子邮件"
     },
     "import": {
       "title": "导入目标",
@@ -13758,6 +13799,15 @@
       "allTitle": "所有指标，包括在此范围内无数据的",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "仪表盘",
+      "sortDashboardsTitle": "仪表盘中用得最多的优先",
+      "sortAlerts": "告警",
+      "sortAlertsTitle": "告警中用得最多的优先",
+      "usageInDashboards": "仪表盘中",
+      "usageHasAlerts": "有告警",
+      "usageInSlos": "SLO 中",
+      "usageLoading": "正在加载指标的使用情况",
+      "usageFailed": "使用情况不可用，请重试",
       "viewGrid": "网格",
       "viewRows": "行",
       "modeExplore": "探索",
@@ -13891,16 +13941,7 @@
         "deleteMessage": "要为本组织中的所有人删除视图 {name} 吗？",
         "modified": "{name}（已修改）",
         "clear": "清除视图"
-      },
-      "sortDashboards": "仪表盘",
-      "sortDashboardsTitle": "仪表盘中用得最多的优先",
-      "sortAlerts": "告警",
-      "sortAlertsTitle": "告警中用得最多的优先",
-      "usageInDashboards": "仪表盘中",
-      "usageHasAlerts": "有告警",
-      "usageInSlos": "SLO 中",
-      "usageLoading": "正在加载指标的使用情况",
-      "usageFailed": "使用情况不可用，请重试"
+      }
     },
     "metricCard": {
       "lastRefreshed": "上次刷新时间：",
@@ -13927,6 +13968,17 @@
       "notEqualTo": "不等于",
       "regexPattern": "正则模式（例如 prod.*）",
       "regexNotMatching": "正则不匹配（例如 test.*）"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR 组",
+      "addGroupTooltip": "添加一组过滤器；序列匹配任意一组即视为匹配",
+      "addToGroup": "向此组添加过滤器",
+      "anyOf": "任一",
+      "andAnyOf": "并且任一",
+      "or": "或",
+      "not": "非",
+      "notTooltip": "匹配整个组都不匹配的序列",
+      "tooManyBranches": "这些过滤器会展开为 {count} 个独立选择器；最多可运行 {max} 个。请将值合并到一个正则过滤器中，或移除一个组。"
     },
     "builderSwitch": {
       "unsupported": "构建器无法显示 {construct}",
@@ -13967,11 +14019,11 @@
         "byLabelsLabel": "按标签",
         "quantileLabel": "分位数",
         "kLabel": "K",
-        "nearestMultipleLabel": "最接近的倍数",
         "withoutLabel": "不包含（丢弃这些标签）",
         "withoutDesc": "聚合时去除所选标签，并保留其他所有标签",
         "offsetLabel": "偏移",
-        "offsetDesc": "读取指标时回溯多久，例如 1h 或 1d"
+        "offsetDesc": "读取指标时回溯多久，例如 1h 或 1d",
+        "nearestMultipleLabel": "最接近的倍数"
       },
       "rangeOnlyFirst": "范围函数只能作为第一步",
       "rangeOnlyFirstNote": "范围函数读取原始样本，因此只能作为第一步。请移除其他步骤以添加范围函数。",
@@ -14041,17 +14093,6 @@
       "empty": "暂无查询",
       "noMatch": "没有查询匹配搜索或加星过滤器",
       "loadMore": "加载更多"
-    },
-    "labelGroups": {
-      "addGroup": "+ OR 组",
-      "addGroupTooltip": "添加一组过滤器；序列匹配任意一组即视为匹配",
-      "addToGroup": "向此组添加过滤器",
-      "anyOf": "任一",
-      "andAnyOf": "并且任一",
-      "or": "或",
-      "not": "非",
-      "notTooltip": "匹配整个组都不匹配的序列",
-      "tooManyBranches": "这些过滤器会展开为 {count} 个独立选择器；最多可运行 {max} 个。请将值合并到一个正则过滤器中，或移除一个组。"
     }
   },
   "settings": {
@@ -21710,7 +21751,8 @@
         "longtask": "长任务",
         "view": "查看",
         "action": "操作",
-        "resource": "资源"
+        "resource": "资源",
+        "failedrequest": "失败请求"
       },
       "subscriptionPlan": {
         "payasyougo": "按需付费",
@@ -22724,6 +22766,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "读取指标在指定时长之前的值",
       "rateDoc": "计算指定时间范围内的每秒平均增长率",
       "irateDoc": "基于最后两个数据点计算每秒瞬时增长率",
       "increaseDoc": "计算指定时间范围内的总增长量",
@@ -22794,8 +22837,7 @@
       "moduloName": "模运算",
       "multiplyByName": "乘以",
       "divideByName": "除以",
-      "exponentName": "指数",
-      "offsetDoc": "读取指标在指定时长之前的值"
+      "exponentName": "指数"
     }
   },
   "passwordPolicy": {
@@ -28177,7 +28219,6 @@
       "appTile": "{product} 应用",
       "webhookTile": "{product} Webhook",
       "twoWay": "双向",
-      "recommendedForAlertResponse": "推荐用于告警响应",
       "choiceHint": "值班呼叫和超级集群使用 Webhook。从 Slack 应用目标进行的手动发送和实时发送是独立的帖子。",
       "unavailableReason": "需要单个集群上的企业版 Slack 应用",
       "unavailableFlag": "此服务器上已关闭；请让运维人员设置 {variable}",
@@ -28185,6 +28226,7 @@
       "unavailableCloud": "您的 Cloud 区域尚未开启此功能",
       "unavailableNoAccess": "请让组织管理员开启 Slack 应用",
       "postOnly": "仅发送消息",
+      "off": "关闭",
       "switchToApp": "切换到 {product} 应用",
       "switchThis": "切换此目标",
       "switchBack": "切换回去",

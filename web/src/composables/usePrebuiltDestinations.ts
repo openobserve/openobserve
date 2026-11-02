@@ -18,7 +18,7 @@ import { ref, computed, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 // Services
-import alertDestinationService from "@/services/alert_destination";
+import alertDestinationService, { type JiraTestIssueResponse } from "@/services/alert_destination";
 import templatesService from "@/services/alert_templates";
 
 // Types and configurations
@@ -33,6 +33,7 @@ import {
   getPopularPrebuiltTypes,
   getPrebuiltTypesByCategory,
 } from "@/utils/prebuilt-templates";
+import { jiraKeepsSavedToken, jiraSetupRequest } from "@/utils/prebuilt-templates/jira";
 
 /**
  * System Templates Architecture:
@@ -115,7 +116,7 @@ const buildDestinationMetadata = (
   ...slackSetupMetadata(type, setup),
 });
 
-const requestErrorMessage = (error: unknown, fallback: I18nText): I18nText => {
+export const requestErrorMessage = (error: unknown, fallback: I18nText): I18nText => {
   if (!error || typeof error !== "object") return fallback;
   const requestError = error as {
     message?: unknown;
@@ -249,6 +250,8 @@ export function usePrebuiltDestinations() {
     // Validate each credential field
     for (const field of config.credentialFields) {
       const value = credentials[field.key];
+
+      if (type === "jira" && field.key === "token" && jiraKeepsSavedToken(credentials)) continue;
 
       // Check required fields
       if (field.required && (!value || value.toString().trim() === "")) {
@@ -424,6 +427,27 @@ export function usePrebuiltDestinations() {
           timestamp: Date.now(),
         };
         return publishTestResult(requestVersion, result);
+      }
+
+      // Jira's test creates a real issue through the server, with the server's error text on failure.
+      if (type === "jira") {
+        try {
+          const response = await alertDestinationService.jiraSetup<JiraTestIssueResponse>(
+            organizationIdentifier.value,
+            jiraSetupRequest(credentials, "test_issue"),
+          );
+          return publishTestResult(requestVersion, {
+            success: true,
+            timestamp: Date.now(),
+            issue: response.data,
+          });
+        } catch (error: unknown) {
+          return publishTestResult(requestVersion, {
+            success: false,
+            timestamp: Date.now(),
+            error: requestErrorMessage(error, t("alerts.prebuilt.testFailedUnknownError")),
+          });
+        }
       }
 
       // Ensure system templates are fetched

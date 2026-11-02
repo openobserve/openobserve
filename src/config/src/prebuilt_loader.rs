@@ -192,7 +192,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
     // Return built-in configuration with templates embedded
     // This ensures the system works even if the JSON file is missing
     PrebuiltDestinationsConfig {
-        revision: 2,
+        revision: 3,
         destinations: vec![
             PrebuiltDestinationConfig {
                 id: "slack".to_string(),
@@ -374,6 +374,30 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 template: TemplateConfig {
                     name: "prebuilt_servicenow".to_string(),
                     body: r#"{"short_description": "[{alert_status}] {alert_name}", "assignment_group": "{credential_assignmentGroup}"}"#.to_string(),
+                    title: None,
+                },
+                credential_fields: vec![],
+                metadata: HashMap::new(),
+            },
+            PrebuiltDestinationConfig {
+                id: "jira".to_string(),
+                name: "Jira".to_string(),
+                description: "Create Jira issues and comment on them".to_string(),
+                destination_type: "http".to_string(),
+                icon: "jira-icon".to_string(),
+                popular: true,
+                category: "incident".to_string(),
+                endpoint: Some(EndpointConfig {
+                    url: "https://YOUR_SITE.atlassian.net".to_string(),
+                    method: "POST".to_string(),
+                    skip_tls_verify: false,
+                    headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
+                    output_format: "JSON".to_string(),
+                    destination_type: "jira".to_string(),
+                }),
+                template: TemplateConfig {
+                    name: "prebuilt_jira".to_string(),
+                    body: r#"{"note": "The Jira destination builds the issue text from the alert data and does not render this template.", "alert_name": "{alert_name}", "alert_status": "{alert_status}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -702,6 +726,33 @@ fn load_builtin_destinations() -> Vec<Destination> {
         Destination {
             id: None,
             org_id: String::new(),
+            name: "Jira".to_string(),
+            module: Module::Alert {
+                template: Some("prebuilt_jira".to_string()),
+                destination_type: DestinationType::Http(Endpoint {
+                    url: "https://YOUR_SITE.atlassian.net".to_string(),
+                    method: HTTPType::POST,
+                    skip_tls_verify: false,
+                    headers: Some(HashMap::from([
+                        ("Content-Type".to_string(), "application/json".to_string()),
+                        ("Accept".to_string(), "application/json".to_string()),
+                        (
+                            "Authorization".to_string(),
+                            "Basic YOUR_AUTH_TOKEN".to_string(),
+                        ),
+                    ])),
+                    output_format: Some(HTTPOutputFormat::JSON),
+                    destination_type: Some("jira".to_string()),
+                    metadata: HashMap::from([
+                        ("service".to_string(), "jira".to_string()),
+                        ("description".to_string(), "Jira issue tracking".to_string()),
+                    ]),
+                }),
+            },
+        },
+        Destination {
+            id: None,
+            org_id: String::new(),
             name: "Email Notification".to_string(),
             module: Module::Alert {
                 template: Some("prebuilt_email".to_string()),
@@ -788,13 +839,13 @@ mod tests {
             "Should load at least some destinations"
         );
 
-        // Should have 8 destinations
-        assert_eq!(destinations.len(), 8);
+        // Should have 9 destinations
+        assert_eq!(destinations.len(), 9);
 
         // Check for specific destinations
         let names: Vec<&str> = destinations.iter().map(|d| d.name.as_str()).collect();
 
-        // Check that we have all 8 expected destination types
+        // Check that we have all 9 expected destination types
         // Names may vary between JSON config and built-in defaults
         let has_slack = names.iter().any(|n| n.contains("Slack"));
         let has_teams = names.iter().any(|n| n.contains("Teams"));
@@ -808,6 +859,7 @@ mod tests {
         });
         let has_opsgenie = names.iter().any(|n| n.contains("Opsgenie"));
         let has_servicenow = names.iter().any(|n| n.contains("ServiceNow"));
+        let has_jira = names.iter().any(|n| n.contains("Jira"));
         let has_email = names.iter().any(|n| n.contains("Email"));
 
         assert!(has_slack, "Missing Slack destination");
@@ -817,6 +869,7 @@ mod tests {
         assert!(has_webhook, "Missing Generic Webhook destination");
         assert!(has_opsgenie, "Missing Opsgenie destination");
         assert!(has_servicenow, "Missing ServiceNow destination");
+        assert!(has_jira, "Missing Jira destination");
         assert!(has_email, "Missing Email destination");
     }
 
@@ -920,6 +973,7 @@ mod tests {
             "webhook",
             "opsgenie",
             "servicenow",
+            "jira",
             "email",
         ];
 

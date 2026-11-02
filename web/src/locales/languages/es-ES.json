@@ -2053,8 +2053,11 @@
       "error": "Error",
       "action": "Acción",
       "view": "Vista",
-      "frustration": "Frustración"
+      "frustration": "Frustración",
+      "failedRequest": "Solicitudes fallidas",
+      "noResponse": "Sin respuesta"
     },
+    "replayCanvasNotRecorded": "Contenido del canvas no grabado",
     "actionOnTarget": "{action} sobre \"{target}\"",
     "errorWhileFetchingErrorEvents": "Error al obtener eventos de error",
     "errorWhileFetchingSessionReplay": "Error al obtener datos de reproducción de sesión",
@@ -11763,6 +11766,7 @@
       "recoveryResolvesIncident": "resuelve el incidente",
       "recoveryClosesAlert": "cierra la alerta",
       "recoveryChatMessage": "nuevo mensaje de \"Resuelta\"",
+      "recoveryJiraComment": "comentar en el ticket abierto",
       "keepFiringFor": "Seguir disparando durante",
       "keepFiringForTooltip": "Espera este tiempo después de que la condición deje de cumplirse antes de recuperarse. 0 recupera inmediatamente.",
       "suppressRepeats": "Suprimir repeticiones",
@@ -12071,7 +12075,37 @@
       "priorityP2": "P2 (Alto)",
       "priorityP3": "P3 (Moderado)",
       "priorityP4": "P4 (Bajo)",
-      "priorityP5": "P5 (Informativo)"
+      "priorityP5": "P5 (Informativo)",
+      "jiraDescription": "Crear tickets en Jira",
+      "jiraConnectSection": "Conectar con Jira",
+      "jiraType": "Tipo de Jira",
+      "jiraCloud": "Jira Cloud",
+      "jiraDataCenter": "Jira Data Center",
+      "jiraUrl": "URL de Jira",
+      "jiraUrlHelp": "La dirección de tu sitio de Jira, por ejemplo {example}",
+      "jiraUrlFormat": "Introduce una URL que empiece por https:// o http://",
+      "jiraEmail": "Correo electrónico",
+      "jiraApiToken": "Token de API",
+      "jiraPersonalAccessToken": "Token de acceso personal",
+      "jiraTokenRequired": "El token es obligatorio",
+      "jiraTokenTip": "Usa una cuenta de bot que solo pueda ver este proyecto.",
+      "jiraConnect": "Conectar",
+      "jiraConnectedSummary": "Conectado a {host} como {name}",
+      "jiraChange": "Cambiar",
+      "jiraConnectMissing": "Rellena los campos de arriba y luego conéctate.",
+      "jiraTicketsSection": "Dónde van los tickets",
+      "jiraProject": "Proyecto",
+      "jiraIssueType": "Tipo de incidencia",
+      "jiraPriority": "Prioridad",
+      "jiraDefaultPriority": "Predeterminada de Jira",
+      "jiraRequiredFields": "Campos obligatorios de Jira",
+      "jiraRequiredFieldHelp": "Obligatorios en Jira para este tipo de incidencia",
+      "jiraUnsupportedField": "Jira requiere '{field}' para {issueType}. OpenObserve no puede rellenar este tipo de campo. Elige otro tipo de incidencia o pide a tu administrador de Jira que lo haga opcional.",
+      "jiraCreateScreenNotLoaded": "La pantalla de creación de este tipo de incidencia no se ha cargado. Espera a que se cargue o vuelve a seleccionar el tipo de incidencia.",
+      "jiraLabelsMissing": "El campo Labels no está en la pantalla de creación de {issueType} en {project}. OpenObserve lo necesita para encontrar sus tickets. Pide a tu administrador de Jira que lo añada.",
+      "jiraBehavior": "La recuperación añade un comentario y no cierra el ticket.",
+      "jiraTestCreated": "Se ha creado {key}. Puedes eliminarlo en Jira.",
+      "jiraOpenIssue": "Abrir en Jira"
     },
     "lastRun": "Última ejecución: {time}",
     "retryTraining": "Reentrenar el modelo y volver a ejecutar la detección",
@@ -13512,7 +13546,14 @@
       "pagerdutyDescription": "Crear incidentes en PagerDuty",
       "opsgenieDescription": "Crear alertas en Opsgenie",
       "servicenowDescription": "Crear incidentes en ServiceNow",
-      "slackAppDescription": "Actualiza las alertas programadas en el mismo mensaje. Confirma, silencia e investiga desde Slack. Requiere un espacio de trabajo conectado."
+      "slackAppRecommendedDescription": "Recomendado para la respuesta a alertas. Actualiza las alertas programadas in situ. Confirma, silencia e investiga desde Slack. Requiere un espacio de trabajo conectado.",
+      "slackAppShort": "Actuar sobre alertas",
+      "chatPostsShort": "Mensajes de chat",
+      "emailShort": "Correo HTML",
+      "pageOnCallShort": "Avisar a la guardia",
+      "servicenowShort": "Incidentes de TI",
+      "jiraShort": "Crear tickets",
+      "customShort": "URL o correo electrónico"
     },
     "import": {
       "title": "Importar destino",
@@ -13758,6 +13799,15 @@
       "allTitle": "Cada métrica, incluyendo aquellas sin datos en este rango",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "Dashboards",
+      "sortDashboardsTitle": "Primero, los más usados en Dashboards",
+      "sortAlerts": "Alertas",
+      "sortAlertsTitle": "Primero, los más usados en alertas",
+      "usageInDashboards": "En Dashboards",
+      "usageHasAlerts": "Tiene alertas",
+      "usageInSlos": "En SLOs",
+      "usageLoading": "Cargando dónde se usan las métricas",
+      "usageFailed": "Uso no disponible, reintentar",
       "viewGrid": "Cuadrícula",
       "viewRows": "Filas",
       "modeExplore": "Explorar",
@@ -13891,16 +13941,7 @@
         "deleteMessage": "¿Eliminar la vista {name} para todos los usuarios de esta organización?",
         "modified": "{name} (modificada)",
         "clear": "Limpiar vista"
-      },
-      "sortDashboards": "Dashboards",
-      "sortDashboardsTitle": "Primero, los más usados en Dashboards",
-      "sortAlerts": "Alertas",
-      "sortAlertsTitle": "Primero, los más usados en alertas",
-      "usageInDashboards": "En Dashboards",
-      "usageHasAlerts": "Tiene alertas",
-      "usageInSlos": "En SLOs",
-      "usageLoading": "Cargando dónde se usan las métricas",
-      "usageFailed": "Uso no disponible, reintentar"
+      }
     },
     "metricCard": {
       "lastRefreshed": "Última actualización:",
@@ -13927,6 +13968,17 @@
       "notEqualTo": "No igual a",
       "regexPattern": "Patrón regex (ej., prod.*)",
       "regexNotMatching": "Regex que no coincide (ej., test.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ Grupo OR",
+      "addGroupTooltip": "Añade un grupo de filtros; una serie coincide cuando coincide con cualquier grupo",
+      "addToGroup": "Añadir un filtro a este grupo",
+      "anyOf": "cualquiera de",
+      "andAnyOf": "y cualquiera de",
+      "or": "o",
+      "not": "no",
+      "notTooltip": "Coincide con las series que no coinciden con este grupo completo",
+      "tooManyBranches": "Estos filtros se expanden a {count} selectores separados; como máximo se pueden ejecutar {max}. Combina los valores en un único filtro de regex o elimina un grupo."
     },
     "builderSwitch": {
       "unsupported": "El generador no puede mostrar {construct}",
@@ -13967,11 +14019,11 @@
         "byLabelsLabel": "Por etiquetas",
         "quantileLabel": "Cuantil",
         "kLabel": "K",
-        "nearestMultipleLabel": "Múltiplo más cercano",
         "withoutLabel": "Sin (eliminar estas etiquetas)",
         "withoutDesc": "Agrega prescindiendo de las etiquetas seleccionadas y conserva todas las demás etiquetas",
         "offsetLabel": "Desplazamiento",
-        "offsetDesc": "Cuánto tiempo atrás se debe leer la métrica; p. ej., 1h o 1d"
+        "offsetDesc": "Cuánto tiempo atrás se debe leer la métrica; p. ej., 1h o 1d",
+        "nearestMultipleLabel": "Múltiplo más cercano"
       },
       "rangeOnlyFirst": "Una función de rango solo puede ser el primer paso",
       "rangeOnlyFirstNote": "Una función de rango lee las muestras sin procesar, por lo que solo puede ser el primer paso. Elimina los demás pasos para agregar una.",
@@ -14041,17 +14093,6 @@
       "empty": "Aún no hay consultas",
       "noMatch": "Ninguna consulta coincide con la búsqueda o el filtro de destacadas",
       "loadMore": "Cargar más"
-    },
-    "labelGroups": {
-      "addGroup": "+ Grupo OR",
-      "addGroupTooltip": "Añade un grupo de filtros; una serie coincide cuando coincide con cualquier grupo",
-      "addToGroup": "Añadir un filtro a este grupo",
-      "anyOf": "cualquiera de",
-      "andAnyOf": "y cualquiera de",
-      "or": "o",
-      "not": "no",
-      "notTooltip": "Coincide con las series que no coinciden con este grupo completo",
-      "tooManyBranches": "Estos filtros se expanden a {count} selectores separados; como máximo se pueden ejecutar {max}. Combina los valores en un único filtro de regex o elimina un grupo."
     }
   },
   "settings": {
@@ -21710,7 +21751,8 @@
         "longtask": "Tarea larga",
         "view": "Ver",
         "action": "Acción",
-        "resource": "Recurso"
+        "resource": "Recurso",
+        "failedrequest": "Solicitud fallida"
       },
       "subscriptionPlan": {
         "payasyougo": "Pago por uso",
@@ -22724,6 +22766,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "Lee la métrica tal como estaba hace la duración indicada",
       "rateDoc": "Calcula la tasa promedio de aumento por segundo durante el rango de tiempo especificado",
       "irateDoc": "Calcula la tasa instantánea de aumento por segundo basada en los últimos dos puntos de datos",
       "increaseDoc": "Calcula el aumento total durante el rango de tiempo especificado",
@@ -22794,8 +22837,7 @@
       "moduloName": "Módulo",
       "multiplyByName": "Multiplicar por",
       "divideByName": "Dividir por",
-      "exponentName": "Exponente",
-      "offsetDoc": "Lee la métrica tal como estaba hace la duración indicada"
+      "exponentName": "Exponente"
     }
   },
   "passwordPolicy": {
@@ -28177,7 +28219,6 @@
       "appTile": "Aplicación de {product}",
       "webhookTile": "Webhook de {product}",
       "twoWay": "Bidireccional",
-      "recommendedForAlertResponse": "Recomendado para la respuesta a alertas",
       "choiceHint": "Los avisos de guardia y los superclústeres usan el webhook. Los envíos manuales y en tiempo real desde un destino de aplicación de Slack son publicaciones independientes.",
       "unavailableReason": "Requiere la aplicación de Slack Enterprise en un único clúster",
       "unavailableFlag": "Desactivado en este servidor; pide a tu operador que configure {variable}",
@@ -28185,6 +28226,7 @@
       "unavailableCloud": "Aún no está activado para tu región de Cloud",
       "unavailableNoAccess": "Pide a un administrador de la organización que active la aplicación de Slack",
       "postOnly": "Solo publicar",
+      "off": "Desactivado",
       "switchToApp": "Cambiar a la aplicación {product}",
       "switchThis": "Cambiar este destino",
       "switchBack": "Revertir",

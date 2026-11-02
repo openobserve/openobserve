@@ -28,16 +28,14 @@ import {
 
 describe("Prebuilt Templates Index", () => {
   describe("destinationTypeTiles (MK-7)", () => {
-    it("puts the Slack app tile first, tagged for alert response, then the relabelled webhook tile", () => {
+    it("puts the Slack app tile first, then the relabelled webhook tile, each with a short line", () => {
       const tiles = destinationTypeTiles(true);
       expect(tiles.map((tile) => tile.id).slice(0, 3)).toEqual(["slack_app", "slack", "discord"]);
       expect(tiles[0].name).toBe("Slack app");
-      expect(tiles[0].tag).toEqual({
-        label: "Recommended for alert response",
-        variant: "success-soft",
-      });
+      expect(tiles[0].shortKey).toBe("alert_destinations.prebuilt.slackAppShort");
       expect(tiles[1].name).toBe("Slack webhook");
-      expect(tiles[1].tag).toEqual({ label: "Post only", variant: "default-soft" });
+      expect(tiles[1].shortKey).toBe("slackApp.destination.postOnly");
+      expect(tiles.every((tile) => !("tag" in tile) || tile.tag === undefined)).toBe(true);
     });
 
     it("keeps the unavailable Slack app disabled and the webhook selectable", () => {
@@ -61,9 +59,10 @@ describe("Prebuilt Templates Index", () => {
         "servicenow",
         "email",
         "opsgenie",
+        "jira",
       ];
 
-      expect(PREBUILT_DESTINATION_TYPES).toHaveLength(7);
+      expect(PREBUILT_DESTINATION_TYPES).toHaveLength(8);
 
       const actualTypes = PREBUILT_DESTINATION_TYPES.map((type) => type.id);
       expectedTypes.forEach((expectedType) => {

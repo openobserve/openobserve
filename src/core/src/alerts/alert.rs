@@ -81,6 +81,7 @@ use crate::{
             custom::{VarValue, process_variable_replace},
             derive_channel_format,
             format::ChannelFormat,
+            jira,
             modifiers::{PreparedTemplate, prepare_modifiers},
             platform::{self, platform_of},
             render,
@@ -354,6 +355,8 @@ pub enum AlertError {
     MultiAlertGroupingError(String),
     #[error("Group by column {column} not found on stream {stream_name}")]
     GroupByColumnNotFound { column: String, stream_name: String },
+    #[error("{reason}")]
+    JiraDestinationNotSupported { destination: String, reason: String },
 }
 
 /// What a manual trigger did: sent, with its messages, or held by an active downtime.
@@ -561,6 +564,33 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
                 destination: dest_name.clone(),
                 platform: format!("{platform:?}"),
                 template: template.name.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Jira keeps one issue per alert, so it refuses alerts that would send for several at once.
+pub(crate) async fn validate_jira_destinations(
+    org_id: &str,
+    alert: &Alert,
+) -> Result<(), AlertError> {
+    for dest_name in alert
+        .destinations
+        .iter()
+        .chain(&alert.recovery_destinations)
+    {
+        if let Ok(destination) = db::alerts::destinations::get(org_id, dest_name).await
+            && let Module::Alert {
+                destination_type: DestinationType::Http(endpoint),
+                ..
+            } = &destination.module
+            && jira::is_jira(endpoint)
+            && let Some(reason) = jira::save_refusal(alert, dest_name)
+        {
+            return Err(AlertError::JiraDestinationNotSupported {
+                destination: dest_name.clone(),
+                reason,
             });
         }
     }
@@ -1015,6 +1045,8 @@ async fn prepare_alert(
     validate_multi_alert_config(alert)?;
 
     validate_recovery_templates(org_id, alert).await?;
+
+    validate_jira_destinations(org_id, alert).await?;
 
     // PromQL carries a third threshold family: the condition value baked into
     // the query. Its warning needs the same §4.5 direction check, measured
@@ -3287,6 +3319,12 @@ async fn send_to_destination_type(
     template: &Template,
     ctx: &mut NotificationContext,
 ) -> Result<String, anyhow::Error> {
+    // Jira builds its own text and keeps one issue per alert, so no template is rendered for it.
+    if let DestinationType::Http(endpoint) = dest_type
+        && jira::is_jira(endpoint)
+    {
+        return jira::send(endpoint, ctx).await;
+    }
     let is_email = matches!(dest_type, DestinationType::Email(_));
     let empty_meta = hashbrown::HashMap::new();
     let metadata: &hashbrown::HashMap<String, String> = match dest_type {
@@ -3534,6 +3572,10 @@ fn members_to_send(kept: Vec<String>, skipped: &[String]) -> Result<Email, anyho
 }
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
+    // A plain body posted at a Jira site root does nothing, so senders without a Jira branch fail.
+    if jira::is_jira(endpoint) {
+        return Err(anyhow::anyhow!(jira::UNSUPPORTED_SENDER));
+    }
     // Block SSRF: validate the destination URL (including DNS resolution) before
     // making any outbound request. The client is built through `build_safe_destination_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.
@@ -4204,6 +4246,13 @@ async fn build_notification_context(
             alert.trigger_condition.warning_threshold.map(|w| w as f64),
         )
     };
+    let family_operator = if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+        agg.having.operator.to_string()
+    } else if let Some(pc) = alert.query_condition.promql_condition.as_ref() {
+        pc.operator.to_string()
+    } else {
+        alert.trigger_condition.operator.to_string()
+    };
     let mut vars = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
         for (key, value) in row.iter() {
@@ -4386,6 +4435,8 @@ async fn build_notification_context(
         stream_type: alert.stream_type.as_str().to_string(),
         stream_name: alert.stream_name.clone(),
         alert_name: alert.name.clone(),
+        alert_id: alert.id.map(|id| id.to_string()).unwrap_or_default(),
+        incident_id: String::new(),
         alert_type: alert_type.to_string(),
         alert_period: alert.trigger_condition.period.to_string(),
         alert_operator: alert.trigger_condition.operator.to_string(),
@@ -4421,6 +4472,7 @@ async fn build_notification_context(
             fmt_observed(family_crit)
         },
         alert_threshold_warn: family_warn.map(fmt_observed).unwrap_or_default(),
+        alert_threshold_operator: family_operator,
         alert_start_time: alert_start_time_str,
         alert_end_time: alert_end_time_str,
         alert_start_time_millis: epoch_millis_or_na(alert_start_time),

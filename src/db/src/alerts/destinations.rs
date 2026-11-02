@@ -73,6 +73,10 @@ pub enum DestinationError {
     SlackAppNeedsEnterprise,
     #[error("{0}")]
     SlackApp(SlackAppRefusal),
+    #[error("Enter the Jira API token.")]
+    JiraTokenMissing,
+    #[error("Enter the API token again, because the Jira URL, type or email changed.")]
+    JiraTokenChanged,
 }
 
 /// A refused Slack app save; `code` lets the form show its own copy (MK-7, MK-20).

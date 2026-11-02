@@ -172,6 +172,7 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
         alert_tags: "infra, prod".into(),
         alert_threshold_crit: "90".into(),
         alert_threshold_warn: "80".into(),
+        alert_threshold_operator: ">".into(),
         alert_start_time: "2026-08-01T10:00:00".into(),
         alert_end_time: "2026-08-01T10:10:00".into(),
         alert_start_time_millis: "1785578400000".into(),
@@ -200,6 +201,8 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
         level,
         chart_url: None,
         chart_png: None,
+        alert_id: String::new(),
+        incident_id: String::new(),
     }
 }
 

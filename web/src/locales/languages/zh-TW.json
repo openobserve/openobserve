@@ -2053,8 +2053,11 @@
       "error": "錯誤",
       "action": "動作",
       "view": "檢視",
-      "frustration": "沮喪"
+      "frustration": "沮喪",
+      "failedRequest": "失敗的請求",
+      "noResponse": "無回應"
     },
+    "replayCanvasNotRecorded": "未錄製畫布內容",
     "actionOnTarget": "{action} 於「{target}」",
     "errorWhileFetchingErrorEvents": "擷取錯誤事件時發生錯誤",
     "errorWhileFetchingSessionReplay": "擷取工作階段重播資料時發生錯誤",
@@ -11758,6 +11761,7 @@
       "recoveryResolvesIncident": "解決事件",
       "recoveryClosesAlert": "關閉警示",
       "recoveryChatMessage": "新的「已解決」訊息",
+      "recoveryJiraComment": "在未結案的工單上留言",
       "keepFiringFor": "持續觸發時間",
       "keepFiringForTooltip": "條件解除後等待這麼久才恢復。0 表示立即恢復。",
       "suppressRepeats": "抑制重複通知",
@@ -12066,7 +12070,37 @@
       "priorityP2": "P2（高）",
       "priorityP3": "P3（中）",
       "priorityP4": "P4（低）",
-      "priorityP5": "P5（資訊）"
+      "priorityP5": "P5（資訊）",
+      "jiraDescription": "在 Jira 建立工單",
+      "jiraConnectSection": "連線至 Jira",
+      "jiraType": "Jira 類型",
+      "jiraCloud": "Jira Cloud",
+      "jiraDataCenter": "Jira Data Center",
+      "jiraUrl": "Jira URL",
+      "jiraUrlHelp": "您的 Jira 網站地址，例如 {example}",
+      "jiraUrlFormat": "輸入以 https:// 或 http:// 開頭的 URL",
+      "jiraEmail": "電子郵件",
+      "jiraApiToken": "API 權杖",
+      "jiraPersonalAccessToken": "個人存取權杖",
+      "jiraTokenRequired": "權杖為必填",
+      "jiraTokenTip": "使用僅能看到此專案的機器人帳戶。",
+      "jiraConnect": "連線",
+      "jiraConnectedSummary": "已以 {name} 身分連線至 {host}",
+      "jiraChange": "變更",
+      "jiraConnectMissing": "填寫上方欄位，然後連線。",
+      "jiraTicketsSection": "工單建立位置",
+      "jiraProject": "專案",
+      "jiraIssueType": "問題類型",
+      "jiraPriority": "優先順序",
+      "jiraDefaultPriority": "Jira 預設",
+      "jiraRequiredFields": "必填的 Jira 欄位",
+      "jiraRequiredFieldHelp": "此問題類型在 Jira 中為必填",
+      "jiraUnsupportedField": "Jira 的 {issueType} 需要 '{field}'。OpenObserve 無法填寫此欄位類型。請選擇其他問題類型，或請您的 Jira 管理員將其設為選填。",
+      "jiraCreateScreenNotLoaded": "此問題類型的建立畫面尚未載入。請等待載入完成，或重新選擇問題類型。",
+      "jiraLabelsMissing": "Labels 欄位未出現在 {project} 中 {issueType} 的建立畫面上。OpenObserve 需要它來尋找其工單。請您的 Jira 管理員加入。",
+      "jiraBehavior": "復原時會新增留言，不會關閉工單。",
+      "jiraTestCreated": "已建立 {key}。您可以在 Jira 中刪除它。",
+      "jiraOpenIssue": "在 Jira 中開啟"
     },
     "lastRun": "上次執行：{time}",
     "retryTraining": "重新訓練模型並重新執行偵測",
@@ -13507,7 +13541,14 @@
       "pagerdutyDescription": "在 PagerDuty 中建立事件",
       "opsgenieDescription": "在 Opsgenie 中建立警示",
       "servicenowDescription": "在 ServiceNow 中建立事件",
-      "slackAppDescription": "就地更新排程警示。可從 Slack 確認、靜音及調查。需要已連結的工作區。"
+      "slackAppRecommendedDescription": "建議用於警示回應。會就地更新排程警示。可直接從 Slack 確認、靜音並調查。需要已連線的工作區。",
+      "slackAppShort": "處理警示",
+      "chatPostsShort": "聊天室貼文",
+      "emailShort": "HTML 電子郵件",
+      "pageOnCallShort": "呼叫值班人員",
+      "servicenowShort": "IT 事件",
+      "jiraShort": "建立工單",
+      "customShort": "URL 或電子郵件"
     },
     "import": {
       "title": "匯入目標",
@@ -13753,6 +13794,15 @@
       "allTitle": "所有指標，包括在此範圍內沒有資料的",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "儀表板",
+      "sortDashboardsTitle": "儀表板中使用最多者優先",
+      "sortAlerts": "警示",
+      "sortAlertsTitle": "警示中使用最多者優先",
+      "usageInDashboards": "儀表板中",
+      "usageHasAlerts": "有警示",
+      "usageInSlos": "SLOs 中",
+      "usageLoading": "正在載入指標使用位置",
+      "usageFailed": "無法取得使用資訊，請重試",
       "viewGrid": "網格",
       "viewRows": "行",
       "modeExplore": "探索",
@@ -13886,16 +13936,7 @@
         "deleteMessage": "要為此組織中的所有使用者刪除檢視 {name} 嗎？",
         "modified": "{name}（已修改）",
         "clear": "清除檢視"
-      },
-      "sortDashboards": "儀表板",
-      "sortDashboardsTitle": "儀表板中使用最多者優先",
-      "sortAlerts": "警示",
-      "sortAlertsTitle": "警示中使用最多者優先",
-      "usageInDashboards": "儀表板中",
-      "usageHasAlerts": "有警示",
-      "usageInSlos": "SLOs 中",
-      "usageLoading": "正在載入指標使用位置",
-      "usageFailed": "無法取得使用資訊，請重試"
+      }
     },
     "metricCard": {
       "lastRefreshed": "上次重新整理：",
@@ -13922,6 +13963,17 @@
       "notEqualTo": "不等於",
       "regexPattern": "正則表達式模式 (例如：prod.*)",
       "regexNotMatching": "正則表達式不匹配 (例如：test.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ OR 群組",
+      "addGroupTooltip": "新增一組篩選條件；序列符合任一組即算符合",
+      "addToGroup": "新增篩選條件至此群組",
+      "anyOf": "任一",
+      "andAnyOf": "且任一",
+      "or": "或",
+      "not": "非",
+      "notTooltip": "改為符合此整組條件未涵蓋的序列",
+      "tooManyBranches": "這些篩選條件會展開成 {count} 個獨立選取器；最多只能執行 {max} 個。請將值合併為一個正規表達式篩選條件，或移除一個群組。"
     },
     "builderSwitch": {
       "unsupported": "建構器無法顯示 {construct}",
@@ -13962,11 +14014,11 @@
         "byLabelsLabel": "依標籤",
         "quantileLabel": "分位數",
         "kLabel": "K",
-        "nearestMultipleLabel": "最接近的倍數",
         "withoutLabel": "排除（捨棄這些標籤）",
         "withoutDesc": "將選取的標籤彙總排除，並保留其他所有標籤",
         "offsetLabel": "偏移",
-        "offsetDesc": "要往回讀取多久以前的指標，例如 1h 或 1d"
+        "offsetDesc": "要往回讀取多久以前的指標，例如 1h 或 1d",
+        "nearestMultipleLabel": "最接近的倍數"
       },
       "rangeOnlyFirst": "範圍函式只能是第一步",
       "rangeOnlyFirstNote": "範圍函式會讀取原始樣本，因此只能是第一步。請移除其他步驟以新增。",
@@ -14036,17 +14088,6 @@
       "empty": "尚無查詢",
       "noMatch": "沒有查詢符合搜尋或星號篩選條件",
       "loadMore": "載入更多"
-    },
-    "labelGroups": {
-      "addGroup": "+ OR 群組",
-      "addGroupTooltip": "新增一組篩選條件；序列符合任一組即算符合",
-      "addToGroup": "新增篩選條件至此群組",
-      "anyOf": "任一",
-      "andAnyOf": "且任一",
-      "or": "或",
-      "not": "非",
-      "notTooltip": "改為符合此整組條件未涵蓋的序列",
-      "tooManyBranches": "這些篩選條件會展開成 {count} 個獨立選取器；最多只能執行 {max} 個。請將值合併為一個正規表達式篩選條件，或移除一個群組。"
     }
   },
   "settings": {
@@ -21705,7 +21746,8 @@
         "longtask": "長任務",
         "view": "檢視",
         "action": "動作",
-        "resource": "資源"
+        "resource": "資源",
+        "failedrequest": "失敗的請求"
       },
       "subscriptionPlan": {
         "payasyougo": "隨用隨付",
@@ -22719,6 +22761,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "讀取指標在指定時間長度之前的值",
       "rateDoc": "計算指定時間範圍內每秒的平均增長率",
       "irateDoc": "根據最後兩個資料點計算每秒的瞬時增長率",
       "increaseDoc": "計算指定時間範圍內的總增長量",
@@ -22789,8 +22832,7 @@
       "moduloName": "模數",
       "multiplyByName": "乘以",
       "divideByName": "除以",
-      "exponentName": "冪運算",
-      "offsetDoc": "讀取指標在指定時間長度之前的值"
+      "exponentName": "冪運算"
     }
   },
   "passwordPolicy": {
@@ -28172,7 +28214,6 @@
       "appTile": "{product} 應用程式",
       "webhookTile": "{product} Webhook",
       "twoWay": "雙向",
-      "recommendedForAlertResponse": "建議用於警示回應",
       "choiceHint": "值班通知與超級叢集會使用 Webhook。從 Slack 應用程式目標手動與即時傳送會是各自獨立的貼文。",
       "unavailableReason": "需要在單一叢集上使用 Enterprise Slack 應用程式",
       "unavailableFlag": "此伺服器已停用；請洽您的操作員設定 {variable}",
@@ -28180,6 +28221,7 @@
       "unavailableCloud": "您的 Cloud 區域尚未啟用",
       "unavailableNoAccess": "請洽組織管理員啟用 Slack 應用程式",
       "postOnly": "僅張貼",
+      "off": "關閉",
       "switchToApp": "切換到 {product} 應用程式",
       "switchThis": "切換此目標",
       "switchBack": "切換回來",

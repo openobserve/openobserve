@@ -349,6 +349,65 @@ describe("AlertSettings — Notify on recovery with nowhere to send", () => {
   });
 });
 
+// Jira keeps one ticket per alert, so its recovery is a comment there, not a new message.
+describe("AlertSettings — Notify on recovery summary for Jira", () => {
+  const destinationObjects = [
+    { name: "ops-jira", type: "http", destination_type_name: "jira" },
+    { name: "ops-slack", type: "http", destination_type_name: "slack" },
+  ];
+  const mountPlan = (destinations: string[], recoveryDestinations: string[] = []) =>
+    mount(
+      defineComponent({
+        components: { OForm, AlertSettings },
+        setup: () => ({
+          schema: parentSchema,
+          defaultValues: { trigger_condition: { silence: 10, period: 10 }, destinations },
+          formData: makeFormData({ notify_on_recovery: true }),
+          destinations,
+          destinationObjects,
+          recoveryDestinations,
+        }),
+        template: `
+          <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+            <AlertSettings
+              :form-data="formData"
+              is-real-time="false"
+              :destinations="destinations"
+              :destination-objects="destinationObjects"
+              :recovery-destinations="recoveryDestinations"
+            />
+          </OForm>
+        `,
+      }),
+      { global: { plugins: [makeStore(), i18n] } },
+    );
+  const planText = (destinations: string[], recoveryDestinations: string[] = []) =>
+    mountPlan(destinations, recoveryDestinations)
+      .findAll('[data-test^="alert-notify-on-recovery-plan-"]')
+      .map((row) => row.text());
+  const comment = t("alerts.alertSettings.recoveryJiraComment");
+  const message = t("alerts.alertSettings.recoveryChatMessage");
+
+  it("says a Jira destination comments on the open ticket", () => {
+    expect(comment).toBe("comment on the open ticket");
+    expect(planText(["ops-jira", "ops-slack"])).toEqual([
+      `ops-jira — ${comment}`,
+      `ops-slack — ${message}`,
+    ]);
+  });
+
+  it("says the same when the recovery is redirected to Jira", () => {
+    expect(planText(["ops-slack"], ["ops-jira"])).toEqual([`ops-jira — ${comment}`]);
+  });
+
+  it("shows the template hint only when a destination renders the template", () => {
+    const hint = '[data-test="alert-notify-on-recovery-hint"]';
+    expect(mountPlan(["ops-jira"]).find(hint).exists()).toBe(false);
+    expect(mountPlan(["ops-slack"], ["ops-jira"]).find(hint).exists()).toBe(false);
+    expect(mountPlan(["ops-jira", "ops-slack"]).find(hint).exists()).toBe(true);
+  });
+});
+
 describe("AlertSettings — Creates Incident toggle visibility", () => {
   const original = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
   afterEach(() => {
