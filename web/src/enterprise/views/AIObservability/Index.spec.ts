@@ -15,16 +15,7 @@
 //
 // @vitest-environment jsdom
 //
-// AIObservabilityShell's rail shows every section on an OSS build —
-// everything beyond Monitor's LLM Insights + Sessions renders LOCKED (lock
-// icon + pitch-card tooltip) rather than being hidden, so OSS users can
-// discover the rest of the module instead of never knowing it exists. All of
-// it is still reachable (not a 404): `web/src/composables/router.ts`
-// registers every one of these routes too, each gated with `withFeatureGate`
-// so OSS actually landing on one redirects to the shared locked-feature page
-// instead of breaking. Enterprise/cloud show every section unlocked, except
-// that with online evaluations off the evaluation sections are left out and
-// their routes render the evaluations-disabled state.
+// OSS shows non-Monitor sections locked (feature-gated routes), enterprise/cloud unlocked.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
@@ -67,8 +58,7 @@ vi.mock("@/types/i18n", async (importOriginal) => {
 
 const SectionRailStub = {
   props: ["groups", "activeKey", "title", "icon", "collapsible", "collapsed"],
-  // Item keys also render to the DOM: after a re-render that swaps the page for
-  // the disabled state, findComponent no longer resolves this stub.
+  // Rendered item keys, because findComponent loses this stub once the page swaps out.
   template:
     '<div class="section-rail"><template v-for="g in groups" :key="g.label"><i v-for="item in g.items" :key="item.key" :data-rail-item="item.key" /></template></div>',
 };
@@ -257,8 +247,7 @@ describe("AIObservabilityShell — enterprise/cloud builds with online evaluatio
   });
 });
 
-// O2_EVAL_ENABLED=false: the server does not register the evaluation APIs, so
-// those sections leave the rail and their deep links show one disabled state.
+// O2_EVAL_ENABLED=false: evaluation sections leave the rail and deep links show the disabled state.
 describe("AIObservabilityShell — enterprise/cloud builds with online evaluations off", () => {
   beforeEach(() => {
     mockIsEnterprise = "true";
@@ -289,19 +278,13 @@ describe("AIObservabilityShell — enterprise/cloud builds with online evaluatio
     expect(wrapper.find('[data-test="router-view"]').exists()).toBe(false);
   });
 
-  it("still renders the page on a route that does not need evaluations", async () => {
-    mockRoute.name = "aiPrompts";
-    const wrapper = await mountShell();
-    expect(wrapper.find('[data-test="router-view"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="online-evals-disabled"]').exists()).toBe(false);
-  });
-
-  it("switches to the disabled state and drops the sections once a late /config reports evaluations off", async () => {
-    mockState.zoConfig = {};
+  it("swaps the page for the disabled state and drops the sections when /config turns evaluations off", async () => {
+    mockState.zoConfig = { version: "v1", online_evals_enabled: true };
     mockRoute.name = "aiExperiments";
     mockRoute.meta = { requiresOnlineEvals: true };
     const wrapper = await mountShell();
     expect(wrapper.find('[data-test="router-view"]').exists()).toBe(true);
+    expect(wrapper.find('[data-rail-item="experiments"]').exists()).toBe(true);
 
     mockState.zoConfig = { version: "v1", online_evals_enabled: false };
     await nextTick();

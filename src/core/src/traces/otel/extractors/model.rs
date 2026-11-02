@@ -26,8 +26,7 @@ use crate::traces::otel::attributes::{
 pub struct ModelExtractor;
 
 impl ModelExtractor {
-    /// Extract the model name: response model, else request model. Used for pricing
-    /// and tokenization, and stored as the response model on successful spans.
+    /// Extract the model name (response model, else request model) for pricing and tokenization.
     pub fn extract(&self, attributes: &HashMap<String, json::Value>) -> Option<String> {
         let model_name_keys = [
             GenAiAttributes::RESPONSE_MODEL,
@@ -48,8 +47,7 @@ impl ModelExtractor {
         None
     }
 
-    /// Extract the model name only from response attributes, i.e. the model that
-    /// actually answered. Absent on calls that failed before a response.
+    /// Extract only the response model, i.e. the model that actually answered.
     pub fn extract_response_model(
         &self,
         attributes: &HashMap<String, json::Value>,

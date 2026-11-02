@@ -210,8 +210,7 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    // `/providers` exists only with online evaluations on; the settings shell
-    // reads this meta to render the evaluations-disabled state on a deep link.
+    // `/providers` exists only with online evaluations on, so the shell reads this meta.
     it("marks llmProviders as needing online evaluations", () => {
       const llmRoute = routes[0].children.find((child: any) => child.name === "llmProviders");
       expect(llmRoute.meta.requiresOnlineEvals).toBe(true);

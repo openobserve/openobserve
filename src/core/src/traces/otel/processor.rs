@@ -18,7 +18,7 @@
 //! Processes OpenTelemetry resource spans and enriches them with OpenObserve-specific
 //! attributes following gen-ai semantic conventions.
 
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, fmt::Write as _};
 
 use config::{
     meta::{
@@ -83,8 +83,7 @@ struct SpanExtractions {
     tool_call_result: Option<json::Value>,
     agent: AgentIdentity,
     evaluation: Evaluation,
-    /// Failed call (status ERROR) that reported neither usage nor cost: it gets no
-    /// estimated tokens, no computed cost and no request-derived response model.
+    /// Failed call with no usage or cost, so it gets no estimated tokens, cost or request model.
     failed_without_usage: bool,
 }
 
@@ -224,7 +223,6 @@ impl OtelIngestionProcessor {
         let op_name =
             map_to_gen_ai_operation_name(span_attributes, resource_attributes, Some(&scope_info));
         let model_name = self.model_extractor.extract(span_attributes);
-        let response_model = self.model_extractor.extract_response_model(span_attributes);
         let provider_name = self.provider_extractor.extract(span_attributes);
         let (input, output) =
             self.input_output_extractor
@@ -262,6 +260,9 @@ impl OtelIngestionProcessor {
         let evaluation = self.evaluation_extractor.extract(span_attributes);
         let failed_without_usage =
             span.is_error && usage_details.usage.is_empty() && cost.is_empty();
+        let response_model = failed_without_usage
+            .then(|| self.model_extractor.extract_response_model(span_attributes))
+            .flatten();
 
         SpanExtractions {
             op_name,
@@ -314,8 +315,7 @@ impl OtelIngestionProcessor {
         let mut cost_status = None;
         let mut zero_priced = false;
 
-        // A failed call that reported no usage consumed nothing we can know: estimating
-        // tokens from its request (and pricing them) would invent a cost.
+        // Estimating tokens for a failed call with no usage would invent a cost.
         if is_generation_or_embedding(extracted.op_name) && !extracted.failed_without_usage {
             // Zero means the payload carried no start time; treat it as unknown rather
             // than as 1970-01-01, which would land every such span in a time-of-day tier.
@@ -467,8 +467,7 @@ impl OtelIngestionProcessor {
             json::json!(extracted.op_name),
         );
 
-        // A failed call keeps only a model the response named; the request model is
-        // not evidence of which model answered.
+        // A failed call keeps only a response-named model; the request model proves nothing.
         let response_model = if extracted.failed_without_usage {
             extracted.response_model.as_ref()
         } else {
@@ -895,10 +894,7 @@ fn cache_input_tokens(usage: &HashMap<String, i64>) -> i64 {
     cache_read.saturating_add(cache_creation)
 }
 
-/// Text a tokenizer should count for a message payload: the `content` / `text` parts of
-/// message JSON (and tool-call arguments), not its keys, roles, ids or punctuation. A
-/// string that is not a JSON array/object is plain text. Structured input carrying none
-/// of those fields falls back to its string leaf values.
+/// Text a tokenizer should count: message `content`/`text` parts and tool-call arguments only.
 fn message_text(value: &json::Value) -> Cow<'_, str> {
     let parsed;
     let structured = match value {
@@ -933,13 +929,17 @@ fn collect_message_text(value: &json::Value, out: &mut String) {
                 "messages",
                 "tool_calls",
                 "toolCalls",
+                // OpenInference `message.content`, `contents.N.message_content.text`, tool calls.
+                "message",
+                "contents",
+                "message_content",
+                "tool_call",
             ] {
                 if let Some(v) = map.get(key) {
                     collect_message_text(v, out);
                 }
             }
-            // Tool call: `{function: {arguments}}` (OpenAI), `{arguments}`, or Vercel's
-            // `{args}` (ai@4) / `{input}` (ai@5+) tool-call parts.
+            // Tool call: OpenAI `{function: {arguments}}`, `{arguments}`, or Vercel `{args}`.
             if let Some(function) = map.get("function") {
                 collect_message_text(function, out);
             }
@@ -947,7 +947,11 @@ fn collect_message_text(value: &json::Value, out: &mut String) {
                 match map.get(key) {
                     Some(json::Value::String(s)) => push_text(out, s),
                     Some(v @ (json::Value::Object(_) | json::Value::Array(_))) => {
-                        push_text(out, &v.to_string())
+                        if !out.is_empty() {
+                            out.push('\n');
+                        }
+                        // Writing into a String cannot fail.
+                        let _ = write!(out, "{v}");
                     }
                     _ => {}
                 }
@@ -2761,8 +2765,7 @@ mod tests {
 
     #[test]
     fn test_vercel_ai5_generate_text_trace_prices_only_provider_call() {
-        // ai@5 `generateText` with default telemetry: the wrapper span carries the summed
-        // usage of its single `doGenerate` child.
+        // ai@5 `generateText`: the wrapper span carries its single `doGenerate` child's usage.
         let mut wrapper = attrs(&[
             ("ai.operationId", json::json!("ai.generateText")),
             ("operation.name", json::json!("ai.generateText")),
@@ -2881,8 +2884,7 @@ mod tests {
         assert_eq!(get_f64(&wrapper, GenAiAttributes::USAGE_COST), Some(0.0));
     }
 
-    /// Anthropic-like prices per token: input $3, output $15, cache read $0.30,
-    /// cache write $3.75 per 1M.
+    /// Anthropic-like per-1M prices: input $3, output $15, cache read $0.30, cache write $3.75.
     fn cache_pricing() -> Vec<CachedModelPricing> {
         use config::meta::model_pricing::PricingTierDefinition;
         vec![CachedModelPricing {
@@ -3191,26 +3193,47 @@ mod tests {
     }
 
     #[test]
-    fn test_message_text_extracts_text_and_tool_arguments() {
-        assert_eq!(message_text(&json::json!("plain prompt")), "plain prompt");
-        let messages = json::json!([
-            {"role": "system", "content": "Be brief."},
-            {"role": "assistant", "content": null, "tool_calls": [
-                {"id": "call_1", "type": "function",
-                 "function": {"name": "weather", "arguments": "{\"city\":\"Paris\"}"}}
-            ]},
-            {"role": "assistant", "content": [
-                {"type": "tool-call", "toolCallId": "c2", "toolName": "t", "input": {"q": 1}}
-            ]}
+    fn test_openinference_estimate_counts_message_text_only() {
+        let question = "What is the capital of France?";
+        let arguments = r#"{"city":"Paris"}"#;
+        let mut span_attrs = attrs(&[
+            ("openinference.span.kind", json::json!("LLM")),
+            ("llm.model_name", json::json!("gpt-4o")),
+            ("llm.input_messages.0.message.role", json::json!("user")),
+            (
+                "llm.input_messages.0.message.content",
+                json::json!(question),
+            ),
+            (
+                "llm.output_messages.0.message.role",
+                json::json!("assistant"),
+            ),
+            (
+                "llm.output_messages.0.message.tool_calls.0.tool_call.id",
+                json::json!("call_0123456789"),
+            ),
+            (
+                "llm.output_messages.0.message.tool_calls.0.tool_call.function.name",
+                json::json!("get_weather"),
+            ),
+            (
+                "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments",
+                json::json!(arguments),
+            ),
         ]);
-        assert_eq!(
-            message_text(&json::Value::String(messages.to_string())),
-            "Be brief.\n{\"city\":\"Paris\"}\n{\"q\":1}"
+        process_ctx(
+            &mut span_attrs,
+            None,
+            SpanContext::default(),
+            built_in_pricing(),
         );
-        // Non-message JSON falls back to its string values.
         assert_eq!(
-            message_text(&json::json!(r#"{"file_path":"/tmp/a.md"}"#)),
-            "/tmp/a.md"
+            get_i64(&span_attrs, GenAiAttributes::USAGE_INPUT_TOKENS),
+            Some(pricing::calculate_token_count("gpt-4o", question))
+        );
+        assert_eq!(
+            get_i64(&span_attrs, GenAiAttributes::USAGE_OUTPUT_TOKENS),
+            Some(pricing::calculate_token_count("gpt-4o", arguments))
         );
     }
 }

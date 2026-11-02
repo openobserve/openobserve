@@ -14,12 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  Stand-in for a page whose API the server registers only with online
-  evaluations on (`O2_EVAL_ENABLED`). The module shell renders this in place
-  of its router-view (see `useOnlineEvalsRouteOff`), so a deep link says the
-  feature is off instead of mounting a page whose every call 404s.
--->
+<!-- Rendered in place of a page whose API exists only with online evaluations on. -->
 <template>
   <OPageLayout
     :title="t('onlineEvals.disabled.title')"

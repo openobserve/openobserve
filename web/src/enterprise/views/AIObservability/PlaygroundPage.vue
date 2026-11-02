@@ -1221,8 +1221,7 @@ function openSaveAsPrompt(variantId: string) {
   savePromptOpen.value = true;
 }
 
-/** The one durable exit. Everything the experiment form needs travels in the
- *  query, so the handoff survives a full page load. */
+/** The one durable exit, carrying the experiment form's inputs in the query to survive a reload. */
 function createExperiment(variantId: string) {
   const variant = draft.variants.find((candidate) => candidate.id === variantId);
   if (!variant) return;

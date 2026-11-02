@@ -333,8 +333,7 @@ impl UsageExtractor {
                 attributes,
                 &[VercelAiSdkAttributes::USAGE_CACHED_INPUT_TOKENS],
             ) {
-                // ai@5 passes the provider's own input count through: OpenAI/Google count
-                // cached tokens in it, Anthropic/Bedrock report them separately.
+                // ai@5 passes through the provider's input count, which may include cache reads.
                 set_val_if_not_zero(&mut usage, "cache_read_input_tokens".to_string(), num);
                 input_includes_cache = !vercel_provider_reports_cache_separately(attributes);
             }
@@ -434,9 +433,7 @@ fn has_provider_native_cache_tokens(attributes: &HashMap<String, json::Value>) -
     .any(|key| attributes.contains_key(*key))
 }
 
-/// Vercel AI SDK providers whose ai@5 `inputTokens` excludes cache reads, as the
-/// provider API's own input count does (`ai.model.provider` is e.g. `anthropic.messages`,
-/// `vertex.anthropic.messages`, `amazon-bedrock`).
+/// Vercel AI SDK providers whose ai@5 `inputTokens` excludes cache reads (e.g. Anthropic, Bedrock).
 fn vercel_provider_reports_cache_separately(attributes: &HashMap<String, json::Value>) -> bool {
     attributes
         .get(VercelAiSdkAttributes::MODEL_PROVIDER)

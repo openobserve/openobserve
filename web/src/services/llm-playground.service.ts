@@ -55,9 +55,7 @@ export interface PlaygroundRunRequest {
   /** Already rendered: `{{tokens}}` are substituted client-side, so the server
    *  binds nothing and `row` is omitted from the request. */
   messages: PlaygroundRequestMessage[];
-  /** Sampling parameters, sent verbatim. The server reads `temperature` and
-   *  `max_tokens` (each defaulting when absent) and passes every other key —
-   *  top_p, stop, provider-specific options — through to the provider. */
+  /** Sampling parameters sent verbatim; keys beyond `temperature`/`max_tokens` pass through. */
   params: Record<string, unknown>;
   /** Definitions only. The Playground never executes a tool — see `toolCall`. */
   tools?: PlaygroundRequestTool[];

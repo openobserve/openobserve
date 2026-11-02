@@ -30,44 +30,11 @@ use crate::traces::otel::attributes::{
 };
 
 /// Scope and span identity used for mapping
-#[derive(Clone, Copy, Debug, Default)]
 pub struct ScopeInfo<'a> {
     /// Instrumentation scope name
     pub name: Option<&'a str>,
     /// Span name; the Vercel AI SDK names its spans by operation id
     pub span_name: Option<&'a str>,
-}
-
-/// Vercel AI SDK operation id, from `ai.operationId` or else the span name.
-fn vercel_operation_id<'a>(
-    attributes: &'a HashMap<String, json::Value>,
-    scope: Option<&ScopeInfo<'a>>,
-) -> Option<&'a str> {
-    if let Some(id) = attributes
-        .get(VercelAiSdkAttributes::OPERATION_ID)
-        .and_then(|v| v.as_str())
-    {
-        return Some(id);
-    }
-    let scope = scope?;
-    if scope.name != Some("ai") {
-        return None;
-    }
-    scope.span_name.filter(|name| name.starts_with("ai."))
-}
-
-/// Map a Vercel AI SDK operation id to an operation name. The top-level calls
-/// (`ai.generateText`, …) wrap one or more provider calls (`*.doGenerate`,
-/// `*.doStream`, `*.doEmbed`) and report their summed usage, so they are
-/// aggregates and must not be priced on top of the provider calls.
-fn map_vercel_operation_id(operation_id: &str) -> Option<&'static str> {
-    match operation_id {
-        "ai.generateText" | "ai.streamText" | "ai.generateObject" | "ai.streamObject"
-        | "ai.embed" | "ai.embedMany" => Some("invoke_workflow"),
-        "ai.embed.doEmbed" | "ai.embedMany.doEmbed" => Some("embeddings"),
-        id if id.ends_with(".doGenerate") || id.ends_with(".doStream") => Some("chat"),
-        _ => None,
-    }
 }
 
 const KNOWN_GEN_AI_OPERATION_NAME_VALUES: &[&str] = &[
@@ -95,8 +62,7 @@ pub fn map_to_gen_ai_operation_name(
     _resource_attributes: &HashMap<String, json::Value>,
     scope: Option<&ScopeInfo<'_>>,
 ) -> &'static str {
-    // Priority 0: Vercel AI SDK operation id. Checked first so a wrapper span is never
-    // classified as a call from its model or usage attributes.
+    // Priority 0: Vercel AI SDK operation id, so a wrapper span is never classified as a call.
     if let Some(op) = vercel_operation_id(attributes, scope).and_then(map_vercel_operation_id) {
         return op;
     }
@@ -310,6 +276,35 @@ pub fn is_generation_or_embedding(op_name: &str) -> bool {
         op_name,
         "chat" | "text_completion" | "generate_content" | "embeddings"
     )
+}
+
+/// Vercel AI SDK operation id, from `ai.operationId` or else the span name.
+fn vercel_operation_id<'a>(
+    attributes: &'a HashMap<String, json::Value>,
+    scope: Option<&ScopeInfo<'a>>,
+) -> Option<&'a str> {
+    if let Some(id) = attributes
+        .get(VercelAiSdkAttributes::OPERATION_ID)
+        .and_then(|v| v.as_str())
+    {
+        return Some(id);
+    }
+    let scope = scope?;
+    if scope.name != Some("ai") {
+        return None;
+    }
+    scope.span_name.filter(|name| name.starts_with("ai."))
+}
+
+/// Wrapper operations (`ai.generateText`, …) sum their children's usage, so stay unpriced.
+fn map_vercel_operation_id(operation_id: &str) -> Option<&'static str> {
+    match operation_id {
+        "ai.generateText" | "ai.streamText" | "ai.generateObject" | "ai.streamObject"
+        | "ai.embed" | "ai.embedMany" => Some("invoke_workflow"),
+        "ai.embed.doEmbed" | "ai.embedMany.doEmbed" => Some("embeddings"),
+        id if id.ends_with(".doGenerate") || id.ends_with(".doStream") => Some("chat"),
+        _ => None,
+    }
 }
 
 #[cfg(test)]

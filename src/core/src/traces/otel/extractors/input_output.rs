@@ -136,11 +136,7 @@ impl InputOutputExtractor {
             return (Some(input.clone()), output.cloned());
         }
 
-        // OpenInference structured messages (llm.input_messages.* / llm.output_messages.*).
-        // Checked before the generic `input.value` / `output.value` fallback: OpenInference
-        // LLM spans carry both, and the structured form keeps roles, tool calls and results.
-        // A side without structured messages (e.g. a failed or streamed call with no
-        // `llm.output_messages.*`) still falls back to its `*.value` attribute.
+        // Structured OpenInference messages first: they keep roles and tool calls over `*.value`.
         let (input, output) = self.extract_openinference_nested(attributes);
         if input.is_some() || output.is_some() {
             return (
@@ -272,8 +268,7 @@ impl InputOutputExtractor {
                     .as_str()
                     .and_then(|s| json::from_str::<json::Value>(s).ok())
                     .unwrap_or_else(|| tool_calls.clone());
-                // Serialise to one string like every other output value: an object here
-                // would be flattened at ingest into `_role`/`_content`/`_tool_calls` columns.
+                // A string, since an object would be flattened into `_role`/`_content` columns.
                 Some(json::Value::String(
                     json::json!({
                         "role": "assistant",
@@ -875,6 +870,26 @@ mod tests {
             output[0]["message"]["tool_calls"][0]["tool_call"]["function"]["name"],
             "get_weather"
         );
+    }
+
+    #[test]
+    fn test_openinference_side_without_structured_messages_keeps_its_value() {
+        let extractor = InputOutputExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("input.value".to_string(), json::json!("raw request"));
+        attrs.insert("output.value".to_string(), json::json!("streamed answer"));
+        attrs.insert(
+            "llm.input_messages.0.message.role".to_string(),
+            json::json!("user"),
+        );
+        attrs.insert(
+            "llm.input_messages.0.message.content".to_string(),
+            json::json!("Weather?"),
+        );
+
+        let (input, output) = extractor.extract(&[], &attrs, "openinference");
+        assert_eq!(input.unwrap()[0]["message"]["content"], "Weather?");
+        assert_eq!(output, Some(json::json!("streamed answer")));
     }
 
     #[test]

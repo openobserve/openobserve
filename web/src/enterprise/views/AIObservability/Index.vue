@@ -104,8 +104,7 @@ const orgQuery = computed(() => ({
 
 const activeSection = computed<string>(() => navSection(route.name, route.query.tab));
 
-// A deep link to an evaluation page on a server with evaluations off renders
-// the disabled state instead of the page (whose every call would 404).
+// A deep link to an evaluation page with evaluations off renders the disabled state instead.
 const onlineEvalsRouteOff = useOnlineEvalsRouteOff();
 
 // Single source of truth for the rail items (groups) AND the breadcrumb
@@ -116,11 +115,10 @@ const onlineEvalsRouteOff = useOnlineEvalsRouteOff();
 // route. Every section beyond Monitor's LLM Insights + Sessions is
 // enterprise/cloud-only — rather than hiding those items in OSS, they stay
 // visible but locked (lock icon + pitch-card tooltip), matching the
-// Settings/IAM rail pattern. On enterprise/cloud with online evaluations off,
-// the evaluation sections (ONLINE_EVAL_FEATURE_KEYS) are left out entirely —
-// there is nothing to upgrade to, the server simply doesn't serve them.
+// Settings/IAM rail pattern.
 const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => {
   const featureGateCtx = buildFeatureGateContext(store.state.zoConfig);
+  // With online evaluations off the server serves no evaluation sections, so drop them.
   const hideEvalSections = hidesOnlineEvalEntries(store.state.zoConfig);
   // Memoized per featureKey, not per nav item — the four Evaluate entries
   // share one key and would otherwise recompute the same access check 4x.

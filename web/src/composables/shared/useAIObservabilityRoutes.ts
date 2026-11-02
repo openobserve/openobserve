@@ -363,18 +363,7 @@ const AI_OBSERVABILITY_SUB_ROUTES: AiObservabilitySubRoute[] = [
   },
 ];
 
-/**
- * The sections whose backend API the server registers only with online
- * evaluations on (`O2_EVAL_ENABLED`; the `llm_eval_config.enabled` block of the
- * HTTP router): Discovery (`/discovery`), Queues (`/annotation_queues`),
- * Datasets (`/datasets`), Playground (`/playground/*`, `/providers`),
- * Experiments (`/experiments`), Remote Tasks (`/tasks`) and the four Evaluate
- * tabs (`/score_configs`, `/scorers`, `/eval_jobs`). LLM Insights, Sessions,
- * Agent Graph, Agent Behavior and Prompts read APIs registered regardless, so
- * they stay. With evaluations off these are left out of the rail and their
- * routes (sub-routes included) carry `meta.requiresOnlineEvals`, which makes
- * the shell render the disabled state instead of the page.
- */
+/** Sections whose backend API the server registers only with online evaluations on. */
 export const ONLINE_EVAL_FEATURE_KEYS: Partial<Record<FeatureKey, true>> = {
   discovery: true,
   queues: true,

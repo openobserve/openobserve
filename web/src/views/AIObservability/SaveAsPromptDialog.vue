@@ -227,8 +227,7 @@ async function save(value: SaveAsPromptForm) {
       if (currentGeneration !== generation) return;
       if (target.status !== "active" || target.type !== content.type)
         throw new Error(t("aiObservability.promptManagement.selectActivePrompt"));
-      // The server rejects baseVersion and baseHash together: the head version
-      // names the base, and ifHead turns a concurrent append into a conflict.
+      // baseVersion and baseHash are exclusive; ifHead turns a concurrent append into a conflict.
       const result = await createVersion.mutateAsync({
         entityId: target.entityId,
         input: {

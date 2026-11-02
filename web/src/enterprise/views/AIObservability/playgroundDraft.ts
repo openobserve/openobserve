@@ -52,9 +52,8 @@ export interface PlaygroundTool {
   parameters: string;
 }
 
-/** What a managed prompt stored for the settings the bench shows in its own
- *  form, kept so saving back can tell an untouched setting from an edit. */
-export interface PlaygroundPromptBasis {
+/** Prompt-stored bench settings, kept so saving back can tell an untouched setting from an edit. */
+interface PlaygroundPromptBasis {
   /** Null when the prompt names no model and the provider's default runs it. */
   model: string | null;
   /** `config.tools` exactly as stored, `null` included. */
@@ -65,18 +64,14 @@ export interface PlaygroundVariant {
   id: string;
   providerId: string;
   model: string;
-  /** Free text, coerced when the run is built. Blank is unset: the run leaves it
-   *  out for the server's default, and a saved prompt does not gain one. */
+  /** Free text coerced at run time, where blank leaves it to the server's default. */
   temperature: string;
-  /** Every sampling parameter except `temperature` — max_tokens, top_p, stop,
-   *  provider-specific keys — carried verbatim from the prompt this variant was
-   *  opened from and sent on every run. Null when the source had no params
-   *  object; absent in drafts stored before this field existed. */
+  /** Sampling params except `temperature`, carried verbatim from the source prompt to every run. */
   params?: Record<string, unknown> | null;
   messages: PlaygroundMessage[];
   tools: PlaygroundTool[];
   responseSchema: string | null;
-  /** The managed prompt this variant was opened from. Absent for any other. */
+  /** The managed prompt this variant was opened from, if any. */
   promptBasis?: PlaygroundPromptBasis;
 }
 
@@ -321,10 +316,8 @@ export function withFieldInserted(variant: PlaygroundVariant, field: string): Pl
 
 // ── prompt config ─────────────────────────────────────────────────
 
-/** A prompt's tool definitions in the bench's editable form. Takes the OpenAI
- *  `{ type, function }` shape or a flat definition; an unnamed entry is not a
- *  tool the bench can show. */
-export function promptTools(value: unknown): PlaygroundTool[] {
+/** A prompt's tool definitions in editable form, from OpenAI `{ type, function }` or flat shape. */
+function promptTools(value: unknown): PlaygroundTool[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry): PlaygroundTool[] => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
@@ -343,13 +336,7 @@ export function promptTools(value: unknown): PlaygroundTool[] {
   });
 }
 
-/**
- * The settings a variant opens with from a prompt's config.
- *
- * A numeric temperature moves into the bench's own field. Everything else in
- * `params` rides along verbatim — a non-numeric temperature included, so the
- * run rejects it out loud instead of the bench dropping it in silence.
- */
+/** Variant settings from a prompt config, moving only a numeric temperature into its own field. */
 export function variantSettingsFromPrompt(
   config: PromptConfig,
 ): Pick<
@@ -372,7 +359,7 @@ export function variantSettingsFromPrompt(
 }
 
 /** The typed temperature, or undefined when the field is blank or not a number. */
-export function temperatureValue(variant: PlaygroundVariant): number | undefined {
+function temperatureValue(variant: PlaygroundVariant): number | undefined {
   const text = variant.temperature.trim();
   if (!text) return undefined;
   const value = Number(text);
@@ -405,16 +392,7 @@ function parseJsonOrNull(value: string): unknown | null {
   }
 }
 
-/**
- * The prompt config Save as Prompt writes for a variant.
- *
- * A setting the bench left alone goes back as the prompt stored it: carried
- * params verbatim, an unset temperature unset, the original `tools` (`null`
- * stays `null`) while the definitions are unchanged. A prompt that named no
- * model keeps naming none while the variant still runs `defaultModel`, the
- * provider default the bench seeded it with — which is what an unnamed model
- * resolves to anyway.
- */
+/** The prompt config Save as Prompt writes, returning untouched settings as stored. */
 export function promptConfigFor(variant: PlaygroundVariant, defaultModel = ""): PromptConfig {
   const basis = variant.promptBasis;
   const temperature = temperatureValue(variant);

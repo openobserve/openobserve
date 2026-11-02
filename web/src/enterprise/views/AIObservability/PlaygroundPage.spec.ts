@@ -555,8 +555,7 @@ describe("PlaygroundPage", () => {
       expect(page.savePromptConfig).toEqual(tuned);
     });
 
-    // The bench still seeds the provider's default so Run is reachable, but the
-    // prompt never named a model or a temperature and must not gain either.
+    // The bench seeds the provider default to run, but the saved prompt must not gain it.
     it("saves a version with no settings without a temperature or the seeded model", async () => {
       const bare: PromptConfig = { model: null, params: null, tools: null, responseFormat: null };
       openPrompt(bare);

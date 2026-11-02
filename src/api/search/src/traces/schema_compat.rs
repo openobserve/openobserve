@@ -76,6 +76,13 @@ impl LlmColumns {
     }
 }
 
+/// Schema facts for callers that only need the generation and usage layout.
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) struct StreamLlmLayout {
+    pub(super) has_gen_ai: bool,
+    pub(super) has_operation_name: bool,
+}
+
 /// Decide which schema generation an Arrow schema belongs to.
 ///
 /// Returns `true` when the new `gen_ai_*` columns are present (i.e. the stream
@@ -94,23 +101,12 @@ pub(super) fn columns_for(schema: &Schema) -> LlmColumns {
     }
 }
 
-/// Whether a new-schema stream stores `gen_ai_operation_name`, which usage
-/// totals need to tell aggregate (agent/workflow) spans from LLM calls.
+/// Whether the stream stores `gen_ai_operation_name`, which totals need to skip aggregate spans.
 pub(super) fn has_operation_name(schema: &Schema) -> bool {
     has_gen_ai_fields(schema) && schema.field_with_name(GEN_AI_OPERATION_NAME_COLUMN).is_ok()
 }
 
-/// Schema facts for callers that only need the generation and usage layout.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(super) struct StreamLlmLayout {
-    pub(super) has_gen_ai: bool,
-    pub(super) has_operation_name: bool,
-}
-
-/// Fetch the stream's Arrow schema from cache and decide whether it uses the
-/// new `gen_ai_*` columns and stores the operation name. Streams missing from
-/// the cache default to legacy so query SQL never references columns that
-/// aren't there for an unknown stream.
+/// The stream's LLM layout from the cached schema; an uncached stream counts as legacy.
 pub(super) async fn stream_llm_layout(
     org_id: &str,
     stream_name: &str,
@@ -125,8 +121,7 @@ pub(super) async fn stream_llm_layout(
         .unwrap_or_default()
 }
 
-/// Spans whose usage is their own rather than a roll-up of their children's.
-/// A span without an operation name counts as non-aggregate.
+/// Spans whose usage is their own, not a roll-up of their children's; no operation name counts.
 pub(super) fn non_aggregate_span_predicate() -> String {
     let ops = AGGREGATE_GEN_AI_OPERATIONS
         .iter()
@@ -138,8 +133,7 @@ pub(super) fn non_aggregate_span_predicate() -> String {
     )
 }
 
-/// `1` when the span group (trace) has a non-aggregate span reporting tokens,
-/// else `0`. When it is `1`, aggregate spans only repeat usage already counted.
+/// `1` when the trace has a non-aggregate span reporting tokens, else `0`.
 pub(super) fn has_leaf_usage_expr() -> String {
     format!(
         "max(CASE WHEN {} AND (gen_ai_usage_input_tokens > 0 OR gen_ai_usage_output_tokens > 0) \
@@ -148,11 +142,7 @@ pub(super) fn has_leaf_usage_expr() -> String {
     )
 }
 
-/// Sum a new-schema usage column over a span group without double-counting
-/// aggregate spans: sums non-aggregate spans when any of them reports tokens,
-/// otherwise every span (usage reported only on an agent span). Without the
-/// operation-name column aggregate spans are indistinguishable, so it is a
-/// plain sum.
+/// Usage sum skipping aggregate spans, or every span when no non-aggregate span reports tokens.
 pub(super) fn usage_sum_expr(column: &str, has_operation_name: bool) -> String {
     if !has_operation_name {
         return format!("sum({column})");
@@ -164,9 +154,7 @@ pub(super) fn usage_sum_expr(column: &str, has_operation_name: bool) -> String {
     )
 }
 
-/// Like [`usage_sum_expr`] for rows that already carry their trace's
-/// [`has_leaf_usage_expr`] value in `has_leaf_usage_col`, so the sum can span
-/// several traces (e.g. a session) while each trace keeps its own fallback.
+/// [`usage_sum_expr`] over rows carrying their trace's [`has_leaf_usage_expr`] flag.
 pub(super) fn per_trace_usage_sum_expr(column: &str, has_leaf_usage_col: &str) -> String {
     format!(
         "sum(CASE WHEN {has_leaf_usage_col} = 0 OR {} THEN {column} END)",
@@ -200,8 +188,7 @@ pub(super) struct ValidatedLlmSchema {
     pub(super) has_cost_net_cache_impact: bool,
     /// `gen_ai_usage_cost_status` exists (ingest marks unpriced / approximate spans).
     pub(super) has_cost_status: bool,
-    /// New schema with `gen_ai_operation_name`; usage totals then skip
-    /// aggregate spans (see [`usage_sum_expr`]).
+    /// New schema with `gen_ai_operation_name`, so usage totals skip aggregate spans.
     pub(super) has_operation_name: bool,
 }
 
@@ -431,6 +418,30 @@ mod tests {
         // than guess from partial migrations.
         let schema = schema_with(&["trace_id", "gen_ai_usage_cost"]);
         assert!(!has_gen_ai_fields(&schema));
+    }
+
+    #[test]
+    fn operation_name_column_is_detected_only_on_new_schema_streams() {
+        let with_op = schema_with(&[
+            "gen_ai_usage_input_tokens",
+            "gen_ai_usage_output_tokens",
+            "gen_ai_usage_cost",
+            "gen_ai_response_model",
+            "gen_ai_conversation_id",
+            "gen_ai_input_messages",
+            "gen_ai_output_messages",
+            "gen_ai_operation_name",
+        ]);
+        assert!(has_operation_name(&with_op));
+        assert!(
+            validate_llm_schema(&with_op, "s")
+                .unwrap()
+                .has_operation_name
+        );
+        let without_op = schema_with(&["gen_ai_usage_input_tokens", "gen_ai_conversation_id"]);
+        assert!(!has_operation_name(&without_op));
+        let legacy_with_op = schema_with(&["llm_usage_tokens_input", "gen_ai_operation_name"]);
+        assert!(!has_operation_name(&legacy_with_op));
     }
 
     #[test]

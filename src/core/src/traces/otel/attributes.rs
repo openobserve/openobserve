@@ -346,8 +346,7 @@ impl FrameworkAttributes {
     pub const TRACELOOP_ENTITY_INPUT: &'static str = "traceloop.entity.input";
     pub const TRACELOOP_ENTITY_OUTPUT: &'static str = "traceloop.entity.output";
     pub const TRACELOOP_SPAN_KIND: &'static str = "traceloop.span.kind";
-    /// OpenLLMetry association properties (also where its LangChain instrumentation puts
-    /// `RunnableConfig.metadata` keys such as `session_id` / `user_id`)
+    /// OpenLLMetry association properties, where LangChain puts `RunnableConfig.metadata` ids.
     pub const TRACELOOP_ASSOCIATION_SESSION_ID: &'static str =
         "traceloop.association.properties.session_id";
     pub const TRACELOOP_ASSOCIATION_USER_ID: &'static str =

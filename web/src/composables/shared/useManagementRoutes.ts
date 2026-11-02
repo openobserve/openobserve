@@ -153,8 +153,7 @@ const useManagementRoutes = () => {
     path: "llm_providers",
     name: "llmProviders",
     component: () => import("@/components/settings/LlmProvidersSettings.vue"),
-    // The settings shell renders the evaluations-disabled state when the
-    // server reports `online_evals_enabled: false` (`/providers` is then unregistered).
+    // `/providers` is unregistered when the server reports `online_evals_enabled: false`.
     meta: {
       titleKey: "llmProviders.title",
       requiresOnlineEvals: true,

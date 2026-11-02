@@ -596,9 +596,7 @@ describe("SettingsIndex", () => {
   });
 });
 
-// `/settings/llm_providers` calls `/providers`, which the server registers only
-// with online evaluations on. The rail hides the entry and a deep link renders
-// the evaluations-disabled state instead of the page.
+// `/providers` exists only with online evaluations on, so the rail hides it and deep links disable.
 describe("SettingsIndex — LLM providers with online evaluations off", () => {
   const LlmProvidersPage = { template: "<div data-test='llm-providers-page'></div>" };
   // SettingsIndex is a route component; its own <router-view> renders the section.

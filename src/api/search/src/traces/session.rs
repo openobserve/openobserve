@@ -35,6 +35,9 @@ use crate::{
     search::error_utils::map_error_to_http_response,
 };
 
+/// Per-row column carrying the span's trace-level `has_leaf_usage_expr`.
+const HAS_LEAF_USAGE_COL: &str = "zo_has_leaf_usage";
+
 /// Session-list pagination deliberately avoids an exact count query because
 /// counting every distinct session is more expensive than fetching one page.
 /// `total` is therefore a lower bound while `has_more` is true, and becomes
@@ -1233,13 +1236,7 @@ fn optional_usage_expr(has_field: bool, sum_expr: &str, alias: &str) -> String {
     }
 }
 
-/// Per-row column carrying the span's trace-level `has_leaf_usage_expr`.
-const HAS_LEAF_USAGE_COL: &str = "zo_has_leaf_usage";
-
-/// `FROM ... WHERE <predicate>` for a query that groups spans of several
-/// traces. With `with_leaf_usage` every row also carries its trace's
-/// [`HAS_LEAF_USAGE_COL`] (a window over `trace_id`), so
-/// [`session_usage_sum`] can skip aggregate spans per trace.
+/// `FROM` clause; with `with_leaf_usage` each row also carries its trace's [`HAS_LEAF_USAGE_COL`].
 fn session_span_rows_sql(stream_ident: &str, predicate: &str, with_leaf_usage: bool) -> String {
     if with_leaf_usage {
         format!(
@@ -1516,12 +1513,12 @@ fn build_latest_session_page_sql(
     };
     let direction = sort.order.sql();
     // Usage sorts must match the totals `build_latest_sessions_sql` reports.
-    let with_leaf_usage = validated.has_gen_ai
-        && validated.has_operation_name
-        && matches!(
-            sort.field,
-            LatestSessionSortField::TotalTokens | LatestSessionSortField::Cost
-        );
+    let with_leaf_usage = validated.has_operation_name
+        && match sort.field {
+            LatestSessionSortField::TotalTokens => validated.has_total_tokens,
+            LatestSessionSortField::Cost => true,
+            _ => false,
+        };
     let (sort_projection, order_by) = match sort.field {
         LatestSessionSortField::EndTime => (
             String::new(),
@@ -1627,7 +1624,7 @@ fn build_latest_sessions_sql(
         )
     };
 
-    let with_leaf_usage = validated.has_gen_ai && validated.has_operation_name;
+    let with_leaf_usage = validated.has_operation_name;
     let usage = |column: &str| session_usage_sum(column, with_leaf_usage);
     let optional_usage =
         |has_field: bool, column: &str| optional_usage_expr(has_field, &usage(column), column);
