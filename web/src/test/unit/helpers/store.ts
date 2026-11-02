@@ -94,6 +94,7 @@ const store = createStore({
     savedViewDialog: false,
     regionInfo: [],
     zoConfig: {
+      query_history_enabled: true,
       service_account_enabled: true,
       // Enterprise-shaped by default, which is what the synthetics specs were
       // written against. The specs that cover the OSS shape set it to false

@@ -355,7 +355,7 @@ export default defineComponent({
 
     onMounted(() => {
       if (router.currentRoute.value.name === "ingestion") {
-        router.push({
+        router.replace({
           name: "recommended",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
@@ -370,7 +370,7 @@ export default defineComponent({
 
     onUpdated(() => {
       if (router.currentRoute.value.name === "ingestion") {
-        router.push({
+        router.replace({
           name: "recommended",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,

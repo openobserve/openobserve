@@ -462,7 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       .fields.y[index]
                   "
                   :allowAggregation="
-                    !['heatmap', 'distribution'].includes(dashboardPanelData.data.type)
+                    !['heatmap', 'distribution', 'boxplot'].includes(dashboardPanelData.data.type)
                   "
                   :customQuery="
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -794,6 +794,8 @@ export default defineComponent({
         case "treemap":
         case "sunburst":
           return { x: t("panel.wellGroup"), y: t("panel.wellSize"), b: t("panel.wellSubgroup") };
+        case "boxplot":
+          return { x: t("panel.wellCategory"), y: t("panel.value"), b: null };
         default:
           return null;
       }
@@ -1214,6 +1216,7 @@ export default defineComponent({
           return t("dashboard.oneFieldMessage");
         case "gauge":
         case "bar-gauge":
+        case "boxplot":
           return t("dashboard.dashboardQueryBuilder.addZeroOrOneLabelField");
         default:
           return t("dashboard.maxtwofieldMessage");
@@ -1247,6 +1250,7 @@ export default defineComponent({
           return t("dashboard.oneValueFieldMessage");
         case "heatmap":
         case "state-timeline":
+        case "boxplot":
         case "hostmap":
           return t("dashboard.oneFieldMessage");
         default:

@@ -42,6 +42,7 @@ document.body.appendChild(node);
 
 // Mock the sqlUtils module
 vi.mock("@/utils/query/sqlUtils", () => ({
+  isExplainQuery: vi.fn(() => false),
   buildSqlQuery: vi.fn(),
   getFieldsFromQuery: vi.fn(),
   isSimpleSelectAllQuery: vi.fn((query) => {

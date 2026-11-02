@@ -48,6 +48,9 @@ export interface CardSubstitutions {
   isPrimaryCloud?: boolean;
 }
 
+/** Whether the ingest token behind `{token}` is known yet; a block carrying it renders only when "ready". */
+export type IngestTokenState = "ready" | "loading" | "unavailable";
+
 /** Context of a step → drives both the title chip and the code-block chrome. */
 export type StepChipKind = "terminal" | "editor" | "run" | "traces";
 

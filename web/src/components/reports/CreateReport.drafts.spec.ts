@@ -430,6 +430,25 @@ describe("CreateReport drafts", () => {
     expect(byTest("editor-draft-restore-dialog")).not.toBeNull();
   });
 
+  it("Cancel asks when the name was typed while the folders were still loading", async () => {
+    let release!: () => void;
+    vi.mocked(dashboardService.list_Folders).mockReturnValue(
+      new Promise((resolve) => {
+        release = () => resolve({ data: { list: [{ name: "Default", folderId: "folder-1" }] } });
+      }) as never,
+    );
+    await mountEditor("/reports/create");
+    await fillField("add-report-name-input", "typed-early");
+    release();
+    await flushPromises();
+
+    expect(form().state.values.name).toBe("typed-early");
+    expect(vm().reportDraft.hasUnsavedChanges()).toBe(true);
+    click("add-report-cancel-btn");
+    await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+  });
+
   it("Cancel with unsaved changes asks, and Discard drops the draft and leaves", async () => {
     await mountEditor("/reports/create");
     await edit({ name: "to-discard" });

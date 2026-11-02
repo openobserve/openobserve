@@ -66,6 +66,8 @@ const guardedRouters = new WeakSet<Router>();
 
 let pendingNavigation: RouteLocationNormalized | null = null;
 
+let arrivalPending = false;
+
 let historyStateProvider: () => LogsHistoryState = () => ({
   zoomStack: [],
   returnPreset: null,
@@ -252,9 +254,19 @@ export function urlWriteMode(
   current: LocationQuery | Record<string, unknown>,
   next: LocationQueryRaw | Record<string, unknown>,
 ): LogsUrlMode {
+  // The first search write after entering Logs only normalizes the link it arrived on; pushing it would trap Back on Logs.
+  if (arrivalPending) {
+    arrivalPending = false;
+    return "replace";
+  }
   return changedParams(current, next).every((key) => VIEW_STATE_PARAMS.has(key))
     ? "replace"
     : "push";
+}
+
+/** Called when the Logs landing runs no search, so the user's first deliberate search keeps its own history entry. */
+export function endLogsArrival(): void {
+  arrivalPending = false;
 }
 
 export function writeLogsUrl(mode: LogsUrlMode, query: LocationQueryRaw): Promise<unknown> {
@@ -286,6 +298,7 @@ export function routeHasLineLink(query: LocationQuery | Record<string, unknown>)
 export function resetLogsUrlForTests(): void {
   boundRouter = null;
   pendingNavigation = null;
+  arrivalPending = false;
   resetShownSearch();
   sharedPage.value = null;
   sharedPageNotice.value = null;
@@ -295,11 +308,13 @@ export function resetLogsUrlForTests(): void {
 function trackPendingNavigation(router: Router): void {
   if (guardedRouters.has(router) || typeof router.beforeEach !== "function") return;
   guardedRouters.add(router);
+  arrivalPending = router.currentRoute.value?.name === "logs";
   router.beforeEach((to) => {
     pendingNavigation = to;
   });
-  router.afterEach((to) => {
+  router.afterEach((to, from, failure) => {
     if (pendingNavigation === to) pendingNavigation = null;
+    if (!failure && to.name !== from.name) arrivalPending = to.name === "logs";
   });
   // A guard that throws skips afterEach, so clear here or Logs URL writes stay blocked.
   router.onError(() => {

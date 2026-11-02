@@ -30,6 +30,27 @@ enum Inner {
     Distributed(Option<infra::dist_lock::Locker>),
 }
 
+/// Longest a save or delete waits for the org-wide composition lock locally.
+/// The existing lock-wait config (`ZO_NATS_LOCK_WAIT_TIMEOUT`, 3600s) belongs to
+/// NATS and is far too long for a request, so this is a fixed bound. A stuck
+/// holder then fails the request with a retryable error instead of hanging it.
+const LOCAL_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+
+async fn lock_local(
+    key: &str,
+    wait: std::time::Duration,
+) -> Result<tokio::sync::OwnedMutexGuard<bool>, infra::errors::Error> {
+    let holder = infra::local_lock::lock(key).await?;
+    tokio::time::timeout(wait, holder.lock_owned())
+        .await
+        .map_err(|_| {
+            infra::errors::Error::Message(format!(
+                "timed out after {}s waiting for the synthetics composition lock; retry shortly",
+                wait.as_secs()
+            ))
+        })
+}
+
 pub async fn lock(org_id: &str) -> Result<CompositionGuard, infra::errors::Error> {
     #[cfg(test)]
     {
@@ -41,8 +62,7 @@ pub async fn lock(org_id: &str) -> Result<CompositionGuard, infra::errors::Error
     }
     let key = format!("/synthetics/composition/{org_id}");
     let inner = if config::get_config().common.local_mode {
-        let holder = infra::local_lock::lock(&key).await?;
-        Inner::Local(holder.lock_owned().await)
+        Inner::Local(lock_local(&key, LOCAL_LOCK_WAIT).await?)
     } else {
         Inner::Distributed(infra::dist_lock::lock(&key, 0).await?)
     };
@@ -59,5 +79,24 @@ impl CompositionGuard {
             }
             Inner::Distributed(locker) => infra::dist_lock::unlock(locker).await,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn local_lock_contention_times_out_then_recovers_on_release() {
+        let key = "/synthetics/composition/lock-timeout-test";
+        let held = lock_local(key, Duration::from_secs(1)).await.unwrap();
+        let err = lock_local(key, Duration::from_millis(50))
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("retry"), "{err}");
+        drop(held);
+        lock_local(key, Duration::from_millis(50)).await.unwrap();
     }
 }

@@ -21,7 +21,7 @@ use promql_parser::parser::Expr as PromExpr;
 
 use super::Engine;
 use crate::{
-    ast::at_modifier::{Pin, pin, rebase_at},
+    ast::at_modifier::{Pin, pin, rebase_at, uses_at},
     exec::PromqlContext,
 };
 
@@ -61,8 +61,8 @@ impl Engine {
         let pinned_eval_ctx = EvalContext::new(at, at, self.eval_ctx.step, self.trace_id.clone());
         let ctx = std::mem::replace(&mut self.ctx, pinned_ctx);
         let eval_ctx = std::mem::replace(&mut self.eval_ctx, pinned_eval_ctx);
-        // the rebase left no `@` behind
-        let has_at_modifier = std::mem::replace(&mut self.has_at_modifier, false);
+        // a pinned subquery's body keeps its own `@`
+        let has_at_modifier = std::mem::replace(&mut self.has_at_modifier, uses_at(&expr));
         let value = self.exec_expr(&expr).await;
         self.ctx = ctx;
         self.eval_ctx = eval_ctx;

@@ -703,6 +703,20 @@ describe("buildPrefillFromPanel — a formula query", () => {
     expect(p.streamCandidates).toBeUndefined();
   });
 
+  it("offers the metrics of inputs reached through a referenced formula", () => {
+    const panel = formulaPanel("F2 * 2");
+    panel.queries!.push({
+      query: "",
+      fields: { stream: "", stream_type: "metrics" },
+      config: { formula: "A / B", hide: true },
+    });
+    const p = buildPrefillFromPanel(panel, makeId);
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual([
+      "http_errors_total",
+      "http_requests_total",
+    ]);
+  });
+
   it("gives legacy inputs without a stored letter their positional one", () => {
     const panel = formulaPanel("A + B");
     delete panel.queries![0].config.ref;
@@ -782,5 +796,10 @@ describe("buildPrefillFromPanel — a formula query", () => {
     const p = buildPrefillFromPanel(formulaPanel("A / B", { queryIndex: 1 }), makeId);
     expect(p.streamName).toBe("http_requests_total");
     expect(p.streamCandidates).toBeUndefined();
+  });
+
+  it("alerts on a logs panel's rows", () => {
+    const logs = buildPrefillFromPanel(sqlPanel({ panelType: "logs" }), makeId);
+    expect(logs.warnings.map((w) => w.key)).not.toContain("unsupportedPanelType");
   });
 });

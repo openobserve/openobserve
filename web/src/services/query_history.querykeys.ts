@@ -14,10 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { orgKey } from "@/composables/query/keys";
+import type { QueryHistoryListParams } from "./query_history";
 
-/** `all` is the invalidation scope; the list sits beneath it, keyed by its filters. */
+/** `all` is the invalidation scope; every list sits beneath it, keyed by its filters. */
 export const queryHistoryKeys = {
-  all: (org: string) => orgKey(org, "metrics", "queryHistory"),
-  list: (org: string, starred: boolean, q: string) =>
-    orgKey(org, "metrics", "queryHistory", "list", { starred, q }),
+  all: (org: string) => orgKey(org, "queryHistory"),
+  list: (org: string, filters: QueryHistoryListParams) =>
+    orgKey(org, "queryHistory", "list", filters),
+  recent: (org: string, source: string) => orgKey(org, "queryHistory", "recent", source),
 };

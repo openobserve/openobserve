@@ -18,15 +18,10 @@ use axum::{
     response::Response,
 };
 use hashbrown::HashMap;
-use o2_enterprise::enterprise::cloud::{
-    billing_group,
-    billings::{self, MeteringProvider},
-};
+use o2_enterprise::enterprise::cloud::billings::MeteringProvider;
 
-use super::IntoHttpResponse;
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    models::billings::GetOrgUsageResponseBody, service::org_usage,
+    common::meta::http::HttpResponse as MetaHttpResponse, models::billings::GetOrgUsageResponseBody,
 };
 
 /// GetUsageData

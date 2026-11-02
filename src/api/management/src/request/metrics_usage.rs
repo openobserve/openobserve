@@ -61,3 +61,41 @@ pub async fn get_metric_usage(
         }
     }
 }
+
+/// GetOrgMetricUsage
+#[utoipa::path(
+    get,
+    path = "/{org_id}/metrics/usage",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "GetOrgMetricUsage",
+    summary = "How much each metric is used",
+    description = "Counts, per metric, the dashboards, alerts, SLOs and scheduled pipelines the caller can read whose queries reference it, in one scan of the org",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = usage::OrgMetricUsage),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "list"}))
+    ),
+)]
+pub async fn get_org_metric_usage(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    match usage::org_metric_usage(&org_id, &user_email.user_id).await {
+        Ok(found) => MetaHttpResponse::json(found),
+        Err(e) => {
+            tracing::error!("[metric usage] org scan failed for {org_id}: {e}");
+            MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                "internal error".to_string(),
+            )
+            .into_response()
+        }
+    }
+}

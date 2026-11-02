@@ -43,28 +43,41 @@ test.describe('Metrics editor query history', () => {
     await custom.click();
     await expect(custom).toHaveAttribute('data-state', 'on');
     await runAndRecord(page, pm, first);
+    await runAndRecord(page, pm, second);
 
     await metrics.openQueryHistory();
     await metrics.searchQueryHistory(String(marker));
     await expect(metrics.historyRow(first)).toHaveCount(1, { timeout: 15000 });
+    await expect(metrics.historyRow(second)).toHaveCount(1, { timeout: 15000 });
 
-    // Star it: the toggle flips, and the entry survives "starred only".
+    // Star one: the toggle flips, and "starred only" keeps it and drops the unstarred one.
     const starred = page.waitForResponse(isHistoryCall('PATCH'));
     await metrics.historyStarButton(first).click();
     expect((await starred).ok()).toBe(true);
     await expect(metrics.historyStarButton(first)).toHaveAttribute('aria-label', 'Unstar');
+    const starredOnlyBox = metrics.historyStarredOnly.locator('[role="checkbox"]');
+    // The new filter shows a skeleton until its list answers, and a skeleton has no rows to find.
+    const starredList = page.waitForResponse(
+      (res) => {
+        const params = new URL(res.url()).searchParams;
+        return isHistoryCall('GET')(res) && params.get('starred') === 'true' && !params.has('count_only');
+      },
+      { timeout: 30000 },
+    );
     await metrics.historyStarredOnly.click();
+    await expect(starredOnlyBox).toHaveAttribute('aria-checked', 'true');
+    const starredRows = await (await starredList).json();
+    expect(starredRows.map((row) => row.query)).toContain(first);
+    expect(starredRows.map((row) => row.query)).not.toContain(second);
     await expect(metrics.historyRow(first)).toHaveCount(1, { timeout: 15000 });
+    await expect(metrics.historyRow(second)).toHaveCount(0);
     await metrics.historyStarredOnly.click();
-    await page.keyboard.press('Escape');
-    await expect(metrics.historyTable).toBeHidden();
-
-    // Replace the editor's query, then load the starred entry back in place.
-    await runAndRecord(page, pm, second);
-    await metrics.openQueryHistory();
+    await expect(starredOnlyBox).toHaveAttribute('aria-checked', 'false');
     await expect(metrics.historyRow(second)).toHaveCount(1, { timeout: 15000 });
+
+    // The editor holds the second query; load the starred entry back in place.
     await metrics.loadHistoryEntry(first);
-    await expect(metrics.historyTable).toBeHidden();
+    await expect(metrics.historyDrawer).toBeHidden();
     await expect
       .poll(() => pm.metricsQueryEditorPage.getCurrentQueryText(), { timeout: 15000 })
       .toBe(first);
@@ -72,7 +85,8 @@ test.describe('Metrics editor query history', () => {
     // Starred entries are never reaped, so remove this run's from the user's history.
     await metrics.openQueryHistory();
     for (const query of [first, second]) {
-      const deleted = page.waitForResponse(isHistoryCall('DELETE'));
+      // The DELETE waits for the row's 6s Undo toast to close.
+      const deleted = page.waitForResponse(isHistoryCall('DELETE'), { timeout: 30000 });
       await metrics.deleteHistoryEntry(query);
       expect((await deleted).ok()).toBe(true);
       await expect(metrics.historyRow(query)).toHaveCount(0, { timeout: 15000 });

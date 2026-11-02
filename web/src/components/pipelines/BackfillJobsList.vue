@@ -537,7 +537,6 @@ const loadJobs = async () => {
   } catch (error: any) {
     console.error("Error loading backfill jobs:", error);
     forbidden.value = error?.response?.status === 403;
-    // The grouped access toast already reports a 403; a second red toast adds nothing.
     if (!forbidden.value) {
       toast({
         variant: "error",

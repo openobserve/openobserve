@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
-import organizations from "./organizations";
+import organizations, {
+  type BillingGroupMember,
+  type OrgDomainOwnership,
+  type OrgDomainRequest,
+} from "./organizations";
+import billings from "./billings";
 import { organizationKeys } from "./organizations.querykeys";
 import { MEDIUM_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
@@ -79,6 +84,40 @@ export const orgPasscodeQuery = (org: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+export const orgDomainsQuery = (org: string) =>
+  queryOptions({
+    queryKey: organizationKeys.domains(org),
+    queryFn: async (): Promise<OrgDomainOwnership[]> =>
+      (await organizations.list_org_domains(org)).data ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+// On the meta org this lists every org's requests.
+export const orgDomainRequestsQuery = (org: string) =>
+  queryOptions({
+    queryKey: organizationKeys.domainRequests(org),
+    queryFn: async (): Promise<OrgDomainRequest[]> =>
+      (await organizations.list_org_domain_requests(org)).data ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+export const billingGroupMembersQuery = (org: string) =>
+  queryOptions({
+    queryKey: organizationKeys.billingGroupMembers(org),
+    queryFn: async (): Promise<BillingGroupMember[]> =>
+      (await billings.list_billing_group_members(org)).data ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** Every org, readable from the meta org only. */
+export const adminOrgsQuery = (org: string) =>
+  queryOptions({
+    queryKey: organizationKeys.adminOrgs(org),
+    queryFn: async (): Promise<{ identifier: string; name: string }[]> =>
+      (await organizations.get_admin_org(org)).data?.data ?? [],
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
 // ── Writes ──────────────────────────────────────────────────────────────────
 
 export const createIngestionTokenMutation = (org: string) =>
@@ -114,5 +153,45 @@ export const updateOrgSettingsMutation = (org: string) =>
     // Not the selected org: domain management writes the meta org.
     mutationFn: (payload: any) => organizations.post_organization_settings(org, payload),
     // Every call site renders its own success and failure toasts.
-    meta: { invalidates: [organizationKeys.settings(org)], silentError: true },
+    meta: {
+      invalidates: [organizationKeys.settings(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
+  });
+
+export const linkOrgDomainMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (domain: string) => organizations.link_org_domain(org, domain),
+    meta: { invalidates: [organizationKeys.domains(org)], silentError: true },
+  });
+
+export const unlinkOrgDomainMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (domain: string) => organizations.unlink_org_domain(org, domain),
+    meta: { invalidates: [organizationKeys.domains(org)], silentError: true },
+  });
+
+export const verifyOrgDomainMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (domain: string) => organizations.verify_org_domain(org, domain),
+    meta: { invalidates: [organizationKeys.domains(org)], silentError: true },
+  });
+
+export const raiseOrgDomainRequestMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (domain: string) => organizations.raise_org_domain_request(org, domain),
+    meta: { invalidates: [organizationKeys.domainRequests(org)], silentError: true },
+  });
+
+export const decideOrgDomainRequestMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { id: string; approve: boolean; reason: string }) =>
+      vars.approve
+        ? organizations.approve_org_domain_request(org, vars.id, vars.reason)
+        : organizations.reject_org_domain_request(org, vars.id, vars.reason),
+    meta: {
+      invalidates: [organizationKeys.domainRequests(org), organizationKeys.domains(org)],
+      silentError: true,
+    },
   });

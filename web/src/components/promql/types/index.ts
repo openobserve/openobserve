@@ -36,6 +36,10 @@ export interface PromqlLabelMatcher {
   /** The four matchers PromQL defines: equal, not-equal, regex, negated regex. */
   op: "=" | "!=" | "=~" | "!~";
   value: string;
+  /** The OR group this matcher belongs to; absent means the base list every group is ANDed with. */
+  group?: number;
+  /** Set on every matcher of a negated group. */
+  negate?: boolean;
 }
 
 /** One step in the chain. PERSISTED — see the note above. */
@@ -169,6 +173,7 @@ export enum PromqlStepId {
   ClampMin = "clamp_min",
 
   // Time & date
+  Offset = "offset",
   Hour = "hour",
   Minute = "minute",
   Month = "month",

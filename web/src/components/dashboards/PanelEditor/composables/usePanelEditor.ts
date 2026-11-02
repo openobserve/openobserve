@@ -28,6 +28,7 @@ import type {
 } from "../types/panelEditor";
 
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { boxplotStatAliases } from "@/utils/dashboard/boxplotStats";
 import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useNotifications from "@/composables/useNotifications";
@@ -518,7 +519,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     return dashboardPanelData.meta.queryFields[queryIndex];
   };
 
-  const collectAliasesOf = (query: any): string[] => {
+  const collectAliasesOf = (query: any, chartType?: string): string[] => {
     const aliases: string[] = [];
     if (!query) return aliases;
 
@@ -527,6 +528,12 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
         if (!it.isDerived && it.alias) aliases.push(it.alias);
       });
     });
+    // A builder box plot returns its y statistics under derived aliases, not as the y alias itself.
+    if (chartType === "boxplot" && !query.customQuery) {
+      query.fields?.y?.forEach((it: any) => {
+        if (it.alias) aliases.push(...boxplotStatAliases(it.alias));
+      });
+    }
 
     const specialFields = [
       "latitude",
@@ -548,8 +555,8 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
 
   // Results can land after further edits, so the aliases of the query that produced them count too.
   const collectFieldAliasesForQuery = (queryIndex: number): string[] => [
-    ...collectAliasesOf(dashboardPanelData.data.queries[queryIndex]),
-    ...collectAliasesOf(chartData.value?.queries?.[queryIndex]),
+    ...collectAliasesOf(dashboardPanelData.data.queries[queryIndex], dashboardPanelData.data.type),
+    ...collectAliasesOf(chartData.value?.queries?.[queryIndex], chartData.value?.type),
   ];
 
   const buildAliasListForQuery = (queryIndex: number): string[] => {

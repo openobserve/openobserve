@@ -1013,6 +1013,28 @@ describe("ExperimentDetailPage", () => {
     );
   });
 
+  it("drops the previous experiment's rows from the table when the route switches experiments", async () => {
+    get.mockResolvedValue(makeExperimentDetail(makeExperiment({ id: "exp-1" })));
+    const wrapper = mount(ExperimentDetailPage, {
+      global: {
+        stubs: {
+          OTable: {
+            props: ["loadingResetKey"],
+            template: `<table :data-reset="loadingResetKey" />`,
+          },
+        },
+      },
+    });
+    await flushPromises();
+    const resetKey = () => wrapper.get("table").attributes("data-reset");
+    expect(resetKey()).toBe("exp-1");
+
+    route.params.id = "exp-2";
+    await flushPromises();
+    expect(resetKey()).toBe("exp-2");
+    route.params.id = "exp-1";
+  });
+
   it("re-fetches the results from the table toolbar", async () => {
     get.mockResolvedValue(makeExperimentDetail(makeExperiment({ id: "exp-1" })));
     const wrapper = mount(ExperimentDetailPage, {

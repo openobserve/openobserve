@@ -19,6 +19,7 @@ import {
   encodeDef,
   exclusionProblem,
   funnelParam,
+  pinnedAfter,
   stepRefParam,
 } from "@/utils/rum/productAnalyticsModel";
 import type { ExclusionStep, FunnelDef, StepRef } from "@/utils/rum/productAnalyticsQueries";
@@ -33,9 +34,15 @@ export interface FunnelEdit {
 const sameStep = (a: StepRef, b: StepRef): boolean =>
   JSON.stringify(stepRefParam(a)) === JSON.stringify(stepRefParam(b));
 
-const withX = (def: FunnelDef, steps: StepRef[], kept: ExclusionStep[]): FunnelDef => ({
+const withX = (
+  def: FunnelDef,
+  steps: StepRef[],
+  kept: ExclusionStep[],
+  pos: (k: number) => number | null,
+): FunnelDef => ({
   ...def,
   steps,
+  breakdown: pinnedAfter(def.breakdown, pos),
   ...(def.x ? { x: kept } : {}),
 });
 
@@ -66,7 +73,7 @@ export function reorderSteps(def: FunnelDef, order: number[]): FunnelEdit {
     if (inverted || exclusionProblem(steps, moved)) dropped.push(x);
     else kept.push(moved);
   }
-  return { def: withX(def, steps, kept), dropped };
+  return { def: withX(def, steps, kept, pos), dropped };
 }
 
 export function moveStep(def: FunnelDef, i: number, by: number): FunnelEdit | null {
@@ -95,6 +102,7 @@ export function removeStep(def: FunnelDef, i: number): FunnelEdit {
       def,
       def.steps.filter((_, j) => j !== i),
       kept,
+      (k) => (k === n ? null : shift(k)),
     ),
     dropped,
   };

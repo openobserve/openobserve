@@ -42,6 +42,7 @@ import {
   stateTimelineSourceRecord,
 } from "@/utils/dashboard/convertStateTimelineData";
 import { isFlowChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
+import { boxplotDrilldownSeries, boxplotDrilldownTime } from "@/utils/dashboard/convertBoxplotData";
 import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/convertHostmapData";
 
 // A click on these lands on a named item (slice, bar, tile), not on a named series.
@@ -245,6 +246,9 @@ export function usePanelDrilldown({
     if (panelSchema.value.type === "heatmap") {
       const { column, row } = heatmapCellValues(params);
       return { __name: row ?? params?.name, __value: value, __axisValue: column };
+    }
+    if (panelSchema.value.type === "boxplot") {
+      return boxplotDrilldownSeries(panelData?.value?.options, params);
     }
     return {
       __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type) ? params?.name : params?.seriesName,
@@ -876,7 +880,11 @@ export function usePanelDrilldown({
         const isHeatmap = panelSchema.value.type === "heatmap";
         // A host map cell spans the whole panel range; its value[0] is a cell index, not a time.
         const hoveredTime =
-          isHeatmap || queryDetails.type === "hostmap" ? null : drilldownParams[0]?.value?.[0];
+          isHeatmap || queryDetails.type === "hostmap"
+            ? null
+            : queryDetails.type === "boxplot"
+              ? boxplotDrilldownTime(queryDetails, panelData?.value?.options, drilldownParams[0])
+              : drilldownParams[0]?.value?.[0];
         const hoveredTimestamp = hoveredTime
           ? getUTCTimestampFromZonedTimestamp(hoveredTime, store.state.timezone)
           : null;

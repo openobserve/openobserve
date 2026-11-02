@@ -427,6 +427,41 @@ export default defineComponent({
       }
     };
 
+    const isEmptyValue = (value: any) =>
+      value === null || value === undefined || (Array.isArray(value) && value.length === 0);
+
+    const selectQueryValuesValue = (variableObject: any) => {
+      if (oldVariablesData[variableObject.name] !== undefined) {
+        variableLog(
+          variableObject.name,
+          `Old values before processing: ${JSON.stringify(oldVariablesData[variableObject.name])}`,
+        );
+
+        const oldValues = Array.isArray(oldVariablesData[variableObject.name])
+          ? oldVariablesData[variableObject.name]
+          : [oldVariablesData[variableObject.name]];
+
+        handleQueryValuesLogic(variableObject, oldValues);
+        return;
+      }
+
+      variableLog(variableObject.name, `Old values not found - keeping existing value if set`);
+
+      if (!isEmptyValue(variableObject.value)) return;
+
+      // Don't auto-select a blank option as default. Find the first non-blank option.
+      const firstNonBlankOption = variableObject.options.find(
+        (opt: any) => opt.value !== "" && opt.label !== "<blank>",
+      );
+      if (firstNonBlankOption) {
+        variableObject.value = variableObject.multiSelect
+          ? [firstNonBlankOption.value]
+          : firstNonBlankOption.value;
+      } else {
+        variableObject.value = variableObject.multiSelect ? [] : null;
+      }
+    };
+
     const handleSearchResponse = (payload: any, response: any, variableObject: any) => {
       variableLog(variableObject.name, `Received response...`);
 
@@ -452,6 +487,11 @@ export default defineComponent({
         (response.type === "event_progress" && response.content.percent === 100) ||
         response.type === "end"
       ) {
+        // A cached query streams its empty newest delta first, which settled the value before any rows arrived.
+        if (isEmptyValue(variableObject.value) && variableObject.options?.length) {
+          selectQueryValuesValue(variableObject);
+        }
+
         // Mark as partially loaded
         variableObject.isVariablePartialLoaded = true;
 
@@ -572,53 +612,7 @@ export default defineComponent({
             const originalValue = JSON.parse(JSON.stringify(variableObject.value));
 
             if (isFirstResponse) {
-              // Update options and handle first response
-              if (oldVariablesData[variableObject.name] !== undefined) {
-                variableLog(
-                  variableObject.name,
-                  `Old values before processing: ${JSON.stringify(oldVariablesData[variableObject.name])}`,
-                );
-
-                const oldValues = Array.isArray(oldVariablesData[variableObject.name])
-                  ? oldVariablesData[variableObject.name]
-                  : [oldVariablesData[variableObject.name]];
-
-                handleQueryValuesLogic(variableObject, oldValues);
-              } else {
-                // Don't auto-set value to first option if dropdown was just opened
-                // Only set default value during initial load or when explicitly needed
-                variableLog(
-                  variableObject.name,
-                  `Old values not found - keeping existing value if set`,
-                );
-
-                // Only set to first option if current value is null/undefined/empty
-                if (
-                  variableObject.value === null ||
-                  variableObject.value === undefined ||
-                  (Array.isArray(variableObject.value) && variableObject.value.length === 0)
-                ) {
-                  // Don't auto-select a blank option as default. Find the first non-blank option.
-                  if (variableObject.options.length) {
-                    // Find the first non-blank option
-                    const firstNonBlankOption = variableObject.options.find(
-                      (opt: any) => opt.value !== "" && opt.label !== "<blank>",
-                    );
-
-                    if (firstNonBlankOption) {
-                      // For multi-select, wrap in array; for single-select, use the value directly
-                      variableObject.value = variableObject.multiSelect
-                        ? [firstNonBlankOption.value]
-                        : firstNonBlankOption.value;
-                    } else {
-                      // All options are blank - keep value unset
-                      variableObject.value = variableObject.multiSelect ? [] : null;
-                    }
-                  } else {
-                    variableObject.value = variableObject.multiSelect ? [] : null;
-                  }
-                }
-              }
+              selectQueryValuesValue(variableObject);
 
               const hasValueChanged =
                 Array.isArray(originalValue) && Array.isArray(variableObject.value)

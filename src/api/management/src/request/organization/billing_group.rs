@@ -316,6 +316,23 @@ pub async fn remove_member(
     if let Err(e) = billing_group::remove_billing_member(&org_id, &member_org_id).await {
         return HttpResponse::bad_request(format!("error in removing member: {e}"));
     }
+
+    let org_id_copy = member_org_id.clone();
+
+    if let Err(e) = db::organization::update_org_setting(&org_id, move |settings| {
+        let before = settings.domain_org_mappings.len();
+        settings
+            .domain_org_mappings
+            .retain(|m| m.org_id != member_org_id);
+        settings.domain_org_mappings.len() != before
+    })
+    .await
+    {
+        log::error!(
+            "error updating domain mapping for {org_id_copy} after removing the membership from {org_id} : {e}"
+        );
+    };
+
     HttpResponse::ok("successfully removed")
 }
 
@@ -366,6 +383,23 @@ pub async fn leave_group(
     if let Err(e) = billing_group::remove_billing_member(&membership.payer_org_id, &org_id).await {
         return HttpResponse::bad_request(format!("error in leaving billing group: {e}"));
     }
+
+    let org_id_copy = org_id.clone();
+
+    if let Err(e) =
+        db::organization::update_org_setting(&membership.payer_org_id, move |settings| {
+            let before = settings.domain_org_mappings.len();
+            settings.domain_org_mappings.retain(|m| m.org_id != org_id);
+            settings.domain_org_mappings.len() != before
+        })
+        .await
+    {
+        log::error!(
+            "error updating domain mapping for {} after removing the membership of {org_id_copy} : {e}",
+            &membership.payer_org_id
+        );
+    };
+
     HttpResponse::ok("successfully left")
 }
 

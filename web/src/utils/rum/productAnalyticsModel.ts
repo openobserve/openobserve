@@ -24,6 +24,9 @@ import {
   DIMENSIONS,
   IDENTITY_FIELDS,
   MAX_FUNNEL_STEPS,
+  isAttributeBreakdown,
+  type AttributeBreakdown,
+  type Breakdown,
   type BreakdownDim,
   type ExclusionStep,
   type FunnelCohort,
@@ -176,6 +179,27 @@ export interface BreakdownRow {
   atLeast: boolean;
   other: boolean;
   notSet: boolean;
+  /** Units that reached the start step with no value; only an attribute breakdown has this row. */
+  noValue: boolean;
+  /** Units that never reached the start step; only an attribute breakdown has this row. */
+  leftBefore: boolean;
+  /** Median ms from the start step to the last; null where the run has none. */
+  medianMs: number | null;
+}
+/** The step an attribute breakdown's rates start at, and how many units reaching it carry a value there. */
+export interface BreakdownStart {
+  step: number;
+  pinned: boolean;
+  anyStep: boolean;
+  covered: number;
+  reached: number;
+  /** The step the automatic rule picks, even while another is pinned; null when no step reaches half. */
+  auto: number | null;
+}
+export interface BreakdownFold {
+  rows: BreakdownRow[];
+  total: number[];
+  start: BreakdownStart | null;
 }
 export type PathNodeKind = StepKind | "other" | "exit" | "start";
 export interface PathNode {
@@ -317,8 +341,9 @@ export const EXACT_ROW_LIMIT = 1000000;
 export const CHANGE_THRESHOLD = 0.5;
 const DOMINANT_SHARE = 0.2;
 const FULL_COVERAGE = 0.5;
+const BREAKDOWN_COVERAGE = 0.5;
 const DATA_TEST_SHARE = 0.2;
-const BREAKDOWN_TOP = 5;
+export const BREAKDOWN_TOP = 5;
 const BREAKDOWN_LIMIT = 1000;
 const PATH_BRANCHES = 5;
 const PATH_ROW_LIMIT = 5000;
@@ -350,6 +375,7 @@ const MAX_EXCLUSIONS = 5;
 export const MAX_FUNNEL_FILTERS = 10;
 export const MAX_FILTER_VALUES = 20;
 export const MAX_VIEW_CONDS = 5;
+export const MAX_STEP_PROP_CONDS = 10;
 /** Session fields Filter all steps can use; env and version stay page-wide. */
 export const FILTER_FIELDS: readonly SessionField[] = [
   "geo_info_country",
@@ -824,9 +850,9 @@ export function decodeDef(param: string | undefined): unknown {
   }
 }
 
-const STEP_OPTION_KEYS = ["min", "fr", "er", "vc"];
+const STEP_OPTION_KEYS = ["min", "fr", "er", "vc", "pc"];
 const EXCLUSION_KEYS = ["s", "a", "b", "w"];
-const FUNNEL_KEYS = ["s", "u", "w", "b", "x", "f"];
+const FUNNEL_KEYS = ["s", "u", "w", "b", "bs", "x", "f"];
 const FILTER_KEYS = ["field", "op", "values", "not"];
 const PARAM_COND_KEYS = ["t", "key", "op", "values"];
 const REF_COND_KEYS = ["t", "op", "values"];
@@ -861,18 +887,31 @@ const parseViewConds = (raw: unknown): ViewCond[] | null => {
   return conds.every((c) => c !== null) ? (conds as ViewCond[]) : null;
 };
 
+// Mirrors the server: an attribute column, never a built-in session field, like an attribute breakdown.
+const parsePropConds = (raw: unknown): FunnelFilter[] | null => {
+  if (!Array.isArray(raw) || !raw.length || raw.length > MAX_STEP_PROP_CONDS) return null;
+  const conds = raw.map(parseFunnelFilter);
+  return conds.every((c) => c !== null && isFilterColumn(c.field))
+    ? (conds as FunnelFilter[])
+    : null;
+};
+
 // An unknown option must fail the whole definition, so an older build never drops a filter it cannot apply.
-const parseStepFilters = (raw: unknown): StepFilters | null => {
-  if (!isRecord(raw) || !onlyKeys(raw, STEP_OPTION_KEYS)) return null;
+const parseStepFilters = (raw: unknown, kind: StepKind): StepFilters | null => {
+  if (!isRecord(raw) || !onlyKeys(raw, kind === "p" ? STEP_OPTION_KEYS : ["pc"])) return null;
+  if (kind !== "p" && raw.pc === undefined) return null;
   if (raw.min !== undefined && !isMs(raw.min)) return null;
   if ((raw.fr !== undefined && raw.fr !== 1) || (raw.er !== undefined && raw.er !== 1)) return null;
   const vc = raw.vc === undefined ? undefined : parseViewConds(raw.vc);
   if (vc === null) return null;
+  const pc = raw.pc === undefined ? undefined : parsePropConds(raw.pc);
+  if (pc === null) return null;
   return {
     ...(raw.min !== undefined ? { minMs: raw.min as number } : {}),
     ...(raw.fr === 1 ? { frustrated: true as const } : {}),
     ...(raw.er === 1 ? { errored: true as const } : {}),
     ...(vc ? { vc } : {}),
+    ...(pc ? { pc } : {}),
   };
 };
 
@@ -904,7 +943,7 @@ export function parseStepRef(raw: unknown): StepRef | null {
   if (kind !== "p" && kind !== "c" && kind !== "e" && kind !== "r") return null;
   if (kind === "e" ? !isEntityId(key) : !isKey(key)) return null;
   if (raw.length === 2) return { kind: kind as StepKind, key };
-  const f = kind === "p" ? parseStepFilters(opts) : null;
+  const f = parseStepFilters(opts, kind);
   return f ? { kind, key, f } : null;
 }
 
@@ -913,9 +952,16 @@ const viewCondParam = (c: ViewCond): Record<string, unknown> =>
     ? { t: "param", key: c.key, op: c.op, values: [...c.values] }
     : { t: "ref", op: c.op, values: [...c.values] };
 
+const filterParam = (r: FunnelFilter): Record<string, unknown> => ({
+  field: r.field,
+  op: r.op,
+  values: [...r.values],
+  ...(r.not ? { not: true } : {}),
+});
+
 export function stepRefParam(step: StepRef): unknown[] {
   if (!step.f) return [step.kind, step.key];
-  const { minMs, frustrated, errored, vc } = step.f;
+  const { minMs, frustrated, errored, vc, pc } = step.f;
   return [
     step.kind,
     step.key,
@@ -924,6 +970,7 @@ export function stepRefParam(step: StepRef): unknown[] {
       ...(frustrated ? { fr: 1 } : {}),
       ...(errored ? { er: 1 } : {}),
       ...(vc?.length ? { vc: vc.map(viewCondParam) } : {}),
+      ...(pc?.length ? { pc: pc.map(filterParam) } : {}),
     },
   ];
 }
@@ -963,6 +1010,18 @@ const parseExclusion = (raw: unknown, steps: StepRef[]): ExclusionStep | null =>
   return x && !exclusionProblem(steps, x) ? x : null;
 };
 
+// A dimension name wins over a column of the same name, as on the server; undefined means invalid.
+const parseBreakdown = (b: unknown, bs: unknown, steps: number): Breakdown | null | undefined => {
+  if (b === undefined || b === null) return bs === undefined ? null : undefined;
+  if (typeof b !== "string") return undefined;
+  if (Object.prototype.hasOwnProperty.call(DIMENSIONS, b))
+    return bs === undefined ? (b as BreakdownDim) : undefined;
+  if (!isFilterColumn(b)) return undefined;
+  if (bs === undefined) return { f: b };
+  const ok = typeof bs === "number" && Number.isInteger(bs) && bs >= 1 && bs <= steps;
+  return ok ? { f: b, s: bs } : undefined;
+};
+
 // An unknown key must fail the whole definition, so an older build never drops a setting it cannot apply.
 export function parseFunnelDef(raw: unknown): FunnelDef | null {
   if (!isRecord(raw) || !Array.isArray(raw.s) || !onlyKeys(raw, FUNNEL_KEYS)) return null;
@@ -974,8 +1033,8 @@ export function parseFunnelDef(raw: unknown): FunnelDef | null {
   if (!unit) return null;
   const w = raw.w === undefined ? "session" : raw.w;
   if (!WINDOWS.includes(w as FunnelWindow)) return null;
-  const b = raw.b === undefined || raw.b === null ? null : raw.b;
-  if (b !== null && !Object.prototype.hasOwnProperty.call(DIMENSIONS, b as string)) return null;
+  const b = parseBreakdown(raw.b, raw.bs, steps.length);
+  if (b === undefined) return null;
   const xs = raw.x === undefined ? [] : raw.x;
   if (!Array.isArray(xs) || xs.length > MAX_EXCLUSIONS) return null;
   const x = xs.map((e) => parseExclusion(e, steps as StepRef[]));
@@ -988,10 +1047,20 @@ export function parseFunnelDef(raw: unknown): FunnelDef | null {
     steps: steps as StepRef[],
     unit,
     window: unit === "sessions" ? "session" : (w as FunnelWindow),
-    breakdown: b as BreakdownDim | null,
+    breakdown: b,
     x: x as ExclusionStep[],
     ...(f.length ? { f: f as FunnelFilter[] } : {}),
   };
+}
+
+/** The breakdown with its pinned step at its new number; a pinned step that is gone falls back to automatic. */
+export function pinnedAfter(
+  b: Breakdown | null,
+  pos: (k: number) => number | null,
+): Breakdown | null {
+  if (!isAttributeBreakdown(b) || b.s === undefined) return b;
+  const s = pos(b.s);
+  return s === null ? { f: b.f } : { f: b.f, s };
 }
 
 export function funnelParam(def: FunnelDef): Record<string, unknown> {
@@ -1000,20 +1069,17 @@ export function funnelParam(def: FunnelDef): Record<string, unknown> {
     u: def.unit,
     w: def.window,
   };
-  if (def.breakdown) out.b = def.breakdown;
+  if (isAttributeBreakdown(def.breakdown)) {
+    out.b = def.breakdown.f;
+    if (def.breakdown.s !== undefined) out.bs = def.breakdown.s;
+  } else if (def.breakdown) out.b = def.breakdown;
   if (def.x?.length)
     out.x = def.x.map((e) => ({
       s: stepRefParam(e.step),
       a: e.a,
       ...(e.b !== undefined ? { b: e.b } : { w: e.withinMs }),
     }));
-  if (def.f?.length)
-    out.f = def.f.map((r) => ({
-      field: r.field,
-      op: r.op,
-      values: [...r.values],
-      ...(r.not ? { not: true } : {}),
-    }));
+  if (def.f?.length) out.f = def.f.map(filterParam);
   return out;
 }
 
@@ -1390,6 +1456,82 @@ export function clickNameHint(rows: { key: string; clicks: number }[]): boolean 
 const nullableNum = (v: unknown): number | null =>
   v === null || v === undefined || v === "" ? null : num(v);
 
+const sumOf = (rows: number[][], steps: number): number[] =>
+  rows.reduce<number[]>((acc, c) => acc.map((v, i) => v + c[i]), Array(steps).fill(0));
+
+// A unit that reached step k passed every step before it, so the earlier columns read its step-k count.
+const countsFrom = (c: number[], k: number): number[] =>
+  c.map((v, i) => (i < k - 1 ? c[k - 1] : v));
+
+const unitsBefore = (c: number[], k: number): number[] =>
+  c.map((v, i) => (i < k - 1 ? v - c[k - 1] : 0));
+
+// The first step where at least half the units reaching it carry a value on that step's row.
+const breakdownStart = (
+  hits: Record<string, unknown>[],
+  steps: number,
+  attribute: AttributeBreakdown,
+): BreakdownStart => {
+  const reached = sumOf(
+    hits.map((h) => hitCounts(h, steps)),
+    steps,
+  );
+  const covered = Array.from({ length: steps }, (_, i) =>
+    hits.reduce((sum, h) => sum + num(h[`dc${i + 1}`]), 0),
+  );
+  // Coverage reads each step's own rows whatever the pin, so the automatic step is known either way.
+  const i = reached.findIndex((c, j) => c > 0 && covered[j] / c >= BREAKDOWN_COVERAGE);
+  const auto = i >= 0 ? i + 1 : null;
+  const at = (step: number, pinned: boolean): BreakdownStart => ({
+    step,
+    pinned,
+    anyStep: false,
+    covered: covered[step - 1],
+    reached: reached[step - 1],
+    auto,
+  });
+  // A pin past the last step reads as automatic, as the SQL does.
+  if (attribute.s !== undefined && attribute.s >= 1 && attribute.s <= steps)
+    return at(attribute.s, true);
+  if (auto !== null) return at(auto, false);
+  const named = hits.filter(isNamedDim).reduce((sum, h) => sum + num(h.c1), 0);
+  return {
+    step: 1,
+    pinned: false,
+    anyStep: true,
+    covered: named,
+    reached: reached[0] ?? 0,
+    auto: null,
+  };
+};
+
+// Units with no value split by whether they reached the start step; from any step, they stay "Not set".
+const unsetRows = (
+  hits: Record<string, unknown>[],
+  steps: number,
+  start: BreakdownStart,
+  row: (c: number[], over: Partial<BreakdownRow>) => BreakdownRow,
+  median: (h: Record<string, unknown>) => number | null,
+): BreakdownRow[] => {
+  const k = start.anyStep ? 1 : start.step;
+  const unset = hits.filter((h) => !isNamedDim(h));
+  const out: BreakdownRow[] = [];
+  const reachedK = sumOf(
+    unset.map((h) => countsFrom(hitCounts(h, steps), k)),
+    steps,
+  );
+  if (reachedK[k - 1] > 0 || (start.anyStep && unset.length)) {
+    const one = unset.length === 1 ? median(unset[0]) : null;
+    out.push(row(reachedK, start.anyStep ? { notSet: true } : { noValue: true, medianMs: one }));
+  }
+  const before = sumOf(
+    hits.map((h) => unitsBefore(hitCounts(h, steps), k)),
+    steps,
+  );
+  if (before.some((v) => v > 0)) out.push(row(before, { leftBefore: true, conversion: 0 }));
+  return out;
+};
+
 export function toFunnelResult(hit: Record<string, number>, def: FunnelDef): FunnelResult {
   const units: number[] = [];
   def.steps.forEach((_, i) => {
@@ -1427,51 +1569,81 @@ export function exclusionRemoved(
   });
 }
 
+/** A breakdown hit's per-step counts, c1..cN. */
+export function hitCounts(h: Record<string, unknown>, steps: number): number[] {
+  return Array.from({ length: steps }, (_, i) => num(h[`c${i + 1}`]));
+}
+
+/** Whether a breakdown hit carries a value; an empty dim is "(not set)". */
+export function isNamedDim(h: Record<string, unknown>): boolean {
+  return h.dim !== null && h.dim !== undefined && h.dim !== "";
+}
+
 export function foldBreakdown(
   hits: Record<string, unknown>[],
   steps: number,
   top: number = BREAKDOWN_TOP,
-): { rows: BreakdownRow[]; total: number[] } {
-  const counts = (h: Record<string, unknown>) =>
-    Array.from({ length: steps }, (_, i) => num(h[`c${i + 1}`]));
-  const sorted = [...hits].sort((a, b) => num(b.c1) - num(a.c1));
-  const named = sorted.filter((h) => h.dim !== null && h.dim !== undefined && h.dim !== "");
+  attribute: AttributeBreakdown | null = null,
+): BreakdownFold {
+  const start = attribute ? breakdownStart(hits, steps, attribute) : null;
+  const k = start && !start.anyStep ? start.step : 1;
+  const counts = (h: Record<string, unknown>) => countsFrom(hitCounts(h, steps), k);
+  const sorted = [...hits].sort((a, b) => num(b[`c${k}`]) - num(a[`c${k}`]));
+  // A value whose units all left before step k only adds to "Left before step k".
+  const named = sorted.filter((h) => isNamedDim(h) && (!start || num(h[`c${k}`]) > 0));
   const head = named.slice(0, top);
-  const rest = sorted.filter((h) => !head.includes(h));
-  const conversion = (c: number[]) => (c[0] > 0 ? c[c.length - 1] / c[0] : 0);
-  const rows: BreakdownRow[] = head.map((h) => {
-    const c = counts(h);
-    return {
-      value: String(h.dim),
-      label: String(h.dim),
-      counts: c,
-      conversion: conversion(c),
-      atLeast: false,
-      other: false,
-      notSet: false,
-    };
+  const rest = start ? named.slice(top) : sorted.filter((h) => !head.includes(h));
+  const conversion = (c: number[]) => (c[k - 1] > 0 ? c[c.length - 1] / c[k - 1] : 0);
+  const median = (h: Record<string, unknown>) => (k < steps ? nullableNum(h[`mt${k}`]) : null);
+  const row = (c: number[], over: Partial<BreakdownRow>): BreakdownRow => ({
+    value: null,
+    label: "",
+    counts: c,
+    conversion: conversion(c),
+    atLeast: false,
+    other: false,
+    notSet: false,
+    noValue: false,
+    leftBefore: false,
+    medianMs: null,
+    ...over,
   });
-  if (rest.length) {
-    const c = rest.reduce<number[]>(
-      (acc, h) => acc.map((v, i) => v + counts(h)[i]),
-      Array(steps).fill(0),
-    );
-    const notSet = rest.every((h) => h.dim === null || h.dim === undefined || h.dim === "");
-    rows.push({
-      value: null,
-      label: "",
-      counts: c,
-      conversion: conversion(c),
-      atLeast: hits.length >= BREAKDOWN_LIMIT,
-      other: !notSet,
-      notSet,
-    });
-  }
-  const total = rows.reduce<number[]>(
-    (acc, r) => acc.map((v, i) => v + r.counts[i]),
-    Array(steps).fill(0),
+  const rows: BreakdownRow[] = head.map((h) =>
+    row(counts(h), { value: String(h.dim), label: String(h.dim), medianMs: median(h) }),
   );
-  return { rows, total };
+  if (rest.length) {
+    const notSet = rest.every((h) => !isNamedDim(h));
+    rows.push(
+      row(sumOf(rest.map(counts), steps), {
+        atLeast: hits.length >= BREAKDOWN_LIMIT,
+        other: !notSet,
+        notSet,
+      }),
+    );
+  }
+  if (start) rows.push(...unsetRows(hits, steps, start, row, median));
+  const total = sumOf(
+    rows.map((r) => r.counts),
+    steps,
+  );
+  return { rows, total, start };
+}
+
+/** One run's funnel numbers; a breakdown run sums its per-value rows, so both periods read the same way. */
+export function funnelResultOf(
+  rows: Record<string, unknown>[],
+  def: FunnelDef,
+): FunnelResult | null {
+  if (def.breakdown) {
+    const hit: Record<string, number> = {};
+    foldBreakdown(rows, def.steps.length).total.forEach((c, i) => {
+      hit[`c${i + 1}`] = c;
+      hit[`seen${i + 1}`] = 1;
+    });
+    return toFunnelResult(hit, def);
+  }
+  const row = rows[0] as Record<string, number> | undefined;
+  return row ? toFunnelResult(row, def) : null;
 }
 
 const UNITS = [
@@ -1752,7 +1924,7 @@ export function branchPredicate(flow: PathFlow, target: BranchTarget): string {
   );
 }
 
-type Period = "day" | "week" | "month";
+export type Period = "day" | "week" | "month";
 
 const periodStart = (d: Date, g: Period): Date =>
   g === "day"
@@ -1763,6 +1935,13 @@ const periodStart = (d: Date, g: Period): Date =>
 
 const nextPeriod = (d: Date, g: Period): Date =>
   g === "day" ? addDays(d, 1) : g === "week" ? addWeeks(d, 1) : addMonths(d, 1);
+
+/** Where the period starting at `startUs` ends, stepped in the zone's wall time like the boundaries. */
+export const periodEndUs = (startUs: number, timezone: string, g: Period): number =>
+  fromZonedTime(
+    nextPeriod(toZonedTime(new Date(startUs / 1000), timezone), g),
+    timezone,
+  ).getTime() * 1000;
 
 // Boundaries are stepped in zoned wall time and converted back, so a DST day is 23 or 25 hours long.
 const boundaries = (
@@ -1799,7 +1978,7 @@ const monthBlocked = (endUs: number, dataStartUs: number | null): boolean => {
   return days !== null && days < MONTH_DATA_DAYS;
 };
 
-const autoGranularity = (
+export const autoGranularity = (
   startUs: number,
   endUs: number,
   dataStartUs: number | null,
@@ -1848,11 +2027,7 @@ export function retentionPeriods(
   const { out, clipped } = boundaries(startUs, endUs, timezone, g, dataStartUs);
   if (out.length > MAX_PERIODS) return { tooMany: true };
   if (out.length < MIN_PERIODS) return { tooShort: true };
-  const lastEnd =
-    fromZonedTime(
-      nextPeriod(toZonedTime(new Date(out[out.length - 1] / 1000), timezone), g),
-      timezone,
-    ).getTime() * 1000;
+  const lastEnd = periodEndUs(out[out.length - 1], timezone, g);
   return {
     granularity: g,
     boundariesUs: out,

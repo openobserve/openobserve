@@ -61,7 +61,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { createFleetConfigMutation } from "@/services/fleet.queries";
 import { makeConfigSchema, type ConfigForm } from "./FleetCreateConfigDialog.schema";
-import { serverMessage } from "./useFleetApi";
+import { failureText } from "./useFleetApi";
 
 const props = withDefaults(
   defineProps<{
@@ -94,7 +94,7 @@ async function submit(value: ConfigForm) {
   } catch (err) {
     toast({
       variant: "error",
-      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
+      message: failureText(err, t),
     });
   }
 }

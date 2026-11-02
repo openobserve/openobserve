@@ -31,14 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="menu-section px-0 py-1">
         <div
           class="menu-item hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
-          @click="configureDedupForAlert"
-          data-test="context-menu-configure-dedup"
-        >
-          <OIcon name="tune" size="sm" class="me-2" />
-          <span>{{ t("alerts.insights.actions.configureDedup") }}</span>
-        </div>
-        <div
-          class="menu-item hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
           @click="editAlert"
           data-test="context-menu-edit-alert"
         >
@@ -96,7 +88,6 @@ const emit = defineEmits<{
     },
   ];
   "select-alert": [string];
-  "configure-dedup": [string];
   "edit-alert": [string];
   "view-history": [string];
 }>();
@@ -114,13 +105,6 @@ const isAlertNameContext = computed(() => {
 
   return typeof props.value === "string" && alertNamePanels.includes(props.panelId);
 });
-
-const configureDedupForAlert = () => {
-  if (typeof props.value === "string") {
-    emit("configure-dedup", props.value);
-    emit("close");
-  }
-};
 
 const editAlert = () => {
   if (typeof props.value === "string") {

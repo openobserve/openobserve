@@ -1002,7 +1002,7 @@ async fn labels(
         ("org_id" = String, Path, description = "Organization name"),
         ("label_name" = String, Path, description = "Label name"),
         ("match[]" = String, Query, description = "Series selector argument that selects the series from which to read the label values"),
-        ("start" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp"),
+        ("start" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp, optional, defaults to 24 hours before end (all time for __name__)"),
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
     responses(
@@ -1258,7 +1258,7 @@ pub async fn format_query_post(
     tag = "Metrics",
     operation_id = "PrometheusParseTree",
     summary = "Parse a PromQL query into a tree",
-    description = "Parses a PromQL query and returns OpenObserve's JSON tree of it: selectors, matrices, calls, aggregates, binary operations, numbers and parentheses, with every other construct marked unsupported. Distinct from Prometheus's parse_query, whose response shape differs.",
+    description = "Parses a PromQL query and returns OpenObserve's JSON tree of it: selectors and matrices (with any offset), calls, aggregates (by or without), binary operations including a plain or, numbers and parentheses, with every other construct marked unsupported. Distinct from Prometheus's parse_query, whose response shape differs.",
     security(
         ("Authorization"= [])
     ),

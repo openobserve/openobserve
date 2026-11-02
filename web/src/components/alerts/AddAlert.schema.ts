@@ -16,7 +16,7 @@
 // AddAlert orchestrator schema.
 //
 // AddAlert owns the ONE <OForm> for the whole wizard. The step children
-// (QueryConfig, AlertSettings, Advanced, Deduplication) render as descendants
+// (QueryConfig, AlertSettings, Advanced) render as descendants
 // and bind their fields by nested `name=` into THIS form, so the schema below
 // must cover every nested path they bind. This file composes their exported
 // rules (single source of truth) and adds the topbar scalars:
@@ -55,7 +55,7 @@ export const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/;
 export const isBlank = (v: unknown): boolean =>
   v === undefined || v === null || (typeof v === "string" && v.trim() === "");
 
-// Step-B field schemas (Advanced / Deduplication / CompareWithPast wizard step
+// Step-B field schemas (Advanced / CompareWithPast wizard step
 // children). All optional/permissive. The step components bind these exact paths
 // by nested `name=` into THIS orchestrator form.
 
@@ -88,18 +88,6 @@ export const advancedShape = {
 
 export const createAdvancedSchema = () => z.looseObject({ ...advancedShape });
 export type AdvancedForm = z.infer<ReturnType<typeof createAdvancedSchema>>;
-
-/** Deduplication (scheduled-only). All fields optional. `enabled` is derived
- *  from `fingerprint_fields.length > 0` by the component; `time_window_minutes`
- *  is sanitized to number|undefined by the component — the raw form state may
- *  transiently hold a string, so the union keeps validation permissive (never
- *  rejects while typing). */
-export const deduplicationSchema = z.object({
-  enabled: z.boolean().optional(),
-  fingerprint_fields: z.array(z.string()).optional(),
-  time_window_minutes: z.union([z.number(), z.string(), z.undefined()]).optional(),
-});
-export type DeduplicationForm = z.infer<typeof deduplicationSchema>;
 
 /** Compare-with-past reference-window row. `offSet` is a relative-time string
  *  (e.g. "15m") edited by the bare CustomDateTimePicker. `uuid` is the row
@@ -136,10 +124,9 @@ export const makeAddAlertSchema = (t: Translator) =>
       trigger_condition: z.looseObject({}).optional(),
       query_condition: z.looseObject({}).optional(),
       logGroupBy: z.array(z.string()).optional(),
-      // Step-B fields (Advanced / Deduplication tabs). Permissive pass-throughs,
+      // Step-B fields (Advanced tab). Permissive pass-throughs,
       // not validated — the superRefine below adds no issues for them.
       context_attributes: contextAttributesSchema.optional(),
-      deduplication: deduplicationSchema.optional(),
       template: z.string().optional(),
       description: z.string().optional(),
       row_template: z.string().optional(),

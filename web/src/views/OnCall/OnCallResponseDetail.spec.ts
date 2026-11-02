@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
@@ -287,6 +287,9 @@ async function renderWith(overrides: Record<string, unknown> = {}) {
 
 // Every test mounts the full response page; on a loaded CI runner one mount can exceed the 5s default.
 vi.setConfig({ testTimeout: 20000 });
+
+// Every page watches the shared route, so a page left mounted reloads on each later route change and slows those tests.
+enableAutoUnmount(afterEach);
 
 describe("OnCallResponseDetail", () => {
   beforeEach(() => {

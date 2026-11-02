@@ -25,6 +25,7 @@ import type {
   EscalationProgress,
   EscalationTarget,
   L0Policy,
+  OnCallPolicy,
   ResponseState,
   ResolvedSegment,
   Rotation,
@@ -53,6 +54,7 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { RowRailTone } from "@/lib/core/Table/OTable.types";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
+import { localeFileMap } from "@/locales";
 import { formatTimestampInTimezone } from "@/utils/date";
 
 /** Who holds `rule` at `atMicros`, counted in the team's `timezone` like `ShiftRule::member_at`; `null` if unusable. */
@@ -523,6 +525,8 @@ export function shortReachReason(
   // Matched on the distinctive noun, not the whole sentence: the engine has
   // reworded these before, and a near-miss must degrade to the sentence rather
   // than to silence.
+  // Before "smtp": the From sentence names `ZO_SMTP_FROM_EMAIL`, which contains it.
+  if (said.includes("zo_smtp_from_email")) return t("oncall.reachShortNoFromAddress");
   if (said.includes("smtp")) return t("oncall.reachShortNoSmtp");
   if (said.includes("not a user of this organization")) return t("oncall.reachShortNoAddress");
   if (said.includes("login, not a mailbox")) return t("oncall.reachShortNotMailbox");
@@ -562,6 +566,41 @@ export function rungProblem(
   // Nothing is hidden: the badge is the summary, the sentence is the answer.
   if (short) return { label: short, tip: raw(why) };
   return { label: raw(why) || t("oncall.contactNoChannel"), tip: null };
+}
+
+/// The order a priority's channels are said in, whatever order they are stored in.
+const CHANNEL_ORDER: Channel[] = ["email", "sms", "voice", "webhook"];
+
+/** A priority's channels as one phrase, "Email, SMS, Voice call". [pure] */
+export function channelList(channels: readonly Channel[] | undefined, t: TranslateFn): string {
+  return CHANNEL_ORDER.filter((channel) => (channels ?? []).includes(channel))
+    .map((channel) => String(t(`oncall.channel_${channel}`)))
+    .join(", ");
+}
+
+/** Names as prose in the reader's language ("A, B, and C"); `locale` is the app's i18n code, e.g. `zh-cn`. [pure] */
+export function listInLocale(items: readonly string[], locale: string): string {
+  return new Intl.ListFormat(localeFileMap[locale] ?? locale, { type: "conjunction" }).format(
+    items,
+  );
+}
+
+/** Every escalation step that pages `rotationId`, numbered by delay within its priority. [pure] */
+export function stepsNamingRotation(
+  policy: Pick<OnCallPolicy, "rungs"> | null,
+  rotationId: string,
+): { priority: number; step: number }[] {
+  return (policy?.rungs ?? []).flatMap((rung) =>
+    [...rung.steps]
+      .sort((a, b) => a.after_micros - b.after_micros)
+      .flatMap((step, index) =>
+        step.targets.some(
+          (target) => target.kind === "rotation" && target.rotation_id === rotationId,
+        )
+          ? [{ priority: rung.priority, step: index + 1 }]
+          : [],
+      ),
+  );
 }
 
 /**
@@ -1048,6 +1087,11 @@ export function shiftBoundary(rule: ShiftRule, index: number, timezone: string):
   return fromLocalMicros(localAnchor + index * rule.shift_micros, timezone);
 }
 
+/** `rule`'s anchor `shifts` handovers earlier on `timezone`'s clock; mirrors `ShiftRule::offset_from`. [pure] */
+export function offsetAnchor(rule: ShiftRule, shifts: number, timezone: string): number {
+  return shiftBoundary(rule, -shifts, timezone) ?? rule.anchor_micros - shifts * rule.shift_micros;
+}
+
 /** Whether `rule` has people and a positive turn length, so its shifts can be counted. [pure] */
 function isCountable(rule: ShiftRule): boolean {
   return !!rule.members?.length && !!rule.shift_micros && rule.shift_micros > 0;
@@ -1281,14 +1325,16 @@ export function stopConsequence(
   return { takers, gap: spansOf(minutes) };
 }
 
-/** Whether the server refuses `a` and `b` side by side: same priority and identical windows. [pure] */
+/** Whether the server refuses `a` and `b` side by side: identical windows, or tied keys with hours and validity that meet. [pure] */
 export function rulesClash(a: ShiftRule, b: ShiftRule): boolean {
   const left = a.restrictions ?? [];
   const right = b.restrictions ?? [];
+  if ((a.priority ?? 0) !== (b.priority ?? 0) || left.length !== right.length) return false;
+  if (left.every((w, i) => sameWindow(w, right[i]))) return true;
   return (
-    (a.priority ?? 0) === (b.priority ?? 0) &&
-    left.length === right.length &&
-    left.every((w, i) => sameWindow(w, right[i]))
+    a.anchor_micros === b.anchor_micros &&
+    validityMeets(a, b) &&
+    spansMeet(weekCoverage(a), weekCoverage(b))
   );
 }
 
@@ -1367,6 +1413,13 @@ function sameWindow(a: TimeWindow, b: TimeWindow): boolean {
     left.length === right.length &&
     left.every((day, i) => day === right[i])
   );
+}
+
+/** Whether the two rules' `[starts_at, ends_at)` validity periods intersect; a missing bound is open. */
+function validityMeets(a: ShiftRule, b: ShiftRule): boolean {
+  const start = Math.max(a.starts_at ?? -Infinity, b.starts_at ?? -Infinity);
+  const end = Math.min(a.ends_at ?? Infinity, b.ends_at ?? Infinity);
+  return start < end;
 }
 
 /** The team-local minutes of the week a rule covers, as `[start, end)` spans. */
@@ -2047,6 +2100,25 @@ export const DEFAULT_ACTIVITY_KINDS: ResponseEventKind[] = [
   "flapped",
 ];
 
+/** How the engine's give-up line opens; twin of escalation.rs `GAVE_UP_MARKER`. */
+const GAVE_UP_MARKER = "nothing could be delivered to this rung";
+
+/** Whether a page that reached nobody is still retried: not once the engine gave up on its run and rung. [pure] */
+export function rungStillRetrying(
+  page: OnCallResponseEvent,
+  events: OnCallResponseEvent[],
+): boolean {
+  if (page.kind !== "page" || page.delivered !== false) return false;
+  const run = page.ladder_run ?? 1;
+  return !events.some(
+    (e) =>
+      e.kind === "sys" &&
+      (e.ladder_run ?? 1) === run &&
+      (e.rung_micros ?? null) === (page.rung_micros ?? null) &&
+      e.body.startsWith(GAVE_UP_MARKER),
+  );
+}
+
 /** What the Phone card shows; `empty` is also the form that Change reopens. */
 export type PhoneCardState = "empty" | "codeSent" | "verified" | "noProvider" | "changed";
 
@@ -2137,6 +2209,28 @@ export function phoneRefusalText(t: TranslateFn, body: VerificationRefusalBody):
 export function samePhone(a: string, b: string): boolean {
   const compact = (p: string) => p.replace(/[\s\-().]/g, "");
   return compact(a) !== "" && compact(a) === compact(b);
+}
+
+/** "times in {zone}", plus the reader's own clock when it is a different zone; the schedule's zone caption. [pure] */
+export function zoneCaption(
+  timezone: string,
+  localZone: string,
+  nowMicros: number,
+  t: TranslateFn,
+): I18nText {
+  if (localZone === timezone) return t("oncall.schedZoneSame", { zone: raw(timezone) });
+  const local = new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(new Date(nowMicros / 1000));
+  return t("oncall.schedZoneDiff", { zone: raw(timezone), local: raw(local) });
+}
+
+/** Whether the server's `to_e164` would take this: `+`, 7 to 15 digits, no leading 0, once spaces and `-().` go. [pure] */
+export function isInternationalPhone(typed: string): boolean {
+  const compact = typed.trim().replace(/[ \-().]/g, "");
+  return /^\+[1-9]\d{6,14}$/.test(compact);
 }
 
 /** Seconds as `m:ss`, or `h:mm:ss` from an hour up. [pure] */

@@ -89,6 +89,16 @@ limitations under the License.
           tabindex="0"
         />
       </div>
+      <div class="w-full py-1">
+        <OFormSwitch
+          name="credentials.euRegion"
+          data-test="pagerduty-eu-region-toggle"
+          :label="t('alerts.prebuiltDestinations.pagerdutyEuRegion')"
+        />
+        <span class="text-text-secondary text-xs">
+          {{ t("alerts.prebuiltDestinations.pagerdutyEuRegionHelp") }}
+        </span>
+      </div>
     </template>
 
     <!-- ServiceNow Fields -->

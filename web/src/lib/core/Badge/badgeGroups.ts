@@ -535,6 +535,9 @@ export const BADGE_GROUPS = {
       offline: { variant: "error-soft", labelKey: "components.badge.serviceStatus.offline" },
       failed: { variant: "error-soft", labelKey: "components.badge.serviceStatus.failed" },
       down: { variant: "error-soft", labelKey: "components.badge.serviceStatus.down" },
+      // Synthetics infrastructure error (backend status 4): the probe could not
+      // run, which is not the same as the target failing.
+      error: { variant: "error-soft", labelKey: "components.badge.serviceStatus.error" },
       unknown: { variant: "default-soft", labelKey: "common.unknown" },
     },
   },
@@ -1872,6 +1875,10 @@ export const BADGE_GROUPS = {
       action: { variant: "purple-soft", labelKey: "components.badge.rumEventType.action" },
       error: { variant: "error-soft", labelKey: "common.error" },
       resource: { variant: "teal-soft", labelKey: "components.badge.rumEventType.resource" },
+      failedrequest: {
+        variant: "error-soft",
+        labelKey: "components.badge.rumEventType.failedrequest",
+      },
       longtask: { variant: "warning-soft", labelKey: "components.badge.rumEventType.longtask" },
     },
     fallback: { variant: "default-soft" },

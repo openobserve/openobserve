@@ -74,7 +74,10 @@ describe("convertPromQLData legend for label-less series", () => {
     ]);
   });
 
-  it("keeps a formula-free panel's names unchanged", async () => {
-    expect(await legendOf([{ ref: "A" }, { ref: "B" }])).toEqual(["{}", "{}"]);
+  it("names a formula-free panel's label-less series after its query", async () => {
+    expect(await legendOf([{ ref: "A" }, { ref: "B" }])).toEqual([
+      "sum(rate(x[5m]))",
+      "sum(rate(x[5m]))",
+    ]);
   });
 });

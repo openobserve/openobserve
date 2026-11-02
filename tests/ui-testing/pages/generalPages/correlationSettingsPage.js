@@ -7,9 +7,9 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
  * Route: /web/settings/correlation?org_identifier={orgId}
  *
  * Tabs:
- * - Service Identity (identity)
  * - Discovered Services (services)
- * - Alert Correlation (alert-correlation)
+ * - Detection Rules (discovery)
+ * - Field Mappings (field-aliases)
  */
 export class CorrelationSettingsPage {
     constructor(page) {
@@ -20,7 +20,7 @@ export class CorrelationSettingsPage {
         this.pageSubtitle = '.general-page-subtitle';
 
         // Tab selectors (OTabs - render as [role="tablist"] / [role="tab"])
-        // Note: tabs use name attribute: services, discovery, alert-correlation, field-aliases
+        // Note: tabs use name attribute: services, discovery, field-aliases
         this.tabsContainer = '[role="tablist"]';
         // The Correlation Settings tabs wrapper (data-test container).
         this.correlationSettingsTabs = '[data-test="correlation-settings-tabs"]';
@@ -29,11 +29,10 @@ export class CorrelationSettingsPage {
         // Placeholder text of the "+ Add field" OSelect trigger.
         this.selectAFieldText = 'Select a field';
         // Visible tab labels (post-revamp): the tab `name` attrs are
-        // services / discovery / alert-correlation / field-aliases, rendered as
+        // services / discovery / field-aliases, rendered as
         // these i18n labels.
         this.servicesTabName = 'Discovered Services';
         this.serviceDiscoveryTabName = 'Detection Rules';
-        this.alertCorrelationTabName = 'Alert Grouping';
         this.fieldAliasesTabName = 'Field Mappings';
         // Detection Rules view (the "Distinguish Services By" configuration tab)
         this.detectionRulesTabName = 'Detection Rules';
@@ -50,12 +49,6 @@ export class CorrelationSettingsPage {
         // ==================== Discovered Services Tab Selectors ====================
         this.retryDiscoveredServicesBtn = '[data-test="retry-discovered-services-btn"]';
         this.refreshDiscoveredServicesBtn = '[data-test="refresh-discovered-services-btn"]';
-
-        // ==================== Alert Correlation Tab Selectors ====================
-        this.dedupSettingsRefreshBtn = '[data-test="dedup-settings-refresh-btn"]';
-        this.organizationDedupEnableCheckbox = '[data-test="organization-deduplication-enable-checkbox"]';
-        this.crossAlertEnableCheckbox = '[data-test="organizationdeduplication-enable-cross-alert-checkbox"]';
-        this.defaultWindowInput = '[data-test="organizationdeduplication-default-window-input"]';
 
         // ==================== Semantic Field Groups Selectors ====================
         this.semanticGroupCategorySelect = '[data-test="semantic-group-category-select"]';
@@ -79,101 +72,6 @@ export class CorrelationSettingsPage {
         this.notification = '[role="alert"]';
     }
 
-    // ==================== Test Data Setup ====================
-
-    /**
-     * Ensure semantic groups exist in the backend for testing fingerprint checkboxes
-     * Adds any missing test groups to the org's semantic groups (GET, merge, PUT), keeping every existing group
-     * @param {string} orgId - Organization identifier
-     * @returns {Promise<boolean>} - True if successful
-     */
-    async ensureSemanticGroupsExist(orgId) {
-        const baseUrl = process.env["ZO_BASE_URL"];
-        const username = process.env["ZO_ROOT_USER_EMAIL"];
-        const password = process.env["ZO_ROOT_USER_PASSWORD"];
-        const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
-
-        // Define test semantic groups that cover common use cases.
-        // Post-revamp shape: {id, display, group, fields} only — the per-group
-        // flags (is_scope / is_stable / normalize) were removed.
-        const testSemanticGroups = [
-            {
-                id: 'k8s-cluster',
-                display: 'K8s Cluster',
-                group: 'Kubernetes',
-                fields: ['k8s.cluster.name', 'k8s_cluster_name'],
-            },
-            {
-                id: 'k8s-namespace',
-                display: 'K8s Namespace',
-                group: 'Kubernetes',
-                fields: ['k8s.namespace.name', 'k8s_namespace_name'],
-            },
-            {
-                id: 'k8s-deployment',
-                display: 'K8s Deployment',
-                group: 'Kubernetes',
-                fields: ['k8s.deployment.name', 'k8s_deployment_name'],
-            },
-            {
-                id: 'service',
-                display: 'Service',
-                group: 'Common',
-                fields: ['service.name', 'service_name', 'service'],
-            }
-        ];
-
-        testLogger.info('Setting up test semantic groups via API', { orgId, groupCount: testSemanticGroups.length });
-
-        try {
-            const url = `${baseUrl}/api/${orgId}/alerts/deduplication/semantic-groups`;
-            const headers = {
-                'Authorization': authHeader,
-                'Content-Type': 'application/json'
-            };
-
-            // PUT replaces the whole list, so writing only the test groups would delete the org's defaults (e.g. `host`) for every other spec on the server.
-            const getResponse = await fetch(url, { headers });
-            if (!getResponse.ok) {
-                testLogger.error('GET semantic-groups failed', { status: getResponse.status });
-                return false;
-            }
-            const current = await getResponse.json();
-            const currentGroups = Array.isArray(current) ? current : current.groups || [];
-            const currentIds = new Set(currentGroups.map((g) => g.id));
-            const missing = testSemanticGroups.filter((g) => !currentIds.has(g.id));
-            if (missing.length === 0) {
-                testLogger.info('Test semantic groups already present', { orgId, total: currentGroups.length });
-                return true;
-            }
-
-            testLogger.info('PUT semantic groups', { url, adding: missing.map((g) => g.id) });
-            const putResponse = await fetch(url, {
-                method: 'PUT',
-                headers,
-                body: JSON.stringify([...currentGroups, ...missing])
-            });
-
-            const putText = await putResponse.text();
-            testLogger.info('PUT semantic-groups response', {
-                status: putResponse.status,
-                statusText: putResponse.statusText,
-                body: putText.substring(0, 500)
-            });
-
-            // Note: We intentionally do NOT POST to /config here.
-            // The config endpoint doesn't persist semantic_field_groups anyway (GET returns 0),
-            // and concurrent config POSTs in parallel tests cause race conditions where
-            // loadConfig() overwrites UI checkbox state with stale API values.
-            // The PUT above is the single source of truth for semantic groups.
-
-            return putResponse.ok;
-        } catch (error) {
-            testLogger.error('Failed to setup semantic groups', { error: error.message, stack: error.stack });
-            return false;
-        }
-    }
-
     // ==================== Navigation ====================
 
     async navigateToCorrelationSettings(orgId) {
@@ -195,12 +93,10 @@ export class CorrelationSettingsPage {
         // Use getByRole for tabs or filter by text
         const servicesTab = this.page.getByRole('tab', { name: this.servicesTabName });
         const serviceDiscoveryTab = this.page.getByRole('tab', { name: this.serviceDiscoveryTabName });
-        const alertCorrelationTab = this.page.getByRole('tab', { name: this.alertCorrelationTabName });
         const fieldAliasesTab = this.page.getByRole('tab', { name: this.fieldAliasesTabName });
 
         await expect(servicesTab).toBeVisible({ timeout: 15000 });
         await expect(serviceDiscoveryTab).toBeVisible();
-        await expect(alertCorrelationTab).toBeVisible();
         await expect(fieldAliasesTab).toBeVisible();
     }
 
@@ -223,22 +119,6 @@ export class CorrelationSettingsPage {
         await this.clickServicesTab();
     }
 
-    async clickAlertCorrelationTab() {
-        const tab = this.page.getByRole('tab', { name: this.alertCorrelationTabName });
-        // Wait for semantic-groups API response that loadConfig() triggers on component mount.
-        // This prevents a race condition where the test interacts with checkboxes before
-        // loadConfig() completes and overwrites localConfig with API values.
-        const semanticGroupsPromise = this.page.waitForResponse(
-            resp => resp.url().includes('/alerts/deduplication/semantic-groups') && resp.status() === 200,
-            { timeout: 15000 }
-        ).catch(() => {
-            testLogger.info('Semantic groups API response not intercepted (may have already fired)');
-        });
-        await tab.click();
-        await semanticGroupsPromise;
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    }
-
     async expectServiceDiscoveryTabActive() {
         const tab = this.page.getByRole('tab', { name: this.serviceDiscoveryTabName });
         await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
@@ -246,11 +126,6 @@ export class CorrelationSettingsPage {
 
     async expectServicesTabActive() {
         const tab = this.page.getByRole('tab', { name: this.servicesTabName });
-        await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
-    }
-
-    async expectAlertCorrelationTabActive() {
-        const tab = this.page.getByRole('tab', { name: this.alertCorrelationTabName });
         await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
     }
 
@@ -484,93 +359,6 @@ export class CorrelationSettingsPage {
         await expect(refreshBtn).toBeVisible({ timeout: 15000 });
     }
 
-    // ==================== Alert Correlation Tab Actions ====================
-
-    async expectAlertCorrelationContentVisible() {
-        await expect(this.page.locator(this.organizationDedupEnableCheckbox)).toBeVisible({ timeout: 15000 });
-    }
-
-    async clickEnableDeduplicationCheckbox() {
-        await this.page.locator(this.organizationDedupEnableCheckbox).click();
-    }
-
-    async clickEnableCrossAlertCheckbox() {
-        await this.page.locator(this.crossAlertEnableCheckbox).click();
-    }
-
-    async expectCrossAlertCheckboxVisible() {
-        await expect(this.page.locator(this.crossAlertEnableCheckbox)).toBeVisible({ timeout: 5000 });
-    }
-
-    async expectCrossAlertCheckboxHidden() {
-        await expect(this.page.locator(this.crossAlertEnableCheckbox)).not.toBeVisible({ timeout: 5000 });
-    }
-
-    /**
-     * Check if the cross-alert deduplication checkbox is currently checked
-     * @returns {Promise<boolean>} True if checkbox is checked
-     */
-    async isCrossAlertCheckboxChecked() {
-        const checkbox = this.page.locator(this.crossAlertEnableCheckbox);
-        // The checkbox uses aria-checked attribute
-        const ariaChecked = await checkbox.getAttribute('aria-checked');
-        if (ariaChecked !== null) {
-            return ariaChecked === 'true';
-        }
-        // Fallback to checking the inner input if visible
-        const input = checkbox.locator('input[type="checkbox"]');
-        if (await input.count() > 0) {
-            return await input.isChecked();
-        }
-        // Last resort - check for checked class
-        const hasCheckedClass = await checkbox.evaluate(el => {
-            return el.classList.contains('checked') ||
-                   el.closest('[role="checkbox"]')?.getAttribute('aria-checked') === 'true';
-        }).catch(() => false);
-        return hasCheckedClass;
-    }
-
-    async fillTimeWindowInput(minutes) {
-        // OFormInput forwards data-test to a wrapper <div>; the real control is
-        // the inner <input type="number">.
-        const wrap = this.page.locator(this.defaultWindowInput);
-        await expect(wrap).toBeVisible({ timeout: 5000 });
-        await wrap.locator('input').first().fill(String(minutes));
-    }
-
-    async getTimeWindowValue() {
-        return await this.page.locator(this.defaultWindowInput).locator('input').first().inputValue();
-    }
-
-    async clickRefreshDedupSettings() {
-        await this.page.locator(this.dedupSettingsRefreshBtn).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    }
-
-    async expectEnableDedupCheckboxVisible() {
-        await expect(this.page.locator(this.organizationDedupEnableCheckbox)).toBeVisible({ timeout: 10000 });
-    }
-
-    async expectTimeWindowInputVisible() {
-        await expect(this.page.locator(this.defaultWindowInput)).toBeVisible({ timeout: 10000 });
-    }
-
-    async expectDedupRefreshButtonVisible() {
-        await expect(this.page.locator(this.dedupSettingsRefreshBtn)).toBeVisible({ timeout: 10000 });
-    }
-
-    // ==================== Fingerprint Checkbox Actions ====================
-
-    async clickFingerprintCheckbox(groupId) {
-        const selector = `[data-test="organizationdeduplication-fingerprint-${groupId}-checkbox"]`;
-        await this.page.locator(selector).click();
-    }
-
-    async expectFingerprintCheckboxVisible(groupId) {
-        const selector = `[data-test="organizationdeduplication-fingerprint-${groupId}-checkbox"]`;
-        await expect(this.page.locator(selector)).toBeVisible({ timeout: 5000 });
-    }
-
     // ==================== Semantic Field Groups Actions ====================
 
     async clickCategorySelect() {
@@ -707,35 +495,6 @@ export class CorrelationSettingsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
-    async isDedupCheckboxChecked() {
-        const checkbox = this.page.locator(this.organizationDedupEnableCheckbox);
-        // Checkboxes use aria-checked or have a specific class when checked
-        const isChecked = await checkbox.getAttribute('aria-checked');
-        if (isChecked !== null) {
-            return isChecked === 'true';
-        }
-        // Fallback: check for checked class
-        const classList = await checkbox.getAttribute('class');
-        return classList?.includes('checked');
-    }
-
-    // ==================== Alert Correlation Save Button ====================
-
-    async clickSaveAlertCorrelation() {
-        // The save button in Alert Correlation tab
-        const saveBtn = this.page.getByRole('button', { name: /save/i }).last();
-        await saveBtn.click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    }
-
-    async expectAlertCorrelationSaveSuccess() {
-        // Wait for positive notification about saved settings
-        const notification = this.page.locator('[role="alert"]');
-        await expect(notification).toBeVisible({ timeout: 10000 });
-        const text = await notification.textContent();
-        return text?.toLowerCase().includes('saved') || text?.toLowerCase().includes('success');
-    }
-
     // ==================== Phase 1 High Priority - Dimension Management ====================
 
     /**
@@ -816,56 +575,7 @@ export class CorrelationSettingsPage {
         await expect(item).not.toBeVisible({ timeout: 5000 });
     }
 
-    // ==================== Phase 1 High Priority - Fingerprint Groups ====================
-
-    /**
-     * Get all fingerprint group checkboxes
-     * @returns {import('@playwright/test').Locator}
-     */
-    getFingerprintGroupCheckboxes() {
-        return this.page.locator('[data-test^="organizationdeduplication-fingerprint-"]');
-    }
-
-    /**
-     * Expect fingerprint groups section to be visible
-     */
-    async expectFingerprintGroupsVisible() {
-        const checkboxes = this.getFingerprintGroupCheckboxes();
-        await expect(checkboxes.first()).toBeVisible({ timeout: 10000 });
-    }
-
-    /**
-     * Expect fingerprint groups section to be hidden
-     */
-    async expectFingerprintGroupsHidden() {
-        const checkboxes = this.page.locator('[data-test^="organizationdeduplication-fingerprint-"]');
-        await expect(checkboxes.first()).not.toBeVisible({ timeout: 5000 });
-    }
-
-    /**
-     * Get count of fingerprint group checkboxes
-     * @returns {Promise<number>}
-     */
-    async getFingerprintGroupsCount() {
-        const checkboxes = this.getFingerprintGroupCheckboxes();
-        return await checkboxes.count();
-    }
-
-    /**
-     * Check if a specific fingerprint group is checked
-     * @param {string} groupId - The group ID
-     * @returns {Promise<boolean>}
-     */
-    async isFingerprintGroupChecked(groupId) {
-        const selector = `[data-test="organizationdeduplication-fingerprint-${groupId}-checkbox"]`;
-        const checkbox = this.page.locator(selector);
-        const isChecked = await checkbox.getAttribute('aria-checked');
-        if (isChecked !== null) {
-            return isChecked === 'true';
-        }
-        const classList = await checkbox.getAttribute('class');
-        return classList?.includes('checked');
-    }
+    // ==================== Phase 1 High Priority - Validation Notifications ====================
 
     /**
      * Expect validation error notification to be visible
@@ -878,14 +588,6 @@ export class CorrelationSettingsPage {
             const text = await notification.first().textContent();
             expect(text.toLowerCase()).toContain(expectedMessage.toLowerCase());
         }
-    }
-
-    /**
-     * Click the Cancel button in Alert Correlation tab
-     */
-    async clickCancelAlertCorrelation() {
-        const cancelBtn = this.page.getByRole('button', { name: /cancel/i });
-        await cancelBtn.click();
     }
 
     // ==================== Phase 1 High Priority - Discovered Services ====================

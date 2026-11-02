@@ -160,6 +160,13 @@ describe("Prebuilt Templates Index", () => {
         "https://events.pagerduty.com/v2/enqueue",
       );
 
+      expect(generateDestinationUrl("pagerduty", { euRegion: true })).toBe(
+        "https://events.eu.pagerduty.com/v2/enqueue",
+      );
+      expect(generateDestinationUrl("pagerduty", { euRegion: false })).toBe(
+        "https://events.pagerduty.com/v2/enqueue",
+      );
+
       const opsgenieCredentials = { euRegion: true };
       expect(generateDestinationUrl("opsgenie", opsgenieCredentials)).toBe(
         "https://api.eu.opsgenie.com/v2/alerts",

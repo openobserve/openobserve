@@ -280,6 +280,60 @@ describe("PublicLinksTable", () => {
     expect(find(w, "dashboards-public-links-off-status").exists()).toBe(false);
   });
 
+  it("says when the org has public links off, holds pause and resume, and keeps a paused link's state", async () => {
+    vi.mocked(admin.listOrg).mockResolvedValue({
+      data: {
+        list: [
+          link({ status: "disabled" }),
+          link({ id: "l2", name: "Lobby", status: "disabled", enabled: false }),
+        ],
+      },
+    } as never);
+    vi.mocked(admin.statusBatch).mockResolvedValue({ data: { list: [] } } as never);
+    const w = build();
+    await flushPromises();
+    expect(find(w, "dashboards-public-links-org-disabled").text()).toContain(
+      "Public links are turned off for this organization",
+    );
+    expect(find(w, "dashboards-public-links-l1-pause-btn").attributes("disabled")).toBeDefined();
+    expect(find(w, "dashboards-public-links-l2-resume-btn").attributes("disabled")).toBeDefined();
+    expect(find(w, "dashboards-public-links-l2-resume-menu").attributes("disabled")).toBeDefined();
+    expect(find(w, "dashboards-public-links-l1-status").text()).toBe("Disabled");
+    expect(find(w, "dashboards-public-links-l2-status").text()).toBe("Disabled · Paused");
+  });
+
+  it("shows no org banner while public links are on", async () => {
+    const w = build();
+    await flushPromises();
+    expect(find(w, "dashboards-public-links-org-disabled").exists()).toBe(false);
+  });
+
+  it("counts never-viewed links on their own tile, so Live matches its badges", async () => {
+    vi.mocked(admin.listOrg).mockResolvedValue({
+      data: {
+        list: [
+          link(),
+          link({ id: "n1", status: "not_viewed", access_count: 0, last_accessed_at: null }),
+          link({ id: "n2", status: "not_viewed", access_count: 0, last_accessed_at: null }),
+        ],
+      },
+    } as never);
+    vi.mocked(admin.statusBatch).mockResolvedValue({ data: { list: [] } } as never);
+    const w = build();
+    await flushPromises();
+    expect(find(w, "dashboards-public-links-summary-live").text()).toContain("1");
+    expect(find(w, "dashboards-public-links-summary-not-viewed").text()).toContain("2");
+    expect(find(w, "dashboards-public-links-summary-not-viewed").text()).toContain("Never viewed");
+
+    await selectTile(w, "live");
+    expect(rows(w)).toHaveLength(1);
+    expect(find(w, "dashboards-public-links-l1-status").text()).toBe("Live");
+
+    await selectTile(w, "not-viewed");
+    expect(rows(w)).toHaveLength(2);
+    expect(find(w, "dashboards-public-links-n1-status").text()).toBe("Never viewed");
+  });
+
   it("searches by name, dashboard, folder and publisher", async () => {
     const w = build();
     await flushPromises();

@@ -517,7 +517,7 @@ export default defineComponent({
             // without a remount.
             existingUser.value = false;
           } else {
-            if (err.response?.status != 403 || err?.status != 403) {
+            if (err.response?.status !== 403 && err?.status !== 403) {
               toast({
                 variant: "error",
                 message: raw(err.response?.data?.message) || t("toastMessages.iam.userSaveFailed"),

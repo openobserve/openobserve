@@ -140,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :show-global-filter="false"
     :show-footer="false"
     :loading="loading"
+    :loading-reset-key="loadingResetKey"
     :empty-message="t('onlineEvals.scorer.detail.versions.empty')"
     :frame="false"
     selection="multiple"
@@ -203,6 +204,7 @@ const props = defineProps<{
   /** Full history, newest first. */
   versions: Scorer[];
   loading: boolean;
+  loadingResetKey?: unknown;
   /** The version jobs run today; tagged in the list. */
   activeVersion: number;
 }>();

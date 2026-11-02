@@ -98,6 +98,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-if="!sessionNotFound" #actions>
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="grid-on"
+        :disabled="heatmapOpening"
+        data-test="session-viewer-view-heatmap-btn"
+        @click="openSessionHeatmap(String(getSessionId), viewerStartUs)"
+      >
+        {{ t("rum.heatmap.viewHeatmap") }}
+        <OTooltip :content="t('rum.heatmap.viewHeatmapTip')" side="bottom" />
+      </OButton>
       <ShareButton
         data-test="session-viewer-share-link-btn"
         :url="shareUrl"
@@ -159,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :end-time="sessionState.data.selectedSession?.end_time || 0"
         :rum-window-us="eventsOnlyRumWindowUs"
         :marked-timestamps="markedTimestamps"
+        :loading="eventsLoading"
         @event-emitted="handleSidebarEvent"
         class="min-h-0 flex-1"
       />
@@ -256,6 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :start-time="sessionState.data.selectedSession?.start_time || 0"
             :end-time="sessionState.data.selectedSession?.end_time || 0"
             :marked-timestamps="markedTimestamps"
+            :loading="eventsLoading"
             @event-emitted="handleSidebarEvent"
             class="h-full"
           />
@@ -302,11 +315,13 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useStreams from "@/composables/useStreams";
 import { sessionEventsProbeSql, type StepKind } from "@/utils/rum/productAnalyticsQueries";
 import { MAX_KEY_LENGTH } from "@/utils/rum/productAnalyticsModel";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
+import useSessionHeatmap from "@/composables/rum/useSessionHeatmap";
 import analytics from "@/services/product_analytics";
 
 import { formatDate } from "@/utils/date";
@@ -398,7 +413,7 @@ const EVENTS_TAIL_US = 60_000_000;
 const DEFAULT_LOOKUP_US = 30 * DAY_US;
 const WATCHDOG_MS = 2000;
 const EVENTS_PAGE_SIZE = 150;
-const RUM_EVENT_TYPES = ["action", "view", "error"];
+const RUM_EVENT_TYPES = ["action", "view", "error", "resource"];
 const MAX_EVENT_PAGES = 50;
 const SEARCH_STREAM_NOT_FOUND = 20002;
 const EMPTY_TIMELINE: MobileTimeline = Object.freeze({
@@ -441,6 +456,7 @@ const segmentEvents = shallowRef<any[]>([]);
 // starting, which is exactly the moment the mobile player mounts — that dip is what let
 // the "No session replay available" empty state flash before the segments arrived.
 const segmentsLoading = ref(true);
+const eventsLoading = ref(true);
 const manifest = shallowRef<ManifestEntry[]>([]);
 const manifestSummary = ref<ManifestSummary | null>(null);
 const run = shallowRef<ReplayRun>({ runId: 0, anchorIndex: 0, appendedThroughIndex: -1 });
@@ -550,6 +566,7 @@ const markedTimestamps = computed<number[]>(() => {
 });
 
 const getSessionId = computed(() => router.currentRoute.value.params.id);
+const { openSessionHeatmap, opening: heatmapOpening } = useSessionHeatmap();
 
 // Read event_time query parameter
 const eventTime = computed(() => {
@@ -589,6 +606,9 @@ const sessionDetails = ref({
 const sessionStartMs = computed(
   () =>
     Number(sessionState.data.selectedSession?.start_time) || Number(manifest.value[0]?.start) || 0,
+);
+const viewerStartUs = computed(
+  () => Number(router.currentRoute.value.query.start_time) || sessionStartMs.value * 1000,
 );
 
 // Session ms of the first full snapshot; nothing before it can be drawn, so seeks there land on it.
@@ -802,6 +822,7 @@ const failSessionLoad = () => {
   sessionNotFound.value = false;
   sessionLoadFailed.value = true;
   segmentsLoading.value = false;
+  eventsLoading.value = false;
   loadState.value = "error";
 };
 
@@ -888,11 +909,11 @@ const searchWithRetry = (req: any, options: RetryOptions = { isCancelled: () => 
 const getSession = async () => {
   let geoFields = "";
 
-  if (performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_country"]) {
+  if (performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_city"]) {
     geoFields += "min(geo_info_city) as city,";
   }
 
-  if (performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_city"]) {
+  if (performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_country"]) {
     geoFields += "min(geo_info_country) as country,";
   }
 
@@ -944,6 +965,7 @@ const getSession = async () => {
     console.error("Failed to fetch session:", error);
     sessionLoadFailed.value = true;
     segmentsLoading.value = false;
+    eventsLoading.value = false;
     loadState.value = "error";
   } finally {
     isLoading.value.pop();
@@ -1463,9 +1485,11 @@ const pollManifest = async () => {
 const pollEvents = async () => {
   const hits = await fetchEventPages(rumEventsSql(), liveWindowUs(lastEventsTs, EVENTS_TAIL_US));
   if (cancelled) return;
+  const failed = await fetchFailedRequests(liveWindowUs(lastEventsTs, EVENTS_TAIL_US));
+  if (cancelled) return;
   const logs = await fetchEventPages(errorLogsSql(), liveWindowUs(lastLogsTs, EVENTS_TAIL_US));
   if (cancelled) return;
-  const changed = addRumEvents(hits);
+  const changed = addRumEvents([...hits, ...failed]);
   if (addErrorLogs(logs) || changed) publishEvents();
 };
 
@@ -1495,6 +1519,10 @@ const eventsRequest = (sql: string, window: QueryWindow, from: number) => {
 const rumEventsSql = () =>
   `select * from "_rumdata" where ${sqlEquals("session_id", sessionId.value)} and (type='error' or type='action' or type='view') order by date asc`;
 
+// Status 0 is a request that got no response: blocked by CORS, aborted or offline.
+const failedRequestsSql = () =>
+  `select * from "_rumdata" where ${sqlEquals("session_id", sessionId.value)} and type='resource' and resource_type in ('fetch','xhr') and (resource_status_code >= 400 or resource_status_code = 0) order by date asc`;
+
 const errorLogsSql = () =>
   `select * from "_rumlog" where ${sqlEquals("session_id", sessionId.value)} and status='error' order by date asc`;
 
@@ -1508,6 +1536,18 @@ const fetchEventPages = async (sql: string, window: QueryWindow) => {
     if (rows.length < EVENTS_PAGE_SIZE || cancelled) break;
   }
   return hits;
+};
+
+// Mobile streams, and streams with no resources yet, lack these columns; that must not cost the other events.
+const fetchFailedRequests = async (window: QueryWindow) => {
+  try {
+    const columns = await rumColumns();
+    if (!columns.resource_status_code || !columns.resource_type) return [];
+    return await fetchEventPages(failedRequestsSql(), window);
+  } catch (error) {
+    console.error("Failed to fetch failed requests:", error);
+    return [];
+  }
 };
 
 // Re-sends of a view share its date, so the document version marks the newer one, and a later arrival when there is none.
@@ -1572,22 +1612,29 @@ const publishEvents = () => {
 // Paged in full, because the live cursor is the largest arrival time seen and a cut-off first page would skip the rest.
 const getSessionEvents = () => {
   isLoading.value.push(true);
-  fetchEventPages(rumEventsSql(), serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US))
-    .then((hits: any[]) => {
+  eventsLoading.value = true;
+  Promise.all([
+    fetchEventPages(rumEventsSql(), serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US)),
+    fetchFailedRequests(serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US)),
+  ])
+    .then(([hits, failed]: [any[], any[]]) => {
       // Test the SOURCE field, not the rendered value: user_email is filled with
       // t("common.unknownUser") when absent, so comparing it to the English
       // literal stopped this backfill firing in every non-English locale.
       if (!sessionState.data.selectedSession?.user_email)
         sessionDetails.value.user_email = hits[0]?.usr_email;
 
-      addRumEvents(hits);
+      addRumEvents([...hits, ...failed]);
       publishEvents();
       getSessionErrorLogs();
     })
     .catch((error) => {
       console.error("Failed to fetch sesion events:", error);
     })
-    .finally(() => isLoading.value.pop());
+    .finally(() => {
+      isLoading.value.pop();
+      eventsLoading.value = false;
+    });
 };
 
 const getSessionErrorLogs = () => {
@@ -1655,6 +1702,16 @@ const handleActionEvent = (event: any) => {
   return _event;
 };
 
+const handleResourceEvent = (event: any) => {
+  const _event = getDefaultEvent(event);
+  _event.type = "failed_request";
+  const status = Number(event?.resource_status_code);
+  _event.name = `${status === 0 ? t("rum.playerEvents.noResponse") : status} ${(
+    event?.resource_method || "GET"
+  ).toUpperCase()} ${event?.resource_url}`;
+  return _event;
+};
+
 const handleViewEvent = (event: any) => {
   const _event = getDefaultEvent(event);
   // if (event.event.custom.error) {
@@ -1679,6 +1736,7 @@ const formatEvent = (event: any) => {
       error: handleErrorEvent,
       action: handleActionEvent,
       view: handleViewEvent,
+      resource: handleResourceEvent,
     };
 
     return eventTypes[event.type](event);

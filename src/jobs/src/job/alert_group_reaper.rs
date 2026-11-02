@@ -301,9 +301,11 @@ async fn sweep_alert(
     let plan = plan_sweep(alert_id, &groups, now, rule_mode, |state| {
         // Per row, not per alert: on a cron schedule each group's deadline
         // depends on where its own `last_seen` falls in the schedule.
-        let resolve_after = alert
-            .trigger_condition
-            .group_resolve_threshold_micros(state.last_seen.unwrap_or(now), k);
+        let resolve_after = alert.trigger_condition.group_resolve_threshold_micros(
+            state.last_seen.unwrap_or(now),
+            k,
+            alert.tz_offset,
+        );
         fate_for_alert(alert, state, now, resolve_after, grace)
     });
 

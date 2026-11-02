@@ -632,7 +632,8 @@ function serviceRowId(row: {
   ]);
 }
 
-const isLoading = ref(false);
+// Starts true: until the first load settles, no services means "not fetched yet", not "none found".
+const isLoading = ref(true);
 // A search in flight with results still on screen — the spinner, not the
 // empty state.
 const isSearching = ref(false);
@@ -1292,10 +1293,14 @@ function openInsightCharts(entry: RedInsight) {
 
 async function loadServicesCatalog() {
   const streamName = streamFilter.value?.replaceAll('"', "");
-  if (!streamName) return;
+  if (!streamName) {
+    if (!isSearching.value) isLoading.value = false;
+    return;
+  }
   void loadInsights();
 
   if (availableStreams.value.length && !availableStreams.value.includes(streamName)) {
+    if (!isSearching.value) isLoading.value = false;
     return;
   }
 

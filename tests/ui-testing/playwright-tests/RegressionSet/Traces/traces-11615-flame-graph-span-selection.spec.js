@@ -104,7 +104,7 @@ test.describe('Trace Flame Graph span selection', () => {
   });
 
   test('P1: selecting a span in the Flame Graph opens its details without leaving the tab', {
-    tag: ['@traceDetails', '@traces', '@functional', '@P1', '@all'],
+    tag: ['@traceDetails', '@traces', '@functional', '@bug-11615', '@regression', '@P1', '@all'],
   }, async ({ page }) => {
     const flameTab = page.locator('[data-test="trace-details-flame-graph-tab"]');
     await flameTab.waitFor({ state: 'visible', timeout: 30000 });

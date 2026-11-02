@@ -99,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size="20"
           :page-size-options="[20, 50, 100]"
           :loading="loading"
+          :loading-reset-key="workflowId"
           :show-global-filter="false"
           :default-columns="false"
           :show-index="true"

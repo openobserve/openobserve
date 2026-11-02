@@ -145,7 +145,6 @@
     "Logs": [
       "web/src/plugins/logs/**",
       "web/src/components/logs/**",
-      "web/src/services/httpsearch.*",
       "web/src/services/saved_views.*",
       "web/src/services/patterns.*",
       "tests/ui-testing/pages/logsPages/**",
@@ -155,7 +154,6 @@
     "Metrics": [
       "web/src/plugins/metrics/**",
       "web/src/components/promql/**",
-      "web/src/views/PromQL/**",
       "web/src/services/metrics.*",
       "tests/ui-testing/pages/metricsPages/**"
     ],
@@ -172,6 +170,12 @@
       "web/src/services/reports.*",
       "tests/ui-testing/pages/reportsPages/**",
       "tests/ui-testing/pages/dashboardPages/**"
+    ],
+    "Profiles": [
+      "web/src/plugins/profiles/**",
+      "web/src/services/profiles.*",
+      "web/src/components/common/FlameGraphView.vue",
+      "tests/ui-testing/pages/profilesPages/**"
     ],
     "RUM": [
       "web/src/components/rum/**",

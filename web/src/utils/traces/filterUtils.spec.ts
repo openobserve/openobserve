@@ -426,3 +426,23 @@ describe("removeFieldCondition", () => {
     });
   });
 });
+
+describe("replaceExistingFieldCondition quotes and replacement tokens (issue 11966)", () => {
+  it("replaces a condition whose value has a doubled quote", () => {
+    expect(replaceExistingFieldCondition("name = 'it''s ok'", "name", "name = 'z'")).toBe(
+      "name = 'z'",
+    );
+  });
+
+  it("inserts the new expression literally when it contains $ tokens", () => {
+    const expr = "name = 'cost $& and $` and $''";
+    expect(replaceExistingFieldCondition("name = 'a'", "name", expr)).toBe(expr);
+  });
+});
+
+describe("removeFieldCondition with AND inside a quoted value (issue 11966)", () => {
+  it("removes only the target condition and keeps a quoted ' and ' intact", () => {
+    expect(removeFieldCondition("a = 'x and y' AND b = '1'", "b")).toBe("a = 'x and y'");
+    expect(removeFieldCondition("a = 'x and y' AND b = '1'", "a")).toBe("b = '1'");
+  });
+});

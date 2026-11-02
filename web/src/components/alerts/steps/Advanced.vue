@@ -166,7 +166,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :searchable="false"
                 clearable
                 width="xs"
-                :placeholder="t('alerts.priorityUnset')"
+                :placeholder="
+                  oncallEnabled ? t('alerts.priorityUnsetPagesAs') : t('alerts.priorityUnset')
+                "
                 data-test="alert-priority-select"
               />
             </div>

@@ -15,6 +15,15 @@
 -->
 <template>
   <div class="flex h-full flex-col" data-test="dashboards-public-links">
+    <OContent v-if="orgDisabled" class="pt-2">
+      <OBanner
+        variant="warning"
+        icon="warning-amber"
+        dense
+        :content="t('dashboard.publicLinks.orgDisabledBanner')"
+        data-test="dashboards-public-links-org-disabled"
+      />
+    </OContent>
     <OTable
       class="min-h-0 flex-1"
       :data="visibleLinks"
@@ -127,6 +136,7 @@
             <OTag
               type="publicLinkStatus"
               :value="statusOf(row)"
+              :label="statusLabel(row, t)"
               :data-test="`dashboards-public-links-${row.id}-status`"
             />
             <OTooltip v-if="statusHints[row.id]" side="bottom" :content="statusHints[row.id]" />
@@ -257,7 +267,7 @@
                 row.enabled ? t('dashboard.publicLinks.pause') : t('dashboard.publicLinks.resume')
               "
               :loading="busyRows.get(row.id) === 'inline'"
-              :disabled="!canPause(row) || busyRows.has(row.id)"
+              :disabled="!canPause(row) || busyRows.has(row.id) || orgDisabled"
               :data-test="`dashboards-public-links-${row.id}-${row.enabled ? 'pause' : 'resume'}-btn`"
               @click="setPaused(row, row.enabled, 'inline')"
             >
@@ -321,7 +331,7 @@
               v-if="canPause(row) && !takeOverReplacesResume(row, userId)"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
               class="md:hidden"
-              :disabled="busyRows.has(row.id)"
+              :disabled="busyRows.has(row.id) || orgDisabled"
               :data-test="`dashboards-public-links-${row.id}-${row.enabled ? 'pause' : 'resume'}-menu`"
               @select="setPaused(row, row.enabled, 'menu')"
             >
@@ -411,6 +421,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -432,8 +444,10 @@ import {
   canTakeOver,
   displayStatus,
   noDashboardAccess,
+  orgSwitchedOff,
   publicLinkColumns,
   publicLinkSearchTerm,
+  statusLabel,
   statusReason,
   forbiddenMessage,
   pauseBlockedReason,
@@ -447,12 +461,13 @@ import { useFolderIcons } from "@/composables/useFolderIcons";
 import { foldersQuery } from "@/services/common.queries";
 import PublicLinkExpiresCell from "./PublicLinkExpiresCell.vue";
 
-type StatusFilter = "live" | "paused" | "attention" | "expired" | "all";
+type StatusFilter = "live" | "notViewed" | "paused" | "attention" | "expired" | "all";
 /** Where a row action was clicked, so the spinner shows on that control. */
 type RowActionSource = "inline" | "menu";
 
 const FILTER_STATUSES: Record<Exclude<StatusFilter, "all">, PublicLinkStatus[]> = {
-  live: ["live", "not_viewed"],
+  live: ["live"],
+  notViewed: ["not_viewed"],
   paused: ["paused"],
   attention: ["needs_attention"],
   expired: ["expired"],
@@ -475,6 +490,7 @@ const linksQuery = useQuery(() =>
   Object.assign(publicLinksListQuery(orgId.value), { enabled: !!orgId.value }),
 );
 const links = computed(() => linksQuery.data.value ?? []);
+const orgDisabled = computed(() => orgSwitchedOff(links.value));
 const { iconFor } = useFolderIcons();
 const foldersListQuery = useQuery(() =>
   Object.assign(foldersQuery(orgId.value, "dashboards"), { enabled: !!orgId.value }),
@@ -552,6 +568,14 @@ const summaryStats = computed<StatItem[]>(() => {
       icon: "check-circle",
       tone: "success",
       dataTest: "dashboards-public-links-summary-live",
+    },
+    {
+      key: "notViewed",
+      label: t("components.badge.publicLinkStatus.notViewed"),
+      value: countOf("notViewed"),
+      icon: "visibility-off",
+      tone: "neutral",
+      dataTest: "dashboards-public-links-summary-not-viewed",
     },
     {
       key: "paused",

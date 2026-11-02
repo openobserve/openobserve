@@ -16,10 +16,15 @@
 import { describe, expect, it } from "vitest";
 import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
-import { buildFunnelPanel, buildTrendsPanel } from "@/utils/rum/productAnalyticsPanels";
+import {
+  buildFunnelPanel,
+  buildFunnelTrendPanel,
+  buildTrendsPanel,
+} from "@/utils/rum/productAnalyticsPanels";
 import {
   assertJoinFree,
   funnelPanelSql,
+  funnelTrendPanelSql,
   trendSql,
   type AnalyticsScope,
 } from "@/utils/rum/productAnalyticsQueries";
@@ -120,6 +125,40 @@ describe("buildFunnelPanel (AC-53)", () => {
     expect(p.queries[0].query).toContain("'2. Saved'");
     expect(p.queries[0].fields.x[0]).toMatchObject({ alias: "x_axis_1", label: "Step" });
     expect(p.queries[0].fields.y[0]).toMatchObject({ alias: "y_axis_1", label: "Sessions" });
+    assertJoinFree(p.queries[0].query);
+  });
+
+  it("from Trend is a line panel of each session's entry, bucketed by histogram at the chosen interval", () => {
+    const three = { ...def, steps: [...def.steps, { kind: "c" as const, key: "buy" }] };
+    const p = buildFunnelTrendPanel(
+      scope,
+      three,
+      { a: 2, b: 3 },
+      "week",
+      events,
+      t,
+    ) as unknown as Panel & {
+      title: string;
+    };
+    expect(p.type).toBe("line");
+    expect(p.title).toBe("Conversion over time: Saved → buy");
+    expect((p as unknown as { config: Record<string, unknown> }).config).toMatchObject({
+      decimals: 1,
+      connect_nulls: false,
+    });
+    expect(p.queries[0].query).toBe(
+      funnelTrendPanelSql(scope, three, { a: 2, b: 3 }, "1 week", { events, sample: 1 }),
+    );
+    expect(p.queries[0].query).toContain("histogram(entry_ts, '1 week') AS x_axis_1");
+    expect(p.queries[0].fields.y[0]).toMatchObject({ alias: "y_axis_1", label: "Conversion (%)" });
+    for (const [g, interval] of [
+      ["day", "1 day"],
+      ["month", "1 month"],
+    ] as const)
+      expect(
+        (buildFunnelTrendPanel(scope, three, { a: 1, b: 3 }, g, events, t) as unknown as Panel)
+          .queries[0].query,
+      ).toContain(`histogram(entry_ts, '${interval}')`);
     assertJoinFree(p.queries[0].query);
   });
 });

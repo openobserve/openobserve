@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { reactive } from "vue";
+import { nextTick, reactive, type SetupContext } from "vue";
 
 // A fresh panel-data object per test so mounting can reset it in place and the
 // assertions see the metrics defaults the container applied.
@@ -49,6 +49,7 @@ const editorRunQuery = vi.hoisted(() => vi.fn());
 const injectedRunQuery = vi.hoisted(() => ({ current: null as any }));
 /** The stub's exposed staleness state, as refs so the container's computed tracks them. */
 const editorState = vi.hoisted(() => ({ current: null as any }));
+const emitChartError = vi.hoisted(() => ({ current: null as ((e: unknown) => void) | null }));
 
 // The real PanelEditor pulls in ECharts + the whole dashboard config surface;
 // none of that is what this container's own logic needs. Stub it, but keep its
@@ -61,9 +62,10 @@ vi.mock("@/components/dashboards/PanelEditor", async () => {
     PanelEditor: {
       name: "PanelEditor",
       props: ["allowedChartTypes"],
-      emits: ["add-to-dashboard", "chart-api-error"],
-      setup: (_: any, { expose }: any) => {
+      emits: ["add-to-dashboard", "chart-api-error", "renderer-error"],
+      setup: (_: unknown, { expose, emit }: SetupContext) => {
         injectedRunQuery.current = inject("runQuery", null);
+        emitChartError.current = (e: unknown) => emit("renderer-error", e);
         editorState.current = {
           isOutDated: ref(false),
           isLoading: ref(false),
@@ -72,6 +74,7 @@ vi.mock("@/components/dashboards/PanelEditor", async () => {
         // Like the real editor, a run snapshots the panel it ran with.
         const runQuery = (...args: any[]) => {
           editorRunQuery(...args);
+          editorState.current.isLoading.value = true;
           editorState.current.chartData.value = JSON.parse(JSON.stringify(panelData.current.data));
         };
         expose({ runQuery, ...editorState.current });
@@ -103,7 +106,7 @@ vi.mock("@/utils/streamPersist", () => ({
 // partial: the panel seed path reaches @/stores, which needs the real createStore
 const storeState = vi.hoisted(() => ({
   selectedOrganization: { identifier: "org1" },
-  zoConfig: { auto_query_enabled: false },
+  zoConfig: { auto_query_enabled: false, query_history_enabled: true },
 }));
 vi.mock("vuex", async (importOriginal) => ({
   ...(await importOriginal<typeof import("vuex")>()),
@@ -119,6 +122,17 @@ const historyApi = vi.hoisted(() => ({
 vi.mock("@/services/query_history", () => ({ default: historyApi }));
 
 import MetricsVisualize from "./MetricsVisualize.vue";
+
+interface VisualizeApi {
+  onUserRun: (range: object) => void;
+}
+
+const finishRun = async (error?: { message: string; code: number }) => {
+  if (error) emitChartError.current?.(error);
+  editorState.current.isLoading.value = false;
+  await flushPromises();
+  await nextTick();
+};
 import { encodeMetricsConfig } from "@/composables/metrics/metricsUrlState";
 import { LIVE_PREVIEW_DEBOUNCE_MS } from "@/composables/dashboard/usePanelLivePreview";
 
@@ -203,6 +217,7 @@ describe("MetricsVisualize", () => {
       panelData.current.data.queries[0].query = "avg(up)";
       (wrapper.vm as any).runQuery();
       await flushPromises();
+      await finishRun();
       editorRunQuery.mockClear();
       window.dispatchEvent(new Event("pointerdown"));
       return wrapper;
@@ -224,6 +239,7 @@ describe("MetricsVisualize", () => {
 
       vm.onUserRun({ valueType: "relative", relativeTimePeriod: "15m" });
       await flushPromises();
+      await finishRun();
       expect(vm.isRunQueryPending).toBe(false);
       expect(historyApi.record).toHaveBeenCalledTimes(1);
     });
@@ -265,6 +281,7 @@ describe("MetricsVisualize", () => {
       const wrapper = await mountEdited();
       (wrapper.vm as any).onUserRun({ valueType: "relative", relativeTimePeriod: "15m" }, true);
       await flushPromises();
+      await finishRun();
       expect(editorRunQuery).toHaveBeenCalledWith(true);
       expect(historyApi.record).toHaveBeenCalledTimes(1);
     });
@@ -360,6 +377,8 @@ describe("MetricsVisualize", () => {
 
       (wrapper.vm as any).onUserRun(RANGE);
       await flushPromises();
+      expect(historyApi.record).not.toHaveBeenCalled();
+      await finishRun();
 
       expect(editorRunQuery).toHaveBeenCalledTimes(1);
       expect(historyApi.record).toHaveBeenCalledWith(
@@ -403,6 +422,7 @@ describe("MetricsVisualize", () => {
 
       (wrapper.vm as any).onUserRun(RANGE);
       await flushPromises();
+      await finishRun();
       expect(editorRunQuery).toHaveBeenCalledTimes(1);
       expect(consoleError).toHaveBeenCalled();
       expect(showErrorNotification).not.toHaveBeenCalled();
@@ -420,6 +440,26 @@ describe("MetricsVisualize", () => {
       await flushPromises();
 
       expect(editorRunQuery).toHaveBeenCalledTimes(2);
+      expect(historyApi.record).not.toHaveBeenCalled();
+    });
+
+    it("records a failed run as error and a cancelled run not at all", async () => {
+      const wrapper = mountVisualize({ selectedDateTime: { startTime: 1000, endTime: 2000 } });
+      await flushPromises();
+      withQuery("sum(up{");
+
+      (wrapper.vm as unknown as VisualizeApi).onUserRun(RANGE);
+      await flushPromises();
+      await finishRun({ message: "parse error: unclosed left brace", code: 400 });
+      expect(historyApi.record.mock.calls[0][1]).toMatchObject({
+        status: "error",
+        context: { error: "parse error: unclosed left brace" },
+      });
+
+      historyApi.record.mockClear();
+      (wrapper.vm as unknown as VisualizeApi).onUserRun(RANGE);
+      await flushPromises();
+      await finishRun({ message: "cancelled", code: 20009 });
       expect(historyApi.record).not.toHaveBeenCalled();
     });
 
@@ -460,7 +500,13 @@ describe("MetricsVisualize", () => {
       expect(data.queries[0].query).toBe("max(b)");
       expect(panelData.current.meta.dateTime.start_time).toEqual(new Date(7000));
       expect(editorRunQuery).toHaveBeenCalledTimes(2);
-      expect(historyApi.record).not.toHaveBeenCalled();
+      await finishRun();
+      expect(historyApi.record).toHaveBeenCalledTimes(1);
+
+      await viz.applyPanelData(blob("bar", "sum(c)"), RANGE, false);
+      await flushPromises();
+      expect(data.queries[0].query).toBe("sum(c)");
+      expect(editorRunQuery).toHaveBeenCalledTimes(2);
     });
   });
 });

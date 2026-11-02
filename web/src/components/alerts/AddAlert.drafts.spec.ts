@@ -151,7 +151,6 @@ const stubs = {
   QueryConfig: true,
   AlertSettings: true,
   CompareWithPast: true,
-  Deduplication: true,
   Advanced: true,
   PreviewAlert: true,
   AlertSummary: true,

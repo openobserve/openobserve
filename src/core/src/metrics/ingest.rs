@@ -105,10 +105,10 @@ impl StreamKeyChecks {
     }
 
     /// Removes the records bound for streams that cannot be stored, as (stream, reason, records).
-    pub(super) fn drop_unstorable<T>(
+    pub(super) fn drop_unstorable<R>(
         &mut self,
         org_id: &str,
-        records_by_stream: &mut RecordsByStream<T>,
+        records_by_stream: &mut HashMap<String, Vec<R>>,
     ) -> Vec<(String, String, usize)> {
         let mut dropped = Vec::new();
         records_by_stream.retain(|stream_name, records| {

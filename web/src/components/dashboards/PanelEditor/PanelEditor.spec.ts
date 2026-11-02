@@ -99,6 +99,7 @@ const mockChartData = ref(undefined as any);
 const mockShowLegendsDialog = ref(false);
 const mockNoticeProps = ref<Record<string, unknown>>({});
 const mockRunQuery = vi.fn();
+const mockHandleChartApiError = vi.fn();
 
 // Mock usePanelEditor composable
 vi.mock("./composables/usePanelEditor", () => ({
@@ -129,7 +130,7 @@ vi.mock("./composables/usePanelEditor", () => ({
     currentPanelData: ref({}),
     initChartData: vi.fn(),
     runQuery: mockRunQuery,
-    handleChartApiError: vi.fn(),
+    handleChartApiError: mockHandleChartApiError,
     handleLastTriggeredAtUpdate: vi.fn(),
     handleLimitNumberOfSeriesWarningMessage: vi.fn(),
     handleIsPartialDataUpdate: vi.fn(),
@@ -415,6 +416,37 @@ describe("PanelEditor.vue", () => {
       wrapper.unmount();
     }
     vi.clearAllMocks();
+  });
+
+  describe("chart toolbar", () => {
+    const mountWithRenderer = (noData: boolean) =>
+      shallowMount(PanelEditor, {
+        props: { pageType: "build" },
+        global: {
+          ...mountGlobal,
+          stubs: {
+            ...mountGlobal.stubs,
+            OButton: false,
+            PanelSchemaRenderer: {
+              name: "PanelSchemaRenderer",
+              props: ["searchType", "panelSchema", "selectedTimeObj", "width", "height"],
+              setup(_: unknown, { expose }: { expose: (exposed: object) => void }) {
+                expose({ noData });
+              },
+              template: "<div />",
+            },
+          },
+        },
+      });
+
+    it("keeps the legends button in place while the chart has no data, so the chart never jumps", async () => {
+      mockChartData.value = { type: "line", queries: [] };
+      wrapper = mountWithRenderer(true);
+      await flushPromises();
+      const btn = wrapper.find('[data-test="panel-editor-show-legends-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.classes()).toContain("invisible");
+    });
   });
 
   describe("Component Initialization", () => {
@@ -953,6 +985,22 @@ describe("PanelEditor.vue", () => {
       wrapper.unmount();
     });
 
+    it("rebuilds the other builder tabs when the chart type changes", async () => {
+      const previous = mockDashboardPanelData.data.type;
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", editMode: false },
+        global: mountGlobal,
+      });
+      await nextTick();
+      mockRegenerateOtherBuilderQueries.mockClear();
+
+      mockDashboardPanelData.data.type = "boxplot";
+      await nextTick();
+      expect(mockRegenerateOtherBuilderQueries).toHaveBeenCalledTimes(1);
+      mockDashboardPanelData.data.type = previous;
+      wrapper.unmount();
+    });
+
     it("rebuilds the query when the bucket size is edited in place", async () => {
       const config = mockDashboardPanelData.data.config as Record<string, any>;
       config.heatmap_y_bucket = { mode: "size", size: 10 };
@@ -1036,6 +1084,28 @@ describe("PanelEditor.vue", () => {
         },
         { name: "end_time", value: mockDashboardPanelData.meta.dateTime.end_time.getTime() },
       ]);
+    });
+  });
+
+  describe("renderer errors", () => {
+    beforeEach(() => {
+      mockChartData.value = {};
+      mockHandleChartApiError.mockClear();
+    });
+
+    it("shows the renderer's error and hands it to the page as renderer-error", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "metrics" },
+        global: mountGlobal,
+      });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      const failure = { message: "parse error: unexpected <EOF>", code: 400 };
+      renderer.vm.$emit("error", failure);
+      expect(mockHandleChartApiError).toHaveBeenCalledWith(failure);
+      expect(wrapper.emitted("renderer-error")).toEqual([[failure]]);
+
+      renderer.vm.$emit("error", { message: "", code: "" });
+      expect(wrapper.emitted("renderer-error")?.[1]).toEqual([{ message: "", code: "" }]);
     });
   });
 });

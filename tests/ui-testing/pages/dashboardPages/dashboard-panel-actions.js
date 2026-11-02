@@ -52,7 +52,8 @@ export default class DashboardactionPage {
     this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
-    this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
+    this.chartRendererSelector = '[data-test="chart-renderer"]';
+    this.chartRendererCanvas = page.locator(this.chartRendererSelector);
     this.chartRendererCanvasEl = page.locator('[data-test="chart-renderer"] canvas');
     this.noDataElement = page.locator('[data-test="no-data"]');
     this.dashboardSearchInput = page.locator('[data-test="dashboard-search"]');
@@ -355,18 +356,16 @@ export default class DashboardactionPage {
   }
 
   // The apply button stays enabled for ~100ms after the click, so waitForChartToRender alone can pass before the query starts and the table later resets to empty.
-  async applyAndWaitForPromQLQuery() {
+  async applyAndWaitForPromQLQuery(isTarget = () => true) {
     const promqlResponse = this.page.waitForResponse(
-      (res) => res.url().includes("/prometheus/api/v1/query_range"),
+      (res) => res.url().includes("/prometheus/api/v1/query_range") && isTarget(new URL(res.url())),
       { timeout: 30000 }
     );
     await this.applyDashboardBtn();
     const response = await promqlResponse;
-    // A streamed (text/event-stream) response never reports finished; waitForChartToRender covers completion.
-    if (!(await response.headerValue("content-type"))?.includes("text/event-stream")) {
-      await response.finished();
-    }
+    await response.finished();
     await this.waitForChartToRender();
+    return response;
   }
 
   /** Resolves with the URL of the next PromQL query_range request; call before the action that fires it. */
@@ -383,6 +382,23 @@ export default class DashboardactionPage {
     return this.page.locator(
       `[data-test="dashboard-edit-panel-${panelName}-dropdown"]`
     );
+  }
+
+  /** Sorted sample values of every series in a finished PromQL query_range event-stream response. */
+  async promqlSampleValues(response) {
+    return (await response.text())
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => {
+        try {
+          return JSON.parse(line.slice("data: ".length));
+        } catch {
+          return null;
+        }
+      })
+      .flatMap((event) => event?.data?.result ?? [])
+      .map((series) => Number((series.value ?? series.values?.at(-1))?.[1]))
+      .sort((a, b) => a - b);
   }
 
   async selectPanelAction(panelName, action) {
@@ -737,15 +753,6 @@ export default class DashboardactionPage {
     );
   }
 
-  /** Sum of the first pie's positive slice values: the basis ECharts and the legend take percents of. */
-  async getPieSliceTotal() {
-    const [pie] = await this.getChartSeries();
-    return (pie?.values ?? [])
-      .map(Number)
-      .filter((v) => Number.isFinite(v) && v > 0)
-      .reduce((a, b) => a + b, 0);
-  }
-
   /**
    * Assert every entry reads "<value>  <percent>%" with `decimals` digits, the value matching its slice
    * (a K/M/B/T abbreviation is expanded) and the percent matching its share of the positive total.
@@ -753,7 +760,11 @@ export default class DashboardactionPage {
    * @param {number} decimals - panel Decimals setting
    */
   async expectPieLegendValueAndPercent(entries, decimals = 2) {
-    const total = await this.getPieSliceTotal();
+    // Summed from the same snapshot: a second read can land on a later render with different data.
+    const total = entries
+      .map((entry) => entry.value)
+      .filter((v) => Number.isFinite(v) && v > 0)
+      .reduce((a, b) => a + b, 0);
     expect(total, "pie slice total").toBeGreaterThan(0);
     for (const entry of entries) {
       const [valueText, percentText] = this.getPieLegendTokens(entry);
@@ -898,12 +909,25 @@ export default class DashboardactionPage {
             try {
               const option = chart.getOption() ?? {};
               charts.push({
+                width: chart.getWidth(),
+                height: chart.getHeight(),
+                hostWidth: host.clientWidth,
+                hostHeight: host.clientHeight,
                 xAxis: axesOf(option.xAxis),
                 yAxis: axesOf(option.yAxis),
                 series: (option.series ?? []).map((s) => ({
                   name: s?.name ? String(s.name) : "",
+                  type: s?.type ?? null,
+                  silent: s?.silent === true,
                   stack: s?.stack === undefined || s?.stack === null ? null : String(s.stack),
+                  radius: s?.radius ?? null,
+                  center: Array.isArray(s?.center) ? s.center.map(String) : null,
+                  min: numberOrNull(s?.min),
+                  max: numberOrNull(s?.max),
                   points: (s?.data ?? []).map(pointOf),
+                  pointNames: (s?.data ?? []).map((point) =>
+                    point !== null && typeof point === "object" && !Array.isArray(point) ? String(point.name ?? "") : "",
+                  ),
                 })),
                 legendEntries: legendEntriesOf(option),
               });
@@ -919,6 +943,73 @@ export default class DashboardactionPage {
       walk(document.querySelector("#app")?._vnode, 0);
       return charts;
     }, scopeSelector);
+  }
+
+  async getGaugeLayoutProblems(expected = {}, scopeSelector = this.chartRendererSelector) {
+    const charts = await this.getChartOptionSnapshots(scopeSelector);
+    if (charts.length !== 1) return [`expected one rendered chart, found ${charts.length}`];
+    const [chart] = charts;
+    const problems = [];
+    const { width, height } = chart;
+    if (!(width > 0 && height > 0)) problems.push(`canvas has no size: ${width}x${height}`);
+    // A dial sized against a stale container overflows the canvas, which is the distortion itself.
+    if (Math.abs(width - chart.hostWidth) > 1 || Math.abs(height - chart.hostHeight) > 1) {
+      problems.push(`canvas ${width}x${height} does not match its container ${chart.hostWidth}x${chart.hostHeight}`);
+    }
+    // A display-name override adds a silent title-only gauge on top of its dial; it is not a dial.
+    const dials = chart.series.filter((s) => !s.silent);
+    if (expected.count !== undefined && dials.length !== expected.count) {
+      problems.push(`expected ${expected.count} dials, found ${dials.length}`);
+    }
+    if (dials.length === 0) problems.push("no gauge series");
+    const placed = [];
+    dials.forEach((dial, i) => {
+      const label = `dial ${i} (${dial.name || "unnamed"})`;
+      if (dial.type !== "gauge") problems.push(`${label}: type is ${dial.type}`);
+      const radius = parseFloat(dial.radius);
+      if (!/px$/.test(String(dial.radius)) || !Number.isFinite(radius) || radius <= 0) {
+        problems.push(`${label}: bad radius ${dial.radius}`);
+        return;
+      }
+      const [cxPct, cyPct] = (dial.center ?? []).map((c) => parseFloat(c));
+      if (!Number.isFinite(cxPct) || !Number.isFinite(cyPct) || cxPct < 0 || cxPct > 100 || cyPct < 0 || cyPct > 100) {
+        problems.push(`${label}: bad center ${JSON.stringify(dial.center)}`);
+        return;
+      }
+      const cx = (cxPct * width) / 100;
+      const cy = (cyPct * height) / 100;
+      if (cx - radius < -2 || cx + radius > width + 2 || cy - radius < -2 || cy + radius > height + 2) {
+        problems.push(`${label}: radius ${radius}px at (${cx.toFixed(0)},${cy.toFixed(0)}) overflows ${width}x${height}`);
+      }
+      for (const other of placed) {
+        if (Math.hypot(cx - other.cx, cy - other.cy) < radius + other.radius - 2) {
+          problems.push(`${label}: overlaps dial ${other.i}`);
+        }
+      }
+      placed.push({ i, cx, cy, radius });
+      if (dial.min === null || dial.max === null || !(dial.min < dial.max)) {
+        problems.push(`${label}: bad range ${dial.min}..${dial.max}`);
+      }
+      if (expected.min !== undefined && dial.min !== expected.min) problems.push(`${label}: min ${dial.min}, expected ${expected.min}`);
+      if (expected.max !== undefined && dial.max !== expected.max) problems.push(`${label}: max ${dial.max}, expected ${expected.max}`);
+      const value = dial.points[0];
+      if (typeof value !== "number" || !Number.isFinite(value)) problems.push(`${label}: value is ${value}`);
+    });
+    return problems;
+  }
+
+  async expectGaugeWellFormed(expect, expected = {}, scopeSelector = this.chartRendererSelector) {
+    await expect
+      .poll(() => this.getGaugeLayoutProblems(expected, scopeSelector), {
+        timeout: 20000,
+        intervals: [500, 1000, 1000, 2000],
+      })
+      .toEqual([]);
+  }
+
+  async getGaugeDialNames(scopeSelector = this.chartRendererSelector) {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    return chart ? chart.series.filter((s) => s.type === "gauge" && !s.silent).map((s) => s.pointNames[0] ?? "") : [];
   }
 
   /**
