@@ -12,6 +12,8 @@ test.describe('Fleet management configurations and deploy', { tag: ['@fleet', '@
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
+    // Cleared first so a failed navigation never leaves afterEach the previous test's closed page.
+    pm = undefined;
     await navigateToBase(page);
     pm = new PageManager(page);
     await pm.fleetManagerPage.assertEnabled();

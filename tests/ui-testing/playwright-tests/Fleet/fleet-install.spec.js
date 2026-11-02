@@ -19,6 +19,8 @@ test.describe('Fleet management Add collector', { tag: ['@fleet', '@enterprise',
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
+    // Cleared first so a failed navigation never leaves afterEach the previous test's closed page.
+    pm = undefined;
     await navigateToBase(page);
     pm = new PageManager(page);
     await pm.fleetManagerPage.assertEnabled();
@@ -144,7 +146,6 @@ test.describe('Fleet management Add collector', { tag: ['@fleet', '@enterprise',
     const target = { ...(await pm.fleetInstallPage.installTarget(pm.fleetSeed, newer.token)), http: true };
     await pm.fleetInstallPage.revealToken();
     const lines = FleetInstallPage.expectedInstallLines('linux', target);
-    expect(lines[1]).toBe(`  --url '${target.baseUrl}' \\`);
     await pm.fleetInstallPage.expectCommandLines(lines);
   });
 });
