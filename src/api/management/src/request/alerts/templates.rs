@@ -412,6 +412,7 @@ pub async fn get_system_templates(Path(org_id): Path<String>) -> Response {
         "webhook",
         "opsgenie",
         "servicenow",
+        "jira",
         "email",
     ];
 

@@ -85,6 +85,19 @@ describe("TrendsPanel (AC-48)", () => {
     expect(w.find('[data-test="rum-analytics-trends"]').text()).toContain("per day");
   });
 
+  it("sends no query until an app is known, then charts it (ENT#3262)", async () => {
+    const w = mountPanel({ scope: { ...scope, app: "" } });
+    expect(renderer(w).exists()).toBe(false);
+    expect(w.find('[data-test="rum-analytics-trends-loading"]').exists()).toBe(true);
+    const addBtn = () => w.find('[data-test="rum-analytics-trends-add-dashboard-btn"]');
+    expect(addBtn().attributes("disabled")).toBeDefined();
+    await w.setProps({ scope });
+    expect((renderer(w).props("panelSchema") as Schema).queries[0].query).toContain(
+      "application_id = 'web'",
+    );
+    expect(addBtn().attributes("disabled")).toBeUndefined();
+  });
+
   it("switches to weekly buckets beyond 31 days", () => {
     const w = mountPanel({ range: { startUs: 0, endUs: 40 * DAY_US } });
     expect((renderer(w).props("panelSchema") as Schema).queries[0].query).toContain("'1 week'");

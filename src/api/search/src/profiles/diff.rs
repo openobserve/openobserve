@@ -160,6 +160,7 @@ pub async fn diff_profiles(
     let params_for = |trace_id, side: &DiffSide| ProfilesSqlParams {
         request_trace_id: trace_id,
         org_id: &org_id,
+        stream_name: &stream_name,
         user_id: &user_email.user_id,
         start_time: side.start_time,
         end_time: side.end_time,

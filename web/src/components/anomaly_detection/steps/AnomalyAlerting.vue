@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex flex-wrap items-center gap-y-1">
             <OSelect
               v-model="configModel.alert_destination_ids"
-              :options="destinations"
+              :options="destinationOptions"
               labelKey="name"
               valueKey="name"
               multiple
@@ -273,7 +273,7 @@ export default defineComponent({
       required: true,
     },
     destinations: {
-      type: Array as PropType<(SelectOption & { name: string })[]>,
+      type: Array as PropType<(SelectOption & { name: string; destination_type_name?: string })[]>,
       default: () => [],
     },
   },
@@ -367,6 +367,11 @@ export default defineComponent({
       return 1;
     });
 
+    // Anomaly detection posts a plain body to the destination URL, which for Jira is the site root.
+    const destinationOptions = computed(() =>
+      props.destinations.filter((d) => d.destination_type_name !== "jira"),
+    );
+
     const openAddDestination = () => {
       const route = router.resolve({
         name: "alertDestinations",
@@ -383,6 +388,7 @@ export default defineComponent({
       priorityOptions,
       tagsModel,
       openAddDestination,
+      destinationOptions,
       visibleChipCount,
       destinationStatus,
       directionOptions,

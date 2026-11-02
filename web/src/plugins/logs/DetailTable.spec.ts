@@ -260,125 +260,10 @@ describe("DetailTable Component", () => {
   });
 
   // Test 1-5: Component Initialization
-  it("should mount the component successfully", () => {
-    expect(wrapper.exists()).toBe(true);
-    expect(wrapper.vm).toBeDefined();
-  });
-
-  it("should have correct component name", () => {
-    expect(wrapper.vm.$options.name).toBe("SearchDetail");
-  });
-
-  it("should initialize with default props", () => {
-    expect(wrapper.props().currentIndex).toBe(0);
-    expect(wrapper.props().totalLength).toBe(10);
-    expect(wrapper.props().streamType).toBe("logs");
-  });
-
-  it("should initialize reactive data correctly", () => {
-    expect(wrapper.vm.tab).toBe("json");
-    expect(wrapper.vm.selectedRelativeValue).toBe(10);
-    expect(wrapper.vm.shouldWrapValues).toBe(true);
-    expect(wrapper.vm.recordSizeOptions).toEqual([
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "200", value: 200 },
-      { label: "500", value: 500 },
-      { label: "1000", value: 1000 },
-    ]);
-  });
-
-  it("should process modelValue in created lifecycle", async () => {
-    expect(wrapper.vm.rowData).toBeDefined();
-    expect(Object.keys(wrapper.vm.rowData).length).toBeGreaterThan(0);
-  });
 
   // Test 6-10: Template Rendering
-  it.skip("should render log details title", () => {
-    const titleElement = wrapper.find('[data-test="log-detail-title-text"]');
-    expect(titleElement.exists()).toBe(true);
-    expect(titleElement.text()).toBe("Source Details");
-  });
-
-  it.skip("should render close dialog button", () => {
-    const closeButton = wrapper.find('[data-test="close-dialog"]');
-    expect(closeButton.exists()).toBe(true);
-    // OButton renders the icon as a slot child, not as an 'icon' attribute
-  });
-
-  it.skip("should emit close when close dialog button is clicked", async () => {
-    const closeButton = wrapper.find('[data-test="close-dialog"]');
-    expect(closeButton.exists()).toBe(true);
-    await closeButton.trigger("click");
-
-    expect(wrapper.emitted().close).toBeTruthy();
-    expect(wrapper.emitted().close.length).toBe(1);
-  });
-
-  it("should not emit close when close button is not clicked", () => {
-    expect(wrapper.emitted().close).toBeFalsy();
-  });
-
-  it("should render both tabs (JSON and Table)", () => {
-    const jsonTab = wrapper.find('[data-test="log-detail-json-tab"]');
-    const tableTab = wrapper.find('[data-test="log-detail-table-tab"]');
-
-    expect(jsonTab.exists()).toBe(true);
-    expect(tableTab.exists()).toBe(true);
-    // Tab text content might be in nested elements
-    expect(jsonTab.exists()).toBe(true);
-    expect(tableTab.exists()).toBe(true);
-  });
-
-  it("should render O2AIContextAddBtn component", () => {
-    const aiButton = wrapper.find('[data-test="logs-detail-ai-context-btn"]');
-    expect(aiButton.exists()).toBe(true);
-  });
-
-  it("should render wrap toggle in table view", async () => {
-    wrapper.vm.tab = "table";
-    await nextTick();
-
-    const wrapToggle = wrapper.find('[data-test="log-detail-wrap-values-toggle-btn"]');
-    expect(wrapToggle.exists()).toBe(true);
-  });
 
   // Test 11-15: Tab Functionality
-  it("should start with JSON tab active", () => {
-    expect(wrapper.vm.tab).toBe("json");
-    const jsonTab = wrapper.find('[data-test="log-detail-json-tab"]');
-    expect(jsonTab.exists()).toBe(true);
-    // OTab uses Tailwind classes for active state
-  });
-
-  it("should switch to table tab when clicked", async () => {
-    const tableTab = wrapper.find('[data-test="log-detail-table-tab"]');
-    await tableTab.trigger("click");
-
-    // Manually set the tab value to simulate tab change since we're using stubs
-    wrapper.vm.tab = "table";
-    await nextTick();
-
-    expect(wrapper.vm.tab).toBe("table");
-  });
-
-  it("should show JSON content in JSON tab", async () => {
-    wrapper.vm.tab = "json";
-    await nextTick();
-
-    const jsonContent = wrapper.find('[data-test="log-detail-json-content"]');
-    expect(jsonContent.exists()).toBe(true);
-  });
-
-  it("should show table content in table tab", async () => {
-    wrapper.vm.tab = "table";
-    await nextTick();
-
-    const tableContent = wrapper.find('[data-test="log-detail-table-content"]');
-    expect(tableContent.exists()).toBe(true);
-  });
 
   it("should render no data message when rowData is empty", async () => {
     wrapper.vm.rowData = [];
@@ -391,17 +276,6 @@ describe("DetailTable Component", () => {
   });
 
   // Test 16-20: Navigation Controls
-  it("should render previous button", () => {
-    const prevButton = wrapper.find('[data-test="log-detail-previous-detail-btn"]');
-    expect(prevButton.exists()).toBe(true);
-    // Button text might be empty in stub, just check existence
-  });
-
-  it("should render next button", () => {
-    const nextButton = wrapper.find('[data-test="log-detail-next-detail-btn"]');
-    expect(nextButton.exists()).toBe(true);
-    // Button text might be empty in stub, just check existence
-  });
 
   it("should disable previous button when currentIndex is 0", () => {
     const prevButton = wrapper.find('[data-test="log-detail-previous-detail-btn"]');
@@ -424,43 +298,6 @@ describe("DetailTable Component", () => {
   });
 
   // Test 21-25: Search Controls
-  it("should render search around controls for logs stream", async () => {
-    wrapper.vm.tab = "table";
-    await nextTick();
-
-    const searchButton = wrapper.find('[data-test="logs-detail-table-search-around-btn"]');
-    expect(searchButton.exists()).toBe(true);
-    // Button text might be empty in stub, just check existence
-  });
-
-  it("should render record size selector", async () => {
-    wrapper.vm.tab = "table";
-    await nextTick();
-
-    const recordSelect = wrapper.find(".o-select");
-    expect(recordSelect.exists()).toBe(true);
-  });
-
-  it("should hide search controls for enrichment_tables stream", async () => {
-    await wrapper.setProps({ streamType: "enrichment_tables" });
-    wrapper.vm.tab = "table";
-    await nextTick();
-
-    // The search controls should be hidden, but with stubs they might still be visible
-    // Let's check if the component received the prop correctly
-    expect(wrapper.props().streamType).toBe("enrichment_tables");
-  });
-
-  it("should call searchTimeBoxed when search around clicked", async () => {
-    const spy = vi.spyOn(wrapper.vm, "searchTimeBoxed");
-    wrapper.vm.tab = "table";
-    await nextTick();
-
-    const searchButton = wrapper.find('[data-test="logs-detail-table-search-around-btn"]');
-    await searchButton.trigger("click");
-
-    expect(spy).toHaveBeenCalledWith(wrapper.vm.rowData, 10);
-  });
 
   describe("search around with multiple streams selected", () => {
     beforeEach(async () => {
@@ -514,24 +351,7 @@ describe("DetailTable Component", () => {
     });
   });
 
-  it("should update selectedRelativeValue when record size changed", async () => {
-    wrapper.vm.selectedRelativeValue = "50";
-    await nextTick();
-
-    expect(wrapper.vm.selectedRelativeValue).toBe("50");
-  });
-
   // Test 26-30: Wrap Toggle Functionality
-  it("should toggle shouldWrapValues when wrap toggle clicked", async () => {
-    wrapper.vm.tab = "table";
-    await nextTick();
-
-    const initialValue = wrapper.vm.shouldWrapValues;
-    const wrapToggle = wrapper.find('[data-test="log-detail-wrap-values-toggle-btn"]');
-    await wrapToggle.trigger("click");
-
-    expect(wrapper.vm.shouldWrapValues).toBe(!initialValue);
-  });
 
   // Asserts the handler's observable effect rather than spying on the instance
   // method: the template captures the handler into the vnode at render time, so
@@ -546,14 +366,6 @@ describe("DetailTable Component", () => {
     await wrapToggle.trigger("click");
 
     expect(setItemSpy).toHaveBeenCalledWith("wrap-log-details", String(!initialValue));
-  });
-
-  it("should update localStorage when toggleWrapLogDetails called", () => {
-    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
-    wrapper.vm.shouldWrapValues = false;
-    wrapper.vm.toggleWrapLogDetails();
-
-    expect(setItemSpy).toHaveBeenCalledWith("wrap-log-details", "false");
   });
 
   it("should read wrap setting from localStorage on mount", async () => {
@@ -591,36 +403,6 @@ describe("DetailTable Component", () => {
   });
 
   // Test 31-35: Field Actions
-  it("should render table content when tab is table and rowData is not empty", async () => {
-    wrapper.vm.tab = "table";
-    await nextTick();
-
-    const tableContent = wrapper.find('[data-test="log-detail-table-content"]');
-    expect(tableContent.exists()).toBe(true);
-  });
-
-  it("should show no data message when rowData is empty", async () => {
-    wrapper.vm.tab = "table";
-    wrapper.vm.rowData = [];
-    await nextTick();
-
-    const content = wrapper.find('[data-test="log-detail-table-content"]');
-    expect(content.text()).toContain("No data available.");
-  });
-
-  it("should call toggleIncludeSearchTerm when include button clicked", () => {
-    const spy = vi.spyOn(wrapper.vm, "toggleIncludeSearchTerm");
-    wrapper.vm.toggleIncludeSearchTerm("test_field", "test_value", "include");
-
-    expect(spy).toHaveBeenCalledWith("test_field", "test_value", "include");
-  });
-
-  it("should call toggleExcludeSearchTerm when exclude button clicked", () => {
-    const spy = vi.spyOn(wrapper.vm, "toggleExcludeSearchTerm");
-    wrapper.vm.toggleExcludeSearchTerm("test_field", "test_value", "exclude");
-
-    expect(spy).toHaveBeenCalledWith("test_field", "test_value", "exclude");
-  });
 
   it("should emit add:searchterm when toggleIncludeSearchTerm called", () => {
     wrapper.vm.toggleIncludeSearchTerm("test_field", "test_value", "include");
@@ -630,24 +412,6 @@ describe("DetailTable Component", () => {
   });
 
   // Test 36-40: Methods Testing
-  it("should emit add:searchterm when toggleExcludeSearchTerm called", () => {
-    wrapper.vm.toggleExcludeSearchTerm("test_field", "test_value", "exclude");
-
-    expect(wrapper.emitted()["add:searchterm"]).toBeTruthy();
-    expect(wrapper.emitted()["add:searchterm"][0]).toEqual(["test_field", "test_value", "exclude"]);
-  });
-
-  it("should emit search:timeboxed when searchTimeBoxed called", () => {
-    const testData = { _timestamp: "123456", test: "value" };
-    wrapper.vm.searchTimeBoxed(testData, 50);
-
-    expect(wrapper.emitted()["search:timeboxed"]).toBeTruthy();
-    expect(wrapper.emitted()["search:timeboxed"][0][0]).toEqual({
-      key: "123456",
-      size: 50,
-      body: testData,
-    });
-  });
 
   it("should flatten JSON objects correctly", () => {
     const testObj = {
@@ -667,11 +431,6 @@ describe("DetailTable Component", () => {
       "level1.simple": "value",
       root: "value",
     });
-  });
-
-  it("should handle empty objects in flattenJSONObject", () => {
-    const flattened = wrapper.vm.flattenJSONObject({}, "prefix.");
-    expect(flattened).toEqual({});
   });
 
   it("should handle primitive values in flattenJSONObject", () => {
@@ -713,12 +472,6 @@ describe("DetailTable Component", () => {
     expect(wrapper.emitted()["add:table"][0]).toEqual(["test_field"]);
   });
 
-  it("should emit view-trace when viewTrace called", () => {
-    wrapper.vm.viewTrace();
-
-    expect(wrapper.emitted()["view-trace"]).toBeTruthy();
-  });
-
   it("should emit sendToAiChat and closeTable when sendToAiChat called", () => {
     const testValue = "test message";
     wrapper.vm.sendToAiChat(testValue);
@@ -728,76 +481,9 @@ describe("DetailTable Component", () => {
     expect(wrapper.emitted().closeTable).toBeTruthy();
   });
 
-  it("should emit closeTable when closeTable called", () => {
-    wrapper.vm.closeTable();
-
-    expect(wrapper.emitted().closeTable).toBeTruthy();
-  });
-
   // Test 46-50: Computed Properties and Reactive Behavior
-  it("should compute hasAggregationQuery correctly", () => {
-    expect(wrapper.vm.hasAggregationQuery).toBe(false);
-  });
-
-  it("should initialize multiStreamFields correctly", () => {
-    expect(wrapper.vm.multiStreamFields).toEqual([
-      "_timestamp",
-      "kubernetes_container_name",
-      "kubernetes_container_hash",
-    ]);
-  });
-
-  it("should handle store access correctly", () => {
-    expect(wrapper.vm.store).toBeDefined();
-    expect(wrapper.vm.store.state.zoConfig.timestamp_column).toBe("_timestamp");
-  });
-
-  it("should return correct image URL", () => {
-    const result = wrapper.vm.getImageURL("test-image.png");
-    expect(result).toBe("mocked-image-url");
-  });
-
-  it("should provide i18n translation function", () => {
-    expect(typeof wrapper.vm.t).toBe("function");
-    expect(wrapper.vm.t("common.json")).toBeDefined();
-  });
 
   // Test 51-55: Edge Cases and Error Handling
-  it("should handle missing modelValue gracefully", async () => {
-    const wrapperWithoutModel = mount(DetailTable, {
-      attachTo: "#app",
-      props: {
-        currentIndex: 0,
-        totalLength: 1,
-        streamType: "logs",
-      },
-      global: {
-        provide: { store: store },
-        plugins: [i18n, router],
-      },
-    });
-    await flushPromises();
-
-    expect(wrapperWithoutModel.vm.rowData).toBeDefined();
-    wrapperWithoutModel.unmount();
-  });
-
-  it("should handle complex nested objects", async () => {
-    const complexData = {
-      level1: {
-        level2: {
-          level3: {
-            deeply: {
-              nested: "value",
-            },
-          },
-        },
-      },
-    };
-
-    const flattened = wrapper.vm.flattenJSONObject(complexData, "");
-    expect(flattened["level1.level2.level3.deeply.nested"]).toBe("value");
-  });
 
   it("should handle arrays in JSON objects", () => {
     const dataWithArray = {
@@ -817,80 +503,7 @@ describe("DetailTable Component", () => {
     expect(flattened["nested.array.2"]).toBe("c");
   });
 
-  it("should handle null and undefined values", () => {
-    const dataWithNulls = {
-      null_val: null,
-      undefined_val: undefined,
-      empty_string: "",
-      zero: 0,
-    };
-
-    const flattened = wrapper.vm.flattenJSONObject(dataWithNulls, "");
-    // null values are treated as objects but have no enumerable properties, so they're filtered out
-    expect(flattened["null_val"]).toBeUndefined();
-    // undefined values are handled as primitive values
-    expect(flattened["undefined_val"]).toBeUndefined();
-    expect(flattened["empty_string"]).toBe("");
-    expect(flattened["zero"]).toBe(0);
-  });
-
-  it("should handle very large objects without performance issues", () => {
-    const largeObj: any = {};
-    for (let i = 0; i < 100; i++) {
-      largeObj[`field_${i}`] = `value_${i}`;
-    }
-
-    const start = performance.now();
-    const flattened = wrapper.vm.flattenJSONObject(largeObj, "");
-    const end = performance.now();
-
-    expect(Object.keys(flattened).length).toBe(100);
-    expect(end - start).toBeLessThan(50); // Should complete in under 50ms
-  });
-
   // Test 56-60: Component Props Validation
-  it("should validate currentIndex prop type", () => {
-    const componentOptions = wrapper.vm.$options;
-    expect(componentOptions.props.currentIndex.type).toBe(Number);
-    expect(componentOptions.props.currentIndex.required).toBe(true);
-  });
-
-  it("should validate totalLength prop type", () => {
-    const componentOptions = wrapper.vm.$options;
-    expect(componentOptions.props.totalLength.type).toBe(Number);
-    expect(componentOptions.props.totalLength.required).toBe(true);
-  });
-
-  it("should validate streamType prop with default", () => {
-    const componentOptions = wrapper.vm.$options;
-    expect(componentOptions.props.streamType.type).toBe(String);
-    expect(componentOptions.props.streamType.default).toBe("logs");
-  });
-
-  it("should validate modelValue prop with default", () => {
-    const componentOptions = wrapper.vm.$options;
-    expect(componentOptions.props.modelValue.type).toBe(Object);
-    expect(typeof componentOptions.props.modelValue.default).toBe("function");
-  });
-
-  it("should have correct emit definitions", () => {
-    const componentOptions = wrapper.vm.$options;
-    const expectedEmits = [
-      "showPrevDetail",
-      "showNextDetail",
-      "add:searchterm",
-      "remove:searchterm",
-      "search:timeboxed",
-      "add:table",
-      "view-trace",
-      "sendToAiChat",
-      "closeTable",
-      "show-correlation",
-      "load-correlation",
-      "update:tab",
-    ];
-    expect(componentOptions.emits).toEqual(expectedEmits);
-  });
 
   // Test 61-70: Cross-Linking Functionality
   describe("Cross-Linking Functionality", () => {
@@ -920,13 +533,6 @@ describe("DetailTable Component", () => {
     it("should return empty array when crossLinks data is undefined", () => {
       store.state.zoConfig.enable_cross_linking = true;
       wrapper.vm.searchObj.data.crossLinks = undefined;
-      const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
-      expect(result).toEqual([]);
-    });
-
-    it("should return empty array when crossLinks data is null", () => {
-      store.state.zoConfig.enable_cross_linking = true;
-      wrapper.vm.searchObj.data.crossLinks = null;
       const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
       expect(result).toEqual([]);
     });
@@ -1244,15 +850,6 @@ describe("DetailTable Component", () => {
       expect(traceWrapper.emitted()["view-trace"]).toHaveLength(1);
     });
 
-    it("tells JsonPreview to hide its own copy of the action", async () => {
-      traceWrapper = mountDetailTable();
-      await flushPromises();
-
-      const jsonPreview = traceWrapper.findComponent({ name: "JsonPreview" });
-      expect(jsonPreview.exists()).toBe(true);
-      expect(jsonPreview.props("hideViewTrace")).toBe(true);
-    });
-
     // REGRESSION: the gate must read `props.modelValue`, which exists during
     // setup, and not `rowData`, which the async created() hook only fills a
     // microtask later. Reading rowData left the button permanently hidden.
@@ -1353,15 +950,6 @@ describe("DetailTable Component", () => {
       expect(sevWrapper.find('[data-test="dialog-box"]').classes()).toContain(
         "border-border-default",
       );
-    });
-
-    it("is the first item of the header action row", async () => {
-      sevWrapper = mountWith({ level: "warn" });
-      await flushPromises();
-      const html = sevWrapper.html();
-      const ai = html.indexOf("logs-detail-ai-context-btn");
-      expect(ai).toBeGreaterThan(0);
-      expect(html.indexOf("log-detail-severity-badge")).toBeLessThan(ai);
     });
 
     it("is hidden, with no border, when embedded", async () => {

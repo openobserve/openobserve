@@ -80,7 +80,10 @@ pub async fn collect_stream_files(
             let settings_max_query_range =
                 get_settings_max_query_range(stream_settings.max_query_range, org_id, user_id)
                     .await;
-            max_query_range = max(max_query_range, settings_max_query_range * 3600 * 1_000_000);
+            max_query_range = max(
+                max_query_range,
+                settings_max_query_range.saturating_mul(3600 * 1_000_000),
+            );
             max_query_range_in_hour = max(max_query_range_in_hour, settings_max_query_range);
             files.extend(stream_files);
         } else {

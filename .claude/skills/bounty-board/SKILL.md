@@ -1,6 +1,6 @@
 ---
 name: bounty-board
-description: Triage, list, and hunt "bounties" — small P2/P3 items in bug-me-not issues of openobserve/openobserve (and the configured private repo) that are safe to auto-fix. `triage` checks each item against current code and, after you approve, posts a verdict comment and the autofix / autofix-declined label; `hunt` prepares an autofix worktree and spec, claims the issue, runs the o2-loop skill on it, and opens a PR you approve; `list` shows open bounties. Never closes issues. Use when the user says "bounty-board", "hunt a bounty", "autofix this bug", "triage bug-me-not issue", "list bounties", or right after bug-me-not files an issue.
+description: Triage, list, and hunt "bounties" — small P2/P3 items in bug-me-not issues of openobserve/openobserve (and the configured private repo) that are safe to auto-fix. `triage` checks each item against current code and, after you approve, posts a verdict comment and the autofix (plus autofix-partial when only some items qualify) or autofix-declined label; `hunt` prepares an autofix worktree and spec, claims the issue, runs the o2-loop skill on it, and opens a PR you approve; `list` shows open bounties. Never closes issues. Use when the user says "bounty-board", "hunt a bounty", "autofix this bug", "triage bug-me-not issue", "list bounties", or right after bug-me-not files an issue.
 ---
 
 # bounty-board
@@ -48,7 +48,7 @@ Shell variables do not survive between Bash tool calls, so every command below u
 | `gate-issue.sh [--hunt] <repo> <n> <work>` | rule 3; writes `issue.json`, `body.md`, `comments.jsonl`, `issue-graph.json`, `me.txt`; exit 0 pass, 10 skip, else error |
 | `parse-bug-items.mjs <body.md>` | checklist → items JSON; `paths` come from the Where section, or from all details only when an item has no **Where:** label |
 | `triage-rules.mjs filter <parsed> <repo>` | rule 2 → `candidates`, `target_repo`, per-item `reason` |
-| `triage-rules.mjs render <parsed> <filter> <verdict.json\|-> <repo> <n> <me> <out>` | `verdict-comment.md` (table, `item N` never `#N`, mentions defused, hidden marker last) and `verdict-result.json` (`label`) |
+| `triage-rules.mjs render <parsed> <filter> <verdict.json\|-> <repo> <n> <me> <out>` | `verdict-comment.md` (table, `item N` never `#N`, mentions defused, hidden marker last) and `verdict-result.json` (`labels`, `remove_labels`) |
 | `triage-rules.mjs marker <comments.jsonl> <repo> <n>` | newest trusted verdict marker (rule 7), or `null` |
 | `triage-rules.mjs hunt-items <parsed> <repo> <marker>` | accepted items still valid on the current body, `dropped`, `body_changed`, `target_repo` |
 | `triage-rules.mjs spec-change <hunt.json>` | the spec's Change section, issue text fenced so it cannot break out |
@@ -78,7 +78,7 @@ Shell variables do not survive between Bash tool calls, so every command below u
    When in doubt, decline. Write `<work>/verdict.json`: `{"items":[{"index":3,"verdict":"accept","reason":"≤15 plain words, no markdown, no @"}]}`, one entry per candidate.
 5. `node "<scripts>/triage-rules.mjs" render "<work>/parsed.json" "<work>/filter.json" "<work>/verdict.json" <repo> <n> <me> "<work>/out"`. On exit 3 (bad verdict, secret-looking reason), fix `verdict.json` and rerun.
 6. Show the user `<work>/out/verdict-comment.md` and ask (`AskUserQuestion`): **post** / **edit** / **skip**. Edit means changing `verdict.json` and rendering again; never hand-edit the marker line.
-7. On post: `gh issue comment -R openobserve/<repo> <n> --body-file "<work>/out/verdict-comment.md"`, then `gh issue edit -R openobserve/<repo> <n> --add-label <label from verdict-result.json>`, plus `--remove-label` for the opposite one (`autofix` ↔ `autofix-declined`) only if `issue.json` shows it. Give the user the comment link.
+7. On post: `gh issue comment -R openobserve/<repo> <n> --body-file "<work>/out/verdict-comment.md"`, then `gh issue edit -R openobserve/<repo> <n>` with `--add-label` for each of `labels` in `verdict-result.json` (`autofix`, plus `autofix-partial` when only some items are accepted, or `autofix-declined`) and `--remove-label` for each of `remove_labels` that `issue.json` shows. Give the user the comment link.
 
 ## Hunt
 
@@ -107,4 +107,4 @@ Shell variables do not survive between Bash tool calls, so every command below u
 
 ## List
 
-`"<scripts>/list-bounties.sh" "<work>"` checks open issues labelled `bug-me-not` + `autofix` and not `autofix-failed` in openobserve and the private repo (when configured), runs `gate-issue.sh --hunt` on each (assignees never hide a bounty), and prints JSON lines; skipped issues go to stderr. Show a table: `repo#n` (link), title, accepted items as `item N`, area (`ui` when any accepted path is under `web/`, else `backend`), age in days, and a flag when `body_changed` (needs re-triage). Then the skipped ones, one line each with the reason. Read-only.
+`"<scripts>/list-bounties.sh" "<work>"` checks open issues labelled `bug-me-not` + `autofix` and not `autofix-failed` in openobserve and the private repo (when configured), runs `gate-issue.sh --hunt` on each (assignees never hide a bounty), and prints JSON lines; skipped issues go to stderr. Show a table: `repo#n` (link), title, accepted items as `item N`, area (`ui` when any accepted path is under `web/`, else `backend`), age in days, a `partial` flag (an open item outside the accepted ones still needs a human fix), and a flag when `body_changed` (needs re-triage). Then the skipped ones, one line each with the reason. Read-only.

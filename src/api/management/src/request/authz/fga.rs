@@ -48,6 +48,7 @@ use crate::{
     request_body(content = inline(UserRoleRequest), description = "UserRoleRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -67,6 +68,15 @@ pub async fn create_role(
 
     if role_name.is_empty() || is_standard_role(&role_name) {
         return MetaHttpResponse::bad_request("Custom role name cannot be empty or standard role");
+    }
+    // A name that fits the role object can still overflow the `#has` role user, leaving it
+    // unupdatable.
+    if o2_openfga::authorizer::org_scoped_object("role", &org_id, &role_name).is_none()
+        || !o2_openfga::authorizer::is_valid_tuple_user(
+            &o2_openfga::authorizer::roles::format_role_user(&org_id, &role_name),
+        )
+    {
+        return MetaHttpResponse::bad_request("Invalid role name");
     }
 
     match o2_openfga::authorizer::roles::create_role(&role_name, &org_id).await {
@@ -396,7 +406,7 @@ pub async fn get_roles(Path(_org_id): Path<String>) -> Response {
     request_body(content = inline(RoleRequest), description = "RoleRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 400, description = "Invalid role name or user id", content_type = "application/json", body = ()),
+        (status = 400, description = "Invalid role name, permission or user id; nothing is applied if any entry is invalid", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -408,22 +418,15 @@ pub async fn update_role(
     Path((org_id, role_id)): Path<(String, String)>,
     Json(update_role): Json<RoleRequest>,
 ) -> Response {
-    use o2_openfga::authorizer::{is_valid_tuple_user, org_scoped_object, roles::format_role_user};
-
-    // The role also becomes the `role:{org}/{name}#has` user, which has its own length limit.
-    if org_scoped_object("role", &org_id, &role_id).is_none()
-        || !is_valid_tuple_user(&format_role_user(&org_id, &role_id))
-    {
-        return MetaHttpResponse::bad_request("Invalid role name");
-    }
-    if !update_role
-        .add_users
-        .iter()
-        .chain(update_role.remove_users.iter())
-        .flatten()
-        .all(|user| o2_openfga::authorizer::is_valid_user_id(user))
-    {
-        return MetaHttpResponse::bad_request("Invalid user id in role users");
+    if let Err(msg) = o2_openfga::authorizer::roles::validate_role_update(
+        &org_id,
+        &role_id,
+        &update_role.add,
+        &update_role.remove,
+        update_role.add_users.as_ref(),
+        update_role.remove_users.as_ref(),
+    ) {
+        return MetaHttpResponse::bad_request(msg);
     }
     match o2_openfga::authorizer::roles::update_role(
         &org_id,
@@ -912,7 +915,7 @@ pub async fn create_group(
     request_body(content = inline(UserGroupRequest), description = "UserGroupRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 400, description = "Invalid group name or user id", content_type = "application/json", body = ()),
+        (status = 400, description = "Invalid group name, user id or role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -933,6 +936,15 @@ pub async fn update_group(
         .all(|user| o2_openfga::authorizer::is_valid_user_id(user))
     {
         return MetaHttpResponse::bad_request("Invalid user id in group users");
+    }
+    if !user_grp
+        .add_roles
+        .iter()
+        .chain(user_grp.remove_roles.iter())
+        .flatten()
+        .all(|role| o2_openfga::authorizer::org_scoped_object("role", &org_id, role).is_some())
+    {
+        return MetaHttpResponse::bad_request("Invalid role name in group roles");
     }
 
     match o2_openfga::authorizer::groups::update_group(
@@ -1562,22 +1574,20 @@ mod tests {
         #[cfg(feature = "enterprise")]
         {
             init_ofga_test();
-            let role_request = o2_dex::meta::auth::RoleRequest {
-                add: vec![o2_dex::meta::auth::O2EntityAuthorization {
-                    object: "permission1".to_string(),
-                    permission: o2_dex::meta::auth::Permission::AllowAll,
-                }],
-                remove: vec![o2_dex::meta::auth::O2EntityAuthorization {
-                    object: "permission2".to_string(),
-                    permission: o2_dex::meta::auth::Permission::AllowAll,
-                }],
+            let grant = |object: &str| o2_dex::meta::auth::O2EntityAuthorization {
+                object: object.to_string(),
+                permission: o2_dex::meta::auth::Permission::AllowAll,
+            };
+            let role_request = |object: &str| o2_dex::meta::auth::RoleRequest {
+                add: vec![grant(object)],
+                remove: vec![grant("stream:permission2")],
                 add_users: Some(HashSet::from_iter(vec!["user1".to_string()])),
                 remove_users: Some(HashSet::from_iter(vec!["user2".to_string()])),
             };
 
             let resp = update_role(
                 Path(("test_org".to_string(), "test_role".to_string())),
-                Json(role_request),
+                Json(role_request("stream:permission1")),
             )
             .await;
             assert_eq!(
@@ -1588,6 +1598,14 @@ mod tests {
                 response_json(resp).await["message"],
                 "Failed to update role"
             );
+
+            // A type the model lacks is the client's error, not OpenFGA's 400 surfaced as a 500.
+            let resp = update_role(
+                Path(("test_org".to_string(), "test_role".to_string())),
+                Json(role_request("no_such_type:permission1")),
+            )
+            .await;
+            assert_eq!(extract_status_code(&resp), StatusCode::BAD_REQUEST);
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1825,6 +1843,15 @@ mod tests {
                 "{name:?}"
             );
         }
+        let resp = create_role(
+            Path("test_org".to_string()),
+            Json(UserRoleRequest {
+                role: too_long_for_role_user,
+                custom: None,
+            }),
+        )
+        .await;
+        assert_eq!(response_json(resp).await["message"], "Invalid role name");
     }
 
     #[cfg(feature = "enterprise")]
@@ -2038,6 +2065,23 @@ mod tests {
                 extract_status_code(&resp),
                 StatusCode::BAD_REQUEST,
                 "{name:?}"
+            );
+        }
+        for (add_roles, remove_roles) in [(members("a#b"), None), (None, members(""))] {
+            let group_request = UserGroupRequest {
+                add_users: None,
+                remove_users: None,
+                add_roles,
+                remove_roles,
+            };
+            let resp = update_group(
+                Path(("test_org".to_string(), "test_group".to_string())),
+                Json(group_request),
+            )
+            .await;
+            assert_eq!(
+                response_json(resp).await["message"],
+                "Invalid role name in group roles"
             );
         }
     }

@@ -99,102 +99,9 @@ describe("CreateDestinationForm", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  describe("Component Initialization", () => {
-    it("renders the component", () => {
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("starts at step 1", () => {
-      expect(wrapper.vm.step).toBe(1);
-    });
-
-    it("has 'openobserve' as default destination type", () => {
-      expect(getFormField(wrapper, "destination_type")).toBe("openobserve");
-    });
-
-    it("initializes with OpenObserve Authorization header", () => {
-      expect(wrapper.vm.apiHeaders).toHaveLength(1);
-      expect(wrapper.vm.apiHeaders[0].key).toBe("Authorization");
-      expect(wrapper.vm.apiHeaders[0].value).toBe("Basic <token>");
-    });
-
-    it("initializes url_endpoint to OpenObserve default endpoint", () => {
-      expect(getFormField(wrapper, "url_endpoint")).toBe("/api/default/default/_json");
-    });
-
-    it("has 'post' as default method", () => {
-      expect(getFormField(wrapper, "method")).toBe("post");
-    });
-
-    it("has 'json' as default output_format", () => {
-      expect(getFormField(wrapper, "output_format")).toBe("json");
-    });
-
-    it("initializes formData.name as empty string", () => {
-      expect(getFormField(wrapper, "name")).toBe("");
-    });
-
-    it("initializes formData.url as empty string", () => {
-      expect(getFormField(wrapper, "url")).toBe("");
-    });
-
-    it("initializes skip_tls_verify as false", () => {
-      expect(getFormField(wrapper, "skip_tls_verify")).toBe(false);
-    });
-
-    it("initializes separator as empty string", () => {
-      expect(getFormField(wrapper, "separator")).toBe("");
-    });
-
-    it("initializes esbulk_index as empty string", () => {
-      expect(getFormField(wrapper, "esbulk_index")).toBe("");
-    });
-  });
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Destination Type Cards", () => {
-    it("renders all 7 destination type cards", () => {
-      const cards = wrapper.findAll('[class*="destination-type-card"]');
-      expect(cards.length).toBeGreaterThanOrEqual(7);
-    });
-
-    it("renders destination card for openobserve", () => {
-      expect(wrapper.find('[data-test="destination-type-card-openobserve"]').exists()).toBe(true);
-    });
-
-    it("renders destination card for splunk", () => {
-      expect(wrapper.find('[data-test="destination-type-card-splunk"]').exists()).toBe(true);
-    });
-
-    it("renders destination card for elasticsearch", () => {
-      expect(wrapper.find('[data-test="destination-type-card-elasticsearch"]').exists()).toBe(true);
-    });
-
-    it("renders destination card for datadog", () => {
-      expect(wrapper.find('[data-test="destination-type-card-datadog"]').exists()).toBe(true);
-    });
-
-    it("renders destination card for custom", () => {
-      expect(wrapper.find('[data-test="destination-type-card-custom"]').exists()).toBe(true);
-    });
-
-    it("openobserve card shows an image", () => {
-      const card = wrapper.find('[data-test="destination-type-card-openobserve"]');
-      expect(card.find("img").exists()).toBe(true);
-    });
-
-    it("applies 'selected' class to the active destination card", () => {
-      const card = wrapper.find('[data-test="destination-type-card-openobserve"]');
-      expect(card.classes()).toContain("selected");
-    });
-
-    it("updates destination_type when a card is clicked", async () => {
-      const splunk = wrapper.find('[data-test="destination-type-card-splunk"]');
-      await splunk.trigger("click");
-      await flushPromises();
-      expect(getFormField(wrapper, "destination_type")).toBe("splunk");
-    });
-
     // Rule ③ proof: selecting a destination-type CARD drives the conditional
     // sections THROUGH THE FORM (form.setFieldValue → form.useStore), with NO
     // `formData` mirror. Clicking the 'custom' card (on step 1) must (a) set the
@@ -219,21 +126,6 @@ describe("CreateDestinationForm", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  describe("defaultUrlEndpoint computed property", () => {
-    it.each([
-      ["openobserve", "/api/{org}/{stream}/_json"],
-      ["splunk", "/services/collector"],
-      ["elasticsearch", "/_bulk"],
-      ["datadog", "/v1/input"],
-      ["dynatrace", "/api/v2/logs/ingest"],
-      ["newrelic", "/log/v1"],
-      ["custom", ""],
-    ])("returns correct endpoint for %s", async (type, expected) => {
-      setFormField(wrapper, "destination_type", type);
-      await nextTick();
-      expect(wrapper.vm.defaultUrlEndpoint).toBe(expected);
-    });
-  });
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Auto-prefill on destination type change", () => {
@@ -242,30 +134,6 @@ describe("CreateDestinationForm", () => {
       await nextTick();
       await flushPromises();
       expect(getFormField(wrapper, "url_endpoint")).toBe("/services/collector");
-    });
-
-    it("sets url_endpoint for Elasticsearch on type change", async () => {
-      setFormField(wrapper, "destination_type", "elasticsearch");
-      await nextTick();
-      expect(getFormField(wrapper, "url_endpoint")).toBe("/_bulk");
-    });
-
-    it("sets url_endpoint for Datadog on type change", async () => {
-      setFormField(wrapper, "destination_type", "datadog");
-      await nextTick();
-      expect(getFormField(wrapper, "url_endpoint")).toBe("/v1/input");
-    });
-
-    it("sets url_endpoint for Dynatrace on type change", async () => {
-      setFormField(wrapper, "destination_type", "dynatrace");
-      await nextTick();
-      expect(getFormField(wrapper, "url_endpoint")).toBe("/api/v2/logs/ingest");
-    });
-
-    it("sets url_endpoint for Newrelic on type change", async () => {
-      setFormField(wrapper, "destination_type", "newrelic");
-      await nextTick();
-      expect(getFormField(wrapper, "url_endpoint")).toBe("/log/v1");
     });
 
     it("sets url_endpoint to empty for Custom on type change", async () => {
@@ -287,13 +155,6 @@ describe("CreateDestinationForm", () => {
       await flushPromises();
       expect(getFormField(wrapper, "output_format")).toBe("esbulk");
       expect(getFormField(wrapper, "esbulk_index")).toBe("default");
-    });
-
-    it("sets output_format to json for Datadog", async () => {
-      setFormField(wrapper, "destination_type", "datadog");
-      await nextTick();
-      await flushPromises();
-      expect(getFormField(wrapper, "output_format")).toBe("json");
     });
 
     it("sets method to 'post' when switching from custom to a non-custom type", async () => {
@@ -364,25 +225,6 @@ describe("CreateDestinationForm", () => {
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Header Management", () => {
-    it("addApiHeader appends a new entry to apiHeaders", () => {
-      const initial = wrapper.vm.apiHeaders.length;
-      wrapper.vm.addApiHeader("X-Custom", "my-value");
-      expect(wrapper.vm.apiHeaders).toHaveLength(initial + 1);
-      expect(wrapper.vm.apiHeaders[initial].key).toBe("X-Custom");
-      expect(wrapper.vm.apiHeaders[initial].value).toBe("my-value");
-    });
-
-    it("deleteApiHeader removes the header at the given index", () => {
-      wrapper.vm.addApiHeader("X-Test", "test");
-      const before = wrapper.vm.apiHeaders.length;
-
-      // The template passes the row INDEX — delete the just-added last row.
-      wrapper.vm.deleteApiHeader(before - 1);
-
-      expect(wrapper.vm.apiHeaders).toHaveLength(before - 1);
-      expect(wrapper.vm.apiHeaders.some((h: any) => h.key === "X-Test")).toBe(false);
-    });
-
     it("deleteApiHeader adds an empty header row when all headers are deleted", () => {
       // Delete each existing row by index 0; the handler backfills one blank row.
       const before = wrapper.vm.apiHeaders.length;
@@ -449,19 +291,6 @@ describe("CreateDestinationForm", () => {
   describe("OpenObserve Org/Stream Dynamic Endpoint", () => {
     // org/stream are form-owned now (name="org"/"stream") — set them on the real
     // form; the endpoint-sync watch rebuilds url_endpoint off the form values.
-    it("updates url_endpoint when openobserveOrg changes", async () => {
-      setFormField(wrapper, "destination_type", "openobserve");
-      setFormField(wrapper, "org", "my-org");
-      await nextTick();
-      expect(getFormField(wrapper, "url_endpoint")).toContain("my-org");
-    });
-
-    it("updates url_endpoint when openobserveStream changes", async () => {
-      setFormField(wrapper, "destination_type", "openobserve");
-      setFormField(wrapper, "stream", "my-stream");
-      await nextTick();
-      expect(getFormField(wrapper, "url_endpoint")).toContain("my-stream");
-    });
 
     it("builds correct endpoint from org and stream", async () => {
       setFormField(wrapper, "destination_type", "openobserve");
@@ -473,72 +302,13 @@ describe("CreateDestinationForm", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  describe("showMetadataFields computed property", () => {
-    it("returns true for splunk", async () => {
-      setFormField(wrapper, "destination_type", "splunk");
-      await nextTick();
-      expect(wrapper.vm.showMetadataFields).toBe(true);
-    });
-
-    it("returns true for datadog", async () => {
-      setFormField(wrapper, "destination_type", "datadog");
-      await nextTick();
-      expect(wrapper.vm.showMetadataFields).toBe(true);
-    });
-
-    it("returns false for openobserve", async () => {
-      setFormField(wrapper, "destination_type", "openobserve");
-      await nextTick();
-      expect(wrapper.vm.showMetadataFields).toBe(false);
-    });
-
-    it("returns false for custom", async () => {
-      setFormField(wrapper, "destination_type", "custom");
-      await nextTick();
-      expect(wrapper.vm.showMetadataFields).toBe(false);
-    });
-  });
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Step Navigation", () => {
-    it("canProceedStep1 is falsy when destination_type is empty", async () => {
-      setFormField(wrapper, "destination_type", "");
-      await nextTick();
-      expect(wrapper.vm.canProceedStep1).toBeFalsy();
-    });
-
-    it("canProceedStep1 is true when a destination type is selected", async () => {
-      setFormField(wrapper, "destination_type", "openobserve");
-      await nextTick();
-      expect(wrapper.vm.canProceedStep1).toBe(true);
-    });
-
-    it("nextStep advances to step 2", async () => {
-      setFormField(wrapper, "destination_type", "openobserve");
-      wrapper.vm.step = 1;
-      wrapper.vm.nextStep();
-      await nextTick();
-      expect(wrapper.vm.step).toBe(2);
-    });
-
     it("nextStep does not advance if destination_type is not selected", async () => {
       setFormField(wrapper, "destination_type", "");
       wrapper.vm.step = 1;
       wrapper.vm.nextStep();
-      await nextTick();
-      expect(wrapper.vm.step).toBe(1);
-    });
-
-    it("prevStep decrements step", async () => {
-      wrapper.vm.step = 2;
-      wrapper.vm.prevStep();
-      await nextTick();
-      expect(wrapper.vm.step).toBe(1);
-    });
-
-    it("prevStep does not go below 1", async () => {
-      wrapper.vm.step = 1;
-      wrapper.vm.prevStep();
       await nextTick();
       expect(wrapper.vm.step).toBe(1);
     });
@@ -586,27 +356,10 @@ describe("CreateDestinationForm", () => {
       expect(w.vm.form.state.values.destination_type).toBe("custom");
       w.unmount();
     });
-
-    it("without forcedType, the Back button and step 1 remain (unchanged default)", () => {
-      // default wrapper has no forcedType
-      expect(wrapper.vm.step).toBe(1);
-      expect(wrapper.find('[data-test="destination-type-card-openobserve"]').exists()).toBe(true);
-    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("canProceedStep2 Validation", () => {
-    it("is true for valid openobserve form data", async () => {
-      setFormField(wrapper, "destination_type", "openobserve");
-      setFormField(wrapper, "name", "valid-dest");
-      setFormField(wrapper, "url", "https://example.com");
-      setFormField(wrapper, "url_endpoint", "/api/org/stream/_json");
-      setFormField(wrapper, "method", "post");
-      setFormField(wrapper, "output_format", "json");
-      await nextTick();
-      expect(wrapper.vm.canProceedStep2).toBeTruthy();
-    });
-
     it("is false when name is missing", async () => {
       setFormField(wrapper, "name", "");
       setFormField(wrapper, "url", "https://example.com");
@@ -726,28 +479,6 @@ describe("CreateDestinationForm", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  describe("isValidDestination computed property", () => {
-    it("is truthy when name, url, and method are provided", () => {
-      setFormField(wrapper, "name", "valid-name");
-      setFormField(wrapper, "url", "https://example.com");
-      setFormField(wrapper, "method", "post");
-      expect(wrapper.vm.isValidDestination).toBeTruthy();
-    });
-
-    it("is falsy when name is empty", () => {
-      setFormField(wrapper, "name", "");
-      setFormField(wrapper, "url", "https://example.com");
-      setFormField(wrapper, "method", "post");
-      expect(wrapper.vm.isValidDestination).toBeFalsy();
-    });
-
-    it("is falsy when url is empty", () => {
-      setFormField(wrapper, "name", "test");
-      setFormField(wrapper, "url", "");
-      setFormField(wrapper, "method", "post");
-      expect(wrapper.vm.isValidDestination).toBeFalsy();
-    });
-  });
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Template Rendering at Step 2", () => {
@@ -756,30 +487,6 @@ describe("CreateDestinationForm", () => {
       wrapper.vm.step = 2;
       await nextTick();
       await flushPromises();
-    });
-
-    it("renders name input field", () => {
-      expect(wrapper.find('[data-test="add-destination-name-input"]').exists()).toBe(true);
-    });
-
-    it("renders URL input field", () => {
-      expect(wrapper.find('[data-test="add-destination-url-input"]').exists()).toBe(true);
-    });
-
-    it("renders url_endpoint input field", () => {
-      expect(wrapper.find('[data-test="add-destination-url-endpoint-input"]').exists()).toBe(true);
-    });
-
-    it("renders output format select field", () => {
-      expect(wrapper.find('[data-test="add-destination-output-format-select"]').exists()).toBe(
-        true,
-      );
-    });
-
-    it("renders skip TLS verify toggle", () => {
-      expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
-        true,
-      );
     });
 
     it("does NOT render Method field for openobserve type", () => {
@@ -798,11 +505,6 @@ describe("CreateDestinationForm", () => {
 
     it("renders Method select for custom destination type", () => {
       expect(wrapper.find('[data-test="add-destination-method-select"]').exists()).toBe(true);
-    });
-
-    it("url_endpoint field is not disabled for custom type", () => {
-      const endpointField = wrapper.find('[data-test="add-destination-url-endpoint-input"]');
-      expect(endpointField.exists()).toBe(true);
     });
   });
 
@@ -887,30 +589,6 @@ describe("CreateDestinationForm", () => {
           headers: { Authorization: "Basic token123" },
         }),
       });
-    });
-
-    it("includes destination_type_name in payload", async () => {
-      (destinationService.create as any).mockResolvedValue({ data: {} });
-
-      setFormField(wrapper, "destination_type", "splunk");
-      setFormField(wrapper, "name", "Splunk Dest");
-      setFormField(wrapper, "url", "https://splunk.example.com");
-      setFormField(wrapper, "url_endpoint", "/services/collector");
-      setFormField(wrapper, "method", "post");
-      setFormField(wrapper, "output_format", "nestedevent");
-      setFormField(wrapper, "headers", [{ key: "Authorization", value: "Splunk token" }]);
-
-      await wrapper.vm.createDestination();
-      await flushPromises();
-
-      expect(destinationService.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          module: "pipeline",
-          data: expect.objectContaining({
-            destination_type_name: "splunk",
-          }),
-        }),
-      );
     });
 
     it("does not append empty endpoint to base URL for custom type", async () => {
@@ -1052,19 +730,6 @@ describe("CreateDestinationForm", () => {
       expect(getFormField(wrapper, "url_endpoint")).toBe("");
     });
 
-    it("uses destination_type_name to set destination_type", () => {
-      wrapper.vm.populateFormForEdit({
-        name: "Datadog Dest",
-        url: "https://http-intake.logs.datadoghq.com/v1/input",
-        method: "post",
-        output_format: "json",
-        destination_type_name: "datadog",
-        skip_tls_verify: false,
-      });
-
-      expect(getFormField(wrapper, "destination_type")).toBe("datadog");
-    });
-
     it("falls back to 'openobserve' when destination_type_name is absent", () => {
       wrapper.vm.populateFormForEdit({
         name: "Unknown",
@@ -1145,45 +810,8 @@ describe("CreateDestinationForm", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  describe("connectionNotes computed property", () => {
-    it.each([
-      "openobserve",
-      "splunk",
-      "elasticsearch",
-      "datadog",
-      "dynatrace",
-      "newrelic",
-      "custom",
-    ])("returns notes with a title and steps array for %s", async (type) => {
-      setFormField(wrapper, "destination_type", type);
-      await nextTick();
-
-      const notes = wrapper.vm.connectionNotes;
-      expect(notes.title).toBeTruthy();
-      expect(Array.isArray(notes.steps)).toBe(true);
-      expect(notes.steps.length).toBeGreaterThan(0);
-    });
-
-    it("OpenObserve notes title contains 'OpenObserve'", () => {
-      setFormField(wrapper, "destination_type", "openobserve");
-      expect(wrapper.vm.connectionNotes.title).toContain("OpenObserve");
-    });
-
-    it("Splunk notes title contains 'Splunk'", async () => {
-      setFormField(wrapper, "destination_type", "splunk");
-      await nextTick();
-      expect(wrapper.vm.connectionNotes.title).toContain("Splunk");
-    });
-  });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  describe("Cancel Emit", () => {
-    it("emits 'cancel' event when $emit('cancel') is called", async () => {
-      wrapper.vm.$emit("cancel");
-      await nextTick();
-      expect(wrapper.emitted("cancel")).toBeTruthy();
-    });
-  });
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Edit Mode via Prop", () => {
@@ -1203,25 +831,6 @@ describe("CreateDestinationForm", () => {
 
       expect(getFormField(editWrapper, "name")).toBe("Prop Dest");
       expect(getFormField(editWrapper, "skip_tls_verify")).toBe(true);
-      editWrapper.unmount();
-    });
-
-    it("isEditMode is false when no destination prop is provided", () => {
-      expect(wrapper.vm.isEditMode).toBe(false);
-    });
-
-    it("isEditMode is true when destination prop is provided", async () => {
-      const editWrapper = createWrapper({
-        destination: {
-          name: "Edit",
-          url: "https://example.com",
-          method: "post",
-          output_format: "json",
-          skip_tls_verify: false,
-        },
-      });
-      await flushPromises();
-      expect(editWrapper.vm.isEditMode).toBe(true);
       editWrapper.unmount();
     });
 

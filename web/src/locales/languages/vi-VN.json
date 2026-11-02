@@ -2053,8 +2053,11 @@
       "error": "Lỗi",
       "action": "Hành động",
       "view": "Lượt xem",
-      "frustration": "Bực bội"
+      "frustration": "Bực bội",
+      "failedRequest": "Yêu cầu thất bại",
+      "noResponse": "Không có phản hồi"
     },
+    "replayCanvasNotRecorded": "Nội dung canvas không được ghi lại",
     "actionOnTarget": "{action} trên \"{target}\"",
     "errorWhileFetchingErrorEvents": "Lỗi khi tải các sự kiện lỗi",
     "errorWhileFetchingSessionReplay": "Lỗi khi tải dữ liệu phát lại phiên",
@@ -11763,6 +11766,7 @@
       "recoveryResolvesIncident": "giải quyết sự cố",
       "recoveryClosesAlert": "đóng cảnh báo",
       "recoveryChatMessage": "thông báo \"Đã giải quyết\" mới",
+      "recoveryJiraComment": "bình luận trên ticket đang mở",
       "keepFiringFor": "Tiếp tục kích hoạt trong",
       "keepFiringForTooltip": "Chờ khoảng thời gian này sau khi điều kiện không còn đúng trước khi khôi phục. 0 sẽ khôi phục ngay lập tức.",
       "suppressRepeats": "Chặn thông báo lặp lại",
@@ -12071,7 +12075,37 @@
       "priorityP2": "P2 (Cao)",
       "priorityP3": "P3 (Trung bình)",
       "priorityP4": "P4 (Thấp)",
-      "priorityP5": "P5 (Thông tin)"
+      "priorityP5": "P5 (Thông tin)",
+      "jiraDescription": "Tạo ticket trong Jira",
+      "jiraConnectSection": "Kết nối với Jira",
+      "jiraType": "Loại Jira",
+      "jiraCloud": "Jira Cloud",
+      "jiraDataCenter": "Jira Data Center",
+      "jiraUrl": "Jira URL",
+      "jiraUrlHelp": "Địa chỉ trang Jira của bạn, ví dụ {example}",
+      "jiraUrlFormat": "Nhập URL bắt đầu bằng https:// hoặc http://",
+      "jiraEmail": "Email",
+      "jiraApiToken": "API Token",
+      "jiraPersonalAccessToken": "Token truy cập cá nhân",
+      "jiraTokenRequired": "Token là bắt buộc",
+      "jiraTokenTip": "Dùng tài khoản bot chỉ có thể thấy dự án này.",
+      "jiraConnect": "Kết nối",
+      "jiraConnectedSummary": "Đã kết nối tới {host} với tư cách {name}",
+      "jiraChange": "Thay đổi",
+      "jiraConnectMissing": "Điền các trường ở trên, sau đó kết nối.",
+      "jiraTicketsSection": "Nơi tạo ticket",
+      "jiraProject": "Dự án",
+      "jiraIssueType": "Loại vấn đề",
+      "jiraPriority": "Mức độ ưu tiên",
+      "jiraDefaultPriority": "Mặc định của Jira",
+      "jiraRequiredFields": "Các trường Jira bắt buộc",
+      "jiraRequiredFieldHelp": "Jira yêu cầu đối với loại vấn đề này",
+      "jiraUnsupportedField": "Jira yêu cầu '{field}' cho {issueType}. OpenObserve không thể điền loại trường này. Hãy chọn loại vấn đề khác hoặc yêu cầu quản trị viên Jira đặt trường này thành tùy chọn.",
+      "jiraCreateScreenNotLoaded": "Màn hình tạo cho loại vấn đề này chưa tải xong. Hãy đợi tải xong hoặc chọn lại loại vấn đề.",
+      "jiraLabelsMissing": "Trường Labels không có trên màn hình tạo cho {issueType} trong {project}. OpenObserve cần trường này để tìm ticket của mình. Hãy yêu cầu quản trị viên Jira thêm trường này.",
+      "jiraBehavior": "Khôi phục sẽ thêm bình luận và không đóng ticket.",
+      "jiraTestCreated": "Đã tạo {key}. Bạn có thể xóa trong Jira.",
+      "jiraOpenIssue": "Mở trong Jira"
     },
     "lastRun": "Lần chạy cuối: {time}",
     "retryTraining": "Huấn luyện lại mô hình và chạy lại phát hiện",
@@ -13512,7 +13546,14 @@
       "pagerdutyDescription": "Tạo sự cố trong PagerDuty",
       "opsgenieDescription": "Tạo cảnh báo trong Opsgenie",
       "servicenowDescription": "Tạo sự cố trong ServiceNow",
-      "slackAppDescription": "Cập nhật cảnh báo theo lịch ngay tại chỗ. Xác nhận, tắt tiếng và điều tra từ Slack. Cần một workspace đã kết nối."
+      "slackAppRecommendedDescription": "Khuyến nghị cho phản hồi cảnh báo. Cập nhật cảnh báo theo lịch tại chỗ. Xác nhận, tắt thông báo và điều tra từ Slack. Cần không gian làm việc đã kết nối.",
+      "slackAppShort": "Xử lý cảnh báo",
+      "chatPostsShort": "Tin nhắn chat",
+      "emailShort": "Email HTML",
+      "pageOnCallShort": "Gọi trực",
+      "servicenowShort": "Sự cố IT",
+      "jiraShort": "Ticket vấn đề",
+      "customShort": "URL hoặc email"
     },
     "import": {
       "title": "Nhập đích",
@@ -13758,6 +13799,15 @@
       "allTitle": "Mọi chỉ số, kể cả không có dữ liệu trong khoảng này",
       "sortAsc": "A–Z",
       "sortDesc": "Z–A",
+      "sortDashboards": "Bảng điều khiển",
+      "sortDashboardsTitle": "Ưu tiên mục được dùng nhiều nhất trong bảng điều khiển",
+      "sortAlerts": "Cảnh báo",
+      "sortAlertsTitle": "Ưu tiên mục được dùng nhiều nhất trong cảnh báo",
+      "usageInDashboards": "Trong bảng điều khiển",
+      "usageHasAlerts": "Có cảnh báo",
+      "usageInSlos": "Trong SLO",
+      "usageLoading": "Đang tải nơi các chỉ số được sử dụng",
+      "usageFailed": "Không thể tải thông tin sử dụng, hãy thử lại",
       "viewGrid": "Lưới",
       "viewRows": "Hàng",
       "modeExplore": "Khám phá",
@@ -13891,16 +13941,7 @@
         "deleteMessage": "Xóa chế độ xem {name} cho mọi người trong tổ chức này?",
         "modified": "{name} (đã sửa đổi)",
         "clear": "Bỏ chế độ xem"
-      },
-      "sortDashboards": "Bảng điều khiển",
-      "sortDashboardsTitle": "Ưu tiên mục được dùng nhiều nhất trong bảng điều khiển",
-      "sortAlerts": "Cảnh báo",
-      "sortAlertsTitle": "Ưu tiên mục được dùng nhiều nhất trong cảnh báo",
-      "usageInDashboards": "Trong bảng điều khiển",
-      "usageHasAlerts": "Có cảnh báo",
-      "usageInSlos": "Trong SLO",
-      "usageLoading": "Đang tải nơi các chỉ số được sử dụng",
-      "usageFailed": "Không thể tải thông tin sử dụng, hãy thử lại"
+      }
     },
     "metricCard": {
       "lastRefreshed": "Làm mới lần cuối:",
@@ -13927,6 +13968,17 @@
       "notEqualTo": "Không bằng",
       "regexPattern": "Mẫu regex (ví dụ: prod.*)",
       "regexNotMatching": "Regex không khớp (ví dụ: test.*)"
+    },
+    "labelGroups": {
+      "addGroup": "+ Nhóm OR",
+      "addGroupTooltip": "Thêm một nhóm bộ lọc; một chuỗi khớp khi khớp với bất kỳ nhóm nào",
+      "addToGroup": "Thêm bộ lọc vào nhóm này",
+      "anyOf": "bất kỳ",
+      "andAnyOf": "và bất kỳ",
+      "or": "hoặc",
+      "not": "không",
+      "notTooltip": "Khớp với chuỗi mà toàn bộ nhóm này không khớp",
+      "tooManyBranches": "Các bộ lọc này mở rộng thành {count} bộ chọn riêng biệt; tối đa {max} bộ có thể chạy. Hãy gộp các giá trị vào một bộ lọc regex hoặc xóa một nhóm."
     },
     "builderSwitch": {
       "unsupported": "Trình dựng không thể hiển thị {construct}",
@@ -13967,11 +14019,11 @@
         "byLabelsLabel": "Theo Nhãn",
         "quantileLabel": "Phân vị",
         "kLabel": "K",
-        "nearestMultipleLabel": "Bội số gần nhất",
         "withoutLabel": "Không gồm (bỏ các nhãn này)",
         "withoutDesc": "Tổng hợp loại bỏ các nhãn đã chọn và giữ mọi nhãn khác",
         "offsetLabel": "Độ lệch",
-        "offsetDesc": "Đọc chỉ số lùi về bao xa, ví dụ 1h hoặc 1d"
+        "offsetDesc": "Đọc chỉ số lùi về bao xa, ví dụ 1h hoặc 1d",
+        "nearestMultipleLabel": "Bội số gần nhất"
       },
       "rangeOnlyFirst": "Hàm khoảng chỉ có thể là bước đầu tiên",
       "rangeOnlyFirstNote": "Hàm khoảng đọc các mẫu thô, vì vậy nó chỉ có thể là bước đầu tiên. Hãy xóa các bước khác để thêm một bước.",
@@ -14041,17 +14093,6 @@
       "empty": "Chưa có truy vấn nào",
       "noMatch": "Không có truy vấn nào khớp với tìm kiếm hoặc bộ lọc gắn sao",
       "loadMore": "Tải thêm"
-    },
-    "labelGroups": {
-      "addGroup": "+ Nhóm OR",
-      "addGroupTooltip": "Thêm một nhóm bộ lọc; một chuỗi khớp khi khớp với bất kỳ nhóm nào",
-      "addToGroup": "Thêm bộ lọc vào nhóm này",
-      "anyOf": "bất kỳ",
-      "andAnyOf": "và bất kỳ",
-      "or": "hoặc",
-      "not": "không",
-      "notTooltip": "Khớp với chuỗi mà toàn bộ nhóm này không khớp",
-      "tooManyBranches": "Các bộ lọc này mở rộng thành {count} bộ chọn riêng biệt; tối đa {max} bộ có thể chạy. Hãy gộp các giá trị vào một bộ lọc regex hoặc xóa một nhóm."
     }
   },
   "settings": {
@@ -21710,7 +21751,8 @@
         "longtask": "Tác vụ dài",
         "view": "Xem",
         "action": "Hành động",
-        "resource": "Tài nguyên"
+        "resource": "Tài nguyên",
+        "failedrequest": "Yêu cầu thất bại"
       },
       "subscriptionPlan": {
         "payasyougo": "Trả theo mức sử dụng",
@@ -22724,6 +22766,7 @@
   },
   "promql": {
     "operations": {
+      "offsetDoc": "Đọc chỉ số như tại thời điểm cách đây khoảng thời gian đã cho",
       "rateDoc": "Tính tốc độ tăng trung bình mỗi giây trong khoảng thời gian đã chỉ định",
       "irateDoc": "Tính tốc độ tăng tức thời mỗi giây dựa trên hai điểm dữ liệu cuối cùng",
       "increaseDoc": "Tính tổng mức tăng trong khoảng thời gian đã chỉ định",
@@ -22794,8 +22837,7 @@
       "moduloName": "Modulo",
       "multiplyByName": "Nhân với",
       "divideByName": "Chia cho",
-      "exponentName": "Lũy thừa",
-      "offsetDoc": "Đọc chỉ số như tại thời điểm cách đây khoảng thời gian đã cho"
+      "exponentName": "Lũy thừa"
     }
   },
   "passwordPolicy": {
@@ -28177,7 +28219,6 @@
       "appTile": "ứng dụng {product}",
       "webhookTile": "webhook {product}",
       "twoWay": "Hai chiều",
-      "recommendedForAlertResponse": "Được khuyến nghị cho phản hồi cảnh báo",
       "choiceHint": "Thông báo trực và super cluster dùng webhook. Gửi thủ công và gửi thời gian thực từ một đích ứng dụng Slack là các bài đăng riêng.",
       "unavailableReason": "Cần ứng dụng Slack Enterprise trên một cụm duy nhất",
       "unavailableFlag": "Đã tắt trên máy chủ này; hãy yêu cầu người vận hành đặt {variable}",
@@ -28185,6 +28226,7 @@
       "unavailableCloud": "Chưa được bật cho vùng Cloud của bạn",
       "unavailableNoAccess": "Hãy yêu cầu quản trị viên tổ chức bật ứng dụng Slack",
       "postOnly": "Chỉ gửi",
+      "off": "Tắt",
       "switchToApp": "Chuyển sang ứng dụng {product}",
       "switchThis": "Chuyển đích này",
       "switchBack": "Chuyển lại",
