@@ -683,6 +683,7 @@
     }
   },
   "common": {
+    "i18nPushTokenProbe": "Проверка отправки перевода",
     "dismiss": "Закрыть",
     "exitFullscreen": "Выйти из полноэкранного режима",
     "moreActions": "Другие действия",

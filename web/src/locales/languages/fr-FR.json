@@ -683,6 +683,7 @@
     }
   },
   "common": {
+    "i18nPushTokenProbe": "Sonde d'envoi de traduction",
     "dismiss": "Ignorer",
     "exitFullscreen": "Quitter le plein écran",
     "moreActions": "Plus d'actions",

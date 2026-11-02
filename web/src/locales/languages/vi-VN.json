@@ -683,6 +683,7 @@
     }
   },
   "common": {
+    "i18nPushTokenProbe": "Kiểm tra đẩy bản dịch",
     "dismiss": "Bỏ qua",
     "exitFullscreen": "Thoát toàn màn hình",
     "moreActions": "Thêm thao tác",

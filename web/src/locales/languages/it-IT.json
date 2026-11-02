@@ -683,6 +683,7 @@
     }
   },
   "common": {
+    "i18nPushTokenProbe": "Sonda push per la traduzione",
     "dismiss": "Ignora",
     "exitFullscreen": "Esci da schermo intero",
     "moreActions": "Altre azioni",

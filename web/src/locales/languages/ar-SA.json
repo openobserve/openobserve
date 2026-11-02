@@ -683,6 +683,7 @@
     }
   },
   "common": {
+    "i18nPushTokenProbe": "فحص دفع الترجمة",
     "dismiss": "تجاهل",
     "exitFullscreen": "إنهاء ملء الشاشة",
     "moreActions": "المزيد من الإجراءات",

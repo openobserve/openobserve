@@ -683,6 +683,7 @@
     }
   },
   "common": {
+    "i18nPushTokenProbe": "Vertaalpush-test",
     "dismiss": "Sluiten",
     "exitFullscreen": "Volledig scherm sluiten",
     "moreActions": "Meer acties",

@@ -683,6 +683,7 @@
     }
   },
   "common": {
+    "i18nPushTokenProbe": "Übersetzungs-Push-Test",
     "dismiss": "Schließen",
     "exitFullscreen": "Vollbild verlassen",
     "moreActions": "Weitere Aktionen",

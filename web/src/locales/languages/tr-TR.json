@@ -683,6 +683,7 @@
     }
   },
   "common": {
+    "i18nPushTokenProbe": "Çeviri gönderme testi",
     "dismiss": "Kapat",
     "exitFullscreen": "Tam ekrandan çık",
     "moreActions": "Daha fazla işlem",

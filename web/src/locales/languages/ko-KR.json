@@ -683,6 +683,7 @@
     }
   },
   "common": {
+    "i18nPushTokenProbe": "번역 푸시 프로브",
     "dismiss": "닫기",
     "exitFullscreen": "전체 화면 종료",
     "moreActions": "작업 더 보기",

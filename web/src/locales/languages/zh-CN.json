@@ -683,6 +683,7 @@
     }
   },
   "common": {
+    "i18nPushTokenProbe": "翻译推送探测",
     "dismiss": "关闭",
     "exitFullscreen": "退出全屏",
     "moreActions": "更多操作",

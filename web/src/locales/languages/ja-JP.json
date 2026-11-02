@@ -683,6 +683,7 @@
     }
   },
   "common": {
+    "i18nPushTokenProbe": "翻訳プッシュプローブ",
     "dismiss": "閉じる",
     "exitFullscreen": "全画面表示を終了",
     "moreActions": "その他のアクション",
