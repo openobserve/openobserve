@@ -1221,7 +1221,7 @@ export default defineComponent({
 
     // only the logs ingest path writes the original record
     const showStoreOriginalDataToggle = computed(() => {
-      return !["traces", "profiles"].includes(modelValue.stream_type);
+      return modelValue.stream_type === "logs";
     });
     //here we added a watcher to
     //1. if user defined schema is enabled then we need to show the schema fields tab and also need to make sure that it would be the active tab
