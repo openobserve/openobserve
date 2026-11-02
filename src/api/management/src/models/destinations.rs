@@ -272,7 +272,9 @@ pub struct Destination {
     /// Specific destination type identifier (e.g., "openobserve", "splunk", "elasticsearch").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination_type_name: Option<String>,
-    /// Optional key-value metadata for the destination.
+    /// Optional key-value metadata for the destination. Without PUT, only known non-secret
+    /// settings such as `prebuilt_type` or `severity` read back whole; `routing_key` and any other
+    /// value read back blank, or a URL as its origin.
     #[serde(default)]
     pub metadata: HashMap<String, String>,
     /// The `slack_app` fields, flat on the body; absent for every other type.
@@ -288,7 +290,7 @@ impl Destination {
     pub fn has_secrets(&self) -> bool {
         !self.url.is_empty()
             || self.headers.as_ref().is_some_and(|h| !h.is_empty())
-            || !self.metadata.is_empty()
+            || self.metadata.keys().any(|key| !is_plain_metadata(key))
             || self.slack_app.previous_webhook.is_some()
     }
 
@@ -505,17 +507,45 @@ impl From<destination_usage::DestinationUse> for DestinationUseResponse {
     }
 }
 
-/// Metadata credentials: PagerDuty's `routing_key`, and the `credential_<field>` copies older
-/// prebuilt destinations kept, such as `credential_webhookUrl`; a URL keeps its origin.
+/// Metadata keys whose values are not secrets: those the web form and the Slack Connect job
+/// write, and `render_format`, which the notifier reads. PagerDuty's `routing_key` is absent: it
+/// is the integration key.
+const PLAIN_METADATA_KEYS: &[&str] = &[
+    "prebuilt_type",
+    "render_format",
+    "setup_method",
+    "slack_team_id",
+    "slack_team_name",
+    "slack_channel_id",
+    "slack_app_name",
+    "credential_channel",
+    "credential_username",
+    "credential_euRegion",
+    "credential_priority",
+    "credential_assignmentGroup",
+    "credential_resolutionCode",
+    "severity",
+    "source",
+    "sourcetype",
+    "hostname",
+    "ddsource",
+    "ddtags",
+    "service",
+    "_index",
+    "converted_from_custom",
+    "conversion_date",
+];
+
+fn is_plain_metadata(key: &str) -> bool {
+    PLAIN_METADATA_KEYS.contains(&key)
+}
+
+/// Any other key may hold a credential, such as `routing_key` or the `credential_<field>` copies
+/// older prebuilt destinations kept (`credential_webhookUrl`): a URL keeps its origin, the rest
+/// is blanked.
 fn redact_metadata(metadata: &mut HashMap<String, String>) {
     for (key, value) in metadata.iter_mut() {
-        let key = key.to_ascii_lowercase();
-        if ["key", "token", "secret", "password"]
-            .iter()
-            .any(|part| key.contains(part))
-        {
-            value.clear();
-        } else if key.contains("url") || key.contains("webhook") {
+        if !is_plain_metadata(key) {
             *value = url_origin(value);
         }
     }
@@ -967,6 +997,8 @@ mod tests {
                 "https://hooks.slack.com/services/T1/B1/s3cr3t".to_string(),
             ),
             ("credential_channel".to_string(), "#operations".to_string()),
+            ("credential_auth".to_string(), "Basic dTpw".to_string()),
+            ("Routing_Key".to_string(), "R0UT1NG".to_string()),
         ]);
         d.redact_secrets();
         let json = serde_json::to_value(&d).unwrap();
@@ -979,11 +1011,29 @@ mod tests {
             "https://hooks.slack.com"
         );
         assert_eq!(json["metadata"]["credential_channel"], "#operations");
+        assert_eq!(
+            json["metadata"]["credential_auth"], "",
+            "an unknown key is blanked"
+        );
+        assert_eq!(json["metadata"]["Routing_Key"], "");
         assert_eq!(json["previous_webhook"]["url"], "https://hooks.slack.com");
         assert_eq!(
             json["previous_webhook"]["metadata"]["slack_channel_id"],
             "C0FAKE00001"
         );
         assert_eq!(json["channel_id"], "C0FAKE00001", "non-secret fields stay");
+    }
+
+    #[test]
+    fn known_settings_alone_need_no_redaction() {
+        let mut d: Destination = serde_json::from_value(serde_json::json!({
+            "name": "dd",
+            "type": "http",
+            "metadata": {"ddsource": "openobserve", "ddtags": "env:prod", "service": "o2"}
+        }))
+        .unwrap();
+        assert!(!d.has_secrets());
+        d.metadata.insert("routing_key".into(), "R0UT1NG".into());
+        assert!(d.has_secrets());
     }
 }
