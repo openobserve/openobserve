@@ -301,11 +301,7 @@ async fn persist_stream_settings(
         );
     }
 
-    let uds_user_fields = settings
-        .defined_schema_fields
-        .iter()
-        .filter(|field| !is_uds_internal_column(field))
-        .count();
+    let uds_user_fields = uds_user_field_count(stream_type, &settings.defined_schema_fields);
     if uds_user_fields > cfg.limit.user_defined_schema_max_fields {
         return Err(StreamSettingsError::BadRequest(format!(
             "user defined schema fields count exceeds the limit: {}",
@@ -453,11 +449,24 @@ fn saved_defined_schema_fields(
     fields.sort_unstable();
     // ingest keeps only the saved list, and a profiles query column may arrive later
     fields.retain(|field| {
-        schema.field_with_name(field).is_ok()
-            || (matches!(stream_type, StreamType::Profiles)
-                && config::meta::profiles::uds_required_columns().any(|name| name == field))
+        schema.field_with_name(field).is_ok() || is_profiles_required_column(stream_type, field)
     });
     fields
+}
+
+// profiles query columns are saved before they arrive, so they take no slot of the user limit
+fn uds_user_field_count(stream_type: StreamType, fields: &[String]) -> usize {
+    fields
+        .iter()
+        .filter(|field| {
+            !is_uds_internal_column(field) && !is_profiles_required_column(stream_type, field)
+        })
+        .count()
+}
+
+fn is_profiles_required_column(stream_type: StreamType, field: &str) -> bool {
+    matches!(stream_type, StreamType::Profiles)
+        && config::meta::profiles::uds_required_columns().any(|name| name == field)
 }
 
 /// Make stream settings internally consistent before validation and persistence.
@@ -1372,6 +1381,15 @@ mod tests {
 
         let traces = saved_defined_schema_fields(StreamType::Traces, &schema, requested);
         assert_eq!(traces, ["k8s_pod_name"]);
+    }
+
+    #[test]
+    fn test_uds_user_field_count_skips_profiles_query_columns() {
+        let fields = [TIMESTAMP_COL_NAME, "stack", "trace_id", "k8s_pod_name"]
+            .map(str::to_string)
+            .to_vec();
+        assert_eq!(uds_user_field_count(StreamType::Profiles, &fields), 1);
+        assert_eq!(uds_user_field_count(StreamType::Traces, &fields), 3);
     }
 
     #[test]
