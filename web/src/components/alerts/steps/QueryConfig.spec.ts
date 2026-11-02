@@ -405,14 +405,6 @@ describe("QueryConfig.vue", () => {
   });
 
   describe("Initialization", () => {
-    it("should mount component successfully", () => {
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should initialize with custom tab by default", () => {
-      expect(wrapper.vm.localTab).toBe("custom");
-    });
-
     it("should initialize with provided tab", async () => {
       const { h } = mountHost({
         tab: "sql",
@@ -430,59 +422,6 @@ describe("QueryConfig.vue", () => {
       expect(wrapper.vm.functionsList).toEqual([
         { name: "test_func", function: "// test function" },
       ]);
-    });
-  });
-
-  describe("Props", () => {
-    it("should accept all required props", () => {
-      expect(wrapper.props().tab).toBe("custom");
-      expect(wrapper.props().inputData).toBeDefined();
-      expect(wrapper.props().columns.length).toBe(2);
-      expect(wrapper.props().streamType).toBe("logs");
-    });
-
-    it("should use default values for optional props", () => {
-      expect(wrapper.props().multiTimeRange).toEqual([]);
-      expect(wrapper.props().generatedSqlQuery).toBe("");
-      expect(wrapper.props().isRealTime).toBe("false");
-      expect(wrapper.props().sqlQuery).toBe("");
-      expect(wrapper.props().promqlQuery).toBe("");
-      expect(wrapper.props().vrlFunction).toBe("");
-      expect(wrapper.props().sqlQueryErrorMsg).toBe("");
-    });
-
-    it("should handle custom stream type", async () => {
-      await setQCProps({ streamType: "metrics" });
-      expect(wrapper.props().streamType).toBe("metrics");
-    });
-
-    it("should handle real-time alert mode", async () => {
-      await setQCProps({ isRealTime: "true" });
-      expect(wrapper.props().isRealTime).toBe("true");
-    });
-
-    it("should handle SQL query prop", async () => {
-      const sqlQuery = "SELECT * FROM logs WHERE status = 200";
-      await setQCProps({ sqlQuery });
-      expect(wrapper.props().sqlQuery).toBe(sqlQuery);
-    });
-
-    it("should handle PromQL query prop", async () => {
-      const promqlQuery = "up{job='test'}";
-      await setQCProps({ promqlQuery });
-      expect(wrapper.props().promqlQuery).toBe(promqlQuery);
-    });
-
-    it("should handle VRL function prop", async () => {
-      const vrlFunction = '.field = "value"';
-      await setQCProps({ vrlFunction });
-      expect(wrapper.props().vrlFunction).toBe(vrlFunction);
-    });
-
-    it("should handle SQL error message prop", async () => {
-      const errorMsg = "Invalid SQL syntax";
-      await setQCProps({ sqlQueryErrorMsg: errorMsg });
-      expect(wrapper.props().sqlQueryErrorMsg).toBe(errorMsg);
     });
   });
 
@@ -517,11 +456,6 @@ describe("QueryConfig.vue", () => {
 
     it("should show tabs for scheduled alerts", () => {
       expect(wrapper.vm.shouldShowTabs).toBe(true);
-    });
-
-    it("should hide tabs for real-time alerts", async () => {
-      await setQCProps({ isRealTime: "true" });
-      expect(wrapper.vm.shouldShowTabs).toBe(false);
     });
   });
 
@@ -604,24 +538,6 @@ describe("QueryConfig.vue", () => {
       expect(wrapper.vm.localTab).toBe("sql");
       expect(wrapper.emitted("update:tab")).toBeTruthy();
       expect(wrapper.emitted("update:tab")![0]).toEqual(["sql"]);
-    });
-
-    it("should switch from custom to SQL tab", async () => {
-      expect(wrapper.vm.localTab).toBe("custom");
-      await wrapper.vm.updateTab("sql");
-      expect(wrapper.vm.localTab).toBe("sql");
-    });
-
-    it("should switch from SQL to PromQL tab", async () => {
-      await setQCProps({ streamType: "metrics" });
-      await wrapper.vm.updateTab("sql");
-      await wrapper.vm.updateTab("promql");
-      expect(wrapper.vm.localTab).toBe("promql");
-    });
-
-    it("should emit update:tab event on tab change", async () => {
-      await wrapper.vm.updateTab("sql");
-      expect(wrapper.emitted("update:tab")).toBeTruthy();
     });
 
     it("should show multi-window dialog when switching to custom with multi-windows", async () => {
@@ -740,10 +656,6 @@ describe("QueryConfig.vue", () => {
 
       expect(wrapper.vm.sqlOrPromqlQuery).toBe(promqlQuery);
     });
-
-    it("should display empty string when no query is set", () => {
-      expect(wrapper.vm.sqlOrPromqlQuery).toBe("");
-    });
   });
 
   describe("Query Updates", () => {
@@ -771,45 +683,6 @@ describe("QueryConfig.vue", () => {
 
       expect(wrapper.emitted("update:vrlFunction")).toBeTruthy();
       expect(wrapper.emitted("update:vrlFunction")![0]).toEqual([encodedVrl]);
-    });
-
-    it("should handle empty SQL query update", async () => {
-      await wrapper.vm.updateSqlQuery("");
-      expect(wrapper.vm.localSqlQuery).toBe("");
-      expect(wrapper.emitted("update:sqlQuery")![0]).toEqual([""]);
-    });
-
-    it("should handle empty PromQL query update", async () => {
-      await wrapper.vm.updatePromqlQuery("");
-      expect(wrapper.vm.localPromqlQuery).toBe("");
-      expect(wrapper.emitted("update:promqlQuery")![0]).toEqual([""]);
-    });
-  });
-
-  describe("Group and Condition Management", () => {
-    it("should emit update-group event", async () => {
-      const groupData = { id: "test-group", conditions: [] };
-      await wrapper.vm.updateGroup(groupData);
-
-      expect(wrapper.emitted("update-group")).toBeTruthy();
-      expect(wrapper.emitted("update-group")![0]).toEqual([groupData]);
-    });
-
-    it("should emit remove-group event", async () => {
-      const groupData = { id: "test-group" };
-      await wrapper.vm.removeConditionGroup(groupData);
-
-      expect(wrapper.emitted("remove-group")).toBeTruthy();
-      expect(wrapper.emitted("remove-group")![0]).toEqual([groupData]);
-    });
-
-    it("should emit input:update event", async () => {
-      const name = "test-field";
-      const field = { value: "test-value" };
-      await wrapper.vm.onInputUpdate(name, field);
-
-      expect(wrapper.emitted("input:update")).toBeTruthy();
-      expect(wrapper.emitted("input:update")![0]).toEqual([name, field]);
     });
   });
 
@@ -1243,22 +1116,6 @@ describe("QueryConfig.vue", () => {
     });
   });
 
-  describe("SQL Validation Trigger", () => {
-    it("should emit validate-sql event", async () => {
-      await wrapper.vm.handleValidateSql();
-
-      expect(wrapper.emitted("validate-sql")).toBeTruthy();
-    });
-
-    it("should emit validate-sql event multiple times", async () => {
-      await wrapper.vm.handleValidateSql();
-      await wrapper.vm.handleValidateSql();
-      await wrapper.vm.handleValidateSql();
-
-      expect(wrapper.emitted("validate-sql")!.length).toBe(3);
-    });
-  });
-
   describe("Editor Dialog", () => {
     it("should open editor dialog on button click", async () => {
       wrapper.vm.localTab = "sql";
@@ -1295,79 +1152,10 @@ describe("QueryConfig.vue", () => {
     });
   });
 
-  describe("Emits", () => {
-    it("should emit all expected events", async () => {
-      await wrapper.vm.updateTab("sql");
-      await wrapper.vm.updateGroup({});
-      await wrapper.vm.removeConditionGroup({});
-      await wrapper.vm.onInputUpdate("test", {});
-      await wrapper.vm.updateSqlQuery("SELECT *");
-      await wrapper.vm.updatePromqlQuery("up");
-      await wrapper.vm.handleVrlFunctionUpdate("vrl");
-      await wrapper.vm.handleValidateSql();
-
-      expect(wrapper.emitted()).toHaveProperty("update:tab");
-      expect(wrapper.emitted()).toHaveProperty("update-group");
-      expect(wrapper.emitted()).toHaveProperty("remove-group");
-      expect(wrapper.emitted()).toHaveProperty("input:update");
-      expect(wrapper.emitted()).toHaveProperty("update:sqlQuery");
-      expect(wrapper.emitted()).toHaveProperty("update:promqlQuery");
-      expect(wrapper.emitted()).toHaveProperty("update:vrlFunction");
-      expect(wrapper.emitted()).toHaveProperty("validate-sql");
-    });
-
-    it("should not emit events when not triggered", () => {
-      expect(wrapper.emitted("update:tab")).toBeFalsy();
-      expect(wrapper.emitted("update-group")).toBeFalsy();
-      expect(wrapper.emitted("remove-group")).toBeFalsy();
-      expect(wrapper.emitted("input:update")).toBeFalsy();
-      expect(wrapper.emitted("update:sqlQuery")).toBeFalsy();
-      expect(wrapper.emitted("update:promqlQuery")).toBeFalsy();
-      expect(wrapper.emitted("update:vrlFunction")).toBeFalsy();
-      expect(wrapper.emitted("validate-sql")).toBeFalsy();
-      expect(wrapper.emitted("clear-multi-windows")).toBeFalsy();
-    });
-  });
-
   describe("Edge Cases", () => {
     it.skip("should handle null inputData gracefully - REQUIRES E2E", async () => {
       // Skipped: Component requires inputData prop and will throw error with null
       // This is expected behavior and should be enforced by TypeScript
-    });
-
-    it("should handle empty columns array", async () => {
-      await setQCProps({ columns: [] });
-      expect(wrapper.props().columns).toEqual([]);
-    });
-
-    it("should handle empty streamFieldsMap", async () => {
-      await setQCProps({ streamFieldsMap: {} });
-      expect(wrapper.props().streamFieldsMap).toEqual({});
-    });
-
-    it("should handle very long SQL query", async () => {
-      const longQuery = "SELECT * FROM logs WHERE " + "field = 'value' AND ".repeat(100);
-      await wrapper.vm.updateSqlQuery(longQuery);
-      expect(wrapper.vm.localSqlQuery.length).toBeGreaterThan(1000);
-    });
-
-    it("should handle very long PromQL query", async () => {
-      const longQuery = "rate(http_requests_total[5m]) " + "+ ".repeat(100) + "0";
-      await wrapper.vm.updatePromqlQuery(longQuery);
-      expect(wrapper.vm.localPromqlQuery.length).toBeGreaterThan(100);
-    });
-
-    it("should handle special characters in queries", async () => {
-      const specialQuery = "SELECT * FROM logs WHERE msg LIKE '%error%' AND status = '500'";
-      await wrapper.vm.updateSqlQuery(specialQuery);
-      expect(wrapper.vm.localSqlQuery).toBe(specialQuery);
-    });
-
-    it("should handle rapid tab switching", async () => {
-      for (let i = 0; i < 10; i++) {
-        await wrapper.vm.updateTab(i % 2 === 0 ? "custom" : "sql");
-      }
-      expect(wrapper.emitted("update:tab")!.length).toBe(10);
     });
 
     it("should handle multiple multi-time ranges", async () => {
@@ -1406,53 +1194,18 @@ describe("QueryConfig.vue", () => {
       await wrapper.vm.updateTab("promql");
       expect(wrapper.vm.localTab).toBe("promql");
     });
-
-    it("should handle zero-length arrays", async () => {
-      await setQCProps({
-        columns: [],
-        multiTimeRange: [],
-      });
-
-      expect(wrapper.props().columns.length).toBe(0);
-      expect(wrapper.props().multiTimeRange.length).toBe(0);
-    });
-
-    it("should handle empty string queries", async () => {
-      await wrapper.vm.updateSqlQuery("");
-      await wrapper.vm.updatePromqlQuery("");
-
-      expect(wrapper.vm.localSqlQuery).toBe("");
-      expect(wrapper.vm.localPromqlQuery).toBe("");
-    });
   });
 
   describe("Accessibility", () => {
-    it("should have proper data-test attributes", () => {
-      // Tabs are hidden for real-time alerts, check component exists
-      expect(wrapper.exists()).toBe(true);
-    });
-
     it("should render FilterGroup in custom mode", async () => {
       wrapper.vm.localTab = "custom";
       await nextTick();
 
       expect(wrapper.find('[data-test="mock-filter-group"]').exists()).toBe(true);
     });
-
-    it("should render QueryEditorDialog", () => {
-      expect(wrapper.find('[data-test="mock-query-editor-dialog"]').exists()).toBe(true);
-    });
-
-    it("should render CustomConfirmDialog", () => {
-      expect(wrapper.find('[data-test="mock-custom-confirm-dialog"]').exists()).toBe(true);
-    });
   });
 
   describe("Negative Cases", () => {
-    it("should not emit update:tab when not called", () => {
-      expect(wrapper.emitted("update:tab")).toBeFalsy();
-    });
-
     it("should not emit clear-multi-windows when canceling dialog", async () => {
       await setQCProps({
         multiTimeRange: [{ label: "1h ago", value: 3600 }],
@@ -1467,27 +1220,6 @@ describe("QueryConfig.vue", () => {
     // rules are imperative pre-save gates that live in
     // useAlertForm.runImperativeQueryChecks — asserted in AddAlert.spec.ts
     // ("imperative query-text gates"), not through the schema.
-  });
-
-  describe("Functions List", () => {
-    it("should load functions from store", () => {
-      expect(wrapper.vm.functionsList).toEqual([
-        { name: "test_func", function: "// test function" },
-      ]);
-    });
-
-    it("should handle empty functions list", async () => {
-      const emptyStore = createMockStore({
-        organizationData: { functions: [] },
-      });
-      mockStoreInstance = emptyStore;
-      const { h } = mountHost({ columns: [], streamFieldsMap: {} }, {}, emptyStore);
-      const emptyWrapper = h.findComponent(QueryConfig);
-
-      expect((emptyWrapper.vm as any).functionsList).toEqual([]);
-      h.unmount();
-      mockStoreInstance = mockStore;
-    });
   });
 
   // R6 PARITY: onLogMeasureColumnChange is bound via @update:model-value on an

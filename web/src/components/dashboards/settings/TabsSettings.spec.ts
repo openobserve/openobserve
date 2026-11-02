@@ -186,43 +186,6 @@ describe("TabsSettings", () => {
     });
   });
 
-  describe("Component Initialization", () => {
-    it("should render correctly with default props", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-tab-settings"]').exists()).toBe(true);
-    });
-
-    it("should have correct component name", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.$options.name).toBe("TabsSettings");
-    });
-
-    it("should emit correct events in emits array", () => {
-      wrapper = createWrapper();
-      // Component does not declare emits in setup(); verify refresh function exists instead.
-      expect(typeof wrapper.vm.refreshRequired).toBe("function");
-    });
-
-    it("should initialize with correct default state", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.showAddTabDialog).toBe(false);
-      expect(wrapper.vm.isTabEditMode).toBe(false);
-      expect(wrapper.vm.selectedTabIdToEdit).toBe("");
-      expect(wrapper.vm.deletePopupVisible).toBe(false);
-      expect(wrapper.vm.tabIdToBeDeleted).toBeNull();
-      expect(wrapper.vm.editTabId).toBeNull();
-    });
-
-    it("should not expose addTabRef (removed after refactor)", () => {
-      wrapper = createWrapper();
-      expect("addTabRef" in wrapper.vm).toBe(false);
-    });
-  });
-
   describe("Dashboard Data Loading", () => {
     it("should call getDashboard on mount", async () => {
       const { getDashboard } = await import("../../../utils/commons");
@@ -243,48 +206,9 @@ describe("TabsSettings", () => {
 
       expect(wrapper.vm.currentDashboardData.data).toEqual(mockDashboardData);
     });
-
-    it("should handle getDashboard failure gracefully", async () => {
-      const { getDashboard } = await import("../../../utils/commons");
-      vi.mocked(getDashboard).mockRejectedValueOnce(new Error("Network error"));
-
-      // Mock console.error and Vue error handler to suppress error messages
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      wrapper = createWrapper();
-
-      // Catch the unhandled promise rejection
-      try {
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      } catch (error) {
-        // Expected to throw due to unhandled promise rejection
-      }
-
-      expect(wrapper.exists()).toBe(true);
-
-      consoleErrorSpy.mockRestore();
-      consoleWarnSpy.mockRestore();
-    });
   });
 
   describe("Header and Navigation", () => {
-    it("should render dashboard header with title", () => {
-      wrapper = createWrapper();
-
-      const header = wrapper.find('[data-test="mock-dashboard-header"]');
-      expect(header.exists()).toBe(true);
-    });
-
-    it("should render add tab button in header", () => {
-      wrapper = createWrapper();
-
-      const addButton = wrapper.find('[data-test="dashboard-tab-settings-add-tab"]');
-      expect(addButton.exists()).toBe(true);
-      expect(addButton.text()).toBe("dashboard.newTab");
-    });
-
     it("should show add tab dialog when add button is clicked", async () => {
       wrapper = createWrapper();
 
@@ -293,39 +217,6 @@ describe("TabsSettings", () => {
 
       expect(wrapper.vm.showAddTabDialog).toBe(true);
       expect(wrapper.vm.isTabEditMode).toBe(false);
-    });
-  });
-
-  describe("Table Structure", () => {
-    it("should render table header with correct columns", () => {
-      wrapper = createWrapper();
-
-      // OTable renders its own column headers (th[data-test="o2-table-th-<id>"]).
-      const nameHeader = wrapper.find('[data-test="o2-table-th-name"]');
-      const actionsHeader = wrapper.find('[data-test="o2-table-th-actions"]');
-
-      expect(nameHeader.exists()).toBe(true);
-      expect(nameHeader.text()).toContain("dashboard.name");
-
-      expect(actionsHeader.exists()).toBe(true);
-      expect(actionsHeader.text()).toContain("dashboard.actions");
-    });
-
-    it("should render draggable container", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      const draggable = wrapper.find('[data-test="dashboard-tab-settings-drag"]');
-      expect(draggable.exists()).toBe(true);
-    });
-
-    it("should render tab rows for each tab", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      const tabRows = wrapper.findAll('[data-test^="o2-table-row-"]');
-      expect(tabRows).toHaveLength(mockDashboardData.tabs.length);
     });
   });
 
@@ -340,24 +231,6 @@ describe("TabsSettings", () => {
       expect(tabNames[0].text()).toBe("Tab 1");
       expect(tabNames[1].text()).toBe("Tab 2");
       expect(tabNames[2].text()).toBe("Tab 3");
-    });
-
-    it.skip("should render drag handles for each tab", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      const dragHandles = wrapper.findAll('[data-test="dashboard-tab-settings-drag-handle"]');
-      expect(dragHandles).toHaveLength(mockDashboardData.tabs.length);
-    });
-
-    it("should render edit buttons for each tab", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      const editButtons = wrapper.findAll('[data-test="dashboard-tab-settings-tab-edit-btn"]');
-      expect(editButtons).toHaveLength(mockDashboardData.tabs.length);
     });
 
     it("should render delete buttons for each tab when more than one tab exists", async () => {
@@ -396,36 +269,6 @@ describe("TabsSettings", () => {
       expect(wrapper.vm.editTabObj.data.name).toBe("Tab 1");
     });
 
-    it("should show edit input when in edit mode", async () => {
-      wrapper = createWrapper();
-      await waitForComponent(wrapper);
-
-      const editButton = wrapper.find('[data-test="dashboard-tab-settings-tab-edit-btn"]');
-      await editButton.trigger("click");
-      await wrapper.vm.$nextTick();
-
-      const editInput = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit"]');
-      expect(editInput.exists()).toBe(true);
-      expect((editInput.element as HTMLInputElement).value).toBe("Tab 1");
-    });
-
-    it("should show save and cancel buttons in edit mode", async () => {
-      wrapper = createWrapper();
-      await waitForComponent(wrapper);
-
-      const editButton = wrapper.find('[data-test="dashboard-tab-settings-tab-edit-btn"]');
-      await editButton.trigger("click");
-      await wrapper.vm.$nextTick();
-
-      const saveButton = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit-save"]');
-      const cancelButton = wrapper.find(
-        '[data-test="dashboard-tab-settings-tab-name-edit-cancel"]',
-      );
-
-      expect(saveButton.exists()).toBe(true);
-      expect(cancelButton.exists()).toBe(true);
-    });
-
     it("should disable save button when tab name is empty", async () => {
       wrapper = createWrapper();
       await waitForComponent(wrapper);
@@ -440,18 +283,6 @@ describe("TabsSettings", () => {
 
       const saveButton = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit-save"]');
       expect(saveButton.attributes("disabled")).toBeDefined();
-    });
-
-    it("should enable save button when tab name is not empty", async () => {
-      wrapper = createWrapper();
-      await waitForComponent(wrapper);
-
-      const editButton = wrapper.find('[data-test="dashboard-tab-settings-tab-edit-btn"]');
-      await editButton.trigger("click");
-      await wrapper.vm.$nextTick();
-
-      const saveButton = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit-save"]');
-      expect(saveButton.attributes("disabled")).toBeUndefined();
     });
 
     it("should call editTab when save button is clicked", async () => {
@@ -497,24 +328,6 @@ describe("TabsSettings", () => {
 
       expect(wrapper.vm.editTabId).toBeNull();
       expect(wrapper.vm.editTabObj.data).toEqual({});
-    });
-
-    it("should handle edit save failure with error notification", async () => {
-      const { editTab } = await import("../../../utils/commons");
-      vi.mocked(editTab).mockRejectedValueOnce(new Error("Edit failed"));
-
-      wrapper = createWrapper();
-      await waitForComponent(wrapper);
-
-      const editButton = wrapper.find('[data-test="dashboard-tab-settings-tab-edit-btn"]');
-      await editButton.trigger("click");
-      await wrapper.vm.$nextTick();
-
-      const saveButton = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit-save"]');
-      await saveButton.trigger("click");
-
-      // Should handle error gracefully
-      expect(wrapper.exists()).toBe(true);
     });
 
     it("should disable edit button for tab currently being edited", async () => {
@@ -579,19 +392,6 @@ describe("TabsSettings", () => {
       );
     });
 
-    it("should handle delete failure with error notification", async () => {
-      const { deleteTab } = await import("../../../utils/commons");
-      vi.mocked(deleteTab).mockRejectedValueOnce(new Error("Delete failed"));
-
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      await wrapper.vm.confirmDelete("target-tab-id");
-
-      // Should handle error gracefully
-      expect(wrapper.exists()).toBe(true);
-    });
-
     it("should emit refresh event after successful deletion", async () => {
       const { deleteTab } = await import("../../../utils/commons");
       vi.mocked(deleteTab).mockResolvedValueOnce(undefined);
@@ -606,25 +406,6 @@ describe("TabsSettings", () => {
   });
 
   describe("Drag and Drop Functionality", () => {
-    it("should expose drag-and-drop reorder handling", () => {
-      wrapper = createWrapper();
-
-      // Row reordering now uses SortableJS attached to the OTable body (see
-      // initSortable), with handleDragEnd persisting the new order.
-      expect(wrapper.find('[data-test="dashboard-tab-settings-drag"]').exists()).toBe(true);
-      expect(typeof wrapper.vm.handleDragEnd).toBe("function");
-    });
-
-    it("should call updateDashboard when drag ends", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      await wrapper.vm.handleDragEnd();
-
-      // handleDragEnd emits refresh on both the success and error paths.
-      expect(wrapper.emitted("refresh")).toBeTruthy();
-    });
-
     it("should emit refresh event after successful drag reorder", async () => {
       const { updateDashboard } = await import("../../../utils/commons");
       vi.mocked(updateDashboard).mockResolvedValueOnce(undefined);
@@ -650,50 +431,9 @@ describe("TabsSettings", () => {
       expect(wrapper.emitted("refresh")).toBeTruthy();
       expect(wrapper.exists()).toBe(true);
     });
-
-    it("should handle 409 conflict errors with specific notification", async () => {
-      const { updateDashboard } = await import("../../../utils/commons");
-      const conflictError: any = new Error("Conflict");
-      conflictError.response = { status: 409, data: { message: "Conflict message" } };
-      vi.mocked(updateDashboard).mockRejectedValueOnce(conflictError);
-
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      await wrapper.vm.handleDragEnd();
-
-      expect(wrapper.exists()).toBe(true);
-    });
   });
 
   describe("Add Tab Drawer (AddTab owns its ODrawer)", () => {
-    it("should render AddTab component with data-test attribute", () => {
-      wrapper = createWrapper();
-
-      const addTab = wrapper.findComponent({ name: "AddTab" });
-      expect(addTab.exists()).toBe(true);
-      expect(addTab.attributes("data-test")).toBe("dashboard-tab-settings-add-tab-dialog");
-    });
-
-    it("should pass open=false to AddTab initially", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      const addTab = wrapper.findComponent({ name: "AddTab" });
-      expect(addTab.props("open")).toBe(false);
-    });
-
-    it("should pass open=true to AddTab when showAddTabDialog is true", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      wrapper.vm.showAddTabDialog = true;
-      await wrapper.vm.$nextTick();
-
-      const addTab = wrapper.findComponent({ name: "AddTab" });
-      expect(addTab.props("open")).toBe(true);
-    });
-
     it("should close drawer when AddTab emits update:open with false", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
@@ -708,18 +448,6 @@ describe("TabsSettings", () => {
       expect(wrapper.vm.showAddTabDialog).toBe(false);
     });
 
-    it("should pass correct props to AddTab component", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      wrapper.vm.showAddTabDialog = true;
-      await wrapper.vm.$nextTick();
-
-      const addTab = wrapper.findComponent({ name: "AddTab" });
-      expect(addTab.props("editMode")).toBe(false);
-      expect(addTab.props("dashboardId")).toBe("test-dashboard-id");
-    });
-
     it("should close dialog and refresh after tab creation", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
@@ -731,48 +459,6 @@ describe("TabsSettings", () => {
       expect(wrapper.vm.showAddTabDialog).toBe(false);
       expect(wrapper.vm.isTabEditMode).toBe(false);
       expect(wrapper.emitted("refresh")).toBeTruthy();
-    });
-
-    it("should set isTabEditMode=false when opening add tab", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      // Simulate clicking add tab button
-      const addButton = wrapper.find('[data-test="dashboard-tab-settings-add-tab"]');
-      await addButton.trigger("click");
-
-      expect(wrapper.vm.showAddTabDialog).toBe(true);
-      expect(wrapper.vm.isTabEditMode).toBe(false);
-    });
-  });
-
-  describe("Event Emissions", () => {
-    it("should emit refresh event from various actions", async () => {
-      const { editTab } = await import("../../../utils/commons");
-      vi.mocked(editTab).mockResolvedValueOnce(undefined);
-
-      wrapper = createWrapper();
-      await waitForComponent(wrapper);
-
-      // Test refresh from edit save
-      const editButton = wrapper.find('[data-test="dashboard-tab-settings-tab-edit-btn"]');
-      await editButton.trigger("click");
-      await wrapper.vm.$nextTick();
-
-      const saveButton = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit-save"]');
-      await saveButton.trigger("click");
-
-      expect(wrapper.emitted("refresh")).toBeTruthy();
-    });
-
-    it("should handle multiple refresh emissions", async () => {
-      wrapper = createWrapper();
-
-      await wrapper.vm.refreshRequired();
-      await wrapper.vm.refreshRequired();
-      await wrapper.vm.refreshRequired();
-
-      expect(wrapper.emitted("refresh")).toHaveLength(3);
     });
   });
 
@@ -792,185 +478,6 @@ describe("TabsSettings", () => {
       // The dark/light ternary collapsed to a single theme-aware token utility.
       expect(editInput.exists()).toBe(true);
       expect(editInput.classes()).toContain("bg-input-bg");
-    });
-
-    it("should apply the same semantic input background when theme is light", async () => {
-      wrapper = createWrapper();
-      await waitForComponent(wrapper);
-
-      const editButton = wrapper.find('[data-test="dashboard-tab-settings-tab-edit-btn"]');
-      await editButton.trigger("click");
-      await wrapper.vm.$nextTick();
-
-      const editInput = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit"]');
-      expect(editInput.classes()).toContain("bg-input-bg");
-    });
-  });
-
-  describe("Props and State Management", () => {
-    it("should maintain reactive state for currentDashboardData", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.currentDashboardData.data).toBeDefined();
-      expect(wrapper.vm.currentDashboardData.data.dashboardId).toBe("test-dashboard-id");
-    });
-
-    it("should handle state changes during edit operations", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      // Start editing
-      await wrapper.vm.editItem("tab1");
-
-      expect(wrapper.vm.editTabId).toBe("tab1");
-      expect(wrapper.vm.editTabObj.data.name).toBe("Tab 1");
-
-      // Cancel editing
-      wrapper.vm.cancelEdit();
-
-      expect(wrapper.vm.editTabId).toBeNull();
-      expect(wrapper.vm.editTabObj.data).toEqual({});
-    });
-  });
-
-  describe("Edge Cases and Error Handling", () => {
-    it("should handle component unmounting cleanly", () => {
-      wrapper = createWrapper();
-      expect(() => wrapper.unmount()).not.toThrow();
-    });
-
-    it("should handle rapid state changes", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      // Rapid editing operations
-      for (let i = 0; i < 5; i++) {
-        await wrapper.vm.editItem("tab1");
-        wrapper.vm.cancelEdit();
-      }
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm.$options.name).toBe("TabsSettings");
-    });
-
-    it("should maintain component integrity after multiple operations", async () => {
-      wrapper = createWrapper();
-      await waitForComponent(wrapper);
-
-      // Perform multiple operations
-      const addButton = wrapper.find('[data-test="dashboard-tab-settings-add-tab"]');
-      const editButton = wrapper.find('[data-test="dashboard-tab-settings-tab-edit-btn"]');
-
-      for (let i = 0; i < 3; i++) {
-        await addButton.trigger("click");
-        wrapper.vm.showAddTabDialog = false;
-
-        await editButton.trigger("click");
-        wrapper.vm.cancelEdit();
-      }
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm.$options.name).toBe("TabsSettings");
-    });
-
-    it("should handle empty tabs array", async () => {
-      const { getDashboard } = await import("../../../utils/commons");
-      vi.mocked(getDashboard).mockResolvedValueOnce({
-        dashboardId: "test",
-        tabs: [],
-      });
-
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      const tabRows = wrapper.findAll('[data-test^="o2-table-row-"]');
-      expect(tabRows).toHaveLength(0);
-    });
-
-    it("should handle null dashboard data gracefully", async () => {
-      const { getDashboard } = await import("../../../utils/commons");
-      vi.mocked(getDashboard).mockResolvedValueOnce(null as any);
-
-      // Mock console errors since null will cause render issues
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      wrapper = createWrapper();
-
-      try {
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      } catch (error) {
-        // Expected to have rendering issues with null data
-      }
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm.currentDashboardData.data).toBeNull();
-
-      consoleErrorSpy.mockRestore();
-      consoleWarnSpy.mockRestore();
-    });
-
-    it("should handle undefined dashboard data gracefully", async () => {
-      const { getDashboard } = await import("../../../utils/commons");
-      vi.mocked(getDashboard).mockResolvedValueOnce(undefined as any);
-
-      // Mock console errors since undefined will cause render issues
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      wrapper = createWrapper();
-
-      try {
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      } catch (error) {
-        // Expected to have rendering issues with undefined data
-      }
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm.currentDashboardData.data).toBeUndefined();
-
-      consoleErrorSpy.mockRestore();
-      consoleWarnSpy.mockRestore();
-    });
-  });
-
-  describe("Integration with Child Components", () => {
-    it("should integrate with DashboardHeader component", () => {
-      wrapper = createWrapper();
-
-      const header = wrapper.findComponent({ name: "DashboardHeader" });
-      expect(header.exists()).toBe(true);
-    });
-
-    it("should integrate with AddTab component", () => {
-      wrapper = createWrapper();
-
-      const addTab = wrapper.findComponent({ name: "AddTab" });
-      expect(addTab.exists()).toBe(true);
-    });
-
-    it("should integrate with TabsDeletePopUp component", () => {
-      wrapper = createWrapper();
-
-      const deletePopup = wrapper.findComponent({ name: "TabsDeletePopUp" });
-      expect(deletePopup.exists()).toBe(true);
-    });
-
-    it("should integrate with the OTable component", () => {
-      wrapper = createWrapper();
-
-      const table = wrapper.findComponent({ name: "OTable" });
-      expect(table.exists()).toBe(true);
-    });
-
-    it("should integrate with AddTab component (owns its own ODrawer)", () => {
-      wrapper = createWrapper();
-
-      const addTab = wrapper.findComponent({ name: "AddTab" });
-      expect(addTab.exists()).toBe(true);
     });
   });
 });

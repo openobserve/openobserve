@@ -29,6 +29,19 @@ export const destinationKeys = {
   all: (org: string) => orgKey(org, "alerts", "destinations"),
   // includeUsage rides the key: a picker fetch (false) and the dependency page's
   // fetch (true) return different shapes, so they must never share a cache entry.
-  list: (org: string, module?: DestinationModule, includeUsage?: boolean) =>
-    orgKey(org, "alerts", "destinations", module ?? "all", includeUsage ? "with-usage" : "plain"),
+  // excludeTypes rides the key only when set, so every unfiltered key stays as it was.
+  list: (
+    org: string,
+    module?: DestinationModule,
+    includeUsage?: boolean,
+    excludeTypes?: readonly string[],
+  ) =>
+    orgKey(
+      org,
+      "alerts",
+      "destinations",
+      module ?? "all",
+      includeUsage ? "with-usage" : "plain",
+      ...(excludeTypes?.length ? [{ excludeTypes }] : []),
+    ),
 };

@@ -956,6 +956,7 @@ pub async fn delete_synthetic(
     request_body(content = BulkDeleteSyntheticsRequestBody, description = "IDs to delete", content_type = "application/json"),
     responses(
         (status = 200, description = "Deleted"),
+        (status = 403, description = "Forbidden"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
 )]
@@ -966,6 +967,31 @@ pub async fn delete_synthetics_bulk(
     #[cfg(not(feature = "enterprise"))] Headers(_user_email): Headers<UserEmail>,
     Json(body): Json<BulkDeleteSyntheticsRequestBody>,
 ) -> Response {
+    // The route gate checks only `?folder=`, so check each id against its stored folder.
+    #[cfg(feature = "enterprise")]
+    for id in &body.ids {
+        let folder = match openobserve_synthetics::service::folder_of(&org_id, id).await {
+            Ok(Some(folder)) => folder,
+            Ok(None) => return MetaHttpResponse::forbidden("Forbidden"),
+            Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
+        };
+        if !check_permissions(
+            id,
+            &org_id,
+            &user_email.user_id,
+            "synthetics",
+            "DELETE",
+            Some(&folder),
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+    }
+
     #[cfg(feature = "enterprise")]
     let user_id = user_email.user_id.as_str();
     #[cfg(not(feature = "enterprise"))]

@@ -430,7 +430,7 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(routes.length).toBe(22);
     });
 
-    // On-call is configured before any data flows, so the empty-data gate must not block it.
+    // On-call and Fleet are set up before any data flows, so the empty-data gate must not block them.
     it.each([
       "onCallResponses",
       "onCallResponseDetail",
@@ -439,6 +439,8 @@ describe("useEnterpriseRoutes.ts", () => {
       "onCallTeamDetail",
       "onCallPolicies",
       "onCallRouting",
+      "fleet",
+      "fleetConfigEditor",
     ])("should flag the %s route as allowOnEmptyData", (name) => {
       const routes = useEnterpriseRoutes();
       const route = routes.find((r: any) => r.name === name);

@@ -365,8 +365,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { useQuery } from "@tanstack/vue-query";
-import { incidentsQuery } from "@/services/incidents.queries";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { incidentsQuery, updateIncidentStatusMutation } from "@/services/incidents.queries";
+import { incidentRefusalToast, incidentStatusToast } from "@/utils/alerts/ackState";
+import type { AckAlertResponse, UnackAlertResponse } from "@/ts/interfaces/alert";
 import {
   defineComponent,
   ref,
@@ -381,7 +383,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
-import incidentsService, { type Incident } from "@/services/incidents";
+import { type Incident } from "@/services/incidents";
 import IncidentAiAnalysisCell from "@/components/alerts/IncidentAiAnalysisCell.vue";
 import { isLiveRca } from "@/utils/incidents/rcaCell";
 import { useListViewState } from "@/composables/useListViewState";
@@ -878,25 +880,41 @@ export default defineComponent({
       filterByStatus("active");
     };
 
+    // The mutation drops the alert, incident and on-call reads the one ack wrote.
+    const statusWrite = useMutation(() =>
+      updateIncidentStatusMutation(store.state.selectedOrganization.identifier),
+    );
     const updateStatus = async (
       incident: Incident,
       newStatus: "open" | "acknowledged" | "resolved",
     ) => {
       try {
-        const org = store.state.selectedOrganization.identifier;
-        await incidentsService.updateStatus(org, incident.id, newStatus);
-        toast({
-          variant: "success",
-          message: t("alerts.incidents.statusUpdated"),
+        const res = await statusWrite.mutateAsync({
+          id: incident.id,
+          status: newStatus,
+          from: incident.status,
         });
+        // Only the one ack's routes answer with what they did.
+        const { ack } = res as { ack?: AckAlertResponse | UnackAlertResponse };
+        toast(
+          incidentStatusToast(
+            newStatus,
+            ack,
+            incident.title || incident.id,
+            store.state.userInfo?.email,
+            t,
+          ) ?? { variant: "success", message: t("alerts.incidents.statusUpdated") },
+        );
         // Post-write reload: must reach the server.
         loadIncidents(true);
         store.dispatch("incidents/setShouldRefresh", true);
       } catch (error: any) {
-        toast({
-          variant: "error",
-          message: t("alerts.incidents.statusUpdateFailed"),
-        });
+        toast(
+          incidentRefusalToast(error, newStatus, t) ?? {
+            variant: "error",
+            message: t("alerts.incidents.statusUpdateFailed"),
+          },
+        );
         console.error("Failed to update incident status:", error);
       }
     };

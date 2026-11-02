@@ -42,14 +42,18 @@ use crate::common::{
 };
 
 /// Columns a stream gains only once a row carried them, so [history_columns] adds each one present.
-const OPTIONAL_HISTORY_COLUMNS: [&str; 6] = [
+const OPTIONAL_HISTORY_COLUMNS: [&str; 7] = [
     "downtime_id",
     "acked_by",
     "ack_action",
     "ack_source",
     "taken_over_from",
     "repeat_suppressed",
+    "success_response",
 ];
+
+/// A webhook can answer with a body of any size, and the list returns up to 1000 rows.
+const SUCCESS_RESPONSE_MAX_CHARS: usize = 500;
 
 /// Every column the data query reads but [OPTIONAL_HISTORY_COLUMNS].
 const HISTORY_COLUMNS: &str = "_timestamp, org, key, status, level, actual_value, \
@@ -180,6 +184,7 @@ pub struct AlertHistoryResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("alert_id" = Option<String>, Query, description = "Filter by specific alert id"),
+        ("anomaly_id" = Option<String>, Query, description = "Return history for this anomaly detection config"),
         ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds"),
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds"),
         ("from" = Option<i64>, Query, description = "Pagination offset (default: 0)"),
@@ -191,6 +196,7 @@ pub struct AlertHistoryResponse {
         (status = 200, description = "Success", content_type = "application/json", body = inline(AlertHistoryResponse)),
         (status = 400, description = "Bad Request", content_type = "application/json"),
         (status = 403, description = "Forbidden", content_type = "application/json"),
+        (status = 404, description = "Alert or anomaly config not found", content_type = "application/json"),
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
 )]
@@ -220,8 +226,10 @@ pub async fn get_alert_history(
             Some(&user_email.user_id),
         )
         .await;
-        if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
-            start_time = end_time - max_query_range * 3600 * 1_000_000;
+        if let Some(clamped) =
+            config::utils::query_range::clamp_start_time(start_time, end_time, max_query_range)
+        {
+            start_time = clamped;
             log::warn!(
                 "Start time for alert History api for org {org_id} updated as per max query range set for triggers stream"
             )
@@ -278,6 +286,46 @@ pub async fn get_alert_history(
     // The anomaly_count is stored in success_response as {"anomalies_found": N}.
     // Result is derived: "anomaly" when count > 0, "normal" when 0, "failed"/"skipped" on error.
     if let Some(ref anomaly_id) = query.anomaly_id {
+        // The route is bypass:true and this branch returns before the RBAC block below.
+        #[cfg(feature = "enterprise")]
+        {
+            let conn = infra::db::get_orm_client_ro().await;
+            let folder_pk =
+                match infra::table::anomaly_detection::config::get_by_id(conn, &org_id, anomaly_id)
+                    .await
+                {
+                    Ok(Some(cfg)) => cfg.folder_id,
+                    Ok(None) => {
+                        return MetaHttpResponse::not_found(format!(
+                            "Anomaly config '{anomaly_id}' not found"
+                        ));
+                    }
+                    Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
+                };
+            // Fail closed: never fall back to the default folder on a failed folder read.
+            let Ok(Some(folder_id)) = infra::table::folders::get_name_by_pk(&folder_pk).await
+            else {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            };
+            if !openobserve_core::auth::check_permissions(
+                anomaly_id,
+                &org_id,
+                &user_email.user_id,
+                "alerts",
+                "GET",
+                Some(&folder_id),
+                false,
+                true,
+                false,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden(format!(
+                    "Access denied to anomaly config '{anomaly_id}'"
+                ));
+            }
+        }
+
         let escaped_id = escape_like(anomaly_id);
         let where_clause = format!(
             "module = 'anomaly_detection' AND key LIKE '%/{escaped_id}' \
@@ -811,7 +859,7 @@ pub async fn get_alert_history(
             success_response: hit
                 .get("success_response")
                 .and_then(|v| v.as_str())
-                .map(String::from),
+                .map(capped_success_response),
             is_partial: hit.get("is_partial").and_then(|v| v.as_bool()),
             delay_in_secs: hit.get("delay_in_secs").and_then(|v| v.as_i64()),
             evaluation_took_in_secs: hit.get("evaluation_took_in_secs").and_then(|v| v.as_f64()),
@@ -957,6 +1005,10 @@ fn history_columns(schema: &Schema) -> String {
         }
     }
     columns
+}
+
+fn capped_success_response(text: &str) -> String {
+    text.chars().take(SUCCESS_RESPONSE_MAX_CHARS).collect()
 }
 
 /// A non-empty text column of a history hit.
@@ -1851,5 +1903,32 @@ mod tests {
         assert!(!history_columns(&Schema::new(fields.clone())).contains("repeat_suppressed"));
         fields.push(Field::new("repeat_suppressed", DataType::Boolean, true));
         assert!(history_columns(&Schema::new(fields)).ends_with(", repeat_suppressed"));
+    }
+
+    #[test]
+    fn a_long_send_result_is_capped_in_the_list() {
+        let sent = "destination ops-jira created OPS-141;";
+        assert_eq!(capped_success_response(sent), sent);
+        let body = format!(
+            "destination hook sent status: 200 OK, body: {}",
+            "é".repeat(5_000)
+        );
+        let capped = capped_success_response(&body);
+        assert_eq!(capped.chars().count(), SUCCESS_RESPONSE_MAX_CHARS);
+        assert!(body.starts_with(&capped));
+    }
+
+    #[test]
+    fn the_destination_send_result_is_read_once_the_stream_has_it() {
+        use arrow_schema::{DataType, Field};
+
+        let field = |name: &str| Field::new(name, DataType::Utf8, true);
+        let mut fields: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        assert!(!history_columns(&Schema::new(fields.clone())).contains("success_response"));
+        fields.push(field("success_response"));
+        assert!(
+            history_columns(&Schema::new(fields)).ends_with(", success_response"),
+            "a sent row such as `destination ops-jira created OPS-141;` must reach the history"
+        );
     }
 }

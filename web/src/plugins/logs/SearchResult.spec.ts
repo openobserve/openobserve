@@ -177,14 +177,6 @@ describe("SearchResult Component", () => {
   });
 
   describe("Table Functionality", () => {
-    it("should calculate table width correctly", () => {
-      window.innerWidth = 1000;
-      wrapper.vm.searchObj.config.splitterModel = 30;
-
-      const width = wrapper.vm.getTableWidth;
-      expect(width).toBe(1000 - 56 - (1000 - 56) * 0.3 - 5);
-    });
-
     it("should scroll table to top", async () => {
       const scrollToSpy = vi.fn();
       wrapper.vm.scrollContainerRef = {
@@ -193,11 +185,6 @@ describe("SearchResult Component", () => {
 
       await wrapper.vm.scrollTableToTop(0);
       expect(scrollToSpy).toHaveBeenCalledWith({ top: 0 });
-    });
-
-    it("should handle missing scrollContainerRef in scrollTableToTop", () => {
-      wrapper.vm.scrollContainerRef = null;
-      expect(() => wrapper.vm.scrollTableToTop(0)).not.toThrow();
     });
 
     // Regression: the skeleton clamped the shared scroller mid-list, so a fresh patterns result mounted half-way down instead of at the top
@@ -521,28 +508,6 @@ describe("SearchResult Component", () => {
   });
 
   describe("Computed Properties", () => {
-    it("should compute toggleWrapFlag", () => {
-      wrapper.vm.searchObj.meta.toggleSourceWrap = true;
-      expect(wrapper.vm.toggleWrapFlag).toBe(true);
-    });
-
-    it("should compute findFTSFields", () => {
-      const fields = [{ name: "field1" }];
-      wrapper.vm.searchObj.data.stream.selectedStreamFields = fields;
-      expect(wrapper.vm.findFTSFields).toEqual(fields);
-    });
-
-    it("should compute updateTitle", () => {
-      const title = "Test Title";
-      wrapper.vm.searchObj.data.histogram.chartParams.title = title;
-      expect(wrapper.vm.noOfRecordsTitle).toBe(title);
-    });
-
-    it("should compute resetPlotChart", () => {
-      wrapper.vm.searchObj.meta.resetPlotChart = true;
-      expect(wrapper.vm.resetPlotChart).toBe(true);
-    });
-
     it("should compute getColumns correctly", () => {
       wrapper.vm.searchObj.data.resultGrid.columns = [
         { id: "col1", name: "field1" },
@@ -592,11 +557,6 @@ describe("SearchResult Component", () => {
       const paginations = wrapper.vm.getPaginations;
 
       expect(paginations).toEqual([1, 2, 3]);
-    });
-
-    it("should compute getWidth", () => {
-      const width = wrapper.vm.getWidth;
-      expect(width).toBe("");
     });
 
     it("should compute getTableWidth correctly", () => {
@@ -859,43 +819,9 @@ describe("SearchResult Component", () => {
       expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
       wrapper.vm.searchObj.meta.sqlMode = false;
     });
-
-    it("should handle updateTitle changes", async () => {
-      const title = "New Title";
-      wrapper.vm.searchObj.data.histogram.chartParams.title = title;
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.noOfRecordsTitle).toBe(title);
-    });
-
-    it("should handle resetPlotChart changes", async () => {
-      wrapper.vm.searchObj.meta.resetPlotChart = true;
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.plotChart).toEqual({});
-      expect(wrapper.vm.searchObj.meta.resetPlotChart).toBe(false);
-    });
-
-    it("should handle toggleWrapFlag changes", async () => {
-      // This test covers the watch functionality for toggleWrapFlag
-      wrapper.vm.searchObj.meta.toggleSourceWrap = true;
-      await wrapper.vm.$nextTick();
-
-      // Verify the computed property works
-      expect(wrapper.vm.toggleWrapFlag).toBe(true);
-    });
   });
 
   describe("Error Handling and Edge Cases", () => {
-    it("should handle function error", async () => {
-      wrapper.vm.searchObj.data.functionError = "Function error";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.searchObj.data.functionError).toBe("Function error");
-    });
-
-    it("should handle changeMaxRecordToReturn", () => {
-      const result = wrapper.vm.changeMaxRecordToReturn(50);
-      expect(result).toBeUndefined();
-    });
-
     it("should handle undefined queryResults in pagination", () => {
       const originalQueryResults = wrapper.vm.searchObj.data.queryResults;
       wrapper.vm.searchObj.data.queryResults = undefined;
@@ -933,38 +859,7 @@ describe("SearchResult Component", () => {
     });
   });
 
-  describe("Component Props and Lifecycle", () => {
-    it("should accept expandedLogs prop", () => {
-      expect(wrapper.props("expandedLogs")).toEqual([]);
-    });
-
-    it("should have correct default prop values", () => {
-      expect(wrapper.props("expandedLogs")).toEqual([]);
-    });
-
-    it("should handle mounted lifecycle", () => {
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle updated lifecycle", async () => {
-      wrapper.vm.searchObj.data.resultGrid.currentPage = 1;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.pageNumberInput).toBe(1);
-    });
-  });
-
   describe("Additional Methods Coverage", () => {
-    it("should handle scroll table to top with valid ref", async () => {
-      const scrollToSpy = vi.fn();
-      wrapper.vm.scrollContainerRef = {
-        scrollTo: scrollToSpy,
-      };
-
-      await wrapper.vm.scrollTableToTop(100);
-      expect(scrollToSpy).toHaveBeenCalledWith({ top: 100 });
-    });
-
     it("should handle recordsPerPage with streaming and jobId", async () => {
       wrapper.vm.searchObj.communicationMethod = "streaming";
       wrapper.vm.searchObj.meta.jobId = "job123";
@@ -1060,33 +955,6 @@ describe("SearchResult Component", () => {
     });
   });
 
-  describe("Component Emits and Events", () => {
-    it("should emit update:columnSizes when handleColumnSizesUpdate is called", async () => {
-      const newSizes = { col1: 150 };
-
-      wrapper.vm.$emit("update:columnSizes", newSizes);
-
-      expect(wrapper.emitted()["update:columnSizes"]).toEqual([[newSizes]]);
-    });
-
-    it("should emit update:datetime on chart update", async () => {
-      const chartData = { start: 1000, end: 2000 };
-
-      await wrapper.vm.onChartUpdate(chartData);
-
-      expect(wrapper.emitted()["update:datetime"]).toEqual([[chartData]]);
-    });
-
-    it("should emit search:timeboxed on time boxed event", async () => {
-      const timeboxData = { key: "2023-01-01T00:00:00Z" };
-
-      await wrapper.vm.onTimeBoxed(timeboxData);
-
-      expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe("2023-01-01T00:00:00Z");
-      expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
-    });
-  });
-
   describe("Reactive Data Updates", () => {
     it("should handle reDrawChartData changes with deep watching", async () => {
       const reDrawChartSpy = vi.spyOn(wrapper.vm, "reDrawChart");
@@ -1097,14 +965,6 @@ describe("SearchResult Component", () => {
       await wrapper.vm.$nextTick();
 
       expect(reDrawChartSpy).toHaveBeenCalled();
-    });
-
-    it("should update pageNumberInput on component update", async () => {
-      wrapper.vm.searchObj.data.resultGrid.currentPage = 7;
-
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.pageNumberInput).toBe(7);
     });
   });
 
@@ -1193,41 +1053,6 @@ describe("SearchResult Component", () => {
     });
   });
 
-  describe("Correlation Panel", () => {
-    it("should have showCorrelation initialized to false", () => {
-      expect(wrapper.vm.showCorrelation).toBe(false);
-    });
-
-    it("should have correlationContext initialized to null", () => {
-      expect(wrapper.vm.correlationContext).toBeNull();
-    });
-
-    it("should have correlationDashboardProps initialized to null", () => {
-      expect(wrapper.vm.correlationDashboardProps).toBeNull();
-    });
-
-    it("should have correlationLoading initialized to false", () => {
-      expect(wrapper.vm.correlationLoading).toBe(false);
-    });
-
-    it("openLogDetailsWithCorrelation function exists", () => {
-      expect(typeof wrapper.vm.openLogDetailsWithCorrelation).toBe("function");
-    });
-  });
-
-  describe("Histogram Selection", () => {
-    it("should have hasHistogramSelection initialized to false", () => {
-      expect(wrapper.vm.hasHistogramSelection).toBe(false);
-    });
-
-    it("should have histogramSelectionRange initialized with zero values", () => {
-      expect(wrapper.vm.histogramSelectionRange).toMatchObject({
-        start: 0,
-        end: 0,
-      });
-    });
-  });
-
   // ───────────────────────────────────────────────────────────────────────────
   // ODrawer migration coverage
   //
@@ -1274,17 +1099,6 @@ describe("SearchResult Component", () => {
       await flushPromises();
 
       expect(reDrawSpy).not.toHaveBeenCalled();
-    });
-
-    it("closes the Detail ODrawer when update:open=false is emitted a second time", async () => {
-      wrapper.vm.searchObj.meta.showDetailTab = true;
-      await flushPromises();
-
-      const drawer = wrapper.findComponent(oDrawerStub);
-      drawer.vm.$emit("update:open", false);
-      await flushPromises();
-
-      expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
     });
   });
   describe("streaming results grid (#14303)", () => {

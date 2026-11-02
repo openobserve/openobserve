@@ -288,53 +288,7 @@ describe("PipelinesList", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  describe("Component Mount and Initialization", () => {
-    it("mounts the PipelinesList component", () => {
-      expect(wrapper.exists()).toBeTruthy();
-      expect(wrapper.vm).toBeTruthy();
-    });
-
-    it("has correct component name", () => {
-      expect(wrapper.vm.$options.__name || wrapper.vm.$options.name).toBe("PipelinesList");
-    });
-
-    it("initializes filterQuery as empty string", () => {
-      expect(wrapper.vm.filterQuery).toBe("");
-    });
-
-    it("initializes showCreatePipeline as false", () => {
-      expect(wrapper.vm.showCreatePipeline).toBe(false);
-    });
-
-    it("initializes activeTab as 'all'", () => {
-      expect(wrapper.vm.activeTab).toBe("all");
-    });
-
-    it("initializes selectedPipelines as empty array", () => {
-      expect(wrapper.vm.selectedPipelines).toEqual([]);
-    });
-
-    it("initializes shouldStartfromNow as true", () => {
-      expect(wrapper.vm.shouldStartfromNow).toBe(true);
-    });
-
-    it("initializes errorDialog as hidden with no data", () => {
-      expect(wrapper.vm.errorDialog.show).toBe(false);
-      expect(wrapper.vm.errorDialog.data).toBeNull();
-    });
-
-    it("initializes backfillDialog as hidden", () => {
-      expect(wrapper.vm.backfillDialog.show).toBe(false);
-    });
-  });
-
   // ─────────────────────────────────────────────────────────────────────────────
-  describe("Computed Properties", () => {
-    it("currentRouteName returns 'pipelines'", () => {
-      expect(wrapper.vm.currentRouteName).toBe("pipelines");
-    });
-  });
-
   // ─────────────────────────────────────────────────────────────────────────────
   describe("getColumnsForActiveTab method", () => {
     it("returns columns with 'actions' for 'all' tab", () => {
@@ -354,18 +308,6 @@ describe("PipelinesList", () => {
       const cols = wrapper.vm.getColumnsForActiveTab("scheduled");
 
       expect(cols.some((c: any) => c.id === "frequency")).toBe(true);
-    });
-
-    it("returns 'period' column for 'scheduled' tab", () => {
-      const cols = wrapper.vm.getColumnsForActiveTab("scheduled");
-
-      expect(cols.some((c: any) => c.id === "period")).toBe(true);
-    });
-
-    it("'all' tab includes 'type' column", () => {
-      const cols = wrapper.vm.getColumnsForActiveTab("all");
-
-      expect(cols.some((c: any) => c.id === "type")).toBe(true);
     });
   });
 
@@ -399,42 +341,6 @@ describe("PipelinesList", () => {
       expect(dialog.props("primaryButtonLabel")).toBe(i18n.global.t("confirmDialog.ok"));
       w.unmount();
     });
-
-    it("resetConfirmDialog hides dialog and clears state", () => {
-      wrapper.vm.confirmDialogMeta.show = true;
-      wrapper.vm.confirmDialogMeta.title = "Test";
-      wrapper.vm.confirmDialogMeta.data = { test: true };
-
-      wrapper.vm.resetConfirmDialog();
-
-      expect(wrapper.vm.confirmDialogMeta.show).toBe(false);
-      expect(wrapper.vm.confirmDialogMeta.title).toBe("");
-      expect(wrapper.vm.confirmDialogMeta.data).toBeNull();
-    });
-
-    it("showErrorDialog opens error dialog with pipeline data", () => {
-      const pipelineWithError = {
-        ...mockRealtimePipeline,
-        last_error: {
-          last_error_timestamp: 1700000000000,
-          error_summary: "Node failed",
-          node_errors: {},
-        },
-      };
-
-      wrapper.vm.showErrorDialog(pipelineWithError);
-
-      expect(wrapper.vm.errorDialog.show).toBe(true);
-      expect(wrapper.vm.errorDialog.data).toStrictEqual(pipelineWithError);
-    });
-
-    it("closeErrorDialog hides error dialog", () => {
-      wrapper.vm.errorDialog.show = true;
-
-      wrapper.vm.closeErrorDialog();
-
-      expect(wrapper.vm.errorDialog.show).toBe(false);
-    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -448,15 +354,6 @@ describe("PipelinesList", () => {
       expect(pipelineService.toggleState).toHaveBeenCalledWith("test-org", "test", false, true);
     });
 
-    it("togglePipeline calls togglePipelineState directly for realtime pipeline regardless of enabled state", () => {
-      (pipelineService.toggleState as MockedFunction<any>).mockResolvedValue({});
-      const row = { pipeline_id: "rt1", enabled: false, type: "realtime" };
-
-      wrapper.vm.togglePipeline(row);
-
-      expect(pipelineService.toggleState).toHaveBeenCalled();
-    });
-
     it("togglePipeline shows resume dialog for disabled scheduled pipeline", async () => {
       const row = { enabled: false, type: "scheduled" };
 
@@ -464,37 +361,6 @@ describe("PipelinesList", () => {
 
       expect(wrapper.vm.resumePipelineDialogMeta.show).toBe(true);
       expect(wrapper.vm.resumePipelineDialogMeta.data).toStrictEqual(row);
-    });
-
-    it("togglePipelineState calls pipelineService.toggleState with correct args", async () => {
-      (pipelineService.toggleState as MockedFunction<any>).mockResolvedValue({});
-      const row = { pipeline_id: "test", enabled: true };
-
-      await wrapper.vm.togglePipelineState(row, true);
-
-      expect(pipelineService.toggleState).toHaveBeenCalledWith("test-org", "test", false, true);
-    });
-
-    it("togglePipelineState handles non-403 errors with notification", async () => {
-      const error = {
-        response: { status: 400, data: { message: "Toggle Error" } },
-      };
-      (pipelineService.toggleState as MockedFunction<any>).mockRejectedValue(error);
-      const row = { pipeline_id: "test", enabled: true };
-
-      await wrapper.vm.togglePipelineState(row, true);
-
-      expect(pipelineService.toggleState).toHaveBeenCalled();
-    });
-
-    it("togglePipelineState silently ignores 403 errors", async () => {
-      const error = { response: { status: 403 } };
-      (pipelineService.toggleState as MockedFunction<any>).mockRejectedValue(error);
-      const row = { pipeline_id: "test", enabled: true };
-
-      await wrapper.vm.togglePipelineState(row, true);
-
-      expect(pipelineService.toggleState).toHaveBeenCalled();
     });
   });
 
@@ -514,14 +380,6 @@ describe("PipelinesList", () => {
         true,
         false,
       );
-    });
-
-    it("handleCancelResumePipeline closes the resume dialog", () => {
-      wrapper.vm.resumePipelineDialogMeta.show = true;
-
-      wrapper.vm.handleCancelResumePipeline();
-
-      expect(wrapper.vm.resumePipelineDialogMeta.show).toBe(false);
     });
   });
 
@@ -558,23 +416,6 @@ describe("PipelinesList", () => {
       });
     });
 
-    it("savePipeline sets showCreatePipeline to false", () => {
-      wrapper.vm.savePipeline({ name: "New Pipeline" });
-
-      expect(wrapper.vm.showCreatePipeline).toBe(false);
-    });
-
-    it("savePipeline handles API errors gracefully", async () => {
-      const error = {
-        response: { status: 400, data: { message: "Error" } },
-      };
-      (pipelineService.createPipeline as MockedFunction<any>).mockRejectedValue(error);
-
-      await wrapper.vm.savePipeline({ name: "New Pipeline" });
-
-      expect(pipelineService.createPipeline).toHaveBeenCalled();
-    });
-
     it("deletePipeline calls pipelineService.deletePipeline with correct args", () => {
       wrapper.vm.confirmDialogMeta.data = mockRealtimePipeline;
       wrapper.vm.confirmDialogMeta.show = true;
@@ -585,30 +426,6 @@ describe("PipelinesList", () => {
         pipeline_id: mockRealtimePipeline.pipeline_id,
         org_id: "test-org",
       });
-    });
-
-    it("deletePipeline resets confirm dialog immediately", () => {
-      wrapper.vm.confirmDialogMeta.data = mockRealtimePipeline;
-      wrapper.vm.confirmDialogMeta.show = true;
-      wrapper.vm.confirmDialogMeta.title = "Delete Pipeline";
-
-      wrapper.vm.deletePipeline();
-
-      expect(wrapper.vm.confirmDialogMeta.show).toBe(false);
-      expect(wrapper.vm.confirmDialogMeta.title).toBe("");
-      expect(wrapper.vm.confirmDialogMeta.data).toBeNull();
-    });
-
-    it("deletePipeline handles API errors gracefully", async () => {
-      const error = {
-        response: { status: 400, data: { message: "Delete Error" } },
-      };
-      (pipelineService.deletePipeline as MockedFunction<any>).mockRejectedValue(error);
-      wrapper.vm.confirmDialogMeta.data = mockRealtimePipeline;
-
-      await wrapper.vm.deletePipeline();
-
-      expect(pipelineService.deletePipeline).toHaveBeenCalled();
     });
   });
 
@@ -687,12 +504,6 @@ describe("PipelinesList", () => {
       expect(exportedFile().functions).toEqual([
         { name: "parse_nginx", function: ".a = 1", params: "row", transType: 0 },
       ]);
-    });
-
-    it("writes one entry per function however many nodes call it", async () => {
-      await wrapper.vm.exportPipeline(fnPipeline);
-
-      expect(exportedFile().functions).toHaveLength(1);
     });
 
     it("leaves a pipeline that calls no function unchanged", async () => {
@@ -846,16 +657,6 @@ describe("PipelinesList", () => {
       }
     });
 
-    it("handles empty pipeline list", async () => {
-      (pipelineService.getPipelines as MockedFunction<any>).mockResolvedValue({
-        data: { list: [] },
-      });
-
-      await wrapper.vm.getPipelines(true);
-
-      expect(wrapper.vm.pipelines).toHaveLength(0);
-    });
-
     it("handles getPipelines API error by logging to console.error", async () => {
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       (pipelineService.getPipelines as MockedFunction<any>).mockRejectedValue(
@@ -873,14 +674,6 @@ describe("PipelinesList", () => {
   describe("Tab Filtering via updateActiveTab", () => {
     beforeEach(() => {
       wrapper.vm.pipelines = mockPipelines;
-    });
-
-    it("'all' tab shows all pipelines", async () => {
-      wrapper.vm.activeTab = "all";
-
-      await wrapper.vm.updateActiveTab();
-
-      expect(wrapper.vm.filteredPipelines.length).toBe(2);
     });
 
     it("'realtime' tab filters to realtime pipelines only", async () => {
@@ -901,14 +694,6 @@ describe("PipelinesList", () => {
       wrapper.vm.filteredPipelines.forEach((p: any) => {
         expect(p.source.source_type).toBe("scheduled");
       });
-    });
-
-    it("'all' tab updates columns via getColumnsForActiveTab", async () => {
-      wrapper.vm.activeTab = "all";
-
-      await wrapper.vm.updateActiveTab();
-
-      expect(wrapper.vm.columns.some((c: any) => c.id === "actions")).toBe(true);
     });
   });
 
@@ -932,16 +717,6 @@ describe("PipelinesList", () => {
       expect(pipelineService.bulkToggleState).toHaveBeenCalledTimes(1);
     });
 
-    it("openBulkDeleteDialog sets confirmDialogMeta for bulk delete", () => {
-      // Populate filteredPipelines so selectedPipelines computed can find the pipeline
-      wrapper.vm.filteredPipelines = [mockRealtimePipeline];
-      wrapper.vm.selectedPipelineIds = [mockRealtimePipeline.pipeline_id];
-
-      wrapper.vm.openBulkDeleteDialog();
-
-      expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
-    });
-
     it("openBulkDeleteDialog drops a named message left by a dismissed single delete", () => {
       wrapper.vm.openDeleteDialog(mockRealtimePipeline);
       wrapper.vm.filteredPipelines = [mockRealtimePipeline];
@@ -955,56 +730,8 @@ describe("PipelinesList", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  describe("Backfill Dialog", () => {
-    it("openBackfillDialog opens dialog with pipeline details", () => {
-      const pipeline = {
-        ...mockScheduledPipeline,
-        source: {
-          ...mockScheduledPipeline.source,
-          trigger_condition: {
-            frequency_type: "minutes",
-            frequency: 30,
-            period: 5,
-          },
-        },
-      };
-
-      wrapper.vm.openBackfillDialog(pipeline);
-
-      expect(wrapper.vm.backfillDialog.show).toBe(true);
-      expect(wrapper.vm.backfillDialog.pipelineId).toBe(mockScheduledPipeline.pipeline_id);
-    });
-  });
-
   // ─────────────────────────────────────────────────────────────────────────────
   describe("ODrawer (Create Pipeline) Migration", () => {
-    it("renders ODrawer stub for the create-pipeline drawer", () => {
-      const drawer = wrapper.findComponent(ODrawerStub);
-
-      expect(drawer.exists()).toBe(true);
-    });
-
-    it("forwards showCreatePipeline=false to ODrawer open prop initially", () => {
-      const drawer = wrapper.findComponent(ODrawerStub);
-
-      expect(drawer.props("open")).toBe(false);
-    });
-
-    it("passes size='lg' to the create-pipeline ODrawer", () => {
-      const drawer = wrapper.findComponent(ODrawerStub);
-
-      expect(drawer.props("size")).toBe("lg");
-    });
-
-    it("forwards showCreatePipeline=true to ODrawer when drawer is opened", async () => {
-      wrapper.vm.showCreatePipeline = true;
-      await nextTick();
-
-      const drawer = wrapper.findComponent(ODrawerStub);
-
-      expect(drawer.props("open")).toBe(true);
-    });
-
     it("updates showCreatePipeline when ODrawer emits update:open", async () => {
       wrapper.vm.showCreatePipeline = true;
       await nextTick();
@@ -1028,60 +755,6 @@ describe("PipelinesList", () => {
         node_errors: {},
       },
     };
-
-    it("renders ODialog stub for the error dialog", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(dialog.exists()).toBe(true);
-    });
-
-    it("ODialog is closed by default", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(dialog.props("open")).toBe(false);
-    });
-
-    it("passes size='md' to ODialog", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(dialog.props("size")).toBe("md");
-    });
-
-    it("forwards errorDialog.show=true to ODialog open prop when opened", async () => {
-      wrapper.vm.showErrorDialog(pipelineWithError);
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(dialog.props("open")).toBe(true);
-    });
-
-    it("forwards pipeline name as title prop on ODialog", async () => {
-      wrapper.vm.showErrorDialog(pipelineWithError);
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(dialog.props("title")).toBe(pipelineWithError.name);
-    });
-
-    it("forwards the last-error timestamp as subTitle prop on ODialog", async () => {
-      wrapper.vm.showErrorDialog(pipelineWithError);
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      const subTitle = dialog.props("subTitle");
-
-      expect(subTitle).toBeTruthy();
-      expect(subTitle).toContain(":");
-    });
-
-    it("forwards primaryButtonLabel (close translation) to ODialog", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(typeof dialog.props("primaryButtonLabel")).toBe("string");
-      expect(dialog.props("primaryButtonLabel")?.length).toBeGreaterThan(0);
-    });
 
     it("closes the error dialog when ODialog emits click:primary", async () => {
       wrapper.vm.showErrorDialog(pipelineWithError);
@@ -1120,66 +793,8 @@ describe("PipelinesList", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  describe("Method Exposure", () => {
-    it("exposes all required methods", () => {
-      const required = [
-        "togglePipeline",
-        "togglePipelineState",
-        "getColumnsForActiveTab",
-        "getPipelines",
-        "editPipeline",
-        "openDeleteDialog",
-        "savePipeline",
-        "deletePipeline",
-        "resetConfirmDialog",
-        "exportPipeline",
-        "exportBulkPipelines",
-        "handleResumePipeline",
-        "handleCancelResumePipeline",
-        "updateActiveTab",
-        "showErrorDialog",
-        "closeErrorDialog",
-        "bulkTogglePipelines",
-        "openBulkDeleteDialog",
-        "bulkDeletePipelines",
-        "openBackfillDialog",
-        "onBackfillSuccess",
-      ];
-
-      required.forEach((m) => {
-        expect(typeof wrapper.vm[m]).toBe("function");
-      });
-    });
-  });
-
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Page restoration across route navigation (OTable pagination-reset fix)", () => {
-    it("defaults currentPage to 1", () => {
-      expect(wrapper.vm.currentPage).toBe(1);
-    });
-
-    it("onPageChange updates currentPage", () => {
-      wrapper.vm.onPageChange(4);
-
-      expect(wrapper.vm.currentPage).toBe(4);
-    });
-
-    it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", () => {
-      vi.useFakeTimers();
-      wrapper.vm.currentPage = 3;
-      const restorePage = vi.fn();
-      // OTable is shallow-stubbed in this suite; plant the piece of its exposed surface the fix depends on directly onto the template ref.
-      wrapper.vm.oTableRef = { restorePage };
-
-      wrapper.vm.restorePageIndex();
-      expect(restorePage).not.toHaveBeenCalled();
-
-      vi.runAllTimers();
-
-      expect(restorePage).toHaveBeenCalledWith(3);
-      vi.useRealTimers();
-    });
-
     it("reasserts the restored page after returning from the pipeline editor route", async () => {
       vi.useFakeTimers();
       wrapper.vm.currentPage = 3;

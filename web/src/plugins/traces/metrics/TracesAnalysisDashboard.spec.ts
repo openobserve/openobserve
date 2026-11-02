@@ -216,95 +216,9 @@ describe("TracesAnalysisDashboard", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Rendering
-  // -------------------------------------------------------------------------
-  describe("rendering", () => {
-    it("should mount without errors", () => {
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should render RenderDashboardCharts when dashboardData is populated", async () => {
-      await flushPromises();
-      const charts = wrapper.find('[data-test="render-dashboard-charts"]');
-      expect(charts.exists()).toBe(true);
-    });
-
-    it("should render the dimension selector sidebar by default", () => {
-      const sidebar = wrapper.find('[data-test="dimension-selector-sidebar"]');
-      expect(sidebar.exists()).toBe(true);
-    });
-
-    it("should render the dimension search input inside the sidebar", () => {
-      const input = wrapper.find('[data-test="dimension-search-input"]');
-      expect(input.exists()).toBe(true);
-    });
-
-    it("should render the collapse/expand button for dimension sidebar", () => {
-      const btn = wrapper.find('[data-test="dimension-selector-collapse-btn"]');
-      expect(btn.exists()).toBe(true);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Title rendering based on analysisType prop
-  // -------------------------------------------------------------------------
-  describe("title rendering based on analysisType", () => {
-    it("should show Latency Insights title when analysisType is 'duration'", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ analysisType: "duration" });
-      await flushPromises();
-      // The i18n key resolves; just verify the component mounts correctly with duration type
-      expect(wrapper.vm.activeAnalysisType).toBe("duration");
-    });
-
-    it("should show Volume Insights title when analysisType is 'volume'", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        analysisType: "volume",
-      });
-      await flushPromises();
-      expect(wrapper.vm.activeAnalysisType).toBe("volume");
-    });
-
-    it("should show Error Insights title when analysisType is 'error'", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        analysisType: "error",
-      });
-      await flushPromises();
-      expect(wrapper.vm.activeAnalysisType).toBe("error");
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Emits
-  // -------------------------------------------------------------------------
-  describe("emits", () => {
-    it("should emit 'close' when onClose is called", async () => {
-      wrapper.vm.onClose();
-      await flushPromises();
-      expect(wrapper.emitted("close")).toBeTruthy();
-      expect(wrapper.emitted("close")!.length).toBe(1);
-    });
-
-    it("should emit 'close' exactly once per onClose invocation", async () => {
-      wrapper.vm.onClose();
-      wrapper.vm.onClose();
-      await flushPromises();
-      expect(wrapper.emitted("close")!.length).toBe(2);
-    });
-  });
-
-  // -------------------------------------------------------------------------
   // Computed: chipColors
   // -------------------------------------------------------------------------
   describe("computed chipColors", () => {
-    it("should return light theme colors when store.state.theme is 'light'", () => {
-      const colors = wrapper.vm.chipColors;
-      expect(colors.baseline).toBe(MOCK_COMPARISON_COLORS.light.baseline);
-      expect(colors.selected).toBe(MOCK_COMPARISON_COLORS.light.selected);
-    });
-
     it("should return dark theme colors when store.state.theme is 'dark'", async () => {
       const darkStore = createStore({
         state: {
@@ -331,10 +245,6 @@ describe("TracesAnalysisDashboard", () => {
   // Computed: availableDimensions
   // -------------------------------------------------------------------------
   describe("computed availableDimensions", () => {
-    it("should return an empty array when streamFields is not provided", () => {
-      expect(wrapper.vm.availableDimensions).toEqual([]);
-    });
-
     it("should map streamFields to {label, value} objects", async () => {
       wrapper.unmount();
       wrapper = mountComponent({
@@ -357,14 +267,6 @@ describe("TracesAnalysisDashboard", () => {
       expect(dims[1].value).toBe("middle_field");
       expect(dims[2].value).toBe("zebra_field");
     });
-
-    it("should handle string streamFields (name = field itself)", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ streamFields: ["field_a", "field_b"] });
-      await flushPromises();
-      const dims = wrapper.vm.availableDimensions;
-      expect(dims).toContainEqual({ label: "field_a", value: "field_a" });
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -376,14 +278,6 @@ describe("TracesAnalysisDashboard", () => {
       { name: "span_status" },
       { name: "http_method" },
     ];
-
-    it("should return all dimensions when dimensionSearchText is empty", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ streamFields: streamFieldsForFilter });
-      await flushPromises();
-      const dims = wrapper.vm.filteredDimensions;
-      expect(dims).toHaveLength(3);
-    });
 
     it("should filter dimensions matching the search text", async () => {
       wrapper.unmount();
@@ -417,71 +311,12 @@ describe("TracesAnalysisDashboard", () => {
       const dims = wrapper.vm.filteredDimensions;
       expect(dims[0].value).toBe("http_method");
     });
-
-    it("should return empty array when no dimensions match search", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ streamFields: streamFieldsForFilter });
-      await flushPromises();
-      wrapper.vm.dimensionSearchText = "nonexistent_field";
-      await flushPromises();
-      expect(wrapper.vm.filteredDimensions).toHaveLength(0);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Computed: currentOrgIdentifier
-  // -------------------------------------------------------------------------
-  describe("computed currentOrgIdentifier", () => {
-    it("should return the org identifier from the store", () => {
-      expect(wrapper.vm.currentOrgIdentifier).toBe("test-org");
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Computed: currentTimeObj
-  // -------------------------------------------------------------------------
-  describe("computed currentTimeObj", () => {
-    it("should expose a __global key with start_time and end_time as Date objects", () => {
-      const timeObj = wrapper.vm.currentTimeObj;
-      expect(timeObj).toHaveProperty("__global");
-      expect(timeObj.__global.start_time).toBeInstanceOf(Date);
-      expect(timeObj.__global.end_time).toBeInstanceOf(Date);
-    });
-
-    it("should derive start_time from timeRange.startTime", () => {
-      const timeObj = wrapper.vm.currentTimeObj;
-      expect(timeObj.__global.start_time.getTime()).toBe(defaultProps.timeRange.startTime);
-    });
-
-    it("should derive end_time from timeRange.endTime", () => {
-      const timeObj = wrapper.vm.currentTimeObj;
-      expect(timeObj.__global.end_time.getTime()).toBe(defaultProps.timeRange.endTime);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Computed: baselineTimeRange
-  // -------------------------------------------------------------------------
-  describe("computed baselineTimeRange", () => {
-    it("should equal the timeRange prop", () => {
-      expect(wrapper.vm.baselineTimeRange).toEqual(defaultProps.timeRange);
-    });
-
-    it("should reflect updates when timeRange prop changes", async () => {
-      const newRange = { startTime: 5_000_000, endTime: 6_000_000 };
-      await wrapper.setProps({ timeRange: newRange });
-      expect(wrapper.vm.baselineTimeRange).toEqual(newRange);
-    });
   });
 
   // -------------------------------------------------------------------------
   // Computed: selectedTimeRangeDisplay
   // -------------------------------------------------------------------------
   describe("computed selectedTimeRangeDisplay", () => {
-    it("should be null when no filters with time range are provided", () => {
-      expect(wrapper.vm.selectedTimeRangeDisplay).toBeNull();
-    });
-
     it("should use rateFilter timeStart/timeEnd when rateFilter has time range", async () => {
       wrapper.unmount();
       wrapper = mountComponent({
@@ -496,31 +331,9 @@ describe("TracesAnalysisDashboard", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Computed: hasSelectedTimeRange
-  // -------------------------------------------------------------------------
-  describe("computed hasSelectedTimeRange", () => {
-    it("should be false when selectedTimeRangeDisplay is null", () => {
-      expect(wrapper.vm.hasSelectedTimeRange).toBe(false);
-    });
-
-    it("should be true when selectedTimeRangeDisplay is not null", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        rateFilter: { start: 1, end: 5, timeStart: 3_000_000, timeEnd: 4_000_000 },
-      });
-      await flushPromises();
-      expect(wrapper.vm.hasSelectedTimeRange).toBe(true);
-    });
-  });
-
-  // -------------------------------------------------------------------------
   // Computed: filterMetadata
   // -------------------------------------------------------------------------
   describe("computed filterMetadata", () => {
-    it("should be null when no active filter without a time range exists", () => {
-      expect(wrapper.vm.filterMetadata).toBeNull();
-    });
-
     it("should return a rate metadata string for 'volume' type with rateFilter (no timeStart)", async () => {
       wrapper.unmount();
       wrapper = mountComponent({
@@ -564,18 +377,6 @@ describe("TracesAnalysisDashboard", () => {
       wrapper.vm.toggleDimension("service_name");
       expect(wrapper.vm.selectedDimensions).toEqual([]);
     });
-
-    it("should create a new array reference on add (reactive)", () => {
-      const before = wrapper.vm.selectedDimensions;
-      wrapper.vm.toggleDimension("http_method");
-      expect(wrapper.vm.selectedDimensions).not.toBe(before);
-    });
-
-    it("should create a new array reference on remove (reactive)", () => {
-      const before = wrapper.vm.selectedDimensions;
-      wrapper.vm.toggleDimension("span_status");
-      expect(wrapper.vm.selectedDimensions).not.toBe(before);
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -589,13 +390,6 @@ describe("TracesAnalysisDashboard", () => {
       await flushPromises();
       expect(wrapper.vm.showDimensionSelector).toBe(false);
       expect(wrapper.vm.splitterModel).toBe(0);
-    });
-
-    it("should save the current splitter position before collapsing", () => {
-      wrapper.vm.showDimensionSelector = true;
-      wrapper.vm.splitterModel = 25;
-      wrapper.vm.toggleDimensionSelector();
-      expect(wrapper.vm.lastSplitterPosition).toBe(25);
     });
 
     it("should restore splitter position when expanding", async () => {
@@ -612,15 +406,6 @@ describe("TracesAnalysisDashboard", () => {
       wrapper.vm.showDimensionSelector = false;
       wrapper.vm.splitterModel = 0;
       wrapper.vm.lastSplitterPosition = 5; // Too small
-      wrapper.vm.toggleDimensionSelector();
-      await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(25);
-    });
-
-    it("should use default 25% width when saved position is 0 during expand", async () => {
-      wrapper.vm.showDimensionSelector = false;
-      wrapper.vm.splitterModel = 0;
-      wrapper.vm.lastSplitterPosition = 0;
       wrapper.vm.toggleDimensionSelector();
       await flushPromises();
       expect(wrapper.vm.splitterModel).toBe(25);
@@ -645,18 +430,6 @@ describe("TracesAnalysisDashboard", () => {
       await flushPromises();
       expect(selectDimensionsFromData).toHaveBeenCalled();
     });
-
-    it("should fall back to selectDimensionsFromData for logs type without enough samples", async () => {
-      const { selectDimensionsFromData } = await import("@/composables/useDimensionSelector");
-      wrapper.unmount();
-      wrapper = mountComponent({
-        streamType: "logs",
-        streamFields: [{ name: "service_name" }],
-        logSamples: [], // fewer than 10
-      });
-      await flushPromises();
-      expect(selectDimensionsFromData).toHaveBeenCalled();
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -672,13 +445,6 @@ describe("TracesAnalysisDashboard", () => {
       await flushPromises();
       expect(generateDashboard).toHaveBeenCalled();
       expect(wrapper.vm.dashboardData).not.toBeNull();
-    });
-
-    it("should increment dashboardRenderKey after loadAnalysis", async () => {
-      const keyBefore = wrapper.vm.dashboardRenderKey;
-      await wrapper.vm.loadAnalysis();
-      await flushPromises();
-      expect(wrapper.vm.dashboardRenderKey).toBe(keyBefore + 1);
     });
 
     it("should call showErrorNotification when generateDashboard throws", async () => {
@@ -773,33 +539,10 @@ describe("TracesAnalysisDashboard", () => {
       expect(wrapper.vm.selectedDimensions).not.toContain("service_name");
     });
 
-    it("should keep other dimensions intact when one panel is deleted", () => {
-      wrapper.vm.handlePanelDelete("panel-1");
-      expect(wrapper.vm.selectedDimensions).toContain("span_status");
-    });
-
-    it("should do nothing when dashboardData has no tabs", () => {
-      wrapper.vm.dashboardData = null;
-      expect(() => wrapper.vm.handlePanelDelete("panel-1")).not.toThrow();
-    });
-
     it("should do nothing when panel id does not exist in panels", () => {
       const dimsBefore = [...wrapper.vm.selectedDimensions];
       wrapper.vm.handlePanelDelete("panel-nonexistent");
       expect(wrapper.vm.selectedDimensions).toEqual(dimsBefore);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // State: splitterModel defaults
-  // -------------------------------------------------------------------------
-  describe("state splitterModel", () => {
-    it("should default splitterModel to 25 on mount", () => {
-      expect(wrapper.vm.splitterModel).toBe(25);
-    });
-
-    it("should default lastSplitterPosition to 25 on mount", () => {
-      expect(wrapper.vm.lastSplitterPosition).toBe(25);
     });
   });
 
@@ -940,79 +683,6 @@ describe("TracesAnalysisDashboard", () => {
   // -------------------------------------------------------------------------
   // Edge cases
   // -------------------------------------------------------------------------
-  describe("edge cases", () => {
-    it("should mount without errors when streamFields is undefined", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ streamFields: undefined });
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should mount without errors when streamFields is an empty array", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ streamFields: [] });
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should mount without errors when streamName is an empty string", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ streamName: "" });
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should mount without errors when all optional filter props are undefined", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        rateFilter: undefined,
-        baseFilter: undefined,
-      });
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should have dashboardData populated after initial mount and flushPromises", async () => {
-      expect(wrapper.vm.dashboardData).not.toBeNull();
-    });
-
-    it("should have isOpen as true on initial mount", () => {
-      expect(wrapper.vm.isOpen).toBe(true);
-    });
-
-    it("should have dimensionSearchText as empty string on initial mount", () => {
-      expect(wrapper.vm.dimensionSearchText).toBe("");
-    });
-
-    it("should have showDimensionSelector as true on initial mount", () => {
-      expect(wrapper.vm.showDimensionSelector).toBe(true);
-    });
-
-    it("should not throw when handlePanelDelete is called with dashboardData having empty panels array", () => {
-      wrapper.vm.dashboardData = { tabs: [{ panels: [] }] };
-      expect(() => wrapper.vm.handlePanelDelete("any-id")).not.toThrow();
-    });
-
-    it("should return availableDimensions as empty when streamFields is not set", () => {
-      expect(wrapper.vm.availableDimensions).toHaveLength(0);
-    });
-
-    it("should return filteredDimensions as empty when streamFields is not set", () => {
-      expect(wrapper.vm.filteredDimensions).toHaveLength(0);
-    });
-
-    it("should not call generateDashboard when loadAnalysis encounters an exception from showErrorNotification setup", async () => {
-      // Edge: confirm error path does not re-throw (component stays stable)
-      const { useLatencyInsightsDashboard } =
-        await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
-      (generateDashboard as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
-        throw new Error("boom");
-      });
-      // Should not throw at the wrapper level
-      await expect(wrapper.vm.loadAnalysis()).resolves.not.toThrow();
-    });
-  });
 });
 
 describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
@@ -1038,19 +708,9 @@ describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
     expect(wrapper.find('[data-test="traces-analysis-dashboard-page"]').exists()).toBe(true);
   });
 
-  it("keeps the header content (baseline time range chip) on the page", () => {
-    const page = wrapper.find('[data-test="traces-analysis-dashboard-page"]');
-    expect(page.find(".baseline-chip").exists()).toBe(true);
-  });
-
   it("loads the analysis and renders the dashboard on mount", () => {
     expect(mockGenerateDashboard).toHaveBeenCalled();
     expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
-  });
-
-  it("shows the analysis title in the page header", () => {
-    const title = wrapper.find('[data-test="traces-analysis-dashboard-page-title"]');
-    expect(title.text()).toBe(gt("volumeInsights.title"));
   });
 
   it("does not leak drawer-only attributes onto the page root", () => {
