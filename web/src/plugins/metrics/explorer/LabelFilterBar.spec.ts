@@ -254,6 +254,58 @@ describe("LabelFilterBar", () => {
       await flushPromises();
     };
 
+    it("offers + OR group only once there is a filter to OR against", async () => {
+      createWrapper();
+      expect(wrapper!.find(`[data-test="${DT}-add-group"]`).exists()).toBe(false);
+      await wrapper!.setProps({ filters: grouped.slice(0, 1) });
+      await flushPromises();
+      expect(wrapper!.find(`[data-test="${DT}-add-group"]`).exists()).toBe(true);
+    });
+
+    it("adds the next filter as a new OR group from the + OR group button", async () => {
+      createWrapper({ filters: grouped });
+      await wrapper!.find(`[data-test="${DT}-add-group"]`).trigger("click");
+      await flushPromises();
+      await type("code");
+      await press("Enter");
+      await press("Enter");
+      await type("503");
+      await press("Enter");
+      expect(wrapper!.emitted("add")![0]).toEqual([
+        { label: "code", value: "503", operator: "=", group: 3 },
+      ]);
+    });
+
+    it("adds into an existing group from its + button, negated when the group is", async () => {
+      createWrapper({ filters: grouped });
+      await wrapper!.find(`[data-test="${DT}-group-add-2"]`).trigger("click");
+      await flushPromises();
+      await type("instance");
+      await press("Enter");
+      await press("Enter");
+      await type("web");
+      await press("Enter");
+      expect(wrapper!.emitted("add")![0]).toEqual([
+        { label: "instance", value: "web", operator: "=", group: 2, negate: true },
+      ]);
+    });
+
+    it("hides labels the group uses and keeps the ones other groups use", async () => {
+      createWrapper({ filters: grouped, labelNames: ["job", "code", "env", "instance"] });
+      await wrapper!.find(`[data-test="${DT}-group-add-1"]`).trigger("click");
+      await flushPromises();
+      expect(rowKeys()).toEqual(expect.arrayContaining(["job", "env", "instance"]));
+      expect(rowKeys()).not.toContain("code");
+    });
+
+    it("still reaches a used label typed in full, so a label can repeat in the base list", async () => {
+      createWrapper({ filters: grouped.slice(0, 1) });
+      await focus();
+      expect(rowKeys()).not.toContain("job");
+      await type("job");
+      expect(rowKeys()).toContain("job");
+    });
+
     it("adds the next filter as a new OR group from a typed (", async () => {
       createWrapper({ filters: grouped });
       await focus();

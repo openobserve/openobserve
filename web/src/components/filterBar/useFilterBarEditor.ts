@@ -190,6 +190,15 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     () => new Set(leafConditions(tree.value).map((node: FilterCondition) => node.field)),
   );
 
+  // A label may repeat across OR groups but not within one, the group being edited or the caret's.
+  const usedInGroup = computed<Set<string>>(() => {
+    if (config.value.connectors !== "any-of-groups") return new Set();
+    const group = editingId.value
+      ? (findParent(tree.value, editingId.value) ?? tree.value)
+      : targetGroup.value;
+    return new Set(group.items.flatMap((item) => (item.kind === "condition" ? [item.field] : [])));
+  });
+
   // Per-group connectors: a group's AND/OR is set once its second item exists, and later items follow it.
   const groupConnector = (group: FilterGroup): FilterConnector | null =>
     config.value.connectors === "per-group" && group.items.length > 1
@@ -236,7 +245,9 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const names = rankByMatch(
       fields.value
         .map((field) => field.name)
-        .filter((name) => !unique || name === editedField || !usedFields.value.has(name)),
+        .filter((name) => !unique || name === editedField || !usedFields.value.has(name))
+        // A label typed in full stays reachable, for matchers like job!="a", job!="b".
+        .filter((name) => name === editedField || name === needle || !usedInGroup.value.has(name)),
       needle,
     ).slice(0, MAX_ROWS);
     for (const name of names) {

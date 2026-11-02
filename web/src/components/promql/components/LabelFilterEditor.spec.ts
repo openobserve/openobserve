@@ -221,6 +221,83 @@ describe("LabelFilterEditor", () => {
       expect((emitted()!.at(-1)![0] as typeof grouped)[1]).toEqual(grouped[1]);
     });
 
+    const suggestRow = (key: string) =>
+      document.body.querySelector<HTMLElement>(`[data-test="${DT}-suggest-item-${key}"]`);
+    const rowExists = (key: string) => Boolean(suggestRow(key));
+    const pick = async (key: string) => {
+      suggestRow(key)!.click();
+      await flushPromises();
+    };
+    const pickMethodGet = async () => {
+      await pick("method");
+      await pick("eq");
+      await vi.waitFor(() => expect(rowExists("GET")).toBe(true));
+      await pick("GET");
+    };
+    const fieldRows = () =>
+      Array.from(document.body.querySelectorAll(`[data-test^="${DT}-suggest-item-"]`)).map((row) =>
+        row.getAttribute("data-test")!.replace(`${DT}-suggest-item-`, ""),
+      );
+
+    it("offers + OR group only once there is a filter to OR against", async () => {
+      mountEditor({ dashboardPanelData: panelData() });
+      expect(wrapper!.find(`[data-test="${DT}-add-group"]`).exists()).toBe(false);
+      await wrapper!.setProps({ labels: grouped.slice(0, 1) });
+      await flushPromises();
+      expect(wrapper!.find(`[data-test="${DT}-add-group"]`).text()).toBe("+ OR group");
+    });
+
+    it("adds a new OR group after the highest one", async () => {
+      mountEditor({ dashboardPanelData: panelData(), labels: grouped });
+      await wrapper!.find(`[data-test="${DT}-add-group"]`).trigger("click");
+      await flushPromises();
+      await pickMethodGet();
+      expect((emitted()!.at(-1)![0] as typeof grouped).at(-1)).toEqual({
+        label: "method",
+        op: "=",
+        value: "GET",
+        group: 3,
+      });
+    });
+
+    it("adds a filter inside a negated group as negated too", async () => {
+      mountEditor({ dashboardPanelData: panelData(), labels: grouped });
+      await wrapper!.find(`[data-test="${DT}-group-add-2"]`).trigger("click");
+      await flushPromises();
+      await pickMethodGet();
+      expect((emitted()!.at(-1)![0] as typeof grouped).at(-1)).toEqual({
+        label: "method",
+        op: "=",
+        value: "GET",
+        group: 2,
+        negate: true,
+      });
+    });
+
+    it("lets another group reuse a label the base list already uses", async () => {
+      const labels = [
+        { label: "method", op: "=", value: "GET" },
+        { label: "status", op: "=", value: "500", group: 1 },
+      ];
+      mountEditor({ dashboardPanelData: panelData(), labels });
+      await wrapper!.find(`[data-test="${DT}-group-add-1"]`).trigger("click");
+      await flushPromises();
+      expect(fieldRows()).toContain("method");
+      expect(fieldRows()).not.toContain("status");
+    });
+
+    it("hides a label from the base list that the base list already uses", async () => {
+      const labels = [
+        { label: "method", op: "=", value: "GET" },
+        { label: "status", op: "=", value: "500", group: 1 },
+      ];
+      mountEditor({ dashboardPanelData: panelData(), labels });
+      await wrapper!.find(`[data-test="${DT}-input"]`).trigger("click");
+      await flushPromises();
+      expect(fieldRows()).not.toContain("method");
+      expect(fieldRows()).toContain("status");
+    });
+
     it("says why the query will not run past the branch cap", () => {
       const labels = [...negated, { ...negated[0], label: "l16" }];
       mountEditor({ dashboardPanelData: panelData(), labels });

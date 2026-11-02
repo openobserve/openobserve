@@ -540,6 +540,23 @@ describe("QueryFilterBar", () => {
     expect(wrapper!.find('[data-test^="query-filter-bar-summary-"]').exists()).toBe(false);
   });
 
+  it("hides a field already used in the group only for any-of-groups bars", async () => {
+    const used = parseSqlFilter("level = 'a'")!;
+    mountBar({ dialect: "promql", modelValue: used });
+    await openBar();
+    expect(rowKeys()).not.toContain("level");
+    wrapper!.unmount();
+    mountBar({ modelValue: used });
+    await openBar();
+    expect(rowKeys()).toContain("level");
+  });
+
+  it("draws no OR group controls outside any-of-groups bars", () => {
+    mountBar({ modelValue: parseSqlFilter("level = 'a' AND (level = 'b' OR status = 1)")! });
+    expect(wrapper!.find('[data-test="query-filter-bar-add-group"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test^="query-filter-bar-group-add-"]').exists()).toBe(false);
+  });
+
   it("limits PromQL to label matchers without connectors", async () => {
     mountBar({ dialect: "promql", modelValue: parseSqlFilter("level = 'a' AND ok = true")! });
     expect(wrapper!.find('[data-test^="query-filter-bar-connector-"]').exists()).toBe(false);

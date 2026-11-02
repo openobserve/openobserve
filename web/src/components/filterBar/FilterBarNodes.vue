@@ -126,11 +126,24 @@ const groupJoin = (index: number) => {
         @toggle-connector="emit('toggle-connector', $event)"
         @toggle-negate="emit('toggle-negate', $event)"
         @ungroup="emit('ungroup', $event)"
+        @add-condition="emit('add-condition', $event)"
       >
         <template #caret="slotProps">
           <slot name="caret" v-bind="slotProps" />
         </template>
       </FilterBarNodes>
+      <span v-if="anyOfGroups && !disabled" class="inline-flex">
+        <OButton
+          variant="ghost"
+          size="icon-xs-sq"
+          icon-left="add"
+          :aria-label="t('metrics.labelGroups.addToGroup')"
+          :data-test="`${dataTest}-group-add-${pathOf(index)}`"
+          @mousedown.prevent
+          @click.stop="emit('add-condition', item.id)"
+        />
+        <OTooltip :content="t('metrics.labelGroups.addToGroup')" />
+      </span>
       <span v-if="item.items.length && (canUngroup?.(item.id) ?? true)" class="inline-flex">
         <OButton
           variant="ghost"

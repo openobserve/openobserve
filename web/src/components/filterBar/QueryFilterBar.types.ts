@@ -107,6 +107,7 @@ export interface FilterBarNodesEmits {
   (_e: "toggle-negate", _id: string): void;
   /** Lift a group's items into its parent. */
   (_e: "ungroup", _id: string): void;
+  (_e: "add-condition", _groupId: string): void;
 }
 
 export interface FilterBarRowsProps extends FilterBarNodesProps {
@@ -123,7 +124,6 @@ export interface FilterBarRowsProps extends FilterBarNodesProps {
 }
 
 export interface FilterBarRowsEmits extends FilterBarNodesEmits {
-  (_e: "add-condition", _groupId: string): void;
   (_e: "add-group", _groupId: string): void;
   /** Start a new condition on the line after node `id`. */
   (_e: "add-after", _id: string): void;

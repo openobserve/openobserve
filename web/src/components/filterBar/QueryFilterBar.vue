@@ -119,6 +119,14 @@ const showPendingConnector = computed(
   () => advanced.value && open.value && !editingId.value && targetGroup.value.items.length > 0,
 );
 const caretGroupId = computed(() => targetGroup.value.id);
+const showAddOrGroup = computed(
+  () =>
+    config.value.connectors === "any-of-groups" &&
+    !vertical.value &&
+    !props.disabled &&
+    hasFilters.value &&
+    editor.canGroupIn(null),
+);
 provide(FILTER_BAR_CHIP_CONTEXT, {
   fieldLabel: (field) => props.fields.find((f) => f.name === field)?.label,
   valueHint: (field, values) => props.valueHint?.(field, values),
@@ -268,6 +276,12 @@ function onAddGroup(groupId: string) {
   open.value = true;
   focus();
   emit("focus");
+}
+
+// Groups stand after the base list whatever the caret was doing.
+function onAddOrGroup() {
+  editor.moveCaretTo(null);
+  onAddGroup(props.modelValue.id);
 }
 
 function onUngroup(id: string) {
@@ -461,6 +475,7 @@ const draftOperator = computed(() => {
         @toggle-connector="editor.toggleConnector"
         @toggle-negate="editor.toggleNegate"
         @ungroup="onUngroup"
+        @add-condition="onAddCondition"
       >
         <template #caret>
           <OTag
@@ -534,6 +549,17 @@ const draftOperator = computed(() => {
       </div>
     </template>
     <template #trailing>
+      <span v-if="showAddOrGroup" class="inline-flex">
+        <OButton
+          variant="ghost"
+          size="xs"
+          :data-test="`${dataTest}-add-group`"
+          @mousedown.prevent
+          @click.stop="onAddOrGroup"
+          >{{ t("metrics.labelGroups.addGroup") }}</OButton
+        >
+        <OTooltip :content="t('metrics.labelGroups.addGroupTooltip')" />
+      </span>
       <OButton
         v-if="hasFilters && !disabled"
         variant="ghost"
