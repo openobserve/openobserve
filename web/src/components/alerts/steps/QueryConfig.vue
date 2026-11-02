@@ -96,14 +96,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- LOGS/TRACES -->
                   <template v-if="isEventBased">
                     <!-- Alert if row -->
-                    <div
-                      class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+                    <OSettingRow
                       data-test="alert-if-row-logs"
+                      :label="t('alerts.plain.notifyMeWhen')"
+                      fill
                     >
-                      <span
-                        class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                        >{{ t("alerts.plain.notifyMeWhen") }}</span
-                      >
                       <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1.5">
                         <!-- Measurement sentence: WHAT to measure. Severity rows
                          below say WHEN it fires (mock: multi-alert-form.html). -->
@@ -350,24 +347,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </template>
                       </div>
-                    </div>
+                    </OSettingRow>
 
                     <!-- group by row (hidden for count mode) -->
-                    <div
+                    <OSettingRow
                       v-if="selectedFunction !== 'total_events' && tierShows('groupBy')"
-                      class="rounded-default text-compact flex items-center gap-3 px-3 py-2"
                       data-test="alert-group-by-row"
+                      :label="t('alerts.plain.groupedBy')"
+                      :info="t('alerts.queryConfig.groupByTooltip')"
+                      fill
                     >
-                      <span
-                        class="text-text-heading text-compact min-w-22.5 shrink-0 font-bold whitespace-nowrap"
-                      >
-                        {{ t("alerts.plain.groupedBy") }}
-                        <OTooltip
-                          :content="t('alerts.queryConfig.groupByTooltip')"
-                          :delay="300"
-                          side="top"
-                        />
-                      </span>
                       <div class="flex flex-wrap items-center gap-2">
                         <template v-for="(group, index) in logGroupByRows" :key="index">
                           <div class="flex items-center gap-1">
@@ -401,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
                         </OButton>
                       </div>
-                    </div>
+                    </OSettingRow>
 
                     <!-- Simple vs Multi alert (M-9) — only once a group-by exists -->
                     <AlertMultiToggle
@@ -414,23 +403,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      added, and NOT for a multi-alert: per-group evaluation
                      fires on any breaching group, so a group-count rule has no
                      meaning there and M-10 rejects it at save time. -->
-                    <div
+                    <OSettingRow
                       v-if="
                         selectedFunction !== 'total_events' && hasLogGroupByFields && !isMultiAlert
                       "
-                      class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                       data-test="alert-having-groups-row"
+                      :label="t('alerts.plain.groupsCount')"
+                      :info="t('alerts.queryConfig.havingGroupsTooltip')"
+                      fill
                     >
-                      <span
-                        class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                      >
-                        {{ t("alerts.plain.groupsCount") }}
-                        <OTooltip
-                          :content="t('alerts.queryConfig.havingGroupsTooltip')"
-                          :delay="300"
-                          side="top"
-                        />
-                      </span>
                       <div class="flex flex-nowrap items-start gap-2">
                         <OFormSelect
                           :aria-label="t('common.operator')"
@@ -463,19 +444,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </OSettingRow>
                   </template>
 
                   <!-- METRICS -->
                   <template v-else>
                     <!-- Alert if row -->
-                    <div
-                      class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
-                    >
-                      <span
-                        class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                        >{{ t("alerts.plain.notifyMeWhen") }}</span
-                      >
+                    <OSettingRow :label="t('alerts.plain.notifyMeWhen')" fill>
                       <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1.5">
                         <!-- Measurement sentence: WHAT to measure. Severity rows
                          below say WHEN it fires (mock: multi-alert-form.html). -->
@@ -748,27 +723,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </template>
                       </div>
-                    </div>
+                    </OSettingRow>
 
                     <!-- group by row — hidden for count mode -->
-                    <div
+                    <OSettingRow
                       v-if="
                         inputData.aggregation &&
                         selectedFunction !== 'total_events' &&
                         tierShows('groupBy')
                       "
-                      class="rounded-default text-compact flex items-center gap-3 px-3 py-2"
+                      :label="t('alerts.plain.groupedBy')"
+                      :info="t('alerts.queryConfig.groupByTooltip')"
+                      fill
                     >
-                      <span
-                        class="text-text-heading text-compact min-w-22.5 shrink-0 font-bold whitespace-nowrap"
-                      >
-                        {{ t("alerts.plain.groupedBy") }}
-                        <OTooltip
-                          :content="t('alerts.queryConfig.groupByTooltip')"
-                          :delay="300"
-                          side="top"
-                        />
-                      </span>
                       <div class="flex flex-wrap items-center gap-2">
                         <template v-for="(group, index) in metricGroupByRows" :key="index">
                           <div class="flex items-center gap-1">
@@ -801,7 +768,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
                         </OButton>
                       </div>
-                    </div>
+                    </OSettingRow>
 
                     <!-- Simple vs Multi alert (M-9) — only once a group-by exists -->
                     <AlertMultiToggle
@@ -812,24 +779,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- no. of groups row — hidden for a multi-alert, see the log
                      branch above for why. -->
-                    <div
+                    <OSettingRow
                       v-if="
                         selectedFunction !== 'total_events' &&
                         hasMetricGroupByFields &&
                         !isMultiAlert
                       "
-                      class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+                      :label="t('alerts.plain.groupsCount')"
+                      :info="t('alerts.queryConfig.havingGroupsTooltip')"
+                      fill
                     >
-                      <span
-                        class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                      >
-                        {{ t("alerts.plain.groupsCount") }}
-                        <OTooltip
-                          :content="t('alerts.queryConfig.havingGroupsTooltip')"
-                          :delay="300"
-                          side="top"
-                        />
-                      </span>
                       <div class="flex flex-nowrap items-start gap-2">
                         <OFormSelect
                           :aria-label="t('common.operator')"
@@ -862,7 +821,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </OSettingRow>
                   </template>
                 </div></Teleport
               >
@@ -872,15 +831,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="!sectionTargets?.querySchedule"
               >
                 <!-- Check every row -->
-                <div
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+                <OSettingRow
+                  :label="t('alerts.queryConfig.checkEvery')"
+                  required
+                  :info="t('alerts.howOftenCheckTooltip')"
+                  fill
                 >
-                  <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-7 font-bold whitespace-nowrap"
-                  >
-                    {{ t("alerts.queryConfig.checkEvery") }} *
-                    <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
-                  </span>
                   <div class="flex flex-col gap-1">
                     <div class="flex items-center gap-2 max-md:flex-wrap">
                       <!-- Minutes/hours mode: number input -->
@@ -1018,7 +974,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ cronError }}
                     </div>
                   </div>
-                </div>
+                </OSettingRow>
               </Teleport>
             </div>
 
@@ -1352,15 +1308,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="!sectionTargets?.querySchedule"
               >
                 <!-- Check every -->
-                <div
-                  class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+                <OSettingRow
+                  :label="t('alerts.queryConfig.checkEvery')"
+                  required
+                  :info="t('alerts.howOftenCheckTooltip')"
+                  fill
                 >
-                  <span
-                    class="text-text-heading text-compact shrink-0 leading-7 font-bold whitespace-nowrap"
-                  >
-                    {{ t("alerts.queryConfig.checkEvery") }} *
-                    <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
-                  </span>
                   <div class="flex flex-col gap-1">
                     <div class="flex items-center gap-2">
                       <template v-if="frequencyMode !== 'cron'">
@@ -1442,7 +1395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ cronError }}
                     </div>
                   </div>
-                </div>
+                </OSettingRow>
               </Teleport>
 
               <Teleport
@@ -1460,14 +1413,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
 
                   <!-- SQL Simple: Alert if No. of events -->
-                  <div
+                  <OSettingRow
                     v-if="localTab === 'sql' && !isMultiAlert"
-                    class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+                    :label="t('alerts.plain.queryReturns')"
+                    fill
                   >
-                    <span
-                      class="text-text-heading text-compact shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                      >{{ t("alerts.plain.queryReturns") }}</span
-                    >
                     <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1.5">
                       <div class="flex flex-wrap items-start gap-2">
                         <OFormSelect
@@ -1564,7 +1514,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OButton>
                       </div>
                     </div>
-                  </div>
+                  </OSettingRow>
 
                   <!-- SQL Multi: Alert if [column]. Reuses the exact
                    having.operator/.value + warning_value fields Custom's
@@ -1575,14 +1525,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    sql_simple_multi_alert_fe_prd.md) rather than a fixed
                    literal — options are refreshed on the same validate-sql
                    pass as the SQL editor's own validation. -->
-                  <div
+                  <OSettingRow
                     v-if="localTab === 'sql' && isMultiAlert"
-                    class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+                    :label="t('alerts.plain.notifyMeWhen')"
+                    fill
                   >
-                    <span
-                      class="text-text-heading text-compact shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                      >{{ t("alerts.plain.notifyMeWhen") }}</span
-                    >
                     <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1.5">
                       <div class="flex items-start gap-2">
                         <span
@@ -1699,7 +1646,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OButton>
                       </div>
                     </div>
-                  </div>
+                  </OSettingRow>
 
                   <div
                     v-if="localTab === 'promql' && !isForecastMode"
@@ -1721,19 +1668,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template
                     v-else-if="localTab === 'promql' && (promqlCondition || isPromRuleMode)"
                   >
-                    <div
+                    <OSettingRow
                       v-if="!isPromRuleMode"
-                      class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+                      :label="t('alerts.plain.valueIs')"
+                      :info="t('alerts.queryConfig.alertIfValueIsTooltip')"
+                      fill
                     >
-                      <span
-                        class="text-text-heading text-compact shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                        >{{ t("alerts.plain.valueIs") }}
-                        <OTooltip
-                          :content="t('alerts.queryConfig.alertIfValueIsTooltip')"
-                          :delay="300"
-                          side="top"
-                        />
-                      </span>
                       <div class="flex flex-col gap-1.5">
                         <div class="flex items-start gap-2">
                           <OFormSelect
@@ -1825,7 +1765,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </OButton>
                         </div>
                       </div>
-                    </div>
+                    </OSettingRow>
                     <AlertMultiToggle
                       :enabled="isPromqlMultiAlert"
                       :disabled="isRuleMultiRequired"
@@ -1839,19 +1779,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </p>
 
                     <!-- Rule expressions own matching, so an extra series-count gate would change their semantics. -->
-                    <div
+                    <OSettingRow
                       v-if="!isPromqlMultiAlert && !isPromRuleMode"
-                      class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
+                      :label="t('alerts.plain.seriesCount')"
+                      :info="t('alerts.queryConfig.havingSeriesTooltip')"
+                      fill
                     >
-                      <span
-                        class="text-text-heading text-compact shrink-0 leading-8.5 font-bold whitespace-nowrap"
-                        >{{ t("alerts.plain.seriesCount") }}
-                        <OTooltip
-                          :content="t('alerts.queryConfig.havingSeriesTooltip')"
-                          :delay="300"
-                          side="top"
-                        />
-                      </span>
                       <div class="flex items-start gap-2">
                         <OFormSelect
                           :aria-label="t('common.operator')"
@@ -1883,7 +1816,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </OSettingRow>
                   </template>
                 </div></Teleport
               >
@@ -1983,6 +1916,7 @@ import {
   parseForecastAlertPromql,
 } from "@/utils/alerts/forecastAlert";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
@@ -2013,6 +1947,7 @@ export default defineComponent({
     OSwitch,
     OFormSwitch,
     OTooltip,
+    OSettingRow,
     OIcon,
     OFormInput,
     OFormSelect,
@@ -3307,34 +3242,18 @@ export default defineComponent({
         ];
       }
 
-      // For metrics, show all three tabs: Builder, SQL, PromQL
+      // SQL and PromQL lead: alerts are mostly written as queries, the builder is the fallback.
       if (props.streamType === "metrics") {
         return [
-          {
-            label: t("alerts.queryBuilder"),
-            value: "custom",
-          },
-          {
-            label: raw("SQL"),
-            value: "sql",
-          },
-          {
-            label: raw("PromQL"),
-            value: "promql",
-          },
+          { label: raw("SQL"), value: "sql" },
+          { label: raw("PromQL"), value: "promql" },
+          { label: t("alerts.queryBuilder"), value: "custom" },
         ];
       }
 
-      // For logs and traces, show only Builder and SQL
       return [
-        {
-          label: t("alerts.queryBuilder"),
-          value: "custom",
-        },
-        {
-          label: raw("SQL"),
-          value: "sql",
-        },
+        { label: raw("SQL"), value: "sql" },
+        { label: t("alerts.queryBuilder"), value: "custom" },
       ];
     });
     // Hide tabs completely for real-time alerts (only one option)

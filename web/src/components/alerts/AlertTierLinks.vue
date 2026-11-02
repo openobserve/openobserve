@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import type { AlertSectionId } from "./alertFormSections";
 import {
   moreLinkLabel,
@@ -64,29 +65,31 @@ const moreLabel = computed(() =>
 <template>
   <div
     v-if="rows.length || view.tucked.length"
-    class="flex flex-col gap-1"
+    class="flex flex-col"
     :data-test="`add-alert-section-${section}-tiers`"
   >
-    <div
+    <OSettingRow
       v-for="r in rows"
       :key="r.row"
-      class="flex flex-wrap items-center gap-x-1 gap-y-1"
+      :label="r.label"
+      fill
       :data-test="`add-alert-section-${section}-row-${r.row}`"
     >
-      <span class="text-text-secondary w-28 shrink-0 text-sm max-md:w-full">{{ r.label }}</span>
-      <OButton
-        v-for="item in r.items"
-        :key="item.id"
-        variant="ghost-primary"
-        size="sm"
-        icon-left="add"
-        :data-test="`add-alert-add-${item.id}`"
-        @click="emit('add', item.id)"
-      >
-        {{ t(item.nameKey) }}
-      </OButton>
-    </div>
-    <div v-if="view.tucked.length">
+      <div class="flex flex-wrap items-center gap-1">
+        <OButton
+          v-for="item in r.items"
+          :key="item.id"
+          variant="ghost-primary"
+          size="sm"
+          icon-left="add"
+          :data-test="`add-alert-add-${item.id}`"
+          @click="emit('add', item.id)"
+        >
+          {{ t(item.nameKey) }}
+        </OButton>
+      </div>
+    </OSettingRow>
+    <div v-if="view.tucked.length" class="py-1">
       <OButton
         variant="ghost-primary"
         size="sm"
