@@ -118,6 +118,9 @@ pub struct LinkSubscriptionResponse {
     context_path = "/api",
     tag = "AWS Marketplace",
     operation_id = "LinkAwsMarketplaceSubscription",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Link AWS Marketplace subscription to organization",
     description = "Exchanges AWS Marketplace token for customer info and creates pending subscription",
     security(

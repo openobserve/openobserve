@@ -906,6 +906,7 @@ pub async fn delete_stream_data_by_time_range(
         ("Authorization"= [])
     ),
     params(
+        ("id" = String, Path, description = "Deletion job id"),
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
     ),

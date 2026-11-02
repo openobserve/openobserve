@@ -675,6 +675,9 @@ pub async fn create_org(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "ExtendTrialPeriod",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Extend organization trial period",
     description = "Extends the trial period for a specified organization to a new end date. This administrative endpoint allows extending trial periods for organizations, giving them more time to evaluate the service before requiring a paid subscription.",
     security(
@@ -953,6 +956,9 @@ pub async fn set_paid_overage_status(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "CreateExternalContract",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Create an external contract subscription for an organization",
     security(
         ("Authorization"= [])
@@ -1071,6 +1077,9 @@ pub async fn create_external_contract(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "ExtendExternalContract",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Extend an external contract end date",
     security(
         ("Authorization"= [])
@@ -1203,6 +1212,9 @@ pub async fn revoke_external_contract(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "EnableOrgStorage",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Enable Org storage for an org",
     description = "Enables org level storage for an org.",
     security(
@@ -1347,6 +1359,7 @@ pub async fn get_org_invites(Path(path): Path<String>) -> Response {
     params(
         ("org_id" = String, Path, description = "Organization id"),
       ),
+    request_body(content = inline(OrganizationInvites), description = "Emails to invite and the role they join with", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(common::meta::organization::OrganizationInviteResponse)),
     ),

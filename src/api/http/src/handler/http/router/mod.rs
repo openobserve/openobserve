@@ -5351,8 +5351,6 @@ mod tests {
         "GET /api/{org_id}/folders/{folder_id}",
         "POST /api/{org_id}/folders",
         "PUT /api/{org_id}/folders/{folder_id}",
-        // o2-enterprise rbac_known_gaps.txt keys this path; fixing it needs a paired change there.
-        "POST /{org_id}/service_streams/_correlate",
     ];
 
     #[cfg(feature = "enterprise")]

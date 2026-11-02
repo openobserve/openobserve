@@ -57,6 +57,9 @@ fn otlp_request_type_from_content_type(content_type: &str) -> Option<OtlpRequest
     context_path = "/api",
     tag = "Profiles",
     operation_id = "PostProfiles",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Ingest profiles data via OTLP",
     description = "Ingests OpenTelemetry profiles data using OTLP protobuf or JSON payloads.",
     extensions(
@@ -66,7 +69,10 @@ fn otlp_request_type_from_content_type(content_type: &str) -> Option<OtlpRequest
     security(("Authorization" = [])),
     responses(
         (status = 200, description = "ExportProfilesServiceResponse, encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),
-        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+        (status = 400, description = "Invalid payload, or a Content-Type other than JSON or protobuf (answered in JSON); google.rpc.Status encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 429, description = "Trial period expired; google.rpc.Status encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 500, description = "Failure; google.rpc.Status encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 503, description = "Ingestion temporarily unavailable; google.rpc.Status encoded like the request", content(("application/x-protobuf"), (Object = "application/json"))),
     )
 )]
 pub async fn otlp_profiles_write(

@@ -268,6 +268,7 @@ all response GET /api/{org_id}/service_streams
 all summary GET /api/{org_id}/service_streams
 all mcp GET /api/{org_id}/service_streams/_analytics
 all ratelimit GET /api/{org_id}/service_streams/_analytics
+all ratelimit POST /api/{org_id}/service_streams/_correlate
 all mcp GET /api/{org_id}/service_streams/config/identity
 all ratelimit GET /api/{org_id}/service_streams/config/identity
 all response GET /api/{org_id}/service_streams/config/identity
@@ -429,8 +430,6 @@ all tag POST /rum/v1/{org_id}/replay
 all ratelimit POST /rum/v1/{org_id}/rum
 all response POST /rum/v1/{org_id}/rum
 all tag POST /rum/v1/{org_id}/rum
-all ratelimit POST /{org_id}/service_streams/_correlate
-all route POST /{org_id}/service_streams/_correlate
 oss response GET /.well-known/oauth-authorization-server
 oss response DELETE /api/v2/{org_id}/alerts/incidents/{incident_id}/rca
 oss response GET /api/v2/{org_id}/alerts/incidents/{incident_id}/rca/live_stream
@@ -516,6 +515,7 @@ oss route GET /api/{org_id}/search_jobs/{job_id}/result
 oss route POST /api/{org_id}/search_jobs/{job_id}/retry
 oss route GET /api/{org_id}/service_streams
 oss route GET /api/{org_id}/service_streams/_analytics
+oss route POST /api/{org_id}/service_streams/_correlate
 oss route GET /api/{org_id}/service_streams/config/identity
 oss route PUT /api/{org_id}/service_streams/config/identity
 oss route GET /api/{org_id}/settings/gen_ai/agent_mapping

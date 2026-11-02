@@ -226,6 +226,7 @@ pub async fn list_services(
 #[utoipa::path(
     post,
     path = "/{org_id}/service_streams/_correlate",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "CorrelateServiceStreams",
     params(

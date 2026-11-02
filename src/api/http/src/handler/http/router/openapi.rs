@@ -1460,6 +1460,24 @@ impl Modify for SecurityAddon {
             "BasicAuth",
             SecurityScheme::Http(Http::new(HttpAuthScheme::Basic)),
         );
+        components.add_security_scheme(
+            "FirehoseAccessKey",
+            SecurityScheme::ApiKey(utoipa::openapi::security::ApiKey::Header(
+                utoipa::openapi::security::ApiKeyValue::with_description(
+                    "X-Amz-Firehose-Access-Key",
+                    "base64 of user:password",
+                ),
+            )),
+        );
+        components.add_security_scheme(
+            "GcpApiKey",
+            SecurityScheme::ApiKey(utoipa::openapi::security::ApiKey::Query(
+                utoipa::openapi::security::ApiKeyValue::with_description(
+                    "API-Key",
+                    "base64 of user:password",
+                ),
+            )),
+        );
     }
 }
 

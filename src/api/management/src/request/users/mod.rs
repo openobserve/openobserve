@@ -562,6 +562,7 @@ pub async fn delete(
     params(
         ("org_id" = String, Path, description = "Organization name"),
       ),
+    request_body(content = BulkDeleteRequest, description = "Emails of the users to remove", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
@@ -836,7 +837,7 @@ const fn default_exp_in() -> u32 {
     tag = "Auth",
     operation_id = "GetPresignedLoginUrl",
     summary = "Generate a presigned login URL",
-    security(("Authorization" = [])),
+    security(("BasicAuth" = [])),
     params(
         ("exp_in" = Option<u32>, Query, description = "URL lifetime in seconds, 600 by default"),
     ),
@@ -1353,7 +1354,7 @@ pub async fn decline_invitation(
         ("token" = String, Path, description = "invitation token"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Invitations are only supported in the cloud edition", content_type = "application/json", body = String, example = json!("Not Supported")),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
@@ -1387,7 +1388,7 @@ pub async fn decline_invitation(
         ("Authorization"= [])
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Invitations are only supported in the cloud edition", content_type = "application/json", body = String, example = json!("Not Supported")),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),

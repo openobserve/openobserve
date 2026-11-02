@@ -30,6 +30,7 @@ const ROUTER_SOURCE: &str = include_str!("../mod.rs");
 const EXCLUDED_ROUTES: &str = include_str!("excluded_routes.txt");
 const RATELIMIT_EXEMPT: &str = include_str!("ratelimit_exempt.txt");
 const BASELINE: &str = include_str!("baseline.txt");
+const MCP_ENABLED: &str = include_str!("mcp_enabled.txt");
 
 // Sits just below the real counts, so a parser regression that loses routes fails loudly.
 const MIN_PARSED_ROUTES: usize = 900;
@@ -69,10 +70,11 @@ const ROUTER_PREFIXES: &[(&str, &str)] = &[
 /// Only serves UI redirects, computed from `base_uri` at startup.
 const UNSCANNED_ROUTERS: &[&str] = &["create_app_router"];
 
-/// What a handler really answers on success: method, path, status, content type, schema shape.
-const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
-    ("POST", "/api/license", "201", JSON, "string"),
+/// What a handler really answers on success: edition, method, path, status, content type, shape.
+const SUCCESS_CONTRACTS: &[ContractRow] = &[
+    ("ent", "POST", "/api/license", "201", JSON, "string"),
     (
+        "all",
         "POST",
         "/api/v2/{org_id}/incidents/events",
         "202",
@@ -80,6 +82,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "object",
     ),
     (
+        "all",
         "POST",
         "/api/v2/{org_id}/incidents/events/{token}",
         "202",
@@ -87,14 +90,16 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "object",
     ),
     (
+        "all",
         "POST",
         "/api/{org_id}/v1/profiles",
         "200",
         "application/x-protobuf",
         "none",
     ),
-    ("POST", "/api/license/refresh", "200", JSON, "string"),
+    ("ent", "POST", "/api/license/refresh", "200", JSON, "string"),
     (
+        "all",
         "GET",
         "/api/{org_id}/synthetics/{id}/artifact",
         "200",
@@ -102,6 +107,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "binary",
     ),
     (
+        "all",
         "GET",
         "/api/{org_id}/synthetics/{id}/artifact",
         "200",
@@ -109,16 +115,39 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "binary",
     ),
     (
+        "ent",
         "PUT",
         "/api/{org_id}/query_manager/cancel",
         "200",
         JSON,
         "array",
     ),
-    ("POST", "/api/{org_id}/sourcemaps", "201", JSON, "object"),
-    ("GET", "/api/{org_id}/sourcemaps", "200", JSON, "array"),
-    ("GET", "/api/{org_id}/users/roles", "200", JSON, "array"),
     (
+        "all",
+        "POST",
+        "/api/{org_id}/sourcemaps",
+        "201",
+        JSON,
+        "object",
+    ),
+    (
+        "all",
+        "GET",
+        "/api/{org_id}/sourcemaps",
+        "200",
+        JSON,
+        "array",
+    ),
+    (
+        "all",
+        "GET",
+        "/api/{org_id}/users/roles",
+        "200",
+        JSON,
+        "array",
+    ),
+    (
+        "all",
         "GET",
         "/api/{org_id}/org_cleanup_tasks/{target_org_id}",
         "200",
@@ -126,6 +155,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "array",
     ),
     (
+        "ent",
         "GET",
         "/api/{org_id}/ratelimit/api_modules",
         "200",
@@ -133,6 +163,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "array",
     ),
     (
+        "all",
         "GET",
         "/api/{org_id}/status_pages/{id}/domains",
         "200",
@@ -140,6 +171,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "array",
     ),
     (
+        "all",
         "GET",
         "/api/{org_id}/status_pages/{id}/notices",
         "200",
@@ -147,14 +179,23 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "array",
     ),
     (
+        "all",
         "GET",
         "/api/{org_id}/status_pages/notices/{nid}/updates",
         "200",
         JSON,
         "array",
     ),
-    ("GET", "/api/{org_id}/oncall/teams", "200", JSON, "array"),
     (
+        "ent",
+        "GET",
+        "/api/{org_id}/oncall/teams",
+        "200",
+        JSON,
+        "array",
+    ),
+    (
+        "ent",
         "GET",
         "/api/{org_id}/oncall/responses",
         "200",
@@ -162,6 +203,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "array",
     ),
     (
+        "ent",
         "GET",
         "/api/{org_id}/oncall/teams/{team_id}/schedule",
         "200",
@@ -169,6 +211,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "nullable",
     ),
     (
+        "ent",
         "POST",
         "/api/{org_id}/oncall/contacts/{user_email}/verify",
         "204",
@@ -176,6 +219,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "none",
     ),
     (
+        "ent",
         "POST",
         "/api/{org_id}/ai/chat_stream",
         "200",
@@ -183,6 +227,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "none",
     ),
     (
+        "all",
         "POST",
         "/api/{org_id}/prometheus/api/v1/query_range",
         "200",
@@ -190,6 +235,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "object",
     ),
     (
+        "all",
         "POST",
         "/api/{org_id}/prometheus/api/v1/query_range",
         "200",
@@ -197,6 +243,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "none",
     ),
     (
+        "all",
         "POST",
         "/api/{org_id}/_search_multi_stream",
         "200",
@@ -204,6 +251,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "none",
     ),
     (
+        "all",
         "GET",
         "/api/{org_id}/{stream_name}/traces/latest_stream",
         "200",
@@ -211,6 +259,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "none",
     ),
     (
+        "ent",
         "DELETE",
         "/api/{org_id}/datasets/{dataset_id}",
         "200",
@@ -218,6 +267,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "object",
     ),
     (
+        "ent",
         "DELETE",
         "/api/{org_id}/scorers/{entity_id}",
         "200",
@@ -225,15 +275,24 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "object",
     ),
     (
+        "ent",
         "DELETE",
         "/api/{org_id}/re_patterns/{pattern_id}",
         "200",
         JSON,
         "object",
     ),
-    ("POST", "/api/{org_id}/storage", "201", JSON, "object"),
-    ("PUT", "/api/{org_id}/storage", "201", JSON, "object"),
     (
+        "ent",
+        "POST",
+        "/api/{org_id}/storage",
+        "201",
+        JSON,
+        "object",
+    ),
+    ("ent", "PUT", "/api/{org_id}/storage", "201", JSON, "object"),
+    (
+        "cloud",
         "GET",
         "/api/{org_id}/billing_group/invites",
         "200",
@@ -241,6 +300,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "array",
     ),
     (
+        "cloud",
         "GET",
         "/api/{org_id}/billing_group/members",
         "200",
@@ -248,6 +308,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "array",
     ),
     (
+        "cloud",
         "POST",
         "/api/{org_id}/azure-marketplace/link-subscription",
         "201",
@@ -255,21 +316,39 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "object",
     ),
     (
+        "cloud",
         "GET",
         "/api/{org_id}/billings/checkout_session_detail",
         "302",
-        "text/html",
-        "string",
+        "",
+        "none",
     ),
     (
+        "cloud",
+        "POST",
+        "/api/{org_id}/invites",
+        "200",
+        JSON,
+        "object",
+    ),
+    (
+        "cloud",
         "GET",
         "/api/{org_id}/billings/unsubscribe",
         "200",
         "text/plain",
         "string",
     ),
-    ("GET", "/api/{org_id}/invites", "200", JSON, "array"),
     (
+        "cloud",
+        "GET",
+        "/api/{org_id}/invites",
+        "200",
+        JSON,
+        "array",
+    ),
+    (
+        "cloud",
         "DELETE",
         "/api/{org_id}/invites/{token}",
         "200",
@@ -277,6 +356,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "string",
     ),
     (
+        "cloud",
         "POST",
         "/api/{org_id}/external_contract",
         "200",
@@ -284,6 +364,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "object",
     ),
     (
+        "cloud",
         "PUT",
         "/api/{org_id}/enable_org_storage",
         "200",
@@ -291,6 +372,7 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
         "object",
     ),
     (
+        "cloud",
         "PUT",
         "/api/{org_id}/extend_trial_period",
         "200",
@@ -299,37 +381,46 @@ const SUCCESS_CONTRACTS: &[(&str, &str, &str, &str, &str)] = &[
     ),
 ];
 
-/// Multipart uploads and the part each handler cannot work without.
-const MULTIPART_UPLOADS: &[(&str, &str)] = &[
-    ("/api/{org_id}/sourcemaps", "file"),
-    ("/api/{org_id}/datasets/{dataset_id}/items/import", "file"),
-    ("/api/{org_id}/settings/logo", "file"),
+/// Multipart uploads (edition, path) and the part each handler cannot work without.
+const MULTIPART_UPLOADS: &[(&str, &str, &str)] = &[
+    ("all", "/api/{org_id}/sourcemaps", "file"),
+    (
+        "ent",
+        "/api/{org_id}/datasets/{dataset_id}/items/import",
+        "file",
+    ),
+    ("all", "/api/{org_id}/settings/logo", "file"),
 ];
 
-/// Query parameters the handler rejects a request without.
-const REQUIRED_QUERY_PARAMS: &[(&str, &str, &str)] = &[
+/// Query parameters (edition, method, path, name) the handler rejects a request without.
+const REQUIRED_QUERY_PARAMS: &[(&str, &str, &str, &str)] = &[
     (
+        "all",
         "POST",
         "/api/{org_id}/prometheus/api/v1/format_query",
         "query",
     ),
-    ("GET", "/api/{org_id}/search/profile", "trace_id"),
+    ("ent", "GET", "/api/{org_id}/search/profile", "trace_id"),
     (
+        "cloud",
         "GET",
         "/api/{org_id}/billings/checkout_session_detail",
         "session_id",
     ),
     (
+        "cloud",
         "GET",
         "/api/{org_id}/billings/checkout_session_detail",
         "status",
     ),
     (
+        "cloud",
         "GET",
         "/api/{org_id}/billings/checkout_session_detail",
         "plan",
     ),
     (
+        "cloud",
         "GET",
         "/api/{org_id}/billings/hosted_subscription_url",
         "plan",
@@ -337,22 +428,57 @@ const REQUIRED_QUERY_PARAMS: &[(&str, &str, &str)] = &[
 ];
 
 /// Handlers that take no body, so a documented one would only mislead a generated client.
-const BODYLESS_ROUTES: &[(&str, &str)] = &[
-    ("POST", "/api/{org_id}/billing_group/invites/{token}/accept"),
+const BODYLESS_ROUTES: &[(&str, &str, &str)] = &[
     (
+        "cloud",
+        "POST",
+        "/api/{org_id}/billing_group/invites/{token}/accept",
+    ),
+    (
+        "cloud",
         "DELETE",
         "/api/{org_id}/billing_group/invites/{token}/reject",
     ),
-    ("GET", "/api/{org_id}/billing_group/members"),
-    ("GET", "/api/{org_id}/billing_group/membership"),
+    ("cloud", "GET", "/api/{org_id}/billing_group/members"),
+    ("cloud", "GET", "/api/{org_id}/billing_group/membership"),
+    (
+        "all",
+        "POST",
+        "/api/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/pause",
+    ),
+    (
+        "all",
+        "POST",
+        "/api/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/refresh",
+    ),
+    (
+        "all",
+        "POST",
+        "/api/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/resume",
+    ),
+    ("all", "POST", "/api/{org_id}/status_pages/{id}/rotate_slug"),
+    (
+        "all",
+        "POST",
+        "/api/{org_id}/org_cleanup_tasks/{target_org_id}/retry",
+    ),
+    ("all", "DELETE", "/api/{org_id}/synthetics/locations/{id}"),
+];
+
+/// Stubs that answer 403 in every build outside cloud, so they document no success response.
+const ALWAYS_FORBIDDEN: &[(&str, &str, &str)] = &[
+    ("noncloud", "GET", "/api/invites"),
+    ("noncloud", "DELETE", "/api/invites/{token}"),
 ];
 
 /// `Option<Json<T>>` bodies and their schema: leaving the body out works, a JSON `null` is a 422.
-const OPTIONAL_BODIES: &[(&str, &str, &str)] = &[("POST", "/auth/login", "SignInUser")];
+const OPTIONAL_BODIES: &[(&str, &str, &str, &str)] =
+    &[("all", "POST", "/auth/login", "SignInUser")];
 
-/// Body fields clients rely on: method, path, request or status, fields, required fields.
+/// Body fields clients rely on: edition, method, path, request or status, fields, required fields.
 const BODY_FIELDS: &[BodyFieldsRow] = &[
     (
+        "cloud",
         "GET",
         "/api/{org_id}/billings/data_usage/{usage_date}",
         "200",
@@ -360,6 +486,7 @@ const BODY_FIELDS: &[BodyFieldsRow] = &[
         &["price_details"],
     ),
     (
+        "all",
         "POST",
         "/api/{org_id}/synthetics/{id}/artifacts/presign",
         "request",
@@ -367,6 +494,7 @@ const BODY_FIELDS: &[BodyFieldsRow] = &[
         &["keys"],
     ),
     (
+        "all",
         "POST",
         "/api/{org_id}/synthetics/{id}/artifacts/presign",
         "200",
@@ -374,6 +502,7 @@ const BODY_FIELDS: &[BodyFieldsRow] = &[
         &["expires_in", "mode", "urls"],
     ),
     (
+        "all",
         "POST",
         "/api/{org_id}/synthetics/agent-tokens",
         "request",
@@ -381,6 +510,7 @@ const BODY_FIELDS: &[BodyFieldsRow] = &[
         &["name"],
     ),
     (
+        "all",
         "POST",
         "/api/{org_id}/synthetics/agent-tokens/rotate",
         "request",
@@ -388,6 +518,7 @@ const BODY_FIELDS: &[BodyFieldsRow] = &[
         &[],
     ),
     (
+        "all",
         "PATCH",
         "/api/{org_id}/synthetics/agent-tokens/{name}",
         "request",
@@ -395,6 +526,7 @@ const BODY_FIELDS: &[BodyFieldsRow] = &[
         &["enabled"],
     ),
     (
+        "all",
         "PUT",
         "/api/{org_id}/synthetics/locations/{id}",
         "request",
@@ -402,6 +534,7 @@ const BODY_FIELDS: &[BodyFieldsRow] = &[
         &["label"],
     ),
     (
+        "ent",
         "POST",
         "/api/{org_id}/traces/agent_signals/compare",
         "request",
@@ -409,23 +542,59 @@ const BODY_FIELDS: &[BodyFieldsRow] = &[
         &["a", "b"],
     ),
     (
+        "all",
         "POST",
         "/gcp/{org_id}/{stream_name}/_sub",
         "request",
         &["message", "subscription"],
         &["message", "subscription"],
     ),
-    ("POST", "/api/license", "request", &["key"], &["key"]),
+    ("ent", "POST", "/api/license", "request", &["key"], &["key"]),
     (
+        "ent",
         "POST",
         "/config/token",
         "request",
         &["token", "token_type"],
         &["token", "token_type"],
     ),
+    (
+        "all",
+        "DELETE",
+        "/api/{org_id}/users/bulk",
+        "request",
+        &["ids"],
+        &["ids"],
+    ),
+    (
+        "all",
+        "POST",
+        "/api/{org_id}/sourcemaps/stacktrace",
+        "request",
+        &["env", "service", "stacktrace", "version"],
+        &["stacktrace"],
+    ),
+    (
+        "cloud",
+        "POST",
+        "/api/{org_id}/invites",
+        "request",
+        &["invites", "role"],
+        &["role"],
+    ),
 ];
 
+type ContractRow = (
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+);
+
 type BodyFieldsRow = (
+    &'static str,
     &'static str,
     &'static str,
     &'static str,
@@ -757,19 +926,35 @@ fn reasoned_entries(file: &'static str) -> BTreeSet<&'static str> {
     entries
 }
 
-/// Baseline lines that apply to this build, as `rule METHOD /path`.
-fn baseline_entries() -> BTreeSet<String> {
+/// Whether a row or line tagged with `edition` describes this build.
+fn edition_applies(edition: &str) -> bool {
+    match edition {
+        "all" => true,
+        "oss" => cfg!(not(feature = "enterprise")),
+        "ent" => cfg!(feature = "enterprise"),
+        "cloud" => cfg!(feature = "cloud"),
+        "noncloud" => cfg!(not(feature = "cloud")),
+        other => panic!("unknown edition {other}"),
+    }
+}
+
+/// The floor of table rows a test must check in this build: OSS, enterprise, cloud.
+fn build_floor(oss: usize, enterprise: usize, cloud: usize) -> usize {
+    if cfg!(feature = "cloud") {
+        cloud
+    } else if cfg!(feature = "enterprise") {
+        enterprise
+    } else {
+        oss
+    }
+}
+
+/// `edition entry` lines that apply to this build, without their edition.
+fn edition_entries(file: &'static str) -> BTreeSet<String> {
     let mut entries = BTreeSet::new();
-    for line in data_lines(BASELINE) {
-        let (edition, entry) = line.split_once(' ').expect("baseline needs an edition");
-        let applies = match edition {
-            "all" => true,
-            "oss" => cfg!(not(feature = "enterprise")),
-            "ent" => cfg!(feature = "enterprise"),
-            "cloud" => cfg!(feature = "cloud"),
-            other => panic!("unknown baseline edition {other}"),
-        };
-        if applies {
+    for line in data_lines(file) {
+        let (edition, entry) = line.split_once(' ').expect("line needs an edition");
+        if edition_applies(edition) {
             assert!(
                 entries.insert(entry.to_string()),
                 "duplicate entry: {entry}"
@@ -777,6 +962,11 @@ fn baseline_entries() -> BTreeSet<String> {
         }
     }
     entries
+}
+
+/// Baseline lines that apply to this build, as `rule METHOD /path`.
+fn baseline_entries() -> BTreeSet<String> {
+    edition_entries(BASELINE)
 }
 
 /// The baseline split into unpublished routes and operation rule violations.
@@ -803,8 +993,9 @@ fn has_success_body(op: &Value) -> bool {
         return false;
     };
     responses.iter().any(|(status, response)| {
-        // 204 has no body to describe, and a 302 is how a redirect handler succeeds.
+        // 204 has no body to describe, and a redirect handler succeeds with a 302.
         status == "204"
+            || (status == "302" && response["headers"]["Location"].is_object())
             || ((status.starts_with('2') || status == "302")
                 && response["content"]
                     .as_object()
@@ -816,6 +1007,25 @@ fn find_op<'a>(ops: &'a [PublishedOp], method: &str, path: &str) -> Option<&'a V
     ops.iter()
         .find(|published| published.method == method && published.path == path)
         .map(|published| &published.op)
+}
+
+/// The op a table row names, `None` in builds the row is not for; an unpublished op panics.
+fn row_op<'a>(
+    ops: &'a [PublishedOp],
+    edition: &str,
+    method: &str,
+    path: &str,
+) -> Option<&'a Value> {
+    if !edition_applies(edition) {
+        return None;
+    }
+    let op = find_op(ops, method, path);
+    Some(op.unwrap_or_else(|| panic!("{edition} row {method} {path} is not published")))
+}
+
+/// `x-o2-mcp` absent, unparsable or without `enabled: false` leaves the MCP tool on.
+fn is_mcp_enabled(op: &Value) -> bool {
+    op["x-o2-mcp"]["enabled"] != false
 }
 
 fn is_nullable(schema: &Value) -> bool {
@@ -928,19 +1138,21 @@ fn has_declared_tag(op: &Value, declared: &BTreeSet<&str>) -> bool {
     })
 }
 
-fn template_params(path: &str) -> BTreeSet<String> {
-    path.split('/')
+fn template_params(path: &str) -> Vec<String> {
+    let names = path
+        .split('/')
         .filter_map(|s| s.strip_prefix('{')?.strip_suffix('}'))
-        .map(|s| s.trim_start_matches('*').to_string())
-        .collect()
+        .map(|s| s.trim_start_matches('*').to_string());
+    sorted_names(names)
 }
 
-fn declared_path_params(op: &Value) -> BTreeSet<String> {
+/// Sorted and not deduplicated, so a path parameter declared twice breaks the rule.
+fn declared_path_params(op: &Value) -> Vec<String> {
     let params = op["parameters"].as_array().into_iter().flatten();
-    params
+    let names = params
         .filter(|param| param["in"] == "path")
-        .filter_map(|param| param["name"].as_str().map(str::to_string))
-        .collect()
+        .filter_map(|param| param["name"].as_str().map(str::to_string));
+    sorted_names(names)
 }
 
 /// Rules a published op breaks, ignoring the rate-limit rule for exempt routes.
@@ -1107,12 +1319,19 @@ fn published_operations_keep_their_contract() {
             .push(route);
     }
     let exempt = reasoned_entries(RATELIMIT_EXEMPT);
+    let forbidden: BTreeSet<String> = ALWAYS_FORBIDDEN
+        .iter()
+        .filter(|(edition, ..)| edition_applies(edition))
+        .map(|(_, method, path)| format!("{method} {path}"))
+        .collect();
     let mut found = BTreeSet::new();
     for published in published_ops(&spec) {
         let route = format!("{} {}", published.method, published.path);
         let is_exempt = exempt.contains(route.as_str());
         for rule in broken_rules(&published, &declared, &routes, is_exempt) {
-            found.insert(format!("{rule} {route}"));
+            if !(rule == "response" && forbidden.contains(&route)) {
+                found.insert(format!("{rule} {route}"));
+            }
         }
     }
     let (_, baseline) = split_baseline();
@@ -1152,9 +1371,8 @@ fn success_responses_match_their_handlers() {
     let spec = published_spec();
     let ops = published_ops(&spec);
     let mut checked = 0;
-    for (method, path, status, content_type, shape) in SUCCESS_CONTRACTS {
-        // Enterprise and cloud rows only exist in those builds.
-        let Some(op) = find_op(&ops, method, path) else {
+    for (edition, method, path, status, content_type, shape) in SUCCESS_CONTRACTS {
+        let Some(op) = row_op(&ops, edition, method, path) else {
             continue;
         };
         checked += 1;
@@ -1184,9 +1402,10 @@ fn success_responses_match_their_handlers() {
             media["schema"]
         );
     }
+    let floor = build_floor(16, 30, 41);
     assert!(
-        checked >= 9,
-        "only {checked} contract rows matched the spec"
+        checked >= floor,
+        "only {checked} of {floor} contract rows checked"
     );
 }
 
@@ -1194,10 +1413,12 @@ fn success_responses_match_their_handlers() {
 fn multipart_uploads_name_their_parts() {
     let spec = published_spec();
     let ops = published_ops(&spec);
-    for (path, part) in MULTIPART_UPLOADS {
-        let Some(op) = find_op(&ops, "POST", path) else {
+    let mut checked = 0;
+    for (edition, path, part) in MULTIPART_UPLOADS {
+        let Some(op) = row_op(&ops, edition, "POST", path) else {
             continue;
         };
+        checked += 1;
         let schema = &op["requestBody"]["content"]["multipart/form-data"]["schema"];
         assert_eq!(schema["properties"][*part]["format"], "binary", "{path}");
         assert!(
@@ -1207,16 +1428,22 @@ fn multipart_uploads_name_their_parts() {
             "{path}: {part} must be required"
         );
     }
+    assert!(
+        checked >= build_floor(2, 3, 3),
+        "only {checked} uploads checked"
+    );
 }
 
 #[test]
 fn required_query_params_are_declared_required() {
     let spec = published_spec();
     let ops = published_ops(&spec);
-    for (method, path, name) in REQUIRED_QUERY_PARAMS {
-        let Some(op) = find_op(&ops, method, path) else {
+    let mut checked = 0;
+    for (edition, method, path, name) in REQUIRED_QUERY_PARAMS {
+        let Some(op) = row_op(&ops, edition, method, path) else {
             continue;
         };
+        checked += 1;
         let declared = op["parameters"].as_array().is_some_and(|params| {
             params.iter().any(|param| {
                 param["name"] == *name && param["in"] == "query" && param["required"] == true
@@ -1224,6 +1451,10 @@ fn required_query_params_are_declared_required() {
         });
         assert!(declared, "{method} {path}: {name} must be a required param");
     }
+    assert!(
+        checked >= build_floor(1, 2, 6),
+        "only {checked} params checked"
+    );
 }
 
 #[test]
@@ -1292,19 +1523,51 @@ async fn range_query_post_declares_what_the_handler_sends() {
 fn bodyless_handlers_document_no_body() {
     let spec = published_spec();
     let ops = published_ops(&spec);
-    for (method, path) in BODYLESS_ROUTES {
-        if let Some(op) = find_op(&ops, method, path) {
+    let mut checked = 0;
+    for (edition, method, path) in BODYLESS_ROUTES {
+        if let Some(op) = row_op(&ops, edition, method, path) {
             assert!(op.get("requestBody").is_none(), "{method} {path}");
+            checked += 1;
         }
     }
+    assert!(
+        checked >= build_floor(6, 6, 10),
+        "only {checked} routes checked"
+    );
+}
+
+#[test]
+fn unsupported_stubs_document_their_403() {
+    let spec = published_spec();
+    let ops = published_ops(&spec);
+    let mut checked = 0;
+    for (edition, method, path) in ALWAYS_FORBIDDEN {
+        let Some(op) = row_op(&ops, edition, method, path) else {
+            continue;
+        };
+        checked += 1;
+        let responses = op["responses"].as_object().unwrap();
+        assert!(responses.contains_key("403"), "{method} {path}: no 403");
+        assert!(
+            !responses.keys().any(|status| status.starts_with('2')),
+            "{method} {path}: the stub never succeeds"
+        );
+    }
+    assert!(
+        checked >= build_floor(2, 2, 0),
+        "only {checked} stubs checked"
+    );
 }
 
 #[test]
 fn optional_bodies_can_be_left_out_but_not_null() {
     let spec = published_spec();
     let ops = published_ops(&spec);
-    for (method, path, schema) in OPTIONAL_BODIES {
-        let body = &find_op(&ops, method, path).unwrap()["requestBody"];
+    for (edition, method, path, schema) in OPTIONAL_BODIES {
+        let Some(op) = row_op(&ops, edition, method, path) else {
+            continue;
+        };
+        let body = &op["requestBody"];
         assert_ne!(body["required"], true, "{method} {path}");
         assert_eq!(
             body["content"][JSON]["schema"]["$ref"],
@@ -1319,9 +1582,8 @@ fn bodies_name_the_fields_their_handlers_use() {
     let spec = published_spec();
     let ops = published_ops(&spec);
     let mut checked = 0;
-    for (method, path, side, fields, required) in BODY_FIELDS {
-        // Enterprise and cloud rows only exist in those builds.
-        let Some(op) = find_op(&ops, method, path) else {
+    for (edition, method, path, side, fields, required) in BODY_FIELDS {
+        let Some(op) = row_op(&ops, edition, method, path) else {
             continue;
         };
         checked += 1;
@@ -1338,18 +1600,20 @@ fn bodies_name_the_fields_their_handlers_use() {
         let needed = sorted_names(needed.map(|name| name.as_str().unwrap().to_string()));
         assert_eq!(needed, *required, "{method} {path} {side}: {schema}");
     }
-    assert!(checked >= 5, "only {checked} body rows matched the spec");
+    let floor = build_floor(9, 12, 14);
+    assert!(
+        checked >= floor,
+        "only {checked} of {floor} body rows checked"
+    );
 }
 
+#[cfg(feature = "cloud")]
 #[test]
 fn usage_details_are_null_without_stripe_billing() {
     let spec = published_spec();
     let ops = published_ops(&spec);
-    // Cloud only.
     let path = "/api/{org_id}/billings/data_usage/{usage_date}";
-    let Some(op) = find_op(&ops, "GET", path) else {
-        return;
-    };
+    let op = find_op(&ops, "GET", path).unwrap();
     let schema = &op["responses"]["200"]["content"][JSON]["schema"];
     assert!(
         is_nullable(&schema["properties"]["price_details"]),
@@ -1372,13 +1636,12 @@ fn location_create_takes_one_or_a_batch() {
     assert!(has("region") && has("locations"), "{body}");
 }
 
+#[cfg(feature = "enterprise")]
 #[test]
 fn eval_job_scorers_can_be_a_bare_id() {
     let spec = published_spec();
     let ops = published_ops(&spec);
-    let Some(op) = find_op(&ops, "GET", "/api/{org_id}/eval_jobs/{job_id}") else {
-        return;
-    };
+    let op = find_op(&ops, "GET", "/api/{org_id}/eval_jobs/{job_id}").unwrap();
     let job = resolved(&spec, &op["responses"]["200"]["content"][JSON]["schema"]);
     let scorer = resolved(&spec, &job["properties"]["scorers"]["items"]);
     let forms = scorer["oneOf"].as_array().expect("two scorer forms");
@@ -1440,14 +1703,12 @@ fn eval_job_and_provider_nulls_fit_their_schemas() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 #[test]
 fn cancel_queries_takes_and_returns_a_list() {
     let spec = published_spec();
     let ops = published_ops(&spec);
-    // Enterprise only.
-    let Some(op) = find_op(&ops, "PUT", "/api/{org_id}/query_manager/cancel") else {
-        return;
-    };
+    let op = find_op(&ops, "PUT", "/api/{org_id}/query_manager/cancel").unwrap();
     let body = &op["requestBody"]["content"][JSON]["schema"];
     assert_eq!(body["type"], "array", "{body}");
     assert!(
@@ -1455,4 +1716,32 @@ fn cancel_queries_takes_and_returns_a_list() {
         "{body}"
     );
     assert!(body["items"]["properties"]["org_id"].is_object(), "{body}");
+}
+
+#[cfg(feature = "enterprise")]
+#[test]
+fn oncall_policy_priorities_are_integers() {
+    let spec = published_spec();
+    let ops = published_ops(&spec);
+    let path = "/api/{org_id}/oncall/teams/{team_id}/policy";
+    let op = find_op(&ops, "PUT", path).unwrap();
+    let body = resolved(&spec, &op["requestBody"]["content"][JSON]["schema"]);
+    let rung = resolved(&spec, &body["properties"]["rungs"]["items"]);
+    assert_eq!(rung["properties"]["priority"]["type"], "integer", "{rung}");
+}
+
+#[test]
+fn enabled_mcp_tools_match_the_snapshot() {
+    let spec = published_spec();
+    let enabled: BTreeSet<String> = published_ops(&spec)
+        .iter()
+        .filter(|published| is_mcp_enabled(&published.op))
+        .map(|published| published.op["operationId"].as_str().unwrap().to_string())
+        .collect();
+    assert!(enabled.len() >= 300, "only {} MCP tools", enabled.len());
+    assert_no_difference(
+        &enabled,
+        &edition_entries(MCP_ENABLED),
+        "the enabled MCP tool set changed; edit mcp_enabled.txt only to enable or disable a tool on purpose",
+    );
 }

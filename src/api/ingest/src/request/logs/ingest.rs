@@ -323,7 +323,7 @@ pub async fn json(
                    the specific request/response structure expected by Kinesis Firehose, making it seamless to \
                    stream AWS CloudWatch logs and other AWS services directly into OpenObserve.",
     security(
-        ("Authorization"= [])
+        ("FirehoseAccessKey"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -396,7 +396,7 @@ pub async fn handle_kinesis_request(
     tag = "Logs",
     operation_id = "GCPSubscription",
     summary = "Ingest logs from a GCP Pub/Sub push subscription",
-    security(("Authorization" = [])),
+    security(("GcpApiKey" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
@@ -463,6 +463,9 @@ pub async fn handle_gcp_request(
     context_path = "/api",
     tag = "Logs",
     operation_id = "PostLogs",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Ingest logs via OTLP",
     description = "Ingests log data using OpenTelemetry Protocol (OTLP) format. Supports both Protocol Buffers and JSON \
                    content types for OTLP log ingestion. This is the standard endpoint for OpenTelemetry SDK and \

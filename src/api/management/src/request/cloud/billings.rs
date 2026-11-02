@@ -160,7 +160,7 @@ pub async fn create_checkout_session(
         ("plan" = String, Query, description = "Subscribed plan"),
     ),
     responses(
-        (status = 302, description = "Redirects to the billing plans page; a very long URL is sent as an HTML refresh page", content_type = "text/html", body = String),
+        (status = 302, description = "Redirects to the billing plans page with an empty body; a target URL of 1024 bytes or more is instead sent as a text/html refresh page", headers(("Location" = String, description = "Billing plans page, absent on the HTML fallback"))),
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),

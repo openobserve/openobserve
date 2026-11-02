@@ -33,7 +33,6 @@ POST /api/{org_id}/billings/new_user_attribution | browser-only marketing beacon
 DELETE /api/{org_id}/mcp | MCP agent protocol session teardown
 GET /api/{org_id}/mcp | MCP agent protocol stream, POST is the published entry point
 POST /api/{org_id}/otel/v1/traces | second mount of the published POST /api/{org_id}/v1/traces
-POST /api/{org_id}/service_streams/_correlate | published at a wrong path, baselined until the paired RBAC gap moves
 POST /api/{org_id}/synthetics/agent/heartbeat | synthetics agent protocol
 POST /api/{org_id}/synthetics/agent/register | synthetics agent protocol
 POST /api/{org_id}/synthetics/jobs/artifact-urls | synthetics runner protocol

@@ -47,6 +47,9 @@ pub struct LinkSubscriptionResponse {
     context_path = "/api",
     tag = "Azure Marketplace",
     operation_id = "LinkAzureMarketplaceSubscription",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Link Azure Marketplace subscription to organization",
     description = "Processes the token provided by azure and links the subscription to organization",
     security(

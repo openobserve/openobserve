@@ -112,6 +112,9 @@ pub async fn json(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PostMetrics",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Ingest metrics via OTLP",
     description = "Ingests metrics data using OpenTelemetry Protocol (OTLP) format. Supports both Protocol Buffers and JSON \
                    content types for OTLP metrics ingestion. This is the standard endpoint for OpenTelemetry SDK and \

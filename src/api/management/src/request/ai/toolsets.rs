@@ -41,6 +41,9 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     context_path = "/api",
     tag = "AI",
     operation_id = "CreateAiToolset",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Create an AI toolset",
     description = "Creates a new AI toolset (MCP server, CLI tool, skill, or generic config). \
                    The `data` field is encrypted at rest using per-org envelope encryption. \

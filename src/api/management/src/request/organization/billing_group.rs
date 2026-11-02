@@ -69,6 +69,9 @@ async fn get_org_name(org_id: &str) -> String {
     path = "/{org_id}/billing_group/invites",
     context_path = "/api",
     operation_id = "ListBillingGroupInvites",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "List invites for and from the org for billing groups",
     description = "List invites for and from the org for billing groups",
     security(("Authorization" = [])),

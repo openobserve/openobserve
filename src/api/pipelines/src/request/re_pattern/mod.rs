@@ -121,6 +121,9 @@ pub struct BuiltInPatternsQuery {
     path = "/{org_id}/re_patterns",
     context_path = "/api",
     operation_id = "SaveRegexPattern",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Create a new regex pattern",
     description = "Stores a new regular expression pattern for log processing and data extraction",
     request_body(
@@ -195,6 +198,7 @@ pub async fn save(
     summary = "Get regex pattern by ID",
     description = "Retrieves a specific regex pattern using its unique identifier",
     params(
+        ("org_id" = String, Path, description = "Organization name"),
         ("pattern_id" = String, Path, description = "id of the pattern to retrieve", example = "12345")
     ),
     security(("Authorization" = [])),
@@ -255,6 +259,9 @@ pub async fn get(Path((org_id, id)): Path<(String, String)>) -> Response {
     path = "/{org_id}/re_patterns",
     context_path = "/api",
     operation_id = "ListRegexPatterns",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "List all regex patterns for organization",
     description = "Lists all regex patterns available within the specified organization",
     security(("Authorization" = [])),
@@ -301,6 +308,7 @@ pub async fn list(Path(org_id): Path<String>) -> Response {
     summary = "Delete regex pattern by ID",
     description = "Removes a regex pattern from the system using its identifier",
     params(
+        ("org_id" = String, Path, description = "Organization name"),
         ("pattern_id" = String, Path, description = "id of the pattern to delete", example = "12345")
     ),
     security(("Authorization" = [])),
@@ -505,6 +513,7 @@ pub async fn delete_bulk(
     summary = "Update regex pattern by ID",
     description = "Modifies an existing regex pattern's configuration and rules",
     params(
+        ("org_id" = String, Path, description = "Organization name"),
         ("pattern_id" = String, Path, description = "id of the pattern to update", example = "12345")
     ),
     request_body(
@@ -647,6 +656,7 @@ pub async fn test(Json(req): Json<PatternTestRequest>) -> Response {
     summary = "Get built-in regex patterns from GitHub",
     description = "Fetches curated regex patterns from the pyWhat project on GitHub. Supports search and tag filtering. Uses frontend caching only.",
     params(
+        ("org_id" = String, Path, description = "Organization name"),
         ("search" = Option<String>, Query, description = "Search query to filter patterns by name, description, or tags"),
         ("tags" = Option<Vec<String>>, Query, description = "Filter patterns by specific tags")
     ),

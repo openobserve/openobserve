@@ -181,6 +181,7 @@ pub async fn delete(
     params(
         ("org_id" = String, Path, description = "Organization name"),
       ),
+    request_body(content = inline(StacktraceRequest), description = "Minified stacktrace and the sourcemap group to translate it with", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),

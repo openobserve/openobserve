@@ -151,6 +151,9 @@ pub async fn save(
     path = "/{org_id}/storage",
     context_path = "/api",
     operation_id = "GetStorageInformation",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Get storage details",
     description = "retrieves storage details if configured in redacted manor",
     security(("Authorization" = [])),
