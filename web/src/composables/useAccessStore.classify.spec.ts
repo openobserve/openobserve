@@ -518,6 +518,22 @@ describe("access store classification", () => {
     ],
     [
       "POST",
+      `/api/v2/acme/alerts/incidents/${ID}/acknowledge`,
+      "incidents",
+      "get",
+      "Get",
+      "Incidents",
+    ],
+    [
+      "POST",
+      `/api/v2/acme/alerts/incidents/${ID}/unacknowledge`,
+      "incidents",
+      "get",
+      "Get",
+      "Incidents",
+    ],
+    [
+      "POST",
       "/api/acme/fleet/configs",
       "fleet_configs",
       "create",
@@ -562,6 +578,15 @@ describe("access store classification", () => {
       "Create",
       "On-Call responses",
     ],
+    [
+      "POST",
+      `/api/acme/oncall/responses/${ID}/unacknowledge`,
+      "oncall_responses",
+      "create",
+      "Create",
+      "On-Call responses",
+    ],
+    ["POST", `/api/acme/oncall/teams/${ID}/slack/test`, "oncall", "update", "Update", "On-Call"],
     ["GET", "/api/acme/synthetics", "synthetic_folder", "list", "List", "Synthetic folders"],
     [
       "GET",

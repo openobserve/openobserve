@@ -384,6 +384,11 @@ const ROUTE_OVERRIDES: RouteOverride[] = [
     resource: "incidents",
     permissions: { DELETE: "update" },
   },
+  {
+    path: /^\/v2\/[^/]+\/alerts\/incidents\/[^/]+\/(acknowledge|unacknowledge)$/,
+    resource: "incidents",
+    permissions: { POST: "get" },
+  },
   { path: /^\/[^/]+\/users\/roles$/, resource: "users", permissions: { GET: "list" } },
   { path: /^\/[^/]+\/users\/roles\/all$/, resource: "users", permissions: { GET: "get" } },
   { path: /^\/[^/]+\/roles\/[^/]+\/users$/, resource: "roles", permissions: { GET: "list" } },
@@ -512,6 +517,11 @@ const ROUTE_OVERRIDES: RouteOverride[] = [
     path: /^\/[^/]+\/oncall\/teams\/[^/]+\/(members|overrides)$/,
     resource: "oncall",
     permissions: { GET: "list", POST: "create", DELETE: "delete" },
+  },
+  {
+    path: /^\/[^/]+\/oncall\/teams\/[^/]+\/slack\/test$/,
+    resource: "oncall",
+    permissions: { POST: "update" },
   },
   {
     path: /^\/[^/]+\/oncall\/(teams\/[^/]+\/resolved-schedule|routing)\/preview$/,
