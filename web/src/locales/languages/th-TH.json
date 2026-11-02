@@ -13100,6 +13100,9 @@
     "alertTypeAnomaly": "Anomaly",
     "enterprise": "Enterprise",
     "enterpriseHint": "Anomaly detection alerts need OpenObserve Enterprise.",
+    "card": {
+      "customizeTooltip": "เปิดตัวแก้ไขการแจ้งเตือนที่กรอกข้อมูลไว้ล่วงหน้า"
+    },
     "drawer": {
       "dataAvailable": "Data available",
       "streamNotFound": "Stream not found",
